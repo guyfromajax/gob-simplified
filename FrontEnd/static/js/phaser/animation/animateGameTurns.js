@@ -2,7 +2,7 @@ import { playTurnAnimation } from "./turnAnimation.js";
 // ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
 // import { runSideInboundSetup } from "./turnAnimation.js"; // ✅ Now handled by AnimationEngine.handleSideInbound()
 import { onAction } from "./onAction.js";
-import { AnimationRouter } from "./AnimationRouter.js?v=clock-observe-telemetry-2";
+import { AnimationRouter } from "./AnimationRouter.js?v=uess-transition-probes-2";
 import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 // ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
@@ -483,50 +483,26 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       });
       
       
-      // If DREB, set up next play (outlet pass for HCO only)
-      // For FAST_BREAK, the outlet pass is handled in the fast break sequence itself
-      // ✅ Force Foul after DREB: skip outlet — foul turn will animate defender→rebounder and "Quick Foul"
+      // Legacy `runDefensiveReboundSetup` call removed (audit bug 1/5):
+      // it ran the outlet pass INSIDE the OREB Putback turn, then the
+      // subsequent HCO turn's entry orchestrator ran handoff + walk-up —
+      // producing two outlet/handoff beats. The HCO entry orchestrator is
+      // now the single source for the rebounder → step0_bh transition.
+      //
+      // BallController.onPutbackEnd() is still called so state is cleared
+      // cleanly for the next turn.
+      //
+      // Tradeoff: until `_build_dreb_turn_from_miss` is extended to fire
+      // on OREB Putback MISS (remediation item 12), there is no discrete
+      // DREB schema turn between Putback bounce and the next HCO turn —
+      // the rebound capture visual is currently missing. Acceptable until
+      // OREB DREB migrates.
       if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK" && !turnData.force_foul_after_dreb) {
-        // For putback misses leading to DREB, find the original MISS turn that has offense_getback
-        // This might be a previous turn (the original shot attempt) or the putback turn itself
-        let missTurn = null;
-        const currentIndex = scene.currentTurn || 0;
-        // Check if previous turn is a MISS (original shot attempt)
-        const previousTurn = scene.simData?.turns?.[currentIndex - 1];
-        if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "BLOCK") {
-          missTurn = previousTurn;
-        } else {
-          // Otherwise, check current turn (might be a MISS/BLOCK with putback)
-          missTurn = scene.simData?.turns?.[currentIndex];
-        }
-        
-        // ✅ DEBUG: Track DREB after putback miss
-        // Putback miss => DREB
-        
-        // ✅ PHASE 2.5: Use BallController lifecycle method for putback end
         const { getBallController } = await import('./BallControllerAdapter.js');
         const ballController = getBallController();
         if (ballController) {
           ballController.onPutbackEnd();
         }
-        
-        // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
-        // ✅ PHASE 4: Removed old _putbackInProgress flag - BallController manages state via lifecycle methods
-        // The putback shot animation is complete, BallController state already cleared by onPutbackEnd()
-        
-        const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
-        orebIdleWatchdog.setInterrupt("route_transition", true);
-        await runDefensiveReboundSetup({
-          scene,
-          ballSprite,
-          playerSprites,
-          rebounderId: turnData.rebounderId,
-          nextPlayType: turnData.next_play_type || "HCO",
-          turnData: missTurn, // get-back source
-          authorityTurnData: turnData, // strict outlet contract source
-        });
-        orebIdleWatchdog.setInterrupt("route_transition", false);
-        orebIdleWatchdog.markProgress();
       }
       // If another OREB, it will be handled by the next OREB turn
     }

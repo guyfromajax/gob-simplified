@@ -18,7 +18,6 @@ import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 import HCOAnimationSystem from './HCOAnimationSystem.js';
 import { enforceUnitCompletionContract } from './unitCompletionContract.js';
-import { playStealSfx } from '../utils/gameSfx.js';
 import gameStore from '../../state/gameStore.js';
 import { ensureConsistentHeartbeat, stopAllArrivalHeartbeats } from './arrivalHeartbeat.js';
 
@@ -290,12 +289,27 @@ export class AnimationEngine {
       return false;
     }
 
-    const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js");
+    const { playTurn, dispatchTurnStop } = await import("./animationPlayback.js?v=uess-timeline-probes-1");
     const sprites = context.playerSprites
       || this.playerSprites
       || this.scene?.playerSprites
       || {};
     const ballSprite = context.ballSprite || this.scene?.ballSprite;
+    if (this.scene) {
+      this.scene.__uessTracePlayback = true;
+    }
+    console.warn("[UESS PLAYBACK] schema:enter", {
+      turnIndex: turnData?.index ?? this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      currentTurn: turnData?.current_turn ?? null,
+      nextPlayType: turnData?.next_play_type ?? null,
+      steps: steps.length,
+      spriteCount: Object.keys(sprites || {}).length,
+      hasBallSprite: Boolean(ballSprite),
+      ballVisible: ballSprite?.visible ?? null,
+      isPaused: this.scene?.isPaused ?? null,
+      skipToEnd: this.scene?.skipToEnd ?? null,
+    });
 
     if (
       turnData?.roles?.is_steal_hco_setup
@@ -319,16 +333,25 @@ export class AnimationEngine {
         turnData,
       });
     }
+    console.warn("[UESS PLAYBACK] schema:exit", {
+      turnIndex: turnData?.index ?? this.scene?.currentTurn ?? null,
+      resultType: turnData?.result_type ?? null,
+      currentTurn: turnData?.current_turn ?? null,
+      turnStop: turnStop ?? null,
+      ballVisible: ballSprite?.visible ?? null,
+      isPaused: this.scene?.isPaused ?? null,
+      skipToEnd: this.scene?.skipToEnd ?? null,
+    });
 
-    const resultTypeNorm = String(turnData?.result_type || "").toUpperCase();
-    if (resultTypeNorm === "DREB" || currentTurnNorm === "DREB") {
-      await this._maybeRunDiscreteDrebOutletLeadIn(
-        turnData,
-        context,
-        sprites,
-        ballSprite,
-      );
-    }
+    // NOTE: legacy `_maybeRunDiscreteDrebOutletLeadIn` removed — it called
+    // `runDefensiveReboundSetup` (legacy outlet pass / handoff / walk-up)
+    // AFTER the schema DREB turn. With the schema DREB turn now handling
+    // rebound capture and the HCO entry orchestrator handling the
+    // BH → PG handoff + walk-up directly, this lead-in caused double
+    // execution (legacy outlet pass then schema handoff teleporting players
+    // back). The helper method is retained below so the function symbol
+    // remains importable in case any test/legacy caller still references
+    // it, but the schema playback path no longer invokes it.
 
     return true;
   }
@@ -1725,7 +1748,8 @@ export class AnimationEngine {
           attachBallToPlayer(this.scene, context.ballSprite, stealerSprite, {
             reason: 'steal_handler_post_skeleton'
           });
-          playStealSfx(this.scene);
+          // Steal SFX now tied to the "STEAL!" announce appearance, not the
+          // ball-attach moment (Sound_Design_Update.md §Steal Announce).
           // Make STEAL end ownership authoritative so stale pass pending owner
           // cannot reclaim the victim at turn boundary.
           setCurrentOwner(this.scene, String(stealerRaw));

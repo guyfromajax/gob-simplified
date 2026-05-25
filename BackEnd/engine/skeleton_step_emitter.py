@@ -48,6 +48,7 @@ from BackEnd.utils.animation_step_helpers import (
     shot_followup_timed_sfx,
     shot_launch_sfx,
     shot_result_sfx,
+    stamp_hot_shot_trail_metadata,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -95,17 +96,16 @@ def _archetype_for_action(action: PlayerAction, turn_type: str = "HCO") -> Playe
     Per-turn-type rules:
       - ``shoot`` → ``shot_motion`` (both HCO + FCP)
       - ``stationary`` / ``post_up`` → ``stationary``
-      - HCO default → ``standard``
-      - FCP default → ``sprint`` (press-break urgency — all FCP movement
-        runs at sprint pace per FCP_HCT_System.md / UESS FCP wiring)
+      - HCO default → ``cruise``
+      - FCP default → ``standard`` (base movement pace for press-break skeleton)
     """
     if action == "shoot":
         return "shot_motion"
     if action in ("stationary", "post_up"):
         return "stationary"
     if turn_type == "FCP":
-        return "sprint"
-    return "standard"
+        return "standard"
+    return "cruise"
 
 
 # --- Helpers ---------------------------------------------------------------
@@ -160,6 +160,118 @@ def _coords_at_movement_index(
             continue
         out[str(pid)] = {"x": float(x), "y": float(y)}
     return out
+
+
+def _normalize_player_coord_map(
+    coords: Optional[Dict[str, Any]],
+) -> Dict[str, GridCoord]:
+    """Normalize ``{player_id: {x,y}}`` keys to strings for cross-turn lookups."""
+    if not isinstance(coords, dict):
+        return {}
+    out: Dict[str, GridCoord] = {}
+    for pid, coord in coords.items():
+        if not isinstance(coord, dict):
+            continue
+        x, y = coord.get("x"), coord.get("y")
+        if x is None or y is None:
+            continue
+        out[str(pid)] = {"x": float(x), "y": float(y)}
+    return out
+
+
+def _resolve_prior_ball_handler_id(
+    prior_turn: Optional[Dict[str, Any]],
+    turn_result: Dict[str, Any],
+) -> Optional[str]:
+    """Resolve who held the ball at the prior turn's end for HCO entry."""
+    if not isinstance(prior_turn, dict):
+        return None
+    stamped = prior_turn.get("final_ball_handler_id")
+    if stamped:
+        return str(stamped)
+    from BackEnd.utils.animation_step_helpers import build_final_ball_handler_id
+
+    rebuilt = build_final_ball_handler_id(prior_turn)
+    if rebuilt:
+        return str(rebuilt)
+    hco_setup = turn_result.get("hco_setup") if isinstance(turn_result, dict) else None
+    inbound = (
+        hco_setup.get("inbound_pass")
+        if isinstance(hco_setup, dict)
+        else None
+    )
+    if isinstance(inbound, dict) and inbound.get("from_player_id"):
+        return str(inbound["from_player_id"])
+    return None
+
+
+def _apply_hco_setup_entry_ids(
+    current_bh_id: Optional[str],
+    step0_bh_id: Optional[str],
+    turn_result: Dict[str, Any],
+) -> tuple:
+    """Align entry BH / receiver when ``hco_setup.inbound_pass`` was propagated."""
+    hco_setup = turn_result.get("hco_setup") if isinstance(turn_result, dict) else None
+    inbound = (
+        hco_setup.get("inbound_pass")
+        if isinstance(hco_setup, dict)
+        else None
+    )
+    if not isinstance(inbound, dict):
+        return current_bh_id, step0_bh_id
+    from_id = inbound.get("from_player_id")
+    to_id = inbound.get("to_player_id")
+    if from_id and not current_bh_id:
+        current_bh_id = str(from_id)
+    if to_id:
+        step0_bh_id = str(to_id)
+    return current_bh_id, step0_bh_id
+
+
+def _wire_prepended_step_chain(steps: List[AnimationStep]) -> None:
+    """Linear next pointers: prepended chain → skeleton step 0."""
+    for i, step in enumerate(steps[:-1]):
+        step["end"]["next"] = {"kind": "next_step", "index": i + 1}
+    if steps:
+        steps[-1]["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+
+
+def _append_hco_minimum_entry_walkup(
+    *,
+    steps: List[AnimationStep],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    prior_final_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+    bh_id: str,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    elapsed_so_far: float,
+    metadata_reason: str = "hco_entry_walkup_minimum",
+) -> float:
+    """Last-resort entry beat: animate all 10 from prior end → setup targets."""
+    from BackEnd.utils.transition_bridge import build_walk_up_step
+
+    clock_r = clock_remaining_at_start - elapsed_so_far
+    shot_r = shot_clock_remaining_at_start - elapsed_so_far
+    walk_step = build_walk_up_step(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        start_coords=prior_final_coords,
+        end_coords=end_coords,
+        bh_id=str(bh_id),
+        clock_remaining_at_start=clock_r,
+        shot_clock_remaining_at_start=shot_r,
+        next_step_index=len(steps) + 1,
+        bh_archetype="cruise",
+        other_archetype="sprint",
+        gate_player_ids=[str(pid) for pid in prior_final_coords.keys()],
+        metadata_reason=metadata_reason,
+    )
+    if walk_step:
+        steps.append(walk_step)
+        return float(walk_step["end"]["time_elapsed"])
+    return 0.0
 
 
 # --- Ball-state walk -------------------------------------------------------
@@ -381,11 +493,24 @@ def _build_step_end_coords_with_interrupts(
 ) -> Dict[str, GridCoord]:
     """UESS §9.5 — gate player reaches full ``destination``; all others end at
     interrupted coord (``start + rate × step_t`` toward destination, clamped).
+
+    UESS §3.2 + §4 decision 10: end.coords MUST include every on-court player
+    in start_coords. Players whose ``destinations[pid]`` is None (stationary
+    by intent OR missing from the animator's partial movement output)
+    carry their start coord forward as their end coord. Without this carry,
+    ``_build_post_shot_sub_steps`` would early-bail when the shooter is
+    dropped (motion offense's synthetic shoot step often omits the shooter
+    from the animator's destinations map → shot_spot=None → no sub-steps
+    → no overlay motion + teleport on the next turn).
     """
     final: Dict[str, GridCoord] = {}
     for pid, sc in start_coords.items():
         dest = destinations.get(pid)
         if dest is None:
+            # Stationary OR missing destination — keep player at start so
+            # they appear in end.coords and downstream sub-steps + overlay
+            # logic can find them.
+            final[pid] = {"x": float(sc["x"]), "y": float(sc["y"])}
             continue
         if pid == gate_id:
             final[pid] = {"x": float(dest["x"]), "y": float(dest["y"])}
@@ -742,8 +867,10 @@ def build_skeleton_animation_steps(
     # orchestrator (their entry seam is the BIP setup positions path).
     is_hco_turn = (turn_type == "HCO") and isinstance(prior_turn, dict)
     if is_hco_turn:
-        current_bh_id = prior_turn.get("final_ball_handler_id")
-        prior_final_coords = prior_turn.get("final_coords") or {}
+        prior_final_coords = _normalize_player_coord_map(
+            prior_turn.get("final_coords") or {}
+        )
+        current_bh_id = _resolve_prior_ball_handler_id(prior_turn, turn_result)
 
         # Step 0 skeleton BH — the player the HCO playcall expects to handle
         # the ball at step 0. NOTE: ``roles.ball_handler`` resolves to the
@@ -756,19 +883,87 @@ def build_skeleton_animation_steps(
             pid = getattr(step0_bh_player, "player_id", None)
             step0_bh_id = str(pid) if pid is not None else None
 
+        current_bh_id, step0_bh_id = _apply_hco_setup_entry_ids(
+            current_bh_id, step0_bh_id, turn_result
+        )
+
         # HCO step 0 setup coords (where the playcall expects players to be
         # at step 0 start). Resolved from animations[0].movement[0].
         setup_coords = _coords_at_movement_index(animations, 0)
 
-        if not current_bh_id or not step0_bh_id or current_bh_id not in prior_final_coords:
+        has_entry_inputs = (
+            bool(current_bh_id)
+            and bool(step0_bh_id)
+            and str(current_bh_id) in prior_final_coords
+        )
+
+        if not has_entry_inputs:
+            # current_bh=None should never happen — every prior turn type
+            # should resolve a final ball handler (animation_steps[-1].end.ball,
+            # turn_result.ball_handler_id, or roles.ball_handler). When it
+            # does, the orchestrator can't fire Handoff/Kickout and the
+            # fallback Walk Up below is the only thing keeping HCO from
+            # cold-starting (= teleport). Log loudly so we catch the gap.
+            if not current_bh_id:
+                _last_step_ball = None
+                if isinstance(prior_turn, dict):
+                    _anim_steps = prior_turn.get("animation_steps") or []
+                    if _anim_steps and isinstance(_anim_steps[-1], dict):
+                        _last_step_ball = (_anim_steps[-1].get("end") or {}).get("ball")
+                _hco_entry_log.error(
+                    "❌❌❌ [HCO ENTRY BUG] current_bh_id is None — prior turn "
+                    "failed to stamp a final ball handler. step0_bh=%s "
+                    "prior_turn.result_type=%s prior_turn.current_turn=%s "
+                    "prior_turn.has_animation_steps=%s "
+                    "prior_turn.ball_handler_id=%s prior_turn.roles.ball_handler=%s "
+                    "prior_turn.rebounderId=%s prior_turn.rebound_type=%s "
+                    "prior_turn.ball_bounce_x=%s prior_turn.ball_bounce_y=%s "
+                    "prior_turn.next_play_type=%s "
+                    "prior_turn.last_step.end.ball=%s. "
+                    "Falling back to minimum walk-up; investigate the "
+                    "prior emitter's final_ball_handler_id resolution AND whether "
+                    "_build_dreb_turn_from_miss should have fired but didn't.",
+                    step0_bh_id,
+                    prior_turn.get("result_type") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("current_turn") if isinstance(prior_turn, dict) else None,
+                    bool(prior_turn.get("animation_steps")) if isinstance(prior_turn, dict) else False,
+                    prior_turn.get("ball_handler_id") if isinstance(prior_turn, dict) else None,
+                    (prior_turn.get("roles") or {}).get("ball_handler") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("rebounderId") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("rebound_type") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("ball_bounce_x") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("ball_bounce_y") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("next_play_type") if isinstance(prior_turn, dict) else None,
+                    _last_step_ball,
+                )
             _hco_entry_log.warning(
                 "🏠 [ENTRY] SKIP missing inputs: current_bh=%s step0_bh=%s "
                 "current_bh_in_final_coords=%s",
                 current_bh_id, step0_bh_id,
                 current_bh_id in prior_final_coords if current_bh_id else False,
             )
+            end_targets = setup_coords or {}
+            walk_bh = step0_bh_id or current_bh_id
+            if end_targets and prior_final_coords and walk_bh:
+                elapsed_delta = _append_hco_minimum_entry_walkup(
+                    steps=steps,
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    prior_final_coords=prior_final_coords,
+                    end_coords=end_targets,
+                    bh_id=str(walk_bh),
+                    clock_remaining_at_start=clock_remaining_at_turn_start,
+                    shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
+                    elapsed_so_far=elapsed_so_far,
+                    metadata_reason="hco_entry_walkup_fallback",
+                )
+                if elapsed_delta:
+                    elapsed_so_far += elapsed_delta
+                    _hco_entry_log.warning(
+                        "🏠 [ENTRY WALKUP FALLBACK FIRED] bh=%s", walk_bh,
+                    )
         else:
-            bh_start_coord = prior_final_coords[current_bh_id]
+            bh_start_coord = prior_final_coords[str(current_bh_id)]
             bh_x = float(bh_start_coord.get("x", 50.0))
             in_back_court = (bh_x < 71.0) if not away_offense else (bh_x > 29.0)
             bh_neq_step0 = (str(current_bh_id) != str(step0_bh_id))
@@ -782,64 +977,75 @@ def build_skeleton_animation_steps(
 
             clock_r = clock_remaining_at_turn_start - elapsed_so_far
             shot_r = shot_clock_remaining_at_turn_start - elapsed_so_far
+            kickout_appended = False
 
-            # --- Handoff or Kickout (mutually exclusive) ---
-            if bh_neq_step0:
-                if in_back_court:
-                    from BackEnd.utils.transition_bridge import build_handoff_step
-                    off_strategy = getattr(off_team, "strategy_settings", {}) or {}
-                    tempo_value = off_strategy.get("tempo_override") or off_strategy.get("tempo")
-                    handoff_steps = build_handoff_step(
+            # --- Handoff (BH ≠ PG: converge + pass) / Handoff hold (BH == PG:
+            # hold beat per tempo) / Kickout. Handoff fires in back court for
+            # both BH≠PG and BH==PG cases — `build_handoff_step` internally
+            # branches on bh_id == receiver_id to emit the hold variant
+            # (Step_By_Step §Handoff Step). Kickout fires only when BH ≠ PG
+            # AND in front court. ---
+            if in_back_court:
+                from BackEnd.utils.transition_bridge import build_handoff_step
+                handoff_steps = build_handoff_step(
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    start_coords=prior_final_coords,
+                    bh_id=str(current_bh_id),
+                    receiver_id=str(step0_bh_id),
+                    is_away_offense=away_offense,
+                    clock_remaining_at_start=clock_r,
+                    shot_clock_remaining_at_start=shot_r,
+                    next_step_index=len(steps),
+                    metadata_reason="hco_entry_handoff",
+                    # Drift non-key players toward their actual HCO step 0
+                    # positions so the Handoff → Walk Up seam is continuous
+                    # (no random lane drift → setup_coords teleport).
+                    setup_coords=setup_coords,
+                )
+                if handoff_steps:
+                    steps.extend(handoff_steps)
+                    tail_clock = handoff_steps[-1]["end"]["clock"]
+                    elapsed_so_far += sum(s["end"]["time_elapsed"] for s in handoff_steps)
+                    clock_r = tail_clock["clock_remaining"]
+                    shot_r = tail_clock["shot_clock_remaining"]
+                    _hco_entry_log.warning(
+                        "🏠 [ENTRY HANDOFF FIRED] steps=%d bh_eq_step0=%s",
+                        len(handoff_steps), not bh_neq_step0,
+                    )
+            elif bh_neq_step0:
+                from BackEnd.utils.transition_bridge import build_kickout_step
+                if setup_coords:
+                    kickout_steps = build_kickout_step(
                         off_lineup=off_lineup,
                         def_lineup=def_lineup,
                         start_coords=prior_final_coords,
                         bh_id=str(current_bh_id),
                         receiver_id=str(step0_bh_id),
+                        setup_coords=setup_coords,
                         is_away_offense=away_offense,
-                        tempo=tempo_value,
                         clock_remaining_at_start=clock_r,
                         shot_clock_remaining_at_start=shot_r,
                         next_step_index=len(steps),
-                        metadata_reason="hco_entry_handoff",
+                        metadata_reason="hco_entry_kickout",
                     )
-                    if handoff_steps:
-                        steps.extend(handoff_steps)
-                        tail_clock = handoff_steps[-1]["end"]["clock"]
-                        elapsed_so_far += sum(s["end"]["time_elapsed"] for s in handoff_steps)
+                    if kickout_steps:
+                        kickout_appended = True
+                        steps.extend(kickout_steps)
+                        tail_clock = kickout_steps[-1]["end"]["clock"]
+                        elapsed_so_far += sum(s["end"]["time_elapsed"] for s in kickout_steps)
                         clock_r = tail_clock["clock_remaining"]
                         shot_r = tail_clock["shot_clock_remaining"]
                         _hco_entry_log.warning(
-                            "🏠 [ENTRY HANDOFF FIRED] steps=%d", len(handoff_steps),
+                            "🏠 [ENTRY KICKOUT FIRED] steps=%d", len(kickout_steps),
                         )
-                else:
-                    from BackEnd.utils.transition_bridge import build_kickout_step
-                    if setup_coords:
-                        kickout_steps = build_kickout_step(
-                            off_lineup=off_lineup,
-                            def_lineup=def_lineup,
-                            start_coords=prior_final_coords,
-                            bh_id=str(current_bh_id),
-                            receiver_id=str(step0_bh_id),
-                            setup_coords=setup_coords,
-                            is_away_offense=away_offense,
-                            clock_remaining_at_start=clock_r,
-                            shot_clock_remaining_at_start=shot_r,
-                            next_step_index=len(steps),
-                            metadata_reason="hco_entry_kickout",
-                        )
-                        if kickout_steps:
-                            steps.extend(kickout_steps)
-                            tail_clock = kickout_steps[-1]["end"]["clock"]
-                            elapsed_so_far += sum(s["end"]["time_elapsed"] for s in kickout_steps)
-                            clock_r = tail_clock["clock_remaining"]
-                            shot_r = tail_clock["shot_clock_remaining"]
-                            _hco_entry_log.warning(
-                                "🏠 [ENTRY KICKOUT FIRED] steps=%d", len(kickout_steps),
-                            )
 
             # --- Walk Up (fires after Handoff, OR alone if BH = step0_bh in
-            # back court). Mutually exclusive with Kickout by x-coord rule. ---
-            if in_back_court and setup_coords:
+            # back court, OR as fallback when neither Handoff nor Kickout
+            # fired — e.g. FB Defensive Stop → HCO where BH = step 0 BH
+            # AND BH is in frontcourt). Skip only when Kickout actually
+            # appended steps (not merely when the kickout branch was evaluated).
+            if setup_coords and not kickout_appended:
                 from BackEnd.utils.transition_bridge import build_walk_up_step
                 # After Handoff, the receiver (step0_bh) has the ball.
                 # Without Handoff, current_bh is still the carrier.
@@ -857,8 +1063,8 @@ def build_skeleton_animation_steps(
                     clock_remaining_at_start=clock_r,
                     shot_clock_remaining_at_start=shot_r,
                     next_step_index=len(steps) + 1,
-                    bh_archetype="cruise",
-                    other_archetype="sprint",
+                    bh_archetype="standard",
+                    other_archetype="standard",
                     gate_player_ids=[walk_bh_id],
                     metadata_reason="hco_entry_walkup",
                 )
@@ -868,13 +1074,34 @@ def build_skeleton_animation_steps(
                     "🏠 [ENTRY WALKUP FIRED] bh=%s", walk_bh_id,
                 )
 
-            # Fix up next-pointers across all prepended steps: linear chain
-            # where step[i].next.index = i + 1; final prepended step points
-            # to skeleton step 0 (= len(steps) in the final array).
-            for i, s in enumerate(steps[:-1]):
-                s["end"]["next"] = {"kind": "next_step", "index": i + 1}
-            if steps:
-                steps[-1]["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+        # Never cold-start HCO: if the decision tree prepended nothing, force
+        # a minimum walk-up from prior end → setup targets (all 10 gated).
+        if not steps and prior_final_coords:
+            end_targets = setup_coords or _coords_at_movement_index(animations, 0)
+            walk_bh = step0_bh_id or current_bh_id
+            if not walk_bh:
+                pg = off_lineup.get("PG")
+                walk_bh = str(getattr(pg, "player_id", "")) if pg else None
+            if end_targets and walk_bh:
+                elapsed_delta = _append_hco_minimum_entry_walkup(
+                    steps=steps,
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    prior_final_coords=prior_final_coords,
+                    end_coords=end_targets,
+                    bh_id=str(walk_bh),
+                    clock_remaining_at_start=clock_remaining_at_turn_start,
+                    shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
+                    elapsed_so_far=elapsed_so_far,
+                    metadata_reason="hco_entry_walkup_minimum",
+                )
+                if elapsed_delta:
+                    elapsed_so_far += elapsed_delta
+                    _hco_entry_log.warning(
+                        "🏠 [ENTRY MINIMUM WALKUP FIRED] bh=%s", walk_bh,
+                    )
+
+        _wire_prepended_step_chain(steps)
 
     reset_count = len(steps)
 
@@ -886,17 +1113,18 @@ def build_skeleton_animation_steps(
     # archetype rate; non-gate movers end at the interrupted coord per
     # §9.5. Without this, the visual would teleport from BIP-end to step 0.
     # HCO already handles the BIP→step-0 seam via the entry orchestrator
-    # (Handoff / Kickout / Walk Up); FCP has no walk-up so we patch step 0
-    # directly here.
+    # (Handoff / Kickout / Walk Up). When that still prepends nothing,
+    # seed skeleton step 0 from prior final_coords (FCP-style fallback).
     fcp_seed_coords: Optional[Dict[str, GridCoord]] = None
+    hco_seed_coords: Optional[Dict[str, GridCoord]] = None
     if turn_type == "FCP" and isinstance(prior_turn, dict):
         prior_fc = prior_turn.get("final_coords") or {}
         if isinstance(prior_fc, dict) and prior_fc:
-            fcp_seed_coords = {
-                str(pid): {"x": float(c["x"]), "y": float(c["y"])}
-                for pid, c in prior_fc.items()
-                if isinstance(c, dict) and "x" in c and "y" in c
-            }
+            fcp_seed_coords = _normalize_player_coord_map(prior_fc)
+    elif turn_type == "HCO" and reset_count == 0 and isinstance(prior_turn, dict):
+        prior_fc = _normalize_player_coord_map(prior_turn.get("final_coords") or {})
+        if prior_fc:
+            hco_seed_coords = prior_fc
 
     for i in range(num_steps):
         # When Reset prepended, skeleton step 0's start coords = Reset's last
@@ -912,6 +1140,22 @@ def build_skeleton_animation_steps(
             start_coords = dict(anim_step0)
             for pid, coord in fcp_seed_coords.items():
                 start_coords[pid] = dict(coord)
+        elif i == 0 and hco_seed_coords:
+            anim_step0 = _coords_at_movement_index(animations, i)
+            start_coords = dict(anim_step0)
+            for pid, coord in hco_seed_coords.items():
+                start_coords[pid] = dict(coord)
+        elif i >= 1 and steps:
+            # UESS §8.1: step N+1 start.coords MUST equal step N end.coords
+            # per player. Without this, non-gate movers interrupted at step N
+            # (per §9.5) would teleport to the animator's skeleton waypoint
+            # at step N+1 start. Fall back to the animator's coord per-pid
+            # only when prior end is missing that pid (e.g., stationary
+            # players currently dropped from end.coords until decision 10
+            # ships).
+            prior_end = steps[-1]["end"]["coords"]
+            anim_start = _coords_at_movement_index(animations, i)
+            start_coords = {**anim_start, **prior_end}
         else:
             start_coords = _coords_at_movement_index(animations, i)
         end_coords = _coords_at_movement_index(animations, i + 1)
@@ -1036,7 +1280,7 @@ def build_skeleton_animation_steps(
                 receiver_player = _player_lookup_by_id(
                     off_lineup, def_lineup, owner_id_end,
                 )
-                receiver_arch = archetype.get(owner_id_end, "cruise")
+                receiver_arch = archetype.get(owner_id_end, "standard")
                 receiver_rate = _ag_grid_per_game_sec(receiver_player, receiver_arch)
                 pass_target_coord = _compute_pass_meet_point(
                     passer_start, receiver_start, receiver_end, receiver_rate,
@@ -1046,7 +1290,13 @@ def build_skeleton_animation_steps(
                     / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
                 )
 
-        t = max(HCO_STEP_T_FLOOR_GAME_SECONDS, natural_t, ball_pass_t)
+        # Shot steps should release as soon as the shooter reaches the shot
+        # spot. Applying the generic HCO floor here creates visible dead-air
+        # between the shooter settling and the [ball_flight] sub-step.
+        if gate_kind == "shooter" and not is_pass_step:
+            t = max(0.05, natural_t)
+        else:
+            t = max(HCO_STEP_T_FLOOR_GAME_SECONDS, natural_t, ball_pass_t)
 
         # UESS §9.5: only the gate player is guaranteed to reach skeleton
         # destination; defenders and other non-gate movers freeze at
@@ -1157,7 +1407,7 @@ def build_skeleton_animation_steps(
                 )
                 if (passer_start_coord and receiver_start_coord
                     and receiver_end_coord):
-                    receiver_archetype = archetype.get(receiver_id_mp, "cruise")
+                    receiver_archetype = archetype.get(receiver_id_mp, "standard")
                     receiver_rate = _ag_grid_per_game_sec(
                         receiver_player, receiver_archetype,
                     )
@@ -1198,6 +1448,36 @@ def build_skeleton_animation_steps(
         result_type_final = (turn_result.get("result_type") or "").upper()
         if result_type_final not in ("MAKE", "MISS", "BLOCK"):
             _apply_post_shot_overlay(steps[-1], turn_result)
+            # Shooting foul on a missed/failed attempt: stamp the
+            # "Shooting Foul!" headline on the last schema step's
+            # end.announcement (fires after sprite snap, before turn_stop
+            # FOUL). Replaces legacy `announceGameEvent('FOUL_SHOOTING')`
+            # which the unimplemented `runFoul` handler doesn't fire
+            # (audit bug 11). Gated on next_play_type=FREE_THROW so we
+            # only announce shooting fouls — common/offensive fouls
+            # with non-FT next plays are handled by other paths.
+            next_play_type_norm = str(
+                turn_result.get("next_play_type") or ""
+            ).upper()
+            fouler_id_final = turn_result.get("foul_player_id")
+            if (
+                result_type_final in ("FOUL", "D_FOUL")
+                and next_play_type_norm == "FREE_THROW"
+                and fouler_id_final
+            ):
+                steps[-1]["end"]["announcement"] = {
+                    "text": "Shooting Foul!",
+                    "team": "neutral",
+                    "hold_ms": 1000,
+                    "style": "shooting_foul",
+                    "player_data": {"playerId": str(fouler_id_final)},
+                    # Whistle SFX carried on announcement payload — FE
+                    # `showAnnouncement` reads `meta.sfx` and puts it on
+                    # `data.sfx`; court.html plays at overlay mount per
+                    # Sound_Design_Update.md (single source of truth for
+                    # announcement-tied SFX).
+                    "meta": {"sfx": "foul"},
+                }
 
     return steps
 
@@ -1302,12 +1582,12 @@ def _interpolate_step_end(
     return {"x": float(x), "y": float(y)}, float(step_t)
 
 
-# Per-overlay-map archetype assignment. Rebounders move at cruise pace
+# Per-overlay-map archetype assignment. Rebounders move at standard pace
 # (controlled positioning under the rim); release / get-back players sprint
 # (outlet / retreat urgency).
 _OVERLAY_ARCHETYPES: Tuple[Tuple[str, PlayerArchetype], ...] = (
-    ("offense_rebounder_coords", "cruise"),
-    ("defense_rebounder_coords", "cruise"),
+    ("offense_rebounder_coords", "standard"),
+    ("defense_rebounder_coords", "standard"),
     ("offense_getback_coords",   "sprint"),
     ("defense_release_coords",   "sprint"),
 )
@@ -1487,9 +1767,9 @@ def _build_make_hold_sub_step(
     beat. Mechanism:
       - All players hold their post-[ball_flight] positions (frozen).
       - Ball sits at the sweet spot.
-      - ``start.announcement`` fires "It's Good!" (or "It's Good! And 1!"
-        on and-one) — the FE's ``runStepAnnouncement`` pauses gameClock
-        + shotClock for ``hold_ms`` (1000ms wall-clock), then resumes.
+      - ``start.announcement`` fires "It's Good!" or the And-1 foul card
+        (``style: "and_one"``) — the FE's ``runStepAnnouncement`` pauses
+        gameClock + shotClock for ``hold_ms`` (1000ms wall-clock), then resumes.
       - Step T = 0 game-sec → no additional wall-clock wait after the
         announcement; ``snapBallToEndState`` then runs and we proceed to
         the SHOT_ATTEMPT turn_stop.
@@ -1499,14 +1779,14 @@ def _build_make_hold_sub_step(
     ``next_play_type == "FREE_THROW"`` and a foul player is named on the
     turn result, the announcement text is swapped.
     """
+    fouler_id = (
+        turn_result.get("foul_player_id")
+        or _safe_id(turn_result.get("foul_player"))
+    )
     is_and_one = (
         str(turn_result.get("next_play_type") or "").upper() == "FREE_THROW"
-        and bool(
-            turn_result.get("foul_player_id")
-            or _safe_id(turn_result.get("foul_player"))
-        )
+        and bool(fouler_id)
     )
-    text = "It's Good! And 1!" if is_and_one else "It's Good!"
     team = "away" if away_offense else "home"
 
     coords = dict(prev_end_coords)
@@ -1514,13 +1794,27 @@ def _build_make_hold_sub_step(
     archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in coords}
     destinations: Dict[str, Optional[GridCoord]] = {pid: None for pid in coords}
 
-    announcement: Dict[str, Any] = {
-        "text": text,
-        "team": team,
-        "hold_ms": MAKE_HOLD_MS,
-        "style": "primary",
-        "player_data": {"playerId": str(shooter_id)},
-    }
+    if is_and_one:
+        announcement: Dict[str, Any] = {
+            "text": "It's Good! And 1!",
+            "team": team,
+            "hold_ms": MAKE_HOLD_MS,
+            "style": "and_one",
+            "player_data": {
+                "playerId": str(shooter_id),
+                "foulerId": str(fouler_id),
+            },
+            # AND-1 whistle carried on payload; FE plays at overlay mount.
+            "meta": {"sfx": "foul"},
+        }
+    else:
+        announcement = {
+            "text": "It's Good!",
+            "team": team,
+            "hold_ms": MAKE_HOLD_MS,
+            "style": "primary",
+            "player_data": {"playerId": str(shooter_id)},
+        }
 
     trigger: AdvanceTrigger = {
         "condition": "fixed_duration",
@@ -1528,7 +1822,7 @@ def _build_make_hold_sub_step(
         "metadata": {"kind": "make_hold"},
     }
 
-    return {
+    step: AnimationStep = {
         "start": {
             "coords": coords,
             "destination": destinations,
@@ -1547,6 +1841,7 @@ def _build_make_hold_sub_step(
             "next": next_step,
         },
     }
+    return step
 
 
 _RATTLE_VARIANTS = frozenset({"LITTLE_RATTLE", "NORMAL_RATTLE", "HEAVY_RATTLE"})
@@ -1557,6 +1852,42 @@ _RATTLE_HOP_COUNTS: Dict[str, int] = {
 }
 
 
+def _shooting_foul_on_miss_announcement(
+    turn_result: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """``Shooting Foul!`` for MISS turns that lead to free throws."""
+    if (turn_result.get("result_type") or "").upper() != "MISS":
+        return None
+    next_play = str(turn_result.get("next_play_type") or "").upper()
+    has_ft = bool(turn_result.get("free_throws_remaining")) or next_play == "FREE_THROW"
+    if not has_ft:
+        return None
+    fouler_id = (
+        turn_result.get("foul_player_id")
+        or _safe_id(turn_result.get("foul_player"))
+    )
+    if not fouler_id:
+        return None
+    return {
+        "text": "Shooting Foul!",
+        "team": "neutral",
+        "hold_ms": 1000.0,
+        "style": "shooting_foul",
+        "player_data": {"playerId": str(fouler_id)},
+        # Whistle SFX carried on payload; FE plays at overlay mount.
+        "meta": {"sfx": "foul"},
+    }
+
+
+def _stamp_shooting_foul_on_miss_end(
+    step: AnimationStep,
+    turn_result: Dict[str, Any],
+) -> None:
+    ann = _shooting_foul_on_miss_announcement(turn_result)
+    if ann:
+        step.setdefault("end", {})["announcement"] = ann
+
+
 def _variant_flight_end(
     shot_variant: Optional[str],
     result_type: str,
@@ -1565,9 +1896,20 @@ def _variant_flight_end(
 ) -> GridCoord:
     """Per-variant ball-flight terminal coord. Mirrors Sound_Design_Update.md
     §Ball Resolve Animations. Falls back to make=MSSS / miss=rim for unknown
-    or missing variant (BLOCK; legacy emitters that haven't rolled a variant).
+    or missing variant (legacy emitters that haven't rolled a variant).
     """
-    is_make = (result_type or "").upper() == "MAKE"
+    result_upper = (result_type or "").upper()
+    # BLOCK: ball is rejected at the block point — never reaches the rim.
+    # Terminate ball flight directly at the block spot (= ball_bounce_x/y,
+    # stamped by shot_manager). The [bounce] step is suppressed for BLOCK
+    # in `_build_post_shot_sub_steps` so the ball doesn't double-animate.
+    # Falls through to the legacy rim fallback if bounce coords are missing.
+    if result_upper == "BLOCK":
+        bx = turn_result.get("ball_bounce_x")
+        by = turn_result.get("ball_bounce_y")
+        if bx is not None and by is not None:
+            return {"x": float(bx), "y": float(by)}
+    is_make = result_upper == "MAKE"
     msss = (dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
             else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM))
     rim = (dict(AWAY_RIM_COORDS) if away_offense else dict(HOME_RIM_COORDS))
@@ -1727,13 +2069,24 @@ def _build_post_shot_sub_steps(
             "shot_variant": shot_variant,
         },
     }
+    stamp_hot_shot_trail_metadata(
+        flight_trigger["metadata"],
+        turn_result.get("shot_score_pre_defense"),
+    )
 
     # Bounce step requires backend-stamped ball_bounce coords. AIRBALL takes
     # the OOB continuation path instead (no rebound visual per spec).
+    # BLOCK suppresses the bounce step: `_variant_flight_end` terminates the
+    # [ball_flight] step directly at the block spot (= ball_bounce_x/y), so
+    # a separate [bounce] would be a 0-distance no-op with a 300ms wait
+    # that visually freezes the rejected ball. The post-[ball_flight]
+    # terminal pointer becomes the SHOT_ATTEMPT turn_stop directly (the
+    # `else` branch at the bottom of this function).
     bx = turn_result.get("ball_bounce_x")
     by = turn_result.get("ball_bounce_y")
     has_bounce_coords = (bx is not None) and (by is not None)
-    needs_bounce = (not is_make) and (not is_airball) and has_bounce_coords
+    is_block = result_type == "BLOCK"
+    needs_bounce = (not is_make) and (not is_airball) and (not is_block) and has_bounce_coords
 
     # SFX cues for the [ball_flight] step. Launch cue fires at detach
     # (= step start). Arrival cue fires at the ball's tween onComplete.
@@ -1766,6 +2119,22 @@ def _build_post_shot_sub_steps(
         sfx_on_ball_arrival=arrival_sfx,
         timed_sfx=timed_sfx,
     )
+
+    # BLOCK announcement fires when ball is blocked at the rim — i.e., at
+    # [ball_flight] end (sprite snap moment). Replaces the legacy
+    # `announceGameEvent('BLOCK')` in ShotAnimationSystem that the schema
+    # short-circuit skips (audit bug 4). Blocker is on the defensive team
+    # → opposite of `away_offense`.
+    if result_type == "BLOCK":
+        blocker_id = turn_result.get("blocker_id")
+        if blocker_id:
+            flight_step["end"]["announcement"] = {
+                "text": "BLOCK!",
+                "team": "home" if away_offense else "away",
+                "hold_ms": 1000,
+                "style": "primary",
+                "player_data": {"playerId": str(blocker_id)},
+            }
 
     # Rewire [shoot]: next → [ball_flight] (was turn_stop SHOT_ATTEMPT).
     shoot_step["end"]["next"] = {"kind": "next_step", "index": flight_idx}
@@ -1821,8 +2190,7 @@ def _build_post_shot_sub_steps(
 
     if is_rattle:
         # Per-hop sub-steps: 40 ms wall-clock each, with rattle-leather.wav
-        # firing at the start of every hop. Hop count = 2 / 4 / 8 for
-        # LITTLE / NORMAL / HEAVY.
+        # firing at hop arrival (ball tween onComplete).
         hop_targets = _rattle_hop_targets(
             variant_upper, away_offense, turn_result,
         )
@@ -1831,7 +2199,7 @@ def _build_post_shot_sub_steps(
                 ball_end=hop_target,
                 step_t=float(RATTLE_HOP_GAME_SECONDS),
                 trigger_kind="rattle_hop",
-                sfx_release=rattle_hop_sfx(),
+                sfx_arrival=rattle_hop_sfx(),
             )
         # RATTLE make: settle into MSSS with the terminal swish at arrival.
         if is_make:
@@ -1921,12 +2289,15 @@ def _build_post_shot_sub_steps(
             ball_motion_style=None,
             next_step=_shot_attempt_turn_stop(),
         )
+        _stamp_shooting_foul_on_miss_end(bounce_step, turn_result)
         last_appended["end"]["next"] = {"kind": "next_step", "index": len(steps)}
         steps.append(bounce_step)
     else:
         # No bounce (AIRBALL, or MISS/BLOCK with no bounce coords): the
         # final variant sub-step (or [ball_flight] if no variant steps)
         # leads directly to the SHOT_ATTEMPT turn_stop.
+        if not is_make:
+            _stamp_shooting_foul_on_miss_end(last_appended, turn_result)
         last_appended["end"]["next"] = _shot_attempt_turn_stop()
 
 
@@ -1963,4 +2334,4 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
             if isinstance(start_actions, dict):
                 start_actions[pid_str] = "cut"
             if isinstance(start_archetype, dict):
-                start_archetype[pid_str] = "cruise"
+                start_archetype[pid_str] = "standard"

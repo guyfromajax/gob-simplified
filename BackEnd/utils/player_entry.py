@@ -22,6 +22,39 @@ def _iter_active_lineup(game) -> Iterable[tuple[str, Any, str]]:
                 yield team_key, player, pos
 
 
+def build_triangle_entrance_coords(game) -> Dict[str, Dict[str, float]]:
+    """Return ``{player_id: {x,y}}`` for all 10 lineup players at timeout/quarter
+    break triangle entrance spots (``OPENING_TIP_ENTRANCE_POSITIONS``).
+
+    Used as the prior-end seam for SIP/BIP ``animation_steps`` when resuming
+    after a timeout or quarter break — players visually return from the top-of-
+    court triangle, not from stale in-memory coords or default (25, 50).
+    """
+    from BackEnd.utils.opening_tip import OPENING_TIP_ENTRANCE_POSITIONS
+
+    out: Dict[str, Dict[str, float]] = {}
+    for team_key, player, pos in _iter_active_lineup(game):
+        entrance = (OPENING_TIP_ENTRANCE_POSITIONS.get(team_key) or {}).get(pos)
+        pid = getattr(player, "player_id", None)
+        if pid is None or not entrance:
+            continue
+        out[str(pid)] = {"x": float(entrance["x"]), "y": float(entrance["y"])}
+    return out
+
+
+def apply_player_coord_map(game, coord_map: Dict[str, Dict[str, float]]) -> None:
+    """Write a ``{player_id: {x,y}}`` map onto active lineup ``player.coords``."""
+    if not isinstance(coord_map, dict):
+        return
+    for _team_key, player, _pos in _iter_active_lineup(game):
+        pid = getattr(player, "player_id", None)
+        if pid is None:
+            continue
+        coord = coord_map.get(str(pid))
+        if isinstance(coord, dict) and coord.get("x") is not None and coord.get("y") is not None:
+            player.coords = {"x": float(coord["x"]), "y": float(coord["y"])}
+
+
 def _destinations_from_turn(game, turn: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
     result_type = str(turn.get("result_type") or "").upper()
     targets: Dict[str, Dict[str, float]] = {}
@@ -88,3 +121,32 @@ def build_bench_entry_payload(game, turn: Optional[Dict[str, Any]], *, context: 
         "target_result_type": turn.get("result_type"),
         "animations": animations,
     }
+
+
+def apply_entry_animation_for_inbound(
+    game,
+    turn: Optional[Dict[str, Any]],
+    *,
+    context: str,
+) -> None:
+    """Attach ``entry_animation`` only when the inbound turn has no schema steps.
+
+    Break-resume SIP/BIP turns emit ``animation_steps`` whose first step is the
+    triangle→setup walk-in. Also attaching BENCH_ENTRY would double-animate that
+    setup on the frontend. Live mid-game inbounds never hit this branch because
+    they do not use triangle seam + entry_animation together.
+    """
+    if not isinstance(turn, dict):
+        game.game_state.pop("entry_animation", None)
+        return
+
+    steps = turn.get("animation_steps")
+    if isinstance(steps, list) and len(steps) > 0:
+        game.game_state.pop("entry_animation", None)
+        return
+
+    payload = build_bench_entry_payload(game, turn, context=context)
+    if payload:
+        game.game_state["entry_animation"] = payload
+    else:
+        game.game_state.pop("entry_animation", None)

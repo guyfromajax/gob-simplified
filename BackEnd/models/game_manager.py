@@ -438,6 +438,12 @@ class GameManager:
             game_state=self.game_state,
             source="bypass:TIMEOUT",
         )
+        for t in reversed(self.turns):
+            if isinstance(t, dict) and str(t.get("result_type") or "").upper() != "TIMEOUT":
+                bh = t.get("final_ball_handler_id")
+                if bh:
+                    self.game_state["timeout_seam_ball_handler_id"] = str(bh)
+                break
         self._append_turn(timeout_turn)
         
         # Set timeout_called flag (for simulation loop stopping)
@@ -773,6 +779,9 @@ class GameManager:
             otb_foul=otb_foul,
             offense_rebounders=miss_turn.get("offense_rebounders"),
             defense_rebounders=miss_turn.get("defense_rebounders"),
+            away_offense=(
+                str(self.offense_team.team_id) == str(self.away_team.team_id)
+            ),
         )
 
         if not animation_steps:
@@ -1049,7 +1058,7 @@ class GameManager:
                 self._append_turn(oreb_turn)
                 # Apply OREB turn's time_elapsed to game state (same method as run_micro_turn)
                 self.turn_manager.update_clock_and_possession(oreb_turn)
-                
+
                 # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
                 if oreb_turn.get("possession_flips"):
                     # print(f"📦 OREB turn flipping possession")
@@ -1057,7 +1066,40 @@ class GameManager:
                     self.switch_possession()
                     oreb_turn["possession_flips"] = False  # ✅ Clear flag to prevent double flip
                     # logging.warning(f"🔄 [OREB] Flipped possession after putback: {old_offense} → {self.offense_team.name}")
-                
+
+                # PUTBACK_MISS → DREB: spawn a discrete DREB schema turn so the
+                # next HCO turn has a proper rebound-capture beat + final BH /
+                # final coords to seed the HCO entry orchestrator's
+                # Handoff/Walk-Up. Without this, the HCO turn's prior_turn is
+                # the OREB PUTBACK_MISS whose [bounce] step ends with BallLoose
+                # (no owner) → orchestrator hits the current_bh=None fallback
+                # → no handoff or rebound beat. Mirrors the same check that
+                # runs on the original `result` below; this branch handles
+                # the OREB-chained case the outer check misses.
+                if (
+                    oreb_turn.get("current_turn") == "OREB"
+                    and oreb_turn.get("result_type") == "PUTBACK_MISS"
+                    and oreb_turn.get("rebound_type") == "DREB"
+                    and oreb_turn.get("next_play_type") in ("HCO", "FAST_BREAK")
+                ):
+                    dreb_turn = self._build_dreb_turn_from_miss(oreb_turn)
+                    if dreb_turn:
+                        original_next = oreb_turn["next_play_type"]
+                        oreb_turn["next_play_type"] = "DREB"
+                        oreb_turn["next_turn"] = "DREB"
+                        dreb_turn["next_play_type"] = original_next
+                        dreb_turn["next_turn"] = original_next
+                        # Possession already flipped by the OREB-loop flip
+                        # block above (oreb_turn.possession_flips=True →
+                        # switch_possession). _build_dreb_turn_from_miss
+                        # hardcodes possession_flips=True on every DREB turn,
+                        # which would double-flip here and revert the
+                        # rebounding team back to defense. Clear it.
+                        dreb_turn["possession_flips"] = False
+                        self._append_turn(dreb_turn)
+                        self._maybe_stamp_hco_setup(dreb_turn)
+                        self.turn_manager.update_clock_and_possession(dreb_turn)
+
                 # If the OREB turn resulted in another OREB, resolve_offensive_rebound_turn
                 # will have set pending_oreb again. The while loop will process it.
                 # This allows consecutive OREBs (miss → OREB → miss → OREB → ...)

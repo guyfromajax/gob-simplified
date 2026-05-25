@@ -15,11 +15,10 @@ import {
   showAndOneAnnouncement,
   showSecondaryAnnouncement,
   buildSecondaryStopperPlayerData,
-  playAnnouncementSfx,
   getFastBreakPlayLabel,
   announceReboundHeadlineIfNeeded,
 } from './announcements.js';
-import { playBlockAnnounceCourtSfx, playChargeAnnounceCourtSfx } from './gameSfx.js';
+import { resolveStealSfxFile } from './gameSfx.js';
 import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
@@ -282,8 +281,11 @@ function handleBlockAnnouncement(turnData, scene, context) {
     secondaryColor: getSecondaryColorForTeam(scene, blockerSprite.team_id)
   };
 
-  playBlockAnnounceCourtSfx(scene);
-  showAnnouncement("BLOCK!", blockerTeam, playerData);
+  // SFX is carried on the announcement payload and played by court.html
+  // at overlay mount — synced to the visual appearance per
+  // Sound_Design_Update.md "Block Announce: Trigger: immediately when the
+  // Block announce appears."
+  showAnnouncement("BLOCK!", blockerTeam, playerData, { sfx: 'duke-its-blocked.wav' });
 }
 
 function handleShootingFoulAnnouncement(turnData, scene, context) {
@@ -302,8 +304,7 @@ function handleShootingFoulAnnouncement(turnData, scene, context) {
     }
   }
 
-  playAnnouncementSfx('foul');
-  showAnnouncement("Shooting Foul!", 'neutral', playerData);
+  showAnnouncement("Shooting Foul!", 'neutral', playerData, { sfx: 'whistle-1-lowervol.wav' });
 }
 
 function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) {
@@ -323,8 +324,7 @@ function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) 
   }
 
   const foulText = turnData?.otb_foul ? "Over The Back!" : pickOffensiveFoulAnnouncementText(turnData);
-  playAnnouncementSfx('foul');
-  showAnnouncement(foulText, defenseTeam, playerData);
+  showAnnouncement(foulText, defenseTeam, playerData, { sfx: 'whistle-1-lowervol.wav' });
 
 }
 
@@ -347,8 +347,7 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
   const foulText = turnData?.otb_foul
     ? "Over The Back!"
     : (turnData?.quick_foul ? "Quick Foul!" : pickDefensiveFoulAnnouncementText(turnData));
-  playAnnouncementSfx('foul');
-  showAnnouncement(foulText, offenseTeam, playerData);
+  showAnnouncement(foulText, offenseTeam, playerData, { sfx: 'whistle-1-lowervol.wav' });
 
 }
 
@@ -368,9 +367,12 @@ function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
     }
   }
 
-  playAnnouncementSfx('foul');
-  playChargeAnnounceCourtSfx(scene);
-  showAnnouncement("CHARGE!", defenseTeam, playerData);
+  // CHARGE plays both the foul whistle and the dedicated stinger
+  // (`duke-charging.wav` per Sound_Design_Update.md). Payload carries both;
+  // court.html plays each at mount.
+  showAnnouncement("CHARGE!", defenseTeam, playerData, {
+    sfx: ['whistle-1-lowervol.wav', 'duke-charging.wav'],
+  });
 
 }
 
@@ -390,8 +392,7 @@ function handleBlockingFoulAnnouncement(turnData, scene, context, offenseTeam) {
     }
   }
 
-  playAnnouncementSfx('foul');
-  showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
+  showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData, { sfx: 'whistle-1-lowervol.wav' });
 
 }
 
@@ -411,7 +412,9 @@ function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
     }
   }
 
-  showAnnouncement("STEAL!", defenseTeam, playerData);
+  // Steal voice tied to the "STEAL!" announce appearance — court.html plays
+  // `meta.sfx` at overlay mount per Sound_Design_Update.md §Steal Announce.
+  showAnnouncement("STEAL!", defenseTeam, playerData, { sfx: resolveStealSfxFile() });
 
 }
 
@@ -469,6 +472,10 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
     turnoverText = typeMap[turnoverType] || "TURNOVER!";
   }
   
-  playAnnouncementSfx(turnoverText === 'Shot Clock Violation!' ? 'shot_clock_violation' : 'foul');
-  showAnnouncement(turnoverText, offenseTeam, playerData);
+  // Shot Clock Violation uses whistle-3.mp3; other turnovers use the foul
+  // whistle. Carried on payload so court.html plays at overlay mount.
+  const turnoverSfxFile = turnoverText === 'Shot Clock Violation!'
+    ? 'whistle-3.mp3'
+    : 'whistle-1-lowervol.wav';
+  showAnnouncement(turnoverText, offenseTeam, playerData, { sfx: turnoverSfxFile });
 }

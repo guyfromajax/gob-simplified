@@ -152,8 +152,8 @@
  *   Backend always stamps when it has per-player rate info.
  * @property {("shot"|"pass")} [ball_motion_style]
  *   Optional. Overrides the ball tween duration: "shot" → 27 grid/game-sec
- *   (min 700 ms FE playback floor), "pass" → 30 grid/game-sec.
- *   "pass" → PASS_GRID_SPOTS_PER_GAME_SECOND (30). Absent → ball tweens over step T.
+ *   (min 400 ms FE playback floor), "pass" → PASS_GRID_SPOTS_PER_GAME_SECOND
+ *   (24). Absent → ball tweens over step T.
  * @property {GridCoord} [ball_arrival_coord]
  *   Optional. Overrides the ball-tween end coord (used for moving-receiver
  *   meet-points). Absent → derived from `step.end.ball` owner / coords.
@@ -164,8 +164,8 @@
  *   Optional. Fires at the ball-tween onComplete (= ball reaches destination).
  *   Used for reception, shot result, etc.
  * @property {TimedSfx[]} [timed_sfx]
- *   Optional. Ordered list of cues fired at explicit offsets from step
- *   start. Each cue runs independently of ball motion (FE uses setTimeout).
+ *   Optional. Follow-up cues fired at `delay_ms` after ball arrival (ball
+ *   tween onComplete). Used for BANK_MAKE / BACK_OF_RIM delayed swish.
  */
 
 /**

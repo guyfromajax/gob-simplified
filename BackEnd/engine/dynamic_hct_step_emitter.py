@@ -341,7 +341,7 @@ def build_dynamic_hct_animation_steps(
         clock_remaining_at_start=clock_remaining_at_turn_start,
         shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
         next_step_index=1,
-        bh_archetype="cruise",
+        bh_archetype="standard",
         other_archetype="sprint",
         gate_player_ids=[walk_up_bh_id],
         metadata_reason="hct_entry_walkup",

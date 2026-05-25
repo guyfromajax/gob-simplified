@@ -137,7 +137,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Steal Announcements:**
 - **"STEAL!"** - Triggered when `result_type === 'STEAL'` or (`result_type === 'TURNOVER'` and text includes "steal")
 - Takes priority over Fast Break announcement (suppresses Fast Break if steal-initiated)
-- Shows stealer's headshot in defense team color
+- Shows stealer's headshot; initials use the stealer's actual team colors (defense side on the turn, resolved per-player — not inferred from the `defenseTeam` context arg alone)
 
 **Turnover Announcements:**
 - **Two pipelines:** the SS&S dispatcher `handleTurnoverAnnouncement()` in `gameAnnouncements.js` (called via `announceGameEvent('TURNOVER', ...)` from `finalizeTurnAfterAnimation()`), and the legacy `announceFromTurnData(turn, 'end', ...)` fallback in `announcements.js`. The legacy path is still invoked from several call sites in `animateGameTurns.js` for turns that haven't been announced inline.
@@ -146,7 +146,7 @@ The Announcement System provides visual feedback for game events using timing-ba
   - `gameAnnouncements.js` typeMap: `TRAVEL → "Travel!"`, `DOUBLE_DRIBBLE → "Double Dribble!"`, `OUT_OF_BOUNDS → "OUT OF BOUNDS!"`, `BAD_PASS → "BAD PASS!"`, `SHOT_CLOCK → "Shot Clock Violation!"`.
   - Legacy `announceFromTurnData` typeMap additionally recognizes: `PALMING → "PALMING!"`, `ILLEGAL_DRIBBLE → "ILLEGAL DRIBBLE!"`, `BACKCOURT → "BACKCOURT VIOLATION!"`.
 - **Shot Clock Violation:** Uses `whistle-3.mp3` (vs `whistle-1-lowervol.wav` for other turnovers). See Sounds below.
-- Shows victim's headshot in offense team color.
+- Shows victim's headshot; initials use the victim's actual team colors (offense side on the turn, resolved per-player).
 
 **Foul Announcements:**
 - **"Charge!"** - Triggered when `result_type === 'CHARGE'` (offensive foul on drive). Routed via gameAnnouncements.js; AnimationEngine routes CHARGE to handleDefault (skeleton animation, then announcement).
@@ -164,18 +164,39 @@ The Announcement System provides visual feedback for game events using timing-ba
 - **"Rebound!"** - `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `announcements.js`. Fires when the rebounder secures the ball (embedded path: rebounder tween `onComplete` after attach + rebound SFX; `ballManager.animateRebound`: rebounder tween `onComplete`). **DREB and OREB** on embedded misses both use the same hook so FAST_BREAK / `force_foul_after_dreb` / odd `next_play_type` branches still get the headline when the rebound animates. Idempotent via `turnData._reboundHeadlineShown` when `turnData` is passed (always pass the authoritative MISS/BLOCK or rebound turn from callers). Primary card uses the same portrait styling as other results (`teamName` from `scene.simData` home/away names; `secondaryColor` from `gameStore.getColors()`).
 - **Discrete `DREB` row (migration):** Backend may append a separate **`DREB`** turn whose `animation_steps` only capture the ball. **Rebound!** idempotency should continue to use the **MISS/BLOCK** turn object when that turn still runs **`ShotAnimationSystem`** embedded rebound; the DREB row does not replace the headline hook by itself. **Outlet** (pass / bring-up) is **`runDefensiveReboundSetup`** after DREB `playTurn` — see **`Rebound_System.md`** (DREB vs outlet) and **`Turn_by_Turn_System.md`** (Discrete `DREB` turn).
 
-### Sounds (SFX)
+### Sounds (SFX) — payload-carries-SFX architecture
 
-All announcement SFX route through `playAnnouncementSfx(kind)` in `announcements.js`. Pass `'shot_clock_violation'` for `whistle-3.mp3`; any other value (or `'foul'`) maps to `whistle-1-lowervol.wav`. Audio plays at volume 0.7 from `/sounds/` + filename.
+**Single source of truth for announcement-tied SFX:** the announcement payload carries a `sfx` field (filename string or filename array), and `court.html`'s overlay mount functions (`window.showAnnouncementOverlay` for primary, `window.showSecondaryAnnouncementOverlay` for secondary) play it via `window.playGameSfx(filename)` at the moment the DOM mounts. Audio is synced to the visual entry (Sound_Design_Update.md "Trigger: immediately when the announce appears"). Both tiers go through exactly one dispatch point.
 
-| Announcement | Sound file | Triggered from |
-|--------------|------------|----------------|
-| **Shot Clock Violation!** | `whistle-3.mp3` | `gameAnnouncements.js` → `handleTurnoverAnnouncement()` (and the legacy `announceFromTurnData` end branch) |
-| Dead ball turnovers (Travel!, Double Dribble!, OUT OF BOUNDS!, BAD PASS!, etc.) | `whistle-1-lowervol.wav` | `gameAnnouncements.js` → `handleTurnoverAnnouncement()` (and legacy `announceFromTurnData`) |
-| Shooting Foul!, Offensive Foul, Defensive Foul, Charge, Blocking Foul | `whistle-1-lowervol.wav` | `gameAnnouncements.js` → `handleShootingFoulAnnouncement` / `handleOffensiveFoulAnnouncement` / `handleDefensiveFoulAnnouncement` / `handleChargeAnnouncement` / `handleBlockingFoulAnnouncement` |
-| AND-1 (shooting foul on make) | `whistle-1-lowervol.wav` | `announcements.js` → `showAndOneAnnouncement()` |
+**Caller flow:**
+1. Caller invokes `showAnnouncement` / `showAndOneAnnouncement` / `showSecondaryAnnouncement` with `meta.sfx = '<filename>'` (or array, or legacy kind — `'foul'` / `'shot_clock_violation'` / `'fb_outlet_denied_court'` / etc.).
+2. The helper normalizes the value to a filename via `resolvePrimarySfxFromMeta` (in `announcements.js`) or the equivalent resolver chain in `showSecondaryAnnouncement`:
+   - Filename (`.wav` / `.mp3`) → as-is.
+   - Filename array → mapped to filename array.
+   - Legacy kind → resolved via `resolveAnnounceMetaCourtSfxFile` (`gameSfx.js`).
+   - Secondary-tier headline with no `meta.sfx` → resolved via `resolveSecondaryAnnounceCourtSfxFile`, which also applies once-per-turn dedupe for `Press!` / `Trap!` / `Fast Break!`.
+3. The resolved filename lands on `data.sfx`; `court.html` plays it at mount.
 
-**No SFX on secondary tier** in v1 — `showSecondaryAnnouncement()` deliberately omits the whistle call. Primary whistles are unchanged.
+**No direct `playXxxCourtSfx(scene)` calls** remain outside `gameSfx.js`. The legacy `playAnnouncementSfx(kind)` function in `announcements.js` is kept exported for back-compat but is no longer called from any internal path.
+
+| Announcement | Sound file | Caller |
+|---|---|---|
+| **Shot Clock Violation!** | `whistle-3.mp3` | `gameAnnouncements.js::handleTurnoverAnnouncement` + `announcements.js::announceFromTurnData` (turnover branch) |
+| Dead-ball turnovers (Travel!, Double Dribble!, OUT OF BOUNDS!, BAD PASS!, …) | `whistle-1-lowervol.wav` | same callers as Shot Clock Violation |
+| Shooting Foul!, Offensive/Defensive Foul, Blocking Foul | `whistle-1-lowervol.wav` | `gameAnnouncements.js` foul handlers + `announceFromTurnData` foul branches |
+| **CHARGE!** | `['whistle-1-lowervol.wav', 'duke-charging.wav']` | `gameAnnouncements.js::handleChargeAnnouncement` |
+| AND-1 (shooting foul on make) | `whistle-1-lowervol.wav` (default, overridable) | `announcements.js::showAndOneAnnouncement` |
+| **BLOCK!** | `duke-its-blocked.wav` | `gameAnnouncements.js::handleBlockAnnouncement` |
+| **STEAL!** / **Interception!** | 33/33/34 random — `sammy-steal.wav` / `braddock-steal.wav` / `butler-steal.wav` (via `resolveStealSfxFile()`) | `handleStealAnnouncement`, `announceFromTurnData` STEAL branch, `fastBreak.js::animateRimRunnerInterception` |
+| Press! | random — `sammy-press.mp3` / `press-braddock.mp3` (once per turn) | secondary headline resolver |
+| Trap! | `trap-braddock.mp3` (once per turn) | secondary headline resolver |
+| Fast Break! | `fast-break-braddock.mp3` (once per turn) | secondary headline resolver |
+| Quick Shot | `quick-shot-braddock.mp3` | secondary headline resolver |
+| Slow It Down | `slow-it-down-braddock.mp3` | secondary headline resolver |
+| Final Shot | random — `sammy-final-shot.mp3` / `final-shot-braddock.mp3` | secondary headline resolver |
+| No Fast Break | `duke-hold-up.wav` | secondary headline resolver + backend `meta.sfx: "no_fast_break"` |
+| Great Stop! (FB defensive stop) | `duke-great-stop.wav` | `fastBreak.js::animateDefensiveStop` (legacy path); schema path via `covert_release_step_emitter.py` stamping `meta.sfx: "fb_defensive_stop"` |
+| FB Outlet Pass Denied! | `duke-denied.wav` | `fastBreak.js::animateRimRunnerOutletDeniedBeat` + backend `meta.sfx: "fb_outlet_denied_court"` |
 
 ### Hold time after result announcements (1000 ms)
 
@@ -252,7 +273,14 @@ When a steal leads to a fast break:
   - **Home** player → tile fill = team **primary**, text = team **secondary**
   - **Away** player → tile fill = **white** (`#ffffff`), text = team **primary**
 - Each headshot resolves its own team independently — important in the foul card where shooter and fouler are on opposite teams; each side gets its own initials-tile color rule.
-- The `initialsInfo` descriptor (`{isHome, primaryColor, secondaryColor, name}`) is built per-headshot by `buildHeadshotInitialsInfo(player, teamSide)` in `announcements.js` and attached to the overlay payload as `headshotInitials` (primary/secondary single-player) or `shooterHeadshotInitials` / `foulerHeadshotInitials` (foul card). The Playcall Center has its own resolver, `buildPlaycallInitialsInfo(playerId)` in `court.html`, which sources the same data (`window.currentGameScene.playerInfo` + `window.gameStore.getColors()`) for user-team players.
+- **Team param vs initials (important):** The `team` argument on `showAnnouncement()` / `showSecondaryAnnouncement()` / `showAndOneAnnouncement()` describes **announcement context** (offense side, defense side, beneficiary team for ribbon/stripe styling). It must **not** be used to infer which colors a featured player's initials tile wears. When `playerData.playerId` is present, initials colors are resolved per-player by `resolvePlayerTeamSide()` → `buildHeadshotInitialsForPlayer()` in `announcements.js`, in this order:
+  1. On-court sprite `team` (`'home'` | `'away'`) from `scene.playerSprites`
+  2. Sprite / playerData `team_id` compared to `scene.simData.home_team_id`
+  3. Roster membership (`gameStore.getRosters()` home vs away lists)
+  4. Fallback to the caller's `team` arg only when membership cannot be determined
+- Scene lookup uses `meta.scene` when provided, otherwise `window.currentGameScene` (set in `gameScene.js`). Callers that run outside the live Phaser scene should pass `{ scene }` in `meta`.
+- Foul announcements historically passed the **beneficiary** side as `team` (e.g. defensive foul card used `offenseTeam` because offense "benefited"). That was correct for ribbon context but caused swapped initials before the per-player resolver above. No caller changes are required — initials now ignore that context when sprite/roster data is available.
+- The `initialsInfo` descriptor (`{isHome, primaryColor, secondaryColor, name}`) is built per-headshot by `buildHeadshotInitialsForPlayer()` and attached to the overlay payload as `headshotInitials` (primary/secondary single-player) or `shooterHeadshotInitials` / `foulerHeadshotInitials` (foul card). The Playcall Center has its own resolver, `buildPlaycallInitialsInfo(playerId)` in `court.html`, which sources the same data (`window.currentGameScene.playerInfo` + `window.gameStore.getColors()`) for user-team players.
 - If `initialsInfo` is unresolvable (no team colors in `gameStore`, or `applyHeadshotFallback` called without it), the legacy generic-headshot fallback still runs — no broken-image icon either way.
 - Jersey and last name are resolved by `getPlayerJerseyValue()` / `getPlayerLastName()` from `gameStore` rosters or the passed `playerData`. The primary overlay displays `#jersey lastName` in the portrait caption; the secondary ribbon shows them stacked in the chip (`#jersey` above last name).
 - If no player data is provided (no `photoUrl` and no `lastName` in the payload), both tiers collapse their player column and center the headline (`.no-player` state).
@@ -269,13 +297,15 @@ When a steal leads to a fast break:
   - `prepareTurnForAnimation()` — Dispatches start announcements via `announceGameEvent()` (Fast Break, Press, Trap, Slow It Down, Quick Shot, Final Shot, Batted Ball OOB) gated by `turn._contextAnnouncementsShown`.
   - `finalizeTurnAfterAnimation()` — Result-side fallbacks (e.g. BLOCK when `!turn._blockAnnounced`, STEAL, TURNOVER).
 - `FrontEnd/static/js/phaser/utils/announcements.js`
-  - `announceFromTurnData(turnData, timing, homeTeamId, scene)` — Legacy end-of-turn dispatcher; still called with `timing: 'end'` from `animateGameTurns.js`. The `timing: 'start'` branch is currently unreachable but is routed to secondary if revived.
+  - `announceFromTurnData(turnData, timing, homeTeamId, scene)` — Legacy end-of-turn dispatcher; still called with `timing: 'end'` from `animateGameTurns.js`. Uses `offense_team_id` (SS&S canonical) with `possession_team_id` fallback. Passes `{ scene }` in meta when resolving player initials. The `timing: 'start'` branch is currently unreachable but is routed to secondary if revived.
   - `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` — Single entry point for primary **Rebound!**; sets `turnData._reboundHeadlineShown` when `turnData` is provided.
   - `showAnnouncement(text, team, playerData, meta)` — Builds **primary** standard payload and calls `window.showAnnouncementOverlay(data)`.
   - `showSecondaryAnnouncement(text, team, playerData, meta)` — Builds **secondary** payload (`tier: 'secondary'`), resolves the team primary color via `gameStore.getColors()` (`resolveSecondaryStripeColor`), and calls `window.showAnnouncementOverlay(data)`.
-  - `showAndOneAnnouncement(team, shooterData, foulPlayerData)` — Builds primary foul-card payload.
+  - `showAndOneAnnouncement(team, shooterData, foulPlayerData, meta)` — Builds primary foul-card payload.
   - `getPlayerImageUrl(photo, playerId)` — Uses explicit portrait paths when provided; otherwise falls back to `generic_headshot.png`. When the resolved URL fails to load, `court.html`'s `applyHeadshotFallback` swaps in the team-aware initials tile (see "Player images and labels" above).
-  - `buildHeadshotInitialsInfo(player, teamSide)` — Resolves `{isHome, primaryColor, secondaryColor, name}` from `gameStore.getColors()` + the player record. Used by all three `show*Announcement` builders to attach the `headshotInitials` payload that `applyHeadshotFallback` consumes on photo-load failure.
+  - `resolvePlayerTeamSide(scene, playerId, playerData, fallbackTeamSide)` — Resolves `'home'` | `'away'` from sprite, team_id, or roster; used exclusively for initials-tile colors.
+  - `buildHeadshotInitialsForPlayer(scene, player, playerId, fallbackTeamSide)` — Wraps `buildHeadshotInitialsInfo()` with per-player team resolution. Used by all three `show*Announcement` builders.
+  - `buildHeadshotInitialsInfo(player, teamSide)` — Low-level color/name descriptor from an already-resolved side + `gameStore.getColors()`.
   - `playAnnouncementSfx(kind)` — Plays `whistle-3.mp3` for `'shot_clock_violation'`, otherwise `whistle-1-lowervol.wav` at volume 0.7.
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.

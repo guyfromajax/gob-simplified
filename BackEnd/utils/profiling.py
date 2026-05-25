@@ -5,9 +5,20 @@ import pstats
 
 
 def run_profiled(func, top_n: int = 50) -> str:
-    """Run func() under cProfile and return a text summary of top N by cumulative time."""
+    """Run func() under cProfile and return a text summary of top N by cumulative time.
+
+    If another profiler is already active on this interpreter (e.g. a concurrent
+    request also passed ?profile=1), fall back to running func() un-profiled so the
+    caller still gets its result instead of a 400.
+    """
     pr = cProfile.Profile()
-    pr.enable()
+    try:
+        pr.enable()
+    except ValueError as exc:
+        if "already active" in str(exc).lower():
+            func()
+            return "[profile skipped: another profiler already active on this interpreter]"
+        raise
     try:
         func()
     finally:

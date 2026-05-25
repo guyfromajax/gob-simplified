@@ -261,40 +261,6 @@ def _triangle_find_player(lineup: Dict[str, Any], player_id: Any) -> Optional[An
     return None
 
 
-def _triangle_apply_coords(player: Any, coords: Optional[Dict[str, float]]) -> None:
-    if player is None or not isinstance(coords, dict):
-        return
-    player.coords = {"x": float(coords["x"]), "y": float(coords["y"])}
-
-
-def _triangle_commit_setup_positions(
-    setup_payload: Dict[str, Any],
-    off_lineup: Dict[str, Any],
-    def_lineup: Dict[str, Any],
-) -> None:
-    for key in ("ball_handler_id", "rim_runner_id", "trailer_id"):
-        player = _triangle_find_player(off_lineup, setup_payload.get(key))
-        coords = setup_payload.get(key.replace("_id", "_to"))
-        _triangle_apply_coords(player, coords)
-
-    for corner in setup_payload.get("corner_players", []):
-        _triangle_apply_coords(
-            _triangle_find_player(off_lineup, corner.get("player_id")),
-            corner.get("to"),
-        )
-
-    for key in ("rr_defender_id", "bh_defender_id"):
-        player = _triangle_find_player(def_lineup, setup_payload.get(key))
-        coords = setup_payload.get(key.replace("_id", "_to"))
-        _triangle_apply_coords(player, coords)
-
-    for helper in setup_payload.get("helper_defenders", []):
-        _triangle_apply_coords(
-            _triangle_find_player(def_lineup, helper.get("player_id")),
-            helper.get("to"),
-        )
-
-
 def _triangle_distance(a: Dict[str, float], b: Dict[str, float]) -> float:
     return ((float(a["x"]) - float(b["x"])) ** 2 + (float(a["y"]) - float(b["y"])) ** 2) ** 0.5
 
@@ -332,7 +298,6 @@ def _triangle_build_turn_result(
     fb_roles["triangle_sequence"] = True
     fb_roles["triangle_branch"] = branch
     fb_roles["triangle_setup_phase"] = setup_payload
-    _triangle_commit_setup_positions(setup_payload, off_lineup, def_lineup)
 
     same_side_corner_id = setup_payload.get("same_side_corner_id")
     same_side_corner = _triangle_find_player(off_lineup, same_side_corner_id)
@@ -365,8 +330,6 @@ def _triangle_build_turn_result(
     elif branch == "triangle_bh_drive":
         drive_to = _spot_coords(_triangle_same_half_spot("lowPost", setup_payload["same_side"]), setup_payload["is_away_offense"])
         mid_lane = _spot_coords("midLane", setup_payload["is_away_offense"])
-        _triangle_apply_coords(ball_handler, drive_to)
-        _triangle_apply_coords(rim_runner, mid_lane)
         setup_payload["triangle_drive_to"] = drive_to
         setup_payload["triangle_rr_drive_to"] = mid_lane
         shooter = ball_handler
@@ -378,8 +341,6 @@ def _triangle_build_turn_result(
     elif branch == "triangle_drive_rr_feed":
         drive_to = _spot_coords(_triangle_same_half_spot("lowPost", setup_payload["same_side"]), setup_payload["is_away_offense"])
         mid_lane = _spot_coords("midLane", setup_payload["is_away_offense"])
-        _triangle_apply_coords(ball_handler, drive_to)
-        _triangle_apply_coords(rim_runner, mid_lane)
         setup_payload["triangle_drive_to"] = drive_to
         setup_payload["triangle_rr_drive_to"] = mid_lane
         shooter = rim_runner
@@ -391,8 +352,6 @@ def _triangle_build_turn_result(
     elif branch == "triangle_drive_corner_kick":
         drive_to = _spot_coords(_triangle_same_half_spot("lowPost", setup_payload["same_side"]), setup_payload["is_away_offense"])
         mid_lane = _spot_coords("midLane", setup_payload["is_away_offense"])
-        _triangle_apply_coords(ball_handler, drive_to)
-        _triangle_apply_coords(rim_runner, mid_lane)
         setup_payload["triangle_drive_to"] = drive_to
         setup_payload["triangle_rr_drive_to"] = mid_lane
         shooter = same_side_corner
@@ -407,7 +366,6 @@ def _triangle_build_turn_result(
     if shooter is None:
         raise ValueError(f"Triangle branch missing shooter: {branch}")
 
-    shooter.coords = {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])}
     defender_count = 1 if defender is not None else 0
     fb_roles["ball_handler"] = ball_handler
     fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
@@ -932,10 +890,6 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     bp = fb_roles.get("rim_runner_burst_phase") or {}
     rr_to = bp.get("rr_to")
     recv_to = bp.get("receiver_to")
-    if rr and isinstance(rr_to, dict):
-        rr.coords = {"x": rr_to["x"], "y": rr_to["y"]}
-    if ball_handler and isinstance(recv_to, dict):
-        ball_handler.coords = {"x": recv_to["x"], "y": recv_to["y"]}
 
     # --- Burst ---
     getback_ids = (most_recent or {}).get("offense_getback") or []
@@ -1124,9 +1078,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
         apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
-            shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
-            rr.coords = shot_spot
-            roles["shot_spot"] = shot_spot
+            roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1178,8 +1130,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
         apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None:
-            rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
-            roles["shot_spot"] = rr.coords
+            roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1344,8 +1295,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
     apply_coords_from_animations_list(game, fb_animations)
     if fb_roles.get("_bh_final_x") is not None:
-        rr.coords = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
-        roles["shot_spot"] = rr.coords
+        roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
     rr_snap_roles = {**roles, "ball_handler": ball_handler}
     rr_snap = build_fast_break_pre_shot_snapshot(
         game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"

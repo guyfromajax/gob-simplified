@@ -244,10 +244,10 @@ def _build_reset_hold_step(
         if pid not in start_coords:
             continue
         actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-        archetype[pid] = "cruise"
+        archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "cruise")
+        rate = _ag_grid_per_game_sec(player, "standard")
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -321,10 +321,10 @@ def _build_reset_pg_converge_step(
         if pid not in start_coords:
             continue
         actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-        archetype[pid] = "cruise"
+        archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "cruise")
+        rate = _ag_grid_per_game_sec(player, "standard")
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -397,10 +397,10 @@ def _build_reset_inbound_pass_step(
         if pid not in start_coords:
             continue
         actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-        archetype[pid] = "cruise"
+        archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "cruise")
+        rate = _ag_grid_per_game_sec(player, "standard")
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}

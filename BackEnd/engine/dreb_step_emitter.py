@@ -81,6 +81,7 @@ def build_dreb_animation_steps(
     otb_foul: Optional[Dict[str, Any]] = None,
     offense_rebounders: Optional[List[Any]] = None,
     defense_rebounders: Optional[List[Any]] = None,
+    away_offense: bool = False,
 ) -> Optional[List[AnimationStep]]:
     """Build the DREB turn's single AnimationStep.
 
@@ -229,6 +230,19 @@ def build_dreb_animation_steps(
             "ball": ball_end,
             "time_elapsed": float(t_game_seconds),
             "clock": clock_end,
+            # "Rebound!" headline fires AFTER sprites snap to end coords —
+            # i.e., the moment the rebounder visually has the ball. Replaces
+            # the legacy `announceReboundHeadlineIfNeeded` call that the
+            # schema DREB path was skipping (audit bug 17). DREB rebounder
+            # is on the defensive team of the MISS turn — opposite of
+            # `away_offense`.
+            "announcement": {
+                "text": "Rebound!",
+                "team": "home" if away_offense else "away",
+                "hold_ms": 1000,
+                "style": "primary",
+                "player_data": {"playerId": str(rebounder_id)},
+            },
             "next": next_step,
         },
     }

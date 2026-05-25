@@ -473,7 +473,7 @@ def _build_outlet_pass_step(
 
     # All others (non-passer, non-receiver, non-getback): drift a random 1–6
     # grid spots toward the attacking basket along x, holding y. Archetype
-    # `cruise` (casual transition pace). Keeps step 0 visually focused on
+    # `standard` (transition pace). Keeps step 0 visually focused on
     # the pass + receiver rather than 6+ sprinters racing the BH; they
     # ramp up to sprint on step 1 once the receiver has caught the ball.
     excluded = {passer_id, receiver_id, *getback_ids}
@@ -484,7 +484,7 @@ def _build_outlet_pass_step(
         drift = random.randint(1, 6)
         drift_x = max(4.0, min(97.0, float(start["x"]) + drift * x_dir))
         drift_target: GridCoord = {"x": drift_x, "y": float(start["y"])}
-        targets.append((pid, drift_target, "cruise"))
+        targets.append((pid, drift_target, "standard"))
 
     # Compute interrupted end coords: start + (rate × T) along start→target.
     for pid, target, arch in targets:
@@ -1122,13 +1122,17 @@ def _build_nice_stop_announcement(
     turn_result: Dict[str, Any],
     fb_roles: Dict[str, Any],
     def_lineup: Dict[str, Any],
+    is_away_offense: bool,
 ) -> Announcement:
-    """``"Nice Stop by <stopper>!"`` announcement payload for the end of the
-    defensive-stop motion step. Mirrors the legacy phrasing.
+    """``"Great Stop!"`` announcement payload for the end of the defensive-stop
+    motion step. Backend is the single source of truth: stamps the final text,
+    resolves the defending team to ``home``/``away`` (so the FE secondary
+    overlay can color the stripe via ``gameStore.getColors()``), and carries
+    the stinger SFX via ``meta.sfx`` per Sound_Design_Update.md §FB Defensive
+    Stop Announce. FE drops its legacy "Nice Stop!" text-rewrite branch.
     """
     stopper_id = turn_result.get("stopper_id") or fb_roles.get("stopper_id")
     stopper = _player_lookup_by_id({}, def_lineup, stopper_id) if stopper_id else None
-    text = "Nice Stop!"
     player_data: Optional[Dict[str, Any]] = None
     if stopper is not None:
         player_data = {
@@ -1142,11 +1146,13 @@ def _build_nice_stop_announcement(
             "photo": None,
             "teamName": None,
         }
+    # Defending team relative to offense: opposite of `is_away_offense`.
+    defense_team = "home" if is_away_offense else "away"
     return {
-        "text": text,
-        "team": "defense",
+        "text": "Great Stop!",
+        "team": defense_team,
         "player_data": player_data,
-        "meta": None,
+        "meta": {"sfx": "fb_defensive_stop"},
         "style": "secondary",
         "hold_ms": 1000,
     }
@@ -1192,6 +1198,9 @@ def build_covert_release_animation_steps(
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
         return None
+
+    from BackEnd.utils.animation_step_helpers import log_fb_emitter_entry
+    log_fb_emitter_entry("CR", all_start_coords, game, off_lineup, def_lineup)
 
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
@@ -1268,7 +1277,7 @@ def build_covert_release_animation_steps(
     )
     if result_type == "DEFENSIVE_STOP":
         outcome_step["end"]["announcement"] = _build_nice_stop_announcement(
-            turn_result, fb_roles, def_lineup
+            turn_result, fb_roles, def_lineup, is_away_offense
         )
 
     # Re-canonicalize the post-shot overlay maps now that `fb_roles` (which
@@ -1296,11 +1305,30 @@ def build_covert_release_animation_steps(
             _ok, len(_ov) if isinstance(_ov, dict) else 0, _bh_in_ov,
         )
 
-    # Movement #1 (post-shot positioning): override outcome step's end.coords
-    # for players in shot_manager's overlay maps (get-back, release,
-    # offense rebounders, defense rebounders for FB). Skips for DEFENSIVE_STOP
-    # since the FB ended without a shot resolving — no rebounder placement.
-    if result_type != "DEFENSIVE_STOP":
+    # Movement #1 (post-shot positioning): split path based on result_type.
+    #   - MAKE/MISS/BLOCK: append variant-aware schema-pure post-shot
+    #     sub-steps ([ball_flight] → variant → [hold] / [bounce]) via
+    #     `_build_post_shot_sub_steps`. The helper rewires outcome_step's
+    #     next pointer from `turn_stop SHOT_ATTEMPT` to the new sub-steps
+    #     and flags the terminal turn_stop with `schema_rendered_arc:true`
+    #     so FE `runShotAttempt` short-circuits (no double arc/hold). SFX,
+    #     announcements, and rebound-cluster overlays are handled by the
+    #     schema sub-steps and shared.py's overlay-apply chain — NOT by
+    #     `_apply_post_shot_overlay` on outcome_step (see shared.py:2982-3004
+    #     for why schema MAKE/MISS/BLOCK intentionally suppresses that).
+    #   - DEFENSIVE_STOP: no shot resolved, no rebounder placement.
+    #   - Other (FOUL / DEAD_BALL_TURNOVER / etc.): keep the legacy overlay
+    #     + clamp on outcome_step until those paths migrate.
+    if result_type in ("MAKE", "MISS", "BLOCK"):
+        try:
+            from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+            _build_post_shot_sub_steps(
+                steps, turn_result, off_lineup, def_lineup, is_away_offense,
+            )
+        except Exception:
+            import logging
+            logging.exception("CR FB post-shot sub-steps failed")
+    elif result_type != "DEFENSIVE_STOP":
         _apply_post_shot_overlay(outcome_step, turn_result)
         # 🔍 Bug B diagnostic: BH end coord after overlay pass.
         if _bh_id_str:
@@ -1334,6 +1362,10 @@ def build_covert_release_animation_steps(
             )
 
     _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
+
+    from BackEnd.utils.animation_step_helpers import log_fb_animation_steps
+    log_fb_animation_steps("CR", steps, off_lineup, def_lineup)
+
     return steps
 
 

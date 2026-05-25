@@ -26,6 +26,8 @@ from BackEnd.constants import (
     MALLEABLE_ATTRS,
     HOME_RIM_COORDS,
     AWAY_RIM_COORDS,
+    MADE_SHOT_SWEET_SPOT_HOME_RIM,
+    MADE_SHOT_SWEET_SPOT_AWAY_RIM,
 )
 from BackEnd.utils.shared import (
     weighted_random_from_dict,
@@ -63,7 +65,7 @@ from BackEnd.engine.phase_resolution import (
     resolve_full_court_press_logic,
     resolve_half_court_trap_logic
 )
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 
@@ -496,6 +498,60 @@ class TurnManager:
                 contract["terminal_owner_pos"],
             )
 
+    def _inbound_setup_coords_from_dest(
+        self,
+        o_dest: Dict[str, Any],
+        d_dest: Dict[str, Any],
+        off_lineup: Dict[str, Any],
+        def_lineup: Dict[str, Any],
+    ) -> Dict[str, Dict[str, float]]:
+        setup_coords: Dict[str, Dict[str, float]] = {}
+        for pos, coord in (o_dest or {}).items():
+            player = off_lineup.get(pos)
+            pid = getattr(player, "player_id", None)
+            if pid is not None and isinstance(coord, dict):
+                setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+        for pos, coord in (d_dest or {}).items():
+            player = def_lineup.get(pos)
+            pid = getattr(player, "player_id", None)
+            if pid is not None and isinstance(coord, dict):
+                setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+        return setup_coords
+
+    def _resolve_inbound_prior_seam(
+        self,
+        prior_turn: Optional[Dict[str, Any]],
+    ) -> tuple:
+        """Resolve prior-end coords + BH for SIP/BIP bridge emission."""
+        game = self.game
+        game_state = getattr(game, "game_state", {}) or {}
+
+        if isinstance(prior_turn, dict):
+            prior_fc = prior_turn.get("final_coords")
+            if isinstance(prior_fc, dict) and len(prior_fc) >= 8:
+                return prior_fc, prior_turn.get("final_ball_handler_id")
+
+        if game_state.get("inbound_seam_from_triangle"):
+            from BackEnd.utils.player_entry import build_triangle_entrance_coords
+
+            triangle = build_triangle_entrance_coords(game)
+            bh = game_state.get("timeout_seam_ball_handler_id")
+            return triangle, bh
+
+        return {}, None
+
+    def _stamp_inbound_hco_handoff(self, payload: Dict[str, Any], sf_id: str, pg_id: str) -> None:
+        """Stamp fields the HCO entry orchestrator reads on the following turn."""
+        next_route = payload.get("next_play_type") or payload.get("next_turn") or "HCO"
+        payload["next_play_type"] = next_route
+        payload.setdefault("next_turn", next_route)
+        payload["hco_setup"] = {
+            "inbound_pass": {
+                "from_player_id": str(sf_id),
+                "to_player_id": str(pg_id),
+            }
+        }
+
     def setup_side_inbound(self):
         """
         Prepare coordinates for a sideline inbound following a dead-ball
@@ -571,6 +627,7 @@ class TurnManager:
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Team on offense during this turn
             "current_turn": "SIDE_INBOUND",  # ✅ SS&S: Explicit turn type
             "next_turn": "HCO",  # ✅ SS&S: Always transitions to HCO after side inbound
+            "next_play_type": "HCO",
             "possession_team_id": offense_team.team_id,  # ✅ TODO: Remove (backwards compatibility)
             "quarter": self.game.quarter,
         }
@@ -604,26 +661,13 @@ class TurnManager:
             sf_id = str(getattr(sf_player, "player_id", "") or "")
             pg_id = str(getattr(pg_player, "player_id", "") or "")
 
-            setup_coords: Dict[str, Dict[str, float]] = {}
-            for pos, coord in (o_dest or {}).items():
-                player = offense_team.lineup.get(pos)
-                pid = getattr(player, "player_id", None)
-                if pid is not None and isinstance(coord, dict):
-                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
-            for pos, coord in (d_dest or {}).items():
-                player = defense_team.lineup.get(pos)
-                pid = getattr(player, "player_id", None)
-                if pid is not None and isinstance(coord, dict):
-                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+            setup_coords = self._inbound_setup_coords_from_dest(
+                o_dest, d_dest, offense_team.lineup, defense_team.lineup
+            )
 
             prior_turns = getattr(game, "turns", None) or []
             prior_turn = prior_turns[-1] if prior_turns else None
-            prior_final_coords = (
-                prior_turn.get("final_coords") if isinstance(prior_turn, dict) else None
-            ) or {}
-            prior_final_bh_id = (
-                prior_turn.get("final_ball_handler_id") if isinstance(prior_turn, dict) else None
-            )
+            prior_final_coords, prior_final_bh_id = self._resolve_inbound_prior_seam(prior_turn)
 
             clock_state = getattr(game, "game_state", {}) or {}
             clock_r = float(clock_state.get("time_remaining", 0) or 0)
@@ -643,10 +687,12 @@ class TurnManager:
                 )
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
+                    self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
                     import logging
                     logging.warning(
-                        "🌉 [SIP_BRIDGE FIRED] step_count=%d sf_id=%s pg_id=%s prior_bh=%s",
+                        "🌉 [SIP_BRIDGE FIRED] step_count=%d sf_id=%s pg_id=%s prior_bh=%s triangle=%s",
                         len(anim_steps), sf_id, pg_id, prior_final_bh_id,
+                        bool((game.game_state or {}).get("inbound_seam_from_triangle")),
                     )
         except Exception as e:
             import logging
@@ -1011,63 +1057,74 @@ class TurnManager:
         # to BIP destinations). Step 2 = inbound pass (SF→PG; other 8 continue
         # toward Step 1 destinations). See transition_bridge.build_bip_animation_steps.
         try:
-            from BackEnd.utils.transition_bridge import build_bip_animation_steps
+            from BackEnd.utils.transition_bridge import (
+                build_bip_animation_steps,
+                build_sip_animation_steps,
+            )
 
             sf_player = offense_team.lineup.get("SF")
             pg_player = offense_team.lineup.get("PG")
             sf_id = str(getattr(sf_player, "player_id", "") or "")
             pg_id = str(getattr(pg_player, "player_id", "") or "")
 
-            # Build setup_coords (player_id-keyed) from per-position o_dest/d_dest.
-            setup_coords: Dict[str, Dict[str, float]] = {}
-            for pos, coord in (o_dest or {}).items():
-                player = offense_team.lineup.get(pos)
-                pid = getattr(player, "player_id", None)
-                if pid is not None and isinstance(coord, dict):
-                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
-            for pos, coord in (d_dest or {}).items():
-                player = defense_team.lineup.get(pos)
-                pid = getattr(player, "player_id", None)
-                if pid is not None and isinstance(coord, dict):
-                    setup_coords[str(pid)] = {"x": float(coord.get("x", 0)), "y": float(coord.get("y", 0))}
+            setup_coords = self._inbound_setup_coords_from_dest(
+                o_dest, d_dest, offense_team.lineup, defense_team.lineup
+            )
 
             prior_turns = getattr(game, "turns", None) or []
             prior_turn = prior_turns[-1] if prior_turns else None
-            prior_final_coords = (
-                prior_turn.get("final_coords") if isinstance(prior_turn, dict) else None
-            ) or {}
+            prior_final_coords, prior_final_bh_id = self._resolve_inbound_prior_seam(prior_turn)
 
             clock_state = getattr(game, "game_state", {}) or {}
             clock_r = float(clock_state.get("time_remaining", 0) or 0)
             shot_r = float(clock_state.get("shot_clock_remaining", 0) or 0)
 
-            # Ball starts at the rim where the shot was just made — that's
-            # the new offense's DEFENSIVE basket (inverse of their attacking
-            # basket). For home offense, the just-scored rim is AWAY_RIM_COORDS;
-            # for away offense, it's HOME_RIM_COORDS.
-            ball_start_coord = (
-                dict(AWAY_RIM_COORDS) if not is_away_offense else dict(HOME_RIM_COORDS)
-            )
+            use_triangle_seam = bool((game.game_state or {}).get("inbound_seam_from_triangle"))
 
             if sf_id and pg_id and prior_final_coords and setup_coords:
-                anim_steps = build_bip_animation_steps(
-                    off_lineup=offense_team.lineup,
-                    def_lineup=defense_team.lineup,
-                    prior_final_coords=prior_final_coords,
-                    setup_coords=setup_coords,
-                    sf_id=sf_id,
-                    pg_id=pg_id,
-                    ball_start_coord=ball_start_coord,
-                    is_fast_break_after_make=False,  # FB-after-MAKE not yet implemented
-                    clock_remaining_at_start=clock_r,
-                    shot_clock_remaining_at_start=shot_r,
-                )
+                anim_steps = None
+                if use_triangle_seam:
+                    # Quarter/timeout break: 3-step walk/hold/pass from triangle
+                    # (same structure as SIP — no rim pickup).
+                    anim_steps = build_sip_animation_steps(
+                        off_lineup=offense_team.lineup,
+                        def_lineup=defense_team.lineup,
+                        prior_final_coords=prior_final_coords,
+                        prior_final_ball_handler_id=prior_final_bh_id,
+                        setup_coords=setup_coords,
+                        sf_id=sf_id,
+                        pg_id=pg_id,
+                        clock_remaining_at_start=clock_r,
+                        shot_clock_remaining_at_start=shot_r,
+                    )
+                else:
+                    # Made-shot / live-play BIP: 4-step rim pickup sequence.
+                    ball_start_coord = (
+                        dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
+                        if not is_away_offense
+                        else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+                    )
+                    anim_steps = build_bip_animation_steps(
+                        off_lineup=offense_team.lineup,
+                        def_lineup=defense_team.lineup,
+                        prior_final_coords=prior_final_coords,
+                        setup_coords=setup_coords,
+                        sf_id=sf_id,
+                        pg_id=pg_id,
+                        ball_start_coord=ball_start_coord,
+                        is_fast_break_after_make=False,
+                        clock_remaining_at_start=clock_r,
+                        shot_clock_remaining_at_start=shot_r,
+                    )
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
+                    self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
                     import logging
+                    bridge_tag = "BIP_BREAK_BRIDGE" if use_triangle_seam else "BIP_BRIDGE"
                     logging.warning(
-                        "🌉 [BIP_BRIDGE FIRED] step_count=%d sf_id=%s pg_id=%s next=%s ball_start=%s",
-                        len(anim_steps), sf_id, pg_id, payload.get("next_play_type"), ball_start_coord,
+                        "🌉 [%s FIRED] step_count=%d sf_id=%s pg_id=%s next=%s prior_bh=%s",
+                        bridge_tag,
+                        len(anim_steps), sf_id, pg_id, payload.get("next_play_type"), prior_final_bh_id,
                     )
         except Exception as e:
             import logging

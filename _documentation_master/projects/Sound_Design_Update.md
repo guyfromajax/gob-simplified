@@ -52,13 +52,19 @@ SFX Direction
 
 ## Court Event SFX
 
-Court event stingers are **in scope** for the secondary announcement ribbon and the Defense Matchups modal. They are **not** primary-tier whistles (`playAnnouncementSfx`); route them through the court gameplay SFX manager (`gameSfx.js` — preload pools, `playGameSfx`, optional `?debug_sfx=1`).
+Court event stingers cover both the primary center-court overlay and the secondary top-edge ribbon (plus the Defense Matchups modal). All announcement-tied SFX route through the **payload-carries-SFX architecture**:
+
+1. The caller passes `meta.sfx = '<filename>'` (string), an array of filenames, or a legacy kind string (e.g. `'foul'`, `'shot_clock_violation'`, `'fb_outlet_denied_court'`, `'steal'`).
+2. The announcement helper (`showAnnouncement` / `showAndOneAnnouncement` / `showSecondaryAnnouncement` in `announcements.js`) resolves the value to a filename via `resolveAnnounceMetaCourtSfxFile` / `resolveSecondaryAnnounceCourtSfxFile` / `resolvePrimarySfxFromMeta` and puts it on the payload as `data.sfx`.
+3. `court.html`'s overlay mount functions read `data.sfx` and call `window.playGameSfx(filename)` at the moment the DOM mounts — synced to the visual entry.
+
+Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` and `window.showSecondaryAnnouncementOverlay`). No JS module outside `gameSfx.js` calls `playFBOutletDeniedCourtSfx` / `playChargeAnnounceCourtSfx` / `playAnnouncementSfx` / etc. directly anymore.
 
 **Shared rules**
 
-- Volume: **0.7** (same as other court SFX).
-- **One SFX per show** — fire once when the UI moment appears; do not stack on re-entrant or idempotent announce calls for the same visible show.
-- Assets live under `FrontEnd/static/sounds/`; use root-relative `/sounds/` + `encodeURIComponent(filename)`.
+- Volume: **0.7** (same as other court SFX). All audio goes through `playGameSfx` (preloaded pool, scene-retained).
+- **One SFX per show** — fire once when the UI moment appears; do not stack on re-entrant or idempotent announce calls for the same visible show. Once-per-turn dedupe for `Press!` / `Trap!` / `Fast Break!` is enforced inside `resolveSecondaryAnnounceCourtSfxFile`.
+- Assets live under `FrontEnd/static/sounds/`; `playGameSfx` already URL-encodes the filename.
 
 **Defense Matchup Modal**
 
@@ -118,7 +124,7 @@ Court event stingers are **in scope** for the secondary announcement ribbon and 
 
 **Steal Announce**
 
-- Trigger: immediately when the ball attaches to teh stealer's sprite.
+- Trigger: immediately when the **Steal** Announce appears.
 - File: **33/33/34** random each show — `sammy-steal.wav` or `braddock-steal.wav` or `butler-steal.wav`
 
 **Charge Announce**

@@ -47,6 +47,7 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "duke-charging.wav",
   "duke-great-stop.wav",
   "duke-denied.wav",
+  "duke-hold-up.wav",
 ]);
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
@@ -184,10 +185,19 @@ export function getGameSfxDebugState() {
 }
 
 export function playGameSfx(scene, filename, volume = DEFAULT_VOLUME, meta = {}) {
-  if (!filename) return;
+  if (!filename) {
+    console.warn("[SFX] playGameSfx called with no filename", meta);
+    return;
+  }
+  if (!scene) {
+    console.warn("[SFX] playGameSfx called with no scene", { filename, ...meta });
+  }
   const pool = ensurePool(filename);
   const audio = nextAudioFromPool(pool);
-  if (!audio) return;
+  if (!audio) {
+    console.warn("[SFX] no audio available in pool (not preloaded or pool exhausted)", { filename, ...meta });
+    return;
+  }
 
   const releaseSceneRef = retainActiveSfx(scene, audio);
   const release = () => {
@@ -337,24 +347,24 @@ export function playShotResultSfx(scene, turnData, result) {
   }
 }
 
-// Fires at the moment the ball attaches to the stealer's sprite. Weighted
-// 33/33/34 across three voice options.
+// Weighted 33/33/34 across three voice options. Tied to the "STEAL!"
+// announcement appearance (Sound_Design_Update.md "Steal Announce"); callers
+// resolve a filename here and pass it via `meta.sfx` on the announcement
+// payload so `court.html` plays the cue at overlay mount.
 const STEAL_SFX_FILES = Object.freeze([
   { file: "sammy-steal.wav", weight: 33 },
   { file: "braddock-steal.wav", weight: 33 },
   { file: "butler-steal.wav", weight: 34 },
 ]);
 
-export function playStealSfx(scene) {
+export function resolveStealSfxFile() {
   const total = STEAL_SFX_FILES.reduce((sum, entry) => sum + entry.weight, 0);
   let roll = Math.random() * total;
   for (const entry of STEAL_SFX_FILES) {
     roll -= entry.weight;
-    if (roll <= 0) {
-      playGameSfx(scene, entry.file, DEFAULT_VOLUME, { event: "steal" });
-      return;
-    }
+    if (roll <= 0) return entry.file;
   }
+  return STEAL_SFX_FILES[STEAL_SFX_FILES.length - 1].file;
 }
 
 // Fires at the moment the ball attaches to the rebounder sprite. DREB → defense
@@ -426,6 +436,80 @@ export function resetSecondaryAnnounceCourtSfxDedup() {
 }
 
 /**
+ * Headline → secondary-tier SFX filename, with once-per-turn dedupe for
+ * Press / Trap / Fast Break. Returns null when no headline match or the
+ * once-per-turn gate has already consumed this turn's stinger.
+ *
+ * Mirrors ``playSecondaryAnnounceCourtSfx`` but does not play — callers put
+ * the returned filename on the announcement payload (``data.sfx``) so the
+ * actual play happens at overlay mount time in ``court.html``, synced to
+ * the visual entry per Sound_Design_Update.md.
+ */
+export function resolveSecondaryAnnounceCourtSfxFile(headline) {
+  const text = String(headline || "").trim();
+  let filename = null;
+  switch (text) {
+    case "Press!":
+      filename = pickRandomCourtEventFile(["sammy-press.mp3", "press-braddock.mp3"]);
+      break;
+    case "Trap!":
+      filename = "trap-braddock.mp3";
+      break;
+    case "Fast Break!":
+      filename = "fast-break-braddock.mp3";
+      break;
+    case "Quick Shot":
+      filename = "quick-shot-braddock.mp3";
+      break;
+    case "Slow It Down":
+      filename = "slow-it-down-braddock.mp3";
+      break;
+    case "Final Shot":
+      filename = pickRandomCourtEventFile(["sammy-final-shot.mp3", "final-shot-braddock.mp3"]);
+      break;
+    case "No Fast Break":
+      filename = "duke-hold-up.wav";
+      break;
+    default:
+      return null;
+  }
+  if (ONCE_PER_TURN_SECONDARY_HEADLINES.has(text)) {
+    if (secondaryCourtEventSfxPlayedThisTurn.has(text)) return null;
+    secondaryCourtEventSfxPlayedThisTurn.add(text);
+  }
+  return filename;
+}
+
+/**
+ * Legacy ``meta.sfx`` KEY → filename (or null when no mapping).
+ *
+ * Supports both:
+ *   - Secondary-tier keys backend stamps on schema announcements:
+ *     ``"steal"`` / ``"block_announce"`` / ``"charge_announce"`` /
+ *     ``"fb_defensive_stop"`` / ``"fb_outlet_denied_court"`` /
+ *     ``"no_fast_break"``. Mirrors ``playAnnouncementMetaCourtSfx``'s switch.
+ *   - Primary-tier legacy kinds historically passed to ``playAnnouncementSfx``:
+ *     ``"foul"`` / ``"shot_clock_violation"``. Lets callers keep the legacy
+ *     ``meta.sfx`` contract while the actual play moves to court.html mount.
+ *
+ * Callers put the returned filename on ``data.sfx``; court.html plays at
+ * overlay mount, synced to the visual entry per Sound_Design_Update.md.
+ */
+export function resolveAnnounceMetaCourtSfxFile(key) {
+  switch (String(key || "").trim()) {
+    case "steal": return resolveStealSfxFile();
+    case "block_announce": return "duke-its-blocked.wav";
+    case "charge_announce": return "duke-charging.wav";
+    case "fb_defensive_stop": return "duke-great-stop.wav";
+    case "fb_outlet_denied_court": return "duke-denied.wav";
+    case "no_fast_break": return "duke-hold-up.wav";
+    case "foul": return "whistle-1-lowervol.wav";
+    case "shot_clock_violation": return "whistle-3.mp3";
+    default: return null;
+  }
+}
+
+/**
  * Secondary-announcement court stingers (Sound_Design_Update.md — Court Event SFX).
  * Press!, Trap!, and Fast Break! play at most once per turn; other mapped headlines
  * still fire on every matching showSecondaryAnnouncement call.
@@ -452,7 +536,11 @@ export function playSecondaryAnnounceCourtSfx(scene, headline) {
     case "Final Shot":
       filename = pickRandomCourtEventFile(["sammy-final-shot.mp3", "final-shot-braddock.mp3"]);
       break;
+    case "No Fast Break":
+      filename = "duke-hold-up.wav";
+      break;
     default:
+      console.warn("[SFX] playSecondaryAnnounceCourtSfx: no headline match", { headline: text });
       return;
   }
   if (ONCE_PER_TURN_SECONDARY_HEADLINES.has(text)) {
@@ -487,6 +575,49 @@ export function playFBOutletDeniedCourtSfx(scene) {
   playGameSfx(scene, "duke-denied.wav", DEFAULT_VOLUME, { event: "fb_outlet_denied" });
 }
 
+/**
+ * Backend-emitted announcement metadata (`announcement.meta.sfx`) is the
+ * schema path for court-event stingers that are not covered by headline-only
+ * secondary mappings. Returns true when the key was recognized.
+ */
+export function playAnnouncementMetaCourtSfx(scene, key, headline = "") {
+  switch (String(key || "").trim()) {
+    case "steal":
+      playGameSfx(scene, resolveStealSfxFile(), DEFAULT_VOLUME, { event: "steal" });
+      return true;
+    case "block_announce":
+      playBlockAnnounceCourtSfx(scene);
+      return true;
+    case "charge_announce":
+      playChargeAnnounceCourtSfx(scene);
+      return true;
+    case "fb_defensive_stop":
+      playFBDefensiveStopCourtSfx(scene);
+      return true;
+    case "fb_outlet_denied_court":
+      playFBOutletDeniedCourtSfx(scene);
+      return true;
+    case "no_fast_break":
+      playGameSfx(scene, "duke-hold-up.wav", DEFAULT_VOLUME, {
+        event: "no_fast_break",
+        headline,
+      });
+      return true;
+    default:
+      console.warn("[SFX] playAnnouncementMetaCourtSfx: unknown meta.sfx key", { key, headline });
+      return false;
+  }
+}
+
 if (typeof window !== "undefined") {
+  // `court.html`'s announcement-overlay mount functions read `data.sfx`
+  // (filename) and call this to play the cue at the moment the overlay
+  // appears — fixes BLOCK SFX timing per Sound_Design_Update.md "Block
+  // Announce: Trigger: immediately when the Block announce appears."
+  // Scene is null because pool retention keeps the audio element alive.
+  window.playGameSfx = (filename, volume) =>
+    playGameSfx(null, filename, typeof volume === "number" ? volume : DEFAULT_VOLUME, {
+      event: "announcement_mount_sfx",
+    });
   window.getGameSfxDebugState = getGameSfxDebugState;
 }

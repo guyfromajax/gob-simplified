@@ -54,6 +54,10 @@ from BackEnd.utils.animation_step_helpers import (
     _euclid,
     _player_lookup_by_id,
     rebound_attemptor_ids,
+    shot_followup_timed_sfx,
+    shot_launch_sfx,
+    shot_result_sfx,
+    stamp_hot_shot_trail_metadata,
     stamp_rebound_capture_player_motion,
     stamp_tween_durations,
 )
@@ -167,6 +171,7 @@ def _build_rebound_capture_step(
     clock_remaining: float,
     shot_clock_remaining: float,
     next_step_index: int,
+    is_away_offense: bool,
     offense_rebounders: Optional[List[Any]] = None,
     defense_rebounders: Optional[List[Any]] = None,
 ) -> AnimationStep:
@@ -254,6 +259,16 @@ def _build_rebound_capture_step(
             "clock": {
                 "clock_remaining": float(clock_remaining) - t,
                 "shot_clock_remaining": float(shot_clock_remaining) - t,
+            },
+            # "Rebound!" headline — OREB rebounder is on the OFFENSIVE team
+            # (same as away_offense). Mirrors DREB; fires after sprite snap
+            # so it lands when the rebounder visually has the ball.
+            "announcement": {
+                "text": "Rebound!",
+                "team": "away" if is_away_offense else "home",
+                "hold_ms": 1000,
+                "style": "primary",
+                "player_data": {"playerId": str(rebounder_id)},
             },
             "next": {"kind": "next_step", "index": next_step_index},
         },
@@ -343,10 +358,19 @@ def _build_ball_flight_step(
     next_step: NextStep,
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
+    turn_result: Optional[Dict[str, Any]] = None,
 ) -> AnimationStep:
     """Putback ball-flight step. Ball travels from shot_spot (= shooter
     coord) to MSSS (make) or rim (miss). Game clock burns; shot clock
-    pinned. All 10 players hold position (no overlay motion per D2)."""
+    pinned. All 10 players hold position (no overlay motion per D2).
+
+    Stamps the same SFX cues as the skeleton emitter's [ball_flight]
+    (audit bug 4 — putback shots were silent because OREB has its own
+    builder that didn't wire SFX):
+      - ``sfx_on_ball_release`` — shot launch SFX (tier by shot score)
+      - ``sfx_on_ball_arrival`` — variant-aware arrival cue
+      - ``timed_sfx`` — secondary swish for BANK_MAKE / BACK_OF_RIM
+    """
     shot_spot = start_coords.get(shooter_id) or {"x": 50.0, "y": 25.0}
     flight_end = _sweet_spot_coords(is_away_offense) if is_make else _rim_coords(is_away_offense)
     dist = _euclid(shot_spot, flight_end)
@@ -365,21 +389,46 @@ def _build_ball_flight_step(
             "result": result_type,
         },
     }
+    if turn_result:
+        stamp_hot_shot_trail_metadata(
+            trigger["metadata"],
+            turn_result.get("shot_score_pre_defense"),
+        )
+
+    shot_variant = (turn_result or {}).get("shot_variant") if turn_result else None
+    launch_sfx = shot_launch_sfx(
+        (turn_result or {}).get("shot_score_pre_defense") if turn_result else None
+    )
+    arrival_sfx = shot_result_sfx(
+        shot_variant,
+        result_type,
+        bank_miss_sfx_file=(turn_result or {}).get("shot_variant_bank_miss_sfx_file")
+        if turn_result else None,
+    )
+    timed_sfx = shot_followup_timed_sfx(shot_variant, result_type)
+
+    start_block: Dict[str, Any] = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetypes,
+        "ball": {"coords": dict(shot_spot)},
+        "clock": {
+            "clock_remaining": float(clock_remaining),
+            "shot_clock_remaining": float(shot_clock_remaining),
+        },
+        "advance_trigger": trigger,
+        "ball_motion_style": "shot",
+    }
+    if launch_sfx:
+        start_block["sfx_on_ball_release"] = launch_sfx
+    if arrival_sfx:
+        start_block["sfx_on_ball_arrival"] = arrival_sfx
+    if timed_sfx:
+        start_block["timed_sfx"] = timed_sfx
 
     step: AnimationStep = {
-        "start": {
-            "coords": {pid: dict(c) for pid, c in start_coords.items()},
-            "destination": destinations,
-            "action": actions,
-            "archetype": archetypes,
-            "ball": {"coords": dict(shot_spot)},
-            "clock": {
-                "clock_remaining": float(clock_remaining),
-                "shot_clock_remaining": float(shot_clock_remaining),
-            },
-            "advance_trigger": trigger,
-            "ball_motion_style": "shot",
-        },
+        "start": start_block,
         "end": {
             "coords": end_coords,
             "ball": {"coords": dict(flight_end)},
@@ -464,6 +513,8 @@ def build_oreb_animation_steps(
     Returns None for unrecognized result_types or when required inputs are
     missing (graceful degradation).
     """
+    import logging as _oreb_log
+
     result_type = (turn_result.get("result_type") or "").upper()
     if result_type not in ("OREB_KICKOUT", "PUTBACK_MAKE", "PUTBACK_MISS"):
         return None
@@ -479,6 +530,10 @@ def build_oreb_animation_steps(
         or str(turn_result.get("rebounderId") or "").strip()
     )
     if not rebounder_id:
+        _oreb_log.warning(
+            "🐛 [OREB_NONE site=rebounder_id_missing] result_type=%s shooter=%s rebounderId=%s",
+            result_type, turn_result.get("shooter"), turn_result.get("rebounderId"),
+        )
         return None
 
     off_team = getattr(game, "offense_team", None)
@@ -493,11 +548,22 @@ def build_oreb_animation_steps(
     prior_turns = getattr(game, "turns", None) or []
     prior_turn = prior_turns[-1] if prior_turns else None
     if not isinstance(prior_turn, dict):
+        _oreb_log.warning(
+            "🐛 [OREB_NONE site=no_prior_turn] result_type=%s rebounder_id=%s",
+            result_type, rebounder_id,
+        )
         return None
 
     bx = prior_turn.get("ball_bounce_x")
     by = prior_turn.get("ball_bounce_y")
     if bx is None or by is None:
+        _oreb_log.warning(
+            "🐛 [OREB_NONE site=prior_bounce_missing] result_type=%s prior_turn_type=%s prior_result_type=%s bx=%s by=%s",
+            result_type,
+            prior_turn.get("current_turn"),
+            prior_turn.get("result_type"),
+            bx, by,
+        )
         return None
     bounce_coords: GridCoord = {"x": float(bx), "y": float(by)}
 
@@ -506,6 +572,11 @@ def build_oreb_animation_steps(
         off_lineup, def_lineup, prior_final_coords,
     )
     if not start_coords or rebounder_id not in start_coords:
+        _oreb_log.warning(
+            "🐛 [OREB_NONE site=rebounder_not_in_start_coords] result_type=%s rebounder_id=%s start_coords_count=%d in_coords=%s",
+            result_type, rebounder_id, len(start_coords),
+            rebounder_id in start_coords,
+        )
         return None
 
     game_state = getattr(game, "game_state", {}) or {}
@@ -521,6 +592,7 @@ def build_oreb_animation_steps(
         def_lineup=def_lineup,
         clock_remaining=clock_remaining,
         shot_clock_remaining=shot_clock_remaining,
+        is_away_offense=is_away_offense,
         next_step_index=1,
         offense_rebounders=prior_turn.get("offense_rebounders"),
         defense_rebounders=prior_turn.get("defense_rebounders"),
@@ -528,20 +600,29 @@ def build_oreb_animation_steps(
     steps: List[AnimationStep] = [capture_step]
     elapsed = capture_step["end"]["time_elapsed"]
 
+    def _finalize(label: str) -> List[AnimationStep]:
+        from BackEnd.utils.animation_step_helpers import log_fb_animation_steps
+        log_fb_animation_steps(
+            label, steps, off_lineup, def_lineup, prefix="OREB_STEP",
+        )
+        return steps
+
     if result_type == "OREB_KICKOUT":
         pg_id = str(turn_result.get("pgId") or "")
         if not pg_id or pg_id == rebounder_id or pg_id not in start_coords:
             # Can't kick out to a missing PG; return capture step only.
-            return steps
+            return _finalize("KICKOUT_NO_PG")
         # ``build_kickout_step`` produces 2 sub-steps (positioning + pass).
-        # Other 8 hold (empty setup_coords → no drift targets).
+        # OREB is emitted before the next HCO skeleton exists, so the shared
+        # kickout target helper falls back to organic HCO lane drift for
+        # non-core players.
         kickout_steps = build_kickout_step(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             start_coords=capture_step["end"]["coords"],
             bh_id=rebounder_id,
             receiver_id=pg_id,
-            setup_coords={},
+            setup_coords=None,
             is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_remaining - elapsed,
             shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
@@ -549,7 +630,7 @@ def build_oreb_animation_steps(
             metadata_reason="oreb_kickout",
         )
         if not kickout_steps:
-            return steps
+            return _finalize("KICKOUT_EMPTY")
         # Rewire next-pointers across the appended kickout sub-steps.
         first_kickout_idx = len(steps)
         for offset, kstep in enumerate(kickout_steps):
@@ -563,7 +644,7 @@ def build_oreb_animation_steps(
                 kstep["end"]["next"] = {"kind": "next_step", "index": 999}
         capture_step["end"]["next"] = {"kind": "next_step", "index": first_kickout_idx}
         steps.extend(kickout_steps)
-        return steps
+        return _finalize("OREB_KICKOUT")
 
     # PUTBACK_MAKE / PUTBACK_MISS share [putback_shoot] + [ball_flight];
     # MAKE adds [hold], MISS adds [bounce].
@@ -599,6 +680,7 @@ def build_oreb_animation_steps(
         next_step=flight_next,
         off_lineup=off_lineup,
         def_lineup=def_lineup,
+        turn_result=turn_result,
     )
     steps.append(flight_step)
     elapsed += flight_step["end"]["time_elapsed"]
@@ -615,7 +697,7 @@ def build_oreb_animation_steps(
             next_step=_shot_attempt_turn_stop(turn_result, "MAKE"),
         )
         steps.append(hold_step)
-        return steps
+        return _finalize("PUTBACK_MAKE")
 
     # PUTBACK_MISS → [bounce] then turn_stop SHOT_ATTEMPT. The OREB turn
     # ENDS HERE; second rebound (DREB or chained OREB) becomes its own
@@ -626,7 +708,7 @@ def build_oreb_animation_steps(
     if sbx is None or sby is None:
         # No second-bounce coords on the turn — emit ball_flight ending the turn.
         flight_step["end"]["next"] = _shot_attempt_turn_stop(turn_result, "MISS")
-        return steps
+        return _finalize("PUTBACK_MISS_NO_BOUNCE")
     bounce_target: GridCoord = {"x": float(sbx), "y": float(sby)}
 
     bounce_step = _build_bounce_step(
@@ -640,4 +722,4 @@ def build_oreb_animation_steps(
         def_lineup=def_lineup,
     )
     steps.append(bounce_step)
-    return steps
+    return _finalize("PUTBACK_MISS")

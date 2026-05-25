@@ -6,10 +6,9 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.
  * Spawns a self-cleaning Phaser 3.60 particle trail that follows ballSprite
  * for `durationMs`, then destroys itself. No leaks, no persistent listeners.
  *
- * Currently fired by `renderBallTransition` in `animationPlayback.js` when the
- * outlet pass step on a Covert Release fast break has a high outlet score
- * (sharp pass). Designed so it can be reused for any ball-tween that wants a
- * visual emphasis effect (e.g., dimes, alley-oops, etc.) in the future.
+ * Fired by `renderBallTransition` in `animationPlayback.js` when:
+ *   - CR outlet pass: ``metadata.outlet_score >= 50``
+ *   - Schema [ball_flight]: ``metadata.hot_shot_trail`` (shot_score_pre_defense > 210)
  *
  * Tuning notes — pass `opts` to adjust:
  *   - `color` / `coreColor`: outer trail tint vs. hot core (defaults orange/cream).

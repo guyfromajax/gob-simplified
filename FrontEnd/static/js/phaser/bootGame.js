@@ -1,5 +1,5 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
-import { createGameScene } from './gameScene.js';
+import { createGameScene } from './gameScene.js?v=uess-turn-preload-1';
 import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
@@ -637,7 +637,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
       const hasFreeThrowsRemaining = (turn.free_throws_remaining ?? 0) > 0;
       const nextPlayTypeIsFreeThrow = turn.next_play_type === 'FREE_THROW';
       const isShootingFoul = hasDefensiveFoul && (hasFreeThrowsRemaining || nextPlayTypeIsFreeThrow);
-      
+
       // 🔍 DEBUG: Log shooting foul detection for Sim Quarter text scroll
       if (resultType === 'MISS') {
         console.warn('🔍 [SHOOTING FOUL MISS DEBUG] bootGame.js Sim Quarter detection:', {
@@ -2271,8 +2271,7 @@ async function handleSimQuarter() {
     payload.full_sim = true;
     
     console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: nextQuarter, gameId, full_sim: true});
-    const base = API_CONFIG.buildUrl('/api/simulate-quarter');
-    const simQuarterUrl = base + (base.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+    const simQuarterUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
     const res = await fetch(simQuarterUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2549,8 +2548,7 @@ async function handleSimFullGame() {
       payload.full_sim = true;
       
       console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
-      const base = API_CONFIG.buildUrl('/api/simulate-quarter');
-      const simQuarterUrl = base + (base.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+      const simQuarterUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
       const res = await fetch(simQuarterUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

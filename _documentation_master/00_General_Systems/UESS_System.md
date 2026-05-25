@@ -77,7 +77,19 @@ Optional:
 
 - `announcement` — mid-turn announcement. Plays after sprites snap to end coords.
 
-### 3.3 Closed vocabularies
+### 3.3 Frontend renderer timing invariants
+
+For ball-motion steps, frontend playback must treat the actual ball tween completion as the visual arrival marker.
+
+- `sfx_on_ball_release` fires when the ball detaches / tween starts.
+- `sfx_on_ball_arrival` fires from the ball tween `onComplete`, not from the step timer.
+- `timed_sfx` cues are scheduled relative to ball arrival, not step start.
+- Step playback may wait longer than the ball tween for readability, but it must not snap / advance before the ball tween completion has fired its arrival cues.
+- If the ball does not move and no tween is created, arrival SFX may fire from the step-end fallback.
+
+This preserves main-branch shot/SFX feel while keeping backend-emitted cues authoritative.
+
+### 3.4 Closed vocabularies
 
 **`PlayerAction`**: `handle_ball`, `pass`, `receive`, `cut`, `screen`, `shoot`, `stationary`, `sprint`, `guard_ball`, `guard_offball`, `post_up`.
 
@@ -85,11 +97,11 @@ Optional:
 
 | Archetype | Rate @ AG=50 | Constant | Use |
 |---|---:|---|---|
-| `cruise` | 12 | `CRUISE_GRID_PER_GAME_SEC` | BH bring-up, settle / transition pace |
+| `cruise` | 13 | `CRUISE_GRID_PER_GAME_SEC` | BH bring-up, settle / transition pace |
 | `shot_motion` | 14 | `SHOT_MOTION_GRID_PER_GAME_SEC` | Shooter during shot |
 | `standard` | 14 | `STANDARD_GRID_PER_GAME_SEC` | Base / unaccelerated movement (AG curve anchor + fallback) |
 | `sprint` | 18 | `SPRINT_GRID_PER_GAME_SEC` | Max-effort movement (walk-up non-BH, converge) |
-| `burst` | 28 | `BURST_GRID_PER_GAME_SEC` | Peak explosive start (FB outlet) |
+| `burst` | 32 | `BURST_GRID_PER_GAME_SEC` | Peak explosive start (FB outlet) |
 | `stationary` | 0 | — | Holds position |
 
 Rate scales with AG via `ag_to_grid_per_game_sec` (see §9.3). Unrecognized archetype strings defensively resolve to `standard` rate.
@@ -266,10 +278,12 @@ Rebounder maps apply first (default for everyone eligible); get-back / release a
 Base movement curve (`ag_to_grid_per_game_sec` in [`shared.py`](../../BackEnd/utils/shared.py)):
 
 ```
-base_rate = 7 + (AG / 100) × 7
+base_rate = STANDARD × (0.90 + (AG / 100) × 0.2)
 ```
 
-Anchored at **AG=50 → 14** (= `STANDARD_GRID_PER_GAME_SEC`). Spread: AG=0 → 7, AG=100 → 21. Capped 0.5–60 in `ag_to_grid_per_game_sec`.
+Anchored at **AG=50 → STANDARD** (= `STANDARD_GRID_PER_GAME_SEC`). Spread: AG=0 → `STANDARD × 0.90`, AG=100 → `STANDARD × 1.10` (1.22x). Curve auto-rebalances when STANDARD changes. Capped 0.5–60 in `ag_to_grid_per_game_sec`.
+
+With current `STANDARD = 14`: AG=0 → 12.6, AG=50 → 14, AG=100 → 15.4.
 
 Per-archetype rate at use sites (`_ag_grid_per_game_sec`):
 
@@ -277,7 +291,7 @@ Per-archetype rate at use sites (`_ag_grid_per_game_sec`):
 archetype_rate = ARCHETYPE_CONSTANT × (base_rate / STANDARD_GRID_PER_GAME_SEC)
 ```
 
-At AG=50, `base_rate / STANDARD` = 1, so each archetype runs at its table rate in §3.3.
+At AG=50, `base_rate / STANDARD` = 1, so each archetype runs at its table rate in §3.4.
 
 ### 9.4 Game-time / wall-time
 
@@ -306,7 +320,7 @@ For per-turn-type behavior, see:
 
 ## 11. Speed values (tuning surface)
 
-**Player archetypes:** single source of truth is **§3.3** (do not duplicate tables here). When §3.3 changes, update [`BackEnd/constants/__init__.py`](../../BackEnd/constants/__init__.py) and the `ag_to_grid_per_game_sec` anchor in §9.3 so AG=50 matches `STANDARD_GRID_PER_GAME_SEC`.
+**Player archetypes:** single source of truth is **§3.4** (do not duplicate tables here). When §3.4 changes, update [`BackEnd/constants/__init__.py`](../../BackEnd/constants/__init__.py) and the `ag_to_grid_per_game_sec` anchor in §9.3 so AG=50 matches `STANDARD_GRID_PER_GAME_SEC`.
 
 ### 11.1 Ball motion speeds
 
@@ -314,12 +328,12 @@ Ball moves at fixed grid/game-sec rate independent of player rates.
 
 | Context | Rate | Constant | Notes |
 |---|---:|---|---|
-| HCO half-court pass | 30 | `PASS_GRID_SPOTS_PER_GAME_SECOND` | Half-court passes; clock-burn accounting |
+| HCO half-court pass | 24 | `PASS_GRID_SPOTS_PER_GAME_SECOND` | Half-court passes; clock-burn accounting |
 | FB pass (sharp) | 40 | `FB_PASS_GRID_SPOTS_PER_GAME_SECOND` | Outlet quality ≥ 50 |
 | FB pass (sloppy) | 30 | `FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY` | Outlet quality < 50 |
-| Reset inbound pass | 30 | `RESET_INBOUND_PASS_GRID_PER_GAME_SECOND` | BH → PG on Reset step |
-| Inbound pass (BIP / SIP) | 30 | `INBOUND_PASS_GRID_PER_GAME_SECOND` | SF → PG; deliberate, slower than Reset |
-| Shot ball motion | 27 | `SHOT_BALL_GRID_PER_GAME_SECOND` | `ball_motion_style="shot"` on `[ball_flight]` (and variant hops). FE: `duration_ms = max(700, gridDist ÷ 27 × tickMs)`; step playback wait `max(step T × tickMs, 700 ms)` so short shots do not jet. Backend `time_elapsed` unchanged. Slower than passes — deliberate release vs quick-twitch pass. |
+| Reset inbound pass | 24 | `RESET_INBOUND_PASS_GRID_PER_GAME_SECOND` | BH → PG on Reset step |
+| Inbound pass (BIP / SIP) | 24 | `INBOUND_PASS_GRID_PER_GAME_SECOND` | SF → PG; deliberate, slower than Reset |
+| Shot ball motion | 27 | `SHOT_BALL_GRID_PER_GAME_SECOND` | `ball_motion_style="shot"` on `[ball_flight]` (and variant hops). FE: `duration_ms = max(400, gridDist ÷ 27 × tickMs)`; step playback wait `max(step T × tickMs, 400 ms)` so short shots do not jet. Arrival SFX anchors to ball tween completion; ball tween and step floor match main-branch `shootBall` parity so short shots do not reach the rim early and idle before result handling. Backend `time_elapsed` unchanged. Slower than passes — deliberate release vs quick-twitch pass. |
 | Free throw shot motion | 12 | `FREE_THROW_SHOT_GRID_PER_GAME_SECOND` | BH → PG on Reset step |
 
 ### 11.2 Floors and timing
@@ -329,7 +343,7 @@ Ball moves at fixed grid/game-sec rate independent of player rates.
 | Pass min duration | 0.5 game-sec | `FB_PASS_MIN_GAME_SECONDS` | T floor for short pass steps |
 | Walk-up step T floor | 1.5 game-sec | (literal in [`transition_bridge.py`](../../BackEnd/utils/transition_bridge.py)) | T = max(1.5, slowest_gate_natural) |
 | HCO skeleton step T floor | 0.5 game-sec | `HCO_STEP_T_FLOOR_GAME_SECONDS` | Min T for HCO skeleton steps (short-distance steps still play visibly) |
-| Shot ball min wall-clock | 700 ms | `SHOT_BALL_MIN_WALL_CLOCK_MS` in [`animationPlayback.js`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js) | FE-only playback floor (ball tween + step wait). Main-branch `shootBall` parity; does not change backend `time_elapsed`. |
+| Shot ball min wall-clock | 400 ms | `SHOT_BALL_MIN_WALL_CLOCK_MS` in [`animationPlayback.js`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js) | FE-only playback floor (ball tween + step wait). Does not change backend `time_elapsed`. |
 | Pass / other ball tween min | 50 ms | (literal in [`animationPlayback.js`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js)) | Safety floor for very short non-shot ball tweens |
 
 ### 11.3 Wall-clock / game-time conversion

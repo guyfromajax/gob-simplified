@@ -1,4 +1,4 @@
-import { animateGameTurns } from './animation/animateGameTurns.js';
+import { animateGameTurns } from './animation/animateGameTurns.js?v=uess-timeline-probes-1';
 import { playGameplayTrack, pauseGameplayTrack, resumeGameplayTrack, evaluateGameplayTrack } from '../musicController.js';
 import { syncSceneTimePaused } from './animation/playbackPause.js';
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
@@ -986,10 +986,9 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
-      const baseUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
-      let url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'profile=1'; // temporary: cProfile profiling; revert when done
+      let url = API_CONFIG.buildUrl('/api/simulate-quarter');
       if (isDebugPlaycall()) {
-        url += '&debug_pc=1';
+        url += (url.includes('?') ? '&' : '?') + 'debug_pc=1';
         const po = payload.playbook_settings && payload.playbook_settings.pc_order;
         const _row = {
           url,
@@ -1267,6 +1266,9 @@ export function createGameScene(Phaser) {
       const openingTipTurn = Array.isArray(simData.turns)
         ? simData.turns.find(turn => turn?.result_type === "OPENING_TIP")
         : null;
+      const firstSimTurn = Array.isArray(simData.turns) ? simData.turns[0] : null;
+      const schemaInboundOnFirstTurn =
+        Array.isArray(firstSimTurn?.animation_steps) && firstSimTurn.animation_steps.length > 0;
       const authoredEntryAnimations = Array.isArray(simData.entry_animation?.animations)
         ? simData.entry_animation.animations
         : (openingTipTurn?.animations || []);
@@ -1275,12 +1277,14 @@ export function createGameScene(Phaser) {
           .filter(anim => anim?.playerId && anim?.entrance)
           .map(anim => [String(anim.playerId), anim.entrance])
       );
-      if (authoredEntranceByPlayerId.size > 0) {
+      if (authoredEntranceByPlayerId.size > 0 && !schemaInboundOnFirstTurn) {
         actualPlayers.forEach(player => {
           const playerId = String(player.playerId ?? player.player_id);
           const entranceCoords = authoredEntranceByPlayerId.get(playerId);
           if (entranceCoords) player.startingCoords = { ...entranceCoords };
         });
+      } else if (schemaInboundOnFirstTurn) {
+        console.warn("🏠 [BENCH_ENTRY] spawn skipped — schema animation_steps handle triangle→setup");
       }
       
       // Filtered active players from roster
@@ -2923,7 +2927,7 @@ export function createGameScene(Phaser) {
 
       // Live clock mode: disable speculative preloading so backend turn decisions
       // (forced-shot/violation at 0) are computed after the visible turn completes.
-      const ENABLE_TURN_PRELOAD = false;
+      const ENABLE_TURN_PRELOAD = true;
 
       // Part 2 (Preload): helper and state defined early so we can preload during initial turns (opening tip → first HCO).
       const simMode = this.mode || 'single';
@@ -3255,12 +3259,17 @@ export function createGameScene(Phaser) {
 
       // Animate initial turns first (opening tip, quarter start inbound, etc.)
       if (initialTurns.length > 0) {
-        if (initialSimData.entry_animation?.kind === "BENCH_ENTRY") {
+        const firstInitialTurn = initialTurns[0];
+        const schemaInboundSteps = Array.isArray(firstInitialTurn?.animation_steps)
+          && firstInitialTurn.animation_steps.length > 0;
+        if (initialSimData.entry_animation?.kind === "BENCH_ENTRY" && !schemaInboundSteps) {
           const { runBenchEntrySequence } = await import('./animation/benchEntry.js');
           await runBenchEntrySequence(this, {
             playerSprites: this.playerSprites,
             entryAnimation: initialSimData.entry_animation,
           });
+        } else if (schemaInboundSteps) {
+          console.warn("🏠 [BENCH_ENTRY] skipped — inbound turn has animation_steps (schema handles triangle→setup)");
         }
         // Part 2: Preload first HCO while opening tip (and any quarter-start inbound) animates.
         if (ENABLE_TURN_PRELOAD) {
@@ -3298,11 +3307,15 @@ export function createGameScene(Phaser) {
 
           // Part 2: Use preloaded turn when available and no overrides; else fetch. On preload failure, fetch with overrides.
           let turnData;
+          const turnFetchWaitStartMs = performance.now();
+          let turnFetchSource = "direct";
           if (preloadedTurnPromise && !offenseOverride && !defenseOverride) {
             try {
+              turnFetchSource = "preload";
               turnData = await preloadedTurnPromise;
             } catch (e) {
               console.warn('⚠️ Preloaded turn failed, fetching fresh:', e?.message);
+              turnFetchSource = "preload_failed_direct";
               turnData = await fetchTurnData(offenseOverride, defenseOverride);
             }
             preloadedTurnPromise = null;

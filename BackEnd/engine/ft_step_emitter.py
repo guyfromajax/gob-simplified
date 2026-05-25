@@ -1,10 +1,10 @@
 """Free throw animation step emitter (UESS / SS&S).
 
 One backend turn = one FT attempt. Emits ``animation_steps[]`` for:
-  lane setup → shoot → ball flight → hold (make) or bounce (miss).
+  lane setup → shoot → ball flight → hold (make) or rim hold → bounce → … (miss).
 
-Final miss stops at the authoritative bounce spot (``ball_bounce_x/y`` on the
-turn); discrete DREB / OREB turns handle rebound capture (see ``game_manager``).
+Miss (non-final): bounce hold → ``ft_return_teleport`` (ball attached to shooter).
+Miss (final): turn_stop at bounce; discrete DREB / OREB handles rebound.
 
 Lane geometry matches ``Animator.capture_free_throw_animation`` (HOME_CFG /
 AWAY_CFG). Clock is pinned for the full turn (no game-clock burn).
@@ -89,6 +89,9 @@ _FT_MISS_SFX = {
 }
 
 _SHOOT_STEP_T = 0.35
+# Legacy FT animator + HCO bounce sub-step: 300ms wall at tickMs=350.
+_RIM_HOLD_GAME_SECONDS = 300.0 / 350.0
+_BOUNCE_HOLD_GAME_SECONDS = 1000.0 / 350.0
 _POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 
@@ -251,7 +254,20 @@ def _ball_motion_step(
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in coords}
     archetypes: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in coords}
     destinations: Dict[str, Optional[GridCoord]] = {pid: None for pid in coords}
-    meta = {"reason": "ft_ball_motion", "target_coords": dict(ball_end)}
+    # Universal FT meta — flags this step as a free-throw ball motion so
+    # `animationPlayback.isFreeThrowShotStep` returns True and the
+    # SHOT_BALL_MIN_WALL_CLOCK_MS (400ms) step-wait floor is bypassed.
+    # Without this, every FT ball-motion step (rim arrival, bounce,
+    # return-to-shooter) would hold for 400ms because they all use
+    # ``ball_motion_style="shot"``. Callers can still pass extra
+    # ``advance_metadata`` (e.g., per-step ``result`` tags) — those merge
+    # on top.
+    meta = {
+        "reason": "ft_ball_motion",
+        "target_coords": dict(ball_end),
+        "free_throw_shot": True,
+        "ball_grid_per_game_second": FREE_THROW_SHOT_GRID_PER_GAME_SECOND,
+    }
     if advance_metadata:
         meta.update(advance_metadata)
     trigger: AdvanceTrigger = {
@@ -275,6 +291,120 @@ def _ball_motion_step(
         "coords": dict(coords),
         "ball": {"coords": dict(ball_end)},
         "time_elapsed": float(step_t),
+        "clock": dict(clock),
+        "next": next_step,
+    }
+    return {"start": start, "end": end}
+
+
+def _ft_ball_stationary_hold_step(
+    *,
+    coords: Dict[str, GridCoord],
+    ball_coord: GridCoord,
+    clock: ClockState,
+    step_t: float,
+    next_step: NextStep,
+    metadata_kind: str,
+) -> AnimationStep:
+    """Ball holds at ``ball_coord``; all players stationary (rim / bounce holds)."""
+    ball: BallState = {"coords": dict(ball_coord)}
+    trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": float(step_t),
+        "metadata": {"kind": metadata_kind, "reason": f"ft_{metadata_kind}"},
+    }
+    start: StepStart = {
+        "coords": dict(coords),
+        "destination": {pid: None for pid in coords},
+        "action": {pid: "stationary" for pid in coords},
+        "archetype": {pid: "stationary" for pid in coords},
+        "ball": ball,
+        "clock": dict(clock),
+        "advance_trigger": trigger,
+    }
+    end: StepEnd = {
+        "coords": dict(coords),
+        "ball": {"coords": dict(ball_coord)},
+        "time_elapsed": float(step_t),
+        "clock": dict(clock),
+        "next": next_step,
+    }
+    return {"start": start, "end": end}
+
+
+def _ft_bounce_motion_step(
+    *,
+    coords: Dict[str, GridCoord],
+    ball_start: GridCoord,
+    ball_end: GridCoord,
+    clock: ClockState,
+    next_step: NextStep,
+) -> AnimationStep:
+    """Rim → bounce_spot using fixed 300ms wall (matches skeleton ``[bounce]``)."""
+    step_t = float(BOUNCE_STEP_GAME_SECONDS)
+    trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": step_t,
+        "metadata": {
+            "kind": "bounce",
+            "target_coords": dict(ball_end),
+            "reason": "ft_miss_bounce",
+        },
+    }
+    start: StepStart = {
+        "coords": dict(coords),
+        "destination": {pid: None for pid in coords},
+        "action": {pid: "stationary" for pid in coords},
+        "archetype": {pid: "stationary" for pid in coords},
+        "ball": {"coords": dict(ball_start)},
+        "clock": dict(clock),
+        "advance_trigger": trigger,
+    }
+    end: StepEnd = {
+        "coords": dict(coords),
+        "ball": {"coords": dict(ball_end)},
+        "time_elapsed": step_t,
+        "clock": dict(clock),
+        "next": next_step,
+    }
+    return {"start": start, "end": end}
+
+
+def _build_ft_return_teleport_step(
+    *,
+    coords: Dict[str, GridCoord],
+    bounce_coord: GridCoord,
+    shooter_id: str,
+    shooter_lane_coord: GridCoord,
+    clock: ClockState,
+    next_step: NextStep,
+) -> AnimationStep:
+    """Rare FT-only exception: instant ball snap bounce → shooter (attached)."""
+    trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": 0.0,
+        "metadata": {
+            "kind": "ft_return_teleport",
+            "target_player_id": str(shooter_id),
+            "reason": "ft_mid_miss_return",
+        },
+    }
+    start: StepStart = {
+        "coords": dict(coords),
+        "destination": {pid: None for pid in coords},
+        "action": {pid: "stationary" for pid in coords},
+        "archetype": {pid: "stationary" for pid in coords},
+        "ball": {"coords": dict(bounce_coord)},
+        "clock": dict(clock),
+        "advance_trigger": trigger,
+    }
+    end: StepEnd = {
+        "coords": dict(coords),
+        "ball": {
+            "owner_player_id": str(shooter_id),
+            "coords": dict(shooter_lane_coord),
+        },
+        "time_elapsed": 0.0,
         "clock": dict(clock),
         "next": next_step,
     }
@@ -363,7 +493,12 @@ def build_ft_animation_steps(
         next_step_index=1,
         bh_archetype="standard",
         other_archetype="standard",
-        gate_player_ids=[shooter_id],
+        # Gate on all 10 so every lane player is fully aligned before the
+        # FT shot fires. Non-movers have natural_t=0 and don't bottleneck;
+        # the actual gate becomes the slowest mover (= the lane player
+        # with the longest natural traversal). In no_lane branches, only
+        # shooter moves, so this still resolves to shooter-as-gate.
+        gate_player_ids=list(setup_targets.keys()),
         metadata_reason="ft_lane_setup",
     )
     setup_step["start"]["ball"] = {
@@ -438,86 +573,109 @@ def build_ft_animation_steps(
     is_final_attempt = free_throws_remaining <= 0
 
     if is_make:
-        # Brief settle at sweet spot (wall-clock via FE shot min; T minimal).
+        # Make hold at sweet spot: ball stays at MSSS while "It's Good!"
+        # announcement plays. Wall-clock duration driven entirely by the
+        # announcement's ``hold_ms`` (1000ms) — FE's `runStepAnnouncement`
+        # pauses clocks, shows the announcement, awaits hold_ms, resumes.
+        # Step T = 0 game-sec so no additional wait fires after the
+        # announcement. Mirrors the skeleton emitter's
+        # `_build_make_hold_sub_step` pattern (per audit §4.1 decision 5).
+        # Applies to BOTH final and non-final FT makes — the rim hold beat
+        # plays every time before the ball returns to the shooter for the
+        # next attempt (non-final) or before the BIP turn fires (final).
         hold_step = _ball_motion_step(
             coords=cursor_coords,
             ball_start=dict(sweet),
             ball_end=dict(sweet),
             clock=cursor_clock,
-            step_t=0.05,
+            step_t=0.0,
             next_step={"kind": "next_step", "index": _next_step_index(steps)},
             ball_motion_style="shot",
         )
+        hold_step["start"]["announcement"] = {
+            "text": "It's Good!",
+            "team": "away" if away_offense else "home",
+            "hold_ms": 1000.0,
+            "style": "primary",
+            "player_data": {"playerId": str(shooter_id)},
+        }
+        # Override the default "shot_resolved" trigger from `_ball_motion_step`
+        # — this is a hold, not a flight. The announcement's hold_ms drives
+        # wall-clock; the step's advance_trigger just needs to round-trip
+        # the schema validator.
+        hold_step["start"]["advance_trigger"]["condition"] = "fixed_duration"
+        hold_step["start"]["advance_trigger"]["metadata"]["kind"] = "make_hold"
         steps.append(hold_step)
         cursor_coords = dict(hold_step["end"]["coords"])
 
         if not is_final_attempt:
-            # Return ball to shooter for next attempt in sequence.
-            return_step = _ball_motion_step(
+            teleport_step = _build_ft_return_teleport_step(
                 coords=cursor_coords,
-                ball_start=dict(sweet),
-                ball_end=dict(lane_targets[shooter_id]),
+                bounce_coord=dict(sweet),
+                shooter_id=str(shooter_id),
+                shooter_lane_coord=dict(lane_targets[shooter_id]),
                 clock=cursor_clock,
-                step_t=max(
-                    0.05,
-                    _euclid(sweet, lane_targets[shooter_id])
-                    / float(FREE_THROW_SHOT_GRID_PER_GAME_SECOND),
-                ),
                 next_step={"kind": "next_step", "index": _next_step_index(steps)},
             )
-            return_step["end"]["ball"] = {"owner_player_id": shooter_id}
-            steps.append(return_step)
-            cursor_coords = dict(return_step["end"]["coords"])
+            steps.append(teleport_step)
+            cursor_coords = dict(teleport_step["end"]["coords"])
     else:
-        # Miss at rim — optional short rim beat before bounce / reset.
-        rim_hold = _ball_motion_step(
+        # MISS path: rim hold (300ms) → bounce → [non-final: bounce hold +
+        # ft_return_teleport] OR [final: turn_stop → discrete DREB/OREB].
+        # ``ball_bounce_x/y`` stamped on every miss (``calculate_bounce_spot``;
+        # final miss also runs rebound logic upstream).
+        bx = turn_result.get("ball_bounce_x")
+        by = turn_result.get("ball_bounce_y")
+        if bx is None or by is None:
+            return steps if steps else None
+        bounce = {"x": float(bx), "y": float(by)}
+
+        rim_hold = _ft_ball_stationary_hold_step(
             coords=cursor_coords,
-            ball_start=dict(rim),
-            ball_end=dict(rim),
+            ball_coord=dict(rim),
             clock=cursor_clock,
-            step_t=0.05,
+            step_t=_RIM_HOLD_GAME_SECONDS,
             next_step={"kind": "next_step", "index": _next_step_index(steps)},
+            metadata_kind="rim_hold",
         )
         steps.append(rim_hold)
-        cursor_coords = dict(rim_hold["end"]["coords"])
 
-        if is_final_attempt:
-            bx = turn_result.get("ball_bounce_x")
-            by = turn_result.get("ball_bounce_y")
-            if bx is None or by is None:
-                return steps if steps else None
-            bounce = {"x": float(bx), "y": float(by)}
-            bounce_t = max(
-                float(BOUNCE_STEP_GAME_SECONDS),
-                _euclid(rim, bounce) / float(FREE_THROW_SHOT_GRID_PER_GAME_SECOND),
-            )
-            bounce_step = _ball_motion_step(
+        bounce_step = _ft_bounce_motion_step(
+            coords=cursor_coords,
+            ball_start=dict(rim),
+            ball_end=dict(bounce),
+            clock=cursor_clock,
+            next_step=(
+                _implicit_turn_end_next(turn_result)
+                if is_final_attempt
+                else {"kind": "next_step", "index": _next_step_index(steps)}
+            ),
+        )
+        steps.append(bounce_step)
+        cursor_coords = dict(bounce_step["end"]["coords"])
+
+        if not is_final_attempt:
+            bounce_hold = _ft_ball_stationary_hold_step(
                 coords=cursor_coords,
-                ball_start=dict(rim),
-                ball_end=bounce,
+                ball_coord=dict(bounce),
                 clock=cursor_clock,
-                step_t=bounce_t,
-                next_step=_implicit_turn_end_next(turn_result),
+                step_t=_BOUNCE_HOLD_GAME_SECONDS,
+                next_step={"kind": "next_step", "index": _next_step_index(steps)},
+                metadata_kind="bounce_hold",
             )
-            steps.append(bounce_step)
-            cursor_coords = dict(bounce_step["end"]["coords"])
-        else:
-            # Non-final miss: ball back to shooter at line for next FT turn.
-            return_step = _ball_motion_step(
+            steps.append(bounce_hold)
+            cursor_coords = dict(bounce_hold["end"]["coords"])
+
+            teleport_step = _build_ft_return_teleport_step(
                 coords=cursor_coords,
-                ball_start=dict(rim),
-                ball_end=dict(lane_targets[shooter_id]),
+                bounce_coord=dict(bounce),
+                shooter_id=str(shooter_id),
+                shooter_lane_coord=dict(lane_targets[shooter_id]),
                 clock=cursor_clock,
-                step_t=max(
-                    0.05,
-                    _euclid(rim, lane_targets[shooter_id])
-                    / float(FREE_THROW_SHOT_GRID_PER_GAME_SECOND),
-                ),
                 next_step={"kind": "next_step", "index": _next_step_index(steps)},
             )
-            return_step["end"]["ball"] = {"owner_player_id": shooter_id}
-            steps.append(return_step)
-            cursor_coords = dict(return_step["end"]["coords"])
+            steps.append(teleport_step)
+            cursor_coords = dict(teleport_step["end"]["coords"])
 
     _pin_ft_clock(steps, clock)
 

@@ -165,11 +165,12 @@ class Announcement(TypedDict, total=False):
     hold_ms: float
     """Wall-clock duration to keep the world paused (default 1000)."""
 
-    style: Literal["primary", "secondary"]
+    style: Literal["primary", "secondary", "and_one", "shooting_foul"]
     """Optional. ``"primary"`` (default — large centered banner via
     ``showAnnouncement``) or ``"secondary"`` (compact side banner via
-    ``showSecondaryAnnouncement``). Explicit routing signal — replaces the
-    legacy text-string sniffing in the playback engine. Absent → ``"primary"``."""
+    ``showSecondaryAnnouncement``). ``"and_one"`` → foul card with shooter +
+    fouler. ``"shooting_foul"`` → ``FOUL_SHOOTING`` dispatcher + whistle.
+    Absent → ``"primary"``."""
 
 
 # --- Step start / end -------------------------------------------------------

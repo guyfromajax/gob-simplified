@@ -20,7 +20,7 @@ import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { enforceUnitCompletionContract } from "./unitCompletionContract.js";
 import { CLAMP_BOUNDS } from "./courtClamp.js";
-import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, playStealSfx, playFBDefensiveStopCourtSfx, playFBOutletDeniedCourtSfx } from "../utils/gameSfx.js";
+import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx } from "../utils/gameSfx.js";
 import * as fastBreakConstants from "../constants/fastBreakConstants.js";
 
 const {
@@ -178,9 +178,12 @@ function resolveFbStrictContractMode() {
   if (raw === "throw") return "throw";
   if (raw === "warn" || raw === true) return "warn";
   if (raw === "off" || raw === false) return "off";
-  // Local default is strict throw-mode for fail-fast contract checks.
+  // Local default: warn instead of throw so missing legacy-payload endpoints
+  // (e.g. FB-after-steal not yet migrated to UESS schema) don't abort the
+  // animation. Override per-session via `window.FB_STRICT_CONTRACT = "throw"`
+  // to fail-fast while debugging contract violations.
   if (isLocalDevFbContractDefault(scope)) {
-    return "throw";
+    return "warn";
   }
   // Non-local debug sessions default to warnings.
   if (scope?.DEBUG_FB_TELEMETRY === true || isAnimationDebugEnabled()) {
@@ -1324,11 +1327,13 @@ async function animateRimRunnerOutletDeniedBeat(
           secondaryColor: getSecondaryColorForTeam(scene, defSprite.team_id),
         }
       : null;
-    playFBOutletDeniedCourtSfx(scene);
-    showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData);
+    showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, stopperPlayerData, {
+      scene, sfx: 'duke-denied.wav',
+    });
   } else {
-    playFBOutletDeniedCourtSfx(scene);
-    showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, null);
+    showSecondaryAnnouncement("FB Outlet Pass Denied!", defenseTeam, null, {
+      scene, sfx: 'duke-denied.wav',
+    });
   }
 
   const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
@@ -1634,9 +1639,12 @@ async function animateRimRunnerInterception(
   const { synchronizeBallState } = await import("./BallControllerAdapter.js");
   synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
   attachBallToPlayer(scene, ballSprite, stealer, { reason: "rim_runner_interception" });
-  playStealSfx(scene);
+  // Steal voice is tied to the "Interception!" announcement appearance
+  // (Sound_Design_Update.md §Steal Announce), passed via `meta.sfx` on the
+  // announcement payload below — court.html plays it at overlay mount.
 
   const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
+  const { resolveStealSfxFile } = await import("../utils/gameSfx.js");
   const stealerInfo = scene.playerInfo?.[stealerId];
   const stealerTeamId = stealer?.team_id;
   const homeTeamField = scene.simData?.home_team;
@@ -1653,7 +1661,7 @@ async function animateRimRunnerInterception(
       }
     : null;
   const defenseSide = stealer?.team === "home" ? "home" : "away";
-  showAnnouncement("Interception!", defenseSide, stealerPlayerData);
+  showAnnouncement("Interception!", defenseSide, stealerPlayerData, { sfx: resolveStealSfxFile() });
   const holdMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
   await new Promise((resolve) => {
     if (scene.time?.delayedCall) scene.time.delayedCall(holdMs, resolve);
@@ -3265,7 +3273,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     } else {
       showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
     }
-    
+
     const makeHoldMs = animationConfig.fastBreak?.makeAnnouncementHoldMs ?? 1000;
     await new Promise(resolve => scene.time.delayedCall(makeHoldMs, resolve));
     
@@ -3922,8 +3930,9 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   if (turnData.fast_break === true && turnData.stopper_id) {
     const { showSecondaryAnnouncement, buildSecondaryStopperPlayerData } = await import('../utils/announcements.js');
     const stopperPlayerData = buildSecondaryStopperPlayerData(scene, turnData.stopper_id, playerSprites);
-    playFBDefensiveStopCourtSfx(scene);
-    showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData, { scene });
+    showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData, {
+      scene, sfx: 'duke-great-stop.wav',
+    });
 
     const stopHoldMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
     await new Promise(resolve => scene.time.delayedCall(stopHoldMs, resolve));

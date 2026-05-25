@@ -6405,6 +6405,19 @@
         overlay.classList.remove('hidden');
         overlay.classList.add('is-visible');
 
+        // SFX dispatch at mount — payload-carries-SFX architecture
+        // (Announcement_System.md "Sounds" + Sound_Design_Update.md "Court
+        // Event SFX"). Fires on the same frame as the entry transition so
+        // audio + visual stay synced — replaces the legacy pattern of
+        // playing SFX from the JS caller before `window.showAnnouncementOverlay`,
+        // which fired audio ~CSS-animation-duration ahead of the visual.
+        if (data && data.sfx && typeof window.playGameSfx === 'function') {
+          var secFiles = Array.isArray(data.sfx) ? data.sfx : [data.sfx];
+          for (var i = 0; i < secFiles.length; i++) {
+            if (secFiles[i]) window.playGameSfx(secFiles[i]);
+          }
+        }
+
         _secAnnTimer = setTimeout(function() {
           overlay.classList.remove('is-visible');
           // Hide after the exit transition completes (~260ms) so the slide-up plays.
@@ -6472,6 +6485,15 @@
           void standardCard.offsetWidth;
         }
         overlay.classList.remove('hidden');
+
+        // SFX dispatch at mount — see secondary overlay's matching block for rationale.
+        if (data && data.sfx && typeof window.playGameSfx === 'function') {
+          var annFiles = Array.isArray(data.sfx) ? data.sfx : [data.sfx];
+          for (var i = 0; i < annFiles.length; i++) {
+            if (annFiles[i]) window.playGameSfx(annFiles[i]);
+          }
+        }
+
         _annTimer = setTimeout(function() {
           overlay.classList.add('hidden');
           _annTimer = null;
@@ -6528,7 +6550,7 @@
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
-    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js`;
+    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=uess-turn-preload-1`;
     document.head.appendChild(bootGameScript);
   </script>
   <script>

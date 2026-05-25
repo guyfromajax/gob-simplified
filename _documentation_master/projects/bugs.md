@@ -19,6 +19,16 @@
 44. Customize computer teams more strategically
 45. Improve FCC API
 46. Leaderboard context explanation
+47. Double rebounds on missed Fast Break shots
+48. Double block announce on Final Shot
+49. Missed Rim SFX not trigger on OREB Putback misses
+50. OREB Kickout, other players' movement
+51, Hold up logic in RR FBs
+52. Fix Fast Break animation
+53. Multiple HCO entries are teleporting and skipping
+54. Better Free Throw animation
+55. Getting a double pass on double screen play where shooter drives to teh basket
+56. Need to fucking sync passes and defender movement on HCO skeleton steps
 
 
 ## Future Cleanup (Non-Critical Warnings)

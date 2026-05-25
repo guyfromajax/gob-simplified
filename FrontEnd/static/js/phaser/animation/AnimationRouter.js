@@ -12,7 +12,7 @@
  * - No complex state management
  */
 
-import AnimationEngine from './AnimationEngine.js';
+import AnimationEngine from './AnimationEngine.js?v=uess-transition-probes-2';
 import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags, animationDebugLog } from '../utils/debugFlags.js';
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
@@ -48,6 +48,10 @@ export class AnimationRouter {
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: Initialized with all components');
     }
+  }
+
+  _traceTimeline(label, payload = {}) {
+    return;
   }
 
   /**
@@ -732,13 +736,34 @@ export class AnimationRouter {
       if (!shouldLog) {
         // Calling engine (log removed)
       }
+      this._traceTimeline("turn:router-before-engine", {
+        resultType: turnData?.result_type ?? null,
+        currentTurn: turnData?.current_turn ?? null,
+        turnIndex: turnData?.index ?? turnIndex ?? null,
+        durationMs: Math.max(0, Number(durationMs) || 0),
+        hasAnimationSteps: Array.isArray(turnData?.animation_steps),
+        steps: Array.isArray(turnData?.animation_steps) ? turnData.animation_steps.length : 0,
+      });
       await this.animationEngine.processTurn(turnData, context);
+      this._traceTimeline("turn:router-after-engine", {
+        resultType: turnData?.result_type ?? null,
+        currentTurn: turnData?.current_turn ?? null,
+        turnIndex: turnData?.index ?? turnIndex ?? null,
+      });
       // Universal continuity guard: do not advance next turn until
       // this turn's clock interpolation window has settled.
       const boundaryWait = await this.waitForClockInterpolationSettle(
         Math.max(0, Number(durationMs) || 0) + 150
       );
       if (boundaryWait) {
+        this._traceTimeline("turn:boundary-clock-wait", {
+          resultType: turnData?.result_type ?? null,
+          turnIndex: turnData?.index ?? turnIndex ?? null,
+          branch: boundaryWait.branch ?? null,
+          waitedMs: Math.round(boundaryWait.waitedMs ?? 0),
+          settleCapMs: boundaryWait.settleCapMs ?? null,
+          contractDurationMs: Math.max(0, Number(durationMs) || 0),
+        });
         this._emitBoundaryWaitTelemetry(turnData, {
           waitedMs: Math.round(boundaryWait.waitedMs ?? 0),
           settleCapMs: boundaryWait.settleCapMs ?? null,
@@ -758,6 +783,14 @@ export class AnimationRouter {
             : globalThis?.UESS_BOUNDARY_TWEEN_DRAIN_POLL_MS) ?? 20
         ) || 20
       );
+      if ((tweenDrain?.waitedMs ?? 0) > 0 || (tweenDrain?.remainingTweens ?? 0) > 0) {
+        this._traceTimeline("turn:boundary-tween-drain", {
+          resultType: turnData?.result_type ?? null,
+          turnIndex: turnData?.index ?? turnIndex ?? null,
+          waitedMs: Math.round(tweenDrain?.waitedMs ?? 0),
+          remainingTweens: tweenDrain?.remainingTweens ?? 0,
+        });
+      }
       if (tweenDrain?.remainingTweens > 0) {
         const leakTweenSample = this._describeBoundaryTweens(
           Number(

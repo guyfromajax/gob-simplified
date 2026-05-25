@@ -606,16 +606,15 @@ def ag_to_grid_per_game_sec(ag):
     Convert AG attribute (1-100, average 50, rare values above 100) to grid
     units per game second.
 
-    Linear curve calibrated so AG=50 base = 14 (matches
-    `STANDARD_GRID_PER_GAME_SEC`), with archetypes producing their documented
-    absolute rates at AG=50 (see UESS_System.md §3.3):
+    Linear curve auto-anchored at `STANDARD_GRID_PER_GAME_SEC` (so the curve
+    rebalances automatically when STANDARD changes — no formula edits needed):
 
-      AG=0   → 7     (slow)
-      AG=50  → 14    (average; sprint = 18)
-      AG=100 → 21    (fast)
+      AG=0   → STANDARD × 0.90   (slow)
+      AG=50  → STANDARD × 1.00   (average; per-archetype constants land
+                                  at their §3.3 table rates here)
+      AG=100 → STANDARD × 1.10   (fast)
 
-    Slope ×7: each AG point = +0.07 grid/game-sec base. Capped at 60
-    grid/game-sec, floored at 0.5.
+    Spread: 1.22x (AG=0 → AG=100). Capped at 60 grid/game-sec, floored at 0.5.
 
     Defaults to AG=50 when input is None / non-numeric.
     """
@@ -623,7 +622,7 @@ def ag_to_grid_per_game_sec(ag):
         ag_val = float(ag) if ag is not None else 50.0
     except (TypeError, ValueError):
         ag_val = 50.0
-    rate = 7.0 + (ag_val / 100.0) * 7.0
+    rate = STANDARD_GRID_PER_GAME_SEC * (0.90 + (ag_val / 100.0) * 0.2)
     return max(0.5, min(rate, 60.0))
 
 
@@ -633,7 +632,7 @@ def calc_cruise_segment_seconds(start, end, *, role="default"):
     HCO bring-up (the bring-the-ball-up moments where players are not pushing
     max effort).
 
-    role="bh"      → CRUISE_GRID_PER_GAME_SEC (12). Used by the ball handler
+    role="bh"      → CRUISE_GRID_PER_GAME_SEC (13). Used by the ball handler
                      during bring-up.
     role="default" → STANDARD_GRID_PER_GAME_SEC (14). Used by the other four
                      offense players and all five defenders during a cruise
@@ -662,7 +661,7 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
         - archetype="shot_motion"    → SHOT_MOTION_GRID_PER_GAME_SEC (14 @ AG=50)
         - archetype="compressed_hco" → SHOT_MOTION_GRID_PER_GAME_SEC (folds into shot_motion)
         - archetype="sprint"         → SPRINT_GRID_PER_GAME_SEC (18 @ AG=50)
-        - archetype="cruise"         → CRUISE_GRID_PER_GAME_SEC (12 @ AG=50)
+        - archetype="cruise"         → CRUISE_GRID_PER_GAME_SEC (13 @ AG=50)
 
     When ``player`` is None (Phase 1/legacy call sites that haven't been
     migrated yet): falls back to the legacy per-archetype pace constants.
@@ -2376,6 +2375,7 @@ def summarize_game_state(game, exclude_animations=True):
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
         **({"timeout_trace_id": game.game_state["timeout_trace_id"]} if game.game_state.get("timeout_trace_id") else {}),
+        **({"timeout_seam_ball_handler_id": game.game_state["timeout_seam_ball_handler_id"]} if game.game_state.get("timeout_seam_ball_handler_id") else {}),
         # ✅ FREE_THROW timeout resume: persist FT state so first simulate_turn creates the FT turn
         **(
             {
@@ -2637,6 +2637,49 @@ def _sanitize_animation_rows(rows: Any, result_type: Optional[str]) -> Any:
     return rows
 
 
+def _clamp_player_coords_map(
+    coords_map: Any, result_type: Optional[str],
+) -> Any:
+    """Clamp a {player_id: {x, y}} map. Preserves `None` values (used as
+    `destination=None` for stationary players per UESS §3.1)."""
+    if not isinstance(coords_map, dict):
+        return coords_map
+    if is_animation_clamp_exempt(result_type):
+        return coords_map
+    out: Dict[str, Any] = {}
+    for pid, coord in coords_map.items():
+        if isinstance(coord, dict):
+            out[pid] = clamp_animation_grid_coords(coord, result_type)
+        else:
+            out[pid] = coord  # null destination, or non-dict — leave alone
+    return out
+
+
+def _sanitize_animation_steps(
+    steps: Any, result_type: Optional[str],
+) -> Any:
+    """Clamp player coord maps in schema `animation_steps[]` (UESS §3
+    payload). Ball coords are intentionally left untouched — they may end
+    OOB for AIRBALL continuation or inbound flows. Exempt result types
+    (BIP/SIP/TIMEOUT) skip clamping entirely so SF can walk to inbound
+    OOB positions in BIP/SIP step 2."""
+    if not isinstance(steps, list):
+        return steps
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        start = step.get("start")
+        if isinstance(start, dict):
+            if "coords" in start:
+                start["coords"] = _clamp_player_coords_map(start.get("coords"), result_type)
+            if "destination" in start:
+                start["destination"] = _clamp_player_coords_map(start.get("destination"), result_type)
+        end = step.get("end")
+        if isinstance(end, dict) and "coords" in end:
+            end["coords"] = _clamp_player_coords_map(end.get("coords"), result_type)
+    return steps
+
+
 def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]] = None) -> Any:
     """
     Return a sanitized copy of a turn payload where animation-facing coordinates are clamped.
@@ -2675,6 +2718,11 @@ def sanitize_turn_animation_payload(turn: Any, context: Optional[Dict[str, Any]]
     # Ball motion/spot fields are consumed by dedicated ball animation logic.
 
     payload["animations"] = _sanitize_animation_rows(payload.get("animations"), result_type)
+    # Schema steps (UESS §3) — clamp player coord maps the same way as
+    # legacy `animations[]`. Ball coords inside step.start.ball / step.end.ball
+    # are left untouched (AIRBALL OOB continuation + intentional ball
+    # placements). Exempt result types (BIP/SIP/TIMEOUT) skip entirely.
+    payload["animation_steps"] = _sanitize_animation_steps(payload.get("animation_steps"), result_type)
 
     final_turn_meta = payload.get("final_turn_meta")
     if isinstance(final_turn_meta, dict):

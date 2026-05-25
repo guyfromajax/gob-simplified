@@ -63,13 +63,13 @@ def _archetype_for_hct_step(
     """Per `Animation_System_Updated.md` HCT scoping table:
 
     | Step | BH | Non-BH offense | PG defender vs BH | Other defenders |
-    | 0 (setup)        | cruise | cruise  | cruise  | cruise  |
-    | 1 (BH advance)   | cruise | cruise  | cruise  | cruise  |
-    | 2 (PG converge)  | default| default | default | default |
-    | 3 (outcome)      | drive  | default | default | default |
+    | 0 (setup)        | standard | standard | standard | standard |
+    | 1 (BH advance)   | standard | standard | standard | standard |
+    | 2 (PG converge)  | default  | default  | default  | default  |
+    | 3 (outcome)      | drive    | default  | default  | default  |
     """
     if step_index in (0, 1):
-        return "cruise"
+        return "standard"
     if step_index == 2:
         return "default"
     if step_index == 3:
@@ -462,7 +462,7 @@ def _apply_post_shot_overlay(step, turn_result):
             if isinstance(start_actions, dict):
                 start_actions[pid_str] = "cut"
             if isinstance(start_archetype, dict):
-                start_archetype[pid_str] = "cruise"
+                start_archetype[pid_str] = "standard"
 
 
 # --- Step 3 branching ------------------------------------------------------

@@ -602,6 +602,9 @@ def build_triangle_animation_steps(
     if not all_start_coords:
         return None
 
+    from BackEnd.utils.animation_step_helpers import log_fb_emitter_entry
+    log_fb_emitter_entry("TRIANGLE", all_start_coords, game, off_lineup, def_lineup)
+
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
     shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
@@ -612,6 +615,8 @@ def build_triangle_animation_steps(
 
     steps: List[AnimationStep] = []
     elapsed = 0.0
+
+    import logging as _tri_log
 
     burst_step = _build_burst_step(
         fb_roles=fb_roles,
@@ -624,6 +629,11 @@ def build_triangle_animation_steps(
         next_step_index=_next_step_index(steps),
     )
     if burst_step is None:
+        _tri_log.warning(
+            "🐛 [TRIANGLE_NONE site=burst_step] outlet_failed=%s triangle_enter_hco=%s result_type=%s skip_outlet_pass=%s",
+            outlet_failed, triangle_enter_hco, result_type,
+            bool(burst_phase.get("skip_outlet_pass")),
+        )
         return None
     steps.append(burst_step)
     elapsed += float(burst_step["end"]["time_elapsed"])
@@ -641,6 +651,10 @@ def build_triangle_animation_steps(
             next_step_index=999,
         )
         if denied is None:
+            _tri_log.warning(
+                "🐛 [TRIANGLE_NONE site=outlet_denied_defender_step] outlet_failed=%s triangle_enter_hco=%s result_type=%s",
+                outlet_failed, triangle_enter_hco, result_type,
+            )
             return None
         steps.append(denied)
         return _finalize_rr_steps(turn_result, game, steps)
@@ -658,6 +672,12 @@ def build_triangle_animation_steps(
             next_step_index=_next_step_index(steps),
         )
         if outlet_step is None:
+            _tri_log.warning(
+                "🐛 [TRIANGLE_NONE site=outlet_pass_step] outlet_failed=%s triangle_enter_hco=%s result_type=%s skip_outlet_pass=%s passer_id=%s receiver_id=%s",
+                outlet_failed, triangle_enter_hco, result_type, skip_outlet_pass,
+                burst_phase.get("outlet_passer_id"),
+                burst_phase.get("outlet_receiver_id"),
+            )
             return None
         steps.append(outlet_step)
         elapsed += float(outlet_step["end"]["time_elapsed"])
@@ -676,10 +696,20 @@ def build_triangle_animation_steps(
         )
         if hold_up is not None:
             steps.append(hold_up)
+        else:
+            _tri_log.warning(
+                "🐛 [TRIANGLE_HOLD_UP_NONE] triangle_enter_hco=%s result_type=%s — proceeding with %d steps",
+                triangle_enter_hco, result_type, len(steps),
+            )
         return _finalize_rr_steps(turn_result, game, steps)
 
     payload = _triangle_setup_payload(fb_roles)
     if not payload:
+        _tri_log.warning(
+            "🐛 [TRIANGLE_NONE site=setup_payload] outlet_failed=%s triangle_enter_hco=%s result_type=%s triangle_branch=%s",
+            outlet_failed, triangle_enter_hco, result_type,
+            turn_result.get("triangle_branch"),
+        )
         return None
 
     setup_step = _build_triangle_setup_step(
@@ -695,6 +725,10 @@ def build_triangle_animation_steps(
         next_step_index=_next_step_index(steps),
     )
     if setup_step is None:
+        _tri_log.warning(
+            "🐛 [TRIANGLE_NONE site=setup_step] triangle_branch=%s payload_keys=%s",
+            turn_result.get("triangle_branch"), list(payload.keys()) if payload else None,
+        )
         return None
     steps.append(setup_step)
     elapsed += float(setup_step["end"]["time_elapsed"])

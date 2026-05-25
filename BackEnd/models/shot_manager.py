@@ -1328,6 +1328,25 @@ class ShotManager:
                 offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
             result["offense_rebounder_coords"] = offense_rebounder_coords
 
+            # Defenders boxing out / crashing for DREB. Mirrors the offensive
+            # rebounder cluster around the same basket (the basket the shooter
+            # is attacking). Release defenders are already excluded from
+            # `defense_rebounders` upstream (see the FB-entry CR branch); no
+            # shooter exclusion needed since shooter is on offense.
+            defense_rebounder_coords = {}
+            for pos in defense_rebounders:
+                rebounder_player = def_team.lineup.get(pos)
+                if rebounder_player is None:
+                    continue
+                if is_home_team_shooting:
+                    rebounder_x = random.randint(85, 92)
+                else:
+                    rebounder_x = random.randint(8, 15)
+                rebounder_x = max(min_x, min(max_x, rebounder_x))
+                rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
+                defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+            result["defense_rebounder_coords"] = defense_rebounder_coords
+
             defense_release_coords = {}
             for pos in defense_release_list:
                 release_player = def_team.lineup.get(pos)
@@ -1349,13 +1368,13 @@ class ShotManager:
 
             if d_foul:
                 # Shooting foul → free throws
-                self.game_state["shooter"] = shooter 
+                self.game_state["shooter"] = shooter
                 foul_player.record_stat("F")
-                
+
                 # Check if player fouled out (5th foul)
                 from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                 foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team)
-                
+
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
@@ -1365,6 +1384,94 @@ class ShotManager:
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
+
+                # Stamp `ball_bounce_x/y` so the schema emitter's `needs_bounce`
+                # gate flips True → the `[bounce]` sub-step fires after
+                # `[ball_flight]`, giving shooting-foul-on-miss the same
+                # rim-action-and-bounce visual as a regular miss (instead of
+                # the ball sticking at rim/back-of-rim). The next-turn FT
+                # setup runs after the schema sub-steps complete; this only
+                # affects the visual bounce, not game logic. Uses the same
+                # `calculate_bounce_spot` path as the regular-miss branch
+                # below — FB uses basket_x; HCO uses shooter_spot.
+                block_spot_used = getattr(self, "_block_spot", None)
+                if block_spot_used:
+                    bounce_spot = block_spot_used
+                elif is_fast_break:
+                    is_away_offense = off_team.team_id == self.game.away_team.team_id
+                    basket_x = 9 if is_away_offense else 91
+                    bounce_spot = calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
+                else:
+                    _, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
+                    bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
+                result["ball_bounce_x"] = bounce_spot["x"]
+                result["ball_bounce_y"] = bounce_spot["y"]
+
+                # Stamp the 4 post-shot overlay maps so the schema engine's
+                # `_collect_overlay_players` picks them up and animates
+                # offensive rebounders, get-back, defensive rebounders, and
+                # release defenders during the [shoot] / [ball_flight] /
+                # [bounce] sub-steps. Mirrors the BLOCKING_FOUL branch
+                # (lines 1437-1502). Without this, shooting-foul-on-miss
+                # had no overlay maps → all 10 players froze during the
+                # shot animation → teleport to overlay positions on the
+                # subsequent FT setup turn.
+                result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
+                result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
+                result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
+                result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
+
+                is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+                shooter_id_excl = getattr(shooter, "player_id", None)
+
+                offense_getback_coords = {}
+                for pos in offense_getback_list:
+                    getback_player = off_team.lineup.get(pos)
+                    if getback_player:
+                        iq = getback_player.attributes.get("IQ", 0)
+                        good_d = d_read < iq
+                        coords = self._calculate_getback_coordinates(
+                            getback_player, off_team, def_team, good_d=good_d
+                        )
+                        offense_getback_coords[getback_player.player_id] = coords
+                result["offense_getback_coords"] = offense_getback_coords
+
+                offense_rebounder_coords = {}
+                for pos in offense_rebounders:
+                    rebounder_player = off_team.lineup.get(pos)
+                    if rebounder_player is None:
+                        continue
+                    if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
+                        continue
+                    if is_home_team_shooting:
+                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                    else:
+                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                result["offense_rebounder_coords"] = offense_rebounder_coords
+
+                defense_rebounder_coords = {}
+                for pos in defense_rebounders:
+                    rebounder_player = def_team.lineup.get(pos)
+                    if rebounder_player is None:
+                        continue
+                    if is_home_team_shooting:
+                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                    else:
+                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                result["defense_rebounder_coords"] = defense_rebounder_coords
+
+                defense_release_coords = {}
+                for pos in defense_release_list:
+                    release_player = def_team.lineup.get(pos)
+                    if release_player:
+                        coords = self._calculate_release_coordinates(
+                            release_player, off_team, def_team, good_release=good_release_flag
+                        )
+                        defense_release_coords[release_player.player_id] = coords
+                result["defense_release_coords"] = defense_release_coords
+
                 # ✅ FOUL OUT: When 5th foul is on shooting foul (miss), set result + context so foul-out popup → lineup → return to free throw
                 if foul_out_info["fouled_out"]:
                     result["fouled_out"] = True
@@ -1443,6 +1550,21 @@ class ShotManager:
                         rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
                     offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                 result["offense_rebounder_coords"] = offense_rebounder_coords
+
+                # Defenders boxing out / crashing for DREB. Same cluster as
+                # offensive rebounders. No shooter exclusion (shooter is on
+                # offense). Release defenders already excluded upstream.
+                defense_rebounder_coords = {}
+                for pos in defense_rebounders:
+                    rebounder_player = def_team.lineup.get(pos)
+                    if rebounder_player is None:
+                        continue
+                    if is_home_team_shooting:
+                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                    else:
+                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                result["defense_rebounder_coords"] = defense_rebounder_coords
 
                 defense_release_coords = {}
                 for pos in defense_release_list:
@@ -1782,6 +1904,21 @@ class ShotManager:
                             rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
                         offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["offense_rebounder_coords"] = offense_rebounder_coords
+
+                    # Defenders boxing out / crashing for DREB. Same cluster
+                    # as offensive rebounders; release defenders already
+                    # excluded from `defense_rebounders` upstream.
+                    defense_rebounder_coords = {}
+                    for pos in defense_rebounders:
+                        rebounder_player = def_team.lineup.get(pos)
+                        if rebounder_player is None:
+                            continue
+                        if is_home_team_shooting:
+                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                        else:
+                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
+                    result["defense_rebounder_coords"] = defense_rebounder_coords
                 
                 # Debug log to verify offense_getback is populated
                 # print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {

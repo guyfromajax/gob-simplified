@@ -321,17 +321,19 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     if not steps:
         return off_lineup.get("PG", list(off_lineup.values())[0])
     
-    # Determine which step to check
+    # When ``step_index`` is explicit (including 0), inspect ONLY that step.
+    # HCO entry orchestrator passes ``step_index=0`` for the playcall's step-0
+    # BH — walking backwards would pick an earlier handle_ball and mis-route
+    # Handoff/Kickout/Walk Up. When ``step_index`` is omitted, walk backwards
+    # from the last step (shot / event resolution semantics).
+    explicit_step = step_index is not None
     if step_index is None:
-        # Default to last step (where event likely occurs)
         step_index = len(steps) - 1
-    
-    # Clamp step_index to valid range
+
     step_index = max(0, min(step_index, len(steps) - 1))
-    
-    # Check steps from step_index backwards to find ball handler
-    # (ball handler might be determined earlier in the sequence)
-    for i in range(step_index, -1, -1):
+    search_indices = [step_index] if explicit_step else range(step_index, -1, -1)
+
+    for i in search_indices:
         step = steps[i]
         pos_actions = step.get("pos_actions", {})
         
@@ -2234,6 +2236,14 @@ def resolve_free_throw_logic(game):
             if game_state.get("last_rebound") == "DREB":
                 result["next_play_type"] = game_state.get("offensive_state", "HCO")
 
+    # Non-final miss: visual bounce only (``calculate_bounce_spot``); no rebound.
+    if not makes_shot and game_state.get("free_throws_remaining", 0) > 0:
+        is_away_offense = off_team.team_id == game.away_team.team_id
+        basket_x = 9 if is_away_offense else 91
+        bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
+        result["ball_bounce_x"] = float(bounce_spot["x"])
+        result["ball_bounce_y"] = float(bounce_spot["y"])
+
     # Final miss: authoritative bounce + crash lists for schema + discrete rebound turns.
     if (
         not makes_shot
@@ -3858,8 +3868,9 @@ def _apply_attack_penalty(shot_location, is_away_offense):
 def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     """
     Set roles["shooter"].coords from the last step of the skeleton when that step
-    has a shoot action for the shooter. Used for HCO, FCP, and HCT so block
-    reconciliation uses the correct shot location. Fast Break does not use this.
+    has a shoot action for the shooter. Used for HCO, FCP, HCT, and Final Turn
+    so block reconciliation uses the correct shot location. Fast Break does not
+    use this.
     """
     _ensure_skeleton_shot_role_positions(game, roles)
     if not skeleton or not roles:
@@ -4277,6 +4288,10 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
     game_state["final_turn"] = True
     try:
+        # SS&S / UESS: same pre-resolve shot coord sync as HCO/FCP/HCT — stamps
+        # roles["shot_spot"] from the skeleton shoot step (with away flip) so
+        # block reconciliation and ball_bounce_x/y match the schema animation.
+        set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)
         final_snap = build_skeleton_pre_resolve_shot_snapshot(
             game, off_lineup, def_lineup, skeleton, roles, "FINAL_TURN", "final_turn_pre_resolve_shot"
         )

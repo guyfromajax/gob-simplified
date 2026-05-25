@@ -359,14 +359,20 @@ export async function animateStealHCOSetup(scene, turnData, playerSprites, ballS
   // Verify attachment
   const { getBallController } = await import('./BallControllerAdapter.js');
   const ballController = getBallController();
-  
+
   if (!ballController?.isAttached || ballController.currentOwner !== ballHandlerSprite) {
     // Attach ball to stealer if not already attached
     attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
       reason: 'steal_hco_setup_verify'
     });
   }
-  
+
+  // Steal SFX is now tied to the "STEAL!" announce appearance (see
+  // Sound_Design_Update.md §Steal Announce + gameAnnouncements.js
+  // `handleStealAnnouncement`), not the ball-attach moment. Removed here
+  // to keep dispatch to a single site.
+
+
   // Get stealer's current position
   const currentGrid = {
     x: ballHandlerSprite.gridX || 50,

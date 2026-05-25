@@ -10,7 +10,11 @@ import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
 } from './foulAnnouncementLanguage.js';
-import { playSecondaryAnnounceCourtSfx } from './gameSfx.js';
+import {
+  resolveStealSfxFile,
+  resolveSecondaryAnnounceCourtSfxFile,
+  resolveAnnounceMetaCourtSfxFile,
+} from './gameSfx.js';
 
 let currentAnnouncement = null;
 
@@ -21,6 +25,27 @@ export function playAnnouncementSfx(kind) {
     sfx.volume = 0.7;
     sfx.play().catch(() => {});
   } catch (e) {}
+}
+
+/**
+ * Normalize the caller-supplied `meta.sfx` into a value `court.html` can play:
+ *   - filename string (`.wav` / `.mp3`) → as-is
+ *   - array (any mix of filenames / legacy kinds) → mapped to filename array
+ *   - legacy kind string (`'foul'` / `'shot_clock_violation'`) → resolved filename
+ *   - anything else → null
+ *
+ * Used by both `showAnnouncement` and `showAndOneAnnouncement` so primary-tier
+ * SFX dispatch goes through one path: caller → `data.sfx` → court.html mount.
+ */
+function resolvePrimarySfxFromMeta(raw) {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    const mapped = raw.map(resolvePrimarySfxFromMeta).filter(Boolean);
+    return mapped.length ? mapped : null;
+  }
+  if (typeof raw !== 'string') return null;
+  if (/\.(wav|mp3)$/i.test(raw)) return raw;
+  return resolveAnnounceMetaCourtSfxFile(raw);
 }
 
 function getPlayerJerseyValue(player) {
@@ -58,6 +83,83 @@ function findRosterPlayer(playerId) {
     .concat(Array.isArray(rosters.home?.players) ? rosters.home.players : [])
     .concat(Array.isArray(rosters.away?.players) ? rosters.away.players : []);
   return allPlayers.find((player) => String(player?.playerId || player?._id || player?.id) === String(playerId)) || null;
+}
+
+function resolveAnnouncementScene(meta) {
+  return meta?.scene
+    || (typeof window !== 'undefined' ? window.currentGameScene : null)
+    || null;
+}
+
+function findPlayerSprite(scene, playerId) {
+  if (!scene?.playerSprites || playerId == null || playerId === '') return null;
+  const sid = String(playerId);
+  const playerSprites = scene.playerSprites;
+  let sprite = playerSprites[sid] || playerSprites[playerId] || null;
+  if (!sprite) {
+    for (const [key, candidate] of Object.entries(playerSprites)) {
+      if (!candidate) continue;
+      const candidateId = String(candidate.playerId ?? candidate.id ?? key);
+      if (candidateId === sid) {
+        sprite = candidate;
+        break;
+      }
+    }
+  }
+  return sprite;
+}
+
+/**
+ * Resolve which home/away side a featured player belongs to for initials-tile colors.
+ * Prefers on-court sprite metadata, then team_id vs sim home id, then roster membership.
+ * Falls back to `fallbackTeamSide` only when player membership cannot be determined.
+ *
+ * @param {import('phaser').Scene|null} scene
+ * @param {string|number|null|undefined} playerId
+ * @param {Object|null|undefined} playerData
+ * @param {'home'|'away'|string|null|undefined} fallbackTeamSide
+ * @returns {'home'|'away'|null}
+ */
+function resolvePlayerTeamSide(scene, playerId, playerData = null, fallbackTeamSide = null) {
+  if (playerId == null || playerId === '') {
+    return fallbackTeamSide === 'home' || fallbackTeamSide === 'away' ? fallbackTeamSide : null;
+  }
+
+  const sid = String(playerId);
+  const sprite = findPlayerSprite(scene, sid);
+
+  if (sprite?.team === 'home' || sprite?.team === 'away') {
+    return sprite.team;
+  }
+
+  const homeId = scene?.simData?.home_team_id ?? scene?.homeTeamId;
+  const teamId = sprite?.team_id ?? playerData?.teamId ?? playerData?.team_id;
+  if (homeId != null && teamId != null) {
+    return String(teamId) === String(homeId) ? 'home' : 'away';
+  }
+
+  const rosterPlayer = findRosterPlayer(sid);
+  if (rosterPlayer) {
+    const rosters = gameStore.getRosters() || {};
+    const inHome = (rosters.home?.players || []).some(
+      (player) => String(player?.playerId || player?._id || player?.id) === sid,
+    );
+    if (inHome) return 'home';
+    const inAway = (rosters.away?.players || []).some(
+      (player) => String(player?.playerId || player?._id || player?.id) === sid,
+    );
+    if (inAway) return 'away';
+  }
+
+  if (fallbackTeamSide === 'home' || fallbackTeamSide === 'away') {
+    return fallbackTeamSide;
+  }
+  return null;
+}
+
+function buildHeadshotInitialsForPlayer(scene, player, playerId, fallbackTeamSide) {
+  const side = resolvePlayerTeamSide(scene, playerId, player, fallbackTeamSide);
+  return buildHeadshotInitialsInfo(player, side);
 }
 
 /**
@@ -161,27 +263,40 @@ export function getSecondaryColorForTeam(scene, teamId) {
  * @param {Object} shooterData - Shooter data { playerId, photo, teamName }
  * @param {Object} foulPlayerData - Fouling player data { playerId, photo, teamName }
  */
-export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
+export function showAndOneAnnouncement(team, shooterData, foulPlayerData, meta = null) {
+  const scene = resolveAnnouncementScene(meta);
   const shooterRoster = shooterData ? findRosterPlayer(shooterData.playerId) : null;
   const foulerRoster = foulPlayerData ? findRosterPlayer(foulPlayerData.playerId) : null;
   const shooter = shooterRoster || shooterData;
   const fouler = foulerRoster || foulPlayerData;
-  // Shooter is on `team`; fouler is by definition on the opposite team.
-  const shooterTeamSide = team === 'away' ? 'away' : 'home';
-  const foulerTeamSide = shooterTeamSide === 'home' ? 'away' : 'home';
+  const shooterFallback = team === 'away' ? 'away' : 'home';
+  const shooterTeamSide = resolvePlayerTeamSide(
+    scene,
+    shooterData?.playerId,
+    shooterData,
+    shooterFallback,
+  );
+  const foulerTeamSide = resolvePlayerTeamSide(
+    scene,
+    foulPlayerData?.playerId,
+    foulPlayerData,
+    shooterTeamSide === 'home' ? 'away' : shooterTeamSide === 'away' ? 'home' : null,
+  );
   const data = {
     type: 'foul',
     foulEventText: "It's Good!",
     shooterPhotoUrl: getPlayerImageUrl(shooterData?.photo, shooterData?.playerId),
-    shooterHeadshotInitials: shooterData ? buildHeadshotInitialsInfo(shooter, shooterTeamSide) : null,
+    shooterHeadshotInitials: shooterData ? buildHeadshotInitialsForPlayer(scene, shooter, shooterData.playerId, shooterFallback) : null,
     shooterJersey: getPlayerJerseyValue(shooter) ? `#${getPlayerJerseyValue(shooter)}` : '',
     shooterLastName: getPlayerLastName(shooter) || '',
     foulerPhotoUrl: getPlayerImageUrl(foulPlayerData?.photo, foulPlayerData?.playerId),
-    foulerHeadshotInitials: foulPlayerData ? buildHeadshotInitialsInfo(fouler, foulerTeamSide) : null,
+    foulerHeadshotInitials: foulPlayerData ? buildHeadshotInitialsForPlayer(scene, fouler, foulPlayerData.playerId, foulerTeamSide) : null,
     foulerJersey: getPlayerJerseyValue(fouler) ? `#${getPlayerJerseyValue(fouler)}` : '',
     foulerLastName: getPlayerLastName(fouler) || '',
+    // AND-1 whistle carried on payload — court.html plays at overlay mount
+    // per Sound_Design_Update.md. Caller override via `meta.sfx`.
+    sfx: resolvePrimarySfxFromMeta(meta?.sfx) ?? 'whistle-1-lowervol.wav',
   };
-  playAnnouncementSfx('foul');
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
   }
@@ -225,6 +340,7 @@ function resolveSecondaryStripeColor(team) {
  *     headline at 50% font-size (e.g. play name "Rim Runner" after "Fast Break!").
  */
 export function showSecondaryAnnouncement(text, team = 'home', playerData = null, meta = null) {
+  const scene = resolveAnnouncementScene(meta);
   const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
   const player = rosterPlayer || playerData;
   const photoUrl = playerData && (playerData.photo || playerData.playerId)
@@ -232,18 +348,39 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     : '';
   const jerseyVal = getPlayerJerseyValue(player);
   const lastName = getPlayerLastName(player) || '';
+  // Single source of truth for secondary-tier SFX. Resolution order:
+  //   1. `meta.sfx` filename string (".wav"/".mp3") — caller passes directly.
+  //   2. `meta.sfx` legacy key string (no extension) — backend-stamped on
+  //      schema announcements (e.g. "fb_outlet_denied_court", "steal").
+  //   3. Headline-based fallback (Press!/Trap!/Fast Break!/etc.) — applies
+  //      once-per-turn dedupe for the three repeating stingers.
+  // `court.html`'s secondary overlay reads `data.sfx` and plays at mount,
+  // synced to the visual entry per Sound_Design_Update.md.
+  const rawMetaSfx = meta?.sfx;
+  let sfxFile = null;
+  if (typeof rawMetaSfx === 'string' && rawMetaSfx) {
+    sfxFile = /\.(wav|mp3)$/i.test(rawMetaSfx)
+      ? rawMetaSfx
+      : resolveAnnounceMetaCourtSfxFile(rawMetaSfx);
+  }
+  if (!sfxFile) {
+    sfxFile = resolveSecondaryAnnounceCourtSfxFile(text);
+  }
   const data = {
     tier: 'secondary',
     type: 'standard',
     eventText: text || '',
     eventSubtitle: typeof meta?.eventSubtitle === 'string' ? meta.eventSubtitle : '',
     photoUrl,
-    headshotInitials: playerData ? buildHeadshotInitialsInfo(player, team) : null,
+    headshotInitials: playerData
+      ? buildHeadshotInitialsForPlayer(scene, player, playerData.playerId, team)
+      : null,
     jersey: jerseyVal ? `#${jerseyVal}` : '',
     lastName,
     teamColor: resolveSecondaryStripeColor(team),
     decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
+    sfx: sfxFile,
   };
   if (String(text || '').trim() === 'Great Stop!' && !photoUrl && !lastName) {
     console.warn('[ANN] Great Stop secondary missing headshot payload', {
@@ -253,7 +390,6 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     });
   }
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
-    playSecondaryAnnounceCourtSfx(meta?.scene ?? null, text);
     window.showAnnouncementOverlay(data);
   }
 }
@@ -324,11 +460,14 @@ export function announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite
 /**
  * Show an announcement — uses new announcement strip (standard variant).
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
- * @param {string} team - 'home', 'away', 'defense', or 'neutral' (unused by strip; kept for API)
+ * @param {string} team - Context side for legacy callers ('home'|'away'|'defense'|'neutral').
+ *   Does not drive initials-tile colors when `playerData` is present — see
+ *   `resolvePlayerTeamSide()` / `buildHeadshotInitialsForPlayer()`.
  * @param {Object} playerData - Optional player data { playerId, photo, teamName } to show headshot
- * @param {Object|null} meta - Optional metadata { decisionPillText, decisionPillTone: 'good'|'bad' }
+ * @param {Object|null} meta - Optional metadata { decisionPillText, decisionPillTone: 'good'|'bad', scene }
  */
 export function showAnnouncement(text, team = 'home', playerData = null, meta = null) {
+  const scene = resolveAnnouncementScene(meta);
   const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
   const player = rosterPlayer || playerData;
   const photoUrl = playerData && (playerData.photo || playerData.playerId)
@@ -339,16 +478,21 @@ export function showAnnouncement(text, team = 'home', playerData = null, meta = 
     type: 'standard',
     eventText: text || '',
     photoUrl,
-    headshotInitials: playerData ? buildHeadshotInitialsInfo(player, team) : null,
+    headshotInitials: playerData
+      ? buildHeadshotInitialsForPlayer(scene, player, playerData.playerId, team)
+      : null,
     jersey: jerseyVal ? `#${jerseyVal}` : '',
     lastName: getPlayerLastName(player) || '',
     position: getPlayerPosition(player) || '',
     decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
+    // Primary-tier SFX carried on payload — court.html plays at overlay mount
+    // so audio is synced to the visual entry per Sound_Design_Update.md.
+    // Accepts: filename string (`.wav`/`.mp3`), filename array, or a legacy
+    // kind string (`'foul'` / `'shot_clock_violation'` resolved via
+    // `resolveAnnounceMetaCourtSfxFile`).
+    sfx: resolvePrimarySfxFromMeta(meta?.sfx),
   };
-  if (meta?.sfx) {
-    playAnnouncementSfx(meta.sfx);
-  }
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
   }
@@ -372,9 +516,12 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     caller: new Error().stack.split('\n')[2]?.trim() // Show caller
   });
 
-  // Determine which team triggered the event
-  const offenseTeamId = turnData.possession_team_id;
-  const isHomeTeamEvent = homeTeamId && String(offenseTeamId) === String(homeTeamId);
+  // SS&S: offense_team_id is canonical; possession_team_id is legacy fallback.
+  const offenseTeamId = turnData.offense_team_id
+    ?? turnData.possession_team_id
+    ?? scene?.offenseTeamId;
+  const isHomeTeamEvent = homeTeamId && offenseTeamId != null
+    && String(offenseTeamId) === String(homeTeamId);
   const offenseTeam = isHomeTeamEvent ? 'home' : 'away';
   const defenseTeam = isHomeTeamEvent ? 'away' : 'home';
   
@@ -421,7 +568,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
           };
         }
       }
-      showAnnouncement("CHARGE!", defenseTeam, playerData);
+      showAnnouncement("CHARGE!", defenseTeam, playerData, scene ? { scene } : null);
       return;
     }
     
@@ -455,26 +602,24 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
+      // Foul whistle carried on payload — court.html plays at overlay mount
+      // per Sound_Design_Update.md (single source for primary-tier SFX).
+      const foulMeta = scene ? { scene, sfx: 'whistle-1-lowervol.wav' } : { sfx: 'whistle-1-lowervol.wav' };
       if (turnData.otb_foul) {
-        playAnnouncementSfx('foul');
-        showAnnouncement("Over The Back!", foulTeam === 'OFFENSE' ? defenseTeam : offenseTeam, playerData);
+        showAnnouncement("Over The Back!", foulTeam === 'OFFENSE' ? defenseTeam : offenseTeam, playerData, foulMeta);
       } else if (isBlockingFoul) {
-        playAnnouncementSfx('foul');
-        showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData);
+        showAnnouncement("BLOCKING FOUL!", offenseTeam, playerData, foulMeta);
       } else if (foulTeam === 'OFFENSE') {
-        // Offensive foul - show in defense team color (they benefited)
-        playAnnouncementSfx('foul');
-        showAnnouncement(pickOffensiveFoulAnnouncementText(turnData), defenseTeam, playerData);
+        showAnnouncement(pickOffensiveFoulAnnouncementText(turnData), defenseTeam, playerData, foulMeta);
       } else {
         // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
         // Bonus fouls (FOUL -> FREE_THROW) stay in this path and should not be reclassified as shooting fouls.
         let defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
         if (isQuickFoul) defensiveFoulText = "Quick Foul!";
         if (isBonusFoul && !isQuickFoul) defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
-        playAnnouncementSfx('foul');
-        showAnnouncement(defensiveFoulText, offenseTeam, playerData);
+        showAnnouncement(defensiveFoulText, offenseTeam, playerData, foulMeta);
       }
-      
+
       return;
     }
     
@@ -502,7 +647,12 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
-      showAnnouncement("STEAL!", defenseTeam, playerData);
+      // Steal voice tied to "STEAL!" announce appearance (Sound_Design_Update.md
+      // §Steal Announce). court.html plays `meta.sfx` at overlay mount.
+      showAnnouncement("STEAL!", defenseTeam, playerData, {
+        sfx: resolveStealSfxFile(),
+        ...(scene ? { scene } : {}),
+      });
       return;
     }
     
@@ -577,9 +727,12 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       }
       
       console.log(`📢 Announcing turnover: ${turnoverText} (result_type: ${turnData.result_type}, source: ${turnData.offensive_state || 'HCO'})`);
-      const turnoverSfxKind = turnoverText === 'Shot Clock Violation!' ? 'shot_clock_violation' : 'foul';
-      playAnnouncementSfx(turnoverSfxKind);
-      showAnnouncement(turnoverText, offenseTeam, playerData);
+      // Whistle carried on payload — court.html plays at mount; Shot Clock
+      // Violation uses whistle-3.mp3, other turnovers use whistle-1-lowervol.
+      const turnoverSfxFile = turnoverText === 'Shot Clock Violation!' ? 'whistle-3.mp3' : 'whistle-1-lowervol.wav';
+      const turnoverMeta = { sfx: turnoverSfxFile };
+      if (scene) turnoverMeta.scene = scene;
+      showAnnouncement(turnoverText, offenseTeam, playerData, turnoverMeta);
       return;
     }
   }

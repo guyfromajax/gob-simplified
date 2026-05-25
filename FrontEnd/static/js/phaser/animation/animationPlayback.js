@@ -27,7 +27,7 @@ import { attachBallToPlayer } from "./ballManager.js";
 // the follow callback and the pass renders as a teleport at step end.
 import { detachBall } from "./BallControllerAdapter.js";
 import { createBallTrail } from "./createBallTrail.js";
-import { playGameSfx, playFBDefensiveStopCourtSfx } from "../utils/gameSfx.js";
+import { playGameSfx } from "../utils/gameSfx.js";
 import {
   waitMsRespectingPause,
   waitWhileUserPaused,
@@ -66,12 +66,52 @@ function ballCoordFromState(ballState, playerCoords) {
 const SHOT_BALL_GRID_PER_GAME_SEC = 27;
 /** Mirrors `BackEnd.constants.FREE_THROW_SHOT_GRID_PER_GAME_SECOND` (UESS §11.1). */
 const FREE_THROW_BALL_GRID_PER_GAME_SEC = 12;
-/** Main-branch-style minimum shot flight (FE playback only; does not change backend T). */
-const SHOT_BALL_MIN_WALL_CLOCK_MS = 700;
-const PASS_BALL_GRID_PER_GAME_SEC = 30;
+/** Minimum step-playback wait for a shot [ball_flight] step (FE only).
+ * Keeps the camera on the rim long enough for short shots to read.
+ * Main-branch parity. Does not change backend T. */
+const SHOT_BALL_MIN_WALL_CLOCK_MS = 400;
+/** Minimum ball-tween wall-clock duration for a shot (FE only).
+ * Keeping the tween
+ * floor equal to the step floor prevents the ball/SFX from reaching the rim
+ * early, then idling before result/bounce handling begins. */
+const SHOT_BALL_MIN_TWEEN_MS = SHOT_BALL_MIN_WALL_CLOCK_MS;
+/** Mirrors `BackEnd.constants.PASS_GRID_SPOTS_PER_GAME_SECOND`. */
+const PASS_BALL_GRID_PER_GAME_SEC = 24;
+
+function shouldTracePlayback(scene = null) {
+  const flag = typeof window !== "undefined" ? window.UESS_TRACE_PLAYBACK : undefined;
+  if (flag === false) return false;
+  if (flag === true) return true;
+  return Boolean(scene?.__uessTracePlayback);
+}
+
+function tracePlayback(scene, label, payload = {}) {
+  return;
+}
 
 function isShotBallMotionStep(step) {
   return step?.start?.ball_motion_style === "shot";
+}
+
+function shotReleasePlayerId(step) {
+  const actions = step?.start?.action || {};
+  for (const [playerId, action] of Object.entries(actions)) {
+    if (action === "shoot") return String(playerId);
+  }
+  return null;
+}
+
+function shouldAdvanceToShotFlightOnShooterSettle(step, steps = null) {
+  const shooterId = shotReleasePlayerId(step);
+  const next = step?.end?.next;
+  if (!shooterId || next?.kind !== "next_step") {
+    return { shouldAdvance: false, shooterId: null };
+  }
+  const nextStep = Array.isArray(steps) ? steps[next.index] : null;
+  return {
+    shouldAdvance: isShotBallMotionStep(nextStep),
+    shooterId,
+  };
 }
 
 /** Backend stamps `advance_trigger.metadata.free_throw_shot` on FT [ball_flight]. */
@@ -81,6 +121,11 @@ function isFreeThrowShotStep(step) {
   if (meta.free_throw_shot === true) return true;
   const rate = Number(meta.ball_grid_per_game_second);
   return Number.isFinite(rate) && rate === FREE_THROW_BALL_GRID_PER_GAME_SEC;
+}
+
+/** Rare FT-only: mid-sequence ball snap bounce → shooter (attached). */
+function isFtReturnTeleportStep(step) {
+  return step?.start?.advance_trigger?.metadata?.kind === "ft_return_teleport";
 }
 
 function shotBallGridRate(step) {
@@ -96,7 +141,7 @@ function shotBallTweenDurationMs(gridDist, clockSecondMs, step = null) {
   if (step && isFreeThrowShotStep(step)) {
     return Math.max(50, fromRate);
   }
-  return Math.max(SHOT_BALL_MIN_WALL_CLOCK_MS, fromRate);
+  return Math.max(SHOT_BALL_MIN_TWEEN_MS, fromRate);
 }
 
 /** Mid-skeleton HCO pass: ownership transfers, ball uses pass motion rate. */
@@ -115,6 +160,66 @@ function isSchemaPassStep(step) {
   );
 }
 
+function schemaPassStartOwnerId(step) {
+  return isBallAttached(step?.start?.ball)
+    ? String(step.start.ball.owner_player_id)
+    : null;
+}
+
+function schemaPassEndOwnerId(step) {
+  return isBallAttached(step?.end?.ball)
+    ? String(step.end.ball.owner_player_id)
+    : null;
+}
+
+function withExpectedDuration(promise, expectedDurationMs = 0) {
+  if (promise && typeof promise === "object") {
+    promise.expectedDurationMs = Math.max(0, Math.round(Number(expectedDurationMs) || 0));
+  }
+  return promise;
+}
+
+async function awaitTweenOrDuration(scene, tweenPromise, expectedDurationMs, fallbackResult = undefined) {
+  if (!tweenPromise || typeof tweenPromise.then !== "function") {
+    return fallbackResult;
+  }
+  const fallbackMs = Math.max(0, Math.round(Number(expectedDurationMs) || 0));
+  if (fallbackMs <= 0) {
+    return tweenPromise;
+  }
+  return Promise.race([
+    tweenPromise,
+    waitMsRespectingPause(scene, fallbackMs).then(() => fallbackResult),
+  ]);
+}
+
+/**
+ * Schedule `timed_sfx` cues relative to a base moment (ball arrival by default).
+ * @param {Phaser.Scene} scene
+ * @param {import("./animationStepSchema.js").TimedSfx[]} timedSfx
+ * @param {number} [baseDelayMs=0]
+ */
+function scheduleTimedSfxCues(scene, timedSfx, baseDelayMs = 0) {
+  if (!scene || !Array.isArray(timedSfx)) return;
+  for (const cue of timedSfx) {
+    if (!cue || !cue.file) continue;
+    const delay = baseDelayMs + Math.max(0, Number(cue.delay_ms) || 0);
+    const playCue = () => playGameSfx(
+      scene,
+      cue.file,
+      typeof cue.volume === "number" ? cue.volume : 0.7,
+      { event: cue.event || "timed_sfx" },
+    );
+    if (delay === 0) {
+      playCue();
+    } else if (scene.time?.delayedCall) {
+      scene.time.delayedCall(delay, playCue);
+    } else {
+      setTimeout(playCue, delay);
+    }
+  }
+}
+
 /**
  * Spawn the ball's own linear tween from its computed start coord to its
  * computed end coord over the step duration. This single dispatch handles
@@ -128,17 +233,19 @@ function isSchemaPassStep(step) {
  * Ownership state changes are applied at step end via snapBallToEndState.
  */
 function renderBallTransition(scene, step, sprites, ballSprite, durationMs, width, height, clockSecondMs, options = {}) {
-  if (!ballSprite) return;
-  const startCoord = ballCoordFromState(step.start.ball, step.start.coords);
+  if (!ballSprite) return withExpectedDuration(Promise.resolve({ tweenStarted: false }), 0);
+  const startCoord = options.ballStartCoordOverride
+    ?? ballCoordFromState(step.start.ball, step.start.coords);
   // ball_arrival_coord override: when the ball's tween should terminate at a
   // backend-computed meet-point rather than the end-state owner's step-end
   // coord. Used by HCO pass steps where the receiver may still be moving
   // when the ball arrives — the meet-point is the receiver's interpolated
   // position at ball-arrival time. Backend pre-resolves; FE consumes.
-  const endCoord = step.start?.ball_arrival_coord
+  const endCoord = options.ballEndCoordOverride
+    ?? step.start?.ball_arrival_coord
     ?? ballCoordFromState(step.end.ball, step.end.coords);
 
-  if (!startCoord || !endCoord) return;
+  if (!startCoord || !endCoord) return withExpectedDuration(Promise.resolve({ tweenStarted: false }), 0);
 
   // When the ball is attached to a player, its visual anchor is the player's
   // hip (sprite + BALL_ATTACH_OFFSET); when in flight or loose, it tracks the
@@ -156,7 +263,7 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     Math.abs(startCoord.x - endCoord.x) < 1e-6 &&
     Math.abs(startCoord.y - endCoord.y) < 1e-6
   ) {
-    return;
+    return withExpectedDuration(Promise.resolve({ tweenStarted: false }), 0);
   }
 
   // Ownership-change handling. When the ball changes owners between steps
@@ -262,8 +369,8 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
   // canvas is 1229×768 → 12.29 px/grid for X, 15.36 px/grid for Y), so a
   // pixel-distance approach over-counts Y-heavy moves and the ball arrives
   // after step T ends.
-  //   "shot" — 27 grid/game-sec (HCO) or 12 (FT via metadata), min 700 ms for HCO only
-  //   "pass" — PASS_GRID_SPOTS_PER_GAME_SECOND (30)
+  //   "shot" — 27 grid/game-sec (HCO) or 12 (FT via metadata), min 400 ms for HCO only
+  //   "pass" — PASS_GRID_SPOTS_PER_GAME_SECOND (24)
   let ballDurationMs = durationMs;
   if (isShotBallMotionStep(step)) {
     const dxGrid = endCoord.x - startCoord.x;
@@ -283,6 +390,17 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     );
   }
 
+  // Hot-shot flame trail: backend stamps ``advance_trigger.metadata.hot_shot_trail``
+  // on schema [ball_flight] when shot_score_pre_defense > 210 (strong tier).
+  // Same threshold as three-strong.wav / legacy ShotAnimationSystem.
+  if (
+    isShotBallMotionStep(step)
+    && !isFreeThrowShotStep(step)
+    && step.start?.advance_trigger?.metadata?.hot_shot_trail
+  ) {
+    createBallTrail(scene, ballSprite, ballDurationMs);
+  }
+
   // When ball_motion_style="pass" and the step ends with ownership on a
   // sprite, attach the ball to that sprite on tween completion (not at
   // step end). The ball then follows the receiver via the BallController
@@ -296,31 +414,40 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     }
   }
 
-  scene.tweens.add({
-    targets: ballSprite,
-    x: endPx.x,
-    y: endPx.y,
-    duration: ballDurationMs,
-    ease: "Linear",
-    onComplete: () => {
-      if (attachOnCompleteSprite) {
-        attachBallToPlayer(scene, ballSprite, attachOnCompleteSprite);
-      }
-      // Generic ball-arrival SFX cue (Sound_Design_Update.md). Currently
-      // used by HCO mid-skeleton pass steps (receive-{strong|medium|weak}.wav).
-      // Fires the moment the ball reaches its destination (meet-point for
-      // moving receivers; receiver coord for stationary).
-      const arrivalSfx = step.start?.sfx_on_ball_arrival;
-      if (arrivalSfx?.file) {
-        playGameSfx(
-          scene,
-          arrivalSfx.file,
-          typeof arrivalSfx.volume === "number" ? arrivalSfx.volume : 0.7,
-          { event: arrivalSfx.event || "ball_arrival" },
-        );
-      }
-    },
+  const tweenPromise = new Promise((resolve) => {
+    scene.tweens.add({
+      targets: ballSprite,
+      x: endPx.x,
+      y: endPx.y,
+      duration: ballDurationMs,
+      ease: "Linear",
+      onComplete: () => {
+        if (attachOnCompleteSprite) {
+          attachBallToPlayer(scene, ballSprite, attachOnCompleteSprite);
+        }
+        // Generic ball-arrival SFX cue (Sound_Design_Update.md). Currently
+        // used by HCO mid-skeleton pass steps (receive-{strong|medium|weak}.wav).
+        // Fires the moment the ball reaches its destination (meet-point for
+        // moving receivers; receiver coord for stationary).
+        const arrivalSfx = step.start?.sfx_on_ball_arrival;
+        if (arrivalSfx?.file) {
+          playGameSfx(
+            scene,
+            arrivalSfx.file,
+            typeof arrivalSfx.volume === "number" ? arrivalSfx.volume : 0.7,
+            { event: arrivalSfx.event || "ball_arrival" },
+          );
+        }
+        const timedSfx = step.start?.timed_sfx;
+        if (Array.isArray(timedSfx) && timedSfx.length > 0) {
+          scheduleTimedSfxCues(scene, timedSfx);
+        }
+        resolve({ tweenStarted: true });
+      },
+      onStop: () => resolve({ tweenStarted: true }),
+    });
   });
+  return withExpectedDuration(tweenPromise, ballDurationMs);
 }
 
 /**
@@ -420,20 +547,7 @@ function inferStepAnnouncementPlayerData(announcement, step, turnData = null) {
   const directPlayerData = normalizeAnnouncementPlayerData(
     announcement?.player_data || announcement?.playerData || null,
   );
-  if (directPlayerData?.playerId) return directPlayerData;
-  const text = String(announcement?.text || "").trim().toLowerCase();
-  if (text !== "nice stop!") return directPlayerData || null;
-  const stopperId =
-    turnData?.stopper_id
-    ?? turnData?.roles?.stopper_id
-    ?? turnData?.roles?.stopper?.player_id
-    ?? turnData?.roles?.stopper;
-  if (stopperId) {
-    return { ...(directPlayerData || {}), playerId: String(stopperId) };
-  }
-  const actions = step?.start?.action || {};
-  const guardStopperId = Object.entries(actions).find(([, action]) => action === "guard_ball")?.[0];
-  return guardStopperId ? { ...(directPlayerData || {}), playerId: guardStopperId } : (directPlayerData || null);
+  return directPlayerData?.playerId ? directPlayerData : (directPlayerData || null);
 }
 
 function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
@@ -462,47 +576,24 @@ function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
   };
 }
 
-function isCovertReleaseDefensiveStopAnnouncement(announcement, turnData = null) {
-  if (turnData?.fast_break_play !== "covert_release") return false;
-  return String(announcement?.text || "").trim().toLowerCase() === "nice stop!";
-}
-
-function isNoFastBreakAnnouncement(announcement) {
-  return String(announcement?.text || "").trim().toLowerCase() === "no fast break";
-}
-
-/**
- * Play `duke-hold-up.wav` when the "No Fast Break" announcement fires
- * (RR FB hold-up branch, step 2 start). Stashes the Audio instance on
- * `scene._activeSfx` so the browser doesn't GC the anonymous Audio object
- * mid-clip — same pattern as the outlet-pass SFX in `renderBallTransition`.
- * Fail-silent.
- */
-function playNoFastBreakSfx(scene) {
-  try {
-    const sfx = new Audio(`/sounds/duke-hold-up.wav`);
-    if (!scene._activeSfx) scene._activeSfx = new Set();
-    scene._activeSfx.add(sfx);
-    const release = () => {
-      if (scene._activeSfx) scene._activeSfx.delete(sfx);
-    };
-    sfx.addEventListener("ended", release, { once: true });
-    sfx.addEventListener("error", release, { once: true });
-    sfx.play().catch(release);
-  } catch (_e) {
-    // Audio is non-critical.
+function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, height) {
+  if (!scene || !sprite || !endCoord) {
+    return Promise.resolve();
   }
+  const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+  return new Promise((resolve) => {
+    scene.tweens.add({
+      targets: sprite,
+      x: endPx.x,
+      y: endPx.y,
+      duration: Math.max(50, Math.round(durationMs)),
+      ease: "Linear",
+      onComplete: resolve,
+      onStop: resolve,
+    });
+  });
 }
 
-function resolveDefenseTeamSideForTurn(scene, turnData, sprites = null) {
-  const playerSprites = sprites || scene?.playerSprites || {};
-  const ballHandlerData = turnData?.roles?.ball_handler;
-  const ballHandlerId = ballHandlerData?.player_id || ballHandlerData;
-  const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
-  if (ballHandlerSprite?.team === "home") return "away";
-  if (ballHandlerSprite?.team === "away") return "home";
-  return "away";
-}
 
 /**
  * Run an in-step announcement: pause clocks, show announcement, await hold,
@@ -518,43 +609,46 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
   scene.gameClock?.pause?.(reason);
   scene.shotClock?.pause?.(reason);
 
-  // Announcement-tied SFX. Fire alongside the announcement so audio + visual
-  // are synced. Once per announcement display (this function runs once per
-  // step.start.announcement / step.end.announcement). Add new cases here as
-  // additional announcements need accompanying SFX.
-  if (isNoFastBreakAnnouncement(announcement)) {
-    playNoFastBreakSfx(scene);
-  }
+  // Announcement-tied SFX is carried on the payload (`data.sfx`) and played
+  // by court.html at overlay mount — single source of truth, synced to the
+  // visual entry per Sound_Design_Update.md. Backend-stamped `meta.sfx` keys
+  // (e.g. "no_fast_break", "fb_outlet_denied_court", "steal") are resolved
+  // to filenames inside `showSecondaryAnnouncement`.
 
   try {
-    const { showAnnouncement, showSecondaryAnnouncement, buildSecondaryStopperPlayerData } = await import("../utils/announcements.js");
+    const {
+      showAnnouncement,
+      showSecondaryAnnouncement,
+      showAndOneAnnouncement,
+    } = await import("../utils/announcements.js");
     const inferredPlayerData = inferStepAnnouncementPlayerData(announcement, step, turnData);
     const playerData = enrichStepAnnouncementPlayerData(scene, inferredPlayerData, sprites);
-    if (isCovertReleaseDefensiveStopAnnouncement(announcement, turnData)) {
-      // Legacy CR override: rewrite "Nice Stop!" → "Great Stop!", play court SFX,
-      // resolve stopper via dedicated builder. Pre-dates the explicit `style`
-      // field; kept for backwards compat with CR emitter output.
-      const stopperId =
-        playerData?.playerId
-        ?? turnData?.stopper_id
-        ?? turnData?.roles?.stopper_id
-        ?? turnData?.roles?.stopper?.player_id
-        ?? turnData?.roles?.stopper;
-      const stopperRef = stopperId
-        ? resolveScenePlayerRef(scene, stopperId, sprites)
-        : { id: null, sprite: null, info: null };
-      const defenseTeam = stopperRef.sprite?.team === "home"
-        ? "home"
-        : stopperRef.sprite?.team === "away"
-          ? "away"
-          : resolveDefenseTeamSideForTurn(scene, turnData, sprites);
-      playFBDefensiveStopCourtSfx(scene);
-      showSecondaryAnnouncement(
-        "Great Stop!",
-        defenseTeam,
-        buildSecondaryStopperPlayerData(scene, stopperId, sprites),
-        { scene },
-      );
+    if (announcement.style === "and_one") {
+      // Backend stamps `style: "and_one"` for the two-portrait foul card
+      // (Announcement_System.md). Resolve shooter + fouler from
+      // announcement.player_data ({ playerId, foulerId }); fall back to the
+      // single-row variant when either resolution fails. SFX comes from
+      // `announcement.meta.sfx` (backend-stamped); no FE hardcode.
+      const shooterId =
+        announcement.player_data?.playerId
+        ?? announcement.player_data?.shooterId;
+      const foulerId =
+        announcement.player_data?.foulerId
+        ?? turnData?.foul_player_id
+        ?? turnData?.foul_player?.player_id;
+      const shooterData = shooterId
+        ? enrichStepAnnouncementPlayerData(scene, { playerId: String(shooterId) }, sprites)
+        : playerData;
+      const foulerData = foulerId
+        ? enrichStepAnnouncementPlayerData(scene, { playerId: String(foulerId) }, sprites)
+        : null;
+      const team = announcement.team || "home";
+      const andOneMeta = { ...(announcement.meta || {}), scene };
+      if (shooterData?.playerId && foulerData?.playerId) {
+        showAndOneAnnouncement(team, shooterData, foulerData, andOneMeta);
+      } else {
+        showAnnouncement(announcement.text, team, shooterData, andOneMeta);
+      }
     } else if (announcement.style === "secondary") {
       showSecondaryAnnouncement(
         announcement.text,
@@ -626,32 +720,34 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     await runStepAnnouncement(scene, step.start.announcement, sprites, step, options.turnData);
   }
 
-  // step.start.timed_sfx: schedule each cue with `setTimeout`-style fire at
-  // its `delay_ms` offset. Independent of ball motion — used for variant
-  // follow-up cues that overlap the next sub-step's motion (e.g. BANK_MAKE
-  // swish at +100 ms after bb-rim-swish.wav, BACK_OF_RIM make swish at
-  // +150 ms after back-of-rim.wav). Backend stamps the resolved filenames /
-  // offsets — FE just schedules.
-  const timedSfx = step.start?.timed_sfx;
-  if (Array.isArray(timedSfx)) {
-    for (const cue of timedSfx) {
-      if (!cue || !cue.file) continue;
-      const delay = Math.max(0, Number(cue.delay_ms) || 0);
-      const playCue = () => playGameSfx(
-        scene,
-        cue.file,
-        typeof cue.volume === "number" ? cue.volume : 0.7,
-        { event: cue.event || "timed_sfx" },
-      );
-      if (delay === 0) {
-        playCue();
-      } else if (scene.time?.delayedCall) {
-        scene.time.delayedCall(delay, playCue);
-      } else {
-        setTimeout(playCue, delay);
-      }
+  // FT mid-sequence return: instant ball snap to shooter — no tween (schema-only exception).
+  if (isFtReturnTeleportStep(step)) {
+    const width = scene.game?.config?.width;
+    const height = scene.game?.config?.height;
+    for (const [playerId, endCoord] of Object.entries(step.end.coords || {})) {
+      const sprite = sprites[playerId];
+      if (!sprite || !endCoord) continue;
+      const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+      sprite.setPosition(endPx.x, endPx.y);
+      sprite.gridX = endCoord.x;
+      sprite.gridY = endCoord.y;
     }
+    if (ballSprite) {
+      ballSprite.setVisible(true);
+    }
+    snapBallToEndState(scene, step, sprites, ballSprite, width, height);
+    if (step.end?.announcement) {
+      await runStepAnnouncement(scene, step.end.announcement, sprites, step, options.turnData);
+    }
+    tracePlayback(scene, "step:ft_return_teleport", {
+      turnIndex: options.turnData?.index ?? null,
+      targetPlayerId: step.start?.advance_trigger?.metadata?.target_player_id ?? null,
+    });
+    return step.end?.next ?? null;
   }
+
+  // timed_sfx fires from ball tween onComplete (see renderBallTransition), or
+  // from the step-end fallback when the ball tween early-returns.
 
   // Spawn one linear tween per player whose start coord differs from end coord.
   // Backend stamps per-player tween durations on step.start.tween_durations
@@ -661,21 +757,63 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   // stretching every player's tween across the gating player's duration.
   // When tween_durations is absent (legacy emitters), fall back to step T.
   const perPlayerDurations = step.start.tween_durations || {};
-  const passReleasesAtStepStart = isSchemaPassStep(step);
+  const isPassStep = isSchemaPassStep(step);
+  const shotReleaseGate = shouldAdvanceToShotFlightOnShooterSettle(step, options.steps);
+  const releaseShotOnShooterSettle = shotReleaseGate.shouldAdvance;
+  const shotReleaseShooterId = shotReleaseGate.shooterId;
+  let shooterTweenPromise = Promise.resolve({ tweenStarted: false });
+  let shooterTweenDurationMs = 0;
+  let ballTransitionPromise = Promise.resolve({ tweenStarted: false });
+  const stepStartedAtMs = performance.now();
+  const activeStepTweenSprites = [];
+  const passStartOwnerId = isPassStep
+    ? schemaPassStartOwnerId(step)
+    : null;
+  const passEndOwnerId = isPassStep
+    ? schemaPassEndOwnerId(step)
+    : null;
 
-  // Pass: detach + ball flight first, then all player tweens (passer + defense) in parallel.
-  if (passReleasesAtStepStart) {
-    renderBallTransition(
-      scene,
-      step,
-      sprites,
-      ballSprite,
+  const stepWaitMs =
+    isShotBallMotionStep(step) && !isFreeThrowShotStep(step)
+      ? Math.max(durationMs, SHOT_BALL_MIN_WALL_CLOCK_MS)
+      : durationMs;
+
+  if (shouldTracePlayback(scene)) {
+    let movers = 0;
+    for (const [playerId, startCoord] of Object.entries(step.start.coords || {})) {
+      const endCoord = step.end?.coords?.[playerId];
+      if (!startCoord || !endCoord) continue;
+      if (
+        Math.abs(endCoord.x - startCoord.x) >= 1e-6 ||
+        Math.abs(endCoord.y - startCoord.y) >= 1e-6
+      ) {
+        movers += 1;
+      }
+    }
+    tracePlayback(scene, "step:start", {
+      turnIndex: options.turnData?.index ?? null,
+      resultType: options.turnData?.result_type ?? null,
+      currentTurn: options.turnData?.current_turn ?? null,
+      stepId: step.id ?? null,
       durationMs,
-      width,
-      height,
-      clockSecondMs,
-      options,
-    );
+      stepWaitMs,
+      timeElapsed: step.end?.time_elapsed ?? null,
+      advanceTrigger: step.start?.advance_trigger?.condition ?? null,
+      advanceTriggerReason: step.start?.advance_trigger?.metadata?.reason ?? null,
+      advanceTriggerTargetPlayerId: step.start?.advance_trigger?.metadata?.target_player_id ?? null,
+      next: step.end?.next ?? null,
+      isPassStep,
+      releaseShotOnShooterSettle,
+      shotReleaseShooterId,
+      passStartOwnerId,
+      passEndOwnerId,
+      movers,
+      spriteCount: Object.keys(sprites || {}).length,
+      hasBallSprite: Boolean(ballSprite),
+      ballVisible: ballSprite?.visible ?? null,
+      isPaused: scene?.isPaused ?? null,
+      skipToEnd: scene?.skipToEnd ?? null,
+    });
   }
 
   for (const [playerId, startCoord] of Object.entries(step.start.coords)) {
@@ -694,41 +832,91 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         ? Math.max(50, Math.round(playerGameSec * clockSecondMs))
         : durationMs;
 
-    const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
-    scene.tweens.add({
-      targets: sprite,
-      x: endPx.x,
-      y: endPx.y,
-      duration: playerDurationMs,
-      ease: "Linear",
+    const tweenPromise = startSchemaPlayerTween(scene, sprite, endCoord, playerDurationMs, width, height);
+    activeStepTweenSprites.push(sprite);
+    if (releaseShotOnShooterSettle && String(playerId) === shotReleaseShooterId) {
+      shooterTweenPromise = tweenPromise;
+      shooterTweenDurationMs = playerDurationMs;
+    }
+  }
+
+  ballTransitionPromise = renderBallTransition(
+    scene,
+    step,
+    sprites,
+    ballSprite,
+    durationMs,
+    width,
+    height,
+    clockSecondMs,
+    options,
+  );
+
+  if (isPassStep) {
+    tracePlayback(scene, "pass:release", {
+      turnIndex: options.turnData?.index ?? null,
+      stepId: step.id ?? null,
+      elapsedMs: Math.round(performance.now() - stepStartedAtMs),
+      passStartOwnerId,
+      passEndOwnerId,
+      ballArrivalCoord: step.start?.ball_arrival_coord ?? null,
+      ballDurationMs: ballTransitionPromise?.expectedDurationMs ?? null,
     });
   }
 
-  if (!passReleasesAtStepStart) {
-    renderBallTransition(
+  if (releaseShotOnShooterSettle) {
+    const shotGateResult = await awaitTweenOrDuration(
       scene,
-      step,
-      sprites,
-      ballSprite,
-      durationMs,
-      width,
-      height,
-      clockSecondMs,
-      options,
+      shooterTweenPromise,
+      shooterTweenDurationMs,
+      { tweenStarted: false, durationFallback: true },
     );
+    if (scene?.tweens?.killTweensOf) {
+      for (const sprite of activeStepTweenSprites) {
+        scene.tweens.killTweensOf(sprite);
+      }
+      if (ballSprite) {
+        scene.tweens.killTweensOf(ballSprite);
+      }
+      if (scene.ballShadowSprite) {
+        scene.tweens.killTweensOf(scene.ballShadowSprite);
+      }
+    }
+    tracePlayback(scene, "shot:release-on-shooter-settle", {
+      turnIndex: options.turnData?.index ?? null,
+      stepId: step.id ?? null,
+      shooterId: shotReleaseShooterId,
+      shooterTweenDurationMs,
+      elapsedMs: Math.round(performance.now() - stepStartedAtMs),
+      shotGateResult,
+      next: step.end?.next ?? null,
+    });
+    return step.end?.next ?? null;
   }
 
   // Wait the prescribed wall-clock duration (only while not user-paused).
   // Shot [ball_flight] steps: FE playback floor so short flights are visible
-  // (main shootBall min 700 ms). Backend step T / clocks unchanged.
-  const stepWaitMs =
-    isShotBallMotionStep(step) && !isFreeThrowShotStep(step)
-      ? Math.max(durationMs, SHOT_BALL_MIN_WALL_CLOCK_MS)
-      : durationMs;
-  await waitMsRespectingPause(scene, stepWaitMs);
+  // (FE playback floor). Backend step T / clocks unchanged.
+  const elapsedBeforeWaitMs = performance.now() - stepStartedAtMs;
+  await waitMsRespectingPause(scene, Math.max(0, stepWaitMs - elapsedBeforeWaitMs));
   if (shouldFastForwardPlayback(scene)) {
     return step.end?.next ?? null;
   }
+
+  const ballTransitionResult = await awaitTweenOrDuration(
+    scene,
+    ballTransitionPromise,
+    ballTransitionPromise?.expectedDurationMs ?? stepWaitMs,
+    { tweenStarted: true, durationFallback: true },
+  );
+  tracePlayback(scene, "step:post-wait", {
+    turnIndex: options.turnData?.index ?? null,
+    stepId: step.id ?? null,
+    elapsedMs: Math.round(performance.now() - stepStartedAtMs),
+    ballTransitionResult,
+    isPaused: scene?.isPaused ?? null,
+    skipToEnd: scene?.skipToEnd ?? null,
+  });
 
   // Ball-arrival SFX — step-end fallback. Normally fires from the ball
   // tween's onComplete in `renderBallTransition` (HCO mid-skeleton pass).
@@ -738,7 +926,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   // case here and fire the SFX at step end (= moment of attach via
   // snapBallToEndState below).
   const arrivalSfx = step.start?.sfx_on_ball_arrival;
-  if (arrivalSfx?.file) {
+  if (arrivalSfx?.file && !ballTransitionResult?.tweenStarted) {
     const startBallCoord = step.start?.ball?.owner_player_id
       ? step.start.coords?.[step.start.ball.owner_player_id]
       : step.start?.ball?.coords ?? step.start?.ball?.current_coords;
@@ -757,6 +945,10 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         typeof arrivalSfx.volume === "number" ? arrivalSfx.volume : 0.7,
         { event: arrivalSfx.event || "ball_arrival" },
       );
+      const timedSfx = step.start?.timed_sfx;
+      if (Array.isArray(timedSfx) && timedSfx.length > 0) {
+        scheduleTimedSfxCues(scene, timedSfx);
+      }
     }
   }
 
@@ -779,6 +971,15 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   if (step.end?.announcement) {
     await runStepAnnouncement(scene, step.end.announcement, sprites, step, options.turnData);
   }
+
+  tracePlayback(scene, "step:end", {
+    turnIndex: options.turnData?.index ?? null,
+    stepId: step.id ?? null,
+    elapsedMs: Math.round(performance.now() - stepStartedAtMs),
+    advanceTrigger: step.start?.advance_trigger?.condition ?? null,
+    advanceTriggerReason: step.start?.advance_trigger?.metadata?.reason ?? null,
+    next: step.end?.next ?? null,
+  });
 
   return step.end.next;
 }
@@ -811,6 +1012,19 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
     snapSpritesToStepStart(scene, entryStep, sprites, ballSprite);
   }
 
+  tracePlayback(scene, "turn:start", {
+    turnIndex: options.turnData?.index ?? null,
+    resultType: options.turnData?.result_type ?? null,
+    currentTurn: options.turnData?.current_turn ?? null,
+    steps: steps.length,
+    startIndex,
+    spriteCount: Object.keys(sprites || {}).length,
+    hasBallSprite: Boolean(ballSprite),
+    ballVisible: ballSprite?.visible ?? null,
+    isPaused: scene?.isPaused ?? null,
+    skipToEnd: scene?.skipToEnd ?? null,
+  });
+
   let currentIndex = startIndex;
   let stepsExecuted = 0;
 
@@ -829,10 +1043,31 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       throw new Error(`playTurn: missing step at index ${currentIndex}`);
     }
 
-    const next = await playAnimationStep(scene, step, sprites, ballSprite, options);
+    tracePlayback(scene, "turn:step-index", {
+      turnIndex: options.turnData?.index ?? null,
+      currentIndex,
+      stepsExecuted,
+      stepId: step.id ?? null,
+    });
+
+    const next = await playAnimationStep(scene, step, sprites, ballSprite, {
+      ...options,
+      steps,
+      currentIndex,
+    });
+    tracePlayback(scene, "turn:next", {
+      turnIndex: options.turnData?.index ?? null,
+      currentIndex,
+      next,
+    });
     if (!next) return null;
 
     if (next.kind === "turn_stop") {
+      tracePlayback(scene, "turn:stop", {
+        turnIndex: options.turnData?.index ?? null,
+        event: next.event,
+        payload: next.payload ?? null,
+      });
       return { event: next.event, payload: next.payload };
     }
     if (next.kind === "next_step") {
@@ -847,6 +1082,11 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
   }
 
   // Index ran past the array — implicit end of turn.
+  tracePlayback(scene, "turn:end-implicit", {
+    turnIndex: options.turnData?.index ?? null,
+    currentIndex,
+    stepsExecuted,
+  });
   return null;
 }
 
@@ -929,12 +1169,28 @@ async function runShotAttempt(scene, payload, context) {
     : (isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS);
   const shotEndPx = gridToPixels(shotEndGrid.x, shotEndGrid.y, width, height);
 
+  const shooterGridX = shooterSprite?.gridX ?? shotEndGrid.x;
+  const shooterGridY = shooterSprite?.gridY ?? shotEndGrid.y;
+  const gridDist = Math.hypot(
+    shotEndGrid.x - shooterGridX,
+    shotEndGrid.y - shooterGridY,
+  );
+  const tickMs = scene?.gameClock?.getState?.().tickMs || 350;
+  const legacyShotDurationMs = Math.max(
+    SHOT_BALL_MIN_WALL_CLOCK_MS,
+    shotBallTweenDurationMs(
+      gridDist,
+      tickMs,
+      { start: { ball_motion_style: "shot" } },
+    ),
+  );
+
   // Phase 1: ball arcs to its end position (rim for miss, sweet spot for make).
-  const { playShotLaunchSfx, playShotResultSfx } = await import("../utils/gameSfx.js");
+  const { playShotLaunchSfx, playShotResultSfx } = await import("../utils/gameSfx.js?v=announcement-meta-sfx-1");
   const ballAnim = await import("./ballAnimationSimple.js");
   if (typeof ballAnim.animateShotToRim === "function") {
     await ballAnim.animateShotToRim(scene, shotEndPx, {
-      duration: 350,
+      duration: legacyShotDurationMs,
       easing: "Sine.easeInOut",
       arc: { height: 50 },
       onShotRelease: () => playShotLaunchSfx(scene, context?.turnData),

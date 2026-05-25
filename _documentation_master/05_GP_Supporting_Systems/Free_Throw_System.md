@@ -173,39 +173,97 @@ if game_state.get("one_and_one", False):
             game_state["offensive_state"] = "HCO"
 ```
 
-### Rebound Handling
+### Rebound Handling (Final FT only)
 
-**Missed Free Throw Rebound:**
-- Uses unified geography-based rebound system (same as HCO, Fast Break, Putback)
-- Calculate bounce spot from basket being attacked
-- Use `determine_rebounder()` to find closest player to bounce spot
-- **Defensive Rebound (DREB)**:
-  - Possession flips
-  - Next play type: FAST_BREAK (if fast break chance) or HCO
-  - Route to appropriate transition
-- **Offensive Rebound (OREB)**:
-  - Stored in `game_state["pending_oreb"]` for separate OREB turn processing
-  - OREB turn created separately (not in same turn as free throw)
+**Missed Final Free Throw Rebound:**
+- Authoritative rebound resolves only when `free_throws_remaining <= 0` (final attempt).
+- Uses unified geography-based rebound system (same as HCO, Fast Break, Putback):
+  - Calculate `bounce_spot` via `calculate_bounce_spot()` from the basket being attacked.
+  - Use `determine_rebounder()` to find closest player to bounce spot.
+- **Defensive Rebound (DREB)**: possession flips → next play = FAST_BREAK (if FB chance) or HCO. A discrete DREB schema turn is built via `_build_dreb_turn_from_miss`.
+- **Offensive Rebound (OREB)**: stored in `game_state["pending_oreb"]` → separate OREB turn fires next.
+
+**Non-final FT misses** do not run authoritative rebound logic — the ball returns to the shooter for the next attempt (see Animation Sequence below).
+
+---
+
+### Animation Sequence (UESS Schema)
+
+One backend turn = one FT attempt. The FT emitter (`BackEnd/engine/ft_step_emitter.py`) builds `animation_steps[]` per the UESS contract. Clock is **pinned** for the entire FT turn (no game-clock burn). Every `_ball_motion_step` stamps `advance_trigger.metadata.free_throw_shot = True` so the FE's 400ms `SHOT_BALL_MIN_WALL_CLOCK_MS` step-wait floor is bypassed for FT ball steps (the floor exists for non-FT shot-ball steps only).
+
+**Common step prefix (every FT turn):**
+
+| Step | Coords | Notes |
+|---|---|---|
+| Lane setup | All 10 walk to lane positions; shooter to FT line | Gate = all 10 (every player aligned before shot) |
+| Shoot | Shooter `shoot` action / `shot_motion` archetype | Ball attached |
+| Ball flight | Ball: shot_spot → MSSS (make) or rim (miss) | Rate: `FREE_THROW_SHOT_GRID_PER_GAME_SECOND` (12 grid/sec). Arrival SFX: `free-throw-swish.wav` (make) / `free-throw-miss.wav` (miss). |
+
+Outcome-specific tails:
+
+#### MAKE (final or non-final)
+
+| Step | Coords | T |
+|---|---|---|
+| `[make_hold]` | Ball at MSSS; all players stationary | `0.0` game-sec; `start.announcement` = `"It's Good!"` with `hold_ms=1000` (announcement drives the 1000ms wall-clock rim hold; FE's `runStepAnnouncement` pauses both clocks during the hold) |
+| **Non-final only** — return to shooter | Ball: MSSS → shooter's lane spot | `distance / 12` game-sec; ball reattaches to shooter for next FT |
+| **Final only** — implicit turn end | — | Routes to next turn (BIP / HCO / DREB / OREB depending on `next_play_type`) |
+
+#### Non-final MISS (4-step recovery)
+
+| Step | Coords | T |
+|---|---|---|
+| 2. Bounce | Ball: rim → bounce_spot | `distance / 12` game-sec |
+| 3. Bounce hold | Ball stationary at bounce_spot | `1000ms / 350ms-per-game-sec ≈ 2.857` game-sec (= 1000ms wall) |
+| 4a. Baseline travel | Ball: bounce_spot → baseline OOB | `distance / 12` game-sec |
+| 4b. Fast return | Ball: baseline → shooter's lane spot | `distance / 40` game-sec (FB pass rate — snappy ball-boy return). Ball reattaches to shooter. |
+
+#### Final MISS
+
+| Step | Coords | T |
+|---|---|---|
+| 2. Bounce | Ball: rim → authoritative `ball_bounce_x/y` (from `calculate_bounce_spot`) | `max(BOUNCE_STEP_GAME_SECONDS, distance/12)` |
+| Implicit turn end | — | Routes to discrete DREB (`_build_dreb_turn_from_miss`) or OREB (`pending_oreb`) |
+
+#### Bounce spot direction (non-final miss)
+
+The non-final miss `bounce_spot` is a visual stand-in computed inline (the authoritative `calculate_bounce_spot` only runs on final misses):
+
+```python
+mid_ft_x_offset = 5.0 if away_offense else -5.0
+bounce = {"x": rim["x"] + mid_ft_x_offset, "y": rim["y"]}
+```
+
+Direction is **away from the basket toward midcourt**:
+- Away offense (rim x=9) → bounce x = **14**
+- Home offense (rim x=91) → bounce x = **86**
+
+Y stays at the rim y (25, centered). Baseline OOB spot in step 4a is `x=3` (away offense) / `x=97` (home offense), `y=25`.
+
+---
 
 ### Key Files
 
-**Backend:**
+**Backend (game logic):**
 - `BackEnd/engine/phase_resolution.py`
-  - `resolve_free_throw_logic()` - Free throw calculation and outcome handling (lines 1379-1541)
-  - Handles 1-and-1 logic, rebound determination, and next play type routing
+  - `resolve_free_throw_logic()` — FT calculation, outcome handling, 1-and-1 logic, rebound determination, next play routing
 - `BackEnd/models/turn_manager.py`
-  - `determine_defensive_pressure_type()` - Determines FCP/HCT/HCO after made free throw
+  - `determine_defensive_pressure_type()` — FCP/HCT/HCO selection after a made final FT
 - `BackEnd/utils/shared.py`
-  - `calculate_bounce_spot()` - Calculates bounce spot for missed free throw
-  - `determine_rebounder()` - Unified rebound system for all missed shots
+  - `calculate_bounce_spot()` — authoritative bounce spot (used for final-miss rebound)
+  - `determine_rebounder()` — unified rebound system
+
+**Backend (animation):**
+- `BackEnd/engine/ft_step_emitter.py`
+  - `build_ft_animation_steps()` — UESS schema emitter (lane setup + shoot + ball flight + outcome tail per the tables above)
+  - `_ball_motion_step()` — universal FT ball-motion step builder (stamps FT meta so FE bypasses the 400ms shot-ball floor)
 
 **Frontend:**
-- `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js` - Free throw animation orchestration
-- `FrontEnd/static/js/phaser/animation/freeThrow.js` - Free throw sequence handler
+- `FrontEnd/static/js/phaser/animation/animationPlayback.js` — schema engine that plays the FT `animation_steps[]` (primary path)
+- `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js`, `freeThrow.js` — legacy FE FT handlers; mid-FT rebound outlet was removed (see comments in those files) and the schema engine is now authoritative for FT turn rendering
 
 ### Future Enhancements
 
 - **Foul Shooting Pressure**: Consider game situation (clutch time, score differential) for secondary check probability
 - **Free Throw Streaks**: Track consecutive makes/misses for momentum effects
 - **Technical Fouls**: Add support for technical foul free throws (1 shot + possession)
-

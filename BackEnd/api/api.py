@@ -1349,6 +1349,12 @@ try:
         if "timeout_trace_id" in saved:
             gm.game_state["timeout_trace_id"] = saved["timeout_trace_id"]
             logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_trace_id={saved['timeout_trace_id']}")
+        if saved.get("timeout_seam_ball_handler_id"):
+            gm.game_state["timeout_seam_ball_handler_id"] = str(saved["timeout_seam_ball_handler_id"])
+            logging.info(
+                "🔄 TIMEOUT RESUME: Applied timeout_seam_ball_handler_id=%s",
+                saved["timeout_seam_ball_handler_id"],
+            )
         
         # ✅ FREE_THROW timeout resume: restore offensive_state, shooter, free_throws so first simulate_turn creates the FT turn
         if saved.get("timeout_next_play_type") == "FREE_THROW":
@@ -2877,6 +2883,11 @@ try:
                                     saved_ng = saved_player_data["attributes"]["NG"]
                                     player.attributes["NG"] = saved_ng
                                     player._rescale_attributes()  # Update scaled attributes based on NG
+                                
+                                # Restore court coords (saved on timeout/quarter breaks)
+                                sx, sy = saved_player_data.get("x"), saved_player_data.get("y")
+                                if sx is not None and sy is not None:
+                                    player.coords = {"x": float(sx), "y": float(sy)}
                                 
                                 # Restore game stats
                                 if "stats" in saved_player_data:

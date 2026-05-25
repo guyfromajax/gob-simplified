@@ -181,7 +181,7 @@ def stamp_rebound_capture_player_motion(
     step_t: float,
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
-    attemptor_archetype: PlayerArchetype = "cruise",
+    attemptor_archetype: PlayerArchetype = "standard",
 ) -> None:
     """Write rebound-capture motion: captor → bounce; attemptors → bounce±offset."""
     attemptor_set = set(attemptor_ids)
@@ -363,6 +363,20 @@ def shot_launch_sfx(shot_score_pre_defense: Any) -> Optional[Dict[str, Any]]:
     }
 
 
+def stamp_hot_shot_trail_metadata(
+    metadata: Dict[str, Any],
+    shot_score_pre_defense: Any,
+) -> None:
+    """Flag ``hot_shot_trail`` on step metadata when pre-defense score exceeds
+    the strong tier (> 210). FE ``renderBallTransition`` reads this on schema
+    ``[ball_flight]`` steps (same threshold as ``three-strong.wav``)."""
+    try:
+        if shot_score_pre_defense is not None and float(shot_score_pre_defense) > 210:
+            metadata["hot_shot_trail"] = True
+    except (TypeError, ValueError):
+        pass
+
+
 # Variants whose final result SFX is driven by the variant's own animation
 # (per-hop rattles, etc.) rather than a single arrival cue. The
 # [ball_flight] step omits ``sfx_on_ball_arrival`` for these; the hop
@@ -427,12 +441,12 @@ def shot_followup_timed_sfx(
     shot_variant: Optional[str],
     result_type: str,
 ) -> Optional[list]:
-    """Per-variant delayed follow-up cues that overlap the next sub-step's
-    motion. Returned as a list suitable for stamping into
-    ``step.start.timed_sfx``.
+    """Per-variant delayed follow-up cues stamped on ``step.start.timed_sfx``.
+    FE schedules each cue at ``delay_ms`` **after ball arrival** (ball tween
+    onComplete), not from step start.
 
-      - BANK_MAKE       → ``swish.wav`` at +100 ms (after bb-rim-swish.wav)
-      - BACK_OF_RIM make → ``swish.wav`` at +150 ms (after back-of-rim.wav)
+      - BANK_MAKE       → ``swish.wav`` at +100 ms after bb-rim-swish.wav
+      - BACK_OF_RIM make → ``swish.wav`` at +150 ms after back-of-rim.wav
     """
     variant = (shot_variant or "").upper()
     rt = (result_type or "").upper()
@@ -455,7 +469,7 @@ def shot_followup_timed_sfx(
 
 
 def rattle_hop_sfx() -> Dict[str, Any]:
-    """SFX cue fired at the start of a single rattle hop step."""
+    """SFX cue fired when the ball lands on a single rattle hop (arrival)."""
     return {
         "file": "rattle-leather.wav",
         "volume": _SFX_DEFAULT_VOLUME,
@@ -518,3 +532,214 @@ def stamp_tween_durations(
         step_t,
         {pid: round(d, 2) for pid, d in durations.items()},
     )
+
+
+_FB_DEBUG_LINEUP_ORDER = ("PG", "SG", "SF", "PF", "C")
+
+
+def _fb_debug_pid_to_role(
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> Dict[str, Tuple[str, str]]:
+    pid_to_role: Dict[str, Tuple[str, str]] = {}
+    for pos in _FB_DEBUG_LINEUP_ORDER:
+        for team_label, lineup in (("OFF", off_lineup), ("DEF", def_lineup)):
+            player = lineup.get(pos) if lineup else None
+            if player is None:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid is not None:
+                pid_to_role[str(pid)] = (team_label, pos)
+    return pid_to_role
+
+
+def _fb_debug_fmt_coord(c: Any) -> str:
+    if not isinstance(c, dict) or "x" not in c or "y" not in c:
+        return "?"
+    try:
+        return f"({float(c['x']):.1f},{float(c['y']):.1f})"
+    except (TypeError, ValueError):
+        return "?"
+
+
+def _fb_debug_sort_key(
+    pid: str, pid_to_role: Dict[str, Tuple[str, str]]
+) -> Tuple[int, int, str]:
+    role = pid_to_role.get(str(pid))
+    if role is None:
+        return (2, 99, str(pid))
+    team_label, pos = role
+    team_idx = 0 if team_label == "OFF" else 1
+    try:
+        pos_idx = _FB_DEBUG_LINEUP_ORDER.index(pos)
+    except ValueError:
+        pos_idx = 99
+    return (team_idx, pos_idx, str(pid))
+
+
+def log_fb_emitter_entry(
+    turn_label: str,
+    all_start_coords: Dict[str, GridCoord],
+    game: Any,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Cross-turn boundary diff: prior turn's ``final_coords`` vs the FB
+    emitter's view of starting coords. Any per-player mismatch is a teleport
+    source. Filter Railway logs on ``🚀 [FB_BRIDGE]``.
+    """
+    import logging
+
+    pid_to_role = _fb_debug_pid_to_role(off_lineup, def_lineup)
+    prior_turns = getattr(game, "turns", None) or []
+    prior_final: Dict[str, Any] = {}
+    prior_label = "?"
+    if prior_turns:
+        last = prior_turns[-1] if isinstance(prior_turns[-1], dict) else {}
+        prior_final = last.get("final_coords") or {}
+        prior_label = last.get("current_turn") or "?"
+
+    logging.warning(
+        "🚀 [FB_BRIDGE %s] entry: start_coords=%d, prior_turn=%s, prior_final_coords=%d",
+        turn_label, len(all_start_coords), prior_label, len(prior_final),
+    )
+
+    teleports: List[Tuple[str, Any, Any, float]] = []
+    for pid, curr in all_start_coords.items():
+        prev = prior_final.get(pid)
+        if prev is None:
+            prev = prior_final.get(str(pid))
+        if not isinstance(prev, dict) or not isinstance(curr, dict):
+            continue
+        try:
+            dx = float(prev.get("x", 0)) - float(curr.get("x", 0))
+            dy = float(prev.get("y", 0)) - float(curr.get("y", 0))
+        except (TypeError, ValueError):
+            continue
+        gap = (dx * dx + dy * dy) ** 0.5
+        if gap > 0.5:
+            teleports.append((str(pid), prev, curr, gap))
+
+    if not teleports:
+        logging.warning(
+            "🚀 [FB_BRIDGE %s] clean vs %s.final_coords",
+            turn_label, prior_label,
+        )
+        return
+
+    logging.warning(
+        "🚀 [FB_BRIDGE %s] ⚠️ %d player(s) teleported between %s.final and FB.step0.start",
+        turn_label, len(teleports), prior_label,
+    )
+    for pid, prev, curr, gap in sorted(
+        teleports, key=lambda row: _fb_debug_sort_key(row[0], pid_to_role)
+    ):
+        team_label, pos = pid_to_role.get(pid, ("?", "?"))
+        logging.warning(
+            "    %s %s (%s): prior_final=%s → step0_start=%s gap=%.2f",
+            team_label, pos, pid,
+            _fb_debug_fmt_coord(prev),
+            _fb_debug_fmt_coord(curr),
+            gap,
+        )
+
+
+def log_fb_animation_steps(
+    turn_label: str,
+    steps: List[Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    prefix: str = "FB_STEP",
+) -> None:
+    """Per-step movers-only schema log. Logs a header per step (T, AT, gate,
+    ball, next) followed by one line per moving player (start→end,
+    destination, action, archetype). Flags step N+1 start vs step N end
+    discontinuities >0.5 grid. Filter on ``🛹 [<prefix>]``.
+
+    ``prefix`` defaults to ``FB_STEP`` for legacy FB callers; OREB callers
+    pass ``OREB_STEP``.
+    """
+    import logging
+
+    if not steps:
+        logging.warning("🛹 [%s %s] empty steps[]", prefix, turn_label)
+        return
+
+    pid_to_role = _fb_debug_pid_to_role(off_lineup, def_lineup)
+    logging.warning("🛹 [%s %s] %d steps", prefix, turn_label, len(steps))
+
+    prev_end_coords: Dict[str, Any] = {}
+    for i, step in enumerate(steps):
+        start = step.get("start") or {}
+        end = step.get("end") or {}
+        actions = start.get("action") or {}
+        archetypes = start.get("archetype") or {}
+        start_coords = start.get("coords") or {}
+        end_coords = end.get("coords") or {}
+        destinations = start.get("destination") or {}
+        at = start.get("advance_trigger") or {}
+        meta = at.get("metadata") or {}
+        ball_start = (start.get("ball") or {}).get("owner_player_id") or "?"
+        ball_end = (end.get("ball") or {}).get("owner_player_id") or "?"
+        next_ptr = end.get("next") or {}
+        t = end.get("time_elapsed")
+        t_str = f"{float(t):.2f}" if isinstance(t, (int, float)) else "?"
+        gate_id = (
+            meta.get("target_player_id")
+            or meta.get("to_player_id")
+            or "?"
+        )
+        gate_coord = meta.get("target_coords")
+
+        logging.warning(
+            "🛹 [%s %s n=%d] t=%ss AT=%s gate=%s%s ball=%s→%s next=%s",
+            prefix, turn_label, i, t_str,
+            at.get("condition", "?"),
+            gate_id,
+            f"@{_fb_debug_fmt_coord(gate_coord)}" if gate_coord else "",
+            ball_start, ball_end, next_ptr,
+        )
+
+        movers = [
+            pid for pid, act in actions.items()
+            if act and act != "stationary"
+        ]
+        movers.sort(key=lambda p: _fb_debug_sort_key(p, pid_to_role))
+        for pid in movers:
+            team_label, pos = pid_to_role.get(str(pid), ("?", "?"))
+            logging.warning(
+                "    %s %s (%s): %s→%s dst=%s %s/%s",
+                team_label, pos, pid,
+                _fb_debug_fmt_coord(start_coords.get(pid)),
+                _fb_debug_fmt_coord(end_coords.get(pid)),
+                _fb_debug_fmt_coord(destinations.get(pid)),
+                actions.get(pid, "?"),
+                archetypes.get(pid, "?"),
+            )
+
+        if i > 0 and prev_end_coords:
+            for pid in sorted(
+                start_coords.keys(),
+                key=lambda p: _fb_debug_sort_key(p, pid_to_role),
+            ):
+                cur = start_coords.get(pid)
+                prev = prev_end_coords.get(pid)
+                if not isinstance(cur, dict) or not isinstance(prev, dict):
+                    continue
+                try:
+                    dx = float(cur.get("x", 0)) - float(prev.get("x", 0))
+                    dy = float(cur.get("y", 0)) - float(prev.get("y", 0))
+                except (TypeError, ValueError):
+                    continue
+                gap = (dx * dx + dy * dy) ** 0.5
+                if gap > 0.5:
+                    team_label, pos = pid_to_role.get(str(pid), ("?", "?"))
+                    logging.warning(
+                        "    ⚠️ [STEP_DISCONTINUITY] step %d %s %s (%s): "
+                        "prev_end=%s ≠ start=%s gap=%.2f",
+                        i, team_label, pos, pid,
+                        _fb_debug_fmt_coord(prev),
+                        _fb_debug_fmt_coord(cur),
+                        gap,
+                    )
+        prev_end_coords = dict(end_coords)

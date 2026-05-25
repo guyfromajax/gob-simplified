@@ -207,7 +207,7 @@ SITUATIONAL_SIP_RECEIVER_POS = "SG"
 # them proportionally for other AG values via
 # ``ag_to_grid_per_game_sec(ag) / STANDARD_GRID_PER_GAME_SEC``.
 # Pass speeds are independent constants — ball physics, not player AG.
-PASS_GRID_SPOTS_PER_GAME_SECOND = 30  # Pass (ball in air): Euclidean — HCO / clock-burn accounting.
+PASS_GRID_SPOTS_PER_GAME_SECOND = 24  # Pass (ball in air): Euclidean — HCO / clock-burn accounting.
 # Fast-break-specific pass rate (schema-based emitters: CR FB). Used by
 # `calc_fb_pass_segment_seconds`. Drives both the visible wall-clock animation
 # duration (game-sec × 350 ms) and the clock-burn for the pass step — these
@@ -217,18 +217,18 @@ FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 40
 FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY = 30  # FB outlet pass when outlet_score < threshold
 FB_OUTLET_QUALITY_THRESHOLD = 50                # sharp/sloppy split on fb_roles["outlet_score"]
 FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (short passes still register)
-RESET_INBOUND_PASS_GRID_PER_GAME_SECOND = 30    # Reset step inbound pass (BH → PG)
-INBOUND_PASS_GRID_PER_GAME_SECOND = 30          # Inbound pass (SF → PG) for BIP / SIP
+RESET_INBOUND_PASS_GRID_PER_GAME_SECOND = 24    # Reset step inbound pass (BH → PG)
+INBOUND_PASS_GRID_PER_GAME_SECOND = 24          # Inbound pass (SF → PG) for BIP / SIP
 HCO_STEP_T_FLOOR_GAME_SECONDS = 0.5             # Min step T for HCO skeleton steps (short-distance steps still visibly play)
 
 # ---- Per-archetype absolute rates (grid/game-sec at AG=50) ----------------
 # Add a new archetype: define an absolute rate here, list it in
 # ``PlayerArchetype`` Literal, and add a branch in ``_ag_grid_per_game_sec``.
-CRUISE_GRID_PER_GAME_SEC      = 12  # archetype "cruise"      — BH bring-up / settle / transition pace
+CRUISE_GRID_PER_GAME_SEC      = 13  # archetype "cruise"      — BH bring-up / settle / transition pace
 SHOT_MOTION_GRID_PER_GAME_SEC = 14  # archetype "shot_motion" — shooter during shot
 STANDARD_GRID_PER_GAME_SEC    = 14  # archetype "standard"    — base / unaccelerated (AG curve anchor @ AG=50)
 SPRINT_GRID_PER_GAME_SEC      = 18  # archetype "sprint"      — max-effort movement (walk-up non-BH, converge)
-BURST_GRID_PER_GAME_SEC       = 28  # archetype "burst"       — peak explosive start (FB outlet)
+BURST_GRID_PER_GAME_SEC       = 32  # archetype "burst"       — peak explosive start (FB outlet)
 
 # Shot ball motion: ball flight rate during the [ball_flight] HCO sub-step.
 # FE mirrors this in animationPlayback.js (grid-distance / rate × tickMs).
