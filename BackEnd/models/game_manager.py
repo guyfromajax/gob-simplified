@@ -1114,8 +1114,7 @@ class GameManager:
         # SS&S animation refactor: MISS with defensive rebound generates a
         # discrete DREB turn (parallels the OREB pattern above). Scoped to
         # turn types whose migration has landed — HCT, HCO, and FAST_BREAK
-        # Covert Release. FCP and other FB variants still bundle DREB info
-        # into the MISS turn the legacy way until those migrations land. See
+        # Covert Release. See
         # _documentation_master/projects/Animation_System_Updated.md.
         is_migrated_fb_miss = (
             result.get("current_turn") == "FAST_BREAK"
