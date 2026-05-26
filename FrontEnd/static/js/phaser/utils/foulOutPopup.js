@@ -85,7 +85,21 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
     console.error('❌ [FOUL-OUT] TimeoutNavigationHelper not loaded!');
     return;
   }
-  
+
+  // ✅ FOUL OUT SCORES: Capture displayed scores from DOM so lineup header shows what user
+  // saw at foul-out time. Mirrors the timeoutButtonManager pattern — without this the lineup
+  // page falls back to a DB read that can return stale (start-of-quarter) scores.
+  let homeScore = null;
+  let awayScore = null;
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  if (homeScoreEl && awayScoreEl) {
+    const h = homeScoreEl.textContent?.trim();
+    const a = awayScoreEl.textContent?.trim();
+    if (h !== undefined && h !== '' && !isNaN(Number(h))) homeScore = Number(h);
+    if (a !== undefined && a !== '' && !isNaN(Number(a))) awayScore = Number(a);
+  }
+
   const params = helper.buildGameNavigationParams({
     sourceParams: urlParams,
     targetQuarter: quarter,
@@ -103,7 +117,9 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
       user_team_id: userTeamId,
       mode: mode,
       tournament_id: tournamentId,
-      franchise_id: franchiseId
+      franchise_id: franchiseId,
+      home_score: homeScore ?? undefined,
+      away_score: awayScore ?? undefined
     }
   });
 

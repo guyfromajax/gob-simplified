@@ -281,7 +281,7 @@ export class AnimationEngine {
       return false;
     }
     const currentTurnNorm = String(turnData?.current_turn || "").toUpperCase();
-    const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle"]);
+    const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle", "after_steal"]);
     const isMigratedFbVariant =
       currentTurnNorm === "FAST_BREAK"
       && MIGRATED_FB_PLAYS.has(turnData?.fast_break_play);
@@ -310,14 +310,6 @@ export class AnimationEngine {
       isPaused: this.scene?.isPaused ?? null,
       skipToEnd: this.scene?.skipToEnd ?? null,
     });
-
-    if (
-      turnData?.roles?.is_steal_hco_setup
-      && (currentTurnNorm === "HCO" || currentTurnNorm === "HCT")
-    ) {
-      const { animateStealHCOSetup } = await import("./turnAnimation.js");
-      await animateStealHCOSetup(this.scene, turnData, sprites, ballSprite);
-    }
 
     const turnStop = await playTurn(
       this.scene,
@@ -435,7 +427,7 @@ export class AnimationEngine {
       // are migrated. Other turn types fall through to the legacy handler
       // dispatch below. See:
       // _documentation_master/projects/Animation_System_Updated.md
-      const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle"]);
+      const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle", "after_steal"]);
       const isMigratedFbVariant =
         turnData?.current_turn === "FAST_BREAK"
         && MIGRATED_FB_PLAYS.has(turnData?.fast_break_play);

@@ -1448,36 +1448,11 @@ def build_skeleton_animation_steps(
         result_type_final = (turn_result.get("result_type") or "").upper()
         if result_type_final not in ("MAKE", "MISS", "BLOCK"):
             _apply_post_shot_overlay(steps[-1], turn_result)
-            # Shooting foul on a missed/failed attempt: stamp the
-            # "Shooting Foul!" headline on the last schema step's
-            # end.announcement (fires after sprite snap, before turn_stop
-            # FOUL). Replaces legacy `announceGameEvent('FOUL_SHOOTING')`
-            # which the unimplemented `runFoul` handler doesn't fire
-            # (audit bug 11). Gated on next_play_type=FREE_THROW so we
-            # only announce shooting fouls — common/offensive fouls
-            # with non-FT next plays are handled by other paths.
-            next_play_type_norm = str(
-                turn_result.get("next_play_type") or ""
-            ).upper()
-            fouler_id_final = turn_result.get("foul_player_id")
-            if (
-                result_type_final in ("FOUL", "D_FOUL")
-                and next_play_type_norm == "FREE_THROW"
-                and fouler_id_final
-            ):
-                steps[-1]["end"]["announcement"] = {
-                    "text": "Shooting Foul!",
-                    "team": "neutral",
-                    "hold_ms": 1000,
-                    "style": "shooting_foul",
-                    "player_data": {"playerId": str(fouler_id_final)},
-                    # Whistle SFX carried on announcement payload — FE
-                    # `showAnnouncement` reads `meta.sfx` and puts it on
-                    # `data.sfx`; court.html plays at overlay mount per
-                    # Sound_Design_Update.md (single source of truth for
-                    # announcement-tied SFX).
-                    "meta": {"sfx": "foul"},
-                }
+            # Bonus / non-shooting FOUL turns (result_type FOUL + next FREE_THROW)
+            # announce via finalizeTurnAfterAnimation / announceFromTurnData — not
+            # "Shooting Foul!" (Announcement_System.md: true shooting fouls are
+            # MISS/MAKE shot-result paths). MISS + FT uses
+            # _stamp_shooting_foul_on_miss_end inside _build_post_shot_sub_steps.
 
     return steps
 

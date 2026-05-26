@@ -19,7 +19,7 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 
 ### 1. `ongoing_games` (Backend)
 
-**Location:** `BackEnd/api/api.py` (line 234)  
+**Location:** `BackEnd/api/api.py`  
 **Type:** `dict[str, GameManager]`  
 **Purpose:** In-memory cache of active `GameManager` instances during gameplay  
 **Lifetime:** Runtime only (cleared on server restart)
@@ -30,12 +30,12 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 - Value: `GameManager` instance with full game state
 
 **When Populated:**
-1. **`/api/init-game`** (line 3952): After creating new game document
-2. **`/api/simulate-quarter`** (line 2272): After loading game from DB for Q1 or resuming from timeout
+1. **`/api/init-game`**: After creating new game document
+2. **`/api/simulate-quarter`**: After loading game from DB for Q1 or resuming from timeout
 
 **When Cleared/Invalidated:**
-1. **New game scenario** (line 1629): When user requests Q1 but cached game is Q2+
-2. **Timeout resume** (line 1743): When resuming from timeout, cache is deleted to force DB reload
+1. **New game scenario**: When user requests Q1 but cached game is Q2+
+2. **Timeout resume**: When resuming from timeout, cache is deleted to force DB reload
 3. **Server restart**: All in-memory state lost
 4. **Manual deletion**: `del ongoing_games[game_id]` in various error paths
 
@@ -50,7 +50,7 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 - **For lineup screen**: Always read from DB (infrequent, ~13 reads per game)
 
 **Refresh Function:**
-- `refresh_game_cache_from_db(gm, saved)` (line 777): Updates critical game state in existing `GameManager` instance to match saved document
+- `refresh_game_cache_from_db(gm, saved)`: Updates critical game state in existing `GameManager` instance to match saved document
 
 ---
 
@@ -104,8 +104,8 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 ### 3. `teamColorCache` (Frontend)
 
 **Location:** 
-- `FrontEnd/static/franchise-command-center.js` (line 17)
-- `FrontEnd/static/tournament.js` (line 11)
+- `FrontEnd/static/franchise-command-center.js`
+- `FrontEnd/static/tournament.js`
 
 **Type:** JavaScript object mapping team names to primary colors  
 **Purpose:** Cache team primary colors for UI rendering  
@@ -120,8 +120,8 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 ```
 
 **When Populated:**
-1. **Franchise Command Center**: `initializeTeamColorCache()` (line 115) - Called once on page load
-2. **Tournament**: `initializeTeamColorCache()` (line 639) - Called once on page load
+1. **Franchise Command Center**: `initializeTeamColorCache()` - Called once on page load
+2. **Tournament**: `initializeTeamColorCache()` - Called once on page load
 
 **When Cleared/Invalidated:**
 1. **Page navigation**: State lost on page unload
@@ -135,6 +135,175 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 - **UI rendering**: Read from cache to avoid repeated lookups
 - **Not authoritative**: Always backed by command center data
 - **Performance optimization**: Reduces data processing during rendering
+
+---
+
+### 4. Backend Module-Level Memoization Caches
+
+Process-lifetime caches that memoize stable lookups (plays collection, scouting templates, etc.). All are populated lazily on first read and **never invalidated** within a process — they reset only on server restart.
+
+| Cache | Location | Stores | Populate |
+|---|---|---|---|
+| `_plays_by_type_focus_cache` | `BackEnd/models/turn_manager.py` | `{(type, focus) → list}` of plays filtered by type + focus | `plays_collection.find()` on cache miss |
+| `_play_doc_by_name_cache` | `BackEnd/models/turn_manager.py` | `{name → dict \| None}` of individual play documents | `plays_collection.find_one()` on cache miss |
+| `_plays_cache` | `BackEnd/models/team_manager.py` | Full plays collection (list of dicts) | `plays_collection.find({})` once at first `TeamManager` init (~16s→1s speedup) |
+| `_plays_names_cache` | `BackEnd/models/team_manager.py` | Play names list, derived from `_plays_cache` | First `TeamManager` init |
+| `_scouting_data_template_cache` | `BackEnd/models/team_manager.py` | Nested scouting-data template structure | `_create_scouting_data_template_base()` once; subsequent inits deepcopy (~7.5s→3ms) |
+| `_QUESTION_BANK_CACHE` | `BackEnd/pgpc_qualification.py` | Press-conference question bank | First module import via `importlib` |
+
+**Correctness model:** the underlying `plays_collection` (and the question bank module) is treated as immutable per-process. Code that mutates the source mid-process would produce stale reads. No invalidation API exists.
+
+---
+
+### 5. Backend `@lru_cache` Decorators
+
+Function-result caches that wrap pure-function calls. `maxsize=1` makes them "compute once per process." Reset on process restart only.
+
+| Cache | Location | Stores |
+|---|---|---|
+| `_load_franchise_first_name_rankings()` | `BackEnd/models/franchise_manager.py` | Ranked first-name tuples loaded from `franchise_first_name_rankings.json` |
+| `get_franchise_name_assets()` | `BackEnd/models/franchise_manager.py` | Composite tuple of first/last names + weights for franchise generation |
+
+---
+
+### 6. Backend Per-Game Cache: `_skeleton_cache`
+
+**Location:** `BackEnd/engine/phase_resolution.py`
+**Type:** `dict[str, dict]` keyed by `play_id`
+**Lifetime:** Per-game (effectively scoped to the game's resolution context)
+**Purpose:** Caches skeleton play documents by `play_id` to avoid repeated DB queries during a single game.
+**Invalidation:** None — destroyed when the game context ends.
+
+---
+
+### 7. Frontend Page-Local Module Caches
+
+Page-local caches stored as module-level `let xCache = ...` variables. Lifetime is the page session — all are cleared on navigation / unload (the JS module re-initializes on the next page load). They are NOT central state management; they're per-module performance optimizations for repeated data lookups.
+
+#### Franchise Command Center (`FrontEnd/static/franchise-command-center.js`)
+
+Beyond the already-documented `teamColorCache`, the FCC defines 14+ sibling caches following the same pattern:
+
+| Cache | Stores | Invalidation |
+|---|---|---|
+| `teamMetaByNameCache` | Team metadata by name (mascot, colors) | Reset on init |
+| `leadersDataCache` | Conference leaders leaderboard | Never explicitly |
+| `teamStatsDataCache` | Team statistics (conference scope) | Never explicitly |
+| `teamTraitsDataCache` | Team traits / characteristics | Never explicitly |
+| `fccTeamStatsSummaryCache` | Team stats summary | Never explicitly |
+| `commandCenterTopDataCache` | Top-level command center data (standings, schedules); also mirrored to `sessionStorage` | `invalidateFccTeamScopedCaches()` on team change |
+| `standingsDataCache` | League standings table | `invalidateFccTeamScopedCaches()` / `invalidateHomeWeekSensitiveCaches()` |
+| `playbooksWeekSavedCache` | Playbooks saved for current week | Never explicitly |
+| `fccPlaybooksSummaryCache` | Playbook summary | `invalidateFccTeamScopedCaches()` |
+| `userRosterPlayersCache` | Current user's roster players | `invalidateFccTeamScopedCaches()` / `invalidateHomeWeekSensitiveCaches()` |
+| `userScheduleDataCache` | User team's game schedule | `invalidateHomeWeekSensitiveCaches()` |
+| `homeLastGameDataCache` | Last game result for home view | `invalidateHomeWeekSensitiveCaches()` |
+| `homeOpponentRosterCache` (Map) | Opponent rosters by team_id | `invalidateFccTeamScopedCaches()` / `invalidateHomeWeekSensitiveCaches()` |
+| `leanRecruitsDataCache` | Available recruits | Never explicitly |
+| `signedRecruitsDataCache` | Signed user recruits | Never explicitly |
+| `scoutingTabDataCache` | Scouting view data | Never explicitly |
+
+**Invalidation hooks (FCC-specific):**
+- `invalidateFccTeamScopedCaches()` — called when the user switches their controlled team
+- `invalidateHomeWeekSensitiveCaches()` — called when advancing to the next week
+
+#### Tournament (`FrontEnd/static/tournament.js`)
+
+Mirrors a subset of the FCC pattern:
+
+| Cache | Stores |
+|---|---|
+| `teamColorCache` (already documented in §3) | Team primary colors |
+| `teamMetaByNameCache` | Team metadata by name |
+
+#### Set Lineup (`FrontEnd/static/set-lineup.js`)
+
+| Cache | Stores | Invalidation |
+|---|---|---|
+| `lineupPlaybooksModalCache` | Playbook settings + shot weights for the lineup-editor modal | Re-fetched on next modal open; no explicit clear |
+
+---
+
+### 8. `ResourceCache` Module
+
+**Location:** `FrontEnd/static/js/shared/resourceCache.js`
+**API:** `window.ResourceCache.createResourceCache(page, franchiseId, season, week)` — factory returning a scoped cache object with `get(scopeKey)` / `set(scopeKey, value)` methods.
+**Backing store:** In-memory (per page load) + `sessionStorage` (per tab) under keys of the form `resource:{page}:{franchiseId}:{season}:{week}:{scopeKey}`.
+**Used by:** `leaders.js`, `team-stats.js` (and likely others — grep `ResourceCache.createResourceCache` for the full list).
+**Purpose:** Reusable cache primitive for FCC sub-pages that need scoped session-level caching (e.g., conference leaders by week).
+**Invalidation:** Memory cleared on page navigation; sessionStorage entries persist until the tab closes.
+
+---
+
+### 9. Persistent Browser Storage
+
+`localStorage` (persists indefinitely) and `sessionStorage` (per-tab session) carry both cache-like data and source-of-truth user preferences. The list below is comprehensive across `FrontEnd/static/`.
+
+#### `localStorage` Keys
+
+**Auth / Session**
+- `auth_token` — JWT for API requests. Removed on logout / auth failure.
+- `auth_user` — Serialized user object (username, email, etc.).
+
+**Franchise Context**
+- `franchise_user_team_id` — User's selected franchise team ID
+- `franchise_user_team` — Franchise team display name
+- `franchise_user_team_primary_color` — Team primary color hex
+- `franchise_week` — Current week number (1-26)
+- `playbooks_position_filters_franchise_*` (dynamic prefix) — Per-franchise playbook filter state
+
+**Game State (Single / Franchise)**
+- `last_game_id` — For resume functionality
+- `last_game_user_team_side` — home / away
+- `last_box_score_gameId`, `last_box_score_url` — Debug helpers
+- `game_home`, `game_away` — Selected team names
+
+**Tournament**
+- `activeTournament` — Serialized active tournament object
+- `userTeamId` — User team ID in tournament context
+
+**UI Preferences (never cleared — true source of truth)**
+- `alpha_disclaimer_dismissed_version` — Alpha disclaimer dismissal version
+- `gob_dont_show_new_franchise_warning` — Warning suppression flag
+
+**Canonical cleanup:** `mode-select.js:clearFranchiseLocalStorage()` removes ~10 keys when exiting franchise mode.
+
+**Orphans flagged:**
+- `franchiseId` in `tournament.js` — legacy; superseded by `userTeamId` / `activeTournament`
+- `game_id` in `box-score.js` — commented-out removal; unclear if read anywhere
+
+#### `sessionStorage` Keys
+
+**Game Setup State**
+- `homeTeam`, `awayTeam`, `myTeam` — Team selection for game setup
+- `mode` — single / franchise / tournament fallback
+
+**UI View State**
+- `lineupView`, `rosterView` — View-mode preferences
+- `gameplan_suppress_warning` — Per-session warning suppression
+
+**Training Playbooks**
+- `gob_training_playbook_focus` — Serialized focused playbook rows (offense / defense)
+- `gob_playbook_training_mode` — Training mode (custom / standard)
+- `gob_training_team_drills_snapshot` — Serialized team drill install snapshot
+- `gob_training_form_draft_*` (dynamic, scoped by `{franchiseId}|{teamId}|w{week}|{stageType}`) — Form draft state
+
+**Playbooks Editor**
+- `playbooksDraft:*` (dynamic, scoped by `{mode}:{teamId}:{franchiseId}:{tournamentId}:{gameId}`) — Editor draft state
+- `playbooksDraftRestoreOnce:*` (matching keys) — One-time draft-restore flag
+
+**Popups / Notifications**
+- `defenseMatchupsDontShow_{gameId}` — Suppress defense-matchups popup for this game
+- `defenseMatchupsAnnouncePlayed_{gameId}` — Game-announced flag (prevents re-announcing)
+
+**FCC Session Cache**
+- `fcc_session_cache_{franchiseId}` — Serialized FCC top-level data snapshot (mirrors `commandCenterTopDataCache` / `standingsDataCache` etc.)
+
+**Generic ResourceCache**
+- `resource:*` (dynamic pattern) — `ResourceCache` module entries; see §8
+
+**Error Telemetry**
+- `errorTelemetry` — Last 10 errors, serialized array
 
 ---
 
@@ -169,6 +338,16 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
    - Not currently implemented (future enhancement)
    - Planned: Invalidate cache when backend version changes
 
+### Invalidation by Cache Category
+
+The matrix above covers the original three caches in detail. The remaining categories follow these patterns:
+
+- **Backend memoization caches (§4) and `@lru_cache` decorators (§5):** Never invalidated within a process. Reset only on server restart. Risk surface: assumes the underlying source (plays collection, ranking JSON files) is immutable per-process.
+- **Backend per-game cache `_skeleton_cache` (§6):** Lifetime tied to the game-context object; destroyed when the game ends. No explicit invalidation API.
+- **Frontend page-local module caches (§7):** Automatically cleared on page navigation (module re-init). Some FCC caches additionally honor `invalidateFccTeamScopedCaches()` / `invalidateHomeWeekSensitiveCaches()` for mid-page invalidation when the user switches team or advances week.
+- **`ResourceCache` (§8):** Memory cleared on navigation; sessionStorage entries persist until the tab closes.
+- **`localStorage` / `sessionStorage` (§9):** Invalidation is per-key and explicit. `mode-select.js:clearFranchiseLocalStorage()` is the canonical cleanup for franchise-context exit. Tab close clears all `sessionStorage`; `localStorage` survives indefinitely unless explicitly removed.
+
 ### Manual Invalidation
 
 1. **Error recovery:**
@@ -187,30 +366,18 @@ Caches are **performance mirrors** of truth (database), never truth itself. They
 
 ## Cache Performance Metrics
 
-**Current Status:** ✅ Implemented (Phase 1.3 and Phase 3 Task 4)
+**Backend:** No structured cache telemetry. `ongoing_games` hits/misses are inferred from request flow; no per-cache-event log line is emitted.
 
-**Backend Telemetry:**
-- **Location:** `BackEnd/api/api.py` and `BackEnd/api/gameplan_routes.py`
-- **Logs:**
-  - `✅ [CACHE-TELEMETRY] Cache HIT` - Cache read successful
-  - `❌ [CACHE-TELEMETRY] Cache MISS` - Cache not available, reading from DB
-  - `🔄 [CACHE-TELEMETRY] Cache SKIP` - source=db, forcing DB read
-  - `🔄 [CACHE-TELEMETRY] Cache REFRESHED` - Cache updated after DB write
-  - `🔄 [CACHE-TELEMETRY] Cache INVALIDATED` - Cache cleared
-  - `✅ [CACHE-TELEMETRY] Cache POPULATED` - Cache entry added
+**Frontend Telemetry** (via `StateTelemetry` in `FrontEnd/static/js/shared/stateTelemetry.js`):
+- `✅ [CACHE-HIT]` — `gameStore` read returned a cached value
+- `⚠️ [CACHE-MISS]` — `gameStore` had no cached value; caller fell back to backend
+- `🔄 [CACHE-INVALIDATE]` — `gameStore` entry cleared (reason logged)
 
-**Frontend Telemetry:**
-- **Location:** `FrontEnd/static/js/state/gameStore.js` (via `StateTelemetry`)
-- **Logs:**
-  - `🟢 [CACHE-HIT]` - Cache read successful
-  - `🟡 [CACHE-MISS]` - Cache not available, reading from backend
-  - `🔴 [CACHE-INVALIDATION]` - Cache cleared (with reason)
+Plus state-contract logs from the same module:
+- `🟢 [STATE-WRITE]` / `🔵 [STATE-READ]` — normal state I/O
+- `🔴 [STATE-VIOLATION]` — read or write hit a non-contract source
 
-**Metrics Captured:**
-- Cache hit rate (reads from cache vs DB)
-- Cache miss rate (reads from DB when cache available)
-- Cache invalidation frequency (with reasons)
-- Cache population events
+**Metrics derivable from frontend logs:** cache hit rate, miss rate, invalidation frequency with reasons. No equivalent backend instrumentation today.
 
 ---
 

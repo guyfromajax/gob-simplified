@@ -84,6 +84,10 @@ function buildPlayerDetailUrl(playerId) {
   return `/player-detail.html?${qs.toString()}`;
 }
 
+function getPlayerStableId(player) {
+  return player?._id || player?.playerId || player?.player_id || null;
+}
+
 function isGameplayLineupContext() {
   // During active gameplay/timeouts/quarter resumes, game_id is present.
   // Pregame lineup flow typically has no game_id yet.
@@ -973,9 +977,10 @@ function renderRosterAttributes() {
   }
 
   rosterDataForSorting.forEach(p => {
+    const playerId = getPlayerStableId(p);
     const tr = document.createElement('tr');
     tr.draggable = !p.ineligible;
-    tr.dataset.playerId = p._id;
+    if (playerId) tr.dataset.playerId = playerId;
     if (p.ineligible || p.fouled_out) {
       tr.classList.add('ineligible');
       tr.style.backgroundColor = '#d3d3d3';
@@ -984,7 +989,7 @@ function renderRosterAttributes() {
       tr.style.cursor = 'not-allowed';
     }
     tr.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', p._id);
+      if (playerId) e.dataTransfer.setData('text/plain', playerId);
     });
 
     const posRatings = p.position_ratings || {};
@@ -1076,10 +1081,11 @@ function renderRosterStats() {
 
   rosterStatsRows.forEach(snap => {
     const p = snap.player;
+    const playerId = getPlayerStableId(p);
     const stats = getGameStatsForRoster(p);
     const tr = document.createElement('tr');
     tr.draggable = !p.ineligible;
-    tr.dataset.playerId = p._id;
+    if (playerId) tr.dataset.playerId = playerId;
     if (p.ineligible || p.fouled_out) {
       tr.classList.add('ineligible');
       tr.style.backgroundColor = '#d3d3d3';
@@ -1088,7 +1094,7 @@ function renderRosterStats() {
       tr.style.cursor = 'not-allowed';
     }
     tr.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', p._id);
+      if (playerId) e.dataTransfer.setData('text/plain', playerId);
     });
 
     const treb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
@@ -1156,10 +1162,13 @@ function renderRosterStats() {
 }
 
 function applySelectionToRosterRows() {
-  const selectedIds = Object.values(lineup);
+  const selectedIds = new Set(Object.values(lineup).filter(Boolean).map(id => String(id)));
   roster.forEach(p => {
-    document.querySelectorAll(`tr[data-player-id="${p._id}"]`).forEach(row => {
-      if (selectedIds.includes(p._id)) {
+    const playerId = getPlayerStableId(p);
+    if (!playerId) return;
+    document.querySelectorAll('tr[data-player-id]').forEach(row => {
+      if (String(row.dataset.playerId) !== String(playerId)) return;
+      if (selectedIds.has(String(playerId))) {
         row.classList.add('selected');
       } else {
         row.classList.remove('selected');
@@ -1167,8 +1176,8 @@ function applySelectionToRosterRows() {
 
       if (!p.ineligible && !p.fouled_out) {
         row.addEventListener('click', () => {
-          if (!selectedIds.includes(p._id)) {
-            const assigned = fillNextSlot(p._id);
+          if (!Object.values(lineup).some(id => String(id) === String(playerId))) {
+            const assigned = fillNextSlot(playerId);
             if (assigned) {
               playSound('click-soft.mp3');
             }
@@ -1189,6 +1198,14 @@ function renderRoster() {
   renderRosterAttributes();
   renderRosterStats();
   applySelectionToRosterRows();
+}
+
+function refreshLineupAvailabilityDisplay() {
+  if (currentView === 'player') {
+    renderPlayerView();
+  } else {
+    renderRoster();
+  }
 }
 
 function sortRoster(columnName) {
@@ -1292,10 +1309,11 @@ function buildAutosetGameState() {
 
 function rosterRowsForAutosetApi() {
   return roster.map(p => {
+    const playerId = getPlayerStableId(p);
     const rawStats = p.stats || {};
     const gameStats = rawStats.game || rawStats;
     return {
-      _id: p._id,
+      _id: playerId,
       first_name: p.first_name || '',
       last_name: p.last_name || '',
       name: p.name,
@@ -1346,6 +1364,7 @@ async function autosetLineup() {
     updateAllSlotDisplays();
     updatePlayButton();
     setupSlotDragAndDrop();
+    refreshLineupAvailabilityDisplay();
     showToast('Lineup auto-generated!');
   } catch (e) {
     console.error('[autosetLineup]', e);
@@ -1966,6 +1985,7 @@ async function init() {
   
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
+  refreshLineupAvailabilityDisplay(); // Keep left-side roster/card disabled state in sync with restored lineup
   try {
     lineupPlaybooksModalCache = await fetchLineupPlaybooksData();
     renderLineupShotWeights(lineupPlaybooksModalCache);
@@ -2219,6 +2239,7 @@ function renderPlayerView() {
 }
 
 function createPlayerCard(player) {
+  const playerId = getPlayerStableId(player);
   const card = document.createElement('div');
   card.className = 'player-card';
   
@@ -2230,10 +2251,10 @@ function createPlayerCard(player) {
     card.style.pointerEvents = 'none';
     card.style.cursor = 'not-allowed';
   }
-  card.dataset.playerId = player._id;
+  if (playerId) card.dataset.playerId = playerId;
   
   // Check if selected
-  const isSelected = Object.values(lineup).includes(player._id);
+  const isSelected = playerId != null && Object.values(lineup).some(id => String(id) === String(playerId));
   if (isSelected) {
     card.classList.add('selected');
   }
@@ -2242,7 +2263,7 @@ function createPlayerCard(player) {
   card.draggable = !isSelected && !player.ineligible && !player.fouled_out;
   if (card.draggable) {
     card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', player._id);
+      if (playerId) e.dataTransfer.setData('text/plain', playerId);
     });
   }
   
@@ -2256,7 +2277,7 @@ function createPlayerCard(player) {
         return;
       }
       if (!isSelected) {
-        fillNextSlot(player._id);
+        fillNextSlot(playerId);
       }
     });
   }
@@ -2283,7 +2304,7 @@ function createCardFront(player) {
   
   // Headshot container (clickable link to player detail)
   const headshotLink = document.createElement('a');
-  applyPlayerDetailLinkBehavior(headshotLink, player._id);
+  applyPlayerDetailLinkBehavior(headshotLink, getPlayerStableId(player));
   headshotLink.style.display = 'block';
   headshotLink.style.textDecoration = 'none';
   
@@ -2323,7 +2344,7 @@ function createCardFront(player) {
   const playerImgBase = staticPrefix + '/images/players/';
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `${playerImgBase}${player._id}.png`;
+  img.src = player.photo || `${playerImgBase}${getPlayerStableId(player)}.png`;
   img.alt = player.name;
   img.onerror = () => {
     img.src = staticPrefix + '/images/players/generic_headshot.png';
@@ -2412,7 +2433,7 @@ function createCardFront(player) {
   flipBtn.setAttribute('aria-label', 'Flip card');
   flipBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    toggleCardFlip(player._id);
+    toggleCardFlip(getPlayerStableId(player));
   });
   front.appendChild(flipBtn);
   
@@ -2567,7 +2588,7 @@ function createCardBack(player) {
   flipBtn.setAttribute('aria-label', 'Flip card back');
   flipBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    toggleCardFlip(player._id);
+    toggleCardFlip(getPlayerStableId(player));
   });
   back.appendChild(flipBtn);
   
@@ -2662,6 +2683,7 @@ function toggleCardFlip(playerId) {
 }
 
 function assignToSlot(pos, playerId) {
+  playerId = String(playerId);
   // Check if slot is already filled
   if (lineup[pos]) {
     showToast('Slot already filled');
@@ -2669,7 +2691,7 @@ function assignToSlot(pos, playerId) {
   }
   
   // Check if player is already in lineup
-  if (Object.values(lineup).includes(playerId)) {
+  if (Object.values(lineup).some(id => String(id) === String(playerId))) {
     showToast('Player already in lineup');
     return false;
   }

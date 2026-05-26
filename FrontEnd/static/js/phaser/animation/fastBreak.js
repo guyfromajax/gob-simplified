@@ -28,11 +28,9 @@ const {
   REBOUNDER_X_MAX,
   REBOUNDER_Y_RANGE,
   SHOT_ATTEMPT_REBOUNDER_Y_RANGE,
-  STEAL_ENTRY_MOVE_X_MIN,
-  STEAL_ENTRY_MOVE_X_MAX,
-  STEAL_ENTRY_MOVE_Y_RANGE,
-  STEAL_ENTRY_Y_MIN,
-  STEAL_ENTRY_Y_MAX,
+  // STEAL_ENTRY_* constants no longer imported — animateStealEntry was
+  // deleted when after_steal FBs migrated to the UESS schema. The backend
+  // owns those values now; FE is a pure renderer for this turn type.
   NON_SHOT_PARTICIPANT_BASKET_KEEPOUT,
   fastBreakShotDefenderGridVsShooter,
 } = fastBreakConstants;
@@ -1929,19 +1927,12 @@ export async function runFastBreakSequence({
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
-  } else if (turnData.roles?.is_steal_entry || (!turnData.roles?.outlet_passer && !turnData.roles?.outlet_receiver)) {
-    // ============================================================================
-    // PHASE 1b: STEAL ENTRY (for steal-initiated Fast Breaks)
-    // ============================================================================
-    // Check is_steal_entry flag OR if there's no outlet pass (steal-initiated)
-    await animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height);
-    leadInUnit = "fb.lead_in.from_hco_steal";
-    
-    // Transition to FastBreak state after steal entry
-    if (scene.stateMachine?.state !== States.FastBreak) {
-      safeTransition(scene.stateMachine, States.FastBreak);
-    }
   }
+  // NOTE: The legacy "PHASE 1b: STEAL ENTRY" branch was removed when after_steal
+  // FBs migrated to the UESS schema. Steal-initiated FBs now route through the
+  // schema dispatcher (runSchemaPlaybackTurn) and the burst step is built by
+  // BackEnd/engine/after_steal_fast_break_step_emitter.py. The FE is a pure
+  // renderer for this turn type; do not reintroduce inline movement math here.
   if (leadInUnit) {
     const leadInAdvanceTrigger =
       leadInUnit === "fb.lead_in.from_hco_steal"
@@ -2581,124 +2572,12 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   }
 }
 
-/**
- * Phase 1b: Steal Entry Animation (for steal-initiated Fast Breaks)
- * - Stealer (ball handler) moves 5-10 x spots toward basket
- * - Stealer moves ±4 y spots (clamped to 3-47)
- * - Ball is already attached to stealer from the steal turn
- */
-async function animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height) {
-  // Get ball handler ID from roles (backend stores player object, frontend gets ID)
-  const ballHandlerId = turnData.roles?.ball_handler_id ||
-                        turnData.roles?.ball_handler?.player_id || 
-                        turnData.ball_handler_id ||
-                        turnData.stealer_id; // Fallback to stealer_id for steals
-  const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
-  
-  if (!ballHandlerSprite) {
-    console.warn("Steal Entry: Ball handler sprite not found", { 
-      ballHandlerId, 
-      roles: turnData.roles,
-      stealer_id: turnData.stealer_id 
-    });
-    return;
-  }
-  
-  // Ball should already be attached to stealer from the steal turn
-  // Verify attachment
-  const { getBallController } = await import('./BallControllerAdapter.js');
-  const ballController = getBallController();
-  
-  if (!ballController?.isAttached || ballController.currentOwner !== ballHandlerSprite) {
-    // Attach ball to stealer if not already attached
-    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
-      reason: 'steal_entry_verify'
-    });
-  }
-  
-  // Get stealer's current position
-  const currentGrid = {
-    x: ballHandlerSprite.gridX || 50,
-    y: ballHandlerSprite.gridY || 25
-  };
-  
-  // ✅ DETAILED LOGGING: Track frontend Steal Entry calculation
-  console.warn("🏀 [FRONTEND STEAL ENTRY] Entry:", {
-    ballHandlerId,
-    currentSpritePosition: { x: ballHandlerSprite.gridX, y: ballHandlerSprite.gridY },
-    roles: turnData.roles,
-    backendOutletX: turnData.roles?.ball_handler_outlet_x,
-    backendOutletY: turnData.roles?.ball_handler_outlet_y,
-    backendMoveX: turnData.roles?.ball_handler_move_x,
-    backendMoveY: turnData.roles?.ball_handler_move_y
-  });
-  
-  // Determine offense team and direction
-  const isHomeOffense = ballHandlerSprite.team === "home";
-  const direction = isHomeOffense ? 1 : -1; // +1 for home (toward x=90), -1 for away (toward x=10)
-  
-  // Calculate steal entry movement (matches backend calculation)
-  // Backend sends ball_handler_move_x and ball_handler_move_y in turnData.roles
-  const moveX = turnData.roles?.ball_handler_move_x || 
-                Phaser.Math.Between(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX);
-  const moveY = turnData.roles?.ball_handler_move_y || 
-                Phaser.Math.Between(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE);
-  
-  // ✅ FIX: Use backend-provided final coordinates if available (more accurate)
-  // Otherwise, calculate from current position
-  let targetGrid;
-  if (turnData.roles?.ball_handler_outlet_x !== undefined && turnData.roles?.ball_handler_outlet_y !== undefined) {
-    // Use backend-calculated final position (for steals, outlet_x/y is the position after steal entry)
-    targetGrid = {
-      x: turnData.roles.ball_handler_outlet_x,
-      y: turnData.roles.ball_handler_outlet_y
-    };
-    console.warn("🏀 [FRONTEND STEAL ENTRY] Using backend final coordinates:", targetGrid);
-  } else {
-    // Fallback: Calculate from current position (shouldn't happen if backend is correct)
-    targetGrid = {
-      x: currentGrid.x + (direction * moveX),
-      y: Phaser.Math.Clamp(
-        currentGrid.y + moveY,
-        STEAL_ENTRY_Y_MIN,
-        STEAL_ENTRY_Y_MAX
-      )
-    };
-    console.warn("⚠️ [FRONTEND STEAL ENTRY] Calculated target (backend coords missing):", targetGrid);
-  }
-  
-  console.warn("🏀 [FRONTEND STEAL ENTRY] Movement Details:", {
-    startingPosition: currentGrid,
-    direction,
-    moveX,
-    moveY,
-    targetPosition: targetGrid,
-    calculation: `${currentGrid.x} + (${direction} * ${moveX}) = ${targetGrid.x}`
-  });
-  
-  // Convert to pixel coordinates
-  const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
-  
-  // Get animation duration
-  const playerDuration = getPlayerDuration(ballHandlerSprite, targetPx.x, targetPx.y, true);
-  
-  // Animate stealer movement
-  await tweenPlayerTo(scene, ballHandlerSprite, targetPx, {
-    duration: playerDuration,
-    easing: "Linear"
-  });
-  
-  // Update sprite grid coordinates
-  ballHandlerSprite.gridX = targetGrid.x;
-  ballHandlerSprite.gridY = targetGrid.y;
-  
-  // Verify ball remains attached after movement
-  if (ballController && (!ballController.isAttached || ballController.currentOwner !== ballHandlerSprite)) {
-    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
-      reason: 'steal_entry_post_movement'
-    });
-  }
-}
+// animateStealEntry() was removed during the after_steal UESS migration.
+// Steal-FB choreography (burst, shot motion, step-back, "Fast Break!" and
+// "Great Stop!" announcements, variant rim SFX) is now emitted as
+// AnimationStep[] by BackEnd/engine/after_steal_fast_break_step_emitter.py
+// and rendered by the FE step dispatcher. Per the pure-renderer mandate
+// for migrated FB plays, no FE inline choreography for steal-FBs.
 
 /**
  * Phase 2a: Fast Break Shot Attempt

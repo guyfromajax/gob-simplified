@@ -109,11 +109,9 @@ Step 4a: Hold (make)
     -if this is not the final FT, hold for 1000ms the teleport the ball to teh free throw shooter (note this is a rare excetion where a ball teleport is acceptable)
 
 Step 4b: Rim beat + bounce to `ball_bounce_x/y` (miss)
-    -if this is the final FT, calcualte OREB or DREB and execture the reboudn step via our standard process
+    -if this is the final FT, calcualte OREB or DREB and execture the reboudn step via our standard process. Final miss → discrete **DREB** or **OREB** turn (not embedded on FT row)
     -if this is not the final FT, hold the ball at the bounce spot for 1000ms then teleport the ball to the FT shooter (note this is a rare excetion where a ball teleport is acceptable)
-    -also ensure that the bounce spot for either use case (final FT or not final FT) is determined via our standard random logic.
-
-Final miss → discrete **DREB** or **OREB** turn (not embedded on FT row)
+    -also ensure that the bounce spot for either use case (final FT or not final FT) is determined via our standard random logic for missed shots.
 
 **Fast Breaks** (schema playback via `animation_steps`; `after_steal` still on legacy `fastBreak.js`)
 

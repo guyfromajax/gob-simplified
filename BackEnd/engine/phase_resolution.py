@@ -1003,6 +1003,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # DREB outlet → covert_release (incl. fallback outlet); steal entry → after_steal
     rebound = game_state.get("last_rebound") == "DREB"
     from BackEnd.constants.fast_break_play_types import (
+        AFTER_STEAL,
         RIM_RUNNER,
         TRIANGLE,
         ensure_fast_break_plays,
@@ -1938,6 +1939,26 @@ def resolve_fast_break_logic(game: "GameManager"):
         except Exception as e:
             logging.warning(
                 "build_covert_release_animation_steps (outcome) failed: %s", e
+            )
+
+    # Parallel-build: emit unified AnimationStep[] for steal-initiated FBs
+    # (after_steal). Schema-driven choreography includes burst, shot motion,
+    # post-shot variant sub-steps (RATTLE hops / bank / etc.), and the
+    # defensive-stop step-back step whose end.coords becomes the
+    # authoritative coord snapshot for the next HCO turn's handoff.
+    if fb_play_key == AFTER_STEAL:
+        try:
+            from BackEnd.engine.after_steal_fast_break_step_emitter import (
+                build_after_steal_fast_break_animation_steps,
+            )
+            anim_steps = build_after_steal_fast_break_animation_steps(
+                turn_result, game,
+            )
+            if anim_steps is not None:
+                turn_result["animation_steps"] = anim_steps
+        except Exception as e:
+            logging.warning(
+                "build_after_steal_fast_break_animation_steps failed: %s", e
             )
 
     # ✅ Add safety checks before returning

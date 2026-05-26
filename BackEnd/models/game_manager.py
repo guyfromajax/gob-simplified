@@ -355,24 +355,16 @@ class GameManager:
         # Stable trace id for end-to-end timeout resume diagnostics.
         self.game_state["timeout_trace_id"] = self.game_state.get("timeout_trace_id") or f"to-{uuid.uuid4().hex[:10]}"
         
-        # ✅ FIX: For DREB => HCO transitions, read offense_team_id from the last turn (which was updated after flip)
-        # For SIP/BIP, self.offense_team.team_id is already correct (possession flipped before turn creation)
-        # This fixes the bug where timeout_offense_team_id was saved as the wrong team during DREB => HCO
-        last_turn = self.turns[-1] if self.turns else None
+        # switch_possession() has already run synchronously inside simulate_macro_turn
+        # by the time we get here, so self.offense_team is the post-flip team for all
+        # normal transitions (DREB→HCO, DREB→FB, MAKE→BIP, SIP/BIP, etc.).
+        # Only exception: offensive-foul foul-outs — possession hasn't flipped yet,
+        # so we use defense_team as the team that will receive the ball.
         foul_out_ctx = self.game_state.get("foul_out_context") or {}
         if timeout_reason == "FOUL_OUT" and foul_out_ctx.get("foul_type") == "OFFENSIVE":
-            # Offensive foul (charge or HCO o-foul): possession flips after this turn; save the team that receives the ball (current defense)
             timeout_offense_team_id = self.defense_team.team_id
             logging.info(f"✅ TIMEOUT: FOUL_OUT offensive foul - using defense_team as next offense (ball goes to them): {timeout_offense_team_id}")
-        elif (last_turn and 
-            last_turn.get("next_play_type") == "HCO" and 
-            last_turn.get("rebound_type") == "DREB" and
-            last_turn.get("offense_team_id")):
-            # DREB => HCO transition: use the turn's offense_team_id (updated after flip at line 347)
-            timeout_offense_team_id = last_turn.get("offense_team_id")
-            logging.info(f"✅ TIMEOUT: DREB => HCO transition detected - using last turn's offense_team_id: {timeout_offense_team_id} (was: {self.offense_team.team_id})")
         else:
-            # SIP/BIP or other cases: use GameManager's offense_team (already correct)
             timeout_offense_team_id = self.offense_team.team_id
         
         self.game_state["timeout_offense_team_id"] = timeout_offense_team_id
@@ -1296,6 +1288,17 @@ class GameManager:
                 foul_result = resolve_non_shooting_foul(
                     roles, self, time_elapsed_override=sl.force_foul_time_elapsed()
                 )
+                # `resolve_non_shooting_foul` returns the result with raw Player
+                # objects in ball_handler / defender / shooter / screener / passer.
+                # This payload is returned directly via JSONResponse, so the
+                # Player objects must be flattened to player_ids before the API
+                # response renders. Mirrors the OREB OTB pattern in
+                # `turn_manager.resolve_offensive_rebound_turn`.
+                foul_result["ball_handler"] = getattr(victim, "player_id", None)
+                foul_result["shooter"] = getattr(victim, "player_id", None)
+                foul_result["defender"] = getattr(foul_player, "player_id", None)
+                foul_result["screener"] = None
+                foul_result["passer"] = None
                 victim.coords = {
                     "x": float(victim_coords.get("x", 50)),
                     "y": float(victim_coords.get("y", 25)),

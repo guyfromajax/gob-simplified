@@ -4933,7 +4933,23 @@ try:
             displayed_shot,
             gm.game_state.get("shot_clock_remaining"),
         )
-        
+
+        # Defense-in-depth: if backend has advanced more than 2s past what the user
+        # sees, possession-changing events (DREB, MAKE→BIP flip) may have happened
+        # between the user's click and our processing. The frontend now serializes
+        # turn preload after animation to prevent this, so a real skew here means
+        # that contract was broken upstream — flag it loudly.
+        if displayed_time is not None and abs(backend_time - int(displayed_time)) > 2:
+            logging.warning(
+                "🚨 [TIMEOUT SKEW] Large backend/displayed clock skew at timeout entry — trace_id=%s game_id=%s backend_time=%s displayed_time=%s diff=%ss offense_team=%s",
+                gm.game_state.get("timeout_trace_id") or request.timeout_trace_id,
+                game_id,
+                backend_time,
+                int(displayed_time),
+                backend_time - int(displayed_time),
+                getattr(gm.offense_team, "team_id", None),
+            )
+
         calling_team = gm.home_team if calling_team_side == 'home' else gm.away_team
         
         # Use unified timeout creation method (same as computer timeouts)

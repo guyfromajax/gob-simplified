@@ -2,13 +2,6 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import {
-  STEAL_HCO_SETUP_MOVE_X_MIN,
-  STEAL_HCO_SETUP_MOVE_X_MAX,
-  STEAL_HCO_SETUP_MOVE_Y_RANGE,
-  STEAL_HCO_SETUP_Y_MIN,
-  STEAL_HCO_SETUP_Y_MAX,
-} from "../constants/fastBreakConstants.js";
-import {
   shootBall,
   SHOT_DEBUG,
   animateRebound,
@@ -339,174 +332,6 @@ function captureLiveSpriteGrid(sprite, width, height) {
  * @param {boolean} isTransition - If true, use MAX_TRANSITION_DURATION instead of MAX_STEP_DURATION
  * @returns {number} Duration in milliseconds
  */
-/**
- * Steal HCO Setup Animation
- * Moves the stealer (ball handler) back away from basket before HCO skeleton starts
- */
-export async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) {
-  const ballHandlerId = turnData.roles?.ball_handler_id;
-  const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
-  
-  if (!ballHandlerSprite) {
-    console.warn("Steal HCO Setup: Ball handler sprite not found", { 
-      ballHandlerId,
-      roles: turnData.roles
-    });
-    return;
-  }
-  
-  // Ball should already be attached to stealer from the steal turn
-  // Verify attachment
-  const { getBallController } = await import('./BallControllerAdapter.js');
-  const ballController = getBallController();
-
-  if (!ballController?.isAttached || ballController.currentOwner !== ballHandlerSprite) {
-    // Attach ball to stealer if not already attached
-    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
-      reason: 'steal_hco_setup_verify'
-    });
-  }
-
-  // Steal SFX is now tied to the "STEAL!" announce appearance (see
-  // Sound_Design_Update.md §Steal Announce + gameAnnouncements.js
-  // `handleStealAnnouncement`), not the ball-attach moment. Removed here
-  // to keep dispatch to a single site.
-
-
-  // Get stealer's current position
-  const currentGrid = {
-    x: ballHandlerSprite.gridX || 50,
-    y: ballHandlerSprite.gridY || 25
-  };
-  
-  // ✅ DETAILED LOGGING: Track frontend HCO Setup calculation
-  console.warn("🏀 [FRONTEND STEAL HCO SETUP] Entry:", {
-    ballHandlerId,
-    currentSpritePosition: { x: ballHandlerSprite.gridX, y: ballHandlerSprite.gridY },
-    roles: turnData.roles,
-    backendFinalX: turnData.roles?.ball_handler_hco_setup_x,
-    backendFinalY: turnData.roles?.ball_handler_hco_setup_y,
-    backendMoveX: turnData.roles?.ball_handler_hco_setup_move_x,
-    backendMoveY: turnData.roles?.ball_handler_hco_setup_move_y
-  });
-  
-  // Determine offense team and direction (away from basket)
-  const isHomeOffense = ballHandlerSprite.team === "home";
-  const direction = isHomeOffense ? -1 : 1; // -1 for home (away from x=90), +1 for away (away from x=10)
-  
-  // Calculate steal HCO setup movement (matches backend calculation)
-  const moveX = turnData.roles?.ball_handler_hco_setup_move_x || 
-                Phaser.Math.Between(STEAL_HCO_SETUP_MOVE_X_MIN, STEAL_HCO_SETUP_MOVE_X_MAX);
-  const moveY = turnData.roles?.ball_handler_hco_setup_move_y || 
-                Phaser.Math.Between(-STEAL_HCO_SETUP_MOVE_Y_RANGE, STEAL_HCO_SETUP_MOVE_Y_RANGE);
-  
-  // ✅ FIX: Use backend-provided final coordinates if available (more accurate)
-  // Otherwise, calculate from current position
-  let targetGrid;
-  if (turnData.roles?.ball_handler_hco_setup_x !== undefined && turnData.roles?.ball_handler_hco_setup_y !== undefined) {
-    // Use backend-calculated final position
-    targetGrid = {
-      x: turnData.roles.ball_handler_hco_setup_x,
-      y: turnData.roles.ball_handler_hco_setup_y
-    };
-    console.warn("🏀 [FRONTEND STEAL HCO SETUP] Using backend final coordinates:", targetGrid);
-  } else {
-    // Fallback: Calculate from current position (shouldn't happen if backend is correct)
-    targetGrid = {
-      x: currentGrid.x + (direction * moveX),
-      y: Phaser.Math.Clamp(
-        currentGrid.y + moveY,
-        STEAL_HCO_SETUP_Y_MIN,
-        STEAL_HCO_SETUP_Y_MAX
-      )
-    };
-    console.warn("⚠️ [FRONTEND STEAL HCO SETUP] Calculated target (backend coords missing):", targetGrid);
-  }
-  
-  console.warn("🏀 [FRONTEND STEAL HCO SETUP] Movement Details:", {
-    startingPosition: currentGrid,
-    direction,
-    moveX,
-    moveY,
-    targetPosition: targetGrid,
-    calculation: `${currentGrid.x} + (${direction} * ${moveX}) = ${targetGrid.x}`
-  });
-  
-  // Convert to pixel coordinates
-  const width = scene.game.config.width;
-  const height = scene.game.config.height;
-  const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
-  
-  // Get animation duration
-  const playerDuration = getPlayerDuration(ballHandlerSprite, targetPx.x, targetPx.y, true);
-  
-  // Animate stealer movement
-  await tweenPlayerTo(scene, ballHandlerSprite, targetPx, {
-    duration: playerDuration,
-    easing: "Linear"
-  });
-  
-  // Update sprite grid coordinates
-  ballHandlerSprite.gridX = targetGrid.x;
-  ballHandlerSprite.gridY = targetGrid.y;
-  
-  // Verify ball remains attached after movement
-  if (ballController && (!ballController.isAttached || ballController.currentOwner !== ballHandlerSprite)) {
-    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
-      reason: 'steal_hco_setup_post_movement'
-    });
-  }
-  
-  // Animate all 9 other players (toward the new offense basket)
-  const otherPlayersMovements = turnData.roles?.other_players_hco_setup_movements || [];
-  if (otherPlayersMovements.length > 0) {
-    console.warn(`🏀 [FRONTEND STEAL HCO SETUP] Animating ${otherPlayersMovements.length} other players toward new offense basket`);
-    
-    const promises = [];
-    for (const movement of otherPlayersMovements) {
-      const playerSprite = playerSprites[movement.player_id];
-      if (!playerSprite) {
-        console.warn(`⚠️ [FRONTEND STEAL HCO SETUP] Player sprite not found: ${movement.player_id}`);
-        continue;
-      }
-      
-      // Get current position
-      const currentGrid = {
-        x: playerSprite.gridX || movement.start_x,
-        y: playerSprite.gridY || movement.start_y
-      };
-      
-      // Use backend-calculated final position
-      const targetGrid = {
-        x: movement.final_x,
-        y: movement.final_y
-      };
-      
-      // Convert to pixel coordinates
-      const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
-      
-      // Get animation duration
-      const duration = getPlayerDuration(playerSprite, targetPx.x, targetPx.y, true);
-      
-      // Animate player movement
-      promises.push(
-        tweenPlayerTo(scene, playerSprite, targetPx, {
-          duration: duration,
-          easing: "Linear"
-        }).then(() => {
-          // Update sprite grid coordinates
-          playerSprite.gridX = targetGrid.x;
-          playerSprite.gridY = targetGrid.y;
-        })
-      );
-    }
-    
-    // Wait for all other players to finish animating
-    await Promise.all(promises);
-    console.warn(`🏀 [FRONTEND STEAL HCO SETUP] All ${otherPlayersMovements.length} other players finished animating`);
-  }
-}
-
 function getPlayerDuration(sprite, targetX, targetY, _isTransition = false, opts = {}) {
   return getPlayerMovementDurationMs(sprite, targetX, targetY, {
     ...opts,
@@ -5030,13 +4855,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       offensiveCount,
       defensiveCount
     });
-  }
-
-  // ============================================================================
-  // STEAL HCO SETUP: Animate stealer moving back before HCO skeleton starts
-  // ============================================================================
-  if (turnData.roles?.is_steal_hco_setup) {
-    await animateStealHCOSetup(scene, turnData, playerSprites, ballSprite);
   }
 
   // ✅ CRITICAL FIX: Run setup tween to move players to step 0 positions before skeleton animation

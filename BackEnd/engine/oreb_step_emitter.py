@@ -48,7 +48,10 @@ from BackEnd.constants import (
     MADE_SHOT_SWEET_SPOT_HOME_RIM,
     SHOT_BALL_GRID_PER_GAME_SECOND,
 )
-from BackEnd.engine.skeleton_step_emitter import _build_make_hold_sub_step
+from BackEnd.engine.skeleton_step_emitter import (
+    _build_make_hold_sub_step,
+    _stamp_shooting_foul_on_miss_end,
+)
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
@@ -708,6 +711,10 @@ def build_oreb_animation_steps(
     if sbx is None or sby is None:
         # No second-bounce coords on the turn — emit ball_flight ending the turn.
         flight_step["end"]["next"] = _shot_attempt_turn_stop(turn_result, "MISS")
+        # Shooting-foul-on-miss announcement attaches to the terminal step
+        # so the FE plays "Shooting Foul!" before turn_stop. Mirrors skeleton
+        # emitter behavior on HCO miss + defensive shooting foul.
+        _stamp_shooting_foul_on_miss_end(flight_step, turn_result)
         return _finalize("PUTBACK_MISS_NO_BOUNCE")
     bounce_target: GridCoord = {"x": float(sbx), "y": float(sby)}
 
@@ -722,4 +729,8 @@ def build_oreb_animation_steps(
         def_lineup=def_lineup,
     )
     steps.append(bounce_step)
+    # Shooting-foul-on-miss announcement attaches to the bounce step's end
+    # so the FE plays "Shooting Foul!" before turn_stop. Mirrors skeleton
+    # emitter behavior on HCO miss + defensive shooting foul.
+    _stamp_shooting_foul_on_miss_end(bounce_step, turn_result)
     return _finalize("PUTBACK_MISS")

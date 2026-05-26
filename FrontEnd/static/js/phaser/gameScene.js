@@ -3271,16 +3271,12 @@ export function createGameScene(Phaser) {
         } else if (schemaInboundSteps) {
           console.warn("🏠 [BENCH_ENTRY] skipped — inbound turn has animation_steps (schema handles triangle→setup)");
         }
-        // Part 2: Preload first HCO while opening tip (and any quarter-start inbound) animates.
-        if (ENABLE_TURN_PRELOAD) {
-          preloadedTurnPromise = fetchTurnData(null, null);
-        }
         // Add indices to initial turns for text scroll
         initialTurns.forEach((turn, idx) => {
           turn.index = idx;
           turnCount++;
         });
-        
+
         await animateGameTurns({
           scene: this,
           simData: { ...initialSimData, turns: initialTurns },
@@ -3290,6 +3286,11 @@ export function createGameScene(Phaser) {
         });
         this._priorAnimatedTurnForLeadIn =
           initialTurns.length > 0 ? initialTurns[initialTurns.length - 1] : null;
+        // Preload first HCO only AFTER opening-tip animation completes (see comment
+        // on main-loop preload below — same reason).
+        if (ENABLE_TURN_PRELOAD) {
+          preloadedTurnPromise = fetchTurnData(null, null);
+        }
       }
 
       // Main turn-by-turn loop
@@ -3406,11 +3407,6 @@ export function createGameScene(Phaser) {
           }
           let finalTurn = turn; // Track the final turn for Quick Adjust logic
 
-          // Part 2: Start preload for next turn (runs in parallel with animation). Skip when we will exit after this turn (timeout or final turn of quarter).
-          if (ENABLE_TURN_PRELOAD && turn.result_type !== 'TIMEOUT' && !turnData.quarter_complete) {
-            preloadedTurnPromise = fetchTurnData(null, null);
-          }
-          
           // ✅ TIMEOUT: Check if this is a timeout turn - if so, stop the simulation loop
           if (turn.result_type === "TIMEOUT") {
             console.log('⏸️ TIMEOUT: Timeout turn detected in simulateTurnByTurn - stopping simulation loop');
@@ -3613,6 +3609,14 @@ export function createGameScene(Phaser) {
             }
           }
           
+          // Preload next turn only AFTER current animation completes. Parallel preload
+          // would let backend simulate possession-changing events (DREB, MAKE→BIP flip)
+          // while the user is still watching the prior animation — a user timeout
+          // captured during that window snapshots state the user hasn't seen yet.
+          if (ENABLE_TURN_PRELOAD && turn.result_type !== 'TIMEOUT' && !turnData.quarter_complete) {
+            preloadedTurnPromise = fetchTurnData(null, null);
+          }
+
           // Update scores and game state after each turn (include response shot_clock so display uses backend authority)
           updateScoreboard({
             home_score: turnData.home_score,

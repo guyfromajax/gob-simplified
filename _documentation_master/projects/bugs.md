@@ -5,30 +5,36 @@
 7. Wire slow it down and quick shot with tempo
 8. OTB fouls need to animate the rebound
 9. Dunks! I need DUNKS!
-10. Block bug, away team had ball, away team was teh blocker in Announcment System and teh ball bounced to a location on the hoem side of the court
+
 11. More action in recruiting
 12. Airball announce
-14. Charge or Block on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
+14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
 37. Player Foul Out Next Step bug
-38. Block on Hold for Final Shot snaps to the wrong end of the court.
 
 40. Batted ball out of bounds is not animating or executing properly
 44. Customize computer teams more strategically
 45. Improve FCC API
-46. Leaderboard context explanation
+46. Import FB Play Types function, no CR arg?
+
 47. Double rebounds on missed Fast Break shots
 48. Double block announce on Final Shot
-49. Missed Rim SFX not trigger on OREB Putback misses
-50. OREB Kickout, other players' movement
+49. Run clock to 0:00 for Final Shot
+
 51, Hold up logic in RR FBs
-52. Fix Fast Break animation
-53. Multiple HCO entries are teleporting and skipping
-54. Better Free Throw animation
+52. No rim visual + SFX on OREB putback makes and misses?
+
 55. Getting a double pass on double screen play where shooter drives to teh basket
-56. Need to fucking sync passes and defender movement on HCO skeleton steps
+56. Some Fast Breaks are still broken
+
+58. Add shot miss rim animation on shooting fouls
+59. Announced Shootig Foul and Holding on same turn. Then announced Shooting Foul and Block Foul (both were bonus situations)
+60. Add dynamic makes and misses to Free Throws (rim aniamtio + SFX)
+61. Steal step back to HCO handoff wonkiness, I don't think we're registering step back coords in the emitter
+
+
 
 
 ## Future Cleanup (Non-Critical Warnings)

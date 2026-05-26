@@ -206,10 +206,38 @@ When two defenders both retreat to basket defense, the second defender's spot is
 - **No-defender corner-3 override**: if no shot defender is present on a Triangle corner 3, calculate shot score as normal but use a Triangle-specific make threshold: make if `shot_score > (190 - offense_team.fb_efficiency)`, else miss. If a shot defender is present, use normal shot resolution logic.
 - **HCO handoff rule**: if Triangle enters `HCO`, all players carry forward from their live positions at the HCO decision boundary. If the current ball handler is not the PG, once the PG reaches HCO step-0 location, animate a pass from the current ball handler to the PG before normal HCO setup completes.
 
-#### After Steal (`after_steal`)
+#### After Steal (`after_steal`) — UESS migrated (May 2026)
 
 - **When**: Fast break entered from **steal** (not DREB outlet). `play_key_for_fast_break_entry(False)` → **`after_steal`**.
 - **What**: No Covert Release outlet; ball handler = stealer; steal entry movement; same **defensive stop y-range ±6** and stop vs shot logic as in Steps 4–8 (steal branch). See **Steal Entry** in Step 3 above.
+- **UESS schema**: After-steal FB is fully migrated to the unified animation step schema. **No frontend choreography logic** — all positions, transitions, announcements, and SFX are backend-emitted. FE is a pure renderer (`runSchemaPlaybackTurn`).
+- **Emitter**: `BackEnd/engine/after_steal_fast_break_step_emitter.py::build_after_steal_fast_break_animation_steps`. Routed via `resolve_fast_break_logic` (`phase_resolution.py`) — same pattern as `covert_release` schema emission, in the same block.
+- **FE gate**: `MIGRATED_FB_PLAYS` in `AnimationEngine.js` includes `"after_steal"` (alongside `covert_release`, `rim_runner`, `triangle`); the FE step dispatcher consumes the schema steps directly.
+- **Legacy code removed**: `animateStealEntry()` in `fastBreak.js`, the `is_steal_entry` routing branch, and the `STEAL_ENTRY_*` constant imports were deleted during migration. The FE constants in `fastBreakConstants.js` remain for reference but are no longer consumed.
+
+**Step schema (shot branch — MAKE / MISS / BLOCK):**
+
+| Step | Purpose | Key fields |
+|---|---|---|
+| 0 — burst | Stealer sprints toward basket; get-back defenders chase; "Fast Break!" secondary announcement on `start` | `action[stealer] = "sprint"`, `archetype = "sprint"`, `end.coords[stealer] = ball_handler_outlet_x/y`, `ball.owner_player_id = stealer`, `start.announcement = "Fast Break!"` |
+| 1 — shot motion | Shooter (= stealer) settles at shot spot, stopper / defender close out | `action[shooter] = "shoot"`, `archetype = "shot_motion"`, ball still attached |
+| 2 — ball flight | Variant-aware flight to rim; launch SFX on release | `sfx_on_ball_release = shot_launch_sfx(shot_score_pre_defense)`; `sfx_on_ball_arrival = shot_result_sfx(variant, result)` (omitted for RATTLE — per-hop sub-steps handle SFX) |
+| 3+ — variant sub-steps | RATTLE hops / BANK_MAKE settle / BANK_MISS graze / AIRBALL OOB | Emitted by skeleton's `_build_post_shot_sub_steps`; per-hop `rattle-leather.wav` for RATTLE |
+| N — hold (MAKE) | 1000ms "Fast Break Score!" announcement (or "Fast Break Score! And 1!" for and-1) at the ball's settle point | `start.announcement.text` overridden in-place by emitter from skeleton's default "It's Good!" |
+| N — bounce (MISS) | Ball bounces from rim to backend-stamped `ball_bounce_x/y`; "Shooting Foul!" stamped on `end.announcement` if miss + defensive shooting foul | `_stamp_shooting_foul_on_miss_end` (shared helper) |
+
+**Step schema (defensive-stop branch — `DEFENSIVE_STOP`):**
+
+| Step | Purpose | Key fields |
+|---|---|---|
+| 0 — burst | Same as shot branch step 0 | Same |
+| 1 — step-back | Ball handler step-backs to top-of-key (`HOME_TOP_KEY` / `AWAY_TOP_KEY`); stopper closes 2 spots in front; "Great Stop!" secondary announcement on `end` | `action[ball_handler] = "dribble"`, `destinations[ball_handler] = top_key`, `end.announcement = "Great Stop!"` with stopper headshot, `end.next = turn_stop FAST_BREAK` |
+
+**Step-back coord-capture invariant (load-bearing):** the step-back step's `end.coords` IS the authoritative coord snapshot for the next HCO turn. The next HCO turn's first step (handoff) reads these as its start coords — without this, the ball handler and stopper would teleport on the handoff. This pattern is the canonical fix shape for the related HCO-steal teleport bug (when that's tackled, use the same step-back end.coords approach instead of capturing pre-step-back positions).
+
+**Make announcement text:** Per design, steal-FB makes read as "Fast Break Score!" not "It's Good!" (overrides skeleton's default). The emitter post-processes the make-hold step's `start.announcement.text` from "It's Good!" → "Fast Break Score!" (and the and-1 variant). Helper: `_override_fb_make_announcement` in the after_steal emitter.
+
+**Stat tracking:** unchanged. Each after_steal FB increments `scouting_data.offense.fast_break_plays["after_steal"]` (`A` on attempt, `S` on success) and the team-level `Fast_Break_Entries` aggregate; the four play keys (CR, RR, Triangle, AFTER_STEAL) all roll up into the team's overall Fast Break stats.
 
 ### When Fast Break Activates
 

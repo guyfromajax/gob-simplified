@@ -132,7 +132,32 @@ The Announcement System provides visual feedback for game events using timing-ba
   - Always displays announcement even if player sprite/info is missing (fallback pattern).
   - Routed via `announceGameEvent('FOUL_SHOOTING', ...)` from `ShotAnimationSystem.handleMissedShot()`.
 
-**Fast Break shot path:** Fast Break shots are animated only in `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`). They use `animateShotToRim()` and do **not** go through `ballManager.shootBall()` or ShotAnimationSystem. Therefore **AND-1** and **"Shooting Foul!"** (on miss) must be detected and announced inside `fastBreak.js` using the same logic as in `ballManager.js` (same `turnData` fields and `showAnnouncement` / `showAndOneAnnouncement` / `triggerFoulEffect`).
+**Fast Break shot path:** Fast Break shots are animated only in `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`). They use `animateShotToRim()` and do **not** go through `ballManager.shootBall()` or ShotAnimationSystem. Therefore **AND-1** and **"Shooting Foul!"** (on miss) must be detected and announced inside `fastBreak.js` using the same logic as in `ballManager.js` (same `turnData` fields and `showAnnouncement` / `showAndOneAnnouncement` / `triggerFoulEffect`). **Note:** the `after_steal` FB play-key is the exception — it migrated to the UESS schema (see "After-Steal Fast Break shot path" below). The legacy path here still applies to DREB-triggered RR / CR / Triangle FBs (their schema migration covers shot result via `_build_post_shot_sub_steps` but in-progress legacy code still handles some choreography).
+
+**After-Steal Fast Break shot path:** Steal-initiated FB shots (`current_turn === "FAST_BREAK"` AND `fast_break_play === "after_steal"`) animate through the UESS step schema emitted by `BackEnd/engine/after_steal_fast_break_step_emitter.py::build_after_steal_fast_break_animation_steps`. Announcements, SFX, and choreography are **backend-emitted** into the step payload — the frontend is a pure renderer. Per-play details:
+
+| Steal-FB case | Step that carries the announcement | How it's stamped |
+|---|---|---|
+| Burst phase | step 0 `start.announcement` | "Fast Break!" secondary headline (suppresses the FE's `prepareTurnForAnimation` dispatch via `turn._contextAnnouncementsShown`) |
+| `MAKE` (with or without and-1) | make-hold step `start.announcement` | `_build_make_hold_sub_step` (from skeleton); text overridden in-place by emitter from "It's Good!" to **"Fast Break Score!"** (or "Fast Break Score! And 1!" for and-1) |
+| `MISS` with defensive shooting foul (bounce branch) | bounce step `end.announcement` | `_stamp_shooting_foul_on_miss_end(bounce_step, turn_result)` (shared with skeleton) |
+| `MISS` with defensive shooting foul (no-bounce branch) | terminal flight step `end.announcement` | Same helper as above on the terminal step |
+| `BLOCK` | ball-flight step `end.announcement` | `BLOCK!` headline (shared post-shot path stamps it) |
+| `DEFENSIVE_STOP` | step-back step `end.announcement` | "Great Stop!" secondary headline with stopper headshot |
+
+**Variant rim SFX (RATTLE, BANK, AIRBALL, etc.)** are emitted as per-hop / per-sub-step `sfx_on_ball_arrival` cues by skeleton's `_build_post_shot_sub_steps` (shared helper). This fixes the legacy bug where `playShotResultSfx` early-returned for RATTLE variants on FB shots (no per-hop sub-steps existed in the legacy single-tween path).
+
+**Step-back coord-capture invariant:** the defensive-stop step-back step's `end.coords` IS the authoritative coord snapshot. The next HCO turn's first step (handoff) consumes those as its start coords so the ball handler and stopper don't teleport. This pattern is the canonical fix shape if you tackle the related HCO-steal teleport bug — the step-back step's `end.coords` is the source of truth, never the pre-step-back snapshot.
+
+**OREB Putback shot path:** Putback shots (`PUTBACK_MAKE` / `PUTBACK_MISS`) animate through the UESS step schema emitted by `BackEnd/engine/oreb_step_emitter.py::build_oreb_animation_steps`. Announcements are **backend-emitted** into the step payload — the frontend just plays them via `runStepAnnouncement`. Same pattern as HCO skeleton shots:
+
+| Putback case | Step that carries the announcement | How it's stamped |
+|---|---|---|
+| `PUTBACK_MAKE` (with or without and-1) | make-hold step (`start.announcement`) | `_build_make_hold_sub_step` (imported from `skeleton_step_emitter`); derives `is_and_one` from `turn_result.next_play_type == "FREE_THROW"` + `foul_player_id` |
+| `PUTBACK_MISS` with defensive shooting foul (bounce branch) | bounce step (`end.announcement`) | `_stamp_shooting_foul_on_miss_end(bounce_step, turn_result)` |
+| `PUTBACK_MISS` with defensive shooting foul (no-bounce branch) | flight step (`end.announcement`) | `_stamp_shooting_foul_on_miss_end(flight_step, turn_result)` |
+
+`_stamp_shooting_foul_on_miss_end` is the same helper used by `skeleton_step_emitter` on HCO miss + foul. It no-ops when `result_type != "MISS"`, when there are no free throws to come, or when no `foul_player_id` is set. The frontend detection in `ballManager.shootBall` (used by the legacy `handleOrebTurn` path) remains as defense-in-depth and will be redundant once all putback playback routes through the schema.
 
 **Steal Announcements:**
 - **"STEAL!"** - Triggered when `result_type === 'STEAL'` or (`result_type === 'TURNOVER'` and text includes "steal")

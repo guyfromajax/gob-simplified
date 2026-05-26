@@ -36,9 +36,9 @@
 This system documents data persistence across all three game modes when users are in non-gameplay situations. Understanding what data persists is critical for maintaining state across navigation transitions and ensuring data consistency.
 
 **Reference Documentation:**
-- `docs/franchise_mode_architecture.md` - Complete franchise mode data structure
-- `docs/COMMON_DATA_SET.md` - Common data structure across all modes
-- `docs/docs_1_systems/01_Game_Mode_Systems/` - Mode-specific system documentation
+- `docs/Franchise_Mode/franchise_mode_architecture.md` - Complete franchise mode data structure
+- `docs/Persistence_Docs/COMMON_DATA_SET.md` - Common data structure across all modes
+- `../01_Game_Mode_Systems/` - Mode-specific system documentation
 
 ---
 
@@ -117,8 +117,6 @@ This system documents data persistence across all three game modes when users ar
 **Scouting Data** (updated by training):
 - `scouting_data`: Defense structures (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone, vs_Fast_Break, FCP, HCT) with `effectiveness`, `momentum`, `cloaking`, `game_stats`, `season_stats`. **Live gameplay** always merges stored data onto the canonical template via **`normalize_scouting_data_for_gameplay`** in `team_manager.py` so each row includes top-level **`used` / `success`** and full nested stats (avoids partial FTD-shaped rows breaking `run_micro_turn`).
 
-**Legacy playcall_settings** (still present for backward compatibility)
-
 **Initialization:** Team objects are created for all 8 teams when franchise is initialized via `FranchiseManager.initialize_season()` or lazily via `ensure_team_objects_exist()` when accessing Game Plan/Playbooks.
 
 #### C. Player Objects (`franchise_players_data` collection, keyed by `franchise_id` + `player_id`)
@@ -130,7 +128,7 @@ This system documents data persistence across all three game modes when users ar
 - **Evolved Position Ratings** (`position_ratings`: PG, SG, SF, PF, C ratings, updated by training)
 - **Statistics** (`season`: season stats, `career`: career stats)
 
-**Note:** Player attributes from training are loaded during game initialization. See `Franchise_Mode_Systems.md` section "3.5. Player Attribute Loading During Game Initialization" for complete details.
+**Note:** Player attributes from training are loaded during game initialization. See `../01_Game_Mode_Systems/Franchise_Mode_Systems.md` section "3.5. Player Attribute Loading During Game Initialization" for complete details.
 
 #### D. Additional Collections (Not in Franchise Document)
 
@@ -147,7 +145,7 @@ This system documents data persistence across all three game modes when users ar
 - Changes to strategy settings, playbook settings, and training improvements persist across the franchise season
 - Team objects include all common data fields (attributes, strategy_settings, plays, scouting_data, playbook_settings)
 
-**For complete structure details, see:** `docs/franchise_mode_architecture.md` Section 7: NON-GAMEPLAY DATA PERSISTENCE
+**For complete structure details, see:** `docs/Franchise_Mode/franchise_mode_architecture.md` Section 7: NON-GAMEPLAY DATA PERSISTENCE
 
 ---
 
@@ -304,8 +302,6 @@ This system documents data persistence across all three game modes when users ar
 **Scouting Data** (loaded from universal collection, NOT updated):
 - `scouting_data`: Defense structures from universal collection
 
-**Legacy playcall_settings** (still present for backward compatibility)
-
 **Initialization:** Team objects are created lazily when user accesses Game Plan or Playbooks page via `ensure_team_objects_exist()`.
 
 **Persistence:**
@@ -331,9 +327,9 @@ This system documents data persistence across all three game modes when users ar
 ### Key Files
 
 **Franchise Mode:**
-- `BackEnd/models/franchise_manager.py` - `initialize_season()` (lines 109-235)
-- `BackEnd/api/franchise_routes.py` - `get_franchise_team_data()` (lines 832-881)
-- `BackEnd/api/franchise_routes.py` - `run_franchise_training()` (lines 1802-2123)
+- `BackEnd/models/franchise_manager.py` - `initialize_season()`
+- `BackEnd/api/franchise_routes.py` - `get_franchise_team_data()`
+- `BackEnd/api/franchise_routes.py` - `run_franchise_training()`
 
 **Tournament Mode:**
 - `BackEnd/tournament/tournament_manager.py` - `create_tournament()` (initializes all 8 teams)
@@ -342,19 +338,19 @@ This system documents data persistence across all three game modes when users ar
 
 **Single Game Mode:**
 - `BackEnd/api/api.py` - `init_game()` (game initialization)
-- `05_GP_Supporting_Systems/Game_Init_System.md` - Full **`POST /api/init-game`** flow, franchise FTD → game doc, tournament/single behavior
+- `../05_GP_Supporting_Systems/Game_Init_System.md` - Full **`POST /api/init-game`** flow, franchise FTD → game doc, tournament/single behavior
 - `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lazy team object creation)
 
 **Common:**
-- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()` (lines 152-299)
-- `BackEnd/models/team_manager.py` - `init_team_attributes()` (lines 185-226); **`normalize_scouting_data_for_gameplay()`** (scouting template merge at `TeamManager` init)
+- `BackEnd/api/gameplan_routes.py` - `ensure_team_objects_exist()`
+- `BackEnd/models/team_manager.py` - `init_team_attributes()`; **`normalize_scouting_data_for_gameplay()`** (scouting template merge at `TeamManager` init)
 - `BackEnd/utils/franchise_ftd_game_seed.py` - `prepare_ftd_for_new_game()` (franchise scouting: merge + per-game defense counter reset)
-- `docs/franchise_mode_architecture.md` - Complete franchise mode architecture
-- `docs/COMMON_DATA_SET.md` - Common data structure across all modes
+- `docs/Franchise_Mode/franchise_mode_architecture.md` - Complete franchise mode architecture
+- `docs/Persistence_Docs/COMMON_DATA_SET.md` - Common data structure across all modes
 
 ---
 
-## Known Issues & Fixes (January 2025-2026)
+## Known Issues & Fixes (January 2025-May 2026)
 
 **Note:** All major persistence issues have been resolved through the Unified State Persistence refactoring (Phases 1-5.7). The fixes documented below are historical and have been integrated into the current system. For complete implementation history, see `Unified_State_Persistence_Work_Plan.md`.
 
@@ -405,26 +401,6 @@ This system documents data persistence across all three game modes when users ar
 
 **See also:** Game Plan & Playbook Settings Persistence → Key Implementation Details (“Game document `_id` when saving to game doc”).
 
-### ✅ Fixed: Playbook Percentage Persistence (0% Values)
-
-**Issue:** Playbook percentages were not persisting correctly, especially 0% values. When users set percentages and saved, then reloaded the playbooks page, percentages would reset to 0 or default values.
-
-**Root Cause:**
-- Frontend `savePlaybookSettings()` only saved percentages > 0 (filtered out 0% values)
-- When loading, all percentages were reset to 0 first, then saved values applied
-- If a play wasn't in the saved percentages object (because it was 0%), it stayed at 0
-- This created a mismatch where the database didn't have complete percentage data
-
-**Fix (January 2025):**
-- Modified `FrontEnd/static/playbooks.js` `savePlaybookSettings()` to save ALL percentages including 0%
-- Changed condition from `playData.percentage > 0` to save all percentages (using `playData.percentage || 0`)
-- This ensures the database is the complete source of truth for all play percentages
-
-**Files Changed:**
-- `FrontEnd/static/playbooks.js` (lines 2073-2120)
-
----
-
 ### ✅ Fixed: Plays Not Populating After Training
 
 **Issue:** After running training in Franchise/Tournament mode, when revisiting the Playbooks page, offense play containers were empty (no plays listed). Defense plays still appeared because they come from hardcoded data.
@@ -444,8 +420,8 @@ This system documents data persistence across all three game modes when users ar
 - Enhanced plays initialization logging to track when plays are populated from universal collection
 
 **Files Changed:**
-- `BackEnd/api/franchise_routes.py` (lines 2204-2213, 2328-2334)
-- `BackEnd/api/tournament_routes.py` (lines 1104-1122, 1184-1190)
+- `BackEnd/api/franchise_routes.py`
+- `BackEnd/api/tournament_routes.py`
 
 **Prevention:**
 - Plays are now initialized before training if empty (prevents empty plays_data from being passed to training)
@@ -485,74 +461,6 @@ This system documents data persistence across all three game modes when users ar
 - Offensive persistence is now `play_id`-first; play names are display values only
 - Motion focus and set-play target shooter live on the team-owned `plays` data, not as separate playbook maps
 - Legacy `set_play_inside`, `set_play_attack`, `set_play_outside`, `slot_assignments`, and `motion_dropdowns` are compatibility inputs only and should not be treated as canonical persistence fields
-
----
-
-### ✅ Fixed: `even_distribution_all` Flag Auto-Redistribution Bug (January 2026)
-
-**Issue:** When `even_distribution_all: true`, percentages were being redistributed on every page load, overwriting saved percentages that users had manually set. Users could not persist custom percentages when the flag was `true`.
-
-**Root Cause:**
-- `loadState()` method checked `even_distribution_all` flag and automatically redistributed percentages on every page load
-- This overwrote saved percentages that were already correctly stored in the database
-- The flag was being used as a "behavior instruction" (redistribute on load) instead of a "preference indicator" (user wants even distribution)
-
-**Fix (January 2026):**
-- Modified `FrontEnd/static/playbooks.js` `loadState()` to never redistribute on page load
-- Flag now only controls UI state (button appearance), not redistribution behavior
-- Saved percentages are always respected regardless of flag value
-- Redistribution only happens when user explicitly clicks "Even Distribution - All" button
-- When user saves after redistribution, the evenly-distributed percentages are saved to database
-- On next load, saved evenly-distributed percentages are loaded (no redistribution occurs)
-
-**Behavior After Fix:**
-- `even_distribution_all: true` means "user last used even distribution" (percentages were already evenly distributed when saved)
-- On page load, saved percentages are always loaded and displayed (no redistribution)
-- When position filters change and flag is `true`, percentages redistribute among new visible plays (intentional behavior)
-- Flag controls UI state (button appearance) only - does not auto-redistribute on load
-
-**Files Changed:**
-- `FrontEnd/static/playbooks.js` (lines 469-503)
-
-**Related Documentation:**
-- `docs/To Do/play_percentage_persistence.md` - Complete analysis and fix documentation
-
----
-
-### ✅ Fixed: Playbook Percentage Loading - State Sections Only Contained First N Plays (January 2026)
-
-**Issue:** Some plays showed 0% even though they had saved percentages in the database. Specifically, plays that weren't in the first N plays (first 3 for set plays, first 4 for motion) didn't get their percentages loaded.
-
-**Root Cause:**
-- `initDefaults()` created state entries only for first N plays from API response (based on array index)
-- `loadPlaybookPercentagesFromAPI()` iterated through `this.state.sections[sectionKey]` which only contained first N plays
-- If a play wasn't in the first N plays (e.g., "SG Pass & Cut" at index 5), it wasn't in state sections, so its percentage couldn't be loaded
-- Position filters could also cause visible plays to not be in state sections
-
-**Fix (January 2026):**
-- Modified `FrontEnd/static/playbooks.js` `loadPlaybookPercentagesFromAPI()` to iterate through **ALL plays** in `this.playData[settingsKey]`
-- For each play, find or create the corresponding state entry (by playId)
-- Apply saved percentage using `play.name` as key
-- This ensures ALL plays from database are matched, not just the first N that were initialized in state
-
-**Matching Strategy:**
-- **Database/API Storage:** Offensive maps now use **`play_id`** keys
-- **Frontend State:** Tracks `playId` plus display name
-- **Matching Process:**
-  1. Iterate through ALL plays in `playData`
-  2. Find or create the state entry by `playId`
-  3. Look up saved percentage using `play_id`
-  4. Fall back to display name only for legacy compatibility
-
-**Files Changed:**
-- `FrontEnd/static/playbooks.js` (lines 505-622)
-
-**Related Documentation:**
-- `docs/To Do/play_percentage_persistence.md` - Complete analysis and fix documentation
-
-**Current State:**
-- That future enhancement is now implemented for offensive playbook persistence
-- `play_name` remains only as a compatibility fallback in some older payloads
 
 ---
 
@@ -728,7 +636,7 @@ else:
 Game documents are created by `init-game` with `_id` commonly stored as a **string** (24-char hex from `generate_game_id()`). When `save_team_settings()` writes to a game doc, it must try `_id` as **string** first (`update_one({"_id": doc_id}, ...)`). If no document is matched and `doc_id` is 24-char hex, retry with `ObjectId(doc_id)`. This applies to single game mode and to franchise/tournament active-game settings writes.
 
 **Unified Extract Function:**
-- **Tournament / game docs:** `extract_team_settings()` uses `teams` (or `franchise_teams` for legacy paths). Resolves team_identifier; tries direct lookup, then name matching.
+- **Tournament / game docs:** `extract_team_settings()` reads from `teams` (`franchise_teams` is retired). Resolves team_identifier; tries direct lookup, then name matching.
 - **Franchise master (pre-game):** Settings are **not** read from `franchise_teams` (now empty post-FTD migration). `load_team_settings_from_doc()` loads directly from **FTD** by `(franchise_id, user_team_object_id)` and returns `strategy_settings` / `playbook_settings` for FCC / pregame and game-init snapshot creation.
 
 **Unified Load Function:**
@@ -774,8 +682,8 @@ if gm:
 
 ### Related Documentation
 
-- `docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md` - Timeout settings persistence
-- `docs/docs_1_systems/03_Data_Persistence/Unified_State_Persistence_Work_Plan.md` - Complete implementation history
+- `../05_GP_Supporting_Systems/Timeout_System.md` - Timeout settings persistence
+- `Unified_State_Persistence_Work_Plan.md` - Complete implementation history
 
 ---
 
@@ -843,7 +751,7 @@ const gameRes = await fetch(`/api/game/${gameId}?quarter=1&source=db`);
 
 **Lineup header during timeout resume:** The lineup page header (time remaining and score) must show the state at the moment the user entered the timeout. **Clock** is read from the **URL** when `resume_from_timeout=true` (timeout navigation puts the displayed clock in the URL). **Scores** are read from the URL when `home_score`/`away_score` are present (same rationale as clock); otherwise scores are loaded from the API with `source=db`. Quarter breaks force clock to 8:00 or 4:00 (OT) and do not use URL clock.
 
-**Court display on return (timeout / quarter break / foul-out):** When the user returns to court with an existing `game_id`, the scoreboard (scores, clock, TOL, fouls) and the Player and Team box scores must show current game state, not stale start-of-quarter data. Scoreboard immediacy and the force-update of Player and Team box scores from `GET /api/game/{game_id}` are documented in **`docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md`** — see “Scoreboard Display Immediacy System” and “Player and Team Box Score Force-Update on Resume”.
+**Court display on return (timeout / quarter break / foul-out):** When the user returns to court with an existing `game_id`, the scoreboard (scores, clock, TOL, fouls) and the Player and Team box scores must show current game state, not stale start-of-quarter data. Scoreboard immediacy and the force-update of Player and Team box scores from `GET /api/game/{game_id}` are documented in **`../05_GP_Supporting_Systems/Timeout_System.md`** — see “Scoreboard Display Immediacy System” and “Player and Team Box Score Force-Update on Resume”.
 
 **Backend Implementation:**
 ```python
@@ -908,6 +816,22 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Cache is refreshed from DB after timeout save as before.
 - Lineup and resume now read a timeout snapshot that reflects what user saw when timeout was called, preventing clock rollback on return to court.
 
+**May 25, 2026 follow-up:** The frontend turn-preload serialization fix eliminated backend-vs-displayed skew at its source for user-play mode. Reconciliation logic retained for safety. A `🚨 [TIMEOUT SKEW]` warning fires if skew exceeds 2s — indicates upstream parallel-fetch reintroduced. See "Fixed: Timeout Offense-Team Save Captured Stale State" below.
+
+### Turn Result Player-Object Sanitization
+
+Turn-result dicts produced during simulation often carry raw `Player` instances in role fields (`ball_handler`, `defender`, `shooter`, `screener`, `passer`). Python's default JSON encoder cannot serialize `Player`, so any turn that reaches the API response with un-flattened Player references raises `TypeError: Object of type Player is not JSON serializable` at `JSONResponse`.
+
+**Universal sanitizer** — `convert_players()` in [`BackEnd/models/turn_manager.py:1139`](../../BackEnd/models/turn_manager.py#L1139) recursively replaces any `Player` instance with `player_to_dict(player)` (walks dicts and lists). It runs at the end of every `run_micro_turn()` cycle ([`turn_manager.py:1976`](../../BackEnd/models/turn_manager.py#L1976)). All turns dispatched through `run_micro_turn` (HCO / FCP / HCT / Fast Break shot / Free Throw / Final Shot, plus their foul / steal / turnover branches) are sanitized automatically.
+
+**Outside-pipeline turns must sanitize manually.** Some helpers append turns to `game.turns` directly, bypassing `run_micro_turn`. Each must mirror the Player → `player_id` conversion before `_append_turn`, or it will 500 the next time it surfaces in an API response.
+
+Known outside-pipeline paths (each carries its own explicit sanitization):
+- OREB OTB foul — `resolve_offensive_rebound_turn()` in [`turn_manager.py:3970-3980`](../../BackEnd/models/turn_manager.py#L3970-L3980)
+- Force-foul-after-DREB — situational foul handler in [`game_manager.py:1296`](../../BackEnd/models/game_manager.py#L1296)
+
+**When adding a new outside-pipeline turn helper:** flatten every Player-typed field on the result dict to `getattr(player, "player_id", None)` (or `None` for absent roles) before `_append_turn`. The OREB OTB block is the canonical pattern to copy.
+
 ### Player Energy (NG) Persistence ✅ **FIXED** (January 2025)
 
 **Problem:** After timeouts and quarter breaks, player energy (NG) values were displaying as 100% on the lineup screen and initial court.html load, even though backend maintained correct values.
@@ -926,8 +850,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Frontend correctly reads NG from `attributes.NG` with proper fallback chain
 
 **Files Changed:**
-- `BackEnd/utils/shared.py` - `summarize_game_state()` (lines 745-768): Save all players, not just lineup
-- `BackEnd/api/api.py` - `get_game_state()` (lines 1097-1120): Extract NG from `attributes.NG` correctly
+- `BackEnd/utils/shared.py` - `summarize_game_state()`: Save all players, not just lineup
+- `BackEnd/api/api.py` - `get_game_state()`: Extract NG from `attributes.NG` correctly
 
 ### Playbook Settings Persistence ✅ **FIXED** (February 2025; franchise/tournament simplified February 2026)
 
@@ -953,8 +877,8 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - `strategy_settings` (Game Plan settings) are validated before use - only uses request if valid, otherwise preserves DB settings
 
 **Files Changed:**
-- `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1824-1847): Restore playbook_settings with consistent key resolution
-- `BackEnd/utils/shared.py` - `summarize_game_state()` (lines 971-974): Enhanced logging for playbook_settings save
+- `BackEnd/api/api.py` - `simulate_quarter_endpoint()`: Restore playbook_settings with consistent key resolution
+- `BackEnd/utils/shared.py` - `summarize_game_state()`: Enhanced logging for playbook_settings save
 
 ### Game Plan Settings Persistence ✅ **FIXED** (February 2025; franchise/tournament simplified February 2026)
 
@@ -980,7 +904,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - Added logging to trace strategy_settings extraction and validation
 
 **Files Changed:**
-- `BackEnd/api/api.py` - `simulate_quarter_endpoint()` (lines 1573-1611): Validate request.strategy_settings before use
+- `BackEnd/api/api.py` - `simulate_quarter_endpoint()`: Validate request.strategy_settings before use
 
 ### Computer Timeout Per-Quarter Tracking Persistence ✅ **COMPLETE** (February 2025)
 
@@ -999,7 +923,7 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 - `BackEnd/utils/shared.py` - `serialize_computer_timeouts()`, `deserialize_computer_timeouts()`, and `summarize_game_state()` (persists `computer_timeouts`)
 - `BackEnd/api/api.py` - `apply_timeout_resume_state_to_gm()` and simulate-quarter load path (restore `computer_timeouts` from saved doc)
 
-**Full system (limits, conditions, flow):** `docs/docs_1_systems/05_GP_Supporting_Systems/Computer_Timeout_System.md`
+**Full system (limits, conditions, flow):** `../05_GP_Supporting_Systems/Computer_Timeout_System.md`
 
 ### Mixed Sim→Play Quarter Restore (Unified Teams) ✅ **FIXED** (February 2026)
 
@@ -1065,21 +989,44 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 **Files Changed:**
 - `BackEnd/models/game_manager.py`
 
+### ✅ Fixed: Timeout Offense-Team Save Captured Stale State (May 25, 2026)
+
+**Problem:** Coming out of a user timeout, the wrong team could be shown as offense on the resume SIP. Most visible after MAKE→BIP transitions: user clicked TO during a play following the made shot; resume showed the scoring team still on offense instead of the team that should have been inbounding.
+
+**Two independent root causes:**
+
+| Cause | Where | Effect |
+|---|---|---|
+| Stale frontend animation while backend ran ahead | Frontend preload ran in parallel with `await animateGameTurns(...)` in `simulateTurnByTurn`, letting backend simulate possession-changing events (DREB, MAKE→BIP flip) while user was still watching prior animation | TO captured backend's post-flip state, not the state user saw at click time |
+| Buggy DREB→HCO special case in `call_timeout` | `game_manager.py` read `last_turn.offense_team_id` expecting post-flip team, but that field is by-design the OLD shooting team (kept "for animation purposes" per `_build_dreb_turn_from_miss`) | When the branch fired, `timeout_offense_team_id` was saved as the shooter instead of the rebounder. Latent because resume path uses `gm.offense_team` as source of truth, but produced ⚠️ TIMEOUT RESUME: Mismatch warnings. |
+
+**Fix:**
+- **Frontend (`gameScene.js`):** Moved `preloadedTurnPromise = fetchTurnData(...)` from BEFORE `await animateGameTurns(...)` to AFTER. Backend can no longer simulate past the displayed state in user-play mode. Applied to both the main turn loop and the initial-turns (opening tip) block.
+- **Backend (`game_manager.py`):** Deleted the DREB→HCO special case in `call_timeout`. Default branch (`self.offense_team.team_id`) is correct in all cases because `switch_possession()` is synchronous inside `simulate_macro_turn` — by the time `call_timeout` runs, `self.offense_team` is always the post-flip team.
+- **Backend (`api.py`):** Added `🚨 [TIMEOUT SKEW]` warning in `call_timeout_endpoint` when `|backend_time - displayed_time| > 2s`. Diagnostic only — does not refuse the request. Fires if anything reintroduces parallel fetch-ahead upstream.
+
+**Architectural invariant (now enforced):** In live user-play mode, backend `gm` state must not advance past what the frontend has animated. The `simulateTurnByTurn` loop preloads the next turn only after the current turn's animation `await` resolves. `🚨 [TIMEOUT SKEW]` is the canary that catches violations.
+
+**Files Changed:**
+- `FrontEnd/static/js/phaser/gameScene.js` — preload serialization
+- `BackEnd/models/game_manager.py` — `call_timeout` simplified
+- `BackEnd/api/api.py` — skew warning in `call_timeout_endpoint`
+
 ### Key Files
 
 **Backend:**
 - `BackEnd/api/api.py`:
-  - `refresh_game_cache_from_db()` (lines 630-680): Refreshes cache from DB
-  - `get_game_state()` (lines 823-1050): Supports `source=db` parameter, extracts NG from `attributes.NG`
-  - `call_timeout_endpoint()` (lines 2825-2891): User timeout save + cache refresh
-  - `simulate_turn_endpoint()` (lines 2390-2600): Computer timeout save + cache refresh
+  - `refresh_game_cache_from_db()`: Refreshes cache from DB
+  - `get_game_state()`: Supports `source=db` parameter, extracts NG from `attributes.NG`
+  - `call_timeout_endpoint()`: User timeout save + cache refresh
+  - `simulate_turn_endpoint()`: Computer timeout save + cache refresh
 - `BackEnd/utils/shared.py`:
-  - `summarize_game_state()` (lines 745-768): Saves all players (lineup + bench) with real-time NG values; persists `computer_timeouts` (per-quarter count + checked_conditions) for computer timeout limit enforcement
+  - `summarize_game_state()`: Saves all players (lineup + bench) with real-time NG values; persists `computer_timeouts` (per-quarter count + checked_conditions) for computer timeout limit enforcement
   - `serialize_computer_timeouts()` / `deserialize_computer_timeouts()`: DB-safe serialization for `computer_timeouts`
 
 **Frontend:**
 - `FrontEnd/static/set-lineup.js`:
-  - `loadRoster()` (line 190): Uses `source=db` for player energy, reads from `attributes.NG`
+  - `loadRoster()`: Uses `source=db` for player energy, reads from `attributes.NG`
   - `setHeader()`: During timeout resume, **clock** from URL (and **scores** from URL when `home_score`/`away_score` present); otherwise scores from API with `source=db`. Quarter breaks force clock to 8:00/4:00 (OT).
 
 ### Benefits
@@ -1103,5 +1050,5 @@ def get_game_state(game_id: str, quarter: int | None = None, source: str | None 
 
 ### Related Documentation
 
-- `docs/docs_1_systems/05_GP_Supporting_Systems/Timeout_System.md` - Timeout state persistence
-- `docs/docs_1_systems/05_GP_Supporting_Systems/Computer_Timeout_System.md` - Computer timeout flow
+- `../05_GP_Supporting_Systems/Timeout_System.md` - Timeout state persistence
+- `../05_GP_Supporting_Systems/Computer_Timeout_System.md` - Computer timeout flow
