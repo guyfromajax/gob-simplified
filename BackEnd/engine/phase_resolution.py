@@ -1943,13 +1943,31 @@ def resolve_fast_break_logic(game: "GameManager"):
 
                 # Update fb_animations end coords for shooter + racing
                 # defenders so the schema emitter renders new positions.
+                # Must write BOTH `entry["end"]` (downstream BE wiring +
+                # FE legacy paths) AND `entry["movement"][-1]["coords"]`
+                # (UESS emitter reads via `_movement_end_coord`). Writing
+                # only `entry["end"]` silently drops the override at the
+                # emitter — BH renders at the legacy animator's spot.
                 _override = dict(cr_geometry["defender_end_coords"])
                 if cr_shooter_id:
                     _override[cr_shooter_id] = cr_geometry["shooter_target"]
+                _override_applied = 0
                 for _entry in (fb_animations or []):
                     _pid_s = str(_entry.get("playerId"))
                     if _pid_s in _override:
-                        _entry["end"] = dict(_override[_pid_s])
+                        _new = dict(_override[_pid_s])
+                        _entry["end"] = _new
+                        _mv = _entry.get("movement") or []
+                        if _mv and isinstance(_mv[-1], dict):
+                            _mv[-1]["coords"] = dict(_new)
+                        _override_applied += 1
+                logging.warning(
+                    "🔍 [FB UNIVERSAL CR] shot_spot=%s contested=%s shot_def=%s applied_overrides=%d",
+                    cr_geometry["shooter_target"],
+                    cr_geometry["contested"],
+                    cr_geometry["shot_defender_id"],
+                    _override_applied,
+                )
 
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)

@@ -754,7 +754,7 @@ def _build_outcome_step(
         st_start = step_start_coords.get(stopper_pid)
         st_end = end_coords.get(stopper_pid)
         st_traversal = (
-            _traversal_seconds(st_start, st_end, _ag_grid_per_game_sec(stopper, "normal"))
+            _traversal_seconds(st_start, st_end, _ag_grid_per_game_sec(stopper, "standard"))
             if st_start and st_end
             else 0.0
         )
@@ -779,13 +779,18 @@ def _build_outcome_step(
 
     # Schema-compliant interrupted-coord clamp: any player whose intended
     # destination (read from legacy animator's animations[].movement[-1])
-    # exceeds what they could traverse at drive rate × T gets clamped to
-    # start + (rate × T) along the path. Without this, non-gate players in
-    # step 1 (especially the FB shot path, where multiple players have
-    # full destinations near the rim) would appear to teleport because
-    # the legacy animator pre-computes full destinations regardless of T.
-    # Rebinds end_coords[pid] (does NOT mutate the dict in place) so
+    # exceeds what they could traverse at their archetype rate × T gets
+    # clamped to start + (rate × T) along the path. Without this, non-gate
+    # players in step 1 (especially the FB shot path, where multiple
+    # players have full destinations near the rim) would appear to teleport
+    # because the legacy animator pre-computes full destinations regardless
+    # of T. Rebinds end_coords[pid] (does NOT mutate the dict in place) so
     # destinations[pid] retains the original target reference.
+    # Per-player archetype is critical: T was computed from the gating
+    # player's archetype rate (BH at sprint). If the clamp uses a slower
+    # archetype, fast-moving players (BH at sprint) get pulled up short of
+    # their target. Using `archetype[pid]` ensures each player's clamp
+    # matches their actual movement rate on this step.
     for pid, start_coord in step_start_coords.items():
         target = end_coords.get(pid)
         if target is None or start_coord is None:
@@ -796,7 +801,8 @@ def _build_outcome_step(
         if dist == 0.0:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "normal") if player else 12.0
+        arch = archetype.get(pid, "standard")
+        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
         max_traversal = rate * t
         if dist > max_traversal:
             ratio = max_traversal / dist
@@ -1047,7 +1053,7 @@ def _build_step_back_step(
         dy = end["y"] - start["y"]
         dist = (dx * dx + dy * dy) ** 0.5
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "normal") if player else 12.0
+        rate = _ag_grid_per_game_sec(player, "sprint") if player else 12.0
         traversal = dist / rate if rate > 0 else 0.0
         if traversal > t:
             t = traversal

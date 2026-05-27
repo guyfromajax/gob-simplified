@@ -731,15 +731,34 @@ def _apply_universal_geometry_for_rr_shot(
     # Update fb_animations end coords for shooter + racing defenders so
     # the schema emitter renders the new positions. Stopper and outlet
     # defender are intentionally left alone (no movement on shot step).
+    # Must write BOTH `entry["end"]` (downstream BE wiring + FE legacy
+    # paths) AND `entry["movement"][-1]["coords"]` (UESS emitter reads
+    # via `_movement_end_coord`). Writing only `entry["end"]` silently
+    # drops the override at the emitter — shooter renders at the legacy
+    # animator's spot.
     end_coords_override: Dict[str, Dict[str, float]] = {
         shooter_id: geometry["shooter_target"],
         **geometry["defender_end_coords"],
     }
+    overrides_applied = 0
     for entry in fb_animations:
         pid = entry.get("playerId")
         pid_str = str(pid) if pid is not None else None
         if pid_str and pid_str in end_coords_override:
-            entry["end"] = dict(end_coords_override[pid_str])
+            new_coords = dict(end_coords_override[pid_str])
+            entry["end"] = new_coords
+            mv = entry.get("movement") or []
+            if mv and isinstance(mv[-1], dict):
+                mv[-1]["coords"] = dict(new_coords)
+            overrides_applied += 1
+
+    logging.warning(
+        "🔍 [FB UNIVERSAL RR] shot_spot=%s contested=%s shot_def=%s applied_overrides=%d",
+        geometry["shooter_target"],
+        geometry["contested"],
+        geometry["shot_defender_id"],
+        overrides_applied,
+    )
 
 
 def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:

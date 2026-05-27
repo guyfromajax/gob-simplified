@@ -10,8 +10,623 @@ Traceback (most recent call last):
   File "/Users/jamesdavies/gob-simplified/BackEnd/api/api.py", line 205, in <module>
     from slowapi.errors import RateLimitExceeded
 ModuleNotFoundError: No module named 'slowapi'
-INFO:     Started server process [41357]
+INFO:     Started server process [88015]
 INFO:     Waiting for application startup.
-⚠️ [DB] ensure_games_franchise_index: Index already exists with a different name: games_franchise_id, full error: {'ok': 0.0, 'errmsg': 'Index already exists with a different name: games_franchise_id', 'code': 85, 'codeName': 'IndexOptionsConflict', '$clusterTime': {'clusterTime': Timestamp(1779897296, 1), 'signature': {'hash': b'\xabrD\xa9\xba\\\x87\x87\x9a\xeb|\xfd\xa6I\x9f-\xbf\xfd\x119', 'keyId': 7605231962646642694}}, 'operationTime': Timestamp(1779897296, 1)}
+⚠️ [DB] ensure_games_franchise_index: Index already exists with a different name: games_franchise_id, full error: {'ok': 0.0, 'errmsg': 'Index already exists with a different name: games_franchise_id', 'code': 85, 'codeName': 'IndexOptionsConflict', '$clusterTime': {'clusterTime': Timestamp(1779902416, 1), 'signature': {'hash': b'u\xd4C\x9f\xf1\xd67"\xdd\xa0\x16_\\\n\x96\x03\xef\x08u4', 'keyId': 7605231962646642694}}, 'operationTime': Timestamp(1779902416, 1)}
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+🌐 [CORS] Configured with origins: ['http://localhost:8000', 'http://localhost:3000', 'https://gob-test.netlify.app', 'https://gob-production.netlify.app', 'https://www.geekedoutbasketball.com', 'https://geekedoutbasketball.com']
+✅ Static files mounted (development mode)
+INFO:     127.0.0.1:58421 - "GET /js/shared/gtm-loader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /js/shared/authGuard.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /js/shared/sentryInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /css/auth-bar.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /images/alpha_badge_gold.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /css/button-font.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /images/yt_icon_red_digital.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /js/shared/maintenanceBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /config/maintenance.json?t=1779902428404 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /static/config/maintenance.json?t=1779902428404 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /static/homepage.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /js/shared/gtm-loader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /css/auth-bar.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /js/shared/authGuard.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/sentryInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /images/alpha_badge_gold.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /static/css/auth-bar.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58439 - "GET /static/images/geekedout_logo.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /static/js/shared/gtm-loader.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58440 - "GET /static/js/shared/authGuard.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /static/js/shared/sentryInit.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /static/images/alpha_badge_gold.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58440 - "GET /css/button-font.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /images/yt_icon_red_digital.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /static/images/homepage/hero-court-gameplay.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58440 - "GET /static/css/button-font.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /js/shared/maintenanceBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /static/images/yt_icon_red_digital.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /static/js/shared/maintenanceBanner.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /static/fonts/BebasNeuePro-Bold.otf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58439 - "GET /static/fonts/BebasNeuePro-Regular.otf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /config/maintenance.json?t=1779902432669 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /static/images/homepage/pillar-coaching-style.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /static/images/homepage/pillar-game-plan.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /static/images/homepage/pillar-press-conference.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /static/config/maintenance.json?t=1779902432669 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58439 - "GET /images/favicon.ico HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /static/images/favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58439 - "GET /js/shared/gtm-loader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /js/shared/authGuard.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/sentryInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /mode-select.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /images/buttons/whiteball.svg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /js/config/api-config.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /css/button-font.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /common.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/maintenanceBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /js/shared/authBarInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58423 - "GET /config/maintenance.json?t=1779902433611 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /css/auth-bar.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /images/alpha_badge_gold.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /images/yt_icon_red_digital.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58440 - "GET /images/geekedout_logo.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /sounds/crossover-21738.mp3 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58439 - "GET /js/musicController.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /images/favicon.ico HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /static/config/maintenance.json?t=1779902433611 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /api/auth/leaderboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /api/community/highlights HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /franchise/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /teams HTTP/1.1" 200 OK
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-NEXT-LEADERS] franchise_id=6a09d4b7e3348a2ccec4b17b team_id=69a6fcb68d2c56aa82e48a54 roster_players=12 | top_scorer name=Roger Henrich PTS_season=15.0 GP=1 pts_per_game=15.0 card_avg=15.0 | top_rebounder name=Roger Henrich REB_season=4.0 GP=1 reb_per_game=4.0 card_avg=4.0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] franchise_id=6a09d4b7e3348a2ccec4b17b week=1 user_team_id=69a6fcb68d2c56aa82e48a56 matchup=69a6fcb68d2c56aa82e48a8c/69a6fcb68d2c56aa82e48a56 matched_docs=0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] fallback lookup franchise_id=6a09d4b7e3348a2ccec4b17b week=1 scanned_docs=64 fallback_matches=1
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] candidate_game_id=6a149b101c7d981ca8e1e5e6 richness=15 quarter=5 is_final=True has_players=True top_box_score=False nested_team_boxes=True
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] selected_game_id=6a149b101c7d981ca8e1e5e6 selected_richness=15
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] Selected game_id=6a149b101c7d981ca8e1e5e6 home=Morristown away=Valdosta Valley has_players=True top_box_score=False nested_teams=True candidate_count=24 from_players=0 from_box_score=24
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] POTG resolved for game_id=6a149b101c7d981ca8e1e5e6 winner=Damonte Adayenbodo pts=21 reb=15 ast=1 stl=2 blk=0 defPct=50
+INFO:     127.0.0.1:58421 - "GET /franchise/command-center/data?franchise_id=6a09d4b7e3348a2ccec4b17b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /images/teams/morristown/morristown_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /js/shared/gtm-loader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/authGuard.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /js/shared/sentryInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /tournament.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /resource-pages.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /franchise-command-center.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /command-center-team-styles.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /scouting-report.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /css/auth-bar.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /js/shared/pageLoadOverlay.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /css/button-font.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58422 - "GET /images/loader1.gif HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/config/api-config.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58423 - "GET /js/shared/accessDenied.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /js/shared/analytics.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /common.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /bracket.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /fcc-tournament-style-a.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /franchise-tournament-brackets-render.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /js/shared/attributeTooltips.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /js/shared/teamStatsTable.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/rosterLoader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /js/shared/rosterStatsRenderer.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/commandCenterTabs.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /js/shared/scoutingReport.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /js/shared/alphaBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /recruiting-common.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /defense-display.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /js/shared/championshipMoments.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /franchise-command-center.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /js/shared/maintenanceBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /js/shared/authBarInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /config/maintenance.json?t=1779902436131 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /images/geekedout_logo.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58423 - "GET /images/alpha_badge_gold.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58440 - "GET /images/yt_icon_red_digital.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58422 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58421 - "GET /js/musicController.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /static/config/maintenance.json?t=1779902436131 HTTP/1.1" 200 OK
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-NEXT-LEADERS] franchise_id=6a09d4b7e3348a2ccec4b17b team_id=69a6fcb68d2c56aa82e48a54 roster_players=12 | top_scorer name=Roger Henrich PTS_season=15.0 GP=1 pts_per_game=15.0 card_avg=15.0 | top_rebounder name=Roger Henrich REB_season=4.0 GP=1 reb_per_game=4.0 card_avg=4.0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] franchise_id=6a09d4b7e3348a2ccec4b17b week=1 user_team_id=69a6fcb68d2c56aa82e48a56 matchup=69a6fcb68d2c56aa82e48a8c/69a6fcb68d2c56aa82e48a56 matched_docs=0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] fallback lookup franchise_id=6a09d4b7e3348a2ccec4b17b week=1 scanned_docs=64 fallback_matches=1
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] candidate_game_id=6a149b101c7d981ca8e1e5e6 richness=15 quarter=5 is_final=True has_players=True top_box_score=False nested_team_boxes=True
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] selected_game_id=6a149b101c7d981ca8e1e5e6 selected_richness=15
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] Selected game_id=6a149b101c7d981ca8e1e5e6 home=Morristown away=Valdosta Valley has_players=True top_box_score=False nested_teams=True candidate_count=24 from_players=0 from_box_score=24
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] POTG resolved for game_id=6a149b101c7d981ca8e1e5e6 winner=Damonte Adayenbodo pts=21 reb=15 ast=1 stl=2 blk=0 defPct=50
+INFO:     127.0.0.1:58438 - "GET /franchise/command-center/data?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Team 69a6fcb68d2c56aa82e48a56 has 15 plays with season_stats: ['5-0 Motion', 'Quick Midrange Jumper', 'PF Post Motion', '4-1 Motion', 'Double Screen Three - Wing', 'Pick & Roll - Entry Pass', '3-2 Motion', 'Base Post Play', 'Drive & Dish - Corner Three', 'Screen & Three - Corner', 'Back Door Cut', 'Rotating Post Play', 'Iso', 'Wrap-Around', 'Wheel Three']
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Play '5-0 Motion': times_run=4, successes=1, player_points=0 players
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Play 'Quick Midrange Jumper': times_run=1, successes=0, player_points=0 players
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Play 'PF Post Motion': times_run=1, successes=0, player_points=0 players
+INFO:     127.0.0.1:58438 - "GET /franchise/team-data?franchise_id=6a09d4b7e3348a2ccec4b17b&team_id=69a6fcb68d2c56aa82e48a56 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /images/teams/morristown/morristown_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58439 - "GET /images/teams/lancaster/lancaster_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58421 - "GET /images/teams/valdosta_valley/valdosta_valley_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58438 - "GET /teams HTTP/1.1" 200 OK
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Morristown
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+INFO:     127.0.0.1:58438 - "GET /roster/69a6fcb68d2c56aa82e48a56?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /franchise/state?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /franchise/standings?franchise_id=6a09d4b7e3348a2ccec4b17b&scope=user_region&team_id=69a6fcb68d2c56aa82e48a56&profile=1 HTTP/1.1" 200 OK
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET GAMEPLAN] query: mode='franchise', team_id='69a6fcb68d2c56aa82e48a56', franchise_id='6a09d4b7e3348a2ccec4b17b', tournament_id=None, game_id=None
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET GAMEPLAN] franchise FTD lookup: doc_id='6a09d4b7e3348a2ccec4b17b', authoritative_team_id='69a6fcb68d2c56aa82e48a56', team_object_id=69a6fcb68d2c56aa82e48a56
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET GAMEPLAN] FTD found: strategy_settings keys=['offense', 'inside', 'attack', 'outside', 'fast_breaks', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding', 'tempo']
+INFO:     127.0.0.1:58438 - "GET /api/gameplan?mode=franchise&franchise_id=6a09d4b7e3348a2ccec4b17b&team_id=69a6fcb68d2c56aa82e48a56 HTTP/1.1" 200 OK
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Team 69a6fcb68d2c56aa82e48a56 has 15 plays with season_stats: ['5-0 Motion', 'Quick Midrange Jumper', 'PF Post Motion', '4-1 Motion', 'Double Screen Three - Wing', 'Pick & Roll - Entry Pass', '3-2 Motion', 'Base Post Play', 'Drive & Dish - Corner Three', 'Screen & Three - Corner', 'Back Door Cut', 'Rotating Post Play', 'Iso', 'Wrap-Around', 'Wheel Three']
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Play '5-0 Motion': times_run=4, successes=1, player_points=0 players
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Play 'Quick Midrange Jumper': times_run=1, successes=0, player_points=0 players
+WARNING:BackEnd.api.franchise_routes:🔍 [TEAM_DATA API] Play 'PF Post Motion': times_run=1, successes=0, player_points=0 players
+INFO:     127.0.0.1:58438 - "GET /franchise/team-data?franchise_id=6a09d4b7e3348a2ccec4b17b&team_id=69a6fcb68d2c56aa82e48a56 HTTP/1.1" 200 OK
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Morristown
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+INFO:     127.0.0.1:58438 - "GET /roster/69a6fcb68d2c56aa82e48a56?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /images/favicon.ico HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58456 - "POST /franchise/play-next-game HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58456 - "GET /set-lineup.html?mode=franchise&franchise_id=6a09d4b7e3348a2ccec4b17b&week=2&home=Lancaster&away=Morristown&home_id=69a6fcb68d2c56aa82e48a54&away_id=69a6fcb68d2c56aa82e48a56&team_id=69a6fcb68d2c56aa82e48a56&user_team_id=69a6fcb68d2c56aa82e48a56&my_team=away HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58456 - "GET /js/shared/gtm-loader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58458 - "GET /js/shared/authGuard.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58460 - "GET /resource-pages.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58464 - "GET /tournament.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58465 - "GET /set-lineup.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58466 - "GET /js/shared/sentryInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58456 - "GET /js/shared/pageLoadOverlay.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58458 - "GET /images/loader1.gif HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58460 - "GET /css/button-font.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58466 - "GET /common.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58456 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "GET /js/shared/playbookTeamId.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58460 - "GET /js/shared/timeoutNavigationHelper.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58458 - "GET /js/shared/attributeTooltips.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58458 - "GET /js/config/api-config.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58460 - "GET /js/shared/accessDenied.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58456 - "GET /js/shared/stateTelemetry.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58466 - "GET /js/shared/pointerValidation.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58465 - "GET /set-lineup.js?v=__BUILD_TS__ HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58465 - "GET /js/shared/maintenanceBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58466 - "GET /js/shared/authBarInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58466 - "GET /js/musicController.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58465 - "GET /config/maintenance.json?t=1779902448646 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58456 - "GET /static/sounds/Timeout_Loop.wav HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58465 - "GET /static/config/maintenance.json?t=1779902448646 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58465 - "GET /images/favicon.ico HTTP/1.1" 307 Temporary Redirect
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-NEXT-LEADERS] franchise_id=6a09d4b7e3348a2ccec4b17b team_id=69a6fcb68d2c56aa82e48a54 roster_players=12 | top_scorer name=Roger Henrich PTS_season=15.0 GP=1 pts_per_game=15.0 card_avg=15.0 | top_rebounder name=Roger Henrich REB_season=4.0 GP=1 reb_per_game=4.0 card_avg=4.0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] franchise_id=6a09d4b7e3348a2ccec4b17b week=1 user_team_id=69a6fcb68d2c56aa82e48a56 matchup=69a6fcb68d2c56aa82e48a8c/69a6fcb68d2c56aa82e48a56 matched_docs=0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] fallback lookup franchise_id=6a09d4b7e3348a2ccec4b17b week=1 scanned_docs=64 fallback_matches=1
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] candidate_game_id=6a149b101c7d981ca8e1e5e6 richness=15 quarter=5 is_final=True has_players=True top_box_score=False nested_team_boxes=True
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] selected_game_id=6a149b101c7d981ca8e1e5e6 selected_richness=15
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] Selected game_id=6a149b101c7d981ca8e1e5e6 home=Morristown away=Valdosta Valley has_players=True top_box_score=False nested_teams=True candidate_count=24 from_players=0 from_box_score=24
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] POTG resolved for game_id=6a149b101c7d981ca8e1e5e6 winner=Damonte Adayenbodo pts=21 reb=15 ast=1 stl=2 blk=0 defPct=50
+INFO:     127.0.0.1:58466 - "GET /franchise/command-center/data?franchise_id=6a09d4b7e3348a2ccec4b17b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "GET /api/validate-pointer?pointer_type=franchise_id&pointer_value=6a09d4b7e3348a2ccec4b17b HTTP/1.1" 200 OK
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Morristown
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+INFO:     127.0.0.1:58466 - "GET /roster/Morristown?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+WARNING:root:✅ [INIT-GAME] FTD loaded for home team=Lancaster franchise_id=6a09d4b7e3348a2ccec4b17b
+WARNING:root:✅ [INIT-GAME] FTD loaded for away team=Morristown franchise_id=6a09d4b7e3348a2ccec4b17b
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Lancaster
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+WARNING:root:⏱️ [PERF] TeamManager(Lancaster): roster=131ms lineup=0ms team_doc=23ms scouting=2ms
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Morristown
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+WARNING:root:⏱️ [PERF] TeamManager(Morristown): roster=197ms lineup=0ms team_doc=22ms scouting=4ms
+WARNING:root:⏱️ [PERF] gm_create breakdown: home_team=157ms away_team=223ms update_position_ratings=1ms
+WARNING:root:✅ [GAME MANAGER] Set user_team_side in game_state: away
+WARNING:root:✅ [INIT-GAME] Set user_team_side in game_state: away
+WARNING:BackEnd.utils.game_team_scoreboard_enrichment:enrich_franchise_teams_scoreboard_meta OK franchise_id='6a09d4b7e3348a2ccec4b17b' franchise_oid=6a09d4b7e3348a2ccec4b17b ftd_team_ids=['69a6fcb68d2c56aa82e48a54', '69a6fcb68d2c56aa82e48a56'] standings_for_slots={'69a6fcb68d2c56aa82e48a54': {'PF': 71, 'PA': 61, 'W': 1, 'L': 0}, '69a6fcb68d2c56aa82e48a56': {'PF': 69, 'PA': 54, 'W': 1, 'L': 0}} debug_slots=[{'slot_raw_repr': "'LANCASTER'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a54', 'row_found': True, 'row_team_name': 'Lancaster', 'ftd_doc_hit': True, 'natl_rank_after': 18, 'wins_after': 1, 'losses_after': 0}, {'slot_raw_repr': "'MORRISTOWN'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a56', 'row_found': True, 'row_team_name': 'Morristown', 'ftd_doc_hit': True, 'natl_rank_after': 33, 'wins_after': 1, 'losses_after': 0}]
+WARNING:root:🔍 [INIT-GAME SCOREBOARD POST-SUMMARIZE] game_id=6a1727f188f912bf58ff58eb mode=franchise franchise_id_param=6a09d4b7e3348a2ccec4b17b summary_franchise_id=None gm_home_team_id=LANCASTER gm_away_team_id=MORRISTOWN gm_home_franchise_id=6a09d4b7e3348a2ccec4b17b gm_away_franchise_id=6a09d4b7e3348a2ccec4b17b summary_home_team_id=LANCASTER summary_away_team_id=MORRISTOWN teams_snapshot={'LANCASTER': {'name': 'Lancaster', 'natl_rank': 18, 'wins': 1, 'losses': 0}, 'MORRISTOWN': {'name': 'Morristown', 'natl_rank': 33, 'wins': 1, 'losses': 0}}
+WARNING:root:✅ [INIT-GAME] Stored user_team_side in game document: away
+WARNING:root:✅ [INIT-GAME] Game doc FTD baseline: home_id=LANCASTER playbook_keys=['motion', 'set_plays', 'fast_breaks', 'zone_defense', 'man_defense', 'pc_order', 'position_filters', 'even_distribution_all', '_meta'] strategy_keys=['offense', 'inside', 'attack', 'outside', 'fast_breaks', 'tempo', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding'] | away_id=MORRISTOWN playbook_keys=['motion', 'set_plays', 'fast_breaks', 'man_defense', 'zone_defense', 'pc_order', '_meta', 'position_filters', 'even_distribution_all', 'position_shot_weights'] strategy_keys=['offense', 'inside', 'attack', 'outside', 'fast_breaks', 'defense', 'aggression', 'hc_trap', 'fc_press', 'rebounding', 'tempo']
+WARNING:root:⏱️ [PERF] init-game total=0.97s gm_create=381ms summary=172ms db_save=68ms
+INFO:     127.0.0.1:58466 - "POST /api/init-game HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "GET /images/teams/morristown/morristown_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] query: mode='franchise', team_id='69a6fcb68d2c56aa82e48a56', franchise_id='6a09d4b7e3348a2ccec4b17b', tournament_id=None, game_id=None, debug_pc=None
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] franchise FTD lookup: doc_id='6a09d4b7e3348a2ccec4b17b', authoritative_team_id='69a6fcb68d2c56aa82e48a56', team_object_id=69a6fcb68d2c56aa82e48a56
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] FTD found: playbook_settings keys=['motion', 'set_plays', 'fast_breaks', 'man_defense', 'zone_defense', 'pc_order', '_meta', 'position_filters', 'even_distribution_all', 'position_shot_weights'], plays count=23
+INFO:     127.0.0.1:58466 - "GET /api/playbooks?mode=franchise&team_id=69a6fcb68d2c56aa82e48a56&franchise_id=6a09d4b7e3348a2ccec4b17b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "POST /api/autoset-lineup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58469 - "GET /court.html?quarter=1&period=Q1&home=Lancaster&away=Morristown&home_id=69a6fcb68d2c56aa82e48a54&away_id=69a6fcb68d2c56aa82e48a56&my_team=away&team_id=69a6fcb68d2c56aa82e48a56&game_id=6a1727f188f912bf58ff58eb&resume_from_timeout=false&away_pg=e78e967d-86f8-4f31-b5f3-2729ac5c3ecb&away_sg=17694da1-cf52-4934-8755-aaddb23e7cd0&away_sf=068c0b8a-c772-4542-a6ec-0cd6f21329ba&away_pf=2e0089ee-a3e6-4c2d-8822-170fbbd335ac&away_c=b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad&mode=franchise&franchise_id=6a09d4b7e3348a2ccec4b17b&week=2 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58469 - "GET /static/court.html?quarter=1&period=Q1&home=Lancaster&away=Morristown&home_id=69a6fcb68d2c56aa82e48a54&away_id=69a6fcb68d2c56aa82e48a56&my_team=away&team_id=69a6fcb68d2c56aa82e48a56&game_id=6a1727f188f912bf58ff58eb&resume_from_timeout=false&away_pg=e78e967d-86f8-4f31-b5f3-2729ac5c3ecb&away_sg=17694da1-cf52-4934-8755-aaddb23e7cd0&away_sf=068c0b8a-c772-4542-a6ec-0cd6f21329ba&away_pf=2e0089ee-a3e6-4c2d-8822-170fbbd335ac&away_c=b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad&mode=franchise&franchise_id=6a09d4b7e3348a2ccec4b17b&week=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58469 - "GET /js/shared/gtm-loader.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /js/shared/authGuard.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58469 - "GET /js/shared/pageLoadOverlay.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58474 - "GET /js/shared/sentryInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58475 - "GET /js/config/api-config.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58477 - "GET /common.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58478 - "GET /js/shared/analytics.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /js/shared/playbookTeamId.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58469 - "GET /css/button-font.css HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58474 - "GET /defense-display.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58478 - "GET /images/loader1.gif HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /app-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58478 - "GET /js/shared/maintenanceBanner.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /js/shared/authBarInit.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /js/musicController.js HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /config/maintenance.json?t=1779902459467 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58470 - "GET /static/config/maintenance.json?t=1779902459467 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /static/js/phaser/animation/ballManager.js HTTP/1.1" 304 Not Modified
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] query: mode='franchise', team_id='69a6fcb68d2c56aa82e48a56', franchise_id='6a09d4b7e3348a2ccec4b17b', tournament_id=None, game_id='6a1727f188f912bf58ff58eb', debug_pc=None
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] franchise+game_doc: before response build, team_obj plays count=23, response built from team_obj
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] Using game doc team_obj for playbook_settings (load_from_game_doc=True), pc_order.offense=8
+INFO:     127.0.0.1:58470 - "GET /api/playbooks?mode=franchise&team_id=69a6fcb68d2c56aa82e48a56&franchise_id=6a09d4b7e3348a2ccec4b17b&game_id=6a1727f188f912bf58ff58eb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /api/plays/68fa43953a0eec681847f8e4 HTTP/1.1" 200 OK
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-NEXT-LEADERS] franchise_id=6a09d4b7e3348a2ccec4b17b team_id=69a6fcb68d2c56aa82e48a54 roster_players=12 | top_scorer name=Roger Henrich PTS_season=15.0 GP=1 pts_per_game=15.0 card_avg=15.0 | top_rebounder name=Roger Henrich REB_season=4.0 GP=1 reb_per_game=4.0 card_avg=4.0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] franchise_id=6a09d4b7e3348a2ccec4b17b week=1 user_team_id=69a6fcb68d2c56aa82e48a56 matchup=69a6fcb68d2c56aa82e48a8c/69a6fcb68d2c56aa82e48a56 matched_docs=0
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] fallback lookup franchise_id=6a09d4b7e3348a2ccec4b17b week=1 scanned_docs=64 fallback_matches=1
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] candidate_game_id=6a149b101c7d981ca8e1e5e6 richness=15 quarter=5 is_final=True has_players=True top_box_score=False nested_team_boxes=True
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-LAST-GAME] selected_game_id=6a149b101c7d981ca8e1e5e6 selected_richness=15
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] Selected game_id=6a149b101c7d981ca8e1e5e6 home=Morristown away=Valdosta Valley has_players=True top_box_score=False nested_teams=True candidate_count=24 from_players=0 from_box_score=24
+WARNING:BackEnd.api.franchise_routes:🧭 [FCC-POTG] POTG resolved for game_id=6a149b101c7d981ca8e1e5e6 winner=Damonte Adayenbodo pts=21 reb=15 ast=1 stl=2 blk=0 defPct=50
+INFO:     127.0.0.1:58478 - "GET /franchise/command-center/data?franchise_id=6a09d4b7e3348a2ccec4b17b HTTP/1.1" 200 OK
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Lancaster
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Morristown
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+INFO:     127.0.0.1:58478 - "GET /roster/Lancaster?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+INFO:     127.0.0.1:58470 - "GET /roster/Morristown?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /images/teams/lancaster/lancaster_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58478 - "GET /images/teams/morristown/morristown_banner_primary.jpg HTTP/1.1" 307 Temporary Redirect
+WARNING:BackEnd.utils.game_team_scoreboard_enrichment:enrich_franchise_teams_scoreboard_meta OK franchise_id='6a09d4b7e3348a2ccec4b17b' franchise_oid=6a09d4b7e3348a2ccec4b17b ftd_team_ids=['69a6fcb68d2c56aa82e48a54', '69a6fcb68d2c56aa82e48a56'] standings_for_slots={'69a6fcb68d2c56aa82e48a54': {'PF': 71, 'PA': 61, 'W': 1, 'L': 0}, '69a6fcb68d2c56aa82e48a56': {'PF': 69, 'PA': 54, 'W': 1, 'L': 0}} debug_slots=[{'slot_raw_repr': "'LANCASTER'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a54', 'row_found': True, 'row_team_name': 'Lancaster', 'ftd_doc_hit': True, 'natl_rank_after': 18, 'wins_after': 1, 'losses_after': 0}, {'slot_raw_repr': "'MORRISTOWN'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a56', 'row_found': True, 'row_team_name': 'Morristown', 'ftd_doc_hit': True, 'natl_rank_after': 33, 'wins_after': 1, 'losses_after': 0}]
+WARNING:root:🔍 [ATTR-CHANGES] /api/game DB path: team_attribute_changes keys=[], home_team_id=LANCASTER, away_team_id=MORRISTOWN
+INFO:     127.0.0.1:58474 - "GET /api/game/6a1727f188f912bf58ff58eb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58482 - "GET /sounds/positive-slide.wav HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58482 - "GET /images/favicon.ico HTTP/1.1" 307 Temporary Redirect
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Lancaster
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] franchise_id=6a09d4b7e3348a2ccec4b17b, team_name=Morristown
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] Loop completed. Returning 12 players from FPD
+WARNING:BackEnd.utils.roster_loader:🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning 12 franchise players
+INFO:     127.0.0.1:58478 - "GET /roster/Lancaster?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /roster/Morristown?franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET GAMEPLAN] query: mode='franchise', team_id='69a6fcb68d2c56aa82e48a56', franchise_id='6a09d4b7e3348a2ccec4b17b', tournament_id=None, game_id='6a1727f188f912bf58ff58eb'
+INFO:     127.0.0.1:58470 - "GET /api/gameplan?mode=franchise&team_id=69a6fcb68d2c56aa82e48a56&game_id=6a1727f188f912bf58ff58eb&franchise_id=6a09d4b7e3348a2ccec4b17b HTTP/1.1" 200 OK
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] query: mode='franchise', team_id='69a6fcb68d2c56aa82e48a56', franchise_id='6a09d4b7e3348a2ccec4b17b', tournament_id=None, game_id='6a1727f188f912bf58ff58eb', debug_pc=None
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] franchise+game_doc: before response build, team_obj plays count=23, response built from team_obj
+WARNING:BackEnd.api.gameplan_routes:🔍 [GET PLAYBOOKS] Using game doc team_obj for playbook_settings (load_from_game_doc=True), pc_order.offense=8
+INFO:     127.0.0.1:58470 - "GET /api/playbooks?mode=franchise&team_id=69a6fcb68d2c56aa82e48a56&game_id=6a1727f188f912bf58ff58eb&franchise_id=6a09d4b7e3348a2ccec4b17b&profile=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58470 - "GET /images/ball.png HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58478 - "GET /images/teams/lancaster/lancaster_court.jpg HTTP/1.1" 307 Temporary Redirect
+WARNING:root:🧭 [TIMEOUT TRACE] simulate-quarter entry trace_id=None raw_game_id=6a1727f188f912bf58ff58eb normalized_game_id=6a1727f188f912bf58ff58eb resume_from_timeout=False requested_quarter=1
+WARNING:root:🔴🔴🔴 [DIAG] simulate-quarter CACHED PATH: gm=True, mode=franchise, game_id=6a1727f188f912bf58ff58eb, quarter=1
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Available team keys in saved_doc: ['LANCASTER', 'MORRISTOWN']
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Looking for team_identifier='Lancaster', settings_type='strategy_settings', mode='single'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Resolved via normalize_team_id_to_canonical: 'Lancaster' → 'LANCASTER'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Lookup result:
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   actual_team_id = 'LANCASTER'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   team_data exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   strategy_settings exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Available team keys in saved_doc: ['LANCASTER', 'MORRISTOWN']
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Looking for team_identifier='Lancaster', settings_type='playbook_settings', mode='single'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Resolved via normalize_team_id_to_canonical: 'Lancaster' → 'LANCASTER'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Lookup result:
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   actual_team_id = 'LANCASTER'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   team_data exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   playbook_settings exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   playbook_settings slot_assignments count: 0
+WARNING:root:✅ [PHASE 5.7] Loaded settings from game doc using unified function (game_id=6a1727f188f912bf58ff58eb, team_identifier=Lancaster)
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Available team keys in saved_doc: ['LANCASTER', 'MORRISTOWN']
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Looking for team_identifier='Morristown', settings_type='strategy_settings', mode='single'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Resolved via normalize_team_id_to_canonical: 'Morristown' → 'MORRISTOWN'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Lookup result:
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   actual_team_id = 'MORRISTOWN'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   team_data exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   strategy_settings exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Available team keys in saved_doc: ['LANCASTER', 'MORRISTOWN']
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Looking for team_identifier='Morristown', settings_type='playbook_settings', mode='single'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Resolved via normalize_team_id_to_canonical: 'Morristown' → 'MORRISTOWN'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS] Lookup result:
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   actual_team_id = 'MORRISTOWN'
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   team_data exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   playbook_settings exists: True
+WARNING:BackEnd.utils.team_settings_manager:🔍 [EXTRACT-TEAM-SETTINGS]   playbook_settings slot_assignments count: 0
+WARNING:root:✅ [PHASE 5.7] Loaded settings from game doc using unified function (game_id=6a1727f188f912bf58ff58eb, team_identifier=Morristown)
+WARNING:root:✅ [simulate-quarter] Cached GM: merged request playbook_settings (user_team_side=away) before sim — DB save will match client boot
+WARNING:root:🔍 [FOUL_OUT DEBUG] restore_timeout_resume_state loaded doc: game_id=6a1727f188f912bf58ff58eb, timeout_trace_id=None, timeout_next_play_type=None, quarter=1, clock=8:00, time_remaining=480, game_stats_initialized=True, has_teams=True, top_level_score={'Lancaster': 0, 'Morristown': 0}
+WARNING:root:⚠️ TIMEOUT RESUME: timeout_next_play_type missing from saved game 6a1727f188f912bf58ff58eb and no timeout_offense_team_id present; treating as no timeout resume
+WARNING:root:🧭 [TIMEOUT TRACE] simulate-quarter pre-sim trace_id=None game_id=6a1727f188f912bf58ff58eb gm_quarter=1 gm_clock=8:00 gm_time_remaining=480
+WARNING:root:🔍 [FOUL_OUT DEBUG] simulate_quarter before _initialize_game_stats: game_id=6a1727f188f912bf58ff58eb, resume_from_timeout=False, game_stats_initialized=True (if False we will call _initialize_game_stats)
+WARNING:root:⚠️ [CLOCK CONTRACT] backend reconciliation fail (mode=warn, result=OPENING_TIP, ledgerElapsed=0, legacyElapsed=5, deltaSeconds=-5, toleranceSeconds=0.1)
+WARNING:root:🎯 [TURN COORDS TURN START] turn=OPENING_TIP, result=OPENING_TIP, offense=Lancaster, Q1, time=8:00
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (25.0, 50.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (25.0, 50.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (25.0, 50.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (25.0, 50.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (25.0, 50.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (25.0, 50.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (25.0, 50.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (25.0, 50.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (25.0, 50.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (25.0, 50.0)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=OPENING_TIP bh=83608be4-5065-4df6-9276-5e69376c15aa
+WARNING:root:🎯 [TURN COORDS TURN END] turn=OPENING_TIP, result=OPENING_TIP, offense=Lancaster, Q1, time=8:00
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (43.0, 30.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (43.0, 17.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (45.0, 37.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (46.0, 21.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (48.0, 29.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (62.0, 25.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (57.0, 15.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (54.0, 37.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (56.0, 20.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (52.0, 29.0)
+WARNING:BackEnd.utils.game_team_scoreboard_enrichment:enrich_franchise_teams_scoreboard_meta OK franchise_id='6a09d4b7e3348a2ccec4b17b' franchise_oid=6a09d4b7e3348a2ccec4b17b ftd_team_ids=['69a6fcb68d2c56aa82e48a54', '69a6fcb68d2c56aa82e48a56'] standings_for_slots={'69a6fcb68d2c56aa82e48a54': {'PF': 71, 'PA': 61, 'W': 1, 'L': 0}, '69a6fcb68d2c56aa82e48a56': {'PF': 69, 'PA': 54, 'W': 1, 'L': 0}} debug_slots=[{'slot_raw_repr': "'LANCASTER'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a54', 'row_found': True, 'row_team_name': 'Lancaster', 'ftd_doc_hit': True, 'natl_rank_after': 18, 'wins_after': 1, 'losses_after': 0}, {'slot_raw_repr': "'MORRISTOWN'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a56', 'row_found': True, 'row_team_name': 'Morristown', 'ftd_doc_hit': True, 'natl_rank_after': 33, 'wins_after': 1, 'losses_after': 0}]
+WARNING:BackEnd.utils.game_team_scoreboard_enrichment:enrich_franchise_teams_scoreboard_meta OK franchise_id='6a09d4b7e3348a2ccec4b17b' franchise_oid=6a09d4b7e3348a2ccec4b17b ftd_team_ids=['69a6fcb68d2c56aa82e48a54', '69a6fcb68d2c56aa82e48a56'] standings_for_slots={'69a6fcb68d2c56aa82e48a54': {'PF': 71, 'PA': 61, 'W': 1, 'L': 0}, '69a6fcb68d2c56aa82e48a56': {'PF': 69, 'PA': 54, 'W': 1, 'L': 0}} debug_slots=[{'slot_raw_repr': "'LANCASTER'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a54', 'row_found': True, 'row_team_name': 'Lancaster', 'ftd_doc_hit': True, 'natl_rank_after': 18, 'wins_after': 1, 'losses_after': 0}, {'slot_raw_repr': "'MORRISTOWN'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a56', 'row_found': True, 'row_team_name': 'Morristown', 'ftd_doc_hit': True, 'natl_rank_after': 33, 'wins_after': 1, 'losses_after': 0}]
+WARNING:root:🧭 [TIMEOUT TRACE] simulate-quarter response trace_id=None game_id=6a1727f188f912bf58ff58eb response_clock=8:00 response_time_remaining=480 first_turn_clock=8:00 first_turn_time_remaining=480 first_turn_type=OPENING_TIP
+WARNING:root:⏱️ [PERF] simulate-quarter total=0.70s sim=0.0s summary=174ms db_save=373ms source=cache q=1 full_sim=False quiet_sim=False
+INFO:     127.0.0.1:58478 - "POST /api/simulate-quarter HTTP/1.1" 200 OK
+WARNING:BackEnd.utils.game_team_scoreboard_enrichment:enrich_franchise_teams_scoreboard_meta OK franchise_id='6a09d4b7e3348a2ccec4b17b' franchise_oid=6a09d4b7e3348a2ccec4b17b ftd_team_ids=['69a6fcb68d2c56aa82e48a54', '69a6fcb68d2c56aa82e48a56'] standings_for_slots={'69a6fcb68d2c56aa82e48a54': {'PF': 71, 'PA': 61, 'W': 1, 'L': 0}, '69a6fcb68d2c56aa82e48a56': {'PF': 69, 'PA': 54, 'W': 1, 'L': 0}} debug_slots=[{'slot_raw_repr': "'LANCASTER'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a54', 'row_found': True, 'row_team_name': 'Lancaster', 'ftd_doc_hit': True, 'natl_rank_after': 18, 'wins_after': 1, 'losses_after': 0}, {'slot_raw_repr': "'MORRISTOWN'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a56', 'row_found': True, 'row_team_name': 'Morristown', 'ftd_doc_hit': True, 'natl_rank_after': 33, 'wins_after': 1, 'losses_after': 0}]
+WARNING:root:🔍 [ATTR-CHANGES] /api/game DB path: team_attribute_changes keys=[], home_team_id=LANCASTER, away_team_id=MORRISTOWN
+INFO:     127.0.0.1:58478 - "GET /api/game/6a1727f188f912bf58ff58eb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58478 - "GET /images/teams/lancaster/lancaster_court.jpg HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58478 - "GET /api/game/6a1727f188f912bf58ff58eb/lineup-for-matchups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58474 - "POST /franchise/complete-week/start-cpu-sims HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58478 - "GET /sounds/confirm-1-lowervol.wav HTTP/1.1" 307 Temporary Redirect
+WARNING:BackEnd.utils.game_team_scoreboard_enrichment:enrich_franchise_teams_scoreboard_meta OK franchise_id='6a09d4b7e3348a2ccec4b17b' franchise_oid=6a09d4b7e3348a2ccec4b17b ftd_team_ids=['69a6fcb68d2c56aa82e48a54', '69a6fcb68d2c56aa82e48a56'] standings_for_slots={'69a6fcb68d2c56aa82e48a54': {'PF': 71, 'PA': 61, 'W': 1, 'L': 0}, '69a6fcb68d2c56aa82e48a56': {'PF': 69, 'PA': 54, 'W': 1, 'L': 0}} debug_slots=[{'slot_raw_repr': "'LANCASTER'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a54', 'row_found': True, 'row_team_name': 'Lancaster', 'ftd_doc_hit': True, 'natl_rank_after': 18, 'wins_after': 1, 'losses_after': 0}, {'slot_raw_repr': "'MORRISTOWN'", 'slot_type': 'str', 'canonical_mongo_team_id': '69a6fcb68d2c56aa82e48a56', 'row_found': True, 'row_team_name': 'Morristown', 'ftd_doc_hit': True, 'natl_rank_after': 33, 'wins_after': 1, 'losses_after': 0}]
+INFO:     127.0.0.1:58474 - "POST /api/save-man-defense-matchups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58474 - "GET /static/sounds/arcade-pulse-1.mp3 HTTP/1.1" 206 Partial Content
+WARNING:root:🧭 [SIM TURN ENTRY TRACE] game_id=6a1727f188f912bf58ff58eb quarter=1 clock=8:00 time_remaining=480 shot_clock_remaining=30 offensive_state=HCO turns_len=1
+WARNING:root:🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr=True, team=Morristown, team_id=MORRISTOWN
+WARNING:root:✅ [LOAD PLAYBOOK] Using GameManager for defense team: pc_order.defense=4, value_type=<class 'dict'>
+WARNING:root:🧭 [HCO_SET_PLAY_VARIANT_TRACE] playcall=Double Screen Three - Wing variant=mid_play_change intended_shooter_pos=SG derived_shooter=Wilbert Struthers derived_shooter_pos=SG final_step_keys=['PG', 'SG', 'SF', 'PF', 'C'] final_step_actions={'PG': {'action': 'stationary', 'location': 'lower midCorner', 'spot': None}, 'SG': {'action': 'shoot', 'location': 'upper midWing', 'spot': None}, 'SF': {'action': 'stationary', 'location': 'lower midWing', 'spot': None}, 'PF': {'action': 'stationary', 'location': 'lower midPost', 'spot': None}, 'C': {'action': 'post_up', 'location': 'lower lowPost', 'spot': None}} final_step_events=[] any_shoot_steps=[{'step_index': 7, 'pos': 'SG', 'location': 'upper midWing', 'spot': None}] step_count=8
+WARNING:root:🔍 [PLAYER.record_stat] ENTRY: Carlton Bonner (ID: b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad), Object ID: 4527917376, Stat: DREB, Amount: 1, OREB: 0, DREB: 0, REB: 0
+WARNING:root:🔍 [PLAYER.record_stat] EXIT: Carlton Bonner (ID: b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad), Object ID: 4527917376, OREB: 0, DREB: 1, REB: 1 (calculated from OREB+DREB)
+WARNING:root:🔍 [SKELETON_EMIT] entry: turn_type=HCO current_turn=HCO next_play_type=FAST_BREAK has_hco_setup=False has_skeleton_steps=True (8) has_animations=True (10) has_step_clock_seconds=True (8)
+WARNING:root:🏠 [ENTRY] current_bh=83608be4-5065-4df6-9276-5e69376c15aa step0_bh=83608be4-5065-4df6-9276-5e69376c15aa bh_x=43.0 away=False in_back_court=True bh_neq_step0=False
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.00s durations={'131abe35-8f84-41ce-ba4c-154556289954': 1.0, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 1.0, '26e15606-2eca-4616-840a-d14b87174395': 1.0, '0df15c02-a4d1-437b-b102-45f42b25e50b': 1.0, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.34, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.81, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 1.0, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 1.0, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 1.0}
+WARNING:root:🏠 [ENTRY HANDOFF FIRED] steps=1 bh_eq_step0=True
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.45s durations={'131abe35-8f84-41ce-ba4c-154556289954': 1.0, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.91, '26e15606-2eca-4616-840a-d14b87174395': 1.45, '83608be4-5065-4df6-9276-5e69376c15aa': 1.45, '0df15c02-a4d1-437b-b102-45f42b25e50b': 1.45, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.23, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 1.25, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 1.43}
+WARNING:root:🏠 [ENTRY WALKUP FIRED] bh=83608be4-5065-4df6-9276-5e69376c15aa
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.28s durations={'131abe35-8f84-41ce-ba4c-154556289954': 1.09, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 1.28, '26e15606-2eca-4616-840a-d14b87174395': 0.52, '83608be4-5065-4df6-9276-5e69376c15aa': 0.85, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.65, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.69, '17694da1-cf52-4934-8755-aaddb23e7cd0': 1.28, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.53, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.17, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.08}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.07s durations={'83608be4-5065-4df6-9276-5e69376c15aa': 1.07, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.86, '131abe35-8f84-41ce-ba4c-154556289954': 0.63, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.98, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.7, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 1.07, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.17, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.32}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.50s durations={'131abe35-8f84-41ce-ba4c-154556289954': 0.35, '26e15606-2eca-4616-840a-d14b87174395': 0.37, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.23, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.19, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.42, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.49}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.20s durations={'0df15c02-a4d1-437b-b102-45f42b25e50b': 1.2, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.22, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.26}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.61s durations={'131abe35-8f84-41ce-ba4c-154556289954': 1.61, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.75, '26e15606-2eca-4616-840a-d14b87174395': 0.37, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.36, '17694da1-cf52-4934-8755-aaddb23e7cd0': 1.16, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.37, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.75, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.18}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.62s durations={'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.49, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.62, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.62, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.33, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.32}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.92s durations={'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.15, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.05, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.22, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.08}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.05s durations={}
+WARNING:root:🔍 [RESET STAMP] skip: current_turn=HCO next_play_type=FAST_BREAK (not HCO)
+WARNING:root:🔍 [RESET PROP] HCO turn but prev had no hco_setup (prev current_turn=OPENING_TIP, prev next_play_type=HCO)
+WARNING:root:🎯 [TURN COORDS TURN START] turn=HCO, result=MISS, offense=Lancaster, Q1, time=7:49
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (81.0, 7.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (68.0, 36.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (68.0, 14.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (80.0, 19.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (86.0, 19.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (80.0, 21.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (70.0, 34.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (68.0, 25.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (78.0, 25.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (84.0, 27.0)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=HCO bh=None
+WARNING:root:🎯 [TURN COORDS TURN END] turn=HCO, result=MISS, offense=Lancaster, Q1, time=7:49
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (50.5, 25.1)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (68.0, 36.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (41.0, 30.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (87.0, 29.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (92.0, 20.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (87.0, 20.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (92.0, 29.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (88.0, 20.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (85.0, 22.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (90.0, 25.0)
+WARNING:root:🎯 [TURN COORDS TURN START] turn=DREB, result=DREB, offense=Lancaster, Q1, time=7:49
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (50.5, 25.1)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (68.0, 36.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (41.0, 30.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (87.0, 29.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (92.0, 20.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (87.0, 20.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (92.0, 29.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (88.0, 20.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (85.0, 22.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (90.0, 25.0)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=DREB bh=b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad
+WARNING:root:🎯 [TURN COORDS TURN END] turn=DREB, result=DREB, offense=Lancaster, Q1, time=7:49
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (50.5, 25.1)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (74.2, 31.4)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (41.0, 30.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (82.0, 25.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (87.3, 24.7)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (88.0, 22.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (85.5, 32.7)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (82.0, 21.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (84.4, 28.4)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (84.0, 27.0)
+WARNING:root:🔍 [RESET STAMP] skip: current_turn=DREB next_play_type=FAST_BREAK (not HCO)
+WARNING:root:🔄 [DREB] Flipped possession after defensive rebound: Lancaster → Morristown
+Turn 2 RESULT: MISS | Offense: LANCASTER | Next: FAST_BREAK (triangle) | Defense Setup: None | Possession Flips: True
+INFO:     127.0.0.1:58486 - "POST /api/simulate-turn HTTP/1.1" 200 OK
+WARNING:root:🧭 [SIM TURN ENTRY TRACE] game_id=6a1727f188f912bf58ff58eb quarter=1 clock=7:48 time_remaining=468 shot_clock_remaining=30 offensive_state=FAST_BREAK turns_len=3
+WARNING:root:🔍 [SHOT LOCATION] No steps in roles
+WARNING:root:🚀 [FB_BRIDGE TRIANGLE] entry: start_coords=10, prior_turn=DREB, prior_final_coords=10
+WARNING:root:🚀 [FB_BRIDGE TRIANGLE] ⚠️ 9 player(s) teleported between DREB.final and FB.step0.start
+WARNING:root:    OFF PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): prior_final=(88.0,22.0) → step0_start=(9.0,31.0) gap=79.51
+WARNING:root:    OFF SG (17694da1-cf52-4934-8755-aaddb23e7cd0): prior_final=(85.5,32.7) → step0_start=(9.0,28.0) gap=76.69
+WARNING:root:    OFF SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): prior_final=(82.0,21.0) → step0_start=(9.0,30.0) gap=73.55
+WARNING:root:    OFF PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): prior_final=(84.4,28.4) → step0_start=(13.0,24.0) gap=71.49
+WARNING:root:    DEF PG (83608be4-5065-4df6-9276-5e69376c15aa): prior_final=(50.5,25.1) → step0_start=(15.0,26.0) gap=35.52
+WARNING:root:    DEF SG (131abe35-8f84-41ce-ba4c-154556289954): prior_final=(74.2,31.4) → step0_start=(9.0,19.0) gap=66.33
+WARNING:root:    DEF SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): prior_final=(41.0,30.0) → step0_start=(90.0,10.0) gap=52.92
+WARNING:root:    DEF PF (0df15c02-a4d1-437b-b102-45f42b25e50b): prior_final=(82.0,25.0) → step0_start=(9.0,24.0) gap=73.01
+WARNING:root:    DEF C (26e15606-2eca-4616-840a-d14b87174395): prior_final=(87.3,24.7) → step0_start=(9.0,33.0) gap=78.70
+WARNING:root:🐛 [TRIANGLE_NONE site=setup_payload] outlet_failed=False triangle_enter_hco=False result_type=MAKE triangle_branch=None
+WARNING:root:🔍 [RESET STAMP] skip: current_turn=FAST_BREAK next_play_type=BASELINE_INBOUND (not HCO)
+WARNING:root:🎯 [TURN COORDS TURN START] turn=FAST_BREAK, result=MAKE, offense=Morristown, Q1, time=7:42
+WARNING:root:  OFFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (9.0, 31.0)
+WARNING:root:  OFFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (9.0, 28.0)
+WARNING:root:  OFFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (9.0, 30.0)
+WARNING:root:  OFFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (13.0, 24.0)
+WARNING:root:  OFFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (84.0, 27.0)
+WARNING:root:  DEFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (15.0, 26.0)
+WARNING:root:  DEFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (9.0, 19.0)
+WARNING:root:  DEFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (90.0, 10.0)
+WARNING:root:  DEFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (9.0, 24.0)
+WARNING:root:  DEFENSE C (26e15606-2eca-4616-840a-d14b87174395): (9.0, 33.0)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=FAST_BREAK bh=None
+WARNING:root:🎯 [TURN COORDS TURN END] turn=FAST_BREAK, result=MAKE, offense=Morristown, Q1, time=7:42
+WARNING:root:  OFFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (9.0, 31.0)
+WARNING:root:  OFFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (9.0, 28.0)
+WARNING:root:  OFFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (9.0, 30.0)
+WARNING:root:  OFFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (13.0, 24.0)
+WARNING:root:  OFFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (84.0, 27.0)
+WARNING:root:  DEFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (15.0, 26.0)
+WARNING:root:  DEFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (9.0, 19.0)
+WARNING:root:  DEFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (90.0, 10.0)
+WARNING:root:  DEFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (9.0, 24.0)
+WARNING:root:  DEFENSE C (26e15606-2eca-4616-840a-d14b87174395): (9.0, 33.0)
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=5.53s durations={'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 5.42, '17694da1-cf52-4934-8755-aaddb23e7cd0': 4.91, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 5.53, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 4.26, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 1.53, '131abe35-8f84-41ce-ba4c-154556289954': 4.63, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 5.53, '26e15606-2eca-4616-840a-d14b87174395': 5.53, '83608be4-5065-4df6-9276-5e69376c15aa': 0.13, '0df15c02-a4d1-437b-b102-45f42b25e50b': 5.53}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.48s durations={'068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.44, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.48, '26e15606-2eca-4616-840a-d14b87174395': 0.06, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.09}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.51s durations={}
+WARNING:root:🌉 [BIP_BRIDGE FIRED] step_count=4 sf_id=da0cf556-b8b9-47d1-91f9-a80595359f4e pg_id=83608be4-5065-4df6-9276-5e69376c15aa next=HCO prior_bh=None
+WARNING:root:🎯 [TURN COORDS TURN START] turn=BASELINE_INBOUND, result=BASELINE_INBOUND, offense=Lancaster, Q1, time=7:40
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (15.0, 26.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (9.0, 19.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (90.0, 10.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (9.0, 24.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (9.0, 33.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (9.0, 31.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (9.0, 28.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (9.0, 30.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (13.0, 24.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (84.0, 27.0)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=BASELINE_INBOUND bh=83608be4-5065-4df6-9276-5e69376c15aa
+WARNING:root:🎯 [TURN COORDS TURN END] turn=BASELINE_INBOUND, result=BASELINE_INBOUND, offense=Lancaster, Q1, time=7:40
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (15.0, 28.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (80.0, 15.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (3.0, 26.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (84.0, 11.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (83.0, 43.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (87.0, 13.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (81.0, 19.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (87.0, 29.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (67.0, 13.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (69.0, 13.0)
+Turn 4 RESULT: MAKE | Offense: MORRISTOWN | Next: BASELINE_INBOUND | Defense Setup: HCO | Possession Flips: True
+INFO:     127.0.0.1:58488 - "POST /api/simulate-turn HTTP/1.1" 200 OK
+WARNING:root:🧭 [SIM TURN ENTRY TRACE] game_id=6a1727f188f912bf58ff58eb quarter=1 clock=7:40 time_remaining=460 shot_clock_remaining=30 offensive_state=HCO turns_len=5
+WARNING:root:🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr=True, team=Morristown, team_id=MORRISTOWN
+WARNING:root:✅ [LOAD PLAYBOOK] Using GameManager for defense team: pc_order.defense=4, value_type=<class 'dict'>
+WARNING:root:🧭 [HCO_SET_PLAY_VARIANT_TRACE] playcall=Double Screen Three - Wing variant=mid_play_change intended_shooter_pos=SG derived_shooter=Ervin Miller derived_shooter_pos=PG final_step_keys=['PG', 'SG', 'SF', 'PF', 'C'] final_step_actions={'PG': {'action': 'shoot', 'location': 'upper midCorner', 'spot': None}, 'SG': {'action': 'cut', 'location': 'upper lowPost', 'spot': None}, 'SF': {'action': 'stationary', 'location': 'upper midWing', 'spot': None}, 'PF': {'action': 'stationary', 'location': 'lower lowPost', 'spot': None}, 'C': {'action': 'drift', 'location': 'upper midBaseline', 'spot': None}} final_step_events=[] any_shoot_steps=[{'step_index': 4, 'pos': 'PG', 'location': 'upper midCorner', 'spot': None}] step_count=5
+WARNING:root:🔍 [SKELETON_EMIT] entry: turn_type=HCO current_turn=HCO next_play_type=BASELINE_INBOUND has_hco_setup=False has_skeleton_steps=True (5) has_animations=True (10) has_step_clock_seconds=True (5)
+WARNING:root:🏠 [ENTRY] current_bh=83608be4-5065-4df6-9276-5e69376c15aa step0_bh=83608be4-5065-4df6-9276-5e69376c15aa bh_x=15.0 away=False in_back_court=True bh_neq_step0=False
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.00s durations={'131abe35-8f84-41ce-ba4c-154556289954': 1.0, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 1.0, '26e15606-2eca-4616-840a-d14b87174395': 0.85, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.61, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 1.0, '17694da1-cf52-4934-8755-aaddb23e7cd0': 1.0, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 1.0, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 1.0, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 1.0}
+WARNING:root:🏠 [ENTRY HANDOFF FIRED] steps=1 bh_eq_step0=True
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=3.31s durations={'131abe35-8f84-41ce-ba4c-154556289954': 0.69, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 3.31, '83608be4-5065-4df6-9276-5e69376c15aa': 3.31, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.55, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.36, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.73, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.45, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.63}
+WARNING:root:🏠 [ENTRY WALKUP FIRED] bh=83608be4-5065-4df6-9276-5e69376c15aa
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.09s durations={'131abe35-8f84-41ce-ba4c-154556289954': 1.09, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.96, '83608be4-5065-4df6-9276-5e69376c15aa': 0.85, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.76, '17694da1-cf52-4934-8755-aaddb23e7cd0': 1.09, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 1.09, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.5, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.08}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=1.07s durations={'83608be4-5065-4df6-9276-5e69376c15aa': 1.07, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.86, '131abe35-8f84-41ce-ba4c-154556289954': 0.57, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.98, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.54, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.73, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.08, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.16}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.50s durations={'131abe35-8f84-41ce-ba4c-154556289954': 0.35, '26e15606-2eca-4616-840a-d14b87174395': 0.37, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.44, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.33}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.50s durations={'17694da1-cf52-4934-8755-aaddb23e7cd0': 0.15, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.17}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.05s durations={}
+WARNING:root:🔍 [RESET STAMP] skip: current_turn=HCO next_play_type=BASELINE_INBOUND (not HCO)
+WARNING:root:🔍 [RESET PROP] propagating hco_setup to HCO turn (prev current_turn=BASELINE_INBOUND)
+WARNING:root:🎯 [TURN COORDS TURN START] turn=HCO, result=MAKE, offense=Lancaster, Q1, time=7:32
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (81.0, 43.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (86.0, 32.0)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (68.0, 36.0)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (86.0, 19.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (89.0, 36.0)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (82.0, 40.0)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (84.0, 27.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (74.0, 32.0)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (84.0, 26.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (85.0, 32.0)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=HCO bh=None
+WARNING:root:🎯 [TURN COORDS TURN END] turn=HCO, result=MAKE, offense=Lancaster, Q1, time=7:32
+WARNING:root:  OFFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (81.0, 43.0)
+WARNING:root:  OFFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (70.4, 30.4)
+WARNING:root:  OFFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (53.7, 31.2)
+WARNING:root:  OFFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (91.0, 23.0)
+WARNING:root:  OFFENSE C (26e15606-2eca-4616-840a-d14b87174395): (88.2, 25.4)
+WARNING:root:  DEFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (87.2, 29.5)
+WARNING:root:  DEFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (85.0, 25.0)
+WARNING:root:  DEFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (83.0, 26.7)
+WARNING:root:  DEFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (91.0, 29.0)
+WARNING:root:  DEFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (89.0, 29.0)
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.55s durations={'131abe35-8f84-41ce-ba4c-154556289954': 0.55, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.55, '26e15606-2eca-4616-840a-d14b87174395': 0.55, '83608be4-5065-4df6-9276-5e69376c15aa': 0.55, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.55, 'e78e967d-86f8-4f31-b5f3-2729ac5c3ecb': 0.16, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.55, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.55, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.55, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.55}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.62s durations={'131abe35-8f84-41ce-ba4c-154556289954': 0.62, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.62, '26e15606-2eca-4616-840a-d14b87174395': 0.62, '83608be4-5065-4df6-9276-5e69376c15aa': 0.62, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.62, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.62, '068c0b8a-c772-4542-a6ec-0cd6f21329ba': 0.62, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.62, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.62}
+WARNING:root:🐌 [TWEEN_DURATIONS] step_t=0.50s durations={'131abe35-8f84-41ce-ba4c-154556289954': 0.5, 'da0cf556-b8b9-47d1-91f9-a80595359f4e': 0.5, '26e15606-2eca-4616-840a-d14b87174395': 0.5, '83608be4-5065-4df6-9276-5e69376c15aa': 0.5, '0df15c02-a4d1-437b-b102-45f42b25e50b': 0.5, '17694da1-cf52-4934-8755-aaddb23e7cd0': 0.5, '2e0089ee-a3e6-4c2d-8822-170fbbd335ac': 0.5, 'b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad': 0.5}
+WARNING:root:🌉 [BIP_BRIDGE FIRED] step_count=4 sf_id=068c0b8a-c772-4542-a6ec-0cd6f21329ba pg_id=e78e967d-86f8-4f31-b5f3-2729ac5c3ecb next=HCO prior_bh=None
+WARNING:root:🎯 [TURN COORDS TURN START] turn=BASELINE_INBOUND, result=BASELINE_INBOUND, offense=Morristown, Q1, time=7:30
+WARNING:root:  OFFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (87.2, 29.5)
+WARNING:root:  OFFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (85.0, 25.0)
+WARNING:root:  OFFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (83.0, 26.7)
+WARNING:root:  OFFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (91.0, 29.0)
+WARNING:root:  OFFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (89.0, 29.0)
+WARNING:root:  DEFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (81.0, 43.0)
+WARNING:root:  DEFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (70.4, 30.4)
+WARNING:root:  DEFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (53.7, 31.2)
+WARNING:root:  DEFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (91.0, 23.0)
+WARNING:root:  DEFENSE C (26e15606-2eca-4616-840a-d14b87174395): (88.2, 25.4)
+WARNING:root:📍 [FINAL_COORDS] stamped 10 players for turn=BASELINE_INBOUND bh=e78e967d-86f8-4f31-b5f3-2729ac5c3ecb
+WARNING:root:🎯 [TURN COORDS TURN END] turn=BASELINE_INBOUND, result=BASELINE_INBOUND, offense=Morristown, Q1, time=7:30
+WARNING:root:  OFFENSE PG (e78e967d-86f8-4f31-b5f3-2729ac5c3ecb): (85.0, 30.0)
+WARNING:root:  OFFENSE SG (17694da1-cf52-4934-8755-aaddb23e7cd0): (60.9, 30.2)
+WARNING:root:  OFFENSE SF (068c0b8a-c772-4542-a6ec-0cd6f21329ba): (97.0, 29.0)
+WARNING:root:  OFFENSE PF (2e0089ee-a3e6-4c2d-8822-170fbbd335ac): (69.7, 25.4)
+WARNING:root:  OFFENSE C (b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad): (67.0, 33.6)
+WARNING:root:  DEFENSE PG (83608be4-5065-4df6-9276-5e69376c15aa): (58.5, 32.5)
+WARNING:root:  DEFENSE SG (131abe35-8f84-41ce-ba4c-154556289954): (44.8, 29.2)
+WARNING:root:  DEFENSE SF (da0cf556-b8b9-47d1-91f9-a80595359f4e): (33.4, 17.4)
+WARNING:root:  DEFENSE PF (0df15c02-a4d1-437b-b102-45f42b25e50b): (68.3, 22.2)
+WARNING:root:  DEFENSE C (26e15606-2eca-4616-840a-d14b87174395): (65.9, 24.0)
+Turn 6 RESULT: MAKE | Offense: LANCASTER | Next: BASELINE_INBOUND | Defense Setup: HCO | Possession Flips: True
+INFO:     127.0.0.1:58490 - "POST /api/simulate-turn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58490 - "GET /sounds/click-tiny.wav HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58513 - "GET /config/maintenance.json?t=1779902519469 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58513 - "GET /static/config/maintenance.json?t=1779902519469 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58530 - "GET /config/maintenance.json?t=1779902580375 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58530 - "GET /static/config/maintenance.json?t=1779902580375 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58539 - "GET /config/maintenance.json?t=1779902639471 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58539 - "GET /static/config/maintenance.json?t=1779902639471 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58596 - "GET /config/maintenance.json?t=1779902700393 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58596 - "GET /static/config/maintenance.json?t=1779902700393 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58616 - "GET /config/maintenance.json?t=1779902760423 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58616 - "GET /static/config/maintenance.json?t=1779902760423 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58642 - "GET /config/maintenance.json?t=1779902820440 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58642 - "GET /static/config/maintenance.json?t=1779902820440 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58659 - "GET /config/maintenance.json?t=1779902911439 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58659 - "GET /static/config/maintenance.json?t=1779902911439 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58666 - "GET /config/maintenance.json?t=1779902971398 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58666 - "GET /static/config/maintenance.json?t=1779902971398 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58693 - "GET /config/maintenance.json?t=1779903031392 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58693 - "GET /static/config/maintenance.json?t=1779903031392 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58713 - "GET /config/maintenance.json?t=1779903091390 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58713 - "GET /static/config/maintenance.json?t=1779903091390 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58738 - "GET /config/maintenance.json?t=1779903151440 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58738 - "GET /static/config/maintenance.json?t=1779903151440 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58749 - "GET /config/maintenance.json?t=1779903211399 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58749 - "GET /static/config/maintenance.json?t=1779903211399 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58757 - "GET /config/maintenance.json?t=1779903271415 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58757 - "GET /static/config/maintenance.json?t=1779903271415 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58790 - "GET /config/maintenance.json?t=1779903331435 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58790 - "GET /static/config/maintenance.json?t=1779903331435 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58819 - "GET /config/maintenance.json?t=1779903391396 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58819 - "GET /static/config/maintenance.json?t=1779903391396 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58841 - "GET /config/maintenance.json?t=1779903451364 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58841 - "GET /static/config/maintenance.json?t=1779903451364 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58860 - "GET /config/maintenance.json?t=1779903511398 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58860 - "GET /static/config/maintenance.json?t=1779903511398 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58876 - "GET /config/maintenance.json?t=1779903571320 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58876 - "GET /static/config/maintenance.json?t=1779903571320 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58895 - "GET /config/maintenance.json?t=1779903631327 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58895 - "GET /static/config/maintenance.json?t=1779903631327 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58923 - "GET /config/maintenance.json?t=1779903691320 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58923 - "GET /static/config/maintenance.json?t=1779903691320 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58954 - "GET /config/maintenance.json?t=1779903751332 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:58954 - "GET /static/config/maintenance.json?t=1779903751332 HTTP/1.1" 200 OK
