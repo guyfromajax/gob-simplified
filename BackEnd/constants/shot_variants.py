@@ -20,6 +20,8 @@ SHOT_VARIANT_HEAVY_RATTLE = "HEAVY_RATTLE"
 SHOT_VARIANT_BANK_MAKE = "BANK_MAKE"
 SHOT_VARIANT_BANK_MISS = "BANK_MISS"
 SHOT_VARIANT_AIRBALL = "AIRBALL"
+SHOT_VARIANT_FREE_THROW_SWISH = "FREE_THROW_SWISH"
+SHOT_VARIANT_FREE_THROW_MISS = "FREE_THROW_MISS"
 
 _RATTLE_VARIANTS = frozenset({
     SHOT_VARIANT_LITTLE_RATTLE,
@@ -237,3 +239,92 @@ def roll_shot_variant_extras(variant, shooter_y=None, rng=None):
             ),
         }
     return {}
+
+
+# Free-throw variant tables (Sound_Design_Update.md §Free Throw variant selection).
+_FT_MAKE_FIRST_HIGH = [
+    (SHOT_VARIANT_FREE_THROW_SWISH, 60),
+    (SHOT_VARIANT_BACK_OF_RIM, 30),
+    (SHOT_VARIANT_LITTLE_RATTLE, 10),
+]
+_FT_MAKE_FIRST_MID = [
+    (SHOT_VARIANT_FREE_THROW_SWISH, 30),
+    (SHOT_VARIANT_BACK_OF_RIM, 30),
+    (SHOT_VARIANT_LITTLE_RATTLE, 30),
+    (SHOT_VARIANT_NORMAL_RATTLE, 10),
+]
+_FT_MAKE_FIRST_LOW = [
+    (SHOT_VARIANT_FREE_THROW_SWISH, 20),
+    (SHOT_VARIANT_BACK_OF_RIM, 20),
+    (SHOT_VARIANT_LITTLE_RATTLE, 20),
+    (SHOT_VARIANT_NORMAL_RATTLE, 20),
+    (SHOT_VARIANT_HEAVY_RATTLE, 20),
+]
+_FT_MAKE_SECOND_CHANCE = [
+    (SHOT_VARIANT_LITTLE_RATTLE, 20),
+    (SHOT_VARIANT_NORMAL_RATTLE, 35),
+    (SHOT_VARIANT_HEAVY_RATTLE, 40),
+    (SHOT_VARIANT_BANK_MAKE, 5),
+]
+_FT_MISS_NEAR = [
+    (SHOT_VARIANT_LITTLE_RATTLE, 40),
+    (SHOT_VARIANT_FREE_THROW_MISS, 30),
+    (SHOT_VARIANT_CLANK, 20),
+    (SHOT_VARIANT_NORMAL_RATTLE, 10),
+]
+_FT_MISS_MID = [
+    (SHOT_VARIANT_NORMAL_RATTLE, 30),
+    (SHOT_VARIANT_FREE_THROW_MISS, 35),
+    (SHOT_VARIANT_CLANK, 20),
+    (SHOT_VARIANT_HEAVY_RATTLE, 10),
+    (SHOT_VARIANT_LITTLE_RATTLE, 5),
+]
+_FT_MISS_FAR = [
+    (SHOT_VARIANT_FREE_THROW_MISS, 40),
+    (SHOT_VARIANT_CLANK, 40),
+    (SHOT_VARIANT_NORMAL_RATTLE, 15),
+    (SHOT_VARIANT_BANK_MISS, 3),
+    (SHOT_VARIANT_AIRBALL, 2),
+]
+
+
+def _weighted_choice(pairs, rng):
+    variants = [v for v, _ in pairs]
+    weights = [w for _, w in pairs]
+    return rng.choices(variants, weights=weights, k=1)[0]
+
+
+def select_ft_shot_variant(
+    ft_shot_score,
+    ft_primary_roll,
+    makes_shot,
+    ft_made_on_second_chance,
+    rng=None,
+):
+    """Roll the animation variant for a resolved free throw.
+
+    ``delta = ft_shot_score - ft_primary_roll`` always uses the first roll,
+    even when a crowd second-chance converts a primary miss to a make.
+    """
+    rng = rng or random
+    delta = float(ft_shot_score) - float(ft_primary_roll)
+
+    if makes_shot:
+        if ft_made_on_second_chance:
+            pairs = _FT_MAKE_SECOND_CHANCE
+        elif delta > 30:
+            pairs = _FT_MAKE_FIRST_HIGH
+        elif delta > 10:
+            pairs = _FT_MAKE_FIRST_MID
+        elif delta > 0:
+            pairs = _FT_MAKE_FIRST_LOW
+        else:
+            pairs = _FT_MAKE_FIRST_LOW
+    elif delta > -10:
+        pairs = _FT_MISS_NEAR
+    elif delta > -30:
+        pairs = _FT_MISS_MID
+    else:
+        pairs = _FT_MISS_FAR
+
+    return _weighted_choice(pairs, rng)

@@ -363,6 +363,15 @@ def shot_launch_sfx(shot_score_pre_defense: Any) -> Optional[Dict[str, Any]]:
     }
 
 
+def shot_launch_sfx_free_throw() -> Dict[str, Any]:
+    """FT launch cue — always ``shot-standard.wav`` (Sound_Design_Update.md)."""
+    return {
+        "file": "shot-standard.wav",
+        "volume": _SFX_DEFAULT_VOLUME,
+        "event": "shot_release_free_throw",
+    }
+
+
 def stamp_hot_shot_trail_metadata(
     metadata: Dict[str, Any],
     shot_score_pre_defense: Any,
@@ -420,6 +429,10 @@ def shot_result_sfx(
         file = bank_miss_sfx_file or "bb-clank.wav"
     elif variant == "AIRBALL":
         file = "airball.wav"
+    elif variant == "FREE_THROW_SWISH":
+        file = "free-throw-swish.wav"
+    elif variant == "FREE_THROW_MISS":
+        file = "free-throw-miss.wav"
     else:
         # Unknown / missing variant — outcome-based fallback so the audio
         # layer never goes silent on a resolved shot.
@@ -440,27 +453,33 @@ def shot_result_sfx(
 def shot_followup_timed_sfx(
     shot_variant: Optional[str],
     result_type: str,
+    *,
+    make_settle_sfx_file: str = "swish.wav",
 ) -> Optional[list]:
     """Per-variant delayed follow-up cues stamped on ``step.start.timed_sfx``.
     FE schedules each cue at ``delay_ms`` **after ball arrival** (ball tween
     onComplete), not from step start.
 
-      - BANK_MAKE       → ``swish.wav`` at +100 ms after bb-rim-swish.wav
-      - BACK_OF_RIM make → ``swish.wav`` at +150 ms after back-of-rim.wav
+      - BANK_MAKE       → settle file at +100 ms after bb-rim-swish.wav
+      - BACK_OF_RIM make → settle file at +150 ms after back-of-rim.wav
+
+    ``make_settle_sfx_file`` defaults to ``swish.wav`` for field goals; free
+    throws pass ``free-throw-swish.wav``.
     """
     variant = (shot_variant or "").upper()
     rt = (result_type or "").upper()
+    settle = make_settle_sfx_file or "swish.wav"
     cues: list = []
     if variant == "BANK_MAKE" and rt == "MAKE":
         cues.append({
-            "file": "swish.wav",
+            "file": settle,
             "delay_ms": 100.0,
             "volume": _SFX_DEFAULT_VOLUME,
             "event": "shot_result_bank_make_swish",
         })
     elif variant == "BACK_OF_RIM" and rt == "MAKE":
         cues.append({
-            "file": "swish.wav",
+            "file": settle,
             "delay_ms": 150.0,
             "volume": _SFX_DEFAULT_VOLUME,
             "event": "shot_result_bor_make_swish",
@@ -477,11 +496,14 @@ def rattle_hop_sfx() -> Dict[str, Any]:
     }
 
 
-def rattle_make_settle_sfx() -> Dict[str, Any]:
+def rattle_make_settle_sfx(
+    *,
+    make_settle_sfx_file: str = "swish.wav",
+) -> Dict[str, Any]:
     """Terminal swish on a RATTLE make (fires when ball settles into MSSS
     after the final hop)."""
     return {
-        "file": "swish.wav",
+        "file": make_settle_sfx_file or "swish.wav",
         "volume": _SFX_DEFAULT_VOLUME,
         "event": "shot_result_rattle_make_swish",
     }

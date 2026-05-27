@@ -1898,9 +1898,9 @@ def _variant_flight_end(
     rim = (dict(AWAY_RIM_COORDS) if away_offense else dict(HOME_RIM_COORDS))
     variant = (shot_variant or "").upper()
 
-    if variant == "SWISH":
+    if variant in ("SWISH", "FREE_THROW_SWISH"):
         return msss
-    if variant == "CLANK":
+    if variant in ("CLANK", "FREE_THROW_MISS"):
         return rim
     if variant == "BACK_OF_RIM":
         return msss if is_make else rim

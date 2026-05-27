@@ -2243,14 +2243,16 @@ def resolve_free_throw_logic(game):
     # FT outcome calculation
     # Formula: (FT * 0.8) + (CH * 0.2)
     ft_shot_score = (attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)
-    result = random.randint(1, 100)
-    text = f"ft_shot_score: {ft_shot_score}, roll: {result}  "
-    makes_shot = result < ft_shot_score
+    ft_primary_roll = random.randint(1, 100)
+    text = f"ft_shot_score: {ft_shot_score}, roll: {ft_primary_roll}  "
+    makes_shot = ft_primary_roll < ft_shot_score
+    ft_made_on_second_chance = False
 
     # Secondary check: miss → make (global default for home FT; away uses crowd tiers)
     if not makes_shot:
         if random.random() < effective_ft_miss_to_make_second_chance(game, off_team):
             makes_shot = True
+            ft_made_on_second_chance = True
 
     shooter.record_stat("FTA")
     text += f"{get_name_safe(shooter)} steps to the line... "
@@ -2270,6 +2272,32 @@ def resolve_free_throw_logic(game):
     # selection can read stale half-court coords.
     apply_coords_from_animations_list(game, animations)
     shooter_pos = get_player_position(off_lineup, shooter)
+
+    from BackEnd.constants.shot_variants import (
+        SHOT_VARIANT_AIRBALL,
+        roll_shot_variant_extras,
+        select_ft_shot_variant,
+    )
+
+    shooter_sc = getattr(shooter, "coords", None) or {}
+    try:
+        shooter_y = float(shooter_sc.get("y", 25))
+    except (TypeError, ValueError):
+        shooter_y = 25.0
+    shot_variant = select_ft_shot_variant(
+        ft_shot_score,
+        ft_primary_roll,
+        makes_shot,
+        ft_made_on_second_chance,
+    )
+    ft_variant_fields = {
+        "ft_shot_score": ft_shot_score,
+        "ft_primary_roll": ft_primary_roll,
+        "ft_made_on_second_chance": ft_made_on_second_chance,
+        "shot_variant": shot_variant,
+        "make_settle_sfx_file": "free-throw-swish.wav",
+        **roll_shot_variant_extras(shot_variant, shooter_y=shooter_y),
+    }
 
     ft_snap = build_free_throw_snapshot(game, off_lineup, def_lineup, shooter)
 
@@ -2305,6 +2333,7 @@ def resolve_free_throw_logic(game):
                     "free_throws_remaining": game_state["free_throws_remaining"],  # ✅ FIX: Include free_throws_remaining so frontend knows more FTs remain
                     "one_and_one": False,  # ✅ FIX: Include one_and_one flag (now False since second FT is unlocked)
                 }
+                ooo.update(ft_variant_fields)
                 attach_position_snapshots(ooo, [ft_snap])
                 return ooo
             else:
@@ -2332,76 +2361,74 @@ def resolve_free_throw_logic(game):
             game_state["offensive_state"] = "HCO"
 
         if not makes_shot:
-            # Unified geography-based rebound system for free throws
-            # Calculate bounce spot (free throw is at the basket being attacked)
-            is_away_offense = off_team.team_id == game.away_team.team_id
-            # Home team attacks away basket (x=91), away team attacks home basket (x=9)
-            basket_x = 9 if is_away_offense else 91
-            bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
-
-            rebounder, rebound_team, stat = determine_rebounder(
-                game,
-                bounce_spot,
-                max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
-            )
-            # Stamped here so ``ft_step_emitter`` + discrete OREB/DREB share one bounce.
-            game_state["_ft_last_bounce_spot"] = dict(bounce_spot)
-
-            anim_list = animations if isinstance(animations, list) else []
-            player_anim_count = sum(
-                1
-                for a in anim_list
-                if isinstance(a, dict) and str(a.get("playerId")) != "ball"
-            )
-            x_gate_fallback = bool(game_state.pop("_ft_rebound_x_gate_fallback", False))
-            _log_ft_rebound_calculation_snapshot(
-                off_team=off_team,
-                def_team=def_team,
-                shooter=shooter,
-                shooter_pos=shooter_pos,
-                basket_x=basket_x,
-                basket_y=25,
-                bounce_spot=bounce_spot,
-                rebounder=rebounder,
-                stat=stat,
-                x_gate_fallback=x_gate_fallback,
-                anim_total=len(anim_list),
-                player_anim_count=player_anim_count,
-                full_sim=bool(game.game_state.get("_is_full_simulation")),
-                no_lane=bool(game_state.get("no_lane")),
-            )
-            
-            game_state["last_rebound"] = stat
-            game_state["last_rebounder"] = rebounder
-            
-            # ✅ Record rebound stat BEFORE checking team (applies to both DREB and OREB)
-            rebounder.record_stat(stat)
-            
-            # Debug logging for free throw rebounds
-            # ✅ COMMENTED OUT: Free throw rebound logs (cluttering transition debugging)
-            # logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} credited with {stat} (Free Throw miss)")
-            rebounder_game_reb = rebounder.stats["game"].get(stat, 0)
-            # logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} now has {rebounder_game_reb} {stat} (game total)")
-
-            if rebound_team == def_team:
+            is_final_airball = shot_variant == SHOT_VARIANT_AIRBALL
+            if is_final_airball:
                 possession_flips = True
-                text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
-                if _FT_MISS_DREB_FAST_BREAK_ENABLED:
-                    p_dreb = fast_break_probability_from_slider(
-                        def_team.strategy_settings.get("fast_breaks", 2)
-                    )
-                    next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
-                else:
-                    next_play_type = "HCO"
-                game_state["offensive_state"] = next_play_type
             else:
-                # Offensive rebound - store for separate turn processing
-                game_state["pending_oreb"] = {
-                    "rebounder": rebounder,
-                    "rebounder_id": getattr(rebounder, "player_id", None),
-                }
-                text += f" {get_name_safe(rebounder)} grabs the offensive rebound."
-                # OREB will be processed as a separate turn
+                # Unified geography-based rebound system for free throws
+                # Calculate bounce spot (free throw is at the basket being attacked)
+                is_away_offense = off_team.team_id == game.away_team.team_id
+                # Home team attacks away basket (x=91), away team attacks home basket (x=9)
+                basket_x = 9 if is_away_offense else 91
+                bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
+
+                rebounder, rebound_team, stat = determine_rebounder(
+                    game,
+                    bounce_spot,
+                    max_x_delta_from_bounce=FREE_THROW_REBOUND_MAX_X_DELTA,
+                )
+                # Stamped here so ``ft_step_emitter`` + discrete OREB/DREB share one bounce.
+                game_state["_ft_last_bounce_spot"] = dict(bounce_spot)
+
+                anim_list = animations if isinstance(animations, list) else []
+                player_anim_count = sum(
+                    1
+                    for a in anim_list
+                    if isinstance(a, dict) and str(a.get("playerId")) != "ball"
+                )
+                x_gate_fallback = bool(game_state.pop("_ft_rebound_x_gate_fallback", False))
+                _log_ft_rebound_calculation_snapshot(
+                    off_team=off_team,
+                    def_team=def_team,
+                    shooter=shooter,
+                    shooter_pos=shooter_pos,
+                    basket_x=basket_x,
+                    basket_y=25,
+                    bounce_spot=bounce_spot,
+                    rebounder=rebounder,
+                    stat=stat,
+                    x_gate_fallback=x_gate_fallback,
+                    anim_total=len(anim_list),
+                    player_anim_count=player_anim_count,
+                    full_sim=bool(game.game_state.get("_is_full_simulation")),
+                    no_lane=bool(game_state.get("no_lane")),
+                )
+
+                game_state["last_rebound"] = stat
+                game_state["last_rebounder"] = rebounder
+
+                # ✅ Record rebound stat BEFORE checking team (applies to both DREB and OREB)
+                rebounder.record_stat(stat)
+
+                if rebound_team == def_team:
+                    possession_flips = True
+                    text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
+                    if _FT_MISS_DREB_FAST_BREAK_ENABLED:
+                        p_dreb = fast_break_probability_from_slider(
+                            def_team.strategy_settings.get("fast_breaks", 2)
+                        )
+                        next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
+                    else:
+                        next_play_type = "HCO"
+                    game_state["offensive_state"] = next_play_type
+                else:
+                    # Offensive rebound - store for separate turn processing
+                    game_state["pending_oreb"] = {
+                        "rebounder": rebounder,
+                        "rebounder_id": getattr(rebounder, "player_id", None),
+                    }
+                    text += f" {get_name_safe(rebounder)} grabs the offensive rebound."
+                    # OREB will be processed as a separate turn
         else:
             if not game_state.get("no_lane", False):
                 possession_flips = True
@@ -2424,6 +2451,7 @@ def resolve_free_throw_logic(game):
         "free_throws_remaining": game_state["free_throws_remaining"],  # For frontend to know if final FT
         "one_and_one": game_state.get("one_and_one", False),  # For frontend 1&1 display
     }
+    result.update(ft_variant_fields)
 
     if makes_shot:
         result["points"] = 1
@@ -2436,7 +2464,10 @@ def resolve_free_throw_logic(game):
             result["next_turn"] = "BASELINE_INBOUND"  # ✅ SS&S: Explicit next turn
     else:
         # Add rebounder information for missed free throws
-        if game_state.get("last_rebounder"):
+        if shot_variant == SHOT_VARIANT_AIRBALL and game_state.get("free_throws_remaining", 0) <= 0:
+            result["next_play_type"] = "BASELINE_INBOUND"
+            result["next_turn"] = "BASELINE_INBOUND"
+        elif game_state.get("last_rebounder"):
             result["rebounderId"] = getattr(game_state["last_rebounder"], "player_id", None)
             result["rebound_type"] = game_state.get("last_rebound", "")
             # Add next play type for defensive rebounds
@@ -2444,7 +2475,11 @@ def resolve_free_throw_logic(game):
                 result["next_play_type"] = game_state.get("offensive_state", "HCO")
 
     # Non-final miss: visual bounce only (``calculate_bounce_spot``); no rebound.
-    if not makes_shot and game_state.get("free_throws_remaining", 0) > 0:
+    if (
+        not makes_shot
+        and game_state.get("free_throws_remaining", 0) > 0
+        and shot_variant != SHOT_VARIANT_AIRBALL
+    ):
         is_away_offense = off_team.team_id == game.away_team.team_id
         basket_x = 9 if is_away_offense else 91
         bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
@@ -2455,6 +2490,7 @@ def resolve_free_throw_logic(game):
     if (
         not makes_shot
         and game_state.get("free_throws_remaining", 0) <= 0
+        and shot_variant != SHOT_VARIANT_AIRBALL
     ):
         bounce_spot = game_state.pop("_ft_last_bounce_spot", None)
         if isinstance(bounce_spot, dict) and "x" in bounce_spot and "y" in bounce_spot:

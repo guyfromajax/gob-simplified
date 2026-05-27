@@ -15,15 +15,31 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import (
+    AIRBALL_OOB_AWAY_COORDS,
+    AIRBALL_OOB_GAME_SECONDS,
+    AIRBALL_OOB_HOME_COORDS,
+    BANK_MAKE_SETTLE_GAME_SECONDS,
+    BANK_MISS_GRAZE_GAME_SECONDS,
     BOUNCE_STEP_GAME_SECONDS,
     FREE_THROW_SHOT_GRID_PER_GAME_SECOND,
     MADE_SHOT_SWEET_SPOT_AWAY_RIM,
     MADE_SHOT_SWEET_SPOT_HOME_RIM,
+    RATTLE_HOP_GAME_SECONDS,
+    RATTLE_MAKE_SETTLE_GAME_SECONDS,
+)
+from BackEnd.engine.skeleton_step_emitter import (
+    _rattle_hop_targets,
+    _variant_flight_end,
 )
 from BackEnd.utils.animation_step_helpers import (
     _euclid,
     _player_lookup_by_id,
     build_final_coords,
+    rattle_hop_sfx,
+    rattle_make_settle_sfx,
+    shot_followup_timed_sfx,
+    shot_launch_sfx_free_throw,
+    shot_result_sfx,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -77,20 +93,13 @@ _FT_AWAY_CFG = {
     "rim": {"x": 9, "y": 25},
 }
 
-_FT_MAKE_SWISH_SFX = {
-    "file": "free-throw-swish.wav",
-    "event": "free_throw_result",
-    "result": "MAKE",
-}
-_FT_MISS_SFX = {
-    "file": "free-throw-miss.wav",
-    "event": "free_throw_result",
-    "result": "MISS",
-}
+_FT_RATTLE_VARIANTS = frozenset({
+    "LITTLE_RATTLE",
+    "NORMAL_RATTLE",
+    "HEAVY_RATTLE",
+})
 
 _SHOOT_STEP_T = 0.35
-# Legacy FT animator + HCO bounce sub-step: 300ms wall at tickMs=350.
-_RIM_HOLD_GAME_SECONDS = 300.0 / 350.0
 _BOUNCE_HOLD_GAME_SECONDS = 1000.0 / 350.0
 _POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
@@ -248,7 +257,9 @@ def _ball_motion_step(
     step_t: float,
     next_step: NextStep,
     ball_motion_style: str = "shot",
+    sfx_on_ball_release: Optional[Dict[str, Any]] = None,
     sfx_on_ball_arrival: Optional[Dict[str, Any]] = None,
+    timed_sfx: Optional[list] = None,
     advance_metadata: Optional[Dict[str, Any]] = None,
 ) -> AnimationStep:
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in coords}
@@ -285,8 +296,12 @@ def _ball_motion_step(
         "advance_trigger": trigger,
         "ball_motion_style": ball_motion_style,
     }
+    if sfx_on_ball_release:
+        start["sfx_on_ball_release"] = dict(sfx_on_ball_release)
     if sfx_on_ball_arrival:
         start["sfx_on_ball_arrival"] = dict(sfx_on_ball_arrival)
+    if timed_sfx:
+        start["timed_sfx"] = list(timed_sfx)
     end: StepEnd = {
         "coords": dict(coords),
         "ball": {"coords": dict(ball_end)},
@@ -409,6 +424,165 @@ def _build_ft_return_teleport_step(
         "next": next_step,
     }
     return {"start": start, "end": end}
+
+
+def _append_ft_variant_post_shot_chain(
+    steps: List[AnimationStep],
+    *,
+    shoot_step: AnimationStep,
+    turn_result: Dict[str, Any],
+    cursor_coords: Dict[str, GridCoord],
+    cursor_clock: ClockState,
+    away_offense: bool,
+    shooter_id: str,
+    shot_spot: GridCoord,
+    is_make: bool,
+    outcome: str,
+) -> tuple[Dict[str, GridCoord], GridCoord, AnimationStep]:
+    """Append [ball_flight] + variant sub-steps after the FT shoot step."""
+    shot_variant = turn_result.get("shot_variant")
+    make_settle = turn_result.get("make_settle_sfx_file") or "free-throw-swish.wav"
+    result_type = "MAKE" if is_make else "MISS"
+    variant_upper = (shot_variant or "").upper()
+    is_rattle = variant_upper in _FT_RATTLE_VARIANTS
+    is_airball = variant_upper == "AIRBALL"
+
+    ball_flight_end = _variant_flight_end(
+        shot_variant, result_type, away_offense, turn_result,
+    )
+    flight_dist = _euclid(shot_spot, ball_flight_end)
+    flight_t = max(
+        0.05, flight_dist / float(FREE_THROW_SHOT_GRID_PER_GAME_SECOND),
+    )
+    launch_sfx = shot_launch_sfx_free_throw()
+    arrival_sfx = shot_result_sfx(
+        shot_variant,
+        result_type,
+        bank_miss_sfx_file=turn_result.get("shot_variant_bank_miss_sfx_file"),
+    )
+    timed_sfx = shot_followup_timed_sfx(
+        shot_variant,
+        result_type,
+        make_settle_sfx_file=make_settle,
+    )
+
+    flight_step = _ball_motion_step(
+        coords=cursor_coords,
+        ball_start=dict(shot_spot),
+        ball_end=ball_flight_end,
+        clock=cursor_clock,
+        step_t=flight_t,
+        next_step={"kind": "next_step", "index": _next_step_index(steps)},
+        sfx_on_ball_release=launch_sfx,
+        sfx_on_ball_arrival=arrival_sfx,
+        timed_sfx=timed_sfx,
+        advance_metadata={
+            "free_throw_shot": True,
+            "ball_grid_per_game_second": FREE_THROW_SHOT_GRID_PER_GAME_SECOND,
+            "result": outcome,
+            "kind": "ball_flight",
+        },
+    )
+    shoot_step["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+    steps.append(flight_step)
+
+    cursor_ball: GridCoord = dict(ball_flight_end)
+    last_appended = flight_step
+
+    def _append_motion(
+        *,
+        ball_end: GridCoord,
+        step_t: float,
+        trigger_kind: str,
+        sfx_arrival: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        nonlocal cursor_coords, cursor_ball, last_appended
+        step = _ball_motion_step(
+            coords=cursor_coords,
+            ball_start=dict(cursor_ball),
+            ball_end=ball_end,
+            clock=cursor_clock,
+            step_t=float(step_t),
+            next_step={"kind": "next_step", "index": _next_step_index(steps)},
+            sfx_on_ball_arrival=sfx_arrival,
+            advance_metadata={
+                "free_throw_shot": True,
+                "ball_grid_per_game_second": FREE_THROW_SHOT_GRID_PER_GAME_SECOND,
+                "kind": trigger_kind,
+                "target_coords": dict(ball_end),
+            },
+        )
+        last_appended["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+        steps.append(step)
+        cursor_ball = dict(ball_end)
+        last_appended = step
+
+    if is_rattle:
+        hop_targets = _rattle_hop_targets(variant_upper, away_offense, turn_result)
+        for hop_target in hop_targets:
+            _append_motion(
+                ball_end=hop_target,
+                step_t=float(RATTLE_HOP_GAME_SECONDS),
+                trigger_kind="rattle_hop",
+                sfx_arrival=rattle_hop_sfx(),
+            )
+        if is_make:
+            msss = (
+                dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
+                if away_offense
+                else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+            )
+            _append_motion(
+                ball_end=msss,
+                step_t=float(RATTLE_MAKE_SETTLE_GAME_SECONDS),
+                trigger_kind="rattle_settle",
+                sfx_arrival=rattle_make_settle_sfx(
+                    make_settle_sfx_file=make_settle,
+                ),
+            )
+    elif variant_upper == "BANK_MAKE":
+        msss = (
+            dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
+            if away_offense
+            else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+        )
+        _append_motion(
+            ball_end=msss,
+            step_t=float(BANK_MAKE_SETTLE_GAME_SECONDS),
+            trigger_kind="bank_settle",
+        )
+    elif variant_upper == "BANK_MISS":
+        msss = (
+            dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
+            if away_offense
+            else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+        )
+        graze = {
+            "x": float(msss["x"]) + float(
+                turn_result.get("shot_variant_backboard_miss_rim_offset_x") or 0
+            ),
+            "y": float(msss["y"]) + float(
+                turn_result.get("shot_variant_backboard_miss_rim_offset_y") or 0
+            ),
+        }
+        _append_motion(
+            ball_end=graze,
+            step_t=float(BANK_MISS_GRAZE_GAME_SECONDS),
+            trigger_kind="bank_graze",
+        )
+    elif is_airball:
+        oob_target = (
+            dict(AIRBALL_OOB_AWAY_COORDS)
+            if away_offense
+            else dict(AIRBALL_OOB_HOME_COORDS)
+        )
+        _append_motion(
+            ball_end=oob_target,
+            step_t=float(AIRBALL_OOB_GAME_SECONDS),
+            trigger_kind="airball_oob",
+        )
+
+    return dict(cursor_coords), cursor_ball, last_appended
 
 
 def build_ft_animation_steps(
@@ -535,8 +709,6 @@ def build_ft_animation_steps(
     cursor_clock = dict(shoot_step["end"]["clock"])
 
     shot_spot = cursor_coords.get(shooter_id) or lane_targets[shooter_id]
-    cfg = _FT_HOME_CFG if offense_is_home else _FT_AWAY_CFG
-    rim = dict(cfg["rim"])
     sweet = (
         dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
         if away_offense
@@ -544,49 +716,30 @@ def build_ft_animation_steps(
     )
 
     is_make = outcome == "MAKE"
-    flight_end = sweet if is_make else rim
-    flight_dist = _euclid(shot_spot, flight_end)
-    flight_t = max(
-        0.05, flight_dist / float(FREE_THROW_SHOT_GRID_PER_GAME_SECOND)
+    cursor_coords, cursor_ball, _last_variant_step = _append_ft_variant_post_shot_chain(
+        steps,
+        shoot_step=shoot_step,
+        turn_result=turn_result,
+        cursor_coords=cursor_coords,
+        cursor_clock=cursor_clock,
+        away_offense=away_offense,
+        shooter_id=shooter_id,
+        shot_spot=dict(shot_spot),
+        is_make=is_make,
+        outcome=outcome,
     )
-    flight_sfx = _FT_MAKE_SWISH_SFX if is_make else _FT_MISS_SFX
-
-    flight_step = _ball_motion_step(
-        coords=cursor_coords,
-        ball_start=dict(shot_spot),
-        ball_end=flight_end,
-        clock=cursor_clock,
-        step_t=flight_t,
-        next_step={"kind": "next_step", "index": _next_step_index(steps)},
-        sfx_on_ball_arrival=flight_sfx,
-        advance_metadata={
-            "free_throw_shot": True,
-            "ball_grid_per_game_second": FREE_THROW_SHOT_GRID_PER_GAME_SECOND,
-            "result": outcome,
-        },
-    )
-    steps.append(flight_step)
-    cursor_coords = dict(flight_step["end"]["coords"])
-    cursor_clock = dict(flight_step["end"]["clock"])
 
     free_throws_remaining = int(turn_result.get("free_throws_remaining", 0) or 0)
     is_final_attempt = free_throws_remaining <= 0
+    shot_variant = str(turn_result.get("shot_variant") or "").upper()
+    is_airball = (not is_make) and shot_variant == "AIRBALL"
 
     if is_make:
-        # Make hold at sweet spot: ball stays at MSSS while "It's Good!"
-        # announcement plays. Wall-clock duration driven entirely by the
-        # announcement's ``hold_ms`` (1000ms) — FE's `runStepAnnouncement`
-        # pauses clocks, shows the announcement, awaits hold_ms, resumes.
-        # Step T = 0 game-sec so no additional wait fires after the
-        # announcement. Mirrors the skeleton emitter's
-        # `_build_make_hold_sub_step` pattern (per audit §4.1 decision 5).
-        # Applies to BOTH final and non-final FT makes — the rim hold beat
-        # plays every time before the ball returns to the shooter for the
-        # next attempt (non-final) or before the BIP turn fires (final).
+        # Make hold at settle point while "It's Good!" announcement plays.
         hold_step = _ball_motion_step(
             coords=cursor_coords,
-            ball_start=dict(sweet),
-            ball_end=dict(sweet),
+            ball_start=dict(cursor_ball),
+            ball_end=dict(cursor_ball),
             clock=cursor_clock,
             step_t=0.0,
             next_step={"kind": "next_step", "index": _next_step_index(steps)},
@@ -599,19 +752,48 @@ def build_ft_animation_steps(
             "style": "primary",
             "player_data": {"playerId": str(shooter_id)},
         }
-        # Override the default "shot_resolved" trigger from `_ball_motion_step`
-        # — this is a hold, not a flight. The announcement's hold_ms drives
-        # wall-clock; the step's advance_trigger just needs to round-trip
-        # the schema validator.
         hold_step["start"]["advance_trigger"]["condition"] = "fixed_duration"
         hold_step["start"]["advance_trigger"]["metadata"]["kind"] = "make_hold"
+        _last_variant_step["end"]["next"] = {
+            "kind": "next_step",
+            "index": len(steps),
+        }
         steps.append(hold_step)
         cursor_coords = dict(hold_step["end"]["coords"])
 
         if not is_final_attempt:
             teleport_step = _build_ft_return_teleport_step(
                 coords=cursor_coords,
-                bounce_coord=dict(sweet),
+                bounce_coord=dict(cursor_ball),
+                shooter_id=str(shooter_id),
+                shooter_lane_coord=dict(lane_targets[shooter_id]),
+                clock=cursor_clock,
+                next_step={"kind": "next_step", "index": _next_step_index(steps)},
+            )
+            steps.append(teleport_step)
+            cursor_coords = dict(teleport_step["end"]["coords"])
+    elif is_airball:
+        if is_final_attempt:
+            _last_variant_step["end"]["next"] = _implicit_turn_end_next(turn_result)
+        else:
+            bounce_hold = _ft_ball_stationary_hold_step(
+                coords=cursor_coords,
+                ball_coord=dict(cursor_ball),
+                clock=cursor_clock,
+                step_t=_BOUNCE_HOLD_GAME_SECONDS,
+                next_step={"kind": "next_step", "index": _next_step_index(steps)},
+                metadata_kind="bounce_hold",
+            )
+            _last_variant_step["end"]["next"] = {
+                "kind": "next_step",
+                "index": len(steps),
+            }
+            steps.append(bounce_hold)
+            cursor_coords = dict(bounce_hold["end"]["coords"])
+
+            teleport_step = _build_ft_return_teleport_step(
+                coords=cursor_coords,
+                bounce_coord=dict(cursor_ball),
                 shooter_id=str(shooter_id),
                 shooter_lane_coord=dict(lane_targets[shooter_id]),
                 clock=cursor_clock,
@@ -620,29 +802,15 @@ def build_ft_animation_steps(
             steps.append(teleport_step)
             cursor_coords = dict(teleport_step["end"]["coords"])
     else:
-        # MISS path: rim hold (300ms) → bounce → [non-final: bounce hold +
-        # ft_return_teleport] OR [final: turn_stop → discrete DREB/OREB].
-        # ``ball_bounce_x/y`` stamped on every miss (``calculate_bounce_spot``;
-        # final miss also runs rebound logic upstream).
         bx = turn_result.get("ball_bounce_x")
         by = turn_result.get("ball_bounce_y")
         if bx is None or by is None:
             return steps if steps else None
         bounce = {"x": float(bx), "y": float(by)}
 
-        rim_hold = _ft_ball_stationary_hold_step(
-            coords=cursor_coords,
-            ball_coord=dict(rim),
-            clock=cursor_clock,
-            step_t=_RIM_HOLD_GAME_SECONDS,
-            next_step={"kind": "next_step", "index": _next_step_index(steps)},
-            metadata_kind="rim_hold",
-        )
-        steps.append(rim_hold)
-
         bounce_step = _ft_bounce_motion_step(
             coords=cursor_coords,
-            ball_start=dict(rim),
+            ball_start=dict(cursor_ball),
             ball_end=dict(bounce),
             clock=cursor_clock,
             next_step=(
@@ -651,6 +819,10 @@ def build_ft_animation_steps(
                 else {"kind": "next_step", "index": _next_step_index(steps)}
             ),
         )
+        _last_variant_step["end"]["next"] = {
+            "kind": "next_step",
+            "index": len(steps),
+        }
         steps.append(bounce_step)
         cursor_coords = dict(bounce_step["end"]["coords"])
 
@@ -693,8 +865,18 @@ def build_ft_animation_steps(
 
 
 def _implicit_turn_end_next(turn_result: Dict[str, Any]) -> NextStep:
-    """Terminal step: next turn is DREB, OREB (pending), or end of sequence."""
+    """Terminal step: next turn is DREB, OREB (pending), BIP (airball), or end."""
     npt = str(turn_result.get("next_play_type") or "").upper()
+    if npt == "BASELINE_INBOUND":
+        return {
+            "kind": "turn_stop",
+            "event": "SHOT_ATTEMPT",
+            "payload": {
+                "schema_rendered_arc": True,
+                "free_throw_final_miss": True,
+                "airball": True,
+            },
+        }
     if npt in ("HCO", "FAST_BREAK", "DREB"):
         return {
             "kind": "turn_stop",
