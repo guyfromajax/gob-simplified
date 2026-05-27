@@ -132,6 +132,29 @@ Step 2: Outcome branch keyed off `result_type`
 | FOUL | Stopper step | `FOUL` | ✗ |
 | STEAL | Outlet contest stop | `STEAL` | ✗ |
 
+### CR Defensive Stop sub-step logic
+- **Viability:** 
+  - Geography: Each defender is checked against the ball handler at outlet position. A defender is "viable" as a stopper only if both are true:
+    -Defender is ahead of ball handler on x grid
+    -Defender is within +- 8 y grid spots of ball handler
+    -if either of these is not true, the defender becomes a race defender
+  - Defense Team Aggression Setting
+    - Aggressive: 100% chance defender will attempt stop if he passes geography check
+    - Normal: 50% chance defender will attempt stop if he passes geography check
+    - Passive: 0% chance defender will attempt stop if he passes geography check
+    - if defender does not attempt a stop, he becomes a race defender
+- **Skill Check**
+  - break_score = (ball_handler.AG + ball_handler.BH + offense team fb_efficiency attribute) × die
+  - stop_score = (stopper.AG + stopper.OD + defense team fb_opp_modifer attribute) × die 
+  - if stop score >= break score, Defensive Stop triggers
+- **Trigger:** BH-beats-stopper gate fails (stopper wins). `result_type = "DEFENSIVE_STOP"`.
+- **Movers:** BH (sprint, AG-scaled) → BH stop spot. Stopper (normal, AG-scaled) → stop spot in front of BH.
+- **Gate:** slower of the two traversals (BH vs stopper) is the advance trigger; the faster one waits visually.
+- **Ball:** stays with BH throughout.
+- **Announcement:** `step.end.announcement = "Nice Stop!"` (secondary, defense team, stopper headshot, `meta.sfx = "fb_defensive_stop"`, 1000ms hold).
+- **Step 2 (extra):** step-back / HCO setup. FB BH retreats to a deep frontcourt spot. HCO BH (default = team's PG) takes a position near FB BH on the same horizontal half (over-and-back avoided by construction). Remaining 8 players take HCO setup positions via the standard `pos1..pos4` alias mapping; defenders mirror with same-lineup-position matchup (2-3 zone footprint by construction).
+- **Transition:** implicit end (`next = next_step` past the array) → caller spawns the next HCO turn.
+
 ## Rim Runner (`rim_runner_step_emitter`)
 
 Step 0: Burst
@@ -147,6 +170,10 @@ Step 1: Branch keyed off outlet contest outcome
 
 | Branch | Steps after Burst | Turn_stop | `schema_rendered_arc` |
 |---|---|---|---|
+- **Skill Check**
+  - outlet_pass_score = (rebounder.PS×0.5 + rebounder.ST×0.3 + rebounder.IQ×0.2 + offense team fb_efficiency) * random.randint(1,6)
+  - outlet_pass_d_score = (defender.IQ×0.5 + defender.OD×0.3 + defender.ST×0.2 + defense team fb_opp_modifer) * random.randint(1,6)
+  - Final Decision: if outlet_pass_d_score . (2 * outlet_pass_score), outlet denied, else outlet pass success
 | **Outlet denied** (`rim_runner_outlet_failed=True`) | Outlet-denied defender close-out; "FB Outlet Pass Denied!" announcement; horizontal drift of non-involved players | implicit end → next HCO | ✗ |
 | **Outlet pass success** | Outlet pass step (`ball_reaches_player`; skipped when `skip_outlet_pass`) → Step 2 | — | — |
 
@@ -160,6 +187,60 @@ Step 2: Branch keyed off RR read result (after successful outlet)
 | **Lane pass + shot** | Lane pass ("Fast Break!" announcement) → Shoot motion → **[skeleton post-shot chain]** | `SHOT_ATTEMPT` | ✓ |
 
 ATs: lane pass = `ball_reaches_player` (RR for shot; primary defender for steal/bat OOB). Shoot motion = `player_reaches_position` (RR reaches shot spot).
+
+### RR Hold-Up vs Lane Pass decision logic (Step 2)
+
+Backend stages (in `resolve_rim_runner_fast_break`) that decide whether the BH attempts the lane pass to RR or holds up:
+
+**Stage B — Burst scores** (sum × die per side; separate die per side; team-level FB attributes baked in)
+- `burst_offense_score = (rr.AG × 0.7 + rr.IQ × 0.3 + offense.fb_efficiency) × random.randint(1, 6)`
+- Defense base depends on whether primary defender is in the get-back pool:
+  - **In get-back**: `burst_def_base = primary.IQ × 0.6 + primary.AG × 0.5`
+  - **NOT in get-back**: `burst_def_base = primary.IQ × 0.5 + primary.AG × 0.5`
+- `burst_defense_score = (burst_def_base + defense.fb_opp_modifier) × random.randint(1, 6)`
+- If no primary defender: `burst_defense_score = 0.0`
+
+**Stage C — `fb_open` decision** (objective: is the lane open?)
+- Rim Runner: `fb_open = burst_offense_score > burst_defense_score`
+- Triangle: `fb_open = (burst_offense_score × 0.8) > burst_defense_score` (stricter than RR but looser than the prior 0.6× spec)
+
+**Stage D — PG read** (BH's subjective assessment)
+- `read_score = (ball_handler.IQ + offense.fb_efficiency) × random.randint(1, 6)`
+- `read_threshold = 200 − (5 × offense.fb_efficiency)` — higher fb_efficiency lowers the threshold
+- `correct_read = read_score > read_threshold`
+- Note: fb_efficiency now influences BOTH sides of the comparison (additive on score, subtractive on threshold).
+
+**Stage E — `pass_attempted` decision**
+- Reads `aggression = off_team.strategy_settings["aggression"]` (integer 0-4 — raw slider, NOT the rolled `aggression_call`)
+- `is_aggressive = aggression >= 3`
+
+| BH read | Aggression | `pass_attempted` |
+|---|---|---|
+| Correct read | any | `= fb_open` (correctly passes iff lane is open) |
+| Misread + aggressive (≥ 3) | — | `random.choice([True, True, False])` (≈ 67% attempt) |
+| Misread + normal/passive (< 3) | — | `random.choice([True, False])` (50/50) |
+
+**Stage F — Outcome**
+- `pass_attempted == True` → Lane Pass branch (intercept / bat OOB / shot resolution)
+- `pass_attempted == False` (RR only) → Hold-Up branch (`rim_runner_no_lane_pass = True`)
+- `pass_attempted == False` + Triangle → Triangle decision tree
+
+### RR Outlet Denied sub-step logic
+- **Trigger:** outlet pass contest fails (outlet defender wins the attribute roll). `rim_runner_outlet_failed = True` on the turn.
+- **Movers:** outlet defender (standard, AG-scaled) → close-out spot at `ball_holder.x + 2 toward basket, ball_holder.y`. Ball holder is the outlet passer (rebounder) normally; if `skip_outlet_pass` (rebounder == receiver), the defender anchors on the receiver instead.
+- **Ball:** stays with ball holder (no pass fires).
+- **Announcement:** `step.end.announcement = "FB Outlet Pass Denied!"` (secondary, defense team, defender headshot, `meta.sfx = "fb_outlet_denied_court"`, 1000ms hold).
+- **Additional steps (after defender close-out):** step 2 = outlet receiver cutback + drift of non-involved players; step 3 = recovery pass back to rebounder.
+- **Transition:** implicit end → caller spawns the next HCO turn (with `hco_setup.inbound_pass` when BH ≠ PG).
+
+### RR Hold-up sub-step logic
+- **Trigger:** BH (outlet receiver) does NOT attempt the lane pass to RR. `rim_runner_no_lane_pass = True` on the turn.
+- **BH settle target:** `bh.x + 6 toward attacking basket`, `bh.y ± 8 toward y=25` (clamped to `[1, 49]` on y, `[4, 97]` on x). Archetype = `standard`, action = `handle_ball`.
+- **Other 9 players:** drift +40 grid spots toward attacking basket at `standard` rate. Offense → `cut`; defense → `guard_offball`. End coords clamped via interrupted-coord at `rate × T` so no one overshoots the BH gate.
+- **Ball:** stays with BH.
+- **Gate:** `player_reaches_position` keyed to BH reaching the settle target.
+- **Announcement:** `step.start.announcement = "No Fast Break"` (secondary, offense team, BH headshot, `meta.sfx = "no_fast_break"`, decision-pill payload, 1000ms hold).
+- **Transition:** implicit end → caller spawns the next HCO turn (with `hco_setup.inbound_pass` when BH ≠ PG, via `_rimRunnerHoldUpInboundPass`).
 
 ## Triangle (`triangle_step_emitter`)
 
@@ -207,6 +288,61 @@ FB step 0's `start.coords` per player must equal prior DREB turn's `final_coords
 | All other non-rebounder offense | `player.coords` (sync'd by `sync_lineup_coords_from_turn` at DREB turn end) |
 
 Any non-match between DREB `final_coords` and FB step 0 `start.coords` is a teleport.
+
+
+## Fast Break — Backend Resolution Stages
+
+(Distinct from schema steps. Stages run inside the FB resolvers BEFORE
+the AnimationStep[] is emitted. Schema steps are the visual rendering of
+the result of these stages.)
+
+### Rim Runner / Covert Release (DREB-triggered)
+
+**Stage 1: Pre-shot skill check ("BH beats defender")**
+- `phase_resolution.py:1224, 1587-1596`
+- `break_score = ball_handler.AG + ball_handler.BH * die`
+- `stop_score = defender.AG + defender.OD * die`
+- If stopper wins: `hold_up=True`, FB ends in defensive stop (no shot,
+  transition to HCO). `stopper_id` is set.
+- If BH wins: `hold_up=False`, proceed to stage 2.
+
+**Stage 2: Shot location** (universal helper — gated by `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `_CR`)
+- New: shooter target = `basket_x ± random(2, 3)` toward center,
+  `y = random.randint(19, 31)`. Replaces the play-specific shot spot.
+- Legacy path preserved behind the flag for revert.
+
+**Stage 3: Shot defender selection + contested decision** (universal helper)
+- Defender single target: `shooter_x ± 2` toward basket, same y as shooter.
+- "Available defenders" race to target at AG-based sprint rate.
+- Race pool per FB:
+  - RR: excludes **Stopper** AND **Outlet defender**. Race pool = Trail
+    + Get-back defenders.
+  - CR: excludes **Stopper** only (no outlet defender concept). Race
+    pool = Trail + Get-back defenders.
+  - (Steal-FB: all 5, no exclusions — same helper.)
+- First arriver → shot defender. Others freeze at interpolated positions
+  at t_first, clamped no closer than 6 grid spots from basket
+  (no-pull-backward edge case for defenders starting inside the zone).
+- Stopper and Outlet defender stay at their end-of-preceding-step
+  positions (no movement during the shot step).
+- Contested if closest defender's x is past shooter's x at t_shooter;
+  else uncontested.
+
+**Stage 4: Shot resolution**
+- `calculate_shot_score(shooter, ..., defender=first_arriver_or_None, apply_defense=contested)`.
+- Uncontested → `apply_defense=False`, threshold override to 1 →
+  automatic MAKE (matches OREB putback uncontested rule and Steal-FB).
+
+### Steal Fast Break (steal-triggered)
+- Single resolver in `after_steal_fast_break.py`.
+- No Stage 1 stopper gate — the steal IS the gate (BH already has the
+  ball at the steal moment).
+- Stages 2-4 use the same universal helper as RR/CR above, with all 5
+  defenders in the race pool.
+
+### Triangle (DREB-triggered) — INTENTIONALLY UNTOUCHED
+- Triangle's existing shot location and shot defender selection logic
+  remain in place. The universal helper is NOT applied to Triangle.
 
 
 **Final Shot**

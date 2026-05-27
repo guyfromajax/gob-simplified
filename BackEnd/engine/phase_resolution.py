@@ -1218,40 +1218,13 @@ def resolve_fast_break_logic(game: "GameManager"):
             fb_roles["defense"] = [defensive_pg]
             print(f"⚡ Fast Break: No defenders ahead, adding defensive PG {get_name_safe(defensive_pg)} as chaser")
 
-    # Defensive pressure check
-    die = random.randint(1, 6)
-    bh_x = getattr(ball_handler, "coords", {}).get("x", 0)
-    break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * die
-    best_defender = None
-    best_stop_score = float("-inf")
-    for defender in fb_roles["defense"]:
-        stop_score = defender.attributes["AG"] + defender.attributes["OD"] * die
-        d_x = getattr(defender, "coords", {}).get("x", 0)
-        if (
-            best_defender is None
-            or stop_score > best_stop_score
-            or (
-                stop_score == best_stop_score
-                and (
-                    abs(d_x - bh_x)
-                    < abs(getattr(best_defender, "coords", {}).get("x", 0) - bh_x)
-                )
-            )
-            or (
-                stop_score == best_stop_score
-                and abs(d_x - bh_x)
-                == abs(getattr(best_defender, "coords", {}).get("x", 0) - bh_x)
-                and defender.player_id < best_defender.player_id
-            )
-        ):
-            best_stop_score = stop_score
-            best_defender = defender
-
+    # Defensive pressure check is computed downstream in the
+    # defender-ahead branch (geography gate + aggression gate + skill
+    # check). Any earlier roll here would use stale (pre-outlet) coords
+    # and is unused. See Step_By_Step_System.md "Fast Break — Backend
+    # Resolution Stages" for the canonical skill-check formula.
     hold_up = False
     stopper_id = None
-    # ✅ Only set hold_up when a defender meets geography (ahead + within y); set in defender_ahead branch below.
-    # Do NOT set here from the early skill check — that uses stale coords and can leave hold_up True when
-    # no defender is actually ahead, causing the animator to use the confrontation spot instead of the rim.
 
     # ✅ NEW LOGIC: Determine event type based on defender positions relative to ball handler
     # Note: This will override hold_up/stopper_id if a defender is ahead after outlet pass
@@ -1390,6 +1363,21 @@ def resolve_fast_break_logic(game: "GameManager"):
     defender_ahead = False
     closest_stopping_defender = None  # Defender who is ahead AND within ±6 y-coords
     closest_stopping_distance = float('inf')
+
+    # CR Defensive Stop — aggression-based stop-attempt probability.
+    # Per-CR spec (see _documentation_master/00_General_Systems/Step_By_Step_System.md
+    # "CR Defensive Stop sub-step logic"). The defense team's strategy_calls
+    # was already rolled by `set_strategy_calls()` at the start of the turn.
+    # Each defender that passes the geography gate also rolls against this
+    # probability; failures become race defenders rather than stop candidates.
+    _agg_call = (
+        getattr(def_team, "strategy_calls", {}) or {}
+    ).get("aggression_call", "normal")
+    _stop_attempt_prob = {
+        "passive": 0.0,
+        "normal": 0.5,
+        "aggressive": 1.0,
+    }.get(_agg_call, 0.5)
     closest_defender_overall = None  # Closest defender overall (for shot attempts, uses Euclidean distance)
     closest_distance_overall = float('inf')
     
@@ -1522,10 +1510,19 @@ def resolve_fast_break_logic(game: "GameManager"):
         is_within_y_range = y_diff <= defensive_stop_y_range
         # logging.debug(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= {defensive_stop_y_range} = {is_within_y_range}")
         
-        # Defender can force defensive stop if: ahead AND within y-range
+        # Defender can force defensive stop if: ahead AND within y-range.
+        # CR adds an aggression gate: each geography-passing defender also
+        # rolls against the team's aggression-derived probability. Failures
+        # are NOT stop candidates (they become race defenders in the
+        # universal helper's race pool downstream).
         if is_ahead and is_within_y_range:
+            if random.random() >= _stop_attempt_prob:
+                # Aggression roll failed — defender does not attempt a stop.
+                # Falls through to be picked up as a race defender by the
+                # universal helper at the shot resolution site.
+                continue
             defender_ahead = True
-            # logging.debug(f"  ✅ Defender can force DEFENSIVE_STOP! (ahead AND within y-range)")
+            # logging.debug(f"  ✅ Defender can force DEFENSIVE_STOP! (ahead AND within y-range AND aggression roll passed)")
             # Find closest stopping defender (x-distance only, as per original logic)
             x_distance_only = abs(defender_outlet_x - ball_handler_outlet_x)
             if x_distance_only < closest_stopping_distance:
@@ -1583,13 +1580,37 @@ def resolve_fast_break_logic(game: "GameManager"):
             fb_roles["defender"] = None
             fb_roles["defender_count"] = 0
     elif defender_ahead and closest_stopping_defender:
-        # ✅ Geography check passed: Defender ahead AND within ±6 y-coords
-        # Now do skill check: Can ball handler beat the defender?
-        die = random.randint(1, 6)
-        break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * die
-        stop_score = closest_stopping_defender.attributes["AG"] + closest_stopping_defender.attributes["OD"] * die
-        
-        logging.debug(f"  🎯 Skill Check: break_score={break_score:.1f} (AG={ball_handler.attributes['AG']}, BH={ball_handler.attributes['BH']}, die={die}) vs stop_score={stop_score:.1f} (AG={closest_stopping_defender.attributes['AG']}, OD={closest_stopping_defender.attributes['OD']}, die={die})")
+        # ✅ Geography + aggression gates passed; one stopper candidate
+        # selected. Now run skill check: can ball handler beat the stopper?
+        # Per CR spec (Step_By_Step_System.md "CR Defensive Stop sub-step
+        # logic"):
+        #   break_score = (BH.AG + BH.BH + offense fb_efficiency) × die_off
+        #   stop_score  = (stopper.AG + stopper.OD + defense fb_opp_modifier) × die_def
+        # Separate die per side (different from the old shared-die formula).
+        die_off = random.randint(1, 6)
+        die_def = random.randint(1, 6)
+        fb_efficiency = (off_team.team_attributes or {}).get("fb_efficiency", 0)
+        fb_opp_modifier = (def_team.team_attributes or {}).get("fb_opp_modifier", 0)
+        break_score = (
+            ball_handler.attributes["AG"]
+            + ball_handler.attributes["BH"]
+            + fb_efficiency
+        ) * die_off
+        stop_score = (
+            closest_stopping_defender.attributes["AG"]
+            + closest_stopping_defender.attributes["OD"]
+            + fb_opp_modifier
+        ) * die_def
+
+        logging.debug(
+            f"  🎯 Skill Check: break_score={break_score:.1f} "
+            f"(AG={ball_handler.attributes['AG']}, BH={ball_handler.attributes['BH']}, "
+            f"fb_efficiency={fb_efficiency}, die_off={die_off}) vs "
+            f"stop_score={stop_score:.1f} "
+            f"(AG={closest_stopping_defender.attributes['AG']}, OD={closest_stopping_defender.attributes['OD']}, "
+            f"fb_opp_modifier={fb_opp_modifier}, die_def={die_def}) | "
+            f"aggression_call={_agg_call}"
+        )
         
         # Store closest stopping defender as stopper for animation (even if ball handler wins)
         # This ensures defender animates to stopper position, showing the attempt
@@ -1820,6 +1841,116 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, snap_roles, "fb_logic_pre_shot"
         )
+        # Universal geometry: CR shot path. Overrides shot_spot + defender
+        # + threshold using the helper. Gated by feature flag for revert.
+        # Race pool: all defenders EXCEPT stopper (CR has no outlet defender
+        # concept). See _documentation_master/projects/fast_break_*.md.
+        if fb_play_key == "covert_release":
+            from BackEnd.constants import USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR
+            if USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR:
+                from BackEnd.utils.fast_break_shot_geometry import (
+                    compute_fb_shot_geometry,
+                )
+
+                cr_shooter = fb_roles["shooter"]
+                cr_shooter_id = (
+                    str(getattr(cr_shooter, "player_id", "")) or None
+                )
+                cr_stopper_id = (
+                    str(stopper_id) if stopper_id is not None else None
+                )
+                cr_available: list = []
+                cr_defender_starts: dict = {}
+                for _d in def_lineup.values():
+                    if _d is None:
+                        continue
+                    _did = getattr(_d, "player_id", None)
+                    if _did is None:
+                        continue
+                    _did_s = str(_did)
+                    if cr_stopper_id is not None and _did_s == cr_stopper_id:
+                        continue
+                    cr_available.append(_d)
+                    # Start coord = end of preceding step. Source from
+                    # animator output; fall back to live coords.
+                    _anim_end = None
+                    for _entry in (fb_animations or []):
+                        if str(_entry.get("playerId")) == _did_s:
+                            _anim_end = (
+                                _entry.get("end") or _entry.get("end_coords")
+                            )
+                            if isinstance(_anim_end, dict):
+                                break
+                    if isinstance(_anim_end, dict) and "x" in _anim_end and "y" in _anim_end:
+                        cr_defender_starts[_did_s] = {
+                            "x": float(_anim_end["x"]),
+                            "y": float(_anim_end["y"]),
+                        }
+                    else:
+                        _raw = getattr(_d, "coords", None) or {}
+                        cr_defender_starts[_did_s] = {
+                            "x": float(_raw.get("x", 50.0)),
+                            "y": float(_raw.get("y", 25.0)),
+                        }
+
+                # Shooter start: animator end → live coords fallback.
+                cr_shooter_start = {"x": 50.0, "y": 25.0}
+                _found = False
+                for _entry in (fb_animations or []):
+                    if str(_entry.get("playerId")) == cr_shooter_id:
+                        _anim_end = (
+                            _entry.get("end") or _entry.get("end_coords")
+                        )
+                        if isinstance(_anim_end, dict) and "x" in _anim_end and "y" in _anim_end:
+                            cr_shooter_start = {
+                                "x": float(_anim_end["x"]),
+                                "y": float(_anim_end["y"]),
+                            }
+                            _found = True
+                            break
+                if not _found:
+                    _raw = getattr(cr_shooter, "coords", None) or {}
+                    if isinstance(_raw, dict) and "x" in _raw and "y" in _raw:
+                        cr_shooter_start = {
+                            "x": float(_raw["x"]),
+                            "y": float(_raw["y"]),
+                        }
+
+                cr_geometry = compute_fb_shot_geometry(
+                    shooter=cr_shooter,
+                    shooter_start=cr_shooter_start,
+                    available_defenders=cr_available,
+                    defender_starts=cr_defender_starts,
+                    is_away_offense=is_away_offense,
+                )
+
+                # Override shot_spot + defender + threshold.
+                roles["shot_spot"] = dict(cr_geometry["shooter_target"])
+                if cr_geometry["contested"] and cr_geometry["shot_defender_id"]:
+                    for _d in def_lineup.values():
+                        if _d is None:
+                            continue
+                        if str(getattr(_d, "player_id", "")) == cr_geometry["shot_defender_id"]:
+                            roles["defender"] = _d
+                            fb_roles["defender"] = _d
+                            fb_roles["defender_count"] = 1
+                            break
+                else:
+                    roles["defender"] = None
+                    fb_roles["defender"] = None
+                    fb_roles["defender_count"] = 0
+                    game_state["fast_break_shot_threshold_override"] = 1
+
+                # Update fb_animations end coords for shooter + racing
+                # defenders so the schema emitter renders new positions.
+                _override = dict(cr_geometry["defender_end_coords"])
+                if cr_shooter_id:
+                    _override[cr_shooter_id] = cr_geometry["shooter_target"]
+                for _entry in (fb_animations or []):
+                    _pid_s = str(_entry.get("playerId"))
+                    if _pid_s in _override:
+                        _entry["end"] = dict(_override[_pid_s])
+
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
         attach_position_snapshots(turn_result, [fb_snap])
@@ -2092,8 +2223,8 @@ def resolve_free_throw_logic(game):
     attrs = shooter.attributes
 
     # FT outcome calculation
-    # Formula: (FT * 0.7) + (CH * 0.2) + MO
-    ft_shot_score = (attrs["FT"] * 0.7) + (attrs["CH"] * 0.2) + attrs["MO"]
+    # Formula: (FT * 0.8) + (CH * 0.2)
+    ft_shot_score = (attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)
     result = random.randint(1, 100)
     text = f"ft_shot_score: {ft_shot_score}, roll: {result}  "
     makes_shot = result < ft_shot_score

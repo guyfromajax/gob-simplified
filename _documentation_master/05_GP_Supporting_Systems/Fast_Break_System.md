@@ -754,4 +754,122 @@ The outlet passer tracks:
     -Step 2: Hold Up Step
     -Step 3: Lead In
 
-  
+
+# Universal Fast Break Shot Geometry Helper
+
+Shared backend module that computes shooter target, defender race
+outcome, and contested decision for FB shot attempts across Rim Runner,
+Covert Release, and Steal-FB. Triangle is intentionally untouched.
+
+**Module:** `BackEnd/utils/fast_break_shot_geometry.py`
+**Public function:** `compute_fb_shot_geometry(...)`
+**Spec source:** discussion 2026-05-27 — same logic originally implemented
+inline in `after_steal_fast_break.py`, refactored into a reusable helper.
+
+## Geometry rules
+
+| Component | Rule |
+|---|---|
+| **Shooter target x** | `basket_x ± random.randint(2, 3)` toward center. AWAY basket=9 → x ∈ {11, 12}. HOME basket=91 → x ∈ {88, 89}. |
+| **Shooter target y** | `random.randint(19, 31)` (uniform random integer in that range). |
+| **Defender single target x** | `shooter_x ± 2` toward basket. AWAY → x ∈ {9, 10}. HOME → x ∈ {90, 91}. |
+| **Defender single target y** | Same as shooter's y. |
+
+## Race + freeze
+
+| Step | Rule |
+|---|---|
+| Per-defender traversal time | `euclidean(start, defender_target) / sprint_rate`. Sprint rate via `_ag_grid_per_game_sec(player, "sprint")` (AG-based). |
+| First arriver | Defender with smallest traversal time. Occupies `defender_target`. |
+| Other available defenders (t_first < t_shooter) | Freeze at their interpolated position at `t_first`. Clamped no closer than 6 grid spots from basket (with **no-pull-backward** edge case: defenders starting inside the 6-spot zone stay at start). |
+| All defenders (t_first ≥ t_shooter) | At interpolated positions at `t_shooter`. No clamp (freeze never fired). |
+
+## Contested decision
+
+At `t_shooter`, find the defender whose x is closest to basket. If that
+defender's x is past the shooter's x (closer to basket), the shot is
+**contested** with that defender as the shot defender. Otherwise
+**uncontested**.
+
+| Case | Shot resolution |
+|---|---|
+| Contested | `calculate_shot_score(apply_defense=True)`; normal `shot_threshold` check decides MAKE / MISS / BLOCK. |
+| Uncontested | `apply_defense=False` + `fast_break_shot_threshold_override = 1` → automatic MAKE (matches OREB-putback uncontested rule). |
+
+## Race-pool definitions per FB type
+
+| FB type | Excluded from race | Race pool |
+|---|---|---|
+| **Rim Runner** | Stopper + Outlet defender | Trail + Get-back defenders |
+| **Covert Release** | Stopper (no outlet defender concept in CR) | Trail + Get-back defenders |
+| **Steal-FB** | None | All 5 defenders |
+| **Triangle** | n/a — helper is NOT applied to Triangle | n/a |
+
+The Stopper and Outlet defender stay at their end-of-preceding-step
+positions (no movement during the shot step).
+
+## Feature flags (per-FB revert)
+
+`BackEnd/constants/__init__.py`:
+
+```python
+USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR = True   # set False to revert RR to legacy
+USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR = True   # set False to revert CR to legacy
+```
+
+Steal-FB always uses the helper; Triangle is intentionally untouched.
+
+## Function signature
+
+```python
+def compute_fb_shot_geometry(
+    *,
+    shooter,                  # player object
+    shooter_start,            # GridCoord — end coord of preceding step
+    available_defenders,      # list of player objects (race pool)
+    defender_starts,          # dict {pid: GridCoord} — end-of-preceding-step
+    is_away_offense,          # bool
+) -> dict
+```
+
+Returns:
+
+| Key | Type | Meaning |
+|---|---|---|
+| `shooter_target` | GridCoord | Where the shooter ends up |
+| `defender_target` | GridCoord | The single point defenders race to |
+| `defender_end_coords` | dict[pid, GridCoord] | End positions for the race pool only |
+| `first_arriver_id` | str \| None | Defender who reached the target first, or None |
+| `contested` | bool | True if a defender is closer to basket than shooter at t_shooter |
+| `shot_defender_id` | str \| None | Defender to use in `calculate_shot_score` (None if uncontested) |
+| `t_shooter_game_seconds` | float | Shooter's traversal time — drives the shot step's advance trigger |
+
+## UESS compliance
+
+Pure function. No side effects on game state. Caller:
+
+1. Calls `compute_fb_shot_geometry(...)` with the right inputs.
+2. Uses returned `shot_defender_id` + `contested` to call
+   `calculate_shot_score` (or `resolve_shot` via roles override).
+3. Stamps `defender_end_coords` + `shooter_target` onto the schema
+   step's end coords for the schema emitter to render.
+
+Schema emitters remain pure renderers.
+
+## Caller integration sites
+
+| FB | File | Site(s) |
+|---|---|---|
+| Steal-FB | `BackEnd/engine/after_steal_fast_break.py` | Inline (helper IS the geometry source) |
+| Rim Runner | `BackEnd/engine/rim_runner_fast_break.py` | 3 sites, via private adapter `_apply_universal_geometry_for_rr_shot` |
+| Covert Release | `BackEnd/engine/phase_resolution.py:1823` area | Inline at the SHOT branch of `resolve_fast_break_logic` |
+
+## Known limitations / scope notes
+
+- **Triangle** is intentionally not migrated. Its existing shot
+  location and defender selection logic remains.
+- **Backward compatibility:** legacy paths in RR/CR are preserved
+  in-file behind the feature flags. Set either flag to `False` to
+  revert that FB type without affecting the other.
+- **Gameplay-feel impact:** uncontested = auto-make introduces a higher
+  FB scoring rate compared to legacy. Tunable via the flag.

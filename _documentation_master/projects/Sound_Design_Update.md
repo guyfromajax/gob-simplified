@@ -16,6 +16,8 @@ SFX Direction
 - `> 210`: `three-strong.wav`
 - Else: `shot-standard.wav`
 
+**Free Throw Shot Attempts**
+- All: `shot-standard.wav`
 
 ## Gameplay Pass SFX
 
@@ -39,9 +41,8 @@ SFX Direction
 
 **Free Throw**
 
-- Trigger: at the moment the ball reaches the basket spot.
-- Made: `free-throw-swish.wav`
-- Missed: `free-throw-miss.wav`
+- **Launch** (ball leaves shooter): `shot-standard.wav` — same trigger as other shot types (see Shot Launch SFX).
+- **Result** (rim action + SFX): chosen by `shot_variant` on the FT turn (see **Free Throw Makes** / **Free Throw Misses** and **Free Throw SFX bindings**). Not a single swish/miss file at basket arrival for every FT.
 
 **Replace All SFX files in the code as follows**
 -confirm-1.mp3 -> confirm-1-lowervol.wav
@@ -155,11 +156,11 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 Each shot resolution carries a **variant**: an animation family + the SFX that plays alongside it. The variant is chosen by the backend (deterministic / replayable) from a shot-quality- and shot-type-weighted distribution, then stamped on the result/turn payload for the frontend to execute.
 
-Free throws are out of scope — their existing animation and SFX are unchanged.
+**Field goals:** selected in `resolve_shot()` (see below). **Free throws:** selected in `resolve_free_throw_logic()` (see **Free Throw variant selection**). Both use the same animation families and most of the same SFX files; FT make settle/follow-ups use `free-throw-swish.wav` instead of `swish.wav`.
 
-### Variant Selection (Backend)
+### Variant Selection — Field Goals (Backend)
 
-Selected inside `resolve_shot()` after `shot_score`, `shot_threshold`, and `shot_type` are finalized (post-defender). The chosen variant is written to a new field on the result payload (e.g. `shot_variant`) so the frontend can dispatch without re-rolling.
+Selected inside `resolve_shot()` after `shot_score`, `shot_threshold`, and `shot_type` are finalized (post-defender). The chosen variant is written to `shot_variant` on the result payload so the frontend can dispatch without re-rolling.
 
 **Tier definition** (closeness to outcome threshold, not absolute score):
 
@@ -199,7 +200,60 @@ gap = shot_score - shot_threshold
 - `gap < -75`: 30% Clank, 20% Back of Rim, 20% Bank Off Backboard, 10% Little Rattle, 10% Normal Rattle, 10% Heavy Rattle.
 - else: 15% Clank, 15% Back of Rim, 20% Bank Off Backboard, 30% Little Rattle, 10% Normal Rattle, 10% Heavy Rattle.
 
-### Ball Resolve Animations
+### Free Throw variant selection (Backend)
+
+Selected in `resolve_free_throw_logic()` after the **primary** make/miss roll and optional crowd **second-chance** flip. Stamped on the FT turn payload for replay:
+
+- `ft_shot_score` — `(FT × 0.8) + (CH × 0.2)`
+- `ft_primary_roll` — `random.randint(1, 100)` on the first roll
+- `ft_made_on_second_chance` — `true` when the crowd roll converts a primary miss to a make
+- `shot_variant` — animation family (same enum as field goals, e.g. `SWISH`, `LITTLE_RATTLE`, `AIRBALL`)
+- Variant extras — same as field goals where applicable (`roll_shot_variant_extras`, shooter `y` for bank)
+
+**Make/miss rule (primary roll):** `makes_shot = ft_primary_roll < ft_shot_score`.
+
+**Delta (tier input):** `delta = ft_shot_score - ft_primary_roll` — always from the **first roll only**, even when a second-chance make changes the final outcome.
+
+**Free Throw Makes**
+
+- **Free Throw Swish** → `free-throw-swish.wav` (clean make; no `swish.wav` on FT)
+- **First-roll make** (`ft_primary_roll < ft_shot_score`, not second-chance):
+    - if `delta > 30`: 60% Free Throw Swish, 30% Back of Rim, 10% Little Rattle
+    - elif `delta > 10`: 30% Free Throw Swish, 30% Back of Rim, 30% Little Rattle, 10% Normal Rattle
+    - elif `delta > 0`: 20% Free Throw Swish, 20% Back of Rim, 20% Little Rattle, 20% Normal Rattle, 20% Heavy Rattle
+- **Second-chance make** (`ft_made_on_second_chance`):
+    - 20% Little Rattle, 35% Normal Rattle, 40% Heavy Rattle, 5% Bank Off Backboard
+
+**Free Throw Misses**
+
+- **Free Throw Miss** → `free-throw-miss.wav` (dedicated miss cue; not `clank.wav`)
+- If second-chance converts to a make → **ignore** miss table; use **Free Throw Makes → second-chance make** instead
+- **First-roll miss** (`ft_primary_roll >= ft_shot_score`, and not second-chance make):
+    - if `delta > -10`: 40% Little Rattle, 30% Free Throw Miss, 20% Clank, 10% Normal Rattle
+    - elif `delta > -30`: 30% Normal Rattle, 35% Free Throw Miss, 20% Clank, 10% Heavy Rattle, 5% Little Rattle
+    - else: 40% Free Throw Miss, 40% Clank, 15% Normal Rattle, 3% Bank Off Backboard, 2% Airball
+
+**Free Throw SFX bindings**
+
+FT reuses field-goal animation families. **Every make settle / delayed make layer uses `free-throw-swish.wav`, never `swish.wav`.**
+
+| Variant bucket | Make (arrival + follow-up) | Miss |
+|---|---|---|
+| Free Throw Swish | `free-throw-swish.wav` | — |
+| Free Throw Miss | — | `free-throw-miss.wav` |
+| Back of Rim | `back-of-rim.wav`, then `free-throw-swish.wav` +150 ms | `back-of-rim.wav` |
+| Little / Normal / Heavy Rattle | `rattle-leather.wav` per hop, then `free-throw-swish.wav` on make settle | `rattle-leather.wav` per hop |
+| Bank Off Backboard | `bb-rim-swish.wav`, then `free-throw-swish.wav` +100 ms | `bb-clank.wav` / `bb-clank-2.wav` (50/50) |
+| Clank | — | `clank.wav` |
+| Airball | — | `airball.wav` |
+
+**Free Throw — AIRBALL (miss only)**
+
+Same **grid animation** as field-goal airball: flight ends 2 units short of MSSS, then tween to OOB resting point (`AIRBALL_OOB_HOME` / `AIRBALL_OOB_AWAY`).
+
+- **Final FT miss + AIRBALL:** Same **game outcome** as FG airball — no rebound, possession to defense, next play **BASELINE_INBOUND** (`BIP`). No `calculate_bounce_spot` rebound path.
+- **Non-final FT miss + AIRBALL:** Animate to OOB like FG; **do not** proceed to BIP. After OOB, hold for the standard non-final FT miss beat (`bounce_hold`, 1000 ms wall — same as after a normal miss bounce hold), then `ft_return_teleport` (ball back to shooter for the next attempt). No rebound turn.
+
 
 Unless noted, the ball is visible throughout all sub-steps; existing post-resolution visibility behavior (hide after standard bounce; settle at MSSS on make) is preserved.
 
@@ -227,7 +281,7 @@ Unless noted, the ball is visible throughout all sub-steps; existing post-resolu
 
 - **BACKBOARD-MISS.** Three stages: (1) flight to bank point (same `x` and shooter-y-conditional `y` formula as Backboard-Make); (2) ~200 ms tween to rim-graze point at `x = MSSS_x + random.randint(-1, 1)`, `y = MSSS_y + random.randint(-1, 1)`; (3) standard bounce-spot + rebound resolution.
 
-- **AIRBALL** (Miss only). Ball flight terminates **2 grid units short** of MADE_SHOT_SWEET_SPOT — at `(88, 25)` home / `(12, 25)` away. Then the ball continues to the OOB resting point at `(97, 25)` home / `(3, 25)` away. **No rebound attempt.** Possession changes to the defense, and the next step is **BIP** (this deviates from the normal dead-ball turnover progression, which goes to SIP).
+- **AIRBALL** (Miss only). Ball flight terminates **2 grid units short** of MADE_SHOT_SWEET_SPOT — at `(88, 25)` home / `(12, 25)` away. Then the ball continues to the OOB resting point at `(97, 25)` home / `(3, 25)` away. **No rebound attempt.** Possession changes to the defense, and the next step is **BIP** (this deviates from the normal dead-ball turnover progression, which goes to SIP). **Free throws:** same OOB animation; see **Free Throw — AIRBALL** for final vs non-final outcome rules.
 
 ### SFX Bindings
 
@@ -247,7 +301,7 @@ When two filenames are listed for a slot (e.g. `bb-clank.wav` / `bb-clank-2.wav`
 
 **SFX timing notes**
 
-- **Rattle SFX**: one `rattle-leather.wav` play fires at the start of each hop (40 ms apart). For make rattles, `swish.wav` plays immediately after the last hop, overlapping the 150 ms settle tween to MSSS.
-- **BOR make follow-up**: `swish.wav` plays 150 ms after `back-of-rim.wav` — long enough to read as "rim → through the net," short enough to feel like one event. Knob: `BOR_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
-- **BANK_MAKE follow-up**: `swish.wav` plays 100 ms after `bb-rim-swish.wav`. The original recording had a baked-in swish that ran too long, so it was trimmed and a separate swish is layered in. Knob: `BANK_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
+- **Rattle SFX**: one `rattle-leather.wav` play fires at the start of each hop (40 ms apart). For make rattles, the net layer plays immediately after the last hop, overlapping the 150 ms settle tween to MSSS — `swish.wav` (field goals) or `free-throw-swish.wav` (free throws).
+- **BOR make follow-up**: net layer 150 ms after `back-of-rim.wav` — `swish.wav` (FG) or `free-throw-swish.wav` (FT). Knob: `BOR_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
+- **BANK_MAKE follow-up**: net layer 100 ms after `bb-rim-swish.wav` — `swish.wav` (FG) or `free-throw-swish.wav` (FT). Knob: `BANK_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
 - **All other variants**: SFX fires at ball-flight `onComplete` (the moment the ball lands at its variant-specific flight target).

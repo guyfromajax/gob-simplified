@@ -22,15 +22,13 @@
 47. Double rebounds on missed Fast Break shots
 48. Double block announce on Final Shot
 49. Run clock to 0:00 for Final Shot
-
-51, Hold up logic in RR FBs
+50. Triangle FB seems to be jetting players on the alignment step and not adhering to player speed archetypes.
 
 55. Getting a double pass on double screen play where shooter drives to teh basket
 56. Some Fast Breaks are still broken
 
-60. Add dynamic makes and misses to Free Throws (rim aniamtio + SFX)
+57. Player Momentum System
 
-61. RR FB Lane passes are teleporting and not animating
 
 
 

@@ -297,62 +297,39 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         else _coord_of(stealer)
     )
 
-    # --- Geometry: BH target, defender single target, offense setup spots ---
-    bh_target = _compute_bh_target(is_away_offense)
-    defender_target = _compute_defender_target(bh_target, is_away_offense)
-
-    # --- AG-based timing: shooter and per-defender traversal ----------------
-    shooter_rate = _ag_grid_per_game_sec(stealer, "sprint")
-    bh_distance = _euclid(bh_start, bh_target)
-    t_shooter = max(0.1, bh_distance / shooter_rate) if shooter_rate > 0 else 0.5
+    # --- Universal helper: shot geometry + contested decision --------------
+    # For Steal-FB, all 5 defenders are in the race pool (no exclusions).
+    # The helper returns shooter target, defender target, end coords for
+    # all racing defenders, first arriver, contested decision, and t_shooter.
+    from BackEnd.utils.fast_break_shot_geometry import compute_fb_shot_geometry
 
     defenders: List[Any] = [p for p in def_lineup.values() if p is not None]
-    defender_traversals: List[Tuple[Any, Dict[str, float], float, float, float]] = []
-    # tuple = (defender, start_coord, rate, distance, time_to_spot)
+    defender_starts: Dict[str, Dict[str, float]] = {}
     for d in defenders:
-        d_start = _coord_of(d)
-        d_rate = _ag_grid_per_game_sec(d, "sprint")
-        d_dist = _euclid(d_start, defender_target)
-        d_time = (d_dist / d_rate) if d_rate > 0 else float("inf")
-        defender_traversals.append((d, d_start, d_rate, d_dist, d_time))
+        d_id = _safe_id(d)
+        if d_id:
+            defender_starts[d_id] = _coord_of(d)
 
-    # Identify first arriver (smallest time to defender_target).
-    first_arriver_tuple = (
-        min(defender_traversals, key=lambda t: t[4])
-        if defender_traversals
-        else None
+    geometry = compute_fb_shot_geometry(
+        shooter=stealer,
+        shooter_start=bh_start,
+        available_defenders=defenders,
+        defender_starts=defender_starts,
+        is_away_offense=is_away_offense,
     )
-    first_arriver = first_arriver_tuple[0] if first_arriver_tuple else None
-    first_arriver_id = _safe_id(first_arriver)
-    t_first = first_arriver_tuple[4] if first_arriver_tuple else float("inf")
+    bh_target = geometry["shooter_target"]
+    defender_target = geometry["defender_target"]
+    first_arriver_id = geometry["first_arriver_id"]
+    contested = geometry["contested"]
+    shot_defender_id = geometry["shot_defender_id"]
+    t_shooter = geometry["t_shooter_game_seconds"]
 
-    # --- End-of-step positions for the schema --------------------------------
-    end_coords: Dict[str, Dict[str, float]] = {}
+    # End-of-step positions for the schema. Helper returned defenders'
+    # end coords; we add the shooter and the 4 non-shooter offensive
+    # players (sampled HCO setup spots, interpolated at t_shooter).
+    end_coords: Dict[str, Dict[str, float]] = dict(geometry["defender_end_coords"])
     end_coords[stealer_id] = dict(bh_target)
 
-    if t_first < t_shooter:
-        # Case A: First defender reached spot. Freeze fires at t_first.
-        for d, d_start, d_rate, d_dist, d_time in defender_traversals:
-            d_id = _safe_id(d)
-            if d_id is None:
-                continue
-            if d is first_arriver:
-                end_coords[d_id] = dict(defender_target)
-            else:
-                interp = _interpolated_position(d_start, defender_target, d_rate, t_first)
-                end_coords[d_id] = _clamp_defender_freeze(interp, d_start["x"], is_away_offense)
-    else:
-        # Case B: No defender reached spot by t_shooter. All defenders at
-        # interpolated t_shooter positions, NO clamp (freeze never fired).
-        for d, d_start, d_rate, d_dist, d_time in defender_traversals:
-            d_id = _safe_id(d)
-            if d_id is None:
-                continue
-            end_coords[d_id] = _interpolated_position(
-                d_start, defender_target, d_rate, t_shooter
-            )
-
-    # Other 4 offensive players: sample 4 unique HCO setup spots.
     other_off_players: List[Any] = [
         p for p in off_lineup.values() if p is not None and _safe_id(p) != stealer_id
     ]
@@ -361,44 +338,19 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         p_id = _safe_id(player)
         if p_id is None:
             continue
-        # Use interpolated position at t_shooter so they don't overshoot the
-        # gate. End coord is wherever they are when shooter arrives.
         p_start = _coord_of(player)
         p_rate = _ag_grid_per_game_sec(player, "sprint")
         end_coords[p_id] = _interpolated_position(
             p_start, target_spot, p_rate, t_shooter
         )
 
-    # --- Contested decision -------------------------------------------------
-    # Find the defender whose x is closest to basket at t_shooter.
-    contested = False
+    # Resolve shot defender player object from id for use in calculate_shot_score.
     shot_defender: Optional[Any] = None
-    if defender_traversals:
-        if is_away_offense:
-            # AWAY basket at x=9: "closer to basket" = smaller x.
-            closest_tuple = min(
-                defender_traversals,
-                key=lambda t: end_coords[_safe_id(t[0])]["x"]
-                if _safe_id(t[0]) in end_coords
-                else float("inf"),
-            )
-            closest_def_x = end_coords[_safe_id(closest_tuple[0])]["x"]
-            # Past shooter (closer to basket) if defender_x < shooter_x.
-            if closest_def_x < bh_target["x"]:
-                contested = True
-                shot_defender = closest_tuple[0]
-        else:
-            # HOME basket at x=91: "closer to basket" = larger x.
-            closest_tuple = max(
-                defender_traversals,
-                key=lambda t: end_coords[_safe_id(t[0])]["x"]
-                if _safe_id(t[0]) in end_coords
-                else float("-inf"),
-            )
-            closest_def_x = end_coords[_safe_id(closest_tuple[0])]["x"]
-            if closest_def_x > bh_target["x"]:
-                contested = True
-                shot_defender = closest_tuple[0]
+    if shot_defender_id:
+        for d in defenders:
+            if _safe_id(d) == shot_defender_id:
+                shot_defender = d
+                break
 
     # --- Shot resolution ----------------------------------------------------
     shot_manager = (

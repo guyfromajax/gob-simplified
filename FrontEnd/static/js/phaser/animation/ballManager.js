@@ -88,6 +88,15 @@ export const SHOT_DEBUG = false;
 export const REBOUND_DEBUG = false;
 export const INBOUND_DEBUG = false;
 
+// UESS migration guard: putback announcements must come from backend
+// animation_steps. Flip to true only if we intentionally need the legacy
+// frontend fallback while debugging.
+const ENABLE_LEGACY_PUTBACK_SHOT_ANNOUNCEMENTS = false;
+
+function isPutbackShotTurn(turnData) {
+  return turnData?.result_type === "PUTBACK_MAKE" || turnData?.result_type === "PUTBACK_MISS";
+}
+
 
 
 /**
@@ -477,9 +486,8 @@ export async function shootBall({
         const actualDuration = Date.now() - tweenStartTime;
         // console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
-        // Announce shot result when ball reaches rim
-        const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
-        const teamStyle = isHomeTeam ? 'home' : 'away';
+        const shouldSuppressPutbackAnnouncements =
+          isPutbackShotTurn(turnData) && !ENABLE_LEGACY_PUTBACK_SHOT_ANNOUNCEMENTS;
         
         // Check if this is a shooting foul (AND-1 or foul on shot)
         // ✅ FIX: Use reliable detection - check for next_play_type or free_throws_remaining (matches backend fields)
@@ -509,61 +517,78 @@ export async function shootBall({
           });
         }
         
-        // Get shooter/foul player data for announcements
-        const shooterSprite = scene.playerSprites?.[shooterId];
-        const shooterInfo = scene.playerInfo?.[shooterId];
-        
-        // Handle both new nested structure (object) and old flat structure (string)
-        const homeTeamField = scene.simData?.home_team;
-        const awayTeamField = scene.simData?.away_team;
-        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-        const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-        
-        const shooterPlayerData = shooterInfo ? {
-          playerId: shooterId,
-          photo: shooterSprite?.photo || null,
-          teamName: shooterTeamName,
-          secondaryColor: getSecondaryColorForTeam(scene, shooterTeamId)
-        } : null;
-        
-        if (result === "MAKE") {
-          if (isShootingFoul) {
-            // AND-1 - Use special two-row announcement
-            const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
-            if (foulPlayerId && shooterPlayerData) {
-              const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
-              const foulPlayerTeamId = foulPlayerSprite?.team_id;
-              const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-              
-              const foulPlayerData = {
-                playerId: foulPlayerId,
-                photo: foulPlayerSprite?.photo || null,
-                teamName: foulPlayerTeamName,
-                secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
-              };
+        if (shouldSuppressPutbackAnnouncements) {
+          console.error('[UESS][OREB] Suppressed legacy ballManager putback announcement fallback', {
+            result,
+            result_type: turnData?.result_type,
+            current_turn: turnData?.current_turn,
+            has_animation_steps: Array.isArray(turnData?.animation_steps) && turnData.animation_steps.length > 0,
+            isShootingFoul,
+            next_play_type: turnData?.next_play_type,
+            free_throws_remaining: turnData?.free_throws_remaining,
+          });
+        } else {
+          // Announce shot result when ball reaches rim. Putback announcements
+          // are intentionally excluded above during the UESS migration.
+          const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
+          const teamStyle = isHomeTeam ? 'home' : 'away';
 
-              showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
-              
-              // NOTE: Red visual is handled by announcement box styling
-              // No need for separate red flash (would mix with green flash)
+          // Get shooter/foul player data for announcements
+          const shooterSprite = scene.playerSprites?.[shooterId];
+          const shooterInfo = scene.playerInfo?.[shooterId];
+          
+          // Handle both new nested structure (object) and old flat structure (string)
+          const homeTeamField = scene.simData?.home_team;
+          const awayTeamField = scene.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+          
+          const shooterPlayerData = shooterInfo ? {
+            playerId: shooterId,
+            photo: shooterSprite?.photo || null,
+            teamName: shooterTeamName,
+            secondaryColor: getSecondaryColorForTeam(scene, shooterTeamId)
+          } : null;
+          
+          if (result === "MAKE") {
+            if (isShootingFoul) {
+              // AND-1 - Use special two-row announcement
+              const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+              if (foulPlayerId && shooterPlayerData) {
+                const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+                const foulPlayerTeamId = foulPlayerSprite?.team_id;
+                const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+                
+                const foulPlayerData = {
+                  playerId: foulPlayerId,
+                  photo: foulPlayerSprite?.photo || null,
+                  teamName: foulPlayerTeamName,
+                  secondaryColor: getSecondaryColorForTeam(scene, foulPlayerTeamId)
+                };
+
+                showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
+                
+                // NOTE: Red visual is handled by announcement box styling
+                // No need for separate red flash (would mix with green flash)
+              } else {
+                // Fallback if data missing
+                showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+              }
             } else {
-              // Fallback if data missing
-              showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+              // Regular made shot
+              showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
             }
-          } else {
-            // Regular made shot
-            showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
-          }
-        } else if (result === "MISS" && isShootingFoul) {
-          // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow)
-          // Get foul player data from turnData (same pattern as AND-1)
-          const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
-          const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
-          if (foulPlayerId && scene) {
-            announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
-          } else {
-            announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
+          } else if (result === "MISS" && isShootingFoul) {
+            // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow)
+            // Get foul player data from turnData (same pattern as AND-1)
+            const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+            const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+            if (foulPlayerId && scene) {
+              announceGameEvent('FOUL_SHOOTING', turnData, scene, { foulerId: foulPlayerId });
+            } else {
+              announceGameEvent('FOUL_SHOOTING', turnData, scene, {});
+            }
           }
         }
         

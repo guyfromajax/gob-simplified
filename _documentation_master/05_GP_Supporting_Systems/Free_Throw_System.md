@@ -2,10 +2,9 @@
 
 **Base Constants**
 
-1. **Free Throw Score Formula**: `(FT * 0.7) + (CH * 0.2) + MO`
-   - FT (Free Throw): 70% weight
+1. **Free Throw Score Formula**: `(FT * 0.8) + (CH * 0.2)`
+   - FT (Free Throw): 80% weight
    - CH (Clutch): 20% weight
-   - MO (Momentum): Full value (not weighted)
 2. **Random Roll**: `random.randint(1, 100)` (1-100 range)
 3. **Primary Success Check**: `result < ft_shot_score` → MAKE
 4. **Secondary Check (Miss-to-Make Conversion)**: 40% chance to convert miss to make
@@ -24,7 +23,7 @@
    - Raise error if no shooter found
 
 2. **Calculate Free Throw Score**
-   - Formula: `(FT * 0.7) + (CH * 0.2) + MO`
+   - Formula: `(FT * 0.8) + (CH * 0.2)`
    - Roll: `random.randint(1, 100)`
    - Primary check: `makes_shot = result < ft_shot_score`
 
@@ -72,16 +71,15 @@ The **Free Throw System** handles free throw shot attempts and outcomes. Free th
 
 **Primary Formula:**
 ```python
-ft_shot_score = (attrs["FT"] * 0.7) + (attrs["CH"] * 0.2) + attrs["MO"]
+ft_shot_score = (attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)
 result = random.randint(1, 100)
 makes_shot = result < ft_shot_score
 ```
 
 **Components:**
 1. **Player Attributes:**
-   - `FT` (Free Throw) - 70% weight
+   - `FT` (Free Throw) - 80% weight
    - `CH` (Clutch) - 20% weight
-   - `MO` (Momentum) - Full value added (not weighted)
 
 2. **Random Roll:** `random.randint(1, 100)` (1-100 range)
 
@@ -101,10 +99,10 @@ if not makes_shot:
 This secondary check provides a "second chance" mechanic that increases overall free throw percentage, helping to achieve the target FT% of 72% per game.
 
 **Example:**
-- Player with `FT = 80`, `CH = 70`, `MO = 5`
-- `ft_shot_score = (80 * 0.7) + (70 * 0.2) + 5 = 56 + 14 + 5 = 75`
+- Player with `FT = 80`, `CH = 70`
+- `ft_shot_score = (80 * 0.8) + (70 * 0.2) = 64 + 14 = 78`
 - Random roll: `80` (1-100)
-- Initial result: `80 >= 75` → **MISS**
+- Initial result: `80 >= 78` → **MISS**
 - Secondary check: `random.random() = 0.35` (35% < 40%) → **CONVERTED TO MAKE**
 - Final result: **MAKE**
 

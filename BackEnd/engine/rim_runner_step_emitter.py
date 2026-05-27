@@ -877,6 +877,16 @@ def _build_lane_pass_step(
         "clock": clock_start,
         "advance_trigger": advance_trigger,
         "announcement": announcement,
+        # FE pass-mode machinery: drives ball detach + tween at the
+        # canonical pass grid/game-sec rate, and re-attaches to the
+        # receiver on tween onComplete. Without this, the FE falls back
+        # to using step T (RR's short sprint, ~0.3 game-sec) as the ball
+        # duration — and since the passer is mid-court while catch_grid
+        # is near the rim, the ball teleports across that distance in the
+        # tiny step T window. See animationPlayback.js `isSchemaPassStep`
+        # and the `ball_motion_style === "pass"` branches in
+        # `renderBallTransition`.
+        "ball_motion_style": "pass",
     }
     end: StepEnd = {
         "coords": end_coords,

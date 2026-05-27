@@ -2002,12 +2002,12 @@
       word-break: break-word;
     }
 
-    /* 6. Inactive offense play name */
-    #row-offense:not(.armed) .play-name {
+    /* 6. Inactive offense play name — default dim; only .selected brightens (not whole row when armed). */
+    #row-offense:not(.armed) .play-name,
+    #row-offense.armed .play-option:not(.selected) .play-name {
       color: rgba(255, 255, 255, 0.55);
     }
 
-    #row-offense.armed .play-name,
     .play-option.selected .play-name {
       color: #fff;
     }
