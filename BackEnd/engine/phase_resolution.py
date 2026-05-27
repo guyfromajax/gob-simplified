@@ -1040,6 +1040,43 @@ def resolve_fast_break_logic(game: "GameManager"):
         DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET if rebound else DEFENSIVE_STOP_Y_RANGE
     )
 
+    # AFTER_STEAL FB short-circuit: the new resolver builds the complete
+    # turn_result (geometry, contested decision, shot resolution, end coords
+    # for all 10 players). The legacy steal-entry + stopper / hold_up logic
+    # downstream is BYPASSED for this path (left intact for DREB FBs).
+    # Schema emission is also handled here so the FE renders from the
+    # turn_result["animation_steps"] payload. See
+    # BackEnd/engine/after_steal_fast_break.py for the spec.
+    if not rebound and fb_play_key == AFTER_STEAL:
+        from BackEnd.engine.after_steal_fast_break import (
+            resolve_after_steal_fast_break,
+        )
+
+        turn_result = resolve_after_steal_fast_break(game)
+
+        # Schema emission for after_steal — same emitter as before, but the
+        # refactored version reads from turn_result["after_steal_end_coords"]
+        # and builds a single drive step + skeleton post-shot sub-steps.
+        try:
+            from BackEnd.engine.after_steal_fast_break_step_emitter import (
+                build_after_steal_fast_break_animation_steps,
+            )
+
+            anim_steps = build_after_steal_fast_break_animation_steps(
+                turn_result, game,
+            )
+            if anim_steps is not None:
+                turn_result["animation_steps"] = anim_steps
+        except Exception as e:  # pragma: no cover
+            logging.warning(
+                "build_after_steal_fast_break_animation_steps failed: %s", e
+            )
+
+        # Track per-play "attempted" aggregate (parity with line 1025).
+        # Already incremented above for all FB paths; "S" increment is in
+        # the new resolver.
+        return turn_result
+
     if rebound and fb_play_key in (RIM_RUNNER, TRIANGLE):
         from BackEnd.engine.rim_runner_fast_break import resolve_rim_runner_fast_break
 

@@ -24,15 +24,14 @@
 49. Run clock to 0:00 for Final Shot
 
 51, Hold up logic in RR FBs
-52. No rim visual + SFX on OREB putback makes and misses?
 
 55. Getting a double pass on double screen play where shooter drives to teh basket
 56. Some Fast Breaks are still broken
 
-58. Add shot miss rim animation on shooting fouls
-59. Announced Shootig Foul and Holding on same turn. Then announced Shooting Foul and Block Foul (both were bonus situations)
 60. Add dynamic makes and misses to Free Throws (rim aniamtio + SFX)
-61. Steal step back to HCO handoff wonkiness, I don't think we're registering step back coords in the emitter
+
+61. RR FB Lane passes are teleporting and not animating
+
 
 
 

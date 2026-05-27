@@ -241,6 +241,30 @@ class ShotManager:
         logging.debug(f"🔍 [SHOT LOCATION] No shoot action found for {shooter_pos} in any step")
         return (None, None)
 
+    def _compute_miss_bounce_spot(self, roles, shooter, off_team):
+        """Grid coord where a missed shot's ball rests for schema ``[bounce]``."""
+        block_spot_used = getattr(self, "_block_spot", None)
+        if block_spot_used:
+            return block_spot_used
+        if roles.get("is_fast_break"):
+            is_away_offense = off_team.team_id == self.game.away_team.team_id
+            basket_x = 9 if is_away_offense else 91
+            return calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
+        _, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
+        return calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
+
+    def _ensure_schema_miss_bounce_for_free_throw(self, result, roles, shooter, off_team):
+        """MISS → FREE_THROW turns need ``ball_bounce_x/y`` for schema ``needs_bounce``."""
+        if str(result.get("result_type") or "").upper() != "MISS":
+            return
+        if str(result.get("next_play_type") or "").upper() != "FREE_THROW":
+            return
+        if result.get("ball_bounce_x") is not None and result.get("ball_bounce_y") is not None:
+            return
+        bounce_spot = self._compute_miss_bounce_spot(roles, shooter, off_team)
+        result["ball_bounce_x"] = bounce_spot["x"]
+        result["ball_bounce_y"] = bounce_spot["y"]
+
     def _resolve_dreb_outlet_receiver(self, rebound_team, rebounder_id):
         """Select deterministic outlet receiver for DREB->halfcourt transition."""
         if rebound_team is None:
@@ -789,6 +813,10 @@ class ShotManager:
                                 "next_play_type": "FREE_THROW",
                                 "shooter": shooter,
                             }
+                        if not made_from_foul:
+                            self._ensure_schema_miss_bounce_for_free_throw(
+                                result, roles, shooter, off_team,
+                            )
                         return result
                     elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
                         # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
@@ -1384,28 +1412,6 @@ class ShotManager:
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
-
-                # Stamp `ball_bounce_x/y` so the schema emitter's `needs_bounce`
-                # gate flips True → the `[bounce]` sub-step fires after
-                # `[ball_flight]`, giving shooting-foul-on-miss the same
-                # rim-action-and-bounce visual as a regular miss (instead of
-                # the ball sticking at rim/back-of-rim). The next-turn FT
-                # setup runs after the schema sub-steps complete; this only
-                # affects the visual bounce, not game logic. Uses the same
-                # `calculate_bounce_spot` path as the regular-miss branch
-                # below — FB uses basket_x; HCO uses shooter_spot.
-                block_spot_used = getattr(self, "_block_spot", None)
-                if block_spot_used:
-                    bounce_spot = block_spot_used
-                elif is_fast_break:
-                    is_away_offense = off_team.team_id == self.game.away_team.team_id
-                    basket_x = 9 if is_away_offense else 91
-                    bounce_spot = calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
-                else:
-                    _, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
-                    bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
-                result["ball_bounce_x"] = bounce_spot["x"]
-                result["ball_bounce_y"] = bounce_spot["y"]
 
                 # Stamp the 4 post-shot overlay maps so the schema engine's
                 # `_collect_overlay_players` picks them up and animates
@@ -2181,6 +2187,12 @@ class ShotManager:
                     result.get("rebounderId"),
                     next_play_type,
                 )
+
+        # Shooting-foul-on-miss (and block-recon miss → FT) must carry
+        # ball_bounce_x/y so the schema emitter appends [bounce] after
+        # [ball_flight]. Centralized here so every MISS → FREE_THROW path
+        # is covered regardless of which branch set next_play_type.
+        self._ensure_schema_miss_bounce_for_free_throw(result, roles, shooter, off_team)
 
         # Enforce role-exclusivity invariant on the post-shot overlay maps
         # before returning. Single source of truth for "which player belongs

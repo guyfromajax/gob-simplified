@@ -1454,6 +1454,14 @@ def build_skeleton_animation_steps(
             # MISS/MAKE shot-result paths). MISS + FT uses
             # _stamp_shooting_foul_on_miss_end inside _build_post_shot_sub_steps.
 
+            # Post-steal HCO transition: when STEAL leads to HCO/HCT/FCP (not
+            # FB), append a silent step-back + 9-player court transition. The
+            # step's end.coords becomes the turn's final_coords so the next
+            # HCO turn's dynamic handoff reads correct start positions and
+            # doesn't teleport. No-op for STEAL → FAST_BREAK (handled by the
+            # after_steal FB emitter).
+            _append_post_steal_hco_transition(steps, turn_result, game)
+
     return steps
 
 
@@ -2310,3 +2318,228 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
                 start_actions[pid_str] = "cut"
             if isinstance(start_archetype, dict):
                 start_archetype[pid_str] = "standard"
+
+
+# --- Post-STEAL → HCO transition step --------------------------------------
+#
+# When a steal occurs inside an HCO turn and the next play is HCO/HCT/FCP
+# (i.e., NOT a fast break — the FB path is handled by the after_steal FB
+# emitter), append a silent transition step at the end of the STEAL turn:
+#
+#   - Stealer step-backs 3-7 grid spots TOWARD the basket they were
+#     defending (= the old offense's offensive basket), y drift ±3, clamped
+#     to court bounds. Half-court guard: stealer cannot cross x=50 backwards
+#     into their own new backcourt once they're in their new frontcourt.
+#   - Other 9 players move 5-10 grid spots toward the NEW offense's basket
+#     (their setup direction), y drift ±6, clamped to court bounds.
+#   - Ball stays attached to the stealer for the entire step.
+#   - No announcement (silent).
+#
+# The step's end.coords becomes the turn's final_coords — so the next HCO
+# turn's first step reads correct positions and the dynamic handoff doesn't
+# teleport. Replaces the deleted FE-only animateStealHCOSetup tween.
+
+_POST_STEAL_STEALER_MOVE_X_MIN: int = 3
+_POST_STEAL_STEALER_MOVE_X_MAX: int = 7
+_POST_STEAL_STEALER_MOVE_Y_RANGE: int = 3
+_POST_STEAL_OTHERS_MOVE_X_MIN: int = 5
+_POST_STEAL_OTHERS_MOVE_X_MAX: int = 10
+_POST_STEAL_OTHERS_MOVE_Y_RANGE: int = 6
+_POST_STEAL_Y_MIN: int = 3
+_POST_STEAL_Y_MAX: int = 47
+_POST_STEAL_X_MIN: int = 4
+_POST_STEAL_X_MAX: int = 96
+_POST_STEAL_STEP_T_GAME_SECONDS: float = 0.5
+
+
+def _append_post_steal_hco_transition(
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+    game: Any,
+) -> None:
+    """If this HCO STEAL turn transitions to HCO/HCT/FCP (not FB), append a
+    silent post-steal transition step that moves the stealer back toward
+    the old defended basket and shifts the other 9 toward the new
+    offensive end. The step's end.coords becomes the turn's authoritative
+    coord snapshot for the next HCO turn's handoff. No-op for steals that
+    transition to FAST_BREAK (handled by the after_steal FB emitter).
+    """
+    import random
+
+    if not steps:
+        return
+
+    result_type = (turn_result.get("result_type") or "").upper()
+    if result_type != "STEAL":
+        return
+
+    next_play_type = str(turn_result.get("next_play_type") or "").upper()
+    if next_play_type not in ("HCO", "HCT", "FCP"):
+        return
+
+    stealer_id = _safe_id(turn_result.get("stealer_id")) or _safe_id(
+        turn_result.get("stealer")
+    )
+    if not stealer_id:
+        return
+
+    prior = steps[-1]
+    prior_end = prior.get("end") if isinstance(prior, dict) else None
+    if not isinstance(prior_end, dict):
+        return
+    start_coords_raw = prior_end.get("coords") or {}
+    if not isinstance(start_coords_raw, dict) or stealer_id not in start_coords_raw:
+        return
+
+    # Normalize start_coords to GridCoord dicts and float values.
+    start_coords: Dict[str, GridCoord] = {}
+    for pid, coord in start_coords_raw.items():
+        if isinstance(coord, dict) and "x" in coord and "y" in coord:
+            start_coords[str(pid)] = {
+                "x": float(coord["x"]),
+                "y": float(coord["y"]),
+            }
+    if stealer_id not in start_coords:
+        return
+
+    # NEW offense = the team that just stole = current defense_team (possession
+    # flip happens AFTER this turn returns from resolution). The new offense's
+    # offensive basket is where they shoot when on offense — the AWAY rim if
+    # the new offense IS the away team, else the HOME rim.
+    new_off_team = getattr(game, "defense_team", None)
+    away_team = getattr(game, "away_team", None)
+    if new_off_team is None or away_team is None:
+        return
+    is_new_away_offense = bool(
+        getattr(new_off_team, "team_id", None) == getattr(away_team, "team_id", None)
+    )
+
+    # Direction conventions (court is fixed; teams don't flip baskets):
+    #   - AWAY shoots at x=9 (AWAY_RIM_COORDS), so AWAY's offensive direction
+    #     is -x (toward x=9).
+    #   - HOME shoots at x=91, so HOME's offensive direction is +x.
+    # Stealer step-back is TOWARD the basket they were defending = the OLD
+    # offense's offensive basket = the OPPOSITE of the new offense's offensive
+    # direction.
+    new_off_direction = -1 if is_new_away_offense else +1  # toward new off rim
+    stealer_step_back_dir = -new_off_direction  # toward old defended rim
+
+    # Compute stealer end coord.
+    stealer_start = start_coords[stealer_id]
+    stealer_move_x = random.randint(
+        _POST_STEAL_STEALER_MOVE_X_MIN, _POST_STEAL_STEALER_MOVE_X_MAX
+    )
+    stealer_move_y = random.randint(
+        -_POST_STEAL_STEALER_MOVE_Y_RANGE, _POST_STEAL_STEALER_MOVE_Y_RANGE
+    )
+    stealer_end_x = stealer_start["x"] + (stealer_step_back_dir * stealer_move_x)
+
+    # Half-court (over-and-back) guard. Only triggers when the stealer is
+    # already in their NEW frontcourt — otherwise they're already in
+    # backcourt and have free movement within it.
+    if is_new_away_offense:
+        # AWAY new offense: frontcourt = x<50, step-back goes +x toward x=91.
+        # If pre-x < 50 (frontcourt), post-x must stay ≤ 50.
+        if stealer_start["x"] < 50.0:
+            stealer_end_x = min(50.0, stealer_end_x)
+    else:
+        # HOME new offense: frontcourt = x>50, step-back goes -x toward x=9.
+        # If pre-x > 50 (frontcourt), post-x must stay ≥ 50.
+        if stealer_start["x"] > 50.0:
+            stealer_end_x = max(50.0, stealer_end_x)
+
+    stealer_end_x = max(float(_POST_STEAL_X_MIN), min(float(_POST_STEAL_X_MAX), stealer_end_x))
+    stealer_end_y = max(
+        float(_POST_STEAL_Y_MIN),
+        min(float(_POST_STEAL_Y_MAX), stealer_start["y"] + stealer_move_y),
+    )
+
+    end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    end_coords[stealer_id] = {"x": stealer_end_x, "y": stealer_end_y}
+
+    # Other 9: move toward NEW offense basket, smaller 5-10 grid range.
+    for pid, coord in start_coords.items():
+        if pid == stealer_id:
+            continue
+        move_x = random.randint(
+            _POST_STEAL_OTHERS_MOVE_X_MIN, _POST_STEAL_OTHERS_MOVE_X_MAX
+        )
+        move_y = random.randint(
+            -_POST_STEAL_OTHERS_MOVE_Y_RANGE, _POST_STEAL_OTHERS_MOVE_Y_RANGE
+        )
+        new_x = coord["x"] + (new_off_direction * move_x)
+        new_x = max(float(_POST_STEAL_X_MIN), min(float(_POST_STEAL_X_MAX), new_x))
+        new_y = max(
+            float(_POST_STEAL_Y_MIN),
+            min(float(_POST_STEAL_Y_MAX), coord["y"] + move_y),
+        )
+        end_coords[pid] = {"x": new_x, "y": new_y}
+
+    # Action/archetype maps. Stealer dribbles (cruise); others sprint to setup.
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetypes: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in start_coords
+    }
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(end_coords[pid]) for pid in start_coords
+    }
+    actions[stealer_id] = "dribble"
+    archetypes[stealer_id] = "standard"
+    for pid in start_coords:
+        if pid == stealer_id:
+            continue
+        actions[pid] = "sprint"
+        archetypes[pid] = "sprint"
+
+    t = _POST_STEAL_STEP_T_GAME_SECONDS
+    prior_clock = prior_end.get("clock") or {}
+    clock_remaining = float(prior_clock.get("clock_remaining", 0) or 0)
+    shot_clock_remaining = float(prior_clock.get("shot_clock_remaining", 0) or 0)
+
+    advance_trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": float(t),
+        "metadata": {"kind": "post_steal_hco_transition"},
+    }
+
+    # Inherit the prior step's turn_stop (the STEAL event) as our terminal
+    # next pointer; the prior step now points to this new step instead.
+    inherited_next = prior_end.get("next") or {
+        "kind": "turn_stop",
+        "event": "STEAL",
+        "payload": {
+            "stealer_id": turn_result.get("stealer_id"),
+            "victim_id": turn_result.get("victim_id"),
+        },
+    }
+
+    new_step: AnimationStep = {
+        "start": {
+            "coords": dict(start_coords),
+            "destination": destinations,
+            "action": actions,
+            "archetype": archetypes,
+            "ball": {"owner_player_id": stealer_id},
+            "clock": {
+                "clock_remaining": clock_remaining,
+                "shot_clock_remaining": shot_clock_remaining,
+            },
+            "advance_trigger": advance_trigger,
+        },
+        "end": {
+            "coords": dict(end_coords),
+            "ball": {"owner_player_id": stealer_id},
+            "time_elapsed": float(t),
+            "clock": {
+                "clock_remaining": clock_remaining - t,
+                "shot_clock_remaining": shot_clock_remaining - t,
+            },
+            "next": inherited_next,
+        },
+    }
+
+    # Rewire prior step's next pointer to this new step.
+    prior_end["next"] = {"kind": "next_step", "index": len(steps)}
+    steps.append(new_step)
