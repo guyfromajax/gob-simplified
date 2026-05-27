@@ -2,8 +2,8 @@
 
 **Base Constants**
 
-1. **Game Completion Trigger**: Q4 ends (or overtime if applicable)
-2. **Completion Detection**: `quarter === 4` and game is finalized
+1. **Game Completion Trigger**: Backend marks a completed Q4 or overtime quarter as final when the score is not tied
+2. **Completion Detection**: Backend response field `is_final === true`; the frontend must not recompute final-vs-overtime from scores
 3. **Navigation Parameters**:
    - `gameId` - Game document ID
    - `mode` - Game mode: 'single', 'tournament', or 'franchise'
@@ -16,7 +16,7 @@
    - Franchise Mode: `/static/franchise-command-center.html?franchise_id={id}&team_id={id}`
    - Single Game Mode: `/static/mode-select.html`
 5. **Key Files**:
-   - `FrontEnd/static/js/phaser/gameScene.js` - Detects game completion, calls completion popup
+   - `FrontEnd/static/js/phaser/gameScene.js` - Renders backend final/quarter-break responses and calls completion popup when `is_final === true`
    - `FrontEnd/static/js/phaser/finalizeGame.js` - Tournament save-result; franchise **phase-a** at EOG (see split API below)
    - `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Creates completion popup; franchise phase B pending: starts **phase-b** in background when popup shows; PGPC vs locker CTA via **`FRANCHISE_PGPC_AT_EOG_ENABLED`** (`franchisePhaseBClient.js`); see `Press_Conference_System.md`
    - `FrontEnd/static/box-score.js` - Locker room navigation; franchise **phase-b** when week finish is pending
@@ -26,7 +26,7 @@
 
 **End of Game System Flow (6 Steps)**
 
-1. **Game Completion Detection**: Game completes when Q4 ends (or overtime), detected in `gameScene.js` when `quarter === 4` and game is finalized
+1. **Game Completion Detection**: Game completes only when the backend returns `is_final === true` after Q4 or any overtime quarter
 2. **Backend Game Finalization** (Franchise Mode — **split API**, April 2026): 
    - **Phase A (automatic at EOG):** `POST /franchise/complete-week/phase-a` with the same body as the historical monolith (`franchise_id`, `week`, `game_id`, `result`, optional `game_document`). Persists the **user** game: `games` / EOG / inbox / `franchise.results[week]` user row, sets `post_game_status.phase_a_user_week`. Idempotent if phase A already completed for that week.
    - **Phase B (user-triggered):** `POST /franchise/complete-week/phase-b` with **`{ franchise_id, week }` only**. Runs CPU games for the rest of the week, recruiting / rank-prestige / EOS side effects, week advance, and clears `post_game_status.phase_a_user_week`. Requires phase A done and non-empty `results[week]`; idempotent if franchise `week` already advanced past the request.
@@ -43,6 +43,33 @@
   - If free throws are pending, run the free throws first, then resolve to End of Game or Overtime based on the post-FT score.
   - If free throws are not pending, resolve directly to End of Game or Overtime (skip other in-turn interruption flows).
 - This prevents final-turn edge cases from skipping score-impacting free throws and keeps quarter/final scoring consistent.
+
+### Final vs Overtime Authority (May 2026)
+
+The backend is the only authority for whether a completed period enters End of Game or advances to overtime. This follows the UESS migration rule that the frontend is a renderer, not a game-logic owner.
+
+**Backend contract:**
+- At quarter completion, `/api/simulate-turn` returns:
+  - `quarter_complete: true`
+  - `quarter`: the backend-ready next quarter number
+  - `next_quarter`: same next-quarter value for explicit navigation
+  - `is_final`: `true` only when Q4 or an overtime quarter completed with `home_score != away_score`
+  - `home_score` / `away_score`: display/debug fields only for this decision
+- The zero-clock early-return path returns the same final-navigation contract (`is_final`, `quarter`, `next_quarter`, scores), so edge responses do not fall back to frontend scoring logic.
+- Full-quarter simulation uses the persisted game summary from `summarize_game_state()`, where `is_final` is true only when `game.quarter > 4` and the score is not tied.
+
+**Frontend contract:**
+- `gameScene.js` must finalize only when `lastTurnData.is_final === true`.
+- If `quarter_complete === true` and `is_final !== true`, the frontend renders the next quarter/OT lineup break using backend `next_quarter` / `quarter`.
+- The frontend must not decide End of Game vs OT by comparing `home_score` and `away_score`, checking `quarter === 4`, or deriving tie state locally.
+- `bootGame.js` full-quarter flows must continue using `lastSummary.is_final === true` as the only game-complete signal.
+
+**Desired period-completion behavior:**
+- End of Q1-Q3: `is_final: false`, next quarter is Q2-Q4.
+- End of Q4 with tied score: `is_final: false`, next quarter is OT1 (`quarter: 5`).
+- End of Q4 with non-tied score: `is_final: true`, enter End of Game flow.
+- End of any OT with tied score: `is_final: false`, next quarter is the next OT.
+- End of any OT with non-tied score: `is_final: true`, enter End of Game flow.
 
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System. For a side-by-side comparison with Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
@@ -145,8 +172,9 @@ The End of Game System handles game completion, displays final scores, and provi
 ### Game Completion Flow
 
 **Trigger:**
-- Game completes when Q4 ends (or overtime if applicable)
-- Detected in `gameScene.js` when `quarter === 4` and game is finalized
+- Game completes when the backend returns `is_final === true` after a completed Q4 or overtime quarter.
+- Tied completed Q4/OT periods are not final; the backend returns `is_final: false` and the next quarter/OT number.
+- `gameScene.js` renders that response; it does not compare scores or derive overtime locally.
 
 **Completion Popup:**
 - **Location:** `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`
@@ -284,7 +312,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 
 ### Key Files
 
-- **`FrontEnd/static/js/phaser/gameScene.js`** - Detects game completion, calls completion popup
+- **`FrontEnd/static/js/phaser/gameScene.js`** - Renders backend final/quarter-break responses and calls completion popup when `is_final === true`
 - **`FrontEnd/static/js/phaser/finalizeGame.js`** - Franchise EOG: **phase-a**; builds `finalScore` with phase B pending for popup
 - **`FrontEnd/static/js/phaser/utils/gameCompletionPopup.js`** - Completion popup; kicks off **`getOrStartFranchisePhaseB`** when franchise + phase B pending; **`FRANCHISE_PGPC_AT_EOG_ENABLED`** toggles PGPC vs Box Score + locker on franchise EOG; `post_game_phase_b` on box-score link when pending
 - **`FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js`** - Single-flight `POST …/phase-b` Promise per franchise week (EOG + PGPC share)

@@ -4265,6 +4265,13 @@ try:
         # Check if quarter is already over.
         # Edge-case rule: at 0:00, only continue if a free throw sequence is pending.
         if gm.game_state["time_remaining"] <= 0 and not pending_terminal_ft:
+            home_score = gm.score.get(gm.home_team.name, 0)
+            away_score = gm.score.get(gm.away_team.name, 0)
+            is_final = (
+                getattr(gm, "quarter", 1) >= 4
+                and home_score != away_score
+            )
+            next_quarter = gm.quarter if is_final or gm.quarter > 4 else gm.quarter + 1
             logging.warning(
                 "🧭 [SIM TURN EARLY RETURN TRACE] reason=quarter_complete game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s",
                 game_id,
@@ -4277,10 +4284,12 @@ try:
             early_return = {
                 "quarter_complete": True,
                 "game_id": game_id,
-                "quarter": gm.quarter,
+                "quarter": next_quarter,
+                "next_quarter": next_quarter,
+                "is_final": is_final,
                 "time_remaining": 0,
-                "home_score": gm.score.get(gm.home_team.name, 0),
-                "away_score": gm.score.get(gm.away_team.name, 0),
+                "home_score": home_score,
+                "away_score": away_score,
                 "turn": None
             }
             # ⏱️ PERFORMANCE: Log early return path
@@ -4691,6 +4700,7 @@ try:
                 "clock": gm.game_state.get("clock", "8:00"),
                 "quarter_complete": quarter_complete,
                 "quarter": gm.quarter,
+                "next_quarter": gm.quarter if quarter_complete else None,
                 "is_final": is_final,
                 "home_score": gm.score.get(gm.home_team.name, 0),
                 "away_score": gm.score.get(gm.away_team.name, 0),

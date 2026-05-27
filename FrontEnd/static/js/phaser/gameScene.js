@@ -3784,11 +3784,8 @@ export function createGameScene(Phaser) {
       
       console.log(`🏁 Quarter ${this.quarter} finished! Total turns: ${turnCount}`);
       
-      // Check if game should end or go to overtime
-      // nextQuarterNumber is the quarter number the backend is ready for next
-      // So the quarter we just finished is nextQuarterNumber - 1
-      // ✅ FIX: Use this.quarter (the quarter we just finished) instead of nextQuarterNumber - 1
-      // This is more reliable since this.quarter is set by the backend
+      // Backend owns the game-end decision. The frontend only renders either
+      // the final flow or the next backend-provided quarter break.
       const quarterThatJustFinished = this.quarter;
       
       // Use scores from lastTurnData if available (most recent/accurate), otherwise fall back to tracked scores
@@ -3798,95 +3795,24 @@ export function createGameScene(Phaser) {
       const finalAwayScore = (lastTurnData && lastTurnData.away_score !== undefined)
         ? lastTurnData.away_score
         : lastAwayScore;
-      const finalIsTied = finalHomeScore === finalAwayScore;
-      
-      // Check if backend marked game as final (more reliable than frontend calculation)
-      let isFinalFromBackend = false;
-      if (lastTurnData && lastTurnData.is_final !== undefined) {
-        isFinalFromBackend = lastTurnData.is_final;
-      }
+      const isFinalFromBackend = lastTurnData?.is_final === true;
+      const backendNextQuarterRaw = lastTurnData?.next_quarter ?? lastTurnData?.quarter ?? nextQuarterNumber;
+      const backendNextQuarter = Number(backendNextQuarterRaw);
+      const nextQuarterFromBackend = Number.isFinite(backendNextQuarter)
+        ? backendNextQuarter
+        : nextQuarterNumber;
       
       console.log('🏁 Game completion check:', {
         quarterJustFinished: quarterThatJustFinished,
-        nextQuarter: nextQuarterNumber,
+        nextQuarter: nextQuarterFromBackend,
         homeScore: finalHomeScore,
         awayScore: finalAwayScore,
-        isTied: finalIsTied,
         isFinalFromBackend: isFinalFromBackend,
+        backendDecisionSource: 'lastTurnData.is_final',
         lastTurnDataScores: lastTurnData ? { home: lastTurnData.home_score, away: lastTurnData.away_score } : null
       });
-      
-      // Game ends if:
-      // 1. Backend says is_final = true (Q4+ complete and not tied)
-      // 2. Q4 is complete and scores are NOT tied → game over
-      // 3. Any OT is complete and scores are NOT tied → game over
-      // Game continues if:
-      // 1. Q4 is complete and scores ARE tied → go to OT
-      // 2. OT is complete and scores ARE tied → go to next OT
-      
-      // Check tie condition FIRST - if tied, go to OT regardless of isFinalFromBackend
-      if (quarterThatJustFinished === 4 && finalIsTied) {
-        // Q4 tied - go to OT
-        console.log('⏰ Game tied after Q4! Going to overtime...');
-        // Show locker room popup for OT
-        const nextQ = nextQuarterNumber; // Should be 5 (first OT)
-        const params = new URLSearchParams(window.location.search);
-        params.set('game_id', this.gameId);
-        params.set('quarter', nextQ);
-        params.set('period', 'OT1');
-        // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
-        
-        // Create locker room popup
-        const popup = document.createElement('div');
-        popup.className = 'locker-room-popup';
-        popup.innerHTML = `
-          <div class="locker-room-content">
-            <h2>Overtime!</h2>
-            <p>Game tied ${finalHomeScore}-${finalAwayScore}</p>
-            <button class="locker-room-button">Start Overtime</button>
-          </div>
-        `;
-        document.body.appendChild(popup);
-        
-        // Wire up button
-        const button = popup.querySelector('.locker-room-button');
-        button.addEventListener('click', () => {
-          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-          window.location.href = `/set-lineup.html?${params.toString()}`;
-        });
-        return;
-      } else if (quarterThatJustFinished > 4 && finalIsTied) {
-        // OT tied - go to next OT
-        const currentOTNumber = quarterThatJustFinished - 4;
-        const nextOTNumber = currentOTNumber + 1;
-        console.log(`⏰ OT${currentOTNumber} tied! Going to OT${nextOTNumber}...`);
-        const nextOT = nextQuarterNumber; // Should be the next OT quarter number
-        const params = new URLSearchParams(window.location.search);
-        params.set('game_id', this.gameId);
-        params.set('quarter', nextOT);
-        params.set('period', `OT${nextOTNumber}`);
-        // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
-        
-        // Create locker room popup
-        const popup = document.createElement('div');
-        popup.className = 'locker-room-popup';
-        popup.innerHTML = `
-          <div class="locker-room-content">
-            <h2>Overtime ${currentOTNumber} Complete!</h2>
-            <p>Game still tied ${finalHomeScore}-${finalAwayScore}</p>
-            <button class="locker-room-button">Start OT${nextOTNumber}</button>
-          </div>
-        `;
-        document.body.appendChild(popup);
-        
-        // Wire up button
-        const button = popup.querySelector('.locker-room-button');
-        button.addEventListener('click', () => {
-          if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-          window.location.href = `/set-lineup.html?${params.toString()}`;
-        });
-        return;
-      } else if (isFinalFromBackend || (quarterThatJustFinished >= 4 && !finalIsTied)) {
+
+      if (isFinalFromBackend) {
         // Game is over - finalize
         console.log('🏆 Game complete! Finalizing...');
         
@@ -4028,7 +3954,7 @@ export function createGameScene(Phaser) {
       } else {
         // Regular quarter complete (Q1-Q3) - show locker room popup
         console.log('✅ Quarter complete - showing locker room popup');
-        const nextQ = this.quarter + 1;
+        const nextQ = nextQuarterFromBackend;
         
         // ✅ FIX: Use TimeoutNavigationHelper (same as Sim Quarter) to ensure resume_from_timeout=false
         // This matches the working Sim Quarter pattern exactly
