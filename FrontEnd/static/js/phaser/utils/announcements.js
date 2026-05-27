@@ -231,13 +231,33 @@ function buildHeadshotInitialsInfo(player, teamSide) {
   };
 }
 
+/**
+ * Normalize player headshot paths for the current host.
+ * On localhost (Flask static), ensure `/static/` prefix; on production, strip it
+ * so paths resolve against the deployed asset root (see preloadPlayerHeadshots.js).
+ */
+export function normalizeHeadshotUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location?.hostname === 'localhost' ||
+      window.location?.hostname === '127.0.0.1');
+  if (!isLocalhost && url.startsWith('/static/')) {
+    return url.replace('/static', '');
+  }
+  if (isLocalhost && !url.startsWith('/static/') && url.startsWith('/images/')) {
+    return `/static${url}`;
+  }
+  return url;
+}
+
 /** Build player image URL with static prefix (localhost vs production). Prefer explicit photo; else /players/{playerId}.png when id known; else generic. Card img onerror maps to generic. */
 export function getPlayerImageUrl(photo, playerId) {
   const base = (typeof window !== 'undefined' && window.API_CONFIG?.buildStaticPath)
     ? window.API_CONFIG.buildStaticPath('/images/players/')
     : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/');
   const filename = playerId ? `${playerId}.png` : 'generic_headshot.png';
-  return photo || `${base}${filename}`;
+  return normalizeHeadshotUrl(photo || `${base}${filename}`);
 }
 
 /** Resolve team secondary color from scene (home/away by team_id). Returns hex string or fallback. */

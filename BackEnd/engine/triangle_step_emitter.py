@@ -11,6 +11,7 @@ See ``rim_runner_step_emitter`` module docstring for shared step builders.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
@@ -354,6 +355,15 @@ def _build_triangle_decision_steps(
     cursor_coords = dict(step_start_coords)
     next_idx = next_step_index
 
+    logging.warning(
+        "🔍 [TRIANGLE DECISION] branch=%s bh_id=%s rr_id=%s corner_id=%s "
+        "rim_runner_to=%s same_side_corner_to=%s "
+        "triangle_drive_to=%s triangle_rr_drive_to=%s",
+        branch, bh_id, rr_id, corner_id,
+        payload.get("rim_runner_to"), payload.get("same_side_corner_to"),
+        payload.get("triangle_drive_to"), payload.get("triangle_rr_drive_to"),
+    )
+
     def append_step(step: Optional[AnimationStep]) -> bool:
         nonlocal cursor_clock, cursor_sc, cursor_coords, next_idx
         if step is None:
@@ -370,40 +380,66 @@ def _build_triangle_decision_steps(
     if branch == "triangle_bh_wing_three":
         return out
 
-    if branch == "triangle_rr_post" and bh_id and rr_id:
-        target = _coord_dict(payload.get("rim_runner_to"))
-        if target:
-            append_step(
-                _build_branch_pass_step(
-                    passer_id=bh_id,
-                    receiver_id=rr_id,
-                    receiver_target=target,
-                    step_start_coords=cursor_coords,
-                    off_lineup=off_lineup,
-                    def_lineup=def_lineup,
-                    clock_remaining_at_start=cursor_clock,
-                    shot_clock_remaining_at_start=cursor_sc,
-                    next_step_index=next_idx,
-                )
+    if branch == "triangle_rr_post":
+        if not (bh_id and rr_id):
+            logging.warning(
+                "🔍 [TRIANGLE SKIP] branch=triangle_rr_post pass step dropped: "
+                "bh_id=%s rr_id=%s — ball will teleport to receiver on shot step",
+                bh_id, rr_id,
             )
+            return out
+        target = _coord_dict(payload.get("rim_runner_to"))
+        if not target:
+            logging.warning(
+                "🔍 [TRIANGLE SKIP] branch=triangle_rr_post pass step dropped: "
+                "payload.rim_runner_to=%s — ball will teleport on shot step",
+                payload.get("rim_runner_to"),
+            )
+            return out
+        append_step(
+            _build_branch_pass_step(
+                passer_id=bh_id,
+                receiver_id=rr_id,
+                receiver_target=target,
+                step_start_coords=cursor_coords,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                clock_remaining_at_start=cursor_clock,
+                shot_clock_remaining_at_start=cursor_sc,
+                next_step_index=next_idx,
+            )
+        )
         return out
 
-    if branch == "triangle_corner_three" and bh_id and corner_id:
-        target = _coord_dict(payload.get("same_side_corner_to"))
-        if target:
-            append_step(
-                _build_branch_pass_step(
-                    passer_id=bh_id,
-                    receiver_id=corner_id,
-                    receiver_target=target,
-                    step_start_coords=cursor_coords,
-                    off_lineup=off_lineup,
-                    def_lineup=def_lineup,
-                    clock_remaining_at_start=cursor_clock,
-                    shot_clock_remaining_at_start=cursor_sc,
-                    next_step_index=next_idx,
-                )
+    if branch == "triangle_corner_three":
+        if not (bh_id and corner_id):
+            logging.warning(
+                "🔍 [TRIANGLE SKIP] branch=triangle_corner_three pass step dropped: "
+                "bh_id=%s corner_id=%s — ball will teleport on shot step",
+                bh_id, corner_id,
             )
+            return out
+        target = _coord_dict(payload.get("same_side_corner_to"))
+        if not target:
+            logging.warning(
+                "🔍 [TRIANGLE SKIP] branch=triangle_corner_three pass step dropped: "
+                "payload.same_side_corner_to=%s — ball will teleport on shot step",
+                payload.get("same_side_corner_to"),
+            )
+            return out
+        append_step(
+            _build_branch_pass_step(
+                passer_id=bh_id,
+                receiver_id=corner_id,
+                receiver_target=target,
+                step_start_coords=cursor_coords,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                clock_remaining_at_start=cursor_clock,
+                shot_clock_remaining_at_start=cursor_sc,
+                next_step_index=next_idx,
+            )
+        )
         return out
 
     if branch not in (
@@ -411,6 +447,10 @@ def _build_triangle_decision_steps(
         "triangle_drive_rr_feed",
         "triangle_drive_corner_kick",
     ):
+        logging.warning(
+            "🔍 [TRIANGLE SKIP] unrecognized branch=%s — no decision steps emitted",
+            branch,
+        )
         return out
 
     movers: List[Tuple[str, GridCoord, PlayerArchetype, PlayerAction]] = []
@@ -421,6 +461,11 @@ def _build_triangle_decision_steps(
     if rr_id and drive_rr:
         movers.append((rr_id, drive_rr, "sprint", "cut"))
     if not movers or not bh_id:
+        logging.warning(
+            "🔍 [TRIANGLE SKIP] branch=%s drive step dropped: bh_id=%s drive_bh=%s "
+            "rr_id=%s drive_rr=%s — no decision steps emitted",
+            branch, bh_id, drive_bh, rr_id, drive_rr,
+        )
         return out
 
     drive_step = _build_parallel_move_step(
@@ -435,30 +480,26 @@ def _build_triangle_decision_steps(
         next_step={"kind": "next_step", "index": next_idx},
     )
     if not append_step(drive_step):
+        logging.warning(
+            "🔍 [TRIANGLE SKIP] branch=%s drive step build returned None — "
+            "no decision steps emitted",
+            branch,
+        )
         return out
 
-    if branch == "triangle_drive_rr_feed" and rr_id and drive_rr:
-        append_step(
-            _build_branch_pass_step(
-                passer_id=bh_id,
-                receiver_id=rr_id,
-                receiver_target=drive_rr,
-                step_start_coords=cursor_coords,
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                clock_remaining_at_start=cursor_clock,
-                shot_clock_remaining_at_start=cursor_sc,
-                next_step_index=next_idx,
+    if branch == "triangle_drive_rr_feed":
+        if not (rr_id and drive_rr):
+            logging.warning(
+                "🔍 [TRIANGLE SKIP] branch=triangle_drive_rr_feed pass step dropped: "
+                "rr_id=%s drive_rr=%s — ball will teleport on shot step",
+                rr_id, drive_rr,
             )
-        )
-    elif branch == "triangle_drive_corner_kick" and corner_id:
-        corner_target = _coord_dict(payload.get("same_side_corner_to"))
-        if corner_target:
+        else:
             append_step(
                 _build_branch_pass_step(
                     passer_id=bh_id,
-                    receiver_id=corner_id,
-                    receiver_target=corner_target,
+                    receiver_id=rr_id,
+                    receiver_target=drive_rr,
                     step_start_coords=cursor_coords,
                     off_lineup=off_lineup,
                     def_lineup=def_lineup,
@@ -467,6 +508,35 @@ def _build_triangle_decision_steps(
                     next_step_index=next_idx,
                 )
             )
+    elif branch == "triangle_drive_corner_kick":
+        if not corner_id:
+            logging.warning(
+                "🔍 [TRIANGLE SKIP] branch=triangle_drive_corner_kick pass step dropped: "
+                "corner_id=%s — ball will teleport on shot step",
+                corner_id,
+            )
+        else:
+            corner_target = _coord_dict(payload.get("same_side_corner_to"))
+            if not corner_target:
+                logging.warning(
+                    "🔍 [TRIANGLE SKIP] branch=triangle_drive_corner_kick pass step dropped: "
+                    "payload.same_side_corner_to=%s — ball will teleport on shot step",
+                    payload.get("same_side_corner_to"),
+                )
+            else:
+                append_step(
+                    _build_branch_pass_step(
+                        passer_id=bh_id,
+                        receiver_id=corner_id,
+                        receiver_target=corner_target,
+                        step_start_coords=cursor_coords,
+                        off_lineup=off_lineup,
+                        def_lineup=def_lineup,
+                        clock_remaining_at_start=cursor_clock,
+                        shot_clock_remaining_at_start=cursor_sc,
+                        next_step_index=next_idx,
+                    )
+                )
     return out
 
 
