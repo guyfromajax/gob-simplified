@@ -5478,7 +5478,7 @@ try:
         from BackEnd.utils.game_id_utils import generate_game_id
         from BackEnd.utils.shared import summarize_game_state
         from BackEnd.main import _initialize_game_stats
-        
+
         home_team = request.get("home_team")
         away_team = request.get("away_team")
         mode = request.get("mode", "single")
@@ -5567,6 +5567,20 @@ try:
             away_plays_data = ap["plays_data"]
             home_scouting_data = hp["scouting_data"]
             away_scouting_data = ap["scouting_data"]
+
+        # FTE v2 Tutorial: pre-seed team_attributes (shot_threshold override) and
+        # strategy_settings before GameManager init. apply_tutorial_initial_state
+        # runs after standard init to overlay quarter / clock / score / fouls /
+        # timeouts / stat overlay / SIP timeout-resume seed. See
+        # _documentation_master/projects/fte_inject_state.md for all values.
+        if mode == "tutorial":
+            from BackEnd.utils.tutorial_game import (
+                prepare_tutorial_team_attributes,
+                TUTORIAL_STRATEGY_SETTINGS,
+            )
+            home_team_attributes, away_team_attributes = prepare_tutorial_team_attributes(user_team_side)
+            home_strategy_settings = dict(TUTORIAL_STRATEGY_SETTINGS)
+            away_strategy_settings = dict(TUTORIAL_STRATEGY_SETTINGS)
 
         # Create GameManager (this initializes teams and players)
         gm_start = time.time()
@@ -5787,7 +5801,16 @@ try:
         
         # Set GameManager quarter to 1 to match
         gm.quarter = 1
-        
+
+        # FTE v2 Tutorial: overlay all mid-Q4 state onto the freshly initialized
+        # game (clock, score, possession, fouls, timeouts, points_by_quarter,
+        # player stat overlays, NG=0.95, SIP timeout-resume seed). Must run
+        # AFTER _initialize_game_stats() and the score-zeroing block above so
+        # the overlay sticks. Mutates both gm and summary.
+        if mode == "tutorial":
+            from BackEnd.utils.tutorial_game import apply_tutorial_initial_state
+            apply_tutorial_initial_state(gm, summary, user_team_side)
+
         # Save to database
         db_start = time.time()
         games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)

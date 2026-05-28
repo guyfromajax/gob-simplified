@@ -15,7 +15,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
@@ -87,6 +87,41 @@ class AuthResponse(BaseModel):
     message: str
 
 
+TutorialStep = Literal[
+    "team_select",
+    "username",
+    "situation",
+    "set_lineup",
+    "in_game",
+    "complete",
+]
+
+
+class TutorialState(BaseModel):
+    """Server-side state for the FTE v2 tutorial-game funnel."""
+    step: TutorialStep
+    team_pick: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+# Index map for forward-only step validation. Higher = later in the funnel.
+_TUTORIAL_STEP_ORDER = {
+    "team_select": 0,
+    "username": 1,
+    "situation": 2,
+    "set_lineup": 3,
+    "in_game": 4,
+    "complete": 5,
+}
+
+
+class TutorialAdvanceRequest(BaseModel):
+    """Advance the tutorial to a new step. Forward-only on the server."""
+    step: TutorialStep
+    team_pick: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     """User info response."""
     user_id: str
@@ -94,7 +129,9 @@ class UserResponse(BaseModel):
     role: str
     username: Optional[str] = None
     created_at: Optional[str] = None
-    fte: Optional[bool] = None  # First-time experience; True = show FTE, False = completed
+    fte: Optional[bool] = None  # Legacy first-time experience flag (preserved during FTE v2 migration)
+    fte_v2_complete: Optional[bool] = None  # FTE v2 — True once debut publish succeeds
+    tutorial_state: Optional[TutorialState] = None
     account_settings: Optional[dict] = None
 
 
@@ -291,6 +328,13 @@ async def signup(request: Request, body: SignupRequest):
         },
         "geek_points": 0,
         "fte": True,
+        "fte_v2_complete": False,
+        "tutorial_state": {
+            "step": "team_select",
+            "team_pick": None,
+            "started_at": now,
+            "completed_at": None,
+        },
         "created_at": now,
         "updated_at": now,
         "version": 1  # Schema version for future migrations
@@ -322,6 +366,14 @@ async def signup(request: Request, body: SignupRequest):
             "email": email,
             "role": "user",
             "username": None,
+            "fte": True,
+            "fte_v2_complete": False,
+            "tutorial_state": {
+                "step": "team_select",
+                "team_pick": None,
+                "started_at": now.isoformat(),
+                "completed_at": None,
+            },
             "account_settings": {
                 "display_color": "default"
             }
@@ -547,6 +599,21 @@ async def get_me(user: dict = Depends(get_current_user)):
     role = db_user.get("role", user.get("role", "user")) if db_user else user.get("role", "user")
     # FTE: True = show first-time experience; False = already completed (default True if missing)
     fte = db_user.get("fte", True) if db_user else True
+    # FTE v2: returned as None for users predating the schema; populated post-migration.
+    fte_v2_complete = db_user.get("fte_v2_complete") if db_user else None
+    raw_tutorial_state = db_user.get("tutorial_state") if db_user else None
+    tutorial_state = None
+    if isinstance(raw_tutorial_state, dict) and raw_tutorial_state.get("step"):
+        def _iso(v):
+            if v is None:
+                return None
+            return v.isoformat() if hasattr(v, "isoformat") else str(v)
+        tutorial_state = TutorialState(
+            step=raw_tutorial_state["step"],
+            team_pick=raw_tutorial_state.get("team_pick"),
+            started_at=_iso(raw_tutorial_state.get("started_at")),
+            completed_at=_iso(raw_tutorial_state.get("completed_at")),
+        )
     account_settings = (db_user.get("account_settings") if db_user else None) or {"display_color": "default"}
 
     return UserResponse(
@@ -556,6 +623,8 @@ async def get_me(user: dict = Depends(get_current_user)):
         username=username,
         created_at=created_at,
         fte=fte,
+        fte_v2_complete=fte_v2_complete,
+        tutorial_state=tutorial_state,
         account_settings=account_settings
     )
 
@@ -725,6 +794,76 @@ async def fte_complete(user: dict = Depends(get_current_user)):
         logger.warning("[FTE] fte-complete update failed for user_id=%s: %s", user["user_id"], e)
         raise HTTPException(status_code=500, detail="Failed to update FTE status")
     return {"message": "FTE completed", "fte": False}
+
+
+@router.post("/tutorial-advance")
+async def tutorial_advance(
+    body: TutorialAdvanceRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Advance the user's tutorial_state to a new step. Server enforces
+    forward-only transitions: a target step earlier than the current step
+    is rejected with 400. Same-step posts are idempotent.
+
+    team_pick (optional) is persisted if provided.
+    """
+    target_step = body.step
+    target_idx = _TUTORIAL_STEP_ORDER[target_step]
+
+    db_user = users_collection.find_one({"_id": ObjectId(user["user_id"])})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_state = db_user.get("tutorial_state") or {}
+    current_step = current_state.get("step", "team_select")
+    current_idx = _TUTORIAL_STEP_ORDER.get(current_step, 0)
+
+    if target_idx < current_idx:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot advance backward from '{current_step}' to '{target_step}'",
+        )
+
+    update = {
+        "tutorial_state.step": target_step,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    if body.team_pick is not None:
+        update["tutorial_state.team_pick"] = body.team_pick
+
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"$set": update},
+    )
+    return {
+        "step": target_step,
+        "team_pick": body.team_pick if body.team_pick is not None else current_state.get("team_pick"),
+    }
+
+
+@router.post("/tutorial-complete")
+async def tutorial_complete(user: dict = Depends(get_current_user)):
+    """
+    Mark the FTE v2 tutorial fully complete. Called by the tutorial post-game
+    modal only after the debut publish succeeds. Sets fte_v2_complete=True and
+    advances tutorial_state to 'complete'.
+    """
+    now = datetime.now(timezone.utc)
+    try:
+        users_collection.update_one(
+            {"_id": ObjectId(user["user_id"])},
+            {"$set": {
+                "fte_v2_complete": True,
+                "tutorial_state.step": "complete",
+                "tutorial_state.completed_at": now,
+                "updated_at": now,
+            }},
+        )
+    except Exception as e:
+        logger.warning("[FTE_V2] tutorial-complete update failed for user_id=%s: %s", user["user_id"], e)
+        raise HTTPException(status_code=500, detail="Failed to mark tutorial complete")
+    return {"fte_v2_complete": True, "step": "complete"}
 
 
 @router.post("/logout")
