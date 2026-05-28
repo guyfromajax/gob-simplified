@@ -1998,7 +1998,20 @@ async function init() {
   if (autosetBtn) {
     autosetBtn.addEventListener('click', autosetLineup);
   }
-  
+
+  // FTE v2 tutorial: auto-fill the lineup on first load + show the Sammy intro
+  // modal. User can still tweak before hitting Play. modeParam comes from the
+  // module-level URL snapshot; ?mode=tutorial originates from tutorial-situation.html.
+  if (modeParam === 'tutorial') {
+    try { await autosetLineup(); } catch (e) { console.warn('[tutorial] autoset on load failed:', e); }
+    import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
+      showSammyModal({
+        body: "I've set your lineup, feel free to make any changes as you see fit.",
+        ctaLabel: 'Got it',
+      });
+    }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
+  }
+
   const btn = document.getElementById('play-now');
   if (btn) {
     btn.addEventListener('click', async () => {
@@ -2028,12 +2041,15 @@ async function init() {
       
       // ✅ PHASE 1.1: Ensure game_id exists before navigating (same as Game Plan / Playbooks)
       // PLAY GAME bypasses game plan; if user clicks before init-game completes, we'd navigate without game_id
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && modeParam === 'single' && quarter === 1) {
+      // FTE v2 tutorial: also runs through this branch (mode === 'tutorial') so the
+      // backend init_game can apply the Q4 4:00 60-60 state injection.
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout &&
+          (modeParam === 'single' || modeParam === 'tutorial') && quarter === 1) {
         if (!initGameInProgress) {
           console.log('⏳ [SET-LINEUP] PLAY GAME: game_id not found, calling init-game...');
           initGameInProgress = true;
           try {
-            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
+            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: modeParam };
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',
@@ -2111,6 +2127,27 @@ async function init() {
         console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
+
+      // FTE v2 tutorial: advance the server-side step to "in_game" before
+      // navigation. Court.html will read resume_from_timeout from URL params
+      // (added by buildGameNavigationParams below) so the engine emits the SIP
+      // first turn per the timeout-resume path in BackEnd/main.py.
+      if (modeParam === 'tutorial') {
+        try {
+          await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
+            method: 'POST',
+            headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ step: 'in_game' }),
+          });
+        } catch (e) {
+          console.warn('[tutorial] could not advance to in_game step:', e);
+        }
+        // Force resume_from_timeout=true so the engine routes through the
+        // existing SIP emission path for the first turn (state seeded by
+        // apply_tutorial_initial_state in PR 1).
+        params.set('resume_from_timeout', 'true');
+      }
+
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
       playSound('confirm-1-lowervol.wav');
