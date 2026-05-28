@@ -1,0 +1,193 @@
+/**
+ * Sammy Modal — design-system chrome shared by all FTE v2 tutorial modals.
+ * Mirrors the standard post-game modal (gameCompletionPopup) so onboarding
+ * lives in the same visual world as gameplay. Sammy headshot at top, single
+ * vertical column. Used by username, situation card, set-lineup intro, and
+ * the tutorial post-game modal.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap');
+
+.sammy-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 18px;
+}
+.sammy-modal-backdrop.open {
+  display: flex;
+}
+
+.sammy-modal-backdrop.open .sammy-modal {
+  animation: sammy-modal-in 200ms ease both;
+}
+@keyframes sammy-modal-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sammy-modal-backdrop.open .sammy-modal {
+    animation: sammy-modal-fade 150ms ease-out both;
+  }
+}
+@keyframes sammy-modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.sammy-modal {
+  background-color: rgba(13, 17, 36, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 26px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  text-align: center;
+}
+
+.sammy-modal-eyebrow {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+  margin: 0;
+}
+
+.sammy-modal-image {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+}
+
+.sammy-modal-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+  max-width: 100%;
+}
+.sammy-modal-body p {
+  margin: 0;
+}
+.sammy-modal-body p + p {
+  margin-top: 0.6em;
+}
+
+/* Optional input area (used by username modal in PR 2b). */
+.sammy-modal-input-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.sammy-modal-input {
+  width: 100%;
+  padding: 11px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #fff;
+  box-sizing: border-box;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.sammy-modal-input:focus {
+  outline: none;
+  border-color: rgba(52, 236, 39, 0.6);
+  box-shadow: 0 0 0 2px rgba(52, 236, 39, 0.2);
+}
+.sammy-modal-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.sammy-modal-hint {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+.sammy-modal-error {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ff6d6d;
+  margin: 0;
+  min-height: 1em;
+}
+
+.sammy-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.sammy-modal-btn {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  padding: 10px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: filter 120ms ease, transform 120ms ease;
+  min-width: 140px;
+}
+.sammy-modal-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.sammy-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.sammy-modal-btn-primary {
+  background: #34EC27;
+  color: #15181f;
+  border-color: rgba(52, 236, 39, 0.5);
+}
+.sammy-modal-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 760px) {
+  .sammy-modal {
+    padding: 22px 18px 20px;
+    gap: 14px;
+  }
+  .sammy-modal-image {
+    width: 80px;
+    height: 80px;
+  }
+  .sammy-modal-actions {
+    flex-direction: column-reverse;
+  }
+  .sammy-modal-btn {
+    width: 100%;
+  }
+}
