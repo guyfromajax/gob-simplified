@@ -346,10 +346,35 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     ? `<button type="button" class="completion-button locker-room-button franchise-pgpc-button">Post-Game Press Conference</button>`
     : `<a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>`;
 
+  // FTE v2 tutorial: same Sammy chrome as the standard modal, but with an
+  // eyebrow ("Your Debut") and a win/loss message inserted above the final
+  // score, and no Box Score button (the tutorial game is throwaway).
+  const isTutorial = mode === 'tutorial';
+  const eyebrowText = isTutorial ? 'Your Debut' : 'Game Complete';
+  let tutorialMessageHtml = '';
+  if (isTutorial && outcomeKnown) {
+    const messageCopy = userWon
+      ? 'Congrats on winning your first game Coach!'
+      : "That was a tough one Coach — but we're confident you'll bounce back.";
+    tutorialMessageHtml = `
+      <section class="gc-section gc-tutorial-message-section">
+        <div class="gc-tutorial-message">${messageCopy}</div>
+      </section>
+    `;
+  }
+
   const actionsSectionHtml = franchisePgpcOnly
     ? `
       <section class="gc-section gc-actions-section">
         <div class="button-container gc-actions-pgpc-only">
+          ${lockerActionHtml}
+        </div>
+      </section>
+    `
+    : isTutorial
+    ? `
+      <section class="gc-section gc-actions-section">
+        <div class="button-container">
           ${lockerActionHtml}
         </div>
       </section>
@@ -398,9 +423,10 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       rgba(13,17,36,0.85) 100%
     ), url('${bannerUrl}');">
       <div class="gc-header-row">
-        <div class="gc-eyebrow">Game Complete</div>
+        <div class="gc-eyebrow">${eyebrowText}</div>
         <div class="gc-outcome-badge ${outcomeBadgeClass}">${outcomeLabel}</div>
       </div>
+      ${tutorialMessageHtml}
       ${finalScore ? `
         <section class="gc-section gc-result-section">
           <div class="final-score-display">
@@ -530,6 +556,21 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       .gc-result-section {
         border-top: none;
         padding-top: 0;
+      }
+
+      /* FTE v2 tutorial: win/loss flavor message above the final score. */
+      .gc-tutorial-message-section {
+        border-top: none;
+        padding-top: 0;
+      }
+      .gc-tutorial-message {
+        font-family: 'Inter', sans-serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        line-height: 1.4;
+        color: rgba(255, 255, 255, 0.92);
+        text-align: center;
+        margin: 0;
       }
 
       .final-score-display {
@@ -872,6 +913,61 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         console.warn('[gameCompletionPopup] delete-completed-single failed:', err);
       }
       window.location.href = lockerRoomUrl;
+    });
+  }
+
+  // FTE v2 tutorial: on locker-room click, publish the debut entry, mark the
+  // tutorial complete, delete the throwaway game doc (single-mode precedent),
+  // then navigate to mode-select. Each call is best-effort — a publish or
+  // complete failure should still let the user reach mode-select.
+  if (lockerRoomBtn && isTutorial && gameId) {
+    lockerRoomBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const haveApi = typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl && API_CONFIG.getAuthHeaders;
+      const headers = { 'Content-Type': 'application/json', ...(haveApi ? API_CONFIG.getAuthHeaders() : {}) };
+
+      if (haveApi && outcomeKnown && userTeamName) {
+        const opponentName = resolvedUserTeamSide === 'home' ? canonicalAwayName : canonicalHomeName;
+        const userScore = resolvedUserTeamSide === 'home' ? homeScore : awayScore;
+        const opponentScore = resolvedUserTeamSide === 'home' ? awayScore : homeScore;
+        try {
+          await fetch(API_CONFIG.buildUrl('/api/community/debut'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              user_team_name: userTeamName,
+              opponent_name: opponentName,
+              user_won: !!userWon,
+              user_score: userScore,
+              opponent_score: opponentScore,
+            }),
+          });
+        } catch (err) {
+          console.warn('[gameCompletionPopup][tutorial] debut publish failed:', err);
+        }
+      }
+
+      if (haveApi) {
+        try {
+          await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-complete'), {
+            method: 'POST',
+            headers,
+          });
+        } catch (err) {
+          console.warn('[gameCompletionPopup][tutorial] tutorial-complete failed:', err);
+        }
+        try {
+          await fetch(API_CONFIG.buildUrl('/api/games/delete-completed-single'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ game_id: gameId }),
+          });
+        } catch (err) {
+          console.warn('[gameCompletionPopup][tutorial] delete-completed-single failed:', err);
+        }
+      }
+
+      window.location.href = '/mode-select.html';
     });
   }
 }
