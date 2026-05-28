@@ -585,6 +585,19 @@ async function loadRoster() {
   // ✅ CRITICAL FIX: Don't init if game_id exists in URL (game already exists) or if resuming from timeout
   // This prevents creating a new game when resuming from timeout, which would reset all game state
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+
+  // FTE v2 tutorial: init-game is supposed to run on the tutorial-situation
+  // page (NOT here). If tutorial mode lands on set-lineup without a game_id,
+  // the situation page failed to navigate properly — bounce back so the user
+  // gets a clean retry instead of getting stuck with a half-initialized game
+  // whose game_id never reaches the Play click (race condition we hit on the
+  // second staging walkthrough).
+  if (!gameId && modeParam === 'tutorial' && !resumeFromTimeout) {
+    console.error('[SET-LINEUP][tutorial] No game_id on URL — bouncing to /tutorial-situation.html');
+    window.location.replace('/tutorial-situation.html');
+    return;
+  }
+
   const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress;
   
   if (shouldInitGame) {

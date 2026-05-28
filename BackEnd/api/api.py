@@ -5821,6 +5821,21 @@ try:
         # ✅ REMOVED: Verbose debug log
         
         response_data = {"game_id": game_id}
+        # FTE v2 tutorial: expose the engine-assigned lineup so the situation
+        # page can pass it forward via URL params without a second round-trip
+        # to /api/game (which has a different response schema than expected).
+        if mode == "tutorial":
+            def _lineup_player_ids(team):
+                out = {}
+                for pos, player in (getattr(team, "lineup", None) or {}).items():
+                    pid = getattr(player, "player_id", None) or getattr(player, "_id", None)
+                    if pid is not None:
+                        out[pos] = str(pid)
+                return out
+            response_data["tutorial_lineup"] = {
+                "home": _lineup_player_ids(gm.home_team),
+                "away": _lineup_player_ids(gm.away_team),
+            }
         if profile_summary is not None:
             response_data["profile_summary"] = profile_summary
         total_time = (time.time() - endpoint_start) * 1000
