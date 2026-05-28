@@ -222,6 +222,28 @@ body.mode-select-page .community-highlight-row--national-gold .community-highlig
   background: rgba(18, 15, 8, 0.62);
 }
 
+/* FTE v2 debut row: bold gold metallic border around the standard chrome.
+   Distinct from --national-gold (championship rows) by using a thicker
+   border + outer glow rather than a warm fill. Non-clickable. */
+body.mode-select-page .community-highlight-row--debut {
+  border: 2px solid rgba(212, 175, 55, 0.85);
+  background: linear-gradient(
+    128deg,
+    rgba(28, 26, 22, 0.95) 0%,
+    rgba(18, 17, 14, 0.98) 60%,
+    rgba(14, 13, 10, 1) 100%
+  );
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.42),
+    0 0 14px rgba(212, 175, 55, 0.35),
+    inset 0 1px 0 rgba(255, 220, 150, 0.18);
+  cursor: default;
+}
+
+body.mode-select-page .community-highlight-row--debut .community-highlight-row-inner {
+  background: rgba(20, 18, 14, 0.5);
+}
+
 body.mode-select-page .community-highlight-copy {
   flex: 1;
   min-width: 0;

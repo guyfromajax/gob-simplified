@@ -59,33 +59,12 @@
     document.head.appendChild(link);
   }
 
-  function ensureFTEStyles() {
-    if (document.getElementById('fte-styles-link')) return;
-    if (document.querySelector('link[href*="fte.css"]')) return;
-    var link = document.createElement('link');
-    link.id = 'fte-styles-link';
-    link.rel = 'stylesheet';
-    link.href = '/css/fte.css';
-    document.head.appendChild(link);
-  }
-
-  var FTE_STEPS = [
-    { title: 'Hey Coach!', body: '<p>Welcome to Geeked-Out Basketball.</p>', showBack: false, primaryLabel: 'Next' },
-    { title: 'We assume you know hoops.', body: '<p>Now learn GOB.</p>', showBack: true, primaryLabel: 'Next' },
-    {
-      title: 'The Tutorial button sits in the top nav.',
-      body: '<div class="fte-tutorial-wrap fte-tutorial-wrap--full-width"><div class="fte-tutorial-preview" aria-hidden="true">Tutorials</div></div>',
-      showBack: true,
-      primaryLabel: 'Next'
-    },
-    {
-      title: 'Deeper breakdowns live on our YouTube channel.',
-      body: '<div class="fte-row-with-img"><span class="fte-content-text">Deeper breakdowns live on our YouTube channel.</span><img src="/images/yt_icon_red_digital.png" alt="YouTube" class="fte-yt-logo"></div>',
-      showBack: true,
-      primaryLabel: 'Done'
-    }
-  ];
-
+  // FTE v2 replaces the old 4-modal welcome flow with a playable tutorial
+  // game. The auth-bar entry decision now routes new users to the funnel
+  // (franchise-select-team?mode=tutorial → username → tutorial-situation →
+  // set-lineup?mode=tutorial → court?mode=tutorial). Grandfathered users
+  // (fte_v2_complete=true) hit no routing at all.
+  //
   // Username modal lives in /js/shared/usernameModal.js (FTE v2 chrome).
   // Loaded on demand via dynamic import — see openUsernameModal() below.
 
@@ -122,46 +101,6 @@
     document.body.appendChild(backdrop);
   }
 
-  function ensureFTEModal() {
-    if (document.getElementById('fte-backdrop')) return;
-    var backdrop = document.createElement('div');
-    backdrop.id = 'fte-backdrop';
-    backdrop.className = 'fte-backdrop';
-    backdrop.setAttribute('role', 'dialog');
-    backdrop.setAttribute('aria-modal', 'true');
-    backdrop.setAttribute('aria-labelledby', 'fte-content-main');
-    backdrop.innerHTML = [
-      '<div class="fte-modal">',
-      '  <div class="fte-content">',
-      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-content-img">',
-      '    <div id="fte-content-main" class="fte-content-main"></div>',
-      '  </div>',
-      '  <div class="fte-footer">',
-      '    <button type="button" id="fte-btn-back" class="fte-btn fte-btn-back">Back</button>',
-      '    <button type="button" id="fte-btn-primary" class="fte-btn fte-btn-next"></button>',
-      '  </div>',
-      '</div>'
-    ].join('');
-    document.body.appendChild(backdrop);
-  }
-
-  function showFTEStep(stepIndex) {
-    var step = FTE_STEPS[stepIndex];
-    var mainEl = document.getElementById('fte-content-main');
-    var backBtn = document.getElementById('fte-btn-back');
-    var primaryBtn = document.getElementById('fte-btn-primary');
-    if (!mainEl || !backBtn || !primaryBtn) return;
-    if (stepIndex === 3 && step.body) {
-      mainEl.innerHTML = step.body;
-    } else if (step.body) {
-      mainEl.innerHTML = '<p>' + step.title + '</p>' + step.body;
-    } else {
-      mainEl.innerHTML = '<p>' + step.title + '</p>';
-    }
-    backBtn.style.display = step.showBack ? '' : 'none';
-    primaryBtn.textContent = step.primaryLabel;
-  }
-
   // Username modal: delegated to /js/shared/usernameModal.js (FTE v2 chrome).
   // Loaded on demand so this classic script doesn't need to be a module.
   // Signature preserved (positional `onSuccess` callback) so existing callers
@@ -176,77 +115,59 @@
       });
   }
 
-  function openFTESteps() {
-    ensureFTEModal();
-    var backdrop = document.getElementById('fte-backdrop');
-    var backBtn = document.getElementById('fte-btn-back');
-    var primaryBtn = document.getElementById('fte-btn-primary');
-    if (!backdrop || !primaryBtn) return;
+  // FTE v2 entry decision. Called from initAuthState() once /api/auth/me
+  // returns. Routes users whose fte_v2_complete is explicitly false to the
+  // appropriate page in the tutorial funnel. Users whose flag is true (or
+  // unknown — pre-migration) are left alone.
+  //
+  // Step → page mapping (per fte_implementation_plan.md §5.1):
+  //   team_select / username → /franchise-select-team.html?mode=tutorial
+  //   situation              → /tutorial-situation.html
+  //   set_lineup / in_game   → /set-lineup.html?mode=tutorial&home=...&away=...
+  //
+  // in_game resumes at set-lineup per Coach Q4(iii): only pre-game steps
+  // resume; if the engine ever started, the game restarts from tip.
+  function routeToTutorial(meData) {
+    if (!meData || meData.fte_v2_complete !== false) return;
+    var state = (meData && meData.tutorial_state) || { step: 'team_select', team_pick: null };
+    var step = state.step || 'team_select';
+    var teamPick = state.team_pick;
 
-    var currentStep = 0;
-    showFTEStep(currentStep);
-    backdrop.classList.add('open');
+    var TEAM_SELECT_URL = '/franchise-select-team.html?mode=tutorial';
+    var SITUATION_URL = '/tutorial-situation.html';
+    var currentPath = window.location.pathname;
 
-    function closeFTE() {
-      backdrop.classList.remove('open');
-    }
-
-    function completeFTE() {
-      if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.buildUrl === 'function' && typeof API_CONFIG.getAuthHeaders === 'function') {
-        fetch(API_CONFIG.buildUrl('/api/auth/fte-complete'), {
-          method: 'POST',
-          headers: API_CONFIG.getAuthHeaders()
-        }).then(function () {
-          try {
-            var authUser = localStorage.getItem('auth_user');
-            if (authUser) {
-              var user = JSON.parse(authUser);
-              user.fte = false;
-              localStorage.setItem('auth_user', JSON.stringify(user));
-            }
-          } catch (e) {}
-          closeFTE();
-        }).catch(function () {
-          closeFTE();
-        });
+    var targetPath;
+    var targetUrl;
+    if (step === 'team_select' || step === 'username') {
+      targetPath = '/franchise-select-team.html';
+      targetUrl = TEAM_SELECT_URL;
+    } else if (step === 'situation') {
+      targetPath = '/tutorial-situation.html';
+      targetUrl = SITUATION_URL;
+    } else if (step === 'set_lineup' || step === 'in_game') {
+      if (!teamPick) {
+        targetPath = '/franchise-select-team.html';
+        targetUrl = TEAM_SELECT_URL;
       } else {
-        closeFTE();
+        targetPath = '/set-lineup.html';
+        var opp = teamPick === 'Xavien' ? 'South Lancaster' : 'Xavien';
+        var params = new URLSearchParams({
+          mode: 'tutorial',
+          home: teamPick,
+          away: opp,
+          my_team: 'home'
+        });
+        targetUrl = '/set-lineup.html?' + params.toString();
       }
-    }
-
-    backBtn.addEventListener('click', function () {
-      if (currentStep > 0) {
-        currentStep -= 1;
-        showFTEStep(currentStep);
-      }
-    });
-
-    primaryBtn.addEventListener('click', function () {
-      if (currentStep === 3 && FTE_STEPS[3].primaryLabel === 'Done') {
-        completeFTE();
-        return;
-      }
-      if (currentStep < FTE_STEPS.length - 1) {
-        currentStep += 1;
-        showFTEStep(currentStep);
-      }
-    });
-  }
-
-  function runFTE(meData) {
-    if (!meData || meData.fte !== true) return;
-    ensureFTEStyles();
-
-    var hasUsername = meData.username && String(meData.username).trim().length > 0;
-    if (!hasUsername) {
-      var fteBackdrop = document.getElementById('fte-backdrop');
-      if (fteBackdrop) fteBackdrop.classList.remove('open');
-      openUsernameModal(function () {
-        openFTESteps();
-      });
+    } else {
+      // 'complete' (or unknown) — should not happen when flag is false, but
+      // be defensive: send to mode-select so the user isn't stranded.
       return;
     }
-    openFTESteps();
+
+    if (currentPath === targetPath) return;
+    window.location.replace(targetUrl);
   }
 
   function createAuthBarHTML() {
@@ -639,7 +560,7 @@
                 res.json().then(function (meData) {
                   setAuthMeData(meData);
                   refreshAccountSettingsModal();
-                  if (meData.fte === true) runFTE(meData);
+                  routeToTutorial(meData);
                 }).catch(function () {
                   setAuthMeData({
                     username: user.username || null,
