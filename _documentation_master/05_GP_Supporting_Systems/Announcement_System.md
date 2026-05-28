@@ -39,6 +39,7 @@
 3. **Idempotent Flags**:
    - `turn._contextAnnouncementsShown` - Prevents duplicate start announcements
    - `turn._reboundHeadlineShown` - Set by `announceReboundHeadlineIfNeeded()` after showing **Rebound!** so the same MISS/BLOCK (or rebound) turn cannot trigger duplicate headlines from `ballManager`, embedded shot rebounds, FT rebound, or `announceGameEvent('REBOUND', ...)`.
+   - `turn._airballAnnounced` - Set when **Airball!** is shown (schema `step.end.announcement` on [ball_flight] or legacy `announceAirballIfNeeded()`) so the legacy shot paths cannot double-announce on the same turn.
 
 4. **Announcement hold time**:
    - **1000 ms** — Uniform delay for result announcements before the next animation. In **ShotAnimationSystem** (HCO/regular makes), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with ball at rim and announcement both visible. Other paths (ballManager made shot, FT make, FB make, "Great Stop!") use a 1000 ms hold after the announcement. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
@@ -128,9 +129,10 @@ The Announcement System provides visual feedback for game events using timing-ba
   - Uses `showAndOneAnnouncement()` for the two-portrait foul card with shooter and fouler headshots.
   - Both player images display `#jersey lastName` directly beneath the headshot when that data is available.
   - Fallback: single-row standard announcement (`"It's Good! And 1!"`) if either player's data is missing.
-- **"Shooting Foul!"** - Detected on shot-result turns (`result_type === "MISS"` with shooting-foul context from the shot pipeline).
-  - Always displays announcement even if player sprite/info is missing (fallback pattern).
-  - Routed via `announceGameEvent('FOUL_SHOOTING', ...)` from `ShotAnimationSystem.handleMissedShot()`.
+   - **"Shooting Foul!"** - Detected on shot-result turns (`result_type === "MISS"` with shooting-foul context from the shot pipeline).
+     - Always displays announcement even if player sprite/info is missing (fallback pattern).
+     - Routed via `announceGameEvent('FOUL_SHOOTING', ...)` from `ShotAnimationSystem.handleMissedShot()`.
+   - **"Airball!"** - Missed shot (field goal or free throw) when `shot_variant === "AIRBALL"`. Shows shooter's headshot on the **primary** overlay. **No announce SFX** — `airball.wav` already fires from shot-result SFX at the same beat ([ball_flight] arrival). Schema path: stamped on `[ball_flight]` `step.end.announcement` by `_build_post_shot_sub_steps` / FT variant chain. Legacy path: `announceAirballIfNeeded()` from `ballManager.js`, `ShotAnimationSystem.js`, `fastBreak.js` on `onShotArrive`.
 
 **Fast Break shot path:** Fast Break shots are animated only in `fastBreak.js` (`animateFastBreakShot`, `animateFastBreakShotWithStopper`). They use `animateShotToRim()` and do **not** go through `ballManager.shootBall()` or ShotAnimationSystem. Therefore **AND-1** and **"Shooting Foul!"** (on miss) must be detected and announced inside `fastBreak.js` using the same logic as in `ballManager.js` (same `turnData` fields and `showAnnouncement` / `showAndOneAnnouncement` / `triggerFoulEffect`). **Note:** the `after_steal` FB play-key is the exception — it migrated to the UESS schema (see "After-Steal Fast Break shot path" below). The legacy path here still applies to DREB-triggered RR / CR / Triangle FBs (their schema migration covers shot result via `_build_post_shot_sub_steps` but in-progress legacy code still handles some choreography).
 
@@ -183,7 +185,10 @@ The Announcement System provides visual feedback for game events using timing-ba
 - **Important distinction:** `result_type === 'FOUL'` that routes to `next_play_type === 'FREE_THROW'` (bonus) is still announced as FOUL. True shooting fouls are announced in shot-result handlers (`MAKE/MISS` paths such as `ballManager.js`, `ShotAnimationSystem.js`, `fastBreak.js`).
 
 **Block Announcements:**
-- **"BLOCK!"** - Announced in `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (when ball has reached block spot), **before** the rebound is announced, so order is always Block → Rebound. Shows blocker's headshot. Routed via `announceGameEvent('BLOCK', ...)` in `gameAnnouncements.js`. Fallback: `finalizeTurnAfterAnimation` announces BLOCK only if `!turn._blockAnnounced`.
+- **"BLOCK!"** - Announced in `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (when ball has reached block spot), **before** the rebound is announced, so order is always Block → Rebound. Shows blocker's headshot. Routed via `announceGameEvent('BLOCK', ...)` in `gameAnnouncements.js`. Fallback: `finalizeTurnAfterAnimation` announces BLOCK only if `!turn._blockAnnounced`. Schema path: `[ball_flight]` `step.end.announcement` (same beat).
+
+**Airball Announcements:**
+- **"Airball!"** - Missed field-goal or free-throw attempt when backend rolls `shot_variant === "AIRBALL"`. Primary overlay with **shooter** headshot (offense team stripe). Triggered at [ball_flight] end — in sync with `airball.wav`, not at OOB continuation. Applies to HCO skeleton shots, putbacks, after-steal FB, and FT attempts (final and non-final). Idempotent via `turn._airballAnnounced`.
 
 **Rebound Announcements:**
 - **"Rebound!"** - `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `announcements.js`. Fires when the rebounder secures the ball (embedded path: rebounder tween `onComplete` after attach + rebound SFX; `ballManager.animateRebound`: rebounder tween `onComplete`). **DREB and OREB** on embedded misses both use the same hook so FAST_BREAK / `force_foul_after_dreb` / odd `next_play_type` branches still get the headline when the rebound animates. Idempotent via `turnData._reboundHeadlineShown` when `turnData` is passed (always pass the authoritative MISS/BLOCK or rebound turn from callers). Primary card uses the same portrait styling as other results (`teamName` from `scene.simData` home/away names; `secondaryColor` from `gameStore.getColors()`).
@@ -212,6 +217,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 | **CHARGE!** | `['whistle-1-lowervol.wav', 'duke-charging.wav']` | `gameAnnouncements.js::handleChargeAnnouncement` |
 | AND-1 (shooting foul on make) | `whistle-1-lowervol.wav` (default, overridable) | `announcements.js::showAndOneAnnouncement` |
 | **BLOCK!** | `duke-its-blocked.wav` | `gameAnnouncements.js::handleBlockAnnouncement` |
+| **Airball!** | *(none — `airball.wav` is shot-result SFX)* | schema `[ball_flight]` `step.end.announcement`; legacy `announceAirballIfNeeded()` |
 | **STEAL!** / **Interception!** | 33/33/34 random — `sammy-steal.wav` / `braddock-steal.wav` / `butler-steal.wav` (via `resolveStealSfxFile()`) | `handleStealAnnouncement`, `announceFromTurnData` STEAL branch, `fastBreak.js::animateRimRunnerInterception` |
 | Press! | random — `sammy-press.mp3` / `press-braddock.mp3` (once per turn) | secondary headline resolver |
 | Trap! | `trap-braddock.mp3` (once per turn) | secondary headline resolver |
@@ -246,6 +252,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Solution — per-turn flags set on `turnData`:**
 - `turn._contextAnnouncementsShown` — Set inside the start-announcement block of `prepareTurnForAnimation()` after Press / Trap / Fast Break / Slow It Down / Quick Shot / Final Shot have been dispatched.
 - `turn._blockAnnounced` — Set by `ShotAnimationSystem.handleMissedShot()` after a `BLOCK` is announced; `finalizeTurnAfterAnimation()` only announces BLOCK as a fallback when this flag is missing.
+- `turn._airballAnnounced` — Set by schema `runStepAnnouncement()` or legacy `announceAirballIfNeeded()` after **Airball!** is shown.
 - `turn._reboundHeadlineShown` — Set by `announceReboundHeadlineIfNeeded()` after **Rebound!** is shown so animation paths and the `REBOUND` dispatcher cannot double-announce the same turn.
 
 **Benefits:**
@@ -333,7 +340,8 @@ When a steal leads to a fast break:
   - `buildHeadshotInitialsInfo(player, teamSide)` — Low-level color/name descriptor from an already-resolved side + `gameStore.getColors()`.
   - `playAnnouncementSfx(kind)` — Plays `whistle-3.mp3` for `'shot_clock_violation'`, otherwise `whistle-1-lowervol.wav` at volume 0.7.
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
-  - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
+  - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `AIRBALL`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
+  - `announceAirballIfNeeded(turnData, scene, context)` — Legacy shot-path helper; schema playback uses backend-stamped `[ball_flight]` announcements instead.
   - Secondary-tier cases (`PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`) call `showSecondaryAnnouncement()`; everything else calls `showAnnouncement()` / `showAndOneAnnouncement()`.
 - `FrontEnd/static/js/phaser/animation/ballManager.js`
   - Shot make announcements (`"It's Good!"`, `"It's Good! And 1!"`) emitted when the ball reaches the rim.
@@ -356,6 +364,8 @@ When a steal leads to a fast break:
   - Weighted language tables for offensive / defensive non-shooting fouls; `isLaneFoulContext(turnData)` selects between non-lane and lane pools.
 
 **Backend:**
+- `BackEnd/engine/skeleton_step_emitter.py` — `_airball_announcement()` stamps **Airball!** on `[ball_flight]` `step.end.announcement` when `shot_variant === "AIRBALL"` (shared by HCO, putback, after-steal FB post-shot chains via `_build_post_shot_sub_steps`).
+- `BackEnd/engine/ft_step_emitter.py` — Same **Airball!** stamp on FT `[ball_flight]` end.
 - `BackEnd/engine/phase_resolution.py`, `BackEnd/models/shot_manager.py`, `BackEnd/engine/rim_runner_fast_break.py` — Set the `is_steal_entry` flag on Fast Break turns originating from a steal.
 - `BackEnd/models/turn_manager.py` — Populates turn data with announcement triggers.
 

@@ -479,7 +479,12 @@ export async function shootBall({
           duration,
           easing: "Sine.easeInOut",
           onShotRelease: () => playShotLaunchSfx(scene, turnData),
-          onShotArrive: () => playShotResultSfx(scene, turnData, result)
+          onShotArrive: () => {
+            playShotResultSfx(scene, turnData, result);
+            import("../utils/gameAnnouncements.js").then(({ announceAirballIfNeeded }) => {
+              announceAirballIfNeeded(turnData, scene, { shooterId });
+            });
+          },
         });
         
         // Handle completion (same logic as before, but now after animateShotToRim completes)

@@ -114,6 +114,136 @@ function ensureTimeoutPopupButtonStyles() {
 }
 
 /**
+ * Shared timeout gate popup shell (user + computer).
+ * Keeps a visible primary announcement stacked above the timeout card
+ * instead of covering it with a full-viewport modal.
+ */
+function ensureTimeoutGatePopupStyles() {
+    if (document.getElementById('timeout-gate-popup-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'timeout-gate-popup-styles';
+    style.textContent = `
+        .user-timeout-popup,
+        .computer-timeout-popup {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .timeout-gate-stack {
+            width: min(860px, calc(100% - 40px));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 22px;
+        }
+
+        .timeout-gate-stack > #announcement-overlay.timeout-held-announcement {
+            position: static;
+            inset: auto;
+            transform: none;
+            z-index: auto;
+            max-width: 100%;
+        }
+
+        .timeout-gate-content {
+            width: min(420px, calc(100vw - 40px));
+            background: rgba(22, 26, 36, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .timeout-modal-accent {
+            height: 3px;
+            width: 100%;
+            background: #F79420;
+            flex-shrink: 0;
+        }
+
+        .timeout-modal-body {
+            padding: 24px 28px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .timeout-gate-content h2 {
+            font-size: 28px;
+            color: #ffffff;
+            margin: 0;
+            font-family: 'Bebas Neue', sans-serif;
+            letter-spacing: 0.04em;
+            line-height: 1;
+        }
+
+        .timeout-modal-actions {
+            padding: 0 28px 24px;
+        }
+
+        @media (max-width: 760px) {
+            .timeout-gate-stack {
+                width: calc(100% - 28px);
+                gap: 16px;
+            }
+
+            .timeout-gate-content {
+                width: min(420px, 100%);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function buildTimeoutGatePopupMarkup(title, buttonLabel) {
+    return `
+        <div class="timeout-gate-stack">
+            <div class="timeout-gate-content">
+                <div class="timeout-modal-accent"></div>
+                <div class="timeout-modal-body">
+                    <h2>${title}</h2>
+                </div>
+                <div class="button-container timeout-modal-actions">
+                    <button type="button" class="timeout-button go-to-timeout-button">${buttonLabel}</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function attachHeldAnnouncementToTimeoutStack(stack) {
+    const heldAnnouncement =
+        typeof window.holdPrimaryAnnouncementOverlayForTimeout === 'function'
+            ? window.holdPrimaryAnnouncementOverlayForTimeout()
+            : null;
+    if (stack && heldAnnouncement) {
+        heldAnnouncement.classList.add('timeout-held-announcement');
+        stack.prepend(heldAnnouncement);
+    }
+}
+
+function dismissTimeoutGatePopup(popup) {
+    if (typeof window.dismissPrimaryAnnouncementOverlayForTimeout === 'function') {
+        window.dismissPrimaryAnnouncementOverlayForTimeout();
+    }
+    popup.remove();
+}
+
+function mountTimeoutGatePopup(popup) {
+    const popupHost = document.getElementById('phaser-container') || document.body;
+    popupHost.appendChild(popup);
+}
+
+/**
  * Ensure button is initialized (lazy initialization)
  */
 function ensureButtonInitialized() {
@@ -561,123 +691,47 @@ async function handleTimeoutButtonClick(executeOnly = false) {
  */
 async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     ensureTimeoutPopupButtonStyles();
+    ensureTimeoutGatePopupStyles();
 
-    // Remove any existing popup
     const existingPopup = document.querySelector('.user-timeout-popup');
     if (existingPopup) {
         existingPopup.remove();
     }
-    
-    // Get user team name
+
     const urlParams = new URLSearchParams(window.location.search);
     const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
     const homeTeamId = scene.simData?.home_team_id;
     const awayTeamId = scene.simData?.away_team_id;
     const teamsObj = scene.simData?.teams || {};
-    
-    const userTeamName = myTeamSide === 'home' 
+
+    const userTeamName = myTeamSide === 'home'
         ? ((homeTeamId && teamsObj[homeTeamId]?.name) || scene.simData?.home_team?.name || scene.homeTeam?.name || 'Your Team')
         : ((awayTeamId && teamsObj[awayTeamId]?.name) || scene.simData?.away_team?.name || scene.awayTeam?.name || 'Your Team');
-    
-    // Create popup (matching game-completion-popup style)
+
     const popup = document.createElement('div');
     popup.className = 'user-timeout-popup';
-    popup.innerHTML = `
-        <div class="user-timeout-content">
-            <div class="timeout-modal-accent"></div>
-            <div class="timeout-modal-body">
-                <h2>${userTeamName} Called Timeout</h2>
-            </div>
-            <div class="button-container timeout-modal-actions">
-                <button class="timeout-button go-to-timeout-button">Go To Timeout</button>
-            </div>
-        </div>
-    `;
-    
-    // Add styles if not already present
-    if (!document.getElementById('user-timeout-popup-styles')) {
-        const style = document.createElement('style');
-        style.id = 'user-timeout-popup-styles';
-        style.textContent = `
-            .user-timeout-popup {
-                position: fixed;
-                inset: 0;
-                background: rgba(0, 0, 0, 0.72);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-            }
+    popup.innerHTML = buildTimeoutGatePopupMarkup(`${userTeamName} Called Timeout`, 'Go To Timeout');
 
-            .user-timeout-content {
-                width: min(420px, calc(100vw - 40px));
-                background: rgba(22, 26, 36, 0.98);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-radius: 14px;
-                box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
-                            inset 0 1px 0 rgba(255, 255, 255, 0.06);
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
+    attachHeldAnnouncementToTimeoutStack(popup.querySelector('.timeout-gate-stack'));
 
-            .timeout-modal-accent {
-                height: 3px;
-                width: 100%;
-                background: #F79420;
-                flex-shrink: 0;
-            }
-
-            .timeout-modal-body {
-                padding: 24px 28px 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .user-timeout-content h2 {
-                font-size: 28px;
-                color: #ffffff;
-                margin: 0;
-                font-family: 'Bebas Neue', sans-serif;
-                letter-spacing: 0.04em;
-                line-height: 1;
-            }
-
-            .timeout-modal-actions {
-                padding: 0 28px 24px;
-            }
-
-        `;
-        document.head.appendChild(style);
-    }
-    
-    // ✅ FIX 2: Add click handler for button - navigation only happens on explicit click
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
         if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-        
-        // ✅ SAFEGUARD: Set flag to indicate user explicitly clicked button
-        // This prevents auto-navigation from other code paths
+
         scene.userTimeoutButtonClicked = true;
-        
-        // Remove popup BEFORE navigation (ensures guard check passes)
-        popup.remove();
-        
-        // Clear pending timeout data from scene
+        dismissTimeoutGatePopup(popup);
+
         if (scene.pendingTimeoutResult) {
             delete scene.pendingTimeoutResult;
         }
         if (scene.pendingTimeoutGameId) {
             delete scene.pendingTimeoutGameId;
         }
-        
-        // Navigate to lineup screen - only happens when user explicitly clicks button
-        // Note: computerTimeout=false (default) ensures guard check runs
+
         await showTimeoutPopup(timeoutResult, gameId, scene, false);
     });
-    
-    document.body.appendChild(popup);
+
+    mountTimeoutGatePopup(popup);
 }
 
 /**
@@ -690,14 +744,13 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
  */
 export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, computerTeamName = null) {
     ensureTimeoutPopupButtonStyles();
+    ensureTimeoutGatePopupStyles();
 
-    // Remove any existing popup of this type
     const existingPopup = document.querySelector('.computer-timeout-popup');
     if (existingPopup) {
         existingPopup.remove();
     }
 
-    // Play timeout airhorn when computer timeout popup appears
     ensureTimeoutSounds();
     if (airhornSound) {
         try {
@@ -710,136 +763,24 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
         }
     }
 
-    // Resolve display name with safe fallback
     const callingTeamName = computerTeamName ||
         timeoutResult?.calling_team ||
         'Computer Team';
 
-    // Create popup (same visual pattern as user timeout popup)
     const popup = document.createElement('div');
     popup.className = 'computer-timeout-popup';
-    popup.innerHTML = `
-        <div class="computer-timeout-stack">
-            <div class="computer-timeout-content">
-                <div class="timeout-modal-accent"></div>
-                <div class="timeout-modal-body">
-                    <h2>${callingTeamName} Called Timeout</h2>
-                </div>
-                <div class="button-container timeout-modal-actions">
-                    <button class="timeout-button go-to-timeout-button">Enter Timeout</button>
-                </div>
-            </div>
-        </div>
-    `;
+    popup.innerHTML = buildTimeoutGatePopupMarkup(`${callingTeamName} Called Timeout`, 'Enter Timeout');
 
-    // Add styles once
-    if (!document.getElementById('computer-timeout-popup-styles')) {
-        const style = document.createElement('style');
-        style.id = 'computer-timeout-popup-styles';
-        style.textContent = `
-            .computer-timeout-popup {
-                position: absolute;
-                inset: 0;
-                background: rgba(0, 0, 0, 0.72);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-            }
+    attachHeldAnnouncementToTimeoutStack(popup.querySelector('.timeout-gate-stack'));
 
-            .computer-timeout-stack {
-                width: min(860px, calc(100% - 40px));
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 22px;
-            }
-
-            .computer-timeout-stack > #announcement-overlay.timeout-held-announcement {
-                position: static;
-                inset: auto;
-                transform: none;
-                z-index: auto;
-                max-width: 100%;
-            }
-
-            .computer-timeout-content {
-                width: min(420px, calc(100vw - 40px));
-                background: rgba(22, 26, 36, 0.98);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-radius: 14px;
-                box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
-                            inset 0 1px 0 rgba(255, 255, 255, 0.06);
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .timeout-modal-accent {
-                height: 3px;
-                width: 100%;
-                background: #F79420;
-                flex-shrink: 0;
-            }
-
-            .timeout-modal-body {
-                padding: 24px 28px 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .computer-timeout-content h2 {
-                font-size: 28px;
-                color: #ffffff;
-                margin: 0;
-                font-family: 'Bebas Neue', sans-serif;
-                letter-spacing: 0.04em;
-                line-height: 1;
-            }
-
-            .timeout-modal-actions {
-                padding: 0 28px 24px;
-            }
-
-            @media (max-width: 760px) {
-                .computer-timeout-stack {
-                    width: calc(100% - 28px);
-                    gap: 16px;
-                }
-
-                .computer-timeout-content {
-                    width: min(420px, 100%);
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    const stack = popup.querySelector('.computer-timeout-stack');
-    const heldAnnouncement =
-        typeof window.holdPrimaryAnnouncementOverlayForTimeout === 'function'
-            ? window.holdPrimaryAnnouncementOverlayForTimeout()
-            : null;
-    if (stack && heldAnnouncement) {
-        heldAnnouncement.classList.add('timeout-held-announcement');
-        stack.prepend(heldAnnouncement);
-    }
-
-    // Navigate only on explicit user click
     const goToTimeoutBtn = popup.querySelector('.go-to-timeout-button');
     goToTimeoutBtn.addEventListener('click', async () => {
         if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-        if (typeof window.dismissPrimaryAnnouncementOverlayForTimeout === 'function') {
-            window.dismissPrimaryAnnouncementOverlayForTimeout();
-        }
-        popup.remove();
+        dismissTimeoutGatePopup(popup);
         await showTimeoutPopup(timeoutResult, gameId, scene, true, computerTeamName);
     });
 
-    const popupHost = document.getElementById('phaser-container') || document.body;
-    popupHost.appendChild(popup);
+    mountTimeoutGatePopup(popup);
 }
 
 /**

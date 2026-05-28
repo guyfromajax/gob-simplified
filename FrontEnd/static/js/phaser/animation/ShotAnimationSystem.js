@@ -1059,6 +1059,11 @@ export class ShotAnimationSystem {
         ease: this.shotConfig.flightEase,
         onComplete: () => {
           playShotResultSfx(this.scene, turnData, turnData.result_type);
+          import('../utils/gameAnnouncements.js').then(({ announceAirballIfNeeded }) => {
+            announceAirballIfNeeded(turnData, this.scene, {
+              shooterId: turnData.shooter_id,
+            });
+          });
           // Ball flight completed - no need to call endFlight since we're managing the tween ourselves
           resolve();
         },

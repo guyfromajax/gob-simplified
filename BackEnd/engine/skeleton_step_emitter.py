@@ -1874,6 +1874,31 @@ _RATTLE_HOP_COUNTS: Dict[str, int] = {
 }
 
 
+def _airball_announcement(
+    turn_result: Dict[str, Any],
+    away_offense: bool,
+) -> Optional[Dict[str, Any]]:
+    """``Airball!`` when a miss resolves as the AIRBALL shot variant.
+
+    Fires at [ball_flight] end — same beat as ``airball.wav`` (no duplicate
+    announce SFX; Sound_Design_Update.md).
+    """
+    if (turn_result.get("shot_variant") or "").upper() != "AIRBALL":
+        return None
+    if (turn_result.get("result_type") or "").upper() == "MAKE":
+        return None
+    shooter_id = turn_result.get("shooter_id") or _safe_id(turn_result.get("shooter"))
+    if not shooter_id:
+        return None
+    return {
+        "text": "Airball!",
+        "team": "away" if away_offense else "home",
+        "hold_ms": 1000.0,
+        "style": "primary",
+        "player_data": {"playerId": str(shooter_id)},
+    }
+
+
 def _shooting_foul_on_miss_announcement(
     turn_result: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
@@ -2157,6 +2182,10 @@ def _build_post_shot_sub_steps(
                 "style": "primary",
                 "player_data": {"playerId": str(blocker_id)},
             }
+    elif is_airball:
+        airball_ann = _airball_announcement(turn_result, away_offense)
+        if airball_ann:
+            flight_step["end"]["announcement"] = airball_ann
 
     # Rewire [shoot]: next → [ball_flight] (was turn_stop SHOT_ATTEMPT).
     shoot_step["end"]["next"] = {"kind": "next_step", "index": flight_idx}

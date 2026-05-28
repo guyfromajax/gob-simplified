@@ -28,6 +28,7 @@ from BackEnd.constants import (
     RATTLE_MAKE_SETTLE_GAME_SECONDS,
 )
 from BackEnd.engine.skeleton_step_emitter import (
+    _airball_announcement,
     _rattle_hop_targets,
     _variant_flight_end,
 )
@@ -485,6 +486,11 @@ def _append_ft_variant_post_shot_chain(
     )
     shoot_step["end"]["next"] = {"kind": "next_step", "index": len(steps)}
     steps.append(flight_step)
+
+    if is_airball and not is_make:
+        airball_ann = _airball_announcement(turn_result, away_offense)
+        if airball_ann:
+            flight_step["end"]["announcement"] = airball_ann
 
     cursor_ball: GridCoord = dict(ball_flight_end)
     last_appended = flight_step

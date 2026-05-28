@@ -105,6 +105,10 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       handleBlockAnnouncement(turnData, scene, context);
       break;
 
+    case 'AIRBALL':
+      handleAirballAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
     // ========== TURNOVERS ==========
     case 'STEAL':
       handleStealAnnouncement(turnData, scene, context, defenseTeam);
@@ -286,6 +290,40 @@ function handleBlockAnnouncement(turnData, scene, context) {
   // Sound_Design_Update.md "Block Announce: Trigger: immediately when the
   // Block announce appears."
   showAnnouncement("BLOCK!", blockerTeam, playerData, { sfx: 'duke-its-blocked.wav' });
+}
+
+/**
+ * Legacy-path helper: announce Airball! when shot_variant is AIRBALL.
+ * Schema playback stamps step.end.announcement on [ball_flight] instead;
+ * this covers ballManager / ShotAnimationSystem / fastBreak paths.
+ */
+export function announceAirballIfNeeded(turnData, scene, context = {}) {
+  if (!turnData || !scene) return;
+  if (String(turnData.shot_variant || '').toUpperCase() !== 'AIRBALL') return;
+  if (String(turnData.result_type || '').toUpperCase() === 'MAKE') return;
+  if (turnData._airballAnnounced) return;
+  turnData._airballAnnounced = true;
+  announceGameEvent('AIRBALL', turnData, scene, context);
+}
+
+function handleAirballAnnouncement(turnData, scene, context, offenseTeam) {
+  const shooterId = context.shooterId || turnData.shooter_id;
+  let playerData = null;
+
+  if (scene && shooterId) {
+    const shooterSprite = scene.playerSprites?.[shooterId];
+    if (shooterSprite) {
+      playerData = {
+        playerId: shooterId,
+        photo: shooterSprite.photo || null,
+        teamName: shooterSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterSprite.team_id),
+      };
+    }
+  }
+
+  // No meta.sfx — airball.wav already fires from shot-result SFX at the same beat.
+  showAnnouncement('Airball!', offenseTeam, playerData);
 }
 
 function handleShootingFoulAnnouncement(turnData, scene, context) {

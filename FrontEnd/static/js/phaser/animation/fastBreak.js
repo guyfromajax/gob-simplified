@@ -2781,7 +2781,14 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     easing: "Sine.easeInOut",
     arc: { height: 50 },
     onShotRelease: () => playShotLaunchSfx(scene, turnData),
-    onShotArrive: () => playShotResultSfx(scene, turnData, turnData.result_type)
+    onShotArrive: () => {
+      playShotResultSfx(scene, turnData, turnData.result_type);
+      import("../utils/gameAnnouncements.js").then(({ announceAirballIfNeeded }) => {
+        announceAirballIfNeeded(turnData, scene, {
+          shooterId: turnData.shooter_id,
+        });
+      });
+    },
   });
   
   // Stop rebounder animations when ball hits rim (made shot)
@@ -3102,7 +3109,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     easing: "Sine.easeInOut",
     arc: { height: 50 },
     onShotRelease: () => playShotLaunchSfx(scene, turnData),
-    onShotArrive: () => playShotResultSfx(scene, turnData, turnData.result_type)
+    onShotArrive: () => {
+      playShotResultSfx(scene, turnData, turnData.result_type);
+      import("../utils/gameAnnouncements.js").then(({ announceAirballIfNeeded }) => {
+        announceAirballIfNeeded(turnData, scene, {
+          shooterId: turnData.shooter_id,
+        });
+      });
+    },
   });
   
   // ✅ Stop rebounder animations when ball hits rim (made shot)

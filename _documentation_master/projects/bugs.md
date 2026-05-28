@@ -5,27 +5,26 @@
 7. Wire slow it down and quick shot with tempo
 8. OTB fouls need to animate the rebound
 9. Dunks! I need DUNKS!
+10. Not announcing shooting fouls on OREB putback misses (& maybe makes?)
 
 11. More action in recruiting
 12. Airball announce
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
+15. Traning page hover tool tips
 
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
 37. Player Foul Out Next Step bug
+38. Don't let user timeout modal hide Announce modal
+39. Offense playcall highlightin in the PC is still broken
 
 40. Batted ball out of bounds is not animating or executing properly
 44. Customize computer teams more strategically
 45. Improve FCC API
 46. Import FB Play Types function, no CR arg?
 
-47. Double rebounds on missed Fast Break shots
 48. Double block announce on Final Shot
 49. Run clock to 0:00 for Final Shot
-50. Triangle FB seems to be jetting players on the alignment step and not adhering to player speed archetypes.
-
-55. Getting a double pass on double screen play where shooter drives to teh basket
-56. Some Fast Breaks are still broken
 
 57. Player Momentum System
 

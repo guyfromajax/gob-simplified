@@ -661,8 +661,14 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
         announcement.text,
         announcement.team || "neutral",
         playerData,
-        announcement.meta || null,
+        { ...(announcement.meta || {}), scene },
       );
+    }
+    if (
+      turnData
+      && String(announcement.text || "").trim().toLowerCase() === "airball!"
+    ) {
+      turnData._airballAnnounced = true;
     }
   } catch (err) {
     console.warn("runStepAnnouncement: showAnnouncement failed", err);
