@@ -60,7 +60,10 @@ async function advanceToSetLineup() {
 }
 
 
-// Returns the initialized game_id, or null on failure.
+// Returns { game_id, home_lineup: { PG, SG, SF, PF, C } } or null on failure.
+// home_lineup is the engine-assigned starting 5 (rank_roster output) which the
+// situation page passes forward as URL params so set-lineup pre-populates with
+// the right players. Backend returns this in the response body when mode=tutorial.
 async function initTutorialGame(userTeam, opponent) {
   try {
     const res = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
@@ -78,38 +81,16 @@ async function initTutorialGame(userTeam, opponent) {
       return null;
     }
     const data = await res.json();
-    return data.game_id || null;
+    if (!data.game_id) return null;
+    const tutorialLineup = (data.tutorial_lineup || {}).home || {};
+    const homeLineup = {};
+    ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
+      if (tutorialLineup[pos]) homeLineup[pos] = String(tutorialLineup[pos]);
+    });
+    return { game_id: data.game_id, home_lineup: homeLineup };
   } catch (e) {
     console.error('[tutorial] init-game threw:', e);
     return null;
-  }
-}
-
-
-// Returns { PG, SG, SF, PF, C } → player_id strings, or {} on failure.
-async function fetchUserLineupFromGame(gameId) {
-  try {
-    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
-      headers: API_CONFIG.getAuthHeaders(),
-    });
-    if (!res.ok) return {};
-    const game = await res.json();
-    const homeTeam = game?.home_team;
-    if (!homeTeam || typeof homeTeam !== 'object') return {};
-    const rawLineup = homeTeam.lineup || {};
-    const out = {};
-    ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
-      const slot = rawLineup[pos];
-      if (!slot) return;
-      const pid = typeof slot === 'string'
-        ? slot
-        : (slot._id || slot.player_id || slot.playerId);
-      if (pid) out[pos] = String(pid);
-    });
-    return out;
-  } catch (e) {
-    console.warn('[tutorial] could not fetch user lineup:', e);
-    return {};
   }
 }
 
@@ -155,26 +136,23 @@ async function main() {
 
   const opponent = deriveOpponent(teamPick);
 
-  const modal = showSammyModal({
+  showSammyModal({
     body: situationBody(opponent),
     ctaLabel: 'Set Lineup',
     dismissOnCta: false,
     onCta: async () => {
       // Order matters: init-game first (the heaviest call; without it,
-      // set-lineup has nothing to display). Then advance state. Then fetch
-      // the lineup the engine assigned. Then navigate.
-      const gameId = await initTutorialGame(teamPick, opponent);
-      if (!gameId) {
-        modal.setError && modal.setError('');
-        // Surface a degraded error via the modal body — no setError for
-        // non-input modals, so console + alert is the path.
+      // set-lineup has nothing to display). The response includes the
+      // engine-assigned lineup (rank_roster output) so we don't need a
+      // second round-trip. Then advance state. Then navigate.
+      const init = await initTutorialGame(teamPick, opponent);
+      if (!init || !init.game_id) {
         console.error('[tutorial] init-game returned no game_id');
         window.alert('Could not start the tutorial game. Please refresh and try again.');
         return;
       }
       await advanceToSetLineup();
-      const lineup = await fetchUserLineupFromGame(gameId);
-      gotoSetLineup(teamPick, opponent, gameId, lineup);
+      gotoSetLineup(teamPick, opponent, init.game_id, init.home_lineup || {});
     },
   });
 }
