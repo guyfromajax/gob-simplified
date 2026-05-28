@@ -44,6 +44,10 @@ function getMode({ tournamentId, franchiseId }) {
   if (tournamentId) return 'tournament';
   if (franchiseId) return 'franchise';
   return 'single'; // ✅ SS&S: Explicitly return 'single' for Single Game mode
+  // Note: FTE v2 'tutorial' mode is set via URL param `mode=tutorial` and
+  // picked up by the `urlMode || getMode(...)` fallback on line 154.
+  // It rides on single-mode infrastructure (no franchise/tournament writes,
+  // game doc deleted on completion) but the backend injects mid-Q4 state.
 }
 
 // Utility function to generate MongoDB ObjectId format game IDs
@@ -170,9 +174,10 @@ let quarter = urlParams.has('quarter') ? parseInt(urlParams.get('quarter'), 10) 
 let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
-// For single game mode, game_id is required even for Q1 (must be created by init-game)
-if (!gameId && mode === 'single') {
-  const errorMsg = `game_id is required for single game mode but missing from URL. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
+// For single game mode (and FTE v2 tutorial mode, which rides single-mode
+// infrastructure), game_id is required even for Q1 (must be created by init-game)
+if (!gameId && (mode === 'single' || mode === 'tutorial')) {
+  const errorMsg = `game_id is required for ${mode} mode but missing from URL. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
   console.error(`❌ [BOOTGAME] ${errorMsg}`);
   alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
   // Don't redirect - let user see the error
