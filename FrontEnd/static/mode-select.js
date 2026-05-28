@@ -367,6 +367,38 @@ function chStandardCopyHtml(entry) {
   return userStrong + ', coaching ' + ut + ', ' + beatLost + ' ' + opp + '. ' + tailRanked;
 }
 
+// FTE v2 debut entry — copy locked by Coach (Q8):
+//   "Username (bold) has completed his onboarding game. Coaching
+//    {team} he defeated/lost to {opp} by a score of {us}-{them}."
+function chDebutCopyHtml(entry) {
+  var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
+  var ut = escapeHtmlMs(entry.user_team_name || '?');
+  var opp = escapeHtmlMs(entry.opponent_name || '?');
+  var verb = entry.user_won ? 'defeated' : 'lost to';
+  var userStrong = '<strong class="ch-username">' + uname + '</strong>';
+  var usc = entry.user_score;
+  var osc = entry.opponent_score;
+  var hasScores =
+    usc != null &&
+    osc != null &&
+    !Number.isNaN(Number(usc)) &&
+    !Number.isNaN(Number(osc));
+  var scoreSuffix = hasScores
+    ? ' by a score of ' + Number(usc) + '-' + Number(osc)
+    : '';
+  return (
+    userStrong +
+    ' has completed his onboarding game. Coaching ' +
+    ut +
+    ' he ' +
+    verb +
+    ' ' +
+    opp +
+    scoreSuffix +
+    '.'
+  );
+}
+
 function chAnnouncementHtml(entry) {
   var u = String(entry.username || entry.user_name || 'Coach');
   var raw = String(entry.announcement_line || '');
@@ -389,6 +421,22 @@ function renderCommunityHighlights(data) {
     var type = entry.entry_type || 'standard';
     var variant = entry.variant || 'standard_row';
     var rowExtra = variant === 'national_gold' ? ' community-highlight-row--national-gold' : '';
+
+    // FTE v2 debut: gold metallic border, no clickable behavior, no GP block.
+    if (type === 'debut') {
+      var debutCopy = chDebutCopyHtml(entry);
+      return (
+        '<div class="community-highlight-row community-highlight-row--debut" style="' +
+        chRowChromeStyle(entry) +
+        '">' +
+        '<div class="community-highlight-row-inner">' +
+        '<div class="community-highlight-copy">' +
+        debutCopy +
+        '</div>' +
+        '</div>' +
+        '</div>'
+      );
+    }
 
     if (type === 'conference_rs_title' || type === 'championship') {
       var ann = chAnnouncementHtml(entry);
