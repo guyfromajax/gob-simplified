@@ -61,7 +61,7 @@ function buildBodyNode(body) {
  * @param {string} [opts.eyebrow]
  * @param {string|HTMLElement} opts.body
  * @param {string} opts.ctaLabel
- * @param {Function} opts.onCta            - signature: (inputValue?) => void | Promise
+ * @param {Function} [opts.onCta]          - signature: (inputValue?) => void | Promise. Defaults to no-op for ack-only modals.
  * @param {string} [opts.secondaryLabel]
  * @param {Function} [opts.onSecondary]
  * @param {boolean} [opts.dismissOnCta=true]
@@ -70,9 +70,12 @@ function buildBodyNode(body) {
  * @returns {{ close: Function, setError: Function, setBusy: Function, element: HTMLElement }}
  */
 export function showSammyModal(opts) {
-  if (!opts || typeof opts.ctaLabel !== 'string' || typeof opts.onCta !== 'function') {
-    throw new Error('showSammyModal: ctaLabel (string) and onCta (function) are required');
+  if (!opts || typeof opts.ctaLabel !== 'string') {
+    throw new Error('showSammyModal: ctaLabel (string) is required');
   }
+  // onCta defaults to a no-op so simple acknowledge-only modals
+  // ("Got it" / "Let's go") don't need to wire a handler.
+  const onCta = typeof opts.onCta === 'function' ? opts.onCta : (() => {});
 
   ensureStylesheetLoaded();
 
@@ -198,7 +201,7 @@ export function showSammyModal(opts) {
     }
     try {
       setBusy(true);
-      await opts.onCta(value);
+      await onCta(value);
       if (dismissOnCta) close();
     } catch (e) {
       // onCta may set its own error message via the returned handle.

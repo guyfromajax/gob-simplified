@@ -60,12 +60,70 @@ async function advanceToSetLineup() {
 }
 
 
-function gotoSetLineup(userTeam, opponent) {
+// Returns the initialized game_id, or null on failure.
+async function initTutorialGame(userTeam, opponent) {
+  try {
+    const res = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        home_team: userTeam,
+        away_team: opponent,
+        mode: 'tutorial',
+        user_team_side: 'home',
+      }),
+    });
+    if (!res.ok) {
+      console.error('[tutorial] init-game failed:', res.status, await res.text().catch(() => ''));
+      return null;
+    }
+    const data = await res.json();
+    return data.game_id || null;
+  } catch (e) {
+    console.error('[tutorial] init-game threw:', e);
+    return null;
+  }
+}
+
+
+// Returns { PG, SG, SF, PF, C } → player_id strings, or {} on failure.
+async function fetchUserLineupFromGame(gameId) {
+  try {
+    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
+      headers: API_CONFIG.getAuthHeaders(),
+    });
+    if (!res.ok) return {};
+    const game = await res.json();
+    const homeTeam = game?.home_team;
+    if (!homeTeam || typeof homeTeam !== 'object') return {};
+    const rawLineup = homeTeam.lineup || {};
+    const out = {};
+    ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
+      const slot = rawLineup[pos];
+      if (!slot) return;
+      const pid = typeof slot === 'string'
+        ? slot
+        : (slot._id || slot.player_id || slot.playerId);
+      if (pid) out[pos] = String(pid);
+    });
+    return out;
+  } catch (e) {
+    console.warn('[tutorial] could not fetch user lineup:', e);
+    return {};
+  }
+}
+
+
+function gotoSetLineup(userTeam, opponent, gameId, lineup) {
   const params = new URLSearchParams({
     mode: 'tutorial',
     home: userTeam,
     away: opponent,
     my_team: 'home',
+  });
+  if (gameId) params.set('game_id', gameId);
+  ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
+    if (lineup[pos]) params.set(`home_${pos.toLowerCase()}`, lineup[pos]);
   });
   window.location.href = `/set-lineup.html?${params.toString()}`;
 }
@@ -97,13 +155,26 @@ async function main() {
 
   const opponent = deriveOpponent(teamPick);
 
-  showSammyModal({
+  const modal = showSammyModal({
     body: situationBody(opponent),
     ctaLabel: 'Set Lineup',
     dismissOnCta: false,
     onCta: async () => {
+      // Order matters: init-game first (the heaviest call; without it,
+      // set-lineup has nothing to display). Then advance state. Then fetch
+      // the lineup the engine assigned. Then navigate.
+      const gameId = await initTutorialGame(teamPick, opponent);
+      if (!gameId) {
+        modal.setError && modal.setError('');
+        // Surface a degraded error via the modal body — no setError for
+        // non-input modals, so console + alert is the path.
+        console.error('[tutorial] init-game returned no game_id');
+        window.alert('Could not start the tutorial game. Please refresh and try again.');
+        return;
+      }
       await advanceToSetLineup();
-      gotoSetLineup(teamPick, opponent);
+      const lineup = await fetchUserLineupFromGame(gameId);
+      gotoSetLineup(teamPick, opponent, gameId, lineup);
     },
   });
 }

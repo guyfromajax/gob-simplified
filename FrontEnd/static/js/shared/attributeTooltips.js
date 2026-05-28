@@ -15,16 +15,16 @@ const ATTRIBUTE_NAMES = {
   RB: 'Rebounding',
   ST: 'Strength',
   AG: 'Agility',
-  FT: 'Free Throw',
+  FT: 'Free Throws',
   ND: 'Endurance',
   IQ: 'Basketball IQ',
   CH: 'Clutch',
   EM: 'Emotion',
   MO: 'Momentum',
   NG: 'Energy',
-  
-  // Other abbreviations
-  POS: 'Position',
+
+  // Other abbreviations (Pos intentionally omitted per Coach feedback —
+  // the column header is already self-descriptive)
   HT: 'Height',
   WT: 'Weight',
   RT: 'Rating'
