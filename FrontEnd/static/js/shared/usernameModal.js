@@ -21,7 +21,7 @@ import { showSammyModal } from '/js/shared/sammyModal.js';
 
 
 const USERNAME_HINT = '3-24 characters. Letters, numbers, and underscores only — no spaces.';
-const USERNAME_PROMPT = 'Choose a username, Coach.';
+const DEFAULT_USERNAME_PROMPT = 'Choose a username, Coach.';
 
 
 function validateUsername(value) {
@@ -54,13 +54,17 @@ function persistUsernameLocally(username) {
  * Open the username modal.
  * @param {Object} opts
  * @param {Function} [opts.onSuccess]  - called after the username is persisted server-side
+ * @param {string}   [opts.prompt]     - override the default body copy (e.g., tutorial flow)
  * @returns {{ close: Function }}      - handle to dismiss the modal early if needed
  */
 export function openUsernameModal(opts = {}) {
   const onSuccess = typeof opts.onSuccess === 'function' ? opts.onSuccess : null;
+  const prompt = typeof opts.prompt === 'string' && opts.prompt.trim()
+    ? opts.prompt
+    : DEFAULT_USERNAME_PROMPT;
 
   const handle = showSammyModal({
-    body: USERNAME_PROMPT,
+    body: prompt,
     ctaLabel: 'Continue',
     dismissOnCta: false,  // we control dismissal — wait for API success
     input: {
