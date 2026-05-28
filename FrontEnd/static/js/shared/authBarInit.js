@@ -84,32 +84,8 @@
     }
   ];
 
-  function ensureUsernameModal() {
-    if (document.getElementById('fte-username-backdrop')) return;
-    var backdrop = document.createElement('div');
-    backdrop.id = 'fte-username-backdrop';
-    backdrop.className = 'fte-username-backdrop';
-    backdrop.setAttribute('role', 'dialog');
-    backdrop.setAttribute('aria-modal', 'true');
-    backdrop.setAttribute('aria-labelledby', 'fte-username-title');
-    backdrop.innerHTML = [
-      '<div class="fte-modal">',
-      '  <div class="fte-content">',
-      '    <img src="/images/sammy_tutorial.png" alt="" class="fte-content-img">',
-      '    <div class="fte-content-main">',
-      '      <p id="fte-username-title">Choose a username</p>',
-      '      <p class="fte-username-hint">No spaces • Letters, numbers, underscores only • 3-24 characters</p>',
-      '      <input type="text" id="fte-username-input" class="fte-username-input" placeholder="Username" maxlength="24" autocomplete="username">',
-      '      <div id="fte-username-error" class="fte-username-error" role="alert" style="display: none;"></div>',
-      '    </div>',
-      '  </div>',
-      '  <div class="fte-footer">',
-      '    <button type="button" id="fte-username-submit" class="fte-btn fte-btn-next">Continue</button>',
-      '  </div>',
-      '</div>'
-    ].join('');
-    document.body.appendChild(backdrop);
-  }
+  // Username modal lives in /js/shared/usernameModal.js (FTE v2 chrome).
+  // Loaded on demand via dynamic import — see openUsernameModal() below.
 
   function ensureAccountSettingsModal() {
     if (document.getElementById('account-settings-backdrop')) return;
@@ -184,90 +160,21 @@
     primaryBtn.textContent = step.primaryLabel;
   }
 
-  function validateUsername(value) {
-    var v = (value || '').trim();
-    if (v.length < 3) return 'Username must be at least 3 characters';
-    if (v.length > 24) return 'Username must be at most 24 characters';
-    if (/[\s]/.test(v)) return 'No spaces allowed';
-    if (!/^[a-zA-Z0-9_]+$/.test(v)) return 'Only letters, numbers, and underscores';
-    return null;
-  }
-
+  // Username modal: delegated to /js/shared/usernameModal.js (FTE v2 chrome).
+  // Loaded on demand so this classic script doesn't need to be a module.
+  // Signature preserved (positional `onSuccess` callback) so existing callers
+  // continue to work unchanged.
   function openUsernameModal(onSuccess) {
-    ensureUsernameModal();
-    var backdrop = document.getElementById('fte-username-backdrop');
-    var input = document.getElementById('fte-username-input');
-    var errorEl = document.getElementById('fte-username-error');
-    var submitBtn = document.getElementById('fte-username-submit');
-    if (!backdrop || !input || !submitBtn) return;
-
-    errorEl.style.display = 'none';
-    errorEl.textContent = '';
-    input.value = '';
-    backdrop.classList.add('open');
-    input.focus();
-
-    function closeUsernameModal() {
-      backdrop.classList.remove('open');
-    }
-
-    submitBtn.onclick = function () {
-      var username = (input.value || '').trim();
-      var err = validateUsername(username);
-      if (err) {
-        errorEl.textContent = err;
-        errorEl.style.display = 'block';
-        return;
-      }
-      errorEl.style.display = 'none';
-      errorEl.textContent = '';
-
-      if (typeof API_CONFIG === 'undefined' || typeof API_CONFIG.buildUrl !== 'function' || typeof API_CONFIG.getAuthHeaders !== 'function') {
-        closeUsernameModal();
-        if (onSuccess) onSuccess();
-        return;
-      }
-
-      submitBtn.disabled = true;
-      fetch(API_CONFIG.buildUrl('/api/auth/set-username'), {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, API_CONFIG.getAuthHeaders()),
-        body: JSON.stringify({ username: username })
+    import('/js/shared/usernameModal.js')
+      .then(function (mod) {
+        mod.openUsernameModal({ onSuccess: onSuccess });
       })
-        .then(function (res) {
-          return res.json().then(function (data) {
-            if (res.ok) {
-              try {
-                var authUser = localStorage.getItem('auth_user');
-                if (authUser) {
-                  var user = JSON.parse(authUser);
-                  user.username = data.username;
-                  localStorage.setItem('auth_user', JSON.stringify(user));
-                }
-              } catch (e) {}
-              var authUserEmail = document.getElementById('auth-user-email');
-              if (authUserEmail) authUserEmail.textContent = data.username;
-              closeUsernameModal();
-              if (onSuccess) onSuccess();
-            } else {
-              errorEl.textContent = data.detail || 'This username is already taken';
-              errorEl.style.display = 'block';
-            }
-          });
-        })
-        .catch(function () {
-          errorEl.textContent = 'Something went wrong. Try again.';
-          errorEl.style.display = 'block';
-        })
-        .then(function () {
-          submitBtn.disabled = false;
-        });
-    };
+      .catch(function (e) {
+        console.error('[authBarInit] Failed to load usernameModal.js:', e);
+      });
   }
 
   function openFTESteps() {
-    var usernameBackdrop = document.getElementById('fte-username-backdrop');
-    if (usernameBackdrop) usernameBackdrop.classList.remove('open');
     ensureFTEModal();
     var backdrop = document.getElementById('fte-backdrop');
     var backBtn = document.getElementById('fte-btn-back');
@@ -337,8 +244,6 @@
       });
       return;
     }
-    var usernameBackdrop = document.getElementById('fte-username-backdrop');
-    if (usernameBackdrop) usernameBackdrop.classList.remove('open');
     openFTESteps();
   }
 
