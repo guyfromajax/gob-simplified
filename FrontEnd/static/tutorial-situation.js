@@ -26,7 +26,7 @@ function deriveOpponent(userTeam) {
 
 function situationBody(opponent) {
   // Copy locked by Coach. En-dash (–) between scores, not a hyphen.
-  return `${opponent}. Tied 60–60. 4 minutes left in the 4th. Win it, Coach.`;
+  return `You're playing against ${opponent}. Tied 60–60. 4 minutes left in the 4th. Go win it, Coach.`;
 }
 
 
@@ -95,11 +95,17 @@ async function initTutorialGame(userTeam, opponent) {
 
 
 function gotoSetLineup(userTeam, opponent, gameId, lineup) {
+  // quarter=4 is critical: without it, set-lineup's module-level `quarter`
+  // defaults to 1, and the /api/game fetch passes ?quarter=1 — which the
+  // backend treats as a "new game scenario" (request Q1 + saved Q4) and
+  // returns empty stats. With quarter=4 in the URL, the fetch returns the
+  // real Q4 60-60 state populated by apply_tutorial_initial_state.
   const params = new URLSearchParams({
     mode: 'tutorial',
     home: userTeam,
     away: opponent,
     my_team: 'home',
+    quarter: '4',
   });
   if (gameId) params.set('game_id', gameId);
   ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {

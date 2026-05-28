@@ -37,8 +37,11 @@ function createTooltipElement() {
   if (!tooltipElement) {
     tooltipElement = document.createElement('div');
     tooltipElement.id = 'attribute-tooltip-bubble';
+    // position: fixed — the positioning math below uses window.innerHeight -
+    // rect.top, which is viewport-relative. Absolute positioning was unreliable
+    // when the page was scrolled.
     tooltipElement.style.cssText = `
-      position: absolute;
+      position: fixed;
       padding: 6px 10px;
       background: rgba(0, 0, 0, 0.95);
       color: #fff;
