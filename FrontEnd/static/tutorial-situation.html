@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager (production only) -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>The Situation, Coach</title>
+  <link rel="stylesheet" href="/css/sammy-modal.css">
+  <style>
+    /* Dark backdrop; the situation modal renders on top via sammyModal. */
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at center, #1a2042 0%, #0a0d1c 70%);
+      background-attachment: fixed;
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <script src="/js/config/api-config.js"></script>
+  <script type="module" src="/tutorial-situation.js"></script>
+</body>
+</html>

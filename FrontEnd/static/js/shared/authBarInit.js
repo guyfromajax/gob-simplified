@@ -30,6 +30,8 @@
     'play-builder.html',
     'play-builder-v2.html',
     'play-details.html',
+    // FTE v2 tutorial funnel — immersive screens, no auth bar
+    'tutorial-situation.html',
     // Optional non-.html route variants
     '/box-score',
     '/game-plan',
