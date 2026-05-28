@@ -1704,6 +1704,11 @@ async function setHeader() {
       clockTime = gameData.clock;
     }
   }
+  // FTE v2 tutorial: prefer the game doc's clock (4:00 set by
+  // apply_tutorial_initial_state) over the quarter-break default ('8:00').
+  if (modeParam === 'tutorial' && gameData && gameData.clock) {
+    clockTime = gameData.clock;
+  }
  
   let formattedClock = '--:--';
   if (clockTime) {
@@ -1746,32 +1751,6 @@ async function setHeader() {
 
   if (playBtn) {
     playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
-  }
-
-  // FTE v2 tutorial: populate the compact left-panel header above the roster
-  // section with mid-game state from the loaded game doc (Q4 4:00 60-60 per
-  // apply_tutorial_initial_state). Hidden in non-tutorial modes.
-  const tutHeader = document.getElementById('tutorial-lineup-header');
-  if (tutHeader) {
-    if (modeParam === 'tutorial' && gameData) {
-      const docQuarter = parseInt(gameData.quarter, 10) || currentQuarter;
-      const docClock = gameData.clock || formattedClock;
-      const tutQuarterEl = document.getElementById('tutorial-lineup-header-quarter-label');
-      const tutClockEl = document.getElementById('tutorial-lineup-header-clock');
-      const tutHomeTeamEl = document.getElementById('tutorial-lineup-header-home-team');
-      const tutAwayTeamEl = document.getElementById('tutorial-lineup-header-away-team');
-      const tutHomeScoreEl = document.getElementById('tutorial-lineup-header-home-score');
-      const tutAwayScoreEl = document.getElementById('tutorial-lineup-header-away-score');
-      if (tutQuarterEl) tutQuarterEl.textContent = `Q${docQuarter}`;
-      if (tutClockEl) tutClockEl.textContent = docClock;
-      if (tutHomeTeamEl) tutHomeTeamEl.textContent = displayUserTeamName;
-      if (tutAwayTeamEl) tutAwayTeamEl.textContent = displayOpponentTeamName;
-      if (tutHomeScoreEl) tutHomeScoreEl.textContent = String(userTeamScore);
-      if (tutAwayScoreEl) tutAwayScoreEl.textContent = String(opponentTeamScore);
-      tutHeader.hidden = false;
-    } else {
-      tutHeader.hidden = true;
-    }
   }
 }
 
