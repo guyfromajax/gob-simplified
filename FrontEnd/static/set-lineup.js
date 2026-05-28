@@ -1747,6 +1747,32 @@ async function setHeader() {
   if (playBtn) {
     playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
   }
+
+  // FTE v2 tutorial: populate the compact left-panel header above the roster
+  // section with mid-game state from the loaded game doc (Q4 4:00 60-60 per
+  // apply_tutorial_initial_state). Hidden in non-tutorial modes.
+  const tutHeader = document.getElementById('tutorial-lineup-header');
+  if (tutHeader) {
+    if (modeParam === 'tutorial' && gameData) {
+      const docQuarter = parseInt(gameData.quarter, 10) || currentQuarter;
+      const docClock = gameData.clock || formattedClock;
+      const tutQuarterEl = document.getElementById('tutorial-lineup-header-quarter-label');
+      const tutClockEl = document.getElementById('tutorial-lineup-header-clock');
+      const tutHomeTeamEl = document.getElementById('tutorial-lineup-header-home-team');
+      const tutAwayTeamEl = document.getElementById('tutorial-lineup-header-away-team');
+      const tutHomeScoreEl = document.getElementById('tutorial-lineup-header-home-score');
+      const tutAwayScoreEl = document.getElementById('tutorial-lineup-header-away-score');
+      if (tutQuarterEl) tutQuarterEl.textContent = `Q${docQuarter}`;
+      if (tutClockEl) tutClockEl.textContent = docClock;
+      if (tutHomeTeamEl) tutHomeTeamEl.textContent = displayUserTeamName;
+      if (tutAwayTeamEl) tutAwayTeamEl.textContent = displayOpponentTeamName;
+      if (tutHomeScoreEl) tutHomeScoreEl.textContent = String(userTeamScore);
+      if (tutAwayScoreEl) tutAwayScoreEl.textContent = String(opponentTeamScore);
+      tutHeader.hidden = false;
+    } else {
+      tutHeader.hidden = true;
+    }
+  }
 }
 
 function restoreLineupFromUrl() {
@@ -2020,7 +2046,7 @@ async function init() {
   if (modeParam === 'tutorial') {
     import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
       showSammyModal({
-        body: "I've set your lineup, feel free to make any changes as you see fit.",
+        body: "I've set your lineup — tweak it if you like, and hover any attribute to see what it means.",
         ctaLabel: 'Got it',
       });
     }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
