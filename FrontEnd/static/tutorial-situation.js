@@ -26,7 +26,7 @@ function deriveOpponent(userTeam) {
 
 function situationBody(opponent) {
   // Copy locked by Coach. En-dash (–) between scores, not a hyphen.
-  return `You're playing against ${opponent}. Tied 60–60. 4 minutes left in the 4th. Go win it, Coach.`;
+  return `You're playing against ${opponent}. Tied 60–60. 4 minutes left in the 4th. Go win it, Coach!`;
 }
 
 

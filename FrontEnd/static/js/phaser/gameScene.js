@@ -2606,7 +2606,10 @@ export function createGameScene(Phaser) {
         // Show game completion popup (absolute path for Netlify/module resolution)
         const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
         const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
-        const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
+        // Prefer this.mode (set from game data at scene init) so 'tutorial'
+        // mode propagates correctly. Fall back to the tournament/franchise/
+        // single derivation for older scenes that don't set this.mode.
+        const mode = this.mode || (this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single'));
         showGameCompletionPopup({
           gameId: this.gameId || simData.game_id,
           mode: mode,

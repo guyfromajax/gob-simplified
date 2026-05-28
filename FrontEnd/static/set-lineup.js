@@ -1080,6 +1080,18 @@ function renderRosterAttributes() {
       sortRoster(columnNames[index]);
     });
   });
+
+  // Re-attach attribute tooltips after the sort-handler clone loop above.
+  // cloneNode(true) does NOT copy event listeners, so any mouseenter/mouseleave
+  // handlers attached by initAttributeTooltips on the original th elements get
+  // wiped when the headers are replaced. We re-attach here so the tooltips
+  // survive every re-render (initial paint, sort clicks, autoset, etc.).
+  if (typeof initAttributeTooltips !== 'undefined') {
+    const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
+    if (thead) {
+      initAttributeTooltips(thead, ['th', '[data-attr]']);
+    }
+  }
 }
 
 function renderRosterStats() {
