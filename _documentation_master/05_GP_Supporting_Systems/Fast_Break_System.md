@@ -239,6 +239,8 @@ When two defenders both retreat to basket defense, the second defender's spot is
 
 **Stat tracking:** unchanged. Each after_steal FB increments `scouting_data.offense.fast_break_plays["after_steal"]` (`A` on attempt, `S` on success) and the team-level `Fast_Break_Entries` aggregate; the four play keys (CR, RR, Triangle, AFTER_STEAL) all roll up into the team's overall Fast Break stats.
 
+**DREB miss chaining:** If a migrated Fast Break shot (`covert_release`, `rim_runner`, `triangle`, or `after_steal`) misses or is blocked and the defense secures the rebound, `GameManager.simulate_macro_turn()` promotes the defensive rebound into a discrete `DREB` turn before routing to the original next play (`HCO` or `FAST_BREAK`). The Fast Break shot turn ends at the schema post-shot bounce / `SHOT_ATTEMPT` stop; the separate `DREB` turn is the authority for rebound capture and ball ownership.
+
 ### When Fast Break Activates
 
 **Trigger Conditions:**
@@ -666,6 +668,7 @@ The outlet passer tracks:
   - `resolve_free_throw_logic()` — missed FT + DREB: `fast_break_probability_from_slider(def_team["fast_breaks"])` for FAST_BREAK vs HCO
   - `resolve_turnover_logic()` / FCP / HCT steal branches — `fast_break_probability_from_slider(def_team["aggression"])` (**stealing** team)
   - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt; increments **`fast_break_plays`** and sets **`fast_break_play`**; **early return** to Rim Runner resolver when DREB + **`rim_runner`** or **`triangle`**
+  - `GameManager.simulate_macro_turn()` promotes migrated Fast Break MISS/BLOCK + `DREB` outcomes (`covert_release`, `rim_runner`, `triangle`, `after_steal`) into a discrete `DREB` turn before `HCO` / next Fast Break routing.
   - Uses coordinate comparison in HOME orientation
   - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
 - `BackEnd/models/shot_manager.py`

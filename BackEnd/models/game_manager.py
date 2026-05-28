@@ -697,9 +697,9 @@ class GameManager:
         - _documentation_master/projects/Animation_System_Updated.md
         - BackEnd/engine/dreb_step_emitter.py
 
-        Currently scoped to HCT, HCO, and FAST_BREAK Covert Release MISS.
-        FCP and other FB variants still bundle DREB info into the MISS turn
-        the legacy way until those turn types migrate.
+        Currently scoped to HCT, HCO, migrated FAST_BREAK MISS/BLOCK paths,
+        final-FT DREB, and OREB putback miss → DREB. FCP still bundles DREB
+        info into the MISS turn the legacy way until that turn type migrates.
 
         Returns the DREB turn dict, or None if required data is missing.
         """
@@ -1105,12 +1105,14 @@ class GameManager:
 
         # SS&S animation refactor: MISS with defensive rebound generates a
         # discrete DREB turn (parallels the OREB pattern above). Scoped to
-        # turn types whose migration has landed — HCT, HCO, and FAST_BREAK
-        # Covert Release. See
+        # turn types whose migration has landed — HCT, HCO, and migrated
+        # FAST_BREAK schema paths. See
         # _documentation_master/projects/Animation_System_Updated.md.
+        from BackEnd.constants.fast_break_play_types import FAST_BREAK_PLAY_KEYS
+
         is_migrated_fb_miss = (
             result.get("current_turn") == "FAST_BREAK"
-            and result.get("fast_break_play") == "covert_release"
+            and result.get("fast_break_play") in FAST_BREAK_PLAY_KEYS
         )
         # Per the OREB UESS migration (D3 c + Q1 ii): treat PUTBACK_MISS as
         # "just another kind of miss" for the purpose of triggering a DREB
@@ -1152,7 +1154,7 @@ class GameManager:
             logging.error(
                 "🧭 [DREB PROMOTION SKIP] FAST_BREAK DREB miss/block not promoted. "
                 "fast_break_play=%s result_type=%s next_play_type=%s rebounderId=%s "
-                "has_animation_steps=%s current_turn=%s eligible_covert_release=%s",
+                "has_animation_steps=%s current_turn=%s eligible_migrated_fb=%s",
                 result.get("fast_break_play"),
                 result.get("result_type"),
                 result.get("next_play_type"),
