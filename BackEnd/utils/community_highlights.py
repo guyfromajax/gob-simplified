@@ -401,6 +401,86 @@ def _build_conference_rs_entry(
     }
 
 
+def _team_colors_by_name(team_name: str) -> tuple[str, str]:
+    """Primary/secondary hex colors for a team looked up by name. Falls back to defaults."""
+    doc = teams_collection.find_one(
+        {"name": team_name},
+        {"primary_color": 1, "secondary_color": 1},
+    ) or {}
+    primary = str(doc.get("primary_color") or "#27408E")
+    secondary = str(doc.get("secondary_color") or "#15181f")
+    return primary, secondary
+
+
+def _build_debut_entry(
+    *,
+    display_username: str,
+    user_team_name: str,
+    opponent_name: str,
+    user_won: bool,
+    user_score: int,
+    opponent_score: int,
+    primary: str,
+    secondary: str,
+) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    return {
+        "at": now.isoformat(),
+        "entry_type": "debut",
+        "variant": "debut",
+        "username": display_username,
+        "user_team_name": user_team_name,
+        "opponent_name": opponent_name,
+        "user_won": bool(user_won),
+        "user_score": int(user_score),
+        "opponent_score": int(opponent_score),
+        "primary_color": primary,
+        "secondary_color": secondary,
+    }
+
+
+def push_debut_entry(
+    *,
+    owner_user_id: Any,
+    user_team_name: str,
+    opponent_name: str,
+    user_won: bool,
+    user_score: int,
+    opponent_score: int,
+) -> None:
+    """Append a tutorial-game debut entry to the global community-highlights feed.
+
+    Display username and user-team colors are resolved server-side from the
+    canonical users / teams collections. Opponent colors are not surfaced on
+    debut rows (the row is framed around the new coach's arrival, not the
+    matchup).
+    """
+    user_doc = None
+    if owner_user_id:
+        try:
+            user_doc = users_collection.find_one(
+                {"_id": ObjectId(str(owner_user_id))},
+                {"username": 1, "email": 1},
+            )
+        except Exception:
+            user_doc = None
+    display_username = _display_username_for_highlight(user_doc)
+
+    primary, secondary = _team_colors_by_name(user_team_name)
+
+    entry = _build_debut_entry(
+        display_username=display_username,
+        user_team_name=user_team_name,
+        opponent_name=opponent_name,
+        user_won=user_won,
+        user_score=user_score,
+        opponent_score=opponent_score,
+        primary=primary,
+        secondary=secondary,
+    )
+    _push_entries([entry])
+
+
 def _build_championship_entry(
     *,
     display_username: str,
