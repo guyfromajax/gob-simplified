@@ -460,14 +460,19 @@ class TeamManager:
         }
 
     @staticmethod
-    def init_team_attributes(mode="single", tournament_seed=None):
+    def init_team_attributes(mode="single", tournament_seed=None, shot_threshold_override=None):
         """
         Initialize team attributes for a new mode instance.
 
         Args:
-            mode (str): Game mode ("single", "tournament", or "franchise")
+            mode (str): Game mode ("single", "tournament", "franchise", or "tutorial")
             tournament_seed (int | None): For mode "tournament" only, seed 1-8 (1=best).
                 When provided, uses seed-based ranges per Mode_Init_System.md.
+            shot_threshold_override (int | None): If provided, replaces the randomly
+                rolled shot_threshold. Used by the FTE v2 tutorial mode to pin the
+                user team and computer team to forced-make / forced-miss values
+                (see fte_inject_state.md §3). All other attributes still randomize
+                per the standard mode logic.
 
         Returns:
             dict: Team attributes with mode-specific randomization
@@ -516,6 +521,10 @@ class TeamManager:
                 team_chemistry = random.randint(7, 25)
                 rebound_modifier = round(rm_lo + random.random() * (rm_hi - rm_lo), 2)
 
+        # Tutorial-only override: forced make/miss per fte_inject_state.md §3.
+        if shot_threshold_override is not None:
+            shot_threshold = int(shot_threshold_override)
+
         return {
             "shot_threshold": shot_threshold,
             "discipline": random.randint(attr_range[0], attr_range[1]),
@@ -529,10 +538,10 @@ class TeamManager:
             "fb_opp_modifier": random.randint(attr_range[0], attr_range[1]),
             "pt_opp_modifier": random.randint(attr_range[0], attr_range[1])
         }
-    
-    def _init_team_attributes(self, mode="single"):
+
+    def _init_team_attributes(self, mode="single", shot_threshold_override=None):
         """Instance method wrapper for static init_team_attributes."""
-        return TeamManager.init_team_attributes(mode)
+        return TeamManager.init_team_attributes(mode, shot_threshold_override=shot_threshold_override)
 
     @staticmethod
     def _create_defense_structure_template():
