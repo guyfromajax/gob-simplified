@@ -79,11 +79,12 @@ function createButtons() {
       ? `<button class="team-card-action team-card-action-select" type="button">Select</button>`
       : `<button class="team-card-action team-card-action-scout" type="button">Scout</button>
          <button class="team-card-action team-card-action-select" type="button">Select</button>`;
+    const overlayClass = TUTORIAL_MODE ? 'team-card-overlay is-single-action' : 'team-card-overlay';
     card.innerHTML = `
       <div class="team-card-banner">
         <img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}">
         <div class="team-card-tagline">${taglines[team] || team}</div>
-        <div class="team-card-overlay">
+        <div class="${overlayClass}">
           ${overlayHtml}
         </div>
       </div>
@@ -194,13 +195,22 @@ document.addEventListener("DOMContentLoaded", function () {
   } catch (e) {}
 
   if (TUTORIAL_MODE) {
-    // Tutorial flow: no back link (per spec, user is locked in after team pick,
-    // but more importantly there's no mode-select to return to pre-onboarding).
+    // Tutorial flow: no back link, strict header, no subtitle. The greeting
+    // lives in the Sammy intro modal that fires below.
     if (backLink) backLink.style.display = 'none';
     const title = document.getElementById('page-title');
     const subtitle = document.getElementById('page-subtitle');
-    if (title) title.textContent = 'Pick Your Program, Coach.';
-    if (subtitle) subtitle.textContent = "It's your first game. Choose the team you want to lead onto the court.";
+    if (title) title.textContent = 'Pick Your Program';
+    if (subtitle) subtitle.style.display = 'none';
+
+    // One-shot Sammy intro modal — Coach feedback from staging walkthrough.
+    import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
+      showSammyModal({
+        body: "Hey Coach! It's your first game! Choose your squad you want to lead onto the court.",
+        ctaLabel: "Let's go",
+        onCta: () => {},
+      });
+    }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
   } else if (backLink) {
     backLink.addEventListener("click", function (event) {
       event.preventDefault();

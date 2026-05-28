@@ -137,6 +137,18 @@ input[type="reset"] {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
+/* FTE v2 tutorial: only the Select action is rendered. Center it in the
+   overlay instead of leaving a phantom Scout slot. */
+.team-card-overlay.is-single-action {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.team-card-overlay.is-single-action > .team-card-action {
+  min-width: 40%;
+  max-width: 60%;
+}
+
 .team-card:hover .team-card-overlay {
   opacity: 1;
   transform: translateY(0);
