@@ -54,6 +54,16 @@ function markDefenseMatchupAnnouncePlayed(gameId) {
 }
 
 export async function showDefenseMatchupsPopup(gameId, scene) {
+    // FTE v2 tutorial: behave as if "Don't show again" was checked. The
+    // tutorial flow is intentionally minimal and the matchups popup adds
+    // friction we don't want for first-time users. Per Coach feedback (Q2).
+    if (typeof window !== 'undefined') {
+        const urlMode = new URLSearchParams(window.location.search).get('mode');
+        if (urlMode === 'tutorial') {
+            return Promise.resolve();
+        }
+    }
+
     // Check if user has checked "Don't show again this game" (in-memory or persisted across page reloads)
     const persisted = typeof sessionStorage !== 'undefined' && gameId && sessionStorage.getItem(SESSION_STORAGE_KEY_PREFIX + gameId) === '1';
     if (dontShowAgainThisGame || persisted) {
