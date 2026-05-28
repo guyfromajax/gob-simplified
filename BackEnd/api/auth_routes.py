@@ -15,7 +15,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
@@ -87,6 +87,24 @@ class AuthResponse(BaseModel):
     message: str
 
 
+TutorialStep = Literal[
+    "team_select",
+    "username",
+    "situation",
+    "set_lineup",
+    "in_game",
+    "complete",
+]
+
+
+class TutorialState(BaseModel):
+    """Server-side state for the FTE v2 tutorial-game funnel."""
+    step: TutorialStep
+    team_pick: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     """User info response."""
     user_id: str
@@ -94,7 +112,9 @@ class UserResponse(BaseModel):
     role: str
     username: Optional[str] = None
     created_at: Optional[str] = None
-    fte: Optional[bool] = None  # First-time experience; True = show FTE, False = completed
+    fte: Optional[bool] = None  # Legacy first-time experience flag (preserved during FTE v2 migration)
+    fte_v2_complete: Optional[bool] = None  # FTE v2 — True once debut publish succeeds
+    tutorial_state: Optional[TutorialState] = None
     account_settings: Optional[dict] = None
 
 
@@ -291,6 +311,13 @@ async def signup(request: Request, body: SignupRequest):
         },
         "geek_points": 0,
         "fte": True,
+        "fte_v2_complete": False,
+        "tutorial_state": {
+            "step": "team_select",
+            "team_pick": None,
+            "started_at": now,
+            "completed_at": None,
+        },
         "created_at": now,
         "updated_at": now,
         "version": 1  # Schema version for future migrations
@@ -322,6 +349,14 @@ async def signup(request: Request, body: SignupRequest):
             "email": email,
             "role": "user",
             "username": None,
+            "fte": True,
+            "fte_v2_complete": False,
+            "tutorial_state": {
+                "step": "team_select",
+                "team_pick": None,
+                "started_at": now.isoformat(),
+                "completed_at": None,
+            },
             "account_settings": {
                 "display_color": "default"
             }
@@ -547,6 +582,21 @@ async def get_me(user: dict = Depends(get_current_user)):
     role = db_user.get("role", user.get("role", "user")) if db_user else user.get("role", "user")
     # FTE: True = show first-time experience; False = already completed (default True if missing)
     fte = db_user.get("fte", True) if db_user else True
+    # FTE v2: returned as None for users predating the schema; populated post-migration.
+    fte_v2_complete = db_user.get("fte_v2_complete") if db_user else None
+    raw_tutorial_state = db_user.get("tutorial_state") if db_user else None
+    tutorial_state = None
+    if isinstance(raw_tutorial_state, dict) and raw_tutorial_state.get("step"):
+        def _iso(v):
+            if v is None:
+                return None
+            return v.isoformat() if hasattr(v, "isoformat") else str(v)
+        tutorial_state = TutorialState(
+            step=raw_tutorial_state["step"],
+            team_pick=raw_tutorial_state.get("team_pick"),
+            started_at=_iso(raw_tutorial_state.get("started_at")),
+            completed_at=_iso(raw_tutorial_state.get("completed_at")),
+        )
     account_settings = (db_user.get("account_settings") if db_user else None) or {"display_color": "default"}
 
     return UserResponse(
@@ -556,6 +606,8 @@ async def get_me(user: dict = Depends(get_current_user)):
         username=username,
         created_at=created_at,
         fte=fte,
+        fte_v2_complete=fte_v2_complete,
+        tutorial_state=tutorial_state,
         account_settings=account_settings
     )
 
