@@ -1733,9 +1733,19 @@ def resolve_fast_break_logic(game: "GameManager"):
                 anim_steps = build_covert_release_animation_steps(result, game)
                 if anim_steps is not None:
                     result["animation_steps"] = anim_steps
+                else:
+                    # The emitter logs its own 🚨 [CR EMITTER NULL] line with
+                    # the specific guard that fired.
+                    logging.warning(
+                        "🚨 [CR EMITTER NULL CONSEQUENCE] (defensive_stop) "
+                        "result_type=%s — animation_steps not set, FE → LEGACY",
+                        result.get("result_type"),
+                    )
             except Exception as e:
-                logging.warning(
-                    "build_covert_release_animation_steps (defensive stop) failed: %s", e
+                logging.exception(
+                    "🚨 [CR EMITTER EXCEPTION] (defensive_stop) result_type=%s: %s "
+                    "— animation_steps not set, FE → LEGACY",
+                    result.get("result_type"), e,
                 )
 
         return result
@@ -1822,8 +1832,14 @@ def resolve_fast_break_logic(game: "GameManager"):
         # from `player.coords`, so applying the legacy animator's pre-staged
         # positions here would create a discontinuity between the prior turn's
         # end coords and step 0 start coords (visible as players "jetting" down
-        # the court at the FB→step-0 boundary). Skip apply_coords for migrated
-        # variants; legacy variants (RR, Triangle) still need it.
+        # the court at the FB→step-0 boundary, or a horizontal mirror-flip
+        # teleport when offense is AWAY since the animator pre-stages in
+        # display orientation via `get_away_player_coords`). Skip apply_coords
+        # for migrated variants. RR + Triangle have the analogous skip gated
+        # by `fb_play_key not in (RIM_RUNNER, TRIANGLE)` at five call sites
+        # inside `resolve_rim_runner_fast_break`. Steal-FB does not call
+        # `apply_coords_from_animations_list` (migrated cleanly without the
+        # legacy animator path).
         if fb_play_key != "covert_release":
             apply_coords_from_animations_list(game, fb_animations)
         # Pass the shot spot to `resolve_shot` via `roles["shot_spot"]` ONLY.
@@ -2122,9 +2138,25 @@ def resolve_fast_break_logic(game: "GameManager"):
             anim_steps = build_covert_release_animation_steps(turn_result, game)
             if anim_steps is not None:
                 turn_result["animation_steps"] = anim_steps
+            else:
+                # The emitter logs its own 🚨 [CR EMITTER NULL] line with the
+                # specific guard that fired. This log marks the consequence
+                # (FE will route to LEGACY_HANDLER → potential double-rebound
+                # on CR FB MISS when DREB promotion fires).
+                logging.warning(
+                    "🚨 [CR EMITTER NULL CONSEQUENCE] result_type=%s rebound_type=%s "
+                    "next_play_type=%s — animation_steps not set, FE → LEGACY",
+                    turn_result.get("result_type"),
+                    turn_result.get("rebound_type"),
+                    turn_result.get("next_play_type"),
+                )
         except Exception as e:
-            logging.warning(
-                "build_covert_release_animation_steps (outcome) failed: %s", e
+            logging.exception(
+                "🚨 [CR EMITTER EXCEPTION] (outcome) result_type=%s rebound_type=%s: %s "
+                "— animation_steps not set, FE → LEGACY",
+                turn_result.get("result_type"),
+                turn_result.get("rebound_type"),
+                e,
             )
 
     # Parallel-build: emit unified AnimationStep[] for steal-initiated FBs

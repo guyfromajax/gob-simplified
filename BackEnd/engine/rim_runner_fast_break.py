@@ -1253,7 +1253,15 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
 
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
-        apply_coords_from_animations_list(game, fb_animations)
+        # UESS Phase 1a/1b: RR's and Triangle's schema emitters read
+        # `player.coords` as the FB step 0 START state (= end of DREB).
+        # The legacy animator's pre-staged FB-END positions are flipped via
+        # `get_away_player_coords` for AWAY offense, so writing them to
+        # `player.coords` here causes a horizontal mirror-flip teleport at
+        # the DREB→FB step 0 boundary. Skip for RR + Triangle (mirrors the
+        # existing CR skip in phase_resolution.py).
+        if fb_play_key not in (RIM_RUNNER, TRIANGLE):
+            apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
@@ -1321,7 +1329,10 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         game_state["fast_break_shot_threshold_override"] = 1
         animator = Animator(game)
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
-        apply_coords_from_animations_list(game, fb_animations)
+        # UESS Phase 1a/1b: skip for RR + Triangle (see DREB→FB teleport
+        # rationale above).
+        if fb_play_key not in (RIM_RUNNER, TRIANGLE):
+            apply_coords_from_animations_list(game, fb_animations)
         if fb_roles.get("_bh_final_x") is not None:
             roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
@@ -1419,7 +1430,9 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         _apply_rr_decision_metadata(tr, pass_attempted=True, fb_open=fb_open)
         rr_anims = Animator(game).capture_fast_break_animation(fb_roles, False, None)
         tr["animations"] = rr_anims
-        if rr_anims:
+        # UESS Phase 1a/1b: skip for RR + Triangle (see DREB→FB teleport
+        # rationale above).
+        if rr_anims and fb_play_key not in (RIM_RUNNER, TRIANGLE):
             apply_coords_from_animations_list(game, rr_anims)
         attach_position_snapshots(
             tr,
@@ -1459,7 +1472,9 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             "animations": bat_anims,
         }
         _apply_rr_decision_metadata(result, pass_attempted=True, fb_open=fb_open)
-        if bat_anims:
+        # UESS Phase 1a/1b: skip for RR + Triangle (see DREB→FB teleport
+        # rationale above).
+        if bat_anims and fb_play_key not in (RIM_RUNNER, TRIANGLE):
             apply_coords_from_animations_list(game, bat_anims)
         attach_position_snapshots(
             result,
@@ -1501,7 +1516,10 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     game_state["fast_break_shot_threshold_override"] = base_threshold + def_chemistry - off_fight
     animator = Animator(game)
     fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
-    apply_coords_from_animations_list(game, fb_animations)
+    # UESS Phase 1a/1b: skip for RR + Triangle (see DREB→FB teleport
+    # rationale above).
+    if fb_play_key not in (RIM_RUNNER, TRIANGLE):
+        apply_coords_from_animations_list(game, fb_animations)
     if fb_roles.get("_bh_final_x") is not None:
         roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
     rr_snap_roles = {**roles, "ball_handler": ball_handler}

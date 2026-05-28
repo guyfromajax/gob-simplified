@@ -179,6 +179,17 @@ def _normalize_player_coord_map(
     return out
 
 
+def _attached_owner_from_step_end(step: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Return ``owner_player_id`` when a step ends with the ball attached."""
+    if not isinstance(step, dict):
+        return None
+    end_ball = (step.get("end") or {}).get("ball") or {}
+    if not isinstance(end_ball, dict):
+        return None
+    owner = end_ball.get("owner_player_id")
+    return str(owner) if owner else None
+
+
 def _resolve_prior_ball_handler_id(
     prior_turn: Optional[Dict[str, Any]],
     turn_result: Dict[str, Any],
@@ -906,27 +917,39 @@ def build_skeleton_animation_steps(
             # cold-starting (= teleport). Log loudly so we catch the gap.
             if not current_bh_id:
                 _last_step_ball = None
+                _last_step_next = None
+                _last_step_ball_owner = None
                 if isinstance(prior_turn, dict):
                     _anim_steps = prior_turn.get("animation_steps") or []
                     if _anim_steps and isinstance(_anim_steps[-1], dict):
-                        _last_step_ball = (_anim_steps[-1].get("end") or {}).get("ball")
+                        _last_step_end = _anim_steps[-1].get("end") or {}
+                        _last_step_ball = _last_step_end.get("ball")
+                        _last_step_next = _last_step_end.get("next")
+                        if isinstance(_last_step_ball, dict):
+                            _last_step_ball_owner = _last_step_ball.get("owner_player_id")
                 _hco_entry_log.error(
                     "❌❌❌ [HCO ENTRY BUG] current_bh_id is None — prior turn "
                     "failed to stamp a final ball handler. step0_bh=%s "
                     "prior_turn.result_type=%s prior_turn.current_turn=%s "
+                    "prior_turn.fast_break_play=%s "
                     "prior_turn.has_animation_steps=%s "
+                    "prior_turn.final_ball_handler_id=%s "
                     "prior_turn.ball_handler_id=%s prior_turn.roles.ball_handler=%s "
                     "prior_turn.rebounderId=%s prior_turn.rebound_type=%s "
                     "prior_turn.ball_bounce_x=%s prior_turn.ball_bounce_y=%s "
                     "prior_turn.next_play_type=%s "
-                    "prior_turn.last_step.end.ball=%s. "
+                    "prior_turn.last_step.end.next=%s "
+                    "prior_turn.last_step.end.ball=%s "
+                    "prior_turn.last_step.end.ball.owner_player_id=%s. "
                     "Falling back to minimum walk-up; investigate the "
                     "prior emitter's final_ball_handler_id resolution AND whether "
                     "_build_dreb_turn_from_miss should have fired but didn't.",
                     step0_bh_id,
                     prior_turn.get("result_type") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("current_turn") if isinstance(prior_turn, dict) else None,
+                    prior_turn.get("fast_break_play") if isinstance(prior_turn, dict) else None,
                     bool(prior_turn.get("animation_steps")) if isinstance(prior_turn, dict) else False,
+                    prior_turn.get("final_ball_handler_id") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("ball_handler_id") if isinstance(prior_turn, dict) else None,
                     (prior_turn.get("roles") or {}).get("ball_handler") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("rebounderId") if isinstance(prior_turn, dict) else None,
@@ -934,7 +957,9 @@ def build_skeleton_animation_steps(
                     prior_turn.get("ball_bounce_x") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("ball_bounce_y") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("next_play_type") if isinstance(prior_turn, dict) else None,
+                    _last_step_next,
                     _last_step_ball,
+                    _last_step_ball_owner,
                 )
             _hco_entry_log.warning(
                 "🏠 [ENTRY] SKIP missing inputs: current_bh=%s step0_bh=%s "
@@ -1195,6 +1220,17 @@ def build_skeleton_animation_steps(
             _player_id_at_pos(off_lineup, end_owner_pos) if end_owner_pos else None
         )
 
+        # Entry-chain seam: player coords for skeleton step 0 already seed
+        # from ``steps[reset_count - 1].end.coords`` when prepended Reset
+        # steps exist. Carry ball ownership the same way — otherwise
+        # ``_walk_ball_owners`` reads skeleton step 0's PG ``pass`` action and
+        # re-stamps PG as holder even though Handoff/Walk Up already delivered
+        # to ``step0_bh_id`` (the playcall's step-0 receiver).
+        if i == 0 and reset_count > 0:
+            prepended_owner = _attached_owner_from_step_end(steps[reset_count - 1])
+            if prepended_owner:
+                owner_id_start = prepended_owner
+
         ball_handler_role = roles.get("ball_handler")
         bh_id_fallback = _safe_id(ball_handler_role) or ""
 
@@ -1209,11 +1245,14 @@ def build_skeleton_animation_steps(
 
         # Detect pass step (ball ownership transfer) early — used both by
         # gate selection (FCP) and by the later ball_motion_style /
-        # ball_arrival_coord / SFX stamping block.
+        # ball_arrival_coord / SFX stamping block. Use resolved player ids
+        # (not skeleton positions) so the entry-chain seam override above
+        # suppresses a duplicate PG→receiver pass when the ball already
+        # arrived via Handoff/Walk Up.
         is_pass_step = (
-            start_owner_pos is not None
-            and end_owner_pos is not None
-            and start_owner_pos != end_owner_pos
+            bool(owner_id_start)
+            and bool(owner_id_end)
+            and str(owner_id_start) != str(owner_id_end)
         )
 
         # === Gate selection ====================================================

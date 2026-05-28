@@ -368,7 +368,7 @@ def _build_triangle_decision_steps(
         nonlocal cursor_clock, cursor_sc, cursor_coords, next_idx
         if step is None:
             return False
-        step["end"]["next"] = {"kind": "next_step", "index": next_idx + 1}
+        step["end"]["next"] = {"kind": "next_step", "index": next_idx}
         out.append(step)
         dt = float(step["end"]["time_elapsed"])
         cursor_clock -= dt

@@ -1127,7 +1127,13 @@ class GameManager:
             and int(result.get("free_throws_remaining", 0) or 0) == 0
             and result.get("rebound_type") == "DREB"
         )
-        if (
+        dreb_promotion_candidate = (
+            result.get("current_turn") == "FAST_BREAK"
+            and result.get("result_type") in ("MISS", "BLOCK")
+            and result.get("rebound_type") == "DREB"
+            and result.get("next_play_type") in ("HCO", "FAST_BREAK")
+        )
+        dreb_promotion_eligible = (
             (
                 result.get("current_turn") in ("HCT", "HCO")
                 or is_migrated_fb_miss
@@ -1141,7 +1147,21 @@ class GameManager:
             )
             and result.get("rebound_type") == "DREB"
             and result.get("next_play_type") in ("HCO", "FAST_BREAK")
-        ):
+        )
+        if dreb_promotion_candidate and not dreb_promotion_eligible:
+            logging.error(
+                "🧭 [DREB PROMOTION SKIP] FAST_BREAK DREB miss/block not promoted. "
+                "fast_break_play=%s result_type=%s next_play_type=%s rebounderId=%s "
+                "has_animation_steps=%s current_turn=%s eligible_covert_release=%s",
+                result.get("fast_break_play"),
+                result.get("result_type"),
+                result.get("next_play_type"),
+                result.get("rebounderId"),
+                bool(result.get("animation_steps")),
+                result.get("current_turn"),
+                is_migrated_fb_miss,
+            )
+        if dreb_promotion_eligible:
             dreb_turn = self._build_dreb_turn_from_miss(result)
             if dreb_turn:
                 # MISS turn now leads to DREB; DREB carries forward the
@@ -1179,6 +1199,20 @@ class GameManager:
                             prev_positions[pos] = {"x": float(x), "y": float(y)}
                         if prev_positions:
                             self.game_state["_prev_offense_positions_for_hco"] = prev_positions
+            elif dreb_promotion_candidate:
+                logging.error(
+                    "🧭 [DREB PROMOTION BUILD FAILED] Candidate passed gate but "
+                    "_build_dreb_turn_from_miss returned None. fast_break_play=%s "
+                    "result_type=%s next_play_type=%s rebounderId=%s "
+                    "ball_bounce_x=%s ball_bounce_y=%s has_animation_steps=%s",
+                    result.get("fast_break_play"),
+                    result.get("result_type"),
+                    result.get("next_play_type"),
+                    result.get("rebounderId"),
+                    result.get("ball_bounce_x"),
+                    result.get("ball_bounce_y"),
+                    bool(result.get("animation_steps")),
+                )
 
         # OTB foul from resolve_offensive_rebound() means no putback/kickout was resolved on the
         # OREB turn. The MISS (or BLOCK) turn still carries embedded OREB; the client otherwise

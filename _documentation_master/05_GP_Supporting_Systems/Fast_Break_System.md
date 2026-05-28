@@ -839,7 +839,7 @@ Returns:
 | `shooter_target` | GridCoord | Where the shooter ends up |
 | `defender_target` | GridCoord | The single point defenders race to |
 | `defender_end_coords` | dict[pid, GridCoord] | End positions for the race pool only |
-| `first_arriver_id` | str \| None | Defender who reached the target first, or None |
+| `first_arriver_id` | str \| None | Defender who reached the target before `t_shooter`, or None |
 | `contested` | bool | True if a defender is closer to basket than shooter at t_shooter |
 | `shot_defender_id` | str \| None | Defender to use in `calculate_shot_score` (None if uncontested) |
 | `t_shooter_game_seconds` | float | Shooter's traversal time — drives the shot step's advance trigger |

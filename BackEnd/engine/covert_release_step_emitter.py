@@ -1180,6 +1180,12 @@ def build_covert_release_animation_steps(
 
     fast_break_play = turn_result.get("fast_break_play")
     if fast_break_play != "covert_release":
+        import logging
+        logging.warning(
+            "🚨 [CR EMITTER NULL] guard=fast_break_play_mismatch fast_break_play=%s "
+            "result_type=%s — FE will fall to LEGACY_HANDLER",
+            fast_break_play, turn_result.get("result_type"),
+        )
         return None
 
     off_team = getattr(game, "offense_team", None)
@@ -1190,6 +1196,14 @@ def build_covert_release_animation_steps(
     bh = fb_roles.get("ball_handler")
     bh_id = _safe_id(bh)
     if not bh_id:
+        import logging
+        logging.warning(
+            "🚨 [CR EMITTER NULL] guard=missing_bh_id result_type=%s "
+            "fb_roles_keys=%s bh_obj=%s — FE will fall to LEGACY_HANDLER",
+            turn_result.get("result_type"),
+            list(fb_roles.keys()) if isinstance(fb_roles, dict) else None,
+            type(bh).__name__ if bh is not None else "None",
+        )
         return None
 
     outlet_passer_id = fb_roles.get("outlet_passer")
@@ -1203,6 +1217,13 @@ def build_covert_release_animation_steps(
     # mutates `player.coords` mid-resolution, so live coords are trustworthy.
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
+        import logging
+        logging.warning(
+            "🚨 [CR EMITTER NULL] guard=empty_all_start_coords result_type=%s "
+            "off_lineup_size=%d def_lineup_size=%d — FE will fall to LEGACY_HANDLER",
+            turn_result.get("result_type"),
+            len(off_lineup or {}), len(def_lineup or {}),
+        )
         return None
 
     from BackEnd.utils.animation_step_helpers import log_fb_emitter_entry
@@ -1228,6 +1249,15 @@ def build_covert_release_animation_steps(
         passer_coord = all_start_coords.get(passer_id)
         receiver_coord = all_start_coords.get(receiver_id)
         if passer_coord is None or receiver_coord is None:
+            import logging
+            logging.warning(
+                "🚨 [CR EMITTER NULL] guard=missing_outlet_coords result_type=%s "
+                "passer_id=%s passer_coord=%s receiver_id=%s receiver_coord=%s "
+                "all_start_coords_size=%d — FE will fall to LEGACY_HANDLER",
+                turn_result.get("result_type"),
+                passer_id, passer_coord, receiver_id, receiver_coord,
+                len(all_start_coords),
+            )
             return None
 
         outlet_step = _build_outlet_pass_step(

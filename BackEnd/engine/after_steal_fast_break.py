@@ -607,7 +607,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         },
         # After-steal-specific fields for the schema emitter:
         "after_steal_end_coords": end_coords,
-        "after_steal_first_arriver_id": first_arriver_id if t_first < t_shooter else None,
+        "after_steal_first_arriver_id": first_arriver_id,
         "after_steal_contested": contested,
         "shot_defender_id": _safe_id(shot_defender),
         "t_shooter_game_seconds": float(t_shooter),
