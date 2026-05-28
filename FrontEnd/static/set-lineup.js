@@ -1999,11 +1999,12 @@ async function init() {
     autosetBtn.addEventListener('click', autosetLineup);
   }
 
-  // FTE v2 tutorial: auto-fill the lineup on first load + show the Sammy intro
-  // modal. User can still tweak before hitting Play. modeParam comes from the
-  // module-level URL snapshot; ?mode=tutorial originates from tutorial-situation.html.
+  // FTE v2 tutorial: init-game has already run on the situation page, so the
+  // lineup is in the URL (restoreLineupFromUrl populates it above). We do NOT
+  // call autoset here — the engine assigned the tutorial-roster starters
+  // (rank_roster + Section 5 templates) and we want to honor that exactly.
+  // Just show the Sammy intro modal so the user knows to tweak if desired.
   if (modeParam === 'tutorial') {
-    try { await autosetLineup(); } catch (e) { console.warn('[tutorial] autoset on load failed:', e); }
     import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
       showSammyModal({
         body: "I've set your lineup, feel free to make any changes as you see fit.",
@@ -2041,15 +2042,15 @@ async function init() {
       
       // ✅ PHASE 1.1: Ensure game_id exists before navigating (same as Game Plan / Playbooks)
       // PLAY GAME bypasses game plan; if user clicks before init-game completes, we'd navigate without game_id
-      // FTE v2 tutorial: also runs through this branch (mode === 'tutorial') so the
-      // backend init_game can apply the Q4 4:00 60-60 state injection.
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout &&
-          (modeParam === 'single' || modeParam === 'tutorial') && quarter === 1) {
+      // (FTE v2 tutorial mode is NOT here — init-game runs earlier on the
+      // situation page so the engine state + roster are available when this
+      // page loads. By the time the user hits Play, game_id is already in URL.)
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && modeParam === 'single' && quarter === 1) {
         if (!initGameInProgress) {
           console.log('⏳ [SET-LINEUP] PLAY GAME: game_id not found, calling init-game...');
           initGameInProgress = true;
           try {
-            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: modeParam };
+            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',
@@ -2939,9 +2940,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initAttributeTooltips !== 'undefined') {
       const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
       if (thead) {
-        initAttributeTooltips(thead, ['th']);
-        
-        // Tooltips initialized (verification logs removed for cleaner console)
+        // Include [data-attr] so the RT span nested inside the Player Name
+        // header (which would otherwise read as "Player NameRT" and miss the
+        // map) gets its own tooltip wiring.
+        initAttributeTooltips(thead, ['th', '[data-attr]']);
       } else {
         console.warn('[TOOLTIP] thead element not found');
       }

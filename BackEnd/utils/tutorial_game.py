@@ -111,11 +111,25 @@ def prepare_tutorial_team_attributes(user_team_side: Optional[str]):
     return home_attrs, away_attrs
 
 
-def _apply_stat_overlay_to_team(team, side: str) -> None:
-    """Rank `team.players` by position_ratings, then apply slot stat overlays.
+# Map from starting-slot keys to the position strings used by team.lineup.
+_STARTING_SLOT_TO_POSITION = {
+    "starting_pg": "PG",
+    "starting_sg": "SG",
+    "starting_sf": "SF",
+    "starting_pf": "PF",
+    "starting_c":  "C",
+}
 
-    Mutates each player's stats["game"] and metadata["fouls"] in place.
-    Also sets NG (energy) to the tutorial boot value for every player.
+
+def _apply_stat_overlay_to_team(team, side: str) -> None:
+    """Rank `team.players` by position_ratings, then apply slot stat overlays
+    AND assign the top-ranked five players to team.lineup. Mutates in place.
+
+    - player.stats["game"] gets the Section 5 stat overlay.
+    - player.metadata["fouls"] is mirrored from the overlay (does NOT reset per Q).
+    - player.NG is set to TUTORIAL_NG_AT_BOOT for every player on the team.
+    - team.lineup is populated {PG, SG, SF, PF, C} → Player objects so the engine
+      knows which 5 are on the court at boot (and so set-lineup can render them).
     """
     if not getattr(team, "players", None):
         logger.warning("[TUTORIAL] team %s has no players to overlay", getattr(team, "name", "?"))
@@ -130,6 +144,7 @@ def _apply_stat_overlay_to_team(team, side: str) -> None:
         })
     ranked = rank_roster(ranking_payload)
 
+    # Stat overlay + foul mirror.
     for slot, pid in ranked:
         player = team.players.get(pid)
         if not player:
@@ -144,15 +159,30 @@ def _apply_stat_overlay_to_team(team, side: str) -> None:
         for key, value in overlay.items():
             player.stats["game"][key] = value
 
-        # Mirror personal fouls onto player.metadata["fouls"] (does not reset per Q).
         if "F" in overlay:
             existing_meta = getattr(player, "metadata", None) or {}
             try:
                 player.metadata = dict(existing_meta)
                 player.metadata["fouls"] = int(overlay["F"])
             except Exception:
-                # Player implementation may not allow attribute assignment; skip silently.
                 pass
+
+    # Assign top-ranked starters to team.lineup so the engine boots with the
+    # correct 5 on the court (and set-lineup renders them when it loads the
+    # game doc). team.lineup expects Player objects keyed by position string.
+    new_lineup = {}
+    for slot, pid in ranked:
+        pos = _STARTING_SLOT_TO_POSITION.get(slot)
+        if not pos:
+            continue
+        player = team.players.get(pid)
+        if player is not None:
+            new_lineup[pos] = player
+    if new_lineup:
+        try:
+            team.lineup = new_lineup
+        except Exception as e:
+            logger.warning("[TUTORIAL] could not assign team.lineup for %s: %s", team.name, e)
 
     # Set NG (energy) on every player on this team.
     for player in team.players.values():
@@ -252,37 +282,66 @@ def apply_tutorial_initial_state(
     gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id
 
     # --- Mirror everything back into the summary that gets persisted to mongo ---
+    # NOTE: summarize_game_state ran BEFORE this helper with an empty lineup and
+    # zero scores, so the captured summary has stale per-team and per-player
+    # data. We update the SPECIFIC summary keys that summarize wrote, using the
+    # canonical schema (see BackEnd/utils/shared.py:1828+):
+    #   - top-level: score, clock, time_remaining, shot_clock_remaining,
+    #     timeout_next_play_type, timeout_offense_team_id, quarter,
+    #     game_stats_initialized
+    #   - summary["teams"][team_id]: score, points_by_quarter, team_fouls, timeouts
+    #   - summary["players"] (flat list): pos + stats for each affected player
+    home_id = home_team.team_id
+    away_id = away_team.team_id
+
     summary["quarter"] = TUTORIAL_QUARTER
     summary["score"] = {home_name: TUTORIAL_SCORE, away_name: TUTORIAL_SCORE}
-    if isinstance(summary.get("home_team"), dict):
-        summary["home_team"]["score"] = TUTORIAL_SCORE
-        summary["home_team"]["points_by_quarter"] = list(home_pbq)
-        summary["home_team"]["team_fouls"] = TUTORIAL_TEAM_FOULS
-        summary["home_team"]["timeouts"] = TUTORIAL_TIMEOUTS_REMAINING
-    if isinstance(summary.get("away_team"), dict):
-        summary["away_team"]["score"] = TUTORIAL_SCORE
-        summary["away_team"]["points_by_quarter"] = list(away_pbq)
-        summary["away_team"]["team_fouls"] = TUTORIAL_TEAM_FOULS
-        summary["away_team"]["timeouts"] = TUTORIAL_TIMEOUTS_REMAINING
+    summary["clock"] = TUTORIAL_CLOCK_DISPLAY
+    summary["time_remaining"] = TUTORIAL_TIME_REMAINING
+    summary["shot_clock_remaining"] = TUTORIAL_SHOT_CLOCK
     summary["game_stats_initialized"] = True
+    summary["timeout_next_play_type"] = "SIDE_INBOUND"
+    summary["timeout_offense_team_id"] = gm.offense_team.team_id
 
-    # game_state is typically nested under summary; sync if present.
-    if isinstance(summary.get("game_state"), dict):
-        gs = summary["game_state"]
-        gs["quarter"] = TUTORIAL_QUARTER
-        gs["time_remaining"] = TUTORIAL_TIME_REMAINING
-        gs["clock"] = TUTORIAL_CLOCK_DISPLAY
-        gs["shot_clock_remaining"] = TUTORIAL_SHOT_CLOCK
-        gs["offense_team"] = gm.offense_team.name
-        gs["defense_team"] = gm.defense_team.name
-        gs["offensive_state"] = TUTORIAL_OFFENSIVE_STATE
-        gs["defense_playcall"] = TUTORIAL_DEFENSE_PLAYCALL
-        gs["team_fouls"] = {home_name: TUTORIAL_TEAM_FOULS, away_name: TUTORIAL_TEAM_FOULS}
-        gs["team_timeouts"] = {home_name: TUTORIAL_TIMEOUTS_REMAINING, away_name: TUTORIAL_TIMEOUTS_REMAINING}
-        gs["home_crowd_factor"] = TUTORIAL_HOME_CROWD_FACTOR
-        gs["game_stats_initialized"] = True
-        gs["timeout_next_play_type"] = "SIDE_INBOUND"
-        gs["timeout_offense_team_id"] = gm.offense_team.team_id
+    teams_obj = summary.get("teams")
+    if isinstance(teams_obj, dict):
+        for tid, pbq, in [(home_id, home_pbq), (away_id, away_pbq)]:
+            team_rec = teams_obj.get(tid) if tid is not None else None
+            if isinstance(team_rec, dict):
+                team_rec["score"] = TUTORIAL_SCORE
+                team_rec["points_by_quarter"] = list(pbq)
+                team_rec["team_fouls"] = TUTORIAL_TEAM_FOULS
+                team_rec["timeouts"] = TUTORIAL_TIMEOUTS_REMAINING
+
+    # summary["players"] entries need their `pos` and `stats` fields updated to
+    # reflect the post-tutorial state (team.lineup was empty at summarize time;
+    # _apply_stat_overlay_to_team mutated player.stats["game"] AFTER summarize).
+    pid_to_info = {}
+    for team_obj in (home_team, away_team):
+        # Position info: only for the 5 starters in the post-overlay lineup.
+        lineup_for_team = getattr(team_obj, "lineup", None) or {}
+        for pos, player in lineup_for_team.items():
+            pid = getattr(player, "player_id", None) or getattr(player, "_id", None)
+            if pid is None:
+                continue
+            pid_to_info.setdefault(str(pid), {})["pos"] = pos
+        # Stats info: for every player on the team (starters + bench).
+        for pid, player in (getattr(team_obj, "players", None) or {}).items():
+            game_stats = dict(getattr(player, "stats", {}).get("game") or {})
+            if game_stats:
+                pid_to_info.setdefault(str(pid), {})["stats"] = game_stats
+
+    players_list = summary.get("players")
+    if isinstance(players_list, list):
+        for entry in players_list:
+            pid_str = str(entry.get("playerId") or entry.get("player_id") or "")
+            if not pid_str or pid_str not in pid_to_info:
+                continue
+            info = pid_to_info[pid_str]
+            if "pos" in info:
+                entry["pos"] = info["pos"]
+            if "stats" in info:
+                entry["stats"] = info["stats"]
 
     logger.warning(
         "✅ [TUTORIAL] applied initial state: Q%d %s, %s vs %s, offense=%s, user_side=%s",
