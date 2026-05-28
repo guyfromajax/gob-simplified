@@ -28,6 +28,21 @@ const taglines = {
   'South Lancaster': 'Us vs The World'
 };
 
+// Mascots (collective noun) for the username-modal copy interpolation —
+// "you're now coaching the {mascot}". Authoritative on teams collection
+// (team_doc.mascot) but hardcoded here to avoid a round-trip on a single
+// modal render. Keep in sync if any team mascot ever changes.
+const mascots = {
+  'Bentley-Truman': 'Knights',
+  'Lancaster': 'Johnnies',
+  'Four Corners': 'Harvest',
+  'Ocean City': 'Admirals',
+  'Morristown': 'Pirates',
+  'Little York': 'Minute Men',
+  'Xavien': 'Elm Trees',
+  'South Lancaster': 'Bulldogs'
+};
+
 const teamContainer = document.getElementById("team-container");
 const errorHost = document.getElementById("team-select-error");
 const loadingOverlay = document.getElementById("team-select-loading");
@@ -133,8 +148,11 @@ async function selectTutorialTeam(team) {
     return;
   }
 
-  // Step 2: open the username modal with team-aware copy.
-  const prompt = `You're now coaching the ${team}. What's your name, Coach?`;
+  // Step 2: open the username modal with team-aware copy. Use the mascot
+  // (collective noun) so the sentence reads naturally — "the Johnnies",
+  // "the Pirates" — instead of grammatically broken "the Lancaster".
+  const mascot = mascots[team] || team;
+  const prompt = `You're now coaching the ${mascot}. What's your name, Coach?`;
   const { openUsernameModal } = await import('/js/shared/usernameModal.js');
   openUsernameModal({
     prompt,
@@ -195,22 +213,17 @@ document.addEventListener("DOMContentLoaded", function () {
   } catch (e) {}
 
   if (TUTORIAL_MODE) {
-    // Tutorial flow: no back link, strict header, no subtitle. The greeting
-    // lives in the Sammy intro modal that fires below.
+    // Tutorial flow: strict header + a single supporting subhead. No intro
+    // modal (Coach feedback: don't block team selection with a modal).
     if (backLink) backLink.style.display = 'none';
     const title = document.getElementById('page-title');
     const subtitle = document.getElementById('page-subtitle');
     if (title) title.textContent = 'Pick Your Program';
-    if (subtitle) subtitle.style.display = 'none';
-
-    // One-shot Sammy intro modal — Coach feedback from staging walkthrough.
-    import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
-      showSammyModal({
-        body: "Hey Coach! It's your first game! Choose your squad you want to lead onto the court.",
-        ctaLabel: "Let's go",
-        onCta: () => {},
-      });
-    }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
+    // Existing #page-subtitle styling (Inter 15px, 66% white) already reads
+    // as supporting text. No extra class needed.
+    if (subtitle) {
+      subtitle.textContent = "Your first game starts now. (Don't sweat it too much — you can pick your franchise team after.)";
+    }
   } else if (backLink) {
     backLink.addEventListener("click", function (event) {
       event.preventDefault();

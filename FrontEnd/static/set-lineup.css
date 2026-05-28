@@ -209,6 +209,53 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   background: rgba(13, 16, 24, 0.97);
 }
 
+/* FTE v2 tutorial: compact mid-game state header above the roster section.
+   Shows Q · Clock and Team Score — Team Score in two stacked rows. */
+.tutorial-lineup-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px 12px;
+  margin: 0 0 12px;
+  background: rgba(8, 11, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.05em;
+}
+.tutorial-lineup-header[hidden] { display: none; }
+.tutorial-lineup-header-quarter {
+  font-size: 22px;
+  color: #34EC27;
+  line-height: 1;
+}
+.tutorial-lineup-header-sep {
+  margin: 0 6px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.tutorial-lineup-header-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 18px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.92);
+}
+.tutorial-lineup-header-score-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  line-height: 1;
+  color: #ffffff;
+}
+.tutorial-lineup-header-score-sep {
+  color: rgba(255, 255, 255, 0.55);
+  font-family: 'Inter', sans-serif;
+}
+
 .lineup-roster-section {
   flex: 1 1 auto;
   display: flex;

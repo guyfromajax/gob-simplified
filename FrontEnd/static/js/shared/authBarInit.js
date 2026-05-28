@@ -44,9 +44,18 @@
 
   function shouldShowAuthBar() {
     var path = window.location.pathname || '';
-    return !PAGES_WITHOUT_AUTH_BAR.some(function (p) {
-      return path.indexOf(p) !== -1;
-    });
+    if (PAGES_WITHOUT_AUTH_BAR.some(function (p) { return path.indexOf(p) !== -1; })) {
+      return false;
+    }
+    // FTE v2: any page loaded with ?mode=tutorial is part of the immersive
+    // onboarding funnel — suppress the auth bar across the whole flow
+    // (team-select most notably; situation + set-lineup are already in
+    // PAGES_WITHOUT_AUTH_BAR above).
+    try {
+      var urlMode = new URLSearchParams(window.location.search).get('mode');
+      if (urlMode === 'tutorial') return false;
+    } catch (_) {}
+    return true;
   }
 
   function ensureAuthBarStyles() {

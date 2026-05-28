@@ -54,6 +54,23 @@
 
     <div class="lineup-main">
       <div class="lineup-left-panel">
+        <!-- FTE v2 tutorial: compact mid-game state header above the roster
+             section. Hidden in non-tutorial modes; populated by setHeader()
+             from the game doc when mode=tutorial. -->
+        <section id="tutorial-lineup-header" class="tutorial-lineup-header" hidden>
+          <div class="tutorial-lineup-header-quarter">
+            <span id="tutorial-lineup-header-quarter-label">Q4</span>
+            <span class="tutorial-lineup-header-sep">·</span>
+            <span id="tutorial-lineup-header-clock">4:00</span>
+          </div>
+          <div class="tutorial-lineup-header-score">
+            <span id="tutorial-lineup-header-home-team">Home</span>
+            <span class="tutorial-lineup-header-score-value" id="tutorial-lineup-header-home-score">60</span>
+            <span class="tutorial-lineup-header-score-sep">—</span>
+            <span class="tutorial-lineup-header-score-value" id="tutorial-lineup-header-away-score">60</span>
+            <span id="tutorial-lineup-header-away-team">Away</span>
+          </div>
+        </section>
         <section class="lineup-roster-section">
           <div class="lineup-roster-header-row">
             <div class="lineup-roster-label">Roster — click or drag to assign</div>
