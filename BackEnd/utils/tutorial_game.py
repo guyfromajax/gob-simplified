@@ -96,23 +96,46 @@ TUTORIAL_USER_OFFENSE_PLAYCALLS = [
 ]
 
 
-def build_tutorial_pc_order_offense() -> list[str]:
-    """Look up the Coach-specified default playcalls in the plays collection
-    and return them as a list of play_id strings in slot order.
+# fte_inject_state.md — Coach-specified preset distribution maps for the
+# user team's Playbooks modal in tutorial mode. These mirror the seed-time
+# percentage schema used by single/franchise (see gameplan_routes.py
+# initialize_playbook_settings) so the modal renders without any frontend
+# changes. Tutorial games are deleted on completion → no persistence to
+# user account or team records.
+TUTORIAL_FAST_BREAKS_PCT = {
+    "covert_release": 33,
+    "rim_runner": 33,
+    "triangle": 34,  # 33+33+34 = 100
+}
+TUTORIAL_ZONE_DEFENSE_PCT = {
+    # Matches gameplan_routes.py:759-768 seed convention (last gets remainder).
+    "zone_23": 33,
+    "zone_32": 33,
+    "zone_131": 34,  # 33+33+34 = 100
+}
+TUTORIAL_MAN_DEFENSE_PCT = {
+    "man_normal": 100,
+    "man_pressure": 0,
+    "man_loose": 0,
+}
 
-    Returns at most len(TUTORIAL_USER_OFFENSE_PLAYCALLS) ids. Any play whose
-    name doesn't resolve in the DB is skipped with a warning so the rest of
-    the slots still populate.
+
+def _load_tutorial_offense_plays() -> list[dict]:
+    """Fetch the 8 Coach-specified plays in slot order with name + play_id +
+    play_type. One DB round-trip; used by both pc_order construction and the
+    motion/set_plays percentage build.
+
+    Returns a list of dicts in slot order, omitting any play whose name
+    doesn't resolve. Each dict: {"name", "play_id", "play_type"}.
     """
     from BackEnd.db import plays_collection
 
     docs = list(plays_collection.find(
         {"name": {"$in": TUTORIAL_USER_OFFENSE_PLAYCALLS}},
-        {"_id": 1, "name": 1, "play_id": 1},
+        {"_id": 1, "name": 1, "play_id": 1, "play_type": 1},
     ))
-    # Build name -> id map. Prefer the canonical play_id field when present,
-    # falling back to _id (matches the lookup pattern used by
-    # normalize_pc_order in playbook_settings_utils).
+    # name -> details. Prefer the canonical play_id field when present,
+    # falling back to _id (matches normalize_pc_order in playbook_settings_utils).
     by_name: dict = {}
     for doc in docs:
         name = doc.get("name")
@@ -121,33 +144,67 @@ def build_tutorial_pc_order_offense() -> list[str]:
         pid = doc.get("play_id") or doc.get("_id")
         if pid is None:
             continue
-        by_name[name] = str(pid)
+        by_name[name] = {
+            "name": name,
+            "play_id": str(pid),
+            "play_type": doc.get("play_type"),
+        }
 
     ordered: list = []
     for name in TUTORIAL_USER_OFFENSE_PLAYCALLS:
-        pid = by_name.get(name)
-        if pid is None:
+        info = by_name.get(name)
+        if info is None:
             logger.warning(
                 "[TUTORIAL] play name not found in plays collection — skipping: %r",
                 name,
             )
             continue
-        ordered.append(pid)
+        ordered.append(info)
     return ordered
+
+
+def build_tutorial_pc_order_offense() -> list[str]:
+    """Backward-compat shim: ordered play_id list for pc_order.offense."""
+    return [p["play_id"] for p in _load_tutorial_offense_plays()]
+
+
+def _even_distribution(keys: list[str]) -> dict[str, int]:
+    """Return {key: percentage} summing to 100, distributed as evenly as
+    possible. Matches gameplan_routes seed convention: base = 100 // n for
+    every key, with the remainder added to the LAST `remainder` keys."""
+    if not keys:
+        return {}
+    n = len(keys)
+    base = 100 // n
+    remainder = 100 - base * n
+    out = {k: base for k in keys}
+    for i, k in enumerate(keys):
+        if i >= n - remainder:
+            out[k] += 1
+    return out
 
 
 def _apply_tutorial_playbook_to_user_team(
     summary: dict, user_team_id, gm
 ) -> None:
-    """Set the user team's playbook_settings.pc_order.offense in BOTH the
-    summary (persisted to mongo) and the in-memory GameManager so the
-    in-game playcall center boots with Coach's 8 default playcalls.
+    """Set the user team's full playbook_settings in BOTH the summary
+    (persisted to mongo) and the in-memory GameManager so the in-game
+    playcall center boots with Coach's preloads AND the Playbooks modal
+    on set-lineup shows the preset distributions:
 
-    Defense pc_order, motion/set_plays/fast_breaks percentages, and the
-    computer team's playbook are left at engine defaults (per Coach scope).
+      pc_order.offense   — 8 plays in slot order (Coach's spec)
+      motion             — 4 motion plays at 25% each
+      set_plays          — 4 set_plays at 25% each
+      fast_breaks        — covert_release/rim_runner/triangle (~33% each)
+      zone_defense       — zone_23/zone_32/zone_131 (~33% each)
+      man_defense        — man_normal 100% / others 0%
+
+    Computer team playbook is left at engine defaults (Coach scope).
+    Tutorial games are deleted on completion (delete-completed-single) so
+    none of this persists to the user account or any per-team master doc.
     """
-    ordered_ids = build_tutorial_pc_order_offense()
-    if not ordered_ids:
+    plays = _load_tutorial_offense_plays()
+    if not plays:
         logger.warning("[TUTORIAL] no playbook play_ids resolved — playcall center will be empty")
         return
 
@@ -160,13 +217,38 @@ def _apply_tutorial_playbook_to_user_team(
         logger.warning("[TUTORIAL] no team record for user_team_id=%s — skipping playbook", user_team_id)
         return
 
+    # Split the 8 plays by their DB play_type. Coach's spec assumes a 4/4
+    # motion/set_play split; if the DB ever drifts (e.g. a play re-typed),
+    # the percentages still distribute evenly across whatever lands in
+    # each bucket and the bucket-total stays at 100%.
+    motion_ids = [p["play_id"] for p in plays if p.get("play_type") == "motion"]
+    set_play_ids = [p["play_id"] for p in plays if p.get("play_type") == "set_play"]
+    ordered_ids = [p["play_id"] for p in plays]
+
     existing_pb = team_rec.get("playbook_settings") if isinstance(team_rec.get("playbook_settings"), dict) else {}
     existing_pc_order = existing_pb.get("pc_order") if isinstance(existing_pb.get("pc_order"), dict) else {}
+
     new_pb = dict(existing_pb)
     new_pb["pc_order"] = {
         "offense": list(ordered_ids),
         "defense": list(existing_pc_order.get("defense") or []),
     }
+    new_pb["motion"] = _even_distribution(motion_ids)
+    new_pb["set_plays"] = _even_distribution(set_play_ids)
+    new_pb["fast_breaks"] = dict(TUTORIAL_FAST_BREAKS_PCT)
+    new_pb["zone_defense"] = dict(TUTORIAL_ZONE_DEFENSE_PCT)
+    new_pb["man_defense"] = dict(TUTORIAL_MAN_DEFENSE_PCT)
+    # position_filters: empty lists per position = "no filter" (match seed default).
+    new_pb.setdefault("position_filters", {
+        "standard": [],
+        "PG": [],
+        "SG": [],
+        "SF": [],
+        "PF": [],
+        "C": [],
+    })
+    new_pb.setdefault("even_distribution_all", True)
+    new_pb.setdefault("_meta", {"user_saved": False, "schema_version": 2})
     team_rec["playbook_settings"] = new_pb
 
     # Also mirror onto the in-memory GameManager team so any code path that
