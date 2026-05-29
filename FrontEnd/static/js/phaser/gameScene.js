@@ -16,6 +16,7 @@ import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonM
 import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
 import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAttributes.js';
 import { resolveTeamsSlotLookupKey } from './utils/loadGameStats.js';
+import { getGameMode } from '../shared/getGameMode.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -2606,13 +2607,9 @@ export function createGameScene(Phaser) {
         // Show game completion popup (absolute path for Netlify/module resolution)
         const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
         const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
-        // Prefer this.mode (set from game data at scene init) so 'tutorial'
-        // mode propagates correctly. Fall back to the tournament/franchise/
-        // single derivation for older scenes that don't set this.mode.
-        const mode = this.mode || (this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single'));
         showGameCompletionPopup({
           gameId: this.gameId || simData.game_id,
-          mode: mode,
+          mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
           tournamentId: this.tournamentId,
           franchiseId: this.franchiseId,
           teamId: this.teamId,
@@ -3939,13 +3936,12 @@ export function createGameScene(Phaser) {
           // Show game completion popup (absolute path for Netlify/module resolution)
           const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
           const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
-          const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
           showGameCompletionPopup({
             gameId: gameId,
-            mode: mode,
+            mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
-            teamId: this.teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
+            teamId: this.teamId,
             userTeamSide: this.userTeamSide,
             finalScore: finalScore
           });

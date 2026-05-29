@@ -8,6 +8,7 @@ import gameStore from '../state/gameStore.js';
 import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
 import { getOrStartFranchiseStartCpuSims } from './utils/franchiseStartCpuSimsClient.js';
 import { preloadGameSfx } from './utils/gameSfx.js';
+import { getGameMode } from '../shared/getGameMode.js';
 
 // API_CONFIG is loaded as a global script, access via window
 const API_CONFIG = window.API_CONFIG;
@@ -1988,7 +1989,7 @@ async function showPopup(score) {
   const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
   showGameCompletionPopup({
     gameId: popupGameId || '',
-    mode: mode || 'single',
+    mode: getGameMode({ urlParams, tournamentId, franchiseId }),
     tournamentId: tournamentId,
     franchiseId: franchiseId,
     teamId: teamId,
@@ -2125,7 +2126,7 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
   
   const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
   const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
-  const popupMode = tournamentId ? 'tournament' : (franchiseId ? 'franchise' : 'single');
+  const popupMode = getGameMode({ urlParams, tournamentId, franchiseId });
   if (window.GOB_Analytics) {
     if (tournamentId) window.GOB_Analytics.tournamentGameCompleted();
     else if (franchiseId) window.GOB_Analytics.franchiseGameCompleted();
@@ -2739,9 +2740,19 @@ async function initGame() {
 }
 
 // console.log('🚨 BOOTGAME: JavaScript is loading and executing!');
-initGame().catch(error => {
-  console.error('Error initializing game:', error);
-});
+// Signal court.html to dismiss the page-load overlay once bootGame's init
+// has settled the pre-game-container visibility (and, in the timeout-resume
+// branch, kicked off the Phaser scene). Always fire — even on error — so
+// the overlay's safety timeout isn't the user's only escape.
+initGame()
+  .catch(error => {
+    console.error('Error initializing game:', error);
+  })
+  .finally(() => {
+    try {
+      window.dispatchEvent(new Event('court-ready'));
+    } catch (e) {}
+  });
 updateOffsets();
 // console.log('🚨 BOOTGAME: Initialization complete!');
 

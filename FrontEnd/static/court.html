@@ -4108,7 +4108,13 @@
 
   <!-- COURT CONTAINER (CENTER) - grid-area: court -->
   <div id="phaser-container" style="grid-area: court;">
-      <div class="pre-game-container">
+      <!--
+        Default-hidden so the page-load overlay can dismiss without the
+        Play Quarter / Sim Quarter buttons flashing through. bootGame removes
+        .hidden when it actually wants to surface the pre-game modal
+        (start of quarter, not timeout resume).
+      -->
+      <div class="pre-game-container hidden">
         <div class="pre-game-backdrop"></div>
         <div class="pre-game-modal-box">
           <div class="pre-game-modal-accent"></div>
@@ -6168,17 +6174,33 @@
       }
 
       // Load accumulated stats if this is a resumed game
-      try {
-        await initializeGameStats();
-        // Initialize stats toggle functionality
-        initializeStatsToggle();
-        // Initialize team box score tabs
-        initializeTeamBoxscoreTabs();
-      } finally {
-        // Always hide overlay when this init block is done (success, early return, or error)
-        if (window.PageLoadOverlay) window.PageLoadOverlay.hide();
-      }
+      await initializeGameStats();
+      // Initialize stats toggle functionality
+      initializeStatsToggle();
+      // Initialize team box score tabs
+      initializeTeamBoxscoreTabs();
+      // Overlay hide is now driven by the 'court-ready' event from bootGame
+      // (see script block below) so the stale pre-game modal can't flash
+      // through before bootGame decides whether to show it.
     }
+  </script>
+  <script>
+    // Hide the page-load overlay only once bootGame signals the court is
+    // ready (Phaser scene started + pre-game modal visibility decided).
+    // Safety timeout: if bootGame errors out we still dismiss the overlay
+    // after 5s so the user isn't permanently blocked.
+    (function () {
+      var dismissed = false;
+      function dismissOverlay() {
+        if (dismissed) return;
+        dismissed = true;
+        if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+          window.PageLoadOverlay.hide();
+        }
+      }
+      window.addEventListener('court-ready', dismissOverlay, { once: true });
+      setTimeout(dismissOverlay, 5000);
+    })();
   </script>
   <script>
     (function () {
