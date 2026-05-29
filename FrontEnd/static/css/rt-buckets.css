@@ -9,8 +9,12 @@
  *   81+   light blue→ .rt-elite
  */
 
-.rt-low      { color: #ff6d6d; }
-.rt-mid      { color: #FFD700; }
-.rt-high     { color: #34EC27; }
-.rt-elite    { color: #4A90D9; }
-.rt-unknown  { color: rgba(255, 255, 255, 0.4); }
+/* !important is deliberate here — this is the canonical scale and must win
+ * over page-local table rules like `.roster-table td { color: ... }` that
+ * have higher selector specificity than a bare `.rt-low`. Applying the
+ * class anywhere should color the element per the scale. */
+.rt-low      { color: #ff6d6d !important; }
+.rt-mid      { color: #FFD700 !important; }
+.rt-high     { color: #34EC27 !important; }
+.rt-elite    { color: #4A90D9 !important; }
+.rt-unknown  { color: rgba(255, 255, 255, 0.4) !important; }
