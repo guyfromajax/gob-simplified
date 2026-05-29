@@ -697,9 +697,8 @@ class GameManager:
         - _documentation_master/projects/Animation_System_Updated.md
         - BackEnd/engine/dreb_step_emitter.py
 
-        Currently scoped to HCT, HCO, migrated FAST_BREAK MISS/BLOCK paths,
-        final-FT DREB, and OREB putback miss → DREB. FCP still bundles DREB
-        info into the MISS turn the legacy way until that turn type migrates.
+        Currently scoped to HCT, HCO, FCP, migrated FAST_BREAK MISS/BLOCK
+        paths, final-FT DREB, and OREB putback miss → DREB.
 
         Returns the DREB turn dict, or None if required data is missing.
         """
@@ -1105,8 +1104,8 @@ class GameManager:
 
         # SS&S animation refactor: MISS with defensive rebound generates a
         # discrete DREB turn (parallels the OREB pattern above). Scoped to
-        # turn types whose migration has landed — HCT, HCO, and migrated
-        # FAST_BREAK schema paths. See
+        # turn types whose migration has landed — HCT, HCO, FCP, and
+        # migrated FAST_BREAK schema paths. See
         # _documentation_master/projects/Animation_System_Updated.md.
         from BackEnd.constants.fast_break_play_types import FAST_BREAK_PLAY_KEYS
 
@@ -1137,7 +1136,7 @@ class GameManager:
         )
         dreb_promotion_eligible = (
             (
-                result.get("current_turn") in ("HCT", "HCO")
+                result.get("current_turn") in ("HCT", "HCO", "FCP")
                 or is_migrated_fb_miss
                 or is_putback_miss_with_dreb
                 or is_ft_final_miss_dreb
@@ -1201,12 +1200,14 @@ class GameManager:
                             prev_positions[pos] = {"x": float(x), "y": float(y)}
                         if prev_positions:
                             self.game_state["_prev_offense_positions_for_hco"] = prev_positions
-            elif dreb_promotion_candidate:
+            else:
                 logging.error(
-                    "🧭 [DREB PROMOTION BUILD FAILED] Candidate passed gate but "
-                    "_build_dreb_turn_from_miss returned None. fast_break_play=%s "
+                    "🧭 [DREB PROMOTION BUILD FAILED] Eligible DREB promotion "
+                    "passed gate but _build_dreb_turn_from_miss returned None. "
+                    "current_turn=%s fast_break_play=%s "
                     "result_type=%s next_play_type=%s rebounderId=%s "
                     "ball_bounce_x=%s ball_bounce_y=%s has_animation_steps=%s",
+                    result.get("current_turn"),
                     result.get("fast_break_play"),
                     result.get("result_type"),
                     result.get("next_play_type"),

@@ -56,7 +56,7 @@ Final step branches on `result_type` (same outcome map as HCT step 3):
 - `DEAD_BALL` / `DEAD_BALL_TURNOVER` / `TURNOVER` → `turn_stop: DEAD_BALL_TURNOVER`
 - `SHOT_CLOCK_EXPIRED` → `turn_stop: SHOT_CLOCK_EXPIRED`
 
-After HCO MISS with defensive rebound, a discrete DREB turn is generated (parallel to OREB). See DREB section above.
+After HCO/HCT/FCP MISS with defensive rebound, a discrete DREB turn is generated (parallel to OREB). See DREB section above.
 
 ## FCP
 

@@ -257,7 +257,7 @@ Five themes dominate. Each generates a cluster of bugs.
 | **Final Shot** | UESS §2 says Not migrated; **code routes through HCO emitter at [turn_manager.py:3208-3218](../../BackEnd/models/turn_manager.py#L3208-L3218)** → `_emit_hco_animation_steps` → `build_skeleton_animation_steps`. Final Shot DOES emit `animation_steps[]` | Doc says No, code says Yes | **Resolved (§4.2 decision 3)** — update UESS §2 to mark Migrated; note `time_elapsed` clock-drain is intentional |
 | **Opening Tip** | [opening_tip.py:124-225 (`execute_opening_tip`)](../../BackEnd/utils/opening_tip.py#L124-L225) emits legacy `animations[]` with non-vocab actions (`TIP_JUMP`, `CONVERGE_ON_BALL`); no `animation_steps[]` key | UESS §2 says "Migrated (legacy emitter; schema-compliant payload)" | **Resolved (§4.2 decision 2)** — actually migrate. UESS §2 stays "Not migrated" until `opening_tip_step_emitter.py` ships |
 | HCT static (legacy non-dynamic) | [hct_step_emitter.py](../../BackEnd/engine/hct_step_emitter.py) invoked from phase_resolution.py:7313, 7630 for static HCT skeleton | UESS §2 mentions only dynamic HCT as migrated | **Resolved (§4.2 decision 9)** — dead path; remove file + callers |
-| **DREB coverage gap** | [game_manager.py:702-704 (`_build_dreb_turn_from_miss`)](../../BackEnd/models/game_manager.py#L702-L704) only fires for HCT / HCO / Covert-Release MISS. **FCP, Rim Runner, Triangle, After-Steal MISS** turns do NOT spawn a discrete DREB turn (rebound capture absorbed into legacy MISS turn, no `animation_steps`) | UESS §2 marks DREB unconditionally migrated | **Resolved (§4.2 decision 8)** — extend trigger to cover all MISS sources; sunset embedded-DREB. §2 DREB row demoted to "Partially migrated" until done |
+| **DREB coverage gap** | [game_manager.py:702-704 (`_build_dreb_turn_from_miss`)](../../BackEnd/models/game_manager.py#L702-L704) now fires for HCT / HCO / FCP / migrated Fast Break MISS/BLOCK, final-FT DREB, and OREB putback miss → DREB. Historical gap: FCP, Rim Runner, Triangle, After-Steal MISS did not spawn a discrete DREB turn (rebound capture absorbed into legacy MISS turn). | UESS §2 marks DREB migrated for current promoted paths | **Partially resolved (§4.2 decision 8)** — FCP closed May 2026; continue sunsetting any remaining embedded-DREB legacy paths. |
 
 ---
 
@@ -390,7 +390,7 @@ UESS §2 says Not migrated; code routes through `_emit_hco_animation_steps`. Inh
 | 2 | **Opening Tip — actually migrate.** Build `opening_tip_step_emitter.py` modeled on `build_bip_animation_steps`. Two steps (Jump Ball + Resolution) per Step_By_Step. Likely needs a new vocab action (e.g. `jump_ball`) — current code uses non-vocab `TIP_JUMP`/`CONVERGE_ON_BALL`. Until built, UESS §2 row stays "Not migrated." |
 | 3 | **Final Shot — mark as Migrated.** Code already routes through `_emit_hco_animation_steps` (commit `b4fc67bf2`). Update UESS §2 row. Note that `time_elapsed = int(time_remaining)` ([phase_resolution.py:4289](../../BackEnd/engine/phase_resolution.py#L4289)) is intentional quarter-clock drain — outside ledger by design. |
 | 7 | Dynamic HCT: wire `_resolve_final_step_next` for STEAL / FOUL / SHOT_ATTEMPT capacity now (future-proof; branches not exercised yet but emitter must support them). | [dynamic_hct_step_emitter.py:64-74](../../BackEnd/engine/dynamic_hct_step_emitter.py#L64-L74) |
-| 8 | Extend `_build_dreb_turn_from_miss` to FCP / Rim Runner / Triangle / After-Steal MISS; sunset embedded-DREB legacy logic. **UESS §2 DREB row demoted to "Partially migrated"** until done. | [game_manager.py:702-704](../../BackEnd/models/game_manager.py#L702-L704) |
+| 8 | Extend `_build_dreb_turn_from_miss` to all MISS/BLOCK DREB sources; FCP is now covered. Continue sunsetting any remaining embedded-DREB legacy logic. | [game_manager.py:702-704](../../BackEnd/models/game_manager.py#L702-L704) |
 | 9 | Static HCT path is dead — **remove**. Drop `hct_step_emitter.py` and its callers at [phase_resolution.py:7313, 7630](../../BackEnd/engine/phase_resolution.py#L7313-L7630). | — |
 
 ### 4.3 §6 / §7 contracts — build
@@ -480,7 +480,7 @@ Sequenced by what unblocks the most + what is safest to cut first. Each item is 
 
 11. **Migrate After-Steal FB to a step emitter** (currently legacy `fastBreak.js`). Resolves bug 18; removes the last `animations[]`-only FB path. **Audit hold/pause/announcement/SFX beats from current legacy execution before shipping** per migration-feel memory.
 
-12. **Extend `_build_dreb_turn_from_miss` (§4.2 decision 8)** to FCP / RR / Triangle / After-Steal MISS; sunset embedded-DREB. Update UESS §2 DREB row to "Migrated" once done.
+12. **Extend `_build_dreb_turn_from_miss` (§4.2 decision 8)** to all MISS/BLOCK DREB sources; FCP is covered. Continue validating RR / Triangle / After-Steal and sunset embedded-DREB where still present.
 
 13. **FE pure-renderer cleanup** (cluster of ~46 violations). Dominant patterns: (a) BallController as FE ownership authority → replace by consuming `ownership_commit_event` (per §4.3 decision 14+15, build the discrete fields when this item starts); (b) FE clock-tween + pause logic in AnimationRouter → replace by passive rendering of backend ledger state; (c) FE `Phaser.Math.Between`/`Math.random` for sparse-payload fallbacks → replace by mandatory backend positions + hard FE error when payload incomplete. **Largest blast radius; do last.** Most legacy FE paths can run in parallel while schema path matures.
 
@@ -491,7 +491,7 @@ Sequenced by what unblocks the most + what is safest to cut first. Each item is 
 16. **Cut dead FE code** (`HCOAnimationSystem.js` likely dead, `possession/` runner gated off). Verify no callers, then remove. **Reduces audit surface for future migrations.**
 
 17. **Update UESS spec docs to reflect decisions**:
-    - §2: Final Shot → Migrated; DREB → Partially migrated until item 12; Opening Tip stays "Not migrated" until item 10
+    - §2: Final Shot → Migrated; DREB row should enumerate promoted paths; Opening Tip stays "Not migrated" until item 10
     - §3.1: `metadata` minimum-key requirements per trigger condition (decision 1)
     - §3.3: PlayerAction vocab adds `jump_ball` if item 10 takes that path; document FB shoot uses `sprint` (decision 4)
     - §6.2: align field names with `uess_ownership_contract` + the new discrete fields (when item 14 ships)

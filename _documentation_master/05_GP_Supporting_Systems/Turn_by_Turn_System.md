@@ -172,7 +172,7 @@ Every turn result from the backend contains data organized into **three distinct
 
 #### Discrete `DREB` turn (defensive rebound as its own turn)
 
-For selected **MISS/BLOCK** flows (e.g. **HCO**, **HCT**, migrated **FAST_BREAK** plays: `covert_release`, `rim_runner`, `triangle`, `after_steal`), `BackEnd/models/game_manager.py` may append a **separate** turn with `result_type` / `current_turn` **`DREB`** after the shot turn. On that path:
+For selected **MISS/BLOCK** flows (e.g. **HCO**, **HCT**, **FCP**, migrated **FAST_BREAK** plays: `covert_release`, `rim_runner`, `triangle`, `after_steal`), `BackEnd/models/game_manager.py` may append a **separate** turn with `result_type` / `current_turn` **`DREB`** after the shot turn. On that path:
 
 1. The **shot** turn still carries rebound resolution fields (`rebounderId`, `rebound_type`, **`dreb_outlet_pass`**, `offense_getback`, etc.) and may set `next_play_type` / `next_turn` to **`DREB`** so the client knows a DREB row follows.
 2. The **`DREB`** turn carries **`animation_steps`** built by `BackEnd/engine/dreb_step_emitter.py` — **rebound capture only** (rebounder to ball; others stationary at post-shot coords from `shot_manager`).
@@ -180,7 +180,7 @@ For selected **MISS/BLOCK** flows (e.g. **HCO**, **HCT**, migrated **FAST_BREAK*
 
 **Related docs:** `Unified_Animation_System.md` (execution unit **`hco.lead_in.from_dreb_outlet`**, strict `dreb_outlet_pass` contract), `Announcement_System.md` (**Rebound!** headline vs outlet choreography), `Rebound_System.md` (post-shot placement vs outlet).
 
-**Not migrated to discrete DREB** (examples): some **FCP** DREB misses may still bundle DREB on the MISS turn until migration notes say otherwise. Migrated Fast Break plays (`covert_release`, `rim_runner`, `triangle`, `after_steal`) promote MISS/BLOCK + DREB into a discrete DREB row.
+**Promotion coverage:** **HCO**, **HCT**, **FCP**, final free-throw DREB, OREB putback miss → DREB, and migrated Fast Break plays (`covert_release`, `rim_runner`, `triangle`, `after_steal`) promote MISS/BLOCK + DREB into a discrete DREB row.
 
 #### Bucket 3: Animation Data ✅ **Always Present (but may be empty)**
 
