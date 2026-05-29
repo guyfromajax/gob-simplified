@@ -88,6 +88,7 @@ class AuthResponse(BaseModel):
 
 
 TutorialStep = Literal[
+    "persona_intro",
     "team_select",
     "username",
     "situation",
@@ -106,13 +107,17 @@ class TutorialState(BaseModel):
 
 
 # Index map for forward-only step validation. Higher = later in the funnel.
+# persona_intro was prepended in the FTE v2 onboarding redesign (Sammy persona
+# intro screen). Grandfathered users already past team_select don't need
+# migration — the routing logic treats their existing step as still valid.
 _TUTORIAL_STEP_ORDER = {
-    "team_select": 0,
-    "username": 1,
-    "situation": 2,
-    "set_lineup": 3,
-    "in_game": 4,
-    "complete": 5,
+    "persona_intro": 0,
+    "team_select": 1,
+    "username": 2,
+    "situation": 3,
+    "set_lineup": 4,
+    "in_game": 5,
+    "complete": 6,
 }
 
 
@@ -330,7 +335,7 @@ async def signup(request: Request, body: SignupRequest):
         "fte": True,
         "fte_v2_complete": False,
         "tutorial_state": {
-            "step": "team_select",
+            "step": "persona_intro",
             "team_pick": None,
             "started_at": now,
             "completed_at": None,
@@ -369,7 +374,7 @@ async def signup(request: Request, body: SignupRequest):
             "fte": True,
             "fte_v2_complete": False,
             "tutorial_state": {
-                "step": "team_select",
+                "step": "persona_intro",
                 "team_pick": None,
                 "started_at": now.isoformat(),
                 "completed_at": None,

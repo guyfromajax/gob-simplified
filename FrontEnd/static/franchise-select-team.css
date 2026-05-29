@@ -95,6 +95,41 @@ input[type="reset"] {
   box-shadow: 0 20px 32px rgba(0, 0, 0, 0.3);
 }
 
+/* FTE v2 — committed selection state. Shown after user taps a card,
+ * before the username modal opens. Orange ring + check badge make the
+ * choice feel registered. */
+.team-card.is-selected {
+  border-color: #F79420;
+  box-shadow: 0 0 0 2px rgba(247, 148, 32, 0.55), 0 20px 32px rgba(0, 0, 0, 0.32);
+}
+
+.team-card-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #F79420;
+  color: #15181f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  z-index: 3;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.team-card.is-selected .team-card-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .team-card-banner {
   position: relative;
   aspect-ratio: 16 / 9;

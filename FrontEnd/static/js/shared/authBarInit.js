@@ -31,6 +31,7 @@
     'play-builder-v2.html',
     'play-details.html',
     // FTE v2 tutorial funnel — immersive screens, no auth bar
+    'tutorial-persona-intro.html',
     'tutorial-situation.html',
     // Optional non-.html route variants
     '/box-score',
@@ -138,10 +139,11 @@
   // resume; if the engine ever started, the game restarts from tip.
   function routeToTutorial(meData) {
     if (!meData || meData.fte_v2_complete !== false) return;
-    var state = (meData && meData.tutorial_state) || { step: 'team_select', team_pick: null };
-    var step = state.step || 'team_select';
+    var state = (meData && meData.tutorial_state) || { step: 'persona_intro', team_pick: null };
+    var step = state.step || 'persona_intro';
     var teamPick = state.team_pick;
 
+    var PERSONA_INTRO_URL = '/tutorial-persona-intro.html';
     var TEAM_SELECT_URL = '/franchise-select-team.html?mode=tutorial';
     var SITUATION_URL = '/tutorial-situation.html';
     var currentPath = window.location.pathname;
@@ -156,7 +158,10 @@
 
     var targetPath;
     var targetUrl;
-    if (step === 'team_select' || step === 'username') {
+    if (step === 'persona_intro') {
+      targetPath = '/tutorial-persona-intro.html';
+      targetUrl = PERSONA_INTRO_URL;
+    } else if (step === 'team_select' || step === 'username') {
       targetPath = '/franchise-select-team.html';
       targetUrl = TEAM_SELECT_URL;
     } else if (step === 'situation') {

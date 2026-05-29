@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GOB — FTE Onboarding Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fte/base.css">
+<link rel="stylesheet" href="fte/screens.css">
+</head>
+<body>
+
+<div id="stage" class="gob-shell">
+
+  <!-- ============================================================
+       SCREEN 0 — Persona intro  (NEW)
+       ============================================================ -->
+  <section class="screen" data-screen-label="00 Intro">
+    <div class="screen-inner">
+      <div class="intro">
+        <div class="coach-avatar coach-avatar--xl">
+          <span class="coach-avatar__ph">SAMMY<br><span style="opacity:.65">generic ·<br>white kit</span></span>
+        </div>
+        <div class="intro__name">SAMMY · ASSISTANT COACH</div>
+        <div class="intro__line">Welcome to GOB, Coach.<br>I'll get you set up.</div>
+        <p class="intro__sub">One quick game to learn the ropes — then you build your own program. I'll be right here the whole way.</p>
+        <button class="gob-btn gob-btn--action gob-btn--lg" data-go="1">LET'S GO</button>
+      </div>
+
+      <div class="note note--bl" style="top:24px; left:24px;">
+        <span class="note__t">NEW: PERSONA INTRO</span>
+        First and only time we use the <b>generic Sammy</b> (white practice kit) — she has no team yet. Introducing her once, named, makes every later appearance feel intentional instead of random.
+      </div>
+      <div class="note note--tr" style="bottom:120px; right:24px;">
+        <span class="note__t">ORANGE, NOT GREEN</span>
+        "Let's go" doesn't advance game state — it's a non-gating primary, so it's orange per your action-color rules. Green is saved for the tip-off.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SCREEN 1 — Pick Your Program
+       ============================================================ -->
+  <section class="screen" data-screen-label="01 Pick Program">
+    <div class="screen-inner">
+      <div class="pick" id="pick-grid-wrap">
+        <div class="pick__head">
+          <div class="pick__title">PICK YOUR PROGRAM</div>
+          <p class="pick__sub">This one's your proving ground — a single game to feel out the controls. Your real franchise comes next. Pick whoever speaks to you.</p>
+        </div>
+        <div class="pick__grid" id="team-grid"></div>
+      </div>
+
+      <div class="note note--tl" style="top:24px; left:24px;">
+        <span class="note__t">COPY: LESS HEDGING</span>
+        "Don't sweat it too much" apologizes for the screen. "Your proving ground" frames the same low-stakes idea as something with intent.
+      </div>
+      <div class="note note--tr" style="top:24px; right:24px;">
+        <span class="note__t">SELECTION STATE</span>
+        Cards now have a real selected state (orange ring + check) so the choice feels committed before the modal opens.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SCREEN 2 — Username  (FUNCTIONAL MODAL, on-system)
+       ============================================================ -->
+  <section class="screen" data-screen-label="02 Username">
+    <div class="screen-inner">
+      <div class="pick pick--dim">
+        <div class="pick__head">
+          <div class="pick__title">PICK YOUR PROGRAM</div>
+          <p class="pick__sub">This one's your proving ground — a single game to feel out the controls.</p>
+        </div>
+        <div class="pick__grid" id="team-grid-dim"></div>
+      </div>
+
+      <div class="gob-modal-overlay is-visible" style="position:absolute;">
+        <div class="gob-modal-backdrop"></div>
+        <div class="gob-modal-box" style="overflow:visible;">
+          <div class="uname-coach">
+            <div class="coach-avatar coach-avatar--team"><span class="coach-avatar__ph">SAMMY<br><span style="opacity:.65">Minute<br>Men kit</span></span></div>
+          </div>
+          <div class="gob-modal-accent" style="border-radius:14px 14px 0 0;"></div>
+          <div class="gob-modal-body" style="padding-top:60px;">
+            <div class="gob-modal-title">YOU'RE COACHING THE MINUTEMEN</div>
+            <p class="gob-modal-subtitle">Every coach in GOB needs a username. What should the league call you?</p>
+            <div style="margin-top:18px;">
+              <input class="gob-field" type="text" placeholder="Username" aria-label="Username">
+              <div class="gob-field-help">3–24 characters · letters, numbers, underscores</div>
+            </div>
+          </div>
+          <div class="gob-modal-actions">
+            <button class="gob-btn gob-btn--action gob-btn-primary" data-go="3" style="flex:1;">CONTINUE</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="note note--tl" style="top:24px; left:24px; max-width:268px;">
+        <span class="note__t">SAMMY NOW WEARS YOUR COLORS</span>
+        From this screen on, Sammy's portrait switches to the <b>team-linked</b> version (Minute Men kit — note the purple ring) and stays that way for the rest of the tutorial. A small touch that makes the choice feel real.
+      </div>
+      <div class="note note--bl" style="bottom:60px; left:24px;">
+        <span class="note__t">CONTINUE → ORANGE</span>
+        Naming yourself configures a preference; it doesn't advance the game. Non-gating = orange. (Was green.)
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SCREEN 3 — Tip-off  (MOMENT MODAL)
+       ============================================================ -->
+  <section class="screen" data-screen-label="03 Tip-off">
+    <div class="tipoff-bg"></div>
+    <div class="screen-inner">
+      <div class="gob-moment-overlay is-visible" style="position:absolute;">
+        <div class="gob-moment-backdrop"></div>
+        <div class="gob-moment-box">
+          <div class="moment-banner">
+            <div class="lineup__banner-fill" style="position:absolute; inset:0;"></div>
+          </div>
+          <div class="moment-body">
+            <div class="coach-avatar coach-avatar--team"><span class="coach-avatar__ph">SAMMY<br><span style="opacity:.65">Minute<br>Men kit</span></span></div>
+            <div class="moment-eyebrow">CRUNCH TIME · Q4</div>
+            <div class="moment-score">
+              <span class="moment-score__team">LITTLE YORK</span>
+              <span class="moment-score__num">60</span>
+              <span class="moment-score__dash">–</span>
+              <span class="moment-score__num">60</span>
+              <span class="moment-score__team">XAVIEN</span>
+            </div>
+            <p class="moment-meta">Tied with four minutes left. The game's in your hands now.</p>
+            <div class="moment-cheer">GO WIN IT, COACH.</div>
+            <div class="moment-actions">
+              <button class="gob-btn gob-btn--gate gob-btn--lg" data-go="4">SET LINEUP</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note note--tl" style="top:24px; left:24px; max-width:268px;">
+        <span class="note__t">PROMOTED TO MOMENT MODAL</span>
+        This is the emotional peak of the tutorial, so it earns the Moment treatment: 560px, full-bleed team banner, the score as the visual hero — not a plain card floating on black.
+      </div>
+      <div class="note note--tr" style="bottom:90px; right:24px;">
+        <span class="note__t">SET LINEUP → GREEN (correct)</span>
+        This one genuinely advances game state, so green is right here — and because it's the only green in the whole flow, it actually lands.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SCREEN 4 — Set Lineup + COACH-MARK
+       ============================================================ -->
+  <section class="screen" data-screen-label="04 Set Lineup">
+    <div class="lineup">
+      <div class="lineup__banner"><div class="lineup__banner-fill"></div></div>
+      <div class="lineup__ctx">
+        <div class="sb-pill">
+          <span class="t">LITTLE YORK</span><span class="n">60</span>
+          <span style="color:var(--w35)">–</span>
+          <span class="n">60</span><span class="t">XAVIEN</span>
+          <span style="color:var(--w20)">|</span><span class="q">Q4</span><span class="t">4:00</span>
+        </div>
+        <button class="gob-btn gob-btn--gate" data-go="4">RETURN TO GAME</button>
+      </div>
+      <div class="lineup__body">
+        <div class="lineup__left">
+          <div class="lineup__section-label">ROSTER — CLICK OR DRAG TO ASSIGN</div>
+          <div id="roster-list"></div>
+        </div>
+        <div class="lineup__right">
+          <div class="lineup__section-label">STARTING FIVE</div>
+          <div id="starter-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coach-mark anchored to roster -->
+    <div class="gob-coachmark gob-coachmark--left" id="coachmark"
+         style="top:140px; left:calc(50% + 30px);">
+      <div class="coach-avatar coach-avatar--sm coach-avatar--team" style="float:left; margin:0 12px 6px 0;">
+        <span class="coach-avatar__ph" style="font-size:8px;">SAMMY</span>
+      </div>
+      <div class="gob-coachmark__eyebrow">QUICK TIP</div>
+      <div class="gob-coachmark__body">I've set a solid lineup for you. Hover any attribute to learn what it does — then tweak the lineup if you want.</div>
+      <div class="gob-coachmark__foot">
+        <span class="gob-coachmark__count">Tip 1 of 1</span>
+        <button class="gob-btn gob-btn--ghost" style="height:34px; min-width:auto; font-size:15px;" data-go="4">GOT IT</button>
+      </div>
+    </div>
+
+    <div class="note note--tl" style="top:24px; left:24px; max-width:262px;">
+      <span class="note__t">COACH-MARK, NOT A MODAL</span>
+      The old centered modal blocked the very thing it described. A spotlight coach-mark points at the roster, keeps the screen visible, and reads as guidance — its own pattern, distinct from your 3 modal types.
+    </div>
+    <div class="note note--bl" style="bottom:70px; left:24px;">
+      <span class="note__t">GOT IT → GHOST</span>
+      An acknowledgement isn't an action. Ghost button keeps green meaningful and the tone calm.
+    </div>
+  </section>
+
+  <!-- Progress thread -->
+  <div class="progress" id="progress"></div>
+</div>
+
+<!-- Prototype chrome -->
+<button class="notes-toggle" id="notesToggle"><span class="dot"></span>Design notes</button>
+<div class="proto-nav">
+  <button id="prevBtn">‹ Back</button>
+  <button id="nextBtn">Next ›</button>
+</div>
+
+<script src="fte/flow.js"></script>
+</body>
+</html>

@@ -322,6 +322,18 @@ function getRT(player) {
   return ratings.length ? Math.max(...ratings) : -Infinity;
 }
 
+// Canonical Attribute Bar Scale (Styleguide §Color System):
+//   0–40 red · 41–60 yellow · 61–80 green · 81+ light blue (incl. 100+)
+// Returns a CSS class suffix; caller applies as `rt-${bucket}`.
+function getRtBucketClass(rt) {
+  const v = Number(rt);
+  if (!Number.isFinite(v)) return 'rt-unknown';
+  if (v <= 40) return 'rt-low';
+  if (v <= 60) return 'rt-mid';
+  if (v <= 80) return 'rt-high';
+  return 'rt-elite';
+}
+
 function showToast(msg) {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -1051,7 +1063,7 @@ function renderRosterAttributes() {
         nameText.textContent = val ?? '--';
         nameText.className = 'player-name-link';
         const rtSpan = document.createElement('span');
-        rtSpan.className = 'inline-rt';
+        rtSpan.className = `inline-rt ${getRtBucketClass(rt)}`;
         rtSpan.textContent = rt ?? '--';
         wrap.appendChild(nameText);
         wrap.appendChild(rtSpan);
@@ -1466,7 +1478,7 @@ function updateSlotDisplay(slot) {
       <div class="slot-info">
         <div class="slot-row-1">
           <div class="player-name">${slotDisplayName}</div>
-          <div class="player-rating">RT: ${rating}</div>
+          <div class="player-rating ${getRtBucketClass(rating)}">RT: ${rating}</div>
         </div>
         <div class="slot-row-2">
           <div class="slot-stat slot-stat-momentum">
@@ -2033,23 +2045,49 @@ async function init() {
   // lineup is in the URL (restoreLineupFromUrl populates it above). We do NOT
   // call autoset here — the engine assigned the tutorial-roster starters
   // (rank_roster + Section 5 templates) and we want to honor that exactly.
-  // Show the Sammy intro modal ONCE per tutorial run (keyed by game_id so
-  // a re-entry from game-plan or a page reload doesn't re-fire it).
+  //
+  // Onboarding redesign: replaces the previous centered "I've set your
+  // lineup" Sammy modal with a coach-mark spotlight anchored to the roster.
+  // Coach-marks are their own guidance pattern (per styleguide), distinct
+  // from the three modal types — they leave the screen visible so the
+  // copy points at the very thing it's describing.
   if (modeParam === 'tutorial') {
     const introKey = gameId
-      ? `fteV2TutorialLineupIntroShown_${gameId}`
-      : 'fteV2TutorialLineupIntroShown';
+      ? `fteV2TutorialLineupCoachMarkShown_${gameId}`
+      : 'fteV2TutorialLineupCoachMarkShown';
     const alreadyShown = (() => {
       try { return sessionStorage.getItem(introKey) === '1'; } catch (_) { return false; }
     })();
     if (!alreadyShown) {
       try { sessionStorage.setItem(introKey, '1'); } catch (_) {}
-      import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
-        showSammyModal({
-          body: "I've set your lineup — tweak it if you like, and hover any attribute to see what it means.",
-          ctaLabel: 'Got it',
+      // Resolve the team-linked Sammy portrait. `homeTeam` here is the
+      // user's team (per fte_inject_state §1-§2, user is always home).
+      Promise.all([
+        import('/js/shared/coachMark.js'),
+        import('/js/shared/teamCoachAsset.js'),
+        import('/js/shared/tutorialProgressThread.js'),
+      ]).then(([{ showCoachMark }, { getTeamSammyImage }, { mountTutorialProgress }]) => {
+        mountTutorialProgress('lineup');
+        // Wait one frame for the roster to render before anchoring.
+        requestAnimationFrame(() => {
+          showCoachMark({
+            anchor: document.getElementById('roster-table-container'),
+            side: 'right',
+            offset: 18,
+            eyebrow: 'QUICK TIP',
+            body: "I've set a solid lineup for you. Hover any attribute to learn what it does — then tweak the lineup if you want.",
+            dismissLabel: 'GOT IT',
+            portraitSrc: getTeamSammyImage(homeTeam),
+            count: 'Tip 1 of 1',
+          });
         });
-      }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
+      }).catch((e) => console.warn('[tutorial] could not show lineup coach-mark:', e));
+    } else {
+      // Re-entry (return from game-plan, timeout-resume, etc.) — keep the
+      // progress thread present but don't re-show the tip.
+      import('/js/shared/tutorialProgressThread.js')
+        .then(({ mountTutorialProgress }) => mountTutorialProgress('lineup'))
+        .catch(() => {});
     }
   }
 

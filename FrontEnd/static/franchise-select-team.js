@@ -102,10 +102,12 @@ function createButtons() {
   teams.forEach(team => {
     const card = document.createElement("div");
     card.className = "team-card";
+    card.dataset.team = team;
     const overlayHtml = `<button class="team-card-action team-card-action-scout" type="button">Scout</button>
        <button class="team-card-action team-card-action-select" type="button">Select</button>`;
     const overlayClass = 'team-card-overlay';
     card.innerHTML = `
+      <div class="team-card-check" aria-hidden="true">✓</div>
       <div class="team-card-banner">
         <img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}">
         <div class="team-card-tagline">${taglines[team] || team}</div>
@@ -133,6 +135,14 @@ function createButtons() {
       selectBtn.addEventListener("click", () => {
         playSound("click-beep.wav");
         if (TUTORIAL_MODE) {
+          // Visually commit the selection so the choice feels registered
+          // before the username modal opens. Clear prior selections so we
+          // never end up with two highlighted cards if the user changes
+          // their mind in the few hundred ms before the modal appears.
+          if (teamContainer) {
+            teamContainer.querySelectorAll('.team-card.is-selected').forEach(el => el.classList.remove('is-selected'));
+          }
+          card.classList.add('is-selected');
           selectTutorialTeam(team);
         } else {
           selectTeam(team);
@@ -165,17 +175,15 @@ async function selectTutorialTeam(team) {
     return;
   }
 
-  // Step 2: open the username modal with team-aware copy. Use the mascot
-  // (collective noun) so the sentence reads naturally — "the Sterling
-  // Knights", "the Pirates" — instead of grammatically broken "the Lancaster".
-  // Mascot string sourced from team_doc.mascot in the teams collection
-  // (single source of truth), fetched at module load.
+  // Step 2: open the username Functional modal with team-aware chrome.
+  // Mascot drives the title ("YOU'RE COACHING THE STERLING KNIGHTS").
+  // Team name drives the Sammy portrait variant (team-linked kit).
   const mascotMap = await fetchMascotMap();
   const mascot = mascotMap[team] || team;
-  const prompt = `You're now coaching the ${mascot}. What's your username, Coach?`;
   const { openUsernameModal } = await import('/js/shared/usernameModal.js');
   openUsernameModal({
-    prompt,
+    teamName: team,
+    mascot,
     onSuccess: async () => {
       // Step 3: advance to "situation" and navigate to the situation card.
       try {
@@ -233,17 +241,19 @@ document.addEventListener("DOMContentLoaded", function () {
   } catch (e) {}
 
   if (TUTORIAL_MODE) {
-    // Tutorial flow: strict header + a single supporting subhead. No intro
-    // modal (Coach feedback: don't block team selection with a modal).
+    // Tutorial flow: strict header + a single confident, low-stakes subhead.
+    // No intro modal (Coach feedback: don't block team selection with a modal).
     if (backLink) backLink.style.display = 'none';
     const title = document.getElementById('page-title');
     const subtitle = document.getElementById('page-subtitle');
     if (title) title.textContent = 'Pick Your Program';
-    // Existing #page-subtitle styling (Inter 15px, 66% white) already reads
-    // as supporting text. No extra class needed.
     if (subtitle) {
-      subtitle.textContent = "Don't sweat it too much. This is your 'learn the ropes' game — you pick your franchise program after this game.";
+      subtitle.textContent = "This one's your proving ground — a single game to feel out the controls. Your real franchise comes next. Pick whoever speaks to you.";
     }
+    // Mount the quiet 5-step progress thread (Pick Program = step 2 of 5).
+    import('/js/shared/tutorialProgressThread.js')
+      .then(({ mountTutorialProgress }) => mountTutorialProgress('program'))
+      .catch((e) => console.warn('[tutorial] could not mount progress thread:', e));
   } else if (backLink) {
     backLink.addEventListener("click", function (event) {
       event.preventDefault();

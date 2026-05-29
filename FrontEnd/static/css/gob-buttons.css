@@ -1,0 +1,109 @@
+/*
+ * Canonical GOB button component — implements the Universal Button Shape
+ * defined in Styleguide_updated.md (Buttons §).
+ *
+ *   min-width: 138px   height: 42px   padding: 0 18px   radius: 10px
+ *   border: 1px solid rgba(255,255,255,0.28)
+ *   inset top highlight: rgba(255,255,255,0.18)
+ *   font: Bebas Neue Pro, +tracking
+ *   hover-lift -1px, press-compress translateY(0)
+ *
+ * Variants are role-based, NOT decorative:
+ *   .gob-btn--action  orange #F79420 — non-gating primary (saves, configures, advances UI)
+ *   .gob-btn--gate    green #34EC27 — gating primary (advances game state). Scarce by design.
+ *   .gob-btn--ghost   subdued — acknowledgements, secondary actions, dismissals
+ *
+ * Use sparingly across the product. Inside Functional modals, the existing
+ * .gob-modal-btn-* classes are already canonical and should be preferred.
+ */
+
+.gob-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 138px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  color: #ffffff;
+  transition: filter 0.14s ease, transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+}
+
+.gob-btn:hover:not(:disabled):not(.is-disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.gob-btn:active:not(:disabled):not(.is-disabled) {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+
+.gob-btn:disabled,
+.gob-btn.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+/* Larger CTA variant — used on Persona Intro / Tip-off where the button is the
+ * primary focal point on a near-empty stage. Still on-system, just scaled up. */
+.gob-btn--lg {
+  height: 50px;
+  min-width: 180px;
+  padding: 0 28px;
+  font-size: 19px;
+  letter-spacing: 0.08em;
+}
+
+/* --- Role variants ----------------------------------------------------- */
+
+/* Non-gating primary — orange. Default for almost every primary CTA. */
+.gob-btn--action {
+  background: #F79420;
+  border-color: rgba(247, 148, 32, 0.55);
+  color: #15181f;
+}
+
+.gob-btn--action:hover:not(:disabled):not(.is-disabled) {
+  background: #ffa84a;
+}
+
+/* Gating primary — green. Reserved for actions that advance game state.
+ * Per styleguide: must remain scarce. In the FTE flow, this appears on
+ * exactly one button (Tip-off → SET LINEUP). */
+.gob-btn--gate {
+  background: #34EC27;
+  border-color: rgba(52, 236, 39, 0.55);
+  color: #15181f;
+}
+
+.gob-btn--gate:hover:not(:disabled):not(.is-disabled) {
+  background: #4dff3f;
+}
+
+/* Ghost — acknowledgements and quiet secondaries. */
+.gob-btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+}
+
+.gob-btn--ghost:hover:not(:disabled):not(.is-disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #ffffff;
+}

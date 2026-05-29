@@ -1,0 +1,82 @@
+/*
+ * FTE v2 tutorial progress indicator — quiet step thread shown at the bottom
+ * of each onboarding screen. Per spec, should not compete with content.
+ */
+
+.tutorial-progress-thread {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(13, 17, 36, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  pointer-events: none;
+}
+
+.tutorial-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-progress-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.tutorial-progress-step.is-complete .tutorial-progress-dot {
+  background: rgba(247, 148, 32, 0.55);
+}
+
+.tutorial-progress-step.is-active .tutorial-progress-dot {
+  background: #F79420;
+  box-shadow: 0 0 0 3px rgba(247, 148, 32, 0.18);
+  transform: scale(1.1);
+}
+
+.tutorial-progress-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+}
+
+.tutorial-progress-step.is-active .tutorial-progress-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tutorial-progress-step.is-complete .tutorial-progress-label {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.tutorial-progress-sep {
+  width: 18px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+@media (max-width: 640px) {
+  .tutorial-progress-label {
+    display: none;
+  }
+  .tutorial-progress-thread {
+    gap: 6px;
+    padding: 7px 11px;
+  }
+  .tutorial-progress-sep {
+    width: 10px;
+  }
+}

@@ -758,6 +758,24 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   font-weight: 700;
 }
 
+/*
+ * Per Styleguide §Color System → Attribute Bar Scale, color the player
+ * rating display by tier so users can scan strength at a glance. Same
+ * thresholds as the attribute pills throughout the product.
+ *   0–40  red       41–60 yellow    61–80 green    81+   light blue
+ * Both .inline-rt (roster row) and .player-rating (slot) share buckets.
+ */
+.inline-rt.rt-low,
+.player-rating.rt-low      { color: #ff6d6d; }
+.inline-rt.rt-mid,
+.player-rating.rt-mid      { color: #FFD700; }
+.inline-rt.rt-high,
+.player-rating.rt-high     { color: #34EC27; }
+.inline-rt.rt-elite,
+.player-rating.rt-elite    { color: #4A90D9; }
+.inline-rt.rt-unknown,
+.player-rating.rt-unknown  { color: rgba(255, 255, 255, 0.4); }
+
 .roster-table tr.selected td,
 .roster-stats-table tr.selected td {
   background: rgba(255,255,255,0.03) !important;
