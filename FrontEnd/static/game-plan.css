@@ -77,6 +77,19 @@ input[type="reset"] {
   margin: 0;
 }
 
+/* FTE v2 tutorial: read-only subhead under the page title, surfaced when
+   game-plan is opened via ?mode=tutorial. */
+.tutorial-readonly-subhead {
+  margin: 4px 0 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.66);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.tutorial-readonly-subhead[hidden] { display: none; }
+
 .game-plan-card {
   margin-top: 0;
 }

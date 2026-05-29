@@ -106,6 +106,11 @@ function gotoSetLineup(userTeam, opponent, gameId, lineup) {
     away: opponent,
     my_team: 'home',
     quarter: '4',
+    // team_id is the user team name. Single-mode game-plan / playbooks
+    // endpoints resolve it via gm.home_team.name == team_id fallback
+    // (gameplan_routes.py). Without this, game-plan can't compute
+    // team_id from the URL (no home_id/team_id present in tutorial nav).
+    team_id: userTeam,
   });
   if (gameId) params.set('game_id', gameId);
   ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
