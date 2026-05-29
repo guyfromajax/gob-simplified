@@ -93,23 +93,35 @@ export function showCoachMark(opts = {}) {
   bubble.setAttribute('role', 'dialog');
   bubble.setAttribute('aria-live', 'polite');
 
+  // Two-column row keeps the portrait fixed-width and the text block flowing
+  // to its right. All body copy stays left-aligned, including lines that
+  // would wrap below the portrait under the older float-based layout.
+  const row = document.createElement('div');
+  row.className = 'gob-coachmark__row';
+
   const portraitImg = document.createElement('img');
   portraitImg.className = 'gob-coachmark__portrait';
   portraitImg.src = portrait;
   portraitImg.alt = '';
-  bubble.appendChild(portraitImg);
+  row.appendChild(portraitImg);
+
+  const textBlock = document.createElement('div');
+  textBlock.className = 'gob-coachmark__text';
 
   if (opts.eyebrow) {
     const eyebrow = document.createElement('div');
     eyebrow.className = 'gob-coachmark__eyebrow';
     eyebrow.textContent = opts.eyebrow;
-    bubble.appendChild(eyebrow);
+    textBlock.appendChild(eyebrow);
   }
 
   const body = document.createElement('p');
   body.className = 'gob-coachmark__body';
   body.textContent = opts.body;
-  bubble.appendChild(body);
+  textBlock.appendChild(body);
+
+  row.appendChild(textBlock);
+  bubble.appendChild(row);
 
   const foot = document.createElement('div');
   foot.className = 'gob-coachmark__foot';

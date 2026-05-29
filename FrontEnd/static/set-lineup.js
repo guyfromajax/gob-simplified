@@ -322,10 +322,13 @@ function getRT(player) {
   return ratings.length ? Math.max(...ratings) : -Infinity;
 }
 
-// Canonical Attribute Bar Scale (Styleguide §Color System):
-//   0–40 red · 41–60 yellow · 61–80 green · 81+ light blue (incl. 100+)
-// Returns a CSS class suffix; caller applies as `rt-${bucket}`.
+// RT color bucket helper — canonical implementation at
+// /js/shared/rtBucket.js (loaded as a classic script on this page).
+// Falls back to a local definition if the global isn't present.
 function getRtBucketClass(rt) {
+  if (typeof window !== 'undefined' && typeof window.getRtBucketClass === 'function') {
+    return window.getRtBucketClass(rt);
+  }
   const v = Number(rt);
   if (!Number.isFinite(v)) return 'rt-unknown';
   if (v <= 40) return 'rt-low';

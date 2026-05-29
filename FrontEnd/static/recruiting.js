@@ -149,6 +149,9 @@
   }
 
   function appendStandardRow(tbody, row, isWeek36) {
+    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    var rtClass = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(row.rt) : '';
+    var rtCell = '<td class="' + rtClass + '">' + (row.rt != null ? row.rt : '--') + '</td>';
     var tr = document.createElement('tr');
     tr.innerHTML = isWeek36 ? [
       '<td>' + row.name + '</td>',
@@ -168,7 +171,7 @@
       '<td>' + row.attrs.ND + '</td>',
       '<td>' + row.attrs.IQ + '</td>',
       '<td>' + row.attrs.FT + '</td>',
-      '<td>' + (row.rt != null ? row.rt : '--') + '</td>',
+      rtCell,
       '<td>' + row.signedDisplay + '</td>'
     ].join('') : [
       '<td>' + row.name + '</td>',
@@ -188,7 +191,7 @@
       '<td>' + row.attrs.ND + '</td>',
       '<td>' + row.attrs.IQ + '</td>',
       '<td>' + row.attrs.FT + '</td>',
-      '<td>' + (row.rt != null ? row.rt : '--') + '</td>',
+      rtCell,
       '<td>' + (row.leanDisplay || '--') + '</td>'
     ].join('');
     tbody.appendChild(tr);

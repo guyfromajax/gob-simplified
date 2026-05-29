@@ -185,6 +185,14 @@ async function selectTutorialTeam(team) {
     teamName: team,
     mascot,
     onSuccess: async () => {
+      // Mask the team-select page during the in-flight nav to tutorial-situation
+      // so the user doesn't see the (now-stale) team grid flash between modal
+      // close and tutorial-situation's first paint. The destination page paints
+      // its own dark backdrop + Moment modal as soon as its script runs, so no
+      // further coordination is needed.
+      if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+        window.PageLoadOverlay.show();
+      }
       // Step 3: advance to "situation" and navigate to the situation card.
       try {
         await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {

@@ -2142,30 +2142,35 @@ function renderTeam(data) {
       nameTd.appendChild(gr);
     }
     tr.appendChild(nameTd);
-    
+
     // Add other columns directly as DOM elements
-    const addCell = (content) => {
+    const addCell = (content, extraClass) => {
       const td = document.createElement('td');
       td.textContent = content;
+      if (extraClass) td.className = extraClass;
       tr.appendChild(td);
     };
-    
+
     addCell(p.pos);
     addCell(p.year);
     addCell(p.height);
     addCell(p.weight);
-    
+
     ATTR_HEADERS.forEach(h => {
       const attrs = p.attributes || {};
       // Use anchor attribute (base value) as fallback, same as lineup screen
       const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
       // Convert to 0-12 scale, except NG which stays as decimal
-      const displayVal = h === 'NG' 
+      const displayVal = h === 'NG'
         ? (rawVal != null ? rawVal.toFixed(2) : '--')
         : (rawVal != null ? Math.floor(rawVal / 10) : '--');
       addCell(displayVal);
     });
-    addCell(p.rt ?? '-');
+    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    addCell(
+      p.rt ?? '-',
+      typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
+    );
 
     tbody.appendChild(tr);
   });
@@ -2419,27 +2424,32 @@ function sortRosterTable(columnName, direction) {
       nameTd.appendChild(gr);
     }
     tr.appendChild(nameTd);
-    
-    const addCell = (content) => {
+
+    const addCell = (content, extraClass) => {
       const td = document.createElement('td');
       td.textContent = content;
+      if (extraClass) td.className = extraClass;
       tr.appendChild(td);
     };
-    
+
     addCell(p.pos);
     addCell(p.year);
     addCell(p.height);
     addCell(p.weight);
-    
+
     ATTR_HEADERS.forEach(h => {
       const attrs = p.attributes || {};
       const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
-      const displayVal = h === 'NG' 
+      const displayVal = h === 'NG'
         ? (rawVal != null ? rawVal.toFixed(2) : '--')
         : (rawVal != null ? Math.floor(rawVal / 10) : '--');
       addCell(displayVal);
     });
-    addCell(p.rt ?? '-');
+    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    addCell(
+      p.rt ?? '-',
+      typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
+    );
 
     tbody.appendChild(tr);
   });

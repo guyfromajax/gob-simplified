@@ -387,12 +387,13 @@ function renderRoster() {
     }
     tr.appendChild(nameTd);
     
-    const addCell = (content) => {
+    const addCell = (content, extraClass) => {
       const td = document.createElement('td');
       td.textContent = content;
+      if (extraClass) td.className = extraClass;
       tr.appendChild(td);
     };
-    
+
     addCell(p.pos);
     addCell(p.year);
     addCell(p.height);
@@ -409,7 +410,11 @@ function renderRoster() {
     addCell(formatAttr('ND'));
     addCell(formatAttr('IQ'));
     addCell(formatAttr('FT'));
-    addCell(p.highestRT !== null ? p.highestRT : '-');
+    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    addCell(
+      p.highestRT !== null ? p.highestRT : '-',
+      typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
+    );
     
     tbody.appendChild(tr);
   });

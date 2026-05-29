@@ -375,7 +375,7 @@
         '<td>' + escapeHtml(recruit.attrs.ND) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.IQ) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.FT) + '</td>',
-        '<td>' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
+        '<td class="' + (typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(recruit.rt) : '') + '">' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
         '<td>' + getLeanCellHtml(recruit) + '</td>',
         '<td>' + (rank
           ? '<button class="picked-rank-badge" type="button" data-action="scroll-to-pick" data-recruit-id="' + escapeHtml(recruit.recruitId) + '">' + rank + '</button>'
@@ -470,7 +470,7 @@
       '<td>' + (recruit ? recruit.height : '--') + '</td>',
       '<td>' + (recruit && recruit.weight != null ? recruit.weight : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
-      '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
@@ -486,7 +486,7 @@
       '<td>' + (recruit ? recruit.homeRegion : '--') + '</td>',
       '<td>' + (recruit ? recruit.archetype : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
-      '<td>' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
