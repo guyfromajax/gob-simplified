@@ -2001,9 +2001,9 @@ function renderRecruits(data) {
     tbody.appendChild(tr);
   });
   
-  // Initialize tooltips for table cells
+  // Initialize tooltips for table cells (and headers)
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody, ['td']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }
 }
 
@@ -2166,15 +2166,16 @@ function renderTeam(data) {
       addCell(displayVal);
     });
     addCell(p.rt ?? '-');
-    
+
     tbody.appendChild(tr);
   });
-  
-  // Initialize tooltips for table cells
+
+  // Initialize tooltips. Scope to the parent table so the SC/SH/ID/… column
+  // headers also get tooltips, not only the cells under them.
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody, ['td']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }
-  
+
   // Add click handlers to sortable headers
   const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th');
   let rosterSortColumn = 'RT';
@@ -2439,12 +2440,12 @@ function sortRosterTable(columnName, direction) {
       addCell(displayVal);
     });
     addCell(p.rt ?? '-');
-    
+
     tbody.appendChild(tr);
   });
-  
+
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody, ['td']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }
 }
 

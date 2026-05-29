@@ -210,9 +210,11 @@ async function loadRoster() {
 
 async function loadStats() {
   try {
-    // Skip stats loading if in base mode (no franchise/tournament)
-    if (!mode) {
-      // Hide stats section for base roster view
+    // Skip stats loading if in base mode (no franchise/tournament) or
+    // FTE v2 tutorial mode — tutorial users haven't played any games yet,
+    // so the table would be empty + the franchise/tournament branches
+    // below would bail with "Invalid mode".
+    if (!mode || mode === 'tutorial') {
       const statsSection = document.getElementById('stats-section');
       if (statsSection) {
         statsSection.style.display = 'none';
@@ -420,11 +422,14 @@ function renderRoster() {
     tbody.appendChild(tr);
   });
   
-  // Initialize tooltips if available
+  // Initialize tooltips if available. Scope to the whole roster table so the
+  // column headers (SC, SH, ID, OD, …) also get tooltips, not just the data
+  // cells under them.
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody, ['td']);
+    const rosterTable = document.getElementById('roster-table') || tbody;
+    initAttributeTooltips(rosterTable, ['td', 'th']);
   }
-  
+
   // If player view is active, re-render it when roster changes
   if (currentView === 'player') {
     renderPlayerView();
