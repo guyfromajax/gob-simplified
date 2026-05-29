@@ -138,16 +138,26 @@ if (modeParam === 'tutorial') {
     teamId = teamIdParam;
     teamName = teamIdParam;
   }
-  // DOM not yet ready when this module-level code runs — defer to load.
-  document.addEventListener('DOMContentLoaded', () => {
+  // game-plan.js is loaded dynamically by the HTML AFTER DOMContentLoaded
+  // already fired (see game-plan.html: script.onload manually calls init()
+  // when document.readyState !== 'loading'). So we can't wait for that
+  // event — it'll never re-fire. Use readyState to branch.
+  const applyReadOnly = () => {
     const subhead = document.getElementById('tutorial-readonly-subhead');
     if (subhead) subhead.hidden = false;
     document.querySelectorAll('.strategy-slider').forEach((el) => {
       el.disabled = true;
     });
+    const slidersContainer = document.querySelector('.sliders-container');
+    if (slidersContainer) slidersContainer.classList.add('tutorial-readonly');
     const saveBtn = document.getElementById('btn-save-game-plan');
     if (saveBtn) saveBtn.style.display = 'none';
-  });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyReadOnly);
+  } else {
+    applyReadOnly();
+  }
 }
 
 // State
