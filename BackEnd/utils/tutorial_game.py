@@ -81,6 +81,104 @@ TUTORIAL_POINTS_BY_QUARTER_OPPONENT = [18, 15, 27, 0]
 TUTORIAL_NG_AT_BOOT = 0.95
 
 
+# Coach-specified default offensive playcall order for the user team's
+# in-game playcall center. Slot 1 → 8 from top of list. shooter_target on
+# each play is left at the DB default (we don't override).
+TUTORIAL_USER_OFFENSE_PLAYCALLS = [
+    "3-2 Motion",
+    "4-1 Motion",
+    "5-0 Motion",
+    "PF Post Motion",
+    "Base Post Play",
+    "Pick & Roll - Entry Pass",
+    "Iso",
+    "Double Screen Three - Wing",
+]
+
+
+def build_tutorial_pc_order_offense() -> list[str]:
+    """Look up the Coach-specified default playcalls in the plays collection
+    and return them as a list of play_id strings in slot order.
+
+    Returns at most len(TUTORIAL_USER_OFFENSE_PLAYCALLS) ids. Any play whose
+    name doesn't resolve in the DB is skipped with a warning so the rest of
+    the slots still populate.
+    """
+    from BackEnd.db import plays_collection
+
+    docs = list(plays_collection.find(
+        {"name": {"$in": TUTORIAL_USER_OFFENSE_PLAYCALLS}},
+        {"_id": 1, "name": 1, "play_id": 1},
+    ))
+    # Build name -> id map. Prefer the canonical play_id field when present,
+    # falling back to _id (matches the lookup pattern used by
+    # normalize_pc_order in playbook_settings_utils).
+    by_name: dict = {}
+    for doc in docs:
+        name = doc.get("name")
+        if not name:
+            continue
+        pid = doc.get("play_id") or doc.get("_id")
+        if pid is None:
+            continue
+        by_name[name] = str(pid)
+
+    ordered: list = []
+    for name in TUTORIAL_USER_OFFENSE_PLAYCALLS:
+        pid = by_name.get(name)
+        if pid is None:
+            logger.warning(
+                "[TUTORIAL] play name not found in plays collection — skipping: %r",
+                name,
+            )
+            continue
+        ordered.append(pid)
+    return ordered
+
+
+def _apply_tutorial_playbook_to_user_team(
+    summary: dict, user_team_id, gm
+) -> None:
+    """Set the user team's playbook_settings.pc_order.offense in BOTH the
+    summary (persisted to mongo) and the in-memory GameManager so the
+    in-game playcall center boots with Coach's 8 default playcalls.
+
+    Defense pc_order, motion/set_plays/fast_breaks percentages, and the
+    computer team's playbook are left at engine defaults (per Coach scope).
+    """
+    ordered_ids = build_tutorial_pc_order_offense()
+    if not ordered_ids:
+        logger.warning("[TUTORIAL] no playbook play_ids resolved — playcall center will be empty")
+        return
+
+    teams_obj = summary.get("teams")
+    if not isinstance(teams_obj, dict) or user_team_id is None:
+        logger.warning("[TUTORIAL] summary.teams missing or no user_team_id — skipping playbook")
+        return
+    team_rec = teams_obj.get(user_team_id)
+    if not isinstance(team_rec, dict):
+        logger.warning("[TUTORIAL] no team record for user_team_id=%s — skipping playbook", user_team_id)
+        return
+
+    existing_pb = team_rec.get("playbook_settings") if isinstance(team_rec.get("playbook_settings"), dict) else {}
+    existing_pc_order = existing_pb.get("pc_order") if isinstance(existing_pb.get("pc_order"), dict) else {}
+    new_pb = dict(existing_pb)
+    new_pb["pc_order"] = {
+        "offense": list(ordered_ids),
+        "defense": list(existing_pc_order.get("defense") or []),
+    }
+    team_rec["playbook_settings"] = new_pb
+
+    # Also mirror onto the in-memory GameManager team so any code path that
+    # reads from gm.user_team.playbook_settings (rather than the doc) sees
+    # the same data.
+    try:
+        user_team = gm.home_team if gm.home_team.team_id == user_team_id else gm.away_team
+        user_team.playbook_settings = dict(new_pb)
+    except Exception as e:
+        logger.warning("[TUTORIAL] could not mirror playbook_settings onto gm: %s", e)
+
+
 def _side_for(user_team_side: str, team_role: str) -> str:
     """Return 'user' or 'computer' for a team given which side the user controls.
 
@@ -342,6 +440,14 @@ def apply_tutorial_initial_state(
                 entry["pos"] = info["pos"]
             if "stats" in info:
                 entry["stats"] = info["stats"]
+
+    # User-team playcall center preloads (Coach's 8 default offensive plays).
+    # Writes pc_order.offense to summary["teams"][user_team_id]["playbook_settings"]
+    # and mirrors onto gm.user_team.playbook_settings.
+    user_team_id_for_pb = (
+        home_team.team_id if (user_team_side or "home") == "home" else away_team.team_id
+    )
+    _apply_tutorial_playbook_to_user_team(summary, user_team_id_for_pb, gm)
 
     logger.warning(
         "✅ [TUTORIAL] applied initial state: Q%d %s, %s vs %s, offense=%s, user_side=%s",
