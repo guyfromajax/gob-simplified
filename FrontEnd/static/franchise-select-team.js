@@ -28,21 +28,6 @@ const taglines = {
   'South Lancaster': 'Us vs The World'
 };
 
-// Mascots (collective noun) for the username-modal copy interpolation —
-// "you're now coaching the {mascot}". Authoritative on teams collection
-// (team_doc.mascot) but hardcoded here to avoid a round-trip on a single
-// modal render. Keep in sync if any team mascot ever changes.
-const mascots = {
-  'Bentley-Truman': 'Knights',
-  'Lancaster': 'Johnnies',
-  'Four Corners': 'Harvest',
-  'Ocean City': 'Admirals',
-  'Morristown': 'Pirates',
-  'Little York': 'Minute Men',
-  'Xavien': 'Elm Trees',
-  'South Lancaster': 'Bulldogs'
-};
-
 const teamContainer = document.getElementById("team-container");
 const errorHost = document.getElementById("team-select-error");
 const loadingOverlay = document.getElementById("team-select-loading");
@@ -53,6 +38,34 @@ const backLink = document.getElementById("team-select-back-link");
 // FTE v2 tutorial branch: when ?mode=tutorial is present, this page is the
 // first step of the new-user funnel rather than a franchise-creation entry.
 const TUTORIAL_MODE = new URLSearchParams(window.location.search).get("mode") === "tutorial";
+
+// Mascot map (team name → mascot string) loaded on demand from /teams.
+// Single source of truth = team_doc.mascot in the teams collection. Used by
+// the username modal copy ("you're now coaching the {mascot}, Coach"). Fired
+// once at module load when in tutorial mode so the click handler can await
+// without an extra round-trip mid-click.
+let mascotMapPromise = null;
+function fetchMascotMap() {
+  if (mascotMapPromise) return mascotMapPromise;
+  mascotMapPromise = fetch(API_CONFIG.buildUrl('/teams'), { headers: API_CONFIG.getAuthHeaders() })
+    .then(res => res.ok ? res.json() : [])
+    .then(teams => {
+      const map = {};
+      for (const t of teams || []) {
+        if (t && t.name && t.mascot) map[t.name] = t.mascot;
+      }
+      return map;
+    })
+    .catch(err => {
+      console.warn('[franchise-select-team] could not load mascots:', err);
+      return {};
+    });
+  return mascotMapPromise;
+}
+if (TUTORIAL_MODE) {
+  // Prefetch so the click handler's await is effectively free.
+  fetchMascotMap();
+}
 
 function buildReturnUrl() {
   return window.location.pathname + window.location.search;
@@ -149,10 +162,13 @@ async function selectTutorialTeam(team) {
   }
 
   // Step 2: open the username modal with team-aware copy. Use the mascot
-  // (collective noun) so the sentence reads naturally — "the Johnnies",
-  // "the Pirates" — instead of grammatically broken "the Lancaster".
-  const mascot = mascots[team] || team;
-  const prompt = `You're now coaching the ${mascot}. What's your name, Coach?`;
+  // (collective noun) so the sentence reads naturally — "the Sterling
+  // Knights", "the Pirates" — instead of grammatically broken "the Lancaster".
+  // Mascot string sourced from team_doc.mascot in the teams collection
+  // (single source of truth), fetched at module load.
+  const mascotMap = await fetchMascotMap();
+  const mascot = mascotMap[team] || team;
+  const prompt = `You're now coaching the ${mascot}. What's your username, Coach?`;
   const { openUsernameModal } = await import('/js/shared/usernameModal.js');
   openUsernameModal({
     prompt,
