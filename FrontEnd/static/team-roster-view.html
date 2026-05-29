@@ -105,43 +105,6 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
     }
 
-    .team-roster-view-toggle {
-      position: absolute;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      display: inline-flex;
-      gap: 0;
-      margin-left: 0;
-      border: 2px solid rgba(255, 255, 255, 0.14);
-      border-radius: 8px;
-      overflow: hidden;
-      max-width: 100%;
-      background: rgba(18, 24, 43, 0.62);
-    }
-
-    .team-roster-view-toggle .view-toggle-btn {
-      padding: 10px 18px;
-      border: 0;
-      background: rgba(255, 255, 255, 0.95);
-      color: rgba(25, 25, 25, 0.78);
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      cursor: pointer;
-      transition: background 0.18s ease, color 0.18s ease;
-    }
-
-    .team-roster-view-toggle .view-toggle-btn:hover {
-      background: #ffffff;
-      color: rgba(18, 18, 18, 0.92);
-    }
-
-    .team-roster-view-toggle .view-toggle-btn.active {
-      background: rgba(61, 55, 43, 0.92);
-      color: #ffffff;
-    }
-
     .section-title {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 2.15rem;
@@ -287,10 +250,6 @@
       font-weight: 600;
     }
 
-    #player-view-container .players-grid {
-      margin-top: 0;
-    }
-
     @media (max-width: 1024px) {
       .team-roster-shell {
         padding: 24px 18px 26px;
@@ -302,14 +261,12 @@
         min-height: 0;
       }
 
-      #back-button,
-      .team-roster-view-toggle {
+      #back-button {
         position: static;
         transform: none;
       }
 
       #back-button,
-      .team-roster-view-toggle,
       #team-banner {
         align-self: center;
       }
@@ -346,16 +303,10 @@
       <button id="back-button" type="button">Back to Locker Room</button>
 
       <img id="team-banner" src="/images/teams/general/general_banner_primary.jpg" alt="Team banner">
-
-      <!-- View Toggle -->
-      <div class="team-roster-view-toggle">
-        <button class="view-toggle-btn active" data-view="grid">Grid View</button>
-        <button class="view-toggle-btn" data-view="player">Player View</button>
-      </div>
     </div>
 
-    <!-- Grid View -->
-    <div id="roster-table-container" class="view-content active team-roster-section">
+    <!-- Roster Grid -->
+    <div id="roster-table-container" class="team-roster-section">
       <div class="fcc-data-card">
         <div class="fcc-data-card-body">
           <div class="scroll-x">
@@ -391,12 +342,7 @@
       </div>
     </div>
 
-    <!-- Player View -->
-    <div id="player-view-container" class="view-content team-roster-section">
-      <div class="players-grid"></div>
-    </div>
-
-    <!-- Season Statistics (shown in both views) -->
+    <!-- Season Statistics -->
     <div id="stats-section" class="team-roster-section">
       <div class="section-title">Season Statistics</div>
       <div class="fcc-data-card">
