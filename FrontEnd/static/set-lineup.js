@@ -322,19 +322,20 @@ function getRT(player) {
   return ratings.length ? Math.max(...ratings) : -Infinity;
 }
 
-// RT color bucket helper — canonical implementation at
-// /js/shared/rtBucket.js (loaded as a classic script on this page).
-// Falls back to a local definition if the global isn't present.
-function getRtBucketClass(rt) {
-  if (typeof window !== 'undefined' && typeof window.getRtBucketClass === 'function') {
-    return window.getRtBucketClass(rt);
-  }
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return 'rt-unknown';
-  if (v <= 40) return 'rt-low';
-  if (v <= 60) return 'rt-mid';
-  if (v <= 80) return 'rt-high';
-  return 'rt-elite';
+// RT color bucket helper.
+//
+// IMPORTANT: do NOT define a local `function getRtBucketClass()` here.
+// set-lineup.js is loaded as a classic (non-module) script, and a top-level
+// function declaration of the same name as the shared global on window
+// silently clobbers it — then any wrapper that tries to delegate to
+// window.getRtBucketClass ends up calling itself recursively until the
+// stack overflows. (That bug masked the entire render in tutorial mode.)
+//
+// Canonical implementation lives at /js/shared/rtBucket.js. The two call
+// sites below pick it up via window. with an inline guard for the rare
+// case it didn't load.
+function rtBucketClassOrEmpty(rt) {
+  return typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '';
 }
 
 function showToast(msg) {
@@ -1066,7 +1067,7 @@ function renderRosterAttributes() {
         nameText.textContent = val ?? '--';
         nameText.className = 'player-name-link';
         const rtSpan = document.createElement('span');
-        rtSpan.className = `inline-rt ${getRtBucketClass(rt)}`;
+        rtSpan.className = `inline-rt ${rtBucketClassOrEmpty(rt)}`;
         rtSpan.textContent = rt ?? '--';
         wrap.appendChild(nameText);
         wrap.appendChild(rtSpan);
@@ -1481,7 +1482,7 @@ function updateSlotDisplay(slot) {
       <div class="slot-info">
         <div class="slot-row-1">
           <div class="player-name">${slotDisplayName}</div>
-          <div class="player-rating ${getRtBucketClass(rating)}">RT: ${rating}</div>
+          <div class="player-rating ${rtBucketClassOrEmpty(rating)}">RT: ${rating}</div>
         </div>
         <div class="slot-row-2">
           <div class="slot-stat slot-stat-momentum">
