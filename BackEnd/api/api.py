@@ -1489,7 +1489,7 @@ try:
     @app.get("/teams")
     def get_team_names():
         teams = teams_collection.find(
-            {}, {"name": 1, "primary_color": 1, "secondary_color": 1, "_id": 0}
+            {}, {"name": 1, "primary_color": 1, "secondary_color": 1, "mascot": 1, "_id": 0}
         )
         return sorted(
             [
@@ -1497,6 +1497,7 @@ try:
                     "name": team.get("name"),
                     "primary_color": team.get("primary_color"),
                     "secondary_color": team.get("secondary_color"),
+                    "mascot": team.get("mascot"),
                 }
                 for team in teams
             ],
