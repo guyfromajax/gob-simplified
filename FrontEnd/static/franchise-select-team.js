@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Existing #page-subtitle styling (Inter 15px, 66% white) already reads
     // as supporting text. No extra class needed.
     if (subtitle) {
-      subtitle.textContent = "Don't sweat it too much. This is your 'learn the ropes' game — you pick your franchise team after.";
+      subtitle.textContent = "Don't sweat it too much. This is your 'learn the ropes' game — you pick your franchise program after this game.";
     }
   } else if (backLink) {
     backLink.addEventListener("click", function (event) {
