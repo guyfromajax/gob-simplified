@@ -90,6 +90,19 @@ input[type="reset"] {
 }
 .tutorial-readonly-subhead[hidden] { display: none; }
 
+/* Visual treatment for read-only sliders in tutorial mode. Applied as a
+   class on .sliders-container so users can tell at a glance the page
+   isn't editable (the input[disabled] state alone is too subtle). */
+.sliders-container.tutorial-readonly {
+  opacity: 0.62;
+}
+.sliders-container.tutorial-readonly input[type="range"] {
+  cursor: not-allowed;
+}
+.sliders-container.tutorial-readonly .strategy-slider-node {
+  filter: grayscale(0.5);
+}
+
 .game-plan-card {
   margin-top: 0;
 }

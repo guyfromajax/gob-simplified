@@ -2033,14 +2033,24 @@ async function init() {
   // lineup is in the URL (restoreLineupFromUrl populates it above). We do NOT
   // call autoset here — the engine assigned the tutorial-roster starters
   // (rank_roster + Section 5 templates) and we want to honor that exactly.
-  // Just show the Sammy intro modal so the user knows to tweak if desired.
+  // Show the Sammy intro modal ONCE per tutorial run (keyed by game_id so
+  // a re-entry from game-plan or a page reload doesn't re-fire it).
   if (modeParam === 'tutorial') {
-    import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
-      showSammyModal({
-        body: "I've set your lineup — tweak it if you like, and hover any attribute to see what it means.",
-        ctaLabel: 'Got it',
-      });
-    }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
+    const introKey = gameId
+      ? `fteV2TutorialLineupIntroShown_${gameId}`
+      : 'fteV2TutorialLineupIntroShown';
+    const alreadyShown = (() => {
+      try { return sessionStorage.getItem(introKey) === '1'; } catch (_) { return false; }
+    })();
+    if (!alreadyShown) {
+      try { sessionStorage.setItem(introKey, '1'); } catch (_) {}
+      import('/js/shared/sammyModal.js').then(({ showSammyModal }) => {
+        showSammyModal({
+          body: "I've set your lineup — tweak it if you like, and hover any attribute to see what it means.",
+          ctaLabel: 'Got it',
+        });
+      }).catch((e) => console.warn('[tutorial] could not load sammyModal:', e));
+    }
   }
 
   const btn = document.getElementById('play-now');
