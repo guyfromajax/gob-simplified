@@ -102,12 +102,9 @@ function createButtons() {
   teams.forEach(team => {
     const card = document.createElement("div");
     card.className = "team-card";
-    // Tutorial flow shows only the Select action — no scouting before first game.
-    const overlayHtml = TUTORIAL_MODE
-      ? `<button class="team-card-action team-card-action-select" type="button">Select</button>`
-      : `<button class="team-card-action team-card-action-scout" type="button">Scout</button>
-         <button class="team-card-action team-card-action-select" type="button">Select</button>`;
-    const overlayClass = TUTORIAL_MODE ? 'team-card-overlay is-single-action' : 'team-card-overlay';
+    const overlayHtml = `<button class="team-card-action team-card-action-scout" type="button">Scout</button>
+       <button class="team-card-action team-card-action-select" type="button">Select</button>`;
+    const overlayClass = 'team-card-overlay';
     card.innerHTML = `
       <div class="team-card-banner">
         <img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}">
@@ -122,7 +119,14 @@ function createButtons() {
     if (scoutBtn) {
       scoutBtn.addEventListener("click", () => {
         playSound("click-beep.wav");
-        window.location.href = '/team-roster-view.html?team_name=' + encodeURIComponent(team) + '&return_url=' + encodeURIComponent(buildReturnUrl());
+        const scoutParams = new URLSearchParams();
+        scoutParams.set('team_name', team);
+        scoutParams.set('return_url', buildReturnUrl());
+        // FTE v2 tutorial: carry mode=tutorial so authBarInit's routeToTutorial
+        // treats team-roster-view as a shoulder page and doesn't bounce the
+        // user back to the team-select step.
+        if (TUTORIAL_MODE) scoutParams.set('mode', 'tutorial');
+        window.location.href = '/team-roster-view.html?' + scoutParams.toString();
       });
     }
     if (selectBtn) {

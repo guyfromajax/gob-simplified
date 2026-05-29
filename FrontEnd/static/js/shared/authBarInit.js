@@ -146,6 +146,14 @@
     var SITUATION_URL = '/tutorial-situation.html';
     var currentPath = window.location.pathname;
 
+    // FTE v2 tutorial "shoulder pages" — entered from the tutorial funnel but
+    // not themselves a step. Treat as in-scope when ?mode=tutorial is set so
+    // the user isn't bounced back to their current step (e.g. Scout opens
+    // team-roster-view from team-select; we must let them stay there).
+    var TUTORIAL_SHOULDER_PAGES = ['/team-roster-view.html'];
+    var urlMode = new URLSearchParams(window.location.search).get('mode');
+    if (urlMode === 'tutorial' && TUTORIAL_SHOULDER_PAGES.indexOf(currentPath) !== -1) return;
+
     var targetPath;
     var targetUrl;
     if (step === 'team_select' || step === 'username') {
