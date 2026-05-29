@@ -94,6 +94,7 @@ Step 5: Bounce (miss/block) or hold (make)
 
 **DREB**
 Step 1: Rebound Capture (captor → bounce; attemptors → bounce ±4x/±6y)
+If OTB fires on the defensive rebound battle, Step 1 still completes the rebound capture and ball attach, then emits `"Over The Back!"` and `turn_stop: FOUL`. SIP/free-throw continuation is produced by the backend's standard non-shooting foul progression, not by frontend inference.
 
 
 **Free Throw** (one attempt per turn; `ft_step_emitter`)
@@ -346,4 +347,3 @@ the result of these stages.)
 
 
 **Final Shot**
-

@@ -86,7 +86,8 @@
    - **"BLOCKING FOUL!"** - Defensive blocking foul on drive (result_type === 'FOUL', foul_team DEFENSE, text contains "blocking foul")
    - **"OFFENSIVE FOUL!" / "DEFENSIVE FOUL!"** - Other non-shooting fouls (with fouling player headshot)
    - **"BLOCK!"** - Block on shot attempt (ShotAnimationSystem when ball reaches block spot, before rebound; blocker's image)
-   - **"Rebound!"** - Rebound secured (DREB and OREB): `announceReboundHeadlineIfNeeded()` in `announcements.js`; see **Rebound announcements** below. **Discrete `DREB` turn** (separate row after some MISS/BLOCK): outlet choreography is **`AnimationEngine._maybeRunDiscreteDrebOutletLeadIn`** → `runDefensiveReboundSetup` after DREB `playTurn` (see `Turn_by_Turn_System.md`); **Rebound!** usually still fires on the **embedded** MISS/BLOCK path via `ShotAnimationSystem.handleEmbeddedRebound`, not on the DREB `animation_steps` row alone.
+   - **"Rebound!"** - Rebound secured (DREB and OREB): embedded paths use `announceReboundHeadlineIfNeeded()` in `announcements.js`; discrete DREB rows can emit the headline as a backend `step.end.announcement`. See **Rebound announcements** below.
+   - **"Over The Back!"** - OTB rebound foul. For discrete DREB OTB, the backend emits this as the DREB step-end announcement after the rebounder reaches/attaches the ball, and the frontend suppresses the generic pre-animation foul announcement for that row.
 
 **Long Form Documentation**
 
@@ -192,7 +193,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 **Rebound Announcements:**
 - **"Rebound!"** - `announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite, rebounderId)` in `announcements.js`. Fires when the rebounder secures the ball (embedded path: rebounder tween `onComplete` after attach + rebound SFX; `ballManager.animateRebound`: rebounder tween `onComplete`). **DREB and OREB** on embedded misses both use the same hook so FAST_BREAK / `force_foul_after_dreb` / odd `next_play_type` branches still get the headline when the rebound animates. Idempotent via `turnData._reboundHeadlineShown` when `turnData` is passed (always pass the authoritative MISS/BLOCK or rebound turn from callers). Primary card uses the same portrait styling as other results (`teamName` from `scene.simData` home/away names; `secondaryColor` from `gameStore.getColors()`).
-- **Discrete `DREB` row (migration):** Backend may append a separate **`DREB`** turn whose `animation_steps` only capture the ball. **Rebound!** idempotency should continue to use the **MISS/BLOCK** turn object when that turn still runs **`ShotAnimationSystem`** embedded rebound; the DREB row does not replace the headline hook by itself. **Outlet** (pass / bring-up) is **`runDefensiveReboundSetup`** after DREB `playTurn` — see **`Rebound_System.md`** (DREB vs outlet) and **`Turn_by_Turn_System.md`** (Discrete `DREB` turn).
+- **Discrete `DREB` row (migration):** Backend may append a separate **`DREB`** turn whose `animation_steps` capture the rebound. Clean DREB rows emit **"Rebound!"** as a backend `step.end.announcement`. DREB rows that resolve to OTB emit **"Over The Back!"** at that same step-end beat instead, with the fouling player's image; `turnPreparation.js` skips the generic FOUL start announcement for these schema DREB OTB rows. **Outlet** (pass / bring-up) is **`runDefensiveReboundSetup`** after DREB `playTurn` only when the DREB row routes to HCO/HCT/FCP, not when it routes to FOUL — see **`Rebound_System.md`** and **`Turn_by_Turn_System.md`**.
 
 ### Sounds (SFX) — payload-carries-SFX architecture
 

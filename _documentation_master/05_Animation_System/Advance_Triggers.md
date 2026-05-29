@@ -28,6 +28,8 @@ See [Animation_System_Updated.md](../projects/Animation_System_Updated.md) for t
 |---|---|---|---|
 | 0 | Rebound capture | `player_reaches_position` (rebounder → ball bounce coords) | rebounder traversal time at `sprint` archetype |
 
+DREB normally ends implicitly after this single step and routes to HCO/HCT/FCP/FAST_BREAK. If an Over The Back foul fires, the same capture step attaches the ball to the rebounder, emits the step-end `"Over The Back!"` announcement, and terminates with `turn_stop: FOUL`; standard backend foul progression then appends SIP or free throws.
+
 ---
 
 ## Not yet migrated

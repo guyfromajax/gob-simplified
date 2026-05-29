@@ -131,12 +131,12 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
 
 
 **Over The Back Fouls**
-On each rebound attempt we will calculate the possibility of over teh back fouls via the following logic
+On each rebound attempt we calculate the possibility of Over The Back fouls via the following logic. OREB and DREB now resolve OTB in their own rebound turns, not in the preceding shot-attempt turn.
 
 -Identify one potential fouling player from each team. 
-    -use the rebounder from teh reboudnging team, and the player on the non-rebounding team who is cloest to the rebounder using Euclidian distance
+    -use the rebounder from the rebounding team, and the player on the non-rebounding team who is closest to the rebounder using Euclidian distance
 -If the closest player from the non-rebounding team is farther than 4 Euclidian distance from the rebounder, there is no Over The Back foul in play for either team
--Offense Threahsold = 90 + offense team discipline value
+-Offense Threshold = 90 + offense team discipline value
 -Defense Threshold = 10 - defense team discipline value
 otb_foul = random.randint(1,100)
 -if otb_foul > Offense Threshold, o foul is in play, elif otb_foul < Defense Threshold, d foul in play, else no foul
@@ -146,8 +146,9 @@ otb_foul = random.randint(1,100)
     - if second_roll > potential fouling player's IQ from the in play foul team (offenssive potential fouler for o foul in play or defensive potential fouler for d foul in play), then foul_still_in_play = True, else foul_in_play = False
     -if foul_still_in_play = True, final_roll = random.randint(1,2), 1 = foul, 2 = no foul
 
--if there is an over the back foul called on the offense or the defense, it will end the turn there and negate any Putback attempt or kickout pass that would have been executed. We will process each like a standard non shooting d foul or non shooting o foul.
--Announcement copy: "Over The Back!" with the fouling player's image through the announcement system
+-If there is an Over The Back foul called on the offense or the defense, it ends the rebound turn there and negates any putback attempt, kickout pass, DREB outlet, or fast-break continuation that would have followed. We process each like a standard non-shooting defensive foul or non-shooting offensive foul.
+-DREB OTB visual order: animate the shot miss in the shot turn, animate players already placed for the rebound battle, move/attach the ball to the DREB rebounder in the DREB turn, then announce `"Over The Back!"` from the DREB step-end announcement and emit `turn_stop: FOUL`.
+-Announcement copy: `"Over The Back!"` with the fouling player's image through the announcement system.
 
 ---
 
@@ -169,6 +170,5 @@ Notes:
 - HCT / FCP previously inherited HCO mechanics (get-back / release). The refactor drops those for HCT / FCP / Fast Break and aligns them on the frontcourt-half x-eligibility filter.
 - HCO retains its existing prefilter — the get-back / release mechanic is HCO-specific.
 - `choose_rebounder` is the per-team primitive. `determine_rebounder` is the whole-game wrapper that calls `choose_rebounder` once per team and then runs the weighted off-vs-def selection. See section above for algorithmic detail.
-
 
 

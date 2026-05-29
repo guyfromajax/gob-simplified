@@ -331,8 +331,16 @@ export async function finalizeTurnAfterAnimation({
     // FOUL turns should always announce foul type, including bonus fouls that lead to free throws.
     // True shooting fouls are emitted as shot result turns (MAKE/MISS) and are announced there.
     const isBonusFoul = isBonusFreeThrowFoulTurn(turn);
+    const isSchemaDrebOtb = (
+      turn.current_turn === 'DREB' &&
+      Boolean(turn.otb_foul) &&
+      Array.isArray(turn.animation_steps) &&
+      turn.animation_steps.length > 0
+    );
     const isBlockingFoul = turn.foul_team === 'DEFENSE' && turn.text?.toLowerCase().includes('blocking foul');
-    if (isBlockingFoul) {
+    if (isSchemaDrebOtb) {
+      // Backend schema step announces OTB after the rebounder reaches/attaches the ball.
+    } else if (isBlockingFoul) {
       announceGameEvent('BLOCKING_FOUL', turn, scene, { foulerId: turn.foul_player_id || turn.defenderId });
     } else {
       const foulTeam = turn.foul_team || 'OFFENSE';

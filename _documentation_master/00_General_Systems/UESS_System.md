@@ -24,7 +24,7 @@ This doc is the single source of truth for the contract. Code is the implementat
 | HCT (dynamic) | ✅ Migrated | `dynamic_hct_step_emitter.build_dynamic_hct_animation_steps` |
 | Fast Break — Covert Release | ✅ Migrated | `covert_release_step_emitter` |
 | Fast Break — Rim Runner | ✅ Migrated | `rim_runner_step_emitter` |
-| DREB (rebound capture) | ✅ Migrated | `dreb_step_emitter` (discrete DREB rows are promoted after HCO/HCT/FCP MISS/BLOCK, final-FT DREB, OREB putback miss → DREB, and migrated Fast Break MISS/BLOCK paths) |
+| DREB (rebound capture) | ✅ Migrated | `dreb_step_emitter` (discrete DREB rows are promoted after HCO/HCT/FCP MISS/BLOCK, final-FT DREB, OREB putback miss → DREB, and migrated Fast Break MISS/BLOCK paths; DREB Over The Back fouls resolve inside this row and emit `turn_stop: FOUL`) |
 | HCO | ✅ Migrated | `skeleton_step_emitter` (schema + universal entry orchestrator; natural-travel-time step T) |
 | FCP | ✅ Migrated | `skeleton_step_emitter` (shared with HCO; FCP-specific gates + sprint archetypes + walker seed for BIP→FCP ball-owner carry; randomized BIP setup positions) |
 | OREB (putback / kickout) | ✅ Migrated | `oreb_step_emitter` (branches by `result_type`: KICKOUT reuses `build_kickout_step`; PUTBACK_MAKE/MISS reuse `[shoot]/[ball_flight]/[hold]/[bounce]` builders; PUTBACK_MISS second rebound is dispatched as a separate DREB turn via the extended `_build_dreb_turn_from_miss` trigger) |

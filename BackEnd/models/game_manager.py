@@ -703,6 +703,8 @@ class GameManager:
         Returns the DREB turn dict, or None if required data is missing.
         """
         from BackEnd.engine.dreb_step_emitter import build_dreb_animation_steps
+        from BackEnd.engine.phase_resolution import resolve_non_shooting_foul
+        from BackEnd.utils.shared import resolve_over_the_back_foul
 
         rebounder_id = miss_turn.get("rebounderId")
         bx = miss_turn.get("ball_bounce_x")
@@ -749,10 +751,41 @@ class GameManager:
             self.game_state.get("shot_clock_remaining", 0) or 0
         )
 
-        # OTB foul on MISS rebounds is currently resolved during shot_manager
-        # (turn becomes a FOUL turn rather than MISS+OTB). DREB-as-own-turn
-        # may revisit this; for now, no OTB.
+        dreb_rebounder = self.defense_team.get_player_by_id(str(rebounder_id))
+        if dreb_rebounder is None:
+            for candidate in (self.defense_team.lineup or {}).values():
+                if str(getattr(candidate, "player_id", "")) == str(rebounder_id):
+                    dreb_rebounder = candidate
+                    break
+
+        otb = resolve_over_the_back_foul(
+            self,
+            dreb_rebounder,
+            self.defense_team,
+            self.offense_team.lineup,
+        )
+
+        def _player_id(player):
+            return getattr(player, "player_id", None) if player is not None else None
+
+        def _team_side_for_player(player):
+            pid = str(_player_id(player) or "")
+            for side, team in (("home", self.home_team), ("away", self.away_team)):
+                for candidate in (getattr(team, "lineup", {}) or {}).values():
+                    if str(_player_id(candidate) or "") == pid:
+                        return side
+            return None
+
         otb_foul = None
+        if otb:
+            foul_player = otb.get("foul_player")
+            victim = otb.get("victim")
+            otb_foul = {
+                "fouler_id": str(_player_id(foul_player)),
+                "victim_id": str(_player_id(victim) or rebounder_id),
+                "foul_team": otb.get("foul_team"),
+                "announcement_team": _team_side_for_player(victim),
+            }
 
         # Single-placement-authority model: shot_manager has already placed
         # every player post-shot (rebound cluster / get-back / release) via
@@ -780,6 +813,54 @@ class GameManager:
 
         # Step's time_elapsed = canonical DREB turn duration.
         time_elapsed = float(animation_steps[0]["end"]["time_elapsed"])
+        time_elapsed_int = int(round(time_elapsed)) if time_elapsed >= 1 else 1
+
+        if otb:
+            foul_player = otb.get("foul_player")
+            victim = otb.get("victim")
+            if foul_player is not None and victim is not None:
+                self.game_state["foul_team"] = otb.get("foul_team", "OFFENSE")
+                foul_result = resolve_non_shooting_foul(
+                    {
+                        "ball_handler": victim,
+                        "defender": (
+                            foul_player
+                            if otb.get("foul_team") == "DEFENSE"
+                            else None
+                        ),
+                        "foul_player": foul_player,
+                        "shooter": victim,
+                        "screener": None,
+                        "passer": None,
+                    },
+                    self,
+                    time_elapsed_override=time_elapsed_int,
+                )
+                foul_result["ball_handler"] = _player_id(victim)
+                foul_result["shooter"] = _player_id(victim)
+                foul_result["defender"] = (
+                    _player_id(foul_player)
+                    if otb.get("foul_team") == "DEFENSE"
+                    else None
+                )
+                foul_result["screener"] = None
+                foul_result["passer"] = None
+                foul_result["foul_player_id"] = _player_id(foul_player)
+                foul_result["victim_id"] = _player_id(victim)
+                foul_result["foul_team"] = otb.get("foul_team")
+                foul_result["otb_foul"] = True
+                foul_result["text"] = "Over the back!"
+                foul_result["current_turn"] = "DREB"
+                foul_result["rebounderId"] = str(rebounder_id)
+                foul_result["offense_rebounders"] = miss_turn.get("offense_rebounders") or []
+                foul_result["defense_rebounders"] = miss_turn.get("defense_rebounders") or []
+                foul_result["ball_bounce_x"] = float(bx)
+                foul_result["ball_bounce_y"] = float(by)
+                foul_result["time_elapsed"] = time_elapsed_int
+                foul_result["animation_steps"] = animation_steps
+                foul_result["offense_team_id"] = miss_offense_team_id
+                foul_result["events"] = []
+                return foul_result
 
         # Possession flips after DREB if the next play (HCO/FAST_BREAK) is
         # for the rebounding team. Because rebounder is on defense (DREB),
@@ -796,7 +877,7 @@ class GameManager:
             "defense_rebounders": miss_turn.get("defense_rebounders") or [],
             "ball_bounce_x": float(bx),
             "ball_bounce_y": float(by),
-            "time_elapsed": int(round(time_elapsed)) if time_elapsed >= 1 else 1,
+            "time_elapsed": time_elapsed_int,
             "animation_steps": animation_steps,
             "possession_flips": possession_flips,
             # offense_team_id at the time of the DREB turn is still the
@@ -1170,8 +1251,9 @@ class GameManager:
                 original_next = result["next_play_type"]
                 result["next_play_type"] = "DREB"
                 result["next_turn"] = "DREB"
-                dreb_turn["next_play_type"] = original_next
-                dreb_turn["next_turn"] = original_next
+                if dreb_turn.get("result_type") != "FOUL":
+                    dreb_turn["next_play_type"] = original_next
+                    dreb_turn["next_turn"] = original_next
 
                 self._append_turn(dreb_turn)
                 # DREB turn doesn't go through the main _micro_turn flow,
@@ -1179,7 +1261,10 @@ class GameManager:
                 self._maybe_stamp_hco_setup(dreb_turn)
                 self.turn_manager.update_clock_and_possession(dreb_turn)
 
-                if dreb_turn.get("possession_flips"):
+                if (
+                    dreb_turn.get("result_type") != "FOUL"
+                    and dreb_turn.get("possession_flips")
+                ):
                     old_offense = self.offense_team.name
                     self.switch_possession()
                     dreb_turn["possession_flips"] = False
