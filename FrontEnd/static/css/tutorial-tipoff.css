@@ -1,0 +1,147 @@
+/*
+ * FTE v2 — Pre-Game Tip-off (Screen 3)
+ * Implemented as a canonical Moment modal per Styleguide_updated.md §Modal
+ * System / Moment Modals: full-bleed team banner background, darkening
+ * gradient, outcome (matchup/score) as the visual hero, portrait spotlight,
+ * subtle scale-in. The only green CTA in the entire FTE flow lives here.
+ */
+
+body.tutorial-tipoff-page {
+  background: #0b0d14;
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.tipoff-stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1;
+}
+
+.tipoff-stage__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 0;
+}
+
+/* Moment modal box — full-bleed team banner background w/ darkening gradient.
+ * Surface, border, radius, max-width all per Moment Modal canonical spec. */
+.tipoff-moment {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100vw - 32px));
+  background-color: rgba(13, 17, 36, 0.97);
+  background-size: cover;
+  background-position: center center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: tipoff-modal-in 200ms ease both;
+}
+
+.tipoff-moment__inner {
+  padding: 28px 28px 24px;
+  text-align: center;
+}
+
+.tipoff-moment__portrait {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center top;
+  background: rgba(0, 0, 0, 0.5);
+  border: 3px solid #F79420;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  margin: 0 auto 14px;
+  display: block;
+}
+
+.tipoff-moment__eyebrow {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: #F79420;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  line-height: 1;
+}
+
+.tipoff-moment__score {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.tipoff-moment__team {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1;
+}
+
+.tipoff-moment__num {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 56px;
+  line-height: 0.95;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.tipoff-moment__dash {
+  font-family: 'Inter', sans-serif;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0 4px;
+}
+
+.tipoff-moment__context {
+  margin: 0 0 18px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.tipoff-moment__rally {
+  margin-bottom: 22px;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  line-height: 1.05;
+}
+
+.tipoff-moment__actions {
+  display: flex;
+  justify-content: center;
+}
+
+.tipoff-moment__cta {
+  width: 100%;
+  max-width: 320px;
+}
+
+@keyframes tipoff-modal-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1.0); }
+}
+
+@media (max-width: 560px) {
+  .tipoff-moment__num { font-size: 44px; }
+  .tipoff-moment__rally { font-size: 24px; }
+  .tipoff-moment__team { font-size: 16px; }
+}

@@ -9,27 +9,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>The Situation, Coach</title>
-  <link rel="stylesheet" href="/css/sammy-modal.css">
-  <style>
-    /* Dark backdrop; the situation modal renders on top via sammyModal. */
-    html, body {
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
-      background: radial-gradient(ellipse at center, #1a2042 0%, #0a0d1c 70%);
-      background-attachment: fixed;
-      font-family: 'Inter', sans-serif;
-    }
-  </style>
+  <title>Crunch Time, Coach</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/tutorial-tipoff.css">
 </head>
-<body>
+<body class="tutorial-tipoff-page">
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <!-- Tip-off Moment modal. Rendered/populated by tutorial-situation.js once
+       team_pick is known so we can set the correct banner background, score,
+       and team-linked Sammy portrait. -->
+  <div class="tipoff-stage" id="tipoff-stage">
+    <div class="tipoff-stage__backdrop"></div>
+    <div class="tipoff-moment" id="tipoff-moment" role="dialog" aria-modal="true" hidden>
+      <div class="tipoff-moment__inner">
+        <img class="tipoff-moment__portrait" id="tipoff-portrait" src="/images/sammy_tutorial.png" alt="">
+        <div class="tipoff-moment__eyebrow">CRUNCH TIME · Q4</div>
+        <div class="tipoff-moment__score">
+          <span class="tipoff-moment__team" id="tipoff-home-team">HOME</span>
+          <span class="tipoff-moment__num" id="tipoff-home-score">60</span>
+          <span class="tipoff-moment__dash">–</span>
+          <span class="tipoff-moment__num" id="tipoff-away-score">60</span>
+          <span class="tipoff-moment__team" id="tipoff-away-team">AWAY</span>
+        </div>
+        <p class="tipoff-moment__context">Tied with four minutes left. The game's in your hands now.</p>
+        <div class="tipoff-moment__rally">GO WIN IT, COACH.</div>
+        <div class="tipoff-moment__actions">
+          <button id="tipoff-cta" type="button" class="gob-btn gob-btn--gate gob-btn--lg tipoff-moment__cta">SET LINEUP</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
   <script type="module" src="/tutorial-situation.js"></script>
 </body>
 </html>

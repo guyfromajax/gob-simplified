@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager (production only) -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Welcome, Coach</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/tutorial-persona-intro.css">
+</head>
+<body class="tutorial-persona-page">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <main class="persona-intro">
+    <img class="persona-intro__portrait" src="/images/sammy_tutorial.png" alt="Sammy, your assistant coach">
+    <div class="persona-intro__name">Sammy · Assistant Coach</div>
+    <h1 class="persona-intro__headline">Welcome to GOB, Coach.<br>I'll get you set up.</h1>
+    <p class="persona-intro__body">One quick game to learn the ropes — then you build your own program. I'll be right here the whole way.</p>
+    <button id="persona-intro-cta" type="button" class="gob-btn gob-btn--action gob-btn--lg">LET'S GO</button>
+    <p id="persona-intro-error" class="persona-intro__error" aria-live="polite"></p>
+  </main>
+
+  <script src="/js/config/api-config.js"></script>
+  <script type="module" src="/tutorial-persona-intro.js"></script>
+</body>
+</html>

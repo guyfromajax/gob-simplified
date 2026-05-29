@@ -1,0 +1,116 @@
+/*
+ * Coach-mark — spotlight guidance pattern, NOT a modal.
+ *
+ * Per styleguide: coach-marks are a distinct pattern from the three modal
+ * types (Functional, Moment, Strategic). They sit on the page, do not block
+ * interaction, and point at a specific element so the user can see the very
+ * thing the copy is describing.
+ */
+
+.gob-coachmark {
+  position: absolute;
+  z-index: 1500;
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px 18px 14px;
+  background: rgba(22, 26, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: auto;
+}
+
+.gob-coachmark.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Pointer arrow — directional triangle that anchors the bubble to its target.
+ * Side modifiers control which edge the arrow protrudes from. */
+.gob-coachmark::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: rgba(22, 26, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transform: rotate(45deg);
+}
+
+.gob-coachmark--left::before {
+  left: -8px;
+  top: 36px;
+  border-right: 0;
+  border-top: 0;
+}
+
+.gob-coachmark--right::before {
+  right: -8px;
+  top: 36px;
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.gob-coachmark--top::before {
+  top: -8px;
+  left: 36px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.gob-coachmark--bottom::before {
+  bottom: -8px;
+  left: 36px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.gob-coachmark__portrait {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center top;
+  border: 2px solid rgba(247, 148, 32, 0.65);
+  background: rgba(0, 0, 0, 0.4);
+  float: left;
+  margin: 0 12px 6px 0;
+  flex-shrink: 0;
+}
+
+.gob-coachmark__eyebrow {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #F79420;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.gob-coachmark__body {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0 0 12px;
+}
+
+.gob-coachmark__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  clear: both;
+}
+
+.gob-coachmark__count {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.04em;
+}

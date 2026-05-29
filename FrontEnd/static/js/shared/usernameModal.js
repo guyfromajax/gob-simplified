@@ -1,27 +1,41 @@
 /**
- * Username Modal — FTE v2 design.
+ * Username Modal — FTE v2 onboarding redesign.
  *
- * Wraps showSammyModal() with username-specific config:
- *   - Validation: 3-24 chars, no spaces, [a-zA-Z0-9_] only
- *   - POST /api/auth/set-username
- *   - On success: update localStorage.auth_user, refresh auth-bar display, close
- *   - On failure: show inline error
+ * Implemented as the canonical Functional modal (`gob-modal-*` chrome,
+ * 3px orange accent bar, Bebas Neue Pro title, Inter subtitle). Team-linked
+ * Sammy portrait overlaps the top edge of the modal so the persona stays
+ * warm without breaking the system box.
  *
- * Replaces the inline username modal previously defined in authBarInit.js
- * (ensureUsernameModal + openUsernameModal). In PR 2b this is invoked by the
- * legacy FTE v1 entry path; in PR 2c it'll also be the username step of the
- * new tutorial funnel.
+ * Primary CTA is the canonical `.gob-btn--action` (orange) — per the
+ * styleguide's Action Color rules, naming yourself is a non-gating action
+ * (configures a preference; doesn't advance game state). Previously this
+ * button was green, which was incorrect.
  *
  * Usage:
  *   import { openUsernameModal } from '/js/shared/usernameModal.js';
- *   openUsernameModal({ onSuccess: () => { ... } });
+ *
+ *   openUsernameModal({
+ *     teamName: 'Bentley-Truman',           // optional — drives Sammy portrait
+ *     mascot: 'Sterling Knights',           // optional — drives title
+ *     onSuccess: () => navigate(...),
+ *   });
+ *
+ * Legacy `prompt` field is no longer used (the new design swaps the
+ * sentence-prompt for a structured Title + Subtitle). Callers that still
+ * pass `prompt` are silently ignored — they'll get the default subtitle.
  */
 
-import { showSammyModal } from '/js/shared/sammyModal.js';
+import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
+import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
 
-
-const USERNAME_HINT = '3-24 characters. Letters, numbers, and underscores only — no spaces.';
-const DEFAULT_USERNAME_PROMPT = 'Choose a username, Coach.';
+const USERNAME_HINT = '3–24 characters · letters, numbers, underscores';
+const DEFAULT_SUBTITLE = "Every coach in GOB needs a username. What should the league call you?";
+const STYLESHEET_HREFS = [
+  // Canonical `.gob-modal-*` classes used by every Functional modal.
+  '/resource-pages.css',
+  '/css/gob-buttons.css',
+  '/css/username-modal.css',
+];
 
 
 function validateUsername(value) {
@@ -42,73 +56,161 @@ function persistUsernameLocally(username) {
       user.username = username;
       localStorage.setItem('auth_user', JSON.stringify(user));
     }
-  } catch (_) {
-    // Best-effort; ignore parse/storage failures.
-  }
+  } catch (_) { /* best-effort */ }
   const emailDisplay = document.getElementById('auth-user-email');
   if (emailDisplay) emailDisplay.textContent = username;
 }
 
 
+function ensureStylesheets() {
+  STYLESHEET_HREFS.forEach((href) => {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  });
+}
+
+
 /**
- * Open the username modal.
  * @param {Object} opts
- * @param {Function} [opts.onSuccess]  - called after the username is persisted server-side
- * @param {string}   [opts.prompt]     - override the default body copy (e.g., tutorial flow)
- * @returns {{ close: Function }}      - handle to dismiss the modal early if needed
+ * @param {string}   [opts.teamName]   — drives Sammy portrait variant
+ * @param {string}   [opts.mascot]     — drives title ("YOU'RE COACHING THE …")
+ * @param {Function} [opts.onSuccess]  — called after username is persisted server-side
+ * @returns {{ close: Function }}
  */
 export function openUsernameModal(opts = {}) {
   const onSuccess = typeof opts.onSuccess === 'function' ? opts.onSuccess : null;
-  const prompt = typeof opts.prompt === 'string' && opts.prompt.trim()
-    ? opts.prompt
-    : DEFAULT_USERNAME_PROMPT;
+  const mascotText = (opts.mascot || '').trim();
+  const titleText = mascotText
+    ? `YOU'RE COACHING THE ${mascotText.toUpperCase()}`
+    : 'CHOOSE A USERNAME';
+  const sammySrc = getTeamSammyImage(opts.teamName);
 
-  const handle = showSammyModal({
-    body: prompt,
-    ctaLabel: 'Continue',
-    dismissOnCta: false,  // we control dismissal — wait for API success
-    input: {
-      placeholder: 'Username',
-      hint: USERNAME_HINT,
-      validate: validateUsername,
-    },
-    onCta: async (username) => {
-      const trimmed = (username || '').trim();
+  ensureStylesheets();
+  // Username step of the funnel — quiet progress thread updates.
+  try { mountTutorialProgress('username'); } catch (_) { /* non-fatal */ }
 
-      // Fallback when API_CONFIG isn't loaded (e.g., on a public-only page) —
-      // dismiss without making the request so the caller isn't stranded.
-      if (typeof API_CONFIG === 'undefined' ||
-          typeof API_CONFIG.buildUrl !== 'function' ||
-          typeof API_CONFIG.getAuthHeaders !== 'function') {
-        handle.close();
-        if (onSuccess) onSuccess();
-        return;
-      }
+  const overlay = document.createElement('div');
+  overlay.className = 'gob-modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
 
-      let res;
-      let data;
-      try {
-        res = await fetch(API_CONFIG.buildUrl('/api/auth/set-username'), {
-          method: 'POST',
-          headers: Object.assign({ 'Content-Type': 'application/json' }, API_CONFIG.getAuthHeaders()),
-          body: JSON.stringify({ username: trimmed }),
-        });
-        data = await res.json();
-      } catch (_) {
-        handle.setError('Something went wrong. Try again.');
-        return;
-      }
+  overlay.innerHTML = `
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box username-modal-box">
+      <div class="username-modal-portrait-wrap" aria-hidden="true">
+        <img class="username-modal-portrait" src="${sammySrc}" alt="">
+      </div>
+      <div class="gob-modal-accent"></div>
+      <div class="gob-modal-body username-modal-body">
+        <div class="gob-modal-title">${titleText}</div>
+        <p class="gob-modal-subtitle">${DEFAULT_SUBTITLE}</p>
+        <div class="username-modal-field-wrap">
+          <input
+            type="text"
+            class="username-modal-input"
+            id="username-modal-input"
+            placeholder="Username"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="24"
+            aria-label="Username"
+          >
+          <p class="username-modal-hint">${USERNAME_HINT}</p>
+          <p class="username-modal-error" id="username-modal-error" aria-live="polite"></p>
+        </div>
+      </div>
+      <div class="gob-modal-actions username-modal-actions">
+        <button type="button" class="gob-btn gob-btn--action username-modal-cta" id="username-modal-cta">CONTINUE</button>
+      </div>
+    </div>
+  `;
 
-      if (!res.ok) {
-        handle.setError((data && data.detail) || 'This username is already taken');
-        return;
-      }
+  document.body.appendChild(overlay);
+  // Force reflow so the .is-visible transition runs.
+  // eslint-disable-next-line no-unused-expressions
+  overlay.offsetHeight;
+  overlay.classList.add('is-visible');
 
-      persistUsernameLocally(data.username);
-      handle.close();
+  const inputEl = overlay.querySelector('#username-modal-input');
+  const errorEl = overlay.querySelector('#username-modal-error');
+  const ctaBtn = overlay.querySelector('#username-modal-cta');
+
+  function setError(msg) {
+    if (errorEl) errorEl.textContent = msg || '';
+  }
+
+  function setBusy(busy) {
+    if (ctaBtn) ctaBtn.disabled = !!busy;
+    if (inputEl) inputEl.disabled = !!busy;
+  }
+
+  function close() {
+    if (!overlay.parentNode) return;
+    overlay.classList.remove('is-visible');
+    setTimeout(() => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }, 180);
+  }
+
+  async function submit() {
+    const value = (inputEl?.value || '').trim();
+    const err = validateUsername(value);
+    if (err) {
+      setError(err);
+      inputEl?.focus();
+      return;
+    }
+    setError('');
+
+    // Public-only fallback — if API isn't loaded, just succeed locally.
+    if (typeof API_CONFIG === 'undefined' ||
+        typeof API_CONFIG.buildUrl !== 'function' ||
+        typeof API_CONFIG.getAuthHeaders !== 'function') {
+      close();
       if (onSuccess) onSuccess();
-    },
-  });
+      return;
+    }
 
-  return handle;
+    setBusy(true);
+    let res;
+    let data;
+    try {
+      res = await fetch(API_CONFIG.buildUrl('/api/auth/set-username'), {
+        method: 'POST',
+        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: value }),
+      });
+      data = await res.json().catch(() => ({}));
+    } catch (_) {
+      setBusy(false);
+      setError('Something went wrong. Try again.');
+      return;
+    }
+
+    if (!res.ok) {
+      setBusy(false);
+      setError((data && data.detail) || 'This username is already taken');
+      return;
+    }
+
+    persistUsernameLocally(data.username);
+    close();
+    if (onSuccess) onSuccess();
+  }
+
+  if (ctaBtn) ctaBtn.addEventListener('click', submit);
+  if (inputEl) {
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submit();
+      }
+    });
+    setTimeout(() => inputEl.focus(), 0);
+  }
+
+  return { close };
 }
