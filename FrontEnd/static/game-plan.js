@@ -129,6 +129,27 @@ if (modeParam === 'single') {
   }
 }
 
+// FTE v2 tutorial: team_id is passed as the user team name (matches the
+// single-mode handling — backend resolves via gm.<team>.name == team_id).
+// Page is read-only: sliders disabled, Save hidden, subhead shown.
+if (modeParam === 'tutorial') {
+  const teamIdParam = urlParams.get('team_id');
+  if (teamIdParam) {
+    teamId = teamIdParam;
+    teamName = teamIdParam;
+  }
+  // DOM not yet ready when this module-level code runs — defer to load.
+  document.addEventListener('DOMContentLoaded', () => {
+    const subhead = document.getElementById('tutorial-readonly-subhead');
+    if (subhead) subhead.hidden = false;
+    document.querySelectorAll('.strategy-slider').forEach((el) => {
+      el.disabled = true;
+    });
+    const saveBtn = document.getElementById('btn-save-game-plan');
+    if (saveBtn) saveBtn.style.display = 'none';
+  });
+}
+
 // State
 let currentSettings = {
   strategy_settings: {}

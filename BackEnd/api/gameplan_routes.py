@@ -1367,11 +1367,18 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
 def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None):
     """
     Get game plan settings for a team in the specified mode.
-    
+
     Args:
         source: Optional source parameter. If "db", always reads from database (for lineup screen consistency).
                 If None or "cache", checks cache first for performance during active gameplay, but DB is always available as fallback.
     """
+    # FTE v2 tutorial games are structurally identical to single-mode games
+    # (same games_collection doc, same ongoing_games cache, same game_id
+    # format). Aliasing to "single" lets every downstream mode == "single"
+    # branch in this function work for tutorial too. Saving is gated on the
+    # frontend (tutorial mode hides the Save button + disables sliders).
+    if mode == "tutorial":
+        mode = "single"
     try:
         logger.warning(f"🔍 [GET GAMEPLAN] query: mode={mode!r}, team_id={team_id!r}, franchise_id={franchise_id!r}, tournament_id={tournament_id!r}, game_id={game_id!r}")
         # ✅ PHASE 5.5: Use helper to get collection and doc_id (simplifies mode handling)
@@ -1761,7 +1768,14 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
 def update_gameplan(request: GamePlanUpdateRequest):
     """Update game plan settings for a team in the specified mode."""
     from BackEnd.utils.team_settings_manager import save_team_settings
-    
+
+    # FTE v2 tutorial: defense-in-depth alias. The Save button is hidden in
+    # tutorial mode on the frontend, but if any code path triggers this PUT
+    # (auto-save, dirty-state flush, etc.), treat tutorial like single — the
+    # write goes to the throwaway game doc and disappears on completion.
+    if request.mode == "tutorial":
+        request.mode = "single"
+
     logger.warning(
         f"🔍 [UPDATE GAMEPLAN] request: mode={request.mode!r}, team_id={request.team_id!r}, "
         f"franchise_id={request.franchise_id!r}, tournament_id={request.tournament_id!r}, game_id={request.game_id!r}"
