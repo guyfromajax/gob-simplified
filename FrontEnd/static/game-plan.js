@@ -415,7 +415,9 @@ async function loadSettings() {
     } else if (mode === 'tournament' && tournamentId) {
       params.set('tournament_id', tournamentId);
       if (gameId) params.set('game_id', gameId);
-    } else if (mode === 'single' && gameId) {
+    } else if ((mode === 'single' || mode === 'tutorial') && gameId) {
+      // Tutorial games are stored in games_collection like single mode; the
+      // backend aliases mode=tutorial → single and requires game_id.
       params.set('game_id', gameId);
     }
     
