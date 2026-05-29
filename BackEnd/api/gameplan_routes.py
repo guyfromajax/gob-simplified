@@ -397,9 +397,14 @@ def get_collection_and_doc_id(mode: str, franchise_id: str = None, tournament_id
         if not tournament_id:
             raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
         return db.tournaments, tournament_id
-    elif mode == "single":
+    elif mode in ("single", "tutorial"):
+        # FTE v2 tutorial games are stored in the games collection like single
+        # mode (throwaway, deleted on completion). They use the same lookup
+        # by game_id. apply_tutorial_initial_state writes playbook_settings
+        # to the game doc so this endpoint returns the Coach-specified
+        # 8-playcall preloads.
         if not game_id:
-            raise HTTPException(status_code=400, detail="game_id required for single game mode")
+            raise HTTPException(status_code=400, detail=f"game_id required for {mode} mode")
         from BackEnd.utils.game_id_utils import normalize_game_id
         normalized_game_id = normalize_game_id(game_id)
         return db.games, normalized_game_id
@@ -1682,19 +1687,19 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         # Get settings or return defaults
         # ✅ SS&S: Use GameManager settings if available (single source of truth during gameplay)
         defaults = get_default_settings()
-        if mode == "single" and use_gamemanager_settings and gm:
+        if mode in ("single", "tutorial") and use_gamemanager_settings and gm:
             # Use GameManager settings (already verified above)
             target_team = None
             if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
                 target_team = gm.home_team
             elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
                 target_team = gm.away_team
-            
+
             if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
                 strategy_settings = target_team.strategy_settings
             else:
                 strategy_settings = team_obj.get("strategy_settings", defaults["strategy_settings"])
-        elif mode == "single" and not use_gamemanager_settings:
+        elif mode in ("single", "tutorial") and not use_gamemanager_settings:
             # ✅ SS&S: GameManager not available - use load_team_settings_from_doc() (same as simulate_quarter_endpoint)
             from BackEnd.api.api import load_team_settings_from_doc
             settings = load_team_settings_from_doc(mode, doc_id, team_id, team_id)
@@ -1826,6 +1831,14 @@ def get_playbooks(
         result["profile_summary"] = profile_summary
         return result
     endpoint_start = time.time()
+    # FTE v2 tutorial games are structurally identical to single-mode games
+    # (same games_collection doc, same ongoing_games cache, same game_id
+    # format). Normalize to "single" so we don't have to extend every
+    # `mode == "single"` branch in this 1000-line function. The cleanups
+    # specific to tutorial (game doc deletion, tutorial-complete, debut
+    # publish) happen in other endpoints, not here.
+    if mode == "tutorial":
+        mode = "single"
     try:
         use_gamemanager_settings = False  # set True in single-mode cache branch; franchise/tournament stay False here
         _dpc_log = debug_pc if isinstance(debug_pc, str) else None
@@ -1851,8 +1864,10 @@ def get_playbooks(
         if mode == "single" and game_id and game_id != doc_id:
             logger.warning(f"🔍 [NORMALIZE] GET /api/playbooks - Normalized game_id from '{game_id}' to '{doc_id}'")
         
-        # ✅ PHASE 5.5: Use normalized doc_id for single mode cache lookup
-        if mode == "single":
+        # ✅ PHASE 5.5: Use normalized doc_id for single/tutorial mode cache lookup
+        # (tutorial games are stored in games_collection like single mode and
+        # the ongoing_games cache holds the same gm reference.)
+        if mode in ("single", "tutorial"):
             game_id = doc_id  # Use normalized game_id for cache lookup
             
             # ✅ PHASE 3.2: Cache is performance mirror, DB is always available as fallback
@@ -1997,8 +2012,10 @@ def get_playbooks(
         # If not loading from game doc, load from master doc (existing logic)
         if not load_from_game_doc:
             # ✅ PERFORMANCE: Load document with projection (only needed fields) to reduce data transfer
-            # For single game mode, try both UUID string and ObjectId formats
-            if mode == "single":
+            # For single game / tutorial mode, try both UUID string and ObjectId formats
+            # (tutorial docs are structured like single — playbook_settings on
+            # summary["teams"][team_id] populated by apply_tutorial_initial_state)
+            if mode in ("single", "tutorial"):
                 # ✅ PERFORMANCE: Add projection for Single Game mode - only fetch teams, home_team_id, away_team_id
                 # This reduces data transfer by 70-90% for game documents (especially after Q1+)
                 doc = collection.find_one(
