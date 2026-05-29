@@ -154,11 +154,34 @@
         // Store token and user info
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
-        
+
         if (window.GOB_Analytics) window.GOB_Analytics.signup();
-        
-        // Redirect to mode select
-        window.location.href = '/mode-select.html';
+
+        // Route directly to the user's current tutorial step. Avoids a
+        // mode-select flash for new users whose first stop is the FTE
+        // persona-intro screen.
+        var nextHref = '/mode-select.html';
+        try {
+          var u = data.user || {};
+          if (u.fte_v2_complete === false) {
+            var step = (u.tutorial_state && u.tutorial_state.step) || 'persona_intro';
+            switch (step) {
+              case 'persona_intro':
+                nextHref = '/tutorial-persona-intro.html';
+                break;
+              case 'team_select':
+              case 'username':
+                nextHref = '/franchise-select-team.html?mode=tutorial';
+                break;
+              case 'situation':
+                nextHref = '/tutorial-situation.html';
+                break;
+              // set_lineup / in_game / complete fall through to mode-select;
+              // mode-select's auth handler will route from there.
+            }
+          }
+        } catch (_) { /* defensive: any failure falls back to mode-select */ }
+        window.location.href = nextHref;
         
       } catch (error) {
         errorEl.textContent = error.message;

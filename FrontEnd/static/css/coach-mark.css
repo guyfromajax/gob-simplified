@@ -69,6 +69,15 @@
   border-top: 0;
 }
 
+/* Flex row keeps the portrait and the text block as siblings — all body
+ * copy stays left-aligned with a consistent indent, no float wrap. */
+.gob-coachmark__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .gob-coachmark__portrait {
   width: 44px;
   height: 44px;
@@ -77,9 +86,12 @@
   object-position: center top;
   border: 2px solid rgba(247, 148, 32, 0.65);
   background: rgba(0, 0, 0, 0.4);
-  float: left;
-  margin: 0 12px 6px 0;
   flex-shrink: 0;
+}
+
+.gob-coachmark__text {
+  flex: 1;
+  min-width: 0;
 }
 
 .gob-coachmark__eyebrow {
@@ -97,7 +109,8 @@
   font-size: 14px;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.88);
-  margin: 0 0 12px;
+  margin: 0;
+  text-align: left;
 }
 
 .gob-coachmark__foot {
@@ -105,7 +118,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  clear: both;
 }
 
 .gob-coachmark__count {

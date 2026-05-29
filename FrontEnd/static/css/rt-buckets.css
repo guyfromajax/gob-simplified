@@ -1,0 +1,16 @@
+/*
+ * Canonical RT (player rating) color scale per Styleguide §Attribute Bar Scale.
+ * Applied to any element bearing one of these class names — works on <td>,
+ * <span>, <div>, etc. Pair with /js/shared/rtBucket.js.
+ *
+ *   0–40  red       → .rt-low
+ *   41–60 yellow    → .rt-mid
+ *   61–80 green     → .rt-high
+ *   81+   light blue→ .rt-elite
+ */
+
+.rt-low      { color: #ff6d6d; }
+.rt-mid      { color: #FFD700; }
+.rt-high     { color: #34EC27; }
+.rt-elite    { color: #4A90D9; }
+.rt-unknown  { color: rgba(255, 255, 255, 0.4); }
