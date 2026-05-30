@@ -1,0 +1,280 @@
+/*
+ * FTE v2 — Attribute Tour Mechanic (tutorial set-lineup, after intro modal).
+ *
+ * Layers (back → front):
+ *   .attribute-tour__scrim      soft dark overlay over the whole page
+ *   .attribute-tour__sammy      compact Sammy coach-mark anchored under the header row
+ *   header-row classes          lifted above the scrim via z-index + gold glow
+ *
+ * The mechanic is additive — it never moves the table, never replaces the
+ * existing tooltip helper, never alters columns. It only orchestrates the
+ * spotlight, the shimmer cue, the per-header explored state, and Sammy.
+ * Existing per-attribute tooltips remain the source of truth for what the
+ * abbreviations mean.
+ */
+
+/* ---------- Scrim ---------- */
+
+.attribute-tour__scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 9, 14, 0.66);
+  z-index: 1400;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 220ms ease;
+}
+
+.attribute-tour__scrim.is-visible {
+  opacity: 1;
+}
+
+/* ---------- Lifted header row ---------- */
+
+/* Lift the table's thead above the scrim so it stays fully lit. */
+.attribute-tour-active thead.attribute-tour__lifted {
+  position: relative;
+  z-index: 1500;
+}
+
+/* Apply the gold ring + soft glow to a wrapper around the thead. We can't
+ * box-shadow a <thead> reliably in all browsers, so the tour wraps each
+ * header cell instead. */
+.attribute-tour-active th.attribute-tour__lifted {
+  position: relative;
+  z-index: 1500;
+  background-color: rgba(11, 13, 20, 0.96);
+  box-shadow:
+    0 0 0 1px rgba(247, 148, 32, 0.5),
+    0 0 38px rgba(247, 148, 32, 0.18);
+}
+
+/* Soften the gold ring on the leftmost/rightmost cells so they merge into
+ * a single horizontal lit row visually (no broken borders between cells). */
+.attribute-tour-active th.attribute-tour__lifted + th.attribute-tour__lifted {
+  box-shadow:
+    inset 1px 0 0 rgba(247, 148, 32, 0.18),
+    0 -1px 0 rgba(247, 148, 32, 0.5),
+    0 1px 0 rgba(247, 148, 32, 0.5),
+    0 0 38px rgba(247, 148, 32, 0.18);
+}
+
+/* The very first lifted cell gets the left ring, the last gets the right. */
+.attribute-tour-active th.attribute-tour__lifted.is-first {
+  box-shadow:
+    inset 1px 0 0 rgba(247, 148, 32, 0.5),
+    0 -1px 0 rgba(247, 148, 32, 0.5),
+    0 1px 0 rgba(247, 148, 32, 0.5),
+    0 0 38px rgba(247, 148, 32, 0.18);
+}
+
+.attribute-tour-active th.attribute-tour__lifted.is-last {
+  box-shadow:
+    inset -1px 0 0 rgba(247, 148, 32, 0.5),
+    0 -1px 0 rgba(247, 148, 32, 0.5),
+    0 1px 0 rgba(247, 148, 32, 0.5),
+    0 0 38px rgba(247, 148, 32, 0.18);
+}
+
+/* ---------- Per-header cue: shimmer underline ---------- */
+
+/* Only tooltipped headers get the shimmer cue — driven by .is-cued. */
+.attribute-tour-active th.is-cued {
+  cursor: help;
+}
+
+.attribute-tour-active th.is-cued::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 4px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #F79420 50%, transparent 100%);
+  opacity: 0.85;
+  border-radius: 1px;
+  pointer-events: none;
+  animation: attribute-tour-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes attribute-tour-shimmer {
+  0%, 100% { opacity: 0.25; transform: scaleX(0.55); }
+  50%      { opacity: 0.9;  transform: scaleX(1);    }
+}
+
+/* Hover tint: orange invitation. */
+.attribute-tour-active th.is-cued:hover {
+  color: #F79420;
+}
+
+/* Explored: green status + shimmer suppressed. */
+.attribute-tour-active th.is-explored {
+  color: #34EC27;
+}
+
+.attribute-tour-active th.is-explored::after {
+  animation: none;
+  opacity: 0.4;
+  background: linear-gradient(90deg, transparent 0%, rgba(52, 236, 39, 0.6) 50%, transparent 100%);
+  transform: scaleX(1);
+}
+
+/* Explored + hover: keep green (don't flicker back to orange). */
+.attribute-tour-active th.is-cued.is-explored:hover {
+  color: #34EC27;
+}
+
+/* ---------- Sammy coach-mark ---------- */
+
+.attribute-tour__sammy {
+  position: fixed;
+  z-index: 1600;
+  width: min(420px, calc(100vw - 32px));
+  padding: 14px 18px 14px;
+  background: rgba(22, 26, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: start;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 220ms ease, transform 220ms ease;
+  pointer-events: auto;
+}
+
+.attribute-tour__sammy.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Upward arrow pointing at the header row above. Positioned on the top
+ * edge of the bubble; horizontal anchor adjustable via --sammy-arrow-x
+ * inline so the arrow lines up with the lifted row. */
+.attribute-tour__sammy::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: var(--sammy-arrow-x, 50%);
+  width: 14px;
+  height: 14px;
+  background: rgba(22, 26, 36, 0.98);
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.attribute-tour__sammy-portrait {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center top;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(247, 148, 32, 0.65);
+}
+
+.attribute-tour__sammy-body {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.attribute-tour__sammy-eyebrow {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #F79420;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.attribute-tour__sammy-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0;
+}
+
+.attribute-tour__sammy-text strong {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.attribute-tour__sammy-foot {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attribute-tour__sammy-count {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.04em;
+}
+
+.attribute-tour__sammy-count.is-complete {
+  color: #34EC27;
+}
+
+.attribute-tour__sammy-dismiss {
+  /* Build on the .gob-btn--ghost recipe inline so this file doesn't depend
+   * on /css/gob-buttons.css being loaded everywhere. Smaller-than-default
+   * to stay compact within the coach-mark. */
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 92px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  transition: opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.attribute-tour__sammy-dismiss.is-emphasized {
+  opacity: 1;
+}
+
+.attribute-tour__sammy-dismiss:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .attribute-tour__sammy {
+    width: calc(100vw - 24px);
+    left: 12px !important;
+    right: 12px;
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .attribute-tour__sammy-portrait {
+    width: 40px;
+    height: 40px;
+  }
+}

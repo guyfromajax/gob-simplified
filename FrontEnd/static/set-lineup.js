@@ -2064,11 +2064,33 @@ async function init() {
     Promise.all([
       import('/js/shared/tutorialProgressThread.js'),
       alreadyShown ? Promise.resolve(null) : import('/js/shared/tutorialLineupModals.js'),
-    ]).then(([{ mountTutorialProgress }, lineupModals]) => {
+      import('/js/shared/attributeTour.js'),
+    ]).then(([{ mountTutorialProgress }, lineupModals, { showAttributeTour }]) => {
       mountTutorialProgress('lineup');
+      // After the intro modal dismisses, fire the attribute tour. The tour
+      // has its own localStorage gate so it only auto-shows once per
+      // browser (intra-tutorial navigations to/from game-plan don't re-fire
+      // it). headerRow is the roster attributes table's <thead>.
+      const launchAttributeTour = () => {
+        const headerRow = document.querySelector('#roster-attributes-pane .roster-table thead');
+        if (!headerRow) return;
+        // Defer a frame so any post-intro-modal layout settles before we
+        // measure the header row for Sammy positioning.
+        requestAnimationFrame(() => {
+          showAttributeTour({ headerRow, teamName: homeTeam });
+        });
+      };
       if (!alreadyShown && lineupModals) {
         try { sessionStorage.setItem(introKey, '1'); } catch (_) {}
-        lineupModals.showLineupIntroModal({ teamName: homeTeam });
+        lineupModals.showLineupIntroModal({
+          teamName: homeTeam,
+          onDismiss: launchAttributeTour,
+        });
+      } else {
+        // Re-entry path (back from game-plan, etc.). The intro modal was
+        // already dismissed in this session. Try to fire the tour anyway —
+        // its localStorage gate will silently no-op if already seen.
+        launchAttributeTour();
       }
     }).catch((e) => console.warn('[tutorial] could not init lineup tutorial chrome:', e));
   }
