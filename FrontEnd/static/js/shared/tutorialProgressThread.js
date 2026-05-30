@@ -17,7 +17,7 @@
  */
 
 const STEPS = [
-  { id: 'persona', label: 'Persona' },
+  { id: 'persona', label: 'Welcome' },
   { id: 'program', label: 'Program' },
   { id: 'username', label: 'Username' },
   { id: 'tipoff', label: 'Tip-off' },
