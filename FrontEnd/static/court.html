@@ -5164,7 +5164,12 @@
         const params = new URLSearchParams();
         params.set('mode', mode);
         params.set('team_id', teamId);
-        if (mode === 'single' && gameId) {
+        // FTE v2 tutorial games live in the games_collection like single mode,
+        // so they need game_id on the request for the backend to find the game
+        // doc and return the preloaded playbook_settings. Without this,
+        // get_playbooks falls back to default-init and returns empty offense
+        // plays — Playcall Center renders blank.
+        if ((mode === 'single' || mode === 'tutorial') && gameId) {
           params.set('game_id', gameId);
         } else if (mode === 'tournament' && tournamentId) {
           params.set('tournament_id', tournamentId);
