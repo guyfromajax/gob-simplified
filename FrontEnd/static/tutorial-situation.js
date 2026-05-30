@@ -93,7 +93,11 @@ async function initTutorialGame(userTeam, opponent) {
   }
 }
 
-function gotoSetLineup(userTeam, opponent, gameId, lineup) {
+function gotoSetLineup(userTeam, opponent, gameId, _lineup) {
+  // Tutorial set-lineup deliberately leaves the 5 slots blank — the user
+  // sets their own lineup as part of the lesson. We no longer forward
+  // home_pg / home_sg / etc. URL params even when the backend provides a
+  // tutorial_lineup hint, so the slots render empty.
   const params = new URLSearchParams({
     mode: 'tutorial',
     home: userTeam,
@@ -103,9 +107,6 @@ function gotoSetLineup(userTeam, opponent, gameId, lineup) {
     team_id: userTeam,
   });
   if (gameId) params.set('game_id', gameId);
-  ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
-    if (lineup[pos]) params.set(`home_${pos.toLowerCase()}`, lineup[pos]);
-  });
   window.location.href = `/set-lineup.html?${params.toString()}`;
 }
 

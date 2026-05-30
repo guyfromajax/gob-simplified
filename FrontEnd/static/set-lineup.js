@@ -2045,54 +2045,32 @@ async function init() {
     autosetBtn.addEventListener('click', autosetLineup);
   }
 
-  // FTE v2 tutorial: init-game has already run on the situation page, so the
-  // lineup is in the URL (restoreLineupFromUrl populates it above). We do NOT
-  // call autoset here — the engine assigned the tutorial-roster starters
-  // (rank_roster + Section 5 templates) and we want to honor that exactly.
-  //
-  // Onboarding redesign: replaces the previous centered "I've set your
-  // lineup" Sammy modal with a coach-mark spotlight anchored to the roster.
-  // Coach-marks are their own guidance pattern (per styleguide), distinct
-  // from the three modal types — they leave the screen visible so the
-  // copy points at the very thing it's describing.
+  // FTE v2 tutorial: the slots load empty (tutorial-situation no longer
+  // forwards home_pg/etc.) — the user sets their own lineup as part of
+  // the lesson. On first paint, show a centered Functional-modal-style
+  // intro that nudges them into the task. The CTA is renamed "Return To
+  // Game" here, and clicking it shows a second modal with algorithm-
+  // chosen feedback before actual navigation.
   if (modeParam === 'tutorial') {
+    const playBtnEl = document.getElementById('play-now');
+    if (playBtnEl) playBtnEl.textContent = 'Return To Game';
+
     const introKey = gameId
-      ? `fteV2TutorialLineupCoachMarkShown_${gameId}`
-      : 'fteV2TutorialLineupCoachMarkShown';
+      ? `fteV2TutorialLineupModalShown_${gameId}`
+      : 'fteV2TutorialLineupModalShown';
     const alreadyShown = (() => {
       try { return sessionStorage.getItem(introKey) === '1'; } catch (_) { return false; }
     })();
-    if (!alreadyShown) {
-      try { sessionStorage.setItem(introKey, '1'); } catch (_) {}
-      // Resolve the team-linked Sammy portrait. `homeTeam` here is the
-      // user's team (per fte_inject_state §1-§2, user is always home).
-      Promise.all([
-        import('/js/shared/coachMark.js'),
-        import('/js/shared/teamCoachAsset.js'),
-        import('/js/shared/tutorialProgressThread.js'),
-      ]).then(([{ showCoachMark }, { getTeamSammyImage }, { mountTutorialProgress }]) => {
-        mountTutorialProgress('lineup');
-        // Wait one frame for the roster to render before anchoring.
-        requestAnimationFrame(() => {
-          showCoachMark({
-            anchor: document.getElementById('roster-table-container'),
-            side: 'right',
-            offset: 18,
-            eyebrow: 'QUICK TIP',
-            body: "I've set a solid lineup for you. Hover any attribute to learn what it does — then tweak the lineup if you want.",
-            dismissLabel: 'GOT IT',
-            portraitSrc: getTeamSammyImage(homeTeam),
-            count: 'Tip 1 of 1',
-          });
-        });
-      }).catch((e) => console.warn('[tutorial] could not show lineup coach-mark:', e));
-    } else {
-      // Re-entry (return from game-plan, timeout-resume, etc.) — keep the
-      // progress thread present but don't re-show the tip.
-      import('/js/shared/tutorialProgressThread.js')
-        .then(({ mountTutorialProgress }) => mountTutorialProgress('lineup'))
-        .catch(() => {});
-    }
+    Promise.all([
+      import('/js/shared/tutorialProgressThread.js'),
+      alreadyShown ? Promise.resolve(null) : import('/js/shared/tutorialLineupModals.js'),
+    ]).then(([{ mountTutorialProgress }, lineupModals]) => {
+      mountTutorialProgress('lineup');
+      if (!alreadyShown && lineupModals) {
+        try { sessionStorage.setItem(introKey, '1'); } catch (_) {}
+        lineupModals.showLineupIntroModal({ teamName: homeTeam });
+      }
+    }).catch((e) => console.warn('[tutorial] could not init lineup tutorial chrome:', e));
   }
 
   const btn = document.getElementById('play-now');
@@ -2234,8 +2212,37 @@ async function init() {
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
       playSound('confirm-1-lowervol.wav');
-      // Delay navigation so the sound can start before the page unloads
-      setTimeout(() => { window.location.href = finalUrl; }, 200);
+      const navigate = () => setTimeout(() => { window.location.href = finalUrl; }, 200);
+
+      // FTE v2 tutorial: insert a feedback modal between Return To Game and
+      // the actual navigation. Algorithm picks a Talent / skill-based /
+      // Unconventional message based on the user's chosen starters. The
+      // modal's CTA is the real navigation trigger.
+      if (modeParam === 'tutorial') {
+        try {
+          const { showLineupFeedbackModal, pickLineupFeedbackMessage } = await import('/js/shared/tutorialLineupModals.js');
+          const starters = ['PG', 'SG', 'SF', 'PF', 'C']
+            .map((pos) => lineup[pos])
+            .filter(Boolean)
+            .map((id) => roster.find((p) => p._id === id))
+            .filter(Boolean);
+          const message = pickLineupFeedbackMessage(starters, roster);
+          showLineupFeedbackModal({
+            teamName: homeTeam,
+            message,
+            onConfirm: navigate,
+          });
+        } catch (e) {
+          // If the feedback modal fails to load, don't block the user from
+          // proceeding — fall through to direct navigation.
+          console.warn('[tutorial] lineup feedback modal failed; proceeding:', e);
+          navigate();
+        }
+        return;
+      }
+
+      // Non-tutorial: navigate directly.
+      navigate();
     });
   }
   // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()

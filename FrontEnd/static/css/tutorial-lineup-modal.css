@@ -1,0 +1,56 @@
+/*
+ * FTE v2 tutorial — set-lineup intro + post-lineup feedback modals.
+ *
+ * Reuse the canonical Functional-modal chrome (.gob-modal-* classes in
+ * resource-pages.css). This file adds only the bits specific to these
+ * two modals: the team-linked Sammy portrait that overlaps the top edge
+ * of the modal box, and the body-only layout (no input field, no title
+ * slot — the message itself is the hero).
+ */
+
+.tutorial-lineup-modal-box {
+  overflow: visible;
+}
+
+.tutorial-lineup-modal-portrait-wrap {
+  position: absolute;
+  top: -56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.tutorial-lineup-modal-portrait {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center top;
+  background: rgba(0, 0, 0, 0.5);
+  border: 3px solid #F79420;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+.tutorial-lineup-modal-body {
+  padding-top: 64px;
+  padding-bottom: 8px;
+  text-align: center;
+}
+
+.tutorial-lineup-modal-message {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+}
+
+.tutorial-lineup-modal-actions {
+  padding-bottom: 24px;
+}
+
+.tutorial-lineup-modal-cta {
+  width: 100%;
+}

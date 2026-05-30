@@ -29,7 +29,7 @@ Grandfathered users (those who already had a franchise when FTE v2 shipped, or n
 | 1 | **Pick Your Program** | `franchise-select-team.html?mode=tutorial` | `team_select` | Existing team cards + orange-ring selected state | (card tap opens modal) |
 | 2 | **Username** | Functional modal over screen 1 | `username` | `.gob-modal-*` chrome (Functional) | `CONTINUE` orange |
 | 3 | **Pre-Game Tip-off** | `tutorial-situation.html` | `situation` | Moment modal (560px, banner bg, score hero) | **`SET LINEUP` green** ← only green in the flow |
-| 4 | **Set Lineup** | `set-lineup.html?mode=tutorial&...` | `set_lineup` → `in_game` | Coach-mark (not a modal) anchored to roster | `GOT IT` ghost (acks tip); `PLAY GAME` green (gating, outside FTE scope) |
+| 4 | **Set Lineup** | `set-lineup.html?mode=tutorial&...` | `set_lineup` → `in_game` | Centered Functional modal w/ team Sammy (intro on load + feedback on CTA click) | `GOT IT` orange (intro); `RETURN TO GAME` green (gating; also relabeled on the page CTA) |
 
 The actual game runs on `court.html?mode=tutorial`; the End-of-Game modal renders the tutorial variant of `gameCompletionPopup.js`.
 
@@ -55,7 +55,7 @@ Helper: `FrontEnd/static/js/shared/teamCoachAsset.js`. Team-name → abbreviatio
 
 ### Action color (Styleguide §)
 
-Green = gating (advances game state). Orange = non-gating primary. In the FTE flow, **exactly one green button**: the Tip-off `SET LINEUP`. Username `CONTINUE`, Persona `LET'S GO`, and any other onboarding CTA are orange. Coach-mark `GOT IT` is ghost — it's an acknowledgement, not an action.
+Green = gating (advances game state). Orange = non-gating primary. In the FTE flow, **two green buttons by design**: the Tip-off `SET LINEUP` and the set-lineup-page `RETURN TO GAME` (both advance game state). Username `CONTINUE`, Persona `LET'S GO`, lineup intro `GOT IT`, and any other onboarding CTA are orange. The lineup-feedback modal's `RETURN TO GAME` is the green CTA (it's the actual navigation trigger; the page-level Return To Game button just opens the feedback modal).
 
 Universal button class system: `FrontEnd/static/css/gob-buttons.css` (`.gob-btn--action` / `--gate` / `--ghost`, plus `--lg`).
 
@@ -91,7 +91,7 @@ TutorialStep = Literal[
 | `team_select` | persona-intro CTA | `/franchise-select-team.html?mode=tutorial` | card `Select` → advance to `username` (+ `team_pick`) |
 | `username` | card select | (modal stays on team-select) | `CONTINUE` → set-username + advance to `situation` |
 | `situation` | username success | `/tutorial-situation.html` | `SET LINEUP` → init-game + advance to `set_lineup` |
-| `set_lineup` | tip-off CTA | `/set-lineup.html?mode=tutorial&quarter=4&...` | `PLAY GAME` → advance to `in_game` |
+| `set_lineup` | tip-off CTA | `/set-lineup.html?mode=tutorial&quarter=4&...` (slots load empty) | `RETURN TO GAME` → opens lineup-feedback modal → modal CTA advances to `in_game` and navigates |
 | `in_game` | play CTA | `/court.html?mode=tutorial&...` | game completes → `complete` |
 | `complete` | EOG locker-room click | `/mode-select.html` | (terminal; `fte_v2_complete=true`) |
 
@@ -181,7 +181,7 @@ Mutates both `GameManager` and the `summary` dict. Injected state:
 | `player.metadata["fouls"]` | per template `F` column (cumulative; doesn't reset per Q) |
 | `NG` (energy) all players | `0.95` |
 | `MO` (momentum) all players | `0` |
-| `team.lineup` | engine-derived starting five (from `rank_roster`) |
+| `team.lineup` | engine-derived starting five (from `rank_roster`) — **harmless default**; the frontend no longer surfaces these as URL hints on set-lineup, and the user's chosen lineup overrides this on Return To Game |
 | `playbook_settings` | the 8 user offense plays above |
 | `timeout_next_play_type` | `SIDE_INBOUND` |
 | `game_stats_initialized` | `True` (critical — engine zeroes stats otherwise) |
@@ -215,8 +215,9 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 | File | Purpose |
 |---|---|
 | `js/shared/teamCoachAsset.js` | Team → Sammy image path |
-| `js/shared/tutorialProgressThread.js` + `css/tutorial-progress.css` | 5-dot progress indicator |
-| `js/shared/coachMark.js` + `css/coach-mark.css` | Spotlight tooltip primitive (Screen 4) |
+| `js/shared/tutorialProgressThread.js` + `css/tutorial-progress.css` | 6-dot progress indicator |
+| `js/shared/tutorialLineupModals.js` + `css/tutorial-lineup-modal.css` | Set-lineup intro + post-lineup feedback modals; also exports `pickLineupFeedbackMessage` (the algorithm) |
+| `js/shared/coachMark.js` + `css/coach-mark.css` | Spotlight tooltip primitive — **available but not currently used in the FTE flow** (set-lineup intro switched to a centered Functional modal); kept for future tutorials |
 | `js/shared/getGameMode.js` | Single source of truth for the mode value passed to EOG popup (see §8) |
 | `js/shared/rtBucket.js` + `css/rt-buckets.css` | RT color bucket helper (exposes `window.getRtBucketClass`) |
 | `css/gob-buttons.css` | `.gob-btn` system (--action / --gate / --ghost / --lg) |
@@ -227,9 +228,50 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 
 | Pattern | Classes / file | Used by |
 |---|---|---|
-| Functional modal | `.gob-modal-*` in `resource-pages.css` (canonical = Auto-Train confirmation in `training.html`) | Username modal |
+| Functional modal | `.gob-modal-*` in `resource-pages.css` (canonical = Auto-Train confirmation in `training.html`) | Username modal, set-lineup intro modal, set-lineup feedback modal |
 | Moment modal | inline in `css/tutorial-tipoff.css` (canonical = `gameCompletionPopup.js`) | Tip-off, EOG |
-| Coach-mark | `.gob-coachmark*` in `css/coach-mark.css` (new primitive — distinct from the three modal types) | Set-lineup intro |
+| Coach-mark | `.gob-coachmark*` in `css/coach-mark.css` | Available primitive; not currently used in FTE |
+
+### Set-lineup tutorial flow
+
+The tutorial set-lineup intentionally loads with empty slots — the user fills their own lineup as part of the lesson. Two modals bracket the experience, both centered Functional-modal chrome with team-linked Sammy portrait overlapping the top edge:
+
+1. **Intro modal** (fires once per `game_id`, sessionStorage guard): "Here's your moment, Coach. Set your lineup for crunch time." Single `GOT IT` orange CTA.
+2. **Feedback modal** (fires every Return To Game click): algorithm-chosen message + single green `RETURN TO GAME` CTA that performs the actual navigation to `court.html`.
+
+The page-level `play-now` button is relabeled "Return To Game" in tutorial mode (still uses the existing green disabled-until-complete styling).
+
+### Set-lineup feedback algorithm
+
+Implemented in `js/shared/tutorialLineupModals.js → pickLineupFeedbackMessage(starters, fullRoster)`. Source of truth lives in the module; this section mirrors it.
+
+**Pool composition** (all checks run together; build a candidate pool, then pick):
+
+| Check | Qualifies if | Message |
+|---|---|---|
+| **Talent** | The 5 chosen starters are the team's top-5 by highest RT (ties at the 5th-place RT all count as eligible) | "You're putting your five best players on the court. Smart." |
+| SC & SH | Both in top-2 attrs | "You're leading with your best scorers, good luck, Coach." |
+| ID & OD | Both in top-2 | "You're leading with your best defenders, good luck, Coach." |
+| (SC or SH) and (ID or OD) | One of each in top-2 | "You're balancing offense and defense, good luck, Coach." |
+| RB & ST | Both in top-2 | "You're leading with your strong rebounders. Let's see how well they clean the boards." |
+| (ID or OD) and ST | At least one defensive + ST in top-2 | "You're leading with muscle and defense. You're an intimidator, Coach." |
+| (SC or SH) and AG | Offensive + AG in top-2 | "You're leading with your athletic scorers. I like it, Coach." |
+| PS & BH | Both in top-2 | "You're leading with fundamentals. I like the discipline, Coach." |
+| ND & AG | Both in top-2 | "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us." |
+| (SC or SH) and IQ | Offensive + IQ in top-2 | "This is a smart offensive lineup." |
+| (ID or OD) and IQ | Defensive + IQ in top-2 | "This is a smart defensive lineup." |
+| 2+ of (ST, AG, ND) | At least two of those three in top-2 | "Leading with pure athleticism. I like it, Coach." |
+| (PS or BH) and IQ | Either + IQ in top-2 | "A very cerebral and disciplined lineup. Good luck, Coach." |
+| (SC or SH) and (ST/AG/ND) | Offensive + any athleticism in top-2 | "This is an athletically focused offensive lineup. Good luck, Coach." |
+| (ID or OD) and (ST/AG/ND) | Defensive + any athleticism in top-2 | "This is an athletically focused defensive lineup. Good luck, Coach." |
+| (SC or SH) and (BH or PS) | Offensive + fundamentals in top-2 | "This is a technically focused offensive lineup. Good luck, Coach." |
+| (ID or OD) and (BH or PS) | Defensive + fundamentals in top-2 | "This is a technically focused defensive lineup. Good luck, Coach." |
+| (SC or SH) and RB | Offensive + RB in top-2 | "This is a rebounding focused offensive lineup. Good luck, Coach." |
+| (ID or OD) and RB | Defensive + RB in top-2 | "This is a rebounding focused defensive lineup. Good luck, Coach." |
+
+**Top-2 attrs** = the set of attribute IDs whose total across the 5 starters is at the #1 or #2 rank (ties at either rank all included). Attrs in play: `SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ`.
+
+**Pick rule**: pool size 1 → use it. Pool size 2+ → random pick. Pool size 0 → Unconventional: "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance."
 
 ### EOG / debut publish
 
@@ -280,7 +322,7 @@ These are real regressions we've hit. Listed so the next person doesn't pay the 
 | 2 | **Duplicated mode derivation at EOG callsites.** Four call-sites of `showGameCompletionPopup` were independently building `mode`. One missed the tutorial branch → Box Score reappeared, locker-room routed wrong, `tutorial-complete` never fired, authBar bounced back to situation. | Always go through `js/shared/getGameMode.js`. |
 | 3 | **Stale `.pre-game-container` flash on court.html.** It used to default to visible; bootGame then decided whether to hide. Caused a "Play Quarter / Sim Quarter" flash before live court paint. | `.pre-game-container.hidden` by default. bootGame removes `.hidden` only when it explicitly wants to show. Overlay dismisses on `court-ready` event dispatched from `bootGame.initGame()`. Don't revert. |
 | 4 | **Bare `.rt-low` etc. without `!important`.** Page-local `.roster-table td { color: ... }` rules (specificity 0,1,1) silently override the bucket classes (0,1,0). | `/css/rt-buckets.css` uses `!important` deliberately. These are canonical scale colors; they should always win. |
-| 5 | **Forgetting to flush `sessionStorage` lineup-intro guard on rerun.** Tutorial coach-mark uses key `fteV2TutorialLineupCoachMarkShown_${gameId}`. Renamed from the prior Sammy-modal key; if you re-tour an existing user, prior runs' keys are harmless but new runs key off the fresh game_id. | No action needed; documented so you don't think it's broken when it skips on re-entry. |
+| 5 | **Forgetting to flush `sessionStorage` lineup-intro guard on rerun.** Tutorial set-lineup intro modal uses key `fteV2TutorialLineupModalShown_${gameId}` (renamed from the prior coach-mark / Sammy-modal keys; old keys are harmless leftovers). Each fresh game_id gets its own key so re-tours work. | No action needed; documented so you don't think it's broken when it skips on re-entry. |
 
 ---
 
@@ -326,4 +368,37 @@ For commit-level history, `git log --grep "FTE v2"`. High-level milestones:
 
 
 **Set Lineup Alogrithm**
+##If User has the players with the top 5 RT values on the team, add Talent message to the list of possible choices.
 
+##Skill based logic
+- Attributes in play: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ
+- Step 1: Calculate the total attributes value for attributes in play for the user's lineup. 
+- Step 2: Identify the top 2 attributes in terms of total. If 2 or more are tied for the second, include them all. Example: 1. SC: 54, 2. SH: 53, ST: 53, IQ: 53 -- all four of those would be considered "Top 2". LMK if that is not clear.
+- Step 3: Choose the outgoing modal messsage based on the top 2 attributes.
+
+##Outgoing modal messages
+**Talent** 
+- "You're putting your five best players on the court. Smart."
+**Skill Based** Track all of the below that qualify based on the top 2 attributes for the lineup
+- SC & SH: "You're leading with your best scorers, good luck Coach."
+- ID & OD: "You're leading with your best defenders, good luck Coach."
+- one of (SC or SH) and one of (ID or OD): "You're balancing offense and defense, good luck Coach."
+- RB & ST: "You're leading with your strong rebounders. Let's see how well they clean the boards."
+- one of (ID or OD) and ST: "You're leading with muscle and defense. You're an intimidator, Coach."
+- one of (SH or SC) and AG: "You're leading with your athletic scorers. I like it Coach."
+- PS & BH: "You're leading wtih fundamentals. I like the discipline, Coach."
+- ND & AG: "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us."
+- one of (SC or SH) and IQ: "This is a smart offensive lineup."
+- one of (ID or OD) and IQ: "This is a smart defensive lineup."
+- two of (ST, AG, ND): "Leading with pure athletcisim. I like it, Coach."
+- one of (PS or BH) and IQ: "A very cerebral and disciplines lineup. Good luck Coach."
+- if the list is zero after checking for qualifiers, use the unconventional message
+- one of (SC or SH) and one of (ST, AG, ND): "This is an athletically focused offensive lineup. Good luck Coach."
+- one of (ID or OD) and one of (ST, AG, ND): "This is an athletically focused defensive lineup. Good luck Coach."
+- one of (SC or SH) and one of (BH or PS): "This is an technically focused offensive lineup. Good luck Coach."
+- one of (ID or OD) and one of (BH or PS): "This is an technically focused defensive lineup. Good luck Coach."
+- one of (SC or SH) and RB: "This is an rebouning focused offensive lineup. Good luck Coach."
+- one of (ID or OD) and RB: "This is an rebounding focused defensive lineup. Good luck Coach."
+
+**Unconventional Message**
+- "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance."
