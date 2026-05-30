@@ -11,6 +11,8 @@
 12. Airball announce
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 15. Traning page hover tool tips
+16. No SFX on RR FB made shot
+17. Need airhorn at end of quarter
 
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
@@ -21,7 +23,6 @@
 40. Batted ball out of bounds is not animating or executing properly
 44. Customize computer teams more strategically
 45. Improve FCC API
-46. Import FB Play Types function, no CR arg?
 
 48. Double block announce on Final Shot
 49. Run clock to 0:00 for Final Shot
