@@ -256,7 +256,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const subtitle = document.getElementById('page-subtitle');
     if (title) title.textContent = 'Pick Your Program';
     if (subtitle) {
-      subtitle.textContent = "This one's your proving ground — a single game to feel out the controls. Your real franchise comes next. Pick whoever speaks to you.";
+      subtitle.textContent = "This one's your onboarding — a single game to feel out the controls. Your real franchise comes next. Pick whoever speaks to you.";
     }
     // Mount the quiet 5-step progress thread (Pick Program = step 2 of 5).
     import('/js/shared/tutorialProgressThread.js')
