@@ -271,26 +271,26 @@ Implemented in `js/shared/tutorialLineupModals.js → pickLineupFeedbackMessage(
 | Check | Qualifies if | Message |
 |---|---|---|
 | **Talent** | The 5 chosen starters are the team's top-5 by highest RT (ties at the 5th-place RT all count as eligible) | "You're putting your five best players on the court. Smart." |
-| SC & SH | Both in top-2 attrs | "You're leading with your best scorers, good luck, Coach." |
-| ID & OD | Both in top-2 | "You're leading with your best defenders, good luck, Coach." |
-| (SC or SH) and (ID or OD) | One of each in top-2 | "You're balancing offense and defense, good luck, Coach." |
-| RB & ST | Both in top-2 | "You're leading with your strong rebounders. Let's see how well they clean the boards." |
-| (ID or OD) and ST | At least one defensive + ST in top-2 | "You're leading with muscle and defense. You're an intimidator, Coach." |
-| (SC or SH) and AG | Offensive + AG in top-2 | "You're leading with your athletic scorers. I like it, Coach." |
-| PS & BH | Both in top-2 | "You're leading with fundamentals. I like the discipline, Coach." |
-| ND & AG | Both in top-2 | "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us." |
-| (SC or SH) and IQ | Offensive + IQ in top-2 | "This is a smart offensive lineup." |
-| (ID or OD) and IQ | Defensive + IQ in top-2 | "This is a smart defensive lineup." |
-| 2+ of (ST, AG, ND) | At least two of those three in top-2 | "Leading with pure athleticism. I like it, Coach." |
-| (PS or BH) and IQ | Either + IQ in top-2 | "A very cerebral and disciplined lineup. Good luck, Coach." |
-| (SC or SH) and (ST/AG/ND) | Offensive + any athleticism in top-2 | "This is an athletically focused offensive lineup. Good luck, Coach." |
-| (ID or OD) and (ST/AG/ND) | Defensive + any athleticism in top-2 | "This is an athletically focused defensive lineup. Good luck, Coach." |
-| (SC or SH) and (BH or PS) | Offensive + fundamentals in top-2 | "This is a technically focused offensive lineup. Good luck, Coach." |
-| (ID or OD) and (BH or PS) | Defensive + fundamentals in top-2 | "This is a technically focused defensive lineup. Good luck, Coach." |
-| (SC or SH) and RB | Offensive + RB in top-2 | "This is a rebounding focused offensive lineup. Good luck, Coach." |
-| (ID or OD) and RB | Defensive + RB in top-2 | "This is a rebounding focused defensive lineup. Good luck, Coach." |
+| SC & SH | Both in top-3 attrs | "You're leading with your best scorers, good luck, Coach." |
+| ID & OD | Both in top-3 | "You're leading with your best defenders, good luck, Coach." |
+| (SC or SH) and (ID or OD) | One of each in top-3 | "You're balancing offense and defense, good luck, Coach." |
+| RB & ST | Both in top-3 | "You're leading with your strong rebounders. Let's see how well they clean the boards." |
+| (ID or OD) and ST | At least one defensive + ST in top-3 | "You're leading with muscle and defense. You're an intimidator, Coach." |
+| (SC or SH) and AG | Offensive + AG in top-3 | "You're leading with your athletic scorers. I like it, Coach." |
+| PS & BH | Both in top-3 | "You're leading with fundamentals. I like the discipline, Coach." |
+| ND & AG | Both in top-3 | "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us." |
+| (SC or SH) and IQ | Offensive + IQ in top-3 | "This is a smart offensive lineup." |
+| (ID or OD) and IQ | Defensive + IQ in top-3 | "This is a smart defensive lineup." |
+| 2+ of (ST, AG, ND) | At least two of those three in top-3 | "Leading with pure athleticism. I like it, Coach." |
+| (PS or BH) and IQ | Either + IQ in top-3 | "A very cerebral and disciplined lineup. Good luck, Coach." |
+| (SC or SH) and (ST/AG/ND) | Offensive + any athleticism in top-3 | "This is an athletically focused offensive lineup. Good luck, Coach." |
+| (ID or OD) and (ST/AG/ND) | Defensive + any athleticism in top-3 | "This is an athletically focused defensive lineup. Good luck, Coach." |
+| (SC or SH) and (BH or PS) | Offensive + fundamentals in top-3 | "This is a technically focused offensive lineup. Good luck, Coach." |
+| (ID or OD) and (BH or PS) | Defensive + fundamentals in top-3 | "This is a technically focused defensive lineup. Good luck, Coach." |
+| (SC or SH) and RB | Offensive + RB in top-3 | "This is a rebounding focused offensive lineup. Good luck, Coach." |
+| (ID or OD) and RB | Defensive + RB in top-3 | "This is a rebounding focused defensive lineup. Good luck, Coach." |
 
-**Top-2 attrs** = the set of attribute IDs whose total across the 5 starters is at the #1 or #2 rank (ties at either rank all included). Attrs in play: `SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ`.
+**Top-3 attrs** = sort all attribute totals descending across the 5 starters; the cutoff is the value at the 3rd position. Include every attr whose total ≥ that cutoff. This captures ties at the #3 rank, and also captures ties at #1 or #2 that extend past index 2 (e.g. four attrs tied at the top all qualify since they all share the cutoff value). Attrs in play: `SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ`. Example: totals SC=54, SH=53, ST=53, IQ=53 yields {SC, SH, ST, IQ} — rank #1 alone, three tied filling ranks #2 and #3.
 
 **Pick rule**: pool size 1 → use it. Pool size 2+ → random pick. Pool size 0 → Unconventional: "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance."
 
@@ -394,13 +394,13 @@ For commit-level history, `git log --grep "FTE v2"`. High-level milestones:
 ##Skill based logic
 - Attributes in play: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ
 - Step 1: Calculate the total attributes value for attributes in play for the user's lineup. 
-- Step 2: Identify the top 2 attributes in terms of total. If 2 or more are tied for the second, include them all. Example: 1. SC: 54, 2. SH: 53, ST: 53, IQ: 53 -- all four of those would be considered "Top 2". LMK if that is not clear.
-- Step 3: Choose the outgoing modal messsage based on the top 2 attributes.
+- Step 2: Identify the top 3 attributes in terms of total. If 2 or more are tied for the third, include them all. Example: 1. SC: 54, 2. SH: 53, ST: 53, IQ: 53 -- all four of those would be considered "Top 3". LMK if that is not clear.
+- Step 3: Choose the outgoing modal messsage based on the top 3 attributes.
 
 ##Outgoing modal messages
 **Talent** 
 - "You're putting your five best players on the court. Smart." (Talent-Led)
-**Skill Based** Track all of the below that qualify based on the top 2 attributes for the lineup
+**Skill Based** Track all of the below that qualify based on the top 3 attributes for the lineup
 - SC & SH: "You're leading with your best scorers, good luck Coach." (Offense-Led)
 - ID & OD: "You're leading with your best defenders, good luck Coach." (Defense-Led)
 - one of (SC or SH) and one of (ID or OD): "You're balancing offense and defense, good luck Coach." (Balanced)
