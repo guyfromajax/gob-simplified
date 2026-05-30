@@ -32,23 +32,62 @@ body.tutorial-tipoff-page {
   z-index: 0;
 }
 
-/* Moment modal box — full-bleed team banner background w/ darkening gradient.
- * Surface, border, radius, max-width all per Moment Modal canonical spec. */
+/* Moment modal box — three-layer composition (Coach fix for readability):
+ *   ::before  team logo/banner used as a watermark texture (low opacity,
+ *             scaled up, anchored off-center so its busiest area sits
+ *             behind the avatar/top edge — NOT under the score)
+ *   ::after   scrim gradient (darkens the area under the score + copy)
+ *   .__inner  text content (sits above both)
+ *
+ * --moment-bg-image is set inline from JS to `url('<team_banner>')`.
+ * --moment-logo-opacity is exposed as a tunable knob per-team (some
+ * marks are busier/brighter than others).
+ */
 .tipoff-moment {
   position: relative;
   z-index: 1;
   width: min(560px, calc(100vw - 32px));
   background-color: rgba(13, 17, 36, 0.97);
-  background-size: cover;
-  background-position: center center;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   animation: tipoff-modal-in 200ms ease both;
+  --moment-logo-opacity: 0.15;
+}
+
+/* Watermark layer — the team logo/banner asset, demoted to texture. */
+.tipoff-moment::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--moment-bg-image, none);
+  background-repeat: no-repeat;
+  background-size: 160% auto;
+  /* Anchor so the busiest part of the wordmark/emblem sits high in the
+   * modal — behind the avatar + top edge, not behind the score/copy. */
+  background-position: 50% 18%;
+  opacity: var(--moment-logo-opacity);
+  filter: grayscale(0.5) brightness(1.15) blur(0.4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Scrim layer — guarantees the text content sits on darkened space. */
+.tipoff-moment::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 42%, rgba(13, 17, 36, 0.78) 0%, rgba(13, 17, 36, 0.40) 45%, transparent 75%),
+    linear-gradient(180deg, rgba(13, 17, 36, 0.55) 0%, rgba(13, 17, 36, 0.30) 30%, rgba(13, 17, 36, 0.72) 78%, rgba(13, 17, 36, 0.96) 100%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .tipoff-moment__inner {
+  position: relative;
+  z-index: 2;
   padding: 28px 28px 24px;
   text-align: center;
 }
@@ -98,7 +137,8 @@ body.tutorial-tipoff-page {
   font-size: 56px;
   line-height: 0.95;
   color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  /* Coach: give the score its own contrast against the watermark. */
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
 }
 
 .tipoff-moment__dash {
@@ -113,7 +153,10 @@ body.tutorial-tipoff-page {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.78);
+  /* Coach: bump one step + subtle shadow for legibility over the
+   * watermark + scrim composition. */
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
 .tipoff-moment__rally {
