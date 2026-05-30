@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **May 3 Update** Removed post-game press conferences. Improved speed of simming computer games. Fixed tournament progression bugs. Added play usage to box scores. Added custom training playbooks to training page. Adjusted play Command score progression / regression system.
+- **May 30 Update** Perfected player location tracking. Improved execution of fast breaks. Increased the effect of AG on player movement speed. Improved Lineup Screen UI/UX for more focused and intuitive information presentation. Fixed a number of edge-case bugs.
 
 Source:
 - `FrontEnd/static/mode-select.html`
