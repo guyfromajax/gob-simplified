@@ -128,7 +128,7 @@ const ATTRS_IN_PLAY = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND
 const TALENT_MESSAGE = "You're putting your five best players on the court. Smart.";
 const UNCONVENTIONAL_MESSAGE = "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance.";
 
-// Qualifier matchers: each takes the set of "top-2 attribute IDs" (a Set<string>)
+// Qualifier matchers: each takes the set of "top-3 attribute IDs" (a Set<string>)
 // and returns true if it qualifies. If qualified, the paired message is
 // added to the candidate pool.
 const QUALIFIERS = [
@@ -208,16 +208,25 @@ const QUALIFIERS = [
 ];
 
 /**
- * Compute the "top 2" set of attribute IDs (by total across the 5 starters).
- * Includes all ties at the #1 OR #2 rank, per the spec — so if 3 attributes
- * share the top spot, all 3 are included; if SC is #1 alone and SH/IQ/ST
- * are tied at #2, all 4 are included.
+ * Compute the "top 3" set of attribute IDs (by total across the 5 starters).
+ *
+ * Per the spec: identify the top 3 attributes by total; if 2+ are tied
+ * for the 3rd rank, include them all. Example — SC: 54, SH: 53, ST: 53,
+ * IQ: 53 yields {SC, SH, ST, IQ} (rank #1 alone, three tied filling
+ * ranks #2 and #3).
+ *
+ * Algorithm: sort attrs descending by total. The value at the 3rd
+ * position (index 2) is the cutoff. Include every attr whose total
+ * >= that cutoff. This naturally captures ties at #3 — anyone sharing
+ * the cutoff value comes in — and ALSO captures ties at #1/#2 that
+ * extend past index 2 (e.g. four attrs tied at the top all qualify
+ * since they all share the cutoff value).
  *
  * @param {Array<{attributes:object}>} starters — 5 player objects with
  *   anchor_<attr> or <attr> fields on player.attributes
  * @returns {Set<string>}
  */
-function computeTopTwoAttributes(starters) {
+function computeTopThreeAttributes(starters) {
   const totals = {};
   for (const attr of ATTRS_IN_PLAY) {
     let sum = 0;
@@ -228,11 +237,10 @@ function computeTopTwoAttributes(starters) {
     }
     totals[attr] = sum;
   }
-  // Sort attribute totals descending. Identify the cutoff value at rank 2
-  // (or rank 1 if there's only one distinct value). Include all attributes
-  // with totals >= the cutoff.
-  const sortedDescUnique = Array.from(new Set(Object.values(totals))).sort((a, b) => b - a);
-  const cutoff = sortedDescUnique[1] ?? sortedDescUnique[0] ?? 0;
+  // Sort attrs descending by total; the value at position index 2 is the
+  // cutoff. ATTRS_IN_PLAY has 11 entries so [2] always exists.
+  const sortedAttrs = [...ATTRS_IN_PLAY].sort((a, b) => totals[b] - totals[a]);
+  const cutoff = totals[sortedAttrs[2]];
   const top = new Set();
   for (const attr of ATTRS_IN_PLAY) {
     if (totals[attr] >= cutoff) top.add(attr);
@@ -271,7 +279,7 @@ function isTopFiveRtLineup(starters, fullRoster) {
 /**
  * Pick a single lineup-feedback message per the spec:
  *   - Talent qualifies if all 5 chosen starters are top-5-RT.
- *   - Each of the 18 skill-based qualifiers checks against the top-2 attrs.
+ *   - Each of the 18 skill-based qualifiers checks against the top-3 attrs.
  *   - Talent + all qualifying skill messages form the candidate pool.
  *   - Pool size 1 → use it. Pool size 2+ → random pick. Pool size 0 → Unconventional.
  *
@@ -283,9 +291,9 @@ export function pickLineupFeedbackMessage(starters, fullRoster) {
   const pool = [];
   if (isTopFiveRtLineup(starters, fullRoster)) pool.push(TALENT_MESSAGE);
 
-  const topTwo = computeTopTwoAttributes(starters);
+  const topThree = computeTopThreeAttributes(starters);
   for (const q of QUALIFIERS) {
-    if (q.test(topTwo)) pool.push(q.message);
+    if (q.test(topThree)) pool.push(q.message);
   }
 
   // Debug log so we can verify which qualifiers matched and what the pool
@@ -298,7 +306,7 @@ export function pickLineupFeedbackMessage(starters, fullRoster) {
       : pool[Math.floor(Math.random() * pool.length)];
   try {
     console.log('[tutorial][lineup-feedback]', {
-      topTwoAttrs: Array.from(topTwo),
+      topThreeAttrs: Array.from(topThree),
       poolSize: pool.length,
       pool,
       picked,
