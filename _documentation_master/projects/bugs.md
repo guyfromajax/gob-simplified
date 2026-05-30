@@ -13,6 +13,7 @@
 15. Traning page hover tool tips
 16. No SFX on RR FB made shot
 17. Need airhorn at end of quarter
+18. Final Turn perfection (Run clock to 0:00 for Final Shot)
 
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
@@ -25,7 +26,6 @@
 45. Improve FCC API
 
 48. Double block announce on Final Shot
-49. Run clock to 0:00 for Final Shot
 
 57. Player Momentum System
 
