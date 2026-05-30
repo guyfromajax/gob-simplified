@@ -75,9 +75,14 @@ function ensureStylesheets() {
 
 /**
  * @param {Object} opts
- * @param {string}   [opts.teamName]   — drives Sammy portrait variant
- * @param {string}   [opts.mascot]     — drives title ("YOU'RE COACHING THE …")
- * @param {Function} [opts.onSuccess]  — called after username is persisted server-side
+ * @param {string}   [opts.teamName]         — drives Sammy portrait variant
+ * @param {string}   [opts.mascot]           — drives title ("YOU'RE COACHING THE …")
+ * @param {string}   [opts.initialUsername]  — pre-fill the input (e.g. existing users
+ *                                             who are being re-tour'd through the funnel
+ *                                             see their current handle; CONTINUE without
+ *                                             editing keeps it via the backend's
+ *                                             same-value-OK update path).
+ * @param {Function} [opts.onSuccess]        — called after username is persisted server-side
  * @returns {{ close: Function }}
  */
 export function openUsernameModal(opts = {}) {
@@ -87,6 +92,9 @@ export function openUsernameModal(opts = {}) {
     ? `YOU'RE COACHING THE ${mascotText.toUpperCase()}`
     : 'CHOOSE A USERNAME';
   const sammySrc = getTeamSammyImage(opts.teamName);
+  // String() guard so a stray null/undefined doesn't end up rendered as
+  // the literal text "null" in the input.
+  const initialUsername = typeof opts.initialUsername === 'string' ? opts.initialUsername : '';
 
   ensureStylesheets();
   // Username step of the funnel — quiet progress thread updates.
@@ -137,6 +145,12 @@ export function openUsernameModal(opts = {}) {
   const inputEl = overlay.querySelector('#username-modal-input');
   const errorEl = overlay.querySelector('#username-modal-error');
   const ctaBtn = overlay.querySelector('#username-modal-cta');
+
+  // Pre-fill with the user's current username if one was passed in. .value
+  // is set via property (not attribute) so submit reads it directly.
+  if (inputEl && initialUsername) {
+    inputEl.value = initialUsername;
+  }
 
   function setError(msg) {
     if (errorEl) errorEl.textContent = msg || '';
@@ -209,7 +223,13 @@ export function openUsernameModal(opts = {}) {
         submit();
       }
     });
-    setTimeout(() => inputEl.focus(), 0);
+    // Autofocus on next tick. When pre-filled, select the whole value so
+    // a single keystroke clears + replaces it (matches OS-level "edit a
+    // pre-filled field" behavior).
+    setTimeout(() => {
+      inputEl.focus();
+      if (initialUsername) inputEl.select();
+    }, 0);
   }
 
   return { close };
