@@ -1,5 +1,5 @@
 /**
- * Tutorial Progress Thread — quiet 5-step indicator for the FTE v2 funnel.
+ * Tutorial Progress Thread — quiet 6-step indicator for the FTE v2 funnel.
  *
  * Per spec: "a subtle progress indicator across the onboarding steps (quiet
  * step thread; should not compete with content)."
@@ -8,7 +8,12 @@
  *   mountTutorialProgress('username');   // step IDs below
  *
  * Steps mirror the user-visible flow, not the backend's TutorialStep enum:
- *   persona | program | username | tipoff | lineup
+ *   persona | program | username | tipoff | lineup | gameplay
+ *
+ * The "gameplay" step is a visual hint of what's coming next — the bar is
+ * never mounted on court.html (per fte_system.md §6), so gameplay is never
+ * the active step. It always renders as a faint pending dot when the bar
+ * is visible, signaling the final stop of the funnel.
  */
 
 const STEPS = [
@@ -17,6 +22,7 @@ const STEPS = [
   { id: 'username', label: 'Username' },
   { id: 'tipoff', label: 'Tip-off' },
   { id: 'lineup', label: 'Lineup' },
+  { id: 'gameplay', label: 'Gameplay' },
 ];
 
 const STYLESHEET_HREF = '/css/tutorial-progress.css';
