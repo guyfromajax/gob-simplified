@@ -2049,12 +2049,19 @@ async function init() {
   // immediately why the tutorial chrome (intro modal + attribute tour)
   // does or doesn't fire on this page load. Cheap, fires once per load.
   try {
+    const introKeyPreview = gameId
+      ? `fteV2TutorialLineupModalShown_${gameId}`
+      : 'fteV2TutorialLineupModalShown';
+    const tourKeyPreview = gameId
+      ? `fteV2TutorialAttrTourShown_${gameId}`
+      : 'fteV2TutorialAttrTourShown';
     console.log('[tutorial][gate]', {
       modeParam,
       isTutorial: modeParam === 'tutorial',
       gameId,
       homeTeam,
-      attrTourSeenFlag: (() => { try { return localStorage.getItem('fteV2AttrTourSeen'); } catch (_) { return '<denied>'; } })(),
+      introModalShown: (() => { try { return sessionStorage.getItem(introKeyPreview); } catch (_) { return '<denied>'; } })(),
+      attrTourShown: (() => { try { return sessionStorage.getItem(tourKeyPreview); } catch (_) { return '<denied>'; } })(),
       url: typeof window !== 'undefined' ? window.location.href : null,
     });
   } catch (_) { /* non-fatal */ }
@@ -2082,9 +2089,13 @@ async function init() {
     ]).then(([{ mountTutorialProgress }, lineupModals, { showAttributeTour }]) => {
       mountTutorialProgress('lineup');
       // After the intro modal dismisses, fire the attribute tour. The tour
-      // has its own localStorage gate so it only auto-shows once per
-      // browser (intra-tutorial navigations to/from game-plan don't re-fire
-      // it). headerRow is the roster attributes table's <thead>.
+      // has its own sessionStorage gate keyed by game_id — matches the
+      // intro modal's pattern, so a fresh tutorial game = fresh tour while
+      // within-tutorial navigation (set-lineup → game-plan → back) stays
+      // quiet. headerRow is the roster attributes table's <thead>.
+      const tourKey = gameId
+        ? `fteV2TutorialAttrTourShown_${gameId}`
+        : 'fteV2TutorialAttrTourShown';
       const launchAttributeTour = () => {
         const headerRow = document.querySelector('#roster-attributes-pane .roster-table thead');
         if (!headerRow) return;
@@ -2094,6 +2105,7 @@ async function init() {
           showAttributeTour({
             headerRow,
             teamName: homeTeam,
+            persistKey: tourKey,
             // Dim everything around the header row instead of laying a
             // scrim on top — <thead> z-index is unreliable against a
             // full-screen overlay (early build had the header rendering

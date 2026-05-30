@@ -238,14 +238,14 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 The tutorial set-lineup intentionally loads with empty slots — the user fills their own lineup as part of the lesson. Three guided beats bracket the experience:
 
 1. **Intro modal** (centered Functional-modal chrome with team-linked Sammy portrait overlapping the top, sessionStorage-guarded per `game_id`): "Here's your moment, Coach. Set your lineup for crunch time." Single `GOT IT` orange CTA.
-2. **Attribute tour** (fires immediately after the intro dismisses, `localStorage`-guarded by `fteV2AttrTourSeen`): the user's first-run nudge that reveals the per-attribute hover tooltips that already live on the column headers. See "Attribute tour mechanic" below.
+2. **Attribute tour** (fires immediately after the intro dismisses, `sessionStorage`-guarded by `fteV2TutorialAttrTourShown_${gameId}` — same per-game_id pattern as the intro modal): the user's first-run nudge that reveals the per-attribute hover tooltips that already live on the column headers. See "Attribute tour mechanic" below.
 3. **Feedback modal** (fires every Return To Game click; same chrome as intro): algorithm-chosen message + single green `RETURN TO GAME` CTA that performs the actual navigation to `court.html`.
 
 The page-level `play-now` button is relabeled "Return To Game" in tutorial mode (still uses the existing green disabled-until-complete styling).
 
 ### Attribute tour mechanic
 
-Module: [`js/shared/attributeTour.js`](FrontEnd/static/js/shared/attributeTour.js) + [`css/attribute-tour.css`](FrontEnd/static/css/attribute-tour.css). Tutorial mode only. Fires once per browser (localStorage flag `fteV2AttrTourSeen`).
+Module: [`js/shared/attributeTour.js`](FrontEnd/static/js/shared/attributeTour.js) + [`css/attribute-tour.css`](FrontEnd/static/css/attribute-tour.css). Tutorial mode only. Fires once per tutorial game (sessionStorage flag `fteV2TutorialAttrTourShown_${gameId}`, same pattern as the intro modal — a fresh tutorial game = fresh tour; intra-tutorial nav doesn't re-fire).
 
 **Stacking approach.** We DIM the surrounding siblings directly instead of laying a full-screen scrim on top. Reason: `<thead>` z-index is unreliable against a full-screen overlay — an earlier build had the lifted header row + its gold ring rendering UNDER the scrim. Dimming siblings keeps the header at its natural position, fully lit, with the ring always visible.
 
@@ -260,7 +260,7 @@ Module: [`js/shared/attributeTour.js`](FrontEnd/static/js/shared/attributeTour.j
 
 **N** = headers whose text content strictly matches a known attribute key (SC SH ID OD PS BH RB ST AG ND IQ FT + HT WT NG). The Player Name th's inline `RT` label is intentionally excluded since RT lives inside the name column, not as its own header.
 
-**Dismissal**: `GOT IT` lifts the dim, fades Sammy, restores every class the tour added, sets the localStorage flag. After dismissal the tooltips behave exactly as before — the tour is one-shot UI; the underlying tooltip helper is permanent.
+**Dismissal**: `GOT IT` lifts the dim, fades Sammy, restores every class the tour added, sets the sessionStorage flag. After dismissal the tooltips behave exactly as before — the tour is one-shot UI; the underlying tooltip helper is permanent.
 
 ### Set-lineup feedback algorithm
 
@@ -343,7 +343,7 @@ These are real regressions we've hit. Listed so the next person doesn't pay the 
 | 2 | **Duplicated mode derivation at EOG callsites.** Four call-sites of `showGameCompletionPopup` were independently building `mode`. One missed the tutorial branch → Box Score reappeared, locker-room routed wrong, `tutorial-complete` never fired, authBar bounced back to situation. | Always go through `js/shared/getGameMode.js`. |
 | 3 | **Stale `.pre-game-container` flash on court.html.** It used to default to visible; bootGame then decided whether to hide. Caused a "Play Quarter / Sim Quarter" flash before live court paint. | `.pre-game-container.hidden` by default. bootGame removes `.hidden` only when it explicitly wants to show. Overlay dismisses on `court-ready` event dispatched from `bootGame.initGame()`. Don't revert. |
 | 4 | **Bare `.rt-low` etc. without `!important`.** Page-local `.roster-table td { color: ... }` rules (specificity 0,1,1) silently override the bucket classes (0,1,0). | `/css/rt-buckets.css` uses `!important` deliberately. These are canonical scale colors; they should always win. |
-| 5 | **Forgetting to flush `sessionStorage` lineup-intro guard on rerun.** Tutorial set-lineup intro modal uses key `fteV2TutorialLineupModalShown_${gameId}` (renamed from the prior coach-mark / Sammy-modal keys; old keys are harmless leftovers). Each fresh game_id gets its own key so re-tours work. | No action needed; documented so you don't think it's broken when it skips on re-entry. |
+| 5 | **Tutorial UI nudge guards: all sessionStorage, all per-`game_id`.** Two keys today: `fteV2TutorialLineupModalShown_${gameId}` (intro modal) + `fteV2TutorialAttrTourShown_${gameId}` (attribute tour). One mental model. Each fresh tutorial game gets a fresh set of nudges. A prior attempt used `localStorage[fteV2AttrTourSeen]` (permanent, per-browser) which made staging testing painful since every retest required `localStorage.removeItem(...)`; consolidated to the per-game_id sessionStorage pattern. **Don't add a new client-side gate for a tutorial UI nudge without matching this pattern.** | No action needed; documented so the next nudge follows the same recipe. |
 
 ---
 
