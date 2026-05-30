@@ -27,25 +27,28 @@
  *   5. Touch fallback: tap on a header opens its tooltip too. Scoped to
  *      the tour run — no global helper changes.
  *
- * Persistence: localStorage flag (per-browser). Acceptable for a one-shot
- * tutorial-mode nudge — the tutorial itself is server-gated to once per
- * account, so re-firing across devices isn't a meaningful concern.
+ * Persistence: sessionStorage flag keyed by tutorial game_id (per-tab,
+ * per-tutorial-game). Matches the intro modal's pattern — one mental
+ * model for "tutorial UI nudge guards". Within-tutorial nav (set-lineup
+ * → game-plan → back) doesn't re-fire (same game_id); a fresh tutorial
+ * game wipes the slate. Real users only play one tutorial (server-gated)
+ * so they still see the tour exactly once.
  *
  *   import { showAttributeTour } from '/js/shared/attributeTour.js';
  *
  *   showAttributeTour({
- *     headerRow:    <tr|thead element>,                 // required — the row to spotlight
- *     teamName:     'Bentley-Truman',                   // for the team-linked Sammy
- *     dimSelectors: ['.lineup-banner-strip', ...],      // caller-owned list of siblings to dim
- *     persistKey:   'fteV2AttrTourSeen',                // optional, defaults shown
- *     onDismiss:    () => { ... },                      // optional callback after dismiss
+ *     headerRow:    <tr|thead element>,                                 // required — the row to spotlight
+ *     teamName:     'Bentley-Truman',                                   // for the team-linked Sammy
+ *     dimSelectors: ['.lineup-banner-strip', ...],                      // caller-owned list of siblings to dim
+ *     persistKey:   `fteV2TutorialAttrTourShown_${gameId}`,             // pass per game_id; default shown below
+ *     onDismiss:    () => { ... },                                      // optional callback after dismiss
  *   });
  */
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
 
 const STYLESHEET_HREF = '/css/attribute-tour.css';
-const DEFAULT_PERSIST_KEY = 'fteV2AttrTourSeen';
+const DEFAULT_PERSIST_KEY = 'fteV2TutorialAttrTourShown';
 
 // Same set the canonical attributeTooltips.js helper recognizes — used to
 // decide which header cells get the shimmer cue and count toward the
@@ -66,12 +69,12 @@ function ensureStylesheet() {
 }
 
 function alreadySeen(persistKey) {
-  try { return localStorage.getItem(persistKey) === '1'; }
+  try { return sessionStorage.getItem(persistKey) === '1'; }
   catch (_) { return false; }
 }
 
 function markSeen(persistKey) {
-  try { localStorage.setItem(persistKey, '1'); }
+  try { sessionStorage.setItem(persistKey, '1'); }
   catch (_) { /* private mode etc. — non-fatal */ }
 }
 
