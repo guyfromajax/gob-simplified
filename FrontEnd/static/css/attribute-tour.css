@@ -1,56 +1,47 @@
 /*
  * FTE v2 — Attribute Tour Mechanic (tutorial set-lineup, after intro modal).
  *
- * Layers (back → front):
- *   .attribute-tour__scrim      soft dark overlay over the whole page
- *   .attribute-tour__sammy      compact Sammy coach-mark anchored under the header row
- *   header-row classes          lifted above the scrim via z-index + gold glow
+ * Stacking approach: instead of laying one full-screen scrim *above* the
+ * page (which fights table-section stacking — <thead> z-index is
+ * notoriously unreliable in some browsers and the header row was
+ * rendering under the scrim), we DIM the siblings directly. The header
+ * row stays at its natural position, full opacity, with the gold ring +
+ * glow visible.
  *
- * The mechanic is additive — it never moves the table, never replaces the
- * existing tooltip helper, never alters columns. It only orchestrates the
- * spotlight, the shimmer cue, the per-header explored state, and Sammy.
- * Existing per-attribute tooltips remain the source of truth for what the
- * abbreviations mean.
+ * Layers (no overlay required):
+ *   .attribute-tour-dim     applied to surrounding content — opacity
+ *                           drops + pointer-events keep the user from
+ *                           clicking buttons mid-tour
+ *   thead / its <th>s       untouched — they stay at full opacity and
+ *                           get the gold ring/glow + shimmer cue
+ *   .attribute-tour__sammy  fixed, high z-index, above everything
+ *
+ * Existing per-attribute tooltips (position: fixed; z-index: 99999) keep
+ * rendering on top — unchanged.
  */
 
-/* ---------- Scrim ---------- */
+/* ---------- Dimmed siblings ---------- */
 
-.attribute-tour__scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(7, 9, 14, 0.66);
-  z-index: 1400;
-  opacity: 0;
-  pointer-events: auto;
+.attribute-tour-dim {
+  opacity: 0.30;
+  pointer-events: none;
   transition: opacity 220ms ease;
-}
-
-.attribute-tour__scrim.is-visible {
-  opacity: 1;
 }
 
 /* ---------- Lifted header row ---------- */
 
-/* Lift the table's thead above the scrim so it stays fully lit. */
-.attribute-tour-active thead.attribute-tour__lifted {
-  position: relative;
-  z-index: 1500;
-}
-
-/* Apply the gold ring + soft glow to a wrapper around the thead. We can't
- * box-shadow a <thead> reliably in all browsers, so the tour wraps each
- * header cell instead. */
+/* Gold ring + soft glow on each header cell. No z-index lift — the
+ * header is fully visible because nothing is over it. */
 .attribute-tour-active th.attribute-tour__lifted {
   position: relative;
-  z-index: 1500;
   background-color: rgba(11, 13, 20, 0.96);
   box-shadow:
     0 0 0 1px rgba(247, 148, 32, 0.5),
     0 0 38px rgba(247, 148, 32, 0.18);
 }
 
-/* Soften the gold ring on the leftmost/rightmost cells so they merge into
- * a single horizontal lit row visually (no broken borders between cells). */
+/* Build a clean horizontal band — internal vertical edges between
+ * adjacent lifted cells merge, only first/last carry the outer ring. */
 .attribute-tour-active th.attribute-tour__lifted + th.attribute-tour__lifted {
   box-shadow:
     inset 1px 0 0 rgba(247, 148, 32, 0.18),
@@ -59,7 +50,6 @@
     0 0 38px rgba(247, 148, 32, 0.18);
 }
 
-/* The very first lifted cell gets the left ring, the last gets the right. */
 .attribute-tour-active th.attribute-tour__lifted.is-first {
   box-shadow:
     inset 1px 0 0 rgba(247, 148, 32, 0.5),
@@ -78,7 +68,6 @@
 
 /* ---------- Per-header cue: shimmer underline ---------- */
 
-/* Only tooltipped headers get the shimmer cue — driven by .is-cued. */
 .attribute-tour-active th.is-cued {
   cursor: help;
 }
@@ -233,9 +222,9 @@
 }
 
 .attribute-tour__sammy-dismiss {
-  /* Build on the .gob-btn--ghost recipe inline so this file doesn't depend
-   * on /css/gob-buttons.css being loaded everywhere. Smaller-than-default
-   * to stay compact within the coach-mark. */
+  /* Ghost button recipe inlined so this file doesn't depend on
+   * /css/gob-buttons.css being loaded everywhere. Compact size to fit
+   * inside the coach-mark. */
   appearance: none;
   cursor: pointer;
   display: inline-flex;

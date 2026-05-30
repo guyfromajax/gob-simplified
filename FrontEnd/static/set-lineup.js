@@ -2077,7 +2077,24 @@ async function init() {
         // Defer a frame so any post-intro-modal layout settles before we
         // measure the header row for Sammy positioning.
         requestAnimationFrame(() => {
-          showAttributeTour({ headerRow, teamName: homeTeam });
+          showAttributeTour({
+            headerRow,
+            teamName: homeTeam,
+            // Dim everything around the header row instead of laying a
+            // scrim on top — <thead> z-index is unreliable against a
+            // full-screen overlay (early build had the header rendering
+            // UNDER the dim). These are the siblings that should fade
+            // back during the tour; the header row itself is absent.
+            dimSelectors: [
+              '.lineup-banner-strip',
+              '.lineup-context-bar',
+              '.lineup-roster-header-row',
+              '#roster-body',
+              '#roster-pos-note',
+              '.roster-panel-actions',
+              '.lineup-right-panel',
+            ],
+          });
         });
       };
       if (!alreadyShown && lineupModals) {
