@@ -247,10 +247,12 @@ The page-level `play-now` button is relabeled "Return To Game" in tutorial mode 
 
 Module: [`js/shared/attributeTour.js`](FrontEnd/static/js/shared/attributeTour.js) + [`css/attribute-tour.css`](FrontEnd/static/css/attribute-tour.css). Tutorial mode only. Fires once per browser (localStorage flag `fteV2AttrTourSeen`).
 
+**Stacking approach.** We DIM the surrounding siblings directly instead of laying a full-screen scrim on top. Reason: `<thead>` z-index is unreliable against a full-screen overlay — an earlier build had the lifted header row + its gold ring rendering UNDER the scrim. Dimming siblings keeps the header at its natural position, fully lit, with the ring always visible.
+
 | Layer | What |
 |---|---|
-| Scrim | Fixed `rgba(7,9,14,0.66)` overlay over the whole viewport; pointer-events capture clicks so the user can't accidentally interact with the page during the tour. |
-| Lifted header row | `z-index: 1500` on the `<thead>` + each `<th>` so the row sits above the scrim. Gold ring + soft glow (`box-shadow: 0 0 0 1px rgba(247,148,32,0.5), 0 0 38px rgba(247,148,32,0.18)`). |
+| Dimmed siblings | Caller passes a `dimSelectors` array (banner, score bar, ATTRIBUTES/STATS toggle, tbody, footnote, right-hand Starting Five panel, action buttons). Each matched element gets `.attribute-tour-dim` → `opacity: 0.30; pointer-events: none`. |
+| Lifted header row | No z-index lift — nothing covers it. Gold ring + soft glow (`box-shadow: 0 0 0 1px rgba(247,148,32,0.5), 0 0 38px rgba(247,148,32,0.18)`) applied per `<th>`, with internal edges merging into a single horizontal band. |
 | Shimmer cue | Each header that maps to a known attribute (per `attributeTooltips.js`) gets a slow ~2.4s gold underline pulse — invitation to hover, not a demand. |
 | Hover/explored states | Hover → orange tint. Once hovered → green tint + shimmer suppressed; counter increments. |
 | Sammy coach-mark | Compact fixed-position bubble below the header row with team-linked Sammy, eyebrow `QUICK TOUR`, body copy, live `X of N explored` counter, ghost `GOT IT` dismiss. Button stays at 55% opacity until all headers are explored, then full opacity. Always clickable. |
@@ -258,7 +260,7 @@ Module: [`js/shared/attributeTour.js`](FrontEnd/static/js/shared/attributeTour.j
 
 **N** = headers whose text content strictly matches a known attribute key (SC SH ID OD PS BH RB ST AG ND IQ FT + HT WT NG). The Player Name th's inline `RT` label is intentionally excluded since RT lives inside the name column, not as its own header.
 
-**Dismissal**: `GOT IT` (or all headers explored, optionally) fades the scrim + shimmer + Sammy, restores every class the tour added, sets the localStorage flag. After dismissal the tooltips behave exactly as before — the tour is one-shot UI; the underlying tooltip helper is permanent.
+**Dismissal**: `GOT IT` lifts the dim, fades Sammy, restores every class the tour added, sets the localStorage flag. After dismissal the tooltips behave exactly as before — the tour is one-shot UI; the underlying tooltip helper is permanent.
 
 ### Set-lineup feedback algorithm
 
@@ -397,27 +399,26 @@ For commit-level history, `git log --grep "FTE v2"`. High-level milestones:
 
 ##Outgoing modal messages
 **Talent** 
-- "You're putting your five best players on the court. Smart."
+- "You're putting your five best players on the court. Smart." (Talent-Led)
 **Skill Based** Track all of the below that qualify based on the top 2 attributes for the lineup
-- SC & SH: "You're leading with your best scorers, good luck Coach."
-- ID & OD: "You're leading with your best defenders, good luck Coach."
-- one of (SC or SH) and one of (ID or OD): "You're balancing offense and defense, good luck Coach."
-- RB & ST: "You're leading with your strong rebounders. Let's see how well they clean the boards."
-- one of (ID or OD) and ST: "You're leading with muscle and defense. You're an intimidator, Coach."
-- one of (SH or SC) and AG: "You're leading with your athletic scorers. I like it Coach."
-- PS & BH: "You're leading wtih fundamentals. I like the discipline, Coach."
-- ND & AG: "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us."
-- one of (SC or SH) and IQ: "This is a smart offensive lineup."
-- one of (ID or OD) and IQ: "This is a smart defensive lineup."
-- two of (ST, AG, ND): "Leading with pure athletcisim. I like it, Coach."
-- one of (PS or BH) and IQ: "A very cerebral and disciplines lineup. Good luck Coach."
-- if the list is zero after checking for qualifiers, use the unconventional message
-- one of (SC or SH) and one of (ST, AG, ND): "This is an athletically focused offensive lineup. Good luck Coach."
-- one of (ID or OD) and one of (ST, AG, ND): "This is an athletically focused defensive lineup. Good luck Coach."
-- one of (SC or SH) and one of (BH or PS): "This is an technically focused offensive lineup. Good luck Coach."
-- one of (ID or OD) and one of (BH or PS): "This is an technically focused defensive lineup. Good luck Coach."
-- one of (SC or SH) and RB: "This is an rebouning focused offensive lineup. Good luck Coach."
-- one of (ID or OD) and RB: "This is an rebounding focused defensive lineup. Good luck Coach."
+- SC & SH: "You're leading with your best scorers, good luck Coach." (Offense-Led)
+- ID & OD: "You're leading with your best defenders, good luck Coach." (Defense-Led)
+- one of (SC or SH) and one of (ID or OD): "You're balancing offense and defense, good luck Coach." (Balanced)
+- RB & ST: "You're leading with your strong rebounders. Let's see how well they clean the boards." (Straight Intimidation)
+- one of (ID or OD) and ST: "You're leading with muscle and defense. You're an intimidator, Coach."(Defensive Intimidation)
+- one of (SH or SC) and AG: "You're leading with your athletic scorers. I like it Coach." (Offensive Quickness)
+- PS & BH: "You're leading wtih fundamentals. I like the discipline, Coach." (Fundamentals)
+- ND & AG: "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us." (Speed)
+- one of (SC or SH) and IQ: "This is a smart offensive lineup." (Intelligent Offense)
+- one of (ID or OD) and IQ: "This is a smart defensive lineup." (Intelligent Defense)
+- two of (ST, AG, ND): "Leading with pure athletcisim. I like it, Coach." (Pure Athleticism)
+- one of (PS or BH) and IQ: "A very cerebral and disciplines lineup. Good luck Coach." (Cerebral Discipline)
+- one of (SC or SH) and one of (ST, AG, ND): "This is an athletically focused offensive lineup. Good luck Coach." (Offensive Athleticism)
+- one of (ID or OD) and one of (ST, AG, ND): "This is an athletically focused defensive lineup. Good luck Coach." (Defensive Athleticism)
+- one of (SC or SH) and one of (BH or PS): "This is an technically focused offensive lineup. Good luck Coach." (Technical Offense)
+- one of (ID or OD) and one of (BH or PS): "This is an technically focused defensive lineup. Good luck Coach." (Technical Defense)
+- one of (SC or SH) and RB: "This is an rebouning focused offensive lineup. Good luck Coach." (Offense & Rebounding)
+- one of (ID or OD) and RB: "This is an rebounding focused defensive lineup. Good luck Coach." (Defense & Rebounding)
 
 **Unconventional Message**
-- "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance."
+- "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance." (Unconventional)

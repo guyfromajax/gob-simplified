@@ -5,9 +5,17 @@
  * Runs in tutorial mode only, after the "Here's your moment, Coach"
  * intro modal dismisses.
  *
+ * Stacking approach: we DIM the surrounding siblings directly instead of
+ * laying a full-screen scrim over everything. <thead> z-index is
+ * notoriously unreliable against a full-screen overlay (early build of
+ * this mechanic had the gold ring + headers rendering UNDER the scrim).
+ * Dimming siblings keeps the header row at its natural position — fully
+ * lit, ring visible, no stacking-order fragility.
+ *
  * What it does:
- *   1. Lays a soft scrim over the page; lifts the table header row above it
- *      with a quiet gold ring so the rest of the page recedes.
+ *   1. Adds .attribute-tour-dim to caller-specified surrounding elements
+ *      (banner, score bar, toggle, tbody, footnote, right panel). Each
+ *      drops to opacity 0.30 + pointer-events: none.
  *   2. Adds a shimmer underline cue to each tooltipped header.
  *   3. Mounts a compact Sammy coach-mark just below the header row,
  *      pointing up at it, with a live "X of N explored" counter and a
@@ -26,10 +34,11 @@
  *   import { showAttributeTour } from '/js/shared/attributeTour.js';
  *
  *   showAttributeTour({
- *     headerRow:   <tr|thead element>,         // required — the row to lift
- *     teamName:    'Bentley-Truman',           // for the team-linked Sammy
- *     persistKey:  'fteV2AttrTourSeen',        // optional, defaults shown
- *     onDismiss:   () => { ... },              // optional callback after dismiss
+ *     headerRow:    <tr|thead element>,                 // required — the row to spotlight
+ *     teamName:     'Bentley-Truman',                   // for the team-linked Sammy
+ *     dimSelectors: ['.lineup-banner-strip', ...],      // caller-owned list of siblings to dim
+ *     persistKey:   'fteV2AttrTourSeen',                // optional, defaults shown
+ *     onDismiss:    () => { ... },                      // optional callback after dismiss
  *   });
  */
 
@@ -115,11 +124,21 @@ export function showAttributeTour(opts = {}) {
 
   document.body.classList.add('attribute-tour-active');
 
-  // Scrim.
-  const scrim = document.createElement('div');
-  scrim.className = 'attribute-tour__scrim';
-  scrim.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(scrim);
+  // Dim siblings. Caller passes a list of CSS selectors for the elements
+  // that should fade back during the tour (banner, score bar, table body,
+  // right-hand panel, etc.). Each matched element gets .attribute-tour-dim
+  // applied — opacity drops + pointer-events disable so the user can't
+  // accidentally click into game-plan/etc. mid-tour. The header row is
+  // intentionally NOT in this list; it stays at its natural position with
+  // full opacity and the gold ring/glow.
+  const dimSelectors = Array.isArray(opts.dimSelectors) ? opts.dimSelectors : [];
+  const dimmedEls = [];
+  dimSelectors.forEach((sel) => {
+    document.querySelectorAll(sel).forEach((el) => {
+      el.classList.add('attribute-tour-dim');
+      dimmedEls.push(el);
+    });
+  });
 
   // Sammy coach-mark.
   const sammyImg = getTeamSammyImage(opts.teamName);
@@ -165,9 +184,8 @@ export function showAttributeTour(opts = {}) {
     sammy.style.setProperty('--sammy-arrow-x', `${Math.max(20, Math.min(arrowX, sammyRect.width - 20))}px`);
   }
 
-  // Reveal scrim + sammy on next frame so the entrance transitions run.
+  // Reveal sammy on next frame so the entrance transition runs.
   requestAnimationFrame(() => {
-    scrim.classList.add('is-visible');
     sammy.classList.add('is-visible');
     // Position after the first paint so getBoundingClientRect is accurate.
     requestAnimationFrame(positionSammy);
@@ -227,13 +245,15 @@ export function showAttributeTour(opts = {}) {
 
   function close() {
     markSeen(persistKey);
-    scrim.classList.remove('is-visible');
     sammy.classList.remove('is-visible');
+    // Lift the dim immediately so the page comes back into focus while
+    // the Sammy bubble fades — feels more responsive than waiting for
+    // both to fade together.
+    dimmedEls.forEach((el) => el.classList.remove('attribute-tour-dim'));
     window.removeEventListener('resize', reposition);
     window.removeEventListener('scroll', reposition, true);
     cleanupFns.forEach((fn) => fn());
     setTimeout(() => {
-      if (scrim.parentNode) scrim.parentNode.removeChild(scrim);
       if (sammy.parentNode) sammy.parentNode.removeChild(sammy);
       // Restore the table — strip every class we added.
       thCells.forEach((th) => {
