@@ -387,38 +387,3 @@ For commit-level history, `git log --grep "FTE v2"`. High-level milestones:
 | Action color rules / Attribute Bar Scale | `_documentation_master/00_General_Systems/Styleguide_updated.md` |
 | Visual reference / design notes | `_documentation_master/07_Design_Systems/FTE Onboarding Redesign.html` |
 
-
-**Set Lineup Alogrithm**
-##If User has the players with the top 5 RT values on the team, add Talent message to the list of possible choices.
-
-##Skill based logic
-- Attributes in play: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ
-- Step 1: Calculate the total attributes value for attributes in play for the user's lineup. 
-- Step 2: Identify the top 3 attributes in terms of total. If 2 or more are tied for the third, include them all. Example: 1. SC: 54, 2. SH: 53, ST: 53, IQ: 53 -- all four of those would be considered "Top 3". LMK if that is not clear.
-- Step 3: Choose the outgoing modal messsage based on the top 3 attributes.
-
-##Outgoing modal messages
-**Talent** 
-- "You're putting your five best players on the court. Smart." (Talent-Led)
-**Skill Based** Track all of the below that qualify based on the top 3 attributes for the lineup
-- SC & SH: "You're leading with your best scorers, good luck Coach." (Offense-Led)
-- ID & OD: "You're leading with your best defenders, good luck Coach." (Defense-Led)
-- one of (SC or SH) and one of (ID or OD): "You're balancing offense and defense, good luck Coach." (Balanced)
-- RB & ST: "You're leading with your strong rebounders. Let's see how well they clean the boards." (Straight Intimidation)
-- one of (ID or OD) and ST: "You're leading with muscle and defense. You're an intimidator, Coach."(Defensive Intimidation)
-- one of (SH or SC) and AG: "You're leading with your athletic scorers. I like it Coach." (Offensive Quickness)
-- PS & BH: "You're leading wtih fundamentals. I like the discipline, Coach." (Fundamentals)
-- ND & AG: "This lineup is fast and athletic. Our opponent will have a difficult time keeping up with us." (Speed)
-- one of (SC or SH) and IQ: "This is a smart offensive lineup." (Intelligent Offense)
-- one of (ID or OD) and IQ: "This is a smart defensive lineup." (Intelligent Defense)
-- two of (ST, AG, ND): "Leading with pure athletcisim. I like it, Coach." (Pure Athleticism)
-- one of (PS or BH) and IQ: "A very cerebral and disciplines lineup. Good luck Coach." (Cerebral Discipline)
-- one of (SC or SH) and one of (ST, AG, ND): "This is an athletically focused offensive lineup. Good luck Coach." (Offensive Athleticism)
-- one of (ID or OD) and one of (ST, AG, ND): "This is an athletically focused defensive lineup. Good luck Coach." (Defensive Athleticism)
-- one of (SC or SH) and one of (BH or PS): "This is an technically focused offensive lineup. Good luck Coach." (Technical Offense)
-- one of (ID or OD) and one of (BH or PS): "This is an technically focused defensive lineup. Good luck Coach." (Technical Defense)
-- one of (SC or SH) and RB: "This is an rebouning focused offensive lineup. Good luck Coach." (Offense & Rebounding)
-- one of (ID or OD) and RB: "This is an rebounding focused defensive lineup. Good luck Coach." (Defense & Rebounding)
-
-**Unconventional Message**
-- "A very unconventional lineup, Coach. You're going to keep our opponent very off-balance." (Unconventional)
