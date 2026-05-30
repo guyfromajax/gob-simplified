@@ -112,16 +112,13 @@ function gotoSetLineup(userTeam, opponent, gameId, _lineup) {
 
 function paintMoment(userTeam, opponent) {
   const banner = resolveTeamBanner(userTeam);
-  // Apply banner + darkening gradient to the modal box (Moment modal spec).
+  // Surface the banner asset to the CSS pipeline as a custom property so
+  // the modal's ::before watermark layer can read it. The darkening
+  // gradient lives in ::after now (see tutorial-tipoff.css) — JS no
+  // longer composites the gradient inline.
   const moment = document.getElementById('tipoff-moment');
   if (moment) {
-    moment.style.backgroundImage = `linear-gradient(
-        to bottom,
-        rgba(13,17,36,0.15) 0%,
-        rgba(13,17,36,0.55) 45%,
-        rgba(13,17,36,0.92) 78%,
-        rgba(13,17,36,0.98) 100%
-      ), url('${banner}')`;
+    moment.style.setProperty('--moment-bg-image', `url('${banner}')`);
     moment.hidden = false;
   }
   const portraitEl = document.getElementById('tipoff-portrait');
