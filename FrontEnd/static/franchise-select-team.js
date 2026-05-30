@@ -178,12 +178,22 @@ async function selectTutorialTeam(team) {
   // Step 2: open the username Functional modal with team-aware chrome.
   // Mascot drives the title ("YOU'RE COACHING THE STERLING KNIGHTS").
   // Team name drives the Sammy portrait variant (team-linked kit).
+  // Pre-fill the input with the user's existing username (if any) so
+  // returning users who are being re-tour'd through the funnel (post-
+  // reset_fte_v2_for_all) can confirm-without-retyping. New signups
+  // get an empty input as before.
   const mascotMap = await fetchMascotMap();
   const mascot = mascotMap[team] || team;
+  let existingUsername = '';
+  try {
+    const raw = localStorage.getItem('auth_user');
+    if (raw) existingUsername = (JSON.parse(raw) || {}).username || '';
+  } catch (_) { /* private mode / corrupt JSON — fall back to empty */ }
   const { openUsernameModal } = await import('/js/shared/usernameModal.js');
   openUsernameModal({
     teamName: team,
     mascot,
+    initialUsername: existingUsername,
     onSuccess: async () => {
       // Mask the team-select page during the in-flight nav to tutorial-situation
       // so the user doesn't see the (now-stale) team grid flash between modal
