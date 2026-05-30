@@ -288,7 +288,21 @@ export function pickLineupFeedbackMessage(starters, fullRoster) {
     if (q.test(topTwo)) pool.push(q.message);
   }
 
-  if (pool.length === 0) return UNCONVENTIONAL_MESSAGE;
-  if (pool.length === 1) return pool[0];
-  return pool[Math.floor(Math.random() * pool.length)];
+  // Debug log so we can verify which qualifiers matched and what the pool
+  // looked like before the random pick. Useful for staging walks; cheap
+  // to leave in production since this fires once per Return To Game click.
+  const picked = pool.length === 0
+    ? UNCONVENTIONAL_MESSAGE
+    : pool.length === 1
+      ? pool[0]
+      : pool[Math.floor(Math.random() * pool.length)];
+  try {
+    console.log('[tutorial][lineup-feedback]', {
+      topTwoAttrs: Array.from(topTwo),
+      poolSize: pool.length,
+      pool,
+      picked,
+    });
+  } catch (_) { /* non-fatal */ }
+  return picked;
 }

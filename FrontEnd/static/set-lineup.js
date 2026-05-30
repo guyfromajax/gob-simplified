@@ -2045,6 +2045,20 @@ async function init() {
     autosetBtn.addEventListener('click', autosetLineup);
   }
 
+  // Debug: surface the resolved mode + tour-gate state so we can see
+  // immediately why the tutorial chrome (intro modal + attribute tour)
+  // does or doesn't fire on this page load. Cheap, fires once per load.
+  try {
+    console.log('[tutorial][gate]', {
+      modeParam,
+      isTutorial: modeParam === 'tutorial',
+      gameId,
+      homeTeam,
+      attrTourSeenFlag: (() => { try { return localStorage.getItem('fteV2AttrTourSeen'); } catch (_) { return '<denied>'; } })(),
+      url: typeof window !== 'undefined' ? window.location.href : null,
+    });
+  } catch (_) { /* non-fatal */ }
+
   // FTE v2 tutorial: the slots load empty (tutorial-situation no longer
   // forwards home_pg/etc.) — the user sets their own lineup as part of
   // the lesson. On first paint, show a centered Functional-modal-style
