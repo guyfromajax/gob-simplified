@@ -16,6 +16,17 @@ const errorEl = document.getElementById('persona-intro-error');
 
 mountTutorialProgress('persona');
 
+// Lobby music — same track + volume as mode-select / franchise-select-team
+// so the audio feels continuous across the onboarding funnel. Each page
+// owns its own Audio instance (the prior page's instance is GC'd on
+// unload); matches the existing precedent on those two pages.
+try {
+  const lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
+  lobbyMusic.loop = true;
+  lobbyMusic.volume = 0.4;
+  lobbyMusic.play().catch(function () {});
+} catch (e) { /* autoplay or codec fail — silent */ }
+
 function showError(msg) {
   if (errorEl) errorEl.textContent = msg || '';
 }

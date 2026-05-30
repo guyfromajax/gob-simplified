@@ -61,7 +61,7 @@ Universal button class system: `FrontEnd/static/css/gob-buttons.css` (`.gob-btn-
 
 ### Progress thread
 
-Quiet 5-dot indicator at the bottom of every funnel screen. Module: `FrontEnd/static/js/shared/tutorialProgressThread.js`; CSS: `FrontEnd/static/css/tutorial-progress.css`. Step IDs: `persona | program | username | tipoff | lineup`. Hidden on `court.html`.
+Quiet 6-dot indicator at the bottom of every funnel screen. Module: `FrontEnd/static/js/shared/tutorialProgressThread.js`; CSS: `FrontEnd/static/css/tutorial-progress.css`. Step IDs: `persona | program | username | tipoff | lineup | gameplay`. Hidden on `court.html` — `gameplay` is therefore never the active step; it always renders as a faint pending dot, signaling the final stop.
 
 ---
 
@@ -323,3 +323,7 @@ For commit-level history, `git log --grep "FTE v2"`. High-level milestones:
 | Canonical button / modal / coach-mark CSS | `css/gob-buttons.css`, `resource-pages.css` (`gob-modal-*`), `css/coach-mark.css`, `css/tutorial-tipoff.css`, `css/username-modal.css` |
 | Action color rules / Attribute Bar Scale | `_documentation_master/00_General_Systems/Styleguide_updated.md` |
 | Visual reference / design notes | `_documentation_master/07_Design_Systems/FTE Onboarding Redesign.html` |
+
+
+**Set Lineup Alogrithm**
+
