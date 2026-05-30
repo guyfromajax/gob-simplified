@@ -217,6 +217,7 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 | `js/shared/teamCoachAsset.js` | Team → Sammy image path |
 | `js/shared/tutorialProgressThread.js` + `css/tutorial-progress.css` | 6-dot progress indicator |
 | `js/shared/tutorialLineupModals.js` + `css/tutorial-lineup-modal.css` | Set-lineup intro + post-lineup feedback modals; also exports `pickLineupFeedbackMessage` (the algorithm) |
+| `js/shared/attributeTour.js` + `css/attribute-tour.css` | First-run attribute-discovery tour on tutorial set-lineup (scrim + lifted header row + shimmer cues + Sammy coach-mark + X-of-N counter) |
 | `js/shared/coachMark.js` + `css/coach-mark.css` | Spotlight tooltip primitive — **available but not currently used in the FTE flow** (set-lineup intro switched to a centered Functional modal); kept for future tutorials |
 | `js/shared/getGameMode.js` | Single source of truth for the mode value passed to EOG popup (see §8) |
 | `js/shared/rtBucket.js` + `css/rt-buckets.css` | RT color bucket helper (exposes `window.getRtBucketClass`) |
@@ -234,12 +235,30 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 
 ### Set-lineup tutorial flow
 
-The tutorial set-lineup intentionally loads with empty slots — the user fills their own lineup as part of the lesson. Two modals bracket the experience, both centered Functional-modal chrome with team-linked Sammy portrait overlapping the top edge:
+The tutorial set-lineup intentionally loads with empty slots — the user fills their own lineup as part of the lesson. Three guided beats bracket the experience:
 
-1. **Intro modal** (fires once per `game_id`, sessionStorage guard): "Here's your moment, Coach. Set your lineup for crunch time." Single `GOT IT` orange CTA.
-2. **Feedback modal** (fires every Return To Game click): algorithm-chosen message + single green `RETURN TO GAME` CTA that performs the actual navigation to `court.html`.
+1. **Intro modal** (centered Functional-modal chrome with team-linked Sammy portrait overlapping the top, sessionStorage-guarded per `game_id`): "Here's your moment, Coach. Set your lineup for crunch time." Single `GOT IT` orange CTA.
+2. **Attribute tour** (fires immediately after the intro dismisses, `localStorage`-guarded by `fteV2AttrTourSeen`): the user's first-run nudge that reveals the per-attribute hover tooltips that already live on the column headers. See "Attribute tour mechanic" below.
+3. **Feedback modal** (fires every Return To Game click; same chrome as intro): algorithm-chosen message + single green `RETURN TO GAME` CTA that performs the actual navigation to `court.html`.
 
 The page-level `play-now` button is relabeled "Return To Game" in tutorial mode (still uses the existing green disabled-until-complete styling).
+
+### Attribute tour mechanic
+
+Module: [`js/shared/attributeTour.js`](FrontEnd/static/js/shared/attributeTour.js) + [`css/attribute-tour.css`](FrontEnd/static/css/attribute-tour.css). Tutorial mode only. Fires once per browser (localStorage flag `fteV2AttrTourSeen`).
+
+| Layer | What |
+|---|---|
+| Scrim | Fixed `rgba(7,9,14,0.66)` overlay over the whole viewport; pointer-events capture clicks so the user can't accidentally interact with the page during the tour. |
+| Lifted header row | `z-index: 1500` on the `<thead>` + each `<th>` so the row sits above the scrim. Gold ring + soft glow (`box-shadow: 0 0 0 1px rgba(247,148,32,0.5), 0 0 38px rgba(247,148,32,0.18)`). |
+| Shimmer cue | Each header that maps to a known attribute (per `attributeTooltips.js`) gets a slow ~2.4s gold underline pulse — invitation to hover, not a demand. |
+| Hover/explored states | Hover → orange tint. Once hovered → green tint + shimmer suppressed; counter increments. |
+| Sammy coach-mark | Compact fixed-position bubble below the header row with team-linked Sammy, eyebrow `QUICK TOUR`, body copy, live `X of N explored` counter, ghost `GOT IT` dismiss. Button stays at 55% opacity until all headers are explored, then full opacity. Always clickable. |
+| Touch fallback | On `touchstart` of a header: synthesize `mouseenter` (so the existing tooltip helper fires) + mark explored. Auto-dispatches `mouseleave` 3s later so taps elsewhere don't leave a stuck tooltip. Scoped to the tour — `attributeTooltips.js` is unchanged. |
+
+**N** = headers whose text content strictly matches a known attribute key (SC SH ID OD PS BH RB ST AG ND IQ FT + HT WT NG). The Player Name th's inline `RT` label is intentionally excluded since RT lives inside the name column, not as its own header.
+
+**Dismissal**: `GOT IT` (or all headers explored, optionally) fades the scrim + shimmer + Sammy, restores every class the tour added, sets the localStorage flag. After dismissal the tooltips behave exactly as before — the tour is one-shot UI; the underlying tooltip helper is permanent.
 
 ### Set-lineup feedback algorithm
 
