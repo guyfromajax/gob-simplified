@@ -49,9 +49,17 @@ from BackEnd.utils.otp_validator import (
     consume_otp
 )
 from BackEnd.utils.email_sender import send_password_reset_email
+from BackEnd.utils.alpha_access_email import send_alpha_welcome_email, send_alpha_waitlist_email
+from BackEnd.utils.alpha_otp_service import (
+    claim_otp_for_email,
+    count_available_otps,
+    find_otp_for_email,
+    release_otp_claim,
+)
 
 RESET_LINK_BASE_URL = os.getenv("RESET_LINK_BASE_URL", "https://www.geekedoutbasketball.com")
 RESET_TOKEN_EXPIRY_HOURS = 1
+ACCESS_CODE_RATE_LIMIT_PER_HOUR = int(os.getenv("ALPHA_ACCESS_CODE_RATE_LIMIT_PER_HOUR", "3"))
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -256,26 +264,148 @@ async def get_auth_config():
     )
 
 
+def _redact_email(email: str) -> str:
+    """Redact email for logging: a***@domain.com"""
+    if "@" in email:
+        local, domain = email.split("@", 1)
+        return f"{local[:1]}***@{domain}" if len(local) > 1 else f"***@{domain}"
+    return "***"
+
+
+def _access_code_rate_limit_exceeded(email: str, now: datetime) -> bool:
+    window_start = now - timedelta(hours=1)
+    recent = access_code_requests_collection.count_documents(
+        {
+            "email": email,
+            "created_at": {"$gte": window_start},
+        }
+    )
+    return recent >= ACCESS_CODE_RATE_LIMIT_PER_HOUR
+
+
+def _trigger_password_reset_for_email(email: str) -> None:
+    user = get_user_by_email(email)
+    if not user:
+        return
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_EXPIRY_HOURS)
+    password_reset_tokens_collection.insert_one({
+        "token": token,
+        "user_id": user["_id"],
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc),
+    })
+    reset_link = f"{RESET_LINK_BASE_URL.rstrip('/')}/reset-password.html?token={token}"
+    send_password_reset_email(email, reset_link)
+
+
+def _record_access_code_request(
+    *,
+    email: str,
+    now: datetime,
+    status: str,
+    otp_code: str | None = None,
+    sent_at: datetime | None = None,
+) -> None:
+    doc = {
+        "email": email,
+        "created_at": now,
+        "status": status,
+    }
+    if otp_code is not None:
+        doc["otp_code"] = otp_code
+    if sent_at is not None:
+        doc["sent_at"] = sent_at
+    access_code_requests_collection.insert_one(doc)
+
+
 @router.post("/request-access-code")
 @_auth_rate_limit
 async def request_access_code(request: Request, body: RequestAccessCodeRequest):
     """
-    Record a request for an alpha access code.
-    
-    User enters email on signup page and clicks "Request Access Code".
-    Request is stored in access_code_requests; admin checks the collection
-    and sends codes manually. No email is sent (transactional email can be
-    added later).
+    Request an alpha access code.
+
+    Sends a welcome email with OTP when capacity exists, a waitlist email when not,
+    or triggers password reset when the email is already registered.
     """
     email = body.email.lower().strip()
     now = datetime.now(timezone.utc)
-    doc = {
-        "email": email,
-        "created_at": now,
-        "status": "pending",
-    }
-    access_code_requests_collection.insert_one(doc)
-    logger.info("Access code request recorded for %s", email)
+
+    if _access_code_rate_limit_exceeded(email, now):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many access code requests. Please try again later.",
+        )
+
+    if get_user_by_email(email):
+        logger.info("Access code request for registered user %s — sending reset", _redact_email(email))
+        _trigger_password_reset_for_email(email)
+        _record_access_code_request(email=email, now=now, status="skipped")
+        return JSONResponse(
+            content={
+                "message": "If an account exists with that email, you will receive a reset link shortly."
+            },
+            status_code=200,
+        )
+
+    existing_otp = find_otp_for_email(email)
+    if existing_otp:
+        otp_code = existing_otp["otp_code"]
+        sent = send_alpha_welcome_email(email, otp_code)
+        status = "sent" if sent else "failed"
+        _record_access_code_request(
+            email=email,
+            now=now,
+            status=status,
+            otp_code=otp_code,
+            sent_at=now if sent else None,
+        )
+        if not sent:
+            logger.warning("Failed to resend alpha welcome email to %s", _redact_email(email))
+        return JSONResponse(
+            content={"message": "Request received. We'll send your access code shortly."},
+            status_code=200,
+        )
+
+    if count_available_otps() == 0:
+        sent = send_alpha_waitlist_email(email)
+        status = "waitlisted" if sent else "failed"
+        _record_access_code_request(email=email, now=now, status=status)
+        if not sent:
+            logger.warning("Failed to send waitlist email to %s", _redact_email(email))
+        return JSONResponse(
+            content={"message": "Request received. We'll send your access code shortly."},
+            status_code=200,
+        )
+
+    otp_code = claim_otp_for_email(email)
+    if not otp_code:
+        sent = send_alpha_waitlist_email(email)
+        status = "waitlisted" if sent else "failed"
+        _record_access_code_request(email=email, now=now, status=status)
+        return JSONResponse(
+            content={"message": "Request received. We'll send your access code shortly."},
+            status_code=200,
+        )
+
+    sent = send_alpha_welcome_email(email, otp_code)
+    if not sent:
+        release_otp_claim(otp_code)
+        _record_access_code_request(email=email, now=now, status="failed", otp_code=otp_code)
+        logger.warning("Failed to send alpha welcome email to %s", _redact_email(email))
+        return JSONResponse(
+            content={"message": "Request received. We'll send your access code shortly."},
+            status_code=200,
+        )
+
+    _record_access_code_request(
+        email=email,
+        now=now,
+        status="sent",
+        otp_code=otp_code,
+        sent_at=now,
+    )
+    logger.info("Access code email sent to %s", _redact_email(email))
     return JSONResponse(
         content={"message": "Request received. We'll send your access code shortly."},
         status_code=200,
@@ -498,14 +628,6 @@ async def update_account_settings(
         },
         "message": "Account settings updated successfully"
     }
-
-
-def _redact_email(email: str) -> str:
-    """Redact email for logging: a***@domain.com"""
-    if "@" in email:
-        local, domain = email.split("@", 1)
-        return f"{local[:1]}***@{domain}" if len(local) > 1 else f"***@{domain}"
-    return "***"
 
 
 @router.post("/reset-request")
