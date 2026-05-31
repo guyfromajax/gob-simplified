@@ -10,30 +10,27 @@ All logic below applies only when **quarter ≥ 4**. Evaluate the time-band tabl
 
 **Time Remaining 2:01 – 3:00**
 - If Score Delta ≥ 12 → Slow It Down = True
-- Else if Score Delta < -12 and > -24 → Quick Shot = True  
-  - Outside Shot Chance = 60%, Attack = 20%, Inside = 20%
+- Else if Score Delta < -12 and > -24 → Quick Shot = True
 - Force Foul = False
 
 **Time Remaining 1:01 – 2:00**
 - If Score Delta ≥ 9 → Slow It Down = True
-- Else if Score Delta < -9 and > -18 → Quick Shot = True  
-  - Outside = 70%, Attack = 20%, Inside = 10%
+- Else if Score Delta < -9 and > -18 → Quick Shot = True
 - Force Foul = False
 
 **Time Remaining 0:31 – 1:00**
 - If Score Delta ≥ 3 → Slow It Down = True
-- Else if Score Delta < -3 and > -12 → Quick Shot = True  
-  - Outside = 80%, Attack = 15%, Inside = 5%
+- Else if Score Delta < -3 and > -12 → Quick Shot = True
 - Force Foul: True if 3 < Score Delta < 12, else False
 
 **Time Remaining 0:01 – 0:30**
 - If Score Delta ≥ 1 → Slow It Down = True
-- Else if Score Delta < -3 → Quick Shot = True  
-  - If Score Delta < -3: Outside Shot Chance = 100%  
-  - Else: run normal playcall logic
+- Else if Score Delta < -3 → Quick Shot = True
 - Force Foul: True if 0 < Score Delta < 9, else False
 
-When Score Delta falls in neither Slow It Down nor Quick Shot for that band → use normal logic (no tempo or shot overrides).
+When Score Delta falls in neither Slow It Down nor Quick Shot for that band → use normal playcall logic (motion/set mix, playbook weights, focus sliders).
+
+**Implementation:** `BackEnd/models/turn_manager.py` → `set_playcalls()` (situational branches call `_select_motion_play_situational_slow` / `_select_set_play_situational_quick_shot`).
 
 ---
 
@@ -47,11 +44,12 @@ When Score Delta falls in neither Slow It Down nor Quick Shot for that band → 
 - If Force Foul = False: proceed to next step.
 - Override Offense Team’s Fast Break setting to 0 (temp override; revert when Slow It Down no longer applies).
 - Next step (if Force Foul = False): offense tempo = "slow".
+- **Playcall (HCO):** Call a **motion** play only. Select from motion plays that have a **non-zero percentage** in the offense team’s playbook settings (weighted by those percentages). If no motion play has a percentage assigned, choose any motion play at random. Playbook set-play percentages and motion/set mix do not apply. User Playcall Center overrides still take precedence when set.
 
 **When Quick Shot applies (per time-band table):**
 - Offense tempo = "fast".
-- Play focus / shot chances = per time-band table (Outside / Attack / Inside ratios, or 100% outside / normal logic in 0:01–0:30 as specified).
 - Override Defense Team's FCP & HCT settings to 0 (temp override; revert when Quick Shot no longer applies).
+- **Playcall (HCO):** Call a **set play** with **outside** shot focus only. All outside set plays are eligible; choose one at **uniform random**. Playbook percentages and motion/set mix do not apply. User Playcall Center overrides still take precedence when set.
 
 Temp overrides (Fast Break, FCP, HCT) are re-evaluated each turn and revert when the situation no longer applies.
 

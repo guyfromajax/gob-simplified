@@ -121,8 +121,8 @@ def get_situational_tempo_override(game, time_remaining_seconds):
 
 def get_situational_play_focus_override(game, time_remaining_seconds):
     """
-    When Quick Shot is active, returns (outside_ratio, attack_ratio, inside_ratio) per time-band table.
-    Band 0:01-0:30: if Score Delta < -3 → 100% outside; else None (normal playcall). Other bands: fixed ratios.
+    Deprecated for playcall selection (superseded by set-play-outside-only Quick Shot logic in set_playcalls).
+    Retained for reference; time-band outside/attack/inside ratios are no longer used to pick plays.
     """
     if not is_quick_shot(game, time_remaining_seconds):
         return None

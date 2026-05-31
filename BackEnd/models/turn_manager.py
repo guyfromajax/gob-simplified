@@ -2323,69 +2323,55 @@ class TurnManager:
             # No override, choose defense normally (will be set below)
             chosen_defense = None
         
-        # Level 1: Determine play type (motion vs set_play)
-        offense_setting = self.game.offense_team.strategy_settings.get("offense", 2)
-        
-        play_type_weights = {
-            0: {"motion": 100, "set_play": 0},
-            1: {"motion": 75, "set_play": 25},
-            2: {"motion": 50, "set_play": 50},
-            3: {"motion": 25, "set_play": 75},
-            4: {"motion": 0, "set_play": 100}
-        }
-        
-        weights = play_type_weights.get(offense_setting, {"motion": 50, "set_play": 50})
-        chosen_play_type = weighted_random_from_dict(weights)
-        
-        # Level 2: Determine play focus (inside/attack/outside)
-        # ✅ Situational Logic (Q4/OT): Quick Shot overrides to outside-heavy focus
+        # Level 1/2: Play type + focus (situational Q4/OT overrides normal selection)
         from BackEnd.utils import situational_logic as sl
         time_remaining = self.game.game_state.get("time_remaining")
-        focus_override = sl.get_situational_play_focus_override(self.game, time_remaining) if sl.is_situational_active(getattr(self.game, "quarter", None)) else None
-        if focus_override:
-            chosen_focus = sl.choose_focus_from_override(focus_override)
-        else:
-            inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
-            attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
-            outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
-            
-            total = inside_val + attack_val + outside_val
-            
-            if total == 0:
-                # Fallback if all are zero (shouldn't happen but safe)
-                chosen_focus = "inside"
+        quarter = getattr(self.game, "quarter", None)
+        slow_it_down = sl.is_situational_active(quarter) and sl.is_slow_it_down(self.game, time_remaining)
+        quick_shot = sl.is_situational_active(quarter) and sl.is_quick_shot(self.game, time_remaining)
+
+        if slow_it_down:
+            chosen_play_type = "motion"
+            chosen_focus = self._choose_focus_from_strategy_settings()
+            matching_plays = self._get_plays_by_type_and_focus(chosen_play_type, chosen_focus)
+            if not matching_plays:
+                print("⚠️ No motion plays found for Slow It Down, using fallback")
+                chosen_playcall = "Inside"
             else:
-                # Roll random number from 1 to total
-                roll = random.randint(1, total)
-                
-                if roll <= inside_val:
-                    chosen_focus = "inside"
-                elif roll <= inside_val + attack_val:
-                    chosen_focus = "attack"
-                else:
-                    chosen_focus = "outside"
-        
-        # Query plays collection for matching play (cached per game process to avoid 200+ DB round-trips per quarter)
-        # ✅ FIX: Motion plays don't filter by play_focus (focus is only for tracking/influence)
-        cache_key = (chosen_play_type, chosen_focus if chosen_play_type != "motion" else None)
-        if cache_key not in _plays_by_type_focus_cache:
-            if chosen_play_type == "motion":
-                query = {"play_type": chosen_play_type}
+                chosen_playcall = self._select_motion_play_situational_slow(matching_plays)["name"]
+        elif quick_shot:
+            chosen_play_type = "set_play"
+            chosen_focus = "outside"
+            matching_plays = self._get_plays_by_type_and_focus(chosen_play_type, chosen_focus)
+            if not matching_plays:
+                print("⚠️ No outside set plays found for Quick Shot, using fallback")
+                chosen_playcall = "Inside"
             else:
-                query = {"play_type": chosen_play_type, "play_focus": chosen_focus}
-            _plays_by_type_focus_cache[cache_key] = list(plays_collection.find(query))
-        matching_plays = _plays_by_type_focus_cache[cache_key]
-        
-        if not matching_plays:
-            # Fallback: if no plays match, log warning and use a default
-            print(f"⚠️ No plays found for {chosen_play_type}{'/' + chosen_focus if chosen_play_type != 'motion' else ''}, using fallback")
-            chosen_playcall = "Inside"  # Fallback to old system
+                chosen_playcall = self._select_set_play_situational_quick_shot(matching_plays)["name"]
         else:
-            # ✅ PLAYBOOK SYSTEM: Use weighted selection based on playbook settings
-            selected_play = self._select_play_with_playbook_weights(
-                matching_plays, chosen_play_type, chosen_focus
-            )
-            chosen_playcall = selected_play["name"]
+            offense_setting = self.game.offense_team.strategy_settings.get("offense", 2)
+            play_type_weights = {
+                0: {"motion": 100, "set_play": 0},
+                1: {"motion": 75, "set_play": 25},
+                2: {"motion": 50, "set_play": 50},
+                3: {"motion": 25, "set_play": 75},
+                4: {"motion": 0, "set_play": 100},
+            }
+            weights = play_type_weights.get(offense_setting, {"motion": 50, "set_play": 50})
+            chosen_play_type = weighted_random_from_dict(weights)
+            chosen_focus = self._choose_focus_from_strategy_settings()
+            matching_plays = self._get_plays_by_type_and_focus(chosen_play_type, chosen_focus)
+            if not matching_plays:
+                print(
+                    f"⚠️ No plays found for {chosen_play_type}"
+                    f"{'/' + chosen_focus if chosen_play_type != 'motion' else ''}, using fallback"
+                )
+                chosen_playcall = "Inside"
+            else:
+                selected_play = self._select_play_with_playbook_weights(
+                    matching_plays, chosen_play_type, chosen_focus
+                )
+                chosen_playcall = selected_play["name"]
         
         # Defense setting - use override if set, otherwise choose normally
         # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
@@ -2645,6 +2631,71 @@ class TurnManager:
             return None
         
         return None
+
+    def _choose_focus_from_strategy_settings(self) -> str:
+        """Level-2 focus from offense inside/attack/outside strategy sliders."""
+        inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
+        attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
+        outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
+        total = inside_val + attack_val + outside_val
+        if total == 0:
+            return "inside"
+        roll = random.randint(1, total)
+        if roll <= inside_val:
+            return "inside"
+        if roll <= inside_val + attack_val:
+            return "attack"
+        return "outside"
+
+    def _get_plays_by_type_and_focus(self, play_type: str, play_focus: str | None) -> list:
+        """Cached plays query; motion ignores play_focus."""
+        cache_key = (play_type, play_focus if play_type != "motion" else None)
+        if cache_key not in _plays_by_type_focus_cache:
+            if play_type == "motion":
+                query = {"play_type": play_type}
+            else:
+                query = {"play_type": play_type, "play_focus": play_focus}
+            _plays_by_type_focus_cache[cache_key] = list(plays_collection.find(query))
+        return _plays_by_type_focus_cache[cache_key]
+
+    def _select_motion_play_situational_slow(self, matching_plays: list) -> dict:
+        """
+        Slow It Down (Q4/OT): motion only — weighted by playbook motion percentages when any > 0,
+        otherwise uniform random among all motion plays.
+        """
+        valid_plays = [p for p in matching_plays if p.get("name") != "To Be Added"]
+        if not valid_plays:
+            valid_plays = matching_plays
+
+        playbook_settings = self._load_playbook_settings(self.game.offense_team.team_id)
+        weights = {}
+        if playbook_settings:
+            for play in valid_plays:
+                play_name = play.get("name")
+                play_id = play.get("play_id") or play.get("_id")
+                percentage = resolve_playbook_percentage(
+                    playbook_settings.get("motion", {}),
+                    play_id=play_id,
+                    play_name=play_name,
+                    default=0,
+                )
+                if percentage > 0:
+                    weights[play_name] = percentage
+
+        if weights:
+            selected_name = weighted_random_from_dict(weights)
+            for play in valid_plays:
+                if play.get("name") == selected_name:
+                    return play
+
+        return random.choice(valid_plays)
+
+    def _select_set_play_situational_quick_shot(self, matching_plays: list) -> dict:
+        """Quick Shot (Q4/OT): outside set plays only, uniform random (ignores playbook settings)."""
+        valid_plays = [p for p in matching_plays if p.get("name") != "To Be Added"]
+        if not valid_plays:
+            valid_plays = matching_plays
+        return random.choice(valid_plays)
 
     def _select_play_with_playbook_weights(self, matching_plays, play_type, play_focus=None):
         """
