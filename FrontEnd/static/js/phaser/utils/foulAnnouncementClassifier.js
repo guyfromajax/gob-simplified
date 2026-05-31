@@ -18,6 +18,8 @@ export function isBonusFreeThrowFoulTurn(turnData) {
 }
 
 export function isShotResultShootingFoulTurn(turnData) {
-  return turnData?.result_type === 'MISS' && hasFreeThrowContinuation(turnData);
+  const rt = turnData?.result_type;
+  const isMissShotResult = rt === 'MISS' || rt === 'PUTBACK_MISS';
+  return isMissShotResult && hasFreeThrowContinuation(turnData);
 }
 

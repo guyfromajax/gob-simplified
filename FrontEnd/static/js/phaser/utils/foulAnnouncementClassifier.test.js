@@ -41,3 +41,24 @@ test("classifies MISS + FREE_THROW continuation as shooting foul shot result", (
   assert.equal(isBonusFreeThrowFoulTurn(turn), false);
 });
 
+test("classifies PUTBACK_MISS + FREE_THROW continuation as shooting foul shot result", () => {
+  const turn = {
+    result_type: "PUTBACK_MISS",
+    foul_team: "DEFENSE",
+    next_play_type: "FREE_THROW",
+    free_throws_remaining: 2,
+    foul_player_id: "def-1",
+  };
+  assert.equal(isShotResultShootingFoulTurn(turn), true);
+  assert.equal(isBonusFreeThrowFoulTurn(turn), false);
+});
+
+test("does not classify PUTBACK_MISS without free throws as shooting foul", () => {
+  const turn = {
+    result_type: "PUTBACK_MISS",
+    next_play_type: "HCO",
+    free_throws_remaining: 0,
+  };
+  assert.equal(isShotResultShootingFoulTurn(turn), false);
+});
+

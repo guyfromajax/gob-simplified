@@ -1900,11 +1900,26 @@ def _airball_announcement(
     }
 
 
+_SHOOTING_FOUL_ON_MISS_RESULT_TYPES = frozenset({"MISS", "PUTBACK_MISS"})
+
+
+def _find_terminal_shoot_step(steps: List[AnimationStep]) -> Optional[AnimationStep]:
+    """Last step whose start actions include ``shoot`` (FB lane-pass may be
+    ``steps[-1]`` when shot-motion build failed). Falls back to ``steps[-1]``."""
+    if not steps:
+        return None
+    for step in reversed(steps):
+        actions = (step.get("start") or {}).get("action") or {}
+        if any(v == "shoot" for v in actions.values()):
+            return step
+    return steps[-1]
+
+
 def _shooting_foul_on_miss_announcement(
     turn_result: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
-    """``Shooting Foul!`` for MISS turns that lead to free throws."""
-    if (turn_result.get("result_type") or "").upper() != "MISS":
+    """``Shooting Foul!`` for missed shot-result turns that lead to free throws."""
+    if (turn_result.get("result_type") or "").upper() not in _SHOOTING_FOUL_ON_MISS_RESULT_TYPES:
         return None
     next_play = str(turn_result.get("next_play_type") or "").upper()
     has_ft = bool(turn_result.get("free_throws_remaining")) or next_play == "FREE_THROW"
@@ -2071,8 +2086,13 @@ def _build_post_shot_sub_steps(
     if result_type not in ("MAKE", "MISS", "BLOCK"):
         return
 
-    shoot_step = steps[-1]
-    shooter_id = _safe_id(turn_result.get("shooter"))
+    shoot_step = _find_terminal_shoot_step(steps)
+    if shoot_step is None:
+        return
+    shooter_id = (
+        _safe_id(turn_result.get("shooter"))
+        or _safe_id(turn_result.get("shooter_id"))
+    )
     shot_spot = shoot_step["end"]["coords"].get(shooter_id) if shooter_id else None
     if not shooter_id or shot_spot is None:
         return  # Can't build ball flight without shooter coord.

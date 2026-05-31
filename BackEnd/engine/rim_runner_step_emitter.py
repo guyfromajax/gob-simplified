@@ -43,6 +43,7 @@ See ``_documentation_master/05_Animation_System/Advance_Triggers.md`` —
 
 from __future__ import annotations
 
+import logging
 import random
 from typing import Any, Dict, List, Optional
 
@@ -1622,6 +1623,52 @@ def _stamp_hco_setup(
     }
 
 
+def _ensure_turn_shooter_for_post_shot(turn_result: Dict[str, Any]) -> None:
+    """``_build_post_shot_sub_steps`` reads ``turn_result[\"shooter\"]``.
+    Rim Runner sometimes only has ``shooter_id`` or ``roles`` populated."""
+    if _safe_id(turn_result.get("shooter")):
+        return
+    sid = _safe_id(turn_result.get("shooter_id"))
+    if sid:
+        turn_result["shooter"] = sid
+        return
+    roles = turn_result.get("roles") or {}
+    phase = roles.get("rim_runner_burst_phase") or {}
+    rr_id = _safe_id(phase.get("rr_id"))
+    if rr_id:
+        turn_result["shooter"] = rr_id
+        return
+    fb_shooter = _safe_id(roles.get("shooter"))
+    if fb_shooter:
+        turn_result["shooter"] = fb_shooter
+
+
+def _warn_if_post_shot_sfx_missing(
+    turn_result: Dict[str, Any],
+    steps: List[AnimationStep],
+) -> None:
+    """UESS contract: MAKE/MISS/BLOCK shot branches must emit [ball_flight] SFX."""
+    rt = (turn_result.get("result_type") or "").upper()
+    if rt not in ("MAKE", "MISS", "BLOCK"):
+        return
+    has_shot_flight_sfx = False
+    for step in steps:
+        start = step.get("start") or {}
+        if start.get("ball_motion_style") == "shot" and (
+            start.get("sfx_on_ball_release") or start.get("sfx_on_ball_arrival")
+        ):
+            has_shot_flight_sfx = True
+            break
+    if not has_shot_flight_sfx:
+        logging.warning(
+            "🎵 [RR POST_SHOT SFX] result_type=%s fast_break_play=%s steps=%d "
+            "— no [ball_flight] shot SFX cues after _build_post_shot_sub_steps",
+            rt,
+            turn_result.get("fast_break_play"),
+            len(steps),
+        )
+
+
 def _finalize_rr_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -1660,6 +1707,7 @@ def _finalize_rr_steps(
     # isn't a shoot step (the helper guards both cases internally).
     off_lineup = getattr(getattr(game, "offense_team", None), "lineup", {}) or {}
     def_lineup = getattr(getattr(game, "defense_team", None), "lineup", {}) or {}
+    _ensure_turn_shooter_for_post_shot(turn_result)
     try:
         from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
         away_team_id = getattr(getattr(game, "away_team", None), "team_id", None)
@@ -1673,8 +1721,8 @@ def _finalize_rr_steps(
             steps, turn_result, off_lineup, def_lineup, away_offense,
         )
     except Exception:
-        import logging
         logging.exception("FB post-shot sub-steps failed")
+    _warn_if_post_shot_sfx_missing(turn_result, steps)
 
     _stamp_hco_setup(turn_result, game, steps)
 
