@@ -130,8 +130,11 @@ Reusable across turn types. Live in [`BackEnd/utils/transition_bridge.py`](../..
 - `build_final_coords(game)` — snapshots `player.coords` at end of every turn.
 - `build_final_ball_handler_id(turn_result)` — resolves the end-of-turn BH.
 - `stamp_tween_durations(start, end_coords, T, off_lineup, def_lineup)` — writes per-player tween durations.
+- `build_foul_announcement(text, team, fouler_id, *, hold_ms=1000, style="primary", sfx_key="foul", extra_meta=None)` — canonical step-announcement dict for any foul event. Stamps `meta.sfx` so the whistle always fires at overlay mount. Use this in every UESS step emitter that emits a foul announcement; constructing the dict by hand is what caused the DREB OTB foul to ship silent (no `meta.sfx`, no whistle). Current consumers: `dreb_step_emitter` (OTB), `skeleton_step_emitter` (shooting-foul-on-miss).
 
 Both `final_coords` and `final_ball_handler_id` are stamped unconditionally on every turn by `_append_turn` in [`game_manager.py`](../../BackEnd/models/game_manager.py). Next-turn emitters read from `prior_turn.final_coords` / `prior_turn.final_ball_handler_id`.
+
+**SFX architecture invariant.** UESS step announcements carry their SFX via `announcement.meta.sfx` (a key resolved by [`gameSfx.js`](../../FrontEnd/static/js/phaser/utils/gameSfx.js); `"foul"` → `whistle-1-lowervol.wav` today). The frontend's `runStepAnnouncement` is deliberately not allowed to hardcode SFX by announcement text — see comment at [`animationPlayback.js:631`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L631). All SFX wiring lives in backend emitters; `build_foul_announcement` exists to enforce that for foul-type events.
 
 ---
 

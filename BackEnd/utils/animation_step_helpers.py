@@ -765,3 +765,77 @@ def log_fb_animation_steps(
                         gap,
                     )
         prev_end_coords = dict(end_coords)
+
+
+# ----------------------------------------------------------------------------
+# Step-announcement helpers
+# ----------------------------------------------------------------------------
+#
+# UESS step emitters emit announcement dicts via `step["end"]["announcement"]`
+# (or directly on the step) that the frontend's runStepAnnouncement picks up.
+# The frontend reads SFX from `announcement.meta.sfx` (architecture comment
+# at animationPlayback.js:631 — "SFX comes from announcement.meta.sfx
+# (backend-stamped); no FE hardcode."). Building these dicts inline is
+# error-prone — the OTB foul on rebound shipped without `meta.sfx` and was
+# silent for weeks. Use this helper instead so the whistle SFX is impossible
+# to forget.
+#
+# SFX key resolution lives in gameSfx.js — `"foul"` → `whistle-1-lowervol.wav`
+# today. Other foul-type SFX keys can be added there without touching emitters.
+
+
+def build_foul_announcement(
+    text: str,
+    team: str,
+    fouler_id: Any,
+    *,
+    hold_ms: int = 1000,
+    style: str = "primary",
+    sfx_key: str = "foul",
+    extra_meta: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Canonical UESS step-announcement dict for any foul event.
+
+    Stamps ``meta.sfx = sfx_key`` (default ``"foul"`` → whistle) so the
+    whistle SFX always fires at announcement mount. This is the single
+    place foul announcements should be constructed inside UESS step
+    emitters; bypassing it risks silent whistles (see dreb_step_emitter
+    OTB regression that motivated this helper).
+
+    Args:
+        text: Announcement headline (e.g. "Over The Back!",
+            "Shooting Foul!", "BLOCKING FOUL!"). Frontend renders verbatim.
+        team: Announcement-team key, one of ``"home"`` / ``"away"`` /
+            ``"neutral"``. Drives accent color on the overlay card.
+        fouler_id: Player ID of the foul committer; coerced to str.
+        hold_ms: How long the overlay stays on screen. Default 1000ms,
+            matches existing foul announcements.
+        style: ``"primary"`` (default) or ``"shooting_foul"`` — the
+            latter triggers the dual-row chrome on the frontend.
+        sfx_key: Key resolved by gameSfx.js. Default ``"foul"`` →
+            ``whistle-1-lowervol.wav``. Override only if a specific foul
+            type wants a different sound (e.g. shot-clock violation uses
+            ``"shot_clock_violation"`` → ``whistle-3.mp3``).
+        extra_meta: Optional dict merged into ``meta`` alongside the SFX
+            key. Use for foul-type-specific metadata (decision pills,
+            etc.) without overriding ``meta.sfx``.
+
+    Returns:
+        Announcement dict ready to assign to ``step["end"]["announcement"]``
+        or used directly as ``announcement`` on a step.
+    """
+    meta: Dict[str, Any] = {"sfx": sfx_key}
+    if extra_meta:
+        # Caller-supplied meta is merged last so explicit overrides win, but
+        # we re-apply sfx_key at the end so a caller can't accidentally
+        # drop the whistle by passing extra_meta={"sfx": None}.
+        meta.update(extra_meta)
+        meta["sfx"] = sfx_key
+    return {
+        "text": text,
+        "team": team,
+        "hold_ms": hold_ms,
+        "style": style,
+        "player_data": {"playerId": str(fouler_id) if fouler_id is not None else ""},
+        "meta": meta,
+    }

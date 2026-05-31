@@ -41,6 +41,7 @@ from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
     _player_lookup_by_id,
+    build_foul_announcement,
     pass_arrival_sfx,
     pass_release_sfx,
     rattle_hop_sfx,
@@ -1915,15 +1916,14 @@ def _shooting_foul_on_miss_announcement(
     )
     if not fouler_id:
         return None
-    return {
-        "text": "Shooting Foul!",
-        "team": "neutral",
-        "hold_ms": 1000.0,
-        "style": "shooting_foul",
-        "player_data": {"playerId": str(fouler_id)},
-        # Whistle SFX carried on payload; FE plays at overlay mount.
-        "meta": {"sfx": "foul"},
-    }
+    # Canonical UESS foul-announcement builder (single source for foul
+    # announcement payloads + meta.sfx). See animation_step_helpers.py.
+    return build_foul_announcement(
+        text="Shooting Foul!",
+        team="neutral",
+        fouler_id=fouler_id,
+        style="shooting_foul",
+    )
 
 
 def _stamp_shooting_foul_on_miss_end(

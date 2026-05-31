@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import HCO_STEP_T_FLOOR_GAME_SECONDS
 from BackEnd.utils.animation_step_helpers import (
+    build_foul_announcement,
     rebound_attemptor_ids,
     stamp_rebound_capture_player_motion,
     stamp_tween_durations,
@@ -204,16 +205,18 @@ def build_dreb_animation_steps(
         next_step = {"kind": "next_step", "index": 999}
 
     if otb_foul:
-        announcement = {
-            "text": "Over The Back!",
-            "team": otb_foul.get("announcement_team")
-            or ("home" if away_offense else "away"),
-            "hold_ms": 1000,
-            "style": "primary",
-            "player_data": {
-                "playerId": str(otb_foul.get("fouler_id") or rebounder_id)
-            },
-        }
+        # Canonical UESS foul-announcement builder. Stamps meta.sfx="foul"
+        # so the whistle fires at overlay mount. Going through the helper
+        # is what guarantees the SFX — building this dict by hand is what
+        # caused OTB to ship silent originally.
+        announcement = build_foul_announcement(
+            text="Over The Back!",
+            team=(
+                otb_foul.get("announcement_team")
+                or ("home" if away_offense else "away")
+            ),
+            fouler_id=otb_foul.get("fouler_id") or rebounder_id,
+        )
     else:
         announcement = {
             "text": "Rebound!",
