@@ -42,8 +42,9 @@ def build_alpha_welcome_html(*, otp_code: str) -> str:
     return (
         "<p>Hey Coach,</p>"
         "<p>Welcome to the Geeked Out Basketball alpha. Thanks for your patience while we "
-        "polish the experience — we push feature updates often, including Coach's Leaderboard "
-        "and Geek Points.</p>"
+        "continue to build the experience. We've just wrapped a major round of feature updates and "
+        "are excited to release the next wave of alpha access codes. Yours is below.</p>"
+        "<p>So jump in, start coaching, and start racking up titles and Geek Points!</p>"
         f'<p>Head to <a href="{signup_url}">{signup_url}</a> to create your account.</p>'
         "<p><strong>Your Access Code:</strong></p>"
         f'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{safe_code}</p>'
