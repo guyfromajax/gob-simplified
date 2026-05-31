@@ -262,20 +262,18 @@
     }
     .rtgp-inner { max-width: 1320px; margin: 0 auto; padding: 0 48px; }
 
-    .rtgp-shot-wrap {
+    .gp-frame { position: relative; max-width: 1320px; margin: 0 auto; }
+    .gp-stage {
       position: relative;
-      margin: 0 auto 36px;
-      max-width: 1320px;
-      border-radius: 14px;
       border: 1px solid var(--border-lt);
-      box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 8px 32px rgba(0,0,0,0.35);
+      border-bottom: 0;
+      border-radius: 14px 14px 0 0;
       overflow: hidden;
-      background: #0a0a14;
+      box-shadow: 0 36px 110px rgba(0,0,0,0.7);
     }
-    .rtgp-shot-wrap img { width: 100%; height: auto; display: block; }
+    .gp-stage img { width: 100%; height: auto; display: block; }
 
-    .rtgp-markers { position: absolute; inset: 0; pointer-events: none; }
-    .rtgp-marker {
+    .gp-pin {
       position: absolute;
       width: clamp(22px, 2.2vw, 30px);
       height: clamp(22px, 2.2vw, 30px);
@@ -288,72 +286,51 @@
       background: rgba(247,148,32,0.16);
       border: 1px solid rgba(247,148,32,0.6);
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      pointer-events: auto;
-      cursor: default;
+      cursor: pointer;
       transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s;
       z-index: 2;
     }
-    .rtgp-marker.is-active,
-    .rtgp-marker:hover {
+    .gp-pin.is-active,
+    .gp-pin:hover {
       background: var(--orange);
       border-color: var(--w);
       color: var(--w);
       box-shadow: 0 0 0 4px rgba(247,148,32,0.25), 0 0 20px rgba(247,148,32,0.45);
-      transform: translate(-50%, -50%) scale(1.08);
-      animation: markerPulse 1.4s ease-in-out infinite;
+      transform: translate(-50%, -50%) scale(1.16);
+      animation: gpPinPulse 1.4s ease-in-out infinite;
     }
-    @keyframes markerPulse {
+    @keyframes gpPinPulse {
       0%, 100% { box-shadow: 0 0 0 4px rgba(247,148,32,0.25), 0 0 20px rgba(247,148,32,0.45); }
       50% { box-shadow: 0 0 0 8px rgba(247,148,32,0.12), 0 0 28px rgba(247,148,32,0.55); }
     }
 
-    .rtgp-legend {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      max-width: 1320px;
-      margin: 0 auto;
+    .gp-caption {
+      display: flex; align-items: center; gap: 16px;
+      max-width: 1320px; margin: 0 auto;
+      padding: 20px 26px; min-height: 76px;
+      background: linear-gradient(180deg, #0e0e18 0%, #0a0a12 100%);
+      border: 1px solid var(--border-lt);
+      border-top: 2px solid rgba(247,148,32,0.65);
+      border-radius: 0 0 14px 14px;
+      box-shadow: 0 36px 110px rgba(0,0,0,0.5);
     }
-    .rtgp-legend-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 16px;
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      cursor: default;
-      transition: border-color 0.2s, background 0.2s, transform 0.2s;
-    }
-    .rtgp-legend-item:hover,
-    .rtgp-legend-item.is-active {
-      border-color: rgba(247,148,32,0.45);
-      background: rgba(247,148,32,0.06);
-      transform: translateY(-2px);
-    }
-    .rtgp-legend-num {
-      flex-shrink: 0;
-      width: 28px; height: 28px;
+    .gp-caption-tag {
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-family: var(--bebas);
-      font-size: 14px;
-      color: var(--orange);
-      background: rgba(247,148,32,0.16);
-      border: 1px solid rgba(247,148,32,0.5);
-      border-radius: 6px;
-      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      font-family: var(--bebas); font-size: 17px; line-height: 1;
+      color: var(--bg); background: var(--orange); border: 1px solid #fff;
     }
-    .rtgp-legend-item:hover .rtgp-legend-num,
-    .rtgp-legend-item.is-active .rtgp-legend-num {
-      background: var(--orange);
-      border-color: var(--w);
-      color: var(--w);
+    .gp-caption-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .gp-caption-label { font-family: var(--bebas); font-size: 1.42rem; letter-spacing: 0.02em; line-height: 1.05; color: #fff; }
+    .gp-caption-hint { font-family: var(--inter); font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--w45); }
+    .gp-caption-ticks { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+    .gp-caption-tick {
+      width: 22px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.14); cursor: pointer;
+      transition: background 0.18s, transform 0.18s;
     }
-    .rtgp-legend-label {
-      font-family: var(--bebas);
-      font-size: clamp(0.95rem, 1.4vw, 1.15rem);
-      letter-spacing: 0.02em;
-      color: var(--w90);
-      line-height: 1.2;
-    }
+    .gp-caption-tick:hover { transform: scaleY(1.6); }
+    .gp-caption-tick.is-active { background: var(--orange); }
 
     /* ══════════════════════════════════ QUOTE BREAKER ══════════════════════════════════ */
     .howto-quote {
@@ -680,8 +657,11 @@
       .footer-hed { font-size: 4rem; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .objection-strip { flex-direction: column; gap: 8px; }
-      .rtgp-legend { grid-template-columns: 1fr; }
       .attr-chips { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 680px) {
+      .gp-caption-ticks { display: none; }
+      .gp-caption-label { font-size: 1.18rem; }
     }
   </style>
 </head>
@@ -779,31 +759,27 @@
         <p class="section-sub">Every possession plays out live. Read the matchup and call the play in real time — or sit back and let your coaching presets do the work.</p>
       </div>
 
-      <div class="rtgp-shot-wrap anim" id="rtgp-shot">
-        <img src="./images/homepage-v2/rtgp-gameplay.png" alt="Real-time gameplay screen with live stats and playcalling" loading="lazy">
-        <div class="rtgp-markers" aria-hidden="true">
-          <span class="rtgp-marker" data-n="1" style="left:44%;top:6%;">1</span>
-          <span class="rtgp-marker" data-n="2" style="left:55%;top:40%;">2</span>
-          <span class="rtgp-marker" data-n="3" style="left:1.5%;top:26%;">3</span>
-          <span class="rtgp-marker" data-n="4" style="left:83%;top:26%;">4</span>
-          <span class="rtgp-marker" data-n="5" style="left:33%;top:52%;">5</span>
-          <span class="rtgp-marker" data-n="6" style="left:9%;top:74%;">6</span>
-          <span class="rtgp-marker" data-n="7" style="left:91%;top:64%;">7</span>
-          <span class="rtgp-marker" data-n="8" style="left:67%;top:91%;">8</span>
-          <span class="rtgp-marker" data-n="9" style="left:40%;top:83%;">9</span>
+      <div class="gp-frame anim" id="gp-frame">
+        <div class="gp-stage">
+          <img src="./images/homepage-v2/rtgp-gameplay.png" alt="Live GOB gameplay" loading="lazy">
+          <span class="gp-pin" data-n="1" style="left:44%;top:6%;">1</span>
+          <span class="gp-pin" data-n="2" style="left:55%;top:40%;">2</span>
+          <span class="gp-pin" data-n="3" style="left:1.5%;top:26%;">3</span>
+          <span class="gp-pin" data-n="4" style="left:83%;top:26%;">4</span>
+          <span class="gp-pin" data-n="5" style="left:33%;top:52%;">5</span>
+          <span class="gp-pin" data-n="6" style="left:9%;top:74%;">6</span>
+          <span class="gp-pin" data-n="7" style="left:91%;top:64%;">7</span>
+          <span class="gp-pin" data-n="8" style="left:67%;top:91%;">8</span>
+          <span class="gp-pin" data-n="9" style="left:40%;top:83%;">9</span>
         </div>
-      </div>
-
-      <div class="rtgp-legend anim" id="rtgp-legend">
-        <div class="rtgp-legend-item" data-n="1"><span class="rtgp-legend-num">1</span><span class="rtgp-legend-label">Scoreboard</span></div>
-        <div class="rtgp-legend-item" data-n="2"><span class="rtgp-legend-num">2</span><span class="rtgp-legend-label">Event Broadcast</span></div>
-        <div class="rtgp-legend-item" data-n="3"><span class="rtgp-legend-num">3</span><span class="rtgp-legend-label">Player Offensive Stats</span></div>
-        <div class="rtgp-legend-item" data-n="4"><span class="rtgp-legend-num">4</span><span class="rtgp-legend-label">Player Defensive Stats</span></div>
-        <div class="rtgp-legend-item" data-n="5"><span class="rtgp-legend-num">5</span><span class="rtgp-legend-label">Active Player Tracking</span></div>
-        <div class="rtgp-legend-item" data-n="6"><span class="rtgp-legend-num">6</span><span class="rtgp-legend-label">Live Team Stats</span></div>
-        <div class="rtgp-legend-item" data-n="7"><span class="rtgp-legend-num">7</span><span class="rtgp-legend-label">Team Play-Call Tendencies</span></div>
-        <div class="rtgp-legend-item" data-n="8"><span class="rtgp-legend-num">8</span><span class="rtgp-legend-label">Timeout &amp; Pause</span></div>
-        <div class="rtgp-legend-item" data-n="9"><span class="rtgp-legend-num">9</span><span class="rtgp-legend-label">Live Playcalling</span></div>
+        <div class="gp-caption" aria-live="polite">
+          <span class="gp-caption-tag">1</span>
+          <div class="gp-caption-body">
+            <span class="gp-caption-label">Scoreboard</span>
+            <span class="gp-caption-hint">Hover the markers to explore the live game</span>
+          </div>
+          <div class="gp-caption-ticks"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -1030,29 +1006,68 @@
 
     applyTweaks();
 
-    /* RTGP marker ↔ legend hover linking */
-    (function initRtgpLinking() {
-      const markers = document.querySelectorAll('.rtgp-marker');
-      const legendItems = document.querySelectorAll('.rtgp-legend-item');
-      if (!markers.length || !legendItems.length) return;
+    /* RTGP interactive caption */
+    (function initGpCaption() {
+      const GP_FEATURES = {
+        '1': 'Scoreboard',
+        '2': 'Event Broadcast',
+        '3': 'Player Offensive Stats',
+        '4': 'Player Defensive Stats',
+        '5': 'Active Player Tracking',
+        '6': 'Live Team Stats',
+        '7': 'Team Play-Call Tendencies',
+        '8': 'Timeout & Pause',
+        '9': 'Live Playcalling'
+      };
 
-      function setActive(n) {
-        markers.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
-        legendItems.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
-      }
-      function clearActive() {
-        markers.forEach(el => el.classList.remove('is-active'));
-        legendItems.forEach(el => el.classList.remove('is-active'));
+      const frame = document.getElementById('gp-frame');
+      if (!frame) return;
+
+      const pins = frame.querySelectorAll('.gp-pin');
+      const captionTag = frame.querySelector('.gp-caption-tag');
+      const captionLabel = frame.querySelector('.gp-caption-label');
+      const captionHint = frame.querySelector('.gp-caption-hint');
+      const ticksContainer = frame.querySelector('.gp-caption-ticks');
+      let hasInteracted = false;
+
+      Object.keys(GP_FEATURES).forEach(n => {
+        const tick = document.createElement('span');
+        tick.className = 'gp-caption-tick' + (n === '1' ? ' is-active' : '');
+        tick.dataset.n = n;
+        tick.setAttribute('role', 'button');
+        tick.setAttribute('tabindex', '0');
+        tick.setAttribute('aria-label', GP_FEATURES[n]);
+        ticksContainer.appendChild(tick);
+      });
+
+      const ticks = ticksContainer.querySelectorAll('.gp-caption-tick');
+
+      function setActive(n, fromInteraction) {
+        if (fromInteraction && !hasInteracted) {
+          hasInteracted = true;
+          captionHint.textContent = 'Live on the court';
+        }
+        captionTag.textContent = n;
+        captionLabel.textContent = GP_FEATURES[n] || '';
+        pins.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
+        ticks.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
       }
 
-      markers.forEach(el => {
-        el.addEventListener('mouseenter', () => setActive(el.dataset.n));
-        el.addEventListener('mouseleave', clearActive);
-      });
-      legendItems.forEach(el => {
-        el.addEventListener('mouseenter', () => setActive(el.dataset.n));
-        el.addEventListener('mouseleave', clearActive);
-      });
+      function bindActivate(el) {
+        const activate = () => setActive(el.dataset.n, true);
+        el.addEventListener('mouseenter', activate);
+        el.addEventListener('click', activate);
+        el.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            activate();
+          }
+        });
+      }
+
+      pins.forEach(bindActivate);
+      ticks.forEach(bindActivate);
+      setActive('1');
     })();
 
     /* Sticky nav */
