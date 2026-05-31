@@ -51,17 +51,15 @@
       --border:     rgba(255,255,255,0.10);
       --border-lt:  rgba(255,255,255,0.20);
       --bebas:      'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-      /* CTAs: Google Bebas Neue only (all caps), not Pro */
       --bebas-neue-cta: 'Bebas Neue', sans-serif;
       --inter:      'Inter', sans-serif;
       --max:        1240px;
     }
 
-    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { font-size: 16px; scroll-behavior: smooth; }
     body { font-family: var(--inter); background: var(--bg); color: var(--w90); line-height: 1.6; -webkit-font-smoothing: antialiased; }
-    img { display: block; max-width: 100%; }
+    img { display: block; max-width: 100%; height: auto; }
     a { text-decoration: none; color: inherit; }
 
     .wrap { max-width: var(--max); margin: 0 auto; padding: 0 48px; }
@@ -73,21 +71,34 @@
       text-transform: uppercase;
     }
 
-    /* Dot texture */
     .dots {
       position: absolute; inset: 0; pointer-events: none;
       background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
       background-size: 36px 36px;
     }
 
-    /* ══════════════════════════════════
-       NAV
-    ══════════════════════════════════ */
-    /* -- Nav: auth-bar overrides for dark homepage -- */
+    /* Shared section typography */
+    .section-eyebrow {
+      font-family: var(--bebas); font-size: 11px; letter-spacing: 0.22em;
+      color: var(--orange); text-transform: uppercase; margin-bottom: 16px;
+    }
+    .section-hed {
+      font-family: var(--bebas);
+      font-size: clamp(2.75rem, 6vw, 5.25rem);
+      line-height: 0.95; letter-spacing: 0.01em; color: var(--w);
+      margin-bottom: 16px;
+    }
+    .section-hed .accent { color: var(--orange); }
+    .section-sub {
+      font-size: clamp(1rem, 1.3vw, 1.18rem);
+      color: var(--w70); max-width: 560px; line-height: 1.7;
+    }
+    .section-intro { margin-bottom: 48px; }
+
+    /* ══════════════════════════════════ NAV ══════════════════════════════════ */
     body.has-auth-bar { padding-top: 0 !important; }
     .auth-bar.gob-hp-nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      /* Align with global nav #12161C + glass */
       background: rgba(18, 22, 28, 0.88);
       backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -105,13 +116,15 @@
       letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.65);
       cursor: pointer; transition: color 0.15s ease; position: relative;
     }
-    .auth-bar.gob-hp-nav .nav-tutorials-link:hover, .auth-bar.gob-hp-nav .nav-tutorials-link:focus-visible { color: #ffffff; outline: none; }
+    .auth-bar.gob-hp-nav .nav-tutorials-link:hover,
+    .auth-bar.gob-hp-nav .nav-tutorials-link:focus-visible { color: #ffffff; outline: none; }
     .auth-bar.gob-hp-nav .nav-tutorials-link::after {
       content: ''; position: absolute; left: 20px; right: 0; bottom: -3px; height: 1px;
       background: rgba(255,255,255,0.6); transform: scaleX(0); transform-origin: left center;
       transition: transform 0.18s ease;
     }
-    .auth-bar.gob-hp-nav .nav-tutorials-link:hover::after, .auth-bar.gob-hp-nav .nav-tutorials-link:focus-visible::after { transform: scaleX(1); }
+    .auth-bar.gob-hp-nav .nav-tutorials-link:hover::after,
+    .auth-bar.gob-hp-nav .nav-tutorials-link:focus-visible::after { transform: scaleX(1); }
     .auth-bar.gob-hp-nav .nav-tutorials-icon { flex-shrink: 0; display: block; }
     .auth-bar.gob-hp-nav .nav-tutorials-label { display: inline-block; }
     .auth-bar.gob-hp-nav .nav-tutorials-link:focus-visible {
@@ -141,22 +154,17 @@
     #nav-cta.nav-cta-visible { opacity: 1; pointer-events: auto; transform: none; }
     #nav-cta:hover { background: var(--orange-dk); }
 
-    /* ══════════════════════════════════
-       HERO — cinematic full-bleed
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ HERO ══════════════════════════════════ */
     .hero {
       position: relative; height: 100vh; min-height: 640px;
       display: flex; align-items: center; justify-content: center;
       overflow: hidden; text-align: center;
     }
-    .hero-bg {
-      position: absolute; inset: 0; z-index: 0;
-    }
+    .hero-bg { position: absolute; inset: 0; z-index: 0; }
     .hero-bg img {
       width: 100%; height: 100%; object-fit: cover; object-position: center 15%;
       filter: saturate(0.7) brightness(0.9);
     }
-    /* Cinematic gradient: edges dark, center shows the game */
     .hero-overlay {
       position: absolute; inset: 0; z-index: 1;
       background:
@@ -176,7 +184,6 @@
     }
     .hero-hed {
       font-family: var(--bebas);
-      /* Tuned so “Build A Program.” fits one line above the fold on typical laptop widths */
       font-size: clamp(2.5rem, 4.2vw + 1.25rem, 6rem);
       line-height: 0.94; letter-spacing: 0.01em; color: var(--w);
     }
@@ -187,7 +194,6 @@
       max-width: 520px; line-height: 1.7;
     }
     .hero-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-    /* Primary CTA — brand orange (matches nav Play The Alpha) */
     .btn-green {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 16px 48px; font-family: var(--bebas-neue-cta); font-size: 1.25rem; letter-spacing: 0.1em;
@@ -201,8 +207,8 @@
       background: var(--orange-dk); transform: translateY(-2px);
       box-shadow: 0 10px 40px rgba(247, 148, 32, 0.55);
     }
+    .btn-green--lg { padding: 18px 52px; font-size: 1.35rem; }
     .hero-microcopy { font-size: 0.8rem; color: var(--w45); font-style: italic; }
-    /* Scroll indicator */
     .hero-scroll {
       position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
       z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -218,11 +224,9 @@
       50% { transform: scaleY(1); transform-origin: top; }
     }
 
-    /* ══════════════════════════════════
-       STATS STRIP — navy, numbers as type
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ STATS STRIP ══════════════════════════════════ */
     .stats-strip {
-      position: relative; overflow: hidden;
+      position: relative; overflow: hidden; display: none;
       background: linear-gradient(135deg, var(--navy-lt) 0%, var(--navy) 55%, var(--navy-dk) 100%);
     }
     .stats-grid {
@@ -246,143 +250,291 @@
       color: rgba(255,255,255,0.45); text-transform: uppercase; line-height: 1.4;
     }
 
-    /* ══════════════════════════════════
-       PILLARS — asymmetric, on navy
-    ══════════════════════════════════ */
-    .pillars {
+    /* ══════════════════════════════════ REAL-TIME GAMEPLAY ══════════════════════════════════ */
+    .rtgp {
+      background: var(--bg);
+      padding: 100px 0 88px;
+    }
+    .rtgp-inner { max-width: 1320px; margin: 0 auto; padding: 0 48px; }
+
+    .rtgp-shot-wrap {
+      position: relative;
+      margin: 0 auto 36px;
+      max-width: 1320px;
+      border-radius: 14px;
+      border: 1px solid var(--border-lt);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 8px 32px rgba(0,0,0,0.35);
+      overflow: hidden;
+      background: #0a0a14;
+    }
+    .rtgp-shot-wrap img { width: 100%; height: auto; display: block; }
+
+    .rtgp-markers { position: absolute; inset: 0; pointer-events: none; }
+    .rtgp-marker {
+      position: absolute;
+      width: clamp(22px, 2.2vw, 30px);
+      height: clamp(22px, 2.2vw, 30px);
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--bebas);
+      font-size: clamp(11px, 1.1vw, 14px);
+      color: var(--orange);
+      background: rgba(247,148,32,0.16);
+      border: 1px solid rgba(247,148,32,0.6);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+      cursor: default;
+      transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s;
+      z-index: 2;
+    }
+    .rtgp-marker.is-active,
+    .rtgp-marker:hover {
+      background: var(--orange);
+      border-color: var(--w);
+      color: var(--w);
+      box-shadow: 0 0 0 4px rgba(247,148,32,0.25), 0 0 20px rgba(247,148,32,0.45);
+      transform: translate(-50%, -50%) scale(1.08);
+      animation: markerPulse 1.4s ease-in-out infinite;
+    }
+    @keyframes markerPulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(247,148,32,0.25), 0 0 20px rgba(247,148,32,0.45); }
+      50% { box-shadow: 0 0 0 8px rgba(247,148,32,0.12), 0 0 28px rgba(247,148,32,0.55); }
+    }
+
+    .rtgp-legend {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+    .rtgp-legend-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: default;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    }
+    .rtgp-legend-item:hover,
+    .rtgp-legend-item.is-active {
+      border-color: rgba(247,148,32,0.45);
+      background: rgba(247,148,32,0.06);
+      transform: translateY(-2px);
+    }
+    .rtgp-legend-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--bebas);
+      font-size: 14px;
+      color: var(--orange);
+      background: rgba(247,148,32,0.16);
+      border: 1px solid rgba(247,148,32,0.5);
+      border-radius: 6px;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .rtgp-legend-item:hover .rtgp-legend-num,
+    .rtgp-legend-item.is-active .rtgp-legend-num {
+      background: var(--orange);
+      border-color: var(--w);
+      color: var(--w);
+    }
+    .rtgp-legend-label {
+      font-family: var(--bebas);
+      font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+      letter-spacing: 0.02em;
+      color: var(--w90);
+      line-height: 1.2;
+    }
+
+    /* ══════════════════════════════════ QUOTE BREAKER ══════════════════════════════════ */
+    .howto-quote {
+      background: var(--bg);
+      padding: 104px 48px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    .howto-quote-inner {
+      max-width: 960px; margin: 0 auto;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+    }
+    .howto-quote-text {
+      font-family: var(--bebas);
+      font-size: clamp(2.2rem, 4.6vw, 4rem);
+      line-height: 1.0; letter-spacing: 0.01em;
+      color: rgba(255,255,255,0.22);
+    }
+    .howto-quote-attrib {
+      font-family: var(--inter);
+      font-size: 0.95rem; font-style: italic;
+      color: rgba(255,255,255,0.42);
+    }
+
+    /* ══════════════════════════════════ PLAYER ATTRIBUTES ══════════════════════════════════ */
+    .player-attrs {
       position: relative; overflow: hidden;
       background: linear-gradient(160deg, var(--navy) 0%, var(--navy-dk) 100%);
-      padding: 64px 0 96px;
+      padding: 116px 0;
     }
-    .pillars-eyebrow {
-      font-family: var(--bebas); font-size: 11px; letter-spacing: 0.22em;
-      color: rgba(255,255,255,0.38); text-transform: uppercase; margin-bottom: 36px;
-    }
-    .pillars-grid {
-      display: grid; grid-template-columns: 1.55fr 1fr; gap: 20px; align-items: start;
-    }
-    .pillar-stack { display: flex; flex-direction: column; gap: 20px; }
+    .player-attrs-inner { max-width: 1180px; margin: 0 auto; padding: 0 48px; }
 
-    /* Card style on navy: dark glass */
-    .pillar-card {
-      background: rgba(8,8,15,0.28); border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 16px; overflow: hidden;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 16px 40px rgba(0,0,0,0.30);
-      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    .attr-chips {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 48px;
     }
-    .pillar-card:hover {
-      border-color: rgba(255,255,255,0.28); transform: translateY(-3px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 24px 56px rgba(0,0,0,0.40);
+    .attr-chip {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: rgba(8,8,15,0.28);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
     }
-    /* image surround */
-    .pillar-img-wrap {
-      width: 100%; padding: 2px 2px 0; background: #f0ede6;
-      aspect-ratio: 2892 / 1704; overflow: hidden;
-    }
-    .pillar-img-wrap img {
-      width: 100%; height: 100%; object-fit: cover; object-position: top center;
-      border-radius: 6px 6px 0 0; display: block;
-      box-shadow: 0 -2px 14px rgba(0,0,0,0.28);
-    }
-    /* Smaller cards use same aspect ratio */
-    .pillar-stack .pillar-img-wrap {
-      aspect-ratio: 2892 / 1704;
-    }
-    .pillar-body { padding: 24px 24px 28px; display: flex; flex-direction: column; gap: 8px; }
-    .pillar-main .pillar-body { padding: 28px 32px 36px; }
-    .pillar-num {
-      font-family: var(--bebas); font-size: 11px; letter-spacing: 0.16em;
-      color: rgba(255,255,255,0.35);
-    }
-    .pillar-hed {
-      font-family: var(--bebas); color: var(--w); letter-spacing: 0.01em; line-height: 1.05;
-    }
-    .pillar-main .pillar-hed { font-size: clamp(1.6rem, 2.5vw, 2.2rem); }
-    .pillar-stack .pillar-hed { font-size: clamp(1.3rem, 1.8vw, 1.7rem); }
-    .pillar-copy { font-size: 0.875rem; color: rgba(255,255,255,0.65); line-height: 1.7; }
-    .pillar-stack .pillar-copy { font-size: 0.8rem; }
-
-    /* ══════════════════════════════════
-       DEEP DIVE — black, editorial
-    ══════════════════════════════════ */
-    .deepdive { background: var(--bg); padding: 120px 0 80px; }
-
-    /* Opening statement — big, anchoring */
-    .deepdive-statement {
-      margin-bottom: 96px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 80px;
-    }
-    .deepdive-hed {
-      font-family: var(--bebas);
-      font-size: clamp(4.5rem, 9vw, 8.5rem);
-      line-height: 0.94; letter-spacing: 0.01em; color: var(--w);
-      margin-bottom: 20px;
-    }
-    .deepdive-sub {
-      font-size: 1.05rem; color: var(--w45); max-width: 480px; line-height: 1.7;
-    }
-
-    /* Editorial feature rows — no card chrome */
-    .feature-row {
-      display: grid; align-items: start;
-      padding: 72px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .feature-row--a { grid-template-columns: 42% 58%; gap: 64px; }
-    .feature-row--b { grid-template-columns: 55% 45%; gap: 64px; }
-    .feature-row--c { grid-template-columns: 38% 62%; gap: 56px; }
-    .feature-row--d { grid-template-columns: 52% 48%; gap: 64px; }
-
-    /* flip: image first visually */
-    .feature-row--flip > *:first-child { order: 2; }
-    .feature-row--flip > *:last-child  { order: 1; }
-
-    .feature-text { display: flex; flex-direction: column; justify-content: center; gap: 16px; }
-    .feature-hed {
-      font-family: var(--bebas);
-      font-size: clamp(2rem, 3.5vw, 3rem);
-      line-height: 1.0; letter-spacing: 0.01em; color: var(--w);
-    }
-    .feature-copy { font-size: 0.925rem; color: var(--w70); line-height: 1.8; max-width: 420px; }
-
-    /* Image: raw, editorial — no card chrome */
-    .feature-img {
-      width: 100%; border-radius: 6px; overflow: hidden;
-      box-shadow: 0 8px 48px rgba(0,0,0,0.55);
-      border: 1px solid rgba(255,255,255,0.07);
-    }
-    .feature-img img { width: 100%; height: auto; display: block; }
-
-    /* Pullquote: typographic section break */
-    .pullquote {
-      container-type: inline-size;
-      padding: 72px 0;
-      border-bottom: 1px solid var(--border);
+    .attr-abbr {
+      flex-shrink: 0;
+      min-width: 36px; padding: 4px 8px;
       text-align: center;
-      overflow-x: auto;
-    }
-    .pullquote-text {
-      max-width: 900px; margin: 0 auto; padding: 0 48px;
-      display: flex; flex-direction: column; align-items: center; gap: 10px;
-    }
-    .pullquote-quote {
       font-family: var(--bebas);
-      white-space: nowrap;
-      font-size: min(4.5rem, max(1rem, calc(100cqi / 30)));
-      line-height: 1.05; letter-spacing: 0.015em;
-      color: rgba(255,255,255,0.18);
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      color: var(--bg);
+      background: var(--orange);
+      border-radius: 6px;
     }
-    .pullquote-attrib {
-      font-family: var(--inter);
-      font-size: 0.95rem; font-weight: 500; font-style: italic;
+    .attr-name {
+      font-family: var(--bebas);
+      font-size: clamp(0.95rem, 1.3vw, 1.1rem);
       letter-spacing: 0.02em;
-      color: rgba(255,255,255,0.28);
+      color: var(--w);
+      line-height: 1.2;
     }
 
-    /* ══════════════════════════════════
-       COMMUNITY — navy
-    ══════════════════════════════════ */
+    .player-shot {
+      max-width: 1180px; margin: 0 auto;
+      border-radius: 14px;
+      border: 1px solid var(--border-lt);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+    .player-shot img { width: 100%; height: auto; display: block; }
+
+    /* ══════════════════════════════════ HOW IT WORKS ══════════════════════════════════ */
+    .howto {
+      background: var(--bg);
+      padding: 100px 0 120px;
+    }
+    .howto-wrap { max-width: 1120px; margin: 0 auto; padding: 0 48px; }
+
+    .howto-header {
+      position: relative;
+      max-width: 1120px;
+      margin: 0 auto 72px;
+      padding: 54px 48px;
+      border-radius: 18px;
+      border: 1px solid var(--border-lt);
+      background: rgba(255,255,255,0.02);
+      text-align: center;
+      overflow: hidden;
+    }
+    .howto-header::before {
+      content: '';
+      position: absolute;
+      top: -40%; left: 50%; transform: translateX(-50%);
+      width: 80%; height: 60%;
+      background: radial-gradient(ellipse, rgba(247,148,32,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .howto-header .section-hed {
+      font-size: clamp(2.1rem, 4.4vw, 3.5rem);
+      line-height: 0.98;
+      margin-bottom: 28px;
+    }
+    .howto-header .section-eyebrow { margin-bottom: 20px; }
+
+    .howto-index {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+      gap: 0;
+      position: relative; z-index: 1;
+    }
+    .howto-index-link {
+      font-family: var(--bebas);
+      font-size: clamp(0.85rem, 1.2vw, 1rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--w70);
+      padding: 8px 16px;
+      transition: color 0.2s;
+    }
+    .howto-index-link:hover { color: var(--orange); }
+    .howto-index-link .num { color: var(--orange); margin-right: 6px; }
+    .howto-index-sep {
+      width: 1px; height: 16px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .howto-block {
+      scroll-margin-top: 40px;
+      margin-bottom: 96px;
+      text-align: center;
+    }
+    .howto-block:last-child { margin-bottom: 0; }
+
+    .howto-block-eyebrow {
+      font-family: var(--bebas);
+      font-size: 11px; letter-spacing: 0.20em;
+      color: var(--orange); text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .howto-hed {
+      font-family: var(--bebas);
+      font-size: clamp(2rem, 3.6vw, 3.1rem);
+      line-height: 0.98; letter-spacing: 0.01em; color: var(--w);
+      margin-bottom: 12px;
+    }
+    .howto-sub {
+      font-size: clamp(1rem, 1.3vw, 1.18rem);
+      color: var(--w70); max-width: 520px; margin: 0 auto 32px;
+      line-height: 1.7;
+    }
+
+    .shot {
+      position: relative;
+      border-radius: 14px;
+      border: 1px solid var(--border-lt);
+      box-shadow: 0 20px 64px rgba(0,0,0,0.5);
+      overflow: hidden;
+      background: #0a0a14;
+    }
+    .shot img { width: 100%; height: auto; display: block; }
+
+    .playbooks-inset {
+      position: absolute;
+      right: 2%; bottom: 5%;
+      width: 27%;
+      border-radius: 12px;
+      border: 1px solid var(--border-lt);
+      background: var(--navy-dk);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.65);
+      overflow: hidden;
+    }
+    .playbooks-inset img { width: 100%; height: auto; display: block; }
+    .playbooks-inset-cap {
+      padding: 8px 10px;
+      font-family: var(--bebas);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ══════════════════════════════════ COMMUNITY ══════════════════════════════════ */
     .community {
       position: relative; overflow: hidden;
       background: linear-gradient(145deg, var(--navy-lt) 0%, var(--navy) 50%, var(--navy-dk) 100%);
@@ -423,14 +575,12 @@
     }
     .btn-white:hover { background: rgba(255,255,255,0.88); transform: translateY(-2px); }
 
-    /* ══════════════════════════════════
-       FOOTER CTA — black, maximum impact
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ FOOTER CTA ══════════════════════════════════ */
     .footer-cta {
+      display: none;
       background: var(--bg); padding: 140px 0 120px;
       text-align: center; position: relative; overflow: hidden;
     }
-    /* Subtle radial glow from below */
     .footer-cta::before {
       content: ''; position: absolute;
       bottom: -100px; left: 50%; transform: translateX(-50%);
@@ -448,10 +598,7 @@
       line-height: 0.93; letter-spacing: 0.01em; color: var(--w);
     }
     .footer-hed span { display: block; }
-    .footer-sub {
-      font-size: 1rem; color: var(--w45); margin-bottom: 4px;
-    }
-    /* Objection strip — replaces FAQ */
+    .footer-sub { font-size: 1rem; color: var(--w45); margin-bottom: 4px; }
     .objection-strip {
       display: flex; align-items: center; gap: 20px;
       font-family: var(--bebas); font-size: 13px; letter-spacing: 0.18em;
@@ -463,9 +610,7 @@
       flex-shrink: 0;
     }
 
-    /* ══════════════════════════════════
-       SITE FOOTER
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ SITE FOOTER ══════════════════════════════════ */
     .site-footer {
       background: var(--bg); border-top: 1px solid var(--border);
       padding: 18px 48px; display: flex; align-items: center; justify-content: space-between;
@@ -474,23 +619,11 @@
     .site-footer a:hover { color: var(--orange); }
     .site-footer-copy { font-size: 12px; color: rgba(255,255,255,0.20); }
 
-    /* ══════════════════════════════════
-       SCROLL ANIMATIONS
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ SCROLL ANIMATIONS ══════════════════════════════════ */
     .anim { opacity: 0; transform: translateY(22px); transition: opacity 0.65s ease, transform 0.65s ease; }
     .anim.in { opacity: 1; transform: none; }
-    .stat-cell:nth-child(1) { transition-delay: 0.00s; }
-    .stat-cell:nth-child(2) { transition-delay: 0.07s; }
-    .stat-cell:nth-child(3) { transition-delay: 0.14s; }
-    .stat-cell:nth-child(4) { transition-delay: 0.21s; }
-    .pillar-stack .pillar-card:nth-child(2) { transition-delay: 0.10s; }
-    .feature-row:nth-child(2) { transition-delay: 0.05s; }
-    .feature-row:nth-child(3) { transition-delay: 0.10s; }
-    .feature-row:nth-child(4) { transition-delay: 0.15s; }
 
-    /* ══════════════════════════════════
-       TWEAKS PANEL
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ TWEAKS PANEL ══════════════════════════════════ */
     .tweaks-panel {
       display: none; position: fixed; bottom: 24px; right: 24px; z-index: 999;
       background: rgba(13,13,26,0.97); border: 1px solid rgba(255,255,255,0.14);
@@ -517,32 +650,39 @@
       background: rgba(52,236,39,0.10); border-color: rgba(52,236,39,0.35); color: var(--green);
     }
 
-    /* ══════════════════════════════════
-       RESPONSIVE
-    ══════════════════════════════════ */
+    /* ══════════════════════════════════ RESPONSIVE ══════════════════════════════════ */
     @media (max-width: 1024px) {
-      .pillars-grid { grid-template-columns: 1fr; }
-      .feature-row--a, .feature-row--b, .feature-row--c, .feature-row--d {
-        grid-template-columns: 1fr; gap: 36px;
-      }
-      .feature-row--flip > * { order: unset; }
+      .attr-chips { grid-template-columns: repeat(3, 1fr); }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
+    @media (max-width: 760px) {
+      .shot--playbooks { display: flex; flex-direction: column; }
+      .playbooks-inset {
+        position: static;
+        width: 100%;
+        margin-top: 16px;
+        right: auto; bottom: auto;
+      }
+      .howto-index-sep { display: none; }
+      .howto-index { flex-direction: column; gap: 4px; }
+    }
     @media (max-width: 640px) {
-      .wrap, .site-footer { padding-left: 20px; padding-right: 20px; }
+      .wrap, .site-footer, .rtgp-inner, .player-attrs-inner, .howto-wrap, .howto-header { padding-left: 20px; padding-right: 20px; }
+      .howto-header { padding: 40px 20px; }
+      .howto-quote { padding: 72px 20px; }
+      .section-hed { font-size: 3rem; }
       .hero-hed { font-size: clamp(2rem, 9.5vw, 3.25rem); }
       .footer-hed { font-size: 4rem; }
-      .deepdive-hed { font-size: 3.5rem; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .objection-strip { flex-direction: column; gap: 8px; }
+      .rtgp-legend { grid-template-columns: 1fr; }
+      .attr-chips { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body class="has-auth-bar">
 
-  <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager -->
 
   <!-- NAV -->
   <div id="auth-bar" class="auth-bar gob-hp-nav">
@@ -579,17 +719,13 @@
     </div>
   </div>
 
-  <!-- ═══════════ HERO ═══════════ -->
+  <!-- HERO -->
   <section class="hero">
     <div class="hero-bg">
-      <img
-        src="./images/homepage/hero-court-gameplay.png"
-        alt="Live GOB gameplay" loading="eager"
-      >
+      <img src="./images/homepage-v2/above-the-fold.png" alt="Live GOB gameplay" loading="eager">
     </div>
     <div class="hero-overlay"></div>
     <div class="dots"></div>
-
     <div class="hero-content">
       <h1 class="hero-hed">
         <span>Build A Program.</span>
@@ -601,14 +737,13 @@
         <span class="hero-microcopy">No download required.</span>
       </div>
     </div>
-
     <div class="hero-scroll" aria-hidden="true">
       <div class="hero-scroll-line"></div>
     </div>
   </section>
 
-  <!-- ═══════════ STATS STRIP ═══════════ -->
-  <div class="stats-strip">
+  <!-- STATS STRIP (hidden by default) -->
+  <div class="stats-strip" id="stats-strip">
     <div class="dots"></div>
     <div class="stats-grid">
       <div class="stat-cell anim">
@@ -630,129 +765,144 @@
     </div>
   </div>
 
-  <!-- ═══════════ PILLARS ═══════════ -->
-  <section class="pillars">
+  <!-- REAL-TIME GAMEPLAY -->
+  <section class="rtgp" id="real-time-gameplay">
+    <div class="rtgp-inner">
+      <div class="section-intro anim">
+        <p class="section-eyebrow">Live On The Court</p>
+        <h2 class="section-hed">Dynamic <span class="accent">Real-Time</span> Gameplay</h2>
+        <p class="section-sub">Every possession plays out live. Read the matchup and call the play in real time — or sit back and let your coaching presets do the work.</p>
+      </div>
+
+      <div class="rtgp-shot-wrap anim" id="rtgp-shot">
+        <img src="./images/homepage-v2/rtgp-gameplay.png" alt="Real-time gameplay screen with live stats and playcalling" loading="lazy">
+        <div class="rtgp-markers" aria-hidden="true">
+          <span class="rtgp-marker" data-n="1" style="left:44%;top:6%;">1</span>
+          <span class="rtgp-marker" data-n="2" style="left:55%;top:40%;">2</span>
+          <span class="rtgp-marker" data-n="3" style="left:1.5%;top:26%;">3</span>
+          <span class="rtgp-marker" data-n="4" style="left:83%;top:26%;">4</span>
+          <span class="rtgp-marker" data-n="5" style="left:33%;top:52%;">5</span>
+          <span class="rtgp-marker" data-n="6" style="left:9%;top:74%;">6</span>
+          <span class="rtgp-marker" data-n="7" style="left:91%;top:64%;">7</span>
+          <span class="rtgp-marker" data-n="8" style="left:67%;top:91%;">8</span>
+          <span class="rtgp-marker" data-n="9" style="left:40%;top:83%;">9</span>
+        </div>
+      </div>
+
+      <div class="rtgp-legend anim" id="rtgp-legend">
+        <div class="rtgp-legend-item" data-n="1"><span class="rtgp-legend-num">1</span><span class="rtgp-legend-label">Scoreboard</span></div>
+        <div class="rtgp-legend-item" data-n="2"><span class="rtgp-legend-num">2</span><span class="rtgp-legend-label">Event Broadcast</span></div>
+        <div class="rtgp-legend-item" data-n="3"><span class="rtgp-legend-num">3</span><span class="rtgp-legend-label">Player Offensive Stats</span></div>
+        <div class="rtgp-legend-item" data-n="4"><span class="rtgp-legend-num">4</span><span class="rtgp-legend-label">Player Defensive Stats</span></div>
+        <div class="rtgp-legend-item" data-n="5"><span class="rtgp-legend-num">5</span><span class="rtgp-legend-label">Active Player Tracking</span></div>
+        <div class="rtgp-legend-item" data-n="6"><span class="rtgp-legend-num">6</span><span class="rtgp-legend-label">Live Team Stats</span></div>
+        <div class="rtgp-legend-item" data-n="7"><span class="rtgp-legend-num">7</span><span class="rtgp-legend-label">Team Play-Call Tendencies</span></div>
+        <div class="rtgp-legend-item" data-n="8"><span class="rtgp-legend-num">8</span><span class="rtgp-legend-label">Timeout &amp; Pause</span></div>
+        <div class="rtgp-legend-item" data-n="9"><span class="rtgp-legend-num">9</span><span class="rtgp-legend-label">Live Playcalling</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JOHN WOODEN QUOTE -->
+  <section class="howto-quote anim" aria-label="Quote">
+    <div class="howto-quote-inner">
+      <p class="howto-quote-text">"Failing to prepare is preparing to fail."</p>
+      <p class="howto-quote-attrib">— John Wooden</p>
+    </div>
+  </section>
+
+  <!-- PLAYER ATTRIBUTES -->
+  <section class="player-attrs" id="player-attributes">
     <div class="dots"></div>
-    <div class="wrap" style="position:relative;z-index:1;">
-      <p class="pillars-eyebrow">How It Works</p>
-      <div class="pillars-grid">
+    <div class="player-attrs-inner">
+      <div class="section-intro anim">
+        <p class="section-eyebrow">Player DNA</p>
+        <h2 class="section-hed">Every Player Has <span class="accent">12 Attributes</span></h2>
+        <p class="section-sub">Twelve measurable skills define every player on your roster — from scoring and shooting to basketball IQ and free throws.</p>
+      </div>
 
-        <!-- Large left card -->
-        <article class="pillar-card pillar-main anim">
-          <div class="pillar-img-wrap">
-            <img
-              src="./images/homepage/pillar-coaching-style.png"
-              alt="Coaching Style selection — four archetypes" loading="lazy"
-            >
-          </div>
-          <div class="pillar-body">
-            <span class="pillar-num">01</span>
-            <h2 class="pillar-hed">Establish Your Coaching Identity</h2>
-            <p class="pillar-copy">Every great program starts with a philosophy. Are you an Authoritarian, a Systems Coach, a Player Maximizer, or a Culture Builder? Choose your identity — and shape how your players grow and your program evolves.</p>
-          </div>
-        </article>
+      <div class="attr-chips anim">
+        <div class="attr-chip"><span class="attr-abbr">SC</span><span class="attr-name">Scoring</span></div>
+        <div class="attr-chip"><span class="attr-abbr">SH</span><span class="attr-name">Shooting</span></div>
+        <div class="attr-chip"><span class="attr-abbr">ID</span><span class="attr-name">Inside Defense</span></div>
+        <div class="attr-chip"><span class="attr-abbr">OD</span><span class="attr-name">Outside Defense</span></div>
+        <div class="attr-chip"><span class="attr-abbr">PS</span><span class="attr-name">Passing</span></div>
+        <div class="attr-chip"><span class="attr-abbr">BH</span><span class="attr-name">Ball Handling</span></div>
+        <div class="attr-chip"><span class="attr-abbr">RB</span><span class="attr-name">Rebounding</span></div>
+        <div class="attr-chip"><span class="attr-abbr">ST</span><span class="attr-name">Strength</span></div>
+        <div class="attr-chip"><span class="attr-abbr">AG</span><span class="attr-name">Agility</span></div>
+        <div class="attr-chip"><span class="attr-abbr">ND</span><span class="attr-name">Endurance</span></div>
+        <div class="attr-chip"><span class="attr-abbr">IQ</span><span class="attr-name">Basketball IQ</span></div>
+        <div class="attr-chip"><span class="attr-abbr">FT</span><span class="attr-name">Free Throws</span></div>
+      </div>
 
-        <!-- Two stacked right -->
-        <div class="pillar-stack">
-          <article class="pillar-card anim">
-            <div class="pillar-img-wrap">
-              <img
-                src="./images/homepage/pillar-game-plan.png"
-                alt="Game Plan sliders — ten tactical dimensions" loading="lazy"
-              >
-            </div>
-            <div class="pillar-body">
-              <span class="pillar-num">02</span>
-              <h2 class="pillar-hed">Dial In Every Detail</h2>
-              <p class="pillar-copy">Set your game plan across ten tactical dimensions and build a playbook tuned to your roster's strengths.</p>
-            </div>
-          </article>
-
-          <article class="pillar-card anim">
-            <div class="pillar-img-wrap">
-              <img
-                src="./images/homepage/pillar-press-conference.png"
-                alt="Post-game press conference" loading="lazy"
-              >
-            </div>
-            <div class="pillar-body">
-              <span class="pillar-num">03</span>
-              <h2 class="pillar-hed">Answer For Every Decision</h2>
-              <p class="pillar-copy">After every game, the press wants answers. Coaching doesn't stop when the final buzzer sounds.</p>
-            </div>
-          </article>
-        </div>
-
+      <div class="player-shot anim">
+        <img src="./images/homepage-v2/player-page.png" alt="Player detail screen showing attributes and scouting report" loading="lazy">
       </div>
     </div>
   </section>
 
-  <!-- ═══════════ DEEP DIVE ═══════════ -->
-  <section class="deepdive">
-    <div class="wrap">
+  <!-- HOW IT WORKS -->
+  <section class="howto" id="how-it-works">
+    <div class="howto-wrap">
+      <header class="howto-header anim">
+        <p class="section-eyebrow">How It Works</p>
+        <h2 class="section-hed">You're Not Pushing Buttons.<br>You're Running A Program.</h2>
+        <nav class="howto-index" aria-label="How it works sections">
+          <a class="howto-index-link" href="#howto-1"><span class="num">01</span>Command Center</a>
+          <span class="howto-index-sep" aria-hidden="true"></span>
+          <a class="howto-index-link" href="#howto-2"><span class="num">02</span>Team Measures</a>
+          <span class="howto-index-sep" aria-hidden="true"></span>
+          <a class="howto-index-link" href="#howto-3"><span class="num">03</span>Training</a>
+          <span class="howto-index-sep" aria-hidden="true"></span>
+          <a class="howto-index-link" href="#howto-4"><span class="num">04</span>Playbooks</a>
+        </nav>
+      </header>
 
-      <!-- Opening statement -->
-      <div class="deepdive-statement anim">
-        <h2 class="deepdive-hed">The Deepest<br>Basketball Sim<br>Ever Built.</h2>
-        <p class="deepdive-sub">Everything a serious basketball sim should have — and a few things you won't find anywhere else.</p>
-      </div>
+      <article class="howto-block anim" id="howto-1">
+        <p class="howto-block-eyebrow">01 — COMMAND CENTER</p>
+        <h3 class="howto-hed">Your Coaching Hub For Everything</h3>
+        <p class="howto-sub">Standings, rankings, scouting intel, and your full program at a glance — updated every week.</p>
+        <!-- TODO: replace with ./images/homepage-v2/command-center.png when asset is added -->
+        <div class="shot">
+          <img src="./images/homepage-v2/national-rankings.png" alt="Franchise command center with national rankings" loading="lazy">
+        </div>
+      </article>
 
-      <!-- Feature 01 -->
-      <div class="feature-row feature-row--a anim">
-        <div class="feature-text">
-          <h3 class="feature-hed">Your Franchise Command Center</h3>
-          <p class="feature-copy">Standings. Rankings. Scouting intel. Locker room chemistry. Recruiting pipeline. Player scoring leaders. All of it on one screen, updated every week. This is what running a program actually feels like.</p>
+      <article class="howto-block anim" id="howto-2">
+        <p class="howto-block-eyebrow">02 — TEAM MEASURES</p>
+        <h3 class="howto-hed">Know Who Your Team Is</h3>
+        <p class="howto-sub">Eight team dimensions visualized as a radar profile — watch it shift week over week as your training takes hold.</p>
+        <div class="shot">
+          <img src="./images/homepage-v2/team-attributes.png" alt="Team attributes radar chart" loading="lazy">
         </div>
-        <div class="feature-img">
-          <img src="./images/homepage/deepdive-franchise-command-center.png" alt="Franchise Command Center" loading="lazy">
-        </div>
-      </div>
+      </article>
 
-      <!-- Feature 02 -->
-      <div class="feature-row feature-row--b feature-row--flip anim">
-        <div class="feature-text">
-          <h3 class="feature-hed">Know Exactly What Your Team Is</h3>
-          <p class="feature-copy">Eight team dimensions — Offense, Defense, Fast Breaks, Press/Traps, Discipline, Fight, and more — visualized as a radar profile. Watch it shift week over week as your training takes hold.</p>
+      <article class="howto-block anim" id="howto-3">
+        <p class="howto-block-eyebrow">03 — TRAINING</p>
+        <h3 class="howto-hed">Every Week Moves The Needle</h3>
+        <p class="howto-sub">Run training, set your coaching focus, and see exactly what changed — shooting up, chemistry holding.</p>
+        <div class="shot">
+          <img src="./images/homepage-v2/tr-header.png" alt="Training report header" loading="lazy">
         </div>
-        <div class="feature-img">
-          <img src="./images/homepage/deepdive-team-measures.png" alt="Team Measures radar chart" loading="lazy">
-        </div>
-      </div>
+      </article>
 
-      <!-- Pullquote breaker -->
-      <div class="pullquote anim">
-        <p class="pullquote-text">
-          <span class="pullquote-quote">“Failing to prepare is preparing to fail.”</span>
-          <span class="pullquote-attrib">— John Wooden</span>
-        </p>
-      </div>
-
-      <!-- Feature 03 -->
-      <div class="feature-row feature-row--c anim">
-        <div class="feature-text">
-          <h3 class="feature-hed">Every Week Moves The Needle</h3>
-          <p class="feature-copy">Run training, set your coaching focus, and watch the results. Shooting up. Chemistry holding. Player development isn't a black box — you see exactly what changed and why.</p>
+      <article class="howto-block anim" id="howto-4">
+        <p class="howto-block-eyebrow">04 — Playbooks</p>
+        <h3 class="howto-hed">Build A Playbook That Fits Your Players</h3>
+        <p class="howto-sub">Assign usage percentages, set target shooters, and track efficiency for every play in your system.</p>
+        <div class="shot shot--playbooks">
+          <img src="./images/homepage/deepdive-playbook-settings.png" alt="Playbook settings screen" loading="lazy">
+          <div class="playbooks-inset">
+            <img src="./images/homepage-v2/playbooks-shot-distribution.png" alt="Expected shot distribution chart" loading="lazy">
+            <p class="playbooks-inset-cap">Expected Shot Distribution</p>
+          </div>
         </div>
-        <div class="feature-img">
-          <img src="./images/homepage/deepdive-training-report.png" alt="Training Report" loading="lazy">
-        </div>
-      </div>
-
-      <!-- Feature 04 -->
-      <div class="feature-row feature-row--d feature-row--flip anim">
-        <div class="feature-text">
-          <h3 class="feature-hed">Build A Playbook That Fits Your System &amp; Your Players</h3>
-          <p class="feature-copy">Assign usage percentages, set target shooters by position, and track efficiency for every play in your system. The game tells you what's working. What you do with that is up to you.</p>
-        </div>
-        <div class="feature-img">
-          <img src="./images/homepage/deepdive-playbook-settings.png" alt="Playbook Settings" loading="lazy">
-        </div>
-      </div>
-
+      </article>
     </div>
   </section>
 
-  <!-- ═══════════ COMMUNITY ═══════════ -->
+  <!-- COMMUNITY -->
   <section class="community">
     <div class="dots"></div>
     <div class="wrap community-inner">
@@ -767,8 +917,8 @@
     </div>
   </section>
 
-  <!-- ═══════════ FOOTER CTA ═══════════ -->
-  <section class="footer-cta">
+  <!-- FOOTER CTA (hidden by default) -->
+  <section class="footer-cta" id="footer-cta">
     <div class="wrap">
       <div class="footer-cta-inner anim">
         <h2 class="footer-hed">
@@ -787,19 +937,18 @@
     </div>
   </section>
 
-  <!-- ═══════════ SITE FOOTER ═══════════ -->
+  <!-- SITE FOOTER -->
   <footer class="site-footer">
     <a href="/faqs.html">FAQs</a>
     <span class="site-footer-copy">© Geeked-Out Basketball</span>
   </footer>
 
-  <!-- ═══════════ TWEAKS PANEL ═══════════ -->
+  <!-- TWEAKS PANEL -->
   <div class="tweaks-panel" id="tweaks-panel">
     <div class="tweaks-title">
       Tweaks
       <button class="tweaks-close" id="tweaks-close">✕</button>
     </div>
-
     <div class="tweak-row">
       <span class="tweak-label">Hero Overlay</span>
       <div class="tweak-options">
@@ -808,39 +957,27 @@
         <button class="tweak-btn" data-tweak="heroOverlay" data-val="heavy">Heavy</button>
       </div>
     </div>
-
     <div class="tweak-row">
       <span class="tweak-label">Stats Strip</span>
       <div class="tweak-options">
-        <button class="tweak-btn active" data-tweak="statsStrip" data-val="show">Show</button>
-        <button class="tweak-btn" data-tweak="statsStrip" data-val="hide">Hide</button>
+        <button class="tweak-btn" data-tweak="statsStrip" data-val="show">Show</button>
+        <button class="tweak-btn active" data-tweak="statsStrip" data-val="hide">Hide</button>
       </div>
     </div>
-
     <div class="tweak-row">
-      <span class="tweak-label">Pullquote</span>
+      <span class="tweak-label">Footer CTA</span>
       <div class="tweak-options">
-        <button class="tweak-btn active" data-tweak="pullquote" data-val="show">Show</button>
-        <button class="tweak-btn" data-tweak="pullquote" data-val="hide">Hide</button>
-      </div>
-    </div>
-
-    <div class="tweak-row">
-      <span class="tweak-label">Pillar Layout</span>
-      <div class="tweak-options">
-        <button class="tweak-btn active" data-tweak="pillarLayout" data-val="asymmetric">Asymm</button>
-        <button class="tweak-btn" data-tweak="pillarLayout" data-val="grid">Grid</button>
+        <button class="tweak-btn" data-tweak="footerCta" data-val="show">Show</button>
+        <button class="tweak-btn active" data-tweak="footerCta" data-val="hide">Hide</button>
       </div>
     </div>
   </div>
 
   <script>
-    /* ─── Tweaks ─── */
     const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-      "heroOverlay": "heavy",
-      "statsStrip": "show",
-      "pullquote": "show",
-      "pillarLayout": "asymmetric"
+      "heroOverlay": "cinematic",
+      "statsStrip": "hide",
+      "footerCta": "hide"
     }/*EDITMODE-END*/;
 
     let tweaks = { ...TWEAK_DEFAULTS };
@@ -852,32 +989,21 @@
     };
 
     function applyTweaks() {
-      // Hero overlay
       document.querySelector('.hero-overlay').style.background = overlays[tweaks.heroOverlay];
+      document.getElementById('stats-strip').style.display = tweaks.statsStrip === 'show' ? '' : 'none';
+      document.getElementById('footer-cta').style.display = tweaks.footerCta === 'show' ? '' : 'none';
 
-      // Stats strip
-      document.querySelector('.stats-strip').style.display = tweaks.statsStrip === 'show' ? '' : 'none';
-
-      // Pullquote
-      document.querySelector('.pullquote').style.display = tweaks.pullquote === 'show' ? '' : 'none';
-
-      // Pillar layout
-      const grid = document.querySelector('.pillars-grid');
-      if (tweaks.pillarLayout === 'grid') {
-        grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
-        const stack = grid.querySelector('.pillar-stack');
-        if (stack) {
-          // flatten stack children into grid directly
-          stack.style.display = 'contents';
-        }
-      } else {
-        grid.style.gridTemplateColumns = '';
-        const stack = grid.querySelector('.pillar-stack');
-        if (stack) stack.style.display = '';
-      }
+      document.querySelectorAll('[data-tweak="statsStrip"]').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === tweaks.statsStrip);
+      });
+      document.querySelectorAll('[data-tweak="footerCta"]').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === tweaks.footerCta);
+      });
+      document.querySelectorAll('[data-tweak="heroOverlay"]').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === tweaks.heroOverlay);
+      });
     }
 
-    // Protocol
     window.addEventListener('message', e => {
       if (e.data?.type === '__activate_edit_mode') document.getElementById('tweaks-panel').classList.add('open');
       if (e.data?.type === '__deactivate_edit_mode') document.getElementById('tweaks-panel').classList.remove('open');
@@ -893,8 +1019,6 @@
       btn.addEventListener('click', () => {
         const key = btn.dataset.tweak, val = btn.dataset.val;
         tweaks[key] = val;
-        document.querySelectorAll(`[data-tweak="${key}"]`).forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         applyTweaks();
         window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: val } }, '*');
       });
@@ -902,7 +1026,32 @@
 
     applyTweaks();
 
-    /* ─── Sticky nav ─── */
+    /* RTGP marker ↔ legend hover linking */
+    (function initRtgpLinking() {
+      const markers = document.querySelectorAll('.rtgp-marker');
+      const legendItems = document.querySelectorAll('.rtgp-legend-item');
+      if (!markers.length || !legendItems.length) return;
+
+      function setActive(n) {
+        markers.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
+        legendItems.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
+      }
+      function clearActive() {
+        markers.forEach(el => el.classList.remove('is-active'));
+        legendItems.forEach(el => el.classList.remove('is-active'));
+      }
+
+      markers.forEach(el => {
+        el.addEventListener('mouseenter', () => setActive(el.dataset.n));
+        el.addEventListener('mouseleave', clearActive);
+      });
+      legendItems.forEach(el => {
+        el.addEventListener('mouseenter', () => setActive(el.dataset.n));
+        el.addEventListener('mouseleave', clearActive);
+      });
+    })();
+
+    /* Sticky nav */
     const nav = document.getElementById('auth-bar');
     const heroCta = document.getElementById('hero-cta');
     const navCta = document.getElementById('nav-cta');
@@ -921,7 +1070,7 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
 
-    /* ─── Scroll entrance ─── */
+    /* Scroll entrance */
     if ('IntersectionObserver' in window) {
       const obs = new IntersectionObserver(entries => {
         entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); } });

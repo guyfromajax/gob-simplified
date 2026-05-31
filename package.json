@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Geeked-Out Basketball - Frontend Layout Tests",
   "scripts": {
-    "sync:homepage": "cp FrontEnd/static/homepage-v3-source.html FrontEnd/static/homepage.html",
+    "sync:homepage": "cp FrontEnd/static/homepage.html FrontEnd/static/homepage-v3-source.html",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
