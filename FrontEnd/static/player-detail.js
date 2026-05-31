@@ -326,6 +326,21 @@
     return `<img src="${photo}" alt="${fullName}" class="pd-portrait" onerror="if(this.dataset.fallbackState==='generic'){this.remove();this.parentElement.innerHTML='<div class=&quot;pd-portrait-placeholder&quot; aria-hidden=&quot;true&quot;></div>';}else if(this.dataset.fallbackState==='player'){this.dataset.fallbackState='generic';this.src='${genericPhoto}';}else{this.dataset.fallbackState='player';this.src='${fallbackPhoto}';}" data-fallback-state="${initialFallbackState}">`;
   }
 
+  function formatScoutingReport(player) {
+    const raw = player?.scouting_report;
+    if (typeof raw !== 'string' || !raw.trim()) {
+      return '<p class="pd-scouting-empty">No scouting report available.</p>';
+    }
+    const escaped = raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/\n/g, '<br>');
+    return `<p class="pd-scouting-text">${escaped}</p>`;
+  }
+
   function renderPlayerPage(player) {
     const content = document.getElementById('pd-content');
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -395,7 +410,7 @@
           <section class="pd-section">
             <div class="pd-section-header">SCOUTING REPORT</div>
             <div class="pd-scouting-body">
-              <div class="pd-placeholder">In Development</div>
+              ${formatScoutingReport(player)}
             </div>
           </section>
 
