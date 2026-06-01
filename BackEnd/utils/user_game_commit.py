@@ -82,6 +82,14 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
             ("record.wins" if user_won else "record.losses"): 1,
         }
         periods = game.get("archetype_periods") or {}
+        if not periods:
+            # Fallback: archetype_periods can be clobbered before finalize, but the
+            # per-quarter result also rides the durable `archetype_hook` breadcrumb.
+            hook = game.get("archetype_hook") or {}
+            for q, h in hook.items():
+                res = (h.get("dbg") or {}).get("result") if isinstance(h, dict) else None
+                if res:
+                    periods[q] = res
         for archetype in periods.values():
             field = f"archetypes.{archetype}"
             inc[field] = inc.get(field, 0) + 1

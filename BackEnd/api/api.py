@@ -3971,7 +3971,7 @@ try:
             # throws, the exception is captured INTO the breadcrumb (error/trace)
             # so we can read the real cause from the game doc.
             _hook = {
-                "hook_build": "hook-b5-2026-06-01",
+                "hook_build": "hook-b6-2026-06-01",
                 "mode": mode,
                 "full_sim": getattr(body, "full_sim", None),
             }
@@ -3989,10 +3989,16 @@ try:
                 _hook["error"] = repr(_ae)
                 _hook["trace"] = _atb.format_exc()[-700:]
             try:
-                games_collection.update_one(
-                    {"_id": game_id_oid},
-                    {"$set": {f"archetype_hook.{getattr(body, 'quarter', 'x')}": _hook}},
-                )
+                _q = getattr(body, "quarter", "x")
+                _set = {f"archetype_hook.{_q}": _hook}
+                # The stash's OWN archetype_periods write doesn't survive to
+                # finalize (something clobbers it), but this call-site write —
+                # same path as the durable archetype_hook — does. So persist the
+                # classified archetype here too, for finalize to fold.
+                _res = (_hook.get("dbg") or {}).get("result")
+                if _res:
+                    _set[f"archetype_periods.{_q}"] = _res
+                games_collection.update_one({"_id": game_id_oid}, {"$set": _set})
             except Exception:
                 logging.exception("[archetype] hook breadcrumb write failed (non-fatal)")
 

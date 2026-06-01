@@ -283,8 +283,9 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - Feed builder: `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })`. Feed entries include the stat line and the player's team context.
 - Ordering: user team first, opponent second; within each team, players are sorted by points scored descending, then minutes played descending when points are tied.
 - Eligibility: only players with more than 0 displayed minutes are included (`MIN` seconds floored to whole minutes).
-- Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played`.
+- Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played, DEF%: {defPct}%`.
 - Rebounds use **TREB = DREB + OREB**. Points are always shown, including `0 points`; all other zero stats are omitted.
+- DEF% uses `DEF_S / DEF_A * 100`, rounded to a whole percent; players with no defensive attempts show `DEF%: 0%`.
 - Rotation: one player line is shown at a time for 8 seconds while phase B is pending.
 - Banner behavior: the team banner follows the currently displayed player. User-team player lines show the user team banner; opponent player lines show the opponent team banner; when the feed loops, the banner switches back with the line.
 

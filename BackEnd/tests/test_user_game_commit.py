@@ -98,6 +98,23 @@ class TestCommitUserGameRecord(unittest.TestCase):
         self._commit(_game(side="home", home_score=80, away_score=80))
         self.assertEqual(self._record(), default_user_tracking()["record"])
 
+    def test_archetype_hook_fallback_when_periods_missing(self):
+        # No archetype_periods, but the durable archetype_hook carries results.
+        g = _game(side="home")
+        g.pop("archetype_periods", None)
+        g["archetype_hook"] = {
+            "1": {"dbg": {"result": "pure_offense"}},
+            "2": {"dbg": {"result": "pure_offense"}},
+            "3": {"dbg": {"result": "the_intimidator"}},
+            "4": {"dbg": {"result": "od_balance"}},
+        }
+        self._commit(g)
+        a = self._archetypes()
+        self.assertEqual(a["pure_offense"], 2)
+        self.assertEqual(a["the_intimidator"], 1)
+        self.assertEqual(a["od_balance"], 1)
+        self.assertEqual(a["total"], 4)
+
     def test_discount_fields_untouched(self):
         self._commit(_game(side="home"))
         rec = self._record()
