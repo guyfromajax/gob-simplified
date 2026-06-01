@@ -3967,12 +3967,20 @@ try:
 
             # Stash the user's coaching archetype for this period (franchise only).
             # Best-effort, idempotent per (game_id, quarter); folded into the user
-            # record at finalize_game (User Account System, Phase 4). Never raises.
-            from BackEnd.utils.archetype_tracking import stash_period_archetype
-            stash_period_archetype(
-                gm=gm, body=body, mode=mode, game_id=game_id_oid,
-                games_collection=games_collection,
-            )
+            # record at finalize_game (User Account System, Phase 4).
+            # Own try/except so failures here are NOT masked as "Mongo upsert failed".
+            try:
+                logging.info(
+                    "[archetype] reached stash call: game=%s mode=%s quarter=%s full_sim=%s",
+                    game_id_oid, mode, getattr(body, "quarter", None), getattr(body, "full_sim", None),
+                )
+                from BackEnd.utils.archetype_tracking import stash_period_archetype
+                stash_period_archetype(
+                    gm=gm, body=body, mode=mode, game_id=game_id_oid,
+                    games_collection=games_collection,
+                )
+            except Exception:
+                logging.exception("[archetype] stash call site failed (non-fatal)")
 
             # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
             if game_id in ongoing_games:

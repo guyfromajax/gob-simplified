@@ -19,8 +19,9 @@ class FakePlayer:
 
 
 class FakeTeam:
-    def __init__(self, players):
+    def __init__(self, players, lineup=None):
         self._by_id = {p.player_id: p for p in players}
+        self.lineup = lineup or {}
 
     def get_player_by_id(self, pid):
         return self._by_id.get(pid)
@@ -114,11 +115,23 @@ class TestStashPeriodArchetype(unittest.TestCase):
 
     def test_incomplete_lineup_skipped(self):
         partial = dict(list(self.home_lineup.items())[:4])  # only 4 starters
+        # No live-lineup fallback available either (FakeTeam.lineup empty).
         stash_period_archetype(
             gm=self.gm, body=self._body(quarter=1, home_lineup=partial),
             mode="franchise", game_id=self.gid, games_collection=self.col,
         )
         self.assertEqual(self._periods(), {})
+
+    def test_fallback_to_live_lineup_when_body_missing(self):
+        # Body sends NO lineup, but the team's live lineup has the 5 players.
+        players = [FakePlayer(f"h{i}", _profile(True)) for i in range(1, 6)]
+        live = {pos: players[i] for i, pos in enumerate(("PG", "SG", "SF", "PF", "C"))}
+        self.gm.home_team = FakeTeam(players, lineup=live)
+        stash_period_archetype(
+            gm=self.gm, body=self._body(quarter=3, home_lineup=None),
+            mode="franchise", game_id=self.gid, games_collection=self.col,
+        )
+        self.assertEqual(self._periods().get("3"), "rebounding_king")
 
     def test_away_side_uses_away_lineup(self):
         self.gm.game_state["user_team_side"] = "away"
