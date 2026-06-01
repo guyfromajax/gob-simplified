@@ -2185,86 +2185,6 @@ def resolve_fast_break_logic(game: "GameManager"):
     return turn_result
 
 
-def _log_ft_rebound_calculation_snapshot(
-    *,
-    off_team,
-    def_team,
-    shooter,
-    shooter_pos,
-    basket_x,
-    basket_y,
-    bounce_spot,
-    rebounder,
-    stat,
-    x_gate_fallback,
-    anim_total,
-    player_anim_count,
-    full_sim,
-    no_lane,
-):
-    """
-    One WARNING line per FT miss that triggers rebound resolution: all lineup coords
-    (post-apply_coords_from_animations_list), shooter slot + coords, attacked basket, bounce.
-    """
-
-    def _lineup_rows(team, side_label):
-        rows = []
-        for pos in sorted((team.lineup or {}).keys()):
-            p = (team.lineup or {}).get(pos)
-            if p is None:
-                continue
-            c = getattr(p, "coords", None) or {}
-            try:
-                x = float(c.get("x", 50))
-                y = float(c.get("y", 25))
-            except (TypeError, ValueError):
-                x, y = 50.0, 25.0
-            rows.append(
-                {
-                    "side": side_label,
-                    "pos": pos,
-                    "player_id": str(getattr(p, "player_id", "") or ""),
-                    "x": round(x, 2),
-                    "y": round(y, 2),
-                }
-            )
-        return rows
-
-    sc = getattr(shooter, "coords", None) or {}
-    try:
-        sx = float(sc.get("x", 50))
-        sy = float(sc.get("y", 25))
-    except (TypeError, ValueError):
-        sx, sy = 50.0, 25.0
-
-    if isinstance(bounce_spot, dict):
-        try:
-            bx = float(bounce_spot.get("x", 0))
-            by = float(bounce_spot.get("y", 0))
-        except (TypeError, ValueError):
-            bx, by = 0.0, 0.0
-    else:
-        bx, by = 0.0, 0.0
-
-    payload = {
-        "tag": "FT_REBOUND_CALC",
-        "full_sim": full_sim,
-        "no_lane": no_lane,
-        "anim_total": anim_total,
-        "player_anim_rows": player_anim_count,
-        "shooter_pos": shooter_pos,
-        "shooter_id": str(getattr(shooter, "player_id", "") or "") if shooter else None,
-        "shooter_xy": {"x": round(sx, 2), "y": round(sy, 2)},
-        "attacked_basket_xy": {"x": float(basket_x), "y": float(basket_y)},
-        "bounce_xy": {"x": round(bx, 2), "y": round(by, 2)},
-        "players": _lineup_rows(off_team, "offense") + _lineup_rows(def_team, "defense"),
-        "x_gate_fallback": x_gate_fallback,
-        "stat": stat,
-        "rebounder_id": str(getattr(rebounder, "player_id", "") or "") if rebounder else None,
-    }
-    logging.warning("[FT_REBOUND_CALC] %s", json.dumps(payload, sort_keys=True))
-
-
 def resolve_free_throw_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     shooter = game_state.get("shooter") or game_state.get("last_ball_handler")
@@ -2412,29 +2332,7 @@ def resolve_free_throw_logic(game):
                 # Stamped here so ``ft_step_emitter`` + discrete OREB/DREB share one bounce.
                 game_state["_ft_last_bounce_spot"] = dict(bounce_spot)
 
-                anim_list = animations if isinstance(animations, list) else []
-                player_anim_count = sum(
-                    1
-                    for a in anim_list
-                    if isinstance(a, dict) and str(a.get("playerId")) != "ball"
-                )
-                x_gate_fallback = bool(game_state.pop("_ft_rebound_x_gate_fallback", False))
-                _log_ft_rebound_calculation_snapshot(
-                    off_team=off_team,
-                    def_team=def_team,
-                    shooter=shooter,
-                    shooter_pos=shooter_pos,
-                    basket_x=basket_x,
-                    basket_y=25,
-                    bounce_spot=bounce_spot,
-                    rebounder=rebounder,
-                    stat=stat,
-                    x_gate_fallback=x_gate_fallback,
-                    anim_total=len(anim_list),
-                    player_anim_count=player_anim_count,
-                    full_sim=bool(game.game_state.get("_is_full_simulation")),
-                    no_lane=bool(game_state.get("no_lane")),
-                )
+                game_state.pop("_ft_rebound_x_gate_fallback", None)
 
                 game_state["last_rebound"] = stat
                 game_state["last_rebounder"] = rebounder
@@ -6089,7 +5987,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 shot_result["next_play_type"] = "FREE_THROW"
                 shot_result["next_turn"] = "FREE_THROW"
                 shot_result["free_throws_remaining"] = free_throws_remaining
-                logging.warning(f"✅ [FCP SHOT] MAKE with shooting foul (AND-1) → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
                 # Regular make → route to BASELINE_INBOUND (pressure may apply again)
                 game_state["offensive_state"] = "HCO"  # Will be set to BASELINE_INBOUND by transition system
@@ -6100,7 +5997,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 shot_result["next_play_type"] = "FREE_THROW"
                 shot_result["next_turn"] = "FREE_THROW"
                 shot_result["free_throws_remaining"] = free_throws_remaining
-                logging.warning(f"✅ [FCP SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
                 # Regular miss or block → reset to HCO
                 game_state["offensive_state"] = "HCO"
@@ -6120,11 +6016,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
         shot_result["current_turn"] = "FCP"  # ✅ SS&S: Explicit turn type for transition system
         
-        # Generate animations from skeleton (already retrieved above)
-        logging.warning(f"🔍 [FCP SHOT] Using skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
-        
         if skeleton and "steps" in skeleton:
-            logging.warning(f"🔍 [FCP SHOT] Converting skeleton to animations...")
             animations = animator.skeleton_to_animations(
                 skeleton, 
                 off_lineup, 
@@ -6132,14 +6024,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 add_defenders=True,
                 is_fcp=True
             )
-            logging.warning(f"🔍 [FCP SHOT] Generated {len(animations)} animations")
             if animations:
                 shot_result["animations"] = animations
-                logging.warning(f"✅ [FCP SHOT] Added animations to shot_result")
-            else:
-                logging.warning(f"⚠️ [FCP SHOT] No animations generated from skeleton!")
-        else:
-            logging.warning(f"⚠️ [FCP SHOT] Skeleton has no steps!")
         
         shot_result["skeleton"] = skeleton
         shot_result["roles"] = shot_roles
@@ -7537,7 +7423,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 shot_result["next_play_type"] = "FREE_THROW"
                 shot_result["next_turn"] = "FREE_THROW"
                 shot_result["free_throws_remaining"] = free_throws_remaining
-                logging.warning(f"✅ [HCT SHOT] MAKE with shooting foul (AND-1) → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
                 # Regular make → route to BASELINE_INBOUND (pressure may apply again)
                 game_state["offensive_state"] = "HCO"  # Will be set to BASELINE_INBOUND by transition system
@@ -7548,7 +7433,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 shot_result["next_play_type"] = "FREE_THROW"
                 shot_result["next_turn"] = "FREE_THROW"
                 shot_result["free_throws_remaining"] = free_throws_remaining
-                logging.warning(f"✅ [HCT SHOT] MISS with shooting foul → FREE_THROW (free_throws_remaining: {free_throws_remaining})")
             else:
                 # Regular miss or block → reset to HCO
                 game_state["offensive_state"] = "HCO"
@@ -7568,13 +7452,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         shot_result["text"] = "TRAP! " + shot_result.get("text", "")
         shot_result["current_turn"] = "HCT"  # ✅ SS&S: Explicit turn type for transition system
         
-        # Generate animations from skeleton (already retrieved above)
         from BackEnd.models.animator import Animator
         animator = Animator(game)
-        logging.warning(f"🔍 [HCT SHOT] Using skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
-            logging.warning(f"🔍 [HCT SHOT] Converting skeleton to animations...")
             animations = animator.skeleton_to_animations(
                 skeleton, 
                 off_lineup, 
@@ -7583,15 +7464,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 is_fcp=False,
                 is_hct=True
             )
-            logging.warning(f"🔍 [HCT SHOT] Generated {len(animations)} animations")
             if animations:
                 shot_result["animations"] = animations
-                logging.warning(f"✅ [HCT SHOT] Added animations to shot_result")
-            else:
-                logging.warning(f"⚠️ [HCT SHOT] No animations generated from skeleton!")
-        else:
-            logging.warning(f"⚠️ [HCT SHOT] Skeleton has no steps!")
-            animations = []
 
         shot_result["skeleton"] = skeleton
         shot_result["roles"] = shot_roles

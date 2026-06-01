@@ -693,7 +693,7 @@ def build_oreb_animation_steps(
             next_step=_shot_attempt_turn_stop(turn_result, "MAKE"),
         )
         steps.append(hold_step)
-        return _finalize("PUTBACK_MAKE")
+        return steps
 
     # PUTBACK_MISS → [bounce] then turn_stop SHOT_ATTEMPT. The OREB turn
     # ENDS HERE; second rebound (DREB or chained OREB) becomes its own
@@ -708,7 +708,7 @@ def build_oreb_animation_steps(
         # so the FE plays "Shooting Foul!" before turn_stop. Mirrors skeleton
         # emitter behavior on HCO miss + defensive shooting foul.
         _stamp_shooting_foul_on_miss_end(flight_step, turn_result)
-        return _finalize("PUTBACK_MISS_NO_BOUNCE")
+        return steps
     bounce_target: GridCoord = {"x": float(sbx), "y": float(sby)}
 
     bounce_step = _build_bounce_step(
@@ -726,4 +726,4 @@ def build_oreb_animation_steps(
     # so the FE plays "Shooting Foul!" before turn_stop. Mirrors skeleton
     # emitter behavior on HCO miss + defensive shooting foul.
     _stamp_shooting_foul_on_miss_end(bounce_step, turn_result)
-    return _finalize("PUTBACK_MISS")
+    return steps

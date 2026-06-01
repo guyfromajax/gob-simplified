@@ -4,8 +4,6 @@ from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, MALLEABLE_ATTRS
 import uuid
 import os
 import random
-import logging
-
 
 DEBUG_SERIALIZATION = os.getenv("DEBUG_SERIALIZATION")
 

@@ -593,11 +593,6 @@ class GameManager:
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))
 
-        # Log per-player coords at TURN START (before sync). These are
-        # `player.coords` as they were entering this turn — i.e., the end
-        # state of the previous turn. Useful for debugging coord-staleness
-        # bugs across turn-to-turn transitions.
-
         if isinstance(turn_result, dict):
             sync_lineup_coords_from_turn(self, turn_result)
 
@@ -618,10 +613,6 @@ class GameManager:
                 turn_result.get("current_turn"),
                 turn_result.get("final_ball_handler_id"),
             )
-
-        # Log per-player coords at TURN END (after sync). These represent
-        # where players are at the END of this turn — what the next turn
-        # will see as its starting state.
 
         self._check_lineups_for_foul_out(turn_result)
         if turn_result.get("fouled_out"):
