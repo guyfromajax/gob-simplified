@@ -280,12 +280,13 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - Sources:
   - EOG popup path: `gameScene.js` passes the resolved final game snapshot into `showGameCompletionPopup()`; `gameCompletionPopup.js` uses that resolved doc for the pulse feed.
   - Box Score path: `box-score.js` uses the already-loaded `gameData`.
-- Feed builder: `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })`.
+- Feed builder: `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })`. Feed entries include the stat line and the player's team context.
 - Ordering: user team first, opponent second; within each team, players are sorted by points scored descending.
 - Eligibility: only players with more than 0 displayed minutes are included (`MIN` seconds floored to whole minutes).
 - Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played`.
 - Rebounds use **TREB = DREB + OREB**. Points are always shown, including `0 points`; all other zero stats are omitted.
 - Rotation: one player line is shown at a time for 8 seconds while phase B is pending.
+- Banner behavior: the team banner follows the currently displayed player. User-team player lines show the user team banner; opponent player lines show the opponent team banner; when the feed loops, the banner switches back with the line.
 
 ### Franchise complete-week team id resolution (February 2026)
 

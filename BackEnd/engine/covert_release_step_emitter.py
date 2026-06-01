@@ -668,15 +668,6 @@ def _build_outcome_step(
         anim_end = _movement_end_coord(animations, pid)
         end_coords[pid] = anim_end if anim_end is not None else start_coord
 
-    # 🔍 Bug B diagnostic: BH end coord after legacy-animator read.
-    if bh_id:
-        _bh_after_anim = end_coords.get(bh_id)
-        import logging as _bug_b_log
-        _bug_b_log.warning(
-            "🐛 [BUG B] BH=%s step1 end after _movement_end_coord: %s",
-            bh_id, _bh_after_anim,
-        )
-
     # Per-player action + archetype.
     actions: Dict[str, PlayerAction] = {}
     archetype: Dict[str, PlayerArchetype] = {}
@@ -810,15 +801,6 @@ def _build_outcome_step(
                 "x": start_coord["x"] + dx * ratio,
                 "y": start_coord["y"] + dy * ratio,
             }
-
-    # 🔍 Bug B diagnostic: BH end coord after the in-_build_outcome_step clamp.
-    if bh_id:
-        _bh_after_old_clamp = end_coords.get(bh_id)
-        import logging as _bug_b_log_2
-        _bug_b_log_2.warning(
-            "🐛 [BUG B] BH=%s step1 end after old clamp loop: %s",
-            bh_id, _bh_after_old_clamp,
-        )
 
     advance_trigger: AdvanceTrigger = {
         "condition": "player_reaches_position",
@@ -958,7 +940,6 @@ def _build_step_back_step(
     import logging
     fb_bh = fb_roles.get("ball_handler")
     if fb_bh is None:
-        logging.warning("🏀 [CR STEP-BACK] returning None: fb_bh is None")
         return None
     fb_bh_id = _safe_id(fb_bh)
     # Resolve position from lineup (authoritative), not from Player.position
@@ -970,12 +951,6 @@ def _build_step_back_step(
         if attr_pos in _LINEUP_ORDER:
             fb_bh_pos = attr_pos
     if fb_bh_pos not in _LINEUP_ORDER:
-        logging.warning(
-            "🏀 [CR STEP-BACK] returning None: could not resolve fb_bh_pos "
-            "(fb_bh_id=%s, off_lineup_player_ids=%s)",
-            fb_bh_id,
-            {k: getattr(v, "player_id", None) for k, v in (off_lineup or {}).items()},
-        )
         return None
 
     is_away_offense = bool(fb_roles.get("is_away_offense"))
@@ -1226,9 +1201,6 @@ def build_covert_release_animation_steps(
         )
         return None
 
-    from BackEnd.utils.animation_step_helpers import log_fb_emitter_entry
-    log_fb_emitter_entry("CR", all_start_coords, game, off_lineup, def_lineup)
-
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
     shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
@@ -1306,11 +1278,6 @@ def build_covert_release_animation_steps(
     # Other outcomes (MAKE/MISS/BLOCK/FOUL/etc.) terminate via their
     # `turn_stop` next pointer set by `_resolve_outcome_next`.
     result_type = (turn_result.get("result_type") or "").upper()
-    import logging
-    logging.warning(
-        "🏀 [CR EMITTER] result_type=%s, has_outlet_pass=%s, steps_so_far=%d",
-        result_type, has_outlet_pass, len(steps),
-    )
     if result_type == "DEFENSIVE_STOP":
         outcome_step["end"]["announcement"] = _build_nice_stop_announcement(
             turn_result, fb_roles, def_lineup, is_away_offense
@@ -1325,21 +1292,7 @@ def build_covert_release_animation_steps(
     from BackEnd.utils.shared import canonicalize_post_shot_overlays
     canonicalize_post_shot_overlays(turn_result)
 
-    # 🔍 Bug B diagnostic: dump overlay maps and BH overlay entries.
-    import logging as _bug_b_log_3
     _bh_id_str = str(bh_id) if bh_id else None
-    for _ok in (
-        "offense_rebounder_coords",
-        "defense_rebounder_coords",
-        "offense_getback_coords",
-        "defense_release_coords",
-    ):
-        _ov = turn_result.get(_ok) or {}
-        _bh_in_ov = _ov.get(_bh_id_str) if _bh_id_str else None
-        _bug_b_log_3.warning(
-            "🐛 [BUG B] overlay %s len=%d bh_entry=%s",
-            _ok, len(_ov) if isinstance(_ov, dict) else 0, _bh_in_ov,
-        )
 
     # Movement #1 (post-shot positioning): split path based on result_type.
     #   - MAKE/MISS/BLOCK: append variant-aware schema-pure post-shot
@@ -1366,15 +1319,6 @@ def build_covert_release_animation_steps(
             logging.exception("CR FB post-shot sub-steps failed")
     elif result_type != "DEFENSIVE_STOP":
         _apply_post_shot_overlay(outcome_step, turn_result)
-        # 🔍 Bug B diagnostic: BH end coord after overlay pass.
-        if _bh_id_str:
-            _bh_after_overlay = (
-                outcome_step.get("end", {}).get("coords", {}).get(_bh_id_str)
-            )
-            _bug_b_log_3.warning(
-                "🐛 [BUG B] BH=%s step1 end after _apply_post_shot_overlay: %s",
-                _bh_id_str, _bh_after_overlay,
-            )
         # Clamp the overlay-derived end coords to each player's archetype
         # rate × step T so non-gate movers don't appear to teleport from
         # their step 0 drift positions to the rim cluster. Without this,
@@ -1387,17 +1331,6 @@ def build_covert_release_animation_steps(
         _clamp_step_end_coords_to_archetype(
             outcome_step, off_lineup, def_lineup
         )
-        # 🔍 Bug B diagnostic: BH end coord after archetype clamp.
-        if _bh_id_str:
-            _bh_after_clamp = (
-                outcome_step.get("end", {}).get("coords", {}).get(_bh_id_str)
-            )
-            _bug_b_log_3.warning(
-                "🐛 [BUG B] BH=%s step1 end after archetype clamp: %s",
-                _bh_id_str, _bh_after_clamp,
-            )
-
-    _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
 
     return steps
 
@@ -1505,245 +1438,3 @@ def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -
                 # don't overwrite those with cruise.
                 if start_archetype.get(pid_str) == "stationary":
                     start_archetype[pid_str] = "sprint"
-
-
-def _log_fb_roles(
-    fb_roles: Dict[str, Any],
-    off_lineup: Dict[str, Any],
-    def_lineup: Dict[str, Any],
-) -> None:
-    """Log get-back / release / outlet-passer roster as name+position+coords.
-
-    Helps diagnose CR FB issues where the wrong players are being treated as
-    get-back defenders or where release/outlet positions look stale.
-    """
-    import logging
-
-    def _resolve(pid: Any) -> tuple:
-        """Return (team_label, pos, name, coords_str) for a player_id."""
-        if pid is None:
-            return ("?", "?", "?", "?")
-        target = str(pid)
-        for team_label, lineup in (("OFFENSE", off_lineup), ("DEFENSE", def_lineup)):
-            for pos, player in (lineup or {}).items():
-                if player is None:
-                    continue
-                player_pid = getattr(player, "player_id", None)
-                if player_pid is not None and str(player_pid) == target:
-                    name = (
-                        getattr(player, "name", None)
-                        or getattr(player, "first_last", None)
-                        or "?"
-                    )
-                    c = getattr(player, "coords", None) or {}
-                    if isinstance(c, dict) and c.get("x") is not None:
-                        try:
-                            coords_str = f"({float(c['x']):.1f}, {float(c['y']):.1f})"
-                        except (TypeError, ValueError):
-                            coords_str = "?"
-                    else:
-                        coords_str = "?"
-                    return (team_label, pos, str(name), coords_str)
-        return ("?", "?", "?", "?")
-
-    getback_ids = list(fb_roles.get("getback_player_ids") or [])
-    outlet_passer = fb_roles.get("outlet_passer")
-    outlet_receiver = fb_roles.get("outlet_receiver")
-    bh = fb_roles.get("ball_handler")
-    bh_pid = getattr(bh, "player_id", None) if bh is not None else None
-
-    if getback_ids:
-        for i, pid in enumerate(getback_ids, start=1):
-            team_label, pos, name, coords_str = _resolve(pid)
-            logging.warning(
-                "🏀 [CR FB ROSTER] get-back #%d: %s %s %s @ %s",
-                i, team_label, pos, name, coords_str,
-            )
-    else:
-        logging.warning("🏀 [CR FB ROSTER] get-back: NONE")
-
-    if outlet_passer is not None:
-        team_label, pos, name, coords_str = _resolve(outlet_passer)
-        logging.warning(
-            "🏀 [CR FB ROSTER] outlet passer (rebounder): %s %s %s @ %s",
-            team_label, pos, name, coords_str,
-        )
-    else:
-        logging.warning("🏀 [CR FB ROSTER] outlet passer: NONE (rebounder == release player)")
-
-    if outlet_receiver is not None:
-        team_label, pos, name, coords_str = _resolve(outlet_receiver)
-        logging.warning(
-            "🏀 [CR FB ROSTER] outlet receiver (release player / BH): %s %s %s @ %s",
-            team_label, pos, name, coords_str,
-        )
-    elif bh_pid is not None:
-        team_label, pos, name, coords_str = _resolve(bh_pid)
-        logging.warning(
-            "🏀 [CR FB ROSTER] ball handler (no outlet receiver): %s %s %s @ %s",
-            team_label, pos, name, coords_str,
-        )
-
-
-def _log_steps_coords(
-    steps: List[AnimationStep],
-    off_lineup: Dict[str, Any],
-    def_lineup: Dict[str, Any],
-    fb_roles: Optional[Dict[str, Any]] = None,
-) -> None:
-    """Per-step, per-player start/end coord log for debugging FB animations.
-
-    Iterates over ``step.start.coords`` (authoritative for which players the
-    emitter actually populated). For each player_id, attempts to resolve
-    team + position via lineup lookup; falls back to ``?`` placeholders so we
-    see SOMETHING per player even when lineup state is unreliable.
-    """
-    import logging
-
-    pid_to_role: Dict[str, tuple] = {}
-    for pos in _LINEUP_ORDER:
-        for team_label, lineup in (("OFFENSE", off_lineup), ("DEFENSE", def_lineup)):
-            player = lineup.get(pos) if lineup else None
-            if player is None:
-                continue
-            pid = getattr(player, "player_id", None)
-            if pid is None:
-                continue
-            pid_to_role[str(pid)] = (team_label, pos)
-
-    def _fmt(coord: Any) -> str:
-        if not isinstance(coord, dict) or "x" not in coord or "y" not in coord:
-            return "?"
-        try:
-            return f"({float(coord['x']):.1f}, {float(coord['y']):.1f})"
-        except (TypeError, ValueError):
-            return "?"
-
-    if fb_roles:
-        _log_fb_roles(fb_roles, off_lineup, def_lineup)
-
-    def _step_kind(idx: int, step: AnimationStep, total_steps: int) -> str:
-        """Human-readable label for what this step represents (for diagnosis)."""
-        actions = (step.get("start", {}).get("action") or {})
-        if "pass" in actions.values() and "receive" in actions.values():
-            return "outlet_pass"
-        # Last step in a 2-step sequence is the outcome (shot/stop/foul/etc.).
-        # In a 3-step sequence (DEFENSIVE_STOP), step 2 is the step-back.
-        if idx == total_steps - 1 and total_steps == 3:
-            return "step_back"
-        return "outcome"
-
-    prev_step_end_coords: Dict[str, GridCoord] = {}
-    for i, step in enumerate(steps):
-        t = step.get("end", {}).get("time_elapsed")
-        kind = _step_kind(i, step, len(steps))
-        start = step.get("start", {}) or {}
-        end = step.get("end", {}) or {}
-        trigger = start.get("advance_trigger") or {}
-        trigger_meta = trigger.get("metadata") or {}
-        ball_start = (start.get("ball") or {}).get("owner_player_id") or "?"
-        ball_end = (end.get("ball") or {}).get("owner_player_id") or "?"
-        next_ptr = end.get("next") or {}
-        next_kind = next_ptr.get("kind", "?")
-        next_extra = (
-            next_ptr.get("index") if next_kind == "next_step"
-            else next_ptr.get("event") if next_kind == "turn_stop"
-            else None
-        )
-        announcement_end = (end.get("announcement") or {}).get("text") if end.get("announcement") else None
-
-        # Outlet-pass step's advance_trigger uses `to_player_id` (ball
-        # reaching receiver); other step kinds use `target_player_id`
-        # (player reaching position). Try both so the log isn't blank.
-        gate_id_for_log = (
-            trigger_meta.get("target_player_id")
-            or trigger_meta.get("to_player_id")
-            or "?"
-        )
-        gate_coord_for_log = trigger_meta.get("target_coords")
-        logging.warning(
-            "🏀 [CR STEP %d] kind=%s T=%s gate=%s gate_coord=%s "
-            "ball=%s→%s next=%s%s announcement=%s players=%d",
-            i,
-            kind,
-            f"{t:.3f}" if isinstance(t, (int, float)) else "?",
-            gate_id_for_log,
-            _fmt(gate_coord_for_log),
-            ball_start,
-            ball_end,
-            next_kind,
-            f"({next_extra})" if next_extra is not None else "",
-            f'"{announcement_end}"' if announcement_end else "—",
-            len((start.get("coords") or {})),
-        )
-
-        start_coords = start.get("coords") or {}
-        end_coords = end.get("coords") or {}
-        actions = start.get("action") or {}
-        archetypes = start.get("archetype") or {}
-
-        # Sort player_ids by (team, position) when known; unresolved goes last.
-        def _sort_key(pid: str) -> tuple:
-            role = pid_to_role.get(pid)
-            if role is None:
-                return (2, 0, str(pid))
-            team_label, pos = role
-            team_idx = 0 if team_label == "OFFENSE" else 1
-            try:
-                pos_idx = _LINEUP_ORDER.index(pos)
-            except ValueError:
-                pos_idx = 99
-            return (team_idx, pos_idx, str(pid))
-
-        # Cross-step continuity check: flag any player whose step N start
-        # doesn't match step N-1 end (within 0.5 grid units). Such gaps cause
-        # visible teleports between steps.
-        if i > 0 and prev_step_end_coords:
-            for pid in sorted(start_coords.keys(), key=_sort_key):
-                cur = start_coords.get(pid)
-                prev = prev_step_end_coords.get(pid)
-                if not isinstance(cur, dict) or not isinstance(prev, dict):
-                    continue
-                dx = float(cur.get("x", 0)) - float(prev.get("x", 0))
-                dy = float(cur.get("y", 0)) - float(prev.get("y", 0))
-                gap = (dx * dx + dy * dy) ** 0.5
-                if gap > 0.5:
-                    team_label, pos = pid_to_role.get(pid, ("?", "?"))
-                    logging.warning(
-                        "  ⚠️ [CR CONTINUITY] step %d %s %s (%s): "
-                        "prev step end %s ≠ this step start %s (gap=%.2f)",
-                        i, team_label, pos, pid,
-                        _fmt(prev), _fmt(cur), gap,
-                    )
-
-        t_seconds = float(t) if isinstance(t, (int, float)) else 0.0
-        for pid in sorted(start_coords.keys(), key=_sort_key):
-            team_label, pos = pid_to_role.get(pid, ("?", "?"))
-            sc = start_coords.get(pid)
-            ec = end_coords.get(pid)
-            action = actions.get(pid, "?")
-            archetype = archetypes.get(pid, "?")
-            dist_str = "?"
-            rate_str = "?"
-            if isinstance(sc, dict) and isinstance(ec, dict):
-                try:
-                    dx = float(ec["x"]) - float(sc["x"])
-                    dy = float(ec["y"]) - float(sc["y"])
-                    dist = (dx * dx + dy * dy) ** 0.5
-                    dist_str = f"{dist:.1f}"
-                    if t_seconds > 0:
-                        rate_str = f"{dist / t_seconds:.1f}"
-                except (TypeError, ValueError):
-                    pass
-            logging.warning(
-                "  %s %s (%s): %s → %s | d=%s units, rate=%s grid/s | %s/%s",
-                team_label, pos, pid,
-                _fmt(sc),
-                _fmt(ec),
-                dist_str,
-                rate_str,
-                action,
-                archetype,
-            )
-
-        prev_step_end_coords = dict(end_coords)

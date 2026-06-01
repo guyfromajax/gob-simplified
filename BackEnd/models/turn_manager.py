@@ -1570,33 +1570,6 @@ class TurnManager:
         if "next_play_type" in result and result["next_play_type"]:
             result["next_turn"] = result["next_play_type"]
 
-        # 🔍 [RESET BYPASS DIAG] Detect HCO turns that skipped the skeleton emitter.
-        # If this fires, the Reset preamble could not be prepended for this turn.
-        if state == "HCO" and "animation_steps" not in result:
-            prior = (getattr(self.game, "turns", None) or [])
-            prior_last = prior[-1] if prior else None
-            prior_next = prior_last.get("next_play_type") if isinstance(prior_last, dict) else None
-            prior_has_setup = (
-                isinstance(prior_last, dict)
-                and prior_next == "HCO"
-                and isinstance(prior_last.get("hco_setup"), dict)
-            )
-            logging.warning(
-                "🔍 [RESET BYPASS] HCO turn produced NO animation_steps — emitter skipped. "
-                "result_type=%s forced_shot=%s forced_shot_reason=%s quick_foul=%s "
-                "has_skeleton=%s has_animations=%s has_step_clock_seconds=%s "
-                "prior_next_play=%s prior_has_hco_setup=%s",
-                result.get("result_type"),
-                result.get("forced_shot"),
-                result.get("forced_shot_reason"),
-                result.get("quick_foul"),
-                bool(result.get("skeleton")),
-                bool(result.get("animations")),
-                bool(result.get("step_clock_seconds")),
-                prior_next,
-                prior_has_setup,
-            )
-
         # STEP 4: Final updates (clock, logs, animation)
         try:
             self.update_clock_and_possession(result)

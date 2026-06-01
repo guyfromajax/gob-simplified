@@ -3966,27 +3966,33 @@ try:
             games_collection.update_one({"_id": game_id_oid}, {"$set": db_summary}, upsert=True)
 
             # Stash the user's coaching archetype for this period (franchise only).
-            # Best-effort, idempotent per (game_id, quarter); folded into the user
-            # record at finalize_game (User Account System, Phase 4).
-            # Own try/except so failures here are NOT masked as "Mongo upsert failed".
             # Diagnosis via DB breadcrumbs (Railway drops logs). `archetype_hook`
-            # proves THIS file is deployed + reached; `hook_build` stamps the version.
+            # proves THIS file is deployed + reached; if the helper import/call
+            # throws, the exception is captured INTO the breadcrumb (error/trace)
+            # so we can read the real cause from the game doc.
+            _hook = {
+                "hook_build": "hook-b3-2026-06-01",
+                "mode": mode,
+                "full_sim": getattr(body, "full_sim", None),
+            }
             try:
-                games_collection.update_one(
-                    {"_id": game_id_oid},
-                    {"$set": {f"archetype_hook.{getattr(body, 'quarter', 'x')}": {
-                        "hook_build": "hook-b2-2026-06-01",
-                        "mode": mode,
-                        "full_sim": getattr(body, "full_sim", None),
-                    }}},
-                )
-                from BackEnd.utils.archetype_tracking import stash_period_archetype
+                from BackEnd.utils.archetype_tracking import stash_period_archetype, STASH_BUILD
+                _hook["helper_build"] = STASH_BUILD
                 stash_period_archetype(
                     gm=gm, body=body, mode=mode, game_id=game_id_oid,
                     games_collection=games_collection,
                 )
+            except Exception as _ae:
+                import traceback as _atb
+                _hook["error"] = repr(_ae)
+                _hook["trace"] = _atb.format_exc()[-700:]
+            try:
+                games_collection.update_one(
+                    {"_id": game_id_oid},
+                    {"$set": {f"archetype_hook.{getattr(body, 'quarter', 'x')}": _hook}},
+                )
             except Exception:
-                logging.exception("[archetype] stash call site failed (non-fatal)")
+                logging.exception("[archetype] hook breadcrumb write failed (non-fatal)")
 
             # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
             if game_id in ongoing_games:

@@ -772,10 +772,6 @@ def simulate_quarter(
 
             gm.simulate_macro_turn()
 
-            if turn_count == 1 or turn_count % 10 == 0:
-                _turn_ms = (_time.time() - _turn_start) * 1000
-                logging.warning(f"⏱️ [PERF] full_sim turn {turn_count} macro_turn={_turn_ms:.0f}ms")
-
             gm.game_state["team_fouls"] = {
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
@@ -803,8 +799,6 @@ def simulate_quarter(
             gm.game_state.pop("timeout_offense_team_id", None)
             gm.game_state.pop("timeout_trace_id", None)
         
-        _loop_sec = _time.time() - _loop_start
-        logging.warning(f"⏱️ [PERF] full_sim loop: Q{gm.quarter} turns={turn_count} loop_time={_loop_sec:.2f}s ({1000*_loop_sec/max(turn_count,1):.0f}ms/turn)")
         logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
         # Keep gm.quarter and gm.game_state["quarter"] synchronized.
         # Quarter attribution for points_by_quarter uses game_state["quarter"].

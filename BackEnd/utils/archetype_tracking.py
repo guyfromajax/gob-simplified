@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Bump on every deploy of this file so a game-doc breadcrumb proves the running
 # code is current (not stale). Read it from `game.archetype_debug.<q>.build`.
-STASH_BUILD = "arch-b2-2026-06-01"
+STASH_BUILD = "arch-b3-2026-06-01"
 
 
 def _to_object_id(game_id):

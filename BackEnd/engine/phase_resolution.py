@@ -622,16 +622,12 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     # Offensive fouls always flip possession, defensive fouls don't (handled by bonus logic)
     possession_flips = (foul_team == off_team)  # True for offensive fouls, False for defensive
     
-    logging.warning(f"🔍 [RESOLVE_FOUL] foul_team={foul_team.name}, off_team={off_team.name}, possession_flips={possession_flips}")
-    logging.warning(f"🔍 [RESOLVE_FOUL] Current offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
-    
     # ✅ FIX: Do NOT flip possession here for offensive fouls - let SIP setup handle it
     # This prevents double-flipping: resolve_non_shooting_foul() sets possession_flips=True,
     # then game_manager.py SIP setup flips based on that flag (same pattern as dead ball turnovers)
     # The flip happens in game_manager.py simulate_macro_turn() before setup_side_inbound()
     # This ensures consistent behavior: all possession flips for SIP transitions happen in one place
-    logging.warning(f"⏭️ [RESOLVE_FOUL] NOT flipping possession here - SIP setup will handle it (possession_flips={possession_flips})")
-    
+
     # next_play_type so turn_manager._should_reset_shot_clock resets on D_FOUL → SIDE_INBOUND (Real_Time_Clock_System.md)
     next_play_type = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
     result = {
@@ -1989,16 +1985,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         game_state.pop("fast_break_shot_threshold_override", None)
         attach_position_snapshots(turn_result, [fb_snap])
 
-        # 🔍 [FB MISS DEBUG] Log Fast Break miss outcome and next-turn/possession state for debugging
-        if turn_result.get("result_type") == "MISS":
-            outcome = "shooting_foul" if turn_result.get("next_play_type") == "FREE_THROW" else turn_result.get("rebound_type", "?")
-            logging.warning(
-                "🔍 [FB MISS] phase_resolution: result_type=MISS outcome=%s next_play_type=%s possession_flips=%s",
-                outcome,
-                turn_result.get("next_play_type"),
-                turn_result.get("possession_flips"),
-            )
-
         turn_result["defender_count"] = defender_count
         turn_result["outlet_passer_id"] = fb_roles.get("outlet_passer")
 
@@ -2603,8 +2589,6 @@ def _check_standard_fouls(calibrated_o_foul, calibrated_d_foul):
     # logging.warning(f"   O_FOUL threshold: <= {calibrated_o_foul}")
     # logging.warning(f"   D_FOUL threshold: >= {calibrated_d_foul}")
     if foul_roll <= calibrated_o_foul:
-        logging.warning(f"   ✅ RESULT: O_FOUL (roll {foul_roll} <= {calibrated_o_foul})")
-        logging.warning("")  # Blank line after standard foul check
         return ("O_FOUL", None, None)
     elif foul_roll >= calibrated_d_foul:
         # logging.warning(f"   ✅ RESULT: D_FOUL (roll {foul_roll} >= {calibrated_d_foul})")
@@ -2802,10 +2786,8 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                         
                         # logging.warning(f"      ✅ Steal attempt result: {steal_result}")
                         if steal_result == "STEAL":
-                            logging.warning("")  # Blank line after steal attempt check
                             return ("STEAL", None, None)
                         elif steal_result == "D_FOUL":
-                            logging.warning("")  # Blank line after steal attempt check
                             return ("D_FOUL", None, None)
                         # If "NO_EVENT", return None
                         # logging.warning(f"      ➡️  No event ({steal_result})")
@@ -4821,46 +4803,6 @@ def resolve_half_court_offense_logic(game):
     # Store intended shooter in roles for later comparison
     roles["intended_shooter_pos"] = intended_shooter_pos
 
-    if result == "SHOT" and not is_motion_play and skeleton and "steps" in skeleton:
-        steps = skeleton.get("steps") or []
-        final_step = steps[-1] if steps else {}
-        final_pos_actions = final_step.get("pos_actions") or {}
-        final_events = final_step.get("events") or []
-        final_step_keys = list(final_pos_actions.keys())
-        final_step_actions = {
-            pos: {
-                "action": action_info.get("action"),
-                "location": action_info.get("location"),
-                "spot": action_info.get("spot"),
-            }
-            for pos, action_info in final_pos_actions.items()
-        }
-        any_shoot_steps = []
-        for step_index, step in enumerate(steps):
-            for pos, action_info in (step.get("pos_actions") or {}).items():
-                if (action_info.get("action") or "").lower().strip() == "shoot":
-                    any_shoot_steps.append(
-                        {
-                            "step_index": step_index,
-                            "pos": pos,
-                            "location": action_info.get("location"),
-                            "spot": action_info.get("spot"),
-                        }
-                    )
-        logging.warning(
-            "🧭 [HCO_SET_PLAY_VARIANT_TRACE] playcall=%s variant=%s intended_shooter_pos=%s derived_shooter=%s derived_shooter_pos=%s final_step_keys=%s final_step_actions=%s final_step_events=%s any_shoot_steps=%s step_count=%s",
-            off_call,
-            skeleton.get("_variant"),
-            intended_shooter_pos,
-            get_name_safe(roles.get("shooter")) if roles.get("shooter") else "NONE",
-            roles.get("shooter_pos"),
-            final_step_keys,
-            final_step_actions,
-            final_events,
-            any_shoot_steps,
-            len(steps),
-        )
-    
     # ============================================================================
     # STEAL HCO SETUP: Check if this HCO turn comes from a steal
     # ============================================================================
@@ -5056,7 +4998,6 @@ def resolve_half_court_offense_logic(game):
         # Map stopper result to event_type
         if result == "O_FOUL":
             event_type = "O_FOUL"
-            logging.warning(f"🔍 [HCO] result=O_FOUL, setting event_type=O_FOUL - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
         elif result == "D_FOUL":
             event_type = "D_FOUL"
         elif result == "DEAD_BALL_TURNOVER":
@@ -5230,7 +5171,6 @@ def resolve_half_court_offense_logic(game):
 
         elif event_type == "O_FOUL":
             game_state["foul_team"] = "OFFENSE"
-            logging.warning(f"🔍 [HCO O_FOUL] About to call resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
             foul_result = resolve_non_shooting_foul(roles, game)
             timing_contract = calc_skeleton_step_timing_contract(
                 roles.get("steps", []),
@@ -5244,7 +5184,6 @@ def resolve_half_court_offense_logic(game):
             foul_result["resolution_step_index"] = timing_contract["resolution_step_index"]
             foul_result["executed_step_count"] = timing_contract["executed_step_count"]
             foul_result["bringup_per_player_seconds"] = timing_contract.get("bringup_per_player_seconds") or {}
-            logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
             # Add skeleton to result. Legacy ``animations[]`` no longer stamped
             # on HCO results (Phase 2 of UESS migration); schema emitter builds
             # them internally.
@@ -6212,7 +6151,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         else:
             logging.warning(f"⚠️ [FCP] No animations generated from skeleton!")
     else:
-        logging.warning(f"⚠️ [FCP] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
         animations = []
 
     if animations:

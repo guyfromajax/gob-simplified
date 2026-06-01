@@ -38,6 +38,27 @@
     return DEFAULT_BANNER_PATH;
   }
 
+  function normalizePulseFeedEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .map(function (entry) {
+        if (typeof entry === 'string') {
+          var text = entry.trim();
+          return text ? { line: text } : null;
+        }
+        if (!entry || typeof entry !== 'object') return null;
+        var line = typeof entry.line === 'string' ? entry.line.trim() : '';
+        if (!line) return null;
+        return {
+          line: line,
+          teamName: entry.teamName || '',
+          imageSrc: entry.imageSrc || '',
+          assetKey: entry.assetKey || ''
+        };
+      })
+      .filter(Boolean);
+  }
+
   function ensureOverlayStructure(overlay) {
     if (!overlay) return overlay;
 
@@ -217,9 +238,20 @@
     var titleText = options.title || '';
     var subtitleText = options.subtitle || '';
     var labelText = options.label || '';
-    var statLines = Array.isArray(options.statLines)
-      ? options.statLines.filter(function (line) { return typeof line === 'string' && line.trim(); })
-      : [];
+    var statLines = normalizePulseFeedEntries(options.statLines);
+
+    function applyFeedEntry(entry) {
+      if (!entry) return;
+      if (pulseStat) pulseStat.textContent = entry.line;
+      if (pulseImage && (entry.imageSrc || entry.teamName)) {
+        pulseImage.src = getPulseImageSrc({
+          imageSrc: entry.imageSrc,
+          teamName: entry.teamName,
+          assetKey: entry.assetKey || options.assetKey || 'banner_primary'
+        });
+        pulseImage.alt = entry.teamName || titleText || labelText || 'Loading';
+      }
+    }
 
     if (pulseLabel) {
       pulseLabel.textContent = labelText;
@@ -259,12 +291,12 @@
     if (pulseStat) {
       if (statLines.length) {
         var statIndex = 0;
-        pulseStat.textContent = statLines[0];
+        applyFeedEntry(statLines[0]);
         pulseStat.style.display = 'block';
         if (statLines.length > 1) {
           pulseFeedTimer = setInterval(function () {
             statIndex = (statIndex + 1) % statLines.length;
-            pulseStat.textContent = statLines[statIndex];
+            applyFeedEntry(statLines[statIndex]);
           }, options.statIntervalMs || 8000);
         }
       } else {
@@ -389,6 +421,7 @@
 
   function collectSideStatLines(gameDoc, side) {
     var box = getBoxScoreForSide(gameDoc, side);
+    var teamName = getTeamNameFromGameDoc(gameDoc, side);
     return Object.keys(box || {})
       .map(function (key, index) {
         var row = box[key];
@@ -398,7 +431,9 @@
         return {
           index: index,
           points: Number(row.PTS || 0),
-          line: formatPostgameStatLine(row)
+          line: formatPostgameStatLine(row),
+          teamName: teamName,
+          assetKey: 'banner_primary'
         };
       })
       .filter(Boolean)
@@ -406,7 +441,13 @@
         if (b.points !== a.points) return b.points - a.points;
         return a.index - b.index;
       })
-      .map(function (entry) { return entry.line; });
+      .map(function (entry) {
+        return {
+          line: entry.line,
+          teamName: entry.teamName,
+          assetKey: entry.assetKey
+        };
+      });
   }
 
   function buildPostgameStatFeed(gameDoc, options) {

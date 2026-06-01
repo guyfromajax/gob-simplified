@@ -672,9 +672,6 @@ def build_triangle_animation_steps(
     if not all_start_coords:
         return None
 
-    from BackEnd.utils.animation_step_helpers import log_fb_emitter_entry
-    log_fb_emitter_entry("TRIANGLE", all_start_coords, game, off_lineup, def_lineup)
-
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
     shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)

@@ -25,19 +25,12 @@ class GameManager:
     _POST_MAKE_BIP_CLOCK_RUNOFF_SECONDS = 2
 
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None, community_engagement_crowd_shift="none"):
-        import time
-        # ⏱️ Coarse timers for gm_create breakdown
-        _t0 = time.time()
         # ✅ SS&S: Set is_user_team flag based on user_team_side
         is_home_user = user_team_side == "home"
         is_away_user = user_team_side == "away"
 
         self.home_team = TeamManager(home_team_name, is_home_team=True, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data, plays_data=home_plays_data, strategy_calls=home_strategy_calls, mode=mode, is_user_team=is_home_user, franchise_id=franchise_id)
-        _home_ms = (time.time() - _t0) * 1000
-        _t0 = time.time()
         self.away_team = TeamManager(away_team_name, is_home_team=False, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data, plays_data=away_plays_data, strategy_calls=away_strategy_calls, mode=mode, is_user_team=is_away_user, franchise_id=franchise_id)
-        _away_ms = (time.time() - _t0) * 1000
-        _t0 = time.time()
         # ✅ Initialize tempo randomly per game (not per team)
         # Tempo is used for time_elapsed calculations, not fast break logic
         tempo_value = TeamManager.init_tempo_random()
@@ -48,12 +41,6 @@ class GameManager:
 
         # Recalculate position ratings for all players (attributes may have changed)
         self._update_position_ratings()
-        _ratings_ms = (time.time() - _t0) * 1000
-        logging.warning(
-            "⏱️ [PERF] gm_create breakdown: home_team=%.0fms away_team=%.0fms update_position_ratings=%.0fms",
-            _home_ms, _away_ms, _ratings_ms,
-        )
-
         self.score = {home_team_name: 0, away_team_name: 0}
         self.quarter = 1
         self.turns = []
@@ -448,15 +435,10 @@ class GameManager:
         - flips=False → next offense = current ``self.offense_team`` (e.g.,
           CR/RR FB stop where offense retains for HCO)
         """
-        import logging as _stamp_log
         if not isinstance(result, dict):
             return
         _next_play = result.get("next_play_type")
         if _next_play != "HCO":
-            _stamp_log.warning(
-                "🔍 [RESET STAMP] skip: current_turn=%s next_play_type=%s (not HCO)",
-                result.get("current_turn"), _next_play,
-            )
             return
 
         # Determine BH at end of this turn. Try event-specific sources first
@@ -507,10 +489,6 @@ class GameManager:
                 bh_source = "roles:ball_handler"
 
         if not bh_id:
-            _stamp_log.warning(
-                "🔍 [RESET STAMP] skip: current_turn=%s result_type=%s — no BH source matched",
-                result.get("current_turn"), result.get("result_type"),
-            )
             return
 
         possession_flips = bool(result.get("possession_flips"))
@@ -518,16 +496,7 @@ class GameManager:
         pg = (getattr(next_off_team, "lineup", {}) or {}).get("PG")
         pg_id = getattr(pg, "player_id", None) if pg is not None else None
         if not pg_id or str(bh_id) == str(pg_id):
-            _stamp_log.warning(
-                "🔍 [RESET STAMP] skip: bh_id=%s pg_id=%s (BH is PG or no PG)",
-                bh_id, pg_id,
-            )
             return
-
-        _stamp_log.warning(
-            "🔍 [RESET STAMP] STAMPING via %s: current_turn=%s bh_id=%s pg_id=%s possession_flips=%s",
-            bh_source, result.get("current_turn"), bh_id, pg_id, possession_flips,
-        )
 
         from_coords = None
         anim_steps = result.get("animation_steps") or []
@@ -607,12 +576,6 @@ class GameManager:
             )
             turn_result["final_coords"] = build_final_coords(self)
             turn_result["final_ball_handler_id"] = build_final_ball_handler_id(turn_result)
-            logging.warning(
-                "📍 [FINAL_COORDS] stamped %d players for turn=%s bh=%s",
-                len(turn_result["final_coords"]),
-                turn_result.get("current_turn"),
-                turn_result.get("final_ball_handler_id"),
-            )
 
         self._check_lineups_for_foul_out(turn_result)
         if turn_result.get("fouled_out"):
@@ -1013,7 +976,6 @@ class GameManager:
         # Propagate hco_setup from a prior turn to the next HCO turn payload.
         # The source turn was stamped above (or in the RR emitter); HCO emitter
         # consumes the propagated field to prepend Reset before the skeleton.
-        import logging as _prop_log
         if (
             isinstance(result, dict)
             and result.get("current_turn") == "HCO"
@@ -1021,29 +983,9 @@ class GameManager:
             and previous_result.get("hco_setup")
         ):
             result["hco_setup"] = previous_result["hco_setup"]
-            _prop_log.warning(
-                "🔍 [RESET PROP] propagating hco_setup to HCO turn (prev current_turn=%s)",
-                previous_result.get("current_turn"),
-            )
-        elif isinstance(result, dict) and result.get("current_turn") == "HCO":
-            _prop_log.warning(
-                "🔍 [RESET PROP] HCO turn but prev had no hco_setup (prev current_turn=%s, prev next_play_type=%s)",
-                (previous_result or {}).get("current_turn") if isinstance(previous_result, dict) else None,
-                (previous_result or {}).get("next_play_type") if isinstance(previous_result, dict) else None,
-            )
 
         self._append_turn(result)
         _perf["next_turn_append"] = (_time.time() - _t0) * 1000
-
-        # 🔍 [FB MISS DEBUG] Log Fast Break miss: outcome, next_turn we're set to process, possession_flips value
-        if result.get("fast_break") and result.get("result_type") == "MISS":
-            outcome = "shooting_foul" if result.get("next_play_type") == "FREE_THROW" else result.get("rebound_type", "?")
-            logging.warning(
-                "🔍 [FB MISS] game_manager: outcome=%s next_turn=%s possession_flips=%s (before flip logic)",
-                outcome,
-                result.get("next_turn"),
-                result.get("possession_flips"),
-            )
 
         # If the turn ended with an offensive rebound, create a separate OREB turn
         # Process ALL consecutive OREBs in this same call (for batch efficiency)
@@ -1199,10 +1141,6 @@ class GameManager:
                     old_offense = self.offense_team.name
                     self.switch_possession()
                     dreb_turn["possession_flips"] = False
-                    logging.warning(
-                        "🔄 [DREB] Flipped possession after defensive rebound: %s → %s",
-                        old_offense, self.offense_team.name,
-                    )
                     if dreb_turn.get("next_play_type") == "HCO":
                         prev_positions = {}
                         for pos, player in (self.offense_team.lineup or {}).items():
@@ -1247,26 +1185,12 @@ class GameManager:
             ):
                 _prev["suppress_oreb_putback_animation"] = True
 
-        # Log breakdown on sample turns during full_sim to see what drives user-game slowness
-        if self.game_state.get("_is_full_simulation") and (
-            self.macro_turn_count <= 3 or self.macro_turn_count % 10 == 0
-        ):
-            logging.warning(
-                "⏱️ [PERF] macro_turn %s breakdown: run_micro_turn=%.0fms next_turn_append=%.0fms oreb_loop=%.0fms",
-                self.macro_turn_count, _perf["run_micro_turn"], _perf["next_turn_append"], _perf["oreb_loop"],
-            )
-
         # ✅ FIX 3: Backend flip for DREB → HCO (Pattern B)
         # Handle possession flips for DREB transitions that go directly to HCO (not through inbound)
         # This includes: MISS with DREB → HCO, STEAL → HCO (direct, not via Fast Break)
         # ✅ SS&S FIX: Only flip if possession_flips is True (prevents double flip for Fast Break → HCO)
         # Fast Break defensive stop sets possession_flips: False, so it won't trigger this flip
         if result.get("next_play_type") == "HCO" and result.get("possession_flips") is True:
-            if result.get("fast_break"):
-                logging.warning(
-                    "🔍 [FB MISS] game_manager: processing DREB→HCO flip possession_flips=%s next_turn=%s",
-                    result.get("possession_flips"), result.get("next_turn"),
-                )
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
@@ -1281,11 +1205,6 @@ class GameManager:
         # Handle possession flips for DREB transitions that go to Fast Break
         # This includes: MISS with DREB → Fast Break, STEAL → Fast Break
         if result.get("next_play_type") == "FAST_BREAK" and result.get("possession_flips"):
-            if result.get("fast_break"):
-                logging.warning(
-                    "🔍 [FB MISS] game_manager: processing DREB→FAST_BREAK flip possession_flips=%s next_turn=%s",
-                    result.get("possession_flips"), result.get("next_turn"),
-                )
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False

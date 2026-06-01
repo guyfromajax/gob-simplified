@@ -203,13 +203,11 @@ class ShotManager:
                 break
         
         if not shooter_pos:
-            logging.warning(f"🔍 [SHOT LOCATION] Shooter {get_name_safe(shooter)} not found in lineup")
             return (None, None)
         
         # Find the shooter's spot from the final step (where they shoot)
         steps = roles.get("steps", [])
         if not steps:
-            logging.warning(f"🔍 [SHOT LOCATION] No steps in roles")
             return (None, None)
         
         # Check the last step for the shooter's spot
@@ -1042,8 +1040,6 @@ class ShotManager:
             if original_made != made:
                 # logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
                 pass
-            else:
-                logging.warning(f"   📊 Shot result unchanged: {'MADE' if made else 'MISS'} (calibration did not force change)")
 
         # Stat tracking (attempts)
         if not defense_applied_defenders:
