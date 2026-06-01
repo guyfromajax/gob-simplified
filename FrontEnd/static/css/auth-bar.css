@@ -27,11 +27,7 @@ body.has-auth-bar {
 .feedback-modal button,
 .feedback-modal [type="button"],
 .feedback-modal [type="submit"],
-.feedback-modal [type="reset"],
-.account-settings-modal button,
-.account-settings-modal [type="button"],
-.account-settings-modal [type="submit"],
-.account-settings-modal [type="reset"] {
+.feedback-modal [type="reset"] {
   font-family: 'Bebas Neue', sans-serif;
 }
 
@@ -418,158 +414,357 @@ body.has-auth-bar {
   color: #6b7280;
 }
 
-.account-settings-backdrop {
+/* ============================================
+   GOB FUNCTIONAL MODAL SYSTEM (shared classes)
+   Mirrors resource-pages.css so the modal renders on auth-bar pages
+   (index, mode-select, ...) that don't load resource-pages.css.
+   ============================================ */
+.gob-modal-overlay {
+  display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: none;
   align-items: center;
   justify-content: center;
   z-index: 10020;
 }
 
-.account-settings-backdrop.open {
+.gob-modal-overlay.is-visible {
   display: flex;
 }
 
-.account-settings-modal {
-  width: min(460px, 92vw);
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-
-.account-settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.account-settings-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.account-settings-close {
-  border: none;
-  background: transparent;
-  color: #6b7280;
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.account-settings-body {
-  padding: 16px;
-  display: grid;
-  gap: 16px;
-}
-
-.account-settings-row {
-  display: grid;
-  gap: 10px;
-}
-
-.account-settings-label {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-.account-settings-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.account-display-pill {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: center;
-  width: min(320px, 100%);
-  min-height: 46px;
-  padding: 4px;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  background: #eef2f7;
-  color: #111827;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.account-display-pill-thumb {
+.gob-modal-backdrop {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
-  height: calc(100% - 8px);
-  border-radius: 999px;
-  background: #27408e;
-  box-shadow: 0 6px 14px rgba(39, 64, 142, 0.2);
-  transition: transform 0.22s ease;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
 }
 
-.account-display-pill.is-team-colors .account-display-pill-thumb,
-.account-display-pill.is-off .account-display-pill-thumb {
-  transform: translateX(100%);
-}
-
-.account-display-pill-option {
+.gob-modal-box {
   position: relative;
   z-index: 1;
+  width: min(420px, calc(100vw - 40px));
+  background: rgba(22, 26, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.gob-modal-accent {
+  height: 3px;
+  width: 100%;
+  flex-shrink: 0;
+  background: #F79420;
+}
+
+.gob-modal-body {
+  padding: 24px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gob-modal-title {
+  margin: 0;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* --- Account Settings — field-level styling only --- */
+/* Two-class specificity pins z-index above the auth bar regardless of
+   whether resource-pages.css (which sets .gob-modal-overlay z-index:200)
+   loads after this stylesheet. */
+.gob-modal-overlay.account-modal-overlay {
+  z-index: 10020;
+}
+
+.account-modal-overlay .gob-modal-backdrop {
+  backdrop-filter: blur(3px);
+}
+
+.account-modal-box {
+  width: min(440px, calc(100% - 48px));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Standard modal entrance: scale 0.96 -> 1.0 over 200ms. The `is-entered`
+     class is added (after a reflow) once the overlay is already displayed, so
+     the transition fires reliably rather than being skipped from display:none. */
+  transform: scale(0.96);
+  opacity: 0;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+.account-modal-box.is-entered {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.account-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 22px 24px 0;
+}
+
+.account-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+.account-modal-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.account-modal-body {
+  padding: 14px 24px 22px;
+  gap: 0;
+}
+
+.account-field {
+  padding: 16px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.account-field--first {
+  padding-top: 0;
+  border-top: none;
+}
+
+.account-manage-row {
+  padding-bottom: 0;
+}
+
+.account-field-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.account-field--first .account-field-label {
+  margin-bottom: 11px;
+}
+
+/* Field 1 — Username identity row */
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.account-avatar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 0 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #4b5563;
-  transition: color 0.2s;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(155deg, #2e3a55, #1a2030);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.70);
 }
 
-.account-display-pill:not(.is-team-colors):not(.is-off) .account-display-pill-option-left,
-.account-display-pill.is-team-colors .account-display-pill-option-right,
-.account-display-pill.is-off .account-display-pill-option-right {
+.account-identity-text {
+  min-width: 0;
+}
+
+.account-username {
+  font-family: 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
   color: #ffffff;
 }
 
-.account-display-pill:hover {
-  border-color: #b7c0ce;
+.account-tier {
+  margin-top: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.42);
 }
 
-.account-display-pill.is-dead,
-.account-display-pill:disabled {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-  cursor: default;
+.account-locked {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
 }
 
-.account-display-pill.is-dead .account-display-pill-thumb,
-.account-display-pill:disabled .account-display-pill-thumb {
-  background: #cbd5e1;
-  box-shadow: none;
+.account-locked svg {
+  display: block;
+  color: rgba(255, 255, 255, 0.35);
 }
 
-.account-display-pill.is-dead .account-display-pill-option,
-.account-display-pill:disabled .account-display-pill-option {
-  color: #9ca3af;
+/* Field 2 — Scouting Ambience toggle row */
+.account-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
-.account-display-help {
-  min-height: 18px;
+.account-toggle-row .account-field-label {
   font-size: 12px;
-  color: #6b7280;
+}
+
+.account-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 54px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.account-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  transition: transform 200ms ease, background 200ms ease;
+}
+
+.account-switch[aria-checked="true"] {
+  background: linear-gradient(180deg, #ffab40, #F79420);
+  border-color: rgba(247, 148, 32, 0.6);
+}
+
+.account-switch[aria-checked="true"] .account-switch-knob {
+  transform: translateX(24px);
+  background: #ffffff;
+}
+
+/* Bottom — Manage Account forward link (dead until the page exists) */
+.account-manage-row {
+  display: flex;
+  justify-content: center;
+}
+
+.account-manage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.14s ease;
+}
+
+.account-manage-link:hover {
+  color: #ffffff;
+}
+
+.account-manage-arrow {
+  transition: transform 0.14s ease;
+}
+
+.account-manage-link:hover .account-manage-arrow {
+  transform: translateX(2px);
+}
+
+/* --- Save toast (Styleguide §Toast Notifications) --- */
+.account-toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 10030;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 3px solid #34EC27;
+  border-radius: 12px;
+  background: rgba(28, 33, 43, 0.97);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(120%);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.account-toast.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.account-toast[hidden] {
+  display: none;
+}
+
+.account-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.5px solid #34EC27;
+  background: rgba(52, 236, 39, 0.15);
+}
+
+.account-toast-copy {
+  min-width: 0;
+}
+
+.account-toast-title {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.account-toast-subline {
+  margin-top: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.54);
 }
 
 /* Site footer – same screens as auth bar; in document flow so visible when user scrolls to bottom */

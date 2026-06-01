@@ -52,7 +52,7 @@ Steps 1-3+: Animation Skeleton (required)
 -Bounce (miss; skipped for AIRBALL)
 -Rebound/Get Back/Release: overlay motion threaded across shoot + ball flight + variant + hold or bounce
 
-##Post-Shot Variant Chain (Sound_Design_Update.md)
+##Post-Shot Variant Chain ([SFX_System.md](../05_Features/SFX_System.md))
 | Variant | Flight end | Intermediate | Terminal | SFX |
 |---|---|---|---|---|
 | SWISH (make) | MSSS | — | hold | `swish.wav` arrival |
@@ -347,3 +347,15 @@ the result of these stages.)
 
 
 **Final Shot**
+
+---
+
+## Turn routing (`offensive_state`)
+
+**Canonical signal:** `game.game_state["offensive_state"]` — which resolver runs next (`HCO`, `HCT`, `FCP`, `FAST_BREAK`, `FREE_THROW`). Handlers (`shot_manager`, `phase_resolution`, etc.) must set it on every exit path; `next_play_type` is display/logging only.
+
+**Rule (source of truth):** [`BackEnd/models/turn_manager.py`](../../BackEnd/models/turn_manager.py) ~1671–1687 — if a handler omits `offensive_state`, that is a handler bug.
+
+**Not routed via `offensive_state`:** `OREB`, `DREB`, `BASELINE_INBOUND` — use `pending_*` flags when extra payload is required (`pending_oreb`, `pending_dreb_fb_play_key`, `pending_terminal_ft`, `situational_force_foul_pending`).
+
+**Hardening (open):** log/assert when a turn resolves without updating `offensive_state` — see [`projects/offensive_state_hardening.md`](../projects/offensive_state_hardening.md).

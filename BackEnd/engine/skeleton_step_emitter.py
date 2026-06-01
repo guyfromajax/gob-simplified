@@ -1459,7 +1459,7 @@ def build_skeleton_animation_steps(
                     )
                     step["start"]["ball_arrival_coord"] = meet
 
-                # Pass / Reception SFX (Sound_Design_Update.md).
+                # Pass / Reception SFX (SFX_System.md).
                 # Backend resolves the tier from attributes; FE just plays.
                 step["start"]["sfx_on_ball_release"] = pass_release_sfx(passer_player)
                 step["start"]["sfx_on_ball_arrival"] = pass_arrival_sfx(receiver_player)
@@ -1882,7 +1882,7 @@ def _airball_announcement(
     """``Airball!`` when a miss resolves as the AIRBALL shot variant.
 
     Fires at [ball_flight] end — same beat as ``airball.wav`` (no duplicate
-    announce SFX; Sound_Design_Update.md).
+    announce SFX; SFX_System.md).
     """
     if (turn_result.get("shot_variant") or "").upper() != "AIRBALL":
         return None
@@ -1956,7 +1956,7 @@ def _variant_flight_end(
     away_offense: bool,
     turn_result: Dict[str, Any],
 ) -> GridCoord:
-    """Per-variant ball-flight terminal coord. Mirrors Sound_Design_Update.md
+    """Per-variant ball-flight terminal coord. Mirrors SFX_System.md
     §Ball Resolve Animations. Falls back to make=MSSS / miss=rim for unknown
     or missing variant (legacy emitters that haven't rolled a variant).
     """
@@ -2055,7 +2055,7 @@ def _build_post_shot_sub_steps(
     away_offense: bool,
 ) -> None:
     """Append schema-pure post-shot sub-steps for MAKE / MISS / BLOCK
-    results. The sequence is variant-aware (Sound_Design_Update.md §Ball
+    results. The sequence is variant-aware (SFX_System.md §Ball
     Resolve Animations + §SFX Bindings):
 
       [shoot]       (already in steps[-1]) — shooter motion

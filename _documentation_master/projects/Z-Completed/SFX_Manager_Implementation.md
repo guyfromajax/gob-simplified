@@ -1,5 +1,7 @@
 # SFX Manager Implementation
 
+> **Superseded by** [`05_Features/SFX_System.md`](../../05_Features/SFX_System.md) § Runtime (implemented).
+
 ## Goal
 
 Make in-game SFX for passes, receptions, shot attempts, missed shots, and made shots as reliable and precisely timed as possible.

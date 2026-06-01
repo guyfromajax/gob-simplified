@@ -348,7 +348,7 @@ export function playShotResultSfx(scene, turnData, result) {
 }
 
 // Weighted 33/33/34 across three voice options. Tied to the "STEAL!"
-// announcement appearance (Sound_Design_Update.md "Steal Announce"); callers
+// announcement appearance (SFX_System.md "Steal Announce"); callers
 // resolve a filename here and pass it via `meta.sfx` on the announcement
 // payload so `court.html` plays the cue at overlay mount.
 const STEAL_SFX_FILES = Object.freeze([
@@ -443,7 +443,7 @@ export function resetSecondaryAnnounceCourtSfxDedup() {
  * Mirrors ``playSecondaryAnnounceCourtSfx`` but does not play — callers put
  * the returned filename on the announcement payload (``data.sfx``) so the
  * actual play happens at overlay mount time in ``court.html``, synced to
- * the visual entry per Sound_Design_Update.md.
+ * the visual entry per SFX_System.md.
  */
 export function resolveSecondaryAnnounceCourtSfxFile(headline) {
   const text = String(headline || "").trim();
@@ -493,7 +493,7 @@ export function resolveSecondaryAnnounceCourtSfxFile(headline) {
  *     ``meta.sfx`` contract while the actual play moves to court.html mount.
  *
  * Callers put the returned filename on ``data.sfx``; court.html plays at
- * overlay mount, synced to the visual entry per Sound_Design_Update.md.
+ * overlay mount, synced to the visual entry per SFX_System.md.
  */
 export function resolveAnnounceMetaCourtSfxFile(key) {
   switch (String(key || "").trim()) {
@@ -510,7 +510,7 @@ export function resolveAnnounceMetaCourtSfxFile(key) {
 }
 
 /**
- * Secondary-announcement court stingers (Sound_Design_Update.md — Court Event SFX).
+ * Secondary-announcement court stingers (SFX_System.md — Court Event SFX).
  * Press!, Trap!, and Fast Break! play at most once per turn; other mapped headlines
  * still fire on every matching showSecondaryAnnouncement call.
  */
@@ -612,7 +612,7 @@ export function playAnnouncementMetaCourtSfx(scene, key, headline = "") {
 if (typeof window !== "undefined") {
   // `court.html`'s announcement-overlay mount functions read `data.sfx`
   // (filename) and call this to play the cue at the moment the overlay
-  // appears — fixes BLOCK SFX timing per Sound_Design_Update.md "Block
+  // appears — fixes BLOCK SFX timing per SFX_System.md "Block
   // Announce: Trigger: immediately when the Block announce appears."
   // Scene is null because pool retention keeps the audio element alive.
   window.playGameSfx = (filename, volume) =>

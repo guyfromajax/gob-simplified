@@ -314,7 +314,7 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData, meta =
     foulerJersey: getPlayerJerseyValue(fouler) ? `#${getPlayerJerseyValue(fouler)}` : '',
     foulerLastName: getPlayerLastName(fouler) || '',
     // AND-1 whistle carried on payload — court.html plays at overlay mount
-    // per Sound_Design_Update.md. Caller override via `meta.sfx`.
+    // per SFX_System.md. Caller override via `meta.sfx`.
     sfx: resolvePrimarySfxFromMeta(meta?.sfx) ?? 'whistle-1-lowervol.wav',
   };
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
@@ -375,7 +375,7 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
   //   3. Headline-based fallback (Press!/Trap!/Fast Break!/etc.) — applies
   //      once-per-turn dedupe for the three repeating stingers.
   // `court.html`'s secondary overlay reads `data.sfx` and plays at mount,
-  // synced to the visual entry per Sound_Design_Update.md.
+  // synced to the visual entry per SFX_System.md.
   const rawMetaSfx = meta?.sfx;
   let sfxFile = null;
   if (typeof rawMetaSfx === 'string' && rawMetaSfx) {
@@ -507,7 +507,7 @@ export function showAnnouncement(text, team = 'home', playerData = null, meta = 
     decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
     // Primary-tier SFX carried on payload — court.html plays at overlay mount
-    // so audio is synced to the visual entry per Sound_Design_Update.md.
+    // so audio is synced to the visual entry per SFX_System.md.
     // Accepts: filename string (`.wav`/`.mp3`), filename array, or a legacy
     // kind string (`'foul'` / `'shot_clock_violation'` resolved via
     // `resolveAnnounceMetaCourtSfxFile`).
@@ -623,7 +623,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       }
 
       // Foul whistle carried on payload — court.html plays at overlay mount
-      // per Sound_Design_Update.md (single source for primary-tier SFX).
+      // per SFX_System.md (single source for primary-tier SFX).
       const foulMeta = scene ? { scene, sfx: 'whistle-1-lowervol.wav' } : { sfx: 'whistle-1-lowervol.wav' };
       if (turnData.otb_foul) {
         showAnnouncement("Over The Back!", foulTeam === 'OFFENSE' ? defenseTeam : offenseTeam, playerData, foulMeta);
@@ -667,7 +667,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
-      // Steal voice tied to "STEAL!" announce appearance (Sound_Design_Update.md
+      // Steal voice tied to "STEAL!" announce appearance (SFX_System.md
       // §Steal Announce). court.html plays `meta.sfx` at overlay mount.
       showAnnouncement("STEAL!", defenseTeam, playerData, {
         sfx: resolveStealSfxFile(),

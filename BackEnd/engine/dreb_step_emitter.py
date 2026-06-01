@@ -235,7 +235,7 @@ def build_dreb_animation_steps(
             "ball": ball_start,
             "clock": clock_start,
             "advance_trigger": trigger,
-            # Rebound SFX cue (Sound_Design_Update.md → "Rebound SFX").
+            # Rebound SFX cue (SFX_System.md → "Rebound SFX").
             # Fires when the ball attaches to the rebounder's sprite, which
             # in the DREB step happens at step-end snap (the ball is
             # already sitting at bounce_coords at step start; only the

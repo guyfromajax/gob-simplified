@@ -867,6 +867,19 @@ Schema emitters remain pure renderers.
 | Rim Runner | `BackEnd/engine/rim_runner_fast_break.py` | 3 sites, via private adapter `_apply_universal_geometry_for_rr_shot` |
 | Covert Release | `BackEnd/engine/phase_resolution.py:1823` area | Inline at the SHOT branch of `resolve_fast_break_logic` |
 
+## Animation and UESS
+
+| Topic | Doc |
+|---|---|
+| Schema contract, migration table, known gaps | [`UESS_System.md`](../00_General_Systems/UESS_System.md) |
+| Per-turn steps (HCO, FB, OREB, etc.) | [`Step_By_Step_System.md`](../00_General_Systems/Step_By_Step_System.md) |
+| Advance triggers | [`Advance_Triggers.md`](../05_Animation_System/Advance_Triggers.md) |
+| Legacy `fastBreak.js` timing / trigger backlog | [`projects/bugs.md`](../projects/bugs.md) § Fast Break animation backlog · archived map in [`projects/Z-Completed/Fast_Break_Refactor.md`](../projects/Z-Completed/Fast_Break_Refactor.md) |
+
+All four FB play keys (`covert_release`, `rim_runner`, `triangle`, `after_steal`) use backend `animation_steps` when present; FE `AnimationEngine` `MIGRATED_FB_PLAYS` gates schema playback. Legacy `runFastBreakSequence` runs only without steps.
+
+---
+
 ## Known limitations / scope notes
 
 - **Triangle** is intentionally not migrated. Its existing shot

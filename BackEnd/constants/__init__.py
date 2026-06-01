@@ -252,7 +252,7 @@ FREE_THROW_SHOT_GRID_PER_GAME_SECOND = 12  # FT shot ball motion (grid/game-sec)
 # intentional, a "settle" feels different per bounce length.
 BOUNCE_STEP_GAME_SECONDS = 300.0 / 350.0
 
-# Post-shot variant animation timings (Sound_Design_Update.md §Ball Resolve
+# Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec
 # clock so FE wall-clock matches the legacy reference timings.
 RATTLE_HOP_GAME_SECONDS = 40.0 / 350.0            # Per-hop wall-clock for RATTLE
@@ -262,7 +262,7 @@ BANK_MISS_GRAZE_GAME_SECONDS = 200.0 / 350.0      # BANK_MISS: bank → rim-graz
 BOR_MAKE_FOLLOWUP_SWISH_DELAY_MS = 150.0          # BACK_OF_RIM make swish offset
 BANK_MAKE_FOLLOWUP_SWISH_DELAY_MS = 100.0         # BANK_MAKE swish offset
 
-# AIRBALL OOB resting points (Sound_Design_Update.md: ball continues from
+# AIRBALL OOB resting points (SFX_System.md: ball continues from
 # 2-short-of-MSSS to the OOB sideline). Animation only; backend resolution
 # still routes the rebound until the resolution-step 3 cleanup lands.
 AIRBALL_OOB_HOME_COORDS = {"x": 97.0, "y": 25.0}

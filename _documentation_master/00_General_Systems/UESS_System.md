@@ -29,7 +29,7 @@ This doc is the single source of truth for the contract. Code is the implementat
 | FCP | ✅ Migrated | `skeleton_step_emitter` (shared with HCO; FCP-specific gates + sprint archetypes + walker seed for BIP→FCP ball-owner carry; randomized BIP setup positions) |
 | OREB (putback / kickout) | ✅ Migrated | `oreb_step_emitter` (branches by `result_type`: KICKOUT reuses `build_kickout_step`; PUTBACK_MAKE/MISS reuse `[shoot]/[ball_flight]/[hold]/[bounce]` builders; PUTBACK_MISS second rebound is dispatched as a separate DREB turn via the extended `_build_dreb_turn_from_miss` trigger) |
 | Fast Break — Triangle | ✅ Migrated | `triangle_step_emitter` (shares burst/outlet with RR) |
-| Fast Break — After Steal | ⏳ Not migrated | legacy `fastBreak.js` (CR-shaped; extend emitter later) |
+| Fast Break — After Steal | ✅ Migrated | `after_steal_fast_break_step_emitter.build_after_steal_fast_break_animation_steps` |
 | Free Throw | ✅ Migrated | `ft_step_emitter.build_ft_animation_steps` |
 | Timeout | ⏳ Not migrated (low priority — minimal animation) | — |
 | Final Shot | ⏳ Not migrated (separate resolver) | — |
@@ -314,7 +314,7 @@ At AG=50, `base_rate / STANDARD` = 1, so each archetype runs at its table rate i
 
 For per-turn-type behavior, see:
 
-- [`Step_By_Step_System.md`](../05_Animation_System/Step_By_Step_System.md) — turn-by-turn step definitions, entry-step decision rules
+- [`Step_By_Step_System.md`](Step_By_Step_System.md) — turn-by-turn step definitions, entry-step decision rules, turn routing (`offensive_state`)
 - [`Fast_Break_System.md`](../05_GP_Supporting_Systems/Fast_Break_System.md) — FB variants and outlet mechanics
 - [`Rebound_System.md`](../05_GP_Supporting_Systems/Rebound_System.md) — rebounder selection per turn type
 - Constants: [`BackEnd/constants/__init__.py`](../../BackEnd/constants/__init__.py)
@@ -356,3 +356,28 @@ Ball moves at fixed grid/game-sec rate independent of player rates.
 | `tickMs` | 350 ms / game-sec | `scene.gameClock`, frontend |
 
 1 game-second = 350 ms wall-clock. Backend-computed T directly drives both clock burn and animation wall-clock duration. No per-step cap.
+
+---
+
+## 12. Known gaps and remediation (from legacy audit)
+
+**Full audit:** [`UESS_Backlog.md`](UESS_Backlog.md) (file:line citations). **Discussion notes:** [`projects/offensive_state_hardening.md`](../projects/offensive_state_hardening.md).
+
+**State (May 2026):** Core turn types emit schema steps, but several UESS invariants are partial. The FE is not yet a pure renderer on all paths.
+
+**Top remediation order** (safest highest-payoff first):
+
+1. Fix §8.1 step-chain in `skeleton_step_emitter` — step `start.coords` from prior step `end.coords` (teleport cluster).
+2. Fix HCO lane-drift / Handoff continuity in `transition_bridge`.
+3. Stamp schema announcements (DREB header, REBOUND, BLOCK, shooting foul, and-one) on emitters; reduce `schema_rendered_arc` FE shortcuts.
+4. FB post-shot sub-steps with variant SFX on RR/Triangle/CR emitters (mirror skeleton `_build_post_shot_sub_steps`).
+5. Backend coord clamping in emitter output (reduce FE `courtClamp` reliance).
+6. Schema-shape backfills bundle (FT hold/bounce, stationary `end.coords`, BIP/SIP actions, overlay exclusivity, etc.).
+7. Replace mid-resolution `apply_coords_from_animations_list` with §8.2 end-of-turn sync (precondition for `shot_state_snapshot`).
+8. Clock authority cleanup (`dynamic_hct` sum, `real_time_elapsed_ms` ordering).
+9. Build `shot_state_snapshot` in `ShotManager.resolve_shot` (§7 — currently unimplemented).
+10. Opening Tip emitter migration.
+11. Extend DREB promotion to all MISS/BLOCK sources.
+12. FE pure-renderer cleanup (~46 violations) + §6.2 ownership field names — **last**, largest blast radius.
+
+**Unbuilt contracts:** `shot_state_snapshot` (§7); `ownership_at_turn_start` / `ownership_commit_event` as named in spec (code uses `uess_ownership_contract` on subset of turns).

@@ -1,10 +1,12 @@
 # Fast Break Refactor
 
+> **Archived May 2026.** Gameplay SSOT: [`Fast_Break_System.md`](../../05_GP_Supporting_Systems/Fast_Break_System.md). Open legacy-path work: [`bugs.md`](../bugs.md) § Fast Break animation backlog. UESS emitters are primary; `fastBreak.js` is fallback when `animation_steps` are absent.
+
 > **Status:** Phase 0 — discovery + scoping. No code changes yet. This doc is the alignment artifact; scope is finalized with the user before Phase 1 starts.
 >
-> **Predecessor:** [`Movement_Rate_Refactor.md`](Movement_Rate_Refactor.md) (✅ shipped May 2026). Patterns established there — AG curve, per-player `game_seconds`, dual-path helpers — are the template for this work.
+> **Predecessor:** [`Movement_Rate_Refactor.md`](Movement_Rate_Refactor.md) in this folder (✅ shipped May 2026). Patterns established there — AG curve, per-player `game_seconds`, dual-path helpers — are the template for this work.
 >
-> **Handoff context:** [`Fast_Break_Handoff.md`](Fast_Break_Handoff.md) — captures user-reported issues and prior-thread carry-over.
+> **Handoff context:** removed (`Fast_Break_Handoff.md` deleted May 2026); open items tracked in [`bugs.md`](../bugs.md) § Fast Break animation backlog.
 
 ## Goal
 
@@ -289,7 +291,7 @@ Dual-path helpers + AG=50 invariant mean the only true regression risk is Phase 
 
 ## Cross-references
 
-- [`Fast_Break_Handoff.md`](Fast_Break_Handoff.md) — prior-thread handoff context (May 2026).
+- [`bugs.md`](../bugs.md) § Fast Break animation backlog — active tracking (May 2026).
 - [`Movement_Rate_Refactor.md`](Movement_Rate_Refactor.md) — predecessor refactor, source of patterns reused here.
 - [`Animation_Cleanup.md`](Animation_Cleanup.md) — broader animation tech-debt queue.
 - [`05_Animation_System/Core_Animation_System.md`](../05_Animation_System/Core_Animation_System.md) — tween-duration-authority section (added during Movement Rate Refactor).

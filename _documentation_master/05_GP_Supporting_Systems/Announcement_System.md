@@ -197,7 +197,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 ### Sounds (SFX) — payload-carries-SFX architecture
 
-**Single source of truth for announcement-tied SFX:** the announcement payload carries a `sfx` field (filename string or filename array), and `court.html`'s overlay mount functions (`window.showAnnouncementOverlay` for primary, `window.showSecondaryAnnouncementOverlay` for secondary) play it via `window.playGameSfx(filename)` at the moment the DOM mounts. Audio is synced to the visual entry (Sound_Design_Update.md "Trigger: immediately when the announce appears"). Both tiers go through exactly one dispatch point.
+**Single source of truth for announcement-tied SFX:** the announcement payload carries a `sfx` field (filename string or filename array), and `court.html`'s overlay mount functions (`window.showAnnouncementOverlay` for primary, `window.showSecondaryAnnouncementOverlay` for secondary) play it via `window.playGameSfx(filename)` at the moment the DOM mounts. Audio is synced to the visual entry ([`SFX_System.md`](../05_Features/SFX_System.md) — court event SFX). Both tiers go through exactly one dispatch point.
 
 **Caller flow:**
 1. Caller invokes `showAnnouncement` / `showAndOneAnnouncement` / `showSecondaryAnnouncement` with `meta.sfx = '<filename>'` (or array, or legacy kind — `'foul'` / `'shot_clock_violation'` / `'fb_outlet_denied_court'` / etc.).

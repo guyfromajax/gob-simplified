@@ -1134,7 +1134,7 @@ def _build_nice_stop_announcement(
     motion step. Backend is the single source of truth: stamps the final text,
     resolves the defending team to ``home``/``away`` (so the FE secondary
     overlay can color the stripe via ``gameStore.getColors()``), and carries
-    the stinger SFX via ``meta.sfx`` per Sound_Design_Update.md §FB Defensive
+    the stinger SFX via ``meta.sfx`` per SFX_System.md §FB Defensive
     Stop Announce. FE drops its legacy "Nice Stop!" text-rewrite branch.
     """
     stopper_id = turn_result.get("stopper_id") or fb_roles.get("stopper_id")

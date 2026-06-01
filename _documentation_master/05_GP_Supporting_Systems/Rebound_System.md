@@ -24,7 +24,7 @@ The MISS turn emitter absorbs these into the final step's `end.coords` via its `
 
 **Embedded DREB** (MISS/BLOCK turn still owns rebound, no separate `DREB` row — e.g. many **FREE_THROW** misses, unmigrated FCP / FB variants): outlet still runs from **`ShotAnimationSystem.handleDefensiveRebound`** → **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP** on that same shot turn. **Rebound!** headline rules (including idempotency with discrete rows): **`Announcement_System.md`**.
 
-This replaces the earlier two-authorities-via-player-id-matching design, where the DREB step ran its own frontcourt-filter / random-near-bounce placement logic and tried to honor shot_manager's get-back / release maps via an exempt list. That coupling was brittle — any mismatch in the exempt set yanked role-players to the rim cluster. See [`Animation_System_Updated.md`](../projects/Animation_System_Updated.md) "DREB emitter — scoping" for the current model.
+This replaces the earlier two-authorities-via-player-id-matching design, where the DREB step ran its own frontcourt-filter / random-near-bounce placement logic and tried to honor shot_manager's get-back / release maps via an exempt list. That coupling was brittle — any mismatch in the exempt set yanked role-players to the rim cluster. See [`UESS_System.md`](../00_General_Systems/UESS_System.md) and [`UESS_Backlog.md`](../00_General_Systems/UESS_Backlog.md) for DREB emitter scoping.
 
 ## Free Throw Miss Rebounds
 
@@ -154,7 +154,7 @@ otb_foul = random.randint(1,100)
 
 ## Rebounder selection per turn type (target state)
 
-Source-of-truth grid for which prefilter and rebounder-selection function each turn type uses. Updated as part of the SS&S animation refactor (see `_documentation_master/projects/Animation_System_Updated.md`).
+Source-of-truth grid for which prefilter and rebounder-selection function each turn type uses. Updated as part of the SS&S animation refactor (see [`UESS_System.md`](../00_General_Systems/UESS_System.md)).
 
 | Turn type | Prefilter | Rebounder selection |
 |---|---|---|

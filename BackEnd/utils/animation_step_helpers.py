@@ -284,7 +284,7 @@ def _player_attr(player: Any, key: str) -> Optional[float]:
 def pass_release_sfx(passer_player: Any) -> Dict[str, Any]:
     """Pick the pass release SFX based on the passer's PS attribute.
 
-    Tiers per ``Sound_Design_Update.md``:
+    Tiers per ``SFX_System.md``:
       - PS > 75 → ``pass-strong.wav``
       - PS < 25 → ``pass-weak.wav``
       - else    → ``pass-medium.wav``
@@ -306,7 +306,7 @@ def pass_release_sfx(passer_player: Any) -> Dict[str, Any]:
 def pass_arrival_sfx(receiver_player: Any) -> Dict[str, Any]:
     """Pick the reception SFX based on the receiver's (IQ + CH) attributes.
 
-    Tiers per ``Sound_Design_Update.md``:
+    Tiers per ``SFX_System.md``:
       - (IQ + CH) > 130 → ``receive-strong.wav``
       - (IQ + CH) < 50  → ``receive-weak.wav``
       - else            → ``receive-medium.wav``
@@ -327,13 +327,13 @@ def pass_arrival_sfx(receiver_player: Any) -> Dict[str, Any]:
     }
 
 
-# --- Shot SFX helpers (Sound_Design_Update.md §Shot Audio) -----------------
+# --- Shot SFX helpers (SFX_System.md §Shot Audio) -----------------
 
 
 def shot_launch_sfx(shot_score_pre_defense: Any) -> Optional[Dict[str, Any]]:
     """Pick the shot-release SFX file from the pre-defense shot score tier.
 
-    Tiers per ``Sound_Design_Update.md``:
+    Tiers per ``SFX_System.md``:
       - score < 101  → ``three-weak.wav``
       - score > 210  → ``three-strong.wav``
       - else         → ``shot-standard.wav``
@@ -364,7 +364,7 @@ def shot_launch_sfx(shot_score_pre_defense: Any) -> Optional[Dict[str, Any]]:
 
 
 def shot_launch_sfx_free_throw() -> Dict[str, Any]:
-    """FT launch cue — always ``shot-standard.wav`` (Sound_Design_Update.md)."""
+    """FT launch cue — always ``shot-standard.wav`` (SFX_System.md)."""
     return {
         "file": "shot-standard.wav",
         "volume": _SFX_DEFAULT_VOLUME,
@@ -402,7 +402,7 @@ def shot_result_sfx(
 ) -> Optional[Dict[str, Any]]:
     """Pick the primary shot-arrival SFX file from the resolved variant.
 
-    Matches the variant → file mapping in ``Sound_Design_Update.md``
+    Matches the variant → file mapping in ``SFX_System.md``
     §SFX Bindings. Returns ``None`` for RATTLE variants — their per-hop
     cues fire on the hop sub-steps instead.
 

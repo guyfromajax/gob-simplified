@@ -1741,7 +1741,7 @@ export class AnimationEngine {
             reason: 'steal_handler_post_skeleton'
           });
           // Steal SFX now tied to the "STEAL!" announce appearance, not the
-          // ball-attach moment (Sound_Design_Update.md §Steal Announce).
+          // ball-attach moment (SFX_System.md §Steal Announce).
           // Make STEAL end ownership authoritative so stale pass pending owner
           // cannot reclaim the victim at turn boundary.
           setCurrentOwner(this.scene, String(stealerRaw));

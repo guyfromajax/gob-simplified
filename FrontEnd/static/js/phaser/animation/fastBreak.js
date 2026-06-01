@@ -1638,7 +1638,7 @@ async function animateRimRunnerInterception(
   synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
   attachBallToPlayer(scene, ballSprite, stealer, { reason: "rim_runner_interception" });
   // Steal voice is tied to the "Interception!" announcement appearance
-  // (Sound_Design_Update.md §Steal Announce), passed via `meta.sfx` on the
+  // (SFX_System.md §Steal Announce), passed via `meta.sfx` on the
   // announcement payload below — court.html plays it at overlay mount.
 
   const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");

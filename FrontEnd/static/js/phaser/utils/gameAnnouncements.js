@@ -287,7 +287,7 @@ function handleBlockAnnouncement(turnData, scene, context) {
 
   // SFX is carried on the announcement payload and played by court.html
   // at overlay mount — synced to the visual appearance per
-  // Sound_Design_Update.md "Block Announce: Trigger: immediately when the
+  // SFX_System.md "Block Announce: Trigger: immediately when the
   // Block announce appears."
   showAnnouncement("BLOCK!", blockerTeam, playerData, { sfx: 'duke-its-blocked.wav' });
 }
@@ -406,7 +406,7 @@ function handleChargeAnnouncement(turnData, scene, context, defenseTeam) {
   }
 
   // CHARGE plays both the foul whistle and the dedicated stinger
-  // (`duke-charging.wav` per Sound_Design_Update.md). Payload carries both;
+  // (`duke-charging.wav` per SFX_System.md). Payload carries both;
   // court.html plays each at mount.
   showAnnouncement("CHARGE!", defenseTeam, playerData, {
     sfx: ['whistle-1-lowervol.wav', 'duke-charging.wav'],
@@ -451,7 +451,7 @@ function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
   }
 
   // Steal voice tied to the "STEAL!" announce appearance — court.html plays
-  // `meta.sfx` at overlay mount per Sound_Design_Update.md §Steal Announce.
+  // `meta.sfx` at overlay mount per SFX_System.md §Steal Announce.
   showAnnouncement("STEAL!", defenseTeam, playerData, { sfx: resolveStealSfxFile() });
 
 }

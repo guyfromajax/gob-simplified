@@ -1,8 +1,10 @@
-# UESS Legacy Audit
+# UESS Backlog (legacy audit)
+
+> **Archived May 2026** from `projects/UESS_Legacy_Audit.md`. Executive summary and remediation order are duplicated in [`UESS_System.md`](UESS_System.md) §12. This file retains the full violation catalog and file:line citations.
 
 Read-only audit of the UESS (Universal End-State Sync) migration. No code edits. All findings cited file:line.
 
-References: [`UESS_System.md`](../00_General_Systems/UESS_System.md), [`Step_By_Step_System.md`](../00_General_Systems/Step_By_Step_System.md).
+References: [`UESS_System.md`](UESS_System.md), [`Step_By_Step_System.md`](Step_By_Step_System.md).
 
 ---
 

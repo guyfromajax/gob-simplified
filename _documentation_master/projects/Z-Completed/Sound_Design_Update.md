@@ -1,3 +1,4 @@
+> **Superseded by** [`05_Features/SFX_System.md`](../../05_Features/SFX_System.md) (May 2026).
 
 SFX Direction
 

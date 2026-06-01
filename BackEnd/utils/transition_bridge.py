@@ -682,7 +682,7 @@ def build_pass_step(
         "clock": clock_start,
         "advance_trigger": advance_trigger,
     }
-    # Pass / Reception SFX (Sound_Design_Update.md). Covers every caller of
+    # Pass / Reception SFX (SFX_System.md). Covers every caller of
     # ``build_pass_step`` — BIP/SIP inbound passes, Reset's inbound-pass
     # sub-step, Handoff/Kickout pass sub-steps. FB outlet passes use a
     # dedicated emitter (covert_release_step_emitter) and don't route

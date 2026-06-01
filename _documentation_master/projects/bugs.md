@@ -1,38 +1,50 @@
-
-2. 3 pointer on P/T Break does not register as a 3
-
+##End of Game / End of Quarter perfection
 6. Don't animate rebound / BIP on Final Shot FT
-7. Wire slow it down and quick shot with tempo
-8. OTB fouls need to animate the rebound
-9. Dunks! I need DUNKS!
-10. Not announcing shooting fouls on OREB putback misses (& maybe makes?)
-
-11. More action in recruiting
-12. Airball announce
-14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
-15. Traning page hover tool tips
-16. No SFX on RR FB made shot
-17. Need airhorn at end of quarter
-18. Final Turn perfection (Run clock to 0:00 for Final Shot)
-
-35. Verify Special Stats are tracking properly
-36. Season & Career Stats for Players for special stats
-37. Player Foul Out Next Step bug
-38. Don't let user timeout modal hide Announce modal
-39. Offense playcall highlightin in the PC is still broken
-
-40. Batted ball out of bounds is not animating or executing properly
-44. Customize computer teams more strategically
-45. Improve FCC API
-
+18. Final Turn perfection (Run clock to 0:00 for Final Shot), airhorn on ending
 48. Double block announce on Final Shot
 
+##Micro Movements
+9. Dunks! I need DUNKS!
+
+##Bugs 
+2. 3 pointer on P/T Break does not register as a 3
+14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
+37. Player Foul Out Next Step bug
+40. Batted ball out of bounds is not animating or executing properly
+
+##New Features
+11. More action in recruiting
+15. Traning page hover tool tips
+35. Verify Special Stats are tracking properly
+36. Season & Career Stats for Players for special stats
+44. Customize computer teams more strategically
+45. Improve FCC API
 57. Player Momentum System
 
+##User Account / Leaderboard
+19. Track wins, losses, titles, geek points, and coaching style by user.
+20. Expand leaderbaoard for these items
+21. Discount Geek Points for simmed games
+22. User account -- link X & Facebook?
+23. New Feedback Form
+26. Alpha Access Code Request messaging on modal
+30. New Tutorials Page / Experience
 
 
 
 
+
+
+## Fast Break animation backlog (legacy path)
+
+Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Break_Refactor.md). **UESS schema path is primary** for `covert_release`, `rim_runner`, `triangle`, `after_steal` when `animation_steps` exist.
+
+- Advance triggers unreliable on legacy `fastBreak.js` / `runFastBreakSequence` (phase boundaries hang or short-circuit).
+- FB visual timing still uses FE `getPlayerDuration` on legacy path; backend does not stamp per-player `game_seconds` in legacy `animator.capture_fast_break_animation` payload.
+- Charge/blocking foul on FB: stop animation immediately (don't wait for defensive spot) — see Bugs §14.
+- Full phase map and backend sites: archived refactor doc.
+
+---
 
 ## Future Cleanup (Non-Critical Warnings)
 

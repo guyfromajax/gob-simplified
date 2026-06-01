@@ -78,37 +78,64 @@
   // Username modal lives in /js/shared/usernameModal.js (FTE v2 chrome).
   // Loaded on demand via dynamic import — see openUsernameModal() below.
 
+  // Account Settings — a Functional Modal (per Styleguide §Modal System).
+  // Reuses the shared `.gob-modal-overlay/backdrop/box/accent/body` classes;
+  // only the username/toggle/link rows add field-level CSS (see auth-bar.css).
   function ensureAccountSettingsModal() {
-    if (document.getElementById('account-settings-backdrop')) return;
-    var backdrop = document.createElement('div');
-    backdrop.id = 'account-settings-backdrop';
-    backdrop.className = 'account-settings-backdrop';
-    backdrop.setAttribute('role', 'dialog');
-    backdrop.setAttribute('aria-modal', 'true');
-    backdrop.setAttribute('aria-labelledby', 'account-settings-title');
-    backdrop.innerHTML = [
-      '<div class="account-settings-modal">',
-      '  <div class="account-settings-header">',
-      '    <h3 id="account-settings-title" class="account-settings-title">Account Settings</h3>',
-      '    <button type="button" id="account-settings-close" class="account-settings-close" aria-label="Close account settings">&times;</button>',
+    if (document.getElementById('account-settings-overlay')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'account-settings-overlay';
+    overlay.className = 'gob-modal-overlay account-modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'account-settings-title');
+    overlay.innerHTML = [
+      '<div class="gob-modal-backdrop" data-account-dismiss></div>',
+      '<div class="gob-modal-box account-modal-box">',
+      // Orange accent — Account Settings is a non-gating settings surface.
+      '  <div class="gob-modal-accent"></div>',
+      '  <div class="account-modal-header">',
+      '    <h3 id="account-settings-title" class="gob-modal-title">Account Settings</h3>',
+      '    <button type="button" id="account-settings-close" class="account-modal-close" aria-label="Close account settings">',
+      '      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">',
+      '        <path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+      '      </svg>',
+      '    </button>',
       '  </div>',
-      '  <div class="account-settings-body">',
-      '    <div class="account-settings-row">',
-      '      <div class="account-settings-label">Username</div>',
-      '      <div id="account-settings-username" class="account-settings-value">-</div>',
+      '  <div class="gob-modal-body account-modal-body">',
+      // Field 1 — Username (display-only, intentionally locked)
+      '    <div class="account-field account-field--first">',
+      '      <div class="account-field-label">Username</div>',
+      '      <div class="account-identity">',
+      '        <div id="account-avatar" class="account-avatar" aria-hidden="true"></div>',
+      '        <div class="account-identity-text">',
+      '          <div id="account-settings-username" class="account-username">-</div>',
+      '          <div class="account-tier">Alpha coach</div>',
+      '        </div>',
+      '        <span class="account-locked">',
+      '          <svg viewBox="0 0 12 12" width="12" height="12" fill="none" aria-hidden="true">',
+      '            <rect x="2.25" y="5.25" width="7.5" height="5.25" rx="1" stroke="currentColor" stroke-width="1.1"/>',
+      '            <path d="M4 5.25 V3.75 a2 2 0 0 1 4 0 V5.25" stroke="currentColor" stroke-width="1.1"/>',
+      '          </svg>',
+      '          LOCKED',
+      '        </span>',
+      '      </div>',
       '    </div>',
-      '    <div class="account-settings-row">',
-      '      <div class="account-settings-label">Scouting Ambience</div>',
-      '      <button type="button" id="account-ambience-pill" class="account-display-pill" aria-label="Scouting ambience toggle" aria-pressed="true">',
-      '        <span class="account-display-pill-thumb" aria-hidden="true"></span>',
-      '        <span class="account-display-pill-option account-display-pill-option-left">On</span>',
-      '        <span class="account-display-pill-option account-display-pill-option-right">Off</span>',
+      // Field 2 — Scouting Ambience (instant-apply sliding switch)
+      '    <div class="account-field account-toggle-row">',
+      '      <div class="account-field-label">Scouting Ambience</div>',
+      '      <button type="button" id="account-ambience-switch" class="account-switch" role="switch" aria-checked="true" aria-label="Scouting ambience">',
+      '        <span class="account-switch-knob" aria-hidden="true"></span>',
       '      </button>',
+      '    </div>',
+      // Forward link to the (not-yet-built) full account page — dead for now.
+      '    <div class="account-field account-manage-row">',
+      '      <a href="#" id="account-manage-link" class="account-manage-link" aria-disabled="true">Manage Account<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
       '    </div>',
       '  </div>',
       '</div>'
     ].join('');
-    document.body.appendChild(backdrop);
+    document.body.appendChild(overlay);
   }
 
   // Username modal: delegated to /js/shared/usernameModal.js (FTE v2 chrome).
@@ -431,28 +458,34 @@
     return musicControllerPromise;
   }
 
-  function applyAmbiencePillVisual(pill, enabled) {
-    if (!pill) return;
-    // `is-off` slides the thumb right to the "Off" option.
-    pill.classList.toggle('is-off', !enabled);
-    pill.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  function applyAmbienceSwitchVisual(switchEl, enabled) {
+    if (!switchEl) return;
+    // aria-checked drives the knob slide / on-state styling in CSS.
+    switchEl.setAttribute('aria-checked', enabled ? 'true' : 'false');
   }
 
-  function syncAmbiencePillFromController(pill, mc) {
-    applyAmbiencePillVisual(pill, mc.isScoutingAmbienceEnabled());
+  function syncAmbienceSwitchFromController(switchEl, mc) {
+    applyAmbienceSwitchVisual(switchEl, mc.isScoutingAmbienceEnabled());
   }
 
   function refreshAccountSettingsModal() {
     var usernameEl = document.getElementById('account-settings-username');
-    var pill = document.getElementById('account-ambience-pill');
-    if (!usernameEl || !pill) return;
+    var switchEl = document.getElementById('account-ambience-switch');
+    if (!usernameEl || !switchEl) return;
 
     var meData = authMeDataCache || window.__gobAuthMeData || {};
-    usernameEl.textContent = meData.username || meData.email || 'Coach';
+    var displayName = meData.username || meData.email || 'Coach';
+    usernameEl.textContent = displayName;
+
+    var avatar = document.getElementById('account-avatar');
+    if (avatar) {
+      // First initial fallback (a real coach avatar image could replace this).
+      avatar.textContent = displayName.charAt(0).toUpperCase();
+    }
 
     loadMusicController()
       .then(function (mc) {
-        syncAmbiencePillFromController(pill, mc);
+        syncAmbienceSwitchFromController(switchEl, mc);
       })
       .catch(function (err) {
         console.warn('[account-settings] music controller import failed', err);
@@ -460,14 +493,74 @@
   }
 
   function closeAccountSettingsModal() {
-    var backdrop = document.getElementById('account-settings-backdrop');
-    if (backdrop) backdrop.classList.remove('open');
+    var overlay = document.getElementById('account-settings-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('is-visible');
+    var box = overlay.querySelector('.account-modal-box');
+    if (box) box.classList.remove('is-entered'); // reset so it re-animates next open
   }
 
   function openAccountSettingsModal() {
     refreshAccountSettingsModal();
-    var backdrop = document.getElementById('account-settings-backdrop');
-    if (backdrop) backdrop.classList.add('open');
+    var overlay = document.getElementById('account-settings-overlay');
+    if (!overlay) return;
+    overlay.classList.add('is-visible');
+    var box = overlay.querySelector('.account-modal-box');
+    if (box) {
+      // Reflow at the pre-entrance scale (overlay is now displayed) so the
+      // scale 0.96 -> 1.0 transition actually runs.
+      box.classList.remove('is-entered');
+      void box.offsetWidth;
+      box.classList.add('is-entered');
+    }
+  }
+
+  // --- Save toast (shared Toast pattern, Styleguide §Toast Notifications) ---
+  var accountToastTimer = null;
+
+  function ensureAccountToast() {
+    var existing = document.getElementById('account-toast');
+    if (existing) return existing;
+    var toast = document.createElement('div');
+    toast.id = 'account-toast';
+    toast.className = 'account-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.hidden = true;
+    toast.innerHTML = [
+      '<span class="account-toast-icon" aria-hidden="true">',
+      '  <svg viewBox="0 0 20 20" width="11" height="11" fill="none">',
+      '    <path d="M5.1 10.4 8.3 13.6 14.9 7" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>',
+      '  </svg>',
+      '</span>',
+      '<div class="account-toast-copy">',
+      '  <div class="account-toast-title">Saved</div>',
+      '  <div id="account-toast-subline" class="account-toast-subline"></div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(toast);
+    return toast;
+  }
+
+  // One toast at a time — a rapid second flip reuses it and resets the 3s timer.
+  function showAccountToast(enabled) {
+    var toast = ensureAccountToast();
+    var subline = document.getElementById('account-toast-subline');
+    if (subline) {
+      subline.textContent = enabled ? 'Scouting ambience on.' : 'Scouting ambience off.';
+    }
+    if (accountToastTimer) {
+      clearTimeout(accountToastTimer);
+      accountToastTimer = null;
+    }
+    toast.hidden = false;
+    // Force reflow so the entrance transition replays on a reused toast.
+    void toast.offsetWidth;
+    toast.classList.add('is-visible');
+    accountToastTimer = setTimeout(function () {
+      toast.classList.remove('is-visible');
+      accountToastTimer = null;
+    }, 3000);
   }
 
   function persistDisplayColor(displayColor) {
@@ -496,7 +589,7 @@
   function initAccountSettingsModal() {
     ensureAccountSettingsModal();
     var settingsBtn = document.getElementById('auth-settings-btn');
-    var backdrop = document.getElementById('account-settings-backdrop');
+    var overlay = document.getElementById('account-settings-overlay');
     var closeBtn = document.getElementById('account-settings-close');
     if (settingsBtn && !settingsBtn.dataset.bound) {
       settingsBtn.dataset.bound = '1';
@@ -506,30 +599,55 @@
       closeBtn.dataset.bound = '1';
       closeBtn.addEventListener('click', closeAccountSettingsModal);
     }
-    if (backdrop && !backdrop.dataset.bound) {
-      backdrop.dataset.bound = '1';
-      backdrop.addEventListener('click', function (e) {
-        if (e.target === backdrop) closeAccountSettingsModal();
+    if (overlay && !overlay.dataset.bound) {
+      overlay.dataset.bound = '1';
+      // Backdrop click dismisses (Functional Modal rule).
+      overlay.addEventListener('click', function (e) {
+        if (e.target && e.target.hasAttribute('data-account-dismiss')) {
+          closeAccountSettingsModal();
+        }
       });
     }
-    var pill = document.getElementById('account-ambience-pill');
-    if (pill && !pill.dataset.bound) {
-      pill.dataset.bound = '1';
-      pill.addEventListener('click', function () {
-        var turningOn = pill.classList.contains('is-off');
+    // ESC dismisses (Functional Modal rule). Bound once at the document level.
+    if (!document.body.dataset.accountEscBound) {
+      document.body.dataset.accountEscBound = '1';
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        var open = document.getElementById('account-settings-overlay');
+        if (open && open.classList.contains('is-visible')) {
+          closeAccountSettingsModal();
+        }
+      });
+    }
+    var switchEl = document.getElementById('account-ambience-switch');
+    if (switchEl && !switchEl.dataset.bound) {
+      switchEl.dataset.bound = '1';
+      switchEl.addEventListener('click', function () {
+        var turningOn = switchEl.getAttribute('aria-checked') !== 'true';
         loadMusicController()
           .then(function (mc) {
+            // Apply instantly — no Save button. setScoutingAmbienceEnabled is
+            // the account's real persistence for this preference.
             mc.setScoutingAmbienceEnabled(turningOn);
-            syncAmbiencePillFromController(pill, mc);
+            syncAmbienceSwitchFromController(switchEl, mc);
             if (turningOn) {
               mc.tryStartScoutingAmbienceForCurrentPage();
             } else {
               mc.clearFranchiseMusicState();
             }
+            showAccountToast(turningOn);
           })
           .catch(function (err) {
             console.warn('[ambience-toggle] music controller import failed', err);
           });
+      });
+    }
+    var manageLink = document.getElementById('account-manage-link');
+    if (manageLink && !manageLink.dataset.bound) {
+      manageLink.dataset.bound = '1';
+      // TODO: point to the full account page once designed/built.
+      manageLink.addEventListener('click', function (e) {
+        e.preventDefault();
       });
     }
   }

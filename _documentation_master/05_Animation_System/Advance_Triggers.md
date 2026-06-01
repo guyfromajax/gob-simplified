@@ -2,7 +2,7 @@
 
 Per-step advance triggers for each turn type in the unified animation system. The advance trigger is the condition that ends a step; backend pre-computes its time `T` (game-seconds) and the frontend playback engine awaits exactly that duration before rendering step end.
 
-See [Animation_System_Updated.md](../projects/Animation_System_Updated.md) for the schema and architecture.
+See [UESS_System.md](../00_General_Systems/UESS_System.md) and [Step_By_Step_System.md](../00_General_Systems/Step_By_Step_System.md) for schema and architecture ([redirect stub](../projects/Animation_System_Updated.md)).
 
 **Trigger conditions (closed vocab):**
 - `fixed_duration` — step ends after a backend-computed duration. T = the duration.

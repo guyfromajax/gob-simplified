@@ -241,7 +241,7 @@ def roll_shot_variant_extras(variant, shooter_y=None, rng=None):
     return {}
 
 
-# Free-throw variant tables (Sound_Design_Update.md §Free Throw variant selection).
+# Free-throw variant tables (SFX_System.md §Free Throw variant selection).
 _FT_MAKE_FIRST_HIGH = [
     (SHOT_VARIANT_FREE_THROW_SWISH, 60),
     (SHOT_VARIANT_BACK_OF_RIM, 30),

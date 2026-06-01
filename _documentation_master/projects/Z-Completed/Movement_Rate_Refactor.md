@@ -1,5 +1,7 @@
 # Movement Rate Refactor
 
+> **Archived May 2026.** Runtime behavior: [`05_Animation_System/AG_Implementation.md`](../../05_Animation_System/AG_Implementation.md) and [`UESS_System.md`](../../00_General_Systems/UESS_System.md) §3.4 / §9.3.
+
 > **Status: ✅ Shipped (Phases 0–4d, May 2026).** Full retirement of legacy pace constants complete; AG-driven timing live across HCO/HCT/FCP/fast-break; visual and game-clock synchronized via per-waypoint `game_seconds`. This doc remains as the design record. For runtime behavior, see code in `BackEnd/utils/shared.py` (`calc_ag_segment_seconds`, `calc_cruise_segment_seconds`, `ag_to_grid_per_game_sec`) and `FrontEnd/static/js/phaser/animation/turnAnimation.js` (waypoint `game_seconds` consumption).
 
 ## Goal

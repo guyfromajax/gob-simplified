@@ -245,7 +245,7 @@ def _build_rebound_capture_step(
                 "shot_clock_remaining": float(shot_clock_remaining),
             },
             "advance_trigger": trigger,
-            # SFX: rebound capture stinger (Sound_Design_Update.md → OREB).
+            # SFX: rebound capture stinger (SFX_System.md → OREB).
             # FE fires from the step-end snap path since the ball tween
             # early-returns (ball doesn't move; only the rebounder moves
             # to it). Same wiring DREB uses.

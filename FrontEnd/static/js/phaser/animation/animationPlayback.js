@@ -327,7 +327,7 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
       playGameSfx(scene, sfxFile, 0.7, { event: "outlet_pass_release" });
     }
 
-    // Generic ball-release SFX cue (Sound_Design_Update.md). Backend stamps
+    // Generic ball-release SFX cue (SFX_System.md). Backend stamps
     // the resolved filename / tier; FE just plays. Used by HCO mid-skeleton
     // pass steps (pass-{strong|medium|weak}.wav) AND the [ball_flight]
     // sub-step (tiered shot launch from `shot_score_pre_defense`) AND each
@@ -425,7 +425,7 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
         if (attachOnCompleteSprite) {
           attachBallToPlayer(scene, ballSprite, attachOnCompleteSprite);
         }
-        // Generic ball-arrival SFX cue (Sound_Design_Update.md). Currently
+        // Generic ball-arrival SFX cue (SFX_System.md). Currently
         // used by HCO mid-skeleton pass steps (receive-{strong|medium|weak}.wav).
         // Fires the moment the ball reaches its destination (meet-point for
         // moving receivers; receiver coord for stationary).
@@ -611,7 +611,7 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
 
   // Announcement-tied SFX is carried on the payload (`data.sfx`) and played
   // by court.html at overlay mount — single source of truth, synced to the
-  // visual entry per Sound_Design_Update.md. Backend-stamped `meta.sfx` keys
+  // visual entry per SFX_System.md. Backend-stamped `meta.sfx` keys
   // (e.g. "no_fast_break", "fb_outlet_denied_court", "steal") are resolved
   // to filenames inside `showSecondaryAnnouncement`.
 

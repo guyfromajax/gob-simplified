@@ -1,3 +1,4 @@
+> **Superseded by** [`05_Features/SFX_System.md`](../../05_Features/SFX_System.md) § Sound library strategy. Full brief retained here.
 
 **The Task**
 Create a library of SFX files to serve and enhance the user's experience in GOB.
