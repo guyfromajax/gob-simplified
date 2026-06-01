@@ -412,14 +412,14 @@
     var minutes = Math.floor(Number(playerData.MIN || 0) / 60);
     var defAttempts = Number(playerData.DEF_A || 0);
     var defStops = Number(playerData.DEF_S || 0);
-    var defPct = defAttempts > 0 ? Math.round((defStops / defAttempts) * 100) : 0;
+    var defText = defAttempts > 0 ? Math.round((defStops / defAttempts) * 100) + '%' : '-';
     var parts = [pluralizeStat(points, 'point')];
     if (treb > 0) parts.push(pluralizeStat(treb, 'rebound'));
     if (assists > 0) parts.push(pluralizeStat(assists, 'assist'));
     if (steals > 0) parts.push(pluralizeStat(steals, 'steal'));
     if (blocks > 0) parts.push(pluralizeStat(blocks, 'block'));
     parts.push(pluralizeStat(minutes, 'minute') + ' played');
-    parts.push('DEF%: ' + defPct + '%');
+    parts.push('DEF: ' + defText);
     return prefix + ': ' + parts.join(', ');
   }
 

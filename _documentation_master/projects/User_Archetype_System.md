@@ -1,6 +1,6 @@
 ## Implementation status (2026-06)
 
-Tracking plumbing **built & verified on gob-staging**. Franchise-only (tournament sunset).
+Tracking plumbing **built & verified end-to-end on gob-staging** (Sim Full Game; archetypes + W/L land on the user record). Franchise-only (tournament sunset).
 
 | Piece | Where | Status |
 |---|---|---|
@@ -13,6 +13,8 @@ Tracking plumbing **built & verified on gob-staging**. Franchise-only (tournamen
 | Surface on `/api/auth/me` | `BackEnd/api/auth_routes.py` | ✅ |
 
 Rules locked in: every period counts (Q1–Q4 + OT, simmed or played); deduped on `(game_id, quarter)` so refreshes/timeouts/foul-outs don't recount; committed once at game completion (abandoned games count 0); `win_rate = round(100*wins/total_games)`.
+
+**Persistence note (load-bearing — don't remove without reading [`simulate_quarter_api_cleanup.md`](simulate_quarter_api_cleanup.md) §5):** the stash's own `$set` of `archetype_periods` does NOT survive to `finalize` in the franchise save flow. So persistence relies on (1) the **api.py call-site** writing `archetype_periods` from the returned `dbg.result`, and (2) a `finalize` **fallback** reading results from the durable `game.archetype_hook.<q>.dbg.result`. Root cause unexplained — open investigation.
 
 **Deferred (not bugs):** (1) **prod backfill** — run `--apply --db production --confirm-production-write` after code ships; (2) **`discount_wins`/`discount_losses`** — fields exist, tracking unwired (future hook reads `game.bulk_sim_used`). Still TODO: manual franchise playthrough on staging to confirm the live stash.
 

@@ -32,6 +32,7 @@
    - **Phase B (user-triggered):** `POST /franchise/complete-week/phase-b` with **`{ franchise_id, week }` only**. Runs CPU games for the rest of the week, recruiting / rank-prestige / EOS side effects, week advance, and clears `post_game_status.phase_a_user_week`. Requires phase A done and non-empty `results[week]`; idempotent if franchise `week` already advanced past the request.
    - **Monolith (fallback / legacy):** `POST /franchise/complete-week` still runs user block + CPU + advance in one call; if phase A already persisted the week row, the user block is skipped (see `franchise_routes.py`).
    - Team id normalization, `stat_updater.finalize_game()`, and **team attribute updates** follow the same rules as before; see **Franchise post-game split (phase A / phase B)** below.
+   - **Side effect (2026-06):** `finalize_game()` also commits the franchise owner's **career record** — W/L and the per-quarter **coaching archetypes** — to the `users` doc (`commit_user_game_record`), reading the game doc's archetypes before week cleanup deletes it. See [`projects/User_Archetype_System.md`](../projects/User_Archetype_System.md).
 3. **Completion Popup Display**: Shows final score, "Box Score" button, and "Go To Locker Room" button with all navigation parameters
 4. **Navigation Anchor Preservation**: Preserves complete navigation anchor set (mode, doc_id, team_id) for seamless return to command center
 5. **Box Score Navigation**: User can navigate to Box Score page with all context parameters preserved (box score reflects updated team attributes)
@@ -283,9 +284,9 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - Feed builder: `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })`. Feed entries include the stat line and the player's team context.
 - Ordering: user team first, opponent second; within each team, players are sorted by points scored descending, then minutes played descending when points are tied.
 - Eligibility: only players with more than 0 displayed minutes are included (`MIN` seconds floored to whole minutes).
-- Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played, DEF%: {defPct}%`.
+- Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played, DEF: {defPct}%`.
 - Rebounds use **TREB = DREB + OREB**. Points are always shown, including `0 points`; all other zero stats are omitted.
-- DEF% uses `DEF_S / DEF_A * 100`, rounded to a whole percent; players with no defensive attempts show `DEF%: 0%`.
+- DEF uses `DEF_S / DEF_A * 100`, rounded to a whole percent; players with no defensive attempts show `DEF: -`.
 - Rotation: one player line is shown at a time for 8 seconds while phase B is pending.
 - Banner behavior: the team banner follows the currently displayed player. User-team player lines show the user team banner; opponent player lines show the opponent team banner; when the feed loops, the banner switches back with the line.
 

@@ -54,6 +54,34 @@ archetype stash failure as a generic Mongo error.
 - "archetype" is overloaded: UESS *movement* archetype (cruise/sprint/burst) vs
   *coaching* archetype. Makes search ambiguous; consider renaming one.
 
+## 5. OPEN: stash's own game-doc writes vanish; call-site writes survive
+
+Found while debugging archetype tracking (2026-06). Within the franchise
+`simulate-quarter` flow, two writes to the **same game doc, same `_id`, same
+`games_collection`** behaved differently:
+
+- A `$set` made **inside** the per-quarter stash helper (`archetype_periods`,
+  `archetype_debug`) **did not survive** to `finalize_game`.
+- A `$set` made at the **call site in api.py** *after* the helper returns
+  (`archetype_hook`) **did survive**.
+
+Same id, same handle, same operation — only the timing/origin differed. Net
+effect: classified archetypes were computed correctly but never reached
+`finalize`, so `archetypes.total` stayed 0 while W/L (derived from
+`summarize_game_state`-persisted fields) committed fine.
+
+**Worked around (not fixed)** in `b6`: write `archetype_periods` from the
+call site, plus a `finalize` fallback that reads results from the durable
+`archetype_hook` breadcrumb. Both ship today.
+
+**To investigate:** what in the franchise game-doc save path (full_sim loop
+re-save at api.py ~3966, `save-result` / `complete-week` / Phase A/B, cache
+refresh, or game-doc delete/recreate) selectively drops fields written mid-handler
+but keeps fields written at end-of-handler. Likely a read-modify-write that
+snapshots the doc before the stash's write and later writes a stale version back.
+If found, we can drop the b6 workaround (call-site write + breadcrumb fallback)
+and let the stash persist directly.
+
 ## Payoff
 
 Items 2–4 are small. Any one would have collapsed the archetype-bug debugging from
