@@ -18,7 +18,7 @@ Tracking plumbing **built & verified end-to-end on gob-staging** (Sim Full Game;
 | First-archetype reveal (Moment modal) | `js/shared/archetypeReveal.js` on FCC | ✅ |
 | Manifest fields added | `archetypes.json`: `sections`, `group`, `description:"TBD"`, `reveal_name` | ✅ |
 
-**UI decisions:** account page deferred (none exists) → explainer link lives in the Account Settings modal; reveal fires on Franchise Command Center; existing coaches backfilled `archetype_reveal_seen=true` (no retroactive popup). Badge reads `lead_archetype` with client fallback to highest archetype count.
+**UI decisions:** account page deferred (none exists) → explainer link lives in the Account Settings modal; reveal fires on Franchise Command Center. **Reveal shows once for EVERY coach (existing + new) after their first non-tutorial game** — backfill sets `archetype_reveal_seen=false`; the modal flips it to `true` when shown. (Existing coaches who already have games see it on their next FCC visit.) Badge reads `lead_archetype` with client fallback to highest archetype count.
 
 Rules locked in: every period counts (Q1–Q4 + OT, simmed or played); deduped on `(game_id, quarter)` so refreshes/timeouts/foul-outs don't recount; committed once at game completion (abandoned games count 0); `win_rate = round(100*wins/total_games)`.
 

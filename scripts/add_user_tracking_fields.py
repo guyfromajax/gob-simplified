@@ -133,16 +133,17 @@ def print_pre_summary(users):
 def apply_backfill(users, dry_run: bool):
     if dry_run:
         print("[DRY-RUN] Would $set default `record` / `archetypes` on users missing them.")
-        print("[DRY-RUN] Would $set `archetype_reveal_seen=true` on users missing it (no retroactive reveal).")
+        print("[DRY-RUN] Would $set `archetype_reveal_seen=false` on users missing it (every coach sees the reveal once after their first non-tutorial game).")
         print("[DRY-RUN] Would set `lead_archetype` (computed from each user's archetype counts) where missing.")
         return
     rec = users.update_many(MISSING_RECORD, {"$set": {"record": default_record()}})
     print(f"`record`     -> Matched: {rec.matched_count}  Modified: {rec.modified_count}")
     arc = users.update_many(MISSING_ARCHETYPES, {"$set": {"archetypes": default_archetypes()}})
     print(f"`archetypes` -> Matched: {arc.matched_count}  Modified: {arc.modified_count}")
-    # Existing coaches predate the reveal feature → mark seen so they get no retroactive popup.
-    rev = users.update_many(MISSING_REVEAL, {"$set": {"archetype_reveal_seen": True}})
-    print(f"`archetype_reveal_seen=true` -> Matched: {rev.matched_count}  Modified: {rev.modified_count}")
+    # Every coach (existing + new) should see the reveal once after their first
+    # real game → default unseen; the reveal modal flips it to true when shown.
+    rev = users.update_many(MISSING_REVEAL, {"$set": {"archetype_reveal_seen": False}})
+    print(f"`archetype_reveal_seen=false` -> Matched: {rev.matched_count}  Modified: {rev.modified_count}")
     # lead_archetype is per-user (highest existing count) → compute individually.
     lead_set = 0
     for u in users.find(MISSING_LEAD, {"archetypes": 1}):
