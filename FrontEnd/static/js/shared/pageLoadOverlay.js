@@ -431,6 +431,7 @@
         return {
           index: index,
           points: Number(row.PTS || 0),
+          minutes: minutes,
           line: formatPostgameStatLine(row),
           teamName: teamName,
           assetKey: 'banner_primary'
@@ -439,6 +440,7 @@
       .filter(Boolean)
       .sort(function (a, b) {
         if (b.points !== a.points) return b.points - a.points;
+        if (b.minutes !== a.minutes) return b.minutes - a.minutes;
         return a.index - b.index;
       })
       .map(function (entry) {
