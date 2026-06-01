@@ -20,7 +20,7 @@
    - `FrontEnd/static/js/phaser/finalizeGame.js` - Tournament save-result; franchise **phase-a** at EOG (see split API below)
    - `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` - Creates completion popup; franchise phase B pending: starts **phase-b** in background when popup shows; PGPC vs locker CTA via **`FRANCHISE_PGPC_AT_EOG_ENABLED`** (`franchisePhaseBClient.js`); see `Press_Conference_System.md`
    - `FrontEnd/static/box-score.js` - Locker room navigation; franchise **phase-b** when week finish is pending
-   - `FrontEnd/static/js/shared/pageLoadOverlay.js` - Full-page pulse overlay during **phase-b** (banner + copy + green bar)
+   - `FrontEnd/static/js/shared/pageLoadOverlay.js` - Full-page pulse overlay during **phase-b** (banner + copy/stat feed + green bar)
    - `BackEnd/api/franchise_routes.py` - `complete_week_phase_a`, `complete_week_phase_b`, monolithic `complete_week`
    - `BackEnd/api/api.py` - ObjectId serialization for tournament/franchise endpoints
 
@@ -261,7 +261,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - **Behavior:** Loads saved week results from DB, runs `_complete_week_finish_cpu_and_persist` (CPU sims, recruiting, rank/prestige, EOS, week advance). Full turn-based CPU games (`run_simulation`) may run **in parallel** inside one phase-b request (`ThreadPoolExecutor`; optional env **`FRANCHISE_CPU_SIM_MAX_WORKERS`**, default **4**). Clears `post_game_status.phase_a_user_week` on successful persist.
 - **Response:** Extends the usual complete-week payload with `status`, `phase: "b"`, `idempotent`.
 - **Frontend triggers:**
-  - EOG popup: **`getOrStartFranchisePhaseB`** runs when the franchise completion modal is shown (`gameCompletionPopup.js`). **Franchise EOG primary CTA:** controlled by **`FRANCHISE_PGPC_AT_EOG_ENABLED`** in `gameCompletionPopup.js`. When **`false`** (current default), the popup shows **Box Score** + **Go To Locker Room**; **Go To Locker Room** dismisses the modal, shows the same **`PageLoadOverlay`** pulse as box-score (“Simulating Computer Games”), **awaits** the same phase-b Promise, then clears pending `localStorage` and navigates to the FCC (no extra click). When **`true`**, the legacy **Post-Game Press Conference** button is shown and **`postGamePressConference.js`** attaches to the same phase-b Promise (PGPC code paths remain in the repo). Box-score entry with `post_game_phase_b=1` uses the **Go To Locker Room** label for the phase-b finish action (see below).
+  - EOG popup: **`getOrStartFranchisePhaseB`** runs when the franchise completion modal is shown (`gameCompletionPopup.js`). **Franchise EOG primary CTA:** controlled by **`FRANCHISE_PGPC_AT_EOG_ENABLED`** in `gameCompletionPopup.js`. When **`false`** (current default), the popup shows **Box Score** + **Go To Locker Room**; **Go To Locker Room** dismisses the modal, shows the same **`PageLoadOverlay`** pulse as box-score (“Simulating Computer Games”), **awaits** the same phase-b Promise, then clears pending `localStorage` and navigates to the FCC (no extra click). The phase-b pulse may include a rotating completed-game player-stat feed below the team banner, sourced from the completed game's `box_score`. When **`true`**, the legacy **Post-Game Press Conference** button is shown and **`postGamePressConference.js`** attaches to the same phase-b Promise (PGPC code paths remain in the repo). Box-score entry with `post_game_phase_b=1` uses the **Go To Locker Room** label for the phase-b finish action (see below).
   - Box score: **Back to Locker Room** or **Go To Locker Room** (phase-b pending from EOG; see below) — same POST and overlay when pending matches URL `franchise_id`. Legacy pending shape `{ body: full CompleteWeekRequest }` still POSTs monolithic **`/franchise/complete-week`**.
 
 **Monolith — `POST /franchise/complete-week`**
@@ -273,6 +273,19 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 
 - When the EOG popup builds the **Box Score** link and phase B is pending, it appends **`post_game_phase_b=1`**.
 - `box-score.js` shows **Go To Locker Room** (same phase-b + overlay behavior as the historical “Sim Computer Games” control) only if that flag is present **and** `localStorage.franchise_complete_week_pending` exists **and** `franchise_id` matches the URL. All other entry paths keep **Back to Locker Room**; phase-b wiring when pending is unchanged.
+
+**Phase-B pulse player-stat feed**
+
+- Scope: franchise **phase-b pulse only**. It is not used by tournament result saving, generic page loading, or normal “Saving game…” statuses.
+- Sources:
+  - EOG popup path: `gameScene.js` passes the resolved final game snapshot into `showGameCompletionPopup()`; `gameCompletionPopup.js` uses that resolved doc for the pulse feed.
+  - Box Score path: `box-score.js` uses the already-loaded `gameData`.
+- Feed builder: `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })`.
+- Ordering: user team first, opponent second; within each team, players are sorted by points scored descending.
+- Eligibility: only players with more than 0 displayed minutes are included (`MIN` seconds floored to whole minutes).
+- Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played`.
+- Rebounds use **TREB = DREB + OREB**. Points are always shown, including `0 points`; all other zero stats are omitted.
+- Rotation: one player line is shown at a time for 8 seconds while phase B is pending.
 
 ### Franchise complete-week team id resolution (February 2026)
 
@@ -318,7 +331,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - **`FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js`** - Single-flight `POST …/phase-b` Promise per franchise week (EOG + PGPC share)
 - **`FrontEnd/static/js/phaser/utils/postGamePressConference.js`** - PGPC modal; attaches to shared phase-b Promise + `press_conference_sessions` API
 - **`FrontEnd/static/box-score.js`** - **phase-b** when `franchise_complete_week_pending` matches; label branching per `post_game_phase_b`
-- **`FrontEnd/static/js/shared/pageLoadOverlay.js`** - Pulse overlay during phase-b
+- **`FrontEnd/static/js/shared/pageLoadOverlay.js`** - Pulse overlay during phase-b, including optional rotating player-stat feed
 - **`BackEnd/api/franchise_routes.py`** - `complete_week_phase_a`, `complete_week_phase_b`, `complete_week`, `_complete_week_finish_cpu_and_persist`
 - **`BackEnd/api/api.py`** - ObjectId serialization for tournament/franchise endpoints
 

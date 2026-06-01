@@ -20,64 +20,6 @@ import logging
 import uuid
 
 
-_LINEUP_POSITION_ORDER = ["PG", "SG", "SF", "PF", "C"]
-
-
-def _log_turn_player_coords(game, turn_result, label):
-    """Per-player coord log at turn boundaries (TURN START / TURN END).
-
-    Fires for every turn type via ``_append_turn``. Includes turn header
-    (turn_type / result_type / offense team / quarter / time remaining)
-    plus one line per player grouped by team (offense first, then defense)
-    and ordered by lineup position (PG/SG/SF/PF/C) within each team.
-
-    Used to debug coord-staleness bugs across turn-to-turn transitions.
-    Filter Railway logs on ``🎯 [TURN COORDS]``.
-    """
-    try:
-        turn_type = (turn_result.get("current_turn") if isinstance(turn_result, dict) else None) or "?"
-        result_type = (turn_result.get("result_type") if isinstance(turn_result, dict) else None) or "?"
-        offense_team_name = getattr(getattr(game, "offense_team", None), "name", "?")
-        game_state = getattr(game, "game_state", {}) or {}
-        quarter = game_state.get("quarter", "?")
-        time_remaining = game_state.get("time_remaining", "?")
-        if isinstance(time_remaining, (int, float)):
-            mins = int(time_remaining) // 60
-            secs = int(time_remaining) % 60
-            time_str = f"{mins}:{secs:02d}"
-        else:
-            time_str = str(time_remaining)
-
-        logging.warning(
-            "🎯 [TURN COORDS %s] turn=%s, result=%s, offense=%s, Q%s, time=%s",
-            label, turn_type, result_type, offense_team_name, quarter, time_str,
-        )
-
-        for team_label, team in (("OFFENSE", getattr(game, "offense_team", None)),
-                                  ("DEFENSE", getattr(game, "defense_team", None))):
-            lineup = getattr(team, "lineup", {}) if team else {}
-            for pos in _LINEUP_POSITION_ORDER:
-                player = lineup.get(pos) if lineup else None
-                if player is None:
-                    continue
-                pid = getattr(player, "player_id", None)
-                coords = getattr(player, "coords", None) or {}
-                if isinstance(coords, dict) and "x" in coords and "y" in coords:
-                    try:
-                        x_str = f"{float(coords['x']):.1f}"
-                        y_str = f"{float(coords['y']):.1f}"
-                    except (TypeError, ValueError):
-                        x_str, y_str = "?", "?"
-                else:
-                    x_str, y_str = "?", "?"
-                logging.warning(
-                    "  %s %s (%s): (%s, %s)",
-                    team_label, pos, pid, x_str, y_str,
-                )
-    except Exception as e:
-        logging.warning("🎯 [TURN COORDS] log failed: %s", e)
-
-
 class GameManager:
     _POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS = 60
     _POST_MAKE_BIP_CLOCK_RUNOFF_SECONDS = 2
@@ -655,7 +597,6 @@ class GameManager:
         # `player.coords` as they were entering this turn — i.e., the end
         # state of the previous turn. Useful for debugging coord-staleness
         # bugs across turn-to-turn transitions.
-        _log_turn_player_coords(self, turn_result, label="TURN START")
 
         if isinstance(turn_result, dict):
             sync_lineup_coords_from_turn(self, turn_result)
@@ -681,7 +622,6 @@ class GameManager:
         # Log per-player coords at TURN END (after sync). These represent
         # where players are at the END of this turn — what the next turn
         # will see as its starting state.
-        _log_turn_player_coords(self, turn_result, label="TURN END")
 
         self._check_lineups_for_foul_out(turn_result)
         if turn_result.get("fouled_out"):

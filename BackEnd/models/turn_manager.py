@@ -688,12 +688,6 @@ class TurnManager:
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
                     self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
-                    import logging
-                    logging.warning(
-                        "🌉 [SIP_BRIDGE FIRED] step_count=%d sf_id=%s pg_id=%s prior_bh=%s triangle=%s",
-                        len(anim_steps), sf_id, pg_id, prior_final_bh_id,
-                        bool((game.game_state or {}).get("inbound_seam_from_triangle")),
-                    )
         except Exception as e:
             import logging
             logging.warning("build_sip_animation_steps failed: %s", e)
@@ -1119,13 +1113,6 @@ class TurnManager:
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
                     self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
-                    import logging
-                    bridge_tag = "BIP_BREAK_BRIDGE" if use_triangle_seam else "BIP_BRIDGE"
-                    logging.warning(
-                        "🌉 [%s FIRED] step_count=%d sf_id=%s pg_id=%s next=%s prior_bh=%s",
-                        bridge_tag,
-                        len(anim_steps), sf_id, pg_id, payload.get("next_play_type"), prior_final_bh_id,
-                    )
         except Exception as e:
             import logging
             logging.warning("build_bip_animation_steps failed: %s", e)
@@ -3881,17 +3868,14 @@ class TurnManager:
         from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context, serialize_lineup
         from BackEnd.models.shot_manager import ShotManager
         
-        logging.warning(f"🔍 [RESOLVE_OREB_TURN] ENTRY: Function called")
         pending_oreb = self.game.game_state.get("pending_oreb")
         if not pending_oreb:
-            logging.warning(f"🔍 [RESOLVE_OREB_TURN] No pending_oreb, returning None")
             return None
         
         rebounder = pending_oreb.get("rebounder")
         rebounder_id = pending_oreb.get("rebounder_id")
         from_block = pending_oreb.get("from_block", False)
         rebounder_name = get_name_safe(rebounder) if rebounder else "UNKNOWN"
-        logging.warning(f"🔍 [RESOLVE_OREB_TURN] Processing OREB for: {rebounder_name} (ID: {rebounder_id}), Object ID: {id(rebounder) if rebounder else 'N/A'}")
         
         # Clear the pending OREB immediately (before processing)
         # If this OREB results in another OREB, it will be set again
@@ -3991,7 +3975,6 @@ class TurnManager:
         
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
-        logging.warning(f"🔍 [RESOLVE_OREB_TURN] After resolve_offensive_rebound: event_type={oreb_event.get('event_type')}, result={oreb_event.get('result')}, has_rebound={'rebound' in oreb_event}")
 
         if oreb_event.get("event_type") == "OTB_FOUL":
             from BackEnd.engine.phase_resolution import resolve_non_shooting_foul

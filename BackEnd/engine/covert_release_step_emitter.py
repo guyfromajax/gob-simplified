@@ -1399,9 +1399,6 @@ def build_covert_release_animation_steps(
 
     _log_steps_coords(steps, off_lineup, def_lineup, fb_roles)
 
-    from BackEnd.utils.animation_step_helpers import log_fb_animation_steps
-    log_fb_animation_steps("CR", steps, off_lineup, def_lineup)
-
     return steps
 
 

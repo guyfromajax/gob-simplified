@@ -123,17 +123,6 @@ class Player:
         return stats
 
     def record_stat(self, stat, amount=1):
-        # 🔍 DEBUG: Log stat recording for OREB/DREB to trace putback miss bug
-        if stat in {"OREB", "DREB"}:
-            player_name = getattr(self, "name", None) or f"{getattr(self, 'first_name', '')} {getattr(self, 'last_name', '')}".strip()
-            player_id = getattr(self, "player_id", None)
-            obj_id = id(self)
-            oreb_before = self.stats["game"].get("OREB", 0)
-            dreb_before = self.stats["game"].get("DREB", 0)
-            reb_before = self.stats["game"].get("REB", 0)
-            logging.warning(f"🔍 [PLAYER.record_stat] ENTRY: {player_name} (ID: {player_id}), Object ID: {obj_id}, "
-                          f"Stat: {stat}, Amount: {amount}, OREB: {oreb_before}, DREB: {dreb_before}, REB: {reb_before}")
-        
         self.stats["game"][stat] += amount
         if stat in {"FGM", "3PTM", "FTM"}:
             s = self.stats["game"]
@@ -141,15 +130,6 @@ class Player:
         elif stat in {"OREB", "DREB"}:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
-            # 🔍 DEBUG: Log after REB calculation
-            player_name = getattr(self, "name", None) or f"{getattr(self, 'first_name', '')} {getattr(self, 'last_name', '')}".strip()
-            player_id = getattr(self, "player_id", None)
-            obj_id = id(self)
-            oreb_after = s.get("OREB", 0)
-            dreb_after = s.get("DREB", 0)
-            reb_after = s.get("REB", 0)
-            logging.warning(f"🔍 [PLAYER.record_stat] EXIT: {player_name} (ID: {player_id}), Object ID: {obj_id}, "
-                          f"OREB: {oreb_after}, DREB: {dreb_after}, REB: {reb_after} (calculated from OREB+DREB)")
 
     def get_fatigue_decay_amount(self, omit_zeros=False):
         """

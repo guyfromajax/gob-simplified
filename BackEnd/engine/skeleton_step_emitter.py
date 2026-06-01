@@ -783,28 +783,7 @@ def build_skeleton_animation_steps(
                 _anim_err,
             )
 
-    # Diagnostic on entry to skeleton emitter (HCO + FCP). Logs what inputs
-    # the emitter received so we can confirm the skeleton / animations /
-    # step_clock_seconds shape per turn. Remove once the migration has burned
-    # in across all skeleton-style turn types.
-    import logging as _skel_emit_log
-    _skel_emit_log.warning(
-        "🔍 [SKELETON_EMIT] entry: turn_type=%s current_turn=%s next_play_type=%s "
-        "has_hco_setup=%s has_skeleton_steps=%s (%d) has_animations=%s (%d) "
-        "has_step_clock_seconds=%s (%d)",
-        turn_type,
-        turn_result.get("current_turn"),
-        turn_result.get("next_play_type"),
-        isinstance(turn_result.get("hco_setup"), dict),
-        bool(skeleton_steps), len(skeleton_steps),
-        bool(animations), len(animations),
-        bool(step_clock_seconds), len(step_clock_seconds),
-    )
-
     if not skeleton_steps or not animations:
-        _skel_emit_log.warning(
-            "🔍 [SKELETON_EMIT] EARLY RETURN None — schema steps will not emit"
-        )
         return None
 
     # Walk one step per skeleton step. Phase 3 of HCO UESS migration: step T

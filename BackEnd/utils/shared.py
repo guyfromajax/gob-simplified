@@ -1127,10 +1127,8 @@ def resolve_offensive_rebound(game, rebounder):
             canonical = new_team.get_player_by_id(pid_str) if pid_str else None
             if canonical is not None:
                 canonical.record_stat(new_stat)
-                logging.warning(f"🏀 Putback Miss Rebound: {get_name_safe(canonical)} (ID: {pid_str}) credited with {new_stat} on canonical roster player")
             else:
                 new_rebounder.record_stat(new_stat)
-                logging.warning(f"🏀 Putback Miss Rebound: {get_name_safe(new_rebounder)} (ID: {pid_str}) credited with {new_stat} on lineup player (canonical lookup failed)")
             # DON'T flip possession here - let turn_manager handle it after the rebound
             # This ensures the shot animates to the correct basket before possession flips
             event["possession_flips"] = False

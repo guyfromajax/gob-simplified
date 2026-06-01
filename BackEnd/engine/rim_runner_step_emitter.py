@@ -1726,10 +1726,6 @@ def _finalize_rr_steps(
 
     _stamp_hco_setup(turn_result, game, steps)
 
-    from BackEnd.utils.animation_step_helpers import log_fb_animation_steps
-    label = str(turn_result.get("fast_break_play") or "FB").upper()
-    log_fb_animation_steps(label, steps, off_lineup, def_lineup)
-
     return steps
 
 
