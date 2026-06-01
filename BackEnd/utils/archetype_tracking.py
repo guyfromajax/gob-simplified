@@ -23,6 +23,10 @@ from BackEnd.utils.coaching_archetype import classify_archetype
 
 logger = logging.getLogger(__name__)
 
+# Bump on every deploy of this file so a game-doc breadcrumb proves the running
+# code is current (not stale). Read it from `game.archetype_debug.<q>.build`.
+STASH_BUILD = "arch-b2-2026-06-01"
+
 
 def _to_object_id(game_id):
     try:
@@ -40,37 +44,47 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
     mid-quarter substitutions don't change the classification) and the players'
     `anchor_` base attributes. No-op if the period was already stashed.
     """
+    # Diagnosis on Railway can't rely on logs (rate-limited + INFO dropped), so
+    # we leave a full per-quarter breadcrumb on the GAME doc. `build` stamps the
+    # running code version so we can verify a deploy is fresh, not stale.
+    quarter = getattr(body, "quarter", None)
+    gid = _to_object_id(game_id)
+    dbg = {
+        "build": STASH_BUILD,
+        "mode": mode,
+        "quarter": quarter,
+        "full_sim": getattr(body, "full_sim", None),
+    }
     try:
         if mode != "franchise":
-            logger.info("[archetype] skip game=%s: mode=%r (not franchise)", game_id, mode)
+            dbg["skip"] = "not_franchise"
             return
         if not getattr(body, "franchise_id", None) or not game_id:
-            logger.info("[archetype] skip game=%s: franchise_id=%r game_id=%r",
-                        game_id, getattr(body, "franchise_id", None), game_id)
+            dbg["skip"] = "no_franchise_id_or_game_id"
             return
-        quarter = getattr(body, "quarter", None)
         if not isinstance(quarter, int) or quarter < 1:
-            logger.info("[archetype] skip game=%s: bad quarter=%r", game_id, quarter)
+            dbg["skip"] = f"bad_quarter:{quarter!r}"
             return
 
         # The user's side is authoritative from game_state; fall back to the request.
         gs_side = gm.game_state.get("user_team_side") if (gm is not None and getattr(gm, "game_state", None)) else None
         body_side = getattr(body, "user_team_side", None)
         side = gs_side or body_side
+        dbg["gs_side"] = gs_side
+        dbg["body_side"] = body_side
+        dbg["side"] = side
         if side not in ("home", "away"):
-            logger.info("[archetype] skip game=%s q=%s: no user side (gs=%r body=%r)",
-                        game_id, quarter, gs_side, body_side)
+            dbg["skip"] = "no_user_side"
             return
 
         period_key = str(quarter)
-        gid = _to_object_id(game_id)
 
         # Dedup: this period already classified for this game → leave it untouched.
         if games_collection.find_one(
             {"_id": gid, f"archetype_periods.{period_key}": {"$exists": True}},
             {"_id": 1},
         ):
-            logger.info("[archetype] skip game=%s q=%s: already stashed", game_id, period_key)
+            dbg["skip"] = "already_stashed"
             return
 
         team = gm.home_team if side == "home" else gm.away_team
@@ -85,26 +99,21 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
             attrs = getattr(player, "attributes", None) if player else None
             if attrs:
                 starters.append(attrs)
-        logger.info("[archetype] game=%s q=%s side=%s body_lineup=%s -> %d starters",
-                    game_id, period_key, side, list(lineup_ids.values()), len(starters))
+        dbg["lineup_ids"] = [str(v) for v in lineup_ids.values()]
+        dbg["body_n"] = len(starters)
 
         # Fallback: the team's live lineup object (always populated by the sim).
         # Covers quarters where the client didn't resend the lineup and any
         # home/away orientation mismatch in the request body.
         if len(starters) != 5:
             live = getattr(team, "lineup", None) or {}
-            alt = [getattr(p, "attributes", None) for p in live.values()]
-            alt = [a for a in alt if a]
-            logger.info("[archetype] game=%s q=%s side=%s: body gave %d, gm.lineup gives %d",
-                        game_id, period_key, side, len(starters), len(alt))
+            alt = [a for a in (getattr(p, "attributes", None) for p in live.values()) if a]
+            dbg["live_n"] = len(alt)
             if len(alt) == 5:
                 starters = alt
 
         if len(starters) != 5:
-            logger.warning(
-                "[archetype] skip stash game=%s q=%s side=%s: resolved %d/5 starters",
-                game_id, period_key, side, len(starters),
-            )
+            dbg["skip"] = "lineup_unresolved"
             return
 
         archetype = classify_archetype(starters)
@@ -114,9 +123,17 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
             {"_id": gid, f"archetype_periods.{period_key}": {"$exists": False}},
             {"$set": {f"archetype_periods.{period_key}": archetype}},
         )
-        logger.info(
-            "[archetype] stashed game=%s q=%s side=%s -> %s",
-            game_id, period_key, side, archetype,
-        )
-    except Exception:
+        dbg["result"] = archetype
+    except Exception as e:
+        dbg["error"] = repr(e)
         logger.exception("[archetype] stash_period_archetype failed (non-fatal)")
+    finally:
+        # Persist the breadcrumb regardless of outcome (rate-limit-proof channel).
+        try:
+            if game_id is not None:
+                qk = str(quarter) if quarter is not None else "x"
+                games_collection.update_one(
+                    {"_id": gid}, {"$set": {f"archetype_debug.{qk}": dbg}}
+                )
+        except Exception:
+            logger.exception("[archetype] breadcrumb write failed")

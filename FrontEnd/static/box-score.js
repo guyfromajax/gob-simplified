@@ -91,6 +91,22 @@ function resolveUserTeamNameForPhaseBPulse(urlParams) {
   return '';
 }
 
+function resolveUserTeamSideForPhaseBPulse(urlParams) {
+  if (!gameData || !urlParams) return null;
+  const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
+  const homeName = homeTeam.name || 'Home Team';
+  const awayName = awayTeam.name || 'Away Team';
+  const myTeamParam = urlParams.get('my_team');
+  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
+  if (myTeamParam === 'home' || myTeamParam === 'away') return myTeamParam;
+  if (teamIdParam) return mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('last_game_user_team_side');
+    if (stored === 'home' || stored === 'away') return stored;
+  }
+  return null;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -2150,10 +2166,19 @@ function setupLockerRoomButton() {
             const overlayTitle = pulseTeamName || 'Your team';
             let usedStatusFallback = false;
             if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+              const userTeamSideForFeed = resolveUserTeamSideForPhaseBPulse(urlParams);
+              const statLines = window.PageLoadOverlay.buildPostgameStatFeed
+                ? window.PageLoadOverlay.buildPostgameStatFeed(gameData, {
+                    userTeamSide: userTeamSideForFeed === 'away' ? 'away' : 'home',
+                  })
+                : [];
               window.PageLoadOverlay.show({
                 variant: 'pulse',
-                title: overlayTitle,
-                subtitle: 'Simulating Computer Games',
+                title: statLines.length ? '' : overlayTitle,
+                label: 'Simulating Computer Games',
+                subtitle: '',
+                statLines,
+                statIntervalMs: 8000,
                 teamName: pulseTeamName || '',
                 assetKey: 'banner_primary',
               });

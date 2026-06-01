@@ -858,11 +858,17 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         } catch (_) {}
         const pulseTeamName = userTeamName || '';
         const overlayTitle = pulseTeamName || 'Your team';
+        const statLines = window.PageLoadOverlay && window.PageLoadOverlay.buildPostgameStatFeed
+          ? window.PageLoadOverlay.buildPostgameStatFeed(resolvedGameDoc, { userTeamSide: resolvedUserTeamSide })
+          : [];
         if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
           window.PageLoadOverlay.show({
             variant: 'pulse',
-            title: overlayTitle,
-            subtitle: 'Simulating Computer Games',
+            title: statLines.length ? '' : overlayTitle,
+            label: 'Simulating Computer Games',
+            subtitle: '',
+            statLines,
+            statIntervalMs: 8000,
             teamName: pulseTeamName,
             assetKey: 'banner_primary',
           });

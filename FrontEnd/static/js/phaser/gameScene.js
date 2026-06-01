@@ -2607,15 +2607,16 @@ export function createGameScene(Phaser) {
         // Show game completion popup (absolute path for Netlify/module resolution)
         const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
         const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
-        showGameCompletionPopup({
-          gameId: this.gameId || simData.game_id,
-          mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
-          tournamentId: this.tournamentId,
-          franchiseId: this.franchiseId,
-          teamId: this.teamId,
-          userTeamSide: this.userTeamSide,
-          finalScore: finalScore
-        });
+          showGameCompletionPopup({
+            gameId: this.gameId || simData.game_id,
+            mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            teamId: this.teamId,
+            userTeamSide: this.userTeamSide,
+            finalScore: finalScore,
+            gameData: simData
+          });
         
         return finalScore;
       };
@@ -3943,7 +3944,8 @@ export function createGameScene(Phaser) {
             franchiseId: this.franchiseId,
             teamId: this.teamId,
             userTeamSide: this.userTeamSide,
-            finalScore: finalScore
+            finalScore: finalScore,
+            gameData: updatedSimData
           });
           
           return finalScore;

@@ -3969,10 +3969,16 @@ try:
             # Best-effort, idempotent per (game_id, quarter); folded into the user
             # record at finalize_game (User Account System, Phase 4).
             # Own try/except so failures here are NOT masked as "Mongo upsert failed".
+            # Diagnosis via DB breadcrumbs (Railway drops logs). `archetype_hook`
+            # proves THIS file is deployed + reached; `hook_build` stamps the version.
             try:
-                logging.info(
-                    "[archetype] reached stash call: game=%s mode=%s quarter=%s full_sim=%s",
-                    game_id_oid, mode, getattr(body, "quarter", None), getattr(body, "full_sim", None),
+                games_collection.update_one(
+                    {"_id": game_id_oid},
+                    {"$set": {f"archetype_hook.{getattr(body, 'quarter', 'x')}": {
+                        "hook_build": "hook-b2-2026-06-01",
+                        "mode": mode,
+                        "full_sim": getattr(body, "full_sim", None),
+                    }}},
                 )
                 from BackEnd.utils.archetype_tracking import stash_period_archetype
                 stash_period_archetype(

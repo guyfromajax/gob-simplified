@@ -17,6 +17,14 @@
   var LOADER_IMG_PATH = '/images/loader1.gif';
   var Z_INDEX = 999999;
   var DEFAULT_BANNER_PATH = '/images/teams/general/general_banner_primary.jpg';
+  var pulseFeedTimer = null;
+
+  function clearPulseFeedTimer() {
+    if (pulseFeedTimer) {
+      clearInterval(pulseFeedTimer);
+      pulseFeedTimer = null;
+    }
+  }
 
   function getPulseImageSrc(options) {
     if (options && options.imageSrc) return options.imageSrc;
@@ -92,12 +100,20 @@
       pulse.className = 'page-load-overlay-pulse';
       pulse.style.cssText = 'display:none;width:min(560px,100%);text-align:center;';
       pulse.innerHTML = [
+        '<p class="page-load-overlay-pulse-label"></p>',
         '<img class="page-load-overlay-pulse-image" alt="">',
         '<h2 class="page-load-overlay-pulse-title"></h2>',
         '<p class="page-load-overlay-pulse-subtitle"></p>',
+        '<p class="page-load-overlay-pulse-stat"></p>',
         '<div class="page-load-overlay-pulse-indicator" aria-hidden="true"><span></span></div>'
       ].join('');
       content.appendChild(pulse);
+    }
+
+    var pulseLabel = pulse.querySelector('.page-load-overlay-pulse-label');
+    if (pulseLabel) {
+      pulseLabel.style.cssText =
+        "display:none;margin:0 0 18px;font-family:'Inter',sans-serif;font-size:16px;line-height:1.4;letter-spacing:0;color:rgba(255,255,255,0.72);";
     }
 
     var pulseImage = pulse.querySelector('.page-load-overlay-pulse-image');
@@ -114,6 +130,12 @@
     var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
     if (pulseSubtitle) {
       pulseSubtitle.style.cssText = 'margin:0 0 22px;font-size:16px;color:rgba(255,255,255,0.68);';
+    }
+
+    var pulseStat = pulse.querySelector('.page-load-overlay-pulse-stat');
+    if (pulseStat) {
+      pulseStat.style.cssText =
+        "display:none;min-height:44px;margin:22px auto 22px;max-width:min(620px,92vw);font-family:'Inter',sans-serif;font-size:16px;line-height:1.4;letter-spacing:0;color:rgba(255,255,255,0.86);";
     }
 
     var pulseIndicator = pulse.querySelector('.page-load-overlay-pulse-indicator');
@@ -148,6 +170,9 @@
         message: input.message || input.title || '',
         title: input.title || input.message || '',
         subtitle: input.subtitle || '',
+        label: input.label || input.pulseLabel || '',
+        statLines: Array.isArray(input.statLines) ? input.statLines : [],
+        statIntervalMs: Number(input.statIntervalMs) > 0 ? Number(input.statIntervalMs) : 8000,
         imageSrc: input.imageSrc || '',
         teamName: input.teamName || '',
         assetKey: input.assetKey || 'banner_primary'
@@ -168,9 +193,11 @@
       message.textContent = options.message || '';
     }
     if (pulse) pulse.style.display = 'none';
+    clearPulseFeedTimer();
   }
 
   function applyPulseVariant(overlay, options) {
+    clearPulseFeedTimer();
     var content = overlay.querySelector('.page-load-overlay-content');
     if (!content) return;
     var spinners = content.querySelectorAll('.page-load-overlay-spinner');
@@ -183,10 +210,21 @@
     if (!pulse) return;
 
     var pulseImage = pulse.querySelector('.page-load-overlay-pulse-image');
+    var pulseLabel = pulse.querySelector('.page-load-overlay-pulse-label');
     var pulseTitle = pulse.querySelector('.page-load-overlay-pulse-title');
     var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
+    var pulseStat = pulse.querySelector('.page-load-overlay-pulse-stat');
     var titleText = options.title || '';
     var subtitleText = options.subtitle || '';
+    var labelText = options.label || '';
+    var statLines = Array.isArray(options.statLines)
+      ? options.statLines.filter(function (line) { return typeof line === 'string' && line.trim(); })
+      : [];
+
+    if (pulseLabel) {
+      pulseLabel.textContent = labelText;
+      pulseLabel.style.display = labelText ? 'block' : 'none';
+    }
 
     if (pulseImage) {
       pulseImage.src = getPulseImageSrc(options);
@@ -198,6 +236,7 @@
     }
     if (pulseSubtitle) {
       pulseSubtitle.textContent = subtitleText;
+      pulseSubtitle.style.display = subtitleText ? 'block' : 'none';
       // With a title, subtitle is secondary. With no title (e.g. training load: logo + feed only),
       // subtitle is the main copy — use readable body type, not oversized display type.
       if (titleText) {
@@ -215,6 +254,22 @@
         pulseSubtitle.style.color = 'rgba(255,255,255,0.88)';
         pulseSubtitle.style.margin = '26px 0 22px';
         pulseSubtitle.style.maxWidth = 'min(520px, 92vw)';
+      }
+    }
+    if (pulseStat) {
+      if (statLines.length) {
+        var statIndex = 0;
+        pulseStat.textContent = statLines[0];
+        pulseStat.style.display = 'block';
+        if (statLines.length > 1) {
+          pulseFeedTimer = setInterval(function () {
+            statIndex = (statIndex + 1) % statLines.length;
+            pulseStat.textContent = statLines[statIndex];
+          }, options.statIntervalMs || 8000);
+        }
+      } else {
+        pulseStat.textContent = '';
+        pulseStat.style.display = 'none';
       }
     }
     pulse.style.display = 'block';
@@ -283,9 +338,91 @@
       el.setAttribute('aria-busy', 'false');
       el.style.display = 'none';
     }
+    clearPulseFeedTimer();
   }
 
-  var api = { show: show, hide: hide, updatePulseSubtitle: updatePulseSubtitle };
+  function getTeamNameFromGameDoc(gameDoc, side) {
+    if (!gameDoc || (side !== 'home' && side !== 'away')) return '';
+    var teamId = side === 'home' ? gameDoc.home_team_id : gameDoc.away_team_id;
+    var teams = gameDoc.teams || {};
+    var team = teamId && teams ? (teams[teamId] || teams[String(teamId)]) : null;
+    if (team && typeof team === 'object') return team.name || team.team_name || '';
+    var fallback = side === 'home' ? gameDoc.home_team : gameDoc.away_team;
+    if (fallback && typeof fallback === 'object') return fallback.name || fallback.team_name || '';
+    return typeof fallback === 'string' ? fallback : '';
+  }
+
+  function getBoxScoreForSide(gameDoc, side) {
+    if (!gameDoc || !gameDoc.box_score || (side !== 'home' && side !== 'away')) return {};
+    var teamId = side === 'home' ? gameDoc.home_team_id : gameDoc.away_team_id;
+    var teamName = getTeamNameFromGameDoc(gameDoc, side);
+    var boxScore = gameDoc.box_score || {};
+    return (teamId && (boxScore[teamId] || boxScore[String(teamId)])) ||
+      (teamName && boxScore[teamName]) ||
+      {};
+  }
+
+  function pluralizeStat(value, singular, plural) {
+    return value + ' ' + (value === 1 ? singular : (plural || singular + 's'));
+  }
+
+  function formatPostgameStatLine(playerData) {
+    var name = playerData.name || 'Unknown';
+    var jersey = playerData.jersey;
+    if (jersey == null || jersey === '') jersey = playerData.jerseyNumber;
+    if (jersey == null || jersey === '') jersey = playerData.jersey_number;
+    var prefix = name + (jersey != null && jersey !== '' ? ' (#' + jersey + ')' : '');
+    var points = Number(playerData.PTS || 0);
+    var treb = Number(playerData.TREB != null ? playerData.TREB : (Number(playerData.DREB || 0) + Number(playerData.OREB || 0)));
+    var assists = Number(playerData.AST || 0);
+    var steals = Number(playerData.STL || 0);
+    var blocks = Number(playerData.BLK || 0);
+    var minutes = Math.floor(Number(playerData.MIN || 0) / 60);
+    var parts = [pluralizeStat(points, 'point')];
+    if (treb > 0) parts.push(pluralizeStat(treb, 'rebound'));
+    if (assists > 0) parts.push(pluralizeStat(assists, 'assist'));
+    if (steals > 0) parts.push(pluralizeStat(steals, 'steal'));
+    if (blocks > 0) parts.push(pluralizeStat(blocks, 'block'));
+    parts.push(pluralizeStat(minutes, 'minute') + ' played');
+    return prefix + ': ' + parts.join(', ');
+  }
+
+  function collectSideStatLines(gameDoc, side) {
+    var box = getBoxScoreForSide(gameDoc, side);
+    return Object.keys(box || {})
+      .map(function (key, index) {
+        var row = box[key];
+        if (!row || typeof row !== 'object' || !row.name) return null;
+        var minutes = Math.floor(Number(row.MIN || 0) / 60);
+        if (minutes <= 0) return null;
+        return {
+          index: index,
+          points: Number(row.PTS || 0),
+          line: formatPostgameStatLine(row)
+        };
+      })
+      .filter(Boolean)
+      .sort(function (a, b) {
+        if (b.points !== a.points) return b.points - a.points;
+        return a.index - b.index;
+      })
+      .map(function (entry) { return entry.line; });
+  }
+
+  function buildPostgameStatFeed(gameDoc, options) {
+    if (!gameDoc || !gameDoc.box_score) return [];
+    options = options || {};
+    var userSide = options.userTeamSide === 'away' ? 'away' : 'home';
+    var opponentSide = userSide === 'home' ? 'away' : 'home';
+    return collectSideStatLines(gameDoc, userSide).concat(collectSideStatLines(gameDoc, opponentSide));
+  }
+
+  var api = {
+    show: show,
+    hide: hide,
+    updatePulseSubtitle: updatePulseSubtitle,
+    buildPostgameStatFeed: buildPostgameStatFeed
+  };
   global.PageLoadOverlay = api;
 
   if (typeof module !== 'undefined' && module.exports) {
