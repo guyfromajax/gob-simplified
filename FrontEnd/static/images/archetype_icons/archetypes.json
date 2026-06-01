@@ -15,6 +15,24 @@
     "wildcard": "#A876E6",
     "balance": "#F79420 + #4E8AEC"
   },
+  "sections": [
+    {
+      "group": "offensive",
+      "label": "Offense-First"
+    },
+    {
+      "group": "defensive",
+      "label": "Defense-First"
+    },
+    {
+      "group": "balanced",
+      "label": "Balanced"
+    },
+    {
+      "group": "specialist",
+      "label": "Specialist"
+    }
+  ],
   "note": "icon id === the user's archetypes.<key> DB field. Lead archetype = key with the highest count among the 18 (ignore 'total'); render svg/<key>.svg.",
   "archetypes": [
     {
@@ -28,7 +46,10 @@
       "attributes": [
         "SC",
         "SH"
-      ]
+      ],
+      "group": "offensive",
+      "description": "TBD",
+      "reveal_name": "Pure Offense"
     },
     {
       "id": "cerebral_offense",
@@ -42,7 +63,10 @@
         "SC",
         "SH",
         "IQ"
-      ]
+      ],
+      "group": "offensive",
+      "description": "TBD",
+      "reveal_name": "Cerebral Offense"
     },
     {
       "id": "offensive_athleticism",
@@ -58,7 +82,10 @@
         "ST",
         "AG",
         "ND"
-      ]
+      ],
+      "group": "offensive",
+      "description": "TBD",
+      "reveal_name": "Offensive Athleticism"
     },
     {
       "id": "offensive_fundamentals",
@@ -73,7 +100,10 @@
         "SH",
         "PS",
         "BH"
-      ]
+      ],
+      "group": "offensive",
+      "description": "TBD",
+      "reveal_name": "Offensive Fundamentals"
     },
     {
       "id": "offensive_rebounding",
@@ -87,7 +117,10 @@
         "SC",
         "SH",
         "RB"
-      ]
+      ],
+      "group": "offensive",
+      "description": "TBD",
+      "reveal_name": "Offensive Rebounding"
     },
     {
       "id": "pure_defense",
@@ -100,7 +133,10 @@
       "attributes": [
         "ID",
         "OD"
-      ]
+      ],
+      "group": "defensive",
+      "description": "TBD",
+      "reveal_name": "Pure Defense"
     },
     {
       "id": "the_intimidator",
@@ -114,7 +150,10 @@
         "ID",
         "OD",
         "ST"
-      ]
+      ],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Intimidator"
     },
     {
       "id": "cerebral_defense",
@@ -128,7 +167,10 @@
         "ID",
         "OD",
         "IQ"
-      ]
+      ],
+      "group": "defensive",
+      "description": "TBD",
+      "reveal_name": "Cerebral Defense"
     },
     {
       "id": "defensive_athleticism",
@@ -143,7 +185,10 @@
         "OD",
         "AG",
         "ND"
-      ]
+      ],
+      "group": "defensive",
+      "description": "TBD",
+      "reveal_name": "Defensive Athleticism"
     },
     {
       "id": "defensive_fundamentals",
@@ -158,7 +203,10 @@
         "OD",
         "PS",
         "BH"
-      ]
+      ],
+      "group": "defensive",
+      "description": "TBD",
+      "reveal_name": "Defensive Fundamentals"
     },
     {
       "id": "defensive_rebounding",
@@ -172,7 +220,10 @@
         "ID",
         "OD",
         "RB"
-      ]
+      ],
+      "group": "defensive",
+      "description": "TBD",
+      "reveal_name": "Defensive Rebounding"
     },
     {
       "id": "rebounding_king",
@@ -185,7 +236,10 @@
       "attributes": [
         "RB",
         "ST"
-      ]
+      ],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Rebounding King"
     },
     {
       "id": "mr_fundamentals",
@@ -199,7 +253,10 @@
         "PS",
         "BH",
         "RB"
-      ]
+      ],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Mr. Fundamentals"
     },
     {
       "id": "outrun_the_competition",
@@ -212,7 +269,10 @@
       "attributes": [
         "ND",
         "AG"
-      ]
+      ],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Outrun the Competition"
     },
     {
       "id": "pure_athleticism",
@@ -226,7 +286,10 @@
         "ST",
         "AG",
         "ND"
-      ]
+      ],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Pure Athleticism"
     },
     {
       "id": "pure_discipline",
@@ -240,7 +303,10 @@
         "PS",
         "BH",
         "IQ"
-      ]
+      ],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Pure Discipline"
     },
     {
       "id": "od_balance",
@@ -255,7 +321,10 @@
         "SH",
         "ID",
         "OD"
-      ]
+      ],
+      "group": "balanced",
+      "description": "TBD",
+      "reveal_name": "O / D Balance"
     },
     {
       "id": "mr_unconventional",
@@ -265,7 +334,10 @@
       "lean": "wildcard",
       "color": "#A876E6",
       "qualifies": "None of the above",
-      "attributes": []
+      "attributes": [],
+      "group": "specialist",
+      "description": "TBD",
+      "reveal_name": "Mr. Unconventional"
     }
   ]
 }

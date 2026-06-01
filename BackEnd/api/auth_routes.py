@@ -49,7 +49,7 @@ from BackEnd.utils.otp_validator import (
     consume_otp
 )
 from BackEnd.utils.email_sender import send_password_reset_email
-from BackEnd.utils.user_tracking import default_user_tracking
+from BackEnd.utils.user_tracking import default_user_tracking, compute_lead_archetype
 from BackEnd.utils.alpha_access_email import send_alpha_welcome_email, send_alpha_waitlist_email
 from BackEnd.utils.alpha_otp_service import (
     claim_otp_for_email,
@@ -149,6 +149,8 @@ class UserResponse(BaseModel):
     account_settings: Optional[dict] = None
     record: Optional[dict] = None  # Career record (wins/losses/total_games/win_rate/discount_*)
     archetypes: Optional[dict] = None  # 18 coaching-archetype counters + total
+    lead_archetype: Optional[str] = None  # denormalized top archetype key for the badge ("" if none)
+    archetype_reveal_seen: Optional[bool] = None  # gates the one-time first-archetype reveal
 
 
 class AuthConfigResponse(BaseModel):
@@ -163,6 +165,7 @@ class LeaderboardEntry(BaseModel):
     username: str
     geek_points: int
     is_current_user: bool = False
+    lead_archetype: str = ""  # coach's badge key ("" = no badge)
 
 
 class LeaderboardRankEntry(BaseModel):
@@ -173,6 +176,7 @@ class LeaderboardRankEntry(BaseModel):
     team_primary_color: str = "#27408E"
     natl_rank: int
     is_current_user: bool = False
+    lead_archetype: str = ""  # coach's badge key ("" = no badge)
 
 
 class LeaderboardResponse(BaseModel):
@@ -637,6 +641,20 @@ async def update_account_settings(
     }
 
 
+@router.patch("/archetype-reveal-seen")
+async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
+    """Mark the one-time first-archetype reveal modal as seen for this account.
+
+    Idempotent; called by the frontend when the reveal is shown so it never
+    appears again on any device/session.
+    """
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"$set": {"archetype_reveal_seen": True, "updated_at": datetime.now(timezone.utc)}}
+    )
+    return {"archetype_reveal_seen": True, "message": "Archetype reveal marked seen"}
+
+
 @router.post("/reset-request")
 @_auth_rate_limit
 async def password_reset_request(request: Request, body: ResetRequest):
@@ -754,6 +772,12 @@ async def get_me(user: dict = Depends(get_current_user)):
     tracking_defaults = default_user_tracking()
     record = (db_user.get("record") if db_user else None) or tracking_defaults["record"]
     archetypes = (db_user.get("archetypes") if db_user else None) or tracking_defaults["archetypes"]
+    # lead_archetype is denormalized server-side; fall back to deriving from counts
+    # for older docs that predate the field (UI also handles its absence).
+    lead_archetype = (db_user.get("lead_archetype") if db_user else None)
+    if lead_archetype is None:
+        lead_archetype = compute_lead_archetype(archetypes)
+    archetype_reveal_seen = bool(db_user.get("archetype_reveal_seen")) if db_user else False
 
     return UserResponse(
         user_id=user["user_id"],
@@ -766,7 +790,9 @@ async def get_me(user: dict = Depends(get_current_user)):
         tutorial_state=tutorial_state,
         account_settings=account_settings,
         record=record,
-        archetypes=archetypes
+        archetypes=archetypes,
+        lead_archetype=lead_archetype,
+        archetype_reveal_seen=archetype_reveal_seen
     )
 
 
@@ -783,6 +809,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             "username": 1,
             "email": 1,
             "geek_points": 1,
+            "lead_archetype": 1,
         }
     ))
 
@@ -802,6 +829,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             "_id": str(doc.get("_id", "")),
             "username": username,
             "geek_points": geek_points,
+            "lead_archetype": str(doc.get("lead_archetype") or ""),
         })
 
     entries.sort(key=lambda entry: (-entry["geek_points"], entry["username"].lower()))
@@ -814,6 +842,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             username=entry["username"],
             geek_points=entry["geek_points"],
             is_current_user=(entry["_id"] == current_user_id),
+            lead_archetype=entry["lead_archetype"],
         )
         ranked_entries.append(ranked)
         if ranked.is_current_user:
@@ -898,6 +927,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             "team_name": team_name,
             "team_primary_color": team_primary_color,
             "natl_rank": natl_rank,
+            "lead_archetype": user_entry.get("lead_archetype", ""),
         })
 
     rank_entries_raw.sort(key=lambda entry: (entry["natl_rank"], entry["username"].lower()))
@@ -909,6 +939,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             team_primary_color=entry["team_primary_color"],
             natl_rank=entry["natl_rank"],
             is_current_user=(entry["_id"] == current_user_id),
+            lead_archetype=entry.get("lead_archetype", ""),
         )
         for index, entry in enumerate(rank_entries_raw, start=1)
     ]

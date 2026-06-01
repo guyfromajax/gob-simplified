@@ -65,11 +65,15 @@ async def get_leaderboard_by_team(
         docs = list(
             users_collection.find(
                 {},
-                {"username": 1, "email": 1},
+                {"username": 1, "email": 1, "lead_archetype": 1},
             )
         )
         usernames_by_user_id = {
             str(doc.get("_id")): _display_username(doc)
+            for doc in docs
+        }
+        lead_by_user_id = {
+            str(doc.get("_id")): str(doc.get("lead_archetype") or "")
             for doc in docs
         }
         franchise_docs = list(
@@ -123,7 +127,11 @@ async def get_leaderboard_by_team(
             if natl_rank <= 0:
                 continue
 
-            result[slug].append({"username": username, "natl_rank": natl_rank})
+            result[slug].append({
+                "username": username,
+                "natl_rank": natl_rank,
+                "lead_archetype": lead_by_user_id.get(user_id, ""),
+            })
 
         for slug, entries in result.items():
             entries.sort(key=lambda entry: (int(entry["natl_rank"]), str(entry["username"]).lower()))
@@ -134,14 +142,14 @@ async def get_leaderboard_by_team(
     docs = list(
         users_collection.find(
             {},
-            {"username": 1, "email": 1, "geek_points_by_team": 1},
+            {"username": 1, "email": 1, "geek_points_by_team": 1, "lead_archetype": 1},
         )
     )
 
     result: dict[str, list[dict[str, str | int]]] = {slug: [] for slug in A1_SLUG_TO_CANONICAL}
 
     for slug, canon_key in A1_SLUG_TO_CANONICAL.items():
-        scores: list[tuple[int, str, str]] = []
+        scores: list[tuple[int, str, str, str]] = []
         for doc in docs:
             gbt = doc.get("geek_points_by_team")
             if not isinstance(gbt, dict):
@@ -156,11 +164,11 @@ async def get_leaderboard_by_team(
             if pts <= 0:
                 continue
             uname = _display_username(doc)
-            scores.append((pts, uname.lower(), uname))
+            scores.append((pts, uname.lower(), uname, str(doc.get("lead_archetype") or "")))
         scores.sort(key=lambda t: (-t[0], t[1]))
         result[slug] = [
-            {"username": uname, "geek_points": pts}
-            for pts, _lower, uname in scores[:3]
+            {"username": uname, "geek_points": pts, "lead_archetype": lead}
+            for pts, _lower, uname, lead in scores[:3]
         ]
 
     return result

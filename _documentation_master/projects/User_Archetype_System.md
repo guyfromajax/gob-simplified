@@ -11,6 +11,14 @@ Tracking plumbing **built & verified end-to-end on gob-staging** (Sim Full Game;
 | Per-period stash | `archetype_tracking.py` → `/api/simulate-quarter` | ✅ + tests |
 | Commit (W/L + archetypes) | `user_game_commit.py` → `finalize_game` | ✅ + tests |
 | Surface on `/api/auth/me` | `BackEnd/api/auth_routes.py` | ✅ |
+| `lead_archetype` + `archetype_reveal_seen` (schema/commit/me/PATCH/leaderboard APIs/backfill) | `user_tracking.compute_lead_archetype`, `user_game_commit.py`, `auth_routes.py`, `leaderboard_routes.py` | ✅ + tests |
+| Shared badge component | `js/shared/archetypeBadge.js` (`createBadge`/`badgeHtml`/`leadFrom`) | ✅ |
+| Badge beside username | account modal (`authBarInit.js`) + leaderboards (`mode-select.js`: geek/rank/by-team) | ✅ |
+| Explainer page | `coaching-archetypes.html` (manifest-driven; 4 sections by `group`) | ✅ |
+| First-archetype reveal (Moment modal) | `js/shared/archetypeReveal.js` on FCC | ✅ |
+| Manifest fields added | `archetypes.json`: `sections`, `group`, `description:"TBD"`, `reveal_name` | ✅ |
+
+**UI decisions:** account page deferred (none exists) → explainer link lives in the Account Settings modal; reveal fires on Franchise Command Center; existing coaches backfilled `archetype_reveal_seen=true` (no retroactive popup). Badge reads `lead_archetype` with client fallback to highest archetype count.
 
 Rules locked in: every period counts (Q1–Q4 + OT, simmed or played); deduped on `(game_id, quarter)` so refreshes/timeouts/foul-outs don't recount; committed once at game completion (abandoned games count 0); `win_rate = round(100*wins/total_games)`.
 

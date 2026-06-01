@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Coaching Archetypes - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <style>
+    :root {
+      --bebas: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      --inter: 'Inter', sans-serif;
+    }
+    body {
+      font-family: var(--inter);
+      margin: 0;
+      padding: 96px 20px 80px;
+      color: #fff;
+      line-height: 1.55;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #243049 0%, rgba(36,48,73,0) 60%),
+        #0d1018;
+      min-height: 100vh;
+    }
+    .ca-container { max-width: 1040px; margin: 0 auto; }
+    .ca-back {
+      display: inline-block; margin-bottom: 18px;
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5);
+      text-decoration: none;
+    }
+    .ca-back:hover { color: #fff; }
+    .ca-title {
+      font-family: var(--bebas); font-weight: 700; font-size: 44px;
+      letter-spacing: 0.04em; margin: 0 0 6px;
+    }
+    .ca-intro { margin: 0 0 30px; color: rgba(255,255,255,0.55); font-size: 15px; max-width: 640px; }
+    .ca-section { margin-bottom: 38px; }
+    .ca-section-label {
+      font-family: var(--bebas); font-weight: 700; font-size: 24px;
+      letter-spacing: 0.04em; color: rgba(255,255,255,0.85);
+      margin: 0 0 14px; padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .ca-grid {
+      display: grid; gap: 14px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 860px) { .ca-grid { grid-template-columns: 1fr; } }
+    .ca-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      grid-template-rows: auto auto;
+      column-gap: 14px; row-gap: 10px;
+      align-items: center;
+    }
+    .ca-card.is-lead {
+      border-color: rgba(247,148,32,0.6);
+      box-shadow: 0 0 0 1px rgba(247,148,32,0.35), 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .ca-card-badge {
+      grid-row: 1; grid-column: 1;
+      width: 64px; height: 64px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .ca-card-name {
+      grid-row: 1; grid-column: 2;
+      font-family: var(--bebas); font-weight: 700; font-size: 22px;
+      letter-spacing: 0.03em; color: #fff; align-self: center;
+    }
+    .ca-card-desc {
+      grid-row: 2; grid-column: 1 / -1;
+      font-size: 13.5px; color: rgba(255,255,255,0.6);
+      min-height: 2.2em;
+    }
+    .ca-empty { color: rgba(255,255,255,0.5); }
+  </style>
+</head>
+<body class="has-auth-bar has-footer">
+  <div id="auth-bar" class="auth-bar"></div>
+
+  <div class="ca-container">
+    <a href="/franchise-command-center.html" class="ca-back">&larr; Back</a>
+    <h1 class="ca-title">Coaching Archetypes</h1>
+    <p class="ca-intro">Your coaching archetype reflects the kind of lineups you put on the floor. Win games your way and your handle evolves over time. Here's the full set.</p>
+    <div id="ca-sections"><div class="ca-empty">Loading archetypes…</div></div>
+  </div>
+
+  <footer id="site-footer" class="site-footer">
+    <a href="/faqs.html">FAQs</a>
+  </footer>
+
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script>
+    (function () {
+      var bar = document.getElementById('auth-bar');
+      if (bar && !bar.querySelector('.auth-bar-left')) {
+        bar.innerHTML = '<div class="auth-bar-left"><a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a></div><img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha"><div class="auth-bar-right"><a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube"><img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24"></a><a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a></div>';
+      }
+    })();
+
+    function leadKeyForViewer() {
+      try {
+        var me = window.__gobAuthMeData;
+        if (me && window.GOBArchetype) return window.GOBArchetype.leadFrom(me);
+      } catch (e) {}
+      return '';
+    }
+
+    function renderArchetypes(manifest) {
+      var host = document.getElementById('ca-sections');
+      if (!manifest || !Array.isArray(manifest.archetypes)) {
+        host.innerHTML = '<div class="ca-empty">Archetypes unavailable.</div>';
+        return;
+      }
+      var sections = Array.isArray(manifest.sections) && manifest.sections.length
+        ? manifest.sections
+        : [{ group: 'offensive', label: 'Offense-First' }, { group: 'defensive', label: 'Defense-First' },
+           { group: 'balanced', label: 'Balanced' }, { group: 'specialist', label: 'Specialist' }];
+      var leadKey = leadKeyForViewer();
+      host.innerHTML = '';
+      sections.forEach(function (section) {
+        var inGroup = manifest.archetypes.filter(function (a) { return a.group === section.group; });
+        if (!inGroup.length) return;
+        var sec = document.createElement('section');
+        sec.className = 'ca-section';
+        var h = document.createElement('h2');
+        h.className = 'ca-section-label';
+        h.textContent = section.label;
+        sec.appendChild(h);
+        var grid = document.createElement('div');
+        grid.className = 'ca-grid';
+        inGroup.forEach(function (a) {
+          var card = document.createElement('div');
+          card.className = 'ca-card' + (a.id === leadKey ? ' is-lead' : '');
+          var badgeWrap = document.createElement('div');
+          badgeWrap.className = 'ca-card-badge';
+          var badge = window.GOBArchetype && window.GOBArchetype.createBadge(a.id, 64);
+          if (badge) badgeWrap.appendChild(badge);
+          var name = document.createElement('div');
+          name.className = 'ca-card-name';
+          name.textContent = a.name;
+          var desc = document.createElement('div');
+          desc.className = 'ca-card-desc';
+          desc.textContent = a.description || 'TBD';
+          card.appendChild(badgeWrap);
+          card.appendChild(name);
+          card.appendChild(desc);
+          grid.appendChild(card);
+        });
+        sec.appendChild(grid);
+        host.appendChild(sec);
+      });
+    }
+
+    function start() {
+      window.GOBArchetype.ensureManifest().then(function (m) {
+        renderArchetypes(m || window.__gobArchetypeManifest);
+      });
+    }
+    // Re-render once the viewer's data lands so the lead-archetype ring can apply.
+    window.addEventListener('gob:auth-me-loaded', start);
+    start();
+  </script>
+</body>
+</html>

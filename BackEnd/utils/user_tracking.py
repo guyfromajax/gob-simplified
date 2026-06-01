@@ -61,11 +61,38 @@ def default_archetypes() -> dict:
 
 
 def default_user_tracking() -> dict:
-    """The full tracking block to merge onto a user doc (signup + backfill)."""
+    """The full tracking block to merge onto a user doc (signup + backfill).
+
+    `lead_archetype` is the denormalized "highest count" key the UI reads to pick
+    the coach's badge ("" until they have games). `archetype_reveal_seen` gates the
+    one-time first-archetype reveal modal (false → eligible to see it).
+    """
     return {
         "record": default_record(),
         "archetypes": default_archetypes(),
+        "lead_archetype": "",
+        "archetype_reveal_seen": False,
     }
+
+
+def compute_lead_archetype(archetypes: dict, recent_keys: list | None = None) -> str:
+    """The archetype key with the highest count (ignoring `total`).
+
+    Returns "" when every count is 0. Ties are broken by *most recently
+    incremented*: pass `recent_keys` (this game's archetypes in chronological
+    order) and the latest tied key wins; otherwise the canonical-order first wins.
+    """
+    counts = {k: int(archetypes.get(k, 0) or 0) for k in ARCHETYPE_KEYS}
+    max_count = max(counts.values()) if counts else 0
+    if max_count <= 0:
+        return ""
+    maxed = [k for k in ARCHETYPE_KEYS if counts[k] == max_count]
+    if len(maxed) == 1:
+        return maxed[0]
+    for key in reversed(recent_keys or []):
+        if key in maxed:
+            return key
+    return maxed[0]
 
 
 def recompute_record_derived(record: dict) -> dict:

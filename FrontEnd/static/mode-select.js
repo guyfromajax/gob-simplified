@@ -246,7 +246,7 @@ function renderGeekPointsLeaderboard(leaderboardData, currentUsername) {
     return `
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
         <div class="community-rank">${entry.rank}.</div>
-        <div class="community-username">${entry.username}</div>
+        <div class="community-username">${entry.username}${coachArchetypeBadge(entry, 22)}</div>
         <div class="community-score">${displayPoints}</div>
       </div>
     `;
@@ -255,11 +255,22 @@ function renderGeekPointsLeaderboard(leaderboardData, currentUsername) {
     <div class="community-leaderboard-separator"></div>
     <div class="community-leaderboard-row is-current-user">
       <div class="community-rank">${currentPinnedEntry.rank}.</div>
-      <div class="community-username">${currentPinnedEntry.username}</div>
+      <div class="community-username">${currentPinnedEntry.username}${coachArchetypeBadge(currentPinnedEntry, 22)}</div>
       <div class="community-score">${displayCommunityLeaderboardPoints(currentPinnedEntry.geek_points)}</div>
     </div>
   ` : '';
   leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
+}
+
+// Coaching-archetype badge markup for a leaderboard entry (reads entry.lead_archetype).
+function coachArchetypeBadge(entry, size) {
+  try {
+    if (!window.GOBArchetype) return '';
+    var lead = window.GOBArchetype.leadFrom(entry);
+    if (!lead) return '';
+    return '<span class="lb-archetype-badge" style="display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px;">'
+      + window.GOBArchetype.badgeHtml(lead, size || 22) + '</span>';
+  } catch (e) { return ''; }
 }
 
 function renderRankLeaderboard(leaderboardData, currentUsername) {
@@ -275,7 +286,7 @@ function renderRankLeaderboard(leaderboardData, currentUsername) {
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
         <div class="community-rank">${entry.rank}.</div>
         <div class="community-username">
-          <span class="community-username-fragment">${escapeHtmlMs(entry.username)}</span>
+          <span class="community-username-fragment">${escapeHtmlMs(entry.username)}</span>${coachArchetypeBadge(entry, 22)}
           <span class="community-username-fragment"> (</span><span class="community-team-name" style="color: ${escapeHtmlMs(teamColor)};">${escapeHtmlMs(entry.team_name)}</span><span class="community-username-fragment">):</span>
         </div>
         <div class="community-score">${displayRank}</div>
@@ -559,7 +570,7 @@ async function loadLeadersByTeam() {
             return (
               '<div class="lbt-leader-row">' +
               '<span class="lbt-leader-rank">' + (i + 1) + '.</span>' +
-              '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + '</span>' +
+              '<span class="lbt-leader-username">' + escapeHtmlLbt(entry.username) + coachArchetypeBadge(entry, 18) + '</span>' +
               '<span class="lbt-leader-points">' + value + '</span>' +
               '</div>'
             );

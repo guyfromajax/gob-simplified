@@ -61,6 +61,7 @@ def _load_user_tracking():
 user_tracking = _load_user_tracking()
 default_record = user_tracking.default_record
 default_archetypes = user_tracking.default_archetypes
+compute_lead_archetype = user_tracking.compute_lead_archetype
 
 
 DB_NAME_STAGING = "gob-staging"
@@ -105,40 +106,58 @@ def get_db_name(target: str) -> str:
 
 MISSING_RECORD = {"record": {"$exists": False}}
 MISSING_ARCHETYPES = {"archetypes": {"$exists": False}}
+MISSING_LEAD = {"lead_archetype": {"$exists": False}}
+MISSING_REVEAL = {"archetype_reveal_seen": {"$exists": False}}
 
 
 def print_pre_summary(users):
     total = users.count_documents({})
     missing_record = users.count_documents(MISSING_RECORD)
     missing_archetypes = users.count_documents(MISSING_ARCHETYPES)
+    missing_lead = users.count_documents(MISSING_LEAD)
+    missing_reveal = users.count_documents(MISSING_REVEAL)
     fully_tracked = users.count_documents(
-        {"record": {"$exists": True}, "archetypes": {"$exists": True}}
+        {"record": {"$exists": True}, "archetypes": {"$exists": True},
+         "lead_archetype": {"$exists": True}, "archetype_reveal_seen": {"$exists": True}}
     )
     print("Before:")
-    print(f"  Total users:               {total}")
-    print(f"  Already fully tracked:     {fully_tracked}")
-    print(f"  Missing `record`:          {missing_record}")
-    print(f"  Missing `archetypes`:      {missing_archetypes}")
-    return missing_record, missing_archetypes
+    print(f"  Total users:                 {total}")
+    print(f"  Already fully tracked:       {fully_tracked}")
+    print(f"  Missing `record`:            {missing_record}")
+    print(f"  Missing `archetypes`:        {missing_archetypes}")
+    print(f"  Missing `lead_archetype`:    {missing_lead}")
+    print(f"  Missing `archetype_reveal_seen`: {missing_reveal}")
+    return missing_record, missing_archetypes, missing_lead, missing_reveal
 
 
 def apply_backfill(users, dry_run: bool):
     if dry_run:
-        print("[DRY-RUN] Would $set default `record` on users missing it.")
-        print("[DRY-RUN] Would $set default `archetypes` on users missing it.")
+        print("[DRY-RUN] Would $set default `record` / `archetypes` on users missing them.")
+        print("[DRY-RUN] Would $set `archetype_reveal_seen=true` on users missing it (no retroactive reveal).")
+        print("[DRY-RUN] Would set `lead_archetype` (computed from each user's archetype counts) where missing.")
         return
     rec = users.update_many(MISSING_RECORD, {"$set": {"record": default_record()}})
     print(f"`record`     -> Matched: {rec.matched_count}  Modified: {rec.modified_count}")
     arc = users.update_many(MISSING_ARCHETYPES, {"$set": {"archetypes": default_archetypes()}})
     print(f"`archetypes` -> Matched: {arc.matched_count}  Modified: {arc.modified_count}")
+    # Existing coaches predate the reveal feature → mark seen so they get no retroactive popup.
+    rev = users.update_many(MISSING_REVEAL, {"$set": {"archetype_reveal_seen": True}})
+    print(f"`archetype_reveal_seen=true` -> Matched: {rev.matched_count}  Modified: {rev.modified_count}")
+    # lead_archetype is per-user (highest existing count) → compute individually.
+    lead_set = 0
+    for u in users.find(MISSING_LEAD, {"archetypes": 1}):
+        lead = compute_lead_archetype(u.get("archetypes") or {})
+        users.update_one({"_id": u["_id"]}, {"$set": {"lead_archetype": lead}})
+        lead_set += 1
+    print(f"`lead_archetype` -> set on {lead_set} user(s)")
 
 
 def print_post_summary(users):
-    missing_record = users.count_documents(MISSING_RECORD)
-    missing_archetypes = users.count_documents(MISSING_ARCHETYPES)
     print("After:")
-    print(f"  Missing `record`:          {missing_record}  (should be 0)")
-    print(f"  Missing `archetypes`:      {missing_archetypes}  (should be 0)")
+    print(f"  Missing `record`:                {users.count_documents(MISSING_RECORD)}  (should be 0)")
+    print(f"  Missing `archetypes`:            {users.count_documents(MISSING_ARCHETYPES)}  (should be 0)")
+    print(f"  Missing `lead_archetype`:        {users.count_documents(MISSING_LEAD)}  (should be 0)")
+    print(f"  Missing `archetype_reveal_seen`: {users.count_documents(MISSING_REVEAL)}  (should be 0)")
 
 
 def main():
@@ -163,11 +182,11 @@ def main():
     db = client[db_name]
     users = db["users"]
 
-    missing_record, missing_archetypes = print_pre_summary(users)
+    missing_record, missing_archetypes, missing_lead, missing_reveal = print_pre_summary(users)
     print()
 
-    if missing_record == 0 and missing_archetypes == 0:
-        print("Every user already has both tracking blocks. Nothing to do.")
+    if missing_record == 0 and missing_archetypes == 0 and missing_lead == 0 and missing_reveal == 0:
+        print("Every user already has all tracking fields. Nothing to do.")
         print()
         print("Done (dry-run)." if dry_run else "Done.")
         return

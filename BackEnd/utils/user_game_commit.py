@@ -23,7 +23,7 @@ from bson import ObjectId
 from pymongo import ReturnDocument
 
 from BackEnd.db import db, users_collection
-from BackEnd.utils.user_tracking import recompute_record_derived
+from BackEnd.utils.user_tracking import compute_lead_archetype, recompute_record_derived
 
 logger = logging.getLogger(__name__)
 
@@ -99,20 +99,27 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
         updated = users_collection.find_one_and_update(
             {"_id": user_oid},
             {"$inc": inc},
-            projection={"record": 1},
+            projection={"record": 1, "archetypes": 1},
             return_document=ReturnDocument.AFTER,
         )
         if not updated:
             logger.warning("[record] user %s not found; record not committed", user_oid)
             return
 
-        # Recompute derived fields from the post-increment counts so they can't drift.
+        # Recompute derived fields from the post-increment counts so they can't drift,
+        # and refresh the denormalized lead_archetype (tie-break: most recently
+        # incremented this game — periods in chronological quarter order).
         rec = recompute_record_derived(updated.get("record", {}))
+        # period keys are quarter strings ("1".."5"); order chronologically, but
+        # tolerate any stray non-digit key without raising.
+        recent_keys = [periods[q] for q in sorted(periods, key=lambda k: (0, int(k)) if str(k).isdigit() else (1, str(k)))]
+        lead = compute_lead_archetype(updated.get("archetypes", {}), recent_keys=recent_keys)
         users_collection.update_one(
             {"_id": user_oid},
             {"$set": {
                 "record.total_games": rec["total_games"],
                 "record.win_rate": rec["win_rate"],
+                "lead_archetype": lead,
                 "updated_at": datetime.now(timezone.utc),
             }},
         )

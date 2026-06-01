@@ -109,7 +109,10 @@
       '      <div class="account-identity">',
       '        <div id="account-avatar" class="account-avatar" aria-hidden="true"></div>',
       '        <div class="account-identity-text">',
-      '          <div id="account-settings-username" class="account-username">-</div>',
+      '          <div class="account-username-row">',
+      '            <span id="account-settings-username" class="account-username">-</span>',
+      '            <span id="account-settings-badge" class="account-username-badge"></span>',
+      '          </div>',
       '          <div class="account-tier">Alpha coach</div>',
       '        </div>',
       '        <span class="account-locked">',
@@ -127,6 +130,10 @@
       '      <button type="button" id="account-ambience-switch" class="account-switch" role="switch" aria-checked="true" aria-label="Scouting ambience">',
       '        <span class="account-switch-knob" aria-hidden="true"></span>',
       '      </button>',
+      '    </div>',
+      // Working link to the coaching-archetypes explainer.
+      '    <div class="account-field account-manage-row">',
+      '      <a href="/coaching-archetypes.html" class="account-manage-link">Coaching Archetypes<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
       '    </div>',
       // Forward link to the (not-yet-built) full account page — dead for now.
       '    <div class="account-field account-manage-row">',
@@ -483,6 +490,8 @@
       avatar.textContent = displayName.charAt(0).toUpperCase();
     }
 
+    renderAccountArchetypeBadge(meData);
+
     loadMusicController()
       .then(function (mc) {
         syncAmbienceSwitchFromController(switchEl, mc);
@@ -490,6 +499,35 @@
       .catch(function (err) {
         console.warn('[account-settings] music controller import failed', err);
       });
+  }
+
+  // Load the shared archetype-badge module on demand (auth bar runs on many pages).
+  function ensureArchetypeBadgeScript() {
+    if (window.GOBArchetype) return Promise.resolve();
+    if (window.__gobArchetypeBadgeLoading) return window.__gobArchetypeBadgeLoading;
+    window.__gobArchetypeBadgeLoading = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = '/js/shared/archetypeBadge.js';
+      s.onload = function () { resolve(); };
+      s.onerror = function () { resolve(); };
+      document.head.appendChild(s);
+    });
+    return window.__gobArchetypeBadgeLoading;
+  }
+
+  // Coaching-archetype badge beside the username (reads lead_archetype, with
+  // the shared fallback to derive from archetype counts on older docs).
+  function renderAccountArchetypeBadge(meData) {
+    var badgeEl = document.getElementById('account-settings-badge');
+    if (!badgeEl) return;
+    badgeEl.innerHTML = '';
+    ensureArchetypeBadgeScript().then(function () {
+      if (!window.GOBArchetype) return;
+      var lead = window.GOBArchetype.leadFrom(meData);
+      if (!lead) return;
+      var badge = window.GOBArchetype.createBadge(lead, 22);
+      if (badge) { badgeEl.innerHTML = ''; badgeEl.appendChild(badge); }
+    });
   }
 
   function closeAccountSettingsModal() {

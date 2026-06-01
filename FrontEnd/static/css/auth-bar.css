@@ -547,7 +547,9 @@ body.has-auth-bar {
   border-top: none;
 }
 
-.account-manage-row {
+/* Only the final row drops its bottom padding (the body's 22px handles the gap);
+   stacked manage links keep their 16px breathing room between each other. */
+.account-modal-body .account-field:last-child {
   padding-bottom: 0;
 }
 
@@ -591,11 +593,26 @@ body.has-auth-bar {
   min-width: 0;
 }
 
+.account-username-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .account-username {
   font-family: 'Inter', sans-serif;
   font-size: 17px;
   font-weight: 600;
   color: #ffffff;
+}
+
+.account-username-badge {
+  display: inline-flex;
+  align-items: center;
+}
+
+.account-username-badge:empty {
+  display: none;
 }
 
 .account-tier {

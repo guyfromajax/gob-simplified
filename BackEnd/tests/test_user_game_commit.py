@@ -115,6 +115,19 @@ class TestCommitUserGameRecord(unittest.TestCase):
         self.assertEqual(a["od_balance"], 1)
         self.assertEqual(a["total"], 4)
 
+    def test_lead_archetype_set_to_highest_count(self):
+        periods = {"1": "pure_offense", "2": "pure_offense", "3": "the_intimidator", "4": "od_balance"}
+        self._commit(_game(side="home", periods=periods))
+        u = self.users.find_one({"_id": self.user_oid})
+        self.assertEqual(u["lead_archetype"], "pure_offense")  # count 2 > others
+
+    def test_lead_archetype_tiebreak_most_recent(self):
+        # All four distinct → all count 1 → tie; latest quarter (Q4) wins.
+        periods = {"1": "pure_offense", "2": "pure_defense", "3": "rebounding_king", "4": "the_intimidator"}
+        self._commit(_game(side="home", periods=periods))
+        u = self.users.find_one({"_id": self.user_oid})
+        self.assertEqual(u["lead_archetype"], "the_intimidator")
+
     def test_discount_fields_untouched(self):
         self._commit(_game(side="home"))
         rec = self._record()
