@@ -1780,6 +1780,12 @@ def finalize_game(
         print(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
         logger.info(f"✅ [FINALIZE_GAME] Found game: game_id={game.get('_id')}, week={game.get('week')}, quarter={quarter}, is_final={is_final}, home={home_team_name}, away={away_team_name}")
 
+        # Commit this game to the franchise owner's account record (W/L) and fold
+        # in the per-period archetype stash. Safe here: the applied_games claim
+        # above already guarantees once-per-game. Best-effort; never raises.
+        from BackEnd.utils.user_game_commit import commit_user_game_record
+        commit_user_game_record(game, franchise_id, home_team_name, away_team_name)
+
         players = game.get("players", [])
         
         # ✅ UNIFIED STRUCTURE: Build box_score from unified teams object

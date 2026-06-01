@@ -49,6 +49,7 @@ from BackEnd.utils.otp_validator import (
     consume_otp
 )
 from BackEnd.utils.email_sender import send_password_reset_email
+from BackEnd.utils.user_tracking import default_user_tracking
 from BackEnd.utils.alpha_access_email import send_alpha_welcome_email, send_alpha_waitlist_email
 from BackEnd.utils.alpha_otp_service import (
     claim_otp_for_email,
@@ -146,6 +147,8 @@ class UserResponse(BaseModel):
     fte_v2_complete: Optional[bool] = None  # FTE v2 — True once debut publish succeeds
     tutorial_state: Optional[TutorialState] = None
     account_settings: Optional[dict] = None
+    record: Optional[dict] = None  # Career record (wins/losses/total_games/win_rate/discount_*)
+    archetypes: Optional[dict] = None  # 18 coaching-archetype counters + total
 
 
 class AuthConfigResponse(BaseModel):
@@ -470,6 +473,10 @@ async def signup(request: Request, body: SignupRequest):
             "started_at": now,
             "completed_at": None,
         },
+        # Career tracking blocks (record + 18 archetypes). Same shape the
+        # backfill applies to existing users — single source of truth in
+        # BackEnd/utils/user_tracking.py.
+        **default_user_tracking(),
         "created_at": now,
         "updated_at": now,
         "version": 1  # Schema version for future migrations
@@ -742,6 +749,11 @@ async def get_me(user: dict = Depends(get_current_user)):
             completed_at=_iso(raw_tutorial_state.get("completed_at")),
         )
     account_settings = (db_user.get("account_settings") if db_user else None) or {"display_color": "default"}
+    # Career tracking (read-only here). Fall back to canonical zeroed defaults so
+    # the response is always well-shaped, even for a user not yet backfilled.
+    tracking_defaults = default_user_tracking()
+    record = (db_user.get("record") if db_user else None) or tracking_defaults["record"]
+    archetypes = (db_user.get("archetypes") if db_user else None) or tracking_defaults["archetypes"]
 
     return UserResponse(
         user_id=user["user_id"],
@@ -752,7 +764,9 @@ async def get_me(user: dict = Depends(get_current_user)):
         fte=fte,
         fte_v2_complete=fte_v2_complete,
         tutorial_state=tutorial_state,
-        account_settings=account_settings
+        account_settings=account_settings,
+        record=record,
+        archetypes=archetypes
     )
 
 

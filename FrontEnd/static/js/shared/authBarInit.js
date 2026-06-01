@@ -534,8 +534,7 @@
       '  </svg>',
       '</span>',
       '<div class="account-toast-copy">',
-      '  <div class="account-toast-title">Saved</div>',
-      '  <div id="account-toast-subline" class="account-toast-subline"></div>',
+      '  <div id="account-toast-message" class="account-toast-message"></div>',
       '</div>'
     ].join('');
     document.body.appendChild(toast);
@@ -545,9 +544,9 @@
   // One toast at a time — a rapid second flip reuses it and resets the 3s timer.
   function showAccountToast(enabled) {
     var toast = ensureAccountToast();
-    var subline = document.getElementById('account-toast-subline');
-    if (subline) {
-      subline.textContent = enabled ? 'Scouting ambience on.' : 'Scouting ambience off.';
+    var message = document.getElementById('account-toast-message');
+    if (message) {
+      message.textContent = enabled ? 'Scouting ambience on.' : 'Scouting ambience off.';
     }
     if (accountToastTimer) {
       clearTimeout(accountToastTimer);

@@ -748,23 +748,16 @@ body.has-auth-bar {
 
 .account-toast-copy {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  min-height: 20px;
 }
 
-.account-toast-title {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  text-transform: uppercase;
-  color: #ffffff;
-}
-
-.account-toast-subline {
-  margin-top: 4px;
+.account-toast-message {
   font-family: 'Inter', sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
-  color: rgba(255, 255, 255, 0.54);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 /* Site footer – same screens as auth bar; in document flow so visible when user scrolls to bottom */

@@ -3964,7 +3964,16 @@ try:
                 logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
             
             games_collection.update_one({"_id": game_id_oid}, {"$set": db_summary}, upsert=True)
-            
+
+            # Stash the user's coaching archetype for this period (franchise only).
+            # Best-effort, idempotent per (game_id, quarter); folded into the user
+            # record at finalize_game (User Account System, Phase 4). Never raises.
+            from BackEnd.utils.archetype_tracking import stash_period_archetype
+            stash_period_archetype(
+                gm=gm, body=body, mode=mode, game_id=game_id_oid,
+                games_collection=games_collection,
+            )
+
             # ✅ PHASE 3.3: Refresh cache after DB write to ensure cache matches DB
             if game_id in ongoing_games:
                 saved_doc_full = games_collection.find_one({"_id": game_id_oid})
