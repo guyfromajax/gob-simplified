@@ -3971,14 +3971,16 @@ try:
             # throws, the exception is captured INTO the breadcrumb (error/trace)
             # so we can read the real cause from the game doc.
             _hook = {
-                "hook_build": "hook-b3-2026-06-01",
+                "hook_build": "hook-b5-2026-06-01",
                 "mode": mode,
                 "full_sim": getattr(body, "full_sim", None),
             }
             try:
                 from BackEnd.utils.archetype_tracking import stash_period_archetype, STASH_BUILD
                 _hook["helper_build"] = STASH_BUILD
-                stash_period_archetype(
+                # Capture the helper's outcome via the hook channel (which survives),
+                # in case the helper's own game-doc write is being clobbered.
+                _hook["dbg"] = stash_period_archetype(
                     gm=gm, body=body, mode=mode, game_id=game_id_oid,
                     games_collection=games_collection,
                 )

@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Bump on every deploy of this file so a game-doc breadcrumb proves the running
 # code is current (not stale). Read it from `game.archetype_debug.<q>.build`.
-STASH_BUILD = "arch-b3-2026-06-01"
+STASH_BUILD = "arch-b5-2026-06-01"
 
 
 def _to_object_id(game_id):
@@ -58,24 +58,31 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
     try:
         if mode != "franchise":
             dbg["skip"] = "not_franchise"
-            return
+            return dbg
         if not getattr(body, "franchise_id", None) or not game_id:
             dbg["skip"] = "no_franchise_id_or_game_id"
-            return
+            return dbg
         if not isinstance(quarter, int) or quarter < 1:
             dbg["skip"] = f"bad_quarter:{quarter!r}"
-            return
+            return dbg
 
-        # The user's side is authoritative from game_state; fall back to the request.
+        # The user's side: in-memory game_state, then the request, then the
+        # just-saved game doc (summarize_game_state persists user_team_side there,
+        # and the stash runs right after that save — this covers Sim Full Game,
+        # where gm.game_state may not carry user_team_side in the loop).
         gs_side = gm.game_state.get("user_team_side") if (gm is not None and getattr(gm, "game_state", None)) else None
         body_side = getattr(body, "user_team_side", None)
         side = gs_side or body_side
+        if side not in ("home", "away"):
+            doc_side = (games_collection.find_one({"_id": gid}, {"user_team_side": 1}) or {}).get("user_team_side")
+            dbg["doc_side"] = doc_side
+            side = side or doc_side
         dbg["gs_side"] = gs_side
         dbg["body_side"] = body_side
         dbg["side"] = side
         if side not in ("home", "away"):
             dbg["skip"] = "no_user_side"
-            return
+            return dbg
 
         period_key = str(quarter)
 
@@ -85,7 +92,7 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
             {"_id": 1},
         ):
             dbg["skip"] = "already_stashed"
-            return
+            return dbg
 
         team = gm.home_team if side == "home" else gm.away_team
 
@@ -114,7 +121,7 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
 
         if len(starters) != 5:
             dbg["skip"] = "lineup_unresolved"
-            return
+            return dbg
 
         archetype = classify_archetype(starters)
 
@@ -137,3 +144,4 @@ def stash_period_archetype(*, gm, body, mode, game_id, games_collection) -> None
                 )
         except Exception:
             logger.exception("[archetype] breadcrumb write failed")
+    return dbg
