@@ -184,7 +184,7 @@ DEFENSE-FIRST
 10. Cerebral Defense: Scouts your offense so thoroughly his team knows your next move before you make it.
 
 BALANCED
-11. O/D Balance: Focuses on the two most simple things that decide every game — score points, and stop your opponent.
+11. O/D Balance: Focuses on the two most simple things that decide every game — score points and stop your opponent.
 
 SPECIALIST
 12. The Intimidator: Sends his biggest, meanest, most relentless lineup out to make you flinch before tip-off.

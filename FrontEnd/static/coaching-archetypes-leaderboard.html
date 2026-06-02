@@ -22,7 +22,15 @@
       color: rgba(255,255,255,0.5); text-decoration: none;
     }
     .alb-back:hover { color: #fff; }
-    .alb-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0 0 22px; }
+    .alb-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .alb-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0; }
+    .alb-ca-link {
+      display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+      font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); text-decoration: none;
+    }
+    .alb-ca-link:hover { color: #fff; }
+    .alb-ca-link .arrow { transition: transform 0.14s ease; }
+    .alb-ca-link:hover .arrow { transform: translateX(2px); }
     .alb-intro { margin: 0 0 26px; color: rgba(255,255,255,0.55); font-size: 14px; }
 
     .alb-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
@@ -57,7 +65,10 @@
 
   <div class="alb">
     <a href="/mode-select.html" class="alb-back" id="alb-back">&larr; Back</a>
-    <h1 class="alb-title">Coaching Archetypes</h1>
+    <div class="alb-header-row">
+      <h1 class="alb-title">Coaching Archetypes</h1>
+      <a href="/coaching-archetypes.html" class="alb-ca-link">See Coaching Archetypes<span class="arrow" aria-hidden="true">&rarr;</span></a>
+    </div>
     <div id="alb-grid" class="alb-grid"><div class="alb-empty">Loading…</div></div>
   </div>
 
