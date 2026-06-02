@@ -93,7 +93,7 @@ def send_feedback_email(*, message: str, category: str, reporter_email: str, con
 _ALPHA_RATING_LABELS = {
     "live_gameplay": "Live Gameplay",
     "between_games": "The Experience Between Games",
-    "recruiting": "Recruiting",
+    "training": "Training",
     "franchise_mode": "Franchise Mode",
     "high_school_setting": "High School Setting",
     "onboarding": "Onboarding Experience",

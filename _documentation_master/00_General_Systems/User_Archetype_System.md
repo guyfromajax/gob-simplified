@@ -5,7 +5,7 @@ Tracking plumbing **built & verified end-to-end on gob-staging** (Sim Full Game;
 | Piece | Where | Status |
 |---|---|---|
 | Schema (single source) | `BackEnd/utils/user_tracking.py` | ✅ |
-| Backfill | `scripts/add_user_tracking_fields.py` | ✅ staging · ⏳ prod deferred |
+| Backfill | `scripts/add_user_tracking_fields.py` | ✅ staging · ✅ prod (gob, 52 users) |
 | Signup defaults | `BackEnd/api/auth_routes.py` | ✅ |
 | Classifier | `BackEnd/utils/coaching_archetype.py` | ✅ + tests |
 | Per-period stash | `archetype_tracking.py` → `/api/simulate-quarter` | ✅ + tests |
@@ -16,7 +16,7 @@ Tracking plumbing **built & verified end-to-end on gob-staging** (Sim Full Game;
 | Badge beside username | account modal (`authBarInit.js`) + leaderboards (`mode-select.js`: geek/rank/by-team) | ✅ |
 | Explainer page | `coaching-archetypes.html` (manifest-driven; 4 sections by `group`) | ✅ |
 | First-archetype reveal (Moment modal) | `js/shared/archetypeReveal.js` on FCC | ✅ |
-| Manifest fields added | `archetypes.json`: `sections`, `group`, `description:"TBD"`, `reveal_name` | ✅ |
+| Manifest fields added | `archetypes.json`: `sections`, `group`, `description` (all 18 written), `reveal_name` | ✅ |
 
 **UI decisions:** account page deferred (none exists) → explainer link lives in the Account Settings modal; reveal fires on Franchise Command Center. **Reveal shows once for EVERY coach (existing + new) after their first non-tutorial game** — backfill sets `archetype_reveal_seen=false`; the modal flips it to `true` when shown. (Existing coaches who already have games see it on their next FCC visit.) Badge reads `lead_archetype` with client fallback to highest archetype count.
 
@@ -24,7 +24,9 @@ Rules locked in: every period counts (Q1–Q4 + OT, simmed or played); deduped o
 
 **Persistence note (load-bearing — don't remove without reading [`simulate_quarter_api_cleanup.md`](../projects/simulate_quarter_api_cleanup.md) §5):** the stash's own `$set` of `archetype_periods` does NOT survive to `finalize` in the franchise save flow. So persistence relies on (1) the **api.py call-site** writing `archetype_periods` from the returned `dbg.result`, and (2) a `finalize` **fallback** reading results from the durable `game.archetype_hook.<q>.dbg.result`. Root cause unexplained — open investigation.
 
-**Deferred (not bugs):** (1) **prod backfill** — run `--apply --db production --confirm-production-write` after code ships. `discount_wins` / `discount_losses` and Geek Points bulk-sim policy are wired: `game.bulk_sim_used` is durable for Sim Full Game / Sim Rest of Game; bulk-sim games increment the discount record fields and receive base Geek Points; non-bulk games receive 2x Geek Points. Still TODO: manual franchise playthrough on staging to confirm the live stash.
+**Shipped:** prod backfill ran (`--apply --db production --confirm-production-write`) — 52 gob users equipped; idempotent re-run confirms "Nothing to do." `discount_wins` / `discount_losses` and Geek Points bulk-sim policy are wired: `game.bulk_sim_used` is durable for Sim Full Game / Sim Rest of Game; bulk-sim games increment the discount record fields and receive base Geek Points; non-bulk games receive 2x Geek Points.
+
+**Still TODO:** manual franchise playthrough on staging to confirm the live stash end-to-end.
 
 ##Modal Display
 - username

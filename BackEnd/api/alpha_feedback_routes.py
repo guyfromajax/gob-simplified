@@ -27,7 +27,7 @@ _OPINION_SET = {"Awful", "OK, but needs work", "Great"}
 _RATING_ALLOWED: dict[str, set[str]] = {
     "live_gameplay": _OPINION_SET,
     "between_games": _OPINION_SET,
-    "recruiting": _OPINION_SET,
+    "training": _OPINION_SET,
     "franchise_mode": _OPINION_SET,
     "high_school_setting": _OPINION_SET,
     "onboarding": _OPINION_SET,
