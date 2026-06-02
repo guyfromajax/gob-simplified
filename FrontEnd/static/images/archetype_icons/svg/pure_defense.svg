@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2 L20 5.2 V11.6 C20 16.5 16.6 20.3 12 22 C7.4 20.3 4 16.5 4 11.6 V5.2 Z" fill="#4E8AEC"></path><path d="M12 4.5 L17.7 6.8 V11.6 C17.7 15.1 15.3 18 12 19.5 C8.7 18 6.3 15.1 6.3 11.6 V6.8 Z" fill="none" stroke="rgba(0,0,0,0.28)" stroke-width="1.1"></path><path d="M12 4.5 V19.5" stroke="rgba(0,0,0,0.28)" stroke-width="1.2"></path></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><defs>
+<linearGradient id="rim-pure_defense" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa3b4"></stop><stop offset="0.5" stop-color="#4d5564"></stop><stop offset="1" stop-color="#23272f"></stop></linearGradient>
+<radialGradient id="in-pure_defense" cx="0.5" cy="0.42" r="0.62"><stop offset="0" stop-color="#10141d"></stop><stop offset="1" stop-color="#070910"></stop></radialGradient>
+<linearGradient id="bl-pure_defense" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#244C92"></stop><stop offset="1" stop-color="#79ABF5"></stop></linearGradient>
+<linearGradient id="br-pure_defense" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#79ABF5"></stop><stop offset="1" stop-color="#244C92"></stop></linearGradient>
+<linearGradient id="top-pure_defense" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.5"></stop><stop offset="0.5" stop-color="#fff" stop-opacity="0"></stop></linearGradient></defs>
+<path d="M32 4 L56 12 V30 C56 44 46 55.5 32 61 C18 55.5 8 44 8 30 V12 Z" fill="url(#rim-pure_defense)"></path>
+<path d="M32 8.5 L51.5 15 V30 C51.5 42 43 51.5 32 56.5 C21 51.5 12.5 42 12.5 30 V15 Z" fill="url(#in-pure_defense)"></path>
+<path d="M32 13 L48 18 V30 C48 40 41 48 32 52 C32 52 32 13 32 13 Z" fill="url(#br-pure_defense)"></path>
+<path d="M32 13 L16 18 V30 C16 40 23 48 32 52 C32 52 32 13 32 13 Z" fill="url(#bl-pure_defense)"></path>
+<path d="M32 13 L48 18 V30 C48 40 41 48 32 52 C23 48 16 40 16 30 V18 Z" fill="url(#top-pure_defense)"></path>
+<path d="M32 13 V52" stroke="#CFE2FF" stroke-width="0.8" stroke-opacity="0.55"></path>
+<path d="M32 13 L48 18 V30 C48 40 41 48 32 52 C23 48 16 40 16 30 V18 Z" fill="none" stroke="#0a1426" stroke-width="1"></path>
+<path d="M32 8.5 L51.5 15 V30 C51.5 42 43 51.5 32 56.5 C21 51.5 12.5 42 12.5 30 V15 Z" fill="none" stroke="#000" stroke-opacity="0.4" stroke-width="1"></path></svg>

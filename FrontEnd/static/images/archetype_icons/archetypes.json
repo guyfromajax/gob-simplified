@@ -1,20 +1,345 @@
 {
   "system": "GOB Coaching Archetype Badges",
-  "version": 2,
+  "version": 3,
   "grid": 24,
   "recommendedSizes": {
     "inline": 22,
     "explainer": 64
   },
-  "treatment": "standalone single glyph, colored by strategic lean",
+  "treatment": "medallion system: hexagon (faces), shield (Pure Defense), standalone (action glyphs); color by group",
   "repoPath": "FrontEnd/static/images/archetype_icons",
   "leanColors": {
     "offense": "#F79420",
     "defense": "#4E8AEC",
-    "specialist": "#E0B249",
-    "wildcard": "#A876E6",
-    "balance": "#F79420 + #4E8AEC"
+    "specialist": "#A876E6",
+    "intimidator": "#E0B249",
+    "balance": "#4E8AEC shield + #F79420 swish"
   },
+  "note": "icon id === user.archetypes.<key> DB field. Lead archetype = user.lead_archetype (key with highest count; tie = most recently incremented; empty when no games). `group` + `sections` drive the explainer order/labels; `lean`/`color` describe the icon's color family; `treatment` is hexagon|shield|standalone. `qualifies`/`attributes` are internal — do NOT surface them in user-facing UI. Each archetype has a `description` (10–20 words; currently 'TBD').",
+  "archetypes": [
+    {
+      "id": "pure_offense",
+      "db_field": "pure_offense",
+      "name": "Pure Offense",
+      "file": "svg/pure_offense.svg",
+      "group": "offensive",
+      "lean": "offense",
+      "color": "#F79420",
+      "qualifies": "SC + SH",
+      "description": "TBD",
+      "attributes": [
+        "SC",
+        "SH"
+      ],
+      "reveal_name": "Pure Offense",
+      "treatment": "standalone"
+    },
+    {
+      "id": "offensive_athleticism",
+      "db_field": "offensive_athleticism",
+      "name": "Offensive Athleticism",
+      "file": "svg/offensive_athleticism.svg",
+      "group": "offensive",
+      "lean": "offense",
+      "color": "#F79420",
+      "qualifies": "(SC / SH) + (ST/AG/ND)",
+      "description": "TBD",
+      "attributes": [
+        "SC",
+        "SH",
+        "ST",
+        "AG",
+        "ND"
+      ],
+      "reveal_name": "Offensive Athleticism",
+      "treatment": "standalone"
+    },
+    {
+      "id": "offensive_rebounding",
+      "db_field": "offensive_rebounding",
+      "name": "Offensive Rebounding",
+      "file": "svg/offensive_rebounding.svg",
+      "group": "offensive",
+      "lean": "offense",
+      "color": "#F79420",
+      "qualifies": "(SC / SH) + RB",
+      "description": "TBD",
+      "attributes": [
+        "SC",
+        "SH",
+        "RB"
+      ],
+      "reveal_name": "Offensive Rebounding",
+      "treatment": "standalone"
+    },
+    {
+      "id": "offensive_fundamentals",
+      "db_field": "offensive_fundamentals",
+      "name": "Offensive Fundamentals",
+      "file": "svg/offensive_fundamentals.svg",
+      "group": "offensive",
+      "lean": "offense",
+      "color": "#F79420",
+      "qualifies": "(SC / SH) + (PS / BH)",
+      "description": "TBD",
+      "attributes": [
+        "SC",
+        "SH",
+        "PS",
+        "BH"
+      ],
+      "reveal_name": "Offensive Fundamentals",
+      "treatment": "hexagon"
+    },
+    {
+      "id": "cerebral_offense",
+      "db_field": "cerebral_offense",
+      "name": "Cerebral Offense",
+      "file": "svg/cerebral_offense.svg",
+      "group": "offensive",
+      "lean": "offense",
+      "color": "#F79420",
+      "qualifies": "(SC / SH) + IQ",
+      "description": "TBD",
+      "attributes": [
+        "SC",
+        "SH",
+        "IQ"
+      ],
+      "reveal_name": "Cerebral Offense",
+      "treatment": "standalone"
+    },
+    {
+      "id": "pure_defense",
+      "db_field": "pure_defense",
+      "name": "Pure Defense",
+      "file": "svg/pure_defense.svg",
+      "group": "defensive",
+      "lean": "defense",
+      "color": "#4E8AEC",
+      "qualifies": "ID + OD",
+      "description": "TBD",
+      "attributes": [
+        "ID",
+        "OD"
+      ],
+      "reveal_name": "Pure Defense",
+      "treatment": "shield"
+    },
+    {
+      "id": "defensive_athleticism",
+      "db_field": "defensive_athleticism",
+      "name": "Defensive Athleticism",
+      "file": "svg/defensive_athleticism.svg",
+      "group": "defensive",
+      "lean": "defense",
+      "color": "#4E8AEC",
+      "qualifies": "(ID / OD) + (AG / ND)",
+      "description": "TBD",
+      "attributes": [
+        "ID",
+        "OD",
+        "AG",
+        "ND"
+      ],
+      "reveal_name": "Defensive Athleticism",
+      "treatment": "standalone"
+    },
+    {
+      "id": "defensive_rebounding",
+      "db_field": "defensive_rebounding",
+      "name": "Defensive Rebounding",
+      "file": "svg/defensive_rebounding.svg",
+      "group": "defensive",
+      "lean": "defense",
+      "color": "#4E8AEC",
+      "qualifies": "(ID / OD) + RB",
+      "description": "TBD",
+      "attributes": [
+        "ID",
+        "OD",
+        "RB"
+      ],
+      "reveal_name": "Defensive Rebounding",
+      "treatment": "standalone"
+    },
+    {
+      "id": "defensive_fundamentals",
+      "db_field": "defensive_fundamentals",
+      "name": "Defensive Fundamentals",
+      "file": "svg/defensive_fundamentals.svg",
+      "group": "defensive",
+      "lean": "defense",
+      "color": "#4E8AEC",
+      "qualifies": "(ID / OD) + (PS / BH)",
+      "description": "TBD",
+      "attributes": [
+        "ID",
+        "OD",
+        "PS",
+        "BH"
+      ],
+      "reveal_name": "Defensive Fundamentals",
+      "treatment": "hexagon"
+    },
+    {
+      "id": "cerebral_defense",
+      "db_field": "cerebral_defense",
+      "name": "Cerebral Defense",
+      "file": "svg/cerebral_defense.svg",
+      "group": "defensive",
+      "lean": "defense",
+      "color": "#4E8AEC",
+      "qualifies": "(ID / OD) + IQ",
+      "description": "TBD",
+      "attributes": [
+        "ID",
+        "OD",
+        "IQ"
+      ],
+      "reveal_name": "Cerebral Defense",
+      "treatment": "standalone"
+    },
+    {
+      "id": "od_balance",
+      "db_field": "od_balance",
+      "name": "O / D Balance",
+      "file": "svg/od_balance.svg",
+      "group": "balanced",
+      "lean": "balance",
+      "color": "#F79420 + #4E8AEC",
+      "qualifies": "(SC/SH) + (ID/OD)",
+      "description": "TBD",
+      "attributes": [
+        "SC",
+        "SH",
+        "ID",
+        "OD"
+      ],
+      "reveal_name": "O / D Balance",
+      "treatment": "standalone"
+    },
+    {
+      "id": "the_intimidator",
+      "db_field": "the_intimidator",
+      "name": "The Intimidator",
+      "file": "svg/the_intimidator.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#E0B249",
+      "qualifies": "(ID / OD) + ST",
+      "description": "TBD",
+      "attributes": [
+        "ID",
+        "OD",
+        "ST"
+      ],
+      "reveal_name": "Intimidator",
+      "treatment": "hexagon"
+    },
+    {
+      "id": "outrun_the_competition",
+      "db_field": "outrun_the_competition",
+      "name": "Outrun the Competition",
+      "file": "svg/outrun_the_competition.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#A876E6",
+      "qualifies": "ND + AG",
+      "description": "TBD",
+      "attributes": [
+        "ND",
+        "AG"
+      ],
+      "reveal_name": "Outrun the Competition",
+      "treatment": "standalone"
+    },
+    {
+      "id": "pure_discipline",
+      "db_field": "pure_discipline",
+      "name": "Pure Discipline",
+      "file": "svg/pure_discipline.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#A876E6",
+      "qualifies": "(PS / BH) + IQ",
+      "description": "TBD",
+      "attributes": [
+        "PS",
+        "BH",
+        "IQ"
+      ],
+      "reveal_name": "Pure Discipline",
+      "treatment": "standalone"
+    },
+    {
+      "id": "pure_athleticism",
+      "db_field": "pure_athleticism",
+      "name": "Pure Athleticism",
+      "file": "svg/pure_athleticism.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#A876E6",
+      "qualifies": "2+ of ST / AG / ND",
+      "description": "TBD",
+      "attributes": [
+        "ST",
+        "AG",
+        "ND"
+      ],
+      "reveal_name": "Pure Athleticism",
+      "treatment": "standalone"
+    },
+    {
+      "id": "rebounding_king",
+      "db_field": "rebounding_king",
+      "name": "Rebounding King",
+      "file": "svg/rebounding_king.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#A876E6",
+      "qualifies": "RB + ST",
+      "description": "TBD",
+      "attributes": [
+        "RB",
+        "ST"
+      ],
+      "reveal_name": "Rebounding King",
+      "treatment": "standalone"
+    },
+    {
+      "id": "mr_fundamentals",
+      "db_field": "mr_fundamentals",
+      "name": "Mr. Fundamentals",
+      "file": "svg/mr_fundamentals.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#A876E6",
+      "qualifies": "2+ of PS / BH / RB",
+      "description": "TBD",
+      "attributes": [
+        "PS",
+        "BH",
+        "RB"
+      ],
+      "reveal_name": "Mr. Fundamentals",
+      "treatment": "hexagon"
+    },
+    {
+      "id": "mr_unconventional",
+      "db_field": "mr_unconventional",
+      "name": "Mr. Unconventional",
+      "file": "svg/mr_unconventional.svg",
+      "group": "specialist",
+      "lean": "specialist",
+      "color": "#A876E6",
+      "qualifies": "None of the above",
+      "description": "TBD",
+      "attributes": [],
+      "reveal_name": "Mr. Unconventional",
+      "treatment": "standalone"
+    }
+  ],
   "sections": [
     {
       "group": "offensive",
@@ -31,313 +356,6 @@
     {
       "group": "specialist",
       "label": "Specialist"
-    }
-  ],
-  "note": "icon id === the user's archetypes.<key> DB field. Lead archetype = key with the highest count among the 18 (ignore 'total'); render svg/<key>.svg.",
-  "archetypes": [
-    {
-      "id": "pure_offense",
-      "db_field": "pure_offense",
-      "name": "Pure Offense",
-      "file": "svg/pure_offense.svg",
-      "lean": "offense",
-      "color": "#F79420",
-      "qualifies": "SC + SH",
-      "attributes": [
-        "SC",
-        "SH"
-      ],
-      "group": "offensive",
-      "description": "TBD",
-      "reveal_name": "Pure Offense"
-    },
-    {
-      "id": "cerebral_offense",
-      "db_field": "cerebral_offense",
-      "name": "Cerebral Offense",
-      "file": "svg/cerebral_offense.svg",
-      "lean": "offense",
-      "color": "#F79420",
-      "qualifies": "(SC / SH) + IQ",
-      "attributes": [
-        "SC",
-        "SH",
-        "IQ"
-      ],
-      "group": "offensive",
-      "description": "TBD",
-      "reveal_name": "Cerebral Offense"
-    },
-    {
-      "id": "offensive_athleticism",
-      "db_field": "offensive_athleticism",
-      "name": "Offensive Athleticism",
-      "file": "svg/offensive_athleticism.svg",
-      "lean": "offense",
-      "color": "#F79420",
-      "qualifies": "(SC / SH) + (ST/AG/ND)",
-      "attributes": [
-        "SC",
-        "SH",
-        "ST",
-        "AG",
-        "ND"
-      ],
-      "group": "offensive",
-      "description": "TBD",
-      "reveal_name": "Offensive Athleticism"
-    },
-    {
-      "id": "offensive_fundamentals",
-      "db_field": "offensive_fundamentals",
-      "name": "Offensive Fundamentals",
-      "file": "svg/offensive_fundamentals.svg",
-      "lean": "offense",
-      "color": "#F79420",
-      "qualifies": "(SC / SH) + (PS / BH)",
-      "attributes": [
-        "SC",
-        "SH",
-        "PS",
-        "BH"
-      ],
-      "group": "offensive",
-      "description": "TBD",
-      "reveal_name": "Offensive Fundamentals"
-    },
-    {
-      "id": "offensive_rebounding",
-      "db_field": "offensive_rebounding",
-      "name": "Offensive Rebounding",
-      "file": "svg/offensive_rebounding.svg",
-      "lean": "offense",
-      "color": "#F79420",
-      "qualifies": "(SC / SH) + RB",
-      "attributes": [
-        "SC",
-        "SH",
-        "RB"
-      ],
-      "group": "offensive",
-      "description": "TBD",
-      "reveal_name": "Offensive Rebounding"
-    },
-    {
-      "id": "pure_defense",
-      "db_field": "pure_defense",
-      "name": "Pure Defense",
-      "file": "svg/pure_defense.svg",
-      "lean": "defense",
-      "color": "#4E8AEC",
-      "qualifies": "ID + OD",
-      "attributes": [
-        "ID",
-        "OD"
-      ],
-      "group": "defensive",
-      "description": "TBD",
-      "reveal_name": "Pure Defense"
-    },
-    {
-      "id": "the_intimidator",
-      "db_field": "the_intimidator",
-      "name": "The Intimidator",
-      "file": "svg/the_intimidator.svg",
-      "lean": "specialist",
-      "color": "#E0B249",
-      "qualifies": "(ID / OD) + ST",
-      "attributes": [
-        "ID",
-        "OD",
-        "ST"
-      ],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Intimidator"
-    },
-    {
-      "id": "cerebral_defense",
-      "db_field": "cerebral_defense",
-      "name": "Cerebral Defense",
-      "file": "svg/cerebral_defense.svg",
-      "lean": "defense",
-      "color": "#4E8AEC",
-      "qualifies": "(ID / OD) + IQ",
-      "attributes": [
-        "ID",
-        "OD",
-        "IQ"
-      ],
-      "group": "defensive",
-      "description": "TBD",
-      "reveal_name": "Cerebral Defense"
-    },
-    {
-      "id": "defensive_athleticism",
-      "db_field": "defensive_athleticism",
-      "name": "Defensive Athleticism",
-      "file": "svg/defensive_athleticism.svg",
-      "lean": "defense",
-      "color": "#4E8AEC",
-      "qualifies": "(ID / OD) + (AG / ND)",
-      "attributes": [
-        "ID",
-        "OD",
-        "AG",
-        "ND"
-      ],
-      "group": "defensive",
-      "description": "TBD",
-      "reveal_name": "Defensive Athleticism"
-    },
-    {
-      "id": "defensive_fundamentals",
-      "db_field": "defensive_fundamentals",
-      "name": "Defensive Fundamentals",
-      "file": "svg/defensive_fundamentals.svg",
-      "lean": "defense",
-      "color": "#4E8AEC",
-      "qualifies": "(ID / OD) + (PS / BH)",
-      "attributes": [
-        "ID",
-        "OD",
-        "PS",
-        "BH"
-      ],
-      "group": "defensive",
-      "description": "TBD",
-      "reveal_name": "Defensive Fundamentals"
-    },
-    {
-      "id": "defensive_rebounding",
-      "db_field": "defensive_rebounding",
-      "name": "Defensive Rebounding",
-      "file": "svg/defensive_rebounding.svg",
-      "lean": "defense",
-      "color": "#4E8AEC",
-      "qualifies": "(ID / OD) + RB",
-      "attributes": [
-        "ID",
-        "OD",
-        "RB"
-      ],
-      "group": "defensive",
-      "description": "TBD",
-      "reveal_name": "Defensive Rebounding"
-    },
-    {
-      "id": "rebounding_king",
-      "db_field": "rebounding_king",
-      "name": "Rebounding King",
-      "file": "svg/rebounding_king.svg",
-      "lean": "specialist",
-      "color": "#E0B249",
-      "qualifies": "RB + ST",
-      "attributes": [
-        "RB",
-        "ST"
-      ],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Rebounding King"
-    },
-    {
-      "id": "mr_fundamentals",
-      "db_field": "mr_fundamentals",
-      "name": "Mr. Fundamentals",
-      "file": "svg/mr_fundamentals.svg",
-      "lean": "wildcard",
-      "color": "#A876E6",
-      "qualifies": "2+ of PS / BH / RB",
-      "attributes": [
-        "PS",
-        "BH",
-        "RB"
-      ],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Mr. Fundamentals"
-    },
-    {
-      "id": "outrun_the_competition",
-      "db_field": "outrun_the_competition",
-      "name": "Outrun the Competition",
-      "file": "svg/outrun_the_competition.svg",
-      "lean": "specialist",
-      "color": "#E0B249",
-      "qualifies": "ND + AG",
-      "attributes": [
-        "ND",
-        "AG"
-      ],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Outrun the Competition"
-    },
-    {
-      "id": "pure_athleticism",
-      "db_field": "pure_athleticism",
-      "name": "Pure Athleticism",
-      "file": "svg/pure_athleticism.svg",
-      "lean": "specialist",
-      "color": "#E0B249",
-      "qualifies": "2+ of ST / AG / ND",
-      "attributes": [
-        "ST",
-        "AG",
-        "ND"
-      ],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Pure Athleticism"
-    },
-    {
-      "id": "pure_discipline",
-      "db_field": "pure_discipline",
-      "name": "Pure Discipline",
-      "file": "svg/pure_discipline.svg",
-      "lean": "specialist",
-      "color": "#E0B249",
-      "qualifies": "(PS / BH) + IQ",
-      "attributes": [
-        "PS",
-        "BH",
-        "IQ"
-      ],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Pure Discipline"
-    },
-    {
-      "id": "od_balance",
-      "db_field": "od_balance",
-      "name": "O / D Balance",
-      "file": "svg/od_balance.svg",
-      "lean": "balance",
-      "color": "#F79420 + #4E8AEC",
-      "qualifies": "(SC/SH) + (ID/OD)",
-      "attributes": [
-        "SC",
-        "SH",
-        "ID",
-        "OD"
-      ],
-      "group": "balanced",
-      "description": "TBD",
-      "reveal_name": "O / D Balance"
-    },
-    {
-      "id": "mr_unconventional",
-      "db_field": "mr_unconventional",
-      "name": "Mr. Unconventional",
-      "file": "svg/mr_unconventional.svg",
-      "lean": "wildcard",
-      "color": "#A876E6",
-      "qualifies": "None of the above",
-      "attributes": [],
-      "group": "specialist",
-      "description": "TBD",
-      "reveal_name": "Mr. Unconventional"
     }
   ]
 }
