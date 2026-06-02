@@ -91,7 +91,7 @@
       '  <button type="button" class="arch-reveal-close" data-dismiss aria-label="Close">&times;</button>',
       '  <div class="arch-reveal-badge" id="arch-reveal-badge"></div>',
       '  <h2 class="arch-reveal-headline"></h2>',
-      '  <p class="arch-reveal-body">Based on your coaching style, you\'re now known as the <strong></strong> coaching archetype. Note this archetype handle will evolve based on your coaching style. You can learn about all of the coaching archetypes via the button below, or through the link on your account page.</p>',
+      '  <p class="arch-reveal-body">Based on your coaching style, you\'re now known as the <strong></strong> coaching archetype. Note this archetype handle will evolve as you develop your program\'s identity.</p>',
       '  <div class="arch-reveal-actions">',
       '    <a class="arch-reveal-btn-primary" href="/coaching-archetypes.html">Explore Coaching Archetypes</a>',
       '    <button type="button" class="arch-reveal-btn-secondary" data-dismiss>Go to Locker Room</button>',
