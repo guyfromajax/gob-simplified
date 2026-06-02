@@ -52,8 +52,8 @@
     }
 
     /* Geek points */
-    .gp-total { font-family: var(--bebas); font-size: 46px; line-height: 1; color: #fff; }
-    .gp-total small { font-family: var(--inter); font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.42); margin-left: 8px; letter-spacing: 0.04em; }
+    .gp-total { font-family: var(--bebas); font-size: 52px; line-height: 1; color: var(--orange); }
+    .gp-card .card-label, .gp-card .gp-total { text-align: center; }
     .gp-team-row, .title-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06);
@@ -75,8 +75,8 @@
     .seg span.on { background: rgba(247,148,32,0.9); color: #15181f; }
 
     /* Archetype board */
-    .arch-board-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
-    @media (max-width: 760px) { .arch-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .arch-board-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 680px) { .arch-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 440px) { .arch-board-grid { grid-template-columns: 1fr; } }
     .arch-cell {
       display: flex; align-items: center; gap: 10px;
@@ -104,8 +104,6 @@
   <div id="auth-bar" class="auth-bar"></div>
 
   <div class="acct">
-    <h1 class="acct-title">Account</h1>
-
     <div class="card">
       <div class="acct-identity">
         <div id="acct-avatar" class="acct-avatar" aria-hidden="true"></div>
@@ -120,9 +118,9 @@
     </div>
 
     <div class="acct-grid">
-      <div class="card">
+      <div class="card gp-card">
         <p class="card-label">Geek Points</p>
-        <div class="gp-total"><span id="gp-total">0</span><small>TOTAL</small></div>
+        <div class="gp-total"><span id="gp-total">0</span></div>
         <div id="gp-by-team" style="margin-top:14px;"></div>
       </div>
       <div class="card">

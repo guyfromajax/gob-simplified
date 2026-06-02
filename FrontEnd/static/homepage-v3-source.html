@@ -303,6 +303,49 @@
       0%, 100% { box-shadow: 0 0 0 4px rgba(247,148,32,0.25), 0 0 20px rgba(247,148,32,0.45); }
       50% { box-shadow: 0 0 0 8px rgba(247,148,32,0.12), 0 0 28px rgba(247,148,32,0.55); }
     }
+    .gp-tooltip {
+      position: absolute;
+      left: 0;
+      top: 0;
+      z-index: 4;
+      max-width: min(280px, 42vw);
+      padding: 9px 12px 8px;
+      border: 1px solid rgba(247,148,32,0.55);
+      border-radius: 7px;
+      background: rgba(8,8,15,0.92);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.45), 0 0 20px rgba(247,148,32,0.18);
+      color: #fff;
+      font-family: var(--bebas);
+      font-size: clamp(1rem, 1.35vw, 1.42rem);
+      line-height: 1;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(16px, -50%);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      white-space: nowrap;
+    }
+    .gp-tooltip.is-visible {
+      opacity: 1;
+      transform: translate(18px, -50%);
+    }
+    .gp-tooltip.is-left {
+      transform: translate(calc(-100% - 16px), -50%);
+    }
+    .gp-tooltip.is-left.is-visible {
+      transform: translate(calc(-100% - 18px), -50%);
+    }
+    .gp-tooltip.is-low {
+      transform: translate(16px, calc(-100% - 12px));
+    }
+    .gp-tooltip.is-low.is-visible {
+      transform: translate(18px, calc(-100% - 14px));
+    }
+    .gp-tooltip.is-left.is-low {
+      transform: translate(calc(-100% - 16px), calc(-100% - 12px));
+    }
+    .gp-tooltip.is-left.is-low.is-visible {
+      transform: translate(calc(-100% - 18px), calc(-100% - 14px));
+    }
 
     .gp-caption {
       display: flex; align-items: center; gap: 16px;
@@ -322,7 +365,6 @@
     }
     .gp-caption-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .gp-caption-label { font-family: var(--bebas); font-size: 1.42rem; letter-spacing: 0.02em; line-height: 1.05; color: #fff; }
-    .gp-caption-hint { font-family: var(--inter); font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--w45); }
     .gp-caption-ticks { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
     .gp-caption-tick {
       width: 22px; height: 4px; border-radius: 2px;
@@ -771,12 +813,12 @@
           <span class="gp-pin" data-n="7" style="left:91%;top:64%;">7</span>
           <span class="gp-pin" data-n="8" style="left:67%;top:91%;">8</span>
           <span class="gp-pin" data-n="9" style="left:40%;top:83%;">9</span>
+          <span class="gp-tooltip" role="tooltip" aria-hidden="true"></span>
         </div>
         <div class="gp-caption" aria-live="polite">
           <span class="gp-caption-tag">1</span>
           <div class="gp-caption-body">
             <span class="gp-caption-label">Scoreboard</span>
-            <span class="gp-caption-hint">Hover the markers to explore the live game</span>
           </div>
           <div class="gp-caption-ticks"></div>
         </div>
@@ -1024,11 +1066,16 @@
       if (!frame) return;
 
       const pins = frame.querySelectorAll('.gp-pin');
+      const tooltip = frame.querySelector('.gp-tooltip');
       const captionTag = frame.querySelector('.gp-caption-tag');
       const captionLabel = frame.querySelector('.gp-caption-label');
-      const captionHint = frame.querySelector('.gp-caption-hint');
       const ticksContainer = frame.querySelector('.gp-caption-ticks');
-      let hasInteracted = false;
+
+      pins.forEach(pin => {
+        pin.setAttribute('role', 'button');
+        pin.setAttribute('tabindex', '0');
+        pin.setAttribute('aria-label', GP_FEATURES[pin.dataset.n] || '');
+      });
 
       Object.keys(GP_FEATURES).forEach(n => {
         const tick = document.createElement('span');
@@ -1042,21 +1089,54 @@
 
       const ticks = ticksContainer.querySelectorAll('.gp-caption-tick');
 
-      function setActive(n, fromInteraction) {
-        if (fromInteraction && !hasInteracted) {
-          hasInteracted = true;
-          captionHint.textContent = 'Live on the court';
-        }
+      function setActive(n) {
         captionTag.textContent = n;
         captionLabel.textContent = GP_FEATURES[n] || '';
         pins.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
         ticks.forEach(el => el.classList.toggle('is-active', el.dataset.n === n));
       }
 
+      function showTooltip(pin) {
+        if (!tooltip || !pin) return;
+        const title = GP_FEATURES[pin.dataset.n] || '';
+        const left = parseFloat(pin.style.left) || 0;
+        const top = parseFloat(pin.style.top) || 0;
+        tooltip.textContent = title;
+        tooltip.style.left = pin.style.left;
+        tooltip.style.top = pin.style.top;
+        tooltip.classList.toggle('is-left', left > 76);
+        tooltip.classList.toggle('is-low', top > 82);
+        tooltip.classList.add('is-visible');
+        tooltip.setAttribute('aria-hidden', 'false');
+      }
+
+      function hideTooltip() {
+        if (!tooltip) return;
+        tooltip.classList.remove('is-visible');
+        tooltip.setAttribute('aria-hidden', 'true');
+      }
+
       function bindActivate(el) {
-        const activate = () => setActive(el.dataset.n, true);
-        el.addEventListener('mouseenter', activate);
-        el.addEventListener('click', activate);
+        const isPin = el.classList.contains('gp-pin');
+        const activate = () => setActive(el.dataset.n);
+        el.addEventListener('mouseenter', () => {
+          activate();
+          if (isPin) showTooltip(el);
+        });
+        el.addEventListener('mouseleave', () => {
+          if (isPin) hideTooltip();
+        });
+        el.addEventListener('focus', () => {
+          activate();
+          if (isPin) showTooltip(el);
+        });
+        el.addEventListener('blur', () => {
+          if (isPin) hideTooltip();
+        });
+        el.addEventListener('click', () => {
+          activate();
+          if (isPin) showTooltip(el);
+        });
         el.addEventListener('keydown', e => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
