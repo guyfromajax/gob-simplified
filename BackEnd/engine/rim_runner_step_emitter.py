@@ -449,7 +449,7 @@ def _build_burst_step(
         )
         return None
 
-    # Gate on RR reaching rr_to at burst rate. Receiver always reaches
+    # Gate on RR reaching rr_to at the backend-authored burst/sprint rate. Receiver always reaches
     # receiver_to earlier (shorter distance, lower archetype) and clamps at
     # destination via _interrupted_coord.
     rr_start = all_start_coords[rr_id]
@@ -457,7 +457,10 @@ def _build_burst_step(
         "x": float(rr_to["x"]),
         "y": float(rr_to["y"]),
     }
-    rr_archetype: PlayerArchetype = "burst"
+    rr_payload_archetype = rr_to.get("movement_archetype")
+    rr_archetype: PlayerArchetype = (
+        rr_payload_archetype if rr_payload_archetype in ("burst", "sprint") else "burst"
+    )
     rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
     rr_rate = _ag_grid_per_game_sec(rr_player, rr_archetype)
     t = max(0.1, _traversal_seconds(rr_start, rr_end_target, rr_rate))
@@ -496,7 +499,7 @@ def _build_burst_step(
             all_start_coords[pid], target, rate, t
         )
 
-    _commit_mover(rr_id, rr_end_target, "sprint", "burst")
+    _commit_mover(rr_id, rr_end_target, "sprint", rr_archetype)
     end_coords[rr_id] = dict(rr_end_target)
 
     _commit_mover(receiver_id, receiver_end_target, "cut", receiver_archetype)

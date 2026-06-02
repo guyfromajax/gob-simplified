@@ -95,7 +95,7 @@
       // Orange accent — Account Settings is a non-gating settings surface.
       '  <div class="gob-modal-accent"></div>',
       '  <div class="account-modal-header">',
-      '    <h3 id="account-settings-title" class="gob-modal-title">Account Settings</h3>',
+      '    <h3 id="account-settings-title" class="gob-modal-title">Username</h3>',
       '    <button type="button" id="account-settings-close" class="account-modal-close" aria-label="Close account settings">',
       '      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">',
       '        <path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
@@ -105,7 +105,6 @@
       '  <div class="gob-modal-body account-modal-body">',
       // Field 1 — Username (display-only, intentionally locked)
       '    <div class="account-field account-field--first">',
-      '      <div class="account-field-label">Username</div>',
       '      <div class="account-identity">',
       '        <div id="account-avatar" class="account-avatar" aria-hidden="true"></div>',
       '        <div class="account-identity-text">',
@@ -132,7 +131,7 @@
       '    </div>',
       // Forward link to the full account page.
       '    <div class="account-field account-manage-row">',
-      '      <a href="/account.html" id="account-manage-link" class="account-manage-link">Manage Account<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
+      '      <a href="/account.html" id="account-manage-link" class="account-manage-link">Account Details<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
       '    </div>',
       '  </div>',
       '</div>'

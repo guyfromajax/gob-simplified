@@ -4,6 +4,7 @@ from BackEnd.engine.rim_runner_fast_break import (
     _resolve_rr_burst_destination,
     _resolve_triangle_setup_payload,
 )
+from BackEnd.engine.rim_runner_step_emitter import _build_burst_step
 from BackEnd.utils.shared import calc_ag_segment_seconds
 
 
@@ -97,3 +98,43 @@ def test_calc_ag_segment_seconds_supports_burst_archetype():
 
     assert burst_seconds < sprint_seconds
     assert burst_seconds == 1.0
+
+
+def test_rim_runner_burst_step_uses_payload_sprint_archetype():
+    off_lineup = {
+        "PG": _player("bh", 45, 15),
+        "PF": _player("rr", 20, 40),
+        "C": _player("passer", 35, 25),
+    }
+    def_lineup = {}
+    start_coords = {
+        "bh": {"x": 45.0, "y": 15.0},
+        "rr": {"x": 20.0, "y": 40.0},
+        "passer": {"x": 35.0, "y": 25.0},
+    }
+    fb_roles = {
+        "rim_runner_burst_phase": {
+            "rr_id": "rr",
+            "outlet_receiver_id": "bh",
+            "outlet_passer_id": "passer",
+            "rr_to": {"x": 30.0, "y": 40.0, "movement_archetype": "sprint"},
+            "receiver_to": {"x": 45.0, "y": 15.0},
+            "other_players": [],
+        }
+    }
+
+    step = _build_burst_step(
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        all_start_coords=start_coords,
+        is_away_offense=False,
+        clock_remaining_at_start=300,
+        shot_clock_remaining_at_start=20,
+        next_step_index=1,
+    )
+
+    assert step is not None
+    assert step["start"]["archetype"]["rr"] == "sprint"
+    assert step["start"]["tween_durations"]["rr"] == step["end"]["time_elapsed"]
+    assert step["end"]["time_elapsed"] > 0.5
