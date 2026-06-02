@@ -321,6 +321,51 @@ body.has-auth-bar {
   }
 }
 
+/* Alpha-feedback "not yet submitted" state (spec §4b): the Feedback button
+   routes to the survey and carries .is-glowing — three coordinated, calm signals
+   on a shared 2.6s loop: a breathing aura, an expanding ring, and the dot pulse. */
+.auth-bar .feedback-btn.is-glowing {
+  background: rgba(var(--auth-feedback-violet), 0.2);
+  border-color: rgba(var(--auth-feedback-violet), 0.5);
+  color: #ddd6fe;
+  animation: fbAura 2.6s ease-in-out infinite;
+}
+.auth-bar .feedback-btn.is-glowing::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 9px;
+  border: 1px solid rgba(167, 139, 250, 0.6);
+  pointer-events: none;
+  animation: fbRing 2.6s ease-out infinite;
+}
+.auth-bar .feedback-btn.is-glowing .feedback-pulse {
+  animation: fbDot 2.6s ease-out infinite;
+}
+
+@keyframes fbAura {
+  0%, 100% { box-shadow: 0 0 14px 0 rgba(139, 92, 246, 0.18); }
+  50%      { box-shadow: 0 0 22px 2px rgba(139, 92, 246, 0.42); }
+}
+@keyframes fbRing {
+  0%   { transform: scale(1);    opacity: 0.6; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+@keyframes fbDot {
+  0%   { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(167, 139, 250, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-bar .feedback-btn.is-glowing {
+    animation: none;
+    box-shadow: 0 0 18px 1px rgba(139, 92, 246, 0.35);
+  }
+  .auth-bar .feedback-btn.is-glowing::after { animation: none; opacity: 0; }
+  .auth-bar .feedback-btn.is-glowing .feedback-pulse { animation: none; }
+}
+
 .feedback-modal-backdrop {
   position: fixed;
   inset: 0;

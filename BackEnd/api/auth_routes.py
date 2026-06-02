@@ -19,7 +19,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from bson import ObjectId
 
 try:
@@ -151,6 +151,9 @@ class UserResponse(BaseModel):
     archetypes: Optional[dict] = None  # 18 coaching-archetype counters + total
     lead_archetype: Optional[str] = None  # denormalized top archetype key for the badge ("" if none)
     archetype_reveal_seen: Optional[bool] = None  # gates the one-time first-archetype reveal
+    alpha_feedback_submitted: Optional[bool] = None  # true once the alpha survey is submitted
+    alpha_feedback_games: Optional[int] = None  # forward-only non-tutorial games since launch (prompt trigger)
+    alpha_feedback_prompt_level: Optional[int] = None  # highest prompt threshold shown (0 / 2 / 5)
     subscription: Optional[str] = None  # e.g. "alpha" — drives the account-page Status field
     geek_points: Optional[int] = None  # total geek points
     geek_points_by_team: Optional[dict] = None  # canonical team_id -> int (lazy; {} when none)
@@ -659,6 +662,32 @@ async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
     return {"archetype_reveal_seen": True, "message": "Archetype reveal marked seen"}
 
 
+class AlphaFeedbackPromptSeen(BaseModel):
+    # The threshold just shown (2 or 5). Stored via $max so the prompt level only
+    # advances — each variant fires once, and out-of-order calls can't lower it.
+    level: int = Field(..., ge=0, le=5)
+
+
+@router.patch("/alpha-feedback-prompt-seen")
+async def mark_alpha_feedback_prompt_seen(
+    body: AlphaFeedbackPromptSeen,
+    user: dict = Depends(get_current_user),
+):
+    """Record that the alpha-feedback prompt modal was shown at the given threshold.
+
+    Called by the frontend when the modal appears so the same variant never
+    re-fires. Idempotent; uses $max so the level only moves forward.
+    """
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {
+            "$max": {"alpha_feedback_prompt_level": int(body.level)},
+            "$set": {"updated_at": datetime.now(timezone.utc)},
+        },
+    )
+    return {"alpha_feedback_prompt_level": int(body.level), "message": "Alpha feedback prompt marked seen"}
+
+
 @router.post("/reset-request")
 @_auth_rate_limit
 async def password_reset_request(request: Request, body: ResetRequest):
@@ -782,6 +811,10 @@ async def get_me(user: dict = Depends(get_current_user)):
     if lead_archetype is None:
         lead_archetype = compute_lead_archetype(archetypes)
     archetype_reveal_seen = bool(db_user.get("archetype_reveal_seen")) if db_user else False
+    # Alpha-feedback gating (read-only here). Missing → unsubmitted / 0 games / no prompt yet.
+    alpha_feedback_submitted = bool(db_user.get("alpha_feedback_submitted")) if db_user else False
+    alpha_feedback_games = int(db_user.get("alpha_feedback_games", 0) or 0) if db_user else 0
+    alpha_feedback_prompt_level = int(db_user.get("alpha_feedback_prompt_level", 0) or 0) if db_user else 0
     # Account-page fields (read-only). championships_total is lazily created by the
     # award logic, so default the four kinds to 0 for coaches with no titles.
     subscription = (db_user.get("subscription") if db_user else None) or "alpha"
@@ -804,6 +837,9 @@ async def get_me(user: dict = Depends(get_current_user)):
         archetypes=archetypes,
         lead_archetype=lead_archetype,
         archetype_reveal_seen=archetype_reveal_seen,
+        alpha_feedback_submitted=alpha_feedback_submitted,
+        alpha_feedback_games=alpha_feedback_games,
+        alpha_feedback_prompt_level=alpha_feedback_prompt_level,
         subscription=subscription,
         geek_points=geek_points,
         geek_points_by_team=geek_points_by_team,

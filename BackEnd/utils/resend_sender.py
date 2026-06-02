@@ -87,3 +87,72 @@ def send_feedback_email(*, message: str, category: str, reporter_email: str, con
         html=html,
         from_email=FEEDBACK_FROM_EMAIL,
     )
+
+
+# Human-readable labels for the 8 rating questions in the alpha survey email.
+_ALPHA_RATING_LABELS = {
+    "live_gameplay": "Live Gameplay",
+    "between_games": "The Experience Between Games",
+    "recruiting": "Recruiting",
+    "franchise_mode": "Franchise Mode",
+    "high_school_setting": "High School Setting",
+    "onboarding": "Onboarding Experience",
+    "game_length": "Time to play a single game",
+    "learning_curve": "Learning curve",
+}
+
+
+def send_alpha_feedback_email(
+    *,
+    ratings: dict,
+    optional_notes: dict,
+    favorite: str,
+    least_favorite: str,
+    would_recommend: bool,
+    context: dict,
+    user_label: str = "",
+) -> bool:
+    """Send the 11-question alpha survey to the team inbox (FEEDBACK_TO_EMAIL).
+
+    Goes to jamie@geekedoutgames.com (env-overridable); never to the submitter.
+    Best-effort: returns False (and no-ops) when Resend isn't configured.
+    """
+    if not RESEND_API_KEY:
+        logger.warning("[ALPHA_FEEDBACK] RESEND_API_KEY not set - skipping survey email send")
+        return False
+
+    notes = optional_notes or {}
+    rows = []
+    for key, label in _ALPHA_RATING_LABELS.items():
+        val = escape(str((ratings or {}).get(key, "—")))
+        note = notes.get(key)
+        note_html = f"<br><em>Note: {escape(str(note))}</em>" if note else ""
+        rows.append(f"<p><strong>{escape(label)}:</strong> {val}{note_html}</p>")
+
+    safe_fav = escape(favorite or "").replace("\n", "<br>")
+    safe_least = escape(least_favorite or "").replace("\n", "<br>")
+    rec = "Yes" if would_recommend else "No"
+    safe_user = escape(str((context or {}).get("user", "") or user_label or ""))
+    safe_agent = escape(str((context or {}).get("user_agent", "")))
+    safe_ip = escape(str((context or {}).get("ip", "")))
+    safe_ver = escape(str((context or {}).get("app_version", "")))
+
+    html = (
+        "<h2>New Alpha Feedback Survey</h2>"
+        f"<p><strong>User:</strong> {safe_user}</p>"
+        + "".join(rows)
+        + "<hr>"
+        f"<p><strong>Favorite thing about GOB:</strong><br>{safe_fav}</p>"
+        f"<p><strong>Least favorite thing about GOB:</strong><br>{safe_least}</p>"
+        f"<p><strong>Would recommend to a friend:</strong> {rec}</p>"
+        "<hr>"
+        f"<p><strong>App version:</strong> {safe_ver}</p>"
+        f"<p><strong>IP:</strong> {safe_ip}</p>"
+        f"<p><strong>User Agent:</strong> {safe_agent}</p>"
+    )
+    return send_resend_html_email(
+        to=[FEEDBACK_TO_EMAIL],
+        subject="[GOB Alpha Survey] New submission",
+        html=html,
+        from_email=FEEDBACK_FROM_EMAIL,
+    )

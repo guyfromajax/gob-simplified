@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>GOB User Feedback - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <style>
+    :root {
+      --bebas: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      --inter: 'Inter', sans-serif;
+      --af-orange: #F79420;
+      --af-green: #34EC27;
+      --af-red: #FF5A5A;
+      --af-yellow: #F4C53D;
+      --af-card: rgba(255,255,255,0.04);
+      --af-line: rgba(255,255,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--inter);
+      margin: 0;
+      padding: 96px 20px 140px;
+      color: #fff;
+      line-height: 1.55;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #243049 0%, rgba(36,48,73,0) 60%),
+        #0d1018;
+      min-height: 100vh;
+    }
+    .af-container { max-width: 900px; margin: 0 auto; }
+    .af-back {
+      display: inline-block; margin-bottom: 16px;
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5);
+      text-decoration: none; cursor: pointer;
+    }
+    .af-back:hover { color: #fff; }
+    .af-title {
+      font-family: var(--bebas); font-weight: 700; font-size: 44px;
+      letter-spacing: 0.04em; margin: 0 0 6px;
+    }
+    .af-intro { margin: 0 0 30px; color: rgba(255,255,255,0.55); font-size: 15px; max-width: 640px; }
+
+    /* Sections */
+    .af-section { margin-bottom: 34px; }
+    .af-section-label {
+      font-family: var(--bebas); font-weight: 700; font-size: 24px;
+      letter-spacing: 0.04em; color: rgba(255,255,255,0.9);
+      margin: 0 0 16px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--af-line);
+    }
+
+    /* Rating question rows */
+    .af-q {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      gap: 18px;
+      align-items: start;
+      background: var(--af-card);
+      border: 1px solid var(--af-line);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 12px;
+    }
+    .af-q-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .af-q-desc { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+    .af-q-control { display: flex; flex-direction: column; gap: 10px; }
+
+    /* Segmented pills */
+    .af-seg { display: flex; gap: 8px; flex-wrap: wrap; }
+    .af-seg-opt {
+      flex: 1 1 auto; min-width: 92px;
+      appearance: none; cursor: pointer;
+      font-family: var(--inter); font-size: 13px; font-weight: 600;
+      color: rgba(255,255,255,0.72);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 9px; padding: 10px 8px;
+      text-align: center; line-height: 1.25;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 80ms ease;
+    }
+    .af-seg-opt:hover { background: rgba(255,255,255,0.09); color: #fff; }
+    .af-seg-opt:active { transform: translateY(1px); }
+    .af-seg-opt.selected[data-tone="bad"]  { background: var(--af-red);    border-color: var(--af-red);    color: #2a0d0d; }
+    .af-seg-opt.selected[data-tone="mid"]  { background: var(--af-yellow); border-color: var(--af-yellow); color: #2a2208; }
+    .af-seg-opt.selected[data-tone="good"] { background: var(--af-green);  border-color: var(--af-green);  color: #06250a; }
+
+    /* Inline optional note */
+    .af-note-toggle {
+      align-self: flex-start;
+      appearance: none; background: none; border: none; cursor: pointer;
+      font-family: var(--inter); font-size: 12px; font-weight: 600;
+      color: rgba(255,255,255,0.42); padding: 0;
+    }
+    .af-note-toggle:hover { color: rgba(255,255,255,0.7); }
+    .af-note { width: 100%; }
+    .af-note[hidden] { display: none; }
+    .af-note textarea {
+      width: 100%; min-height: 64px; resize: vertical;
+      font-family: var(--inter); font-size: 13px; color: #fff;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.14); border-radius: 9px;
+      padding: 9px 11px;
+    }
+    .af-note textarea:focus { outline: none; border-color: rgba(247,148,32,0.5); }
+
+    /* Open-ended */
+    .af-open { margin-bottom: 14px; }
+    .af-open-label { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .af-open textarea {
+      width: 100%; min-height: 92px; resize: vertical;
+      font-family: var(--inter); font-size: 14px; color: #fff;
+      background: var(--af-card);
+      border: 1px solid var(--af-line); border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .af-open textarea:focus { outline: none; border-color: rgba(247,148,32,0.5); }
+
+    /* Yes/No */
+    .af-bool { margin-top: 4px; }
+    .af-bool-label { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+    .af-bool-options { display: flex; gap: 10px; }
+    .af-bool-opt {
+      appearance: none; cursor: pointer; min-width: 120px;
+      font-family: var(--inter); font-size: 14px; font-weight: 700;
+      color: rgba(255,255,255,0.72);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px; padding: 12px 18px;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+    .af-bool-opt:hover { background: rgba(255,255,255,0.09); color: #fff; }
+    .af-bool-opt.selected[data-val="yes"] { background: var(--af-green); border-color: var(--af-green); color: #06250a; }
+    .af-bool-opt.selected[data-val="no"]  { background: var(--af-red);   border-color: var(--af-red);   color: #2a0d0d; }
+
+    /* Sticky bottom bar */
+    .af-bottom {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      padding: 14px 24px;
+      background: rgba(14, 18, 28, 0.96);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(8px);
+    }
+    .af-progress { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .af-progress-count {
+      font-family: var(--bebas); font-size: 22px; letter-spacing: 0.04em;
+      color: rgba(255,255,255,0.85); white-space: nowrap;
+    }
+    .af-dashes { display: flex; gap: 5px; }
+    .af-dash {
+      width: 16px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.16);
+      transition: background 160ms ease;
+    }
+    .af-dash.done { background: var(--af-orange); }
+    .af-submit {
+      appearance: none; cursor: not-allowed;
+      font-family: var(--bebas); font-size: 19px; letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 11px 34px;
+      transition: background 140ms ease, color 140ms ease, filter 140ms ease;
+    }
+    .af-submit.ready {
+      cursor: pointer; color: #15181f; background: var(--af-orange);
+      border-color: rgba(247,148,32,0.5);
+    }
+    .af-submit.ready:hover { filter: brightness(1.06); }
+    .af-submit[disabled] { pointer-events: none; }
+    .af-error { color: var(--af-red); font-size: 13px; margin: 12px 0 0; min-height: 1em; }
+
+    /* Thank-you state */
+    .af-thanks { display: none; text-align: center; padding: 60px 10px; }
+    .af-thanks.show { display: block; }
+    .af-thanks h2 { font-family: var(--bebas); font-size: 40px; letter-spacing: 0.04em; margin: 0 0 12px; }
+    .af-thanks p { color: rgba(255,255,255,0.6); font-size: 15px; margin: 0 0 26px; }
+    .af-thanks a {
+      display: inline-block; text-decoration: none;
+      font-family: var(--bebas); font-size: 18px; letter-spacing: 0.05em;
+      color: #15181f; background: var(--af-orange);
+      border-radius: 10px; padding: 11px 30px;
+    }
+
+    /* Responsive: rows stack < 760px; pills go 2x2 < 460px (wrap handles it) */
+    @media (max-width: 760px) {
+      .af-q { grid-template-columns: 1fr; gap: 12px; }
+    }
+    @media (max-width: 460px) {
+      .af-seg-opt { min-width: calc(50% - 4px); }
+      .af-bottom { flex-direction: column; align-items: stretch; gap: 10px; }
+      .af-submit { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .af-seg-opt, .af-bool-opt, .af-dash, .af-submit { transition: none; }
+    }
+  </style>
+</head>
+<body class="has-auth-bar has-footer">
+  <div id="auth-bar" class="auth-bar"></div>
+
+  <div class="af-container">
+    <a class="af-back" id="af-back">&larr; Back</a>
+    <h1 class="af-title">GOB User Feedback</h1>
+
+    <div id="af-form">
+      <p class="af-intro">A few quick questions to help us make GOB better. All 11 are required &mdash; optional notes are not.</p>
+
+      <!-- SECTION 01 -->
+      <section class="af-section">
+        <h2 class="af-section-label">Give Us Your Opinion on Each of the 6 Areas Below</h2>
+        <div id="af-section-1"></div>
+      </section>
+
+      <!-- SECTION 02 -->
+      <section class="af-section">
+        <h2 class="af-section-label">How Did You Feel About Each of These Two?</h2>
+        <div id="af-section-2"></div>
+      </section>
+
+      <!-- SECTION 03 -->
+      <section class="af-section">
+        <h2 class="af-section-label">Lastly &mdash; In Your Own Words</h2>
+        <div class="af-open">
+          <div class="af-open-label">What is your favorite thing about GOB?</div>
+          <textarea id="af-favorite" maxlength="5000" placeholder="Tell us what you think"></textarea>
+        </div>
+        <div class="af-open">
+          <div class="af-open-label">What is your least favorite thing about GOB?</div>
+          <textarea id="af-least" maxlength="5000" placeholder="Tell us what you think"></textarea>
+        </div>
+        <div class="af-bool">
+          <div class="af-bool-label">Would you recommend GOB to a friend?</div>
+          <div class="af-bool-options" id="af-recommend">
+            <button type="button" class="af-bool-opt" data-val="yes">Yes</button>
+            <button type="button" class="af-bool-opt" data-val="no">No</button>
+          </div>
+        </div>
+      </section>
+
+      <p class="af-error" id="af-error"></p>
+    </div>
+
+    <!-- THANK YOU -->
+    <div class="af-thanks" id="af-thanks">
+      <h2>Thanks, Coach.</h2>
+      <p>Your feedback goes straight to the team. We read every word.</p>
+      <a href="/franchise-command-center.html">Back to Command Center</a>
+    </div>
+  </div>
+
+  <!-- Sticky progress + submit -->
+  <div class="af-bottom" id="af-bottom">
+    <div class="af-progress">
+      <span class="af-progress-count" id="af-count">0/11</span>
+      <div class="af-dashes" id="af-dashes"></div>
+    </div>
+    <button type="button" class="af-submit" id="af-submit" disabled>Submit</button>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      // Static auth-bar shell (same approach as coaching-archetypes.html).
+      var bar = document.getElementById('auth-bar');
+      if (bar && !bar.querySelector('.auth-bar-left')) {
+        bar.innerHTML = '<div class="auth-bar-left"><a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a></div><img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha"><div class="auth-bar-right"><a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube"><img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24"></a><a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a></div>';
+      }
+
+      function playSound(filename) {
+        try {
+          var a = new Audio('/sounds/' + encodeURIComponent(filename));
+          a.volume = 0.7;
+          a.play().catch(function () {});
+        } catch (e) {}
+      }
+
+      // Back: return to wherever the coach came from (FCC, nav button, etc.).
+      var back = document.getElementById('af-back');
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (window.history.length > 1) { window.history.back(); return; }
+        window.location.href = '/franchise-command-center.html';
+      });
+
+      // --- Question definitions ---------------------------------------------
+      var OPINION = [
+        { val: 'Awful', tone: 'bad' },
+        { val: 'OK, but needs work', tone: 'mid' },
+        { val: 'Great', tone: 'good' }
+      ];
+      var SECTION_1 = [
+        { key: 'live_gameplay',       title: 'Live Gameplay',                 desc: 'Player animations, sound effects, and in-game announcements' },
+        { key: 'between_games',       title: 'The Experience Between Games',  desc: 'Stats, Standings &amp; Scouting' },
+        { key: 'recruiting',          title: 'Recruiting',                    desc: 'In-Season Leans, Invites, &amp; Recruiting Day' },
+        { key: 'franchise_mode',      title: 'Franchise Mode',                desc: '26-Week Season + Tournaments' },
+        { key: 'high_school_setting', title: 'High School Setting',           desc: "Cool, or you'd prefer college or pro?" },
+        { key: 'onboarding',          title: 'Onboarding Experience',         desc: 'Did you feel fully equipped to start playing right away?' }
+      ];
+      var SECTION_2 = [
+        { key: 'game_length',   title: 'The time it took to play a single game was…', desc: '',
+          opts: [ { val: 'Too Short', tone: 'bad' }, { val: 'Just Right', tone: 'good' }, { val: 'Too Long', tone: 'bad' } ] },
+        { key: 'learning_curve', title: 'The learning curve for this game is…', desc: '',
+          opts: [ { val: 'Too Easy', tone: 'bad' }, { val: 'Just Right', tone: 'good' }, { val: 'Too Hard', tone: 'bad' } ] }
+      ];
+      var RATING_KEYS = SECTION_1.map(function (q) { return q.key; })
+        .concat(SECTION_2.map(function (q) { return q.key; }));
+
+      // --- State ------------------------------------------------------------
+      var ratings = {};        // key -> chosen label
+      var notes = {};          // key -> optional note text
+
+      // --- Build a rating row -----------------------------------------------
+      function buildRow(q, opts) {
+        var row = document.createElement('div');
+        row.className = 'af-q';
+        row.setAttribute('data-q', q.key);
+
+        var text = document.createElement('div');
+        text.className = 'af-q-text';
+        text.innerHTML = '<div class="af-q-title">' + q.title + '</div>' +
+          (q.desc ? '<div class="af-q-desc">' + q.desc + '</div>' : '');
+
+        var control = document.createElement('div');
+        control.className = 'af-q-control';
+
+        var seg = document.createElement('div');
+        seg.className = 'af-seg';
+        seg.setAttribute('role', 'group');
+        opts.forEach(function (o) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'af-seg-opt';
+          b.setAttribute('data-val', o.val);
+          b.setAttribute('data-tone', o.tone);
+          b.textContent = o.val;
+          b.addEventListener('click', function () {
+            playSound('click-tiny.wav');
+            var already = b.classList.contains('selected');
+            // single-select within the row; re-tapping the active one deselects
+            seg.querySelectorAll('.af-seg-opt').forEach(function (x) { x.classList.remove('selected'); });
+            if (already) {
+              delete ratings[q.key];
+            } else {
+              b.classList.add('selected');
+              ratings[q.key] = o.val;
+            }
+            updateProgress();
+          });
+          seg.appendChild(b);
+        });
+
+        var toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'af-note-toggle';
+        toggle.textContent = '+ Optional feedback';
+
+        var noteWrap = document.createElement('div');
+        noteWrap.className = 'af-note';
+        noteWrap.hidden = true;
+        var ta = document.createElement('textarea');
+        ta.maxLength = 2000;
+        ta.placeholder = 'Tell us more';
+        ta.addEventListener('input', function () {
+          var v = (ta.value || '').trim();
+          if (v) { notes[q.key] = v; } else { delete notes[q.key]; }
+        });
+        noteWrap.appendChild(ta);
+
+        toggle.addEventListener('click', function () {
+          noteWrap.hidden = !noteWrap.hidden;
+          toggle.textContent = noteWrap.hidden ? '+ Optional feedback' : '− Optional feedback';
+          if (!noteWrap.hidden) ta.focus();
+        });
+
+        control.appendChild(seg);
+        control.appendChild(toggle);
+        control.appendChild(noteWrap);
+        row.appendChild(text);
+        row.appendChild(control);
+        return row;
+      }
+
+      var host1 = document.getElementById('af-section-1');
+      SECTION_1.forEach(function (q) { host1.appendChild(buildRow(q, OPINION)); });
+      var host2 = document.getElementById('af-section-2');
+      SECTION_2.forEach(function (q) { host2.appendChild(buildRow(q, q.opts)); });
+
+      // --- Open-ended + Yes/No ----------------------------------------------
+      var favEl = document.getElementById('af-favorite');
+      var leastEl = document.getElementById('af-least');
+      favEl.addEventListener('input', updateProgress);
+      leastEl.addEventListener('input', updateProgress);
+
+      var recommend = null; // true | false | null
+      var recHost = document.getElementById('af-recommend');
+      recHost.querySelectorAll('.af-bool-opt').forEach(function (b) {
+        b.addEventListener('click', function () {
+          playSound('click-tiny.wav');
+          recHost.querySelectorAll('.af-bool-opt').forEach(function (x) { x.classList.remove('selected'); });
+          b.classList.add('selected');
+          recommend = (b.getAttribute('data-val') === 'yes');
+          updateProgress();
+        });
+      });
+
+      // --- Progress bar ------------------------------------------------------
+      var dashHost = document.getElementById('af-dashes');
+      var dashes = [];
+      for (var i = 0; i < 11; i++) {
+        var d = document.createElement('span');
+        d.className = 'af-dash';
+        dashHost.appendChild(d);
+        dashes.push(d);
+      }
+      var countEl = document.getElementById('af-count');
+      var submitBtn = document.getElementById('af-submit');
+
+      function completedCount() {
+        var n = 0;
+        RATING_KEYS.forEach(function (k) { if (ratings[k]) n++; });
+        if ((favEl.value || '').trim()) n++;
+        if ((leastEl.value || '').trim()) n++;
+        if (recommend !== null) n++;
+        return n;
+      }
+
+      function updateProgress() {
+        var n = completedCount();
+        countEl.textContent = n + '/11';
+        for (var i = 0; i < 11; i++) {
+          if (i < n) dashes[i].classList.add('done');
+          else dashes[i].classList.remove('done');
+        }
+        if (n >= 11) {
+          submitBtn.disabled = false;
+          submitBtn.classList.add('ready');
+        } else {
+          submitBtn.disabled = true;
+          submitBtn.classList.remove('ready');
+        }
+      }
+
+      // --- Submit ------------------------------------------------------------
+      var errEl = document.getElementById('af-error');
+      var submitting = false;
+      submitBtn.addEventListener('click', function () {
+        if (submitBtn.disabled || submitting) return;
+        if (completedCount() < 11) return;
+        submitting = true;
+        playSound('click-tiny.wav');
+        errEl.textContent = '';
+        submitBtn.classList.remove('ready');
+        submitBtn.disabled = true;
+
+        var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl)
+          ? API_CONFIG.buildUrl('/api/alpha-feedback') : '/api/alpha-feedback';
+        var headers = { 'Content-Type': 'application/json' };
+        if (typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders) {
+          var ah = API_CONFIG.getAuthHeaders() || {};
+          for (var k in ah) headers[k] = ah[k];
+        }
+
+        var payload = {
+          ratings: ratings,
+          optional_notes: notes,
+          favorite: (favEl.value || '').trim(),
+          least_favorite: (leastEl.value || '').trim(),
+          would_recommend: !!recommend
+        };
+
+        fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(payload) })
+          .then(function (res) {
+            if (!res.ok) throw new Error('Something went wrong. Please try again.');
+            return res.json();
+          })
+          .then(function () {
+            if (window.__gobAuthMeData) window.__gobAuthMeData.alpha_feedback_submitted = true;
+            document.getElementById('af-form').style.display = 'none';
+            document.getElementById('af-bottom').style.display = 'none';
+            document.getElementById('af-thanks').classList.add('show');
+            window.scrollTo(0, 0);
+          })
+          .catch(function (err) {
+            errEl.textContent = err.message || 'Something went wrong. Please try again.';
+            submitBtn.disabled = false;
+            submitBtn.classList.add('ready');
+            submitting = false;
+          });
+      });
+
+      updateProgress();
+    })();
+  </script>
+</body>
+</html>

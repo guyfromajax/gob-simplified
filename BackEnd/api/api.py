@@ -75,6 +75,7 @@ try:
     from .leaderboard_routes import router as leaderboard_router
     from .admin_routes import router as admin_router
     from .feedback_routes import router as feedback_router
+    from .alpha_feedback_routes import router as alpha_feedback_router
     from BackEnd.utils.auth import get_current_user
     from BackEnd.utils.ownership import verify_game_owned_by_user
     import traceback
@@ -240,6 +241,7 @@ try:
     app.include_router(leaderboard_router)
     app.include_router(admin_router)
     app.include_router(feedback_router)
+    app.include_router(alpha_feedback_router)
 
     @app.get("/debug/server-state")
     def debug_server_state():

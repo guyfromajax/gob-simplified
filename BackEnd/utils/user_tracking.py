@@ -67,12 +67,25 @@ def default_user_tracking() -> dict:
     `lead_archetype` is the denormalized "highest count" key the UI reads to pick
     the coach's badge ("" until they have games). `archetype_reveal_seen` gates the
     one-time first-archetype reveal modal (false → eligible to see it).
+
+    Alpha-feedback fields gate the alpha survey + its post-game prompt modal:
+      `alpha_feedback_submitted` — true once the user submits the 11-question survey.
+      `alpha_feedback_games`     — FORWARD-ONLY counter of non-tutorial games completed
+                                   after this feature shipped (incremented in
+                                   commit_user_game_record). Starts at 0 for everyone,
+                                   so existing veterans are only prompted after playing
+                                   new games — never reuse record.total_games here.
+      `alpha_feedback_prompt_level` — highest prompt threshold already shown (0 / 2 / 5),
+                                   so each modal variant fires once.
     """
     return {
         "record": default_record(),
         "archetypes": default_archetypes(),
         "lead_archetype": "",
         "archetype_reveal_seen": False,
+        "alpha_feedback_submitted": False,
+        "alpha_feedback_games": 0,
+        "alpha_feedback_prompt_level": 0,
     }
 
 

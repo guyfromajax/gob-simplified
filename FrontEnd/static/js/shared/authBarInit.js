@@ -412,11 +412,25 @@
     root.style.setProperty('--fcc-primary-deep', deep);
   }
 
+  // Alpha feedback: until the survey is submitted (and once the coach has reached
+  // the first prompt threshold of 2 games), the nav Feedback button reroutes to
+  // the survey form and shows a pulsing violet aura instead of opening the bug modal.
+  var alphaFeedbackRewire = false;
+  function applyAlphaFeedbackState(me) {
+    try {
+      var games = me ? (parseInt(me.alpha_feedback_games, 10) || 0) : 0;
+      alphaFeedbackRewire = !!(me && !me.alpha_feedback_submitted && games >= 2);
+      var btn = document.getElementById('feedback-btn');
+      if (btn) btn.classList.toggle('is-glowing', alphaFeedbackRewire);
+    } catch (e) {}
+  }
+
   function setAuthMeData(meData) {
     if (!meData) return;
     meData.account_settings = normalizeAccountSettings(meData.account_settings);
     authMeDataCache = meData;
     window.__gobAuthMeData = meData;
+    applyAlphaFeedbackState(meData);
     applyGlobalDisplayColor(meData.account_settings.display_color);
     try {
       window.dispatchEvent(new CustomEvent('gob:auth-me-loaded', { detail: meData }));
@@ -868,6 +882,12 @@
     }
     function openModal() {
       playSound('click-tiny.wav');
+      // Until the alpha survey is submitted, the Feedback button routes to the
+      // survey form instead of opening the general bug-report modal.
+      if (alphaFeedbackRewire) {
+        window.location.href = '/alpha-feedback.html';
+        return;
+      }
       setStatus('', false);
       backdrop.classList.add('open');
       messageEl.focus();
