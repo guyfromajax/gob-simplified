@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Coaching Archetypes Leaderboard - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <style>
+    :root { --bebas: 'Bebas Neue Pro', 'Bebas Neue', sans-serif; --inter: 'Inter', sans-serif; --orange: #F79420; }
+    body {
+      font-family: var(--inter); margin: 0; padding: 92px 20px 80px; color: #fff; line-height: 1.5;
+      background: radial-gradient(1200px 620px at 50% -12%, #243049 0%, rgba(36,48,73,0) 60%), #0d1018;
+      min-height: 100vh;
+    }
+    .alb { max-width: 1080px; margin: 0 auto; }
+    .alb-back {
+      display: inline-block; margin-bottom: 14px; font-size: 13px; font-weight: 600;
+      color: rgba(255,255,255,0.5); text-decoration: none;
+    }
+    .alb-back:hover { color: #fff; }
+    .alb-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0 0 4px; }
+    .alb-intro { margin: 0 0 26px; color: rgba(255,255,255,0.55); font-size: 14px; }
+
+    .alb-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+    @media (max-width: 880px) { .alb-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 560px) { .alb-grid { grid-template-columns: 1fr; } }
+
+    .alb-card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; padding: 14px 16px;
+    }
+    .alb-card-head {
+      display: flex; align-items: center; gap: 10px;
+      padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .alb-card-badge { width: 28px; height: 28px; flex: 0 0 auto; display: inline-flex; align-items: center; }
+    .alb-card-name { font-family: var(--bebas); font-size: 18px; letter-spacing: 0.03em; color: #fff; }
+
+    .alb-row {
+      display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+      font-size: 13px; border-radius: 7px;
+    }
+    .alb-row.is-current { background: rgba(247,148,32,0.12); }
+    .alb-rank { font-family: var(--bebas); font-size: 14px; color: rgba(255,255,255,0.4); width: 20px; flex: 0 0 auto; }
+    .alb-user { flex: 1; min-width: 0; color: rgba(255,255,255,0.85); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alb-row.is-current .alb-user { color: #fff; }
+    .alb-pct { flex: 0 0 auto; font-family: var(--bebas); font-size: 15px; color: var(--orange); font-variant-numeric: tabular-nums; }
+    .alb-empty { color: rgba(255,255,255,0.35); font-size: 12.5px; padding: 8px 4px; }
+  </style>
+</head>
+<body class="has-auth-bar has-footer">
+  <div id="auth-bar" class="auth-bar"></div>
+
+  <div class="alb">
+    <a href="/mode-select.html" class="alb-back" id="alb-back">&larr; Back</a>
+    <h1 class="alb-title">Coaching Archetypes</h1>
+    <p class="alb-intro">Top coaches in each archetype, by the share of their games coached in that style.</p>
+    <div id="alb-grid" class="alb-grid"><div class="alb-empty">Loading…</div></div>
+  </div>
+
+  <footer id="site-footer" class="site-footer"><a href="/faqs.html">FAQs</a></footer>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script>
+    (function () {
+      var bar = document.getElementById('auth-bar');
+      if (bar && !bar.querySelector('.auth-bar-left')) {
+        bar.innerHTML = '<div class="auth-bar-left"><a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a></div><img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha"><div class="auth-bar-right"><a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube"><img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24"></a><a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a></div>';
+      }
+    })();
+
+    // Back returns to wherever the coach came from (mode-select, etc.).
+    (function () {
+      var back = document.getElementById('alb-back');
+      if (!back) return;
+      back.addEventListener('click', function (e) {
+        if (window.history.length > 1) { e.preventDefault(); window.history.back(); return; }
+        try {
+          var ref = document.referrer;
+          if (ref && new URL(ref).origin === window.location.origin) { e.preventDefault(); window.location.href = ref; }
+        } catch (_) {}
+      });
+    })();
+
+    // Fixed display order (6 rows × 3 cols) per spec.
+    var ORDER = [
+      'od_balance', 'pure_offense', 'pure_defense',
+      'pure_athleticism', 'offensive_athleticism', 'defensive_athleticism',
+      'rebounding_king', 'offensive_rebounding', 'defensive_rebounding',
+      'mr_fundamentals', 'offensive_fundamentals', 'defensive_fundamentals',
+      'pure_discipline', 'cerebral_offense', 'cerebral_defense',
+      'the_intimidator', 'outrun_the_competition', 'mr_unconventional'
+    ];
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; });
+    }
+
+    function render(boards) {
+      boards = boards || {};
+      var host = document.getElementById('alb-grid');
+      host.innerHTML = ORDER.map(function (key) {
+        var rows = boards[key] || [];
+        var name = window.GOBArchetype ? window.GOBArchetype.nameFor(key) : key;
+        var badge = window.GOBArchetype ? window.GOBArchetype.badgeHtml(key, 28) : '';
+        var body = rows.length
+          ? rows.map(function (r) {
+              return '<div class="alb-row' + (r.is_current_user ? ' is-current' : '') + '">'
+                + '<span class="alb-rank">' + r.rank + '</span>'
+                + '<span class="alb-user">' + escapeHtml(r.username) + '</span>'
+                + '<span class="alb-pct">' + r.pct + '%</span></div>';
+            }).join('')
+          : '<div class="alb-empty">No coaches yet.</div>';
+        return '<div class="alb-card">'
+          + '<div class="alb-card-head"><span class="alb-card-badge">' + badge + '</span>'
+          + '<span class="alb-card-name">' + escapeHtml(name) + '</span></div>'
+          + body + '</div>';
+      }).join('');
+    }
+
+    window.GOBArchetype.ensureManifest().then(function () {
+      var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) ? API_CONFIG.buildUrl('/api/leaderboard/by-archetype') : '/api/leaderboard/by-archetype';
+      var headers = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders) ? API_CONFIG.getAuthHeaders() : {};
+      fetch(url, { headers: headers })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(render)
+        .catch(function () { render({}); });
+    });
+  </script>
+</body>
+</html>

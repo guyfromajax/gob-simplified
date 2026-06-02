@@ -8,6 +8,7 @@ from bson import ObjectId
 
 from BackEnd.db import users_collection, franchises_collection, franchise_team_data_collection
 from BackEnd.utils.auth import get_current_user
+from BackEnd.utils.user_tracking import ARCHETYPE_KEYS
 
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 
@@ -171,4 +172,58 @@ async def get_leaderboard_by_team(
             for pts, _lower, uname, lead in scores[:3]
         ]
 
+    return result
+
+
+@router.get("/by-archetype")
+async def get_leaderboard_by_archetype(user: dict = Depends(get_current_user)):
+    """Top 5 coaches per coaching archetype, ranked by each coach's personal
+    percentage for that archetype (their `archetypes.<key>` ÷ `archetypes.total`).
+
+    Pure percentage, no minimum games. Returns a dict keyed by archetype key →
+    list of up to 5 rows `{ rank, username, pct, is_current_user }` (empty list
+    when no coach has that archetype yet).
+    """
+    current_user_id = str(user.get("user_id", "")).strip()
+    docs = list(
+        users_collection.find(
+            {"archetypes.total": {"$gt": 0}},
+            {"username": 1, "email": 1, "archetypes": 1},
+        )
+    )
+
+    boards: dict[str, list] = {k: [] for k in ARCHETYPE_KEYS}
+    for doc in docs:
+        arche = doc.get("archetypes") or {}
+        try:
+            total = int(arche.get("total", 0) or 0)
+        except (TypeError, ValueError):
+            total = 0
+        if total <= 0:
+            continue
+        uname = _display_username(doc)
+        uid = str(doc.get("_id"))
+        for k in ARCHETYPE_KEYS:
+            try:
+                count = int(arche.get(k, 0) or 0)
+            except (TypeError, ValueError):
+                count = 0
+            if count <= 0:
+                continue
+            pct = round(count / total * 100)
+            boards[k].append((pct, count, total, uname, uid))
+
+    result: dict[str, list[dict]] = {}
+    for k in ARCHETYPE_KEYS:
+        # pct desc, then raw count desc, then total desc, then username for a stable order.
+        rows = sorted(boards[k], key=lambda t: (-t[0], -t[1], -t[2], t[3].lower()))[:5]
+        result[k] = [
+            {
+                "rank": i + 1,
+                "username": uname,
+                "pct": pct,
+                "is_current_user": (uid == current_user_id),
+            }
+            for i, (pct, count, total, uname, uid) in enumerate(rows)
+        ]
     return result
