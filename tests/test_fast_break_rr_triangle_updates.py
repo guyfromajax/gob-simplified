@@ -4,7 +4,11 @@ from BackEnd.engine.rim_runner_fast_break import (
     _resolve_rr_burst_destination,
     _resolve_triangle_setup_payload,
 )
-from BackEnd.engine.rim_runner_step_emitter import _build_burst_step
+from BackEnd.engine.rim_runner_step_emitter import (
+    _build_burst_step,
+    is_lane_pass_to_rr_resolution_turn,
+)
+from BackEnd.engine.triangle_step_emitter import build_triangle_animation_steps
 from BackEnd.utils.shared import calc_ag_segment_seconds
 
 
@@ -138,3 +142,82 @@ def test_rim_runner_burst_step_uses_payload_sprint_archetype():
     assert step["start"]["archetype"]["rr"] == "sprint"
     assert step["start"]["tween_durations"]["rr"] == step["end"]["time_elapsed"]
     assert step["end"]["time_elapsed"] > 0.5
+
+
+def _full_lineups():
+    off = {
+        "PG": _player("bh", 45, 15),
+        "SG": _player("sg", 50, 20),
+        "SF": _player("sf", 48, 30),
+        "PF": _player("rr", 20, 40),
+        "C": _player("reb", 35, 25),
+    }
+    deff = {
+        "PG": _player("d1", 70, 25),
+        "SG": _player("d2", 72, 20),
+        "SF": _player("d3", 74, 30),
+        "PF": _player("d4", 76, 15),
+        "C": _player("d5", 78, 35),
+    }
+    return off, deff
+
+
+def test_is_lane_pass_to_rr_resolution_turn_triangle_quick_shot():
+    turn = {
+        "fast_break_play": "triangle",
+        "rim_runner_pass_attempted": True,
+        "result_type": "MISS",
+    }
+    assert is_lane_pass_to_rr_resolution_turn(turn, {}) is True
+
+
+def test_is_lane_pass_to_rr_resolution_turn_triangle_setup_tree():
+    turn = {"fast_break_play": "triangle", "rim_runner_pass_attempted": False}
+    roles = {"triangle_setup_phase": {"ball_handler_id": "bh"}}
+    assert is_lane_pass_to_rr_resolution_turn(turn, roles) is False
+
+
+def test_triangle_lane_pass_miss_builds_animation_steps():
+    off, deff = _full_lineups()
+    game = SimpleNamespace(
+        game_state={
+            "time_remaining": 420.0,
+            "shot_clock_remaining": 24.0,
+            "_is_full_simulation": False,
+        },
+        offense_team=SimpleNamespace(lineup=off, team_id="home"),
+        defense_team=SimpleNamespace(lineup=deff, team_id="away"),
+    )
+    turn_result = {
+        "fast_break_play": "triangle",
+        "result_type": "MISS",
+        "rim_runner_pass_attempted": True,
+        "rim_runner_fb_open": True,
+        "rebound_type": "DREB",
+        "animations": [],
+        "shooter": off["PF"],
+        "defender": deff["PG"],
+        "roles": {
+            "rim_runner_burst_phase": {
+                "rr_id": "rr",
+                "outlet_receiver_id": "bh",
+                "outlet_passer_id": None,
+                "skip_outlet_pass": True,
+                "rr_to": {"x": 30.0, "y": 40.0, "movement_archetype": "sprint"},
+                "receiver_to": {"x": 45.0, "y": 15.0},
+                "other_players": [],
+                "is_away_offense": False,
+            },
+            "shooter": off["PF"],
+            "ball_handler": off["PG"],
+        },
+    }
+
+    steps = build_triangle_animation_steps(turn_result, game)
+
+    assert steps is not None
+    assert len(steps) >= 3
+    terminal = steps[-1]["end"]["next"]
+    assert terminal.get("kind") == "turn_stop"
+    assert terminal.get("event") == "SHOT_ATTEMPT"
+    assert terminal.get("payload", {}).get("schema_rendered_arc") is True

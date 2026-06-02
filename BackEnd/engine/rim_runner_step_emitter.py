@@ -33,9 +33,9 @@ Branch dispatch is keyed off ``turn_result``:
 - ``rim_runner_bat_oob`` (bool) → Bat OOB branch.
 - otherwise (``result_type`` MAKE/MISS/BLOCK/FOUL) → Shot branch.
 
-Triangle (next migration) drafts off the same burst + outlet pass steps,
-so ``_build_burst_step`` and ``_build_outlet_pass_step`` are designed for
-reuse by ``triangle_step_emitter.py``.
+Triangle reuses burst, outlet, and ``append_lane_pass_to_rr_resolution_steps``
+for the open-lane pass-ahead path; full Triangle setup uses
+``triangle_step_emitter.py``.
 
 See ``_documentation_master/05_Animation_System/Advance_Triggers.md`` —
 "Rim Runner" — for the per-step trigger spec.
@@ -1732,6 +1732,148 @@ def _finalize_rr_steps(
     return steps
 
 
+# --- Lane pass → RR resolution (RR + Triangle + future FB plays) ------------
+
+
+def is_lane_pass_to_rr_resolution_turn(
+    turn_result: Dict[str, Any],
+    fb_roles: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """True when post-outlet animation should use the shared lane-pass emitter.
+
+    Rim Runner always uses this path after a non-denied outlet (hold-up,
+    intercept, bat OOB, or lane pass + shot). Triangle uses it only when
+    ``rim_runner_pass_attempted`` is set (open-lane quick shot); the full
+    Triangle setup/decision tree omits ``triangle_setup_phase`` and sets
+    ``pass_attempted`` false instead.
+    """
+    roles = fb_roles if fb_roles is not None else (turn_result.get("roles") or {})
+    if roles.get("triangle_setup_phase") or turn_result.get("triangle_setup_phase"):
+        return False
+    if turn_result.get("triangle_enter_hco"):
+        return False
+    if turn_result.get("rim_runner_outlet_failed"):
+        return False
+
+    play = turn_result.get("fast_break_play")
+    if play == "triangle":
+        return bool(turn_result.get("rim_runner_pass_attempted"))
+    if play == "rim_runner":
+        return True
+    return bool(turn_result.get("rim_runner_pass_attempted"))
+
+
+def append_lane_pass_to_rr_resolution_steps(
+    *,
+    turn_result: Dict[str, Any],
+    game: Any,
+    steps: List[AnimationStep],
+    last_end_coords: Dict[str, GridCoord],
+    elapsed: float,
+    clock_remaining: float,
+    shot_clock_remaining: float,
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+) -> Optional[List[AnimationStep]]:
+    """Append post-outlet lane-pass resolution steps and finalize.
+
+    Shared by Rim Runner and Triangle (and future FB plays that reuse
+    ``resolve_rim_runner_fast_break`` lane-pass shot resolution). Caller
+    must already have appended burst and optional outlet pass steps.
+
+    Branches: hold-up, intercept, bat OOB, lane pass + shot motion.
+    """
+    no_lane_pass = bool(turn_result.get("rim_runner_no_lane_pass"))
+    interception = bool(turn_result.get("rim_runner_interception"))
+    bat_oob = bool(turn_result.get("rim_runner_bat_oob"))
+
+    clock_at = clock_remaining - elapsed
+    sc_at = shot_clock_remaining - elapsed
+    coords = dict(last_end_coords)
+    next_idx = len(steps) + 1
+
+    if interception:
+        intercept = _build_lane_pass_intercepted_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_at,
+            shot_clock_remaining_at_start=sc_at,
+        )
+        if intercept is not None:
+            steps.append(intercept)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    if bat_oob:
+        batted = _build_lane_pass_batted_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_at,
+            shot_clock_remaining_at_start=sc_at,
+        )
+        if batted is not None:
+            steps.append(batted)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    if no_lane_pass:
+        hold_up = _build_hold_up_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_start_coords=coords,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_at,
+            shot_clock_remaining_at_start=sc_at,
+        )
+        if hold_up is not None:
+            steps.append(hold_up)
+        return _finalize_rr_steps(turn_result, game, steps)
+
+    lane_pass = _build_lane_pass_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        step_start_coords=coords,
+        is_away_offense=is_away_offense,
+        clock_remaining_at_start=clock_at,
+        shot_clock_remaining_at_start=sc_at,
+        next_step_index=next_idx,
+    )
+    if lane_pass is None:
+        return None
+    steps.append(lane_pass)
+    elapsed += float(lane_pass["end"]["time_elapsed"])
+    coords = dict(lane_pass["end"]["coords"])
+    clock_at = clock_remaining - elapsed
+    sc_at = shot_clock_remaining - elapsed
+
+    shot_motion = _build_shot_motion_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        animations=turn_result.get("animations") or [],
+        step_start_coords=coords,
+        clock_remaining_at_start=clock_at,
+        shot_clock_remaining_at_start=sc_at,
+    )
+    if shot_motion is not None:
+        steps.append(shot_motion)
+
+    return _finalize_rr_steps(turn_result, game, steps)
+
+
 # --- Main entry point: branch dispatcher -----------------------------------
 
 
@@ -1776,9 +1918,6 @@ def build_rim_runner_animation_steps(
     shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
 
     outlet_failed = bool(turn_result.get("rim_runner_outlet_failed"))
-    no_lane_pass = bool(turn_result.get("rim_runner_no_lane_pass"))
-    interception = bool(turn_result.get("rim_runner_interception"))
-    bat_oob = bool(turn_result.get("rim_runner_bat_oob"))
 
     steps: List[AnimationStep] = []
     elapsed = 0.0
@@ -1840,82 +1979,16 @@ def build_rim_runner_animation_steps(
         elapsed += float(outlet_step["end"]["time_elapsed"])
         last_end_coords = dict(outlet_step["end"]["coords"])
 
-    next_idx = len(steps) + 1
-
-    if interception:
-        intercept = _build_lane_pass_intercepted_step(
-            turn_result=turn_result,
-            fb_roles=fb_roles,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            step_start_coords=last_end_coords,
-            is_away_offense=is_away_offense,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-        )
-        if intercept is not None:
-            steps.append(intercept)
-        return _finalize_rr_steps(turn_result, game, steps)
-
-    if bat_oob:
-        batted = _build_lane_pass_batted_step(
-            turn_result=turn_result,
-            fb_roles=fb_roles,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            step_start_coords=last_end_coords,
-            is_away_offense=is_away_offense,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-        )
-        if batted is not None:
-            steps.append(batted)
-        return _finalize_rr_steps(turn_result, game, steps)
-
-    if no_lane_pass:
-        hold_up = _build_hold_up_step(
-            turn_result=turn_result,
-            fb_roles=fb_roles,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            step_start_coords=last_end_coords,
-            is_away_offense=is_away_offense,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-        )
-        if hold_up is not None:
-            steps.append(hold_up)
-        return _finalize_rr_steps(turn_result, game, steps)
-
-    # Shot branch: lane pass + shot motion.
-    lane_pass = _build_lane_pass_step(
+    return append_lane_pass_to_rr_resolution_steps(
         turn_result=turn_result,
+        game=game,
+        steps=steps,
+        last_end_coords=last_end_coords,
+        elapsed=elapsed,
+        clock_remaining=clock_remaining,
+        shot_clock_remaining=shot_clock_remaining,
         fb_roles=fb_roles,
         off_lineup=off_lineup,
         def_lineup=def_lineup,
-        step_start_coords=last_end_coords,
         is_away_offense=is_away_offense,
-        clock_remaining_at_start=clock_remaining - elapsed,
-        shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-        next_step_index=next_idx,
     )
-    if lane_pass is None:
-        return None
-    steps.append(lane_pass)
-    elapsed += float(lane_pass["end"]["time_elapsed"])
-    last_end_coords = dict(lane_pass["end"]["coords"])
-
-    shot_motion = _build_shot_motion_step(
-        turn_result=turn_result,
-        fb_roles=fb_roles,
-        off_lineup=off_lineup,
-        def_lineup=def_lineup,
-        animations=turn_result.get("animations") or [],
-        step_start_coords=last_end_coords,
-        clock_remaining_at_start=clock_remaining - elapsed,
-        shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-    )
-    if shot_motion is not None:
-        steps.append(shot_motion)
-
-    return _finalize_rr_steps(turn_result, game, steps)

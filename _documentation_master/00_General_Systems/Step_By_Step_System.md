@@ -248,10 +248,20 @@ Backend stages (in `resolve_rim_runner_fast_break`) that decide whether the BH a
 Steps 0-1: Burst + outlet pass (shared with Rim Runner; outlet-denied reuses RR's denied path)
 
 Step 2: RR read gate (stricter threshold: `fb_open = (burst_offense_score × 0.8) > burst_defense_score`)
-- If `pass_attempted = True`: route to RR lane-pass branch (intercept / bat OOB / shot)
-- If `pass_attempted = False`: proceed to Step 3
 
-Step 3: Triangle setup ("Fast Break!" announcement)
+| Outcome | Emitter path | Steps (summary) |
+|---|---|---|
+| `pass_attempted = True` | **`append_lane_pass_to_rr_resolution_steps`** (shared with Rim Runner; `rim_runner_step_emitter.py`) | Same as RR Step 2 table: hold-up / intercept / bat OOB / lane pass → shoot → **[skeleton post-shot chain]** |
+| `pass_attempted = False` | Triangle-only setup tree (below) | Step 3+ |
+
+**Lane-pass quick shot** (outlet receiver passes ahead to RR — no Triangle corners/setup):
+- Detection: `rim_runner_pass_attempted` on turn_result, **no** `triangle_setup_phase`.
+- Passer on lane-pass step = `rim_runner_burst_phase.outlet_receiver_id` (ball handler after burst; outlet pass step skipped when `skip_outlet_pass`).
+- Shot motion uses **`_build_shot_motion_step`** (RR), not `_build_triangle_shot_motion_step`.
+- Announcement subtitle uses play label **"Triangle"** via `_fb_play_label(fast_break_play)`.
+- Miss → DREB: same discrete DREB promotion as other migrated FB misses (schema bounce on MISS turn, rebound capture on DREB turn).
+
+Step 3: Triangle setup ("Fast Break!" announcement) — only when `pass_attempted = False`
 - AT: `player_reaches_position` (RR + BH both reach setup spots)
 - Corner players: `sprint` to upper/lower corner (lower-y → lower corner)
 - BH: non-burst to wing (upper if y > 25 else lower)

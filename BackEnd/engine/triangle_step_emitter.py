@@ -1,12 +1,15 @@
 """Triangle Fast Break animation step emitter (UESS / SS&S).
 
 Triangle reuses Rim Runner burst + outlet pass (DREB entry), then diverges:
-  burst → outlet (optional) → triangle setup → decision lead-in → shot motion.
 
-Outlet-denied and ``triangle_enter_hco`` (hold-up) reuse the RR branch steps
-from ``rim_runner_step_emitter``.
+  - **Lane-pass quick shot** (``rim_runner_pass_attempted``): shared
+    ``append_lane_pass_to_rr_resolution_steps`` — outlet receiver → RR lane
+    pass → shot motion → skeleton post-shot chain (same as Rim Runner).
+  - **Setup tree** (``pass_attempted`` false): triangle setup → decision
+    lead-in → ``_build_triangle_shot_motion_step`` → finalize.
 
-See ``rim_runner_step_emitter`` module docstring for shared step builders.
+Outlet-denied and ``triangle_enter_hco`` reuse RR branch steps from
+``rim_runner_step_emitter``.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from BackEnd.utils.animation_step_schema import (
 
 from BackEnd.engine.rim_runner_step_emitter import (
     _all_player_start_coords,
+    append_lane_pass_to_rr_resolution_steps,
     _build_burst_step,
     _build_hold_up_step,
     _build_outlet_denied_defender_step,
@@ -45,6 +49,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _finalize_rr_steps,
     _interrupted_coord,
     _is_offense_player,
+    is_lane_pass_to_rr_resolution_turn,
     _movement_end_coord,
     _player_lookup_by_id,
     _resolve_shot_next,
@@ -769,6 +774,33 @@ def build_triangle_animation_steps(
                 triangle_enter_hco, result_type, len(steps),
             )
         return _finalize_rr_steps(turn_result, game, steps)
+
+    # Open-lane quick shot: outlet receiver → RR lane pass + shot (same
+    # schema chain as Rim Runner; no triangle_setup_phase on turn_result).
+    if is_lane_pass_to_rr_resolution_turn(turn_result, fb_roles):
+        lane_pass_steps = append_lane_pass_to_rr_resolution_steps(
+            turn_result=turn_result,
+            game=game,
+            steps=steps,
+            last_end_coords=last_end_coords,
+            elapsed=elapsed,
+            clock_remaining=clock_remaining,
+            shot_clock_remaining=shot_clock_remaining,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+        )
+        if lane_pass_steps is None:
+            _tri_log.warning(
+                "🐛 [TRIANGLE_NONE site=lane_pass_to_rr] outlet_failed=%s "
+                "result_type=%s skip_outlet_pass=%s pass_attempted=%s",
+                outlet_failed,
+                result_type,
+                skip_outlet_pass,
+                turn_result.get("rim_runner_pass_attempted"),
+            )
+        return lane_pass_steps
 
     payload = _triangle_setup_payload(fb_roles)
     if not payload:

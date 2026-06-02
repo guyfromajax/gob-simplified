@@ -177,9 +177,11 @@ When two defenders both retreat to basket defense, the second defender's spot is
 
 #### Triangle (`triangle`)
 
-- **Status**: Planned dedicated Fast Break play family. It should live inside the universal Fast Break framework, but use its own phase graph rather than the Rim Runner hold-up / lane-pass resolution after the initial RR read.
+- **Status**: UESS-migrated for burst, outlet, denied-outlet, **lane-pass quick shot**, and full setup/decision branches. Backend emitter: `BackEnd/engine/triangle_step_emitter.py` (setup tree) plus shared `append_lane_pass_to_rr_resolution_steps` in `rim_runner_step_emitter.py` (open-lane pass-ahead).
 - **Entry**: Triangle drafts off the Rim Runner DREB entry. It uses the same RR burst, outlet receiver placement, outlet contest, and denied-outlet branch. If the outlet is denied, Triangle uses the same denied-outlet comeback branch and then enters `HCO` exactly as RR does.
-- **RR read gate**: After a successful outlet, Triangle still performs the RR lane-pass read first. It uses the same `burst_offense_score`, `burst_defense_score`, `correct_read`, and `pass_attempted` logic as RR, except the open-lane threshold is stricter: `fb_open = (burst_offense_score * 0.8) > burst_defense_score`. If `pass_attempted = True`, Triangle resolves exactly like the RR lane-pass branch. If `pass_attempted = False`, Triangle enters its own setup/decision flow below.
+- **RR read gate**: After a successful outlet, Triangle still performs the RR lane-pass read first. It uses the same `burst_offense_score`, `burst_defense_score`, `correct_read`, and `pass_attempted` logic as RR, except the open-lane threshold is stricter: `fb_open = (burst_offense_score * 0.8) > burst_defense_score`.
+  - **`pass_attempted = True`**: Resolution matches Rim Runner (outlet receiver → RR lane pass → attack shot). **`animation_steps`** are built via **`append_lane_pass_to_rr_resolution_steps`** (burst → optional outlet → lane pass → `_build_shot_motion_step` → skeleton post-shot sub-steps). Turn has **`rim_runner_pass_attempted`** and **no** `triangle_setup_phase`. Frontend must use schema playback (`NEW_PLAYBACK_ENGINE`); legacy `fastBreak.js` `animateRebound` on the MISS turn causes double rebound animation if steps are missing.
+  - **`pass_attempted = False`**: Triangle enters its own setup/decision flow below (`triangle_setup_phase` on roles).
 - **Triangle setup**:
   - Two remaining offensive players become corner players and sprint to `upper corner` / `lower corner` (`HCO_STRING_SPOTS` labels).
   - Ball handler uses non-burst movement to `upper wing` if `y > 25`, else `lower wing`.
@@ -663,7 +665,9 @@ The outlet passer tracks:
   - Covert Release: defender farthest from rim (excluding shooter’s matchup); **AG**-based x floors + **IQ** (`good_release` / `good_d_release`) y/x bands; HOME orientation + **x** mirror for away FB offense
 - `BackEnd/constants/fast_break_constants.py` — Movement bands, **`fast_break_shot_defender_end_coords()`** / **`fast_break_secondary_shot_defender_end_coords()`** (single source for FB shot defender geometry vs shooter final)
 - `BackEnd/constants/fast_break_play_types.py` — Play keys, `default_fast_break_plays()`, `ensure_fast_break_plays()`, `play_key_for_fast_break_entry()` (DREB: **50/50** when called; live path uses **`pending_dreb_fb_play_key`** from `shot_manager`)
-- `BackEnd/engine/rim_runner_fast_break.py` — **`resolve_rim_runner_fast_break()`** — Rim Runner DREB outlet play (outlet contest, burst, read, pass/intercept/bat/shot)
+- `BackEnd/engine/rim_runner_fast_break.py` — **`resolve_rim_runner_fast_break()`** — Rim Runner / Triangle DREB outlet play (outlet contest, burst, read, pass/intercept/bat/shot or Triangle setup tree)
+- `BackEnd/engine/rim_runner_step_emitter.py` — **`build_rim_runner_animation_steps()`**; shared **`append_lane_pass_to_rr_resolution_steps()`** (outlet receiver → RR lane pass + shot, hold-up, intercept, bat OOB) used by Rim Runner and Triangle lane-pass quick shot
+- `BackEnd/engine/triangle_step_emitter.py` — **`build_triangle_animation_steps()`** — burst/outlet/denied + lane-pass delegate + Triangle setup/decision branches
 - `BackEnd/engine/phase_resolution.py`
   - `resolve_free_throw_logic()` — missed FT + DREB: `fast_break_probability_from_slider(def_team["fast_breaks"])` for FAST_BREAK vs HCO
   - `resolve_turnover_logic()` / FCP / HCT steal branches — `fast_break_probability_from_slider(def_team["aggression"])` (**stealing** team)
