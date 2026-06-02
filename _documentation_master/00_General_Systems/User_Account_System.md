@@ -5,15 +5,27 @@
 1. **Endpoints**:
    - **POST /api/auth/signup** – Create account (OTP required when `IS_ALPHA=true`)
    - **POST /api/auth/login** – Login and get JWT token
-   - **GET /api/auth/me** – Current user info (requires auth)
+   - **POST /api/auth/logout** – Logout (client discards token)
+   - **GET /api/auth/me** – Current user info incl. `account_settings`, `tutorial_state`, `record`, `archetypes`, `lead_archetype`, `archetype_reveal_seen` (requires auth)
    - **GET /api/auth/config** – Auth config (IS_ALPHA, OTP required)
    - **POST /api/auth/request-access-code** – Request alpha access code (body: `email`); stores request for admin to process manually
    - **POST /api/auth/set-username** – Set username (requires auth)
+   - **PATCH /api/auth/account-settings** – Update account settings, e.g. `display_color` (requires auth)
+   - **PATCH /api/auth/archetype-reveal-seen** – Mark the one-time first-archetype reveal modal seen (requires auth)
+   - **GET /api/auth/leaderboard** – Alpha leaderboard (geek-points + franchise-rank views); each coach row includes `lead_archetype` (requires auth)
+   - **POST /api/auth/fte-complete** – Mark legacy first-time experience complete (requires auth)
+   - **POST /api/auth/tutorial-advance** – Advance the FTE v2 tutorial step (requires auth)
+   - **POST /api/auth/tutorial-complete** – Complete the FTE v2 tutorial (requires auth)
    - **POST /api/auth/reset-request** – Request password reset email (body: `email`)
    - **POST /api/auth/reset-password** – Set new password with token (body: `token`, `new_password`)
+   - Also: **GET /api/leaderboard/by-team** (`BackEnd/api/leaderboard_routes.py`) – top coaches per A1 team; rows include `lead_archetype`
 
 2. **Data**:
-   - **Users collection**: `user_id` (ObjectId), `email`, `password_hash`, `role`, `subscription`, `geek_points` (int total), `geek_points_by_team` (optional dict: canonical `team_id` → int; lazy-created on first award per team), `username` (optional), `username_lower` (for uniqueness), `created_at`, `last_login_at`, `version`
+   - **Users collection**:
+     - *Auth core:* `_id` (ObjectId), `email`, `password_hash`, `role`, `subscription`, `username` (optional), `username_lower` (for uniqueness), `created_at`, `updated_at`, `last_login_at`, `version`
+     - *Geek points:* `geek_points` (int total), `geek_points_by_team` (optional dict: canonical `team_id` → int; lazy-created on first award per team)
+     - *Profile / UX:* `account_settings` (`{ display_color }`), `fte` (bool, legacy FTE flag), `fte_v2_complete` (bool), `tutorial_state` (`{ step, team_pick, started_at, completed_at }`)
+     - *Coaching-archetype tracking:* `record` (`{ wins, losses, total_games, win_rate, discount_wins, discount_losses }`), `archetypes` (18 per-archetype counters + `total`), `lead_archetype` (string key, `""` when no games), `archetype_reveal_seen` (bool). Shapes are the single source of truth in `BackEnd/utils/user_tracking.py` — see [`projects/User_Archetype_System.md`](../projects/User_Archetype_System.md).
    - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (or `set_admin_user_production.py` for production DB). Admin status is read from the DB when needed: `/api/auth/me` and builder API checks use the DB role so promoting a user to admin works without re-login.
    - **subscription**, **geek_points**: New signups get `subscription: "alpha"` (string) and `geek_points: 0` (integer). `geek_points_by_team` is not set until the user earns franchise points by team. Existing users were backfilled via `scripts/add_user_subscription_geek_points.py`.
    - **password_reset_tokens collection**: `token`, `user_id`, `expires_at`, `created_at` (tokens expire in 1 hour, deleted after use)
@@ -38,7 +50,26 @@ The User Account System handles signup, login, JWT-based authentication, and opt
 
 **Location:** `BackEnd/api/auth_routes.py`, `BackEnd/utils/auth.py`, `BackEnd/utils/otp_validator.py`  
 **Status:** ✅ Implemented with rate limiting and alpha OTP  
-**Scope:** Signup, login, JWT, protected endpoints, username
+**Scope:** Signup, login, logout, JWT, protected endpoints, username, account settings, FTE/tutorial state, and coaching-archetype tracking surfaced on the user doc
+
+### User Game Record Tracking
+
+User win/loss tracking lives on `users.record`.
+
+Fields:
+
+- `wins` — completed user franchise games won
+- `losses` — completed user franchise games lost
+- `total_games` — derived as `wins + losses`
+- `win_rate` — derived as `round(100 * wins / total_games)` when `total_games > 0`, else `0`
+- `discount_wins` — completed wins where the game used **Sim Full Game** or **Sim Rest of Game**
+- `discount_losses` — completed losses where the game used **Sim Full Game** or **Sim Rest of Game**
+
+Every completed user franchise game increments either `wins` or `losses`. If the completed game has `games.bulk_sim_used = true`, the same outcome also increments either `discount_wins` or `discount_losses`.
+
+`games.bulk_sim_used` is set by `/api/simulate-quarter` when the user advances via Sim Full Game or Sim Rest of Game. It is sticky once true, so later played quarters cannot clear the discount marker.
+
+Geek Points use the same marker: bulk-sim games receive the base Geek Points award, while non-bulk games receive 2x the final base award. See [`Geek_Points_System.md`](Geek_Points_System.md).
 
 ### Endpoints
 
@@ -47,11 +78,19 @@ The User Account System handles signup, login, JWT-based authentication, and opt
 | GET | /api/auth/config | No | Returns `is_alpha`, `otp_required` |
 | POST | /api/auth/signup | No | Create user; OTP required when alpha |
 | POST | /api/auth/login | No | Email + password → JWT + user |
-| GET | /api/auth/me | Yes | Current user profile |
+| POST | /api/auth/logout | No | Logout (client discards token) |
+| GET | /api/auth/me | Yes | Current user profile (incl. settings, tutorial_state, record, archetypes, lead_archetype, archetype_reveal_seen) |
 | POST | /api/auth/request-access-code | No | Request alpha access code (body: email); stores in DB for admin |
 | POST | /api/auth/set-username | Yes | Set or update username |
+| PATCH | /api/auth/account-settings | Yes | Update account settings (e.g. `display_color`) |
+| PATCH | /api/auth/archetype-reveal-seen | Yes | Mark the one-time first-archetype reveal modal seen |
+| GET | /api/auth/leaderboard | Yes | Alpha leaderboard (geek-points + rank views); rows include `lead_archetype` |
+| POST | /api/auth/fte-complete | Yes | Mark legacy first-time experience complete |
+| POST | /api/auth/tutorial-advance | Yes | Advance FTE v2 tutorial step |
+| POST | /api/auth/tutorial-complete | Yes | Complete FTE v2 tutorial |
 | POST | /api/auth/reset-request | No | Request reset email (generic 200 response) |
 | POST | /api/auth/reset-password | No | Set new password with token; invalidates token |
+| GET | /api/leaderboard/by-team | Yes | Top coaches per A1 team; rows include `lead_archetype` (separate router) |
 
 ### Request Access Code (alpha signup)
 
@@ -136,7 +175,9 @@ Stale/invalid tokens in `localStorage` caused UI to show "logged in" state even 
 
 ### Key Files
 
-- **BackEnd/api/auth_routes.py** – All auth endpoints (signup, login, me, config, set-username)
+- **BackEnd/api/auth_routes.py** – All `/api/auth/*` endpoints (signup, login, logout, me, config, set-username, account-settings, archetype-reveal-seen, leaderboard, fte-complete, tutorial-advance/complete, reset)
+- **BackEnd/api/leaderboard_routes.py** – `/api/leaderboard/by-team` (coach leaderboards; rows carry `lead_archetype`)
+- **BackEnd/utils/user_tracking.py** – single source of truth for the `record` / `archetypes` / `lead_archetype` shapes on the user doc (see `projects/User_Archetype_System.md`)
 - **BackEnd/utils/auth.py** – Password hashing, JWT creation, `get_current_user`, `get_user_by_email`
 - **BackEnd/utils/otp_validator.py** – Alpha OTP validation and consumption
 - **BackEnd/utils/rate_limiter.py** – Rate limit config; auth endpoints use `AUTH_RATE_LIMIT`
@@ -144,3 +185,35 @@ Stale/invalid tokens in `localStorage` caused UI to show "logged in" state even 
 - **BackEnd/utils/email_sender.py** – SendGrid password-reset email (Step 11)
 - **FrontEnd/static/js/shared/accessDenied.js** – 401/403 UX + redirect; clears `auth_token` on 401
 - **FrontEnd/static/set-lineup.js** – lineup/gameplay fetches fail closed on 401/403
+
+
+**User Access Points**
+##Account Modal##
+- Accessed via the gear icon in the top nav bar
+   - remove "Alpha Coach' from the modal
+- Username row
+- Scouting Ambience Toggle
+- Manage Account link
+**Note: remove the Coaching Archetypes link from the modal
+
+##Full Account Page##
+- Username info 
+   - circle image, username, badge
+- Geek Points value
+   - Sub categories of Geek Points by team
+- Title section
+   -National, Region, and Confernece Tournametn titles as well as regular season conference champtionship titles
+- Status (all get "Alpha" for now, but this will be a dynamic filed tied to the subscription field in the user doc in the db)
+- Scouting Ambience toggle
+- In-Game Display toggle ("Pos" on left, "#" on right)
+   - This will be a new feature that I'll brief you on after we implement this. For now make it set to Pos on the left and a dead toggle.
+- Coaching Archetypes Board
+   - Dispaly all Coahcing Archetypes that the user has > 0% value for, in desceding order, highest to lowest. Ranked #1. for highest, #2. for second highest, etc. Also I suggest this be a 3 or 4 column layout, so if the user has values for say 12 of them, we don't have a long vertical section of 12 listd, but rather a 3x4 or 4x3
+- link to User history page (new page we'll need to create)
+   -User history will track Franchsise Seasons
+      - Team & Franchise # ("Morristown - #1)
+      - Season #
+      - Record
+      - Any titles won
+-Link to Coaching Archetypes page
+**The Link to user hsitory page can be a dead link for now since we have not created that page.

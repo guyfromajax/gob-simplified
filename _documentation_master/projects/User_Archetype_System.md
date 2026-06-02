@@ -24,7 +24,7 @@ Rules locked in: every period counts (Q1–Q4 + OT, simmed or played); deduped o
 
 **Persistence note (load-bearing — don't remove without reading [`simulate_quarter_api_cleanup.md`](simulate_quarter_api_cleanup.md) §5):** the stash's own `$set` of `archetype_periods` does NOT survive to `finalize` in the franchise save flow. So persistence relies on (1) the **api.py call-site** writing `archetype_periods` from the returned `dbg.result`, and (2) a `finalize` **fallback** reading results from the durable `game.archetype_hook.<q>.dbg.result`. Root cause unexplained — open investigation.
 
-**Deferred (not bugs):** (1) **prod backfill** — run `--apply --db production --confirm-production-write` after code ships; (2) **`discount_wins`/`discount_losses`** — fields exist, tracking unwired (future hook reads `game.bulk_sim_used`). Still TODO: manual franchise playthrough on staging to confirm the live stash.
+**Deferred (not bugs):** (1) **prod backfill** — run `--apply --db production --confirm-production-write` after code ships. `discount_wins` / `discount_losses` and Geek Points bulk-sim policy are wired: `game.bulk_sim_used` is durable for Sim Full Game / Sim Rest of Game; bulk-sim games increment the discount record fields and receive base Geek Points; non-bulk games receive 2x Geek Points. Still TODO: manual franchise playthrough on staging to confirm the live stash.
 
 ##Modal Display
 - username
@@ -113,7 +113,7 @@ Rules locked in: every period counts (Q1–Q4 + OT, simmed or played); deduped o
 
 ## Bulk sim tracking (Sim Full Game / Sim Rest of Game)
 
-**Goal:** Geek Points discounting + `record.discount_wins` / `record.discount_losses`. **Not** triggered by Sim Quarter alone or Play Quarter only.
+**Goal:** Geek Points gameplay-mode policy + `record.discount_wins` / `record.discount_losses`. **Not** triggered by Sim Quarter alone or Play Quarter only.
 
 ### Game document (`games` collection)
 
@@ -142,6 +142,8 @@ if body.advance_method in ("sim_full_game", "sim_rest_of_game"):
 
 Optional audit array: `quarter_log: [{ "quarter": 1, "advance_method": "play_quarter" }, ...]` (append-only).
 
+**Implementation status:** `advance_method` is accepted by `/api/simulate-quarter`. `Sim Full Game` / `Sim Rest of Game` send `advance_method` from `bootGame.js`, and the backend persists sticky `games.bulk_sim_used = true` for `sim_full_game` / `sim_rest_of_game`. Once true, later non-bulk saves preserve the flag. `Sim Quarter` is sunset and does not set `bulk_sim_used`.
+
 **Examples:**
 
 | Session | `bulk_sim_used` |
@@ -159,9 +161,8 @@ After resolving user win/loss for the game (single / tournament / franchise user
 2. `$inc` `record.wins` or `record.losses` and `record.total_games` (recompute `win_rate` in app or via aggregation).
 3. If `bulk_sim_used`:
    - `$inc` `record.discount_wins` or `record.discount_losses` (same outcome as step 2).
-4. Franchise geek points: in `maybe_award_franchise_win_geek_points` / `maybe_award_franchise_loss_geek_points`, accept `bulk_sim_used: bool` and apply discount (e.g. `delta = max(1, int(delta * 0.5))` or separate reduced ranges — product decision).
+4. Franchise Geek Points: in `maybe_award_franchise_win_geek_points` / `maybe_award_franchise_loss_geek_points`, pass `bulk_sim_used: bool`. Bulk-sim games receive the existing base award; non-bulk games receive `2 * base_award`.
 
 **Leaderboard / display:** Primary record = all games; optional UI line “Bulk-sim record: {discount_wins}-{discount_losses}” or exclude discount games from a future “competitive” leaderboard.
 
 **Reference:** [`Gameplay_Buttons_System.md`](../05_GP_Supporting_Systems/Gameplay_Buttons_System.md), [`Geek_Points_System.md`](../00_General_Systems/Geek_Points_System.md), `bootGame.js` (`handleSimFullGame` / `handleButtonClick`).
-

@@ -41,7 +41,8 @@ def default_record() -> dict:
 
     `total_games` and `win_rate` are derived (see `recompute_record_derived`);
     they start at 0 and are recomputed on every write. `discount_wins` /
-    `discount_losses` are tracked separately (wiring deferred — see the plan).
+    `discount_losses` track completed games that used Sim Full Game or Sim Rest
+    of Game.
     """
     return {
         "wins": 0,

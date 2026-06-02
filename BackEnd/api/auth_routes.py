@@ -151,6 +151,10 @@ class UserResponse(BaseModel):
     archetypes: Optional[dict] = None  # 18 coaching-archetype counters + total
     lead_archetype: Optional[str] = None  # denormalized top archetype key for the badge ("" if none)
     archetype_reveal_seen: Optional[bool] = None  # gates the one-time first-archetype reveal
+    subscription: Optional[str] = None  # e.g. "alpha" — drives the account-page Status field
+    geek_points: Optional[int] = None  # total geek points
+    geek_points_by_team: Optional[dict] = None  # canonical team_id -> int (lazy; {} when none)
+    championships_total: Optional[dict] = None  # { conf_rs, conf_t, region, national } -> int counts
 
 
 class AuthConfigResponse(BaseModel):
@@ -778,6 +782,13 @@ async def get_me(user: dict = Depends(get_current_user)):
     if lead_archetype is None:
         lead_archetype = compute_lead_archetype(archetypes)
     archetype_reveal_seen = bool(db_user.get("archetype_reveal_seen")) if db_user else False
+    # Account-page fields (read-only). championships_total is lazily created by the
+    # award logic, so default the four kinds to 0 for coaches with no titles.
+    subscription = (db_user.get("subscription") if db_user else None) or "alpha"
+    geek_points = int(db_user.get("geek_points", 0) or 0) if db_user else 0
+    geek_points_by_team = (db_user.get("geek_points_by_team") if db_user else None) or {}
+    raw_champs = (db_user.get("championships_total") if db_user else None) or {}
+    championships_total = {k: int(raw_champs.get(k, 0) or 0) for k in ("conf_rs", "conf_t", "region", "national")}
 
     return UserResponse(
         user_id=user["user_id"],
@@ -792,7 +803,11 @@ async def get_me(user: dict = Depends(get_current_user)):
         record=record,
         archetypes=archetypes,
         lead_archetype=lead_archetype,
-        archetype_reveal_seen=archetype_reveal_seen
+        archetype_reveal_seen=archetype_reveal_seen,
+        subscription=subscription,
+        geek_points=geek_points,
+        geek_points_by_team=geek_points_by_team,
+        championships_total=championships_total
     )
 
 

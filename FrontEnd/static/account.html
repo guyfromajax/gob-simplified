@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Account - Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <style>
+    :root { --bebas: 'Bebas Neue Pro', 'Bebas Neue', sans-serif; --inter: 'Inter', sans-serif; --orange: #F79420; }
+    body {
+      font-family: var(--inter); margin: 0; padding: 92px 20px 80px; color: #fff; line-height: 1.5;
+      background: radial-gradient(1200px 620px at 50% -12%, #243049 0%, rgba(36,48,73,0) 60%), #0d1018;
+      min-height: 100vh;
+    }
+    .acct { max-width: 920px; margin: 0 auto; }
+    .acct-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0 0 18px; }
+
+    .card {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px; padding: 20px 22px;
+    }
+    .card + .card, .acct-grid + .card, .card + .acct-grid { margin-top: 14px; }
+    .acct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    @media (max-width: 760px) { .acct-grid { grid-template-columns: 1fr; } }
+
+    .card-label {
+      font-family: var(--inter); font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: rgba(255,255,255,0.42); margin: 0 0 14px;
+    }
+
+    /* Identity */
+    .acct-identity { display: flex; align-items: center; gap: 16px; }
+    .acct-avatar {
+      flex-shrink: 0; width: 78px; height: 78px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(155deg, #2e3a55, #1a2030);
+      border: 1px solid rgba(255,255,255,0.16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+      font-family: var(--bebas); font-size: 36px; color: rgba(255,255,255,0.78);
+    }
+    .acct-id-text { min-width: 0; }
+    .acct-name-row { display: flex; align-items: center; gap: 10px; }
+    .acct-name { font-family: var(--bebas); font-size: 34px; letter-spacing: 0.03em; color: #fff; }
+    .acct-status {
+      margin-top: 6px; display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--orange); background: rgba(247,148,32,0.12);
+      border: 1px solid rgba(247,148,32,0.4); border-radius: 999px; padding: 4px 11px;
+    }
+
+    /* Geek points */
+    .gp-total { font-family: var(--bebas); font-size: 46px; line-height: 1; color: #fff; }
+    .gp-total small { font-family: var(--inter); font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.42); margin-left: 8px; letter-spacing: 0.04em; }
+    .gp-team-row, .title-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 13.5px;
+    }
+    .gp-team-row:first-of-type, .title-row:first-of-type { border-top: none; }
+    .gp-team-name, .title-name { color: rgba(255,255,255,0.72); }
+    .gp-team-pts, .title-count { font-family: var(--bebas); font-size: 18px; color: #fff; }
+    .title-count.zero { color: rgba(255,255,255,0.3); }
+    .muted-empty { color: rgba(255,255,255,0.4); font-size: 13px; padding: 6px 0; }
+
+    /* Settings rows */
+    .set-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+    .set-row:first-of-type { border-top: none; }
+    .set-label { font-size: 13.5px; color: rgba(255,255,255,0.82); font-weight: 600; }
+    /* dead segmented control (In-Game Display) */
+    .seg { display: inline-flex; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; overflow: hidden; opacity: 0.85; cursor: default; }
+    .seg span { padding: 6px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: rgba(255,255,255,0.5); }
+    .seg span.on { background: rgba(247,148,32,0.9); color: #15181f; }
+
+    /* Archetype board */
+    .arch-board-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+    @media (max-width: 760px) { .arch-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 440px) { .arch-board-grid { grid-template-columns: 1fr; } }
+    .arch-cell {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 11px; padding: 10px 12px;
+    }
+    .arch-rank { font-family: var(--bebas); font-size: 16px; color: rgba(255,255,255,0.42); width: 22px; flex-shrink: 0; }
+    .arch-badge { width: 30px; height: 30px; flex-shrink: 0; display: inline-flex; align-items: center; }
+    .arch-meta { min-width: 0; }
+    .arch-aname { font-family: var(--inter); font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .arch-pct { font-family: var(--bebas); font-size: 15px; color: var(--orange); }
+
+    /* footer links */
+    .acct-links { display: flex; gap: 22px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+    .acct-link { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    .acct-link:hover { color: #fff; }
+    .acct-link[aria-disabled="true"] { color: rgba(255,255,255,0.3); cursor: default; }
+    .acct-link .arrow { transition: transform .14s ease; }
+    .acct-link:not([aria-disabled="true"]):hover .arrow { transform: translateX(2px); }
+
+    /* reuse .account-switch from auth-bar.css for the ambience toggle */
+  </style>
+</head>
+<body class="has-auth-bar has-footer">
+  <div id="auth-bar" class="auth-bar"></div>
+
+  <div class="acct">
+    <h1 class="acct-title">Account</h1>
+
+    <div class="card">
+      <div class="acct-identity">
+        <div id="acct-avatar" class="acct-avatar" aria-hidden="true"></div>
+        <div class="acct-id-text">
+          <div class="acct-name-row">
+            <span id="acct-name" class="acct-name">Coach</span>
+            <span id="acct-badge" class="arch-badge"></span>
+          </div>
+          <span class="acct-status" id="acct-status">Alpha</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="acct-grid">
+      <div class="card">
+        <p class="card-label">Geek Points</p>
+        <div class="gp-total"><span id="gp-total">0</span><small>TOTAL</small></div>
+        <div id="gp-by-team" style="margin-top:14px;"></div>
+      </div>
+      <div class="card">
+        <p class="card-label">Titles</p>
+        <div id="titles"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-label">Settings</p>
+      <div class="set-row">
+        <span class="set-label">Scouting Ambience</span>
+        <button type="button" id="acct-ambience-switch" class="account-switch" role="switch" aria-checked="true" aria-label="Scouting ambience">
+          <span class="account-switch-knob" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div class="set-row">
+        <span class="set-label">In-Game Display</span>
+        <div class="seg" aria-label="In-game player display (coming soon)" aria-disabled="true" title="Coming soon">
+          <span class="on">Pos</span><span>#</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-label">Coaching Archetypes</p>
+      <div id="arch-board"></div>
+    </div>
+
+    <div class="acct-links">
+      <a class="acct-link" href="#" id="history-link" aria-disabled="true">Season History<span class="arrow" aria-hidden="true">&rarr;</span></a>
+      <a class="acct-link" href="/coaching-archetypes.html">Coaching Archetypes<span class="arrow" aria-hidden="true">&rarr;</span></a>
+    </div>
+  </div>
+
+  <footer id="site-footer" class="site-footer"><a href="/faqs.html">FAQs</a></footer>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script>
+    (function () {
+      var bar = document.getElementById('auth-bar');
+      if (bar && !bar.querySelector('.auth-bar-left')) {
+        bar.innerHTML = '<div class="auth-bar-left"><a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a></div><img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha"><div class="auth-bar-right"><a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube"><img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24"></a><a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a></div>';
+      }
+    })();
+
+    var TEAM_NAMES = {
+      BENTLEY_TRUMAN: 'Bentley Truman', LANCASTER: 'Lancaster', FOUR_CORNERS: 'Four Corners',
+      OCEAN_CITY: 'Ocean City', MORRISTOWN: 'Morristown', LITTLE_YORK: 'Little York',
+      XAVIEN: 'Xavien', SOUTH_LANCASTER: 'South Lancaster'
+    };
+    var TITLE_LABELS = [
+      ['national', 'National'], ['region', 'Region'],
+      ['conf_t', 'Conference Tournament'], ['conf_rs', 'Conference (Reg. Season)']
+    ];
+    function teamName(id) { return TEAM_NAMES[id] || String(id || '').replace(/_/g, ' '); }
+    function cap(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+    function render(me) {
+      me = me || {};
+      var name = me.username || (me.email ? me.email.split('@')[0] : 'Coach');
+      document.getElementById('acct-name').textContent = name;
+      document.getElementById('acct-avatar').textContent = name.charAt(0).toUpperCase();
+      document.getElementById('acct-status').textContent = cap(me.subscription) || 'Alpha';
+
+      // badge
+      var badgeHost = document.getElementById('acct-badge');
+      badgeHost.innerHTML = '';
+      var lead = window.GOBArchetype ? window.GOBArchetype.leadFrom(me) : (me.lead_archetype || '');
+      if (lead && window.GOBArchetype) {
+        var b = window.GOBArchetype.createBadge(lead, 30);
+        if (b) badgeHost.appendChild(b);
+      }
+
+      // geek points
+      document.getElementById('gp-total').textContent = Number(me.geek_points || 0).toLocaleString();
+      var gbt = me.geek_points_by_team || {};
+      var teams = Object.keys(gbt).filter(function (k) { return Number(gbt[k]) > 0; })
+        .sort(function (a, b) { return Number(gbt[b]) - Number(gbt[a]); });
+      var gpHost = document.getElementById('gp-by-team');
+      gpHost.innerHTML = teams.length
+        ? teams.map(function (k) {
+            return '<div class="gp-team-row"><span class="gp-team-name">' + teamName(k) + '</span><span class="gp-team-pts">' + Number(gbt[k]).toLocaleString() + '</span></div>';
+          }).join('')
+        : '<div class="muted-empty">No team points yet.</div>';
+
+      // titles
+      var champs = me.championships_total || {};
+      document.getElementById('titles').innerHTML = TITLE_LABELS.map(function (t) {
+        var n = Number(champs[t[0]] || 0);
+        return '<div class="title-row"><span class="title-name">' + t[1] + '</span><span class="title-count' + (n ? '' : ' zero') + '">' + n + '</span></div>';
+      }).join('');
+
+      // archetype board: count>0, descending, ranked, percentages
+      var arche = me.archetypes || {};
+      var total = Number(arche.total || 0);
+      var entries = Object.keys(arche).filter(function (k) { return k !== 'total' && Number(arche[k]) > 0; })
+        .map(function (k) { return { key: k, count: Number(arche[k]) }; })
+        .sort(function (a, b) { return b.count - a.count; });
+      var boardHost = document.getElementById('arch-board');
+      if (!entries.length || !total) {
+        boardHost.innerHTML = '<div class="muted-empty">Play a franchise game to earn your first coaching archetype.</div>';
+      } else {
+        boardHost.innerHTML = '<div class="arch-board-grid">' + entries.map(function (e, i) {
+          var pct = Math.round((e.count / total) * 100);
+          var nm = window.GOBArchetype ? window.GOBArchetype.nameFor(e.key) : e.key;
+          var badge = window.GOBArchetype ? window.GOBArchetype.badgeHtml(e.key, 30) : '';
+          return '<div class="arch-cell"><span class="arch-rank">#' + (i + 1) + '</span>'
+            + '<span class="arch-badge">' + badge + '</span>'
+            + '<span class="arch-meta"><span class="arch-aname">' + nm + '</span> <span class="arch-pct">' + pct + '%</span></span></div>';
+        }).join('') + '</div>';
+      }
+    }
+
+    // Scouting Ambience toggle — instant-apply, mirrors the account modal.
+    function wireAmbience(me) {
+      var sw = document.getElementById('acct-ambience-switch');
+      if (!sw) return;
+      function apply(enabled) { sw.setAttribute('aria-checked', enabled ? 'true' : 'false'); }
+      import('/js/musicController.js').then(function (mc) {
+        apply(mc.isScoutingAmbienceEnabled());
+        sw.addEventListener('click', function () {
+          var turningOn = sw.getAttribute('aria-checked') !== 'true';
+          mc.setScoutingAmbienceEnabled(turningOn);
+          apply(turningOn);
+          if (turningOn) mc.tryStartScoutingAmbienceForCurrentPage();
+          else mc.clearFranchiseMusicState();
+        });
+      }).catch(function () { /* toggle stays visual if controller unavailable */ });
+    }
+
+    function start() {
+      window.GOBArchetype.ensureManifest().then(function () {
+        var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) ? API_CONFIG.buildUrl('/api/auth/me') : '/api/auth/me';
+        var headers = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders) ? API_CONFIG.getAuthHeaders() : {};
+        fetch(url, { headers: headers })
+          .then(function (r) { return r.ok ? r.json() : (window.__gobAuthMeData || {}); })
+          .then(function (me) { render(me); wireAmbience(me); })
+          .catch(function () { render(window.__gobAuthMeData || {}); wireAmbience({}); });
+      });
+    }
+    start();
+  </script>
+</body>
+</html>

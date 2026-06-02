@@ -13,6 +13,14 @@ If the team document cannot be resolved for a rare edge case, the code may incre
 
 When the **user’s franchise team** **wins** a game, the owning account receives a random geek-point award in the ranges below. When the user’s team **loses** a game they **played in**, the account receives **`random.randint(1, 2)`** geek points (same `$inc` pattern on `geek_points` and `geek_points_by_team.<team_id>`). Simmed games between two other teams do not award loss points (participation is verified).
 
+Gameplay-mode multiplier:
+
+- If the completed user game used **Sim Full Game** or **Sim Rest of Game** at any point, the user receives the base award listed below.
+- If the completed user game did **not** use Sim Full Game / Sim Rest of Game, the final base award is doubled.
+- The same final delta is applied to both `geek_points` and `geek_points_by_team.<team_id>`.
+
+The durable source for this decision is `games.bulk_sim_used`.
+
 Awards are applied server-side when results are committed (notably via `POST /franchise/complete-week`, and EOS helpers that record matchup results and `POST /franchise/sim-championship`).
 
 Implementation: `BackEnd/utils/franchise_geek_points.py` (`maybe_award_franchise_win_geek_points`, `maybe_award_franchise_loss_geek_points`).
@@ -21,8 +29,10 @@ Implementation: `BackEnd/utils/franchise_geek_points.py` (`maybe_award_franchise
 
 | Event | Geek points |
 |--------|-------------|
-| Win | `random.randint(5, 15)` |
-| Loss | `random.randint(1, 2)` |
+| Win, bulk-sim game | `random.randint(5, 15)` |
+| Win, non-bulk game | `2 * random.randint(5, 15)` |
+| Loss, bulk-sim game | `random.randint(1, 2)` |
+| Loss, non-bulk game | `2 * random.randint(1, 2)` |
 
 ### End-of-season tournaments (weeks 27–34)
 
@@ -30,18 +40,21 @@ Tournament phase and round come from the franchise EOS bracket metadata (`BackEn
 
 | Event | Geek points |
 |--------|-------------|
-| Conference tournament, rounds 1–2 | `random.randint(15, 20)` |
-| Conference championship (round 3) | `random.randint(25, 35)` |
-| Region tournament (semifinal or final week) | `random.randint(40, 50)` |
-| National tournament, rounds 1–2 | `random.randint(50, 75)` |
-| National championship (round 3) | `random.randint(125, 175)` |
-| Loss (any week / phase, user played) | `random.randint(1, 2)` |
+| Conference tournament, rounds 1–2 | Base: `random.randint(15, 20)` |
+| Conference championship (round 3) | Base: `random.randint(25, 35)` |
+| Region tournament (semifinal or final week) | Base: `random.randint(40, 50)` |
+| National tournament, rounds 1–2 | Base: `random.randint(50, 75)` |
+| National championship (round 3) | Base: `random.randint(125, 175)` |
+| Loss (any week / phase, user played) | Base: `random.randint(1, 2)` |
+
+For EOS games, apply the same gameplay-mode multiplier to the base value: bulk-sim games receive the base value; non-bulk games receive `2 * base`.
 
 ### Notes
 
 - Only the **franchise owner** (`franchise_doc.user_id` → `users._id`) is credited; guest or unauthenticated flows without a stored owner do not receive points.
 - Wins are detected by matching the game winner to the user’s team (`user_team_object_id` on the franchise document), including when team identifiers are stored as ObjectId strings or canonical `team_id` strings.
 - Losses award the flat 1–2 range above when the user’s team was a participant and did not win. Ties are handled by whichever team is recorded as the winner in the commit path.
+- `games.bulk_sim_used` is set by `/api/simulate-quarter` when the user advances via Sim Full Game or Sim Rest of Game. It is sticky once true.
 
 ## API
 

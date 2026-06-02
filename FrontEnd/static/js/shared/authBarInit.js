@@ -113,7 +113,6 @@
       '            <span id="account-settings-username" class="account-username">-</span>',
       '            <span id="account-settings-badge" class="account-username-badge"></span>',
       '          </div>',
-      '          <div class="account-tier">Alpha coach</div>',
       '        </div>',
       '        <span class="account-locked">',
       '          <svg viewBox="0 0 12 12" width="12" height="12" fill="none" aria-hidden="true">',
@@ -131,13 +130,9 @@
       '        <span class="account-switch-knob" aria-hidden="true"></span>',
       '      </button>',
       '    </div>',
-      // Working link to the coaching-archetypes explainer.
+      // Forward link to the full account page.
       '    <div class="account-field account-manage-row">',
-      '      <a href="/coaching-archetypes.html" class="account-manage-link">Coaching Archetypes<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
-      '    </div>',
-      // Forward link to the (not-yet-built) full account page — dead for now.
-      '    <div class="account-field account-manage-row">',
-      '      <a href="#" id="account-manage-link" class="account-manage-link" aria-disabled="true">Manage Account<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
+      '      <a href="/account.html" id="account-manage-link" class="account-manage-link">Manage Account<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
       '    </div>',
       '  </div>',
       '</div>'
@@ -677,14 +672,6 @@
           .catch(function (err) {
             console.warn('[ambience-toggle] music controller import failed', err);
           });
-      });
-    }
-    var manageLink = document.getElementById('account-manage-link');
-    if (manageLink && !manageLink.dataset.bound) {
-      manageLink.dataset.bound = '1';
-      // TODO: point to the full account page once designed/built.
-      manageLink.addEventListener('click', function (e) {
-        e.preventDefault();
       });
     }
   }

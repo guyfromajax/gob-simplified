@@ -3200,6 +3200,35 @@ def _resolve_user_eos_game_meta_or_raise(
     return eos_g_meta
 
 
+def _resolve_user_game_bulk_sim_used(req: CompleteWeekRequest) -> bool:
+    """Read durable bulk-sim marker from the completed user game, when available."""
+    if isinstance(getattr(req, "game_document", None), dict):
+        if req.game_document.get("bulk_sim_used") is True:
+            return True
+
+    user_game_id = getattr(req, "game_id", None)
+    if not user_game_id:
+        return False
+
+    lookup_ids: list[Any] = [user_game_id]
+    try:
+        if ObjectId.is_valid(str(user_game_id)):
+            oid = ObjectId(str(user_game_id))
+            if oid not in lookup_ids:
+                lookup_ids.append(oid)
+    except Exception:
+        pass
+
+    for lookup_id in lookup_ids:
+        try:
+            doc = db.games.find_one({"_id": lookup_id}, {"bulk_sim_used": 1})
+        except Exception:
+            doc = None
+        if doc and doc.get("bulk_sim_used") is True:
+            return True
+    return False
+
+
 def _complete_week_process_user_game_block(
     franchise_doc: dict,
     req: CompleteWeekRequest,
@@ -3215,6 +3244,7 @@ def _complete_week_process_user_game_block(
     
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
+    bulk_sim_used = _resolve_user_game_bulk_sim_used(req)
     eos_g_meta = None
     if req.week in ft.EOS_WEEKS:
         eos_g_meta = _resolve_user_eos_game_meta_or_raise(
@@ -3278,12 +3308,14 @@ def _complete_week_process_user_game_block(
         winner_team_id=user_winner_id,
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
+        bulk_sim_used=bulk_sim_used,
     )
     maybe_award_franchise_loss_geek_points(
         owner_user_id=franchise_doc.get("user_id"),
         user_team_id_str=user_team_id_str,
         winner_team_id=user_winner_id,
         participant_team_ids=(team1_id, team2_id),
+        bulk_sim_used=bulk_sim_used,
     )
     maybe_award_franchise_eos_title_championship(
         owner_user_id=franchise_doc.get("user_id"),

@@ -128,11 +128,25 @@ class TestCommitUserGameRecord(unittest.TestCase):
         u = self.users.find_one({"_id": self.user_oid})
         self.assertEqual(u["lead_archetype"], "the_intimidator")
 
-    def test_discount_fields_untouched(self):
+    def test_discount_fields_untouched_for_non_bulk_game(self):
         self._commit(_game(side="home"))
         rec = self._record()
         self.assertEqual(rec["discount_wins"], 0)
         self.assertEqual(rec["discount_losses"], 0)
+
+    def test_bulk_sim_win_increments_discount_wins(self):
+        game = _game(side="home", home_score=88, away_score=80)
+        game["bulk_sim_used"] = True
+        self._commit(game)
+        rec = self._record()
+        self.assertEqual((rec["wins"], rec["losses"], rec["discount_wins"], rec["discount_losses"]), (1, 0, 1, 0))
+
+    def test_bulk_sim_loss_increments_discount_losses(self):
+        game = _game(side="home", home_score=70, away_score=80)
+        game["bulk_sim_used"] = True
+        self._commit(game)
+        rec = self._record()
+        self.assertEqual((rec["wins"], rec["losses"], rec["discount_wins"], rec["discount_losses"]), (0, 1, 0, 1))
 
 
 if __name__ == "__main__":

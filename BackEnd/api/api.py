@@ -419,6 +419,9 @@ try:
         # When True, fully simulates the quarter instantly and increments quarter number
         # When False (default), uses turn-by-turn mode (for playing with animation)
         full_sim: bool = False  # If True, turn_by_turn_mode=False (fully simulate instantly)
+        # How the user advanced this period. Used for durable gameplay-mode metadata;
+        # simulation behavior still keys off full_sim for backward compatibility.
+        advance_method: str | None = None
         # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
         resume_from_timeout: bool = False
         timeout_trace_id: str | None = None
@@ -428,6 +431,29 @@ try:
     
     
     ongoing_games: dict[str, GameManager] = {}
+
+    BULK_SIM_ADVANCE_METHODS = {"sim_full_game", "sim_rest_of_game"}
+    VALID_ADVANCE_METHODS = BULK_SIM_ADVANCE_METHODS | {"play_quarter", "sim_quarter"}
+
+    def _normalize_advance_method(value: str | None) -> str | None:
+        if value is None:
+            return None
+        method = str(value).strip().lower()
+        return method if method in VALID_ADVANCE_METHODS else None
+
+    def _apply_bulk_sim_metadata(summary: dict, body: QuarterSimulationRequest, previous_doc: dict | None = None) -> bool:
+        """Persist sticky user bulk-sim metadata onto a game summary.
+
+        `bulk_sim_used` becomes true when the user starts any period via Sim Full
+        Game or Sim Rest of Game. Once true, it stays true on later saves.
+        """
+        method = _normalize_advance_method(getattr(body, "advance_method", None))
+        if method:
+            summary["advance_method"] = method
+        bulk_sim_used = bool((previous_doc or {}).get("bulk_sim_used")) or method in BULK_SIM_ADVANCE_METHODS
+        if bulk_sim_used:
+            summary["bulk_sim_used"] = True
+        return bulk_sim_used
     
     
     class TurnSimulationRequest(BaseModel):
@@ -3897,6 +3923,11 @@ try:
 
         # Add start_box_score (only needed for Q2-Q4 frontend, not critical for saves)
         frontend_summary["start_box_score"] = gm.game_state.get("start_box_score")
+        bulk_sim_used_for_response = _apply_bulk_sim_metadata(
+            frontend_summary,
+            body,
+            locals().get("saved") if isinstance(locals().get("saved"), dict) else None,
+        )
         
         # Get is_final status
         is_final = frontend_summary.get("is_final", False)
@@ -3942,6 +3973,13 @@ try:
             db_summary["simulation_engine"] = (
                 "full_quarter_sim" if body.full_sim else "turn_by_turn"
             )
+            bulk_sim_used_for_response = _apply_bulk_sim_metadata(
+                db_summary,
+                body,
+                locals().get("saved") if isinstance(locals().get("saved"), dict) else None,
+            )
+            if bulk_sim_used_for_response:
+                frontend_summary["bulk_sim_used"] = True
             
             # ✅ FIX: Ensure game_id is converted to ObjectId for consistent database storage
             # This ensures the _id format matches when we try to find it later

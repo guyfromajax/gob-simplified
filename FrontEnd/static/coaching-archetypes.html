@@ -86,7 +86,7 @@
   <div id="auth-bar" class="auth-bar"></div>
 
   <div class="ca-container">
-    <a href="/franchise-command-center.html" class="ca-back">&larr; Back</a>
+    <a href="/mode-select.html" class="ca-back" id="ca-back">&larr; Back</a>
     <h1 class="ca-title">Coaching Archetypes</h1>
     <p class="ca-intro">Your coaching archetype reflects the kind of lineups you put on the floor. Win games your way and your handle evolves over time. Here's the full set.</p>
     <div id="ca-sections"><div class="ca-empty">Loading archetypes…</div></div>
@@ -103,6 +103,31 @@
       if (bar && !bar.querySelector('.auth-bar-left')) {
         bar.innerHTML = '<div class="auth-bar-left"><a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a></div><img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha"><div class="auth-bar-right"><a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube"><img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24"></a><a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></a></div>';
       }
+    })();
+
+    // Back returns the coach to wherever they came from (account modal's page,
+    // the FCC reveal, a leaderboard, etc.). Falls back to the link's href
+    // (mode-select) only on a direct/cold load with no in-app history.
+    (function () {
+      var back = document.getElementById('ca-back');
+      if (!back) return;
+      back.addEventListener('click', function (e) {
+        var fallback = back.getAttribute('href');
+        if (window.history.length > 1) {
+          e.preventDefault();
+          window.history.back();
+          return;
+        }
+        var ref = document.referrer;
+        try {
+          if (ref && new URL(ref).origin === window.location.origin) {
+            e.preventDefault();
+            window.location.href = ref;
+            return;
+          }
+        } catch (_) {}
+        // else: let the anchor navigate to its fallback href.
+      });
     })();
 
     function leadKeyForViewer() {

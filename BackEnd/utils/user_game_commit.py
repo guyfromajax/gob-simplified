@@ -10,8 +10,7 @@ has succeeded — that claim is the idempotency boundary. This helper does not
 re-guard against double-application. Best-effort: it never raises into
 finalize_game.
 
-`discount_wins` / `discount_losses` are intentionally left untouched — bulk-sim
-discount tracking is deferred (the hook would read `game.get("bulk_sim_used")`).
+`discount_wins` / `discount_losses` increment when `game.bulk_sim_used` is true.
 """
 
 from __future__ import annotations
@@ -81,6 +80,8 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
             "record.total_games": 1,
             ("record.wins" if user_won else "record.losses"): 1,
         }
+        if game.get("bulk_sim_used") is True:
+            inc["record.discount_wins" if user_won else "record.discount_losses"] = 1
         periods = game.get("archetype_periods") or {}
         if not periods:
             # Fallback: archetype_periods can be clobbered before finalize, but the

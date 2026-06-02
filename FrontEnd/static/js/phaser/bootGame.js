@@ -2476,6 +2476,7 @@ async function handleSimFullGame() {
     let currentQ = quarter;
     let gId = gameId;
     let lastSummary;
+    const bulkAdvanceMethod = Math.max(0, quarter) >= 2 ? 'sim_rest_of_game' : 'sim_full_game';
     while (true) {
       // ✅ Show "Simulating Q1", "Simulating Q2", etc. for Sim Full Game / Sim Rest of Game
       // Stop at Q4 (don't show Q5+)
@@ -2552,8 +2553,9 @@ async function handleSimFullGame() {
       }
       // ✅ FIX: Add full_sim=true for "simming" operations (fully simulate without animation)
       payload.full_sim = true;
+      payload.advance_method = bulkAdvanceMethod;
       
-      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
+      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true, advance_method: bulkAdvanceMethod});
       const simQuarterUrl = API_CONFIG.buildUrl('/api/simulate-quarter');
       const res = await fetch(simQuarterUrl, {
         method: 'POST',

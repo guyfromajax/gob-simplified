@@ -7,6 +7,75 @@ from BackEnd.api import api
 client = TestClient(api.app)
 
 
+def test_bulk_sim_metadata_sets_sticky_flag_for_sim_full_game():
+    request = api.QuarterSimulationRequest(
+        home_team="Home",
+        away_team="Away",
+        full_sim=True,
+        advance_method="sim_full_game",
+    )
+    summary = {}
+
+    bulk_sim_used = api._apply_bulk_sim_metadata(summary, request)
+
+    assert bulk_sim_used is True
+    assert summary["advance_method"] == "sim_full_game"
+    assert summary["bulk_sim_used"] is True
+
+
+def test_bulk_sim_metadata_sets_sticky_flag_for_sim_rest_of_game():
+    request = api.QuarterSimulationRequest(
+        home_team="Home",
+        away_team="Away",
+        full_sim=True,
+        advance_method="sim_rest_of_game",
+    )
+    summary = {}
+
+    bulk_sim_used = api._apply_bulk_sim_metadata(summary, request)
+
+    assert bulk_sim_used is True
+    assert summary["advance_method"] == "sim_rest_of_game"
+    assert summary["bulk_sim_used"] is True
+
+
+def test_bulk_sim_metadata_stays_true_after_later_non_bulk_save():
+    request = api.QuarterSimulationRequest(
+        home_team="Home",
+        away_team="Away",
+        full_sim=False,
+        advance_method="play_quarter",
+    )
+    summary = {}
+
+    bulk_sim_used = api._apply_bulk_sim_metadata(
+        summary,
+        request,
+        previous_doc={"bulk_sim_used": True},
+    )
+
+    assert bulk_sim_used is True
+    assert summary["advance_method"] == "play_quarter"
+    assert summary["bulk_sim_used"] is True
+
+
+def test_bulk_sim_metadata_does_not_set_flag_for_play_quarter_or_sim_quarter():
+    for method, full_sim in (("play_quarter", False), ("sim_quarter", True)):
+        request = api.QuarterSimulationRequest(
+            home_team="Home",
+            away_team="Away",
+            full_sim=full_sim,
+            advance_method=method,
+        )
+        summary = {}
+
+        bulk_sim_used = api._apply_bulk_sim_metadata(summary, request)
+
+        assert bulk_sim_used is False
+        assert summary["advance_method"] == method
+        assert "bulk_sim_used" not in summary
+
+
 def make_fake_load_roster(short_team_name: str):
     def fake_load_roster(team_name):
         num_players = 4 if team_name == short_team_name else 5
