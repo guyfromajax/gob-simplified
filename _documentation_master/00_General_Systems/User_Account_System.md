@@ -6,7 +6,7 @@
    - **POST /api/auth/signup** – Create account (OTP required when `IS_ALPHA=true`)
    - **POST /api/auth/login** – Login and get JWT token
    - **POST /api/auth/logout** – Logout (client discards token)
-   - **GET /api/auth/me** – Current user info incl. `account_settings`, `tutorial_state`, `record`, `archetypes`, `lead_archetype`, `archetype_reveal_seen` (requires auth)
+   - **GET /api/auth/me** – Current user info incl. `account_settings`, `tutorial_state`, `record`, `archetypes`, `lead_archetype`, `archetype_reveal_seen`, plus account-page fields `subscription`, `geek_points`, `geek_points_by_team`, `championships_total` (requires auth)
    - **GET /api/auth/config** – Auth config (IS_ALPHA, OTP required)
    - **POST /api/auth/request-access-code** – Request alpha access code (body: `email`); stores request for admin to process manually
    - **POST /api/auth/set-username** – Set username (requires auth)
@@ -26,6 +26,12 @@
      - *Geek points:* `geek_points` (int total), `geek_points_by_team` (optional dict: canonical `team_id` → int; lazy-created on first award per team)
      - *Profile / UX:* `account_settings` (`{ display_color }`), `fte` (bool, legacy FTE flag), `fte_v2_complete` (bool), `tutorial_state` (`{ step, team_pick, started_at, completed_at }`)
      - *Coaching-archetype tracking:* `record` (`{ wins, losses, total_games, win_rate, discount_wins, discount_losses }`), `archetypes` (18 per-archetype counters + `total`), `lead_archetype` (string key, `""` when no games), `archetype_reveal_seen` (bool). Shapes are the single source of truth in `BackEnd/utils/user_tracking.py` — see [`projects/User_Archetype_System.md`](../projects/User_Archetype_System.md).
+     - *Titles / championships:* `championships_total` (dict: `kind` → int count) and `championships_by_team` (dict: canonical `team_id` → `kind` → int). The four title `kind` keys:
+       - `conf_rs` — regular-season conference championship (1-seed at week 26)
+       - `conf_t` — conference tournament title
+       - `region` — region tournament title
+       - `national` — national title
+       - **Lazy:** these fields do not exist on a fresh user — they're `$inc`-created the moment a coach wins their first title, by `maybe_award_conference_rs_championship` / `maybe_award_franchise_eos_title_championship` in `BackEnd/utils/franchise_championships.py` (called from the franchise game-completion flow in `franchise_routes.py`). **No backfill needed** — readers default each kind to `0` when absent (`/api/auth/me` and the account page). Source of truth: `BackEnd/utils/franchise_championships.py`.
    - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (or `set_admin_user_production.py` for production DB). Admin status is read from the DB when needed: `/api/auth/me` and builder API checks use the DB role so promoting a user to admin works without re-login.
    - **subscription**, **geek_points**: New signups get `subscription: "alpha"` (string) and `geek_points: 0` (integer). `geek_points_by_team` is not set until the user earns franchise points by team. Existing users were backfilled via `scripts/add_user_subscription_geek_points.py`.
    - **password_reset_tokens collection**: `token`, `user_id`, `expires_at`, `created_at` (tokens expire in 1 hour, deleted after use)
@@ -79,7 +85,7 @@ Geek Points use the same marker: bulk-sim games receive the base Geek Points awa
 | POST | /api/auth/signup | No | Create user; OTP required when alpha |
 | POST | /api/auth/login | No | Email + password → JWT + user |
 | POST | /api/auth/logout | No | Logout (client discards token) |
-| GET | /api/auth/me | Yes | Current user profile (incl. settings, tutorial_state, record, archetypes, lead_archetype, archetype_reveal_seen) |
+| GET | /api/auth/me | Yes | Current user profile (settings, tutorial_state, record, archetypes, lead_archetype, archetype_reveal_seen, subscription, geek_points, geek_points_by_team, championships_total) |
 | POST | /api/auth/request-access-code | No | Request alpha access code (body: email); stores in DB for admin |
 | POST | /api/auth/set-username | Yes | Set or update username |
 | PATCH | /api/auth/account-settings | Yes | Update account settings (e.g. `display_color`) |
