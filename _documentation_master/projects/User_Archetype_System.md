@@ -166,3 +166,31 @@ After resolving user win/loss for the game (single / tournament / franchise user
 **Leaderboard / display:** Primary record = all games; optional UI line “Bulk-sim record: {discount_wins}-{discount_losses}” or exclude discount games from a future “competitive” leaderboard.
 
 **Reference:** [`Gameplay_Buttons_System.md`](../05_GP_Supporting_Systems/Gameplay_Buttons_System.md), [`Geek_Points_System.md`](../00_General_Systems/Geek_Points_System.md), `bootGame.js` (`handleSimFullGame` / `handleButtonClick`).
+
+
+**coaching-archetypes.html copy**
+OFFENSE-FIRST
+1. Pure Offense: Scoreboard says it all — this coach will look to simply outscore you, every... single... game.
+2. Offensive Athleticism: Turns raw speed and strength into buckets, running you off the floor before you've set your feet.
+3. Offensive Rebounding: Treats every miss as a second chance and crashes the glass until the ball goes in.
+4. Offensive Fundamentals: Wins by subtraction — fewer turnovers, smarter shots, and zero possessions wasted.
+5. Cerebral Offense: Builds an attack that reads your defense two steps early and exploits it before you know it's broken.
+
+DEFENSE-FIRST
+6. Pure Defense: Good luck putting the ball in the basket against this coach's squad.
+7. Defensive Athleticism: Unleashes his quickest, strongest defenders to suffocate the ball and turn stops into chaos.
+8. Defensive Rebounding: One shot, one possession — he ends every trip down the floor by ripping down the board.
+9. Defensive Fundamentals: Locks in on the essentials: guard your man, know your responsibilities, give nothing away.
+10. Cerebral Defense: Scouts your offense so thoroughly his team knows your next move before you make it.
+
+BALANCED
+11. O/D Balance: Focuses on the two most simple things that decide every game — score points, and stop your opponent.
+
+SPECIALIST
+12. The Intimidator: Sends his biggest, meanest, most relentless lineup out to make you flinch before tip-off.
+13. Outrun the Competition: Pushes the pace from the opening whistle with a roster and scheme built to run you into the ground.
+14. Pure Discipline: Demands a clean sheet every night — zero mistakes, no exceptions.
+15. Pure Athleticism: Bends the entire scheme around pure physical gifts, betting that athletes win games.
+16. Rebounding King: Lives by one truth: games are won on the glass, at both ends of the floor.
+17. Mr. Fundamentals: Masters the boring stuff first, because to him the basics are everything.
+18. Mr. Unconventional: Takes the risks no one else will, running schemes that refuse to fit any textbook.

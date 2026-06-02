@@ -26,7 +26,7 @@
       "lean": "offense",
       "color": "#F79420",
       "qualifies": "SC + SH",
-      "description": "TBD",
+      "description": "Scoreboard says it all — this coach will look to simply outscore you, every... single... game.",
       "attributes": [
         "SC",
         "SH"
@@ -43,7 +43,7 @@
       "lean": "offense",
       "color": "#F79420",
       "qualifies": "(SC / SH) + (ST/AG/ND)",
-      "description": "TBD",
+      "description": "Turns raw speed and strength into buckets, running you off the floor before you've set your feet.",
       "attributes": [
         "SC",
         "SH",
@@ -63,7 +63,7 @@
       "lean": "offense",
       "color": "#F79420",
       "qualifies": "(SC / SH) + RB",
-      "description": "TBD",
+      "description": "Treats every miss as a second chance and crashes the glass until the ball goes in.",
       "attributes": [
         "SC",
         "SH",
@@ -81,7 +81,7 @@
       "lean": "offense",
       "color": "#F79420",
       "qualifies": "(SC / SH) + (PS / BH)",
-      "description": "TBD",
+      "description": "Wins by subtraction — fewer turnovers, smarter shots, and zero possessions wasted.",
       "attributes": [
         "SC",
         "SH",
@@ -100,7 +100,7 @@
       "lean": "offense",
       "color": "#F79420",
       "qualifies": "(SC / SH) + IQ",
-      "description": "TBD",
+      "description": "Builds an attack that reads your defense two steps early and exploits it before you know it's broken.",
       "attributes": [
         "SC",
         "SH",
@@ -118,7 +118,7 @@
       "lean": "defense",
       "color": "#4E8AEC",
       "qualifies": "ID + OD",
-      "description": "TBD",
+      "description": "Good luck putting the ball in the basket against this coach's squad.",
       "attributes": [
         "ID",
         "OD"
@@ -135,7 +135,7 @@
       "lean": "defense",
       "color": "#4E8AEC",
       "qualifies": "(ID / OD) + (AG / ND)",
-      "description": "TBD",
+      "description": "Unleashes his quickest, strongest defenders to suffocate the ball and turn stops into chaos.",
       "attributes": [
         "ID",
         "OD",
@@ -154,7 +154,7 @@
       "lean": "defense",
       "color": "#4E8AEC",
       "qualifies": "(ID / OD) + RB",
-      "description": "TBD",
+      "description": "One shot, one possession — he ends every trip down the floor by ripping down the board.",
       "attributes": [
         "ID",
         "OD",
@@ -172,7 +172,7 @@
       "lean": "defense",
       "color": "#4E8AEC",
       "qualifies": "(ID / OD) + (PS / BH)",
-      "description": "TBD",
+      "description": "Locks in on the essentials: guard your man, know your responsibilities, give nothing away.",
       "attributes": [
         "ID",
         "OD",
@@ -191,7 +191,7 @@
       "lean": "defense",
       "color": "#4E8AEC",
       "qualifies": "(ID / OD) + IQ",
-      "description": "TBD",
+      "description": "Scouts your offense so thoroughly his team knows your next move before you make it.",
       "attributes": [
         "ID",
         "OD",
@@ -209,7 +209,7 @@
       "lean": "balance",
       "color": "#F79420 + #4E8AEC",
       "qualifies": "(SC/SH) + (ID/OD)",
-      "description": "TBD",
+      "description": "Focuses on the two most simple things that decide every game — score points, and stop your opponent.",
       "attributes": [
         "SC",
         "SH",
@@ -228,7 +228,7 @@
       "lean": "specialist",
       "color": "#E0B249",
       "qualifies": "(ID / OD) + ST",
-      "description": "TBD",
+      "description": "Sends his biggest, meanest, most relentless lineup out to make you flinch before tip-off.",
       "attributes": [
         "ID",
         "OD",
@@ -246,7 +246,7 @@
       "lean": "specialist",
       "color": "#A876E6",
       "qualifies": "ND + AG",
-      "description": "TBD",
+      "description": "Pushes the pace from the opening whistle with a roster and scheme built to run you into the ground.",
       "attributes": [
         "ND",
         "AG"
@@ -263,7 +263,7 @@
       "lean": "specialist",
       "color": "#A876E6",
       "qualifies": "(PS / BH) + IQ",
-      "description": "TBD",
+      "description": "Demands a clean sheet every night — zero mistakes, no exceptions.",
       "attributes": [
         "PS",
         "BH",
@@ -281,7 +281,7 @@
       "lean": "specialist",
       "color": "#A876E6",
       "qualifies": "2+ of ST / AG / ND",
-      "description": "TBD",
+      "description": "Bends the entire scheme around pure physical gifts, betting that athletes win games.",
       "attributes": [
         "ST",
         "AG",
@@ -299,7 +299,7 @@
       "lean": "specialist",
       "color": "#A876E6",
       "qualifies": "RB + ST",
-      "description": "TBD",
+      "description": "Lives by one truth: games are won on the glass, at both ends of the floor.",
       "attributes": [
         "RB",
         "ST"
@@ -316,7 +316,7 @@
       "lean": "specialist",
       "color": "#A876E6",
       "qualifies": "2+ of PS / BH / RB",
-      "description": "TBD",
+      "description": "Masters the boring stuff first, because to him the basics are everything.",
       "attributes": [
         "PS",
         "BH",
@@ -334,7 +334,7 @@
       "lean": "specialist",
       "color": "#A876E6",
       "qualifies": "None of the above",
-      "description": "TBD",
+      "description": "Takes the risks no one else will, running schemes that refuse to fit any textbook.",
       "attributes": [],
       "reveal_name": "Mr. Unconventional",
       "treatment": "standalone"
