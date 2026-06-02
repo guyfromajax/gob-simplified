@@ -160,10 +160,10 @@ Step 2: Outcome branch keyed off `result_type`
 
 Step 0: Burst
 - AT: `player_reaches_position` (RR reaches `rr_to`)
-- Archetypes: RR = `burst`; outlet receiver = `sprint`; get-back defenders = `sprint`; outlet passer = `stationary`; others = drift toward attacking basket (per `rim_runner_burst_phase` payload)
-- RR destination (`rr_to`):
-  - X: roll `movement_factor` vs `0.6×AG + 0.2×IQ + 0.2×CH` — success → `start_x + randint(20, 25)` toward basket; fail → `start_x + randint(9, 14)` toward basket; clamped `[4, 97]`; sign by home/away offense
-  - Y (uses pre-sprint y): if `y > 24` → `randint(30, 35)`; else `randint(15, 20)`
+- Archetypes: RR = `burst` on movement-check success, `sprint` on failure; outlet receiver = `sprint`; get-back defenders = `sprint`; outlet passer = `stationary`; others = drift toward attacking basket (per `rim_runner_burst_phase` payload)
+- RR destination (`rr_to`): upper or lower wing (depending on which is his vertical half) on the offense side of the court
+  - X & Y: roll `movement_factor` vs `0.6×AG + 0.2×IQ + 0.2×CH` — success → RR moves at burst speed toward rr_to; fail → RR moves at sprint speed toward rr_to; clamped at the destination; sign by home/away offense
+  - Vertical half (uses pre-sprint y): if `y > 24` → upper; else lower
   - Dynamic override when prior shot has `ball_bounce_x` in mid-court band (home `25 < x < 50`; away `50 < x < 75`): X measured from `outlet_receiver_target + burst_delta`, not from RR's pre-burst x
 - Outlet contest defender moves to `outlet_defender_to` (passer x ±2, same y as passer)
 
@@ -247,13 +247,13 @@ Backend stages (in `resolve_rim_runner_fast_break`) that decide whether the BH a
 
 Steps 0-1: Burst + outlet pass (shared with Rim Runner; outlet-denied reuses RR's denied path)
 
-Step 2: RR read gate (stricter threshold: `fb_open = (burst_offense_score × 0.6) > burst_defense_score`)
+Step 2: RR read gate (stricter threshold: `fb_open = (burst_offense_score × 0.8) > burst_defense_score`)
 - If `pass_attempted = True`: route to RR lane-pass branch (intercept / bat OOB / shot)
 - If `pass_attempted = False`: proceed to Step 3
 
 Step 3: Triangle setup ("Fast Break!" announcement)
 - AT: `player_reaches_position` (RR + BH both reach setup spots)
-- Corner players: `burst` to upper/lower corner (lower-y → lower corner)
+- Corner players: `sprint` to upper/lower corner (lower-y → lower corner)
 - BH: non-burst to wing (upper if y > 25 else lower)
 - RR: non-burst to same-side lowPost as BH wing
 - Trailer (rebounder/outlet passer): non-burst to opposite wing

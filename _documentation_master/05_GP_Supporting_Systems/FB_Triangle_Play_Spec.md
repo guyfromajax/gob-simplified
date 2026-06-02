@@ -90,7 +90,7 @@ Once one Triangle phase hands off to the next:
 Current formula:
 - `burst_offense_score` is calculated the same way as RR
 - `burst_defense_score` is calculated the same way as RR
-- `fb_open = (burst_offense_score * 0.6) > burst_defense_score`
+- `fb_open = (burst_offense_score * 0.8) > burst_defense_score`
 
 - Calculate `correct_read` the same way as RR.
 - Calculate `pass_attempted` the same way as RR.
@@ -116,7 +116,7 @@ The two offensive players who are not:
 become the Triangle corner players.
 
 #### Corner players
-- both corner players use RR burst movement
+- both corner players sprint to their corners
 - one targets `lower corner`
 - one targets `upper corner`
 - assignment rule:
@@ -301,6 +301,6 @@ Triangle should therefore be implemented as:
 - RR entry behavior should be reused where possible rather than duplicated.
 - RR denied-outlet branch should remain owned by the existing denied branch owner.
 - Triangle-specific logic begins only after a successful outlet and a `no pass to RR` outcome from the RR read.
-- Corner bursts use the same burst behavior as RR burst.
+- Corner players sprint to their corner targets.
 - Non-burst Triangle movement uses the current Fast Break non-burst duration.
 - Triangle should be added to the canonical Fast Break System doc after implementation.

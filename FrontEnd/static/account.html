@@ -45,7 +45,7 @@
     .acct-name-row { display: flex; align-items: center; gap: 10px; }
     .acct-name { font-family: var(--bebas); font-size: 34px; letter-spacing: 0.03em; color: #fff; }
     .acct-status {
-      margin-top: 6px; display: inline-flex; align-items: center; gap: 6px;
+      margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
       color: var(--orange); background: rgba(247,148,32,0.12);
       border: 1px solid rgba(247,148,32,0.4); border-radius: 999px; padding: 4px 11px;
@@ -85,9 +85,9 @@
     }
     .arch-rank { font-family: var(--bebas); font-size: 16px; color: rgba(255,255,255,0.42); width: 22px; flex-shrink: 0; }
     .arch-badge { width: 30px; height: 30px; flex-shrink: 0; display: inline-flex; align-items: center; }
-    .arch-meta { min-width: 0; }
-    .arch-aname { font-family: var(--inter); font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .arch-pct { font-family: var(--bebas); font-size: 15px; color: var(--orange); }
+    .arch-meta { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+    .arch-aname { flex: 1; min-width: 0; font-family: var(--inter); font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .arch-pct { flex: 0 0 auto; font-family: var(--bebas); font-size: 15px; color: var(--orange); }
 
     /* footer links */
     .acct-links { display: flex; gap: 22px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
@@ -112,8 +112,8 @@
             <span id="acct-name" class="acct-name">Coach</span>
             <span id="acct-badge" class="arch-badge"></span>
           </div>
-          <span class="acct-status" id="acct-status">Alpha</span>
         </div>
+        <span class="acct-status" id="acct-status">Alpha</span>
       </div>
     </div>
 

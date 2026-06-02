@@ -18,6 +18,7 @@ from BackEnd.constants import (
     STANDARD_GRID_PER_GAME_SEC,
     SHOT_MOTION_GRID_PER_GAME_SEC,
     SPRINT_GRID_PER_GAME_SEC,
+    BURST_GRID_PER_GAME_SEC,
 )
 
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
@@ -661,6 +662,7 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
         - archetype="shot_motion"    → SHOT_MOTION_GRID_PER_GAME_SEC (14 @ AG=50)
         - archetype="compressed_hco" → SHOT_MOTION_GRID_PER_GAME_SEC (folds into shot_motion)
         - archetype="sprint"         → SPRINT_GRID_PER_GAME_SEC (18 @ AG=50)
+        - archetype="burst"          → BURST_GRID_PER_GAME_SEC (32 @ AG=50)
         - archetype="cruise"         → CRUISE_GRID_PER_GAME_SEC (13 @ AG=50)
 
     When ``player`` is None (Phase 1/legacy call sites that haven't been
@@ -685,6 +687,8 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
             # No legacy-equivalent constant — sprint is new in Phase 3.
             # OPEN_FLOOR_RATE (20) is the closest analog for max-effort movement.
             rate = _LEGACY_OF_RATE
+        elif archetype == "burst":
+            rate = BURST_GRID_PER_GAME_SEC
         else:
             rate = _LEGACY_COF_RATE
         return calc_isotropic_segment_seconds(start, end, rate)
@@ -699,6 +703,8 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
         rate = SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
     elif archetype == "sprint":
         rate = SPRINT_GRID_PER_GAME_SEC * ag_scale
+    elif archetype == "burst":
+        rate = BURST_GRID_PER_GAME_SEC * ag_scale
     elif archetype == "cruise":
         rate = CRUISE_GRID_PER_GAME_SEC * ag_scale
     else:

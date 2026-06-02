@@ -129,8 +129,8 @@ Five terminal branches. Steps 0–1 (Burst, Outlet pass) are shared across 4 of 
 |---|---|---|---|---|
 | 0 | Burst | `player_reaches_position` | outlet receiver (reaches `receiver_to`) | receiver traversal at default archetype |
 
-- **Rim Runner**: 9–14 or 20–25 x spots toward basket (skill check: roll d100 < `0.6×AG + 0.2×IQ + 0.2×CH` → 20–25, else 9–14); y to a wing band on the same side as start (15–20 or 30–35).
-- **Outlet Receiver**: ~8 x spots toward basket (or `rebound_x ± 12` in dynamic-placement mode); y snaps to the opposite wing band from RR (15 or 35).
+- **Rim Runner**: targets same-side `upper wing` / `lower wing` (`y > 24` → upper). Skill check: roll d100 < `0.6×AG + 0.2×IQ + 0.2×CH`; success uses a 20–25 x delta at `burst` speed, fail uses a 9–14 x delta at `sprint` speed. X is clamped at the wing destination. If prior `ball_bounce_x` is in the mid-court band (home `25 < x < 50`; away `50 < x < 75`), measure the x delta from `receiver_to.x`; otherwise measure from RR's pre-burst x.
+- **Outlet Receiver**: fixed outlet x by side (`45` home offense, `55` away offense); y snaps to the opposite wing band from RR (`15` if RR starts upper, else `35`).
 - **Outlet Passer (rebounder)**: stationary at rebound spot; ball attaches to them at burst start.
 - **Outlet Defender**: tweens to passer.x ± 2 (toward basket), same y as passer.
 - **Get Back Players** (defenders flagged in prior shot's `offense_getback`):
@@ -143,7 +143,7 @@ Five terminal branches. Steps 0–1 (Burst, Outlet pass) are shared across 4 of 
 |---|---|---|---|---|
 | 1 | Outlet pass | `ball_reaches_player` | outlet receiver | passer→receiver distance ÷ pass speed |
 
-- **Rim Runner**: continues sprinting toward `rr_to` (tween started in step 0).
+- **Rim Runner**: continues toward `rr_to` (tween started in step 0 at `burst` or `sprint` timing from the movement check).
 - **Outlet Receiver**: stationary at `receiver_to`, awaits ball.
 - **Outlet Passer**: stationary, releases ball at step start.
 - **Outlet Defender**: continues toward contest spot.

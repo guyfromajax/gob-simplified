@@ -68,6 +68,10 @@ def _triangle_half_from_y(y: float) -> str:
     return "upper" if float(y) > 25.0 else "lower"
 
 
+def _rr_half_from_y(y: float) -> str:
+    return "upper" if float(y) > 24.0 else "lower"
+
+
 def _triangle_same_half_spot(prefix: str, half: str) -> str:
     return f"{half} {prefix}"
 
@@ -167,7 +171,7 @@ def _resolve_triangle_setup_payload(
                 "player_id": getattr(offense_roles["lower_corner"], "player_id", None),
                 "spot": lower_corner_spot,
                 "to": _spot_coords(lower_corner_spot, is_away_offense),
-                "burst": True,
+                "burst": False,
             }
         )
     if offense_roles["upper_corner"] is not None:
@@ -176,7 +180,7 @@ def _resolve_triangle_setup_payload(
                 "player_id": getattr(offense_roles["upper_corner"], "player_id", None),
                 "spot": upper_corner_spot,
                 "to": _spot_coords(upper_corner_spot, is_away_offense),
-                "burst": True,
+                "burst": False,
             }
         )
 
@@ -452,6 +456,45 @@ def _find_most_recent_shot_turn(game: Any, max_turns: int = 10) -> Optional[dict
         if turn.get("result_type") in ["MISS", "MAKE", "BLOCK"]:
             return turn
     return None
+
+
+def _resolve_rr_burst_destination(
+    *,
+    rr_x0: float,
+    rr_y0: float,
+    outlet_receiver_target_x: float,
+    dx_burst: int,
+    is_away_offense: bool,
+    most_recent_shot_turn: Optional[dict],
+) -> Tuple[Dict[str, float], Optional[float]]:
+    rr_half = _rr_half_from_y(rr_y0)
+    rr_wing_to = _spot_coords(f"{rr_half} wing", is_away_offense)
+    x_dir = -1 if is_away_offense else 1
+
+    dynamic_base_x = None
+    try:
+        bounce_x = float((most_recent_shot_turn or {}).get("ball_bounce_x"))
+    except (TypeError, ValueError):
+        bounce_x = None
+    if bounce_x is not None:
+        if (not is_away_offense and 25 < bounce_x < 50) or (is_away_offense and 50 < bounce_x < 75):
+            dynamic_base_x = float(outlet_receiver_target_x)
+
+    base_x = dynamic_base_x if dynamic_base_x is not None else float(rr_x0)
+    raw_x = float(base_x) + x_dir * dx_burst
+    wing_x = float(rr_wing_to["x"])
+    if is_away_offense:
+        clamped_x = max(raw_x, wing_x)
+    else:
+        clamped_x = min(raw_x, wing_x)
+
+    return (
+        {
+            "x": float(max(4, min(97, int(round(clamped_x))))),
+            "y": float(rr_wing_to["y"]),
+        },
+        dynamic_base_x,
+    )
 
 
 def _basket_x_for_offense(is_away_offense: bool) -> float:
@@ -806,14 +849,13 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         + 0.2 * float(rr_attrs.get("CH", 0) or 0)
     )
     burst_anim_success = movement_factor < burst_threshold_anim
+    rr_movement_archetype = "burst" if burst_anim_success else "sprint"
     dx_burst = random.randint(20, 25) if burst_anim_success else random.randint(9, 14)
 
-    if rr_y0 > 24:
-        rr_new_y = float(random.randint(30, 35))
-    else:
-        rr_new_y = float(random.randint(15, 20))
+    rr_half = _rr_half_from_y(rr_y0)
+    rr_new_y = float(_spot_coords(f"{rr_half} wing", is_away_offense)["y"])
 
-    receive_ty = 15.0 if rr_new_y > 25 else 35.0
+    receive_ty = 15.0 if rr_half == "upper" else 35.0
 
     most_recent = _find_most_recent_shot_turn(game)
 
@@ -841,7 +883,15 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         if best_p is None:
             best_p = next(p for p in offense_players if p)
 
-    rr_new_x = float(max(4, min(97, int(round(rr_x0 + x_dir * dx_burst)))))
+    rr_destination, dynamic_base_x = _resolve_rr_burst_destination(
+        rr_x0=rr_x0,
+        rr_y0=rr_y0,
+        outlet_receiver_target_x=best_tx,
+        dx_burst=dx_burst,
+        is_away_offense=is_away_offense,
+        most_recent_shot_turn=most_recent,
+    )
+    rr_new_x = float(rr_destination["x"])
 
     skip_outlet_pass = bool(
         rebounder is not None
@@ -933,12 +983,18 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         )
 
     recv_id_val = getattr(ball_handler, "player_id", None)
-    # Phase 4b: per-segment game_seconds for RR sprint and outlet receiver settle.
+    # Phase 4b: per-segment game_seconds for RR burst/sprint and outlet receiver settle.
     rr_from = {"x": float(rr_x0), "y": float(rr_y0)}
     rr_to = {
         "x": float(rr_new_x),
         "y": float(rr_new_y),
-        "game_seconds": calc_ag_segment_seconds(rr_from, {"x": float(rr_new_x), "y": float(rr_new_y)}, rr, archetype="standard"),
+        "game_seconds": calc_ag_segment_seconds(
+            rr_from,
+            {"x": float(rr_new_x), "y": float(rr_new_y)},
+            rr,
+            archetype=rr_movement_archetype,
+        ),
+        "movement_archetype": rr_movement_archetype,
     }
     recv_start = {
         "x": float(_player_x(ball_handler)),
@@ -955,8 +1011,10 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         "rr_from": rr_from,
         "rr_to": rr_to,
         "burst_success": burst_anim_success,
+        "burst_delta": dx_burst,
         "movement_factor": movement_factor,
         "burst_threshold": burst_threshold_anim,
+        "dynamic_rr_x_base": dynamic_base_x,
         "skip_outlet_pass": skip_outlet_pass,
         "outlet_passer_id": None if skip_outlet_pass else rid,
         "outlet_receiver_id": recv_id_val,
