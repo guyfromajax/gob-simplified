@@ -17,6 +17,7 @@
       --af-green: #34EC27;
       --af-red: #FF5A5A;
       --af-yellow: #F4C53D;
+      --af-blue: #3D9BFF;
       --af-card: rgba(255,255,255,0.04);
       --af-line: rgba(255,255,255,0.08);
     }
@@ -88,6 +89,7 @@
     .af-seg-opt.selected[data-tone="bad"]  { background: var(--af-red);    border-color: var(--af-red);    color: #2a0d0d; }
     .af-seg-opt.selected[data-tone="mid"]  { background: var(--af-yellow); border-color: var(--af-yellow); color: #2a2208; }
     .af-seg-opt.selected[data-tone="good"] { background: var(--af-green);  border-color: var(--af-green);  color: #06250a; }
+    .af-seg-opt.selected[data-tone="best"] { background: var(--af-blue);   border-color: var(--af-blue);   color: #04162a; }
 
     /* Inline optional note */
     .af-note-toggle {
@@ -292,9 +294,10 @@
 
       // --- Question definitions ---------------------------------------------
       var OPINION = [
-        { val: 'Awful', tone: 'bad' },
-        { val: 'OK, but needs work', tone: 'mid' },
-        { val: 'Great', tone: 'good' }
+        { val: 'Poor', tone: 'bad' },
+        { val: 'Needs Work', tone: 'mid' },
+        { val: 'Good', tone: 'good' },
+        { val: 'Great', tone: 'best' }
       ];
       var SECTION_1 = [
         { key: 'live_gameplay',       title: 'Live Gameplay',                 desc: 'Player animations, sound effects, and in-game announcements' },

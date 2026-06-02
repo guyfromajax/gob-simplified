@@ -23,7 +23,7 @@ _submit_cooldown_seconds = 10
 # Allowed rating labels per question. The 6 Section-01 questions share one set;
 # the 2 Section-02 questions each have their own. Kept verbatim with the
 # frontend's segmented-control labels (the corrected copy from the build prompt).
-_OPINION_SET = {"Awful", "OK, but needs work", "Great"}
+_OPINION_SET = {"Poor", "Needs Work", "Good", "Great"}
 _RATING_ALLOWED: dict[str, set[str]] = {
     "live_gameplay": _OPINION_SET,
     "between_games": _OPINION_SET,
