@@ -252,7 +252,7 @@
     <div class="af-thanks" id="af-thanks">
       <h2>Thanks, Coach.</h2>
       <p>Your feedback goes straight to the team. We read every word.</p>
-      <a href="/franchise-command-center.html">Back to Command Center</a>
+      <a id="af-thanks-cc" href="/mode-select.html">Back to Command Center</a>
     </div>
   </div>
 
@@ -284,12 +284,36 @@
         } catch (e) {}
       }
 
-      // Back: return to wherever the coach came from (FCC, nav button, etc.).
+      // Resolve the user's current franchise so "back to the FCC" lands on the
+      // Command Center (which needs ?franchise_id=) rather than bouncing to the
+      // team-select screen. Falls back to mode-select when there's no franchise.
+      var ccUrl = '/mode-select.html';
+      function resolveCommandCenterUrl() {
+        var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl)
+          ? API_CONFIG.buildUrl('/franchise/current') : '/franchise/current';
+        var headers = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders)
+          ? (API_CONFIG.getAuthHeaders() || {}) : {};
+        return fetch(url, { headers: headers })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (data && data.franchise_id) {
+              ccUrl = '/franchise-command-center.html?franchise_id=' + encodeURIComponent(data.franchise_id);
+            }
+            var link = document.getElementById('af-thanks-cc');
+            if (link) link.setAttribute('href', ccUrl);
+            return ccUrl;
+          })
+          .catch(function () { return ccUrl; });
+      }
+      resolveCommandCenterUrl();
+
+      // Back: return to wherever the coach came from (FCC, nav button, etc.);
+      // on a cold load with no history, go to the resolved Command Center.
       var back = document.getElementById('af-back');
       back.addEventListener('click', function (e) {
         e.preventDefault();
         if (window.history.length > 1) { window.history.back(); return; }
-        window.location.href = '/franchise-command-center.html';
+        window.location.href = ccUrl;
       });
 
       // --- Question definitions ---------------------------------------------
