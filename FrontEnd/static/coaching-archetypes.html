@@ -36,6 +36,14 @@
       font-family: var(--bebas); font-weight: 700; font-size: 44px;
       letter-spacing: 0.04em; margin: 0 0 6px;
     }
+    .ca-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .ca-lb-link {
+      display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+      font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); text-decoration: none;
+    }
+    .ca-lb-link:hover { color: #fff; }
+    .ca-lb-link .arrow { transition: transform 0.14s ease; }
+    .ca-lb-link:hover .arrow { transform: translateX(2px); }
     .ca-intro { margin: 0 0 30px; color: rgba(255,255,255,0.55); font-size: 15px; max-width: 640px; }
     .ca-section { margin-bottom: 38px; }
     .ca-section-label {
@@ -87,8 +95,11 @@
 
   <div class="ca-container">
     <a href="/mode-select.html" class="ca-back" id="ca-back">&larr; Back</a>
-    <h1 class="ca-title">Coaching Archetypes</h1>
-    <p class="ca-intro">Your coaching archetype reflects the kind of lineups you put on the floor. Win games your way and your handle evolves over time. Here's the full set.</p>
+    <div class="ca-header-row">
+      <h1 class="ca-title">Coaching Archetypes</h1>
+      <a href="/coaching-archetypes-leaderboard.html" class="ca-lb-link">Leaderboard<span class="arrow" aria-hidden="true">&rarr;</span></a>
+    </div>
+    <p class="ca-intro">Win games your way and your handle evolves over time. Here's the full set.</p>
     <div id="ca-sections"><div class="ca-empty">Loading archetypes…</div></div>
   </div>
 
