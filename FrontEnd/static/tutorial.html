@@ -24,8 +24,10 @@
     font-size: clamp(46px, 6.4vw, 80px); line-height: .96; letter-spacing: .01em;
     margin: 8px 0 10px; color: var(--text);
   }
-  .hero-guide { max-width: 64ch; font-size: 14.5px; color: var(--muted); line-height: 1.5; margin: 0 0 18px; text-wrap: pretty; }
-  .hero-guide .hero-attr { color: var(--muted-2); }
+  /* quote flows to the full column width (wraps only when the layout forces it);
+     the attribution always drops to its own second line */
+  .hero-guide { font-size: 14.5px; color: var(--muted); line-height: 1.5; margin: 0 0 18px; text-wrap: pretty; }
+  .hero-guide .hero-attr { display: block; color: var(--muted-2); }
   .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
   @media (max-width: 760px) {
     .hero { flex-direction: column; align-items: flex-start; }
