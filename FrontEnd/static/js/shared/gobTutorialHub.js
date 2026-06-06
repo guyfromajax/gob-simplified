@@ -51,7 +51,7 @@
   var TOTAL = LEARNABLE.length;
 
   // recommended learning order for the “next up” cue
-  var ORDER = ['player-attributes', 'game-plans', 'training', 'team-attributes', 'playbooks', 'scouting', 'recruiting'];
+  var ORDER = ['player-attributes', 'training', 'team-attributes', 'game-plans', 'playbooks', 'scouting', 'recruiting'];
   function catOf(id) { var f = CATS.find(function (c) { return c.topics.some(function (t) { return t.id === id; }); }); return f ? f.id : 'players'; }
   function topicOf(id) { var t; CATS.forEach(function (c) { c.topics.forEach(function (x) { if (x.id === id) t = x; }); }); return t; }
   function nextLesson() {
@@ -62,15 +62,17 @@
   }
   function updateNext() {
     var nx = nextLesson();
+    var headline = document.getElementById('hero-topic');
+    var kick = document.getElementById('kicker-label');
     var btn = document.getElementById('cta-next');
-    var cue = document.getElementById('sammy-next');
+    // headline = the dynamic next-lesson name (single source of truth)
+    if (headline) headline.textContent = nx ? nx.name : 'You’re all caught up';
+    // kicker keeps its orange tick bar
+    if (kick) kick.innerHTML = '<span class="tick"></span> ' + (nx ? 'Next up' : 'Nice work, coach');
+    // CTA label stays live; button is inert this pass (no sub-page navigation)
     if (btn) {
-      if (nx) { btn.textContent = nx.name; btn.setAttribute('href', '#cat-' + nx.cat); btn.dataset.target = nx.id; btn.style.display = ''; }
-      else { btn.textContent = 'All caught up'; btn.setAttribute('href', '#topics'); btn.removeAttribute('data-target'); btn.style.display = ''; }
-    }
-    if (cue) {
-      if (nx) { cue.innerHTML = '<span class="nx-lbl">Next up</span><span class="nx-name">' + nx.name + '</span><span class="nx-go">→</span>'; cue.setAttribute('href', '#cat-' + nx.cat); cue.dataset.target = nx.id; cue.style.display = ''; }
-      else { cue.innerHTML = '<span class="nx-lbl">Nice work</span><span class="nx-name">Every lesson explored</span>'; cue.removeAttribute('href'); cue.removeAttribute('data-target'); cue.style.display = ''; }
+      if (nx) { btn.textContent = 'Start lesson'; btn.setAttribute('href', '#cat-' + nx.cat); btn.dataset.target = nx.id; }
+      else { btn.textContent = 'Browse all topics'; btn.setAttribute('href', '#topics'); btn.removeAttribute('data-target'); }
     }
   }
 

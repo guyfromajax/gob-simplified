@@ -15,32 +15,21 @@
   <style>
   /* ===================== HUB (page-specific) ===================== */
 
-  /* HERO */
-  .hero { display: grid; grid-template-columns: 1.55fr 1fr; gap: 30px; align-items: center; padding: 30px 4px 30px; }
+  /* HERO — dynamic "next up" band */
+  .hero { display: flex; align-items: center; gap: 26px; padding: 26px 24px; margin-top: 4px; }
+  .hero-avatar { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 3px solid var(--orange); box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+  .hero-main { flex: 1; min-width: 0; }
   .hero h1 {
     font-family: var(--display); font-weight: 400;
-    font-size: clamp(54px, 7.2vw, 96px); line-height: 1; letter-spacing: .005em;
-    margin: 12px 0 18px; color: var(--text);
+    font-size: clamp(46px, 6.4vw, 80px); line-height: .96; letter-spacing: .01em;
+    margin: 8px 0 10px; color: var(--text);
   }
-  .hero h1 .accent { color: var(--orange); }
-  /* keep "MASTERING GOB" on one line; the normal space between the spans
-     lets it wrap to two lines only when the viewport is too narrow to fit */
-  .hero h1 .l1, .hero h1 .l2 { display: inline; }
-  .hero .lede { max-width: 50ch; font-size: 16px; color: var(--muted); margin: 0 0 24px; text-wrap: pretty; }
-  .hero .lede strong { color: var(--text); font-weight: 600; }
+  .hero-guide { max-width: 64ch; font-size: 14.5px; color: var(--muted); line-height: 1.5; margin: 0 0 18px; text-wrap: pretty; }
+  .hero-guide .hero-attr { color: var(--muted-2); }
   .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
-
-  /* Sammy card */
-  .sammy { display: flex; gap: 16px; padding: 20px; align-items: flex-start; }
-  .sammy img { width: 66px; height: 66px; border-radius: 50%; object-fit: cover; border: 2px solid var(--orange); flex-shrink: 0; }
-  .sammy .role { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
-  .sammy .who { font-family: var(--display); font-size: 24px; line-height: 1; letter-spacing: .02em; margin: 4px 0 8px; color: var(--text); }
-  .sammy .say { font-size: 13.5px; color: var(--muted); line-height: 1.45; margin: 0; }
-  .sammy-next { display: inline-flex; align-items: center; gap: 9px; margin-top: 14px; padding: 7px 12px; border-radius: 9px; background: rgba(247,148,32,0.10); border: 1px solid rgba(247,148,32,0.34); text-decoration: none; transition: background .15s, border-color .15s, transform .12s; }
-  .sammy-next:hover { background: rgba(247,148,32,0.16); border-color: rgba(247,148,32,0.5); transform: translateY(-1px); }
-  .sammy-next .nx-lbl { font-family: var(--body); font-size: 9.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--orange); white-space: nowrap; }
-  .sammy-next .nx-name { font-family: var(--display); font-size: 18px; letter-spacing: .03em; color: var(--text); line-height: 1; }
-  .sammy-next .nx-go { color: var(--orange); font-size: 14px; margin-left: 2px; }
+  @media (max-width: 760px) {
+    .hero { flex-direction: column; align-items: flex-start; }
+  }
 
   /* PROGRESS STRIP */
   .progress-strip { display: flex; align-items: center; gap: 20px; padding: 16px 20px; margin-top: 4px; }
@@ -153,25 +142,18 @@
       <span class="spacer"></span>
     </header>
 
-    <!-- HERO -->
-    <section class="hero">
-      <div>
-        <span class="eyebrow"><span class="tick"></span> GOB Coaching Academy</span>
-        <h1><span class="l1">MASTERING</span> <span class="l2 accent">GOB</span></h1>
+    <!-- HERO — dynamic "next up" band -->
+    <section class="hero panel" aria-label="Your next lesson">
+      <img class="hero-avatar" src="/images/sammy_tutorial.png" alt="Coach Sammy">
+      <div class="hero-main">
+        <span class="eyebrow" id="kicker-label"><span class="tick"></span> Next up</span>
+        <h1 id="hero-topic">Player Attributes</h1>
+        <p class="hero-guide">“Pick up right where you left off — or browse any topic, any time. Learn GOB on your terms.” <span class="hero-attr">— Coach Sammy</span></p>
         <div class="hero-cta">
-          <a class="gob-btn gob-btn--action gob-btn--lg" href="#cat-players" id="cta-next" data-target="player-attributes">Player Attributes</a>
+          <a class="gob-btn gob-btn--action gob-btn--lg" href="#cat-players" id="cta-next" data-target="player-attributes">Start lesson</a>
           <a class="gob-btn gob-btn--ghost gob-btn--lg" href="#topics" id="jump-cats">Browse all topics</a>
         </div>
       </div>
-      <aside class="sammy panel" aria-label="Your guide">
-        <img src="/images/sammy_tutorial.png" alt="Coach Sammy">
-        <div>
-          <div class="role">Your guide</div>
-          <div class="who">Coach Sammy</div>
-          <p class="say">“We’ll cue the next tutorial in line for you here. But you can browse any of the topics at any time — so you can learn GOB on your terms.”</p>
-          <a class="sammy-next" id="sammy-next" href="#cat-players" data-target="player-attributes"></a>
-        </div>
-      </aside>
     </section>
 
     <!-- PROGRESS -->
