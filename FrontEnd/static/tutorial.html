@@ -23,7 +23,9 @@
     margin: 12px 0 18px; color: var(--text);
   }
   .hero h1 .accent { color: var(--orange); }
-  .hero h1 .l1, .hero h1 .l2 { display: block; }
+  /* keep "MASTERING GOB" on one line; the normal space between the spans
+     lets it wrap to two lines only when the viewport is too narrow to fit */
+  .hero h1 .l1, .hero h1 .l2 { display: inline; }
   .hero .lede { max-width: 50ch; font-size: 16px; color: var(--muted); margin: 0 0 24px; text-wrap: pretty; }
   .hero .lede strong { color: var(--text); font-weight: 600; }
   .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }

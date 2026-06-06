@@ -17,10 +17,17 @@
      priority -> the one topic every coach must master first
      (Recruiting & Scouting content is TBD/authored later, but they are
       presented as normal Advanced lessons here — not flagged as TBD.)   */
+  // Grid fills left-to-right, top-to-bottom, so array order sets the layout:
+  //   Players  | Training
+  //   Team     | Strategy
   var CATS = [
     { id: 'players', name: 'Players', icon: I.player, topics: [
       { id: 'player-attributes', name: 'Player Attributes', icon: I.player, depth: 'foundational', priority: true,
         desc: 'The 14 attributes that determine the unique skill set of every player.' }
+    ]},
+    { id: 'training', name: 'Training', icon: I.training, topics: [
+      { id: 'training', name: 'Training', icon: I.training, depth: 'foundational',
+        desc: 'Player & team drills, playbook installs, scrimmages, and the coaching style that defines your team’s focus.' }
     ]},
     { id: 'team', name: 'Team', icon: I.team, topics: [
       { id: 'team-attributes', name: 'Team Attributes', icon: I.shield, depth: 'foundational',
@@ -35,10 +42,6 @@
         desc: 'Learn how to build playbooks that match your coaching style.' },
       { id: 'scouting', name: 'Scouting', icon: I.scout, depth: 'advanced',
         desc: 'Learn how to study your upcoming opponents.' }
-    ]},
-    { id: 'training', name: 'Training', icon: I.training, topics: [
-      { id: 'training', name: 'Training', icon: I.training, depth: 'foundational',
-        desc: 'Player & team drills, playbook installs, scrimmages, and the coaching style that defines your team’s focus.' }
     ]}
   ];
 
