@@ -77,11 +77,11 @@
 
   /* Bottom nav: Home -> hub top; categories -> their section anchor on the hub */
   var NAV = [
-    { id: 'home', label: 'Home', icon: ICONS.home, href: HUB },
+    { id: 'home', label: 'Tutorial Home', icon: ICONS.home, href: HUB },
     { id: 'players', label: 'Players', icon: ICONS.player, href: HUB + '#cat-players' },
+    { id: 'training', label: 'Training', icon: ICONS.training, href: HUB + '#cat-training' },
     { id: 'team', label: 'Team', icon: ICONS.team, href: HUB + '#cat-team' },
-    { id: 'strategy', label: 'Strategy', icon: ICONS.strategy, href: HUB + '#cat-strategy' },
-    { id: 'training', label: 'Training', icon: ICONS.training, href: HUB + '#cat-training' }
+    { id: 'strategy', label: 'Strategy', icon: ICONS.strategy, href: HUB + '#cat-strategy' }
   ];
 
   function smoothScrollTo(el) {
