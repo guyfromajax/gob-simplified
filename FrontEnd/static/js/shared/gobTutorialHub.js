@@ -87,8 +87,10 @@
         var badge = t.priority ? '<span class="tag-first">★ Master first</span>'
                   : isTbd ? '<span class="tag-tbd">TBD</span>'
                   : t.depth ? '<span class="depth ' + t.depth + '">' + t.depth + '</span>' : '';
+        // recommended-order step number (1–7 across all categories; non-contiguous within a panel)
+        var step = ORDER.indexOf(t.id) + 1;
         return '<a class="' + cls + '" data-topic="' + t.id + '" data-soon href="#">' +
-            '<span class="t-ico">' + (t.icon || '') + '</span>' +
+            '<span class="t-num">' + step + '</span>' +
             '<span class="t-main">' +
               '<span class="t-row"><span class="t-name">' + t.name + '</span>' + badge + '</span>' +
               '<span class="t-desc">' + t.desc + '</span>' +
@@ -101,7 +103,6 @@
           '<header class="cat-head">' +
             '<span class="cat-chip">' + (c.icon || '') + '</span>' +
             '<span class="cat-name">' + c.name + '</span>' +
-            '<span class="cat-count">' + c.topics.length + '</span>' +
           '</header>' +
           '<div class="cat-body">' + tiles + '</div>' +
         '</section>';
@@ -171,10 +172,8 @@
     var seeRem = document.getElementById('see-reminders');
     if (seeRem) seeRem.addEventListener('click', function () { sfx('click-tiny.wav'); toast('Reminders', 'The reminders manager is part of the next build pass.'); });
 
-    // core-loop steps + hero/Sammy cues: scroll to the category, pulse its target tile
+    // hero "next up" cue: scroll to the category, pulse its target tile
     document.body.addEventListener('click', function (e) {
-      var step = e.target.closest('.loop-step');
-      if (step) sfx('click-tiny.wav');
       var tgt = e.target.closest('[data-target]');
       if (!tgt) return;
       sfx('click-tiny.wav');

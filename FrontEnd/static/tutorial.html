@@ -49,27 +49,6 @@
   .section-head h2 { font-family: var(--display); font-weight: 400; font-size: 36px; line-height: 1; letter-spacing: .01em; margin: 7px 0 0; color: var(--text); }
   .section-head .hint { font-size: 12.5px; color: var(--muted-2); max-width: 40ch; text-align: right; }
 
-  /* CORE LOOP */
-  .coreloop { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .loop-step {
-    position: relative; padding: 18px 16px 16px; border-radius: var(--radius);
-    border: 1px solid var(--panel-border); text-decoration: none; color: inherit;
-    background: var(--panel-flat);
-    transition: transform .12s, border-color .15s, background .15s;
-  }
-  .loop-step:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.22); background: rgba(28,33,46,0.95); }
-  .loop-step .num {
-    font-family: var(--display); font-size: 16px; width: 32px; height: 32px; border-radius: 9px;
-    display: flex; align-items: center; justify-content: center; margin-bottom: 13px;
-    background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid var(--hair);
-  }
-  .loop-step.first .num { background: var(--orange); color: #15181f; border-color: transparent; }
-  .loop-step .st-tag { position: absolute; top: 16px; right: 14px; font-family: var(--body); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--orange); }
-  .loop-step .st-title { font-family: var(--display); font-size: 22px; line-height: 1; letter-spacing: .02em; margin-bottom: 6px; color: var(--text); }
-  .loop-step .st-desc { font-size: 12px; color: var(--muted-2); line-height: 1.4; }
-  .loop-step .conn { position: absolute; right: -8px; top: 50%; transform: translateY(-50%); z-index: 2; color: var(--muted-3); font-size: 14px; }
-  .loop-step:last-child .conn { display: none; }
-
   /* CATEGORY GRID */
   .cats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; align-items: start; }
   .cat { overflow: hidden; }
@@ -77,13 +56,12 @@
   .cat-chip { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.07); border: 1px solid var(--hair); color: var(--text); }
   .cat-chip svg { width: 21px; height: 21px; }
   .cat-name { font-family: var(--display); font-size: 26px; line-height: 1; letter-spacing: .02em; color: var(--text); flex: 1; }
-  .cat-count { font-family: var(--display); font-size: 18px; color: var(--muted-3); }
   .cat-body { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
 
   .tile { display: flex; align-items: center; gap: 14px; padding: 13px 12px; border-radius: 11px; text-decoration: none; color: inherit; position: relative; border: 1px solid transparent; transition: background .14s, border-color .14s; }
   .tile:hover { background: rgba(255,255,255,0.04); }
-  .tile .t-ico { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid var(--hair); color: var(--text); }
-  .tile .t-ico svg { width: 20px; height: 20px; }
+  /* recommended-order step badge (replaces the old icon chip) */
+  .tile .t-num { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 19px; letter-spacing: .02em; background: rgba(255,255,255,0.06); border: 1px solid var(--hair); color: var(--muted); }
   .tile .t-main { flex: 1; min-width: 0; }
   .tile .t-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .tile .t-name { font-weight: 700; font-size: 15px; color: var(--text); letter-spacing: -.01em; }
@@ -94,9 +72,9 @@
   /* priority + tbd + seen states */
   .tile--priority { background: rgba(247,148,32,0.06); border-color: rgba(247,148,32,0.28); }
   .tile--priority:hover { background: rgba(247,148,32,0.10); }
-  .tile--priority .t-ico { background: rgba(247,148,32,0.16); border-color: rgba(247,148,32,0.4); color: var(--orange); }
+  .tile--priority .t-num { background: var(--orange); color: #15181f; border-color: transparent; }
   .tile--tbd { opacity: .68; }
-  .tile--tbd .t-ico { color: var(--muted-2); }
+  .tile--tbd .t-num { color: var(--muted-2); }
 
   .tag-first { font-family: var(--body); font-size: 9.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: #15181f; background: var(--orange); padding: 2px 7px; border-radius: 5px; }
   .tag-tbd { font-family: var(--body); font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: rgba(255,255,255,0.08); border: 1px solid var(--hair); padding: 2px 7px; border-radius: 5px; }
@@ -119,14 +97,10 @@
   .reminders p { margin: 0; font-size: 13.5px; color: var(--muted); max-width: 64ch; }
 
   @media (max-width: 920px) {
-    .hero { grid-template-columns: 1fr; }
-    .coreloop { grid-template-columns: repeat(2, 1fr); }
-    .loop-step .conn { display: none; }
     .cats { grid-template-columns: 1fr; }
     .reminders { grid-template-columns: 1fr; }
   }
   @media (max-width: 560px) {
-    .coreloop { grid-template-columns: 1fr; }
     .progress-strip { flex-wrap: wrap; }
     .section-head { flex-direction: column; align-items: flex-start; }
     .section-head .hint { text-align: left; }
@@ -169,44 +143,6 @@
       <button class="reset-link" id="reset" type="button">Reset</button>
     </div>
 
-    <!-- CORE LOOP -->
-    <section class="section" id="start-here">
-      <div class="section-head">
-        <div>
-          <span class="eyebrow"><span class="tick"></span> Start Here</span>
-          <h2>MASTER THE FUNDAMENTALS</h2>
-        </div>
-        <p class="hint">Four pillars every coach should understand.</p>
-      </div>
-      <div class="coreloop">
-        <a class="loop-step first" href="#cat-players">
-          <div class="num">1</div>
-          <div class="st-tag">Start here</div>
-          <div class="st-title">KNOW YOUR PLAYERS</div>
-          <div class="st-desc">The 14 ratings that decide every possession.</div>
-          <div class="conn">→</div>
-        </a>
-        <a class="loop-step" href="#cat-strategy">
-          <div class="num">2</div>
-          <div class="st-title">SET YOUR GAME PLAN</div>
-          <div class="st-desc">Shape how your team plays on both ends.</div>
-          <div class="conn">→</div>
-        </a>
-        <a class="loop-step" href="#cat-training">
-          <div class="num">3</div>
-          <div class="st-title">TRAIN YOUR TEAM</div>
-          <div class="st-desc">Drills & coaching style that drive growth.</div>
-          <div class="conn">→</div>
-        </a>
-        <a class="loop-step" href="#cat-strategy">
-          <div class="num">4</div>
-          <div class="st-title">SCOUT & ADJUST</div>
-          <div class="st-desc">Read opponents and refine week to week.</div>
-          <div class="conn">→</div>
-        </a>
-      </div>
-    </section>
-
     <!-- TOPICS -->
     <section class="section" id="topics">
       <div class="section-head">
@@ -214,7 +150,7 @@
           <span class="eyebrow"><span class="tick"></span> All Topics</span>
           <h2>MASTER THE COMPLETE COACHING SYSTEM</h2>
         </div>
-        <p class="hint">Browse the whole system. Each topic is a self-contained lesson — dip in anytime.</p>
+        <p class="hint">The numbers mark the recommended order — but every lesson stands alone, so dip in anywhere.</p>
       </div>
       <div class="cats" id="cats"></div>
     </section>
