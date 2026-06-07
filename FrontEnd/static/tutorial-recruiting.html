@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Recruiting — Mastering GOB | Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <style>
+  /* ===================== RECRUITING LESSON (page-specific) ===================== */
+
+  .crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-2); margin-bottom: 14px; flex-wrap: wrap; }
+  .crumb a:hover { color: var(--text); }
+  .crumb .sep { color: var(--muted-3); }
+  .crumb .here { color: var(--orange); font-weight: 600; }
+
+  .lesson-hero { padding: 4px 4px 0; margin-bottom: 30px; }
+  .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0; color: var(--text); }
+  .lesson-hero .intro { font-size: 16px; color: var(--muted); margin: 14px 0 0; line-height: 1.45; }
+
+  .lsec { margin-top: 42px; }
+  .lsec-head { margin-bottom: 18px; }
+  .lsec-head h2 { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: .01em; margin: 7px 0 6px; color: var(--text); }
+  .lsec-head .sub { margin: 0; font-size: 14.5px; color: var(--muted); line-height: 1.6; max-width: 72ch; text-wrap: pretty; }
+  .lsec-body { font-size: 14.5px; color: var(--muted); line-height: 1.65; margin: 0 0 16px; max-width: 72ch; text-wrap: pretty; }
+
+  /* likelihood ladder */
+  .ladder { padding: 18px 20px; }
+  .ladder-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .ladder-row:last-child { margin-bottom: 0; }
+  .ld-label { width: 88px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--text); }
+  .ld-track { flex: 1; height: 24px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--hair); overflow: hidden; }
+  .ld-bar { height: 100%; border-radius: 5px; }
+  .ld-mult { width: 38px; flex-shrink: 0; text-align: right; font-size: 12px; font-weight: 700; color: var(--muted-2); }
+  .ladder-cap { margin: 12px 0 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+
+  .lock {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-top: 14px; padding: 14px 16px; border-radius: 11px;
+    background: rgba(247,148,32,0.1); border: 1px solid rgba(247,148,32,0.28);
+  }
+  .lock-ico { flex-shrink: 0; width: 20px; height: 20px; color: var(--orange); margin-top: 1px; }
+  .lock-ico svg { width: 20px; height: 20px; }
+  .lock p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.55; text-wrap: pretty; }
+
+  .signals { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+  .signal { padding: 16px 17px; border-radius: 12px; border: 1px solid var(--panel-border); background: var(--panel-flat); }
+  .signal-name { font-family: var(--display); font-size: 22px; line-height: 1; letter-spacing: .02em; color: var(--text); margin-bottom: 8px; }
+  .signal-desc { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+
+  /* rating scale (recruit RT tiers) */
+  .scale-card { padding: 22px 24px; }
+  .scale-bar { display: flex; height: 16px; border-radius: 6px; overflow: hidden; border: 1px solid var(--hair); }
+  .scale-bar > span { display: block; }
+  .scale-legend { display: flex; margin-top: 14px; }
+  .scale-legend .sl { font-size: 12px; }
+  .scale-legend .sl b { display: block; font-family: var(--display); font-size: 17px; letter-spacing: .02em; font-weight: 400; }
+  .scale-legend .sl .rng { color: var(--muted-2); }
+  .scale-note { margin: 14px 0 0; font-size: 13px; color: var(--muted-2); line-height: 1.55; text-wrap: pretty; }
+  .scale-note em { color: var(--text); font-style: normal; font-weight: 600; }
+
+  /* calendar ribbon */
+  .ribbon { display: flex; height: 38px; border-radius: 8px; overflow: hidden; border: 1px solid var(--hair); margin-bottom: 12px; }
+  .rib-seg {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--body); font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    padding: 0 6px; overflow: hidden; white-space: nowrap; color: var(--ink);
+  }
+  .rib-seg--rd { min-width: 74px; flex-shrink: 0; }
+  .rib-seg svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .rib-key { display: flex; flex-wrap: wrap; gap: 14px 20px; margin-bottom: 16px; }
+  .rib-key-item { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted-2); }
+  .rib-key-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  .phases { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .phase {
+    padding: 16px 15px 15px; border-radius: 12px;
+    border: 1px solid var(--panel-border); border-left: 3px solid var(--ac);
+    background: var(--panel-flat);
+  }
+  .ph-weeks { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ac); margin-bottom: 6px; }
+  .ph-name { font-family: var(--display); font-size: 24px; line-height: 1; letter-spacing: .02em; color: var(--text); margin: 0 0 10px; }
+  .ph-pill {
+    display: inline-flex; margin-bottom: 12px;
+    font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px;
+  }
+  .ph-pill--passive { color: #8893a8; background: rgba(136,147,168,0.14); border: 1px solid rgba(136,147,168,0.32); }
+  .ph-pill--active { color: #f79420; background: rgba(247,148,32,0.14); border: 1px solid rgba(247,148,32,0.32); }
+  .ph-pill--payoff { color: #d4a017; background: rgba(212,160,23,0.14); border: 1px solid rgba(212,160,23,0.32); }
+  .ph-points { margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--muted-2); line-height: 1.5; }
+  .ph-points li + li { margin-top: 6px; }
+
+  /* tips */
+  .tips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .tip {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 16px 15px; border-radius: 12px;
+    border: 1px solid var(--panel-border); border-left: 3px solid var(--tc, var(--orange));
+    background: var(--panel-flat);
+  }
+  .tip--thesis { --tc: #d4a017; }
+  .tip-icon {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--tc, var(--orange)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tc, var(--orange)) 28%, transparent);
+    color: var(--tc, var(--orange));
+  }
+  .tip-icon svg { width: 17px; height: 17px; }
+  .tip-main { min-width: 0; }
+  .tip-title { font-family: var(--display); font-size: 22px; line-height: 1.05; letter-spacing: .02em; color: var(--text); margin-bottom: 6px; }
+  .tip-line { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+
+  .handoff { margin-top: 42px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+  .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
+  .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  @media (max-width: 900px) {
+    .signals, .tips { grid-template-columns: 1fr; }
+    .phases { grid-template-columns: repeat(2, 1fr); }
+    .handoff { flex-direction: column; align-items: flex-start; }
+  }
+  @media (max-width: 560px) {
+    .phases { grid-template-columns: 1fr; }
+    .ld-label { width: 72px; font-size: 11px; }
+  }
+  </style>
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="team">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back to game</button>
+      <span class="spacer"></span>
+    </header>
+
+    <section class="lesson-hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#cat-team">Team</a>
+        <span class="sep">›</span>
+        <span class="here">Recruiting</span>
+      </nav>
+      <h1>RECRUITING</h1>
+      <p class="intro">Build your roster across the season — earn leans, win visits, and close on Recruiting Day.</p>
+    </section>
+
+    <!-- EVERY RECRUIT HAS LEANS -->
+    <section class="lsec" id="leans">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Start Here</span>
+        <h2>EVERY RECRUIT HAS LEANS</h2>
+      </div>
+      <p class="lsec-body">Every recruit carries a ranked lean list — up to three programs he is favoring. Your position on that list is the single biggest predictor of whether you land him. Win games, send the right invites, and climb the ladder.</p>
+
+      <div class="ladder panel">
+        <div class="ladder-row">
+          <span class="ld-label">#1 lean</span>
+          <div class="ld-track"><div class="ld-bar" style="width:100%;background:#d4a017;"></div></div>
+          <span class="ld-mult">~8×</span>
+        </div>
+        <div class="ladder-row">
+          <span class="ld-label">#2 lean</span>
+          <div class="ld-track"><div class="ld-bar" style="width:50%;background:#f79420;"></div></div>
+          <span class="ld-mult">~4×</span>
+        </div>
+        <div class="ladder-row">
+          <span class="ld-label">#3 lean</span>
+          <div class="ld-track"><div class="ld-bar" style="width:25%;background:#e0883a;"></div></div>
+          <span class="ld-mult">~2×</span>
+        </div>
+        <div class="ladder-row">
+          <span class="ld-label">Not listed</span>
+          <div class="ld-track"><div class="ld-bar" style="width:12.5%;background:#8893a8;"></div></div>
+          <span class="ld-mult">~1×</span>
+        </div>
+        <p class="ladder-cap">Each step up the list roughly doubles your odds of signing that recruit.</p>
+      </div>
+
+      <div class="lock">
+        <span class="lock-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        </span>
+        <p>Nothing is locked in until Recruiting Day. Leans shift all season — a #1 slot in November is momentum, not a guarantee.</p>
+      </div>
+
+      <div class="signals">
+        <article class="signal">
+          <div class="signal-name">Loyal lean</div>
+          <p class="signal-desc">When your program holds the #1 lean slot, a recruit is genuinely favoring you. Protect it with wins and strong visits — but know the list can still move.</p>
+        </article>
+        <article class="signal">
+          <div class="signal-name">Locked in</div>
+          <p class="signal-desc">A lean is interest, not a contract. Recruits only commit when you run Recruiting on Week 35 — that's when points and promises turn into signatures.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- TALENT, AT A GLANCE -->
+    <section class="lsec" id="rating">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Reading a Recruit</span>
+        <h2>TALENT, AT A GLANCE</h2>
+      </div>
+      <div class="scale-card panel">
+        <div class="scale-bar">
+          <span style="background:#ff6d6d;width:25%"></span>
+          <span style="background:#ffd700;width:25%"></span>
+          <span style="background:#34ec27;width:25%"></span>
+          <span style="background:#4a90d9;width:25%"></span>
+        </div>
+        <div class="scale-legend">
+          <div class="sl" style="color:#ff6d6d;width:25%"><b>Average</b><span class="rng">10s–20s</span></div>
+          <div class="sl" style="color:#ffd700;width:25%"><b>Good</b><span class="rng">30s</span></div>
+          <div class="sl" style="color:#34ec27;width:25%"><b>Strong</b><span class="rng">40s</span></div>
+          <div class="sl" style="color:#4a90d9;width:25%"><b>Elite</b><span class="rng">50+</span></div>
+        </div>
+        <p class="scale-note">A recruit's RT reflects his best position rating today — roughly half of his ceiling as a finished player. Attributes grow after he signs. <em>Recruiting is a gamble.</em></p>
+      </div>
+    </section>
+
+    <!-- THE RECRUITING CALENDAR -->
+    <section class="lsec" id="calendar">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> The Season</span>
+        <h2>THE RECRUITING CALENDAR</h2>
+        <p class="sub">Recruiting breathes with the season — long passive stretches, a focused invite window, another wait through the tournament, then the payoff.</p>
+      </div>
+
+      <div class="ribbon" aria-hidden="true">
+        <div class="rib-seg" style="width:50%;background:#8893a8;color:#0d1117;">Passive Phase</div>
+        <div class="rib-seg" style="width:20%;background:#f79420;color:#15181f;">Invite Season</div>
+        <div class="rib-seg" style="width:22%;background:#8893a8;color:#0d1117;">Tournament</div>
+        <div class="rib-seg rib-seg--rd" style="width:8%;background:#d4a017;color:#1a1500;" aria-label="Recruiting Day">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 21V5l7-2 7 2v16"/><path d="M9 21v-6h6v6"/></svg>
+        </div>
+      </div>
+      <div class="rib-key">
+        <span class="rib-key-item"><span class="rib-key-dot" style="background:#8893a8;"></span> Passive — lean-building only</span>
+        <span class="rib-key-item"><span class="rib-key-dot" style="background:#f79420;"></span> Active — official visits</span>
+        <span class="rib-key-item"><span class="rib-key-dot" style="background:#d4a017;"></span> Recruiting Day — commitments</span>
+      </div>
+
+      <div class="phases">
+        <article class="phase" style="--ac:#8893a8;">
+          <div class="ph-weeks">Weeks 1–19</div>
+          <h3 class="ph-name">Passive Phase</h3>
+          <span class="ph-pill ph-pill--passive">Passive</span>
+          <ul class="ph-points">
+            <li>Wins and quality losses can add your program to a recruit's lean list.</li>
+            <li>Performance shifts who recruits are watching — no invites yet.</li>
+            <li>Build relationships quietly before the window opens.</li>
+          </ul>
+        </article>
+        <article class="phase" style="--ac:#f79420;">
+          <div class="ph-weeks">Weeks 20–26</div>
+          <h3 class="ph-name">Invite Season</h3>
+          <span class="ph-pill ph-pill--active">Active</span>
+          <ul class="ph-points">
+            <li>Save recruiting orders before each training week.</li>
+            <li>One official visit per team per week — make each one count.</li>
+            <li>A strong visit can move you up a recruit's lean list.</li>
+          </ul>
+        </article>
+        <article class="phase" style="--ac:#8893a8;">
+          <div class="ph-weeks">Weeks 27–34</div>
+          <h3 class="ph-name">Tournament</h3>
+          <span class="ph-pill ph-pill--passive">Passive</span>
+          <ul class="ph-points">
+            <li>Postseason play — recruiting waits for the national tourney to finish.</li>
+            <li>Wins and losses still shift leans in the background.</li>
+            <li>Hold your closing pitch for Recruiting Day.</li>
+          </ul>
+        </article>
+        <article class="phase" style="--ac:#d4a017;">
+          <div class="ph-weeks">Week 35</div>
+          <h3 class="ph-name">Recruiting Day</h3>
+          <span class="ph-pill ph-pill--payoff">The Payoff</span>
+          <ul class="ph-points">
+            <li>Assign recruiting points and playing-time promises.</li>
+            <li>Run Recruiting to sign your class.</li>
+            <li>This is when commitments become real.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- RECRUITING TIPS -->
+    <section class="lsec" id="tips">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Strategy</span>
+        <h2>RECRUITING TIPS</h2>
+      </div>
+      <div class="tips">
+        <article class="tip">
+          <span class="tip-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
+          </span>
+          <div class="tip-main">
+            <div class="tip-title">Win in Your Region</div>
+            <p class="tip-line">Home-region recruits lean toward local programs — stack wins when it matters most.</p>
+          </div>
+        </article>
+        <article class="tip">
+          <span class="tip-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </span>
+          <div class="tip-main">
+            <div class="tip-title">Use Your Visits</div>
+            <p class="tip-line">Weeks 20–26 are your only official visit window — prioritize recruits already leaning your way.</p>
+          </div>
+        </article>
+        <article class="tip">
+          <span class="tip-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19h16"/><path d="M7 16l4-4 4 2 4-6"/></svg>
+          </span>
+          <div class="tip-main">
+            <div class="tip-title">Read RT &amp; Archetype</div>
+            <p class="tip-line">RT tells you talent today; archetype tells you fit — don't chase stars who don't match your system.</p>
+          </div>
+        </article>
+        <article class="tip tip--thesis">
+          <span class="tip-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3.5 19 6v5.5c0 4.3-2.9 7.4-7 8.9-4.1-1.5-7-4.6-7-8.9V6z"/><path d="M9 11.5l2.2 2.2L15.5 9.5"/></svg>
+          </span>
+          <div class="tip-main">
+            <div class="tip-title">Get on the Lean List</div>
+            <p class="tip-line">Everything else gets easier once a recruit is leaning your way — that's the job all season long.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">You've reached the end</div>
+        <div class="nx">You're all caught up</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial.html#topics">Browse all topics</a>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var toastTimer;
+    function sfx(f) {
+      if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
+    }
+    document.body.addEventListener('click', function (e) {
+      var el = e.target.closest('[data-soon]');
+      if (!el) return;
+      e.preventDefault();
+      sfx('click-tiny.wav');
+      var label = el.getAttribute('data-soon-label') || 'This lesson';
+      var t = document.getElementById('toast');
+      if (!t) return;
+      t.querySelector('.tt').textContent = 'Coming soon';
+      t.querySelector('.ts').textContent = label + ' is part of the next build pass.';
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3000);
+    });
+    if (window.GOB) window.GOB.markSeen('recruiting');
+  })();
+  </script>
+</body>
+</html>
