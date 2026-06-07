@@ -50,6 +50,7 @@
   .lever-title { font-family: var(--display); font-size: 28px; line-height: 1; letter-spacing: .02em; margin: 0; color: var(--text); }
 
   .lever-intro { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0 0 16px; max-width: 72ch; text-wrap: pretty; }
+  .lever-intro--wide { max-width: none; }
   .lever-intro + .lever-intro { margin-top: -8px; }
 
   .xlink {
@@ -112,20 +113,24 @@
     color: var(--muted-2); margin: 4px 0 16px;
   }
   .arch-group {
-    margin-bottom: 16px; padding-left: 14px;
-    border-left: 3px solid var(--arch-color, var(--orange));
+    padding: 17px 19px 19px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--arch) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--arch) 24%, transparent);
+    border-left: 3px solid var(--arch);
   }
+  .arch-group + .arch-group { margin-top: 14px; }
   .arch-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .arch-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--arch-color); }
-  .arch-name { font-family: var(--display); font-size: 24px; line-height: 1; letter-spacing: .02em; color: var(--arch-color); margin: 0; }
+  .arch-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--arch); }
+  .arch-name { font-family: var(--display); font-size: 24px; line-height: 1; letter-spacing: .02em; color: var(--arch); margin: 0; }
   .arch-focuses {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px 16px;
   }
   .arch-focus { text-align: left; }
-  .arch-focus-name { display: block; font-weight: 700; font-size: 13px; color: var(--arch-color); margin-bottom: 4px; }
-  .arch-focus-desc { display: block; font-size: 12px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+  .focus-name { display: block; font-size: 13px; color: var(--text); font-weight: 700; margin-bottom: 4px; }
+  .focus-desc { display: block; font-size: 12px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
 
   .handoff { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
   .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
@@ -177,7 +182,7 @@
             <span class="lever-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 8v8M17.5 8v8M3.5 10v4M20.5 10v4M6.5 12h11"/></svg>
             </span>
-            <h2 class="lever-title">Player Drills &amp; General</h2>
+            <h2 class="lever-title">Player Drills</h2>
           </div>
           <p class="lever-intro">Each drill sharpens one specific player attribute. Here's the full map:</p>
           <div class="dmap-grid">
@@ -279,7 +284,7 @@
             </span>
             <h2 class="lever-title">Scrimmages</h2>
           </div>
-          <p class="lever-intro">Scrimmages sharpen execution and reinforce system cohesion — they have a multiplying effect on the Installs you put into place during Team Drills. They also tend to improve team chemistry, but that is not always guaranteed as sometimes your players can come to blows during a particularly intense scrimmage. Over-scrimmaging also runs the risk of your players starting the next game a bit fatigued.</p>
+          <p class="lever-intro lever-intro--wide">Scrimmages sharpen execution and reinforce system cohesion — they have a multiplying effect on the Installs you put into place during Team Drills. They also tend to improve team chemistry, but that is not always guaranteed as sometimes your players can come to blows during a particularly intense scrimmage. Over-scrimmaging also runs the risk of your players starting the next game a bit fatigued.</p>
         </article>
 
         <!-- Coaching Style -->
@@ -290,49 +295,49 @@
             </span>
             <h2 class="lever-title">Coaching Style</h2>
           </div>
-          <p class="lever-intro">Your coaching focus determines what you emphasize across drills, scrimmages, post-practice wrap-ups, and pre-game locker room talks — shaping motivation, tone, and where your team grows most. For maximum impact, align it with the drills you run that week.</p>
-          <p class="lever-intro">Leaning into one primary category builds a clear identity. Pairing it with a strong secondary focus compounds gains as the season progresses — shaping not just development, but who your team becomes.</p>
+          <p class="lever-intro lever-intro--wide">Your coaching focus determines what you emphasize across drills, scrimmages, post-practice wrap-ups, and pre-game locker room talks — shaping motivation, tone, and where your team grows most. For maximum impact, align it with the drills you run that week.</p>
+          <p class="lever-intro lever-intro--wide">Leaning into one primary category builds a clear identity. Pairing it with a strong secondary focus compounds gains as the season progresses — shaping not just development, but who your team becomes.</p>
 
           <div class="focuses">
             <p class="focuses-cap">16 Focuses · 4 Coaching Archetypes</p>
 
-            <div class="arch-group" style="--arch-color:#C0392B;">
+            <div class="arch-group" style="--arch:#C0392B;">
               <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Authoritarian</h3></div>
               <div class="arch-focuses">
-                <div class="arch-focus"><span class="arch-focus-name">Discipline</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Rebounding</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Execution</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Teamwork</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Discipline</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Rebounding</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Execution</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Teamwork</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
               </div>
             </div>
 
-            <div class="arch-group" style="--arch-color:#D4A017;">
+            <div class="arch-group" style="--arch:#D4A017;">
               <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Systems Coach</h3></div>
               <div class="arch-focuses">
-                <div class="arch-focus"><span class="arch-focus-name">Offense</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Defense</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Fast Breaks</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Press / Trap</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Offense</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Defense</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Fast Breaks</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Press / Trap</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
               </div>
             </div>
 
-            <div class="arch-group" style="--arch-color:#3A8C4A;">
+            <div class="arch-group" style="--arch:#3A8C4A;">
               <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Player Maximizer</h3></div>
               <div class="arch-focuses">
-                <div class="arch-focus"><span class="arch-focus-name">Top 3</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Attributes 4–6</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Positional Focus</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Custom</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Top 3</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Attributes 4–6</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Positional Focus</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Custom</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
               </div>
             </div>
 
-            <div class="arch-group" style="--arch-color:#7B5EA7;">
+            <div class="arch-group" style="--arch:#7B5EA7;">
               <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Culture Builder</h3></div>
               <div class="arch-focuses">
-                <div class="arch-focus"><span class="arch-focus-name">Inspire</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Confidence</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Community Engagement</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="arch-focus-name">Team Building</span><span class="arch-focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Inspire</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Confidence</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Community Engagement</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+                <div class="arch-focus"><span class="focus-name">Team Building</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
               </div>
             </div>
           </div>
