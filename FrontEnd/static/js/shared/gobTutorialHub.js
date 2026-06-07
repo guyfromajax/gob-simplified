@@ -53,7 +53,7 @@
   // recommended learning order for the “next up” cue
   var ORDER = ['player-attributes', 'training', 'team-attributes', 'game-plans', 'playbooks', 'scouting', 'recruiting'];
   // topics whose sub-page exists this pass → real links; everything else is dead (toast)
-  var LIVE = { 'player-attributes': '/player-attributes.html' };
+  var LIVE = { 'player-attributes': '/player-attributes.html', 'training': '/tutorial-training.html' };
   function catOf(id) { var f = CATS.find(function (c) { return c.topics.some(function (t) { return t.id === id; }); }); return f ? f.id : 'players'; }
   function topicOf(id) { var t; CATS.forEach(function (c) { c.topics.forEach(function (x) { if (x.id === id) t = x; }); }); return t; }
   function nextLesson() {

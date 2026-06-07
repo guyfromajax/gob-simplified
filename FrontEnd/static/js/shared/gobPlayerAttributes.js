@@ -98,10 +98,11 @@
       if (!s) return;
       e.preventDefault();
       sfx('click-tiny.wav');
+      var label = s.getAttribute('data-soon-label') || 'This lesson';
       var t = document.getElementById('toast');
       if (!t) return;
       t.querySelector('.tt').textContent = 'Lesson coming soon';
-      t.querySelector('.ts').textContent = 'Training is part of the next build pass.';
+      t.querySelector('.ts').textContent = label + ' is part of the next build pass.';
       t.classList.add('show');
       clearTimeout(toastTimer);
       toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3000);
