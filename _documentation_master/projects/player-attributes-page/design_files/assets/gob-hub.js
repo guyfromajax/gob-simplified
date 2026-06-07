@@ -1,25 +1,15 @@
 /* ===========================================================
    GOB Tutorial Hub — data, rendering, progress, toast
    IA: Players / Team / Strategy / Training
-
-   Dead this pass: topic tiles, core-loop steps, hero action button,
-   "Next up" pill, "See All Reminders" — they never navigate to a
-   sub-page (those don't exist yet). When a sub-page ships it only has
-   to call GOB.markSeen('<topic-id>') on load and the whole progress /
-   next-up / explored-✓ system lights up automatically.
    =========================================================== */
 (function () {
   'use strict';
   var I = (window.GOB && window.GOB.icons) || {};
-  function sfx(f) { if (window.GOB && window.GOB.playSound) window.GOB.playSound(f); }
 
   /* ---- category + topic model ----
-     priority -> the one topic every coach must master first
-     (Recruiting & Scouting content is TBD/authored later, but they are
-      presented as normal Advanced lessons here — not flagged as TBD.)   */
-  // Grid fills left-to-right, top-to-bottom, so array order sets the layout:
-  //   Players  | Training
-  //   Team     | Strategy
+     live:false  -> page not built yet (this pass = hub only)
+     tag:'tbd'   -> content to be authored later (Recruiting, Scouting)
+     priority    -> the one topic every coach must master first        */
   var CATS = [
     { id: 'players', name: 'Players', icon: I.player, topics: [
       { id: 'player-attributes', name: 'Player Attributes', icon: I.player, depth: 'foundational', priority: true,
@@ -45,15 +35,13 @@
     ]}
   ];
 
-  // progress denominator excludes TBD topics (none flagged this pass -> 7)
+  // progress denominator excludes TBD topics
   var LEARNABLE = [];
   CATS.forEach(function (c) { c.topics.forEach(function (t) { if (t.tag !== 'tbd') LEARNABLE.push(t.id); }); });
   var TOTAL = LEARNABLE.length;
 
   // recommended learning order for the “next up” cue
   var ORDER = ['player-attributes', 'training', 'team-attributes', 'game-plans', 'playbooks', 'scouting', 'recruiting'];
-  // topics whose sub-page exists this pass → real links; everything else is dead (toast)
-  var LIVE = { 'player-attributes': '/player-attributes.html' };
   function catOf(id) { var f = CATS.find(function (c) { return c.topics.some(function (t) { return t.id === id; }); }); return f ? f.id : 'players'; }
   function topicOf(id) { var t; CATS.forEach(function (c) { c.topics.forEach(function (x) { if (x.id === id) t = x; }); }); return t; }
   function nextLesson() {
@@ -64,20 +52,14 @@
   }
   function updateNext() {
     var nx = nextLesson();
-    var headline = document.getElementById('hero-topic');
-    var kick = document.getElementById('kicker-label');
+    var topic = document.getElementById('hero-topic');
+    var kicker = document.getElementById('kicker-label');
     var btn = document.getElementById('cta-next');
-    // headline = the dynamic next-lesson name (single source of truth)
-    if (headline) headline.textContent = nx ? nx.name : 'You’re all caught up';
-    // kicker keeps its orange tick bar
-    if (kick) kick.innerHTML = '<span class="tick"></span> ' + (nx ? 'Next up' : 'Nice work, coach');
-    // CTA: navigate to the next lesson's page if it exists; otherwise inert (scroll + pulse)
+    if (topic) topic.textContent = nx ? nx.name : 'You’re all caught up';
+    if (kicker) kicker.textContent = nx ? 'Next up' : 'Nice work, coach';
     if (btn) {
-      if (nx) {
-        btn.textContent = 'Start lesson';
-        if (LIVE[nx.id]) { btn.setAttribute('href', LIVE[nx.id]); btn.removeAttribute('data-target'); }
-        else { btn.setAttribute('href', '#cat-' + nx.cat); btn.dataset.target = nx.id; }
-      } else { btn.textContent = 'Browse all topics'; btn.setAttribute('href', '#topics'); btn.removeAttribute('data-target'); }
+      if (nx) { btn.textContent = 'Start lesson'; btn.setAttribute('href', '#cat-' + nx.cat); btn.dataset.target = nx.id; }
+      else { btn.textContent = 'Browse all topics'; btn.setAttribute('href', '#topics'); delete btn.dataset.target; }
     }
   }
 
@@ -89,15 +71,12 @@
       var tiles = c.topics.map(function (t) {
         var isTbd = t.tag === 'tbd';
         var cls = 'tile' + (t.priority ? ' tile--priority' : '') + (isTbd ? ' tile--tbd' : '');
+        var num = ORDER.indexOf(t.id) + 1;
         var badge = t.priority ? '<span class="tag-first">★ Master first</span>'
                   : isTbd ? '<span class="tag-tbd">TBD</span>'
                   : t.depth ? '<span class="depth ' + t.depth + '">' + t.depth + '</span>' : '';
-        // recommended-order step number (1–7 across all categories; non-contiguous within a panel)
-        var step = ORDER.indexOf(t.id) + 1;
-        // live topics navigate to their sub-page; dead ones toast via [data-soon]
-        var nav = LIVE[t.id] ? 'href="' + LIVE[t.id] + '"' : 'data-soon href="#"';
-        return '<a class="' + cls + '" data-topic="' + t.id + '" ' + nav + '>' +
-            '<span class="t-num">' + step + '</span>' +
+        return '<a class="' + cls + '" data-topic="' + t.id + '" data-soon href="#">' +
+            '<span class="t-num" aria-label="Recommended step ' + num + '">' + (num || '•') + '</span>' +
             '<span class="t-main">' +
               '<span class="t-row"><span class="t-name">' + t.name + '</span>' + badge + '</span>' +
               '<span class="t-desc">' + t.desc + '</span>' +
@@ -131,7 +110,7 @@
   }
   function set(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
 
-  /* ---- toast (styleguide: bottom-right, single reused node) ---- */
+  /* ---- toast (styleguide: bottom-right) ---- */
   var toastTimer;
   function toast(title, sub) {
     var t = document.getElementById('toast');
@@ -145,52 +124,52 @@
 
   /* ---- wire ---- */
   function wire() {
-    // dead topic tiles: toast preview + mark explored (the future-page hook)
     document.body.addEventListener('click', function (e) {
       var soon = e.target.closest('[data-soon]');
-      if (!soon) return;
-      e.preventDefault();
-      sfx('click-tiny.wav');
-      var tbd = soon.classList.contains('tile--tbd');
-      if (tbd) {
-        toast('In development', 'We’ll author this once the others are nailed.');
-      } else {
-        var id = soon.getAttribute('data-topic');
-        var fresh = id && !window.GOB.isSeen(id);
-        if (id) window.GOB.markSeen(id);
-        toast(fresh ? 'Marked as explored' : 'Lesson preview', 'Full lesson lands in the next build pass.');
+      if (soon) {
+        e.preventDefault();
+        var tbd = soon.classList.contains('tile--tbd');
+        if (tbd) {
+          toast('In development', 'We’ll author this once the others are nailed.');
+        } else {
+          var id = soon.getAttribute('data-topic');
+          var fresh = id && !window.GOB.isSeen(id);
+          if (id) window.GOB.markSeen(id);
+          toast(fresh ? 'Marked as explored' : 'Lesson preview', 'Full lesson lands in the next build pass.');
+        }
       }
     });
-
-    // "Browse all topics" -> smooth scroll to the topics section
     var jump = document.getElementById('jump-cats');
     if (jump) jump.addEventListener('click', function (e) {
       e.preventDefault();
-      sfx('click-tiny.wav');
       var el = document.getElementById('topics');
-      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 24, behavior: 'smooth' });
+    });
+    var reset = document.getElementById('reset');
+    if (reset) reset.addEventListener('click', function () { window.GOB.unseenAll(); toast('Progress reset', 'Your explored topics were cleared.'); });
+
+    var seeRem = document.getElementById('see-reminders');
+    if (seeRem) seeRem.addEventListener('click', function () { toast('Reminders', 'The reminders manager is part of the next build pass.'); });
+
+    var demo = document.getElementById('demo-seen');
+    if (demo) demo.addEventListener('click', function () {
+      // lets the user feel the progress system without a built topic page
+      var next = LEARNABLE.find(function (id) { return !window.GOB.isSeen(id); });
+      if (next) { window.GOB.markSeen(next); toast('Topic marked explored', 'Watch your knowledge meter climb.'); }
+      else toast('All caught up', 'You’ve explored every available lesson.');
     });
 
-    // Reset progress
-    var reset = document.getElementById('reset');
-    if (reset) reset.addEventListener('click', function () { sfx('click-tiny.wav'); window.GOB.unseenAll(); toast('Progress reset', 'Your explored topics were cleared.'); });
-
-    // "See All Reminders" — dead (manager not built)
-    var seeRem = document.getElementById('see-reminders');
-    if (seeRem) seeRem.addEventListener('click', function () { sfx('click-tiny.wav'); toast('Reminders', 'The reminders manager is part of the next build pass.'); });
-
-    // hero "next up" cue: scroll to the category, pulse its target tile
     document.body.addEventListener('click', function (e) {
       var tgt = e.target.closest('[data-target]');
-      if (!tgt) return;
-      sfx('click-tiny.wav');
-      var id = tgt.dataset.target;
-      var tile = document.querySelector('.tile[data-topic="' + id + '"]');
-      if (tile) {
-        setTimeout(function () {
-          tile.classList.add('pulse');
-          setTimeout(function () { tile.classList.remove('pulse'); }, 1600);
-        }, 480);
+      if (tgt) {
+        var id = tgt.dataset.target;
+        var tile = document.querySelector('.tile[data-topic="' + id + '"]');
+        if (tile) {
+          setTimeout(function () {
+            tile.classList.add('pulse');
+            setTimeout(function () { tile.classList.remove('pulse'); }, 1600);
+          }, 480);
+        }
       }
     });
 
