@@ -4439,8 +4439,9 @@ async function renderScoutingTab() {
   const status = document.getElementById('fcc-scouting-status');
   const content = document.getElementById('fcc-scouting-content');
   const opponentName = document.getElementById('fcc-scouting-opponent-name');
+  const opponentRecord = document.getElementById('fcc-scouting-opponent-record');
   const opponentRank = document.getElementById('fcc-scouting-opponent-rank');
-  if (!status || !content || !opponentName || !opponentRank) return;
+  if (!status || !content || !opponentName || !opponentRecord || !opponentRank) return;
 
   status.style.display = 'block';
   content.style.display = 'none';
@@ -4459,7 +4460,8 @@ async function renderScoutingTab() {
   const losses = Number(standingsEntry?.L || 0);
   const rank = Number(rankingEntry?.natl_rank || 0);
 
-  opponentName.textContent = `${opponentTeamName} (${wins}-${losses})`;
+  opponentName.textContent = opponentTeamName;
+  opponentRecord.textContent = `${wins}-${losses}`;
   opponentRank.textContent = Number.isFinite(rank) && rank > 0 ? String(rank) : '--';
 
   const teamPageLink = document.getElementById('fcc-scouting-team-page-link');

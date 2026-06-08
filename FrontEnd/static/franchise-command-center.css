@@ -1850,66 +1850,72 @@ input[type="reset"] {
   padding: 14px 16px 12px;
 }
 
-#franchise-container .fcc-scouting-summary-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 18px;
+#franchise-container .fcc-scouting-meta-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 13px;
+  margin-bottom: 14px;
 }
 
-#franchise-container .fcc-scouting-summary-left {
-  min-width: 0;
-}
-
-#franchise-container .fcc-scouting-opponent-label {
-  color: rgba(255, 255, 255, 0.6);
+#franchise-container .fcc-scouting-meta-label {
+  color: rgba(255, 255, 255, 0.5);
   font-family: 'Inter', sans-serif;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-#franchise-container .fcc-scouting-opponent-name {
-  margin-top: 4px;
-  color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 38px;
-  letter-spacing: 0.03em;
-  line-height: 1;
-}
-
-#franchise-container .fcc-scouting-summary-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  text-align: right;
-}
-
-#franchise-container .fcc-scouting-rank-row {
-  display: flex;
+#franchise-container .fcc-scouting-meta-rank {
+  display: inline-flex;
   align-items: baseline;
-  justify-content: flex-end;
   gap: 8px;
-  white-space: nowrap;
-}
-
-#franchise-container .fcc-scouting-rank-label {
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 #franchise-container .fcc-scouting-rank-value {
-  color: #ffffff;
+  color: #f7f9ff;
   font-family: 'Inter', sans-serif;
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1;
+}
+
+#franchise-container .fcc-scouting-hero-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+#franchise-container .fcc-scouting-hero-name {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+#franchise-container .fcc-scouting-opponent-name {
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 54px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#franchise-container .fcc-scouting-opponent-record {
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Inter', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1;
+  position: relative;
+  top: 2px;
+  white-space: nowrap;
 }
 
 #franchise-container .fcc-scouting-team-page-link {
@@ -2365,20 +2371,11 @@ input[type="reset"] {
   font-weight: 600;
 }
 
-@media (max-width: 760px) {
-  #franchise-container .fcc-scouting-summary-row {
-    grid-template-columns: 1fr;
+@media (max-width: 720px) {
+  #franchise-container .fcc-scouting-hero-row {
+    flex-direction: column;
     align-items: flex-start;
     gap: 16px;
-  }
-
-  #franchise-container .fcc-scouting-summary-right {
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  #franchise-container .fcc-scouting-rank-row {
-    justify-content: flex-start;
   }
 }
 

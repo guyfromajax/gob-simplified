@@ -13,8 +13,6 @@ Leading up to each game, the user will see a Scouting Report tab in the Command 
 - Shows player attributes and player stats
 
 
-
-
 **Tips & Hints**
 - Study the Scouting Report tab in the Command Center and opponent team page before running training each week, so you have context on how you want to manage training.
 - Look for tendencies from your opponent. Do they run a particular play more than others? Do they run Motion or Set Plays more often on offense? Do they run Zone or Man more often on defense. Do they like to Fast Break, Press or Trap more often than normal? Who is their top scorer or scorers? 
