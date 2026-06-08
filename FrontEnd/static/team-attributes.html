@@ -22,9 +22,7 @@
 
   .lesson-hero { padding: 4px 4px 0; margin-bottom: 30px; }
   .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0; color: var(--text); }
-
-  .lsec { margin-top: 40px; }
-  .lsec-head { margin-bottom: 18px; }
+  .lesson-hero .intro { font-size: 16px; color: var(--muted); max-width: 72ch; margin: 14px 0 0; line-height: 1.45; text-wrap: pretty; }
 
   /* mechanic explainer */
   .mech-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -71,7 +69,7 @@
   .ac-lever { display: block; font-size: 12px; color: var(--muted-2); margin-top: 10px; line-height: 1.45; text-wrap: pretty; }
   .ac-lever strong { color: #4a90d9; font-weight: 700; }
 
-  .handoff { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
   .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
   .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
   .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -100,11 +98,12 @@
         <span class="here">Team Attributes</span>
       </nav>
       <h1>TEAM ATTRIBUTES</h1>
+      <p class="intro">Every team has 11 attributes that comprise its unique DNA.</p>
     </section>
 
     <!-- MECHANIC EXPLAINER -->
     <section class="lsec" id="mechanics">
-      <div class="lsec-head">
+      <div class="lsec-eyebrow-only">
         <span class="eyebrow"><span class="tick"></span> Two Ways Your Team Evolves</span>
       </div>
       <div class="mech-grid">
@@ -131,7 +130,7 @@
 
     <!-- REFERENCE -->
     <section class="lsec" id="reference">
-      <div class="lsec-head">
+      <div class="lsec-eyebrow-only">
         <span class="eyebrow"><span class="tick"></span> The Eleven</span>
       </div>
 

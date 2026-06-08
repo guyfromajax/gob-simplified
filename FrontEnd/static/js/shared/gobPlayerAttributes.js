@@ -63,6 +63,14 @@
       '<span class="mo-end hot">Hot</span></div></div>';
   }
 
+  var GROUP_LABELS = {
+    offense: 'Offense Attributes',
+    defense: 'Defense Attributes',
+    technical: 'Technical Attributes',
+    physical: 'Physical Attributes',
+    intangibles: 'Intangible Attributes'
+  };
+
   function renderReference() {
     var host = document.getElementById('attr-reference');
     if (!host) return;
@@ -83,8 +91,9 @@
           '</div>';
       }).join('');
       return '<div class="attr-group">' +
-          '<div class="ag-head"><span class="ag-dot" style="background:' + t.color + '"></span>' +
-          '<h3>' + t.label + '</h3><span class="ag-n">' + list.length + '</span></div>' +
+          '<div class="lsec-eyebrow-only">' +
+            '<span class="eyebrow"><span class="tick" style="background:' + t.color + '"></span> ' + GROUP_LABELS[key] + '</span>' +
+          '</div>' +
           '<div class="ag-cards">' + cards + '</div>' +
         '</div>';
     }).join('');

@@ -24,34 +24,9 @@
   .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0 0 14px; color: var(--text); }
   .lesson-hero .intro { font-size: 16px; color: var(--muted); max-width: 64ch; margin: 0; text-wrap: pretty; }
 
-  .lsec { margin-top: 40px; }
-  .lsec-eyebrow-only { margin-bottom: 18px; }
-
-  .levers { display: flex; flex-direction: column; gap: 14px; }
-
-  .lever {
-    padding: 22px 24px;
-    border-radius: var(--radius);
-    border: 1px solid var(--panel-border);
-    background: var(--panel-flat);
-    border-left: 3px solid var(--lever-accent, var(--orange));
-  }
-  .lever--wide { width: 100%; }
-  .lever--feature { padding: 26px 24px 24px; }
-
-  .lever-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-  .lever-icon {
-    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,0.05); border: 1px solid var(--hair);
-    color: var(--lever-accent, var(--orange));
-  }
-  .lever-icon svg { width: 18px; height: 18px; }
-  .lever-title { font-family: var(--display); font-size: 28px; line-height: 1; letter-spacing: .02em; margin: 0; color: var(--text); }
-
-  .lever-intro { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0 0 16px; max-width: 72ch; text-wrap: pretty; }
-  .lever-intro--wide { max-width: none; }
-  .lever-intro + .lever-intro { margin-top: -8px; }
+  .sec-body { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0 0 16px; max-width: 72ch; text-wrap: pretty; }
+  .sec-body--wide { max-width: none; }
+  .sec-body + .sec-body { margin-top: -8px; }
 
   .xlink {
     display: inline-flex; align-items: center; gap: 6px; margin-top: 16px;
@@ -164,7 +139,7 @@
   .focus-name { display: block; font-size: 13px; color: var(--text); font-weight: 700; margin-bottom: 4px; }
   .focus-desc { display: block; font-size: 12px; color: var(--muted); line-height: 1.45; text-wrap: pretty; }
 
-  .handoff { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
   .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
   .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
   .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -201,183 +176,155 @@
       <p class="intro">Practice is where your program develops into your vision.</p>
     </section>
 
-    <section class="lsec" id="training-week">
+    <section class="lsec" id="player-drills">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Player Drills</span>
+      </div>
+      <p class="sec-body">Each drill sharpens one specific player attribute. Here's the full map:</p>
+      <div class="dmap-grid">
+        <div class="dmap-cell"><span class="dmap-name">Inside Offense</span><span class="dmap-code" style="background:#f79420;">SC</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Outside Offense</span><span class="dmap-code" style="background:#f79420;">SH</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Inside Defense</span><span class="dmap-code" style="background:#4a90d9;">ID</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Outside Defense</span><span class="dmap-code" style="background:#4a90d9;">OD</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Passing</span><span class="dmap-code" style="background:#7b5ea7;">PS</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Ball Handling</span><span class="dmap-code" style="background:#7b5ea7;">BH</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Rebounding</span><span class="dmap-code" style="background:#7b5ea7;">RB</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Strength</span><span class="dmap-code" style="background:#aeb8cc;">ST</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Agility</span><span class="dmap-code" style="background:#aeb8cc;">AG</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Conditioning</span><span class="dmap-code" style="background:#aeb8cc;">ND</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Free Throws</span><span class="dmap-code" style="background:#d4a017;">FT</span></div>
+        <div class="dmap-cell"><span class="dmap-name">Film Study</span><span class="dmap-code" style="background:#d4a017;">IQ</span></div>
+      </div>
+      <div class="dmap-notes">
+        <div class="dmap-notes-label">Good to know</div>
+        <ul class="dmap-notes-list">
+          <li class="dmap-notes-item"><strong>Film Study</strong> gives coaches better insight into upcoming opponents — especially tendencies from their most recent game.</li>
+        </ul>
+      </div>
+      <a class="xlink" href="/player-attributes.html">See the 14 player attributes →</a>
+    </section>
 
-      <div class="levers">
+    <section class="lsec" id="breaks">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Breaks</span>
+      </div>
+      <p class="sec-body sec-body--wide">Breaks boost the effectiveness of all drills and reduce fatigue heading into the next game. But too many run the risk of straining team chemistry and weakening your team's Fight and Discipline attributes. Strong-chemistry teams absorb more downtime with less risk.</p>
+    </section>
 
-        <!-- Player Drills & General -->
-        <article class="lever lever--wide panel" style="--lever-accent:#f79420;">
-          <div class="lever-head">
-            <span class="lever-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 8v8M17.5 8v8M3.5 10v4M20.5 10v4M6.5 12h11"/></svg>
-            </span>
-            <h2 class="lever-title">Player Drills</h2>
+    <section class="lsec" id="team-drills">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Team Drills</span>
+      </div>
+      <div class="ins-grid">
+        <div class="ins-card" style="--ins-accent:#f79420;">
+          <span class="ins-dot"></span>
+          <div class="ins-main">
+            <div class="ins-name">Offense Install</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
           </div>
-          <p class="lever-intro">Each drill sharpens one specific player attribute. Here's the full map:</p>
-          <div class="dmap-grid">
-            <div class="dmap-cell"><span class="dmap-name">Inside Offense</span><span class="dmap-code" style="background:#f79420;">SC</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Outside Offense</span><span class="dmap-code" style="background:#f79420;">SH</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Inside Defense</span><span class="dmap-code" style="background:#4a90d9;">ID</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Outside Defense</span><span class="dmap-code" style="background:#4a90d9;">OD</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Passing</span><span class="dmap-code" style="background:#7b5ea7;">PS</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Ball Handling</span><span class="dmap-code" style="background:#7b5ea7;">BH</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Rebounding</span><span class="dmap-code" style="background:#7b5ea7;">RB</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Strength</span><span class="dmap-code" style="background:#aeb8cc;">ST</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Agility</span><span class="dmap-code" style="background:#aeb8cc;">AG</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Conditioning</span><span class="dmap-code" style="background:#aeb8cc;">ND</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Free Throws</span><span class="dmap-code" style="background:#d4a017;">FT</span></div>
-            <div class="dmap-cell"><span class="dmap-name">Film Study</span><span class="dmap-code" style="background:#d4a017;">IQ</span></div>
+        </div>
+        <div class="ins-card" style="--ins-accent:#4a90d9;">
+          <span class="ins-dot"></span>
+          <div class="ins-main">
+            <div class="ins-name">Defense Install</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
           </div>
-          <div class="dmap-notes">
-            <div class="dmap-notes-label">Good to know</div>
-            <ul class="dmap-notes-list">
-              <li class="dmap-notes-item"><strong>Film Study</strong> gives coaches better insight into upcoming opponents — especially tendencies from their most recent game.</li>
-            </ul>
+        </div>
+        <div class="ins-card" style="--ins-accent:#f79420;">
+          <span class="ins-dot"></span>
+          <div class="ins-main">
+            <div class="ins-name">Fast Break Install</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
           </div>
-          <a class="xlink" href="/player-attributes.html">See the 14 player attributes →</a>
-        </article>
-
-        <!-- Breaks -->
-        <article class="lever lever--wide panel" style="--lever-accent:#aeb8cc;">
-          <div class="lever-head">
-            <span class="lever-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 14.5A8.5 8.5 0 1 1 10.5 6"/><path d="M14 3h4v4"/><path d="M10 20H6v-4"/></svg>
-            </span>
-            <h2 class="lever-title">Breaks</h2>
+        </div>
+        <div class="ins-card" style="--ins-accent:#4a90d9;">
+          <span class="ins-dot"></span>
+          <div class="ins-main">
+            <div class="ins-name">Fast Break Defense Install</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
           </div>
-          <p class="lever-intro lever-intro--wide">Breaks boost the effectiveness of all drills and reduce fatigue heading into the next game. But too many run the risk of straining team chemistry and weakening your team's Fight and Discipline attributes. Strong-chemistry teams absorb more downtime with less risk.</p>
-        </article>
-
-        <!-- Team Drills -->
-        <article class="lever lever--wide panel" style="--lever-accent:#4a90d9;">
-          <div class="lever-head">
-            <span class="lever-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg>
-            </span>
-            <h2 class="lever-title">Team Drills</h2>
+        </div>
+        <div class="ins-card" style="--ins-accent:#4a90d9;">
+          <span class="ins-dot"></span>
+          <div class="ins-main">
+            <div class="ins-name">Press/Trap Install</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
           </div>
-          <p class="lever-intro">Consistent emphasis strengthens these traits over time. Neglect lets them erode.</p>
-          <div class="ins-grid">
-            <div class="ins-card" style="--ins-accent:#f79420;">
-              <span class="ins-dot"></span>
-              <div class="ins-main">
-                <div class="ins-name">Offense Install</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
-              </div>
-            </div>
-            <div class="ins-card" style="--ins-accent:#4a90d9;">
-              <span class="ins-dot"></span>
-              <div class="ins-main">
-                <div class="ins-name">Defense Install</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
-              </div>
-            </div>
-            <div class="ins-card" style="--ins-accent:#f79420;">
-              <span class="ins-dot"></span>
-              <div class="ins-main">
-                <div class="ins-name">Fast Break Install</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
-              </div>
-            </div>
-            <div class="ins-card" style="--ins-accent:#4a90d9;">
-              <span class="ins-dot"></span>
-              <div class="ins-main">
-                <div class="ins-name">Fast Break Defense Install</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
-              </div>
-            </div>
-            <div class="ins-card" style="--ins-accent:#4a90d9;">
-              <span class="ins-dot"></span>
-              <div class="ins-main">
-                <div class="ins-name">Press/Trap Install</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
-              </div>
-            </div>
-            <div class="ins-card" style="--ins-accent:#f79420;">
-              <span class="ins-dot"></span>
-              <div class="ins-main">
-                <div class="ins-name">Press/Trap Break Install</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
-              </div>
-            </div>
-            <div class="ins-card ins-card--full">
-              <span class="ins-dot" style="background:#d4a017;"></span>
-              <div class="ins-main">
-                <div class="ins-name">Training Playbooks</div>
-                <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.</p>
-              </div>
-            </div>
+        </div>
+        <div class="ins-card" style="--ins-accent:#f79420;">
+          <span class="ins-dot"></span>
+          <div class="ins-main">
+            <div class="ins-name">Press/Trap Break Install</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.</p>
           </div>
-          <a class="xlink" href="/team-attributes.html">See team attributes →</a>
-        </article>
-
-        <!-- Scrimmages -->
-        <article class="lever lever--wide panel" style="--lever-accent:#7b5ea7;">
-          <div class="lever-head">
-            <span class="lever-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
-            </span>
-            <h2 class="lever-title">Scrimmages</h2>
+        </div>
+        <div class="ins-card ins-card--full">
+          <span class="ins-dot" style="background:#d4a017;"></span>
+          <div class="ins-main">
+            <div class="ins-name">Training Playbooks</div>
+            <p class="ins-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.</p>
           </div>
-          <p class="lever-intro lever-intro--wide">Scrimmages sharpen execution and reinforce system cohesion — they have a multiplying effect on the Installs you put into place during Team Drills. They also tend to improve team chemistry, but that is not always guaranteed as sometimes your players can come to blows during a particularly intense scrimmage. Over-scrimmaging also runs the risk of your players starting the next game a bit fatigued.</p>
-        </article>
+        </div>
+      </div>
+      <a class="xlink" href="/team-attributes.html">See team attributes →</a>
+    </section>
 
-        <!-- Coaching Style -->
-        <article class="lever lever--wide lever--feature panel" style="--lever-accent:#d4a017;">
-          <div class="lever-head">
-            <span class="lever-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3 4 7v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
-            </span>
-            <h2 class="lever-title">Coaching Style</h2>
+    <section class="lsec" id="scrimmages">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Scrimmages</span>
+      </div>
+      <p class="sec-body sec-body--wide">Scrimmages sharpen execution and reinforce system cohesion — they have a multiplying effect on the Installs you put into place during Team Drills. They also tend to improve team chemistry, but that is not always guaranteed as sometimes your players can come to blows during a particularly intense scrimmage. Over-scrimmaging also runs the risk of your players starting the next game a bit fatigued.</p>
+    </section>
+
+    <section class="lsec" id="coaching-style">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Coaching Style</span>
+      </div>
+      <p class="sec-body sec-body--wide">Your coaching focus determines what you emphasize across drills, scrimmages, post-practice wrap-ups, and pre-game locker room talks — shaping motivation, tone, and where your team grows most. For maximum impact, align it with the drills you run that week.</p>
+      <p class="sec-body sec-body--wide">Leaning into one primary category builds a clear identity. Pairing it with a strong secondary focus compounds gains as the season progresses — shaping not just development, but who your team becomes.</p>
+
+      <div class="focuses">
+        <p class="focuses-cap">16 Focuses · 4 Coaching Archetypes</p>
+
+        <div class="arch-group" style="--arch:#C0392B;">
+          <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Authoritarian</h3></div>
+          <div class="arch-focuses">
+            <div class="arch-focus"><span class="focus-name">Discipline</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Rebounding</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Execution</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Teamwork</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
           </div>
-          <p class="lever-intro lever-intro--wide">Your coaching focus determines what you emphasize across drills, scrimmages, post-practice wrap-ups, and pre-game locker room talks — shaping motivation, tone, and where your team grows most. For maximum impact, align it with the drills you run that week.</p>
-          <p class="lever-intro lever-intro--wide">Leaning into one primary category builds a clear identity. Pairing it with a strong secondary focus compounds gains as the season progresses — shaping not just development, but who your team becomes.</p>
+        </div>
 
-          <div class="focuses">
-            <p class="focuses-cap">16 Focuses · 4 Coaching Archetypes</p>
-
-            <div class="arch-group" style="--arch:#C0392B;">
-              <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Authoritarian</h3></div>
-              <div class="arch-focuses">
-                <div class="arch-focus"><span class="focus-name">Discipline</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Rebounding</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Execution</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Teamwork</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-              </div>
-            </div>
-
-            <div class="arch-group" style="--arch:#D4A017;">
-              <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Systems Coach</h3></div>
-              <div class="arch-focuses">
-                <div class="arch-focus"><span class="focus-name">Offense</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Defense</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Fast Breaks</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Press / Trap</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-              </div>
-            </div>
-
-            <div class="arch-group" style="--arch:#3A8C4A;">
-              <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Player Maximizer</h3></div>
-              <div class="arch-focuses">
-                <div class="arch-focus"><span class="focus-name">Top 3</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Attributes 4–6</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Positional Focus</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Custom</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-              </div>
-            </div>
-
-            <div class="arch-group" style="--arch:#7B5EA7;">
-              <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Culture Builder</h3></div>
-              <div class="arch-focuses">
-                <div class="arch-focus"><span class="focus-name">Inspire</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Confidence</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Community Engagement</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-                <div class="arch-focus"><span class="focus-name">Team Building</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
-              </div>
-            </div>
+        <div class="arch-group" style="--arch:#D4A017;">
+          <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Systems Coach</h3></div>
+          <div class="arch-focuses">
+            <div class="arch-focus"><span class="focus-name">Offense</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Defense</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Fast Breaks</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Press / Trap</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
           </div>
-        </article>
+        </div>
 
+        <div class="arch-group" style="--arch:#3A8C4A;">
+          <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Player Maximizer</h3></div>
+          <div class="arch-focuses">
+            <div class="arch-focus"><span class="focus-name">Top 3</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Attributes 4–6</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Positional Focus</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Custom</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+          </div>
+        </div>
+
+        <div class="arch-group" style="--arch:#7B5EA7;">
+          <div class="arch-head"><span class="arch-dot"></span><h3 class="arch-name">Culture Builder</h3></div>
+          <div class="arch-focuses">
+            <div class="arch-focus"><span class="focus-name">Inspire</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Confidence</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Community Engagement</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+            <div class="arch-focus"><span class="focus-name">Team Building</span><span class="focus-desc">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</span></div>
+          </div>
+        </div>
       </div>
     </section>
 

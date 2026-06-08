@@ -26,18 +26,8 @@
   .lesson-hero .intro { font-size: 16px; color: var(--muted); max-width: 64ch; margin: 0; text-wrap: pretty; }
   .lesson-hero .intro strong { color: var(--text); font-weight: 600; }
 
-  /* section heads */
-  .lsec { margin-top: 40px; }
-  .lsec-head { margin-bottom: 18px; }
-  .lsec-head h2 { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: .01em; margin: 7px 0 6px; color: var(--text); }
-  .lsec-head p { margin: 0; font-size: 13.5px; color: var(--muted-2); max-width: 70ch; }
-
   /* REFERENCE — category groups of attribute cards */
   .attr-group { margin-bottom: 22px; }
-  .ag-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .ag-dot { width: 12px; height: 12px; border-radius: 50%; }
-  .ag-head h3 { font-family: var(--display); font-weight: 400; font-size: 24px; line-height: 1; letter-spacing: .02em; margin: 0; color: var(--text); white-space: nowrap; }
-  .ag-n { font-family: var(--display); font-size: 16px; color: var(--muted-3); }
   .ag-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .attr-card { display: flex; gap: 13px; text-align: left; padding: 15px; border-radius: 12px; border: 1px solid var(--panel-border); border-left: 3px solid var(--ac); background: var(--panel-flat); }
   .attr-card--wide { grid-column: 1 / -1; }
@@ -74,7 +64,7 @@
   .scale-legend .sl .rng { color: var(--muted-2); }
 
   /* footer handoff */
-  .handoff { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
   .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
   .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
   .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -114,9 +104,8 @@
 
     <!-- RATING SCALE -->
     <section class="lsec">
-      <div class="lsec-head">
-        <span class="eyebrow"><span class="tick"></span> How To Read A Rating</span>
-        <h2>THE ATTRIBUTE SCALE</h2>
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Attribute Scale</span>
       </div>
       <div class="scale-card panel">
         <div class="scale-bar">

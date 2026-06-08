@@ -24,12 +24,10 @@
   .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0 0 14px; color: var(--text); }
   .lesson-hero .intro { font-size: 16px; color: var(--muted); max-width: 70ch; margin: 0; text-wrap: pretty; }
 
-  .lsec { margin-top: 48px; }
-  #what .lsec-head, #report .lsec-head, #deeper .lsec-head, #plan .lsec-head { margin-bottom: 0; }
-  #what > .body-copy { margin-top: 18px; }
-  #report .lsec-head + .rblock { margin-top: 18px; }
-  #deeper .lsec-head + .body-copy { margin-top: 18px; }
-  #plan .lsec-head + .work { margin-top: 18px; }
+  #what > .body-copy { margin-top: 0; }
+  #report .lsec-eyebrow-only + .rblock { margin-top: 0; }
+  #deeper .lsec-eyebrow-only + .body-copy { margin-top: 0; }
+  #plan .lsec-eyebrow-only + .work { margin-top: 0; }
 
   .body-copy { font-size: 14px; line-height: 1.6; color: var(--muted); max-width: 80ch; margin: 0 0 16px; text-wrap: pretty; }
   .body-copy strong, .rblock > p strong, .measure-cap strong, .payoff p strong, .loop-note strong { color: var(--text); font-weight: 600; }
@@ -126,7 +124,7 @@
   .payoff svg { width: 22px; height: 22px; color: var(--orange); flex-shrink: 0; }
   .payoff p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
 
-  .handoff { margin-top: 48px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
   .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
   .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
   .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -169,7 +167,7 @@
     </section>
 
     <section class="lsec" id="what">
-      <div class="lsec-head">
+      <div class="lsec-eyebrow-only">
         <span class="eyebrow"><span class="tick"></span> The Habit</span>
       </div>
       <p class="body-copy">Scouting should be one of your first steps each week. It's best to scout before you run training, as what you learn about your opponent could shape how you prepare.</p>
@@ -212,7 +210,7 @@
     </section>
 
     <section class="lsec" id="report">
-      <div class="lsec-head">
+      <div class="lsec-eyebrow-only">
         <span class="eyebrow"><span class="tick"></span> The Report</span>
       </div>
 
@@ -299,7 +297,7 @@
     </section>
 
     <section class="lsec" id="deeper">
-      <div class="lsec-head">
+      <div class="lsec-eyebrow-only">
         <span class="eyebrow"><span class="tick"></span> The Team Page</span>
       </div>
       <p class="body-copy">The Scouting Report gives you the projected five, but games aren't won by five players. Follow the link to the opponent's <strong>team page</strong> for the full picture. Here you'll find every player's full attributes and season statistics. The attributes tell you who they are; the season stats tell you what they've actually done. Together they tell you a complete story about your opponent's team makeup.</p>
@@ -320,7 +318,7 @@
     </section>
 
     <section class="lsec" id="plan">
-      <div class="lsec-head">
+      <div class="lsec-eyebrow-only">
         <span class="eyebrow"><span class="tick"></span> Turning Intel Into a Plan</span>
       </div>
 
@@ -362,11 +360,12 @@
 
     <section class="handoff panel">
       <div class="h-l">
-        <div class="lbl">You've reached the end of the tutorial</div>
-        <div class="nx">You're all caught up</div>
+        <div class="lbl">Next up</div>
+        <div class="nx">Recruiting</div>
       </div>
       <div class="h-actions">
-        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial.html#topics">Browse all topics</a>
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial-recruiting.html">Start lesson</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial.html#topics">All topics</a>
       </div>
     </section>
 

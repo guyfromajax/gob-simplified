@@ -117,6 +117,11 @@ body.gob-tut #site-footer { margin-bottom: calc(var(--nav-h) + 8px); }
 }
 .eyebrow .tick { width: 20px; height: 2px; background: var(--orange); border-radius: 2px; }
 
+/* ---------- Section rhythm (lesson pages) ---------- */
+.lsec { margin-top: 40px; }
+.lsec-eyebrow-only { margin-bottom: 18px; }
+.handoff { margin-top: 40px; }
+
 /* ---------- Panels ---------- */
 .panel {
   border: 1px solid var(--panel-border); border-radius: var(--radius);

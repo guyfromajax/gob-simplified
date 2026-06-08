@@ -24,17 +24,8 @@
   .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0 0 14px; color: var(--text); }
   .lesson-hero .intro { font-size: 16px; color: var(--muted); margin: 0; line-height: 1.45; max-width: 72ch; text-wrap: pretty; }
 
-  .lsec { margin-top: 40px; }
-  .lsec-head { margin-bottom: 18px; }
-  .lsec-head h2 { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: .01em; margin: 7px 0 6px; color: var(--text); }
-  .lsec-head .sub { margin: 0; font-size: 14.5px; color: var(--muted); line-height: 1.65; max-width: 72ch; text-wrap: pretty; }
-
   .gp-group { margin-bottom: 26px; }
   .gp-group:last-child { margin-bottom: 0; }
-  .gp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .gp-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-  .gp-head h3 { font-family: var(--display); font-weight: 400; font-size: 24px; line-height: 1; letter-spacing: .02em; margin: 0; color: var(--text); }
-  .gp-n { font-family: var(--display); font-size: 16px; color: var(--muted-3); }
 
   .dial-card {
     padding: 16px 17px 15px; border-radius: 12px;
@@ -70,7 +61,7 @@
 
   .gp-dials { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
-  .handoff { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
   .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
   .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
   .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -107,10 +98,8 @@
 
       <!-- OFFENSE -->
       <div class="gp-group" style="--ac:#f79420;">
-        <div class="gp-head">
-          <span class="gp-dot" style="background:#f79420;"></span>
-          <h3>Offense</h3>
-          <span class="gp-n">5</span>
+        <div class="lsec-eyebrow-only">
+          <span class="eyebrow"><span class="tick" style="background:#f79420;"></span> Offense</span>
         </div>
 
         <article class="dial-card dial-card--feature" style="--ac:#f79420;">
@@ -188,10 +177,8 @@
 
       <!-- DEFENSE -->
       <div class="gp-group" style="--ac:#4a90d9;">
-        <div class="gp-head">
-          <span class="gp-dot" style="background:#4a90d9;"></span>
-          <h3>Defense</h3>
-          <span class="gp-n">5</span>
+        <div class="lsec-eyebrow-only">
+          <span class="eyebrow"><span class="tick" style="background:#4a90d9;"></span> Defense</span>
         </div>
 
         <article class="dial-card dial-card--feature" style="--ac:#4a90d9;">
