@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scouting — Mastering GOB</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/gob-tutorial.css">
+<style>
+/* ===================== SCOUTING LESSON ===================== */
+
+/* breadcrumb + hero (shared family vocabulary) */
+.crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-2); margin-bottom: 14px; }
+.crumb a:hover { color: var(--text); }
+.crumb .sep { color: var(--muted-3); }
+.crumb .here { color: var(--orange); font-weight: 600; }
+
+.lesson-hero { padding: 4px 4px 0; margin-bottom: 30px; }
+.lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0 0 14px; color: var(--text); }
+.lesson-hero .intro { font-size: 16px; color: var(--muted); max-width: 70ch; margin: 0; text-wrap: pretty; }
+.lesson-hero .intro strong { color: var(--text); font-weight: 600; }
+
+/* section heads (shared) */
+.lsec { margin-top: 48px; }
+/* consistent eyebrow → first-sentence spacing across every section (18px) */
+#what .lsec-head, #report .lsec-head, #deeper .lsec-head, #plan .lsec-head { margin-bottom: 0; }
+#what > .body-copy { margin-top: 18px; }
+#report .lsec-head + .rblock { margin-top: 18px; }
+#deeper .lsec-head + .body-copy { margin-top: 18px; }
+#plan .lsec-head > h2 { margin-top: 18px; }
+#plan .lsec-head + .work { margin-top: 18px; }
+.lsec-head { margin-bottom: 20px; }
+.lsec-head h2 { font-family: var(--display); font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: .01em; margin: 7px 0 8px; color: var(--text); }
+.lsec-head p { margin: 0; font-size: 14px; color: var(--muted); max-width: 80ch; line-height: 1.6; text-wrap: pretty; }
+.lsec-head p strong { color: var(--text); font-weight: 600; }
+
+.body-copy { font-size: 14px; line-height: 1.6; color: var(--muted); max-width: 80ch; margin: 0 0 16px; text-wrap: pretty; }
+.body-copy strong { color: var(--text); font-weight: 600; }
+
+/* ---- §1 weekly loop ---- */
+.loop { margin-top: 22px; padding: 22px 26px; }
+.loop-head { display: flex; align-items: baseline; gap: 11px; margin-bottom: 18px; }
+.loop-head .lh { font-family: var(--display); font-size: 21px; letter-spacing: .03em; color: var(--text); }
+.loop-head .ls { font-size: 12px; color: var(--muted-2); }
+.loop-flow { display: flex; align-items: stretch; gap: 0; }
+.loop-step { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 9px; padding: 4px 6px; position: relative; }
+.loop-ico { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid var(--hair); color: var(--muted-2); }
+.loop-ico svg { width: 23px; height: 23px; }
+.loop-step.active .loop-ico { background: var(--orange); border-color: var(--orange); color: #15181f; box-shadow: 0 6px 18px rgba(247,148,32,0.32); }
+.loop-step .ln { font-family: var(--display); font-size: 18px; letter-spacing: .02em; color: var(--text); line-height: 1; }
+.loop-step.active .ln { color: var(--orange-soft); }
+.loop-step .ld { font-size: 11px; color: var(--muted-2); line-height: 1.35; max-width: 15ch; }
+.loop-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted-3); padding-top: 23px; }
+.loop-arrow svg { width: 22px; height: 22px; }
+.loop-note { margin: 16px 0 0; padding-top: 15px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--muted-2); display: flex; align-items: center; gap: 9px; }
+.loop-note svg { width: 16px; height: 16px; color: var(--orange); flex-shrink: 0; }
+.loop-note strong { color: var(--text); font-weight: 600; }
+
+/* ---- report feature blocks ---- */
+.rblock { margin-top: 30px; }
+.rblock-head { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-bottom: 9px; }
+.rblock-head .rk { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--ac, var(--muted-2)); }
+.rblock-head h3 { font-family: var(--display); font-weight: 400; font-size: 25px; letter-spacing: .02em; line-height: 1.04; margin: 0; color: var(--text); }
+.rblock > p { font-size: 13.5px; line-height: 1.6; color: var(--muted); max-width: 80ch; margin: 0 0 16px; text-wrap: pretty; }
+.rblock > p strong { color: var(--text); font-weight: 600; }
+
+/* framed screenshot */
+.shot { border-radius: 14px; border: 1px solid var(--panel-border); background: #0a0c12; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+.shot .shot-win { position: relative; overflow: hidden; display: block; }
+.shot img { width: 100%; height: auto; display: block; }
+/* recreated opponent header (crisp, editable) sitting above the cropped table */
+.opp-hd { padding: 22px 26px 20px; background: linear-gradient(180deg, rgba(38,44,56,.45), rgba(20,24,33,.5)); }
+.opp-meta { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 13px; margin-bottom: 14px; border-bottom: 1px solid var(--hair); }
+.opp-meta .oe { font-size: 11.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-2); }
+.opp-meta .orank { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-2); }
+.opp-meta .orank b { color: var(--text); font-weight: 700; margin-left: 4px; }
+.opp-hero { display: flex; justify-content: space-between; align-items: center; gap: 22px; }
+.opp-hero .oname { font-family: var(--display); font-weight: 400; font-size: 46px; line-height: .9; letter-spacing: .01em; color: var(--text); white-space: nowrap; }
+.opp-hero .oname .orec { font-family: var(--body); font-size: 16px; font-weight: 600; color: var(--muted-2); letter-spacing: 0; margin-left: 12px; vertical-align: 3px; }
+.opp-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 8px 14px; border-radius: 9px; color: var(--orange-soft); border: 1px solid rgba(247,148,32,.45); background: rgba(247,148,32,.06); white-space: nowrap; }
+.opp-btn svg { width: 14px; height: 14px; }
+.five-win { display: block; aspect-ratio: 2726 / 500; overflow: hidden; position: relative; }
+.five-win img { position: absolute; left: 0; top: -65.2%; width: 100%; height: auto; display: block; }
+.shot figcaption { display: flex; align-items: center; gap: 9px; padding: 12px 16px; font-size: 12px; color: var(--muted-2); border-top: 1px solid var(--hair); background: var(--panel-flat); }
+.shot figcaption .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ac, var(--orange)); flex-shrink: 0; }
+.shot figcaption strong { color: var(--text); font-weight: 600; }
+
+/* ---- team measures: recreated spider + bars ---- */
+.measures { display: grid; grid-template-columns: 1.25fr 1fr; gap: 26px; align-items: center; padding: 24px 26px; }
+.radar-wrap { position: relative; }
+.radar { width: 100%; height: auto; display: block; overflow: visible; }
+.radar .ring { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 1; }
+.radar .spoke { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+.radar .shape { fill: rgba(74,144,217,0.22); stroke: #6aa6e6; stroke-width: 2; stroke-linejoin: round; }
+.radar .vtx { fill: #6aa6e6; }
+.radar .vtx-strong { fill: var(--green); }
+.radar .vtx-weak { fill: var(--orange); }
+.radar .lbl { font-family: var(--body); font-size: 13px; font-weight: 600; fill: var(--muted-2); }
+.radar .lbl-strong { fill: var(--green); font-weight: 700; }
+.radar .lbl-weak { fill: var(--orange); font-weight: 700; }
+
+.bars { display: flex; flex-direction: column; gap: 16px; }
+.bar h4 { font-family: var(--body); font-size: 13px; font-weight: 700; color: var(--text); margin: 0 0 8px; }
+.bar-track { position: relative; height: 22px; border-radius: 7px; background: rgba(255,255,255,0.05); overflow: hidden; }
+.bar-fill { position: absolute; top: 0; height: 100%; }
+.bar-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--yellow); }
+.bar-chem { display: flex; align-items: center; justify-content: center; height: 100%; border-radius: 7px; background: linear-gradient(90deg, #b9791a, #f4a623); color: #1a1500; font-weight: 800; font-size: 12px; letter-spacing: .03em; }
+.measure-cap { grid-column: 1 / -1; margin: 4px 0 0; padding-top: 18px; border-top: 1px solid var(--hair); font-size: 13.5px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
+.measure-cap strong { color: var(--text); font-weight: 600; }
+.measure-cap .gtag { color: var(--green); font-weight: 700; }
+.measure-cap .otag { color: var(--orange); font-weight: 700; }
+
+/* ---- §4 worksheet ---- */
+.work { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
+.wcard { padding: 22px 24px 24px; border-radius: 16px; border: 1px solid var(--panel-border); border-top: 3px solid var(--ac); background: var(--panel-flat); }
+.wcard-h { display: flex; align-items: center; gap: 12px; margin-bottom: 7px; }
+.wcard-ico { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--ac); color: var(--ink); }
+.wcard-ico svg { width: 20px; height: 20px; }
+.wcard h3 { font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: .02em; line-height: 1; margin: 0; color: var(--text); }
+.wcard .wlead { font-size: 12.5px; line-height: 1.5; color: var(--muted); margin: 0 0 15px; text-wrap: pretty; }
+.wlist { display: flex; flex-direction: column; gap: 10px; }
+.witem { display: flex; gap: 11px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--muted); text-wrap: pretty; }
+.witem .chk { flex-shrink: 0; width: 19px; height: 19px; border-radius: 6px; border: 1.5px solid var(--ac); display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.witem .chk svg { width: 11px; height: 11px; color: var(--ac); }
+.witem b { color: var(--text); font-weight: 600; }
+
+.payoff { margin-top: 16px; display: flex; gap: 13px; align-items: center; padding: 18px 22px; border-radius: 14px; border: 1px solid rgba(247,148,32,0.3); background: rgba(247,148,32,0.07); }
+.payoff svg { width: 22px; height: 22px; color: var(--orange); flex-shrink: 0; }
+.payoff p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
+.payoff p strong { color: var(--text); font-weight: 600; }
+
+/* footer handoff (shared) */
+.handoff { margin-top: 48px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+.handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+.handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
+.handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 880px) {
+  .measures { grid-template-columns: 1fr; }
+  .work { grid-template-columns: 1fr; }
+  .handoff { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 620px) {
+  .loop-flow { flex-direction: column; gap: 6px; }
+  .loop-step { flex-direction: row; text-align: left; justify-content: flex-start; width: 100%; gap: 14px; }
+  .loop-step .ld { max-width: none; }
+  .loop-arrow { transform: rotate(90deg); padding: 2px 0; }
+}
+</style>
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="strategy">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back to game</button>
+      <span class="spacer"></span>
+    </header>
+
+    <!-- HERO -->
+    <section class="lesson-hero" data-screen-label="Scouting — hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="Tutorial Home.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="Tutorial Home.html#cat-strategy">Strategy</a>
+        <span class="sep">›</span>
+        <span class="here">Scouting</span>
+      </nav>
+      <h1>SCOUTING</h1>
+      <p class="intro">Before every game, a Scouting Report appears in your Command Center. It's your best resource to learn about your upcoming opponent.</p>
+    </section>
+
+    <!-- §1 WHAT SCOUTING IS -->
+    <section class="lsec" id="what" data-screen-label="Scouting — what it is">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> The Habit</span>
+      </div>
+      <p class="body-copy">Scouting should be one of your first steps each week. It's best to scout before you run training, as what you learn about your opponent could shape how you prepare.</p>
+
+      <div class="loop panel">
+        <div class="loop-head">
+          <span class="lh">Your weekly routine</span>
+          <span class="ls">scouting comes first</span>
+        </div>
+        <div class="loop-flow">
+          <div class="loop-step active">
+            <span class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg></span>
+            <span class="ln">Scout</span>
+            <span class="ld">Study your next opponent</span>
+          </div>
+          <div class="loop-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+          <div class="loop-step">
+            <span class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11M9 4l11 11M4 9l11 11"></path><circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none"></circle></svg></span>
+            <span class="ln">Train</span>
+            <span class="ld">Prepare for their weaknesses</span>
+          </div>
+          <div class="loop-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+          <div class="loop-step">
+            <span class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M9 9h6v6H9z"></path></svg></span>
+            <span class="ln">Game Plan</span>
+            <span class="ld">Tune your dials to match</span>
+          </div>
+          <div class="loop-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></div>
+          <div class="loop-step">
+            <span class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5v15l12-7.5z"></path></svg></span>
+            <span class="ln">Play</span>
+            <span class="ld">Execute with an edge</span>
+          </div>
+        </div>
+        <div class="loop-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 4v4h4"></path></svg>
+          <span>Every week loops back to the top. <strong>Scout first</strong> — everything downstream is shaped by what you learn here.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- §2 WHAT'S IN THE REPORT -->
+    <section class="lsec" id="report" data-screen-label="Scouting — what's in the report">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> The Report</span>
+      </div>
+
+      <!-- header + projected five -->
+      <div class="rblock" style="--ac:#f79420">
+        <div class="rblock-head"><span class="rk">Header</span></div>
+        <p>Opponent name, record, and national rank. A link to their team page. And their projected starting five.</p>
+        <figure class="shot shot--five">
+          <div class="opp-hd">
+            <div class="opp-meta">
+              <span class="oe">Upcoming Opponent</span>
+              <span class="orank">National Rank <b>9</b></span>
+            </div>
+            <div class="opp-hero">
+              <span class="oname">Ann Arbor <span class="orec">7-1</span></span>
+              <span class="opp-btn">View Team Page <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+            </div>
+          </div>
+          <span class="five-win"><img src="assets/scouting/starting-five.png" alt="Projected Starting Five attribute table for the opponent's five most likely starters"></span>
+        </figure>
+      </div>
+
+      <!-- team measures (recreated) -->
+      <div class="rblock" style="--ac:#4a90d9">
+        <div class="rblock-head"><span class="rk">Team Measures</span></div>
+        <p>All eleven core team attributes, anchored by a spider chart. The chart gives you the shape of the team at a glance — where they're elite, where they're exposed.</p>
+        <div class="measures panel">
+          <div class="radar-wrap">
+            <svg class="radar" viewBox="-74 -22 588 492" role="img" aria-label="Spider chart of the opponent's eight team measures: Fast Break Defense and Offense are longest; Fight is shortest">
+              <!-- rings -->
+              <polygon class="ring" points="220,55 336.7,103.3 385,220 336.7,336.7 220,385 103.3,336.7 55,220 103.3,103.3"></polygon>
+              <polygon class="ring" points="220,96.25 307.5,132.5 343.75,220 307.5,307.5 220,343.75 132.5,307.5 96.25,220 132.5,132.5"></polygon>
+              <polygon class="ring" points="220,137.5 278.3,161.7 302.5,220 278.3,278.3 220,302.5 161.7,278.3 137.5,220 161.7,161.7"></polygon>
+              <polygon class="ring" points="220,178.75 249.2,190.8 261.25,220 249.2,249.2 220,261.25 190.8,249.2 178.75,220 190.8,190.8"></polygon>
+              <!-- spokes -->
+              <line class="spoke" x1="220" y1="220" x2="220" y2="55"></line>
+              <line class="spoke" x1="220" y1="220" x2="336.7" y2="103.3"></line>
+              <line class="spoke" x1="220" y1="220" x2="385" y2="220"></line>
+              <line class="spoke" x1="220" y1="220" x2="336.7" y2="336.7"></line>
+              <line class="spoke" x1="220" y1="220" x2="220" y2="385"></line>
+              <line class="spoke" x1="220" y1="220" x2="103.3" y2="336.7"></line>
+              <line class="spoke" x1="220" y1="220" x2="55" y2="220"></line>
+              <line class="spoke" x1="220" y1="220" x2="103.3" y2="103.3"></line>
+              <!-- data shape -->
+              <polygon class="shape" points="220,68.2 306.3,133.7 368.5,220 287.7,287.7 220,302.5 108,332 163.9,220 126.7,126.7"></polygon>
+              <!-- vertices -->
+              <circle class="vtx" cx="220" cy="68.2" r="4"></circle>
+              <circle class="vtx" cx="306.3" cy="133.7" r="4"></circle>
+              <circle class="vtx" cx="368.5" cy="220" r="4"></circle>
+              <circle class="vtx" cx="287.7" cy="287.7" r="4"></circle>
+              <circle class="vtx" cx="220" cy="302.5" r="4"></circle>
+              <circle class="vtx-strong" cx="108" cy="332" r="5.5"></circle>
+              <circle class="vtx-weak" cx="163.9" cy="220" r="5.5"></circle>
+              <circle class="vtx" cx="126.7" cy="126.7" r="4"></circle>
+              <!-- labels -->
+              <text class="lbl" x="220" y="14" text-anchor="middle">Offense</text>
+              <text class="lbl" x="366" y="90" text-anchor="start">Fast Breaks</text>
+              <text class="lbl" x="398" y="224" text-anchor="start">Discipline</text>
+              <text class="lbl" x="372" y="372" text-anchor="start">Press/Traps</text>
+              <text class="lbl" x="220" y="412" text-anchor="middle">Defense</text>
+              <text class="lbl lbl-strong" x="74" y="372" text-anchor="end">Fast Break Defense</text>
+              <text class="lbl lbl-weak" x="40" y="224" text-anchor="end">Fight</text>
+              <text class="lbl" x="74" y="90" text-anchor="end">P/T Offense</text>
+            </svg>
+          </div>
+          <div class="bars">
+            <div class="bar">
+              <h4>Shooting</h4>
+              <div class="bar-track"><span class="bar-fill" style="left:52%; width:18%; background:var(--green);"></span><span class="bar-mark" style="left:52%;"></span></div>
+            </div>
+            <div class="bar">
+              <h4>Rebounding</h4>
+              <div class="bar-track"><span class="bar-fill" style="left:25%; width:24%; background:var(--red);"></span><span class="bar-mark" style="left:49%;"></span></div>
+            </div>
+            <div class="bar">
+              <h4>Team Chemistry</h4>
+              <div class="bar-track"><span class="bar-chem" style="width:96%;">24 / 25</span></div>
+            </div>
+          </div>
+          <p class="measure-cap">Read it like a silhouette: a <span class="gtag">long spoke is a strength to respect</span> — here, <strong>Fast Break Defense</strong> and <strong>Offense</strong> — while a <span class="otag">short spoke is a weakness to attack</span>, like their thin <strong>Fight</strong>. The three bars round out the picture: strong <strong>Shooting</strong>, soft <strong>Rebounding</strong>, and near-maxed <strong>Team Chemistry</strong>.</p>
+        </div>
+      </div>
+
+      <!-- play usage -->
+      <div class="rblock" style="--ac:#34ec27">
+        <div class="rblock-head"><span class="rk">Play Usage</span></div>
+        <p>Usage from last game including times used and success rates for each play. This is your window into their <strong>tendencies</strong>: the plays they trust, and the ones that are working.</p>
+        <figure class="shot shot--scroll">
+          <span class="shot-win"><img src="assets/scouting/play-usage.png" alt="Play Usage table listing each play the opponent ran last game with times run, success rate, and usage percentage"></span>
+        </figure>
+      </div>
+    </section>
+
+    <!-- §3 DIGGING DEEPER -->
+    <section class="lsec" id="deeper" data-screen-label="Scouting — digging deeper">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> The Team Page</span>
+      </div>
+      <p class="body-copy">The Scouting Report gives you the projected five, but games aren't won by five players. Follow the link to the opponent's <strong>team page</strong> for the full picture. Here you'll find every player's full attributes and season statistics. The attributes tell you who they are; the season stats tell you what they've actually done. Together they tell you a complete story about your opponent's team makeup.</p>
+
+      <div class="rblock" style="--ac:#f79420">
+        <div class="rblock-head"><span class="rk">Who they are</span><h3>Full Roster Attributes</h3></div>
+        <figure class="shot shot--scroll">
+          <span class="shot-win"><img src="assets/scouting/roster-attributes.png" alt="Opponent team page showing every player's full attribute ratings, color-coded by overall rating"></span>
+        </figure>
+      </div>
+
+      <div class="rblock" style="--ac:#4a90d9">
+        <div class="rblock-head"><span class="rk">What they've done</span></div>
+        <figure class="shot shot--scroll">
+          <span class="shot-win"><img src="assets/scouting/season-stats.png" alt="Opponent season statistics table with per-player scoring, shooting splits, rebounding, and defensive stats"></span>
+        </figure>
+      </div>
+    </section>
+
+    <!-- §4 TURNING INTEL INTO A PLAN -->
+    <section class="lsec" id="plan" data-screen-label="Scouting — turning intel into a plan">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Turning Intel Into a Plan</span>
+      </div>
+
+      <div class="work">
+        <div class="wcard" style="--ac:#4a90d9;--ink:#08152b">
+          <div class="wcard-h">
+            <span class="wcard-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path></svg></span>
+            <h3>Read Their Tendencies</h3>
+          </div>
+          <p class="wlead">Look at their play usage and team measures and ask:</p>
+          <div class="wlist">
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do they lean on <b>one play</b> more than the rest?</span></div>
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do they favor <b>Motion or Set Plays</b> on offense?</span></div>
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do they run more <b>Man or Zone</b> on defense?</span></div>
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do they like to <b>Fast Break, Press, or Trap</b> more than a typical team?</span></div>
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Who's their <b>top scorer</b> — or scorers — that you'll need to account for?</span></div>
+          </div>
+        </div>
+
+        <div class="wcard" style="--ac:#f79420;--ink:#15181f">
+          <div class="wcard-h">
+            <span class="wcard-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"></circle></svg></span>
+            <h3>Find Your Mismatches</h3>
+          </div>
+          <p class="wlead">Look at their projected five and the bench players who get real minutes, and ask where you hold an edge:</p>
+          <div class="wlist">
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do you have an <b>advantage down low</b> that inside plays could exploit?</span></div>
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do you have the <b>depth to push the pace</b> and fatigue them with Fast Breaks or Presses &amp; Traps?</span></div>
+            <div class="witem"><span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg></span><span>Do they <b>lack the athletes</b> to defend an attack-heavy scheme with lots of drives to the basket?</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="payoff">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"></path></svg>
+        <p>The above are just a small sample of a nearly infinite number of questions and angles you can consider while scouting. As you play the game and get a feel for your team's identity, you'll figure out which scouting approach works best for you.</p>
+      </div>
+    </section>
+
+    <!-- HANDOFF (completion) -->
+    <section class="handoff panel" data-screen-label="Scouting — completion handoff">
+      <div class="h-l">
+        <div class="lbl">You've reached the end of the tutorial</div>
+        <div class="nx">You're all caught up</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="Tutorial Home.html#topics">Browse all topics</a>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <!-- TOAST -->
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <script src="assets/gob-nav.js"></script>
+  <script>
+    if (window.GOB) window.GOB.markSeen('scouting');
+
+    document.body.addEventListener('click', function (e) {
+      var s = e.target.closest('[data-soon]');
+      if (s) {
+        e.preventDefault();
+        var t = document.getElementById('toast');
+        if (t) {
+          t.querySelector('.tt').textContent = s.getAttribute('data-soon-title') || 'Lesson coming soon';
+          t.querySelector('.ts').textContent = s.getAttribute('data-soon-sub') || 'This is part of the next build pass.';
+          t.classList.add('show');
+          clearTimeout(window.__tt);
+          window.__tt = setTimeout(function () { t.classList.remove('show'); }, 3000);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

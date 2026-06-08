@@ -1,10 +1,9 @@
 /* ===========================================================
    GOB Tutorial Experience — shared behavior
-   - Sub-page back button -> Tutorial Home (/tutorial.html)
-   - Hub back button -> where the user entered from (or history / hub fallback)
-   - Persistent bottom nav (active state + in-page smart scroll)
-   - Per-topic progress (localStorage)  -> window.GOB
-   - Contextual tip modal + per-topic mute (for future sub-pages)
+   - Smart back button (returns to where the user entered from)
+   - Persistent bottom nav active state
+   - Per-topic progress (localStorage)
+   - Contextual tip modal + per-topic mute
    =========================================================== */
 (function () {
   'use strict';
@@ -13,44 +12,29 @@
   var MUTE_KEY = 'gob_tut_muted';
   var ORIGIN_KEY = 'gob_tut_origin';
 
-  var HUB = '/tutorial.html';
-
-  function isTutorialHub() {
-    return /\/tutorial\.html$/i.test(location.pathname);
-  }
-
-  /* ---- sound hook (repo pattern: inline playSound over /sounds/) ---- */
-  function playSound(filename) {
-    try {
-      var a = new Audio('/sounds/' + encodeURIComponent(filename));
-      a.volume = 0.5;
-      a.play().catch(function () {});
-    } catch (e) {}
-  }
-
   /* ---- storage helpers ---- */
   function load(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch (e) { return []; } }
   function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
 
-  var GOB = window.GOB = window.GOB || {};
-  GOB.playSound = playSound;
-  GOB.seen = function () { return load(SEEN_KEY); };
-  GOB.isSeen = function (id) { return load(SEEN_KEY).indexOf(id) !== -1; };
-  GOB.markSeen = function (id) {
-    var s = load(SEEN_KEY);
-    if (s.indexOf(id) === -1) { s.push(id); save(SEEN_KEY, s); }
-    window.dispatchEvent(new CustomEvent('gob:progress', { detail: { id: id } }));
+  var GOB = window.GOB = {
+    seen: function () { return load(SEEN_KEY); },
+    isSeen: function (id) { return load(SEEN_KEY).indexOf(id) !== -1; },
+    markSeen: function (id) {
+      var s = load(SEEN_KEY);
+      if (s.indexOf(id) === -1) { s.push(id); save(SEEN_KEY, s); }
+      window.dispatchEvent(new CustomEvent('gob:progress', { detail: { id: id } }));
+    },
+    unseenAll: function () { save(SEEN_KEY, []); window.dispatchEvent(new CustomEvent('gob:progress', {})); },
+    isMuted: function (id) { return load(MUTE_KEY).indexOf(id) !== -1; },
+    mute: function (id) { var m = load(MUTE_KEY); if (m.indexOf(id) === -1) { m.push(id); save(MUTE_KEY, m); } }
   };
-  GOB.unseenAll = function () { save(SEEN_KEY, []); window.dispatchEvent(new CustomEvent('gob:progress', {})); };
-  GOB.isMuted = function (id) { return load(MUTE_KEY).indexOf(id) !== -1; };
-  GOB.mute = function (id) { var m = load(MUTE_KEY); if (m.indexOf(id) === -1) { m.push(id); save(MUTE_KEY, m); } };
 
   /* ---- smart back: remember external entry point ---- */
   function rememberOrigin() {
     try {
       var ref = document.referrer;
-      // any in-tutorial page (hub + per-topic sub-pages); extend as sub-pages ship
-      var fromTutorial = ref && /tutorial|player-attributes|tutorial-training|team-attributes|tutorial-recruiting|tutorial-playbooks|game-plans|scouting/i.test(ref);
+      var here = location.pathname.split('/').pop();
+      var fromTutorial = ref && /Tutorial%20Home|Player%20Attributes|tutorial/i.test(ref);
       // Only set origin if we arrived from OUTSIDE the tutorial and none stored yet
       if (ref && !fromTutorial && !sessionStorage.getItem(ORIGIN_KEY)) {
         sessionStorage.setItem(ORIGIN_KEY, ref);
@@ -58,15 +42,10 @@
     } catch (e) {}
   }
   function goBack() {
-    playSound('x-back.mp3');
-    if (!isTutorialHub()) {
-      location.href = HUB;
-      return;
-    }
     var origin = sessionStorage.getItem(ORIGIN_KEY);
     if (origin) { location.href = origin; return; }
     if (window.history.length > 1) { window.history.back(); return; }
-    location.href = HUB;
+    location.href = 'Tutorial Home.html';
   }
 
   /* ---- icon library (shared) ---- */
@@ -84,19 +63,13 @@
   };
   GOB.icons = ICONS;
 
-  /* Bottom nav: Home -> hub top; categories -> their section anchor on the hub */
   var NAV = [
-    { id: 'home', label: 'Tutorial Home', icon: ICONS.home, href: HUB },
-    { id: 'players', label: 'Players', icon: ICONS.player, href: HUB + '#cat-players' },
-    { id: 'training', label: 'Training', icon: ICONS.training, href: HUB + '#cat-training' },
-    { id: 'team', label: 'Team', icon: ICONS.team, href: HUB + '#cat-team' },
-    { id: 'strategy', label: 'Strategy', icon: ICONS.strategy, href: HUB + '#cat-strategy' }
+    { id: 'home', label: 'Home', icon: ICONS.home, href: 'Tutorial Home.html' },
+    { id: 'players', label: 'Players', icon: ICONS.player, href: 'Tutorial Home.html#topics' },
+    { id: 'team', label: 'Team', icon: ICONS.team, href: 'Tutorial Home.html#topics' },
+    { id: 'strategy', label: 'Strategy', icon: ICONS.strategy, href: 'Tutorial Home.html#topics' },
+    { id: 'training', label: 'Training', icon: ICONS.training, href: 'Tutorial Home.html#topics' }
   ];
-
-  function smoothScrollTo(el) {
-    if (!el) return;
-    window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
-  }
 
   function renderNav() {
     var wrap = document.getElementById('bottomnav');
@@ -106,36 +79,18 @@
       return '<a class="gob-navbtn ' + n.id + (n.id === active ? ' active' : '') + '" data-nav="' + n.id + '" href="' + n.href + '">' +
         '<span class="ico">' + n.icon + '</span><span class="lbl">' + n.label + '</span></a>';
     }).join('');
-
-    wrap.addEventListener('click', function (e) {
-      var btn = e.target.closest('.gob-navbtn');
-      if (!btn) return;
-      playSound('click-tiny.wav');
-      // if the target lives on this page (a #anchor on the hub), scroll smoothly
-      var href = btn.getAttribute('href') || '';
-      var hash = href.indexOf('#') !== -1 ? href.slice(href.indexOf('#')) : '';
-      var onHub = /tutorial\.html(#|$)/.test(href) || href === HUB || href.charAt(0) === '#';
-      if (onHub) {
-        var target = hash ? document.querySelector(hash) : document.querySelector('.gob-shell');
-        if (target) { e.preventDefault(); smoothScrollTo(target); if (hash) history.replaceState(null, '', hash); }
-      }
-    });
   }
 
   /* ---- wire up on DOM ready ---- */
   function init() {
     rememberOrigin();
     renderNav();
+
     var back = document.querySelector('[data-gob-back]');
-    if (back) {
-      if (!isTutorialHub()) {
-        back.innerHTML = '<span class="chev">‹</span> Back To Tutorial Home';
-      }
-      back.addEventListener('click', goBack);
-    }
+    if (back) back.addEventListener('click', goBack);
   }
 
-  /* ---- modal builder (used by future per-topic / contextual tips) ---- */
+  /* ---- modal builder ---- */
   GOB.showTip = function (opts) {
     opts = opts || {};
     var topicId = opts.id || 'generic';
@@ -145,10 +100,10 @@
       '<div class="gob-modal" role="dialog" aria-modal="true" aria-label="Tutorial tip">' +
         '<button class="gob-modal-x" aria-label="Close">&times;</button>' +
         '<div class="gob-modal-head">' +
-          '<img class="gob-modal-avatar" src="' + (opts.avatar || '/images/sammy_tutorial.png') + '" alt="Coach Sammy">' +
+          '<img class="gob-modal-avatar" src="' + (opts.avatar || 'FrontEnd/static/images/sammy_tutorial.png') + '" alt="Coach Sammy">' +
           '<div>' +
             '<div class="gob-modal-kicker">' + (opts.kicker || 'Coach Sammy') + '</div>' +
-            '<div class="gob-modal-title">' + (opts.title || 'There’s a tutorial for that') + '</div>' +
+            '<div class="gob-modal-title">' + (opts.title || 'There\u2019s a tutorial for that') + '</div>' +
           '</div>' +
         '</div>' +
         '<p class="gob-modal-body">' + (opts.body || '') + '</p>' +
@@ -156,7 +111,7 @@
           '<a class="btn btn-primary gob-modal-go" href="' + (opts.href || '#') + '">' + (opts.cta || 'Show me') + '</a>' +
           '<button class="btn btn-ghost gob-modal-later">Maybe later</button>' +
         '</div>' +
-        '<button class="gob-modal-mute">Got it — don’t remind me about ' + (opts.topicLabel || 'this') + '</button>' +
+        '<button class="gob-modal-mute">Got it \u2014 don\u2019t remind me about ' + (opts.topicLabel || 'this') + '</button>' +
       '</div>';
     document.body.appendChild(overlay);
     requestAnimationFrame(function () { overlay.classList.add('open'); });
