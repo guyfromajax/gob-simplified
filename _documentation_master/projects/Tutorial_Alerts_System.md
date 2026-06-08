@@ -1,0 +1,48 @@
+
+**The System**
+- We'll cue the user with modals at key points during their early experience with the game. 
+- These will be one-time per user only. Once a user sees a modal, it will never show again.
+- If a user chooses not to proceed to with the tutorial, add a glow effect behind teh Tutorials button in the top nav bar with the next tutorial noted in a call out coming from the button. Example, "Next: Player Attributes".
+- Modal Buttons
+    - Tutorials (primary design)
+    - I'll Do This Later (ghost design)
+-Modal timing and copy for each is noted below
+-Note, if a user has already viewed a tutorial, we will still present them with the modal per the logic below, but we will not show the glow effect with teh callout next to the Tutorial button if they choose to skip it.
+
+
+**Player Attributes**
+-When: after the user completes their fte game and they land back on the mode-selet screen.
+-Modal Copy
+    "Great job coach. Now we suggest you master your knowledge of Player Attributes before starting your first franchise. You can do this via the Tutorial button."
+
+**Training**
+-When: when teh user presses the Run Training button for the first time in their first frandchise instance
+-Modal Copy
+    "You're about to run training for the first time. We suggest you review the Training tutorial before proceeding."
+
+**Team Attributes**
+-When: when the user returns from their first training and lands back on the FCC
+-Modal Copy
+    "Great job running your first training Coach. You probably saw that you evolved some of your team attributes. Learn about those in the Team Attributes tutorial"
+
+**Game Plan**
+-When: when teh user presses the Play Next Game button for the first time in their first frandchise instance
+-Modal Copy
+    "You're about to play your first game coach. Check out the Game Plan tutorial to make sure you you're up to speed on that before you tip off."
+
+**Playbooks**
+-When: when the user returns from their week 2 training in their first franchise instance and lands on the FCC.
+-Modal Copy
+    "You're doing great coach. You're now ready for the Playbooks tutorial."
+
+**Scouting**
+-When: when user returns to the FCC after completing their week 3 game of their first franchise instance.
+-Modal Copy
+    "You're moving right along coach. You've probably checked out the Scouting Report tab already. Read the Scouting tutorial to learn some tips and tricks."
+
+**Recruiting**
+-When: when user returns to the FCC after completing their week 6 game of their first franchise instance.
+-Modal Copy
+    "Ok Caoch, you're six games into the season. It's time to get smart on Recruiting via our Recruiting tutorial."
+
+    
