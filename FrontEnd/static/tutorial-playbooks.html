@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Playbooks — Mastering GOB | Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <style>
+  /* ===================== PLAYBOOKS LESSON (page-specific) ===================== */
+
+  .crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-2); margin-bottom: 14px; flex-wrap: wrap; }
+  .crumb a:hover { color: var(--text); }
+  .crumb .sep { color: var(--muted-3); }
+  .crumb .here { color: var(--orange); font-weight: 600; }
+
+  .lesson-hero { padding: 4px 4px 0; margin-bottom: 30px; }
+  .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0 0 14px; color: var(--text); }
+  .lesson-hero .intro { font-size: 16px; color: var(--muted); margin: 0; line-height: 1.45; max-width: 72ch; text-wrap: pretty; }
+
+  .lsec { margin-top: 40px; }
+  .lsec-eyebrow-only { margin-bottom: 18px; }
+
+  .lsec-body strong, .orient-body strong, .layer-body strong, .layer-close strong,
+  .cmd-intro strong, .cmd-dir-body strong, .cmd-close strong, .dist-note strong,
+  .legend-body strong, .override-card strong, .pc-note strong { color: var(--text); font-weight: 600; }
+
+  /* orientation cards */
+  .orient-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .orient-card {
+    padding: 18px 17px 17px; border-radius: 12px;
+    border: 1px solid var(--panel-border); border-left: 3px solid var(--ac);
+    background: var(--panel-flat);
+  }
+  .orient-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .orient-icon {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--ac) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ac) 28%, transparent);
+    color: var(--ac);
+  }
+  .orient-icon svg { width: 17px; height: 17px; }
+  .orient-title { font-family: var(--display); font-size: 22px; line-height: 1.05; letter-spacing: .02em; color: var(--text); margin: 0; }
+  .orient-body { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.5; text-wrap: pretty; }
+
+  .edit-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    vertical-align: baseline; margin: 0 2px;
+    height: 22px; padding: 0 10px; border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    color: #fff; font-family: var(--display); font-size: 11px; font-weight: 700;
+    letter-spacing: .04em; white-space: nowrap;
+  }
+
+  /* play capsule + legend */
+  .capsule-wrap {
+    display: grid; grid-template-columns: minmax(240px, 320px) 1fr;
+    gap: 22px; align-items: start;
+    padding: 22px 24px;
+  }
+  .capsule-stage { position: relative; padding: 18px; }
+  .capsule-marker {
+    position: absolute; width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; color: #15181f;
+    background: var(--orange); border: 2px solid rgba(255,255,255,0.35);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35); z-index: 2;
+  }
+  .capsule-marker--1 { top: 0; left: 0; }
+  .capsule-marker--2 { top: 0; right: 0; }
+  .capsule-marker--3 { bottom: 0; left: 0; }
+  .capsule-marker--4 { bottom: 0; right: 0; }
+
+  .play-capsule {
+    position: relative; min-height: 88px; padding: 14px 16px 12px;
+    border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+      rgba(255,255,255,0.03);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .capsule-top {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin-bottom: 10px;
+  }
+  .capsule-name {
+    font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.25;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .capsule-name .muted { color: var(--muted-2); font-weight: 600; }
+  .capsule-pct { flex-shrink: 0; font-size: 15px; font-weight: 700; color: var(--text); }
+  .capsule-meta {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  }
+  .capsule-cmd { font-size: 11px; font-weight: 600; color: #4a90d9; line-height: 1.2; }
+  .capsule-top-scorer {
+    flex-shrink: 0; font-size: 11px; color: var(--muted-2); line-height: 1.2; text-align: right;
+  }
+
+  .legend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .legend-item {
+    padding: 14px 15px; border-radius: 11px;
+    border: 1px solid var(--hair); background: rgba(255,255,255,0.03);
+  }
+  .legend-kicker {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted-2);
+  }
+  .legend-num {
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; color: #15181f; background: var(--orange);
+  }
+  .legend-title { font-family: var(--display); font-size: 20px; line-height: 1; letter-spacing: .02em; color: var(--text); margin-bottom: 6px; }
+  .legend-body { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+
+  /* layer cards */
+  .layer-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+  .layer-card {
+    padding: 20px 20px 18px; border-radius: 12px;
+    border: 1px solid var(--panel-border); border-left: 3px solid var(--ac);
+    background: var(--panel-flat);
+  }
+  .layer-kicker {
+    font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ac); margin-bottom: 4px;
+  }
+  .layer-title { font-family: var(--display); font-size: 26px; line-height: 1; letter-spacing: .02em; color: var(--text); margin: 0 0 12px; }
+  .layer-sub { font-size: 13px; font-weight: 600; color: var(--muted); margin: -6px 0 12px; }
+  .layer-body { margin: 0 0 14px; font-size: 13px; color: var(--muted-2); line-height: 1.55; text-wrap: pretty; }
+  .usage-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .usage-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border-radius: 9px;
+    border: 1px solid var(--hair); background: rgba(255,255,255,0.03);
+  }
+  .usage-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .usage-pct { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .layer-close { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.5; text-wrap: pretty; }
+
+  .pc-label {
+    font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted-2); margin-bottom: 8px;
+  }
+  .pc-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
+  .pc-item {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 9px 11px; border-radius: 8px;
+    border: 1px solid var(--hair); background: rgba(255,255,255,0.03);
+    font-size: 12.5px; color: var(--text); line-height: 1.35;
+  }
+  .pc-item .n { font-weight: 800; color: var(--muted-2); min-width: 14px; }
+  .pc-note { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.5; text-wrap: pretty; }
+
+  .override-head { margin: 4px 0 12px; }
+  .override-head h3 {
+    font-family: var(--display); font-size: 24px; line-height: 1; letter-spacing: .02em;
+    color: var(--text); margin: 0 0 6px;
+  }
+  .override-tag {
+    display: inline-flex; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    padding: 3px 8px; border-radius: 999px;
+    color: var(--muted-2); background: rgba(255,255,255,0.06); border: 1px solid var(--hair);
+  }
+  .override-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .override-card {
+    padding: 16px 16px 15px; border-radius: 12px;
+    border: 1px solid var(--panel-border); background: var(--panel-flat);
+  }
+  .override-badge {
+    display: inline-flex; margin-bottom: 8px;
+    font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px;
+  }
+  .override-badge--turn { color: #f79420; background: rgba(247,148,32,0.14); border: 1px solid rgba(247,148,32,0.32); }
+  .override-badge--persist { color: #4a90d9; background: rgba(74,144,217,0.14); border: 1px solid rgba(74,144,217,0.32); }
+  .override-title { font-family: var(--display); font-size: 20px; line-height: 1.05; letter-spacing: .02em; color: var(--text); margin-bottom: 8px; }
+  .override-card p { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+
+  /* command */
+  .cmd-card { padding: 22px 24px; }
+  .cmd-intro { margin: 0 0 16px; font-size: 14px; color: var(--muted); line-height: 1.6; text-wrap: pretty; }
+  .cmd-dirs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+  .cmd-dir {
+    padding: 16px 16px 15px; border-radius: 12px;
+    border: 1px solid var(--hair); background: rgba(255,255,255,0.03);
+    border-left: 3px solid var(--dc, var(--orange));
+  }
+  .cmd-dir-title { font-family: var(--display); font-size: 22px; line-height: 1.05; letter-spacing: .02em; color: var(--text); margin-bottom: 8px; }
+  .cmd-dir-body { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+  .cmd-close { margin: 0; font-size: 13px; color: var(--muted-2); line-height: 1.55; text-wrap: pretty; }
+
+  /* shot distribution */
+  .dist-card { padding: 22px 24px; }
+  .dist-intro { margin: 0 0 18px; font-size: 14px; color: var(--muted); line-height: 1.6; text-wrap: pretty; }
+  .dist-grids { display: flex; flex-direction: column; gap: 16px; margin-bottom: 14px; }
+  .dist-group-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted-2); margin-bottom: 8px;
+  }
+  .dist-strip { display: flex; gap: 6px; }
+  .dist-cell {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 10px 6px 8px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04); text-align: center; position: relative;
+  }
+  .dist-pos {
+    font-family: var(--display); font-size: 13px; color: rgba(255,255,255,0.35);
+    line-height: 1; margin-bottom: 6px; letter-spacing: .05em;
+  }
+  .dist-val { font-size: 22px; font-weight: 700; line-height: 1; }
+  .dist-accent {
+    position: absolute; bottom: 0; left: 12%; right: 12%; height: 2px;
+    border-radius: 2px 2px 0 0;
+  }
+  .dist-note { margin: 0; font-size: 13px; color: var(--muted-2); line-height: 1.55; text-wrap: pretty; }
+
+  .handoff { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+  .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
+  .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  @media (max-width: 900px) {
+    .orient-grid, .layer-grid, .override-grid, .cmd-dirs, .legend-grid { grid-template-columns: 1fr; }
+    .capsule-wrap { grid-template-columns: 1fr; }
+    .handoff { flex-direction: column; align-items: flex-start; }
+  }
+  </style>
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="strategy">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back to game</button>
+      <span class="spacer"></span>
+    </header>
+
+    <section class="lesson-hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#cat-strategy">Strategy</a>
+        <span class="sep">›</span>
+        <span class="here">Playbooks</span>
+      </nav>
+      <h1>PLAYBOOKS</h1>
+      <p class="intro">Your playbook sets the mix of presets the sim will choose for every possession — and the plays you can call in real time to override those presets, via the Playcall Center.</p>
+    </section>
+
+    <!-- ORIENTATION -->
+    <section class="lsec" id="orientation">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Orientation</span>
+      </div>
+      <div class="orient-grid">
+        <article class="orient-card" style="--ac:#f79420;">
+          <div class="orient-head">
+            <span class="orient-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h9l5 5v11H5z"/><path d="M13.5 4v5H19"/><path d="M8.5 13h7M8.5 16.5h5"/></svg>
+            </span>
+            <h2 class="orient-title">Playbook Editor</h2>
+          </div>
+          <p class="orient-body">Where you build and edit everything. Reach it from the <span class="edit-pill">Edit Playbooks</span> button on the Command Center.</p>
+        </article>
+        <article class="orient-card" style="--ac:#4a90d9;">
+          <div class="orient-head">
+            <span class="orient-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4.5h14a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M8.5 3v3M15.5 3v3"/><path d="M8 11.5l2.3 2.3L16 8.5"/></svg>
+            </span>
+            <h2 class="orient-title">Command Center Tab</h2>
+          </div>
+          <p class="orient-body">The Playbooks tab shows your current setup at a glance — read-only, no editing.</p>
+        </article>
+        <article class="orient-card" style="--ac:#34ec27;">
+          <div class="orient-head">
+            <span class="orient-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 20h10"/><path d="M12 18v2"/></svg>
+            </span>
+            <h2 class="orient-title">During a Live Game</h2>
+          </div>
+          <p class="orient-body">Pull up your playbook as a read-only reference any time from the Lineup screen.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- AT A GLANCE -->
+    <section class="lsec" id="at-a-glance">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> At a Glance</span>
+      </div>
+      <div class="capsule-wrap panel">
+        <div class="capsule-stage">
+          <span class="capsule-marker capsule-marker--1" aria-hidden="true">1</span>
+          <span class="capsule-marker capsule-marker--2" aria-hidden="true">2</span>
+          <span class="capsule-marker capsule-marker--3" aria-hidden="true">3</span>
+          <span class="capsule-marker capsule-marker--4" aria-hidden="true">4</span>
+          <article class="play-capsule" aria-label="Example play capsule">
+            <div class="capsule-top">
+              <div class="capsule-name">Back Door Cut <span class="muted">(SF)</span></div>
+              <div class="capsule-pct">15%</div>
+            </div>
+            <div class="capsule-meta">
+              <div class="capsule-cmd">CMD: 56</div>
+              <div class="capsule-top-scorer">TOP: Kevin Nelson (12)</div>
+            </div>
+          </article>
+        </div>
+        <div class="legend-grid">
+          <article class="legend-item">
+            <div class="legend-kicker"><span class="legend-num">1</span> Top left</div>
+            <div class="legend-title">Play Name</div>
+            <p class="legend-body">For <strong>Set Plays</strong> the parentheses show the <strong>target shooter</strong>; for <strong>Motion</strong> plays they show the <strong>focus</strong>.</p>
+          </article>
+          <article class="legend-item">
+            <div class="legend-kicker"><span class="legend-num">2</span> Top right</div>
+            <div class="legend-title">Usage %</div>
+            <p class="legend-body">How often the play is currently set to be called.</p>
+          </article>
+          <article class="legend-item">
+            <div class="legend-kicker"><span class="legend-num">3</span> Bottom left</div>
+            <div class="legend-title">CMD</div>
+            <p class="legend-body">Your team's <strong>Command</strong> of the play — how well they execute it. More on Command below.</p>
+          </article>
+          <article class="legend-item">
+            <div class="legend-kicker"><span class="legend-num">4</span> Bottom right</div>
+            <div class="legend-title">Top Scorer</div>
+            <p class="legend-body">The player who's scored the most on this play this season.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLAYBOOK COMPONENTS -->
+    <section class="lsec" id="components">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Playbook Components</span>
+      </div>
+
+      <div class="layer-grid">
+        <article class="layer-card" style="--ac:#f79420;">
+          <h2 class="layer-title">Usage Percentages</h2>
+          <p class="layer-sub">Your automatic mix</p>
+          <p class="layer-body">The presets the sim uses to call plays each possession — whether you're playing live or simming. <strong>Each play type totals 100% on its own:</strong></p>
+          <div class="usage-rows">
+            <div class="usage-row"><span class="usage-name">Motion <span style="color:var(--muted-2);font-weight:500;">(offense)</span></span><span class="usage-pct">100%</span></div>
+            <div class="usage-row"><span class="usage-name">Set Plays <span style="color:var(--muted-2);font-weight:500;">(offense)</span></span><span class="usage-pct">100%</span></div>
+            <div class="usage-row"><span class="usage-name">Man <span style="color:var(--muted-2);font-weight:500;">(defense)</span></span><span class="usage-pct">100%</span></div>
+            <div class="usage-row"><span class="usage-name">Zone <span style="color:var(--muted-2);font-weight:500;">(defense)</span></span><span class="usage-pct">100%</span></div>
+            <div class="usage-row"><span class="usage-name">Fast Breaks <span style="color:var(--muted-2);font-weight:500;">(holistic mix)</span></span><span class="usage-pct">100%</span></div>
+          </div>
+          <p class="layer-close">The balance <strong>between</strong> Motion and Set Plays — and between Man and Zone — is set separately in your <strong>Game Plan</strong>. Think of these presets as your team's <strong>default tendencies</strong>: what they'll naturally run when you're not calling something yourself.</p>
+        </article>
+
+        <article class="layer-card" style="--ac:#4a90d9;">
+          <h2 class="layer-title">Playcall Center</h2>
+          <p class="layer-sub">Your real-time control</p>
+          <p class="layer-body">Holds the plays you can call on demand during a game to override your presets — <strong>up to 8 offensive plays and 8 defensive plays</strong>. You can set these plays in your Playbook Editor.</p>
+          <div class="pc-label">Offense · up to 8</div>
+          <div class="pc-list">
+            <div class="pc-item"><span class="n">1</span> Base Post Play (C)</div>
+            <div class="pc-item"><span class="n">2</span> Pick &amp; Roll - Iso (SG)</div>
+            <div class="pc-item"><span class="n">3</span> Double Screen Three (SG)</div>
+          </div>
+          <p class="pc-note">One useful quirk: a play can sit at <strong>0% usage and still live in your Playcall Center</strong> — perfect for a situational play you never want called automatically but want on hand.</p>
+        </article>
+      </div>
+
+      <div class="override-head">
+        <h3>How overrides behave</h3>
+        <span class="override-tag">offense and defense work differently</span>
+      </div>
+      <div class="override-grid">
+        <article class="override-card">
+          <span class="override-badge override-badge--turn">One turn</span>
+          <div class="override-title">Offensive playcalls</div>
+          <p>Call a play, it runs <strong>that possession</strong>, then you're back to your usage mix.</p>
+        </article>
+        <article class="override-card">
+          <span class="override-badge override-badge--persist">Persists</span>
+          <div class="override-title">Defense, Press/Trap, Tempo &amp; Aggression</div>
+          <p>These <strong>hold until you change them</strong> — or until a timeout, quarter break, or player foul-out resets things.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- COMMAND -->
+    <section class="lsec" id="command">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Managing Your Team's Command of the Playbook</span>
+      </div>
+      <div class="cmd-card panel">
+        <p class="cmd-intro">Command operates on a <strong>0–100 scale</strong>. There are benefits to pushing this score above 100, but at a diminishing scale.</p>
+        <div class="cmd-dirs">
+          <article class="cmd-dir" style="--dc:#34ec27;">
+            <div class="cmd-dir-title">Training raises it</div>
+            <p class="cmd-dir-body">The more your team practices a play in Training Installs &amp; Scrimmages, the higher its Command climbs.</p>
+          </article>
+          <article class="cmd-dir" style="--dc:#ff6d6d;">
+            <div class="cmd-dir-title">Calling it lowers it</div>
+            <p class="cmd-dir-body">The more you run a play in live games, the more its Command drops — you're putting it on tape for opponents to scout.</p>
+          </article>
+        </div>
+        <p class="cmd-close">That's the tension to manage: <strong>leaning on your best plays makes them more readable over time</strong>, while practice keeps them sharp.</p>
+      </div>
+    </section>
+
+    <!-- SHOT DISTRIBUTION -->
+    <section class="lsec" id="shot-distribution">
+      <div class="lsec-eyebrow-only">
+        <span class="eyebrow"><span class="tick"></span> Expected Shot Distribution</span>
+      </div>
+      <div class="dist-card panel">
+        <p class="dist-intro">When you save your playbook, you'll see your expected shot distribution — the share of shots each position is projected to take, broken out two ways:</p>
+        <div class="dist-grids">
+          <div>
+            <div class="dist-group-label">Playbooks — your usage presets</div>
+            <div class="dist-strip">
+              <div class="dist-cell">
+                <div class="dist-pos">PG</div>
+                <div class="dist-val" style="color:#ffd700;">12%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">SG</div>
+                <div class="dist-val" style="color:#34ec27;">30%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">SF</div>
+                <div class="dist-val" style="color:#4a90d9;">36%</div>
+                <div class="dist-accent" style="background:#4a90d9;"></div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">PF</div>
+                <div class="dist-val" style="color:#ff6d6d;">4%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">C</div>
+                <div class="dist-val" style="color:#ffd700;">18%</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="dist-group-label">Playcall Center — your on-demand plays</div>
+            <div class="dist-strip">
+              <div class="dist-cell">
+                <div class="dist-pos">PG</div>
+                <div class="dist-val" style="color:#ff6d6d;">4%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">SG</div>
+                <div class="dist-val" style="color:#34ec27;">25%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">SF</div>
+                <div class="dist-val" style="color:#ffd700;">12%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">PF</div>
+                <div class="dist-val" style="color:#34ec27;">24%</div>
+              </div>
+              <div class="dist-cell">
+                <div class="dist-pos">C</div>
+                <div class="dist-val" style="color:#4a90d9;">35%</div>
+                <div class="dist-accent" style="background:#4a90d9;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="dist-note">Use it to check that your distribution matches your personnel: <strong>if your best scorer's position is barely getting touches, your mix may need rebalancing.</strong></p>
+      </div>
+    </section>
+
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">Next up</div>
+        <div class="nx">Scouting</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="#" data-soon data-soon-label="Scouting">Start lesson</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial.html#topics">All topics</a>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var toastTimer;
+    function sfx(f) {
+      if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
+    }
+    document.body.addEventListener('click', function (e) {
+      var el = e.target.closest('[data-soon]');
+      if (!el) return;
+      e.preventDefault();
+      sfx('click-tiny.wav');
+      var label = el.getAttribute('data-soon-label') || 'This lesson';
+      var t = document.getElementById('toast');
+      if (!t) return;
+      t.querySelector('.tt').textContent = 'Coming soon';
+      t.querySelector('.ts').textContent = label + ' is part of the next build pass.';
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3000);
+    });
+    if (window.GOB) window.GOB.markSeen('playbooks');
+  })();
+  </script>
+</body>
+</html>

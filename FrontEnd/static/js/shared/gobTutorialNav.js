@@ -45,7 +45,7 @@
     try {
       var ref = document.referrer;
       // any in-tutorial page (hub + per-topic sub-pages); extend as sub-pages ship
-      var fromTutorial = ref && /tutorial|player-attributes|tutorial-training|team-attributes|tutorial-recruiting|game-plans/i.test(ref);
+      var fromTutorial = ref && /tutorial|player-attributes|tutorial-training|team-attributes|tutorial-recruiting|tutorial-playbooks|game-plans/i.test(ref);
       // Only set origin if we arrived from OUTSIDE the tutorial and none stored yet
       if (ref && !fromTutorial && !sessionStorage.getItem(ORIGIN_KEY)) {
         sessionStorage.setItem(ORIGIN_KEY, ref);
