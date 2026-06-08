@@ -77,6 +77,12 @@ def default_user_tracking() -> dict:
                                    new games — never reuse record.total_games here.
       `alpha_feedback_prompt_level` — highest prompt threshold already shown (0 / 2 / 5),
                                    so each modal variant fires once.
+
+    Tutorial-alert fields gate the contextual Sammy modals + nav glow:
+      `tutorial_alerts_franchise_id`   — first franchise instance alerts apply to (never changes).
+      `tutorial_alerts_dismissed`      — alert ids whose modal was shown (once per user).
+      `tutorial_alerts_games`          — games completed on the locked franchise since enrollment.
+      `tutorial_alerts_training_returns` — FCC returns after training on the locked franchise.
     """
     return {
         "record": default_record(),
@@ -86,7 +92,21 @@ def default_user_tracking() -> dict:
         "alpha_feedback_submitted": False,
         "alpha_feedback_games": 0,
         "alpha_feedback_prompt_level": 0,
+        "tutorial_alerts_franchise_id": None,
+        "tutorial_alerts_dismissed": [],
+        "tutorial_alerts_games": 0,
+        "tutorial_alerts_training_returns": 0,
     }
+
+
+TUTORIAL_ALERT_IDS: tuple[str, ...] = (
+    "player-attributes",
+    "training",
+    "team-attributes",
+    "playbooks",
+    "scouting",
+    "recruiting",
+)
 
 
 def compute_lead_archetype(archetypes: dict, recent_keys: list | None = None) -> str:

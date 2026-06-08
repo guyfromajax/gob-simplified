@@ -13,36 +13,36 @@
 **Player Attributes**
 -When: after the user completes their fte game and they land back on the mode-selet screen.
 -Modal Copy
-    "Great job coach. Now we suggest you master your knowledge of Player Attributes before starting your first franchise. You can do this via the Tutorial button."
+    "Nice work, Coach. Before you start your first franchise, get to know Player Attributes — they're the foundation for every decision ahead."
 
 **Training**
 -When: when teh user presses the Run Training button for the first time in their first frandchise instance
 -Modal Copy
-    "You're about to run training for the first time. We suggest you review the Training tutorial before proceeding."
+    "You're about to run training for the first time, Coach. Take a minute with the Training tutorial first."
 
 **Team Attributes**
 -When: when the user returns from their first training and lands back on the FCC
 -Modal Copy
-    "Great job running your first training Coach. You probably saw that you evolved some of your team attributes. Learn about those in the Team Attributes tutorial"
+    "You just evolved some of your team's attributes, Coach. The Team Attributes tutorial breaks down the impact of those changes."
 
 **Game Plan**
 -When: when teh user presses the Play Next Game button for the first time in their first frandchise instance
 -Modal Copy
-    "You're about to play your first game coach. Check out the Game Plan tutorial to make sure you you're up to speed on that before you tip off."
+    "Your first game is next, Coach. Run through the Game Plan tutorial before you tip off."
 
 **Playbooks**
 -When: when the user returns from their week 2 training in their first franchise instance and lands on the FCC.
 -Modal Copy
-    "You're doing great coach. You're now ready for the Playbooks tutorial."
+    "Hey Coach, we think you're ready for the Playbooks tutorial."
 
 **Scouting**
 -When: when user returns to the FCC after completing their week 3 game of their first franchise instance.
 -Modal Copy
-    "You're moving right along coach. You've probably checked out the Scouting Report tab already. Read the Scouting tutorial to learn some tips and tricks."
+    "You've seen the Scouting Report tab by now, Coach. The Scouting tutorial covers how to read it and turn it into an edge."
 
 **Recruiting**
 -When: when user returns to the FCC after completing their week 6 game of their first franchise instance.
 -Modal Copy
-    "Ok Caoch, you're six games into the season. It's time to get smart on Recruiting via our Recruiting tutorial."
+    "Six games in, Coach. Time to get smart on Recruiting — it's how you build your program for the long haul."
 
     

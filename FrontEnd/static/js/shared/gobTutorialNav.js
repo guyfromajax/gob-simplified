@@ -135,12 +135,13 @@
     }
   }
 
-  /* ---- modal builder (used by future per-topic / contextual tips) ---- */
+  /* ---- modal builder (tutorial tips + contextual alerts) ---- */
   GOB.showTip = function (opts) {
     opts = opts || {};
     var topicId = opts.id || 'generic';
+    var alertMode = !!opts.alertMode;
     var overlay = document.createElement('div');
-    overlay.className = 'gob-modal-overlay';
+    overlay.className = 'gob-modal-overlay gob-tip-overlay';
     overlay.innerHTML =
       '<div class="gob-modal" role="dialog" aria-modal="true" aria-label="Tutorial tip">' +
         '<button class="gob-modal-x" aria-label="Close">&times;</button>' +
@@ -148,25 +149,42 @@
           '<img class="gob-modal-avatar" src="' + (opts.avatar || '/images/sammy_tutorial.png') + '" alt="Coach Sammy">' +
           '<div>' +
             '<div class="gob-modal-kicker">' + (opts.kicker || 'Coach Sammy') + '</div>' +
-            '<div class="gob-modal-title">' + (opts.title || 'There’s a tutorial for that') + '</div>' +
+            '<div class="gob-modal-title">' + (opts.title || 'There\u2019s a tutorial for that') + '</div>' +
           '</div>' +
         '</div>' +
         '<p class="gob-modal-body">' + (opts.body || '') + '</p>' +
         '<div class="gob-modal-actions">' +
-          '<a class="btn btn-primary gob-modal-go" href="' + (opts.href || '#') + '">' + (opts.cta || 'Show me') + '</a>' +
-          '<button class="btn btn-ghost gob-modal-later">Maybe later</button>' +
+          '<a class="btn btn-primary gob-modal-go" href="' + (opts.href || '#') + '">' + (opts.cta || (alertMode ? 'Tutorials' : 'Show me')) + '</a>' +
+          '<button class="btn btn-ghost gob-modal-later" type="button">' + (opts.laterLabel || (alertMode ? 'I\u2019ll Do This Later' : 'Maybe later')) + '</button>' +
         '</div>' +
-        '<button class="gob-modal-mute">Got it — don’t remind me about ' + (opts.topicLabel || 'this') + '</button>' +
+        (alertMode ? '' : ('<button class="gob-modal-mute" type="button">Got it \u2014 don\u2019t remind me about ' + (opts.topicLabel || 'this') + '</button>')) +
       '</div>';
     document.body.appendChild(overlay);
     requestAnimationFrame(function () { overlay.classList.add('open'); });
 
-    function close() { overlay.classList.remove('open'); setTimeout(function () { overlay.remove(); }, 220); }
-    overlay.querySelector('.gob-modal-x').addEventListener('click', close);
-    overlay.querySelector('.gob-modal-later').addEventListener('click', close);
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-    overlay.querySelector('.gob-modal-mute').addEventListener('click', function () { GOB.mute(topicId); close(); });
-    return close;
+    function dismissLater() {
+      overlay.classList.remove('open');
+      setTimeout(function () { overlay.remove(); }, 220);
+      if (typeof opts.onLater === 'function') opts.onLater();
+    }
+    function dismissGo(e) {
+      if (e) e.preventDefault();
+      overlay.classList.remove('open');
+      setTimeout(function () { overlay.remove(); }, 220);
+      if (typeof opts.onGo === 'function') opts.onGo();
+      if (opts.href && opts.href !== '#') window.location.href = opts.href;
+    }
+
+    overlay.querySelector('.gob-modal-x').addEventListener('click', dismissLater);
+    overlay.querySelector('.gob-modal-later').addEventListener('click', dismissLater);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) dismissLater(); });
+    var go = overlay.querySelector('.gob-modal-go');
+    if (go) go.addEventListener('click', dismissGo);
+    var mute = overlay.querySelector('.gob-modal-mute');
+    if (mute) {
+      mute.addEventListener('click', function () { GOB.mute(topicId); dismissLater(); });
+    }
+    return dismissLater;
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

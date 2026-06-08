@@ -49,7 +49,7 @@ from BackEnd.utils.otp_validator import (
     consume_otp
 )
 from BackEnd.utils.email_sender import send_password_reset_email
-from BackEnd.utils.user_tracking import default_user_tracking, compute_lead_archetype
+from BackEnd.utils.user_tracking import default_user_tracking, compute_lead_archetype, TUTORIAL_ALERT_IDS
 from BackEnd.utils.alpha_access_email import send_alpha_welcome_email, send_alpha_waitlist_email
 from BackEnd.utils.alpha_otp_service import (
     claim_otp_for_email,
@@ -154,6 +154,10 @@ class UserResponse(BaseModel):
     alpha_feedback_submitted: Optional[bool] = None  # true once the alpha survey is submitted
     alpha_feedback_games: Optional[int] = None  # forward-only non-tutorial games since launch (prompt trigger)
     alpha_feedback_prompt_level: Optional[int] = None  # highest prompt threshold shown (0 / 2 / 5)
+    tutorial_alerts_franchise_id: Optional[str] = None  # first franchise instance for alert gating
+    tutorial_alerts_dismissed: Optional[list[str]] = None  # alert ids whose modal was shown
+    tutorial_alerts_games: Optional[int] = None  # games completed on locked franchise since enrollment
+    tutorial_alerts_training_returns: Optional[int] = None  # training returns on locked franchise
     subscription: Optional[str] = None  # e.g. "alpha" — drives the account-page Status field
     geek_points: Optional[int] = None  # total geek points
     geek_points_by_team: Optional[dict] = None  # canonical team_id -> int (lazy; {} when none)
@@ -688,6 +692,103 @@ async def mark_alpha_feedback_prompt_seen(
     return {"alpha_feedback_prompt_level": int(body.level), "message": "Alpha feedback prompt marked seen"}
 
 
+class TutorialAlertDismissRequest(BaseModel):
+    alert_id: str = Field(..., min_length=1, max_length=64)
+
+    @field_validator("alert_id")
+    @classmethod
+    def validate_alert_id(cls, v: str) -> str:
+        if v not in TUTORIAL_ALERT_IDS:
+            raise ValueError("invalid tutorial alert id")
+        return v
+
+
+class TutorialAlertsEnrollRequest(BaseModel):
+    franchise_id: str = Field(..., min_length=1, max_length=64)
+
+
+class TutorialAlertsIncrementRequest(BaseModel):
+    franchise_id: str = Field(..., min_length=1, max_length=64)
+    field: Literal["games", "training_returns"]
+
+
+@router.patch("/tutorial-alert-dismiss")
+async def dismiss_tutorial_alert(
+    body: TutorialAlertDismissRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Record that a tutorial alert modal was shown for this account (idempotent)."""
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {
+            "$addToSet": {"tutorial_alerts_dismissed": body.alert_id},
+            "$set": {"updated_at": datetime.now(timezone.utc)},
+        },
+    )
+    return {"alert_id": body.alert_id, "message": "Tutorial alert dismissed"}
+
+
+@router.patch("/tutorial-alerts-enroll")
+async def enroll_tutorial_alerts(
+    body: TutorialAlertsEnrollRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Lock tutorial-alert progress to the user's first franchise instance."""
+    users_collection.update_one(
+        {
+            "_id": ObjectId(user["user_id"]),
+            "$or": [
+                {"tutorial_alerts_franchise_id": {"$exists": False}},
+                {"tutorial_alerts_franchise_id": None},
+                {"tutorial_alerts_franchise_id": ""},
+            ],
+        },
+        {
+            "$set": {
+                "tutorial_alerts_franchise_id": body.franchise_id,
+                "updated_at": datetime.now(timezone.utc),
+            },
+        },
+    )
+    db_user = users_collection.find_one({"_id": ObjectId(user["user_id"])}, {"tutorial_alerts_franchise_id": 1})
+    locked = str(db_user.get("tutorial_alerts_franchise_id") or "") if db_user else body.franchise_id
+    return {"tutorial_alerts_franchise_id": locked, "message": "Tutorial alerts enrolled"}
+
+
+@router.patch("/tutorial-alerts-increment")
+async def increment_tutorial_alerts(
+    body: TutorialAlertsIncrementRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Forward-only counters for games / training returns on the locked franchise."""
+    db_user = users_collection.find_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"tutorial_alerts_franchise_id": 1},
+    )
+    locked = str((db_user or {}).get("tutorial_alerts_franchise_id") or "")
+    if not locked or locked != str(body.franchise_id):
+        return {"skipped": True, "message": "Franchise not enrolled for tutorial alerts"}
+
+    counter_field = (
+        "tutorial_alerts_games"
+        if body.field == "games"
+        else "tutorial_alerts_training_returns"
+    )
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {
+            "$inc": {counter_field: 1},
+            "$set": {"updated_at": datetime.now(timezone.utc)},
+        },
+    )
+    db_user = users_collection.find_one({"_id": ObjectId(user["user_id"])}, {counter_field: 1})
+    return {
+        "field": body.field,
+        "value": int((db_user or {}).get(counter_field, 0) or 0),
+        "message": "Tutorial alert counter incremented",
+    }
+
+
 @router.post("/reset-request")
 @_auth_rate_limit
 async def password_reset_request(request: Request, body: ResetRequest):
@@ -815,6 +916,19 @@ async def get_me(user: dict = Depends(get_current_user)):
     alpha_feedback_submitted = bool(db_user.get("alpha_feedback_submitted")) if db_user else False
     alpha_feedback_games = int(db_user.get("alpha_feedback_games", 0) or 0) if db_user else 0
     alpha_feedback_prompt_level = int(db_user.get("alpha_feedback_prompt_level", 0) or 0) if db_user else 0
+    tutorial_alerts_franchise_id = None
+    tutorial_alerts_dismissed: list[str] = []
+    tutorial_alerts_games = 0
+    tutorial_alerts_training_returns = 0
+    if db_user:
+        raw_franchise_id = db_user.get("tutorial_alerts_franchise_id")
+        if raw_franchise_id is not None:
+            tutorial_alerts_franchise_id = str(raw_franchise_id)
+        raw_dismissed = db_user.get("tutorial_alerts_dismissed")
+        if isinstance(raw_dismissed, list):
+            tutorial_alerts_dismissed = [str(x) for x in raw_dismissed if x]
+        tutorial_alerts_games = int(db_user.get("tutorial_alerts_games", 0) or 0)
+        tutorial_alerts_training_returns = int(db_user.get("tutorial_alerts_training_returns", 0) or 0)
     # Account-page fields (read-only). championships_total is lazily created by the
     # award logic, so default the four kinds to 0 for coaches with no titles.
     subscription = (db_user.get("subscription") if db_user else None) or "alpha"
@@ -840,6 +954,10 @@ async def get_me(user: dict = Depends(get_current_user)):
         alpha_feedback_submitted=alpha_feedback_submitted,
         alpha_feedback_games=alpha_feedback_games,
         alpha_feedback_prompt_level=alpha_feedback_prompt_level,
+        tutorial_alerts_franchise_id=tutorial_alerts_franchise_id,
+        tutorial_alerts_dismissed=tutorial_alerts_dismissed,
+        tutorial_alerts_games=tutorial_alerts_games,
+        tutorial_alerts_training_returns=tutorial_alerts_training_returns,
         subscription=subscription,
         geek_points=geek_points,
         geek_points_by_team=geek_points_by_team,

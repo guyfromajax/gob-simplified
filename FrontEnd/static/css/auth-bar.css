@@ -105,6 +105,55 @@ body.has-auth-bar {
   transform: scaleX(1);
 }
 
+.nav-tutorials-link.is-alert-glow {
+  color: var(--auth-nav-fg);
+  filter: drop-shadow(0 0 10px rgba(247, 148, 32, 0.55));
+}
+
+.nav-tutorials-callout {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #15181f;
+  background: #f79420;
+  box-shadow: 0 6px 18px rgba(247, 148, 32, 0.35);
+  pointer-events: none;
+}
+
+.nav-tutorials-callout::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #f79420;
+}
+
+@media (max-width: 720px) {
+  .nav-tutorials-callout {
+    left: 0;
+    top: calc(100% + 8px);
+    transform: none;
+  }
+  .nav-tutorials-callout::before {
+    right: auto;
+    left: 18px;
+    top: -12px;
+    transform: none;
+    border: 6px solid transparent;
+    border-bottom-color: #f79420;
+  }
+}
+
 .nav-tutorials-icon {
   flex-shrink: 0;
   display: block;

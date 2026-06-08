@@ -2103,9 +2103,10 @@ function setupLockerRoomButton() {
       ? resolveFranchiseLockerRoomUrl({
           params: urlParams,
           franchiseId: urlFranchiseId,
-          teamId: urlTeamId
+          teamId: urlTeamId,
+          extraParams: { tut_alert: 'game_complete' }
         })
-      : buildFranchiseLockerRoomUrl(urlFranchiseId, urlTeamId);
+      : buildFranchiseLockerRoomUrl(urlFranchiseId, urlTeamId, { tut_alert: 'game_complete' });
   } else {
     // ✅ PHASE 2.4: Removed localStorage fallbacks - mode and IDs must come from URL
     // If no mode/ID in URL, default to single game mode

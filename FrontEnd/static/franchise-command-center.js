@@ -3246,12 +3246,20 @@ playNowBtn.addEventListener('click', async () => {
     params.set('session_type', sessionType);
     params.set('return_url', getCurrentRelativeUrl());
     if (userTeamId) params.set('team_id', userTeamId);
-    await confirmSfxReady;
-    try {
-      const { clearFranchiseMusicState } = await import('/js/musicController.js');
-      clearFranchiseMusicState();
-    } catch {}
-    window.location.href = `/training.html?${params.toString()}`;
+    const navigateToTraining = async () => {
+      await confirmSfxReady;
+      try {
+        const { clearFranchiseMusicState } = await import('/js/musicController.js');
+        clearFranchiseMusicState();
+      } catch {}
+      window.location.href = `/training.html?${params.toString()}`;
+    };
+    if (window.GOBTutorialAlerts) {
+      const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining);
+      if (blocked) return;
+    } else {
+      await navigateToTraining();
+    }
     return;
   }
 

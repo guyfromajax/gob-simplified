@@ -69,6 +69,37 @@
     document.head.appendChild(link);
   }
 
+  function loadScriptOnce(src) {
+    return new Promise(function (resolve, reject) {
+      if (document.querySelector('script[src="' + src + '"]')) {
+        resolve();
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = reject;
+      document.body.appendChild(s);
+    });
+  }
+
+  function ensureTutorialAlertExperience() {
+    if (!document.getElementById('gob-tutorial-styles-link') && !document.querySelector('link[href*="gob-tutorial.css"]')) {
+      var css = document.createElement('link');
+      css.id = 'gob-tutorial-styles-link';
+      css.rel = 'stylesheet';
+      css.href = '/css/gob-tutorial.css';
+      document.head.appendChild(css);
+    }
+    if (window.GOBTutorialAlerts) return Promise.resolve();
+    var chain = window.GOB ? Promise.resolve() : loadScriptOnce('/js/shared/gobTutorialNav.js');
+    return chain.then(function () {
+      return loadScriptOnce('/js/shared/gobTutorialAlerts.js');
+    }).catch(function (err) {
+      console.warn('[authBarInit] tutorial alerts scripts failed to load', err);
+    });
+  }
+
   // FTE v2 replaces the old 4-modal welcome flow with a playable tutorial
   // game. The auth-bar entry decision now routes new users to the funnel
   // (franchise-select-team?mode=tutorial → username → tutorial-situation →
@@ -738,6 +769,9 @@
                   setAuthMeData(meData);
                   refreshAccountSettingsModal();
                   routeToTutorial(meData);
+                  ensureTutorialAlertExperience().then(function () {
+                    if (window.GOBTutorialAlerts) window.GOBTutorialAlerts.onAuthMeLoaded(meData);
+                  });
                 }).catch(function () {
                   setAuthMeData({
                     username: user.username || null,
@@ -981,6 +1015,7 @@
     injectFooter();
     initAccountSettingsModal();
     initAuthState();
+    ensureTutorialAlertExperience();
     initAlphaBadge();
     initFeedbackModal();
   }

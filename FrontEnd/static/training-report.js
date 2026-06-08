@@ -417,9 +417,10 @@ function setupLockerRoomButton() {
       const lockerRoomUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
         ? resolveFranchiseLockerRoomUrl({
             franchiseId: franchiseId,
-            teamId: teamId
+            teamId: teamId,
+            extraParams: { tut_alert: 'training_return' }
           })
-        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`;
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tut_alert=training_return`;
       window.location.href = lockerRoomUrl;
     } else if (mode === 'tournament') {
       // Use same pattern as franchise mode - tournament.html is the command center
