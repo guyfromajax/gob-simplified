@@ -92,7 +92,7 @@
       }).join('');
       return '<div class="attr-group">' +
           '<div class="lsec-eyebrow-only">' +
-            '<span class="eyebrow"><span class="tick" style="background:' + t.color + '"></span> ' + GROUP_LABELS[key] + '</span>' +
+            '<span class="eyebrow"><span class="tick"></span> ' + GROUP_LABELS[key] + '</span>' +
           '</div>' +
           '<div class="ag-cards">' + cards + '</div>' +
         '</div>';
