@@ -69,16 +69,16 @@
     position: absolute; width: 22px; height: 22px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 800; color: #15181f;
-    background: var(--orange); border: 2px solid rgba(255,255,255,0.35);
+    border: 2px solid rgba(255,255,255,0.35);
     box-shadow: 0 2px 8px rgba(0,0,0,0.35); z-index: 2;
   }
-  .capsule-marker--1 { top: 0; left: 0; }
-  .capsule-marker--2 { top: 0; right: 0; }
-  .capsule-marker--3 { bottom: 0; left: 0; }
-  .capsule-marker--4 { bottom: 0; right: 0; }
+  .capsule-marker--1 { top: 0; left: 0; background: var(--orange); }
+  .capsule-marker--2 { top: 0; right: 0; background: var(--lblue); }
+  .capsule-marker--3 { bottom: 0; left: 0; background: var(--green); }
+  .capsule-marker--4 { bottom: 0; right: 0; background: #7b5ea7; }
 
   .play-capsule {
-    position: relative; min-height: 67px; padding: 14px 16px 4px;
+    position: relative; min-height: 67px; padding: 7px 16px 4px;
     border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
     background:
       linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
@@ -108,17 +108,19 @@
     padding: 14px 15px; border-radius: 11px;
     border: 1px solid var(--hair); background: rgba(255,255,255,0.03);
   }
-  .legend-kicker {
+  .legend-head {
     display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-    font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--muted-2);
   }
   .legend-num {
     width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 800; color: #15181f; background: var(--orange);
+    font-size: 10px; font-weight: 800; color: #15181f;
   }
-  .legend-title { font-family: var(--display); font-size: 20px; line-height: 1; letter-spacing: .02em; color: var(--text); margin-bottom: 6px; }
+  .legend-num--1 { background: var(--orange); }
+  .legend-num--2 { background: var(--lblue); }
+  .legend-num--3 { background: var(--green); }
+  .legend-num--4 { background: #7b5ea7; }
+  .legend-title { font-family: var(--display); font-size: 20px; line-height: 1; letter-spacing: .02em; color: var(--text); margin: 0; }
   .legend-body { margin: 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
 
   /* layer cards */
@@ -306,23 +308,31 @@
         </div>
         <div class="legend-grid">
           <article class="legend-item">
-            <div class="legend-kicker"><span class="legend-num">1</span> Top left</div>
-            <div class="legend-title">Play Name</div>
+            <div class="legend-head">
+              <span class="legend-num legend-num--1">1</span>
+              <h2 class="legend-title">Play Name</h2>
+            </div>
             <p class="legend-body">For <strong>Set Plays</strong> the parentheses show the <strong>target shooter</strong>; for <strong>Motion</strong> plays they show the <strong>focus</strong>.</p>
           </article>
           <article class="legend-item">
-            <div class="legend-kicker"><span class="legend-num">2</span> Top right</div>
-            <div class="legend-title">Usage %</div>
+            <div class="legend-head">
+              <span class="legend-num legend-num--2">2</span>
+              <h2 class="legend-title">Usage %</h2>
+            </div>
             <p class="legend-body">How often the play is currently set to be called.</p>
           </article>
           <article class="legend-item">
-            <div class="legend-kicker"><span class="legend-num">3</span> Bottom left</div>
-            <div class="legend-title">CMD</div>
+            <div class="legend-head">
+              <span class="legend-num legend-num--3">3</span>
+              <h2 class="legend-title">CMD</h2>
+            </div>
             <p class="legend-body">Your team's <strong>Command</strong> of the play — how well they execute it. More on Command below.</p>
           </article>
           <article class="legend-item">
-            <div class="legend-kicker"><span class="legend-num">4</span> Bottom right</div>
-            <div class="legend-title">Top Scorer</div>
+            <div class="legend-head">
+              <span class="legend-num legend-num--4">4</span>
+              <h2 class="legend-title">Top Scorer</h2>
+            </div>
             <p class="legend-body">The player who's scored the most on this play this season.</p>
           </article>
         </div>
