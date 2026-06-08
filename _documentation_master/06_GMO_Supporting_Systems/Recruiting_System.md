@@ -12,6 +12,19 @@
             - Key `3` is always `None` at init
 2. Upon new franchise init and the start of each new season within a franchise instance, create **300** new recruits per recruit generation (`generate_recruits_list(count=300)`).
 
+**Recruit RT color scale (UI display)**
+
+Recruit RT text uses `/js/shared/rtBucket.js` → `getRecruitRtBucketClass(rt)` with `/css/rt-buckets.css` (same class names and hex colors as the player Attribute Bar Scale, recruit-specific breakpoints):
+
+| RT range | Color | Class |
+|----------|-------|-------|
+| 0–29 | `#ff6d6d` red | `.rt-low` |
+| 30–39 | `#FFD700` yellow | `.rt-mid` |
+| 40–49 | `#34EC27` green | `.rt-high` |
+| 50+ | `#4A90D9` light blue | `.rt-elite` |
+
+Applied on: FCC Recruits tab (and home-card RT column), `recruiting.html`, `recruiting-orders.html`, `recruiting-results.html`, training-report recruiting meta line (`{Name} - RT: n`). **Player** roster/lineup RT continues to use `getRtBucketClass` (0–40 / 41–60 / 61–80 / 81+).
+
 **FCC Recruiting Tab**
 -Place copy at the top of the Recruiting tab in the FCC, in smaller copy than the recurits list below.
     -Weeks 1-18: `Recruiting Invites Begin Week 20`
@@ -28,7 +41,7 @@
 1. **Layout:** Eight stacked **region cards** (`Region A` … `Region H`). Each card holds a scrollable table of recruits whose **`Home Region`** value resolves to that letter (first character of the stored home-region label, uppercased). There is **no** separate “Home Region” column—the region is implied by the card title.
 2. **Row count:** All recruits returned for the franchise in `recruiting-data` are shown (canonical pool size **300** per season init / new season).
 3. **Default ordering:** Within each region, recruits are sorted by **RT descending** by default. **Clickable column headers** reorder rows (per region table) and apply the same sort key across all eight tables on re-render.
-4. **Columns (weeks ≠ 36), left to right:** `Name`, `Archetype`, `HT`, `WT`, `POS`, the twelve attributes `SC` … `FT` (display values are raw recruit attributes **floor-divided by 10**), `RT`, **`Current Lean`**.
+4. **Columns (weeks ≠ 36), left to right:** `Name`, `Archetype`, `HT`, `WT`, `POS`, the twelve attributes `SC` … `FT` (display values are raw recruit attributes **floor-divided by 10**), **`RT`** (colored via recruit RT scale — see **Recruit RT color scale** above), **`Current Lean`**.
 5. **`Current Lean` cell:** Built from the recruit’s `Lean` map keys `"1"`, `"2"`, `"3"` in order. Empty slots are skipped. Literal `"open"` stays `open`; otherwise values are resolved through the global **team id → team name** map when the stored value is an id, else shown as-is. Multiple values are comma-separated (same rules as the examples in the prior spec: e.g. `open`; `Morristown`; `Morristown, Bentley-Truman`; etc.).
 6. **Header / chrome:** Center title **“Recruiting”**; **Back** link returns to the FCC locker room (via `buildFccUrl` / query context). **No** Recruiting Orders button on this page.
 7. **Status line:** Subtitle under the header explains grouping/sorting for non–week-36 (`Recruits are grouped by home region and sorted by RT by default. Click any header to reorder all regions.`).

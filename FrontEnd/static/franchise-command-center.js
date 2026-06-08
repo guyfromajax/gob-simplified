@@ -1052,7 +1052,7 @@ function renderHomeRecruitingCard() {
             <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
             <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
             <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.rt ?? '--')}</span>
+            <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
           </div>
         `).join('')}
       </div>
@@ -1688,7 +1688,7 @@ function renderFccRecruits() {
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td>' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
+        '<td class="' + (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
       ].join('');
       tbody.appendChild(tr);
     });

@@ -51,7 +51,7 @@
               '<td>' + formatHeight(teamRow.visit.height) + '</td>',
               '<td>' + (teamRow.visit.weight != null ? teamRow.visit.weight : '--') + '</td>',
               '<td>' + (teamRow.visit.pos || '--') + '</td>',
-              '<td>' + (teamRow.visit.rt != null ? teamRow.visit.rt : '--') + '</td>'
+              '<td class="' + (teamRow.visit.rt != null && typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(teamRow.visit.rt) : '') + '">' + (teamRow.visit.rt != null ? teamRow.visit.rt : '--') + '</td>'
             ].join('');
           } else {
             tr.innerHTML = [

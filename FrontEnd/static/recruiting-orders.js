@@ -375,7 +375,7 @@
         '<td>' + escapeHtml(recruit.attrs.ND) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.IQ) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.FT) + '</td>',
-        '<td class="' + (typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(recruit.rt) : '') + '">' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
+        '<td class="' + (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
         '<td>' + getLeanCellHtml(recruit) + '</td>',
         '<td>' + (rank
           ? '<button class="picked-rank-badge" type="button" data-action="scroll-to-pick" data-recruit-id="' + escapeHtml(recruit.recruitId) + '">' + rank + '</button>'
@@ -470,7 +470,7 @@
       '<td>' + (recruit ? recruit.height : '--') + '</td>',
       '<td>' + (recruit && recruit.weight != null ? recruit.weight : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
-      '<td class="' + (recruit && typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
@@ -486,7 +486,7 @@
       '<td>' + (recruit ? recruit.homeRegion : '--') + '</td>',
       '<td>' + (recruit ? recruit.archetype : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
-      '<td class="' + (recruit && typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
@@ -568,7 +568,7 @@
       '<div class="slot-grip" aria-hidden="true">' + buildGripHtml() + '</div>',
       '<div class="slot-body">',
       '<div class="slot-name" title="' + escapeHtml(recruit.name) + '">' + formatInviteListNameDisplay(recruit.name) + '</div>',
-      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
+      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt ' + (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
       '</div>',
       isUserInLeanTopThree(recruit) ? '<span class="lean-dot is-solid" aria-label="Your team is on this recruit\u2019s lean list"></span>' : '<span></span>',
       '<button class="slot-remove" type="button" data-action="remove" data-index="' + index + '" aria-label="Remove ' + escapeHtml(recruit.name) + '">×</button>'

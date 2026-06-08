@@ -3,6 +3,10 @@
 
   var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
+  function recruitRtClass(rt) {
+    return typeof global.getRecruitRtBucketClass === 'function' ? global.getRecruitRtBucketClass(rt) : '';
+  }
+
   function fetchJSON(url, options) {
     options = options || {};
     var headers = Object.assign({}, global.API_CONFIG ? API_CONFIG.getAuthHeaders() : {}, options.headers || {});
@@ -216,7 +220,7 @@
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td>' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
+        '<td class="' + recruitRtClass(recruit.rt) + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
         '<td>' + (recruit.leanDisplay || '--') + '</td>',
         onActionClick ? '<td><button class="recruiting-row-action-btn" type="button">' + (getActionLabel ? getActionLabel(recruit, selectedIds.has(recruit.recruitId)) : '+') + '</button></td>' : ''
       ].join('');
@@ -264,6 +268,7 @@
     getQueryContext: getQueryContext,
     normalizeRecruits: normalizeRecruits,
     playSound: playSound,
+    recruitRtClass: recruitRtClass,
     recruitingOrderIds: recruitingOrderIds,
     renderRecruitTableRows: renderRecruitTableRows,
     sortRecruits: sortRecruits,

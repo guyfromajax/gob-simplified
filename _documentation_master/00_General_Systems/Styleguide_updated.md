@@ -41,6 +41,9 @@ The canonical color scale for player attribute bar fills throughout the product.
 - **61–80:** `#34EC27` — green (solid)
 - **81+:** `#4A90D9` — light blue (elite, including 100+)
 
+### Recruit RT Scale
+Recruit RT text (recruiting surfaces only): **0–29** red, **30–39** yellow, **40–49** green, **50+** blue — same hex values and `.rt-*` classes as above; use `getRecruitRtBucketClass` in `/js/shared/rtBucket.js`.
+
 ### Color Usage Rules
 - `#0b0d14` is the default page background for all in-game screens (near-black with faint cool undertone). See Page Background System.
 - `#27408E` is the brand accent color — used for atmospheric moments (community section, leaderboard backgrounds, franchise card atmosphere). It is no longer the default shell background.
@@ -48,7 +51,8 @@ The canonical color scale for player attribute bar fills throughout the product.
 - Green (`#34EC27`) is reserved exclusively for gating actions and positive semantic data states. It must never appear as a decorative, atmospheric, or brand color.
 - Orange is the key action color of the product and the standard for all non-gating primary actions.
 - Team-color theming should affect franchise card atmosphere and community highlight rows only — not core readability surfaces, tabs, or panels.
-- The Attribute Bar Scale must be applied consistently — do not invent alternative thresholds for individual pages.
+- The Attribute Bar Scale must be applied consistently for **player** RT display.
+- **Recruit RT** uses `getRecruitRtBucketClass` (0–29 / 30–39 / 40–49 / 50+; same hex colors and CSS classes). See Styleguide.md §Recruit RT Scale.
 - Dark Blue (`#27408E`) must never be used as a stat fill, attribute bar color, pill color, or any data visualization color.
 
 ## Typography

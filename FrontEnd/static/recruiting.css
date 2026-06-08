@@ -388,7 +388,7 @@ input[type="reset"] {
 }
 
 .slot-rt {
-  color: var(--gob-orange);
+  font-weight: 700;
 }
 
 .slot-remove {

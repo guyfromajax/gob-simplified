@@ -149,8 +149,8 @@
   }
 
   function appendStandardRow(tbody, row, isWeek36) {
-    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    var rtClass = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(row.rt) : '';
+    // RT colored per recruit RT scale (see /css/rt-buckets.css, getRecruitRtBucketClass).
+    var rtClass = typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(row.rt) : '';
     var rtCell = '<td class="' + rtClass + '">' + (row.rt != null ? row.rt : '--') + '</td>';
     var tr = document.createElement('tr');
     tr.innerHTML = isWeek36 ? [

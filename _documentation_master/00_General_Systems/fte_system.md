@@ -220,7 +220,7 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 | `js/shared/attributeTour.js` + `css/attribute-tour.css` | First-run attribute-discovery tour on tutorial set-lineup (scrim + lifted header row + shimmer cues + Sammy coach-mark + X-of-N counter) |
 | `js/shared/coachMark.js` + `css/coach-mark.css` | Spotlight tooltip primitive — **available but not currently used in the FTE flow** (set-lineup intro switched to a centered Functional modal); kept for future tutorials |
 | `js/shared/getGameMode.js` | Single source of truth for the mode value passed to EOG popup (see §8) |
-| `js/shared/rtBucket.js` + `css/rt-buckets.css` | RT color bucket helper (exposes `window.getRtBucketClass`) |
+| `js/shared/rtBucket.js` + `css/rt-buckets.css` | RT color buckets: `getRtBucketClass` (player RT), `getRecruitRtBucketClass` (recruit RT) |
 | `css/gob-buttons.css` | `.gob-btn` system (--action / --gate / --ghost / --lg) |
 | `images/sammy_tutorial.png` | Generic Sammy (Screen 0 only) |
 | `images/coaches/<abbr>/Sammy-<abbr>.png` | Team-linked Sammy (Screens 2–4 + EOG) |

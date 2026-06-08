@@ -59,8 +59,17 @@ The canonical color scale for player attribute bar fills throughout the product.
 - Orange is the key action color of the product and the standard for all non-gating primary actions.
 - Team-color theming should primarily affect atmosphere and background expression, not core readability surfaces.
 - Semantic colors must never be used for buttons, navigation, or interactive controls.
-- The Attribute Bar Scale must be applied consistently — do not invent alternative thresholds for individual pages.
+- The Attribute Bar Scale must be applied consistently for **player** RT display — do not invent alternative thresholds on roster/lineup surfaces.
+- **Recruit RT** uses a separate bucket function (`getRecruitRtBucketClass` in `/js/shared/rtBucket.js`) with recruit-specific thresholds (see Recruit RT Scale below). Same CSS classes and hex colors; different breakpoints.
 - Dark Blue (`#27408E`) must never be used as a stat fill, attribute bar color, pill color, or any data visualization color. It is reserved exclusively for brand identity and shell backgrounds.
+
+### Recruit RT Scale
+Applied wherever **recruit** RT values are displayed as colored text (FCC Recruits tab, recruiting.html, recruiting-orders.html, recruiting-results.html, training-report recruiting strip, etc.). Uses the same CSS classes as the Attribute Bar Scale (`.rt-low` / `.rt-mid` / `.rt-high` / `.rt-elite`) and the same hex colors, but recruit-specific breakpoints:
+
+- **0–29:** `#ff6d6d` — red
+- **30–39:** `#FFD700` — yellow
+- **40–49:** `#34EC27` — green
+- **50+:** `#4A90D9` — light blue
 
 ## Typography
 

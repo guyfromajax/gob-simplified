@@ -136,3 +136,6 @@ The calculation logic is implemented in `BackEnd/utils/position_ratings.py`:
 - `_height_to_rating(height: float) -> float`: Height conversion function
 - `_clamp(value: float, lower: int = 1, upper: int = 100) -> int`: Result clamping
 
+## Recruit RT display (UI)
+
+On recruiting surfaces, displayed **RT** is the recruit's **best position rating** (max of `PG`–`C`). Colored RT text uses **`getRecruitRtBucketClass`** in `/js/shared/rtBucket.js` with breakpoints **0–29 / 30–39 / 40–49 / 50+** (see `Recruiting_System.md` and Styleguide §Recruit RT Scale). Player roster/lineup RT uses the separate player scale via **`getRtBucketClass`**.

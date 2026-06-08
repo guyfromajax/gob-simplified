@@ -1,18 +1,20 @@
 /*
- * Canonical RT (player rating) color scale per Styleguide §Attribute Bar Scale.
- * Applied to any element bearing one of these class names — works on <td>,
- * <span>, <div>, etc. Pair with /js/shared/rtBucket.js.
+ * Canonical RT color scale — shared CSS classes for colored RT text.
+ * Pair with /js/shared/rtBucket.js:
  *
- *   0–40  red       → .rt-low
- *   41–60 yellow    → .rt-mid
- *   61–80 green     → .rt-high
- *   81+   light blue→ .rt-elite
+ *   getRtBucketClass(rt)        — player RT (0–40 / 41–60 / 61–80 / 81+)
+ *   getRecruitRtBucketClass(rt) — recruit RT (0–29 / 30–39 / 40–49 / 50+)
+ *
+ * Colors (both scales):
+ *   red    #ff6d6d  → .rt-low
+ *   yellow #FFD700  → .rt-mid
+ *   green  #34EC27  → .rt-high
+ *   blue   #4A90D9  → .rt-elite
+ *
+ * !important is deliberate — page-local table td { color: ... } rules must not
+ * override the canonical scale on elements bearing these classes.
  */
 
-/* !important is deliberate here — this is the canonical scale and must win
- * over page-local table rules like `.roster-table td { color: ... }` that
- * have higher selector specificity than a bare `.rt-low`. Applying the
- * class anywhere should color the element per the scale. */
 .rt-low      { color: #ff6d6d !important; }
 .rt-mid      { color: #FFD700 !important; }
 .rt-high     { color: #34EC27 !important; }

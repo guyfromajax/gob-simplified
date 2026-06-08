@@ -573,9 +573,34 @@ function renderTrainingReportRecruitingBanner() {
   const m = mRaw === null || mRaw === undefined ? '' : String(mRaw).trim();
 
   titleEl.textContent = h;
-  metaLineEl.textContent = m;
   titleEl.classList.toggle('is-hidden', !h);
+
+  metaLineEl.textContent = '';
   metaLineEl.classList.toggle('is-hidden', !m);
+  if (!m) return;
+
+  if (typeof window.getRecruitRtBucketClass !== 'function') {
+    metaLineEl.textContent = m;
+    return;
+  }
+
+  const re = /RT:\s*(\d+)/g;
+  let last = 0;
+  let match;
+  while ((match = re.exec(m)) !== null) {
+    if (match.index > last) {
+      metaLineEl.appendChild(document.createTextNode(m.slice(last, match.index)));
+    }
+    metaLineEl.appendChild(document.createTextNode('RT: '));
+    const span = document.createElement('span');
+    span.className = window.getRecruitRtBucketClass(match[1]);
+    span.textContent = match[1];
+    metaLineEl.appendChild(span);
+    last = match.index + match[0].length;
+  }
+  if (last < m.length) {
+    metaLineEl.appendChild(document.createTextNode(m.slice(last)));
+  }
 }
 
 function getReportWeekNumber() {
