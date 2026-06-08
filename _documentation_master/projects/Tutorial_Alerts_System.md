@@ -45,4 +45,44 @@
 -Modal Copy
     "Six games in, Coach. Time to get smart on Recruiting — it's how you build your program for the long haul."
 
-    
+
+---
+
+## Technical Execution
+
+*(scaffold — expand as needed)*
+
+**Files**
+
+| Layer | File | Role |
+|---|---|---|
+| Orchestrator | `FrontEnd/static/js/shared/gobTutorialAlerts.js` | eligibility, queue, modal trigger, nav glow |
+| Modal builder | `FrontEnd/static/js/shared/gobTutorialNav.js` | `GOB.showTip()` (alertMode), local lesson `seen` state |
+| Loader | `FrontEnd/static/js/shared/authBarInit.js` | loads nav+alerts scripts, fires `onAuthMeLoaded` |
+| Triggers | `franchise-command-center.js` (training click), `box-score.js` / `training-report.js` (`tut_alert` URL param on FCC return) |
+| API | `BackEnd/api/auth_routes.py` | dismiss / enroll / increment endpoints |
+| Schema | `BackEnd/utils/user_tracking.py` | `tutorial_alerts_*` fields + `TUTORIAL_ALERT_IDS` |
+
+**Server-persisted state (per user, on `/api/auth/me`)**
+
+| Field | Meaning |
+|---|---|
+| `tutorial_alerts_franchise_id` | first franchise instance; alerts lock to it (never changes) |
+| `tutorial_alerts_dismissed[]` | alert ids whose modal has been shown (one-time per user) |
+| `tutorial_alerts_games` | games completed on the locked franchise |
+| `tutorial_alerts_training_returns` | training returns on the locked franchise |
+
+Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server-side** (cross-device).
+
+**Flow**
+- Player Attributes: `onAuthMeLoaded` on mode-select, gated on `fte_v2_complete`.
+- Training: `interceptTraining()` wraps the Run Training click.
+- Team Attributes / Playbooks / Scouting / Recruiting: FCC return via `?tut_alert=` param → `processFccReturn()` → counter increment → eligibility check.
+- On skip ("I'll Do This Later") with the lesson still unseen → nav-bar glow + "Next: <Topic>" callout (`applyNavGlow`).
+
+**Gotchas (load-bearing — see bug history below)**
+- **Yield, don't drop.** Alerts yield to the archetype-reveal and alpha-feedback modals (`shouldYieldToOtherModals`). When yielding, the alert must stay queued and retry — `drainQueue` gates on `canShowAlert()` *before* dequeuing, retries via `scheduleDrainRetry()`, and is re-driven by `gob:auth-me-loaded` (fires when the blocking modal closes).
+- **Never swallow a click.** `interceptTraining` only blocks navigation when an alert *actually shows*; if it can't (yield / scripts not loaded / none eligible) training proceeds — otherwise Run Training looks like a dead button.
+
+**Bug history**
+- 2026-06-08: Run Training was a hard no-op when an alert yielded (`interceptTraining` returned "blocked" unconditionally); Player Attributes alert was silently dropped when it yielded to the archetype reveal (queue shifted the item off without showing). Fixed via the two gotchas above.

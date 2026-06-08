@@ -2,6 +2,7 @@
 6. Don't animate rebound / BIP on Final Shot FT
 18. Final Turn perfection (Run clock to 0:00 for Final Shot), airhorn on ending
 48. Double block announce on Final Shot
+49. No OREB putback attempts on missed final shot
 
 ##Micro Movements
 9. Dunks! I need DUNKS!
@@ -15,21 +16,18 @@
 ##New Features
 11. More action in recruiting
 15. Traning page hover tool tips
+59. Better UX on training page
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
 44. Customize computer teams more strategically
 45. Improve FCC API
 57. Player Momentum System
+60. Universal distance-based rebound helper
+61. News feed
+62. Leaderboard -- change Rank to Titles
 
-##User Account / Leaderboard
-19. Track wins, losses, titles, geek points, and coaching style by user.
-20. Expand leaderbaoard for these items
-21. Discount Geek Points for simmed games
+##User Account
 22. User account -- link X & Facebook?
-23. New Feedback Form
-26. Alpha Access Code Request messaging on modal
-30. New Tutorials Page / Experience
-
 
 
 

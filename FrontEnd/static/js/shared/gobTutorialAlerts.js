@@ -38,6 +38,7 @@
   var meCache = null;
   var queue = [];
   var showing = false;
+  var drainTimer = null;
 
   function sfx(f) {
     if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
@@ -212,10 +213,20 @@
     callout.textContent = 'Next: ' + (LABELS[targetId] || targetId);
   }
 
+  /**
+   * Whether an alert modal can be presented right now. False when the tutorial
+   * modal builder hasn't loaded yet, or when a higher-priority modal (archetype
+   * reveal / alpha feedback) is pending and we must yield to it.
+   */
+  function canShowAlert() {
+    if (!window.GOB || !window.GOB.showTip) return false;
+    if (shouldYieldToOtherModals()) return false;
+    return true;
+  }
+
   function showAlert(id, opts) {
     opts = opts || {};
-    if (!window.GOB || !window.GOB.showTip) return Promise.resolve(false);
-    if (shouldYieldToOtherModals()) return Promise.resolve(false);
+    if (!canShowAlert()) return Promise.resolve(false);
 
     showing = true;
     return markDismissed(id).then(function () {
@@ -256,8 +267,23 @@
     drainQueue();
   }
 
+  function scheduleDrainRetry() {
+    if (drainTimer) return;
+    drainTimer = setTimeout(function () {
+      drainTimer = null;
+      drainQueue();
+    }, 1200);
+  }
+
   function drainQueue() {
     if (showing || !queue.length) return;
+    /* Gate BEFORE dequeuing: if a higher-priority modal is up (or the modal
+       builder isn't loaded yet), keep the alert queued and retry — don't drop
+       it. Retries until the blocker clears (also re-driven by auth-me reload). */
+    if (!canShowAlert()) {
+      scheduleDrainRetry();
+      return;
+    }
     var next = queue.shift();
     showAlert(next);
   }
@@ -294,6 +320,10 @@
     if (meCache && meCache.fte_v2_complete && isModeSelect()) {
       evaluateAndShow({ checkPlayerAttributes: true });
     }
+
+    /* A fresh auth-me usually means a blocking modal (archetype reveal / alpha
+       feedback) just resolved — retry any alert deferred by the yield gate. */
+    drainQueue();
   }
 
   function onFccDomReady() {
@@ -326,7 +356,10 @@
         return false;
       }
       var ids = eligibleIds({ franchiseId: franchiseId, checkTrainingClick: true });
-      if (!ids.length) {
+      /* No eligible alert, OR a higher-priority modal is up / scripts not ready:
+         let training proceed. Never swallow the click — blocking without showing
+         a modal looks like a dead button. */
+      if (!ids.length || !canShowAlert()) {
         if (navigate) navigate();
         return false;
       }
