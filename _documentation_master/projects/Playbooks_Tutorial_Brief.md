@@ -12,8 +12,6 @@
     - Target Shooter in parentheses for Set Plays
 - Top Right: % usage currently set
 - Bottom Left: Team's Command score
-    - Scale: 0-100
-    - 100+ has benefits, but at diminishing returns
 - Bottom Right: Top Scorer (for the current season)
 
 **Editing Playbooks Settings (playbooks.html page)**
@@ -41,3 +39,12 @@
 -Expected Shot Distribution
     - When the user saves their playbooks settings, they will see the expected shot districtuion by position for their usage preset and their playcall center plays
     - These will also be displayed on the Command Center Playbooks tab and on the Lineup Screen during live gameplay.
+
+**Plays' Command Scores**
+- Represents the team's command level of each play.
+- Scale: 0-100
+    - 100+ has benefits, but at diminishing returns
+- Changes
+    - Command increases as the team practices it during Training
+    - Command decreases the more the play is called during live gameplay (this is meant to simulate the fact that they are putting the play on tape more often for opponents to scout)
+- Teams with better command of plays will execute those plays more effectively during gameplay
