@@ -81,6 +81,38 @@
     color: #15181f; text-align: center;
   }
 
+  .dmap-notes {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--hair);
+  }
+  .dmap-notes-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted-3);
+    margin-bottom: 11px;
+  }
+  .dmap-notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .dmap-notes-item {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    margin: 0;
+  }
+  .dmap-notes-item strong {
+    color: var(--text);
+    font-weight: 700;
+  }
+
   /* install cards */
   .ins-grid {
     display: grid;
@@ -195,6 +227,12 @@
             <div class="dmap-cell"><span class="dmap-name">Conditioning</span><span class="dmap-code" style="background:#aeb8cc;">ND</span></div>
             <div class="dmap-cell"><span class="dmap-name">Free Throws</span><span class="dmap-code" style="background:#d4a017;">FT</span></div>
             <div class="dmap-cell"><span class="dmap-name">Film Study</span><span class="dmap-code" style="background:#d4a017;">IQ</span></div>
+          </div>
+          <div class="dmap-notes">
+            <div class="dmap-notes-label">Good to know</div>
+            <ul class="dmap-notes-list">
+              <li class="dmap-notes-item"><strong>Film Study</strong> gives coaches better insight into upcoming opponents — especially tendencies from their most recent game.</li>
+            </ul>
           </div>
           <a class="xlink" href="/player-attributes.html">See the 14 player attributes →</a>
         </article>
