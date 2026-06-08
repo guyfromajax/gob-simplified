@@ -91,16 +91,9 @@
     60% { box-shadow: 0 0 0 2px rgba(247,148,32,0.28); }
   }
 
-  /* REMINDERS BAND */
-  .reminders { margin-top: 40px; display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 24px 26px; position: relative; overflow: hidden; }
-  .reminders::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--orange); }
-  .reminders .r-eyebrow { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
-  .reminders h3 { font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1; letter-spacing: .01em; margin: 8px 0 8px; color: var(--text); }
-  .reminders p { margin: 0; font-size: 13.5px; color: var(--muted); max-width: 64ch; }
 
   @media (max-width: 920px) {
     .cats { grid-template-columns: 1fr; }
-    .reminders { grid-template-columns: 1fr; }
   }
   @media (max-width: 560px) {
     .progress-strip { flex-wrap: wrap; }
@@ -155,16 +148,6 @@
         <p class="hint">The numbers mark the recommended order — but every lesson stands alone, so dip in anywhere.</p>
       </div>
       <div class="cats" id="cats"></div>
-    </section>
-
-    <!-- REMINDERS -->
-    <section class="reminders panel">
-      <div>
-        <span class="r-eyebrow">Smart Reminders</span>
-        <h3>WE’LL FIND YOU WHEN IT MATTERS</h3>
-        <p>As your season unfolds, Coach Sammy will surface the next lesson when it becomes relevant. Already a pro? Mute any topic and it won’t bug you again.</p>
-      </div>
-      <button class="gob-btn gob-btn--ghost" id="see-reminders" type="button">See All Reminders</button>
     </section>
 
   </div>

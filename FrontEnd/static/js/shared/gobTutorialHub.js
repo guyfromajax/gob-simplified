@@ -3,8 +3,7 @@
    IA: Players / Team / Strategy / Training
 
    Dead this pass: topic tiles, core-loop steps, hero action button,
-   "Next up" pill, "See All Reminders" — they never navigate to a
-   sub-page (those don't exist yet). When a sub-page ships it only has
+   "Next up" pill — they never navigate to a sub-page (those don't exist yet). When a sub-page ships it only has
    to call GOB.markSeen('<topic-id>') on load and the whole progress /
    next-up / explored-✓ system lights up automatically.
    =========================================================== */
@@ -174,10 +173,6 @@
     // Reset progress
     var reset = document.getElementById('reset');
     if (reset) reset.addEventListener('click', function () { sfx('click-tiny.wav'); window.GOB.unseenAll(); toast('Progress reset', 'Your explored topics were cleared.'); });
-
-    // "See All Reminders" — dead (manager not built)
-    var seeRem = document.getElementById('see-reminders');
-    if (seeRem) seeRem.addEventListener('click', function () { sfx('click-tiny.wav'); toast('Reminders', 'The reminders manager is part of the next build pass.'); });
 
     // hero "next up" cue: scroll to the category, pulse its target tile
     document.body.addEventListener('click', function (e) {
