@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scouting Report — Opponent Link Options</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#f79420; --orange-soft:#ffa84a; --green:#34ec27; --lblue:#4a90d9;
+  --base:#0b0d14; --text:#f7f9ff;
+  --muted:rgba(255,255,255,.72); --muted-2:rgba(255,255,255,.5); --muted-3:rgba(255,255,255,.34);
+  --panel-border:rgba(255,255,255,.12); --hair:rgba(255,255,255,.08);
+  --display:'Bebas Neue','Arial Narrow',sans-serif; --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--body); color:var(--text);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(39,64,142,.55) 0%, rgba(20,31,74,.25) 38%, transparent 70%),
+    linear-gradient(180deg,#11183a 0%,#0c1024 46%,var(--base) 100%);
+  background-attachment:fixed; min-height:100vh; padding:46px 40px 80px;
+  -webkit-font-smoothing:antialiased;
+}
+.page-h{max-width:1180px; margin:0 auto 30px;}
+.page-h h1{font-family:var(--display); font-weight:400; font-size:40px; letter-spacing:.02em; margin:0 0 8px;}
+.page-h p{margin:0; color:var(--muted); font-size:14.5px; max-width:80ch; line-height:1.6;}
+.page-h .rec{margin-top:14px; padding:12px 16px; border-radius:11px; border:1px solid rgba(247,148,32,.3); background:rgba(247,148,32,.07); font-size:13.5px; color:var(--muted); line-height:1.55;}
+.page-h .rec b{color:var(--text);}
+
+.opt{max-width:1180px; margin:0 auto 26px;}
+.opt-lab{display:flex; align-items:baseline; gap:11px; margin:0 0 11px 2px;}
+.opt-lab .k{font-family:var(--display); font-size:23px; letter-spacing:.03em; color:var(--orange-soft);}
+.opt-lab .d{font-size:12.5px; color:var(--muted-2);}
+.opt-lab .best{font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#0b0d14; background:var(--green); padding:2px 8px; border-radius:999px;}
+
+/* ===== opponent header band (recreated from the game) ===== */
+.shell{border:1px solid rgba(255,255,255,.07); border-radius:18px; padding:14px; background:linear-gradient(180deg, rgba(20,23,32,.5), rgba(11,13,20,.4));}
+.opp{
+  position:relative; border-radius:14px; padding:26px 30px;
+  background:linear-gradient(180deg, rgba(48,54,66,.55), rgba(28,33,42,.6));
+  border:1px solid var(--panel-border);
+}
+.opp-eyebrow{font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--muted-2); margin-bottom:6px;}
+.opp-main{display:flex; align-items:flex-end; justify-content:space-between; gap:24px;}
+.opp-name{font-family:var(--display); font-weight:400; font-size:58px; line-height:.9; letter-spacing:.01em; color:var(--text); margin:0; white-space:nowrap;}
+.opp-name .rec{color:var(--muted-2);}
+.opp-rank{font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--muted-2); white-space:nowrap; padding-bottom:5px;}
+.opp-rank b{font-family:var(--display); font-weight:400; font-size:34px; letter-spacing:.02em; color:var(--text); margin-left:10px; vertical-align:-3px;}
+
+/* shared button bits */
+.tp-btn{
+  display:inline-flex; align-items:center; gap:8px; font-family:var(--body);
+  font-size:12.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  padding:9px 15px; border-radius:9px; cursor:pointer; text-decoration:none;
+  transition:all .15s ease; white-space:nowrap;
+}
+.tp-btn svg{width:15px; height:15px; transition:transform .15s ease;}
+.tp-btn:hover svg{transform:translateX(3px);}
+
+/* --- A: ghost button, right side grouped with rank --- */
+.a-right{display:flex; flex-direction:column; align-items:flex-end; gap:12px;}
+.tp-ghost{color:var(--orange-soft); border:1px solid rgba(247,148,32,.45); background:rgba(247,148,32,.06);}
+.tp-ghost:hover{background:rgba(247,148,32,.14); border-color:var(--orange);}
+
+/* --- B: small text link under the name --- */
+.b-name-wrap{display:flex; flex-direction:column; gap:9px;}
+.tp-text{display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:var(--lblue); text-decoration:none; letter-spacing:.01em;}
+.tp-text svg{width:14px; height:14px; transition:transform .15s ease;}
+.tp-text:hover{color:#74ace6;}
+.tp-text:hover svg{transform:translateX(3px);}
+
+/* --- C: clickable title with hover affordance --- */
+.c-title{display:inline-flex; align-items:center; gap:16px; cursor:pointer; text-decoration:none; color:var(--text); transition:color .15s ease;}
+.c-title .chev{font-family:var(--body); display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:50%; border:1.5px solid var(--muted-3); color:var(--muted-2); opacity:0; transform:translateX(-8px); transition:all .18s ease; margin-bottom:4px;}
+.c-title .chev svg{width:18px; height:18px;}
+.c-title:hover{color:#fff;}
+.c-title:hover .chev{opacity:1; transform:translateX(0); border-color:var(--orange); color:var(--orange);}
+.c-hint{font-size:11.5px; color:var(--muted-3); margin-top:8px; letter-spacing:.02em;}
+
+/* --- D: solid accent chip, right side --- */
+.tp-solid{color:#15181f; background:var(--orange); border:1px solid var(--orange);}
+.tp-solid:hover{background:var(--orange-soft);}
+
+@media(max-width:760px){
+  .opp-main{flex-direction:column; align-items:flex-start; gap:16px;}
+  .a-right{align-items:flex-start;}
+}
+</style>
+</head>
+<body>
+
+  <div class="page-h">
+    <h1>Scouting Report — "study the opponent" link</h1>
+    <p>Four ways to send the coach to the opponent's full team page, mocked on your real header. Each keeps the Bebas title you like intact.</p>
+    <div class="rec"><b>My recommendation: A (or A + C together).</b> A puts an explicit, discoverable action high in the header without touching the title. Layering C on top rewards anyone who instinctively clicks the team name — belt and suspenders, no downside.</div>
+  </div>
+
+  <!-- A -->
+  <div class="opt">
+    <div class="opt-lab"><span class="k">Option A</span><span class="d">Ghost button, top-right — grouped with National Rank</span><span class="best">Recommended</span></div>
+    <div class="shell"><div class="opp">
+      <div class="opp-eyebrow">Upcoming Opponent</div>
+      <div class="opp-main">
+        <h2 class="opp-name">Ann Arbor <span class="rec">(0-0)</span></h2>
+        <div class="a-right">
+          <div class="opp-rank">National Rank <b>80</b></div>
+          <a class="tp-btn tp-ghost" href="#">View Team Page
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          </a>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- C -->
+  <div class="opt">
+    <div class="opt-lab"><span class="k">Option C</span><span class="d">The team name itself is the link — chevron + brighten on hover</span></div>
+    <div class="shell"><div class="opp">
+      <div class="opp-eyebrow">Upcoming Opponent</div>
+      <div class="opp-main">
+        <div>
+          <a class="c-title" href="#">
+            <span class="opp-name">Ann Arbor <span class="rec">(0-0)</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+          </a>
+          <div class="c-hint">Hover the name — click to open their team page</div>
+        </div>
+        <div class="opp-rank">National Rank <b>80</b></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- B -->
+  <div class="opt">
+    <div class="opt-lab"><span class="k">Option B</span><span class="d">Small "See Roster" text link directly under the name</span></div>
+    <div class="shell"><div class="opp">
+      <div class="opp-eyebrow">Upcoming Opponent</div>
+      <div class="opp-main">
+        <div class="b-name-wrap">
+          <h2 class="opp-name">Ann Arbor <span class="rec">(0-0)</span></h2>
+          <a class="tp-text" href="#">See full roster &amp; stats
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          </a>
+        </div>
+        <div class="opp-rank">National Rank <b>80</b></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- D -->
+  <div class="opt">
+    <div class="opt-lab"><span class="k">Option D</span><span class="d">Solid orange action chip, top-right — most prominent</span></div>
+    <div class="shell"><div class="opp">
+      <div class="opp-eyebrow">Upcoming Opponent</div>
+      <div class="opp-main">
+        <h2 class="opp-name">Ann Arbor <span class="rec">(0-0)</span></h2>
+        <div class="a-right">
+          <div class="opp-rank">National Rank <b>80</b></div>
+          <a class="tp-btn tp-solid" href="#">Scout Full Roster
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          </a>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+</body>
+</html>

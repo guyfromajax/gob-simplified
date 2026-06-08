@@ -432,10 +432,14 @@ window.addEventListener('gob:account-settings-updated', (event) => {
 
 let standingsDataCache = null;
 
-function buildTeamLink(t) {
+function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
   const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
+  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}&return_url=${returnUrl}`;
+}
+
+function buildTeamLink(t) {
   const teamLink = document.createElement('a');
-  teamLink.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab&return_url=${returnUrl}`;
+  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, t.name, 'standings-tab');
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
   teamLink.textContent = `${rankPrefix}${t.name}`;
@@ -4457,6 +4461,16 @@ async function renderScoutingTab() {
 
   opponentName.textContent = `${opponentTeamName} (${wins}-${losses})`;
   opponentRank.textContent = Number.isFinite(rank) && rank > 0 ? String(rank) : '--';
+
+  const teamPageLink = document.getElementById('fcc-scouting-team-page-link');
+  if (teamPageLink) {
+    if (opponent.id && franchiseId) {
+      teamPageLink.href = buildFranchiseTeamPageUrl(opponent.id, opponentTeamName, 'coaches-tab');
+    } else {
+      // TODO: wire team page URL when opponent team id is unavailable in matchup context
+      teamPageLink.href = '#';
+    }
+  }
 
   try {
     const authHeaders = API_CONFIG.getAuthHeaders();

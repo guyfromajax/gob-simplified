@@ -1,6 +1,7 @@
 /* ===========================================================
    GOB Tutorial Experience — shared behavior
-   - Smart back button (returns to where the user entered from)
+   - Sub-page back button -> Tutorial Home (/tutorial.html)
+   - Hub back button -> where the user entered from (or history / hub fallback)
    - Persistent bottom nav (active state + in-page smart scroll)
    - Per-topic progress (localStorage)  -> window.GOB
    - Contextual tip modal + per-topic mute (for future sub-pages)
@@ -13,6 +14,10 @@
   var ORIGIN_KEY = 'gob_tut_origin';
 
   var HUB = '/tutorial.html';
+
+  function isTutorialHub() {
+    return /\/tutorial\.html$/i.test(location.pathname);
+  }
 
   /* ---- sound hook (repo pattern: inline playSound over /sounds/) ---- */
   function playSound(filename) {
@@ -54,6 +59,10 @@
   }
   function goBack() {
     playSound('x-back.mp3');
+    if (!isTutorialHub()) {
+      location.href = HUB;
+      return;
+    }
     var origin = sessionStorage.getItem(ORIGIN_KEY);
     if (origin) { location.href = origin; return; }
     if (window.history.length > 1) { window.history.back(); return; }
@@ -118,7 +127,12 @@
     rememberOrigin();
     renderNav();
     var back = document.querySelector('[data-gob-back]');
-    if (back) back.addEventListener('click', goBack);
+    if (back) {
+      if (!isTutorialHub()) {
+        back.innerHTML = '<span class="chev">‹</span> Back To Tutorial Home';
+      }
+      back.addEventListener('click', goBack);
+    }
   }
 
   /* ---- modal builder (used by future per-topic / contextual tips) ---- */

@@ -1881,10 +1881,17 @@ input[type="reset"] {
 
 #franchise-container .fcc-scouting-summary-right {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  text-align: right;
+}
+
+#franchise-container .fcc-scouting-rank-row {
+  display: flex;
   align-items: baseline;
   justify-content: flex-end;
   gap: 8px;
-  text-align: right;
   white-space: nowrap;
 }
 
@@ -1903,6 +1910,41 @@ input[type="reset"] {
   font-size: 22px;
   font-weight: 800;
   line-height: 1;
+}
+
+#franchise-container .fcc-scouting-team-page-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 9px 15px;
+  border-radius: 9px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  color: #ffa84a;
+  border: 1px solid rgba(247, 148, 32, 0.45);
+  background: rgba(247, 148, 32, 0.06);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#franchise-container .fcc-scouting-team-page-link svg {
+  width: 15px;
+  height: 15px;
+  transition: transform 0.15s ease;
+}
+
+#franchise-container .fcc-scouting-team-page-link:hover {
+  background: rgba(247, 148, 32, 0.14);
+  border-color: #f79420;
+}
+
+#franchise-container .fcc-scouting-team-page-link:hover svg {
+  transform: translateX(3px);
 }
 
 #franchise-container .fcc-scouting-card-head {
@@ -2321,6 +2363,23 @@ input[type="reset"] {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  #franchise-container .fcc-scouting-summary-row {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  #franchise-container .fcc-scouting-summary-right {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  #franchise-container .fcc-scouting-rank-row {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 1280px) {
