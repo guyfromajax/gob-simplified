@@ -20,12 +20,12 @@ class TutorialAlertsSchemaTests(unittest.TestCase):
                 "player-attributes",
                 "training",
                 "team-attributes",
+                "game-plans",
                 "playbooks",
                 "scouting",
                 "recruiting",
             ),
         )
-        self.assertNotIn("game-plans", TUTORIAL_ALERT_IDS)
 
 
 if __name__ == "__main__":

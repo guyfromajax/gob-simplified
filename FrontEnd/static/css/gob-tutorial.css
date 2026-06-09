@@ -122,6 +122,32 @@ body.gob-tut #site-footer { margin-bottom: calc(var(--nav-h) + 8px); }
 .lsec-eyebrow-only { margin-bottom: 18px; }
 .handoff { margin-top: 40px; }
 
+/* ---------- Alert-resume sticky footer (modal entry only) ---------- */
+body.gob-tut--alert-resume {
+  padding-bottom: calc(var(--nav-h) * 2 + 28px);
+}
+body.gob-tut--alert-resume #site-footer {
+  margin-bottom: calc(var(--nav-h) * 2 + 12px);
+}
+.gob-tut-alert-resume {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--nav-h);
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(10, 12, 20, 0.86);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.gob-tut-alert-resume__btn {
+  min-width: 200px;
+}
+
 /* ---------- Panels ---------- */
 .panel {
   border: 1px solid var(--panel-border); border-radius: var(--radius);
@@ -253,3 +279,125 @@ body.gob-tut #site-footer { margin-bottom: calc(var(--nav-h) + 8px); }
   font-size: 11px; color: var(--muted-3); cursor: pointer; text-align: left;
 }
 .gob-tip-overlay .gob-modal-mute:hover { color: var(--muted); }
+
+/* ===========================================================
+   Tutorial Alert — Coach Sammy "coach-card" (premium takeover)
+   One component serves all 7 tutorial-alert lessons.
+   Distinct from the .gob-modal tip above: full-screen takeover,
+   two-column branded card. Built entirely on the tokens above.
+   =========================================================== */
+.gob-talert-overlay {
+  position: fixed; inset: 0; z-index: 10045;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: radial-gradient(120% 100% at 50% 50%, rgba(7,8,12,0.55) 20%, rgba(7,8,12,0.82));
+  -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+  opacity: 1; /* resting state is fully visible — never opacity:0 */
+}
+/* entrance: scrim fade + card rise/scale, dropped on animationend */
+.gob-talert-overlay.is-entering { animation: gob-talert-ov-in .4s ease; }
+@keyframes gob-talert-ov-in { from { opacity: 0; } }
+/* leaving: brief fade before removal */
+.gob-talert-overlay.is-leaving { opacity: 0; transition: opacity .25s ease; }
+
+.gob-talert {
+  position: relative; width: min(94vw, 800px);
+  display: grid; grid-template-columns: 256px 1fr;
+  background: linear-gradient(180deg, var(--panel-1), var(--panel-2));
+  border: 1px solid var(--panel-border); border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: 0 50px 110px -34px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.gob-talert-overlay.is-entering .gob-talert {
+  animation: gob-talert-in .5s cubic-bezier(.2,.8,.2,1) .08s backwards;
+}
+@keyframes gob-talert-in { from { transform: translateY(14px) scale(.985); opacity: 0; } }
+
+.gob-talert-close {
+  position: absolute; top: 15px; right: 16px; z-index: 5; width: 30px; height: 30px;
+  border: none; border-radius: 8px; background: transparent; color: var(--muted-2);
+  font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: .15s;
+}
+.gob-talert-close:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+
+/* left rail (branded) */
+.gob-talert-rail {
+  position: relative; padding: 30px 22px 26px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: linear-gradient(168deg, rgba(247,148,32,0.17), rgba(247,148,32,0.015) 52%), rgba(0,0,0,0.2);
+  border-right: 1px solid var(--hair);
+}
+.gob-talert-mark {
+  position: absolute; top: 16px; left: 18px; display: flex; align-items: center; gap: 6px;
+  font-family: var(--body); font-size: 10px; font-weight: 800; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--orange-soft);
+}
+.gob-talert-mark svg { width: 15px; height: 15px; }
+.gob-talert-id { display: flex; flex-direction: column; align-items: center; }
+.gob-talert-portrait {
+  display: block; width: 124px; height: 124px; border-radius: 22px; overflow: hidden; margin-top: 34px;
+  box-shadow: 0 0 0 2px var(--orange), 0 16px 34px -12px rgba(0,0,0,0.75);
+}
+.gob-talert-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gob-talert-coach {
+  font-family: var(--display); font-size: 27px; line-height: 1; letter-spacing: .03em;
+  margin-top: 18px; white-space: nowrap;
+}
+.gob-talert-progress {
+  margin-top: auto; padding-top: 22px; display: flex; flex-direction: column; align-items: center; gap: 11px;
+}
+.gob-talert-num {
+  font-family: var(--display); font-size: 15px; letter-spacing: .07em; color: var(--orange-soft); white-space: nowrap;
+}
+.gob-talert-dots { display: flex; align-items: center; gap: 7px; }
+.gob-talert-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: .3s; }
+.gob-talert-dots i.on { background: var(--orange); width: 20px; border-radius: 3px; }
+.gob-talert-dots i.done { background: rgba(247,148,32,0.55); }
+
+/* right content */
+.gob-talert-content {
+  padding: 40px 40px 38px; display: flex; flex-direction: column; justify-content: center; min-height: 330px;
+}
+.gob-talert-title {
+  font-family: var(--body); font-weight: 800; font-size: 37px; line-height: 1.02; letter-spacing: -0.012em;
+  margin: 0; color: var(--text);
+}
+.gob-talert-text {
+  font-size: 16.5px; line-height: 1.55; color: var(--muted); margin: 14px 0 30px; max-width: 42ch; text-wrap: pretty;
+}
+.gob-talert-actions { display: flex; align-items: center; gap: 22px; }
+.gob-talert-btn { font-family: var(--body); cursor: pointer; border: none; transition: .16s; text-decoration: none; }
+.gob-talert-btn-primary {
+  background: linear-gradient(180deg, var(--orange-soft), var(--orange)); color: #15181f;
+  font-size: 16px; font-weight: 700; padding: 14px 32px; border-radius: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 22px -7px rgba(247,148,32,0.6), inset 0 1px 0 rgba(255,255,255,0.45);
+}
+.gob-talert-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px -8px rgba(247,148,32,0.7), inset 0 1px 0 rgba(255,255,255,0.45);
+}
+.gob-talert-btn-ghost {
+  background: transparent; color: var(--muted); font-family: var(--display); font-size: 20px;
+  letter-spacing: .04em; padding: 8px 4px;
+}
+.gob-talert-btn-ghost:hover { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gob-talert-overlay, .gob-talert-overlay.is-entering, .gob-talert-overlay.is-entering .gob-talert {
+    animation: none; opacity: 1; transform: none;
+  }
+}
+
+/* responsive: rail moves on top below ~560px */
+@media (max-width: 560px) {
+  .gob-talert { grid-template-columns: 1fr; width: min(94vw, 420px); }
+  .gob-talert-rail {
+    flex-direction: row; justify-content: flex-start; gap: 16px; text-align: left;
+    padding: 46px 20px 18px; border-right: none; border-bottom: 1px solid var(--hair);
+  }
+  .gob-talert-portrait { width: 64px; height: 64px; border-radius: 14px; margin-top: 0; }
+  .gob-talert-coach { font-size: 22px; margin-top: 0; }
+  .gob-talert-id { flex-direction: column; gap: 8px; }
+  .gob-talert-progress { margin: 0; padding-top: 0; align-items: flex-start; }
+  .gob-talert-content { padding: 26px 24px 28px; min-height: 0; }
+  .gob-talert-title { font-size: 30px; }
+}

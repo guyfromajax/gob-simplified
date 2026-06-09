@@ -290,6 +290,29 @@ Used during active gameplay at decision points — quarter breaks, timeouts, fou
 - No background imagery — data surfaces must remain fully readable
 - Backdrop click does NOT dismiss — user must explicitly submit or the game cannot proceed
 
+#### Tutorial Alert (Coach Card)
+The contextual Coach Sammy lesson prompt — one component for all 7 tutorial alerts (`gobTutorialAlerts.js` → `GOB.showTip({alertMode:true})`; styles in `css/gob-tutorial.css`, `.gob-talert-*`). A full-screen takeover, distinct from the 560px Moment Modal.
+
+**Design rules:**
+- Layout: two-column card, `grid-template-columns: 256px 1fr`, max width `800px`, radius `20px` (`--radius-lg`)
+- Scrim: `radial-gradient(...rgba(7,8,12,0.55)→0.82)` + `backdrop-filter: blur(7px)`
+- Left rail (branded): whistle-glyph "TUTORIAL" mark top-left; Coach Sammy portrait in a `22px` rounded square with a `2px` orange ring (`--orange #f79420`); "Coach Sammy" in Bebas; bottom-pinned progress block — "Lesson N of 7" + 7-dot indicator (past = `rgba(247,148,32,0.55)`, current = elongated orange pill, future = `rgba(255,255,255,0.2)`)
+- Right content (vertically centered): lesson title as headline (Inter 800 `37px`, no eyebrow), 2–3 lines body (`--muted`), then primary "Start lesson" (orange gradient, ink text) + ghost "I'll do this later" (Bebas)
+- Close ✕ top-right
+- Coach art: lesson 1 = generic white-uniform Sammy; lessons 2–7 = selected team's uniform Sammy (`/images/coaches/<abbr>/Sammy-<abbr>.png`), generic fallback
+- Entrance: scrim fade + card rise/scale via `.is-entering`, dropped on `animationend`; **resting state is fully visible (never `opacity:0`)**; honors `prefers-reduced-motion`
+- Responsive: below `560px` the rail stacks on top (portrait + name inline) and the card narrows to `420px`
+
+#### Tutorial Alert Resume Footer (Back To Game)
+Shown on lesson **sub-pages only**, and **only** when the user arrived via an alert modal's **Start lesson** CTA. Replaces the normal sub-page chrome for that visit. Implementation: `gobTutorialAlertResume.js`; styles `.gob-tut-alert-resume*` in `css/gob-tutorial.css`. Product spec: `projects/Tutorial_Alerts_System.md` → *Back To Game*.
+
+**Design rules:**
+- **Hide** the top `Back To Tutorial Home` button (`[data-gob-back]`) and the bottom **Next up** `.handoff` panel for this entry path only.
+- **Sticky bar:** fixed full-width container sitting directly above the tutorial bottom nav (`bottom: var(--nav-h)`, `z-index: 45`); same frosted dark treatment as the bottom nav (`rgba(10,12,20,0.86)` + blur + top hairline border).
+- **Single CTA:** centered **Back To Game** button (`.gob-btn.gob-btn--lg`, min-width `200px`).
+- **Scroll-gated styling (visual only):** ghost (`.gob-btn--ghost`) until the user reaches the page bottom; then orange fill (`.gob-btn--action`). Button remains clickable in both states.
+- **Body padding:** `.gob-tut--alert-resume` adds extra bottom padding so content is not obscured by the sticky bar + bottom nav stack.
+
 ### Shared Rules (All Three Types)
 - Backdrop click dismisses Functional Modals only
 - Moment Modals and Strategic Modals require explicit button action to dismiss

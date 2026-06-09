@@ -7,12 +7,13 @@
 (function () {
   'use strict';
 
-  var ORDER = ['player-attributes', 'training', 'team-attributes', 'playbooks', 'scouting', 'recruiting'];
+  var ORDER = ['player-attributes', 'training', 'team-attributes', 'game-plans', 'playbooks', 'scouting', 'recruiting'];
 
   var LIVE = {
     'player-attributes': '/player-attributes.html',
     'training': '/tutorial-training.html',
     'team-attributes': '/team-attributes.html',
+    'game-plans': '/game-plans.html',
     'playbooks': '/tutorial-playbooks.html',
     'scouting': '/scouting.html',
     'recruiting': '/tutorial-recruiting.html'
@@ -22,15 +23,54 @@
     'player-attributes': 'Player Attributes',
     'training': 'Training',
     'team-attributes': 'Team Attributes',
+    'game-plans': 'Game Plans',
     'playbooks': 'Playbooks',
     'scouting': 'Scouting',
     'recruiting': 'Recruiting'
   };
 
+  /* Lesson position within the hub's recommended 7-lesson curriculum (1-based). */
+  var LESSON_TOTAL = 7;
+  var LESSON_INDEX = {
+    'player-attributes': 1,
+    'training': 2,
+    'team-attributes': 3,
+    'game-plans': 4,
+    'playbooks': 5,
+    'scouting': 6,
+    'recruiting': 7
+  };
+
+  var GENERIC_SAMMY = '/images/sammy_tutorial.png';
+
+  /* Per-team Coach Sammy portraits — mirror of teamCoachAsset.js (that file is an
+     ES module; this script is a classic IIFE, so the 8-team map is duplicated
+     here intentionally). Lesson 1 uses the generic portrait; lessons 2–7 use the
+     selected team's uniform, falling back to generic when no team is set. */
+  var TEAM_COACH_ABBR = {
+    'Bentley-Truman': 'BT',
+    'Four Corners': 'FC',
+    'Lancaster': 'Lan',
+    'Little York': 'LY',
+    'Morristown': 'Mor',
+    'Ocean City': 'OC',
+    'South Lancaster': 'SL',
+    'Xavien': 'Xav'
+  };
+
+  function portraitFor(id) {
+    if (id === 'player-attributes') return GENERIC_SAMMY;
+    var team = '';
+    try { team = localStorage.getItem('franchise_user_team') || ''; } catch (e) {}
+    var abbr = TEAM_COACH_ABBR[team];
+    return abbr ? '/images/coaches/' + abbr + '/Sammy-' + abbr + '.png' : GENERIC_SAMMY;
+  }
+
   var BODIES = {
     'player-attributes': 'Nice work, Coach. Before you start your first franchise, get to know Player Attributes — they\'re the foundation for every decision ahead.',
     'training': 'You\'re about to run training for the first time, Coach. Take a minute with the Training tutorial first.',
     'team-attributes': 'You just evolved some of your team\'s attributes, Coach. The Team Attributes tutorial breaks down the impact of those changes.',
+    'game-plans': 'Your first game is next, Coach. Run through the Game Plan tutorial before you tip off.',
     'playbooks': 'Hey Coach, we think you\'re ready for the Playbooks tutorial.',
     'scouting': 'You\'ve seen the Scouting Report tab by now, Coach. The Scouting tutorial covers how to read it and turn it into an edge.'
   };
@@ -163,6 +203,34 @@
     return (window.location.pathname || '').indexOf('franchise-command-center') !== -1;
   }
 
+  function currentRelativeReturnUrl() {
+    var params = new URLSearchParams(window.location.search);
+    params.delete('tut_alert');
+    var qs = params.toString();
+    return window.location.pathname + (qs ? '?' + qs : '') + (window.location.hash || '');
+  }
+
+  function defaultReturnUrl(id) {
+    if (id === 'player-attributes') return '/mode-select.html';
+    if (isFcc()) return currentRelativeReturnUrl();
+    return window.location.pathname + window.location.search + (window.location.hash || '');
+  }
+
+  function stashAlertResume(alertId, returnUrl) {
+    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setContext) {
+      window.GOBTutorialAlertResume.setContext(alertId, returnUrl);
+      return;
+    }
+    try {
+      sessionStorage.setItem('gob_tut_alert_resume', JSON.stringify({
+        entrySource: 'tutorial-alert',
+        alertId: alertId,
+        lessonId: alertId,
+        returnUrl: returnUrl
+      }));
+    } catch (e) {}
+  }
+
   function eligibleIds(opts) {
     opts = opts || {};
     var out = [];
@@ -181,6 +249,7 @@
       if (!franchiseId || !franchiseLocked(franchiseId)) return;
 
       if (id === 'training' && opts.checkTrainingClick) out.push(id);
+      if (id === 'game-plans' && opts.checkPlayNextGame) out.push(id);
       if (id === 'team-attributes' && opts.checkFccReturn && trainingReturns >= 1) out.push(id);
       if (id === 'playbooks' && opts.checkFccReturn && trainingReturns >= 2) out.push(id);
       if (id === 'scouting' && opts.checkFccReturn && games >= 3) out.push(id);
@@ -239,6 +308,7 @@
     opts = opts || {};
     if (!canShowAlert()) return Promise.resolve(false);
 
+    var returnUrl = opts.returnUrl || defaultReturnUrl(id);
     showing = true;
     return markDismissed(id).then(function () {
       return new Promise(function (resolve) {
@@ -259,9 +329,15 @@
           title: LABELS[id],
           body: bodyFor(id),
           href: LIVE[id] || '/tutorial.html',
-          cta: 'Tutorials',
-          laterLabel: 'I\'ll Do This Later',
-          onGo: function () { finish(true); },
+          lessonIndex: LESSON_INDEX[id] || 1,
+          lessonTotal: LESSON_TOTAL,
+          portrait: portraitFor(id),
+          cta: 'Start lesson',
+          laterLabel: 'I\'ll do this later',
+          onGo: function () {
+            stashAlertResume(id, returnUrl);
+            finish(true);
+          },
           onLater: function () { finish(false); }
         });
 
@@ -271,9 +347,13 @@
     });
   }
 
-  function enqueue(ids) {
-    ids.forEach(function (id) {
-      if (queue.indexOf(id) === -1) queue.push(id);
+  function enqueue(items) {
+    items.forEach(function (item) {
+      var id = typeof item === 'string' ? item : item.id;
+      var returnUrl = typeof item === 'object' && item ? item.returnUrl : null;
+      if (!id) return;
+      var exists = queue.some(function (q) { return q.id === id; });
+      if (!exists) queue.push({ id: id, returnUrl: returnUrl });
     });
     drainRetries = 0; // fresh batch — give the retry budget a clean slate
     drainQueue();
@@ -306,16 +386,20 @@
       return;
     }
     var next = queue.shift();
-    showAlert(next);
+    showAlert(next.id, { returnUrl: next.returnUrl });
   }
 
   function evaluateAndShow(opts) {
+    opts = opts || {};
     var ids = eligibleIds(opts);
     if (!ids.length) {
       applyNavGlow();
       return Promise.resolve(false);
     }
-    enqueue(ids);
+    var returnUrl = opts.returnUrl || null;
+    enqueue(ids.map(function (id) {
+      return { id: id, returnUrl: returnUrl || defaultReturnUrl(id) };
+    }));
     return Promise.resolve(true);
   }
 
@@ -367,7 +451,7 @@
     enrollFranchise(franchiseId).then(applyNavGlow);
   }
 
-  function interceptTraining(franchiseId, navigate) {
+  function interceptTraining(franchiseId, navigate, returnUrl) {
     meCache = meCache || window.__gobAuthMeData || null;
     return enrollFranchise(franchiseId).then(function () {
       return refreshMeFromServer();
@@ -384,7 +468,25 @@
         if (navigate) navigate();
         return false;
       }
-      return showAlert(ids[0]).then(function () { return true; });
+      return showAlert(ids[0], { returnUrl: returnUrl }).then(function () { return true; });
+    });
+  }
+
+  function interceptPlayNextGame(franchiseId, setLineupUrl, navigate) {
+    meCache = meCache || window.__gobAuthMeData || null;
+    return enrollFranchise(franchiseId).then(function () {
+      return refreshMeFromServer();
+    }).then(function () {
+      if (!franchiseLocked(franchiseId)) {
+        if (navigate) navigate();
+        return false;
+      }
+      var ids = eligibleIds({ franchiseId: franchiseId, checkPlayNextGame: true });
+      if (!ids.length || !canShowAlert()) {
+        if (navigate) navigate();
+        return false;
+      }
+      return showAlert(ids[0], { returnUrl: setLineupUrl }).then(function () { return true; });
     });
   }
 
@@ -393,6 +495,7 @@
     onAuthMeLoaded: onAuthMeLoaded,
     onFccDomReady: onFccDomReady,
     interceptTraining: interceptTraining,
+    interceptPlayNextGame: interceptPlayNextGame,
     applyNavGlow: applyNavGlow,
     refreshMeFromServer: refreshMeFromServer,
     processFccReturn: processFccReturn

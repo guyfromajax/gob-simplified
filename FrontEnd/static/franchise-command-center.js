@@ -3246,16 +3246,17 @@ playNowBtn.addEventListener('click', async () => {
     params.set('session_type', sessionType);
     params.set('return_url', getCurrentRelativeUrl());
     if (userTeamId) params.set('team_id', userTeamId);
+    const trainingReturnUrl = `/training.html?${params.toString()}`;
     const navigateToTraining = async () => {
       await confirmSfxReady;
       try {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = `/training.html?${params.toString()}`;
+      window.location.href = trainingReturnUrl;
     };
     if (window.GOBTutorialAlerts) {
-      const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining);
+      const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
       if (blocked) return;
     } else {
       await navigateToTraining();
@@ -3381,12 +3382,24 @@ playNowBtn.addEventListener('click', async () => {
     if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
     if (resolvedSide) url += `&my_team=${resolvedSide}`;
     console.log('Navigating to', url);
-    await confirmSfxReady;
-    try {
-      const { clearFranchiseMusicState } = await import('/js/musicController.js');
-      clearFranchiseMusicState();
-    } catch {}
-    window.location.href = url;
+    const navigateToLineup = async () => {
+      await confirmSfxReady;
+      try {
+        const { clearFranchiseMusicState } = await import('/js/musicController.js');
+        clearFranchiseMusicState();
+      } catch {}
+      window.location.href = url;
+    };
+    if (window.GOBTutorialAlerts) {
+      const blocked = await window.GOBTutorialAlerts.interceptPlayNextGame(franchiseId, url, navigateToLineup);
+      if (blocked) {
+        playNowBtn.disabled = false;
+        playNowBtn.textContent = originalText;
+        return;
+      }
+    } else {
+      await navigateToLineup();
+    }
   } catch (err) {
     console.error(err);
     alert('Unable to play next game');

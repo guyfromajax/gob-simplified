@@ -122,10 +122,22 @@
     });
   }
 
+  function isLessonSubPage() {
+    return /\/(player-attributes|tutorial-training|team-attributes|game-plans|tutorial-playbooks|scouting|tutorial-recruiting)\.html$/i.test(location.pathname || '');
+  }
+
+  function loadAlertResumeScript() {
+    if (!isLessonSubPage() || document.querySelector('script[src*="gobTutorialAlertResume.js"]')) return;
+    var s = document.createElement('script');
+    s.src = '/js/shared/gobTutorialAlertResume.js';
+    document.body.appendChild(s);
+  }
+
   /* ---- wire up on DOM ready ---- */
   function init() {
     rememberOrigin();
     renderNav();
+    loadAlertResumeScript();
     var back = document.querySelector('[data-gob-back]');
     if (back) {
       if (!isTutorialHub()) {
@@ -135,9 +147,84 @@
     }
   }
 
+  /* ---- whistle glyph (rail mark) ---- */
+  var WHISTLE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="14" r="6"></circle><path d="M15 11l6-3-1.2 4.2"></path><path d="M9 8V5h4"></path></svg>';
+
+  /* ---- premium coach-card alert (full-screen takeover; serves all 7 lessons) ---- */
+  function showAlertCard(opts) {
+    var lessonNum = parseInt(opts.lessonIndex, 10) || 1;
+    var lessonTotal = parseInt(opts.lessonTotal, 10) || 7;
+    var portrait = opts.portrait || '/images/sammy_tutorial.png';
+
+    var dots = '';
+    for (var i = 0; i < lessonTotal; i++) {
+      var cls = i < lessonNum - 1 ? ' class="done"' : (i === lessonNum - 1 ? ' class="on"' : '');
+      dots += '<i' + cls + '></i>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.className = 'gob-talert-overlay is-entering';
+    overlay.innerHTML =
+      '<div class="gob-talert" role="dialog" aria-modal="true" aria-labelledby="gob-talert-title">' +
+        '<button class="gob-talert-close" aria-label="Close">✕</button>' +
+        '<div class="gob-talert-rail">' +
+          '<span class="gob-talert-mark">' + WHISTLE_SVG + 'Tutorial</span>' +
+          '<span class="gob-talert-id">' +
+            '<span class="gob-talert-portrait"><img src="' + portrait + '" alt="Coach Sammy"></span>' +
+            '<span class="gob-talert-coach">Coach Sammy</span>' +
+          '</span>' +
+          '<span class="gob-talert-progress">' +
+            '<span class="gob-talert-num">Lesson ' + lessonNum + ' of ' + lessonTotal + '</span>' +
+            '<span class="gob-talert-dots">' + dots + '</span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="gob-talert-content">' +
+          '<h2 class="gob-talert-title" id="gob-talert-title"></h2>' +
+          '<p class="gob-talert-text"></p>' +
+          '<div class="gob-talert-actions">' +
+            '<a class="gob-talert-btn gob-talert-btn-primary" href="' + (opts.href || '#') + '">' + (opts.cta || 'Start lesson') + '</a>' +
+            '<button class="gob-talert-btn gob-talert-btn-ghost" type="button">' + (opts.laterLabel || 'I’ll do this later') + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    /* textContent (not innerHTML) for copy — avoids markup injection from config */
+    overlay.querySelector('.gob-talert-title').textContent = opts.title || '';
+    overlay.querySelector('.gob-talert-text').textContent = opts.body || '';
+
+    document.body.appendChild(overlay);
+    /* drop is-entering once the entrance finishes so the resting state is plain */
+    function clearEntering() { overlay.classList.remove('is-entering'); }
+    overlay.addEventListener('animationend', clearEntering);
+    setTimeout(clearEntering, 800);
+
+    var done = false;
+    function close(started) {
+      if (done) return;
+      done = true;
+      overlay.classList.add('is-leaving');
+      setTimeout(function () { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 250);
+      if (started) { if (typeof opts.onGo === 'function') opts.onGo(); }
+      else if (typeof opts.onLater === 'function') opts.onLater();
+    }
+
+    overlay.querySelector('.gob-talert-close').addEventListener('click', function () { close(false); });
+    overlay.querySelector('.gob-talert-btn-ghost').addEventListener('click', function () { close(false); });
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false); });
+    var go = overlay.querySelector('.gob-talert-btn-primary');
+    go.addEventListener('click', function (e) {
+      e.preventDefault();
+      close(true);
+      if (opts.href && opts.href !== '#') window.location.href = opts.href;
+    });
+
+    return function () { close(false); };
+  }
+
   /* ---- modal builder (tutorial tips + contextual alerts) ---- */
   GOB.showTip = function (opts) {
     opts = opts || {};
+    if (opts.alertMode) return showAlertCard(opts);
     var topicId = opts.id || 'generic';
     var alertMode = !!opts.alertMode;
     var overlay = document.createElement('div');

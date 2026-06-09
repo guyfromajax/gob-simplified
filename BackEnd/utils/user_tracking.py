@@ -103,6 +103,7 @@ TUTORIAL_ALERT_IDS: tuple[str, ...] = (
     "player-attributes",
     "training",
     "team-attributes",
+    "game-plans",
     "playbooks",
     "scouting",
     "recruiting",

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutorial Alert Modal — Coach Sammy</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --orange:#f79420; --orange-soft:#ffb255; --orange-deep:#e07d0a;
+  --ink:#15181f;
+  --panel:#1d212b; --panel-2:#232838; --panel-edge:rgba(255,255,255,0.10);
+  --text:#f7f9ff; --muted:#aab2c5; --muted-2:#6f7993; --hair:rgba(255,255,255,0.09);
+  --display:'Bebas Neue','Arial Narrow',sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{margin:0; font-family:var(--body); color:var(--text); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(70% 55% at 20% 16%, rgba(247,148,32,0.10), transparent 60%),
+    radial-gradient(65% 65% at 86% 92%, rgba(39,64,142,0.32), transparent 60%),
+    linear-gradient(160deg,#1a1d27,#0c0e15 60%,#07080c);}
+/* faux game scene behind the takeover */
+.scene{position:fixed; inset:0; background:repeating-linear-gradient(115deg, rgba(255,255,255,0.012) 0 2px, transparent 2px 28px);}
+
+/* ---------- takeover backdrop ---------- */
+.overlay{position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:radial-gradient(120% 100% at 50% 50%, rgba(7,8,12,0.55) 20%, rgba(7,8,12,0.82));
+  -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);}
+.overlay.is-entering{animation:ov-in .4s ease;}
+@keyframes ov-in{from{opacity:0;}}
+
+/* ---------- modal ---------- */
+.tut-modal{position:relative; width:min(94vw,800px); display:grid; grid-template-columns:256px 1fr;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border:1px solid var(--panel-edge); border-radius:20px; overflow:hidden;
+  box-shadow:0 50px 110px -34px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);}
+.is-entering .tut-modal{animation:modal-in .5s cubic-bezier(.2,.8,.2,1) .08s backwards;}
+@keyframes modal-in{from{transform:translateY(14px) scale(.985); opacity:0;}}
+
+.tut-close{position:absolute; top:15px; right:16px; z-index:5; width:30px; height:30px; border:none; border-radius:8px; background:transparent; color:var(--muted-2); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s;}
+.tut-close:hover{background:rgba(255,255,255,0.07); color:var(--text);}
+
+/* rail */
+.tut-rail{position:relative; padding:30px 22px 26px; display:flex; flex-direction:column; align-items:center; text-align:center;
+  background:linear-gradient(168deg, rgba(247,148,32,0.17), rgba(247,148,32,0.015) 52%), rgba(0,0,0,0.2);
+  border-right:1px solid var(--hair);}
+.tut-mark{position:absolute; top:16px; left:18px; display:flex; align-items:center; gap:6px;
+  font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--orange-soft);}
+.tut-mark svg{width:15px; height:15px;}
+.tut-rail-id{display:flex; flex-direction:column; align-items:center;}
+.tut-portrait{display:block; width:124px; height:124px; border-radius:22px; overflow:hidden; margin-top:34px;
+  box-shadow:0 0 0 2px var(--orange), 0 16px 34px -12px rgba(0,0,0,0.75);}
+.tut-portrait img{width:100%; height:100%; object-fit:cover; display:block;}
+.tut-coach{font-family:var(--display); font-size:27px; line-height:1; letter-spacing:.03em; margin-top:18px; white-space:nowrap;}
+.tut-progress{margin-top:auto; padding-top:22px; display:flex; flex-direction:column; align-items:center; gap:11px;}
+.tut-lesson-num{font-family:var(--display); font-size:15px; letter-spacing:.07em; color:var(--orange-soft); white-space:nowrap;}
+.tut-dots{display:flex; align-items:center; gap:7px;}
+.tut-dots i{width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,0.2); transition:.3s;}
+.tut-dots i.on{background:var(--orange); width:20px; border-radius:3px;}
+.tut-dots i.done{background:rgba(247,148,32,0.55);}
+
+/* body */
+.tut-content{padding:40px 40px 38px; display:flex; flex-direction:column; justify-content:center; min-height:330px;}
+.tut-title{font-weight:800; font-size:37px; line-height:1.02; letter-spacing:-0.012em; margin:0;}
+.tut-text{font-size:16.5px; line-height:1.55; color:var(--muted); margin:14px 0 30px; max-width:42ch;}
+.tut-actions{display:flex; align-items:center; gap:22px;}
+.tut-btn{font-family:var(--body); cursor:pointer; border:none; transition:.16s;}
+.tut-btn-primary{background:linear-gradient(180deg,var(--orange-soft),var(--orange)); color:var(--ink);
+  font-size:16px; font-weight:700; padding:14px 32px; border-radius:11px;
+  box-shadow:0 10px 22px -7px rgba(247,148,32,0.6), inset 0 1px 0 rgba(255,255,255,0.45);}
+.tut-btn-primary:hover{transform:translateY(-1px); box-shadow:0 14px 28px -8px rgba(247,148,32,0.7), inset 0 1px 0 rgba(255,255,255,0.45);}
+.tut-btn-ghost{background:transparent; color:var(--muted); font-family:var(--display); font-size:20px; letter-spacing:.04em; padding:8px 4px;}
+.tut-btn-ghost:hover{color:var(--text);}
+
+@media (prefers-reduced-motion: reduce){
+  .overlay,.tut-modal{animation:none; opacity:1; transform:none;}
+}
+
+/* responsive: stack the rail on top for narrow screens */
+@media (max-width:560px){
+  .tut-modal{grid-template-columns:1fr; width:min(94vw,420px);}
+  .tut-rail{flex-direction:row; justify-content:flex-start; gap:16px; text-align:left; padding:46px 20px 18px; border-right:none; border-bottom:1px solid var(--hair);}
+  .tut-portrait{width:64px; height:64px; border-radius:14px; margin-top:0;}
+  .tut-coach{font-size:22px; margin-top:0;}
+  .tut-rail-id{display:flex; flex-direction:column; gap:8px;}
+  .tut-progress{margin:0; padding-top:0; align-items:flex-start;}
+  .tut-content{padding:26px 24px 28px; min-height:0;}
+  .tut-title{font-size:30px;}
+}
+
+/* demo control (NOT part of the component) */
+.demo{position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:60;
+  display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:12px;
+  background:rgba(10,12,18,0.82); border:1px solid var(--hair); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);}
+.demo span{font-size:11px; color:var(--muted-2); margin-right:4px; letter-spacing:.04em;}
+.demo button{width:30px; height:30px; border-radius:8px; border:1px solid var(--hair); background:rgba(255,255,255,0.04); color:var(--muted); font-size:12px; font-weight:700; cursor:pointer;}
+.demo button:hover{color:var(--text); border-color:rgba(247,148,32,.5);}
+.demo button.active{background:var(--orange); color:var(--ink); border-color:var(--orange);}
+</style>
+</head>
+<body>
+<div class="scene"></div>
+
+<div class="overlay is-entering" id="overlay">
+  <div class="tut-modal" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+    <button class="tut-close" aria-label="Close">✕</button>
+
+    <div class="tut-rail">
+      <span class="tut-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="14" r="6"></circle><path d="M15 11l6-3-1.2 4.2"></path><path d="M9 8V5h4"></path></svg>
+        Tutorial
+      </span>
+      <span class="tut-rail-id">
+        <span class="tut-portrait"><img src="assets/coach/sammy.png" alt="Coach Sammy"></span>
+        <span class="tut-coach">Coach Sammy</span>
+      </span>
+      <span class="tut-progress">
+        <span class="tut-lesson-num" id="tutNum">Lesson 1 of 7</span>
+        <span class="tut-dots" id="tutDots"></span>
+      </span>
+    </div>
+
+    <div class="tut-content">
+      <h2 class="tut-title" id="tutTitle">Player Attributes</h2>
+      <p class="tut-text" id="tutText">Nice work, Coach. Before you start your first franchise, get to know Player Attributes — they're the foundation for every decision ahead.</p>
+      <div class="tut-actions">
+        <button class="tut-btn tut-btn-primary">Start lesson</button>
+        <button class="tut-btn tut-btn-ghost">I'll do this later</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- demo control: step through the 7 lessons (not part of the component) -->
+<div class="demo" id="demo"><span>Preview lesson</span></div>
+
+<script>
+const LESSONS = [
+  { t:"Player Attributes", x:"Nice work, Coach. Before you start your first franchise, get to know Player Attributes — they're the foundation for every decision ahead." },
+  { t:"Training",          x:"Practice is where your program develops into your vision. Let's break down how to spend your week." },
+  { t:"Team Attributes",   x:"Every team has 11 attributes that comprise its unique DNA. Here's how yours grows — and how it can slip." },
+  { t:"Game Plans",        x:"Game day is won in the settings. Let's tune your offensive and defensive dials before tip-off." },
+  { t:"Playbooks",         x:"Your playbook sets the mix of plays the sim runs every possession. Time to build it." },
+  { t:"Scouting",          x:"Walk into every game with a plan. Here's how to read your next opponent." },
+  { t:"Recruiting",        x:"Your program's future is built on the recruiting trail. Let's go land your class." },
+];
+const TOTAL = LESSONS.length;
+const dotsEl = document.getElementById('tutDots');
+const numEl  = document.getElementById('tutNum');
+const titleEl= document.getElementById('tutTitle');
+const textEl = document.getElementById('tutText');
+const demoEl = document.getElementById('demo');
+
+function render(n){ // n is 0-indexed
+  numEl.textContent = `Lesson ${n+1} of ${TOTAL}`;
+  titleEl.textContent = LESSONS[n].t;
+  textEl.textContent = LESSONS[n].x;
+  dotsEl.innerHTML = '';
+  for(let i=0;i<TOTAL;i++){
+    const d=document.createElement('i');
+    if(i<n) d.className='done'; else if(i===n) d.className='on';
+    dotsEl.appendChild(d);
+  }
+  [...demoEl.querySelectorAll('button')].forEach((b,i)=>b.classList.toggle('active', i===n));
+}
+for(let i=0;i<TOTAL;i++){
+  const b=document.createElement('button'); b.textContent=i+1;
+  b.onclick=()=>render(i); demoEl.appendChild(b);
+}
+render(0);
+// entrance animation runs once, then we drop the class so the resting state is plain (and screenshot-safe)
+const ov=document.getElementById('overlay');
+ov.addEventListener('animationend', ()=>ov.classList.remove('is-entering'));
+setTimeout(()=>ov.classList.remove('is-entering'), 800);
+
+document.querySelector('.tut-close').onclick = ()=>{
+  const ov=document.getElementById('overlay');
+  ov.style.transition='opacity .25s'; ov.style.opacity='0';
+};
+</script>
+</body>
+</html>
