@@ -135,6 +135,11 @@
   function shouldYieldToOtherModals() {
     var me = meCache || window.__gobAuthMeData;
     if (!me) return false;
+    /* These modals (archetype reveal, alpha feedback) only ever mount on the
+       FCC. On any other screen — notably mode-select, where Player Attributes
+       fires — there is nothing to yield to, and yielding here would defer the
+       alert against a blocker that can never clear. Only gate on FCC. */
+    if (!isFcc()) return false;
     if (me.archetype_reveal_seen === false) return true;
     if (me.alpha_feedback_submitted) return false;
     var games = parseInt(me.alpha_feedback_games, 10) || 0;

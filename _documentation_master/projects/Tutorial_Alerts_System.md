@@ -81,8 +81,10 @@ Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server
 - On skip ("I'll Do This Later") with the lesson still unseen → nav-bar glow + "Next: <Topic>" callout (`applyNavGlow`).
 
 **Gotchas (load-bearing — see bug history below)**
-- **Yield, don't drop.** Alerts yield to the archetype-reveal and alpha-feedback modals (`shouldYieldToOtherModals`). When yielding, the alert must stay queued and retry — `drainQueue` gates on `canShowAlert()` *before* dequeuing, retries via `scheduleDrainRetry()`, and is re-driven by `gob:auth-me-loaded` (fires when the blocking modal closes).
+- **A gate may only reference state reachable on the screen it fires on.** The yield to archetype-reveal / alpha-feedback (`shouldYieldToOtherModals`) is **scoped to FCC** (`isFcc()`), because those modals only mount on FCC. On mode-select (where Player Attributes fires) there is nothing to yield to, so the gate must not apply — otherwise the alert defers forever against a blocker that can never clear. This is the core design rule: **one alert, one screen, gates that only depend on state present on that screen.**
+- **Yield, don't drop.** Where yielding *is* legitimate (FCC alerts), the alert stays queued and retries — `drainQueue` gates on `canShowAlert()` *before* dequeuing, retries via `scheduleDrainRetry()`, and is re-driven by `gob:auth-me-loaded` (fires when the blocking modal closes).
 - **Never swallow a click.** `interceptTraining` only blocks navigation when an alert *actually shows*; if it can't (yield / scripts not loaded / none eligible) training proceeds — otherwise Run Training looks like a dead button.
 
 **Bug history**
-- 2026-06-08: Run Training was a hard no-op when an alert yielded (`interceptTraining` returned "blocked" unconditionally); Player Attributes alert was silently dropped when it yielded to the archetype reveal (queue shifted the item off without showing). Fixed via the two gotchas above.
+- 2026-06-08: Run Training was a hard no-op when an alert yielded (`interceptTraining` returned "blocked" unconditionally); fixed by only blocking when a modal actually shows.
+- 2026-06-09: Player Attributes never appeared on mode-select. Root cause: `shouldYieldToOtherModals` yielded whenever `archetype_reveal_seen === false`, but the archetype-reveal modal only mounts on FCC — so on mode-select a new user (reveal not yet seen) yielded against a blocker that could never clear. Fixed by scoping the yield to FCC only.
