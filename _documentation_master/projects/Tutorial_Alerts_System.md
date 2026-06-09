@@ -99,7 +99,8 @@ FCC return URLs are captured at modal show time; `tut_alert` is stripped from th
 | Modal builder | `FrontEnd/static/js/shared/gobTutorialNav.js` | `GOB.showTip()` (alertMode), local lesson `seen` state, loads resume script on sub-pages |
 | Alert-resume footer | `FrontEnd/static/js/shared/gobTutorialAlertResume.js` | sticky Back To Game bar, scroll-gated styling, context read/clear |
 | Loader | `FrontEnd/static/js/shared/authBarInit.js` | loads nav+alerts scripts, fires `onAuthMeLoaded` |
-| Triggers | `franchise-command-center.js` (Run Training + Play Next Game clicks), `box-score.js` / `training-report.js` (`tut_alert` URL param on FCC return) |
+| Triggers | `franchise-command-center.js` (Run Training + Play Next Game clicks), `training-report.js` (`tut_alert=training_return` on training return) |
+| Game counter | `BackEnd/utils/user_game_commit.py` | server-side `$inc tutorial_alerts_games` per finalized game, scoped to the enrolled franchise |
 | API | `BackEnd/api/auth_routes.py` | dismiss / enroll / increment endpoints |
 | Schema | `BackEnd/utils/user_tracking.py` | `tutorial_alerts_*` fields + `TUTORIAL_ALERT_IDS` (7 ids incl. `game-plans`) |
 | Styles | `FrontEnd/static/css/gob-tutorial.css` | `.gob-tut-alert-resume*`, `.gob-tut--alert-resume` body padding |
@@ -110,8 +111,8 @@ FCC return URLs are captured at modal show time; `tut_alert` is stripped from th
 |---|---|
 | `tutorial_alerts_franchise_id` | first franchise instance; alerts lock to it (never changes) |
 | `tutorial_alerts_dismissed[]` | alert ids whose modal has been shown (one-time per user) |
-| `tutorial_alerts_games` | games completed on the locked franchise |
-| `tutorial_alerts_training_returns` | training returns on the locked franchise |
+| `tutorial_alerts_games` | games completed on the locked franchise — **incremented server-side** at game commit (`user_game_commit.py`), not via a URL param |
+| `tutorial_alerts_training_returns` | training returns on the locked franchise (incremented client-side via `tut_alert=training_return`) |
 
 Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server-side** (cross-device).
 
@@ -119,7 +120,8 @@ Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server
 - Player Attributes: `onAuthMeLoaded` on mode-select, gated on `fte_v2_complete`.
 - Training: `interceptTraining()` wraps the Run Training click; stores `/training.html?…` as resume URL.
 - Game Plans: `interceptPlayNextGame()` wraps Play Next Game after matchup URL is built; stores set-lineup URL as resume URL.
-- Team Attributes / Playbooks / Scouting / Recruiting: FCC return via `?tut_alert=` param → `processFccReturn()` → counter increment → eligibility check; resume URL = current FCC URL at modal show.
+- Team Attributes / Playbooks (training_returns) + Scouting / Recruiting (games): evaluated by `onFccDomReady` on **every FCC load** (not gated on a URL param). `training_returns` increments client-side from `tut_alert=training_return`; `games` is read from the server count. Resume URL = current FCC URL at modal show.
+  - *Why param-independent:* the franchise game→FCC return navigates via `return_url`, which the box-score never tags with `tut_alert=game_complete`. The old param-gated path therefore never incremented `games` nor evaluated Scouting/Recruiting — so both are now server-counted and evaluated unconditionally. See bug history 2026-06-09 (counter).
 - On **Start lesson**: `stashAlertResume(alertId, returnUrl)` → `sessionStorage` → lesson sub-page reads via `GOBTutorialAlertResume`.
 - On skip ("I'll Do This Later") with the lesson still unseen → nav-bar glow + "Next: <Topic>" callout (`applyNavGlow`); no resume context is set.
 - **"I'll do this later" advance** (when the modal blocked an underlying navigation): Training → `/training.html`; Game Plans → set-lineup URL; Player Attributes → FCC when an active franchise exists on mode-select (`GOBModeSelect.getFranchiseCommandCenterUrlForLater`); Team Attributes / Playbooks / Scouting / Recruiting → no extra navigation (user is already on FCC). Close ✕ / backdrop dismiss without advancing.
@@ -150,3 +152,4 @@ Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server
 - 2026-06-09: Player Attributes never appeared on mode-select. Root cause: `shouldYieldToOtherModals` yielded whenever `archetype_reveal_seen === false`, but the archetype-reveal modal only mounts on FCC — so on mode-select a new user (reveal not yet seen) yielded against a blocker that could never clear. Fixed by scoping the yield to FCC only.
 - 2026-06-09 (sweep): Same bug class hit **training / team-attributes / playbooks** on FCC. The reveal only renders when `lead_archetype` is set (≥1 real game), but the yield fired on `archetype_reveal_seen === false` alone — so the early-franchise alerts (which fire *before* the first game) yielded against a reveal that couldn't appear. Fixed: yield to the reveal only when `archetype_reveal_seen === false && lead_archetype` (mirrors `archetypeReveal.maybeShow`). Also bounded the drain-retry and made it re-pull `/api/auth/me` (blocker modals PATCH the server but don't refresh our cache), so legitimate yields resolve instead of spinning on stale state. scouting/recruiting were already safe (fire post-game, reveal already seen).
 - 2026-06-09: Team Attributes (and post-game scouting/recruiting) alert missing after training/game. Root cause: `training.js` attaches `return_url` (FCC) to the training-report redirect; training-report's "Go To Locker Room" called `resolveFranchiseLockerRoomUrl({ extraParams: { tut_alert: … } })`, but that helper returned `return_url` **without** merging `extraParams` — so `tut_alert` never reached the FCC and `processFccReturn` never ran. Fixed: merge `extraParams` into a safe `return_url` when both are present (`common.js`).
+- 2026-06-09 (counter): **Scouting (`games≥3`) and Recruiting (`games≥6`) never fired.** `tutorial_alerts_games` was incremented only via `tut_alert=game_complete`, attached solely to box-score's fallback "Go To Locker Room" branch — but franchise games return via the earlier `return_url` branch, which never carries the param. So the counter never left 0, and the FCC only *evaluated* these alerts when the (absent) param was present. The first five alerts were unaffected (none read the `games` counter). Fixed (server-authoritative): increment `tutorial_alerts_games` in `user_game_commit.py` per finalized game, scoped to the enrolled franchise; and `onFccDomReady` now evaluates FCC-return alerts on every load instead of only when a `tut_alert` param is present. Removed the client-side `games` increment + the dead `processFccReturn`.

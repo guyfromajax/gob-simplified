@@ -450,21 +450,6 @@
     return Promise.resolve(true);
   }
 
-  function processFccReturn(franchiseId, eventType) {
-    if (!isFcc() || !franchiseId) return Promise.resolve();
-    return enrollFranchise(franchiseId).then(function () {
-      if (!franchiseLocked(franchiseId)) return null;
-      if (eventType === 'training_return') return incrementCounter(franchiseId, 'training_returns');
-      if (eventType === 'game_complete') return incrementCounter(franchiseId, 'games');
-      return null;
-    }).then(function () {
-      return evaluateAndShow({
-        franchiseId: franchiseId,
-        checkFccReturn: true
-      });
-    });
-  }
-
   function onAuthMeLoaded(me) {
     meCache = me || window.__gobAuthMeData || null;
     applyNavGlow();
@@ -485,17 +470,28 @@
     var evt = params.get('tut_alert');
     if (!franchiseId) return;
 
-    if (evt === 'training_return' || evt === 'game_complete') {
-      processFccReturn(franchiseId, evt).then(function () {
+    enrollFranchise(franchiseId).then(function () {
+      /* Training returns are still counted client-side via the URL param. Game
+         counts are incremented server-side at commit (user_game_commit.py), so
+         we just read the fresh count rather than incrementing here. */
+      if (evt === 'training_return' && franchiseLocked(franchiseId)) {
+        return incrementCounter(franchiseId, 'training_returns');
+      }
+      return refreshMeFromServer();
+    }).then(function () {
+      if (evt) {
         params.delete('tut_alert');
         var qs = params.toString();
         var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
         try { history.replaceState(null, '', next); } catch (e) {}
-      });
-      return;
-    }
-
-    enrollFranchise(franchiseId).then(applyNavGlow);
+      }
+      /* Evaluate FCC-return alerts on EVERY load (param-independent): the server
+         counters (games / training_returns) + dismissed state gate them, so
+         Scouting/Recruiting surface no matter how the user returned from a game.
+         This is the other half of the fix — the old code only evaluated when a
+         `tut_alert` param was present, which the franchise game return omits. */
+      return evaluateAndShow({ franchiseId: franchiseId, checkFccReturn: true });
+    }).then(applyNavGlow);
   }
 
   function interceptTraining(franchiseId, navigate, returnUrl) {
@@ -552,8 +548,7 @@
     interceptTraining: interceptTraining,
     interceptPlayNextGame: interceptPlayNextGame,
     applyNavGlow: applyNavGlow,
-    refreshMeFromServer: refreshMeFromServer,
-    processFccReturn: processFccReturn
+    refreshMeFromServer: refreshMeFromServer
   };
 
   window.addEventListener('gob:auth-me-loaded', function (e) {

@@ -59,6 +59,23 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
             return
         user_oid = _to_oid(user_id)
 
+        # Forward-only counter for the tutorial-alert prompts (Scouting after the
+        # 3rd game, Recruiting after the 6th). Scoped to the user's enrolled (first)
+        # franchise so games in any other franchise can't inflate it. This is the
+        # authoritative server-side increment — it replaces the fragile frontend
+        # `tut_alert=game_complete` URL param, which the franchise box-score return
+        # path bypasses via `return_url` (so the count never reached the threshold).
+        try:
+            users_collection.update_one(
+                {"_id": user_oid, "tutorial_alerts_franchise_id": str(franchise_id)},
+                {
+                    "$inc": {"tutorial_alerts_games": 1},
+                    "$set": {"updated_at": datetime.now(timezone.utc)},
+                },
+            )
+        except Exception:
+            logger.exception("[record] tutorial_alerts_games increment failed (non-fatal)")
+
         teams_obj = game.get("teams") or {}
         home_obj = teams_obj.get(game.get("home_team_id")) or {}
         away_obj = teams_obj.get(game.get("away_team_id")) or {}
