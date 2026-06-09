@@ -39,6 +39,7 @@
   var queue = [];
   var showing = false;
   var drainTimer = null;
+  var drainRetries = 0;
 
   function sfx(f) {
     if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
@@ -140,7 +141,12 @@
        fires — there is nothing to yield to, and yielding here would defer the
        alert against a blocker that can never clear. Only gate on FCC. */
     if (!isFcc()) return false;
-    if (me.archetype_reveal_seen === false) return true;
+    /* Only yield to the archetype reveal if it will ACTUALLY render this visit:
+       it requires a lead_archetype (>= 1 real game) — see archetypeReveal.js.
+       Early-franchise alerts (training / team-attributes / playbooks) fire
+       before the first game, when seen=false but no reveal can appear; yielding
+       there would defer them against a blocker that never shows. */
+    if (me.archetype_reveal_seen === false && me.lead_archetype) return true;
     if (me.alpha_feedback_submitted) return false;
     var games = parseInt(me.alpha_feedback_games, 10) || 0;
     var level = parseInt(me.alpha_feedback_prompt_level, 10) || 0;
@@ -269,14 +275,24 @@
     ids.forEach(function (id) {
       if (queue.indexOf(id) === -1) queue.push(id);
     });
+    drainRetries = 0; // fresh batch — give the retry budget a clean slate
     drainQueue();
   }
 
+  /* Bound the retry: a genuine yield clears when the blocking modal is dismissed,
+     but those modals PATCH the server WITHOUT refreshing our meCache or
+     re-dispatching gob:auth-me-loaded — so we must re-pull /api/auth/me to see
+     the cleared state, and stop after a sane number of tries rather than poll
+     forever if the user simply leaves the blocker open. */
+  var MAX_DRAIN_RETRIES = 20; // ~24s at 1200ms
+
   function scheduleDrainRetry() {
     if (drainTimer) return;
+    if (drainRetries >= MAX_DRAIN_RETRIES) return; // give up; re-evaluated on next FCC load
     drainTimer = setTimeout(function () {
       drainTimer = null;
-      drainQueue();
+      drainRetries += 1;
+      refreshMeFromServer().then(drainQueue);
     }, 1200);
   }
 
