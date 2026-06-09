@@ -689,6 +689,21 @@ function goToFranchiseCommandCenter() {
   }
 }
 
+/** Tutorial alert "I'll do this later" for Player Attributes → FCC when a franchise exists. */
+function getFranchiseCommandCenterUrlForLater() {
+  if (!currentFranchise || !currentFranchise.franchise_id) return null;
+  var fid = currentFranchise.franchise_id;
+  var tid = currentFranchise.user_team_id || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_user_team_id') : null);
+  if (typeof buildFranchiseLockerRoomUrl === 'function') {
+    return buildFranchiseLockerRoomUrl(fid, tid);
+  }
+  return './franchise-command-center.html?mode=franchise&franchise_id=' + encodeURIComponent(fid) +
+    (tid ? '&team_id=' + encodeURIComponent(tid) : '');
+}
+
+window.GOBModeSelect = window.GOBModeSelect || {};
+window.GOBModeSelect.getFranchiseCommandCenterUrlForLater = getFranchiseCommandCenterUrlForLater;
+
 const newFranchiseModal = document.getElementById('new-franchise-modal');
 const newFranchiseDontShowAgain = document.getElementById('new-franchise-dont-show-again');
 const newFranchiseModalCancel = document.getElementById('new-franchise-modal-cancel');

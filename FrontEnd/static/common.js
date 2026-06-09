@@ -131,13 +131,28 @@ function resolveFranchiseLockerRoomUrl(options = {}) {
   const params = options.params instanceof URLSearchParams
     ? options.params
     : new URLSearchParams(window.location.search);
+  const extraParams = options.extraParams || {};
   const explicitReturnUrl = options.returnUrl != null ? options.returnUrl : params.get('return_url');
   const safeReturnUrl = getSafeReturnUrl(explicitReturnUrl);
-  if (safeReturnUrl) return safeReturnUrl;
+
+  if (safeReturnUrl) {
+    if (!extraParams || !Object.keys(extraParams).length) return safeReturnUrl;
+    try {
+      const merged = new URL(safeReturnUrl, window.location.origin);
+      Object.keys(extraParams).forEach(function (key) {
+        if (extraParams[key] != null && extraParams[key] !== '') {
+          merged.searchParams.set(key, extraParams[key]);
+        }
+      });
+      return `${merged.pathname}${merged.search}${merged.hash || ''}`;
+    } catch (_e) {
+      return safeReturnUrl;
+    }
+  }
 
   const franchiseId = options.franchiseId != null ? options.franchiseId : params.get('franchise_id');
   const teamId = options.teamId != null ? options.teamId : params.get('team_id');
-  return buildFranchiseLockerRoomUrl(franchiseId, teamId, options.extraParams || {});
+  return buildFranchiseLockerRoomUrl(franchiseId, teamId, extraParams);
 }
 
 // Canonical attribute bar color scale — see Styleguide.md ### Attribute Bar Scale

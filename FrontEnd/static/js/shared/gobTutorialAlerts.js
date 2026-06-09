@@ -231,6 +231,44 @@
     } catch (e) {}
   }
 
+  /** Resolve FCC URL for Player Attributes "I'll do this later" (mode-select). */
+  function fccUrlForPlayerAttributesLater() {
+    if (window.GOBModeSelect && typeof window.GOBModeSelect.getFranchiseCommandCenterUrlForLater === 'function') {
+      return window.GOBModeSelect.getFranchiseCommandCenterUrlForLater();
+    }
+    try {
+      var fid = localStorage.getItem('franchise_id') || localStorage.getItem('franchiseId');
+      var tid = localStorage.getItem('franchise_user_team_id');
+      if (fid && typeof buildFranchiseLockerRoomUrl === 'function') {
+        return buildFranchiseLockerRoomUrl(fid, tid);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  /**
+   * Where to send the user when they skip via "I'll do this later" — only when
+   * an underlying action was blocked (intercept) or a concrete advance URL exists.
+   */
+  function runLaterAdvance(id, opts) {
+    opts = opts || {};
+    if (typeof opts.onLaterAdvance === 'function') {
+      opts.onLaterAdvance();
+      return;
+    }
+    var url = opts.advanceUrl;
+    if (!url) {
+      if (id === 'player-attributes') url = fccUrlForPlayerAttributesLater();
+      else if (id === 'training' || id === 'game-plans') url = opts.returnUrl || null;
+      /* team-attributes / playbooks / scouting / recruiting: already on FCC — no navigation */
+    }
+    if (!url) return;
+    var current = window.location.pathname + window.location.search + (window.location.hash || '');
+    var resolved = url.charAt(0) === '/' ? url : url.replace(/^\.\//, '/');
+    if (resolved === current) return;
+    window.location.href = url;
+  }
+
   function eligibleIds(opts) {
     opts = opts || {};
     var out = [];
@@ -338,7 +376,10 @@
             stashAlertResume(id, returnUrl);
             finish(true);
           },
-          onLater: function () { finish(false); }
+          onLater: function () {
+            finish(false);
+            runLaterAdvance(id, opts);
+          }
         });
 
         /* showTip marks dismissed via our pre-call; ensure glow after paint */
@@ -351,9 +392,11 @@
     items.forEach(function (item) {
       var id = typeof item === 'string' ? item : item.id;
       var returnUrl = typeof item === 'object' && item ? item.returnUrl : null;
+      var advanceUrl = typeof item === 'object' && item ? item.advanceUrl : null;
+      var onLaterAdvance = typeof item === 'object' && item ? item.onLaterAdvance : null;
       if (!id) return;
       var exists = queue.some(function (q) { return q.id === id; });
-      if (!exists) queue.push({ id: id, returnUrl: returnUrl });
+      if (!exists) queue.push({ id: id, returnUrl: returnUrl, advanceUrl: advanceUrl, onLaterAdvance: onLaterAdvance });
     });
     drainRetries = 0; // fresh batch — give the retry budget a clean slate
     drainQueue();
@@ -386,7 +429,11 @@
       return;
     }
     var next = queue.shift();
-    showAlert(next.id, { returnUrl: next.returnUrl });
+    showAlert(next.id, {
+      returnUrl: next.returnUrl,
+      advanceUrl: next.advanceUrl,
+      onLaterAdvance: next.onLaterAdvance
+    });
   }
 
   function evaluateAndShow(opts) {
@@ -468,7 +515,11 @@
         if (navigate) navigate();
         return false;
       }
-      return showAlert(ids[0], { returnUrl: returnUrl }).then(function () { return true; });
+      return showAlert(ids[0], {
+        returnUrl: returnUrl,
+        advanceUrl: returnUrl,
+        onLaterAdvance: navigate
+      }).then(function () { return true; });
     });
   }
 
@@ -486,7 +537,11 @@
         if (navigate) navigate();
         return false;
       }
-      return showAlert(ids[0], { returnUrl: setLineupUrl }).then(function () { return true; });
+      return showAlert(ids[0], {
+        returnUrl: setLineupUrl,
+        advanceUrl: setLineupUrl,
+        onLaterAdvance: navigate
+      }).then(function () { return true; });
     });
   }
 
