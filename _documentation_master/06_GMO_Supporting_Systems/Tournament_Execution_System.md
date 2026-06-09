@@ -115,7 +115,7 @@ Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); m
 
 **Build:** `initialize_region_tournaments` → `_build_region_bracket` from conference **champion** + **RS #1** (#1 seed in `seeds`, or inferred from `bracket.round1[0].home_team` if `seeds` missing).
 
-**Bye:** champion == RS #1 for a conference → that side can skip to **region final** (possibly **no R1** rows, **final** with two real teams).
+**Bye:** champion == RS #1 for a conference → that side skips week 30 and advances to the **region final**. If both conferences produce a double winner, the region has no R1 rows; its two real final teams still wait until week 31.
 
 **Reconcile:** `reconcile_region_tournaments_with_canonical` — replace or patch incomplete unplayed slots from canonical. Runs on **FCC load**, **sim-rest**, **`POST /franchise/play-next-game`** (region weeks), and **`_resolve_complete_week_week_games`** (region weeks). The play / complete-week entry-point reconciles were added so a user who clicks Play without first hitting `/franchise/command-center/data` cannot land on a half-built region bracket whose placeholder `R1_0`/`R1_1` slots would drop their pair out of `get_eos_week_games` and trip the bracket-write invariant. Helper: `_maybe_reconcile_region_for_eos(franchise_doc, franchise_id, week=, context_label=)` (idempotent: persists only when something actually changed; logs `[EOS-REGION-RECONCILE] context=<label>`).
 
@@ -126,8 +126,8 @@ Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); m
 `franchise_tournament.get_eos_week_games(franchise_doc, week, include_completed=False)`.
 
 - **Conference:** playable mode uses each conference’s **`current_round`** (not global week) so slow brackets still list R1 after calendar advances.
-- **Region week 30:** real R1 matchups; if **no** playable R1 but **`final[0]`** has two real teams, emit that final as **round 2** (double-bye path).
-- **Region week 31:** finals. **National:** same calendar vs `current_round` pattern as conference.
+- **Region week 30:** real R1 matchups only. Ready finals are never emitted in week 30. If every region has two bye teams, the slate is empty and `sim-rest-of-tournament` advances the calendar to week 31 without recording games.
+- **Region week 31:** all ready finals, including double-bye finals. **National:** same calendar vs `current_round` pattern as conference.
 
 ---
 

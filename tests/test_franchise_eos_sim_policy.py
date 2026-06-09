@@ -3,9 +3,14 @@ from unittest.mock import MagicMock
 
 from BackEnd.api import franchise_routes
 from BackEnd.api.franchise_routes import (
+    RegionByeModalSeenRequest,
+    SimRestOfTournamentRequest,
     _get_user_eos_phase_status,
     _save_user_eos_bracket_result,
+    _should_show_region_bye_modal,
     _should_use_tbt_for_eos_game,
+    mark_region_bye_modal_seen,
+    sim_rest_of_tournament,
 )
 from BackEnd.tournament import franchise_tournament as ft
 
@@ -443,11 +448,178 @@ def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
     assert week_29_status["eliminated_from_current_phase"] is True
 
     week_30_status = _get_user_eos_phase_status(franchise_doc, user_team_id, 30)
-    # Week 30 meta now includes the region final when round1 is empty; user has a real game, not a bye-with-empty-meta.
+    # Both conference double-winners wait through week 30 and play the region final in week 31.
     assert week_30_status["active_this_week"] is True
-    assert week_30_status["has_game_this_week"] is True
-    assert week_30_status["has_bye_this_week"] is False
+    assert week_30_status["has_game_this_week"] is False
+    assert week_30_status["has_bye_this_week"] is True
     assert week_30_status["eliminated_from_current_phase"] is False
+
+    week_31_status = _get_user_eos_phase_status(franchise_doc, user_team_id, 31)
+    assert week_31_status["active_this_week"] is True
+    assert week_31_status["has_game_this_week"] is True
+    assert week_31_status["has_bye_this_week"] is False
+    assert week_31_status["eliminated_from_current_phase"] is False
+
+
+def _region_bye_modal_doc(user_team_id, opponent_id, *, week=30, seen_season=None):
+    doc = {
+        "_id": ObjectId(),
+        "week": week,
+        "current_season": 3,
+        "eos_tournament_active": True,
+        "region_tournaments": {
+            "A": {
+                "round1": [],
+                "final": [
+                    {
+                        "away_team": user_team_id,
+                        "home_team": opponent_id,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    }
+                ],
+                "current_round": 1,
+            }
+        },
+    }
+    if seen_season is not None:
+        doc["region_bye_modal_seen_season"] = seen_season
+    return doc
+
+
+def test_region_bye_modal_is_eligible_for_double_bye_user_once_per_season(monkeypatch):
+    user_team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    opponent_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    franchise_doc = _region_bye_modal_doc(user_team_id, opponent_id)
+    monkeypatch.setattr(
+        franchise_routes,
+        "_build_user_eos_sim_scope",
+        lambda franchise_doc, team_id: {"region": "A"},
+    )
+
+    assert _should_show_region_bye_modal(franchise_doc, user_team_id) is True
+
+    franchise_doc["region_bye_modal_seen_season"] = 3
+    assert _should_show_region_bye_modal(franchise_doc, user_team_id) is False
+
+    franchise_doc["current_season"] = 4
+    assert _should_show_region_bye_modal(franchise_doc, user_team_id) is True
+
+
+def test_region_bye_modal_is_eligible_for_single_bye_user(monkeypatch):
+    user_team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    round1_away = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    round1_home = "cccccccccccccccccccccccc"
+    franchise_doc = _region_bye_modal_doc(user_team_id, "R1_0")
+    franchise_doc["region_tournaments"]["A"]["round1"] = [
+        {
+            "away_team": round1_away,
+            "home_team": round1_home,
+            "winner": None,
+            "game_id": None,
+            "score": {},
+        }
+    ]
+    monkeypatch.setattr(
+        franchise_routes,
+        "_build_user_eos_sim_scope",
+        lambda franchise_doc, team_id: {"region": "A"},
+    )
+
+    assert _should_show_region_bye_modal(franchise_doc, user_team_id) is True
+
+
+def test_region_bye_modal_excludes_other_teams_byes_eliminated_users_and_week31(monkeypatch):
+    user_team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    bye_team_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    opponent_id = "cccccccccccccccccccccccc"
+    franchise_doc = _region_bye_modal_doc(bye_team_id, opponent_id)
+    monkeypatch.setattr(
+        franchise_routes,
+        "_build_user_eos_sim_scope",
+        lambda franchise_doc, team_id: {"region": "A"},
+    )
+
+    assert _should_show_region_bye_modal(franchise_doc, user_team_id) is False
+
+    franchise_doc["week"] = 31
+    assert _should_show_region_bye_modal(franchise_doc, bye_team_id) is False
+
+    franchise_doc["week"] = 30
+    franchise_doc["eos_tournament_active"] = False
+    assert _should_show_region_bye_modal(franchise_doc, bye_team_id) is False
+
+
+def test_mark_region_bye_modal_seen_persists_current_season(monkeypatch):
+    franchise_id = ObjectId()
+    franchise_doc = {"_id": franchise_id, "current_season": 5}
+    mock_db = MagicMock()
+    monkeypatch.setattr(franchise_routes, "db", mock_db)
+    monkeypatch.setattr(
+        franchise_routes,
+        "verify_franchise_owned_by_user",
+        lambda requested_id, user_id: franchise_doc,
+    )
+
+    response = mark_region_bye_modal_seen(
+        RegionByeModalSeenRequest(franchise_id=str(franchise_id)),
+        user={"user_id": "test-user"},
+    )
+
+    assert response == {"seen": True, "season": 5}
+    mock_db.franchises.update_one.assert_called_once_with(
+        {"_id": franchise_id},
+        {"$set": {"region_bye_modal_seen_season": 5}},
+    )
+
+
+def test_sim_rest_advances_empty_double_bye_week30_to_week31():
+    franchise_id = ObjectId()
+    user_team_id = ObjectId()
+    opponent_id = ObjectId()
+    franchise_doc = {
+        "_id": franchise_id,
+        "week": 30,
+        "eos_tournament_active": True,
+        "user_team_id": "User Team",
+        "user_team_object_id": str(user_team_id),
+        "results": {},
+        "region_tournaments": {
+            "A": {
+                "round1": [],
+                "final": [
+                    {
+                        "away_team": str(user_team_id),
+                        "home_team": str(opponent_id),
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    }
+                ],
+                "current_round": 1,
+            }
+        },
+    }
+    franchise_routes.db.franchises.insert_one(franchise_doc)
+    franchise_routes.db.teams.insert_one(
+        {"_id": user_team_id, "name": "User Team", "conference": 1, "region": "A"}
+    )
+    try:
+        response = sim_rest_of_tournament(
+            SimRestOfTournamentRequest(franchise_id=str(franchise_id))
+        )
+        assert response == {"status": "success", "week": 31}
+
+        saved = franchise_routes.db.franchises.find_one({"_id": franchise_id})
+        assert saved["week"] == 31
+        assert saved["results"]["30"] == []
+        final = saved["region_tournaments"]["A"]["final"][0]
+        assert final["winner"] is None
+        assert final["game_id"] is None
+    finally:
+        franchise_routes.db.franchises.delete_one({"_id": franchise_id})
+        franchise_routes.db.teams.delete_one({"_id": user_team_id})
 
 
 def test_merge_phase_a_eos_preserves_cpu_r1_winners_when_stale_bracket_missing_them():

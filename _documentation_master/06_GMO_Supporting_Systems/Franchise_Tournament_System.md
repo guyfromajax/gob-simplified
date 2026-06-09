@@ -7,7 +7,7 @@ Applies to franchise mode only; does not affect Tournament mode (standalone) tou
 | Weeks   | Phase              | Description |
 |---------|--------------------|-------------|
 | 27–29   | Conference         | 16 conference tournaments (8 teams each). R1, R2, Final. |
-| 30–31   | Region             | 8 region tournaments (4 teams each). R1 (or bye), then Region Final. Week 30 may have 0 games if all 16 conferences have a double winner (RS#1 + conf tournament winner). |
+| 30–31   | Region             | 8 region tournaments (4 teams each). Week 30 is R1 (or bye); week 31 is every Region Final. Week 30 may have 0 games if all 16 conferences have a double winner (RS#1 + conf tournament winner). |
 | 32–34   | National           | 8 region winners. QF, SF, Final. |
 
 ## Tiebreakers (no differential)
@@ -23,14 +23,27 @@ Each regular season concludes with a conference tournament for every conference 
 
 ## Region Tournament
 
-Each Region will have a Region tournament consisting of the teams in its two conferences
+Each region has a Region Tournament consisting of qualifiers from its two conferences.
 
-The team that wins each conference tournamant and the team that was ranked 1 in the converence after week 26 in each conference both quality for the region tournament
+The conference tournament winner and the team ranked first in the conference after week 26 both qualify for the Region Tournament.
 
-Region tournament round 1 matchups will be
--conference tournament winner from one conference vs conference regular season winner from the other conference
--note if the same team wins both the regulars season title and the conference tournament title, they will receive a bye and the two teams who qualified in the other conference will play each other to determine who plays that team in teh region title game
--if both conferences have one team who wins the conference regular season title and the conference tournament title, those two teams will automatically qualify for the region champtionship and there ill be no first round of the region tournament
+Region Tournament first-round matchups:
+- The conference tournament winner from one conference plays the regular-season winner from the other conference.
+- If the same team wins both its conference regular-season title and conference tournament title, it receives a bye. The two qualifiers from the other conference play to determine its Region Championship opponent.
+- If each conference has one team that won both titles, those two teams automatically qualify for the Region Championship and that region has no first-round game.
+- Week 30 is reserved for Region Tournament first-round games. A region with two bye teams plays no game in week 30, while other regions still play their first-round games normally.
+- All Region Championship games are played in week 31, including championships where both teams earned first-round byes.
+
+### Week 30 User Bye Modal
+
+- Show the Sammy modal only when the user team has a week 30 Region Tournament bye.
+- Do not show it when only computer teams have byes or when the user has been eliminated.
+- Show it only once per franchise season. The API persists the current season in `region_bye_modal_seen_season`; a new season can qualify independently.
+- Eligibility is returned by the command-center API as `region_bye_modal_eligible`.
+- Queue it after pending championship moments and wait until other command-center overlays are closed.
+- Message: "Hey Coach, congratulations! You won both your conference regular-season title and your conference tournament title. This means you’ve earned a bye in the Region Tournament and have automatically qualified for the Region Championship game. Sim this week’s games, then start preparing for the Region Championship!"
+- Primary button: `Sim Region First Round`. It runs the existing `/franchise/sim-rest-of-tournament` week-advance flow.
+- Ghost button: `Back to Locker Room`. It closes the modal and leaves the user in the Franchise Command Center.
 
 ## National Tournament
 
@@ -70,5 +83,5 @@ Region tournament round 1 matchups will be
     - `has_bye_this_week`
     - `eliminated_from_current_phase`
 - Example:
-    - user loses in conference week 28 -> week 29 shows `Sim Next Round`
+    - user loses in conference week 28 -> week 29 shows `Sim Conference Tourney Championship`
     - if that same team qualifies into the region tournament, week 30 derives them as active again from the region bracket and they can resume the normal EOS flow

@@ -80,6 +80,12 @@
   var showing = false;
   var drainTimer = null;
   var drainRetries = 0;
+  /* Alert ids already presented this page load. Dismissal is patched into
+     meCache locally, but meCache can be overwritten by a later onAuthMeLoaded
+     carrying a stale /me object (fetched before the dismiss PATCH) — this set
+     is the page-local source of truth that survives that overwrite, so an
+     alert can never re-queue/re-show within the same page session. */
+  var presented = {};
 
   function sfx(f) {
     if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
@@ -277,7 +283,7 @@
     var trainingReturns = parseInt(meCache && meCache.tutorial_alerts_training_returns, 10) || 0;
 
     ORDER.forEach(function (id) {
-      if (dismissed(id)) return;
+      if (presented[id] || dismissed(id)) return;
 
       if (id === 'player-attributes') {
         if (opts.checkPlayerAttributes && meCache && meCache.fte_v2_complete && isModeSelect()) out.push(id);
@@ -348,6 +354,7 @@
 
     var returnUrl = opts.returnUrl || defaultReturnUrl(id);
     showing = true;
+    presented[id] = true;
     return markDismissed(id).then(function () {
       return new Promise(function (resolve) {
         var closed = false;
@@ -394,7 +401,7 @@
       var returnUrl = typeof item === 'object' && item ? item.returnUrl : null;
       var advanceUrl = typeof item === 'object' && item ? item.advanceUrl : null;
       var onLaterAdvance = typeof item === 'object' && item ? item.onLaterAdvance : null;
-      if (!id) return;
+      if (!id || presented[id]) return;
       var exists = queue.some(function (q) { return q.id === id; });
       if (!exists) queue.push({ id: id, returnUrl: returnUrl, advanceUrl: advanceUrl, onLaterAdvance: onLaterAdvance });
     });
@@ -429,6 +436,12 @@
       return;
     }
     var next = queue.shift();
+    /* Final guard: an item queued before its id was presented elsewhere
+       (e.g. via a direct intercept) must not re-show. */
+    if (presented[next.id]) {
+      drainQueue();
+      return;
+    }
     showAlert(next.id, {
       returnUrl: next.returnUrl,
       advanceUrl: next.advanceUrl,

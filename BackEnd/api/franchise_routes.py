@@ -2233,6 +2233,27 @@ def _get_user_eos_phase_status(
     return status
 
 
+REGION_BYE_MODAL_SEEN_SEASON_FIELD = "region_bye_modal_seen_season"
+
+
+def _should_show_region_bye_modal(
+    franchise_doc: dict[str, Any],
+    user_team_id_str: Optional[str],
+) -> bool:
+    """True once per franchise season when the user has a week-30 region bye."""
+    if not franchise_doc or not user_team_id_str:
+        return False
+    if not franchise_doc.get("eos_tournament_active", False):
+        return False
+    week = int(franchise_doc.get("week", 0) or 0)
+    eos_status = _get_user_eos_phase_status(franchise_doc, user_team_id_str, week)
+    if not eos_status.get("has_bye_this_week", False):
+        return False
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
+    seen_season = int(franchise_doc.get(REGION_BYE_MODAL_SEEN_SEASON_FIELD, 0) or 0)
+    return seen_season != current_season
+
+
 @router.options("/franchise/select-team")
 async def select_team_options():
     """
@@ -5681,6 +5702,7 @@ def command_center_data(
         user_has_bye = bool(eos_status.get("has_bye_this_week", False)) if eos_status else False
         has_playable_eos_round = (
             week_val not in ft.EOS_WEEKS
+            or week_val == ft.EOS_REGION_WEEKS[0]
             or (
                 franchise_doc
                 and len(ft.get_eos_week_games(franchise_doc, week_val, include_completed=False)) > 0
@@ -5694,6 +5716,12 @@ def command_center_data(
         )
         response["user_eliminated"] = user_eliminated
         response["offer_sim_rest"] = offer_sim_rest
+        response["region_bye_modal_eligible"] = bool(
+            _should_show_region_bye_modal(
+                franchise_doc,
+                str(team_id) if team_id else None,
+            )
+        )
         return response
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -10512,6 +10540,25 @@ class DismissChampionshipMomentRequest(BaseModel):
     moment_id: str
 
 
+class RegionByeModalSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/region-bye-modal-seen")
+def mark_region_bye_modal_seen(
+    req: RegionByeModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that this franchise season's week-30 region-bye modal was presented."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {REGION_BYE_MODAL_SEEN_SEASON_FIELD: current_season}},
+    )
+    return {"seen": True, "season": current_season}
+
+
 @router.get("/franchise/championship-moments/context")
 def championship_moment_context(
     franchise_id: str,
@@ -10617,7 +10664,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             meta_count,
             sim_rest_reconcile_persisted,
         )
-        raise HTTPException(status_code=400, detail="No games in current EOS round (e.g. week 30 with all double-winners)")
+        if week != ft.EOS_REGION_WEEKS[0]:
+            raise HTTPException(status_code=400, detail="No games in current EOS round.")
 
     _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)

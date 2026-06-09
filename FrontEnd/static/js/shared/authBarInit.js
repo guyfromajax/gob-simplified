@@ -770,7 +770,12 @@
                   refreshAccountSettingsModal();
                   routeToTutorial(meData);
                   ensureTutorialAlertExperience().then(function () {
-                    if (window.GOBTutorialAlerts) window.GOBTutorialAlerts.onAuthMeLoaded(meData);
+                    /* Read the live global, not the closure's meData: the alerts
+                       module patches dismissals into __gobAuthMeData (new object),
+                       so the captured meData can be stale by the time this runs —
+                       passing it would revert a local dismissal and re-show the
+                       modal (see Tutorial_Alerts_System.md bug history). */
+                    if (window.GOBTutorialAlerts) window.GOBTutorialAlerts.onAuthMeLoaded(window.__gobAuthMeData || meData);
                   });
                 }).catch(function () {
                   setAuthMeData({

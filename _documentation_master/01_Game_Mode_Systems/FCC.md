@@ -99,7 +99,7 @@ This is hydrated via:
 
 The top-right hero button is not static. Its label and behavior are controlled by `updatePlayButton(topData)`.
 
-Possible live states:
+Possible regular-season and fallback labels:
 
 - `Run Training`
 - `Run Training Camp`
@@ -108,6 +108,8 @@ Possible live states:
 - `Recruiting`
 - `Go To Next Season`
 - `Sim Next Round`
+
+Postseason weeks 27-34 replace the generic play/sim labels with the tournament-round labels documented below.
 
 ### Current mode mapping
 
@@ -146,7 +148,22 @@ The CTA logic depends on:
 - `cut_required`
 - `week`
 
-During franchise postseason weeks 27-34, `training_disabled_for_postseason` skips the normal Run Training CTA. If the user is still active and does not have a sim-rest/bye state, the primary CTA reads `Play Next Game`. Existing eliminated, bye, week 35 recruiting, and season rollover states keep priority.
+During franchise postseason weeks 27-34, `training_disabled_for_postseason` skips the normal Run Training CTA. Existing eliminated, bye, week 35 recruiting, and season rollover states keep priority.
+
+Postseason CTA labels preserve the existing `play` and `sim-rest-tournament` behaviors:
+
+| Week | Active user CTA | Eliminated/bye user CTA |
+|------|-----------------|--------------------------|
+| 27 | `Play Conference Tourney First Round` | N/A |
+| 28 | `Play Conference Tourney Semifinals` | `Sim Conference Tourney Semifinals` |
+| 29 | `Play Conference Tourney Championship` | `Sim Conference Tourney Championship` |
+| 30 | `Play Region Tourney First Round` | `Sim Region Tourney First Round` |
+| 31 | `Play Region Tourney Championship` | `Sim Region Tourney Championship` |
+| 32 | `Play National Tourney First Round` | `Sim National Tourney First Round` |
+| 33 | `Play National Tourney Semifinals` | `Sim National Tourney Semifinals` |
+| 34 | `Play National Championship!` | `Sim National Championship` |
+
+A user with a Region Tournament bye is active but uses the week 30 sim-rest state, so the CTA is `Sim Region Tourney First Round`.
 
 ---
 
@@ -829,7 +846,7 @@ Extra team-name mapping fetch:
 ### EOS side effects reflected in FCC
 
 - training may be disabled for eliminated teams
-- hero CTA may become `Sim Next Round`
+- hero CTA becomes the week-specific tournament simulation label
 - champion completion can trigger championship summary modal
 
 ---

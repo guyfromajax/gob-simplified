@@ -2788,8 +2788,9 @@ async function init() {
   const pendingMoments = Array.isArray(topData?.pending_championship_moments)
     ? topData.pending_championship_moments
     : [];
+  let championshipMomentsDone = Promise.resolve();
   if (pendingMoments.length && typeof window.ChampionshipMoments !== 'undefined') {
-    void window.ChampionshipMoments.processPendingMoments(
+    championshipMomentsDone = window.ChampionshipMoments.processPendingMoments(
       franchiseId,
       pendingMoments,
       {
@@ -2799,6 +2800,9 @@ async function init() {
   } else {
     maybeShowChampionshipCompleteModal(topData);
   }
+  championshipMomentsDone.then(() => {
+    if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
+  });
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
     showCutPlayersRequiredModal(Number(topData.cut_count || 0));
   }
@@ -3082,13 +3086,34 @@ function showCutPlayersRequiredModal(cutCount) {
   overlay.querySelector('#fcc-cut-required-close')?.focus();
 }
 
+const EOS_PLAY_CTA_BY_WEEK = Object.freeze({
+  27: 'Play Conference Tourney First Round',
+  28: 'Play Conference Tourney Semifinals',
+  29: 'Play Conference Tourney Championship',
+  30: 'Play Region Tourney First Round',
+  31: 'Play Region Tourney Championship',
+  32: 'Play National Tourney First Round',
+  33: 'Play National Tourney Semifinals',
+  34: 'Play National Championship!',
+});
+
+const EOS_SIM_CTA_BY_WEEK = Object.freeze({
+  28: 'Sim Conference Tourney Semifinals',
+  29: 'Sim Conference Tourney Championship',
+  30: 'Sim Region Tourney First Round',
+  31: 'Sim Region Tourney Championship',
+  32: 'Sim National Tourney First Round',
+  33: 'Sim National Tourney Semifinals',
+  34: 'Sim National Championship',
+});
+
 function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
   if (!data) return;
   
   const eosTournamentActive = data.eos_tournament_active || false;
   const eosTournament = data.eos_tournament;
-  const week = data.week || 1;
+  const week = Number(data.week || 1);
   const trainingDisabledForEos = !!data.training_disabled_for_eos;
   const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || (week >= 27 && week <= 34);
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
@@ -3123,10 +3148,10 @@ function updatePlayButton(data) {
     playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
-    playNowBtn.textContent = 'Sim Next Round';
+    playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else if (trainingDisabledForPostseason && !eliminated) {
-    playNowBtn.textContent = 'Play Next Game';
+    playNowBtn.textContent = EOS_PLAY_CTA_BY_WEEK[week] || 'Play Next Game';
     playNowBtn.dataset.mode = 'play';
   } else if (trainingDisabledForEos || eliminated) {
     playNowBtn.textContent = 'Go To Next Season';

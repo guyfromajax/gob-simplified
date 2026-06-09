@@ -1,4 +1,4 @@
-"""Region EOS week 30: get_eos_week_games must list finals when round1 is empty (double-bye)."""
+"""Region EOS scheduling: week 30 is R1 only; week 31 is finals only."""
 from __future__ import annotations
 
 import sys
@@ -15,7 +15,7 @@ def _tid():
     return str(ObjectId())
 
 
-def test_week30_double_bye_region_exposes_final_not_empty_meta():
+def test_double_bye_region_waits_until_week31_for_final():
     t1, t2 = _tid(), _tid()
     franchise_doc = {
         "region_tournaments": {
@@ -34,7 +34,9 @@ def test_week30_double_bye_region_exposes_final_not_empty_meta():
             },
         }
     }
-    games = ft.get_eos_week_games(franchise_doc, 30, include_completed=False)
+    assert ft.get_eos_week_games(franchise_doc, 30, include_completed=False) == []
+
+    games = ft.get_eos_week_games(franchise_doc, 31, include_completed=False)
     assert len(games) == 1
     g = games[0]
     assert g["phase"] == "region"
@@ -83,7 +85,7 @@ def test_week30_three_team_one_r1_only():
 
 
 def test_week30_all_eight_regions_mixed_double_bye_and_full():
-    """Sim-rest needs non-empty meta when every region is represented; mix 2-team and 4-team."""
+    """Double-bye finals wait while other regions play their R1 games."""
     ids = [str(ObjectId()) for _ in range(24)]
     regions = {}
     for idx, letter in enumerate(ft.REGION_LETTERS):
@@ -107,16 +109,16 @@ def test_week30_all_eight_regions_mixed_double_bye_and_full():
             }
     franchise_doc = {"region_tournaments": regions}
     games = ft.get_eos_week_games(franchise_doc, 30, include_completed=False)
-    # 4 regions × 1 final + 4 regions × 2 R1 = 12
-    assert len(games) == 12
+    # Only the four regions with R1 games appear in week 30.
+    assert len(games) == 8
     finals_week30 = [g for g in games if g.get("round") == 2]
     r1_week30 = [g for g in games if g.get("round") == 1]
-    assert len(finals_week30) == 4
+    assert len(finals_week30) == 0
     assert len(r1_week30) == 8
 
 
-def test_week30_round1_nonempty_but_no_playable_r1_still_surfaces_final():
-    """Legacy / odd shapes: round1 rows exist but none are real R1 games; final is ready."""
+def test_week30_round1_nonempty_but_no_playable_r1_does_not_surface_final():
+    """Legacy placeholder rows must not pull a ready final forward into week 30."""
     t1, t2 = _tid(), _tid()
     franchise_doc = {
         "region_tournaments": {
@@ -144,13 +146,15 @@ def test_week30_round1_nonempty_but_no_playable_r1_still_surfaces_final():
         }
     }
     games = ft.get_eos_week_games(franchise_doc, 30, include_completed=False)
-    assert len(games) == 1
-    assert games[0]["round"] == 2
-    assert str(games[0]["away_id"]) == t1
-    assert str(games[0]["home_id"]) == t2
+    assert games == []
+    finals = ft.get_eos_week_games(franchise_doc, 31, include_completed=False)
+    assert len(finals) == 1
+    assert finals[0]["round"] == 2
+    assert str(finals[0]["away_id"]) == t1
+    assert str(finals[0]["home_id"]) == t2
 
 
-def test_week30_include_completed_skips_won_final():
+def test_week30_history_does_not_include_completed_final():
     t1, t2 = _tid(), _tid()
     franchise_doc = {
         "region_tournaments": {
@@ -172,6 +176,8 @@ def test_week30_include_completed_skips_won_final():
     games = ft.get_eos_week_games(franchise_doc, 30, include_completed=False)
     assert games == []
     hist = ft.get_eos_week_games(franchise_doc, 30, include_completed=True)
+    assert hist == []
+    hist = ft.get_eos_week_games(franchise_doc, 31, include_completed=True)
     assert len(hist) == 1
     assert hist[0].get("winner") == t1
 

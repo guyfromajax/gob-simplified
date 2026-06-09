@@ -2,9 +2,8 @@
 Franchise End-of-Season Tournament: Conference → Region → National.
 
 Weeks 27–29: Conference tournaments (16 brackets, 8 teams each).
-Weeks 30–31: Region tournaments (8 brackets, 4 teams each, with bye logic). Week 30 includes
-region finals when there is no playable R1 (e.g. both conferences double-bye, or round1 only
-has placeholders) but final already has two real teams.
+Weeks 30–31: Region tournaments (8 brackets, 4 teams each, with bye logic).
+Week 30 is round 1 only; every ready region final is held in week 31.
 Weeks 32–34: National tournament (8 region winners).
 
 Seeding/tiebreaker: W first, then natl_rank (no differential).
@@ -413,7 +412,6 @@ def get_eos_week_games(
             for r in REGION_LETTERS:
                 rt = region_tournaments.get(r, {})
                 round1 = rt.get("round1", [])
-                r1_playable_appended = 0
                 for i, m in enumerate(round1):
                     if not include_completed and m.get("winner"):
                         continue
@@ -427,36 +425,6 @@ def get_eos_week_games(
                             "region": r,
                             "round": 1,
                             "matchup_index": i,
-                        }
-                        if include_completed:
-                            g["winner"] = m.get("winner")
-                            g["score"] = m.get("score", {})
-                            g["game_id"] = m.get("game_id")
-                        games.append(g)
-                        r1_playable_appended += 1
-                # No R1 games to list (empty round1, or only placeholders / skipped rows): if final is
-                # already two real teams, expose it here so week 30 meta matches week 31 shape.
-                if r1_playable_appended == 0:
-                    final = rt.get("final", [])
-                    if not final:
-                        continue
-                    m = final[0]
-                    if not include_completed and m.get("winner"):
-                        continue
-                    away = m.get("away_team")
-                    home = m.get("home_team")
-                    if isinstance(away, str) and away.startswith("R1"):
-                        continue
-                    if isinstance(home, str) and home.startswith("R1"):
-                        continue
-                    if away and home:
-                        g = {
-                            "away_id": ObjectId(away) if isinstance(away, str) else away,
-                            "home_id": ObjectId(home) if isinstance(home, str) else home,
-                            "phase": "region",
-                            "region": r,
-                            "round": 2,
-                            "matchup_index": 0,
                         }
                         if include_completed:
                             g["winner"] = m.get("winner")
