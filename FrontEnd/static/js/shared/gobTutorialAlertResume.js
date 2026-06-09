@@ -1,11 +1,12 @@
 /**
  * Tutorial alert resume — sticky "Back To Game" footer on lesson sub-pages
- * when the user entered via a contextual alert modal (primary CTA only).
+ * when the user entered via a contextual alert modal or the training-page link.
  */
 (function () {
   'use strict';
 
   var STORAGE_KEY = 'gob_tut_alert_resume';
+  var VALID_ENTRY_SOURCES = { 'tutorial-alert': true, 'training-page': true };
 
   var PATH_TO_LESSON = {
     '/player-attributes.html': 'player-attributes',
@@ -19,7 +20,17 @@
 
   function lessonIdFromPath() {
     var path = (window.location.pathname || '').replace(/\/+$/, '') || '/';
-    return PATH_TO_LESSON[path] || null;
+    var id = PATH_TO_LESSON[path];
+    if (id) return id;
+    var key;
+    for (key in PATH_TO_LESSON) {
+      if (path.endsWith(key)) return PATH_TO_LESSON[key];
+    }
+    return null;
+  }
+
+  function isValidContext(ctx) {
+    return !!(ctx && VALID_ENTRY_SOURCES[ctx.entrySource] && ctx.lessonId && ctx.returnUrl);
   }
 
   function readContext() {
@@ -27,7 +38,7 @@
       var raw = sessionStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
       var ctx = JSON.parse(raw);
-      if (!ctx || ctx.entrySource !== 'tutorial-alert' || !ctx.lessonId || !ctx.returnUrl) return null;
+      if (!isValidContext(ctx)) return null;
       return ctx;
     } catch (e) {
       return null;
@@ -38,16 +49,24 @@
     try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
   }
 
-  function setContext(alertId, returnUrl) {
-    if (!alertId || !returnUrl) return;
+  function writeContext(lessonId, returnUrl, entrySource) {
+    if (!lessonId || !returnUrl || !VALID_ENTRY_SOURCES[entrySource]) return;
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-        entrySource: 'tutorial-alert',
-        alertId: alertId,
-        lessonId: alertId,
+        entrySource: entrySource,
+        alertId: lessonId,
+        lessonId: lessonId,
         returnUrl: returnUrl
       }));
     } catch (e) {}
+  }
+
+  function setContext(alertId, returnUrl) {
+    writeContext(alertId, returnUrl, 'tutorial-alert');
+  }
+
+  function setTrainingPageContext(returnUrl) {
+    writeContext('training', returnUrl, 'training-page');
   }
 
   function isAtBottom(threshold) {
@@ -68,8 +87,11 @@
     var back = document.querySelector('[data-gob-back]');
     if (back) back.hidden = true;
 
-    var handoff = document.querySelector('.handoff');
-    if (handoff) handoff.hidden = true;
+    document.querySelectorAll('.handoff').forEach(function (el) {
+      el.remove();
+    });
+
+    if (document.querySelector('.gob-tut-alert-resume')) return;
 
     var bar = document.createElement('div');
     bar.className = 'gob-tut-alert-resume';
@@ -105,8 +127,10 @@
 
   window.GOBTutorialAlertResume = {
     setContext: setContext,
+    setTrainingPageContext: setTrainingPageContext,
     clearContext: clearContext,
-    readContext: readContext
+    readContext: readContext,
+    isValidContext: isValidContext
   };
 
   if (document.readyState === 'loading') {

@@ -757,6 +757,21 @@ body.training-page #points-remaining {
   color: currentColor;
 }
 
+body.training-page .training-header-left {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+body.training-page .training-tutorial-btn {
+  min-width: 0;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+
 body.training-page .back-button {
   justify-self: start;
   display: inline-flex;
@@ -1391,9 +1406,14 @@ body.training-page .custom-focus-cancel-btn {
   }
 
   body.training-page .back-button,
+  body.training-page .training-header-left,
   body.training-page .header-actions,
   body.training-page .header-center {
     justify-self: center;
+  }
+
+  body.training-page .training-header-left {
+    justify-content: center;
   }
 
   body.training-page .header-actions {

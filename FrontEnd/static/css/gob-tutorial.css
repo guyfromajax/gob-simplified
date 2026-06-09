@@ -123,6 +123,10 @@ body.gob-tut #site-footer { margin-bottom: calc(var(--nav-h) + 8px); }
 .handoff { margin-top: 40px; }
 
 /* ---------- Alert-resume sticky footer (modal entry only) ---------- */
+body.gob-tut--alert-resume .handoff,
+body.gob-tut--alert-resume [data-gob-back] {
+  display: none !important;
+}
 body.gob-tut--alert-resume {
   padding-bottom: calc(var(--nav-h) * 2 + 28px);
 }

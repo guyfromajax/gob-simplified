@@ -79,6 +79,45 @@ function clearTrainingFormDraftForCurrentContext() {
   } catch (_e) {}
 }
 
+function clearTutorialResumeContext() {
+  try {
+    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.clearContext) {
+      window.GOBTutorialAlertResume.clearContext();
+    } else {
+      sessionStorage.removeItem('gob_tut_alert_resume');
+    }
+  } catch (_e) {}
+}
+
+function currentTrainingReturnUrl() {
+  return window.location.pathname + window.location.search + (window.location.hash || '');
+}
+
+function navigateToTrainingTutorial() {
+  playSound('click-tiny.wav');
+  saveTrainingFormDraft();
+  const returnUrl = currentTrainingReturnUrl();
+  if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
+    window.GOBTutorialAlertResume.setTrainingPageContext(returnUrl);
+  } else {
+    try {
+      sessionStorage.setItem('gob_tut_alert_resume', JSON.stringify({
+        entrySource: 'training-page',
+        alertId: 'training',
+        lessonId: 'training',
+        returnUrl: returnUrl
+      }));
+    } catch (_e) {}
+  }
+  window.location.href = '/tutorial-training.html';
+}
+
+function wireTrainingTutorialButton() {
+  const btn = document.getElementById('training-tutorial-btn');
+  if (!btn) return;
+  btn.addEventListener('click', navigateToTrainingTutorial);
+}
+
 /** Main PM radio value; modal assigns a concrete leaf here before submit */
 const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
 
@@ -895,6 +934,7 @@ if (customFocusCancelBtn) {
  * Handle back button click
  */
 backBtn.addEventListener('click', function() {
+  clearTutorialResumeContext();
   // Get URL parameters to determine where to navigate back
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode');
@@ -1234,6 +1274,7 @@ submitBtn.addEventListener('click', async function() {
       sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
       sessionStorage.removeItem(STORAGE_TEAM_DRILLS_SNAPSHOT);
       clearTrainingFormDraftForCurrentContext();
+      clearTutorialResumeContext();
     } catch (_clearErr) {}
 
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
@@ -1416,6 +1457,7 @@ function wireCustomTrainingPlaybook() {
 (async function initTrainingPage() {
   const redirected = await redirectIfTrainingAlreadyCommitted();
   if (redirected) return;
+  wireTrainingTutorialButton();
   await initializeTrainingPoints();
   wireCustomTrainingPlaybook();
 })();

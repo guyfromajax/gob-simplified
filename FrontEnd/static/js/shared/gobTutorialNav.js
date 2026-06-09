@@ -126,6 +126,64 @@
     return /\/(player-attributes|tutorial-training|team-attributes|game-plans|tutorial-playbooks|scouting|tutorial-recruiting)\.html$/i.test(location.pathname || '');
   }
 
+  var ALERT_RESUME_KEY = 'gob_tut_alert_resume';
+  var PATH_TO_LESSON = {
+    '/player-attributes.html': 'player-attributes',
+    '/tutorial-training.html': 'training',
+    '/team-attributes.html': 'team-attributes',
+    '/game-plans.html': 'game-plans',
+    '/tutorial-playbooks.html': 'playbooks',
+    '/scouting.html': 'scouting',
+    '/tutorial-recruiting.html': 'recruiting'
+  };
+
+  function lessonIdFromPath() {
+    var path = (location.pathname || '').replace(/\/+$/, '') || '/';
+    var id = PATH_TO_LESSON[path];
+    if (id) return id;
+    var key;
+    for (key in PATH_TO_LESSON) {
+      if (path.endsWith(key)) return PATH_TO_LESSON[key];
+    }
+    return null;
+  }
+
+  var VALID_ALERT_RESUME_SOURCES = { 'tutorial-alert': true, 'training-page': true };
+
+  function readAlertResumeContext() {
+    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.readContext) {
+      return window.GOBTutorialAlertResume.readContext();
+    }
+    try {
+      var raw = sessionStorage.getItem(ALERT_RESUME_KEY);
+      if (!raw) return null;
+      var ctx = JSON.parse(raw);
+      if (!ctx || !VALID_ALERT_RESUME_SOURCES[ctx.entrySource] || !ctx.lessonId || !ctx.returnUrl) return null;
+      return ctx;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Hide hub chrome immediately when entering from an alert modal (before async resume script). */
+  function suppressAlertResumeChrome() {
+    var lessonId = lessonIdFromPath();
+    if (!lessonId) return null;
+    var ctx = readAlertResumeContext();
+    if (!ctx || ctx.lessonId !== lessonId) return null;
+
+    document.body.classList.add('gob-tut--alert-resume');
+
+    var back = document.querySelector('[data-gob-back]');
+    if (back) back.hidden = true;
+
+    document.querySelectorAll('.handoff').forEach(function (el) {
+      el.remove();
+    });
+
+    return ctx;
+  }
+
   function loadAlertResumeScript() {
     if (!isLessonSubPage() || document.querySelector('script[src*="gobTutorialAlertResume.js"]')) return;
     var s = document.createElement('script');
@@ -137,6 +195,7 @@
   function init() {
     rememberOrigin();
     renderNav();
+    suppressAlertResumeChrome();
     loadAlertResumeScript();
     var back = document.querySelector('[data-gob-back]');
     if (back) {

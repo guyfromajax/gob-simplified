@@ -13,6 +13,7 @@
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/training.css">
 </head>
 <body class="training-page">
@@ -24,7 +25,10 @@
   <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
     <header class="training-header">
-      <button id="back-btn" class="back-button">Back</button>
+      <div class="training-header-left">
+        <button id="back-btn" class="back-button" type="button">Back</button>
+        <button id="training-tutorial-btn" type="button" class="gob-btn gob-btn--ghost training-tutorial-btn">Training Tutorial</button>
+      </div>
       <div class="header-center">
         <h1 class="page-title">Team Training</h1>
         <div class="points-display">POINTS REMAINING: <span id="points-remaining">24</span></div>
@@ -407,6 +411,7 @@
 
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/gobTutorialAlertResume.js"></script>
   <script src="/training.js"></script>
 </body>
 </html>
