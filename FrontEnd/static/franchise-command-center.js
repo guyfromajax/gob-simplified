@@ -29,6 +29,8 @@ let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
+let currentWeekInviteRecruitCache = null;
+let newLeanRecruitIdsCache = [];
 let fccTeamStatsSummaryCache = null;
 let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
@@ -1036,11 +1038,110 @@ function renderHomeTeamStatsCard() {
   `;
 }
 
+function getNewLeanRecruitIdSet() {
+  return new Set((newLeanRecruitIdsCache || []).map((id) => String(id)));
+}
+
+function isNewLeanRecruit(recruit) {
+  if (!recruit) return false;
+  const recruitId = recruit.recruitId != null ? recruit.recruitId : recruit.recruit_id;
+  return getNewLeanRecruitIdSet().has(String(recruitId));
+}
+
+function partitionRecruitsWithNewLeans(recruits, sortFn, sortState) {
+  const newLeanIds = getNewLeanRecruitIdSet();
+  if (!newLeanIds.size) {
+    return sortFn ? sortFn(recruits, sortState) : recruits.slice();
+  }
+  const newOnes = [];
+  const rest = [];
+  recruits.forEach((recruit) => {
+    if (newLeanIds.has(String(recruit.recruitId))) newOnes.push(recruit);
+    else rest.push(recruit);
+  });
+  if (!sortFn) return newOnes.concat(rest);
+  return sortFn(newOnes, sortState).concat(sortFn(rest, sortState));
+}
+
+function buildHomeRecruitRowHtml(recruit) {
+  const rowHtml = `
+    <div class="fcc-home-recruit-row">
+      <span class="fcc-home-recruit-name">${escapeHomeHtml(recruit.name || '--')}</span>
+      <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
+      <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
+      <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
+      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
+    </div>
+  `;
+  if (!isNewLeanRecruit(recruit)) return rowHtml;
+  return `
+    <div class="fcc-newlean-row">
+      ${rowHtml}
+      <div class="fcc-newlean-tag"><span class="fcc-newlean-badge">New</span></div>
+    </div>
+  `;
+}
+
+function buildFccInviteBlockHtml(recruit, week, wide) {
+  if (!recruit) return '';
+  const rtClass = typeof window.getRecruitRtBucketClass === 'function'
+    ? window.getRecruitRtBucketClass(recruit.rt)
+    : '';
+  const weightDisplay = recruit.weight != null ? recruit.weight : '--';
+  const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
+  const rtDisplay = recruit.rt != null ? recruit.rt : '--';
+  const topHtml = `
+    <div class="fcc-invite__top">
+      <span class="fcc-invite__eyebrow">Week ${Number(week)} Invite</span>
+      <span class="fcc-invite__status"><span class="fcc-invite__dot" aria-hidden="true"></span>Visit Pending</span>
+    </div>
+  `;
+  const idHtml = `
+    <div class="fcc-invite__id">
+      <span class="fcc-invite__name">${escapeHomeHtml(recruit.name || '--')}</span>
+      <span class="fcc-invite__meta">${escapeHomeHtml(meta)}</span>
+    </div>
+  `;
+  const rtHtml = `
+    <div class="fcc-invite__rt">
+      <span class="fcc-invite__rtnum ${rtClass}">${escapeHomeHtml(rtDisplay)}</span>
+      <span class="fcc-invite__rtlabel">RT</span>
+    </div>
+  `;
+  if (wide) {
+    return `<div class="fcc-invite fcc-invite--wide">${topHtml}${idHtml}${rtHtml}</div>`;
+  }
+  return `<div class="fcc-invite">${topHtml}<div class="fcc-invite__body">${idHtml}${rtHtml}</div></div>`;
+}
+
+function renderFccRecruitsInviteBanner() {
+  const host = document.getElementById('fcc-recruits-invite');
+  if (!host) return;
+  const week = Number(document.body.dataset.fccWeek || commandCenterTopDataCache?.week || 1);
+  const invite = currentWeekInviteRecruitCache;
+  if (week < 20 || week > 26 || !invite) {
+    host.innerHTML = '';
+    host.hidden = true;
+    return;
+  }
+  host.innerHTML = buildFccInviteBlockHtml(invite, week, true);
+  host.hidden = false;
+}
+
 function renderHomeRecruitingCard() {
   const body = document.getElementById('home-recruiting-body');
   if (!body) return;
-  const recruits = [...leanRecruitsDataCache].sort((a, b) => Number(b.rt || 0) - Number(a.rt || 0));
+  const week = Number(commandCenterTopDataCache?.week || document.body.dataset.fccWeek || 1);
+  const inviteBlock = (week >= 20 && week <= 26 && currentWeekInviteRecruitCache)
+    ? buildFccInviteBlockHtml(currentWeekInviteRecruitCache, week, false)
+    : '';
+  const recruits = partitionRecruitsWithNewLeans(
+    [...leanRecruitsDataCache].sort((a, b) => Number(b.rt || 0) - Number(a.rt || 0)),
+    null,
+    null
+  );
   body.innerHTML = `
+    ${inviteBlock}
     <div class="fcc-home-recruiting">
       <div class="fcc-home-list-scroll">
         <div class="fcc-home-recruit-header">
@@ -1050,15 +1151,7 @@ function renderHomeRecruitingCard() {
           <span>WT</span>
           <span>RT</span>
         </div>
-        ${recruits.map((recruit) => `
-          <div class="fcc-home-recruit-row">
-            <span class="fcc-home-recruit-name">${escapeHomeHtml(recruit.name || '--')}</span>
-            <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
-            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
-            <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-            <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
-          </div>
-        `).join('')}
+        ${recruits.map((recruit) => buildHomeRecruitRowHtml(recruit)).join('')}
       </div>
     </div>
   `;
@@ -1648,6 +1741,8 @@ function renderFccRecruits() {
   const fullListLink = document.getElementById('fcc-recruits-full-link');
   if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
 
+  renderFccRecruitsInviteBanner();
+
   const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
   if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
   if (fullListLink) {
@@ -1705,14 +1800,20 @@ function renderFccRecruits() {
   }
   RecruitingCommon.renderRecruitTableRows(
     tbody,
-    RecruitingCommon.sortRecruits(leanRecruitsDataCache, recruitSortState),
-    {}
+    partitionRecruitsWithNewLeans(
+      leanRecruitsDataCache,
+      RecruitingCommon.sortRecruits.bind(RecruitingCommon),
+      recruitSortState
+    ),
+    { newLeanIds: getNewLeanRecruitIdSet() }
   );
 }
 
 function initFccRecruits(topData) {
   if (typeof RecruitingCommon === 'undefined') return;
   document.body.dataset.fccWeek = String(Number(topData?.week || 1));
+  currentWeekInviteRecruitCache = topData?.current_week_invite_recruit || null;
+  newLeanRecruitIdsCache = Array.isArray(topData?.new_lean_recruit_ids) ? topData.new_lean_recruit_ids : [];
   leanRecruitsDataCache = RecruitingCommon.normalizeRecruits(
     topData?.lean_recruits || [],
     topData?.team_name_map || {}

@@ -321,6 +321,7 @@ class FranchiseManager:
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
             "recruiting_performance_lean_applied": {},
+            "fcc_pending_new_lean_recruit_ids": [],
             "applied_games": [],
             "rank_prestige_system_version": FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
             "rank_prestige_last_applied_week": 0,

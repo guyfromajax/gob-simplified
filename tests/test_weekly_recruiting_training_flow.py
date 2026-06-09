@@ -36,6 +36,70 @@ class _TrainingDb:
         self.franchises = _TrainingFranchisesCollection(franchise_doc)
 
 
+def test_team_was_newly_added_to_lean_detects_additions_not_rank_moves():
+    team_id = "team-a"
+    prior = {"1": "team-b", "2": None, "3": None}
+    added = {"1": "team-b", "2": team_id, "3": None}
+    moved_up = {"1": team_id, "2": "team-b", "3": None}
+    assert franchise_routes._team_was_newly_added_to_lean(prior, added, team_id) is True
+    assert franchise_routes._team_was_newly_added_to_lean(prior, moved_up, team_id) is False
+
+
+def test_fcc_current_week_invite_recruit_skips_outside_window_and_processed_weeks():
+    team_id = str(ObjectId())
+    franchise_doc = {"_id": ObjectId(), "week": 19, "recruiting_results": {}}
+    assert franchise_routes._fcc_current_week_invite_recruit(
+        franchise_doc, team_id, {"1": "r1"}
+    ) is None
+
+    franchise_doc["week"] = 27
+    assert franchise_routes._fcc_current_week_invite_recruit(
+        franchise_doc, team_id, {"1": "r1"}
+    ) is None
+
+    franchise_doc["week"] = 22
+    franchise_doc["recruiting_results"] = {"22": {team_id: "r1"}}
+    assert franchise_routes._fcc_current_week_invite_recruit(
+        franchise_doc, team_id, {"1": "r1", "2": "r2"}
+    ) is None
+
+
+def test_fcc_current_week_invite_recruit_returns_top_remaining_order(monkeypatch):
+    team_id = str(ObjectId())
+    franchise_id = ObjectId()
+    franchise_doc = {
+        "_id": franchise_id,
+        "week": 22,
+        "recruiting_results": {"20": {team_id: "r1"}, "21": {team_id: "r2"}},
+    }
+    saved_orders = {"1": "r1", "2": "r2", "3": "r3"}
+
+    monkeypatch.setattr(
+        franchise_routes.franchise_recruits_data_collection,
+        "find_one",
+        lambda query, projection=None: {
+            "recruit_id": "r3",
+            "name": "Test Recruit",
+            "archetype": "Slasher",
+            "height": 77,
+            "weight": 210,
+            "position_ratings": {"SG": 44},
+        },
+    )
+
+    payload = franchise_routes._fcc_current_week_invite_recruit(
+        franchise_doc, team_id, saved_orders
+    )
+    assert payload == {
+        "recruit_id": "r3",
+        "name": "Test Recruit",
+        "archetype": "Slasher",
+        "height": "6'5\"",
+        "weight": 210,
+        "rt": 44,
+    }
+
+
 def test_save_recruiting_orders_week20_only_persists_orders(monkeypatch):
     franchise_id = str(ObjectId())
     team_id = str(ObjectId())

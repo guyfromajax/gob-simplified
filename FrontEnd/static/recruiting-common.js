@@ -191,6 +191,7 @@
   function renderRecruitTableRows(tbody, recruits, options) {
     if (!tbody) return;
     var selectedIds = options && options.selectedIds ? options.selectedIds : new Set();
+    var newLeanIds = options && options.newLeanIds ? options.newLeanIds : new Set();
     var onRowClick = options && options.onRowClick;
     var onActionClick = options && options.onActionClick;
     var getActionLabel = options && options.getActionLabel;
@@ -200,9 +201,13 @@
       var tr = document.createElement('tr');
       tr.dataset.recruitId = recruit.recruitId;
       if (selectedIds.has(recruit.recruitId)) tr.classList.add('recruit-selected');
+      if (newLeanIds.has(String(recruit.recruitId))) tr.classList.add('fcc-newlean');
       if (onRowClick) tr.classList.add('recruit-clickable');
+      var nameCell = newLeanIds.has(String(recruit.recruitId))
+        ? '<td><span class="fcc-newlean-cell"><span class="fcc-newlean-badge">New</span>' + recruit.name + '</span></td>'
+        : '<td>' + recruit.name + '</td>';
       tr.innerHTML = [
-        '<td>' + recruit.name + '</td>',
+        nameCell,
         '<td>' + recruit.homeRegion + '</td>',
         '<td>' + recruit.archetype + '</td>',
         '<td>' + recruit.height + '</td>',

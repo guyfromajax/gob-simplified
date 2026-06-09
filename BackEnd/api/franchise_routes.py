@@ -27,7 +27,7 @@ from BackEnd.db import (
     franchise_players_data_collection,
     franchise_recruits_data_collection,
 )
-from BackEnd.utils.shared import summarize_game_state
+from BackEnd.utils.shared import format_height, summarize_game_state
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
@@ -94,6 +94,7 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
+FCC_PENDING_NEW_LEAN_RECRUITS_FIELD = "fcc_pending_new_lean_recruit_ids"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 AWARDS_FIELD = "awards"
 WEEK_35_RECRUITING_POINTS_BUDGET = 20
@@ -3258,6 +3259,9 @@ def _complete_week_process_user_game_block(
     user_team_id_str: Any,
     _u_name: str | None,
 ) -> tuple[dict, dict, int, dict | None, str | None]:
+    if user_team_id_str:
+        _clear_fcc_pending_new_lean_recruits(franchise_doc, franchise_id)
+
     gp_before = user_geek_points_snapshot_for_franchise(franchise_doc)
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
@@ -5518,6 +5522,10 @@ def command_center_data(
             response["awards_ready"] = False
         if franchise_id and franchise_doc and team_id:
             try:
+                user_ftd_doc = franchise_team_data_collection.find_one(
+                    {"franchise_id": fid, "team_id": ObjectId(str(team_id))},
+                    {"Recruits": 1},
+                ) or {}
                 response["lean_recruits"] = list(
                     franchise_recruits_data_collection.find(
                         {
@@ -5541,15 +5549,40 @@ def command_center_data(
                     for player in (week_35_results.get("signed_players") or [])
                     if str(player.get("team_id") or "") == str(team_id)
                 ]
+                response["current_week_invite_recruit"] = _fcc_current_week_invite_recruit(
+                    franchise_doc,
+                    str(team_id),
+                    user_ftd_doc.get("Recruits"),
+                )
+                pending_new_lean_ids = [
+                    str(rid)
+                    for rid in (franchise_doc.get(FCC_PENDING_NEW_LEAN_RECRUITS_FIELD) or [])
+                    if rid
+                ]
+                if pending_new_lean_ids and _find_user_last_completed_game(franchise_doc, str(team_id)):
+                    lean_recruit_ids = {
+                        str(recruit.get("recruit_id"))
+                        for recruit in response["lean_recruits"]
+                        if recruit.get("recruit_id")
+                    }
+                    response["new_lean_recruit_ids"] = [
+                        rid for rid in pending_new_lean_ids if rid in lean_recruit_ids
+                    ]
+                else:
+                    response["new_lean_recruit_ids"] = []
             except Exception as e:
                 logger.debug("fcc lean recruits: %s", e)
                 response["lean_recruits"] = []
                 response["team_name_map"] = {}
                 response["week_35_user_recruits"] = []
+                response["current_week_invite_recruit"] = None
+                response["new_lean_recruit_ids"] = []
         else:
             response["lean_recruits"] = []
             response["team_name_map"] = {}
             response["week_35_user_recruits"] = []
+            response["current_week_invite_recruit"] = None
+            response["new_lean_recruit_ids"] = []
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
@@ -6729,6 +6762,70 @@ def _recruit_display_name_for_training_report(recruit_doc: dict) -> str:
     return full or "Recruit"
 
 
+def _fcc_current_week_invite_recruit(
+    franchise_doc: dict | None,
+    user_team_id: str | None,
+    saved_orders: dict | None,
+) -> dict[str, Any] | None:
+    """
+    Pending weekly invite for FCC recruiting surfaces (weeks 20–26, before that week's
+    recruiting results exist). Uses saved visit orders minus prior-week assignments.
+    """
+    if not franchise_doc or not user_team_id:
+        return None
+    try:
+        week = int(franchise_doc.get("week", 1) or 1)
+    except (TypeError, ValueError):
+        return None
+    if week < 20 or week > 26:
+        return None
+
+    recruiting_results = franchise_doc.get("recruiting_results") or {}
+    if str(week) in recruiting_results:
+        return None
+
+    order_list = _team_order_list(saved_orders)
+    if not order_list:
+        return None
+
+    used_recruit_ids: set[str] = set()
+    team_id_str = str(user_team_id)
+    for prior_week in range(20, week):
+        week_results = recruiting_results.get(str(prior_week)) or {}
+        recruit_id = week_results.get(team_id_str)
+        if not recruit_id:
+            for key, value in week_results.items():
+                if str(key) == team_id_str:
+                    recruit_id = value
+                    break
+        if recruit_id:
+            used_recruit_ids.add(str(recruit_id))
+
+    pending_recruit_id = _highest_remaining_team_target(order_list, used_recruit_ids)
+    if not pending_recruit_id:
+        return None
+
+    fid = franchise_doc.get("_id")
+    if fid is None:
+        return None
+    recruit_doc = franchise_recruits_data_collection.find_one(
+        {"franchise_id": str(fid), "recruit_id": pending_recruit_id},
+        {"_id": 0, "franchise_id": 0},
+    )
+    if not recruit_doc:
+        return None
+
+    weight = recruit_doc.get("weight")
+    return {
+        "recruit_id": pending_recruit_id,
+        "name": _recruit_display_name_for_training_report(recruit_doc),
+        "archetype": recruit_doc.get("archetype") or "--",
+        "height": format_height(recruit_doc.get("height")) or "--",
+        "weight": int(weight) if isinstance(weight, (int, float)) else None,
+        "rt": _recruit_rt(recruit_doc),
+    }
+
+
 def _training_report_recruiting_display(
     franchise_doc: dict | None,
     report_week: int,
@@ -6943,6 +7040,55 @@ def _normalize_recruit_lean_doc(lean_doc: dict | None) -> dict[str, str | None]:
     return lean
 
 
+def _team_on_recruit_lean(lean_doc: dict | None, team_id: str) -> bool:
+    normalized = _normalize_recruit_lean_doc(lean_doc)
+    team_id_str = str(team_id)
+    return any(str(normalized.get(rank) or "") == team_id_str for rank in ("1", "2", "3"))
+
+
+def _team_was_newly_added_to_lean(
+    prior_lean: dict | None,
+    updated_lean: dict | None,
+    team_id: str,
+) -> bool:
+    """True when team_id was not on the lean list before but is after (not rank moves)."""
+    return _team_on_recruit_lean(updated_lean, team_id) and not _team_on_recruit_lean(prior_lean, team_id)
+
+
+def _clear_fcc_pending_new_lean_recruits(franchise_doc: dict, franchise_id: ObjectId) -> None:
+    if not franchise_doc.get(FCC_PENDING_NEW_LEAN_RECRUITS_FIELD):
+        return
+    franchise_doc[FCC_PENDING_NEW_LEAN_RECRUITS_FIELD] = []
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {FCC_PENDING_NEW_LEAN_RECRUITS_FIELD: []}},
+    )
+
+
+def _append_fcc_pending_new_lean_recruits(
+    franchise_doc: dict,
+    franchise_id: ObjectId,
+    recruit_ids: list[str],
+    user_team_id: str,
+) -> None:
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_object_id or str(user_team_object_id) != str(user_team_id):
+        return
+    unique_new = [str(rid) for rid in recruit_ids if rid]
+    if not unique_new:
+        return
+    existing = [str(rid) for rid in (franchise_doc.get(FCC_PENDING_NEW_LEAN_RECRUITS_FIELD) or [])]
+    merged = existing[:]
+    for rid in unique_new:
+        if rid not in merged:
+            merged.append(rid)
+    franchise_doc[FCC_PENDING_NEW_LEAN_RECRUITS_FIELD] = merged
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {FCC_PENDING_NEW_LEAN_RECRUITS_FIELD: merged}},
+    )
+
+
 def _lean_has_open_slot(lean_doc: dict[str, str | None]) -> bool:
     return lean_doc.get("1") in (None, "open") or lean_doc.get("2") is None or lean_doc.get("3") is None
 
@@ -7049,6 +7195,9 @@ def _apply_performance_based_recruiting_lean_updates(
         )
     )
     recruit_by_id = {r["recruit_id"]: r for r in recruits}
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    user_team_id_str = str(user_team_object_id) if user_team_object_id else ""
+    newly_added_for_user: list[str] = []
 
     played: set[str] = set()
     game_by_team: dict[str, dict] = {}
@@ -7083,7 +7232,12 @@ def _apply_performance_based_recruiting_lean_updates(
         doc = recruit_by_id.get(rid)
         if not doc:
             return
-        new_lean = _apply_team_to_recruit_performance_lean(doc.get("Lean"), team_id)
+        old_lean = doc.get("Lean")
+        new_lean = _apply_team_to_recruit_performance_lean(old_lean, team_id)
+        if user_team_id_str and team_id == user_team_id_str and _team_was_newly_added_to_lean(
+            old_lean, new_lean, team_id
+        ):
+            newly_added_for_user.append(rid)
         doc["Lean"] = new_lean
         franchise_recruits_data_collection.update_one(
             {"franchise_id": str(fid), "recruit_id": rid},
@@ -7129,6 +7283,12 @@ def _apply_performance_based_recruiting_lean_updates(
         _maybe_roll(team_id, loss_chances[0], rt_low=True)
         _maybe_roll(team_id, loss_chances[1], rt_low=False)
 
+    _append_fcc_pending_new_lean_recruits(
+        franchise_doc,
+        fid,
+        newly_added_for_user,
+        user_team_id_str,
+    )
     db.franchises.update_one(
         {"_id": fid},
         {"$set": {f"recruiting_performance_lean_applied.{week}": True}},
@@ -7230,6 +7390,9 @@ def _apply_complete_week_recruiting_lean_updates(
         )
     }
     team_outcomes = _team_outcomes_by_week_results(results)
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    user_team_id_str = str(user_team_object_id) if user_team_object_id else ""
+    newly_added_for_user: list[str] = []
 
     bulk_updates = []
     for team_id, recruit_id in recruit_visit_pairs:
@@ -7237,12 +7400,17 @@ def _apply_complete_week_recruiting_lean_updates(
         team_doc = team_docs_by_id.get(team_id)
         if not recruit_doc or not team_doc:
             continue
+        old_lean = recruit_doc.get("Lean")
         updated_lean = _update_recruit_lean_after_visit(
-            recruit_doc.get("Lean"),
+            old_lean,
             team_id,
             str(team_doc.get("region") or "").upper() == str(recruit_doc.get("Home Region") or "").upper(),
             team_outcomes.get(team_id) == "win",
         )
+        if user_team_id_str and team_id == user_team_id_str and _team_was_newly_added_to_lean(
+            old_lean, updated_lean, team_id
+        ):
+            newly_added_for_user.append(recruit_id)
         bulk_updates.append({
             "filter": {"franchise_id": str(fid), "recruit_id": recruit_id},
             "update": {"$set": {"Lean": updated_lean}},
@@ -7250,6 +7418,13 @@ def _apply_complete_week_recruiting_lean_updates(
 
     for op in bulk_updates:
         franchise_recruits_data_collection.update_one(op["filter"], op["update"])
+
+    _append_fcc_pending_new_lean_recruits(
+        franchise_doc,
+        fid,
+        newly_added_for_user,
+        user_team_id_str,
+    )
 
     franchise_team_data_collection.update_many(
         {"franchise_id": fid},
@@ -11222,6 +11397,7 @@ def finish_season(req: FinishSeasonRequest):
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
             "recruiting_performance_lean_applied": {},
+            FCC_PENDING_NEW_LEAN_RECRUITS_FIELD: [],
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},
             AWARDS_FIELD: awards_reset,
