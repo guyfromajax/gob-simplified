@@ -55,7 +55,7 @@ Question 9: "What Is Your Favorite Thing About GOB?"
 Question 10: What Is Your Least Favorite Thing About GOB?
 
 Question 11: "Anything else you'd like to tell us?"
-- Optional text input with prefill "Optional, but we'd love to hear what you have to see. We read every word."
+- Optional text input with prefill "Optional, but we'd love to hear what you have to say. We read every word."
 
 Question 12: Would you recommend GOB to a friend:
 -Yes/No toggle
