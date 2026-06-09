@@ -29,6 +29,19 @@
 ##User Account
 22. User account -- link X & Facebook?
 
+##Full Product Readiness
+100. Press & Trap Plays
+101. EOG/EOQ Perfection
+102. Team court images
+103. Player images
+104. Media & Beat reporters
+105. More responsive front end
+106. Monetization plan
+107. Stripe
+108. Message board
+109. More dynamic HCO animations
+110. Geek Points syste
+
 
 
 
