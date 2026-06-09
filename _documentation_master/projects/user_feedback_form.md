@@ -44,24 +44,27 @@ Slider: "N/A", "Too Easy", "Just Right", "Too Hard"
 Slider fill colors: black, red, green, red
 
 
-##2 Open-Ended Questions & One Boolean**
+##3 Open-Ended Questions & One Boolean**
 Title: "Lastly, Give Us Your Opinion -- In Your Own Words"
 
 **Format**
-- All three questions are required
+- Questions 9, 10, and 12 are required. Question 11 is optional.
 - The first two are simple text boxes with prefills "Tell Us What You Think"
 
 Question 9: "What Is Your Favorite Thing About GOB?"
 Question 10: What Is Your Least Favorite Thing About GOB?
 
-Question 11: Would you recommend GOB to a friend: 
+Question 11: "Anything else you'd like to tell us?"
+- Optional text input with prefill "Optional, but we'd love to hear what you have to see. We read every word."
+
+Question 12: Would you recommend GOB to a friend:
 -Yes/No toggle
 -Toggle starts neutral
 -Yes highlight in green, no highlights in red
 
 
 **Page UX**
--An always present bar at the bottom of the screen with a "Submit" button that is dead until the user completes all 11 required questions, then becomes orage. Also have a tracking bar at the bottom. 0/11, 1/ll, 2/11, etc -- with eleven dashes that start grey and become orage as teh user completes questions.
+-An always present bar at the bottom of the screen with a "Submit" button that is dead until the user completes the 11 required questions, then becomes orage. Also have a tracking bar at the bottom. 0/12, 1/12, 2/12, etc -- with twelve dashes that start grey and become orage as teh user completes questions.
 
 **Page wiring**
 - All form submissions are saved to teh gob db (main) or gob-staging db (staging), in a newly created "alpha_feedback" collection for each db. Can we initiate this collection for each db lazily as the first user submits a form? or do we need to create these collections ahead of time.
@@ -77,4 +80,4 @@ Question 11: Would you recommend GOB to a friend:
 
 - if the user does not provide feedback
     - we re-present this feedback to the suer one more time, after they complete their fifth game, changing copy in modal from "2" to "5"
-    - until the user complete the feedback form once, rewire teh Feedback button in the top nav bar to go to this 11-question feedback form. Also place a purple highlight emitting from the button until the user has provided feedback. Make the highlight noticeable, but not obnoxious.
+    - until the user complete the feedback form once, rewire teh Feedback button in the top nav bar to go to this 12-question feedback form. Also place a purple highlight emitting from the button until the user has provided feedback. Make the highlight noticeable, but not obnoxious.

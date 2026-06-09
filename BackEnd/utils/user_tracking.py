@@ -69,7 +69,7 @@ def default_user_tracking() -> dict:
     one-time first-archetype reveal modal (false → eligible to see it).
 
     Alpha-feedback fields gate the alpha survey + its post-game prompt modal:
-      `alpha_feedback_submitted` — true once the user submits the 11-question survey.
+      `alpha_feedback_submitted` — true once the user submits the 12-question survey.
       `alpha_feedback_games`     — FORWARD-ONLY counter of non-tutorial games completed
                                    after this feature shipped (incremented in
                                    commit_user_game_record). Starts at 0 for everyone,

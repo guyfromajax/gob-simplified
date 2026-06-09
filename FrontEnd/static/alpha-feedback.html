@@ -211,7 +211,7 @@
     <h1 class="af-title">GOB User Feedback</h1>
 
     <div id="af-form">
-      <p class="af-intro">A few quick questions to help us make GOB better. All 11 are required &mdash; optional notes are not.</p>
+      <p class="af-intro">A few quick questions to help us make GOB better. Question 11 is optional; the other 11 are required.</p>
 
       <!-- SECTION 01 -->
       <section class="af-section">
@@ -236,6 +236,10 @@
           <div class="af-open-label">What is your least favorite thing about GOB?</div>
           <textarea id="af-least" maxlength="5000" placeholder="Tell us what you think"></textarea>
         </div>
+        <div class="af-open">
+          <div class="af-open-label">Anything else you'd like to tell us?</div>
+          <textarea id="af-anything-else" maxlength="5000" placeholder="Optional, but we'd love to hear what you have to see. We read every word."></textarea>
+        </div>
         <div class="af-bool">
           <div class="af-bool-label">Would you recommend GOB to a friend?</div>
           <div class="af-bool-options" id="af-recommend">
@@ -259,7 +263,7 @@
   <!-- Sticky progress + submit -->
   <div class="af-bottom" id="af-bottom">
     <div class="af-progress">
-      <span class="af-progress-count" id="af-count">0/11</span>
+      <span class="af-progress-count" id="af-count">0/12</span>
       <div class="af-dashes" id="af-dashes"></div>
     </div>
     <button type="button" class="af-submit" id="af-submit" disabled>Submit</button>
@@ -423,8 +427,10 @@
       // --- Open-ended + Yes/No ----------------------------------------------
       var favEl = document.getElementById('af-favorite');
       var leastEl = document.getElementById('af-least');
+      var anythingElseEl = document.getElementById('af-anything-else');
       favEl.addEventListener('input', updateProgress);
       leastEl.addEventListener('input', updateProgress);
+      anythingElseEl.addEventListener('input', updateProgress);
 
       var recommend = null; // true | false | null
       var recHost = document.getElementById('af-recommend');
@@ -441,7 +447,7 @@
       // --- Progress bar ------------------------------------------------------
       var dashHost = document.getElementById('af-dashes');
       var dashes = [];
-      for (var i = 0; i < 11; i++) {
+      for (var i = 0; i < 12; i++) {
         var d = document.createElement('span');
         d.className = 'af-dash';
         dashHost.appendChild(d);
@@ -455,18 +461,26 @@
         RATING_KEYS.forEach(function (k) { if (ratings[k]) n++; });
         if ((favEl.value || '').trim()) n++;
         if ((leastEl.value || '').trim()) n++;
+        if ((anythingElseEl.value || '').trim()) n++;
         if (recommend !== null) n++;
         return n;
       }
 
+      function requiredQuestionsComplete() {
+        return RATING_KEYS.every(function (k) { return !!ratings[k]; }) &&
+          !!(favEl.value || '').trim() &&
+          !!(leastEl.value || '').trim() &&
+          recommend !== null;
+      }
+
       function updateProgress() {
         var n = completedCount();
-        countEl.textContent = n + '/11';
-        for (var i = 0; i < 11; i++) {
+        countEl.textContent = n + '/12';
+        for (var i = 0; i < 12; i++) {
           if (i < n) dashes[i].classList.add('done');
           else dashes[i].classList.remove('done');
         }
-        if (n >= 11) {
+        if (requiredQuestionsComplete()) {
           submitBtn.disabled = false;
           submitBtn.classList.add('ready');
         } else {
@@ -480,7 +494,7 @@
       var submitting = false;
       submitBtn.addEventListener('click', function () {
         if (submitBtn.disabled || submitting) return;
-        if (completedCount() < 11) return;
+        if (!requiredQuestionsComplete()) return;
         submitting = true;
         playSound('click-tiny.wav');
         errEl.textContent = '';
@@ -500,6 +514,7 @@
           optional_notes: notes,
           favorite: (favEl.value || '').trim(),
           least_favorite: (leastEl.value || '').trim(),
+          anything_else: (anythingElseEl.value || '').trim(),
           would_recommend: !!recommend
         };
 

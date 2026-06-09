@@ -96,7 +96,7 @@ if client:
     password_reset_tokens_collection = db["password_reset_tokens"]
     press_conference_sessions_collection = db["press_conference_sessions"]
     community_highlights_collection = db["community_highlights"]
-    # Alpha 11-question feedback survey (lazily created on first insert; lands in
+    # Alpha 12-question feedback survey (lazily created on first insert; lands in
     # gob.alpha_feedback on prod, gob-staging.alpha_feedback on staging — DB chosen
     # by _get_database_name, no per-env branching).
     alpha_feedback_collection = db["alpha_feedback"]
@@ -130,7 +130,7 @@ else:
     password_reset_tokens_collection = db["password_reset_tokens"]
     press_conference_sessions_collection = db["press_conference_sessions"]
     community_highlights_collection = db["community_highlights"]
-    # Alpha 11-question feedback survey (lazily created on first insert).
+    # Alpha 12-question feedback survey (lazily created on first insert).
     alpha_feedback_collection = db["alpha_feedback"]
     print("🔵 [DEBUG] db.py: Mongomock collections initialized", file=sys.stderr, flush=True)
 

@@ -47,6 +47,7 @@ class AlphaFeedbackRequest(BaseModel):
     optional_notes: Dict[str, str] = Field(default_factory=dict)
     favorite: str = Field(..., max_length=_FAVORITE_MAX)
     least_favorite: str = Field(..., max_length=_FAVORITE_MAX)
+    anything_else: str = Field(default="", max_length=_FAVORITE_MAX)
     would_recommend: bool
     app_version: Optional[str] = Field(default=None, max_length=100)
 
@@ -77,6 +78,7 @@ async def submit_alpha_feedback(
     # --- Validate the two open-ended answers (required, non-empty trimmed). ---
     favorite = (body.favorite or "").strip()
     least_favorite = (body.least_favorite or "").strip()
+    anything_else = (body.anything_else or "").strip()
     if not favorite or not least_favorite:
         raise HTTPException(status_code=422, detail="Both written answers are required.")
 
@@ -106,6 +108,7 @@ async def submit_alpha_feedback(
         "optional_notes": optional_notes,
         "favorite": favorite[:_FAVORITE_MAX],
         "least_favorite": least_favorite[:_FAVORITE_MAX],
+        "anything_else": anything_else[:_FAVORITE_MAX],
         "would_recommend": bool(body.would_recommend),
         "context": context,
         "updated_at": now,
@@ -138,6 +141,7 @@ async def submit_alpha_feedback(
             optional_notes=optional_notes,
             favorite=favorite,
             least_favorite=least_favorite,
+            anything_else=anything_else,
             would_recommend=bool(body.would_recommend),
             context=context,
             user_label=user_label,

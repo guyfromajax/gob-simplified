@@ -108,11 +108,12 @@ def send_alpha_feedback_email(
     optional_notes: dict,
     favorite: str,
     least_favorite: str,
+    anything_else: str,
     would_recommend: bool,
     context: dict,
     user_label: str = "",
 ) -> bool:
-    """Send the 11-question alpha survey to the team inbox (FEEDBACK_TO_EMAIL).
+    """Send the 12-question alpha survey to the team inbox (FEEDBACK_TO_EMAIL).
 
     Goes to jamie@geekedoutgames.com (env-overridable); never to the submitter.
     Best-effort: returns False (and no-ops) when Resend isn't configured.
@@ -131,6 +132,7 @@ def send_alpha_feedback_email(
 
     safe_fav = escape(favorite or "").replace("\n", "<br>")
     safe_least = escape(least_favorite or "").replace("\n", "<br>")
+    safe_anything_else = escape(anything_else or "").replace("\n", "<br>") or "<em>No response</em>"
     rec = "Yes" if would_recommend else "No"
     safe_user = escape(str((context or {}).get("user", "") or user_label or ""))
     safe_agent = escape(str((context or {}).get("user_agent", "")))
@@ -144,6 +146,7 @@ def send_alpha_feedback_email(
         + "<hr>"
         f"<p><strong>Favorite thing about GOB:</strong><br>{safe_fav}</p>"
         f"<p><strong>Least favorite thing about GOB:</strong><br>{safe_least}</p>"
+        f"<p><strong>Anything else they'd like to tell us:</strong><br>{safe_anything_else}</p>"
         f"<p><strong>Would recommend to a friend:</strong> {rec}</p>"
         "<hr>"
         f"<p><strong>App version:</strong> {safe_ver}</p>"
