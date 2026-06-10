@@ -33,6 +33,7 @@ input[type="reset"] {
   display: flex;
   flex-direction: column;
   --fcc-shell-offset: 30px;
+  height: calc(100vh - var(--fcc-shell-offset));
   min-height: calc(100vh - var(--fcc-shell-offset));
   max-height: calc(100vh - var(--fcc-shell-offset));
   box-sizing: border-box;
@@ -246,7 +247,7 @@ body.has-auth-bar #franchise-container {
 
 #franchise-container #tournament-tabs {
   padding: 6px 4px 0;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -261,7 +262,6 @@ body.has-auth-bar #franchise-container {
   grid-row: 2;
   align-self: stretch;
   min-height: 0;
-  max-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -517,6 +517,37 @@ body.has-auth-bar #franchise-container {
   min-height: 0;
 }
 
+/* Stack tab sections at natural height so the active tab panel scrolls vertically */
+#franchise-container #tournament-tabs > .tab-content.active > * {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+#franchise-container .fcc-scouting-layout > .fcc-data-card {
+  flex: 0 0 auto;
+}
+
+/* Table wrappers scroll horizontally only; vertical scroll stays on the tab panel */
+#franchise-container .tab-content .scroll-x {
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container .tab-content .scroll-x::-webkit-scrollbar {
+  height: 10px;
+}
+
+#franchise-container .tab-content .scroll-x::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#franchise-container .tab-content .scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+
 #franchise-container .tab-content > h3,
 #franchise-container .tab-content h2 {
   color: #ffffff;
@@ -548,7 +579,7 @@ body.has-auth-bar #franchise-container {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 100%;
+  min-height: 0;
   text-align: center;
   font-family: 'Inter', sans-serif;
   font-size: 18px;
@@ -559,14 +590,12 @@ body.has-auth-bar #franchise-container {
 
 #home-tab {
   min-height: 0;
-  flex: 0 0 auto;
 }
 
 .fcc-home-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  flex: 0 0 auto;
 }
 
 .fcc-home-card {
@@ -1934,38 +1963,6 @@ body.has-auth-bar #franchise-container {
   padding: 0;
 }
 
-#franchise-container #roster-tab .scroll-x,
-#franchise-container #player-stats-tab .scroll-x,
-#franchise-container #recruits-tab .scroll-x,
-#franchise-container #fcc-team-stats-summary-tab .scroll-x {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container #roster-tab .scroll-x::-webkit-scrollbar,
-#franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar,
-#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar,
-#franchise-container #fcc-team-stats-summary-tab .scroll-x::-webkit-scrollbar {
-  height: 10px;
-}
-
-#franchise-container #roster-tab .scroll-x::-webkit-scrollbar-track,
-#franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar-track,
-#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar-track,
-#franchise-container #fcc-team-stats-summary-tab .scroll-x::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container #roster-tab .scroll-x::-webkit-scrollbar-thumb,
-#franchise-container #player-stats-tab .scroll-x::-webkit-scrollbar-thumb,
-#franchise-container #recruits-tab .scroll-x::-webkit-scrollbar-thumb,
-#franchise-container #fcc-team-stats-summary-tab .scroll-x::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-}
-
 #franchise-container #roster-tab table.roster-table,
 #franchise-container #player-stats-tab table.stats-table,
 #franchise-container #recruits-tab table.recruiting-table,
@@ -2251,26 +2248,6 @@ body.has-auth-bar #franchise-container {
 #franchise-container #coaches-tab .tm-side-card-label,
 #franchise-container #coaches-tab .tm-radar-axis-label {
   font-size: 18px;
-}
-
-#franchise-container #coaches-tab .scroll-x {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container #coaches-tab .scroll-x::-webkit-scrollbar {
-  height: 10px;
-}
-
-#franchise-container #coaches-tab .scroll-x::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container #coaches-tab .scroll-x::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
 }
 
 #franchise-container #coaches-tab .scouting-projected-lineup-wrap {
