@@ -3257,8 +3257,8 @@ function showCutPlayersRequiredModal(cutCount) {
     <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="fcc-cut-required-title" aria-describedby="fcc-cut-required-copy">
       <div class="gob-modal-accent"></div>
       <div class="gob-modal-body">
-        <h3 id="fcc-cut-required-title" class="gob-modal-title">Assign Training Squad</h3>
-        <p id="fcc-cut-required-copy" class="gob-modal-subtitle">You need to assign ${cutCount} player${cutCount === 1 ? '' : 's'} to the training squad. Note these players will be ineligible to play this season, but they will be available to you for training camp next season.</p>
+        <h3 id="fcc-cut-required-title" class="gob-modal-title">Trim Your Roster to Size</h3>
+        <p id="fcc-cut-required-copy" class="gob-modal-subtitle">Assign ${cutCount} player${cutCount === 1 ? '' : 's'} to your training squad. They'll sit out this season, but they'll keep developing and return eligible next year.</p>
       </div>
       <div class="gob-modal-actions">
         <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Close</button>
