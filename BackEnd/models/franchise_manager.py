@@ -8,6 +8,7 @@ from pathlib import Path
 import json
 import logging
 import os
+import uuid
 
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
@@ -343,7 +344,7 @@ class FranchiseManager:
             walk_on_ids = []
             for _ in range(3):
                 wo = generate_walk_on_profile()
-                wid = str(uuid_module.uuid4())
+                wid = str(uuid.uuid4())
                 first_name, _, last_name = (wo.get("name") or "").partition(" ")
                 players_map[wid] = {
                     "meta": {
@@ -432,7 +433,6 @@ class FranchiseManager:
 
         # ✅ FTD/FPD/FRD: Create franchise_team_data, franchise_players_data, franchise_recruits_data
         # *after* franchise insert so we have franchise_id.
-        import uuid as uuid_module
         from BackEnd.db import (
             franchise_team_data_collection,
             franchise_players_data_collection,
@@ -474,7 +474,7 @@ class FranchiseManager:
         frd_docs = [
             {
                 "franchise_id": str(self.franchise_id),
-                "recruit_id": str(uuid_module.uuid4()),
+                "recruit_id": str(uuid.uuid4()),
                 "name": recruit["name"],
                 "attributes": recruit["attributes"],
                 "position_ratings": recruit["position_ratings"],
