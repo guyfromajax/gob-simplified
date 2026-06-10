@@ -158,6 +158,9 @@
     const startingPossession = sourceParams.get('starting_possession');
     if (startWithInbound) params.set('start_with_inbound', startWithInbound);
     if (startingPossession) params.set('starting_possession', startingPossession);
+    if (sourceParams.get('locked_exhausted_user_lineup') === 'true') {
+      params.set('locked_exhausted_user_lineup', 'true');
+    }
     
     // ============================================
     // 8. MODE/TOURNAMENT/FRANCHISE PARAMS

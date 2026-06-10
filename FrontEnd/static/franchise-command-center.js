@@ -2175,6 +2175,64 @@ function renderTrainingResults(data) {
   }
 }
 
+function renderTrainingSquad(trainingSquad) {
+  const section = document.getElementById('training-squad-section');
+  const tbody = document.getElementById('training-squad-body');
+  if (!section || !tbody) return;
+  // Undefined => not provided on this render (e.g. cache restore); leave as-is.
+  if (!Array.isArray(trainingSquad)) return;
+  if (!trainingSquad.length) {
+    section.style.display = 'none';
+    tbody.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = '';
+  trainingSquad.forEach(p => {
+    try {
+      const best = getBestPosition(p.position_ratings || {});
+      const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
+      const attrs = p.attributes || {};
+      const tr = document.createElement('tr');
+
+      const nameTd = document.createElement('td');
+      const nameLink = document.createElement('a');
+      nameLink.href = buildPlayerDetailUrl(p._id);
+      nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
+      nameLink.style.color = 'inherit';
+      nameLink.style.textDecoration = 'none';
+      nameTd.appendChild(nameLink);
+      tr.appendChild(nameTd);
+
+      const addCell = (content, extraClass) => {
+        const td = document.createElement('td');
+        td.textContent = content;
+        if (extraClass) td.className = extraClass;
+        tr.appendChild(td);
+      };
+      addCell(best.pos || '--');
+      addCell(yearMap[(p.year || '').toLowerCase()] || p.year || '--');
+      addCell(formatHeight(p.height));
+      addCell(p.weight ?? '--');
+      ATTR_HEADERS.forEach(h => {
+        const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
+        const displayVal = h === 'NG'
+          ? (rawVal != null ? rawVal.toFixed(2) : '--')
+          : (rawVal != null ? Math.floor(rawVal / 10) : '--');
+        addCell(displayVal);
+      });
+      const rt = best.rating;
+      addCell(rt ?? '-', typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '');
+      tbody.appendChild(tr);
+    } catch (e) {
+      console.error('Error rendering training squad player:', p, e);
+    }
+  });
+  section.style.display = '';
+  if (typeof initAttributeTooltips !== 'undefined') {
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
+  }
+}
+
 function renderTeam(data) {
   if (!data) {
     return;
@@ -2202,6 +2260,7 @@ function renderTeam(data) {
         rt: best.rating,
         has_playing_time_promise: !!p.has_playing_time_promise,
         is_graduating: !!p.is_graduating,
+        walk_on: !!p.walk_on,
       };
       return player;
     } catch (error) {
@@ -2246,6 +2305,13 @@ function renderTeam(data) {
       gr.style.fontWeight = '700';
       nameTd.appendChild(gr);
     }
+    if (p.walk_on) {
+      const wo = document.createElement('span');
+      wo.textContent = ' (walk on)';
+      wo.style.color = '#8a93a6';
+      wo.style.fontWeight = '700';
+      nameTd.appendChild(wo);
+    }
     tr.appendChild(nameTd);
 
     // Add other columns directly as DOM elements
@@ -2285,6 +2351,9 @@ function renderTeam(data) {
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }
+
+  // Training Squad (ineligible players) rendered below the active roster.
+  renderTrainingSquad(data.training_squad);
 
   // Add click handlers to sortable headers
   const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th');
@@ -2527,6 +2596,13 @@ function sortRosterTable(columnName, direction) {
       gr.style.color = '#2f8f46';
       gr.style.fontWeight = '700';
       nameTd.appendChild(gr);
+    }
+    if (p.walk_on) {
+      const wo = document.createElement('span');
+      wo.textContent = ' (walk on)';
+      wo.style.color = '#8a93a6';
+      wo.style.fontWeight = '700';
+      nameTd.appendChild(wo);
     }
     tr.appendChild(nameTd);
 
@@ -2903,9 +2979,29 @@ async function init() {
   }
   championshipMomentsDone.then(() => {
     if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
+    if (window.BigNewsModals) {
+      window.BigNewsModals.maybeShow(topData, {
+        userTeamId,
+        teamIdToNameMap: topData?.team_name_map || {},
+        teamIdMetaMap,
+      });
+    }
   });
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
-    showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+    const showTs = () => showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+    // Sequence behind tutorial alerts: on the season-1 week-1 return the Team
+    // Attributes tutorial must come first. whenReturnAlertsSettled fires once that
+    // alert is dismissed (or immediately if no tutorial alert is showing). Fallback
+    // to showing directly if the tutorial-alert module isn't present.
+    const ta = window.GOBTutorialAlerts;
+    if (ta && typeof ta.whenReturnAlertsSettled === 'function') {
+      let shown = false;
+      const fire = () => { if (shown) return; shown = true; showTs(); };
+      ta.whenReturnAlertsSettled(fire);
+      setTimeout(fire, 8000); // safety net if the settle signal never arrives
+    } else {
+      showTs();
+    }
   }
   
   if (topData && (topData.team_id || topData.team) && userTeamId) {
@@ -3161,8 +3257,8 @@ function showCutPlayersRequiredModal(cutCount) {
     <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="fcc-cut-required-title" aria-describedby="fcc-cut-required-copy">
       <div class="gob-modal-accent"></div>
       <div class="gob-modal-body">
-        <h3 id="fcc-cut-required-title" class="gob-modal-title">Cut Players Required</h3>
-        <p id="fcc-cut-required-copy" class="gob-modal-subtitle">You need to cut ${cutCount} player${cutCount === 1 ? '' : 's'} before the next game.</p>
+        <h3 id="fcc-cut-required-title" class="gob-modal-title">Assign Training Squad</h3>
+        <p id="fcc-cut-required-copy" class="gob-modal-subtitle">You need to assign ${cutCount} player${cutCount === 1 ? '' : 's'} to the training squad. Note these players will be ineligible to play this season, but they will be available to you for training camp next season.</p>
       </div>
       <div class="gob-modal-actions">
         <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Close</button>
@@ -3237,7 +3333,7 @@ function updatePlayButton(data) {
   const cutRequired = !!data.cut_required;
   
   if (cutRequired) {
-    playNowBtn.textContent = 'Cut Players';
+    playNowBtn.textContent = 'Assign Training Squad';
     playNowBtn.dataset.mode = 'cut-players';
   } else if (week === 35) {
     playNowBtn.textContent = 'Recruiting';
@@ -3396,12 +3492,43 @@ playNowBtn.addEventListener('click', async () => {
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
     params.set('return_url', getCurrentRelativeUrl());
-    await confirmSfxReady;
-    try {
-      const { clearFranchiseMusicState } = await import('/js/musicController.js');
-      clearFranchiseMusicState();
-    } catch {}
-    window.location.href = `/recruiting-orders.html?${params.toString()}`;
+    const recruitingUrl = `/recruiting-orders.html?${params.toString()}`;
+    const goRecruiting = async () => {
+      await confirmSfxReady;
+      try {
+        const { clearFranchiseMusicState } = await import('/js/musicController.js');
+        clearFranchiseMusicState();
+      } catch {}
+      window.location.href = recruitingUrl;
+    };
+    // Offer optional pre-recruiting cuts (real cuts — players lost forever).
+    const cutParams = new URLSearchParams();
+    cutParams.set('franchise_id', franchiseId);
+    cutParams.set('team_id', userTeamId);
+    cutParams.set('mode', 'cut');
+    cutParams.set('from', 'week35');
+    cutParams.set('next_url', recruitingUrl);
+    const cutUrl = `/cut-players.html?${cutParams.toString()}`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gob-modal-overlay fcc-cut-required-modal is-visible';
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.innerHTML = `
+      <div class="gob-modal-backdrop"></div>
+      <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="fcc-wk35-cut-title" aria-describedby="fcc-wk35-cut-copy">
+        <div class="gob-modal-accent"></div>
+        <div class="gob-modal-body">
+          <h3 id="fcc-wk35-cut-title" class="gob-modal-title">Cut Players?</h3>
+          <p id="fcc-wk35-cut-copy" class="gob-modal-subtitle">Would you like to cut any players ahead of recruiting? Note any players cut will be lost forever, but you will open additional slots for recruiting.</p>
+        </div>
+        <div class="gob-modal-actions">
+          <button type="button" class="gob-modal-btn-secondary" id="fcc-wk35-cut-yes">Cut Players</button>
+          <button type="button" class="gob-modal-btn-primary" id="fcc-wk35-cut-no">No Cuts</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#fcc-wk35-cut-yes')?.addEventListener('click', () => { window.location.href = cutUrl; });
+    overlay.querySelector('#fcc-wk35-cut-no')?.addEventListener('click', () => { overlay.remove(); goRecruiting(); });
     return;
   }
 
@@ -3680,7 +3807,26 @@ function renderFccInbox(topData) {
   }
 
   inboxItems.forEach((item) => {
-    if (!item || item.type !== 'game_result') return;
+    if (!item) return;
+    if (item.type === 'training_squad_report') {
+      const tsParams = new URLSearchParams({
+        franchise_id: String(franchiseId || ''),
+        team_id: String(tid || ''),
+        from: 'inbox',
+      });
+      const p = document.createElement('p');
+      p.className = 'fcc-inbox-message';
+      p.appendChild(document.createTextNode(`Week #${Number(item.week)} Training Squad Development report `));
+      const a = document.createElement('a');
+      a.href = `/training-squad-report.html?${tsParams.toString()}`;
+      a.className = 'fcc-inbox-link';
+      a.textContent = 'here';
+      p.appendChild(a);
+      p.appendChild(document.createTextNode('.'));
+      el.appendChild(p);
+      return;
+    }
+    if (item.type !== 'game_result') return;
     const itemWeek = Number(item.week);
     const verb = item.result === 'win' ? 'defeated' : 'lost to';
     const text = Number.isFinite(itemWeek) && item.user_team_name && item.opponent_team_name

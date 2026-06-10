@@ -913,6 +913,10 @@ export function createGameScene(Phaser) {
         payload.resume_from_timeout = true;
         // ✅ REMOVED: Timeout resume logging (cluttering console)
       }
+      if (urlParams.get('locked_exhausted_user_lineup') === 'true') {
+        payload.locked_exhausted_user_lineup = true;
+        payload.user_team_side = urlParams.get('my_team');
+      }
       if (timeoutTraceId) {
         payload.timeout_trace_id = timeoutTraceId;
       }

@@ -79,7 +79,7 @@ from BackEnd.utils.franchise_championships import (
 )
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.utils.team_play_utils import iter_team_plays
-from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets
+from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
     SOS_AVG_DEFAULT,
@@ -2235,6 +2235,163 @@ def _get_user_eos_phase_status(
 
 
 REGION_BYE_MODAL_SEEN_SEASON_FIELD = "region_bye_modal_seen_season"
+BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
+RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
+
+BRACKET_REVEAL_WEEKS = {
+    27: ("conference", "Conference Tournament · Weeks 27–29", "full"),
+    30: ("region", "Region Tournament · Weeks 30–31", "compact4"),
+    32: ("national", "National Tournament · Weeks 32–34", "full"),
+}
+
+
+def _franchise_current_season(franchise_doc: dict[str, Any]) -> int:
+    return int(franchise_doc.get("current_season", 1) or 1)
+
+
+def _bracket_reveal_seen_key(tier: str, season: int) -> str:
+    return f"{tier}:{season}"
+
+
+def _round1_not_started(bracket: dict[str, Any] | None) -> bool:
+    if not bracket:
+        return False
+    round1 = bracket.get("round1") or []
+    if not round1:
+        return False
+    for matchup in round1:
+        if isinstance(matchup, dict) and matchup.get("winner"):
+            return False
+    return True
+
+
+def _sanitize_bracket_for_reveal(bracket: dict[str, Any] | None, *, keep_final: bool = False) -> dict[str, Any]:
+    b = deepcopy(bracket or {})
+    for round_key in ("round1", "round2", "final"):
+        for matchup in b.get(round_key) or []:
+            if not isinstance(matchup, dict):
+                continue
+            matchup.pop("winner", None)
+            if "score" in matchup:
+                matchup["score"] = {}
+    b["round2"] = []
+    if not keep_final:
+        b["final"] = []
+    return b
+
+
+def _build_bracket_reveal_modal_payload(
+    franchise_doc: dict[str, Any] | None,
+    team_doc: dict[str, Any] | None,
+    week: int | None,
+) -> dict[str, Any] | None:
+    """Bracket Reveal modal: first FCC entry at EOS phase start before round 1 is played."""
+    if not franchise_doc or not team_doc:
+        return None
+    week_val = int(week or 0)
+    spec = BRACKET_REVEAL_WEEKS.get(week_val)
+    if not spec:
+        return None
+    if not franchise_doc.get("eos_tournament_active"):
+        return None
+
+    tier, eyebrow, layout = spec
+    season = _franchise_current_season(franchise_doc)
+    reveal_key = _bracket_reveal_seen_key(tier, season)
+    seen = franchise_doc.get(BRACKET_REVEAL_SEEN_FIELD) or {}
+    if seen.get(reveal_key):
+        return None
+
+    bracket: dict[str, Any] | None = None
+    seeds: dict[str, Any] = {}
+
+    if tier == "conference":
+        conf = team_doc.get("conference")
+        if conf is None:
+            return None
+        ct = (franchise_doc.get("conference_tournaments") or {}).get(str(conf)) or {}
+        raw = ct.get("bracket") or {}
+        if not _round1_not_started(raw):
+            return None
+        bracket = _sanitize_bracket_for_reveal(raw)
+        seeds = ct.get("seeds") or {}
+    elif tier == "region":
+        region = str(team_doc.get("region") or "").upper()
+        if len(region) != 1:
+            return None
+        rt = (franchise_doc.get("region_tournaments") or {}).get(region) or {}
+        raw = {
+            "round1": rt.get("round1") or [],
+            "round2": [],
+            "final": rt.get("final") or [],
+        }
+        if not _round1_not_started(raw):
+            return None
+        bracket = _sanitize_bracket_for_reveal(raw, keep_final=True)
+        seeds = rt.get("seeds") or {}
+    else:
+        nt = franchise_doc.get("national_tournament") or {}
+        raw = nt.get("bracket") or {}
+        if not _round1_not_started(raw):
+            return None
+        bracket = _sanitize_bracket_for_reveal(raw)
+        seeds = nt.get("seeds") or {}
+
+    if not bracket or not (bracket.get("round1") or []):
+        return None
+
+    return {
+        "eligible": True,
+        "tier": tier,
+        "eyebrow": eyebrow,
+        "layout": layout,
+        "reveal_key": reveal_key,
+        "bracket": bracket,
+        "seeds": seeds,
+        "display_week": week_val,
+    }
+
+
+def _build_recruiting_results_modal_payload(
+    franchise_doc: dict[str, Any] | None,
+    team_id: str | None,
+) -> dict[str, Any] | None:
+    """Recruiting Results modal: first FCC entry after week-35 signings for the user team."""
+    if not franchise_doc or not team_id:
+        return None
+    if not franchise_doc.get("week_35_recruiting_ran"):
+        return None
+    season = _franchise_current_season(franchise_doc)
+    if int(franchise_doc.get(RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD, 0) or 0) == season:
+        return None
+
+    week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+    signed = [
+        player
+        for player in (week_35_results.get("signed_players") or [])
+        if str(player.get("team_id") or "") == str(team_id)
+    ]
+    if not signed:
+        return None
+
+    recruits = []
+    for player in signed[:5]:
+        recruits.append(
+            {
+                "name": player.get("name") or "--",
+                "pos": player.get("pos") or "--",
+                "archetype": player.get("archetype") or "--",
+                "height": player.get("height"),
+                "weight": player.get("weight"),
+                "rt": player.get("rt"),
+            }
+        )
+
+    return {
+        "eligible": True,
+        "recruits": recruits,
+        "count": len(recruits),
+    }
 
 
 def _should_show_region_bye_modal(
@@ -3897,6 +4054,16 @@ def _finalize_franchise_week_after_cpu_games(
     existing_results[str(week)] = results
     _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
     _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
+    # Training-squad weekly progression (weeks 2–26) + milestone development report.
+    try:
+        _apply_training_squad_progression_and_report(
+            franchise_id, franchise_doc, week, user_team_id_str
+        )
+    except Exception:
+        logger.exception(
+            "[TS-PROGRESSION] failed; continuing. franchise_id=%s week=%s",
+            franchise_id_str, week,
+        )
     try:
         _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, week, results)
     except Exception:
@@ -3914,6 +4081,11 @@ def _finalize_franchise_week_after_cpu_games(
         "week": next_week,
         "season_inbox": franchise_doc.get("season_inbox", []),
     }
+    # Persist training-squad report state if the progression hook wrote any.
+    if "training_squad_reports" in franchise_doc:
+        update_fields["training_squad_reports"] = franchise_doc["training_squad_reports"]
+    if "training_squad_report_baseline" in franchise_doc:
+        update_fields["training_squad_report_baseline"] = franchise_doc["training_squad_report_baseline"]
 
     if week == ScheduleManager.REGULAR_SEASON_WEEKS:
         ftd_docs = list(
@@ -5754,6 +5926,16 @@ def command_center_data(
                 franchise_doc,
                 str(team_id) if team_id else None,
             )
+        )
+        response["bracket_reveal_modal"] = (
+            _build_bracket_reveal_modal_payload(franchise_doc, team_doc, week)
+            if franchise_doc and team_doc
+            else None
+        )
+        response["recruiting_results_modal"] = (
+            _build_recruiting_results_modal_payload(franchise_doc, str(team_id) if team_id else None)
+            if franchise_doc
+            else None
         )
         return response
     if profile:
@@ -7873,9 +8055,14 @@ def _calculate_available_roster_spots(fid: ObjectId, user_team_id: str) -> int:
 
     ftd_doc = franchise_team_data_collection.find_one(
         {"franchise_id": fid, "team_id": team_object_id},
-        {"players": 1},
+        {"players": 1, "training_squad_players": 1},
     ) or {}
-    roster_player_ids = [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+    # Active + training-squad players both occupy roster slots next season (TS
+    # rejoins the pool), so both count against the 15-man cap.
+    roster_player_ids = (
+        [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+        + [str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id]
+    )
     if not roster_player_ids:
         return 15
 
@@ -8010,8 +8197,15 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
             )
             continue
 
-        cut_ids = set(_choose_cut_player_ids(roster_player_ids, fpd_map, cut_count))
-        remaining_ids = [player_id for player_id in roster_player_ids if player_id not in cut_ids]
+        # Lowest-RT players move to the training squad — NOT cut/deleted. They stay
+        # in FPD (ineligible to play) and rejoin the pool at next Training Camp.
+        ts_ids = _choose_cut_player_ids(roster_player_ids, fpd_map, cut_count)
+        ts_set = set(ts_ids)
+        remaining_ids = [player_id for player_id in roster_player_ids if player_id not in ts_set]
+        existing_ts = [
+            str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id
+        ]
+        new_training_squad = existing_ts + [pid for pid in ts_ids if pid not in existing_ts]
         remaining_scholarships = [
             str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
             if str(player_id) in remaining_ids
@@ -8030,16 +8224,146 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
             {
                 "players": remaining_ids,
                 "scholarship_players": remaining_scholarships,
-                "training_squad_players": [],
+                "training_squad_players": new_training_squad,
                 "playing_time_promise_players": remaining_ptp,
                 "total_player_attrs": total_player_attrs,
                 "updated_at": datetime.utcnow(),
             },
         )
-        if cut_ids:
-            franchise_players_data_collection.delete_many(
-                {"franchise_id": str(franchise_id), "player_id": {"$in": list(cut_ids)}}
-            )
+
+
+TRAINING_SQUAD_ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
+TRAINING_SQUAD_REPORT_WEEKS = (6, 11, 16, 21, 26)
+
+
+def _ts_progression_band(ch_value: Any) -> tuple[int, int]:
+    """CH-gated weekly attribute delta band for training-squad players."""
+    ch = int(ch_value or 0)
+    if ch > 79:
+        return (-1, 4)
+    if ch > 59:
+        return (-1, 3)
+    if ch > 39:
+        return (-2, 3)
+    if ch > 19:
+        return (-2, 2)
+    return (-3, 2)
+
+
+def _ts_attr_snapshot(attrs: dict[str, Any]) -> dict[str, int]:
+    """Anchor (base) values for the 13 evolving attrs."""
+    out: dict[str, int] = {}
+    for k in TRAINING_SQUAD_ATTR_KEYS:
+        v = attrs.get("anchor_" + k, attrs.get(k))
+        if v is not None:
+            out[k] = int(v)
+    return out
+
+
+def _apply_training_squad_progression_and_report(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+    completed_week: int,
+    user_team_id_str: Any,
+) -> None:
+    """Weeks 2–26: evolve every training-squad player's 13 attrs (CH-gated band) for
+    user AND CPU teams (persisted to FPD; ratings recomputed). On report weeks
+    (6/11/16/21/26) build the user's Training Squad Development report (delta vs the
+    previous report) onto franchise_doc, with an inbox link. franchise_doc fields set
+    here (season_inbox, training_squad_reports, training_squad_report_baseline) are
+    persisted by the caller's update_fields."""
+    if completed_week < 2 or completed_week > ScheduleManager.REGULAR_SEASON_WEEKS:
+        return
+    from BackEnd.utils.position_ratings import compute_position_ratings
+
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "training_squad_players": 1},
+    ))
+    all_ts_ids: list[str] = []
+    for d in ftd_docs:
+        all_ts_ids.extend([str(pid) for pid in (d.get("training_squad_players") or []) if pid])
+    if not all_ts_ids:
+        return
+    fpd_docs = list(franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id), "player_id": {"$in": all_ts_ids}},
+    ))
+    fpd_by_id = {d["player_id"]: d for d in fpd_docs}
+
+    # User team's TS players (report is user-only).
+    user_ts_ids: list[str] = []
+    if user_team_id_str:
+        user_ftd = next((d for d in ftd_docs if str(d.get("team_id")) == str(user_team_id_str)), None)
+        if user_ftd:
+            user_ts_ids = [str(pid) for pid in (user_ftd.get("training_squad_players") or []) if pid]
+
+    # Baseline (post-camp) captured on the first progression run, BEFORE evolving.
+    baseline = franchise_doc.get("training_squad_report_baseline")
+    if not baseline:
+        baseline = {}
+        for pid in user_ts_ids:
+            d = fpd_by_id.get(pid)
+            if d:
+                baseline[pid] = _ts_attr_snapshot(d.get("attributes") or {})
+        franchise_doc["training_squad_report_baseline"] = baseline
+
+    # Evolve every training-squad player (all teams), recompute ratings.
+    lo_clamp = 1  # PLAYER_ATTR_CLAMP[0] — min 1, no max
+    for d in fpd_docs:
+        attrs = d.get("attributes") or {}
+        band_lo, band_hi = _ts_progression_band(attrs.get("anchor_CH", attrs.get("CH")))
+        for key in TRAINING_SQUAD_ATTR_KEYS:
+            base = attrs.get("anchor_" + key, attrs.get(key))
+            if base is None:
+                continue
+            new_val = max(lo_clamp, int(base) + random.randint(band_lo, band_hi))
+            attrs[key] = new_val
+            attrs["anchor_" + key] = new_val
+        meta = d.get("meta") or {}
+        new_ratings = compute_position_ratings({
+            "attributes": attrs,
+            "height": meta.get("height"),
+            "name": (str(meta.get("first_name", "")) + " " + str(meta.get("last_name", ""))).strip(),
+        })
+        franchise_players_data_collection.update_one(
+            {"_id": d["_id"]},
+            {"$set": {"attributes": attrs, "position_ratings": new_ratings, "updated_at": datetime.utcnow()}},
+        )
+        d["attributes"] = attrs  # keep in-memory copy current for the report
+
+    # Report (user only) on milestone weeks.
+    if completed_week not in TRAINING_SQUAD_REPORT_WEEKS or not user_ts_ids:
+        return
+    players_report = []
+    new_baseline: dict[str, Any] = {}
+    for pid in user_ts_ids:
+        d = fpd_by_id.get(pid)
+        if not d:
+            continue
+        current = _ts_attr_snapshot(d.get("attributes") or {})
+        meta = d.get("meta") or {}
+        name = (str(meta.get("first_name", "")) + " " + str(meta.get("last_name", ""))).strip()
+        players_report.append({
+            "player_id": pid,
+            "name": name or pid,
+            "pos": _best_position(d.get("position_ratings") or {}).get("pos", "--"),
+            "baseline": (baseline.get(pid) or {}),  # values at last report (or post-camp)
+            "current": current,
+        })
+        new_baseline[pid] = current  # reset baseline for the next report period
+
+    reports = franchise_doc.get("training_squad_reports") or {}
+    reports[str(completed_week)] = {"week": int(completed_week), "players": players_report}
+    franchise_doc["training_squad_reports"] = reports
+    franchise_doc["training_squad_report_baseline"] = new_baseline
+
+    season_inbox = list(franchise_doc.get("season_inbox") or [])
+    season_inbox.insert(0, {
+        "type": "training_squad_report",
+        "week": int(completed_week),
+        "message": "Week #" + str(int(completed_week)) + " Training Squad Development report",
+    })
+    franchise_doc["season_inbox"] = season_inbox
 
 
 def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
@@ -8320,55 +8644,25 @@ def _assign_jerseys_to_signed_players(
         team_to_existing_numbers[team_id].add(jersey)
 
 
-def _generate_walk_on_profile() -> dict[str, Any]:
-    first_names, last_names, first_name_weights = get_franchise_name_assets()
-    attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
-    attrs = {}
-    over_19 = 0
-    for key in attr_keys:
-        value = random.randint(1, 22)
-        if value > 19 and over_19 >= 3:
-            value = random.randint(1, 19)
-        if value > 19:
-            over_19 += 1
-        attrs[key] = value
-    attrs = Player.randomize_game_attributes(attrs)
-    first_name = choose_franchise_first_name(first_names, first_name_weights)
-    last_name = random.choice(last_names).title()
-    name = f"{first_name} {last_name}"
-    height = random.randint(66, 72)
-    weight = random.randint(155, 179)
-    position_ratings = compute_position_ratings({
-        "attributes": attrs,
-        "height": height,
-        "name": name,
-    }, profile="recruit")
-    return {
-        "recruit_id": None,
-        "name": name,
-        "attributes": attrs,
-        "position_ratings": position_ratings,
-        "height": height,
-        "weight": weight,
-        "archetype": "Walk On",
-        "year": "Freshman",
-        "Home Region": "",
-    }
-
-
 def _current_team_capacity_state(franchise_id: ObjectId) -> dict[str, dict[str, Any]]:
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
-        {"team_id": 1, "players": 1, "scholarship_players": 1},
+        {"team_id": 1, "players": 1, "scholarship_players": 1, "training_squad_players": 1},
     ))
     roster_player_ids = []
     for doc in ftd_docs:
         roster_player_ids.extend([str(player_id) for player_id in (doc.get("players") or []) if player_id])
+        roster_player_ids.extend([str(player_id) for player_id in (doc.get("training_squad_players") or []) if player_id])
     fpd_map = _load_fpd_map(franchise_id, roster_player_ids)
     state: dict[str, dict[str, Any]] = {}
     for doc in ftd_docs:
         team_id = str(doc.get("team_id"))
-        players = [str(player_id) for player_id in (doc.get("players") or []) if player_id]
+        # Active + training squad both occupy roster slots next season (TS returns to
+        # the pool), so both count toward the 15-man cap when signing recruits.
+        players = (
+            [str(player_id) for player_id in (doc.get("players") or []) if player_id]
+            + [str(player_id) for player_id in (doc.get("training_squad_players") or []) if player_id]
+        )
         scholarship_players = {str(player_id) for player_id in (doc.get("scholarship_players") or []) if player_id}
         returning_players = []
         returning_scholarships = set()
@@ -8521,7 +8815,7 @@ def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
         capacity[winner_team_id]["roster_count"] += 1
     for team_id, team_doc in team_docs.items():
         while capacity.get(team_id, {}).get("roster_count", 0) < 15:
-            walk_on = _generate_walk_on_profile()
+            walk_on = generate_walk_on_profile()
             signed_players.append(
                 _week_35_result_entry_from_recruit(
                     walk_on,
@@ -8751,6 +9045,13 @@ def run_week_35_recruiting(
     ) or {}
     if not user_ftd.get(RECRUITING_ORDERS_WEEK_35_FIELD):
         raise HTTPException(status_code=400, detail="Recruiting orders must be saved before recruiting can run")
+
+    # CPU teams cut ahead of recruiting (real cuts), regardless of the user's choice,
+    # so the freed slots are available to the recruiting fill that follows.
+    try:
+        _apply_cpu_week_35_cuts(fid, excluded_team_id=user_team_id)
+    except Exception:
+        logger.exception("[WK35-CPU-CUTS] failed; continuing. franchise_id=%s", str(fid))
 
     results = _run_week_35_signings(franchise_doc)
     season_transition_token = _mint_season_transition_token()
@@ -9104,16 +9405,21 @@ def cut_franchise_players(
         name = " ".join(part for part in [meta.get("first_name", ""), meta.get("last_name", "")] if part).strip() or player_id
         cut_names.append(name)
 
+    # The selected players move to the training squad — they are NOT cut/deleted.
+    # `players` becomes the 12-man active roster; training_squad holds the rest
+    # (ineligible to play, retained in FPD, available again next Training Camp).
     remaining_roster_ids = [player_id for player_id in roster_player_ids if player_id not in set(requested_ids)]
     if len(remaining_roster_ids) != 12:
-        raise HTTPException(status_code=400, detail="Cuts must leave exactly 12 players on the roster")
+        raise HTTPException(status_code=400, detail="You must leave exactly 12 active players")
 
+    existing_training_squad = [
+        str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id
+    ]
+    new_training_squad = existing_training_squad + [
+        pid for pid in requested_ids if pid not in existing_training_squad
+    ]
     remaining_scholarships = [
         str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
-        if str(player_id) in remaining_roster_ids
-    ]
-    remaining_training_squad = [
-        str(player_id) for player_id in (ftd_doc.get("training_squad_players") or [])
         if str(player_id) in remaining_roster_ids
     ]
     remaining_ptp = [
@@ -9131,14 +9437,11 @@ def cut_franchise_players(
         {
             "players": remaining_roster_ids,
             "scholarship_players": remaining_scholarships,
-            "training_squad_players": remaining_training_squad,
+            "training_squad_players": new_training_squad,
             "playing_time_promise_players": remaining_ptp,
             "total_player_attrs": total_player_attrs,
             "updated_at": datetime.utcnow(),
         },
-    )
-    franchise_players_data_collection.delete_many(
-        {"franchise_id": str(fid), "player_id": {"$in": requested_ids}}
     )
 
     return {
@@ -9147,6 +9450,128 @@ def cut_franchise_players(
         "cut_names": cut_names,
         "remaining_roster_count": len(remaining_roster_ids),
     }
+
+
+def _hard_release_players(fid: ObjectId, team_object_id: Any, release_ids) -> int:
+    """Permanently release players: strip from every FTD roster list AND delete their
+    FPD docs (the real week-35 cut — distinct from training-squad assignment)."""
+    release_set = {str(p) for p in (release_ids or []) if p}
+    if not release_set:
+        return 0
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"players": 1, "scholarship_players": 1, "training_squad_players": 1, "playing_time_promise_players": 1},
+    ) or {}
+
+    def _strip(field: str) -> list[str]:
+        return [str(p) for p in (ftd_doc.get(field) or []) if p and str(p) not in release_set]
+
+    remaining_players = _strip("players")
+    fpd_map = _load_fpd_map(fid, remaining_players)
+    total_player_attrs = sum(
+        core_total_player_attrs((fpd_map.get(pid) or {}).get("attributes") or {})
+        for pid in remaining_players
+    )
+    _update_ftd_roster_state(
+        fid,
+        team_object_id,
+        {
+            "players": remaining_players,
+            "scholarship_players": _strip("scholarship_players"),
+            "training_squad_players": _strip("training_squad_players"),
+            "playing_time_promise_players": _strip("playing_time_promise_players"),
+            "total_player_attrs": total_player_attrs,
+            "updated_at": datetime.utcnow(),
+        },
+    )
+    franchise_players_data_collection.delete_many(
+        {"franchise_id": str(fid), "player_id": {"$in": list(release_set)}}
+    )
+    return len(release_set)
+
+
+def _apply_cpu_week_35_cuts(fid: ObjectId, excluded_team_id: Any = None) -> None:
+    """Week-35 real cuts for CPU teams ahead of recruiting. Rolls each player's best-RT:
+    RT<10 → 100% cut, RT<15 → 50%, RT<20 → 25%. Applies to active + training-squad."""
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "players": 1, "training_squad_players": 1},
+    ))
+    all_ids: list[str] = []
+    for d in ftd_docs:
+        all_ids += [str(p) for p in (d.get("players") or []) if p]
+        all_ids += [str(p) for p in (d.get("training_squad_players") or []) if p]
+    if not all_ids:
+        return
+    fpd_map = _load_fpd_map(fid, all_ids)
+    for d in ftd_docs:
+        team_id = d.get("team_id")
+        if not team_id or (excluded_team_id and str(team_id) == str(excluded_team_id)):
+            continue
+        candidates = (
+            [str(p) for p in (d.get("players") or []) if p]
+            + [str(p) for p in (d.get("training_squad_players") or []) if p]
+        )
+        to_cut: list[str] = []
+        for pid in candidates:
+            rt = int(_best_position((fpd_map.get(pid) or {}).get("position_ratings") or {}).get("rating") or 0)
+            if rt < 10:
+                chance = 1.0
+            elif rt < 15:
+                chance = 0.5
+            elif rt < 20:
+                chance = 0.25
+            else:
+                chance = 0.0
+            if chance > 0 and random.random() < chance:
+                to_cut.append(pid)
+        if to_cut:
+            _hard_release_players(fid, team_id, to_cut)
+
+
+@router.post("/franchise/cut-players-final")
+def cut_franchise_players_final(
+    req: CutPlayersRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Week-35 real cuts (FPD deleted, removed from all team lists). Any number incl. 0."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    fid = franchise_doc["_id"]
+    if int(franchise_doc.get("week", 1) or 1) != 35:
+        raise HTTPException(status_code=400, detail="Final cuts can only run during week 35")
+    if franchise_doc.get("week_35_recruiting_ran"):
+        raise HTTPException(status_code=400, detail="Recruiting has already run for this season")
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_object_id:
+        raise HTTPException(status_code=404, detail="User team not found in franchise")
+    team_object_id = ObjectId(user_team_object_id)
+    ftd_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": team_object_id},
+        {"players": 1, "training_squad_players": 1},
+    ) or {}
+    roster_set = (
+        {str(p) for p in (ftd_doc.get("players") or []) if p}
+        | {str(p) for p in (ftd_doc.get("training_squad_players") or []) if p}
+    )
+    requested = [str(p) for p in (req.player_ids or []) if p and str(p) in roster_set]
+    fpd_map = _load_fpd_map(fid, requested)
+    cut_names = []
+    for pid in requested:
+        meta = (fpd_map.get(pid) or {}).get("meta") or {}
+        cut_names.append(
+            " ".join(x for x in [meta.get("first_name", ""), meta.get("last_name", "")] if x).strip() or pid
+        )
+    _hard_release_players(fid, team_object_id, requested)
+    return {"status": "success", "cut_count": len(requested), "cut_names": cut_names}
+
+
+@router.get("/franchise/training-squad-reports")
+def get_training_squad_reports(franchise_id: str, user: dict = Depends(get_current_user)):
+    """Stored Training Squad Development reports (user team), newest week first."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    reports = franchise_doc.get("training_squad_reports") or {}
+    ordered = [reports[k] for k in sorted(reports.keys(), key=lambda x: int(x), reverse=True)]
+    return {"reports": ordered, "attr_keys": TRAINING_SQUAD_ATTR_KEYS}
 
 
 @router.get("/franchise/scouting-report")
@@ -10734,6 +11159,49 @@ def mark_region_bye_modal_seen(
     return {"seen": True, "season": current_season}
 
 
+class BracketRevealModalSeenRequest(BaseModel):
+    franchise_id: str
+    reveal_key: str
+
+
+@router.patch("/franchise/bracket-reveal-modal-seen")
+def mark_bracket_reveal_modal_seen(
+    req: BracketRevealModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that a bracket-reveal modal (conference/region/national) was dismissed."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    reveal_key = str(req.reveal_key or "").strip()
+    if not reveal_key:
+        raise HTTPException(status_code=400, detail="reveal_key required")
+    seen = dict(franchise_doc.get(BRACKET_REVEAL_SEEN_FIELD) or {})
+    seen[reveal_key] = True
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {BRACKET_REVEAL_SEEN_FIELD: seen}},
+    )
+    return {"seen": True, "reveal_key": reveal_key}
+
+
+class RecruitingResultsModalSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/recruiting-results-modal-seen")
+def mark_recruiting_results_modal_seen(
+    req: RecruitingResultsModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that the week-35 recruiting results modal was dismissed."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD: current_season}},
+    )
+    return {"seen": True, "season": current_season}
+
+
 @router.get("/franchise/championship-moments/context")
 def championship_moment_context(
     franchise_id: str,
@@ -11192,8 +11660,18 @@ def finish_season(req: FinishSeasonRequest):
     for ftd_doc in ftd_docs:
         team_id = str(ftd_doc.get("team_id"))
         scholarship_players = {str(player_id) for player_id in (ftd_doc.get("scholarship_players") or []) if player_id}
-        for player_id in (ftd_doc.get("players") or []):
-            player_id_str = str(player_id)
+        # Active roster AND training-squad players both return to the active pool for
+        # next season (advance a year), then compete again in Training Camp. Graduating
+        # seniors drop from either list.
+        returning_candidate_ids = (
+            [str(player_id) for player_id in (ftd_doc.get("players") or []) if player_id]
+            + [str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id]
+        )
+        seen_returning: set[str] = set()
+        for player_id_str in returning_candidate_ids:
+            if player_id_str in seen_returning:
+                continue
+            seen_returning.add(player_id_str)
             fpd_doc = fpd_by_id.get(player_id_str)
             if not fpd_doc:
                 continue

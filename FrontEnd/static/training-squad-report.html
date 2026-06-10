@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/authGuard.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Training Squad Development</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <style>
+    .tsr-page { max-width: 1100px; margin: 0 auto; padding: 18px clamp(12px, 3vw, 32px) 60px; }
+    .tsr-report { margin-top: 28px; }
+    .tsr-report + .tsr-report { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 28px; }
+    .tsr-report-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tsr-report-title { font-family: 'Bebas Neue', sans-serif; letter-spacing: .04em; font-size: 24px; color: #f7f9ff; margin: 0; }
+    .tsr-toggle { display: inline-flex; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; overflow: hidden; }
+    .tsr-toggle .toggle-btn { background: transparent; color: rgba(255,255,255,0.65); border: none; padding: 7px 14px; font-family: 'Bebas Neue', sans-serif; letter-spacing: .04em; font-size: 14px; cursor: pointer; }
+    .tsr-toggle .toggle-btn.active { background: #f79420; color: #15181f; }
+    .tsr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tsr-table th, .tsr-table td { padding: 6px 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.07); white-space: nowrap; }
+    .tsr-table th:first-child, .tsr-table td:first-child { text-align: left; }
+    .tsr-table thead th { font-family: 'Bebas Neue', sans-serif; letter-spacing: .04em; color: rgba(255,255,255,0.6); }
+    .tsr-pos { color: rgba(255,255,255,0.5); }
+    .tsr-up { color: #34ec27; font-weight: 700; }
+    .tsr-down { color: #ff6d6d; font-weight: 700; }
+    .tsr-zero { color: rgba(255,255,255,0.35); }
+    .tsr-empty { color: rgba(255,255,255,0.55); margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="resource-page-container fcc-brand-page-shell tsr-page">
+    <div class="gob-page-header">
+      <button id="back-btn" class="brand-back-link" type="button">Back To Locker Room</button>
+      <h1>Training Squad Development</h1>
+    </div>
+    <div id="tsr-reports"></div>
+  </div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/attributeTooltips.js"></script>
+  <script src="/training-squad-report.js"></script>
+</body>
+</html>

@@ -9,249 +9,51 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Tournament Mode Command Center</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <title>Tournament Command Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/tournament.css">
-  <link rel="stylesheet" href="/command-center-team-styles.css">
-  <link rel="stylesheet" href="/scouting-report.css">
   <link rel="stylesheet" href="/css/auth-bar.css">
   <script src="/js/shared/pageLoadOverlay.js"></script>
 </head>
-<body>
-  <!-- Page load overlay: hides stale/incomplete TCC until data and UI are ready (not shown on tab switch) -->
+<body class="tcc-page">
   <div id="page-load-overlay" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
     <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
   </div>
-  <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
   <div id="cc-loading-overlay" class="cc-loading-overlay" style="display:none;">Loading...</div>
+
   <div id="tournament-container">
-
-  <div id="tournament-top">
-    <div id="top-left">
+    <div id="tournament-top">
       <img id="user-team-logo" src="" alt="Team Logo" class="team-logo">
-      <div class="left-info">
-        <button id="exit-tournament" class="mode-exit-btn">Exit Tournament</button>
-      </div>
+      <button id="exit-tournament" type="button" class="mode-exit-btn">Exit Tournament</button>
     </div>
 
-    <div id="top-center">
-      <div class="chemistry-label">Team Chemistry</div>
-      <div class="chemistry-bar">
-        <div class="chemistry-bar-fill"></div>
-        <div class="chemistry-bar-text">14 / 25</div>
+    <div class="arena-scroll">
+      <div class="arena is-playing" id="tournament-arena">
+        <div class="arena__spot" aria-hidden="true"></div>
+        <div class="arena__floor" aria-hidden="true"></div>
+        <div class="arena__grain" aria-hidden="true"></div>
+        <div class="arena__vignette" aria-hidden="true"></div>
+        <div id="bracket" class="bracket" aria-live="polite"></div>
       </div>
-      <div class="team-stats">
-        <div>Offense: A</div>
-        <div>Athleticism: B+</div>
-        <div>Prestige: A+</div>
-        <div>Defense: B</div>
-        <div>Intangibles: C</div>
-        <div>Seed: 1</div>
-      </div>
-    </div>
-
-      <div id="top-right" class="right-controls">
-        <div class="gameplan-buttons-container">
-          <button id="set-gameplan-tournament" class="gameplan-btn-set">Set Game Plan</button>
-          <button id="playbooks-tournament" class="gameplan-btn-playbooks">Playbooks</button>
-          <button id="scouting-report-btn" class="secondary-btn" style="display: none;">Scouting Report</button>
-        </div>
-        <div class="play-now-container">
-          <button id="play-now" class="play-now-btn">Play Next Game</button>
-          <button id="sim-remaining" class="play-now-btn" style="display: none;">Sim Next Round</button>
-        </div>
-      </div>
-  </div>
-
-  <div id="tournament-tabs">
-    <div class="tab-buttons">
-      <button data-tab="bracket-tab" class="active">Bracket</button>
-      <button data-tab="roster-tab">Roster</button>
-      <button data-tab="team-tab">Team</button>
-      <button data-tab="stats-tab">Stats</button>
-      <button data-tab="schedule-tab">Schedule</button>
-    </div>
-    <div id="bracket-tab" class="tab-content active">
-      <div style="width: 100%; overflow-x: auto;">
-        <div id="bracket" class="bracket">
-        </div>
-      </div>
-    </div>
-    <div id="roster-tab" class="tab-content">
-      <div style="width: 100%; overflow-x: auto;">
-        <table class="roster-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>POS</th>
-              <th>Year</th>
-              <th>Height</th>
-              <th>Weight</th>
-              <th>SC</th>
-              <th>SH</th>
-              <th>ID</th>
-              <th>OD</th>
-              <th>PS</th>
-              <th>BH</th>
-              <th>RB</th>
-              <th>AG</th>
-              <th>ST</th>
-              <th>ND</th>
-              <th>IQ</th>
-              <th>FT</th>
-              <th>RT</th>
-            </tr>
-          </thead>
-          <tbody id="roster-body"></tbody>
-        </table>
-      </div>
-
-      <div style="margin-top: 20px; width: 100%; overflow-x: auto;">
-        <table class="stats-table">
-          <thead>
-            <tr>
-              <th class="sortable" data-stat="name">Player</th>
-              <th class="sortable" data-stat="PTS">PTS</th>
-              <th class="sortable" data-stat="FGM">FGM</th>
-              <th class="sortable" data-stat="FGA">FGA</th>
-              <th class="sortable" data-stat="FG%">FG%</th>
-              <th class="sortable" data-stat="TPM">3PTM</th>
-              <th class="sortable" data-stat="TPA">3PTA</th>
-              <th class="sortable" data-stat="3PT%">3PT%</th>
-              <th class="sortable" data-stat="FTM">FTM</th>
-              <th class="sortable" data-stat="FTA">FTA</th>
-              <th class="sortable" data-stat="FT%">FT%</th>
-              <th class="sortable" data-stat="DREB">DREB</th>
-              <th class="sortable" data-stat="OREB">OREB</th>
-              <th class="sortable" data-stat="TREB">TREB</th>
-              <th class="sortable" data-stat="AST">AST</th>
-              <th class="sortable" data-stat="STL">STL</th>
-              <th class="sortable" data-stat="BLK">BLK</th>
-              <th class="sortable" data-stat="F">F</th>
-              <th class="sortable" data-stat="MIN">MIN</th>
-              <th class="sortable" data-stat="TO">TO</th>
-            </tr>
-          </thead>
-          <tbody id="roster-stats-body"></tbody>
-        </table>
-      </div>
-    </div>
-    <div id="team-tab" class="tab-content">
-      <div class="training-report-styled">
-        <!-- Team Report Section -->
-        <section class="team-section">
-          <h2>Team Report</h2>
-          <div class="team-attributes-grid" id="team-attributes-grid"></div>
-        </section>
-
-        <!-- Playbook Summary Section -->
-        <section class="playbook-summary-section">
-          <h2>Playbook Summary</h2>
-          <div class="playbook-summary-container" id="playbook-summary-container">
-            <!-- Plays will be populated here -->
-          </div>
-        </section>
-      </div>
-    </div>
-    <div id="stats-tab" class="tab-content">
-      <div style="margin-top: 20px; width: 100%; overflow-x: auto;">
-        <h3>Team Stats</h3>
-        <table class="stats-table">
-          <thead>
-            <tr>
-              <th class="sortable" data-stat="team">Team</th>
-              <th class="sortable" data-stat="W">W</th>
-              <th class="sortable" data-stat="L">L</th>
-              <th class="sortable" data-stat="PF">PF</th>
-              <th class="sortable" data-stat="PA">PA</th>
-              <th class="sortable" data-stat="FGM">FGM</th>
-              <th class="sortable" data-stat="FGA">FGA</th>
-              <th class="sortable" data-stat="FG%">FG%</th>
-              <th class="sortable" data-stat="3PTM">3PTM</th>
-              <th class="sortable" data-stat="TPA">3PTA</th>
-              <th class="sortable" data-stat="3PT%">3PT%</th>
-              <th class="sortable" data-stat="FTM">FTM</th>
-              <th class="sortable" data-stat="FTA">FTA</th>
-              <th class="sortable" data-stat="FT%">FT%</th>
-              <th class="sortable" data-stat="DREB">DREB</th>
-              <th class="sortable" data-stat="OREB">OREB</th>
-              <th class="sortable" data-stat="TREB">TREB</th>
-              <th class="sortable" data-stat="AST">AST</th>
-              <th class="sortable" data-stat="STL">STL</th>
-              <th class="sortable" data-stat="BLK">BLK</th>
-              <th class="sortable" data-stat="F">F</th>
-              <th class="sortable" data-stat="TO">TO</th>
-              <th class="sortable" data-stat="DEF_A">DEFA</th>
-              <th class="sortable" data-stat="DEF%">DEF%</th>
-              <th class="sortable" data-stat="SCR_A">SCRA</th>
-              <th class="sortable" data-stat="SCR%">SCR%</th>
-            </tr>
-          </thead>
-          <tbody id="teamstats-body"></tbody>
-        </table>
-      </div>
-      <div id="leaderboards"></div>
-    </div>
-    <div id="schedule-tab" class="tab-content">
-      <div id="schedule-container" class="schedule-container"></div>
     </div>
   </div>
 
-  </div> <!-- end tournament-container -->
+  <div id="bracket-tip" class="tip" role="tooltip" aria-hidden="true"></div>
 
-  <!-- Scouting Report Modal -->
-  <div id="scouting-report-modal" class="scouting-modal" style="display: none;">
-    <div class="scouting-modal-content">
-      <div class="scouting-modal-header">
-        <h2 id="scouting-report-title">Scouting Report</h2>
-        <button class="scouting-modal-close">&times;</button>
-      </div>
-      <div class="scouting-modal-body">
-        <div id="scouting-loading" class="scouting-loading">Loading scouting report...</div>
-        <div id="scouting-content" style="display: none;">
-          <div class="training-report-styled">
-            <section class="projected-starting-five-section">
-              <div class="scouting-projected-header">
-                <h2>Projected Starting 5</h2>
-                <div class="scouting-projected-toggle view-toggle" role="group" aria-label="Projected lineup columns">
-                  <button type="button" class="toggle-btn active" data-scouting-projected="attributes">Attributes</button>
-                  <button type="button" class="toggle-btn" data-scouting-projected="stats">Stats</button>
-                </div>
-              </div>
-              <div id="scouting-projected-lineup" class="scouting-projected-lineup-wrap"></div>
-            </section>
-          </div>
-          <!-- Team Report Section -->
-          <div class="training-report-styled">
-            <section class="team-section">
-              <h2>Team Report</h2>
-              <div class="team-attributes-grid" id="scouting-team-attributes-grid"></div>
-            </section>
-          </div>
-          
-          <!-- Play Usage Section -->
-          <section class="play-usage-section">
-            <h2>Play Usage (Last Game)</h2>
-            <div class="scroll-x">
-              <table class="play-usage-table" id="play-usage-table">
-                <thead>
-                  <tr>
-                    <th>Play Name</th>
-                    <th>Times Run</th>
-                    <th>Success Rate</th>
-                    <th>Usage %</th>
-                  </tr>
-                </thead>
-                <tbody id="play-usage-body">
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      </div>
+  <div id="tournament-celebrate" class="celebrate" aria-hidden="true">
+    <div class="celebrate__rays" aria-hidden="true"></div>
+    <div class="celebrate__glow" aria-hidden="true"></div>
+    <div class="confetti" id="tcc-confetti" aria-hidden="true"></div>
+    <div class="celebrate__inner">
+      <div class="celebrate__trophy" aria-hidden="true"></div>
+      <div class="celebrate__eyebrow" id="tcc-cele-eyebrow"></div>
+      <div class="celebrate__title">Champions</div>
+      <img class="celebrate__logo" id="tcc-cele-logo" src="" alt="">
+      <div class="celebrate__team" id="tcc-cele-team"></div>
+      <div class="celebrate__sub" id="tcc-cele-sub"></div>
+      <button type="button" class="celebrate__close" id="tcc-cele-close">Continue</button>
     </div>
   </div>
 
@@ -260,15 +62,7 @@
   <script src="/js/shared/analytics.js"></script>
   <script src="/common.js"></script>
   <script src="/bracket.js"></script>
-  <script src="/js/shared/attributeTooltips.js"></script>
-  <script src="/js/shared/teamStatsTable.js"></script>
-  <script src="/js/shared/rosterLoader.js"></script>
-  <script src="/js/shared/rosterStatsRenderer.js"></script>
-  <script src="/js/shared/commandCenterTabs.js"></script>
-  <script src="/js/shared/scoutingReport.js"></script>
   <script src="/js/shared/alphaBanner.js"></script>
-  <script src="/defense-display.js"></script>
   <script src="/tournament.js"></script>
-
 </body>
 </html>

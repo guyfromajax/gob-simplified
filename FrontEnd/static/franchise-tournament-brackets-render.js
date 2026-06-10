@@ -31,8 +31,13 @@
   ) {
     if (!bracketPayload || !bracketPayload.bracket) return null;
 
+    const resolvedTier = tierHint || (typeof FccTournamentStyleA !== 'undefined' && FccTournamentStyleA.inferTier
+      ? FccTournamentStyleA.inferTier(sectionTitle)
+      : 'conference');
+
     const section = document.createElement('section');
     section.className = 'fcc-tournament-section fcc-tb-tier';
+    section.setAttribute('data-tb-tier', resolvedTier);
 
     const heading = document.createElement('h4');
     heading.className = 'fcc-tournament-section-title fcc-tb-tier-title';
@@ -89,125 +94,67 @@
       return [];
     }
 
-    let tournamentTitle = 'End-of-Season Tournament';
-    if (week >= 27 && week <= 29) {
-      tournamentTitle = 'Conference Tournament';
-    } else if (week >= 30 && week <= 31) {
-      tournamentTitle = 'Region Tournament';
-    } else if (week >= 32 && week <= 36) {
-      tournamentTitle = 'National Tournament';
+    const tierOrder = { national: 0, region: 1, conference: 2 };
+    const entries = [];
+
+    if (nationalTournament && nationalTournament.bracket) {
+      entries.push({
+        tier: 'national',
+        title: 'National Tournament',
+        payload: nationalTournament,
+        layout: 'full',
+      });
+    }
+    if (regionTournament && regionTournament.bracket) {
+      entries.push({
+        tier: 'region',
+        title: 'Region Tournament',
+        payload: regionTournament,
+        layout: 'compact4',
+      });
+    }
+    if (conferenceTournament && conferenceTournament.bracket) {
+      entries.push({
+        tier: 'conference',
+        title: 'Conference Tournament',
+        payload: conferenceTournament,
+        layout: 'full',
+      });
     }
 
-    const sections = [];
-    if (week >= 27 && week <= 29 && conferenceTournament) {
-      sections.push(
-        createBracketSection(
-          'Conference Tournament',
-          conferenceTournament,
-          'full',
-          teamIdToNameMap,
-          userTeamId,
-          teamIdMetaMap,
-          topData,
-          'fcc',
-          'conference'
-        )
-      );
-    } else if (week >= 30 && week <= 31) {
-      if (regionTournament) {
-        sections.push(
-          createBracketSection(
-            'Region Tournament',
-            regionTournament,
-            'compact4',
-            teamIdToNameMap,
-            userTeamId,
-            teamIdMetaMap,
-            topData,
-            'fcc',
-            'region'
-          )
-        );
-      }
-      if (conferenceTournament) {
-        sections.push(
-          createBracketSection(
-            'Conference Tournament',
-            conferenceTournament,
-            'full',
-            teamIdToNameMap,
-            userTeamId,
-            teamIdMetaMap,
-            topData,
-            'fcc',
-            'conference'
-          )
-        );
-      }
-    } else if (week >= 32 && week <= 36) {
-      if (nationalTournament) {
-        sections.push(
-          createBracketSection(
-            'National Tournament',
-            nationalTournament,
-            'full',
-            teamIdToNameMap,
-            userTeamId,
-            teamIdMetaMap,
-            topData,
-            'fcc',
-            'national'
-          )
-        );
-      }
-      if (regionTournament) {
-        sections.push(
-          createBracketSection(
-            'Region Tournament',
-            regionTournament,
-            'compact4',
-            teamIdToNameMap,
-            userTeamId,
-            teamIdMetaMap,
-            topData,
-            'fcc',
-            'region'
-          )
-        );
-      }
-      if (conferenceTournament) {
-        sections.push(
-          createBracketSection(
-            'Conference Tournament',
-            conferenceTournament,
-            'full',
-            teamIdToNameMap,
-            userTeamId,
-            teamIdMetaMap,
-            topData,
-            'fcc',
-            'conference'
-          )
-        );
-      }
-    } else if (eosTournament) {
+    if (!entries.length && eosTournament) {
+      let tournamentTitle = 'End-of-Season Tournament';
+      if (week >= 27 && week <= 29) tournamentTitle = 'Conference Tournament';
+      else if (week >= 30 && week <= 31) tournamentTitle = 'Region Tournament';
+      else if (week >= 32 && week <= 36) tournamentTitle = 'National Tournament';
       const eosTier = week >= 32 ? 'national' : week >= 30 ? 'region' : 'conference';
-      sections.push(
-        createBracketSection(
-          tournamentTitle,
-          eosTournament,
-          week >= 30 && week <= 31 ? 'compact4' : 'full',
+      entries.push({
+        tier: eosTier,
+        title: tournamentTitle,
+        payload: eosTournament,
+        layout: week >= 30 && week <= 31 ? 'compact4' : 'full',
+      });
+    }
+
+    entries.sort(function (a, b) {
+      return (tierOrder[a.tier] != null ? tierOrder[a.tier] : 9) - (tierOrder[b.tier] != null ? tierOrder[b.tier] : 9);
+    });
+
+    return entries
+      .map(function (entry) {
+        return createBracketSection(
+          entry.title,
+          entry.payload,
+          entry.layout,
           teamIdToNameMap,
           userTeamId,
           teamIdMetaMap,
           topData,
           'fcc',
-          eosTier
-        )
-      );
-    }
-
-    return sections.filter(Boolean);
+          entry.tier
+        );
+      })
+      .filter(Boolean);
   }
 
   function buildAllSections(topData, userTeamId, teamIdToNameMap, teamIdMetaMap) {

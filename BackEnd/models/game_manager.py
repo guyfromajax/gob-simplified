@@ -388,9 +388,15 @@ class GameManager:
         if result.get("timeout_reason"):
             return
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+        locked_player_ids = {
+            str(pid)
+            for pid in (self.game_state.get("locked_exhausted_lineup_player_ids") or [])
+        }
         for team in [self.home_team, self.away_team]:
             for player in (team.lineup or {}).values():
                 if not player:
+                    continue
+                if str(getattr(player, "player_id", "")) in locked_player_ids:
                     continue
                 foul_count = (player.get_stat("F", "game") or 0) if hasattr(player, "get_stat") else 0
                 if foul_count >= 5:

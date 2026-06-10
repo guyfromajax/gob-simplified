@@ -108,6 +108,9 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                                 base_player["last_name"] = meta.get("last_name")
                             if meta.get("team"):
                                 base_player["team"] = meta.get("team")
+                            # Walk-on status is persisted as the player's archetype.
+                            # Surface it raw here; the /roster endpoint gates display.
+                            base_player["walk_on"] = (meta.get("archetype") == "Walk On")
                             players.append(base_player)
                         except Exception as e:
                             logger.error(f"❌ [ROSTER LOADER] Exception processing player {pid} (idx {idx}): {type(e).__name__}: {str(e)}")

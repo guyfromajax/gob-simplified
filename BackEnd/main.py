@@ -161,7 +161,12 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     # print(f"[DEV] Initialized game stats for players: {affected}")
 
 
-def _ensure_complete_lineup(team, game_state=None) -> None:
+def _ensure_complete_lineup(
+    team,
+    game_state=None,
+    *,
+    allow_incomplete_user_foul_out_transition: bool = False,
+) -> None:
     """Ensure a team has players at all required positions.
 
     If any position from ``POSITION_LIST`` is missing, attempt to build a
@@ -173,11 +178,18 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         game_state: Optional game state dict to check for ineligible players
     """
 
-    # First, remove any fouled-out players (5+ fouls) from the lineup
+    locked_player_ids = {
+        str(pid)
+        for pid in ((game_state or {}).get("locked_exhausted_lineup_player_ids") or [])
+    }
+
+    # First, remove any fouled-out players (5+ fouls) from the lineup, except
+    # players in the server-validated exhausted user lineup.
     for pos, player in list(team.lineup.items()):
         if player and hasattr(player, "get_stat"):
             foul_count = player.get_stat("F", "game")
-            if foul_count is not None and foul_count >= 5:
+            player_id = str(getattr(player, "player_id", ""))
+            if foul_count is not None and foul_count >= 5 and player_id not in locked_player_ids:
                 team.lineup[pos] = None
 
     # Now find missing positions (including those we just cleared)
@@ -203,12 +215,55 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         if len(available_players) >= len(missing):
             break
 
-    if available_players is None or len(available_players) < len(missing):
-        fouled_out_count = sum(1 for p in team.get_all_players() if getattr(p, "get_stat", None) and (p.get_stat("F", "game") or 0) >= 5)
+    available_players = list(available_players or [])
+    if len(available_players) < len(missing):
+        all_players = list(team.get_all_players())
+        fouled_out_players = [
+            p
+            for p in all_players
+            if getattr(p, "get_stat", None)
+            and (p.get_stat("F", "game") or 0) >= 5
+            and getattr(p, "player_id", None) not in current_player_ids
+        ]
+        allow_fouled_out_reentry = bool(
+            (game_state and game_state.get("allow_fouled_out_lineup_reentry"))
+            or not getattr(team, "is_user_team", False)
+        )
+        shortfall = len(missing) - len(available_players)
+        if allow_fouled_out_reentry and len(fouled_out_players) >= shortfall:
+            emergency_players = random.sample(fouled_out_players, shortfall)
+            available_players.extend(emergency_players)
+            logging.warning(
+                "Computer-team lineup exhaustion: Team '%s' randomly re-admitted %s "
+                "fouled-out player(s) to complete the lineup: %s",
+                team.name,
+                shortfall,
+                [getattr(p, "player_id", None) for p in emergency_players],
+            )
+        else:
+            fouled_out_count = len(fouled_out_players)
+            if (
+                allow_incomplete_user_foul_out_transition
+                and getattr(team, "is_user_team", False)
+            ):
+                logging.warning(
+                    "User-team lineup exhaustion: Team '%s' has %s open position(s); "
+                    "deferring repair to the locked set-lineup flow.",
+                    team.name,
+                    len(missing),
+                )
+                return
+            raise ValueError(
+                f"Team '{team.name}' lineup missing positions {missing}: "
+                f"Only {len(available_players)} eligible players available "
+                f"(need {len(missing)}, {fouled_out_count} fouled out) even after relaxing NG and foul limits"
+            )
+
+    if len(available_players) < len(missing):
         raise ValueError(
             f"Team '{team.name}' lineup missing positions {missing}: "
-            f"Only {len(available_players) if available_players else 0} eligible players available "
-            f"(need {len(missing)}, {fouled_out_count} fouled out) even after relaxing NG and foul limits"
+            f"Only {len(available_players)} players available after emergency re-entry "
+            f"(need {len(missing)})"
         )
     
     # Fill gaps with unified autoset (position_ratings + chemistry pools; same family as build_lineup_from_mongo)
@@ -236,6 +291,46 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         raise ValueError(
             f"Team '{team.name}' lineup incomplete; missing positions: {remaining}"
         )
+
+
+def activate_locked_exhausted_user_lineup(
+    gm: GameManager,
+    user_team_side: str | None,
+    lineup_ids: dict[str, str] | None,
+) -> None:
+    """Validate and activate the five-player exhausted-roster exception."""
+    if user_team_side not in {"home", "away"}:
+        raise ValueError("Locked exhausted lineup requires user_team_side.")
+    if not isinstance(lineup_ids, dict):
+        raise ValueError("Locked exhausted lineup requires a lineup.")
+
+    positions = set(POSITION_LIST)
+    if set(lineup_ids.keys()) != positions:
+        raise ValueError("Locked exhausted lineup must fill PG, SG, SF, PF, and C.")
+    selected_ids = {str(pid) for pid in lineup_ids.values() if pid}
+    if len(selected_ids) != 5:
+        raise ValueError("Locked exhausted lineup must contain five distinct players.")
+
+    team = gm.home_team if user_team_side == "home" else gm.away_team
+    if not getattr(team, "is_user_team", False):
+        raise ValueError("Locked exhausted lineup must belong to the user team.")
+
+    roster = list(team.get_all_players())
+    roster_ids = {str(getattr(player, "player_id", "")) for player in roster}
+    if not selected_ids.issubset(roster_ids):
+        raise ValueError("Locked exhausted lineup contains a player outside the user roster.")
+
+    non_fouled_out_ids = {
+        str(getattr(player, "player_id", ""))
+        for player in roster
+        if (player.get_stat("F", "game") or 0) < 5
+    }
+    if len(non_fouled_out_ids) > 4:
+        raise ValueError("Locked exhausted lineup is only allowed with four or fewer eligible players.")
+    if not non_fouled_out_ids.issubset(selected_ids):
+        raise ValueError("Locked exhausted lineup must include every player with fewer than five fouls.")
+
+    gm.game_state["locked_exhausted_lineup_player_ids"] = sorted(selected_ids)
 
 
 def simulate_quarter(
@@ -1024,6 +1119,10 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
     """
 
     gm = GameManager(home_team_name, away_team_name)
+    # Full simulations have no lineup UI. If foul-outs leave fewer than five
+    # eligible players, permit the minimum required fouled-out players to
+    # re-enter rather than abandoning the simulated game.
+    gm.game_state["allow_fouled_out_lineup_reentry"] = True
 
     # Ensure default lineups exist before the opening tip so tip-off logic and
     # tests that patch ``build_lineup_from_mongo`` have actual players to work

@@ -1061,22 +1061,77 @@ input[type="reset"] {
   background: #ebebeb;
 }
 
+.fcc-data-card.fcc-tournament-card .fcc-tournament-card-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: min(72vh, 920px);
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
 .fcc-tournament-divider {
   border: 0;
-  border-top: 1px solid #cfd3d8;
-  margin: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin: 22px 0;
 }
 
 /* ===== FCC Tournament — Style A (Classic horizontal), .fcc-tb-* ===== */
 .fcc-data-card.fcc-tournament-card .fcc-tournament-divider,
 .resource-page-container .fcc-tournament-divider {
-  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.14);
 }
 
 .fcc-data-card.fcc-tournament-card .fcc-tournament-section.fcc-tb-tier {
+  position: relative;
+  isolation: isolate;
   padding: 12px 0 16px;
   background: transparent;
-  border-radius: 0;
+  border-radius: 16px;
+  --tb-intensity: 0.62;
+  --tb-champ-scale: 1;
+}
+
+.fcc-tb-tier[data-tb-tier='region'] {
+  --tb-intensity: 0.82;
+  --tb-champ-scale: 1.15;
+}
+
+.fcc-tb-tier[data-tb-tier='national'] {
+  --tb-intensity: 1.05;
+  --tb-champ-scale: 1.32;
+}
+
+.fcc-tb-tier::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 16px;
+  background:
+    radial-gradient(60% 52% at 50% 0%, rgba(212, 168, 72, calc(0.2 * var(--tb-intensity))) 0%, transparent 60%),
+    linear-gradient(180deg, transparent 55%, rgba(39, 64, 142, calc(0.22 * var(--tb-intensity))) 100%);
+  box-shadow: inset 0 0 120px 30px rgba(0, 0, 0, 0.45);
+}
+
+.fcc-tb-tier::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 16px;
+  opacity: calc(0.35 * var(--tb-intensity));
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.015) 0 2px,
+    transparent 2px 48px
+  );
+}
+
+.fcc-tb-tier > * {
+  position: relative;
+  z-index: 1;
 }
 
 .fcc-tournament-section-title.fcc-tb-tier-title {
@@ -1142,11 +1197,12 @@ input[type="reset"] {
 }
 
 .fcc-tb-mu {
-  background: rgba(35, 42, 51, 1);
+  background: linear-gradient(180deg, #283039, #20262e);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   min-width: 0;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
 }
 
 .fcc-tb-mu--tbd {
@@ -1156,25 +1212,54 @@ input[type="reset"] {
 }
 
 .fcc-tb-mu--user {
-  box-shadow: 0 0 0 1px rgba(43, 214, 106, 0.12);
+  border-color: rgba(43, 214, 106, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(43, 214, 106, 0.45),
+    0 0 26px rgba(43, 214, 106, 0.32),
+    0 8px 22px rgba(0, 0, 0, 0.4);
 }
 
 .fcc-tb-mu--championship {
-  background: linear-gradient(180deg, #2a1f0a, #1a1f26);
-  border-color: rgba(212, 168, 72, 0.4);
-  box-shadow: 0 0 0 1px rgba(212, 168, 72, 0.08), 0 6px 20px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, #322611, #221a0d 60%, #1a1f26);
+  border: 1px solid rgba(212, 168, 72, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(212, 168, 72, 0.3),
+    0 0 calc(40px * var(--tb-intensity, 1)) rgba(212, 168, 72, 0.42),
+    0 14px 40px rgba(0, 0, 0, 0.5);
 }
 
 .fcc-tb-team {
   display: grid;
-  grid-template-columns: 22px 1fr auto;
+  grid-template-columns: 22px auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
   font-size: 11.5px;
   line-height: 1.15;
-  min-height: 30px;
+  min-height: 42px;
   font-family: 'Inter', sans-serif;
+}
+
+.fcc-tb-logo {
+  display: block;
+  height: 26px;
+  aspect-ratio: 1920 / 679;
+  width: auto;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.fcc-tb-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fcc-tb-logo--empty {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .fcc-tb-team + .fcc-tb-team {
@@ -1183,7 +1268,38 @@ input[type="reset"] {
 
 .fcc-tb-team--user {
   border-left: 3px solid #2bd66a;
-  background: rgba(43, 214, 106, 0.07);
+  background: linear-gradient(90deg, rgba(43, 214, 106, 0.16), rgba(43, 214, 106, 0.04));
+}
+
+.fcc-tb-team--user .fcc-tb-name-text,
+.fcc-tb-team--user .fcc-tb-score {
+  color: #eafff2;
+}
+
+.fcc-tb-team--user .fcc-tb-seed {
+  color: #2bd66a;
+}
+
+.fcc-tb-team--champion {
+  background: linear-gradient(90deg, rgba(212, 168, 72, 0.22), rgba(212, 168, 72, 0.06));
+}
+
+.fcc-tb-team--champion.fcc-tb-team--user {
+  background: linear-gradient(90deg, rgba(43, 214, 106, 0.22), rgba(212, 168, 72, 0.1));
+}
+
+.fcc-tb-team--bye {
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0 7px, transparent 7px 14px);
+}
+
+.fcc-tb-bye-label {
+  display: inline-block;
+  font: 700 9px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.2em;
+  color: rgba(212, 168, 72, 0.72);
+  border: 1px dashed rgba(212, 168, 72, 0.4);
+  border-radius: 4px;
+  padding: 3px 9px;
 }
 
 .fcc-tb-seed {
@@ -1277,6 +1393,12 @@ input[type="reset"] {
   margin-bottom: 8px;
 }
 
+.fcc-tb-trophy svg {
+  width: calc(46px * var(--tb-champ-scale, 1));
+  height: calc(46px * var(--tb-champ-scale, 1));
+  filter: drop-shadow(0 0 10px rgba(212, 168, 72, 0.6));
+}
+
 .fcc-tb-trophy-badge {
   font: 800 10px/1 'JetBrains Mono', monospace;
   letter-spacing: 0.15em;
@@ -1285,6 +1407,37 @@ input[type="reset"] {
   border: 1px solid rgba(212, 168, 72, 0.32);
   padding: 5px 8px;
   border-radius: 4px;
+}
+
+.fcc-tb-champ-plate {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.fcc-tb-champ-plate__eyebrow {
+  font: 700 8.5px/1 'JetBrains Mono', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.fcc-tb-champ-plate__name {
+  display: inline-block;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 25px;
+  letter-spacing: 0.03em;
+  margin-top: 5px;
+  white-space: nowrap;
+  color: #f0c560;
+  text-shadow: 0 0 18px rgba(212, 168, 72, 0.55);
+}
+
+.fcc-tb-crown {
+  width: 13px;
+  height: 13px;
+  margin-left: 2px;
+  vertical-align: middle;
+  filter: drop-shadow(0 0 4px rgba(212, 168, 72, 0.7));
 }
 
 .fcc-tb-conn {
@@ -1304,16 +1457,10 @@ input[type="reset"] {
   padding: 4px 0 8px;
 }
 
-.fcc-tb-region--4 {
+.fcc-tb-region--4,
+.fcc-tb-region--3,
+.fcc-tb-region--full {
   grid-template-columns: 1fr 1fr minmax(12px, 0.35fr);
-}
-
-.fcc-tb-region--3 {
-  grid-template-columns: 1fr 1fr minmax(12px, 0.35fr);
-}
-
-.fcc-tb-region--2 {
-  grid-template-columns: 1fr;
 }
 
 .fcc-tb-region-col {
@@ -1337,41 +1484,47 @@ input[type="reset"] {
   margin-top: 36px;
 }
 
-.fcc-tb-bye-card {
-  display: grid;
-  grid-template-columns: 22px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px dashed rgba(212, 168, 72, 0.32);
-  background: rgba(212, 168, 72, 0.06);
-  font-size: 11.5px;
-  font-family: 'Inter', sans-serif;
-  color: rgba(247, 249, 255, 0.85);
+.fcc-tb-mu-wrap--region4-champ {
+  margin-top: 8px;
 }
 
-.fcc-tb-bye-seed {
-  font: 700 10px/1 'JetBrains Mono', monospace;
-  color: #d4a848;
-  text-align: center;
+@media (prefers-reduced-motion: no-preference) {
+  .fcc-tb-enter .fcc-tb-col--r1l,
+  .fcc-tb-enter .fcc-tb-col--r1r,
+  .fcc-tb-enter .fcc-tb-region-col:first-child {
+    animation: fcc-tb-col-in 0.42s ease both;
+  }
+
+  .fcc-tb-enter .fcc-tb-col--r2l,
+  .fcc-tb-enter .fcc-tb-col--r2r {
+    animation: fcc-tb-col-in 0.42s ease 0.08s both;
+  }
+
+  .fcc-tb-enter .fcc-tb-col--final,
+  .fcc-tb-enter .fcc-tb-region-col:nth-child(2) {
+    animation: fcc-tb-col-in 0.48s ease 0.16s both;
+  }
+
+  .fcc-tb-enter .fcc-tb-conn {
+    opacity: 0;
+    animation: fcc-tb-conn-in 0.38s ease 0.28s both;
+  }
 }
 
-.fcc-tb-bye-badge {
-  font: 700 9px/1 'JetBrains Mono', monospace;
-  letter-spacing: 0.1em;
-  color: #d4a848;
+@keyframes fcc-tb-col-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.fcc-tb-both-bye-note {
-  text-align: center;
-  color: rgba(247, 249, 255, 0.62);
-  font: 500 11px/1.45 'Inter', sans-serif;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+@keyframes fcc-tb-conn-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 900px) {
@@ -1391,7 +1544,8 @@ input[type="reset"] {
   }
 
   .fcc-tb-region--4,
-  .fcc-tb-region--3 {
+  .fcc-tb-region--3,
+  .fcc-tb-region--full {
     grid-template-columns: 1fr;
   }
 

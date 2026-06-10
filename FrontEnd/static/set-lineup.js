@@ -33,6 +33,7 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
+let exhaustedUserLineupLocked = urlParams.get('locked_exhausted_user_lineup') === 'true';
 
 /** @returns {boolean} true if response was 401/403 and redirect was triggered — caller must stop. */
 function abortIfAccessDenied(response) {
@@ -86,6 +87,84 @@ function buildPlayerDetailUrl(playerId) {
 
 function getPlayerStableId(player) {
   return player?._id || player?.playerId || player?.player_id || null;
+}
+
+function getRosterGameFouls(player) {
+  const raw = player?.stats || {};
+  const game = raw.game || raw;
+  return Number(game.F ?? player?.F ?? 0) || 0;
+}
+
+function shuffleCopy(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function buildExhaustedUserLineupIfNeeded() {
+  const nonFouledOut = roster.filter(player => getRosterGameFouls(player) < 5);
+  const fouledOut = roster.filter(player => getRosterGameFouls(player) >= 5);
+  if (nonFouledOut.length > 4 || fouledOut.length < 8) return false;
+
+  const hasPreservedLockedLineup =
+    exhaustedUserLineupLocked
+    && ['PG', 'SG', 'SF', 'PF', 'C'].every(pos => lineup[pos]);
+
+  if (!hasPreservedLockedLineup) {
+    const shortfall = 5 - nonFouledOut.length;
+    const selected = [
+      ...nonFouledOut,
+      ...shuffleCopy(fouledOut).slice(0, shortfall),
+    ];
+    const randomizedFive = shuffleCopy(selected);
+    ['PG', 'SG', 'SF', 'PF', 'C'].forEach((pos, index) => {
+      lineup[pos] = String(getPlayerStableId(randomizedFive[index]));
+    });
+  }
+
+  exhaustedUserLineupLocked = true;
+  const currentParams = new URLSearchParams(window.location.search);
+  currentParams.set('locked_exhausted_user_lineup', 'true');
+  ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
+    currentParams.set(`${myTeamSide}_${pos.toLowerCase()}`, lineup[pos]);
+  });
+  history.replaceState(null, '', `${window.location.pathname}?${currentParams.toString()}`);
+  return true;
+}
+
+function lockExhaustedUserLineupControls() {
+  if (!exhaustedUserLineupLocked) return;
+  document.body.classList.add('exhausted-lineup-locked');
+  document.querySelectorAll(
+    '#autoset-lineup, #roster-view-attributes, #roster-view-stats, .slot .remove'
+  ).forEach(control => {
+    control.disabled = true;
+    control.setAttribute('aria-disabled', 'true');
+  });
+  document.querySelectorAll('.slot, #roster-body tr, #roster-body-stats tr, .player-card').forEach(element => {
+    element.draggable = false;
+    element.setAttribute('draggable', 'false');
+  });
+}
+
+function showExhaustedUserLineupModal() {
+  if (!exhaustedUserLineupLocked) return;
+  const modal = document.getElementById('exhausted-lineup-modal');
+  const button = document.getElementById('exhausted-lineup-got-it');
+  if (!modal || !button) return;
+  const seenKey = `exhaustedLineupModalShown_${gameId || 'game'}`;
+  try {
+    if (sessionStorage.getItem(seenKey) === '1') return;
+    sessionStorage.setItem(seenKey, '1');
+  } catch (_) {}
+  modal.hidden = false;
+  button.addEventListener('click', () => {
+    modal.hidden = true;
+  }, { once: true });
+  setTimeout(() => button.focus(), 0);
 }
 
 function isGameplayLineupContext() {
@@ -1996,7 +2075,10 @@ async function init() {
   
   // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
   // This ensures fouled-out players are removed even if they were in the URL params
-  removeIneligiblePlayersFromLineup();
+  if (!exhaustedUserLineupLocked) {
+    removeIneligiblePlayersFromLineup();
+  }
+  const enteredExhaustedLineupState = buildExhaustedUserLineupIfNeeded();
   
   // ✅ FOUL OUT FIX: Add diagnostic helper function for browser console
   window.checkFoulOutStatus = function() {
@@ -2032,6 +2114,8 @@ async function init() {
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
   refreshLineupAvailabilityDisplay(); // Keep left-side roster/card disabled state in sync with restored lineup
+  lockExhaustedUserLineupControls();
+  if (enteredExhaustedLineupState) showExhaustedUserLineupModal();
   try {
     lineupPlaybooksModalCache = await fetchLineupPlaybooksData();
     renderLineupShotWeights(lineupPlaybooksModalCache);

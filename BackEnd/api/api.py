@@ -426,6 +426,7 @@ try:
         advance_method: str | None = None
         # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
         resume_from_timeout: bool = False
+        locked_exhausted_user_lineup: bool = False
         timeout_trace_id: str | None = None
         # Optional: designated Rim Runner (player id) per team for fast-break resolution
         home_rim_runner_player_id: str | None = None
@@ -3843,6 +3844,18 @@ try:
                 for log in loggers_to_quiet:
                     log.setLevel(logging.ERROR)
             try:
+                if body.locked_exhausted_user_lineup:
+                    from BackEnd.main import activate_locked_exhausted_user_lineup
+                    locked_lineup = (
+                        body.home_lineup
+                        if body.user_team_side == "home"
+                        else body.away_lineup
+                    )
+                    activate_locked_exhausted_user_lineup(
+                        gm,
+                        body.user_team_side,
+                        locked_lineup,
+                    )
                 # Rim Runner designation (persist on game_state for fast-break logic)
                 rr_map = gm.game_state.setdefault("rim_runner_by_team_id", {})
                 if body.home_rim_runner_player_id:
@@ -5414,10 +5427,21 @@ try:
         players = []
         pt_promise_ids = set()
         franchise_week = None
+        # Walk-on tags persist into the new season's preseason and drop once week-1
+        # Training Camp is complete. Display gate only — the player keeps its
+        # archetype ("Walk On") in the data regardless.
+        show_walk_on = False
         if franchise_id:
             try:
-                franchise_doc = franchises_collection.find_one({"_id": ObjectId(franchise_id)}, {"week": 1})
+                from BackEnd.utils.franchise_training_state import franchise_training_fully_complete_for_week
+                franchise_doc = franchises_collection.find_one({"_id": ObjectId(franchise_id)}, {"week": 1, "training_status": 1})
                 franchise_week = franchise_doc.get("week") if franchise_doc else None
+                try:
+                    _wk = int(franchise_week or 1)
+                except (TypeError, ValueError):
+                    _wk = 1
+                _ts = (franchise_doc.get("training_status") or {}) if franchise_doc else {}
+                show_walk_on = (_wk == 1) and not franchise_training_fully_complete_for_week(_ts, 1)
                 ftd_doc = franchise_team_data_collection.find_one(
                     {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
                     {"playing_time_promise_players": 1},
@@ -5461,6 +5485,10 @@ try:
                 "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
                 "has_playing_time_promise": player_id_str in pt_promise_ids,
                 "is_graduating": bool(franchise_week == 36 and str(p.get("year") or "").strip().lower() in {"senior", "graduate"}),
+                # Only first-year walk-ons are tagged: shows in the new season's
+                # preseason, drops once Training Camp completes, and never returns
+                # once they advance past Freshman (the archetype stays in the data).
+                "walk_on": bool(p.get("walk_on")) and show_walk_on and str(p.get("year") or "").strip().lower() == "freshman",
             })
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
@@ -5496,13 +5524,57 @@ try:
             except Exception:
                 pass
 
+        # Training squad (franchise only): ineligible-to-play players retained on the
+        # roster. Returned separately so the UI lists them under a "Training Squad"
+        # header with attributes (they have no season stats — they don't play).
+        training_squad = []
+        if franchise_id and team_doc.get("_id"):
+            try:
+                ts_ftd = franchise_team_data_collection.find_one(
+                    {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
+                    {"training_squad_players": 1},
+                ) or {}
+                ts_ids = [str(pid) for pid in (ts_ftd.get("training_squad_players") or []) if pid]
+                if ts_ids:
+                    ts_docs = list(franchise_players_data_collection.find(
+                        {"franchise_id": str(franchise_id), "player_id": {"$in": ts_ids}},
+                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1},
+                    ))
+                    ts_by_id = {d["player_id"]: d for d in ts_docs}
+                    for pid in ts_ids:
+                        d = ts_by_id.get(pid)
+                        if not d:
+                            continue
+                        ts_meta = d.get("meta") or {}
+                        ts_name = f"{ts_meta.get('first_name','')} {ts_meta.get('last_name','')}".strip()
+                        ts_attrs = (d.get("attributes") or {}).copy()
+                        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+                            if attr_key in ts_attrs and f"anchor_{attr_key}" not in ts_attrs:
+                                ts_attrs[f"anchor_{attr_key}"] = ts_attrs[attr_key]
+                        training_squad.append({
+                            "_id": pid,
+                            "first_name": ts_meta.get("first_name", ""),
+                            "last_name": ts_meta.get("last_name", ""),
+                            "name": ts_name,
+                            "year": ts_meta.get("year"),
+                            "height": ts_meta.get("height"),
+                            "weight": ts_meta.get("weight"),
+                            "jersey": ts_meta.get("jersey"),
+                            "archetype": ts_meta.get("archetype"),
+                            "position_ratings": d.get("position_ratings") or {},
+                            "attributes": ts_attrs,
+                        })
+            except Exception:
+                training_squad = []
+
         response_data = {
             "team": team.get("name", match if match else team_identifier),
             "team_name": team.get("name", match if match else team_identifier),
             "primary_color": team.get("primary_color", "#000000"),
             "secondary_color": team.get("secondary_color", "#ffffff"),
             "team_chemistry": roster_team_chemistry,
-            "players": players
+            "players": players,
+            "training_squad": training_squad,
         }
         
         # ✅ DEBUG: Log response details for box score debugging

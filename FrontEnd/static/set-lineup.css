@@ -957,6 +957,45 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   padding: 18px 20px 20px;
 }
 
+.exhausted-lineup-dialog {
+  width: min(520px, calc(100vw - 32px));
+  margin-top: min(28vh, 220px);
+}
+
+.exhausted-lineup-body {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  padding: 30px;
+  text-align: center;
+}
+
+.exhausted-lineup-body h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 0.02em;
+}
+
+.exhausted-lineup-body p {
+  margin: 0;
+  color: rgba(255,255,255,0.82);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.set-lineup-page.exhausted-lineup-locked .lineup-roster-section,
+.set-lineup-page.exhausted-lineup-locked .lineup-slots-section,
+.set-lineup-page.exhausted-lineup-locked .lineup-left-footer {
+  pointer-events: none;
+}
+
+.set-lineup-page.exhausted-lineup-locked .lineup-roster-section,
+.set-lineup-page.exhausted-lineup-locked .lineup-slots-section {
+  opacity: 0.72;
+}
+
 .lineup-playbooks-sections {
   display: grid;
   gap: 16px;

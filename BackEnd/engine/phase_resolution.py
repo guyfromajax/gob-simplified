@@ -260,6 +260,12 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
         return {"fouled_out": False, "foul_count": 0}
     
     foul_count = foul_player.get_stat("F", "game")
+    locked_player_ids = {
+        str(pid)
+        for pid in ((game_state or {}).get("locked_exhausted_lineup_player_ids") or [])
+    }
+    if str(getattr(foul_player, "player_id", "")) in locked_player_ids:
+        return {"fouled_out": False, "foul_count": foul_count}
     fouled_out = foul_count >= 5
     
     if fouled_out:
@@ -269,7 +275,11 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
                 foul_team.lineup[pos] = None
                 # Immediately replace the fouled-out player to ensure lineup is always complete
                 from BackEnd.main import _ensure_complete_lineup
-                _ensure_complete_lineup(foul_team, game_state)
+                _ensure_complete_lineup(
+                    foul_team,
+                    game_state,
+                    allow_incomplete_user_foul_out_transition=True,
+                )
                 break
     
     return {

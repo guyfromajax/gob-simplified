@@ -152,6 +152,52 @@ def get_franchise_name_assets() -> tuple[tuple[str, ...], tuple[str, ...], tuple
     return tuple(first_names), tuple(last_names), tuple(first_name_weights)
 
 
+def generate_walk_on_profile() -> dict:
+    """Generate a single walk-on player profile (low, small Freshman).
+
+    Shared by season-1 franchise init (3/team) and the week-35 roster fill.
+    Attributes roll 1–32 with at most 3 exceeding 29; archetype "Walk On".
+    """
+    from BackEnd.models.player import Player
+    from BackEnd.utils.position_ratings import compute_position_ratings
+
+    first_names, last_names, first_name_weights = get_franchise_name_assets()
+    attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+    attrs: dict = {}
+    over_29 = 0
+    for key in attr_keys:
+        value = random.randint(1, 32)
+        if value > 29 and over_29 >= 3:
+            value = random.randint(1, 29)
+        if value > 29:
+            over_29 += 1
+        attrs[key] = value
+    attrs = Player.randomize_game_attributes(attrs)
+    # Walk-ons get a tighter CH init (1–90) than the default 1–100; other ranges unchanged.
+    attrs["CH"] = random.randint(1, 90)
+    attrs["anchor_CH"] = attrs["CH"]
+    first_name = choose_franchise_first_name(first_names, first_name_weights)
+    last_name = random.choice(last_names).title()
+    name = f"{first_name} {last_name}"
+    height = random.randint(66, 72)
+    weight = random.randint(155, 179)
+    position_ratings = compute_position_ratings(
+        {"attributes": attrs, "height": height, "name": name},
+        profile="recruit",
+    )
+    return {
+        "recruit_id": None,
+        "name": name,
+        "attributes": attrs,
+        "position_ratings": position_ratings,
+        "height": height,
+        "weight": weight,
+        "archetype": "Walk On",
+        "year": "Freshman",
+        "Home Region": "",
+    }
+
+
 class FranchiseManager:
     def __init__(self, db):
         self.db = db
@@ -285,6 +331,40 @@ class FranchiseManager:
                 "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
             }
         _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
+
+        # ✅ Season 1 walk-ons: every team carries 3 walk-ons so each roster sits at
+        # 15. During week-1 Training Camp each team assigns 3 to the training squad
+        # (user picks; CPU auto-picks lowest RT), leaving 12 active. Generated here
+        # under the franchise-creation load screen so the FCC lands lag-free.
+        _t0 = time.time()
+        for team in self.teams:
+            team_obj_id = team.get("_id")
+            team_name = team.get("name", "")
+            walk_on_ids = []
+            for _ in range(3):
+                wo = generate_walk_on_profile()
+                wid = str(uuid_module.uuid4())
+                first_name, _, last_name = (wo.get("name") or "").partition(" ")
+                players_map[wid] = {
+                    "meta": {
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "team": team_name,
+                        "team_id": str(team_obj_id) if team_obj_id is not None else None,
+                        "height": wo["height"],
+                        "weight": wo["weight"],
+                        "year": "Freshman",
+                        "jersey": None,
+                        "archetype": "Walk On",
+                    },
+                    "season": zero_stats.copy(),
+                    "career": zero_stats.copy(),
+                    "attributes": wo["attributes"],
+                    "position_ratings": wo["position_ratings"],
+                }
+                walk_on_ids.append(wid)
+            team["player_ids"] = [str(pid) for pid in team.get("player_ids", [])] + walk_on_ids
+        _perf["generate_walkons"] = (time.time() - _t0) * 1000
 
         # Initialize franchise-specific team stats using mode initialization system
         from BackEnd.models.team_manager import TeamManager
@@ -495,7 +575,9 @@ class FranchiseManager:
                 "team_id": team_object_id,
                 "players": players,
                 "scholarship_players": players[:12],
-                "training_squad_players": players[12:15],
+                # Empty at init — the 3 over-12 are assigned to the training squad
+                # during week-1 Training Camp (user picks / CPU auto), not here.
+                "training_squad_players": [],
                 "playing_time_promise_players": [],
                 "Recruits": {str(i): None for i in range(1, 21)},
                 "recruiting_orders_week_35": {},

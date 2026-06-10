@@ -11,6 +11,7 @@ const returnTab = urlParams.get('return_tab'); // 'standings-tab' or 'schedule-t
 const returnUrl = urlParams.get('return_url'); // Full return URL
 
 let rosterData = [];
+let trainingSquadData = [];
 let statsData = [];
 let rosterSortColumn = 'RT';
 let rosterSortDirection = 'desc';
@@ -192,8 +193,35 @@ async function loadRoster() {
     
     // Default sort by RT descending
     rosterData.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
-    
+
+    // Training squad (ineligible players) — same row shape, rendered below the roster.
+    trainingSquadData = (data.training_squad || []).map(p => {
+      const attrs = p.attributes || {};
+      const posRatings = p.position_ratings || {};
+      let highestRT = -Infinity;
+      Object.entries(posRatings).forEach(([, rating]) => {
+        if (typeof rating === 'number' && rating > highestRT) highestRT = rating;
+      });
+      const heightInches = p.height || 0;
+      return {
+        _id: p._id,
+        name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        jersey: p.jersey,
+        pos: getBestPosition(posRatings).pos || '--',
+        year: p.year || '--',
+        height: `${Math.floor(heightInches / 12)}'${heightInches % 12}"`,
+        weight: p.weight || '--',
+        attributes: attrs,
+        position_ratings: posRatings,
+        highestRT: highestRT !== -Infinity ? highestRT : null,
+        hasPlayingTimePromise: false,
+        isGraduating: false
+      };
+    });
+    trainingSquadData.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+
     renderRoster();
+    renderTrainingSquadView();
   } catch (error) {
     console.error('Error loading roster:', error);
     document.getElementById('roster-body').innerHTML = `<tr><td colspan="18">Error loading roster: ${error.message}</td></tr>`;
@@ -343,10 +371,26 @@ function getBestPosition(positionRatings) {
 }
 
 function renderRoster() {
-  const tbody = document.getElementById('roster-body');
+  renderRosterInto(rosterData, 'roster-body');
+}
+
+function renderTrainingSquadView() {
+  const section = document.getElementById('ts-roster-section');
+  if (!section) return;
+  if (!trainingSquadData || !trainingSquadData.length) {
+    section.style.display = 'none';
+    return;
+  }
+  renderRosterInto(trainingSquadData, 'ts-roster-body');
+  section.style.display = '';
+}
+
+function renderRosterInto(data, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
   tbody.innerHTML = '';
-  
-  rosterData.forEach(p => {
+
+  data.forEach(p => {
     const tr = document.createElement('tr');
     const attrs = p.attributes || {};
     
@@ -423,7 +467,7 @@ function renderRoster() {
   // column headers (SC, SH, ID, OD, …) also get tooltips, not just the data
   // cells under them.
   if (typeof initAttributeTooltips !== 'undefined') {
-    const rosterTable = document.getElementById('roster-table') || tbody;
+    const rosterTable = tbody.closest('table') || tbody;
     initAttributeTooltips(rosterTable, ['td', 'th']);
   }
 }

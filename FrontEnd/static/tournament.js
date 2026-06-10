@@ -10,6 +10,28 @@ let userTeamName = ""; // Team name for bracket comparisons
 let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting (matches Franchise pattern)
 let teamColorCache = null; // Cache for team primary colors
 let teamMetaByNameCache = null;
+/** team_id -> { region, natl_rank, W, L, mascot } for bracket tooltips */
+const teamIdMetaMap = {};
+/** team_id -> seed (1-8), set when bracket renders */
+let bracketSeedMap = {};
+let tccCelebrationShown = false;
+
+const TCC_TROPHY_SVG =
+  '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true">' +
+  '<path d="M14 7h20v8a10 10 0 0 1-20 0V7z" fill="url(#tcc-tg)" stroke="#f0c560" stroke-width="1.2"/>' +
+  '<path d="M14 9H8v3a7 7 0 0 0 7 7" stroke="#d4a848" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+  '<path d="M34 9h6v3a7 7 0 0 1-7 7" stroke="#d4a848" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+  '<path d="M24 25v7" stroke="#d4a848" stroke-width="2.4" stroke-linecap="round"/>' +
+  '<path d="M17 40c0-3 3-5 7-5s7 2 7 5H17z" fill="url(#tcc-tg)" stroke="#f0c560" stroke-width="1.2"/>' +
+  '<rect x="20" y="32" width="8" height="4" rx="1" fill="#d4a848"/>' +
+  '<defs><linearGradient id="tcc-tg" x1="24" y1="7" x2="24" y2="41" gradientUnits="userSpaceOnUse">' +
+  '<stop stop-color="#f4d27a"/><stop offset="1" stop-color="#c79a3e"/></linearGradient></defs></svg>';
+
+const TCC_CELE_TIER = {
+  conference: { scale: 0.85, intensity: 0.6, confetti: 42 },
+  region: { scale: 1.0, intensity: 0.8, confetti: 75 },
+  national: { scale: 1.22, intensity: 1.05, confetti: 130 },
+};
 let tournamentRosterData = null; // ✅ SS&S: Store roster data with merged stats (matches Franchise pattern)
 
 function playSound(filename) {
@@ -120,11 +142,135 @@ function getLogo(teamName) {
   return typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
 }
 
-function getTeamTooltipText(teamName) {
-  if (!teamName) return '';
-  const meta = teamMetaByNameCache?.[teamName] || null;
-  const mascot = String(meta?.mascot || '').trim();
-  return mascot ? `${teamName} ${mascot}` : String(teamName);
+function getTeamTooltipData(teamId, teamName) {
+  const resolvedId = teamId != null ? String(teamId) : '';
+  const name =
+    (resolvedId && teamIdNameMap[resolvedId]) ||
+    teamName ||
+    '';
+  const meta = (resolvedId && teamIdMetaMap[resolvedId]) || teamMetaByNameCache?.[name] || {};
+  const seed = bracketSeedMap[resolvedId] ?? meta.seed ?? null;
+  const region = meta.region ? String(meta.region).toUpperCase() : '';
+  const natlRank =
+    meta.natl_rank != null && Number.isFinite(Number(meta.natl_rank))
+      ? Number(meta.natl_rank)
+      : null;
+  let record = '';
+  if (meta.W != null || meta.L != null) {
+    const w = Number.isFinite(Number(meta.W)) ? Number(meta.W) : 0;
+    const l = Number.isFinite(Number(meta.L)) ? Number(meta.L) : 0;
+    record = `${w}-${l}`;
+  }
+  return { seed, region, name, natlRank, record };
+}
+
+function buildBracketSeedMap(round1) {
+  const map = {};
+  if (!round1 || round1.length < 4) return map;
+  map[round1[0].home_team] = 1;
+  map[round1[0].away_team] = 8;
+  map[round1[1].home_team] = 4;
+  map[round1[1].away_team] = 5;
+  map[round1[2].home_team] = 2;
+  map[round1[2].away_team] = 7;
+  map[round1[3].home_team] = 3;
+  map[round1[3].away_team] = 6;
+  return map;
+}
+
+function spawnTccConfetti(container, count) {
+  if (!container) return;
+  container.innerHTML = '';
+  const colors = ['#f0c560', '#d4a848', '#2bd66a', '#27408e', '#ffffff'];
+  const motionOk = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (let i = 0; i < count; i += 1) {
+    const piece = document.createElement('i');
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = colors[i % colors.length];
+    if (motionOk) {
+      piece.style.animationDuration = `${3.6 + Math.random() * 2.4}s`;
+      piece.style.animationDelay = `${Math.random() * 1.2}s`;
+    }
+    container.appendChild(piece);
+  }
+}
+
+function hideTccCelebration() {
+  const overlay = document.getElementById('tournament-celebrate');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function showTccCelebration(payload) {
+  const overlay = document.getElementById('tournament-celebrate');
+  if (!overlay || tccCelebrationShown) return;
+
+  const tierKey = payload.tier || 'national';
+  const tier = TCC_CELE_TIER[tierKey] || TCC_CELE_TIER.national;
+  overlay.style.setProperty('--cele-scale', String(tier.scale));
+  overlay.style.setProperty('--cele-intensity', String(tier.intensity));
+
+  const trophyEl = overlay.querySelector('.celebrate__trophy');
+  if (trophyEl) trophyEl.innerHTML = TCC_TROPHY_SVG;
+
+  const eyebrowEl = document.getElementById('tcc-cele-eyebrow');
+  if (eyebrowEl) eyebrowEl.textContent = payload.eyebrow || 'TOURNAMENT';
+
+  const logoEl = document.getElementById('tcc-cele-logo');
+  if (logoEl) {
+    logoEl.src = payload.logoSrc || '';
+    logoEl.alt = payload.teamName || 'Champion';
+  }
+
+  const teamEl = document.getElementById('tcc-cele-team');
+  if (teamEl) teamEl.textContent = payload.teamName || '';
+
+  const subEl = document.getElementById('tcc-cele-sub');
+  if (subEl) subEl.textContent = payload.subline || '';
+
+  spawnTccConfetti(document.getElementById('tcc-confetti'), tier.confetti);
+
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  tccCelebrationShown = true;
+}
+
+function maybeShowTccCelebration(finalMatch) {
+  if (!tournament?.completed || !finalMatch?.winner || tccCelebrationShown) return;
+  const winnerId = String(finalMatch.winner);
+  const winnerName = teamIdNameMap[winnerId] || winnerId;
+  if (!isUserTeam(winnerId) && !isUserTeam(winnerName)) return;
+  const hid = finalMatch.home_team;
+  const aid = finalMatch.away_team;
+  const loserId = String(winnerId) === String(hid) ? aid : hid;
+  const loserName = teamIdNameMap[String(loserId)] || String(loserId);
+  const sc = finalMatch.score || {};
+  const hName = teamIdNameMap[String(hid)] || String(hid);
+  const aName = teamIdNameMap[String(aid)] || String(aid);
+  const hs = sc[hid] ?? sc[hName] ?? '';
+  const as = sc[aid] ?? sc[aName] ?? '';
+  const meta = teamIdMetaMap[winnerId] || {};
+  let record = '';
+  if (meta.W != null || meta.L != null) {
+    record = `${Number(meta.W) || 0}-${Number(meta.L) || 0}`;
+  }
+
+  showTccCelebration({
+    tier: 'national',
+    eyebrow: 'TOURNAMENT',
+    teamName: winnerName,
+    logoSrc: getLogo(winnerName),
+    subline: `${record ? record + ' · ' : ''}defeated ${loserName} ${hs}-${as}`.trim(),
+  });
+}
+
+function wireTccCelebrationClose() {
+  const btn = document.getElementById('tcc-cele-close');
+  if (btn && !btn._tccBound) {
+    btn._tccBound = true;
+    btn.addEventListener('click', hideTccCelebration);
+  }
 }
 
 
@@ -239,22 +385,27 @@ function renderBracket() {
     });
   }
 
-  // ✅ Shared bracket renderer (bracket.js) – same DOM for TCC and FCC
+  bracketSeedMap = buildBracketSeedMap(round1);
+
+  // Arena bracket renderer (TCC Command Center)
   if (typeof renderBracketShared === 'function') {
     renderBracketShared(bracket, { round1, round2, final: finalRound }, teamIdNameMap, {
+      arena: true,
       results,
+      seeds: bracketSeedMap,
       getLogo,
       isUserTeam,
-      getTooltip: function (teamId, teamName) {
-        const resolvedName = teamIdNameMap[String(teamId)] || teamName || '';
-        return getTeamTooltipText(resolvedName);
+      userTeamId,
+      tournamentLabel: 'TOURNAMENT',
+      champEyebrow: 'Tournament Champions',
+      getTooltipData: getTeamTooltipData,
+      onRendered: function (info) {
+        maybeShowTccCelebration(info?.final || finalRound[0] || null);
       },
     });
   } else {
     console.warn('[TCC] renderBracketShared not found; bracket.js may not be loaded');
   }
-  // ensure CTA buttons reflect latest bracket state
-  updateCTA();
 }
 
 // Store roster data for sorting
@@ -724,34 +875,43 @@ function renderTeamStats(data) {
   tournamentTeamsDataForSorting = JSON.parse(JSON.stringify(data.teams || [])); // Deep copy for sorting
 
   for (const k of Object.keys(teamIdNameMap)) delete teamIdNameMap[k];
+  for (const k of Object.keys(teamIdMetaMap)) delete teamIdMetaMap[k];
   (data.teams || []).forEach(t => {
     if (t.team_id != null && t.team != null) {
       teamIdNameMap[String(t.team_id)] = t.team;
+      const st = t.stats || {};
+      teamIdMetaMap[String(t.team_id)] = {
+        team: t.team,
+        mascot: t.mascot || teamMetaByNameCache?.[t.team]?.mascot || '',
+        region: t.region != null && t.region !== '' ? String(t.region).toUpperCase() : '',
+        natl_rank: t.natl_rank != null && Number.isFinite(Number(t.natl_rank)) ? Number(t.natl_rank) : null,
+        W: Number.isFinite(Number(st.W)) ? Number(st.W) : 0,
+        L: Number.isFinite(Number(st.L)) ? Number(st.L) : 0,
+      };
     }
   });
   if (Object.keys(teamIdNameMap).length) {
     renderBracket();
-    renderSchedule();
   }
 
-  console.log('🔍 [DEBUG renderTeamStats] Calling TeamStatsTable.renderTeamStatsTable() with', tournamentTeamsDataForSorting.length, 'teams');
-  TeamStatsTable.renderTeamStatsTable(tournamentTeamsDataForSorting);
-  console.log('✅ [DEBUG renderTeamStats] TeamStatsTable.renderTeamStatsTable() called');
-  
-  // Add click handlers to sortable headers (only once)
-  const sortableHeaders = document.querySelectorAll('#stats-tab .sortable');
-  sortableHeaders.forEach(header => {
-    // Remove existing listeners to avoid duplicates
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-    
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      const stat = newHeader.dataset.stat;
-      TeamStatsTable.sortTeamStats(stat, tournamentTeamsDataForSorting);
+  const statsBody = document.getElementById('teamstats-body');
+  if (statsBody && typeof TeamStatsTable !== 'undefined') {
+    console.log('🔍 [DEBUG renderTeamStats] Calling TeamStatsTable.renderTeamStatsTable() with', tournamentTeamsDataForSorting.length, 'teams');
+    TeamStatsTable.renderTeamStatsTable(tournamentTeamsDataForSorting);
+    console.log('✅ [DEBUG renderTeamStats] TeamStatsTable.renderTeamStatsTable() called');
+
+    const sortableHeaders = document.querySelectorAll('#stats-tab .sortable');
+    sortableHeaders.forEach(header => {
+      const newHeader = header.cloneNode(true);
+      header.parentNode.replaceChild(newHeader, header);
+      newHeader.style.cursor = 'pointer';
+      newHeader.style.userSelect = 'none';
+      newHeader.addEventListener('click', () => {
+        const stat = newHeader.dataset.stat;
+        TeamStatsTable.sortTeamStats(stat, tournamentTeamsDataForSorting);
+      });
     });
-  });
+  }
 }
 
 // ✅ SS&S: Team stats table rendering now uses shared module (teamStatsTable.js)
@@ -1069,65 +1229,10 @@ function updateCTA(data) {
 function populateTop(data) {
   if (!data) return;
 
-  // Update team logo
   if (data.team) {
-    const formattedTeam = formatTeamName(data.team);
     const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
     const logoEl = document.getElementById('user-team-logo');
-    if (logoEl) {
-      logoEl.src = logoSrc;
-    }
-    
-    // Update coach images
-    const abbr = teamMap[formattedTeam];
-    const sammyEl = document.getElementById('coach-sammy');
-    const dukeEl = document.getElementById('coach-duke');
-    if (abbr) {
-      if (sammyEl) sammyEl.src = `/images/coaches/${abbr}/Sammy-${abbr}.png`;
-      if (dukeEl) dukeEl.src = `/images/coaches/${abbr}/Duke-${abbr}.png`;
-    } else {
-      if (sammyEl) sammyEl.removeAttribute('src');
-      if (dukeEl) dukeEl.removeAttribute('src');
-    }
-  }
-  
-  // Update chemistry bar with proportional fill
-  const chemistryBar = document.querySelector('.chemistry-bar');
-  if (chemistryBar) {
-    const chemistryValue = data.team_chemistry || 0;
-    const fillElement = chemistryBar.querySelector('.chemistry-bar-fill');
-    const textElement = chemistryBar.querySelector('.chemistry-bar-text');
-    
-    if (fillElement) {
-      const percentage = (chemistryValue / 25) * 100;
-      fillElement.style.width = `${percentage}%`;
-    }
-    
-    if (textElement) {
-      textElement.textContent = `${chemistryValue} / 25`;
-    }
-  }
-  
-  // Update team stats (align with Franchise structure)
-  const statsContainer = document.querySelector('#top-center .team-stats');
-  if (statsContainer) {
-    const offenseEl = statsContainer.querySelector('div:nth-child(1)');
-    const athleticismEl = statsContainer.querySelector('div:nth-child(2)');
-    const prestigeEl = statsContainer.querySelector('div:nth-child(3)');
-    const defenseEl = statsContainer.querySelector('div:nth-child(4)');
-    const intangiblesEl = statsContainer.querySelector('div:nth-child(5)');
-    const seedEl = statsContainer.querySelector('div:nth-child(6)');
-    
-    if (offenseEl) offenseEl.textContent = `Offense: ${data.offense || '--'}`;
-    if (athleticismEl) athleticismEl.textContent = `Athleticism: ${data.athleticism || '--'}`;
-    if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
-    if (defenseEl) defenseEl.textContent = `Defense: ${data.defense || '--'}`;
-    if (intangiblesEl) intangiblesEl.textContent = `Intangibles: ${data.intangibles || '--'}`;
-    // Tournament mode shows seed instead of rank
-    if (seedEl) {
-      const seed = data.seed || tournament?.seed || '--';
-      seedEl.textContent = `Seed: ${seed}`;
-    }
+    if (logoEl) logoEl.src = logoSrc;
   }
 }
 
@@ -1507,16 +1612,8 @@ function handleTournamentUpdate(doc) {
     });
   tournament = doc;
   localStorage.setItem("activeTournament", JSON.stringify(doc));
-  updateTeamChemistry();
   renderBracket();
-  renderSchedule();
-  // ✅ SS&S: Reload roster and stats to ensure player stats populate after game completion (matches Franchise pattern)
-  loadRoster().then(() => {
-    renderRoster(); // renderRoster() now calls renderRosterStats() internally (matches Franchise)
-  });
-  // ✅ FIX: Reload team data to refresh player stats on Team tab
-  loadTeamData();
-  updateCTA();
+  refreshTeamStats();
 }
 
 window.handleTournamentUpdate = handleTournamentUpdate;
@@ -1568,50 +1665,25 @@ async function initializeTournament() {
       console.warn('⚠️ [TOURNAMENT INIT] commandCenterData.team_id not found - using existing userTeamId:', userTeamId);
     }
     
-    // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /tournament/team-data
-    // This ensures 100% consistency between header and Team tab (matches FCC pattern)
-    if (tournament && tournament._id && userTeamId) {
-      try {
-        const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/tournament/team-data')}?tournament_id=${encodeURIComponent(tournament._id)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
-        if (teamDataResponse.ok) {
-          const teamData = await teamDataResponse.json();
-          // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
-          if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
-            commandCenterData.team_chemistry = teamData.team_attributes.team_chemistry;
-            console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', commandCenterData.team_chemistry);
-          }
-        }
-      } catch (error) {
-        console.warn('Could not fetch team_chemistry from team-data endpoint:', error);
-      }
-    }
-    
-    // Populate top bar using structured data (aligns with Franchise)
     populateTop(commandCenterData);
     
-    // ✅ FIX: Store user team name for leaderboard highlighting (matches Franchise pattern)
     if (commandCenterData.team) {
       userTeamNameForLeaders = commandCenterData.team;
     }
   } else {
-    // Fallback: Update from tournament object (backward compatibility)
     if (tournament.user_team_id) {
-      userTeamName = tournament.user_team_id; // Team name for bracket comparisons
+      userTeamName = tournament.user_team_id;
     }
     if (!userTeamId && tournament.user_team_object_id) {
-      userTeamId = tournament.user_team_object_id; // ObjectId for API calls
+      userTeamId = tournament.user_team_object_id;
       localStorage.setItem("userTeamId", userTeamId);
     } else if (!userTeamId && tournament.user_team_id) {
-      // Fallback: use team name if ObjectId not available
       userTeamId = tournament.user_team_id;
       localStorage.setItem("userTeamId", userTeamId);
     }
     
-    // Fallback: Update top bar from tournament object
     initTopAssets(userTeamId);
-    updateTeamChemistry();
     
-    // ✅ FIX: Fallback: Store user team name for leaderboard highlighting (matches Franchise pattern)
     if (tournament.user_team_id) {
       userTeamNameForLeaders = tournament.user_team_id;
     }
@@ -1619,158 +1691,16 @@ async function initializeTournament() {
   
   if (window.GOB_Analytics) window.GOB_Analytics.tournamentEntered();
 
-  // Ensure userTeamId is set before proceeding
-  if (!userTeamId) {
-    console.error("❌ userTeamId not found - cannot load roster");
-    return;
-  }
-  
-  // Initialize team color cache for leaderboard highlighting
   await initializeTeamColorCache();
-  
-  await loadRoster();
-  renderBracket();
-  renderSchedule();
-  renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-  await refreshLeaders();
-  
-  // ✅ FIX: Call renderTeamStats directly in DOMContentLoaded (matches Franchise pattern)
-  // Franchise calls it directly in init(), not just in refreshLeaders()
-  console.log('🔍 [DEBUG DOMContentLoaded] Loading team stats on initial page load');
-  if (tournament && tournament._id) {
-    try {
-      const url = `${API_CONFIG.buildUrl('/tournament/team-stats')}?tournament_id=${encodeURIComponent(tournament._id)}`;
-      console.log('🔍 [DEBUG DOMContentLoaded] Fetching team stats from:', url);
-      const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
-      const data = await res.json();
-      console.log('🔍 [DEBUG DOMContentLoaded] Team stats response:', {
-        hasData: !!data,
-        teamsCount: data?.teams?.length || 0
-      });
-      renderTeamStats(data);
-    } catch (err) {
-      console.error("❌ [DEBUG DOMContentLoaded] Failed to load team stats", err);
-    }
-  } else {
-    console.warn('⚠️ [DEBUG DOMContentLoaded] Tournament not loaded, cannot fetch team stats');
-  }
-  
-  // ✅ MIGRATION: Update CTA using command center data (aligns with Franchise)
-  updateCTA(commandCenterData);
-  
-  // Update scouting report button visibility
-  updateScoutingButton(commandCenterData);
-  
-  // Initialize tooltips for table headers
-  if (typeof initAttributeTooltips !== 'undefined') {
-    const rosterTable = document.querySelector('#roster-tab .roster-table');
-    if (rosterTable) {
-      initAttributeTooltips(rosterTable, ['th']);
-    }
-  }
-  
-  // Load team data for Team tab
-  await loadTeamData();
-
-  const playBtn = document.getElementById('play-now');
-  if (playBtn) {
-    playBtn.addEventListener('click', async () => {
-      playSound('confirm-1-lowervol.wav');
-      if (!tournament || !tournament._id) {
-        alert('Tournament not loaded');
-        return;
-      }
-      playBtn.disabled = true;
-      try {
-        // ✅ REMOVED: Training is not used in Tournament mode - proceed directly to game
-        const payload = { tournament_id: tournament._id };
-        const res = await fetch(API_CONFIG.buildUrl('/tournament/simulate-round'), {
-          method: 'POST',
-          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        console.log('[PlayNow] simulate round', { payload, response: data });
-        if (!res.ok || data.error) {
-          alert(data.detail || data.error || 'Unable to start game');
-          playBtn.disabled = false;
-          return;
-        }
-        if (data.already_played) {
-          playBtn.disabled = false;
-          await refreshTeamStats();
-          await refreshLeaders();
-          alert('This round has already been played.');
-          return;
-        }
-        await refreshTeamStats();
-        await refreshLeaders();
-        const { home, away } = data;
-        if (!home || !away) throw new Error('Matchup not found');
-        // Compare with team name (bracket uses team names, not ObjectIds)
-        const mySide = home === userTeamName ? 'home' : (away === userTeamName ? 'away' : '');
-        // ✅ FIX: Add mode=tournament parameter (matches Franchise pattern)
-        // This ensures mode is preserved through navigation chain: TCC → Lineup → Game Plan → Court
-        let url = `/set-lineup.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
-        // Add team IDs for gameplan API compatibility
-        url += `&home_id=${encodeURIComponent(home)}&away_id=${encodeURIComponent(away)}`;
-        if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;
-        if (mySide) url += `&my_team=${mySide}`;
-        window.location.href = url;
-      } catch (err) {
-        console.error('Failed to start game', err);
-        alert('Unable to start game');
-        playBtn.disabled = false;
-      }
-    });
-  }
-
-  // Game Plan and Playbooks buttons are wired in wireTccNavButtons() on DOMContentLoaded
-
-  const simBtn = document.getElementById('sim-remaining');
-  if (simBtn) {
-    simBtn.addEventListener('click', async () => {
-      if (simBtn.disabled) return;
-      if (!tournament) {
-        alert('Tournament not loaded');
-        return;
-      }
-      if (tournament.completed) return;
-      simBtn.disabled = true;
-      if (!tournament._id) {
-        alert('Tournament not loaded');
-        simBtn.disabled = false;
-        return;
-      }
-      console.log('#sim-remaining click start');
-      try {
-        const res = await fetch(API_CONFIG.buildUrl('/tournament/sim-remaining'), {
-          method: 'POST',
-          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tournament_id: tournament._id })
-        });
-        if (!res.ok) throw new Error('Request failed');
-        const data = await res.json();
-        tournament = data;
-        localStorage.setItem('activeTournament', JSON.stringify(tournament));
-        await loadRoster();
-        renderRoster();
-        renderBracket();
-        console.log('#sim-remaining bracket refreshed');
-        renderRoster(); // ✅ SS&S: renderRoster() now calls renderRosterStats() internally (matches Franchise)
-        await refreshLeaders();
-        updateCTA();
-        console.log('#sim-remaining bracket update complete');
-      } catch (err) {
-        console.error('Sim remaining failed:', err.message);
-        alert('Unable to simulate remaining games');
-        simBtn.disabled = false;
-      }
-    });
+  wireTccCelebrationClose();
+  await refreshTeamStats();
+  if (!document.getElementById('bracket')?.children?.length) {
+    renderBracket();
   }
 
   const exitBtn = document.getElementById('exit-tournament');
-  if (exitBtn) {
+  if (exitBtn && !exitBtn._tccBound) {
+    exitBtn._tccBound = true;
     exitBtn.addEventListener('click', () => {
       playSound('x-back.mp3');
       window.location.href = '/mode-select.html';

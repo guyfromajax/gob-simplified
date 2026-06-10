@@ -87,6 +87,33 @@
      alert can never re-queue/re-show within the same page session. */
   var presented = {};
 
+  /* FCC-return coordination: the Training Squad modal must wait for the Team
+     Attributes (and any other FCC-return) tutorial alert to resolve before it
+     shows. `returnAlertsSettled` flips true once this load's FCC-return alert has
+     been shown-and-dismissed, or determined not-eligible. Consumers register via
+     whenReturnAlertsSettled() and fire immediately if already settled. */
+  var returnAlertsSettled = false;
+  var settledCallbacks = [];
+
+  function markReturnAlertsSettled() {
+    if (returnAlertsSettled) return;
+    returnAlertsSettled = true;
+    var cbs = settledCallbacks.slice();
+    settledCallbacks = [];
+    cbs.forEach(function (cb) { try { cb(); } catch (e) {} });
+  }
+
+  function whenReturnAlertsSettled(cb) {
+    if (typeof cb !== 'function') return;
+    if (returnAlertsSettled) { cb(); return; }
+    settledCallbacks.push(cb);
+  }
+
+  /* Settle once the alert pipeline is idle (nothing showing, nothing queued). */
+  function maybeMarkSettledIfIdle() {
+    if (!showing && !queue.length) markReturnAlertsSettled();
+  }
+
   function sfx(f) {
     if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
   }
@@ -365,6 +392,7 @@
           if (!startedLesson) applyNavGlow();
           resolve(startedLesson);
           drainQueue();
+          maybeMarkSettledIfIdle();
         }
 
         window.GOB.showTip({
@@ -418,7 +446,11 @@
 
   function scheduleDrainRetry() {
     if (drainTimer) return;
-    if (drainRetries >= MAX_DRAIN_RETRIES) return; // give up; re-evaluated on next FCC load
+    if (drainRetries >= MAX_DRAIN_RETRIES) {
+      // Give up retrying this load; don't block the Training Squad modal forever.
+      markReturnAlertsSettled();
+      return; // re-evaluated on next FCC load
+    }
     drainTimer = setTimeout(function () {
       drainTimer = null;
       drainRetries += 1;
@@ -504,7 +536,13 @@
          This is the other half of the fix — the old code only evaluated when a
          `tut_alert` param was present, which the franchise game return omits. */
       return evaluateAndShow({ franchiseId: franchiseId, checkFccReturn: true });
-    }).then(applyNavGlow);
+    }).then(function () {
+      applyNavGlow();
+      /* If no FCC-return alert ended up showing (none eligible / already seen),
+         settle now so the Training Squad modal can proceed. If one IS showing,
+         finish() settles on dismissal. */
+      maybeMarkSettledIfIdle();
+    });
   }
 
   function interceptTraining(franchiseId, navigate, returnUrl) {
@@ -561,7 +599,8 @@
     interceptTraining: interceptTraining,
     interceptPlayNextGame: interceptPlayNextGame,
     applyNavGlow: applyNavGlow,
-    refreshMeFromServer: refreshMeFromServer
+    refreshMeFromServer: refreshMeFromServer,
+    whenReturnAlertsSettled: whenReturnAlertsSettled
   };
 
   window.addEventListener('gob:auth-me-loaded', function (e) {

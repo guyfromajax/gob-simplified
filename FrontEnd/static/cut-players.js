@@ -8,6 +8,9 @@
   var players = [];
   var cutCount = 0;
   var allowLeave = false;
+  // mode 'cut' = week-35 real cuts (any number, FPD deleted). Default = training-squad assignment.
+  var isCutMode = urlParams.get('mode') === 'cut';
+  var nextUrl = urlParams.get('next_url');
 
   function playSound(filename) {
     try {
@@ -39,7 +42,7 @@
     var title = document.getElementById('cut-modal-title');
     var message = document.getElementById('cut-modal-message');
     var actions = document.getElementById('cut-modal-actions');
-    title.textContent = config.title || 'Cut Players';
+    title.textContent = config.title || 'Assign Training Squad';
     message.textContent = config.message || '';
     if (accent) {
       accent.className = 'gob-modal-accent';
@@ -105,8 +108,15 @@
   function updateStatus() {
     var status = document.getElementById('cut-status');
     var selectedCount = selectedIds.size;
-    status.textContent = 'You need to cut ' + cutCount + ' player' + (cutCount === 1 ? '' : 's') + '. Selected: ' + selectedCount + '.';
     var submitBtn = document.getElementById('submit-btn');
+    if (isCutMode) {
+      // Any number (including 0) may be cut; submit is always enabled.
+      status.textContent = 'Select any players to cut — they will be lost forever. Selected: ' + selectedCount + '.';
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('is-dead');
+      return;
+    }
+    status.textContent = 'You need to assign ' + cutCount + ' player' + (cutCount === 1 ? '' : 's') + ' to the training squad. Selected: ' + selectedCount + '.';
     var active = selectedCount === cutCount;
     submitBtn.disabled = !active;
     submitBtn.classList.toggle('is-dead', !active);
@@ -186,8 +196,8 @@
       return;
     }
     showModal({
-      title: 'Leave Cut Players?',
-      message: 'You have selected players to cut but have not submitted them. Are you sure you want to leave?',
+      title: 'Leave Without Assigning?',
+      message: 'You have selected players for the training squad but have not submitted them. Are you sure you want to leave?',
       accent: 'is-red',
       actions: [
         { label: 'Stay', variant: 'gob-modal-btn-primary' },
@@ -196,7 +206,13 @@
     });
   }
 
+  function goNext() {
+    allowLeave = true;
+    window.location.href = nextUrl || buildFccUrl();
+  }
+
   function submitCuts() {
+    if (isCutMode) { submitFinalCuts(); return; }
     if (selectedIds.size !== cutCount) return;
     var namesInOrder = players.filter(function (player) {
       return selectedIds.has(player._id);
@@ -204,8 +220,8 @@
       return player.name;
     });
     showModal({
-      title: 'Confirm Cuts',
-      message: 'You are going to cut ' + formatNames(namesInOrder) + '. This cannot be undone. Are you sure you want to proceed with the cuts?',
+      title: 'Confirm Training Squad',
+      message: 'You are going to assign ' + formatNames(namesInOrder) + ' to the training squad. They will be ineligible to play this season, but available for training camp next season. Proceed?',
       accent: 'is-red',
       actions: [
         { label: 'Cancel', variant: 'gob-modal-btn-secondary' },
@@ -222,14 +238,14 @@
               })
             })
               .then(function (res) {
-                if (!res.ok) throw new Error('Failed to process cuts');
+                if (!res.ok) throw new Error('Failed to assign training squad');
                 return res.json();
               })
               .then(function (data) {
                 playSound('confirm-1-lowervol.wav');
                 showModal({
-                  title: 'Cuts Processed',
-                  message: formatNames(data.cut_names || namesInOrder) + ' have been cut.',
+                  title: 'Training Squad Assigned',
+                  message: formatNames(data.cut_names || namesInOrder) + ' have been assigned to the training squad.',
                   accent: 'is-green',
                   actions: [{
                     label: 'Back To Locker Room',
@@ -244,8 +260,60 @@
               .catch(function (err) {
                 console.error(err);
                 showModal({
-                  title: 'Cuts Failed',
-                  message: 'Unable to process player cuts.',
+                  title: 'Assignment Failed',
+                  message: 'Unable to assign players to the training squad.',
+                  actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
+                });
+              });
+          }
+        }
+      ]
+    });
+  }
+
+  function submitFinalCuts() {
+    var namesInOrder = players.filter(function (player) {
+      return selectedIds.has(player._id);
+    }).map(function (player) { return player.name; });
+
+    if (!namesInOrder.length) {
+      // No cuts selected — proceed straight to recruiting.
+      goNext();
+      return;
+    }
+    showModal({
+      title: 'Confirm Cuts',
+      message: 'You are going to cut ' + formatNames(namesInOrder) + '. These players will be lost forever. Proceed?',
+      accent: 'is-red',
+      actions: [
+        { label: 'Cancel', variant: 'gob-modal-btn-secondary' },
+        {
+          label: 'Cut Players',
+          variant: 'gob-modal-btn-primary',
+          onClick: function () {
+            fetch(API_CONFIG.buildUrl('/franchise/cut-players-final'), {
+              method: 'POST',
+              headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ franchise_id: franchiseId, player_ids: Array.from(selectedIds) })
+            })
+              .then(function (res) {
+                if (!res.ok) throw new Error('Failed to cut players');
+                return res.json();
+              })
+              .then(function (data) {
+                playSound('confirm-1-lowervol.wav');
+                showModal({
+                  title: 'Players Cut',
+                  message: formatNames(data.cut_names || namesInOrder) + ' have been cut. Continuing to recruiting.',
+                  accent: 'is-green',
+                  actions: [{ label: 'Continue to Recruiting', variant: 'gob-modal-btn-primary', onClick: goNext }]
+                });
+              })
+              .catch(function (err) {
+                console.error(err);
+                showModal({
+                  title: 'Cut Failed',
+                  message: 'Unable to cut players.',
                   actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
                 });
               });
@@ -268,7 +336,12 @@
       var topData = results[0] || {};
       var roster = results[1] || {};
       cutCount = Number(topData.cut_count || 0);
-      players = (roster.players || []).map(function (player) {
+      // Week-35 cut mode: cut from active roster AND training squad. Assignment mode: active only.
+      var pool = (roster.players || []).slice();
+      if (isCutMode && Array.isArray(roster.training_squad)) {
+        pool = pool.concat(roster.training_squad);
+      }
+      players = pool.map(function (player) {
         var positionRatings = player.position_ratings || {};
         var best = getBestPosition(positionRatings);
         return {
@@ -287,7 +360,7 @@
         return Number(b.highestRT || -1) - Number(a.highestRT || -1);
       });
       renderTable();
-      if (!topData.cut_required || cutCount <= 0) {
+      if (!isCutMode && (!topData.cut_required || cutCount <= 0)) {
         showModal({
           title: 'No Cuts Required',
           message: 'Your roster is already at the legal 12-player limit.',
@@ -311,6 +384,16 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    if (isCutMode) {
+      // Relabel the page for real cuts (page chrome defaults to training-squad assignment).
+      document.title = 'Cut Players';
+      var h1 = document.querySelector('.cut-players-header h1');
+      if (h1) h1.textContent = 'Cut Players';
+      var submitLabel = document.getElementById('submit-btn');
+      if (submitLabel) submitLabel.textContent = 'Submit Cuts';
+      var lastTh = document.querySelector('#cut-players-table thead th:last-child');
+      if (lastTh) lastTh.textContent = 'Cut';
+    }
     document.getElementById('back-btn').addEventListener('click', attemptLeave);
     document.getElementById('submit-btn').addEventListener('click', submitCuts);
     window.addEventListener('beforeunload', function (e) {
