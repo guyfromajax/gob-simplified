@@ -2,10 +2,8 @@
    GOB Tutorial Hub — data, rendering, progress, toast
    IA: Players / Team / Strategy / Training
 
-   Dead this pass: topic tiles, core-loop steps, hero action button,
-   "Next up" pill — they never navigate to a sub-page (those don't exist yet). When a sub-page ships it only has
-   to call GOB.markSeen('<topic-id>') on load and the whole progress /
-   next-up / explored-✓ system lights up automatically.
+   Dead this pass: topic tiles with no LIVE page toast on click.
+   Sub-pages call GOB.markSeen('<topic-id>') on load and progress / Continue / explored-✓ update automatically.
    =========================================================== */
 (function () {
   'use strict';
@@ -63,20 +61,24 @@
   }
   function updateNext() {
     var nx = nextLesson();
-    var headline = document.getElementById('hero-topic');
-    var kick = document.getElementById('kicker-label');
-    var btn = document.getElementById('cta-next');
-    // headline = the dynamic next-lesson name (single source of truth)
-    if (headline) headline.textContent = nx ? nx.name : 'You’re all caught up';
-    // kicker keeps its orange tick bar
-    if (kick) kick.innerHTML = '<span class="tick"></span> ' + (nx ? 'Next up' : 'Nice work, coach');
-    // CTA: navigate to the next lesson's page if it exists; otherwise inert (scroll + pulse)
-    if (btn) {
-      if (nx) {
-        btn.textContent = 'Start lesson';
-        if (LIVE[nx.id]) { btn.setAttribute('href', LIVE[nx.id]); btn.removeAttribute('data-target'); }
-        else { btn.setAttribute('href', '#cat-' + nx.cat); btn.dataset.target = nx.id; }
-      } else { btn.textContent = 'Browse all topics'; btn.setAttribute('href', '#topics'); btn.removeAttribute('data-target'); }
+    var wrap = document.getElementById('continue-wrap');
+    var link = document.getElementById('continue-link');
+    var nameEl = document.getElementById('continue-name');
+    if (!wrap || !link) return;
+
+    if (nx) {
+      if (nameEl) nameEl.textContent = nx.name;
+      wrap.hidden = false;
+      if (LIVE[nx.id]) {
+        link.setAttribute('href', LIVE[nx.id]);
+        link.removeAttribute('data-target');
+      } else {
+        link.setAttribute('href', '#cat-' + nx.cat);
+        link.dataset.target = nx.id;
+      }
+    } else {
+      wrap.hidden = true;
+      link.removeAttribute('data-target');
     }
   }
 
@@ -161,20 +163,11 @@
       }
     });
 
-    // "Browse all topics" -> smooth scroll to the topics section
-    var jump = document.getElementById('jump-cats');
-    if (jump) jump.addEventListener('click', function (e) {
-      e.preventDefault();
-      sfx('click-tiny.wav');
-      var el = document.getElementById('topics');
-      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
-    });
-
     // Reset progress
     var reset = document.getElementById('reset');
     if (reset) reset.addEventListener('click', function () { sfx('click-tiny.wav'); window.GOB.unseenAll(); toast('Progress reset', 'Your explored topics were cleared.'); });
 
-    // hero "next up" cue: scroll to the category, pulse its target tile
+    // Continue link (non-live lessons): scroll to category anchor, pulse target tile
     document.body.addEventListener('click', function (e) {
       var tgt = e.target.closest('[data-target]');
       if (!tgt) return;

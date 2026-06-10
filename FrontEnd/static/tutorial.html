@@ -15,23 +15,10 @@
   <style>
   /* ===================== HUB (page-specific) ===================== */
 
-  /* HERO — dynamic "next up" band */
-  .hero { display: flex; align-items: center; gap: 26px; padding: 26px 24px; margin-top: 4px; }
-  .hero-avatar { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 3px solid var(--orange); box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
-  .hero-main { flex: 1; min-width: 0; }
-  .hero h1 {
-    font-family: var(--display); font-weight: 400;
-    font-size: clamp(46px, 6.4vw, 80px); line-height: .96; letter-spacing: .01em;
-    margin: 8px 0 10px; color: var(--text);
-  }
-  /* quote flows to the full column width (wraps only when the layout forces it);
-     the attribution always drops to its own second line */
-  .hero-guide { font-size: 14.5px; color: var(--muted); line-height: 1.5; margin: 0 0 18px; text-wrap: pretty; }
-  .hero-guide .hero-attr { display: block; color: var(--muted-2); }
-  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
-  @media (max-width: 760px) {
-    .hero { flex-direction: column; align-items: flex-start; }
-  }
+  .tut-top { margin-top: 4px; }
+  .tm-title { font-family: var(--display); font-weight: 400; font-size: 40px; line-height: 1; letter-spacing: .01em; margin: 6px 0 14px; color: var(--text); }
+  .continue-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--orange-soft); text-decoration: none; }
+  .continue-link:hover { color: var(--orange); }
 
   /* PROGRESS STRIP */
   .progress-strip { display: flex; align-items: center; gap: 20px; padding: 16px 20px; margin-top: 4px; }
@@ -111,31 +98,24 @@
       <span class="spacer"></span>
     </header>
 
-    <!-- HERO — dynamic "next up" band -->
-    <section class="hero panel" aria-label="Your next lesson">
-      <img class="hero-avatar" src="/images/sammy_tutorial.png" alt="Coach Sammy">
-      <div class="hero-main">
-        <span class="eyebrow" id="kicker-label"><span class="tick"></span> Next up</span>
-        <h1 id="hero-topic">Player Attributes</h1>
-        <p class="hero-guide">“Pick up right where you left off — or browse any topic, any time. Learn GOB on your terms.” <span class="hero-attr">— Coach Sammy</span></p>
-        <div class="hero-cta">
-          <a class="gob-btn gob-btn--action gob-btn--lg" href="#cat-players" id="cta-next" data-target="player-attributes">Start lesson</a>
-          <a class="gob-btn gob-btn--ghost gob-btn--lg" href="#topics" id="jump-cats">Browse all topics</a>
+    <!-- TOP: calm identity + progress -->
+    <div class="tut-top">
+      <span class="eyebrow"><span class="tick"></span> Tutorials</span>
+      <h1 class="tm-title">Learn GOB</h1>
+      <div class="progress-strip panel">
+        <div class="pct" id="pct">0%</div>
+        <div class="meta">
+          <div class="top">
+            <span class="lbl">Your Coaching Knowledge</span>
+            <span class="sub">
+              <span id="seen-n">0</span> of <span id="total-n">7</span> lessons explored
+              <span id="continue-wrap" hidden> · <a class="continue-link" id="continue-link" href="#">Continue → <span id="continue-name"></span></a></span>
+            </span>
+          </div>
+          <div class="bar"><i id="bar"></i></div>
         </div>
+        <button class="reset-link" id="reset" type="button">Reset</button>
       </div>
-    </section>
-
-    <!-- PROGRESS -->
-    <div class="progress-strip panel">
-      <div class="pct" id="pct">0%</div>
-      <div class="meta">
-        <div class="top">
-          <span class="lbl">Your Coaching Knowledge</span>
-          <span class="sub"><span id="seen-n">0</span> of <span id="total-n">7</span> lessons explored</span>
-        </div>
-        <div class="bar"><i id="bar"></i></div>
-      </div>
-      <button class="reset-link" id="reset" type="button">Reset</button>
     </div>
 
     <!-- TOPICS -->
