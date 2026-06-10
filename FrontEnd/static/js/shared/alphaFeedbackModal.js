@@ -1,12 +1,11 @@
 /**
  * Alpha feedback prompt — post-game Moment modal on the Franchise Command Center.
  *
- * Fires when an unsubmitted coach returns to the FCC after their 2nd non-tutorial
- * game (and once more after the 5th, copy swapped to "five games"). Gating reads
- * three /api/auth/me fields:
+ * Fires when an unsubmitted coach returns to the FCC after their 4th non-tutorial
+ * game (and once more after the 8th). Gating reads three /api/auth/me fields:
  *   - alpha_feedback_submitted  → true ends all prompts forever.
- *   - alpha_feedback_games      → FORWARD-ONLY count of games since launch (2 / 5 thresholds).
- *   - alpha_feedback_prompt_level→ highest threshold already shown (0 / 2 / 5).
+ *   - alpha_feedback_games      → FORWARD-ONLY count of games since launch (4 / 8 thresholds).
+ *   - alpha_feedback_prompt_level→ highest threshold already shown (0 / 4 / 8; 2 / 5 legacy).
  * On show we PATCH the prompt level (via $max) so each variant fires exactly once.
  * Dismissing (button / ✕ / backdrop) never marks feedback given — only a real
  * survey submission flips alpha_feedback_submitted (in /api/alpha-feedback).
@@ -135,6 +134,14 @@
     overlay.classList.add('is-entered');
   }
 
+  // Legacy prompt levels (2 / 5) count as having seen the old first/second prompts.
+  function hasSeenFirstPrompt(level) {
+    return level >= 4 || level === 2;
+  }
+  function hasSeenSecondPrompt(level) {
+    return level >= 8 || level === 5;
+  }
+
   function maybeShow(me) {
     if (shown || !me) return;
     if (me.alpha_feedback_submitted) return;
@@ -146,12 +153,12 @@
     var level = parseInt(me.alpha_feedback_prompt_level, 10) || 0;
 
     var targetLevel, body;
-    if (games >= 5 && level < 5) {
-      targetLevel = 5;
-      body = "Now that you've played five games, we'd love to get your feedback to make the game better.";
-    } else if (games >= 2 && level < 2) {
-      targetLevel = 2;
-      body = "Now that you've played a couple of games, we'd love to get your feedback to make the game better.";
+    if (games >= 8 && !hasSeenSecondPrompt(level)) {
+      targetLevel = 8;
+      body = "Now that you've played eight games, we'd love to get your feedback to make the game better.";
+    } else if (games >= 4 && !hasSeenFirstPrompt(level)) {
+      targetLevel = 4;
+      body = "Now that you've played four games, we'd love to get your feedback to make the game better.";
     } else {
       return;
     }

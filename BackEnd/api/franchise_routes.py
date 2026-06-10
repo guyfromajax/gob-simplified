@@ -2192,38 +2192,64 @@ def _get_user_eos_phase_status(
         "has_game_this_week": False,
         "has_bye_this_week": False,
         "eliminated_from_current_phase": False,
+        "region_qualified": False,
     }
     if not franchise_doc or not user_team_id_str or week not in ft.EOS_WEEKS:
         return status
 
     scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+    user_conference = scope.get("conference")
+    user_region = scope.get("region")
     week_games_meta = ft.get_eos_week_games(franchise_doc, week)
     found = ft.find_user_game_in_eos_week(week_games_meta, user_team_id_str)
     if found:
         status["has_game_this_week"] = True
         status["active_this_week"] = True
 
+    region_qual = ft.user_qualifies_for_region_tournament(
+        franchise_doc, user_team_id_str, user_conference
+    )
+    region_bracket_active = ft.user_has_active_region_bracket_path(
+        franchise_doc, user_team_id_str, str(user_region or "")
+    )
+
     if week in ft.EOS_CONFERENCE_WEEKS:
         status["phase"] = "conference"
-        status["eliminated_from_current_phase"] = not status["has_game_this_week"]
+        status["region_qualified"] = region_qual or region_bracket_active
+        if status["has_game_this_week"]:
+            status["eliminated_from_current_phase"] = False
+        elif status["region_qualified"]:
+            status["eliminated_from_current_phase"] = False
+        else:
+            status["eliminated_from_current_phase"] = True
         return status
 
     if week in ft.EOS_REGION_WEEKS:
         status["phase"] = "region"
-        user_region = scope.get("region")
         rt = (franchise_doc.get("region_tournaments") or {}).get(user_region or "", {})
         final_list = rt.get("final", []) or []
         final_matchup = final_list[0] if final_list else {}
         final_has_user = (
-            str(final_matchup.get("away_team")) == user_team_id_str
-            or str(final_matchup.get("home_team")) == user_team_id_str
+            ft._eos_team_id_canonical(final_matchup.get("away_team"))
+            == ft._eos_team_id_canonical(user_team_id_str)
+            or ft._eos_team_id_canonical(final_matchup.get("home_team"))
+            == ft._eos_team_id_canonical(user_team_id_str)
         )
         final_unplayed = not final_matchup.get("winner")
         if week == ft.EOS_REGION_WEEKS[0] and not status["has_game_this_week"] and final_has_user and final_unplayed:
             status["has_bye_this_week"] = True
             status["active_this_week"] = True
         elif not status["has_game_this_week"]:
-            status["eliminated_from_current_phase"] = True
+            if region_bracket_active:
+                status["eliminated_from_current_phase"] = False
+                status["active_this_week"] = True
+            else:
+                status["eliminated_from_current_phase"] = True
+        status["region_qualified"] = (
+            status["has_game_this_week"]
+            or status["has_bye_this_week"]
+            or region_bracket_active
+        )
         return status
 
     if week in ft.EOS_NATIONAL_WEEKS:
@@ -5905,6 +5931,11 @@ def command_center_data(
         user_eliminated = training_disabled_for_eos
         tournament_complete = bool(national_tournament.get("champion")) if national_tournament else False
         user_has_bye = bool(eos_status.get("has_bye_this_week", False)) if eos_status else False
+        region_qualified_waiting = bool(
+            eos_status.get("region_qualified")
+            and not eos_status.get("has_game_this_week")
+            and week_val in ft.EOS_CONFERENCE_WEEKS
+        ) if eos_status else False
         has_playable_eos_round = (
             week_val not in ft.EOS_WEEKS
             or week_val == ft.EOS_REGION_WEEKS[0]
@@ -5914,13 +5945,15 @@ def command_center_data(
             )
         )
         offer_sim_rest = (
-            (user_eliminated or user_has_bye)
+            (user_eliminated or user_has_bye or region_qualified_waiting)
             and eos_tournament_active
             and not tournament_complete
             and has_playable_eos_round
         )
         response["user_eliminated"] = user_eliminated
         response["offer_sim_rest"] = offer_sim_rest
+        response["region_qualified"] = bool(eos_status.get("region_qualified")) if eos_status else False
+        response["has_eos_game_this_week"] = bool(eos_status.get("has_game_this_week")) if eos_status else False
         response["region_bye_modal_eligible"] = bool(
             _should_show_region_bye_modal(
                 franchise_doc,
@@ -6944,14 +6977,52 @@ def _recruit_display_name_for_training_report(recruit_doc: dict) -> str:
     return full or "Recruit"
 
 
+def _user_week_visit_recruit_id(
+    recruiting_results: dict | None,
+    week: int,
+    user_team_id: str,
+) -> str | None:
+    """Assigned visit recruit for one team/week (same key resolution as training report)."""
+    assignments = (recruiting_results or {}).get(str(week)) or {}
+    if not assignments:
+        return None
+    team_id_str = str(user_team_id)
+    recruit_id = assignments.get(team_id_str)
+    if not recruit_id:
+        for key, value in assignments.items():
+            if str(key) == team_id_str:
+                recruit_id = value
+                break
+    return str(recruit_id) if recruit_id else None
+
+
+def _fcc_recruit_invite_payload(
+    recruit_doc: dict,
+    recruit_id: str,
+    status: str,
+) -> dict[str, Any]:
+    weight = recruit_doc.get("weight")
+    return {
+        "recruit_id": recruit_id,
+        "name": _recruit_display_name_for_training_report(recruit_doc),
+        "archetype": recruit_doc.get("archetype") or "--",
+        "height": format_height(recruit_doc.get("height")) or "--",
+        "weight": int(weight) if isinstance(weight, (int, float)) else None,
+        "rt": _recruit_rt(recruit_doc),
+        "status": status,
+    }
+
+
 def _fcc_current_week_invite_recruit(
     franchise_doc: dict | None,
     user_team_id: str | None,
     saved_orders: dict | None,
 ) -> dict[str, Any] | None:
     """
-    Pending weekly invite for FCC recruiting surfaces (weeks 20–26, before that week's
-    recruiting results exist). Uses saved visit orders minus prior-week assignments.
+    Weekly visit recruit for FCC recruiting surfaces (weeks 20–26).
+
+    After that week's recruiting results exist: assigned visitor from recruiting_results
+    (same source as training-report.html). Before processing: top remaining saved order.
     """
     if not franchise_doc or not user_team_id:
         return None
@@ -6962,8 +7033,24 @@ def _fcc_current_week_invite_recruit(
     if week < 20 or week > 26:
         return None
 
+    fid = franchise_doc.get("_id")
+    if fid is None:
+        return None
+    fid_str = str(fid)
+    team_id_str = str(user_team_id)
     recruiting_results = franchise_doc.get("recruiting_results") or {}
-    if str(week) in recruiting_results:
+    week_results_exist = str(week) in recruiting_results
+
+    if week_results_exist:
+        assigned_recruit_id = _user_week_visit_recruit_id(recruiting_results, week, team_id_str)
+        if not assigned_recruit_id:
+            return None
+        recruit_doc = franchise_recruits_data_collection.find_one(
+            {"franchise_id": fid_str, "recruit_id": assigned_recruit_id},
+            {"_id": 0, "franchise_id": 0},
+        )
+        if recruit_doc:
+            return _fcc_recruit_invite_payload(recruit_doc, assigned_recruit_id, "assigned")
         return None
 
     order_list = _team_order_list(saved_orders)
@@ -6971,41 +7058,23 @@ def _fcc_current_week_invite_recruit(
         return None
 
     used_recruit_ids: set[str] = set()
-    team_id_str = str(user_team_id)
     for prior_week in range(20, week):
-        week_results = recruiting_results.get(str(prior_week)) or {}
-        recruit_id = week_results.get(team_id_str)
-        if not recruit_id:
-            for key, value in week_results.items():
-                if str(key) == team_id_str:
-                    recruit_id = value
-                    break
-        if recruit_id:
-            used_recruit_ids.add(str(recruit_id))
+        prior_rid = _user_week_visit_recruit_id(recruiting_results, prior_week, team_id_str)
+        if prior_rid:
+            used_recruit_ids.add(prior_rid)
 
     pending_recruit_id = _highest_remaining_team_target(order_list, used_recruit_ids)
     if not pending_recruit_id:
         return None
 
-    fid = franchise_doc.get("_id")
-    if fid is None:
-        return None
     recruit_doc = franchise_recruits_data_collection.find_one(
-        {"franchise_id": str(fid), "recruit_id": pending_recruit_id},
+        {"franchise_id": fid_str, "recruit_id": pending_recruit_id},
         {"_id": 0, "franchise_id": 0},
     )
     if not recruit_doc:
         return None
 
-    weight = recruit_doc.get("weight")
-    return {
-        "recruit_id": pending_recruit_id,
-        "name": _recruit_display_name_for_training_report(recruit_doc),
-        "archetype": recruit_doc.get("archetype") or "--",
-        "height": format_height(recruit_doc.get("height")) or "--",
-        "weight": int(weight) if isinstance(weight, (int, float)) else None,
-        "rt": _recruit_rt(recruit_doc),
-    }
+    return _fcc_recruit_invite_payload(recruit_doc, pending_recruit_id, "pending")
 
 
 def _training_report_recruiting_display(
@@ -7030,13 +7099,7 @@ def _training_report_recruiting_display(
     tid_str = str(user_team_object_id)
 
     if 20 <= w <= 26:
-        assignments = (franchise_doc.get("recruiting_results") or {}).get(str(w)) or {}
-        rid = assignments.get(tid_str)
-        if not rid and assignments:
-            for k, v in assignments.items():
-                if str(k) == tid_str:
-                    rid = v
-                    break
+        rid = _user_week_visit_recruit_id(franchise_doc.get("recruiting_results"), w, tid_str)
         if not rid:
             return {"header": "Recruiting Visit", "meta_line": None}
         recruit = franchise_recruits_data_collection.find_one(

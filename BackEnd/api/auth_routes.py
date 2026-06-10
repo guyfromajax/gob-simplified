@@ -153,7 +153,7 @@ class UserResponse(BaseModel):
     archetype_reveal_seen: Optional[bool] = None  # gates the one-time first-archetype reveal
     alpha_feedback_submitted: Optional[bool] = None  # true once the alpha survey is submitted
     alpha_feedback_games: Optional[int] = None  # forward-only non-tutorial games since launch (prompt trigger)
-    alpha_feedback_prompt_level: Optional[int] = None  # highest prompt threshold shown (0 / 2 / 5)
+    alpha_feedback_prompt_level: Optional[int] = None  # highest prompt threshold shown (0 / 4 / 8; 2 / 5 legacy)
     tutorial_alerts_franchise_id: Optional[str] = None  # first franchise instance for alert gating
     tutorial_alerts_dismissed: Optional[list[str]] = None  # alert ids whose modal was shown
     tutorial_alerts_games: Optional[int] = None  # games completed on locked franchise since enrollment
@@ -667,9 +667,9 @@ async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
 
 
 class AlphaFeedbackPromptSeen(BaseModel):
-    # The threshold just shown (2 or 5). Stored via $max so the prompt level only
-    # advances — each variant fires once, and out-of-order calls can't lower it.
-    level: int = Field(..., ge=0, le=5)
+    # The threshold just shown (4 or 8; 2 / 5 legacy). Stored via $max so the prompt
+    # level only advances — each variant fires once, and out-of-order calls can't lower it.
+    level: int = Field(..., ge=0, le=8)
 
 
 @router.patch("/alpha-feedback-prompt-seen")

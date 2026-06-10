@@ -1084,16 +1084,21 @@ function buildHomeRecruitRowHtml(recruit) {
 
 function buildFccInviteBlockHtml(recruit, week, wide) {
   if (!recruit) return '';
+  const isAssigned = recruit.status === 'assigned';
   const rtClass = typeof window.getRecruitRtBucketClass === 'function'
     ? window.getRecruitRtBucketClass(recruit.rt)
     : '';
   const weightDisplay = recruit.weight != null ? recruit.weight : '--';
   const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
   const rtDisplay = recruit.rt != null ? recruit.rt : '--';
+  const eyebrow = isAssigned ? 'Recruiting Visit' : `Week ${Number(week)} Invite`;
+  const statusHtml = isAssigned
+    ? ''
+    : '<span class="fcc-invite__status"><span class="fcc-invite__dot" aria-hidden="true"></span>Visit Pending</span>';
   const topHtml = `
     <div class="fcc-invite__top">
-      <span class="fcc-invite__eyebrow">Week ${Number(week)} Invite</span>
-      <span class="fcc-invite__status"><span class="fcc-invite__dot" aria-hidden="true"></span>Visit Pending</span>
+      <span class="fcc-invite__eyebrow">${escapeHomeHtml(eyebrow)}</span>
+      ${statusHtml}
     </div>
   `;
   const idHtml = `
@@ -3315,6 +3320,8 @@ function updatePlayButton(data) {
   const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || (week >= 27 && week <= 34);
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
   const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
+  const regionQualified = !!data.region_qualified;
+  const hasEosGameThisWeek = !!data.has_eos_game_this_week;
   
   // Fallback: infer eliminated from bracket when API doesn't return user_eliminated/offer_sim_rest
   let userTeamEliminated = false;
@@ -3345,6 +3352,16 @@ function updatePlayButton(data) {
     playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
   } else if (showSimRest && eosTournamentActive) {
+    playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
+    playNowBtn.dataset.mode = 'sim-rest-tournament';
+  } else if (
+    trainingDisabledForPostseason
+    && !eliminated
+    && regionQualified
+    && week >= 27
+    && week <= 29
+    && !hasEosGameThisWeek
+  ) {
     playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
     playNowBtn.dataset.mode = 'sim-rest-tournament';
   } else if (trainingDisabledForPostseason && !eliminated) {

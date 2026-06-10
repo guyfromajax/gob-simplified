@@ -96,7 +96,7 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
         inc = {
             "record.total_games": 1,
             ("record.wins" if user_won else "record.losses"): 1,
-            # Forward-only counter for the alpha-feedback prompt (2nd / 5th game).
+            # Forward-only counter for the alpha-feedback prompt (4th / 8th game).
             # Lazily created by $inc, so existing users start effectively at 0 from
             # this deploy forward — "only games after launch" count. Distinct from
             # record.total_games (which carries pre-launch history).

@@ -263,9 +263,9 @@
 
     row.appendChild(elSpan('fcc-tb-seed', slot.seed != null ? String(slot.seed) : ''));
 
-    if (slot.name) {
+    if (slot.name && !slot.revealMode) {
       row.appendChild(createBannerEl(slot.name));
-    } else {
+    } else if (!slot.revealMode) {
       var logoSpacer = document.createElement('span');
       logoSpacer.className = 'fcc-tb-logo fcc-tb-logo--empty';
       row.appendChild(logoSpacer);

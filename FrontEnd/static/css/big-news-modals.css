@@ -164,12 +164,73 @@
 }
 
 .bn-bracket-scale {
+  width: 100%;
   transform-origin: top left;
 }
 
 .bn-bracket-scale .fcc-tb-classic,
 .bn-bracket-scale .fcc-tb-region {
-  min-width: 1180px;
+  width: 100%;
+  min-width: 0;
+}
+
+.bn-bracket-scale .fcc-tb-classic {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.bn-bracket-scale .fcc-tb-region--4,
+.bn-bracket-scale .fcc-tb-region--3,
+.bn-bracket-scale .fcc-tb-region--full {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(8px, 0.15fr);
+}
+
+.bn-bracket-scale .fcc-tb-col {
+  padding-inline: 3px;
+}
+
+.bn-bracket-scale .fcc-tb-team {
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  gap: 4px;
+  min-height: 36px;
+  padding: 5px 6px;
+  font-size: 10.5px;
+}
+
+.bn-bracket-scale .fcc-tb-seed {
+  width: 18px;
+  font-size: 9px;
+}
+
+.bn-bracket-scale .fcc-tb-score {
+  min-width: 18px;
+  font-size: 10px;
+}
+
+.bn-bracket-scale .fcc-tb-col-head {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  font-size: 8.5px;
+  letter-spacing: 0.09em;
+}
+
+.bn-bracket-scale .fcc-tb-logo {
+  display: none;
+}
+
+.bn-bracket-scale .fcc-tb-trophy svg {
+  width: 38px;
+  height: 38px;
+}
+
+.bn-bracket-scale .fcc-tb-trophy-badge {
+  padding: 4px 6px;
+  font-size: 8px;
+}
+
+.bn-bracket-scale .fcc-tb-region-chip {
+  margin-right: 3px;
+  padding-inline: 3px;
+  font-size: 8px;
 }
 
 .bn-recruits {

@@ -45,7 +45,7 @@ def test_team_was_newly_added_to_lean_detects_additions_not_rank_moves():
     assert franchise_routes._team_was_newly_added_to_lean(prior, moved_up, team_id) is False
 
 
-def test_fcc_current_week_invite_recruit_skips_outside_window_and_processed_weeks():
+def test_fcc_current_week_invite_recruit_skips_outside_window_and_processed_weeks(monkeypatch):
     team_id = str(ObjectId())
     franchise_doc = {"_id": ObjectId(), "week": 19, "recruiting_results": {}}
     assert franchise_routes._fcc_current_week_invite_recruit(
@@ -59,8 +59,65 @@ def test_fcc_current_week_invite_recruit_skips_outside_window_and_processed_week
 
     franchise_doc["week"] = 22
     franchise_doc["recruiting_results"] = {"22": {team_id: "r1"}}
+
+    def _missing_recruit(_query, projection=None):
+        return None
+
+    monkeypatch.setattr(
+        franchise_routes.franchise_recruits_data_collection,
+        "find_one",
+        _missing_recruit,
+    )
     assert franchise_routes._fcc_current_week_invite_recruit(
         franchise_doc, team_id, {"1": "r1", "2": "r2"}
+    ) is None
+
+
+def test_fcc_current_week_invite_recruit_returns_assigned_visit_after_processing(monkeypatch):
+    team_id = str(ObjectId())
+    franchise_id = ObjectId()
+    franchise_doc = {
+        "_id": franchise_id,
+        "week": 22,
+        "recruiting_results": {"22": {team_id: "r1"}},
+    }
+
+    monkeypatch.setattr(
+        franchise_routes.franchise_recruits_data_collection,
+        "find_one",
+        lambda query, projection=None: {
+            "recruit_id": "r1",
+            "name": "Assigned Recruit",
+            "archetype": "Shooter",
+            "height": 75,
+            "weight": 195,
+            "position_ratings": {"SG": 52},
+        },
+    )
+
+    payload = franchise_routes._fcc_current_week_invite_recruit(
+        franchise_doc, team_id, {"1": "r2", "2": "r3"}
+    )
+    assert payload == {
+        "recruit_id": "r1",
+        "name": "Assigned Recruit",
+        "archetype": "Shooter",
+        "height": "6'3\"",
+        "weight": 195,
+        "rt": 52,
+        "status": "assigned",
+    }
+
+
+def test_fcc_current_week_invite_recruit_skips_pending_after_processed_no_visit(monkeypatch):
+    team_id = str(ObjectId())
+    franchise_doc = {
+        "_id": ObjectId(),
+        "week": 22,
+        "recruiting_results": {"22": {}},
+    }
+    assert franchise_routes._fcc_current_week_invite_recruit(
+        franchise_doc, team_id, {"1": "r2", "2": "r3"}
     ) is None
 
 
@@ -97,6 +154,7 @@ def test_fcc_current_week_invite_recruit_returns_top_remaining_order(monkeypatch
         "height": "6'5\"",
         "weight": 210,
         "rt": 44,
+        "status": "pending",
     }
 
 

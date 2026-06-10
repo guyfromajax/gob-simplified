@@ -199,6 +199,79 @@ def _get_conf_champions_and_rs1(
     return champions, rs1
 
 
+def user_qualifies_for_region_tournament(
+    franchise_doc: Dict[str, Any],
+    user_team_id_str: str,
+    team_conference: Optional[int] = None,
+) -> bool:
+    """True when the user is the conf tournament winner or RS#1 (region qualifiers per spec)."""
+    uid = _eos_team_id_canonical(user_team_id_str)
+    if not uid:
+        return False
+    champions, rs1 = _get_conf_champions_and_rs1(franchise_doc, [], {})
+    if team_conference is not None:
+        try:
+            conf_num = int(team_conference)
+        except (TypeError, ValueError):
+            conf_num = None
+        if conf_num is not None:
+            champ = _eos_team_id_canonical(champions.get(conf_num))
+            rs = _eos_team_id_canonical(rs1.get(conf_num))
+            return uid in {champ, rs} - {""}
+    allowed = {
+        _eos_team_id_canonical(v)
+        for v in list(champions.values()) + list(rs1.values())
+        if v
+    }
+    allowed.discard("")
+    return uid in allowed
+
+
+def _user_lost_eos_matchup(matchup: Dict[str, Any], uid: str) -> bool:
+    winner = _eos_team_id_canonical(matchup.get("winner"))
+    if not winner:
+        return False
+    return winner != uid
+
+
+def user_has_active_region_bracket_path(
+    franchise_doc: Dict[str, Any],
+    user_team_id_str: str,
+    user_region: str,
+) -> bool:
+    """True if the user occupies an unplayed (or not-yet-lost) slot in their region bracket."""
+    uid = _eos_team_id_canonical(user_team_id_str)
+    if not uid:
+        return False
+    letter = str(user_region or "").strip().upper()
+    if letter not in REGION_LETTERS:
+        return False
+    rt = (franchise_doc.get("region_tournaments") or {}).get(letter) or {}
+    for matchup in rt.get("round1") or []:
+        if not isinstance(matchup, dict):
+            continue
+        away = _eos_team_id_canonical(matchup.get("away_team"))
+        home = _eos_team_id_canonical(matchup.get("home_team"))
+        if uid not in (away, home):
+            continue
+        if _user_lost_eos_matchup(matchup, uid):
+            return False
+        if not matchup.get("winner"):
+            return True
+    for matchup in rt.get("final") or []:
+        if not isinstance(matchup, dict):
+            continue
+        away = _eos_team_id_canonical(matchup.get("away_team"))
+        home = _eos_team_id_canonical(matchup.get("home_team"))
+        if uid not in (away, home):
+            continue
+        if _user_lost_eos_matchup(matchup, uid):
+            return False
+        if not matchup.get("winner"):
+            return True
+    return False
+
+
 def initialize_region_tournaments(
     franchise_doc: Dict[str, Any],
     teams_collection,

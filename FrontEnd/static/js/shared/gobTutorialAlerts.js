@@ -223,8 +223,10 @@
     if (me.alpha_feedback_submitted) return false;
     var games = parseInt(me.alpha_feedback_games, 10) || 0;
     var level = parseInt(me.alpha_feedback_prompt_level, 10) || 0;
-    if (games >= 5 && level < 5) return true;
-    if (games >= 2 && level < 2) return true;
+    var seenSecond = level >= 8 || level === 5;
+    var seenFirst = level >= 4 || level === 2;
+    if (games >= 8 && !seenSecond) return true;
+    if (games >= 4 && !seenFirst) return true;
     return false;
   }
 

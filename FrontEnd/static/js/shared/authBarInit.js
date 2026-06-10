@@ -450,7 +450,7 @@
   function applyAlphaFeedbackState(me) {
     try {
       var games = me ? (parseInt(me.alpha_feedback_games, 10) || 0) : 0;
-      alphaFeedbackRewire = !!(me && !me.alpha_feedback_submitted && games >= 2);
+      alphaFeedbackRewire = !!(me && !me.alpha_feedback_submitted && games >= 4);
       var btn = document.getElementById('feedback-btn');
       if (btn) btn.classList.toggle('is-glowing', alphaFeedbackRewire);
     } catch (e) {}

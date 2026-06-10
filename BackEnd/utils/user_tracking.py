@@ -75,7 +75,7 @@ def default_user_tracking() -> dict:
                                    commit_user_game_record). Starts at 0 for everyone,
                                    so existing veterans are only prompted after playing
                                    new games — never reuse record.total_games here.
-      `alpha_feedback_prompt_level` — highest prompt threshold already shown (0 / 2 / 5),
+      `alpha_feedback_prompt_level` — highest prompt threshold already shown (0 / 4 / 8; 2 / 5 legacy),
                                    so each modal variant fires once.
 
     Tutorial-alert fields gate the contextual Sammy modals + nav glow:

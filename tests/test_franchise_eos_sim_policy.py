@@ -445,7 +445,8 @@ def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
 
     week_29_status = _get_user_eos_phase_status(franchise_doc, user_team_id, 29)
     assert week_29_status["active_this_week"] is False
-    assert week_29_status["eliminated_from_current_phase"] is True
+    assert week_29_status["region_qualified"] is True
+    assert week_29_status["eliminated_from_current_phase"] is False
 
     week_30_status = _get_user_eos_phase_status(franchise_doc, user_team_id, 30)
     # Both conference double-winners wait through week 30 and play the region final in week 31.
@@ -459,6 +460,85 @@ def test_user_can_reenter_in_region_after_conference_loss(monkeypatch):
     assert week_31_status["has_game_this_week"] is True
     assert week_31_status["has_bye_this_week"] is False
     assert week_31_status["eliminated_from_current_phase"] is False
+
+
+def test_rs1_conf_final_loser_stays_region_eligible(monkeypatch):
+    """RS#1 who lost the conf championship must not be treated as season-over before/during region."""
+    user_team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    conf_champ_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    other_rs1 = "cccccccccccccccccccccccc"
+    cross_conf_champ = "dddddddddddddddddddddddd"
+
+    monkeypatch.setattr(
+        franchise_routes,
+        "_build_user_eos_sim_scope",
+        lambda franchise_doc, team_id: {
+            "active": False,
+            "conference": 1,
+            "region": "A",
+            "region_conferences": (1, 2),
+        },
+    )
+
+    franchise_doc = {
+        "conference_tournaments": {
+            "1": {
+                "champion": conf_champ_id,
+                "seeds": {user_team_id: 1, conf_champ_id: 2},
+                "bracket": {
+                    "round1": [],
+                    "round2": [],
+                    "final": [
+                        {
+                            "away_team": user_team_id,
+                            "home_team": conf_champ_id,
+                            "winner": conf_champ_id,
+                        }
+                    ],
+                },
+                "current_round": 3,
+            },
+            "2": {
+                "champion": cross_conf_champ,
+                "seeds": {cross_conf_champ: 1, other_rs1: 2},
+                "bracket": {"round1": [], "round2": [], "final": []},
+                "current_round": 3,
+            },
+        },
+        "region_tournaments": {
+            "A": {
+                "round1": [
+                    {
+                        "away_team": conf_champ_id,
+                        "home_team": other_rs1,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                    {
+                        "away_team": cross_conf_champ,
+                        "home_team": user_team_id,
+                        "winner": None,
+                        "game_id": None,
+                        "score": {},
+                    },
+                ],
+                "final": [{"away_team": "R1_0", "home_team": "R1_1", "winner": None, "game_id": None, "score": {}}],
+                "current_round": 1,
+            }
+        },
+    }
+
+    week_29 = _get_user_eos_phase_status(franchise_doc, user_team_id, 29)
+    assert week_29["region_qualified"] is True
+    assert week_29["eliminated_from_current_phase"] is False
+
+    week_30 = _get_user_eos_phase_status(franchise_doc, user_team_id, 30)
+    assert week_30["has_game_this_week"] is True
+    assert week_30["eliminated_from_current_phase"] is False
+
+    assert ft.user_qualifies_for_region_tournament(franchise_doc, user_team_id, 1) is True
+    assert ft.user_qualifies_for_region_tournament(franchise_doc, conf_champ_id, 1) is True
 
 
 def _region_bye_modal_doc(user_team_id, opponent_id, *, week=30, seen_season=None):
