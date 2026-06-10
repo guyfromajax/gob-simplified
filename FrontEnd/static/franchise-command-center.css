@@ -12,6 +12,7 @@
 }
 
 body {
+  font-family: 'Inter', sans-serif;
   background: #0b0d14;
   color: var(--fcc-text);
 }
@@ -70,6 +71,7 @@ input[type="reset"] {
 }
 
 #franchise-container #tournament-top {
+  display: grid;
   background: transparent;
   grid-template-columns: minmax(180px, 1fr) minmax(420px, 1.25fr) minmax(220px, 1fr);
   gap: 12px;
@@ -77,6 +79,7 @@ input[type="reset"] {
   margin-bottom: 0;
   align-items: start;
   flex-shrink: 0;
+  border: 0;
 }
 
 #franchise-container #top-left,
@@ -90,6 +93,7 @@ input[type="reset"] {
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
+  justify-self: start;
   gap: 0;
   padding-top: 2px;
 }
@@ -195,6 +199,7 @@ input[type="reset"] {
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
+  justify-self: end;
   padding-top: 2px;
 }
 
@@ -564,8 +569,10 @@ input[type="reset"] {
 #franchise-container #home-tab .fcc-home-card h3 {
   margin: 0 0 18px;
   color: #ffffff;
+  font-family: 'Bebas Neue', cursive;
   font-size: 16px;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 #franchise-container #home-tab .fcc-home-card-head {
@@ -754,6 +761,62 @@ input[type="reset"] {
   max-height: 50px;
   object-fit: contain;
   justify-self: end;
+}
+
+#franchise-container .team-tooltip-host {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+#franchise-container .team-tooltip-host::after {
+  content: attr(data-team-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(12, 16, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  z-index: 40;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+#franchise-container .team-tooltip-host::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(12, 16, 24, 0.94) transparent transparent transparent;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+  z-index: 39;
+}
+
+#franchise-container .team-tooltip-host:hover::after,
+#franchise-container .team-tooltip-host:hover::before,
+#franchise-container .team-tooltip-host:focus-within::after,
+#franchise-container .team-tooltip-host:focus-within::before {
+  opacity: 1;
+  visibility: visible;
 }
 
 .fcc-home-matchup-top .team-tooltip-host {
@@ -1008,7 +1071,7 @@ input[type="reset"] {
   font-weight: 700;
 }
 
-/* FCC Tournament tab: same bracket layout as TCC (tournament.css .bracket grid) */
+/* FCC Tournament tab: bracket mount (styles in .fcc-tb-* below) */
 #tournament-bracket-container.bracket,
 #fcc-tournament-bracket.fcc-tournament-bracket,
 #all-brackets-root.fcc-tournament-bracket {
