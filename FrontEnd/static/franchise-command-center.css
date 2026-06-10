@@ -32,9 +32,14 @@ input[type="reset"] {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 36px);
-  max-height: calc(100vh - 36px);
+  --fcc-shell-offset: 30px;
+  min-height: calc(100vh - var(--fcc-shell-offset));
+  max-height: calc(100vh - var(--fcc-shell-offset));
   box-sizing: border-box;
+}
+
+body.has-auth-bar #franchise-container {
+  --fcc-shell-offset: 102px;
 }
 
 #franchise-container::before {
@@ -254,26 +259,37 @@ input[type="reset"] {
 
 #franchise-container #tournament-tabs > .tab-content.active {
   grid-row: 2;
+  align-self: stretch;
   min-height: 0;
+  max-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
 }
 
-/* Schedule / Tournament tab: scroll tall postseason bracket stacks without clipping */
-#franchise-container #schedule-tab.tab-content.active {
-  padding: 0;
-  overflow: hidden;
+#franchise-container #tournament-tabs > .tab-content.active::-webkit-scrollbar {
+  width: 10px;
+}
+
+#franchise-container #tournament-tabs > .tab-content.active::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+#franchise-container #tournament-tabs > .tab-content.active::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+}
+
+#franchise-container #tournament-tabs > .tab-content.active::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 #franchise-container #schedule-tab .fcc-schedule-tab-inner {
   box-sizing: border-box;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 18px 22px 22px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -485,7 +501,7 @@ input[type="reset"] {
 
 #franchise-container .tab-content {
   display: none;
-  min-height: 300px;
+  min-height: 0;
   padding: 18px 22px 22px;
   border: 1px solid var(--fcc-panel-border);
   border-radius: 20px;
@@ -493,12 +509,12 @@ input[type="reset"] {
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 16%),
     rgba(14, 16, 26, 0.9);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  overflow: hidden;
 }
 
 #franchise-container .tab-content.active {
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 #franchise-container .tab-content > h3,
@@ -543,12 +559,14 @@ input[type="reset"] {
 
 #home-tab {
   min-height: 0;
+  flex: 0 0 auto;
 }
 
 .fcc-home-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+  flex: 0 0 auto;
 }
 
 .fcc-home-card {
@@ -1125,11 +1143,7 @@ input[type="reset"] {
 }
 
 .fcc-data-card.fcc-tournament-card .fcc-tournament-card-body {
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: min(72vh, 920px);
   min-height: 0;
-  -webkit-overflow-scrolling: touch;
 }
 
 .fcc-tournament-divider {
