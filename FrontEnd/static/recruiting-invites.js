@@ -1145,13 +1145,13 @@
           navigateAway(Recruiting.buildRecruitingUrl('recruiting-results.html', context, { week: String(activeWeek) }));
           return;
         }
-        // This page handles week 35 only; invite-list weeks (20-26) live on recruiting-invites.
-        if (activeWeek !== 35) {
-          navigateAway(Recruiting.buildRecruitingUrl('recruiting-invites.html', context, {}));
+        // Week 35 (points/playing-time + run recruiting) lives on the orders page.
+        if (activeWeek === 35) {
+          navigateAway(Recruiting.buildRecruitingUrl('recruiting-orders.html', context, {}));
           return;
         }
 
-        mode = 'week35';
+        mode = 'visits';
         userTeamId = data.team_id || context.teamId || '';
         availableRosterSpots = Number(data.available_roster_spots || 0);
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});

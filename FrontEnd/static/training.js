@@ -1358,7 +1358,7 @@ async function initializeTrainingPoints() {
               if (teamId) params.set('team_id', teamId);
               params.set('from', 'training');
               params.set('session_type', urlParams.get('session_type') || 'in-season');
-              window.location.href = `/recruiting-orders.html?${params.toString()}`;
+              window.location.href = `/recruiting-invites.html?${params.toString()}`;
             };
           }
         }
