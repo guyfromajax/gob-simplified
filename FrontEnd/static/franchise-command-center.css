@@ -2051,6 +2051,39 @@ body.has-auth-bar #franchise-container {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
 }
 
+/* Roster tab: scrolling moves to the tab panel (both axes) so the attribute
+   header row can stick to the top while the user scrolls down */
+#franchise-container #tournament-tabs > #roster-tab.tab-content.active {
+  overflow-x: auto;
+}
+
+#franchise-container #roster-tab .fcc-data-card {
+  overflow: visible;
+  align-self: flex-start;
+  width: max-content;
+  min-width: 100%;
+}
+
+#franchise-container #roster-tab .fcc-data-card-body.scroll-x {
+  overflow: visible;
+}
+
+#franchise-container #roster-tab table.roster-table thead th {
+  z-index: 2;
+  /* Opaque base so scrolled rows don't show through the stuck header */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
+    #262b34;
+}
+
+#franchise-container #roster-tab table.roster-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+#franchise-container #roster-tab table.roster-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
 #franchise-container #roster-tab table.roster-table tbody td,
 #franchise-container #player-stats-tab table.stats-table tbody td,
 #franchise-container #recruits-tab table.recruiting-table tbody td,

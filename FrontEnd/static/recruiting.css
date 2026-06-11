@@ -1037,7 +1037,8 @@ input[type="reset"] {
 /* ===== Week 35 Focus List: budget dock, steppers, order status ===== */
 .focus-budget-dock {
   position: sticky;
-  top: 12px;
+  /* Clear the fixed global nav + sticky page header (same offset as .invite-dock). */
+  top: max(12px, env(safe-area-inset-top, 0px) + var(--recruiting-invite-dock-top));
   z-index: 10;
   margin: 0 0 18px;
   padding: 12px 16px;
@@ -1192,4 +1193,11 @@ input[type="reset"] {
 @media (prefers-reduced-motion: reduce) {
   .orders-grid-table tbody tr.is-over-budget td { animation: none; }
   .focus-budget-fill { transition: none; }
+}
+
+/* Points column needs room for the −/+ steppers (5% + overflow:hidden clipped the + button). */
+.orders-grid-table.orders-grid-table-week36 th:nth-child(11),
+.orders-grid-table.orders-grid-table-week36 td:nth-child(11) {
+  width: 9%;
+  overflow: visible;
 }

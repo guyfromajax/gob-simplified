@@ -303,7 +303,7 @@
       if (visitsDock) { visitsDock.hidden = true; visitsDock.style.display = 'none'; }
       if (ordersTableSection) ordersTableSection.hidden = false;
       if (poolTitle) poolTitle.textContent = 'All Recruits';
-      if (poolFiltersEl) poolFiltersEl.hidden = true;
+      if (poolFiltersEl) poolFiltersEl.hidden = false;
       if (picksToggle) picksToggle.hidden = true;
       updateFocusBudget();
       updateOrderStatus();
@@ -488,7 +488,7 @@
     }
     Recruiting.renderRecruitTableRows(
       document.getElementById('recruits-body'),
-      Recruiting.sortRecruits(recruits, sortState),
+      Recruiting.sortRecruits(applyPoolFilters(recruits), sortState),
       {
         selectedIds: getSelectedIds(),
         onRowClick: function (recruit) {
@@ -1380,7 +1380,7 @@
             renderRecruitList();
           }
         );
-        if (!isWeek35Mode()) bindVisitFilters();
+        bindVisitFilters(); // wires region chips, search, RT-min, leans-only (week 35 + visits)
         rerender();
         if (typeof window.initAttributeTooltips === 'function') {
           window.initAttributeTooltips(document.getElementById('recruits-table'), ['th']);
