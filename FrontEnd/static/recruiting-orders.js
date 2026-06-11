@@ -407,8 +407,10 @@
       var label = FOCUS_SORT_LABELS[focusSortState.key] || focusSortState.key;
       var arrow = focusSortState.direction === 'asc' ? '↑' : '↓';
       el.textContent = 'Order: ' + label + ' ' + arrow;
+      el.classList.add('is-sorted');
     } else {
       el.textContent = 'Order: Custom';
+      el.classList.remove('is-sorted');
     }
   }
 
@@ -420,7 +422,9 @@
     var counts = getPositionCounts();
     el.innerHTML = ['PG', 'SG', 'SF', 'PF', 'C'].map(function (pos) {
       var count = counts[pos] || 0;
-      return '<span class="focus-pos' + (count ? '' : ' is-zero') + '">' + pos + ' <b>' + count + '</b></span>';
+      return '<span class="focus-pos' + (count ? '' : ' is-zero') + '">' +
+        '<span class="focus-pos-count">' + count + '</span>' +
+        '<span class="focus-pos-abbr">' + pos + '</span></span>';
     }).join('');
   }
 
@@ -435,16 +439,31 @@
     var remainingEl = document.getElementById('focus-budget-remaining');
     var spotsEl = document.getElementById('focus-budget-spots');
     var fillEl = document.getElementById('focus-budget-fill');
+    var rankedEl = document.getElementById('focus-ranked-count');
     if (assignedEl) assignedEl.textContent = String(assigned);
     if (totalEl) totalEl.textContent = String(total);
-    if (remainingEl) remainingEl.textContent = String(remaining);
     if (spotsEl) spotsEl.textContent = String(availableRosterSpots);
-    if (fillEl) fillEl.style.width = (total > 0 ? Math.min(100, Math.round((assigned / total) * 100)) : 0) + '%';
+    if (fillEl) fillEl.style.width = (total > 0 ? Math.max(0, Math.min(100, Math.round((assigned / total) * 100))) : 0) + '%';
+
     bar.classList.remove('is-ontrack', 'is-low', 'is-complete', 'is-over');
-    if (assigned > total) bar.classList.add('is-over');
-    else if (assigned === total) bar.classList.add('is-complete');
-    else if (remaining <= 5) bar.classList.add('is-low');
-    else bar.classList.add('is-ontrack');
+    if (remaining < 0) {
+      bar.classList.add('is-over');
+      if (remainingEl) remainingEl.textContent = Math.abs(remaining) + ' over budget';
+    } else if (remaining === 0) {
+      bar.classList.add('is-complete');
+      if (remainingEl) remainingEl.textContent = 'Fully allocated ✓';
+    } else if (remaining <= 10) {
+      bar.classList.add('is-low');
+      if (remainingEl) remainingEl.textContent = remaining + ' remaining';
+    } else {
+      bar.classList.add('is-ontrack');
+      if (remainingEl) remainingEl.textContent = remaining + ' remaining';
+    }
+
+    if (rankedEl) {
+      rankedEl.textContent = String(currentEntries.length);
+      rankedEl.classList.toggle('is-full', currentEntries.length >= MAX_RECRUITING_ORDER_SLOTS);
+    }
     renderFocusPosTally();
   }
 

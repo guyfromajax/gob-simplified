@@ -1041,106 +1041,214 @@ input[type="reset"] {
   top: max(12px, env(safe-area-inset-top, 0px) + var(--recruiting-invite-dock-top));
   z-index: 10;
   margin: 0 0 18px;
-  padding: 12px 16px;
-  border: 1px solid var(--gob-border);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(31, 37, 52, 0.97), rgba(20, 24, 34, 0.96));
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
-.focus-budget-top {
+.focus-budget-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(31, 37, 52, 0.97), rgba(20, 24, 34, 0.96));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --budget-color: #F79420;
+}
+.focus-budget-bar.is-ontrack { --budget-color: #F79420; }
+.focus-budget-bar.is-low { --budget-color: #FFD700; }
+.focus-budget-bar.is-complete { --budget-color: #34EC27; }
+.focus-budget-bar.is-over { --budget-color: #ff6d6d; }
+
+.budget-divider {
+  width: 1px;
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Segment 1 — Points (hero) */
+.budget-points {
+  flex: 1 1 300px;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+}
+.budget-points-top {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.budget-points-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.budget-points-value {
+  font-family: 'Bebas Neue', sans-serif;
+  line-height: 1;
+}
+.budget-points-value strong {
+  font-size: 38px;
+  font-weight: 400;
+  color: var(--budget-color);
+}
+.budget-points-total {
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.4);
+}
+.budget-points-remaining {
+  margin-left: auto;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--budget-color);
+  white-space: nowrap;
+}
+.budget-track {
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.budget-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--budget-color);
+  transition: width 0.28s ease, background 0.18s ease;
+}
+
+/* Segment 2 — Open Roster Spots */
+.budget-roster {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+.budget-roster-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  line-height: 1;
+  color: #fff;
+}
+.budget-roster-label {
+  width: 92px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+/* Segment 3 — Ranked counter stacked above the position tally */
+.budget-rankpos {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.budget-ranked {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.budget-ranked-num {
+  font-family: 'Bebas Neue', sans-serif;
+  line-height: 1;
+}
+.budget-ranked-num strong {
+  font-size: 22px;
+  font-weight: 400;
+  color: #fff;
+}
+.budget-ranked-num strong.is-full {
+  color: #F79420;
+}
+.budget-ranked-cap {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.34);
+}
+.budget-ranked-label {
+  align-self: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.focus-pos-tally {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+}
+.focus-pos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.focus-pos-count {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 15px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.82);
+}
+.focus-pos-abbr {
+  font-family: 'Inter', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.36);
+}
+.focus-pos.is-zero .focus-pos-count { color: rgba(255, 255, 255, 0.2); }
+.focus-pos.is-zero .focus-pos-abbr { color: rgba(255, 255, 255, 0.18); }
+
+/* Order status pill — relocated beside the Focus List heading */
+.focus-list-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
-
-.focus-order-status {
-  font-family: 'Bebas Neue', sans-serif;
-  letter-spacing: 0.06em;
-  font-size: 15px;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.focus-pos-tally {
+.order-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-.focus-pos {
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  font-family: 'Inter', sans-serif;
   font-size: 11px;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.5);
-}
-.focus-pos b {
-  color: rgba(255, 255, 255, 0.82);
   font-weight: 700;
-}
-.focus-pos.is-zero { color: rgba(255, 255, 255, 0.28); }
-.focus-pos.is-zero b { color: rgba(255, 255, 255, 0.34); }
-
-.focus-budget-bar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  --budget-color: #f79420;
-}
-.focus-budget-bar.is-ontrack { --budget-color: #f79420; }
-.focus-budget-bar.is-low { --budget-color: #f5c518; }
-.focus-budget-bar.is-complete { --budget-color: #34ec27; }
-.focus-budget-bar.is-over { --budget-color: #ff6d6d; }
-
-.focus-budget-label {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-}
-.focus-budget-values {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  line-height: 1;
-  color: #fff;
-}
-.focus-budget-values strong { color: var(--budget-color); }
-.focus-budget-sep { margin: 0 3px; color: rgba(255, 255, 255, 0.4); }
-
-.focus-budget-meter {
-  flex: 1 1 160px;
-  min-width: 120px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-}
-.focus-budget-fill {
-  display: block;
-  height: 100%;
-  width: 0%;
-  border-radius: 999px;
-  background: var(--budget-color);
-  transition: width 0.18s ease, background 0.18s ease;
-}
-
-.focus-budget-remaining {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.6);
   white-space: nowrap;
 }
-.focus-budget-remaining strong { color: var(--budget-color); font-weight: 700; }
-
-.focus-budget-spots {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  white-space: nowrap;
+.order-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
 }
-.focus-budget-spots strong { color: rgba(255, 255, 255, 0.82); }
+.order-indicator.is-sorted {
+  border-color: rgba(247, 148, 32, 0.4);
+  color: #F79420;
+}
+.order-indicator.is-sorted::before { background: #F79420; }
 
 /* Per-recruit points steppers */
 .points-stepper {
@@ -1192,7 +1300,7 @@ input[type="reset"] {
 
 @media (prefers-reduced-motion: reduce) {
   .orders-grid-table tbody tr.is-over-budget td { animation: none; }
-  .focus-budget-fill { transition: none; }
+  .budget-fill { transition: none; }
 }
 
 /* Points column needs room for the −/+ steppers (5% + overflow:hidden clipped the + button). */

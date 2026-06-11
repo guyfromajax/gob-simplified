@@ -66,6 +66,9 @@
       '<h2 class="news-story-headline">' + escapeHtml(story.headline) + '</h2>',
       '<div class="news-story-body">',
       (story.lines || []).map(function (line) {
+        if (!String(line == null ? '' : line).trim()) {
+          return '<div class="news-story-gap"></div>';
+        }
         return '<p class="news-story-line">' + escapeHtml(line) + '</p>';
       }).join(''),
       '</div>',

@@ -27,16 +27,31 @@
 
     <div class="recruiting-orders-sticky-scope">
     <div id="focus-budget-dock" class="focus-budget-dock" hidden>
-      <div class="focus-budget-top">
-        <span id="focus-order-status" class="focus-order-status">Order: Custom</span>
-        <div id="focus-pos-tally" class="focus-pos-tally" aria-label="Added recruits by highest-rated position"></div>
-      </div>
       <div id="focus-budget-bar" class="focus-budget-bar is-ontrack">
-        <span class="focus-budget-label">Points</span>
-        <span class="focus-budget-values"><strong id="focus-budget-assigned">0</strong><span class="focus-budget-sep">/</span><span id="focus-budget-total">50</span></span>
-        <div class="focus-budget-meter" role="progressbar" aria-label="Points assigned"><span id="focus-budget-fill" class="focus-budget-fill"></span></div>
-        <span class="focus-budget-remaining"><strong id="focus-budget-remaining">50</strong> left</span>
-        <span class="focus-budget-spots">Open spots <strong id="focus-budget-spots">0</strong></span>
+        <!-- Segment 1: Points (hero) -->
+        <div class="budget-points">
+          <div class="budget-points-top">
+            <span class="budget-points-label">Points Assigned</span>
+            <span class="budget-points-value"><strong id="focus-budget-assigned">0</strong><span class="budget-points-total"> / <span id="focus-budget-total">50</span></span></span>
+            <span class="budget-points-remaining" id="focus-budget-remaining">50 remaining</span>
+          </div>
+          <div class="budget-track" role="progressbar" aria-label="Points assigned"><span id="focus-budget-fill" class="budget-fill"></span></div>
+        </div>
+        <span class="budget-divider" aria-hidden="true"></span>
+        <!-- Segment 2: Open Roster Spots -->
+        <div class="budget-roster">
+          <span class="budget-roster-value" id="focus-budget-spots">0</span>
+          <span class="budget-roster-label">Open Roster Spots</span>
+        </div>
+        <span class="budget-divider" aria-hidden="true"></span>
+        <!-- Segment 3: Ranked counter + position tally -->
+        <div class="budget-rankpos">
+          <div class="budget-ranked">
+            <span class="budget-ranked-num"><strong id="focus-ranked-count">0</strong><span class="budget-ranked-cap"> / 20</span></span>
+            <span class="budget-ranked-label">Ranked</span>
+          </div>
+          <div id="focus-pos-tally" class="focus-pos-tally" aria-label="Added recruits by highest-rated position"></div>
+        </div>
       </div>
     </div>
     <div id="visits-dock-section" class="recruiting-visits-dock-contents recruiting-v2-dock-section" hidden>
@@ -61,7 +76,10 @@
     </div>
 
     <section id="orders-table-section" class="gob-page-panel recruiting-section">
-      <p id="orders-help" class="gob-page-help recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
+      <div class="focus-list-heading">
+        <p id="orders-help" class="gob-page-help recruiting-help">Rank up to 20 recruits. Drag and drop rows or use the up/down buttons to adjust priority.</p>
+        <span id="focus-order-status" class="order-indicator">Order: Custom</span>
+      </div>
       <p id="orders-status" class="gob-page-status recruiting-status-text"></p>
       <div class="gob-data-grid-shell">
         <div class="gob-data-grid-scroll scroll-x">

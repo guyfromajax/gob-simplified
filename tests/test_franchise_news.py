@@ -138,6 +138,125 @@ def test_ps_all_stars_returns_none_when_nobody_qualifies():
     assert franchise_routes._build_ps_all_stars_story(4, [], {}) is None
 
 
+def _recruit_doc(recruit_id, name, rt, archetype="Sharp Shooter"):
+    return {
+        "recruit_id": recruit_id,
+        "name": name,
+        "archetype": archetype,
+        "position_ratings": {"PG": rt},
+    }
+
+
+def test_recruiting_leans_top_rated_section_format_sort_and_rt_boundary():
+    recruit_by_id = {
+        "r1": _recruit_doc("r1", "Max High", 62, archetype="Floor General"),
+        "r2": _recruit_doc("r2", "Mid Guy", 50),
+        "r3": _recruit_doc("r3", "Boundary Bob", 49),  # RT must exceed 49
+    }
+    events = [
+        {"recruit_id": "r2", "team_id": "t1"},
+        {"recruit_id": "r1", "team_id": "t2"},
+        {"recruit_id": "r3", "team_id": "t1"},
+    ]
+
+    story = franchise_routes._build_recruiting_leans_story(
+        6, events, {}, {"t1": "Alpha", "t2": "Beta"}, recruit_by_id, {}, None,
+    )
+
+    assert story is not None
+    assert story["headline"] == "Updated Recruiting Leans Announced"
+    assert story["week"] == 6
+    assert story["type"] == "recruiting_leans"
+    assert story["story_id"] == "w6-recruiting-leans"
+    # RT descending; Boundary Bob (49) excluded; no conference section appended.
+    assert story["lines"] == [
+        "Top Rated Recruit Announcements",
+        "Max High who is a 62 rated Floor General has announced a lean toward Beta.",
+        "Mid Guy who is a 50 rated Sharp Shooter has announced a lean toward Alpha.",
+    ]
+
+
+def test_recruiting_leans_combines_multiple_teams_for_one_recruit():
+    recruit_by_id = {"r1": _recruit_doc("r1", "Max High", 70)}
+    events = [
+        {"recruit_id": "r1", "team_id": "t1"},
+        {"recruit_id": "r1", "team_id": "t2"},
+        {"recruit_id": "r1", "team_id": "t1"},  # duplicate event ignored
+    ]
+
+    story = franchise_routes._build_recruiting_leans_story(
+        4, events, {}, {"t1": "Alpha", "t2": "Beta"}, recruit_by_id, {}, None,
+    )
+
+    assert story["lines"][1] == (
+        "Max High who is a 70 rated Sharp Shooter has announced a lean toward Alpha and Beta."
+    )
+
+
+def test_recruiting_leans_conference_section_grouping_and_sorting():
+    recruit_by_id = {
+        "r1": _recruit_doc("r1", "Al Low", 28),
+        "r2": _recruit_doc("r2", "Bo Mid", 41),
+        "r3": _recruit_doc("r3", "Cy Top", 55),
+        "r4": _recruit_doc("r4", "Out Of Conf", 60),
+    }
+    events = [
+        {"recruit_id": "r1", "team_id": "t1"},
+        {"recruit_id": "r2", "team_id": "t1"},
+        {"recruit_id": "r3", "team_id": "t2"},
+        {"recruit_id": "r4", "team_id": "t9"},  # team outside user's conference
+    ]
+    conference_by_team_id = {"t1": "3", "t2": "3", "t9": "7"}
+    rank_by_team_id = {"t1": 88, "t2": 12, "t9": 1}
+
+    story = franchise_routes._build_recruiting_leans_story(
+        10, events, rank_by_team_id, {"t1": "Alpha", "t2": "Beta", "t9": "Niner"},
+        recruit_by_id, conference_by_team_id, "3",
+    )
+
+    # Cy Top (55) also hits the Top Rated section, and Out Of Conf (60) qualifies
+    # there even though his team isn't in the user's conference.
+    assert story["lines"] == [
+        "Top Rated Recruit Announcements",
+        "Out Of Conf who is a 60 rated Sharp Shooter has announced a lean toward Niner.",
+        "Cy Top who is a 55 rated Sharp Shooter has announced a lean toward Beta.",
+        "",
+        "Conference 3 Lean Announcements",
+        "Beta",  # natl_rank 12 lists before rank 88
+        "Cy Top (55)",
+        "Alpha",
+        "Bo Mid (41), Al Low (28)",  # recruits sorted by RT descending
+    ]
+
+
+def test_recruiting_leans_conference_only_runs_without_top_rated_section():
+    recruit_by_id = {"r1": _recruit_doc("r1", "Al Low", 30)}
+    events = [{"recruit_id": "r1", "team_id": "t1"}]
+
+    story = franchise_routes._build_recruiting_leans_story(
+        8, events, {"t1": 40}, {"t1": "Alpha"}, recruit_by_id, {"t1": "5"}, "5",
+    )
+
+    assert story["lines"] == [
+        "Conference 5 Lean Announcements",
+        "Alpha",
+        "Al Low (30)",
+    ]
+
+
+def test_recruiting_leans_returns_none_when_nothing_qualifies():
+    recruit_by_id = {"r1": _recruit_doc("r1", "Al Low", 30)}
+    # Low RT and the team is outside the user's conference.
+    events = [{"recruit_id": "r1", "team_id": "t1"}]
+
+    assert franchise_routes._build_recruiting_leans_story(
+        3, events, {}, {"t1": "Alpha"}, recruit_by_id, {"t1": "2"}, "6",
+    ) is None
+    assert franchise_routes._build_recruiting_leans_story(
+        3, [], {}, {}, {}, {}, "6",
+    ) is None
+
+
 def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
     franchise_id = ObjectId()
     team_a, team_b = str(ObjectId()), str(ObjectId())

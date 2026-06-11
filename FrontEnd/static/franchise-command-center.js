@@ -38,6 +38,7 @@ let fccPlaybooksSummaryCache = null;
 let userRosterPlayersCache = [];
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
+let fccNewsListCache = null;
 const homeOpponentRosterCache = new Map();
 const FCC_SESSION_CACHE_PREFIX = 'fcc-shell';
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
@@ -193,6 +194,7 @@ function adoptAuthoritativeFccTeamId(topData) {
 function invalidateHomeWeekSensitiveCaches() {
   userScheduleDataCache = null;
   homeLastGameDataCache = null;
+  fccNewsListCache = null;
   homeOpponentRosterCache.clear();
 }
 
@@ -1191,6 +1193,51 @@ function renderHomeNewsCard() {
     </div>
     ${seeAllLink}
   `;
+}
+
+function buildStandaloneNewsUrl(storyId) {
+  const q = new URLSearchParams();
+  if (franchiseId) q.set('franchise_id', franchiseId);
+  if (userTeamId) q.set('team_id', userTeamId);
+  if (storyId) q.set('story', storyId);
+  const qs = q.toString();
+  return `/news.html${qs ? `?${qs}` : ''}`;
+}
+
+async function renderNewsTab() {
+  const host = document.getElementById('fcc-news-list');
+  if (!host) return;
+  if (!fccNewsListCache) {
+    const data = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/news')}?franchise_id=${franchiseId}`);
+    if (!data) {
+      host.innerHTML = '<div class="fcc-news-tab-empty">Failed to load news.</div>';
+      return;
+    }
+    fccNewsListCache = Array.isArray(data.news) ? data.news : [];
+  }
+  const news = fccNewsListCache;
+  if (!news.length) {
+    host.innerHTML = '<div class="fcc-news-tab-empty">No News To Report</div>';
+    return;
+  }
+  // Group stories by release week, newest week first (season_news is newest first).
+  const byWeek = new Map();
+  news.forEach((story) => {
+    const week = Number(story.week || 0);
+    if (!byWeek.has(week)) byWeek.set(week, []);
+    byWeek.get(week).push(story);
+  });
+  const weeks = [...byWeek.keys()].sort((a, b) => b - a);
+  host.innerHTML = weeks.map((week) => `
+    <section class="fcc-data-card fcc-news-tab-week">
+      <div class="fcc-news-tab-week-title">Week ${week}</div>
+      <div class="fcc-news-tab-week-body">
+        ${byWeek.get(week).map((story) => `
+          <a class="fcc-news-tab-headline" href="${buildStandaloneNewsUrl(story.story_id)}">${escapeHomeHtml(story.headline || '--')}</a>
+        `).join('')}
+      </div>
+    </section>
+  `).join('');
 }
 
 async function renderHomeTab() {
@@ -3787,6 +3834,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
+        }
+        if (tabName === 'press-tab') {
+          void renderNewsTab();
         }
         if (tabName === 'game-plan-tab') {
           renderGamePlanSummary();

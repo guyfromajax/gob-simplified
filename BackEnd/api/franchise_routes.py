@@ -4079,8 +4079,8 @@ def _finalize_franchise_week_after_cpu_games(
     """
     existing_results = franchise_doc.get("results", {})
     existing_results[str(week)] = results
-    _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
-    _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
+    new_lean_events = _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
+    new_lean_events += _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
     # Training-squad weekly progression (weeks 2–26) + milestone development report.
     ts_weekly_gains: list[dict[str, Any]] = []
     try:
@@ -4092,10 +4092,13 @@ def _finalize_franchise_week_after_cpu_games(
             "[TS-PROGRESSION] failed; continuing. franchise_id=%s week=%s",
             franchise_id_str, week,
         )
-    # Weekly news (upset report + practice-squad all-stars). Must run before the
-    # rank update below so the upset criteria use entering-week natl_rank values.
+    # Weekly news (upset report + practice-squad all-stars + recruiting leans).
+    # Must run before the rank update below so the upset criteria use
+    # entering-week natl_rank values.
     try:
-        _append_franchise_week_news(franchise_id, franchise_doc, week, results, ts_weekly_gains)
+        _append_franchise_week_news(
+            franchise_id, franchise_doc, week, results, ts_weekly_gains, new_lean_events
+        )
     except Exception:
         logger.exception(
             "[NEWS] weekly news generation failed; continuing. franchise_id=%s week=%s",
@@ -7408,10 +7411,13 @@ def _apply_performance_based_recruiting_lean_updates(
     franchise_doc: dict,
     week: int,
     results: list[dict],
-) -> None:
+) -> list[dict[str, str]]:
+    """Applies the week's performance-based lean rolls. Returns the week's new-lean
+    events ([{recruit_id, team_id}, ...] where the team was newly added to a recruit's
+    lean list) for downstream consumers like the weekly news."""
     chances = _game_performance_lean_chances_for_week(week)
     if chances is None:
-        return
+        return []
 
     fid = franchise_doc["_id"]
     applied_map = franchise_doc.get("recruiting_performance_lean_applied") or {}
@@ -7421,7 +7427,7 @@ def _apply_performance_based_recruiting_lean_updates(
             franchise_doc.get("_id"),
             week,
         )
-        return
+        return []
 
     ftd_docs = list(
         franchise_team_data_collection.find(
@@ -7441,7 +7447,7 @@ def _apply_performance_based_recruiting_lean_updates(
         )
         franchise_doc.setdefault("recruiting_performance_lean_applied", {})
         franchise_doc["recruiting_performance_lean_applied"][str(week)] = True
-        return
+        return []
 
     team_oid_list = [ObjectId(tid) for tid in natl_by_team_id]
     team_region_by_id: dict[str, str] = {}
@@ -7458,6 +7464,7 @@ def _apply_performance_based_recruiting_lean_updates(
     _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     user_team_id_str = str(user_team_object_id) if user_team_object_id else ""
     newly_added_for_user: list[str] = []
+    new_lean_events: list[dict[str, str]] = []
 
     played: set[str] = set()
     game_by_team: dict[str, dict] = {}
@@ -7494,10 +7501,10 @@ def _apply_performance_based_recruiting_lean_updates(
             return
         old_lean = doc.get("Lean")
         new_lean = _apply_team_to_recruit_performance_lean(old_lean, team_id)
-        if user_team_id_str and team_id == user_team_id_str and _team_was_newly_added_to_lean(
-            old_lean, new_lean, team_id
-        ):
-            newly_added_for_user.append(rid)
+        if _team_was_newly_added_to_lean(old_lean, new_lean, team_id):
+            new_lean_events.append({"recruit_id": rid, "team_id": team_id})
+            if user_team_id_str and team_id == user_team_id_str:
+                newly_added_for_user.append(rid)
         doc["Lean"] = new_lean
         franchise_recruits_data_collection.update_one(
             {"franchise_id": str(fid), "recruit_id": rid},
@@ -7555,6 +7562,7 @@ def _apply_performance_based_recruiting_lean_updates(
     )
     franchise_doc.setdefault("recruiting_performance_lean_applied", {})
     franchise_doc["recruiting_performance_lean_applied"][str(week)] = True
+    return new_lean_events
 
 
 def _update_recruit_lean_after_visit(
@@ -7597,13 +7605,16 @@ def _apply_complete_week_recruiting_lean_updates(
     franchise_doc: dict,
     week: int,
     results: list[dict],
-) -> None:
+) -> list[dict[str, str]]:
+    """Applies the week's visit-based lean updates (weeks 20-26). Returns the week's
+    new-lean events ([{recruit_id, team_id}, ...] where the team was newly added to a
+    recruit's lean list) for downstream consumers like the weekly news."""
     applied = (franchise_doc.get("recruiting_lean_updates_applied") or {}).get(str(week))
     if applied:
         logger.info("Skipping recruiting lean updates for franchise=%s week=%s; already applied", franchise_doc.get("_id"), week)
-        return
+        return []
     if week < 20 or week > 26:
-        return
+        return []
 
     fid = franchise_doc["_id"]
     ftd_docs = list(franchise_team_data_collection.find(
@@ -7612,7 +7623,7 @@ def _apply_complete_week_recruiting_lean_updates(
     ))
     if not ftd_docs:
         db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
-        return
+        return []
 
     visited_recruit_ids: set[str] = set()
     team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
@@ -7639,7 +7650,7 @@ def _apply_complete_week_recruiting_lean_updates(
 
     if not recruit_visit_pairs:
         db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
-        return
+        return []
 
     recruit_ids = [recruit_id for _, recruit_id in recruit_visit_pairs]
     recruit_docs_by_id = {
@@ -7653,6 +7664,7 @@ def _apply_complete_week_recruiting_lean_updates(
     _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     user_team_id_str = str(user_team_object_id) if user_team_object_id else ""
     newly_added_for_user: list[str] = []
+    new_lean_events: list[dict[str, str]] = []
 
     bulk_updates = []
     for team_id, recruit_id in recruit_visit_pairs:
@@ -7667,10 +7679,10 @@ def _apply_complete_week_recruiting_lean_updates(
             str(team_doc.get("region") or "").upper() == str(recruit_doc.get("Home Region") or "").upper(),
             team_outcomes.get(team_id) == "win",
         )
-        if user_team_id_str and team_id == user_team_id_str and _team_was_newly_added_to_lean(
-            old_lean, updated_lean, team_id
-        ):
-            newly_added_for_user.append(recruit_id)
+        if _team_was_newly_added_to_lean(old_lean, updated_lean, team_id):
+            new_lean_events.append({"recruit_id": recruit_id, "team_id": team_id})
+            if user_team_id_str and team_id == user_team_id_str:
+                newly_added_for_user.append(recruit_id)
         bulk_updates.append({
             "filter": {"franchise_id": str(fid), "recruit_id": recruit_id},
             "update": {"$set": {"Lean": updated_lean}},
@@ -7694,6 +7706,7 @@ def _apply_complete_week_recruiting_lean_updates(
         {"_id": fid},
         {"$set": {f"recruiting_lean_updates_applied.{week}": True}},
     )
+    return new_lean_events
 
 
 def _resolve_weekly_recruiting_visits(
@@ -8599,12 +8612,99 @@ def _build_ps_all_stars_story(
     }
 
 
+NEWS_TOP_RECRUIT_MIN_RT = 49  # recruit RT must exceed this for the Top Rated section
+
+
+def _build_recruiting_leans_story(
+    week: int,
+    lean_events: list[dict[str, str]],
+    rank_by_team_id: dict[str, int],
+    team_name_map: dict[str, str],
+    recruit_by_id: dict[str, dict[str, Any]],
+    conference_by_team_id: dict[str, str],
+    user_conference: str | None,
+) -> dict[str, Any] | None:
+    """Updated Recruiting Leans Announced: recruits with RT > NEWS_TOP_RECRUIT_MIN_RT
+    who newly added a team to their lean list this week, followed by new leans toward
+    teams in the user's conference (a recruit can appear in both sections). None when
+    neither section has content."""
+    # Group the week's new-lean events per recruit (a recruit can pick up
+    # multiple teams in performance-lean weeks; combine into one line).
+    teams_by_recruit: dict[str, list[str]] = {}
+    for event in lean_events or []:
+        recruit_id = str(event.get("recruit_id") or "")
+        team_id = str(event.get("team_id") or "")
+        if not recruit_id or not team_id:
+            continue
+        team_ids = teams_by_recruit.setdefault(recruit_id, [])
+        if team_id not in team_ids:
+            team_ids.append(team_id)
+    if not teams_by_recruit:
+        return None
+
+    top_entries: list[tuple[int, dict[str, Any], list[str]]] = []
+    conference_recruits_by_team: dict[str, list[tuple[int, str]]] = {}
+    for recruit_id, team_ids in teams_by_recruit.items():
+        recruit_doc = recruit_by_id.get(recruit_id)
+        if not recruit_doc:
+            continue
+        rt = _recruit_rt(recruit_doc)
+        if rt > NEWS_TOP_RECRUIT_MIN_RT:
+            top_entries.append((rt, recruit_doc, team_ids))
+        if user_conference is None:
+            continue
+        for team_id in team_ids:
+            if conference_by_team_id.get(team_id) == user_conference:
+                conference_recruits_by_team.setdefault(team_id, []).append(
+                    (rt, str(recruit_doc.get("name") or ""))
+                )
+
+    top_lines: list[str] = []
+    top_entries.sort(key=lambda entry: entry[0], reverse=True)
+    for rt, recruit_doc, team_ids in top_entries:
+        team_names = _join_with_and([team_name_map.get(tid, tid) for tid in team_ids])
+        top_lines.append(
+            f"{recruit_doc.get('name')} who is a {rt} rated {recruit_doc.get('archetype')} "
+            f"has announced a lean toward {team_names}."
+        )
+
+    conference_lines: list[str] = []
+    # Conference teams from lowest natl_rank to highest (rank 1 first).
+    for team_id in sorted(
+        conference_recruits_by_team, key=lambda tid: rank_by_team_id.get(tid, 999)
+    ):
+        entries = sorted(conference_recruits_by_team[team_id], key=lambda e: e[0], reverse=True)
+        conference_lines.append(team_name_map.get(team_id, team_id))
+        conference_lines.append(", ".join(f"{name} ({rt})" for rt, name in entries))
+
+    if not top_lines and not conference_lines:
+        return None
+    lines: list[str] = []
+    if top_lines:
+        lines.append("Top Rated Recruit Announcements")
+        lines.extend(top_lines)
+    if conference_lines:
+        if lines:
+            lines.append("")
+        lines.append(f"Conference {user_conference} Lean Announcements")
+        lines.extend(conference_lines)
+    return {
+        "story_id": f"w{week}-recruiting-leans",
+        "week": int(week),
+        "type": "recruiting_leans",
+        "headline": "Updated Recruiting Leans Announced",
+        "lines": lines,
+        "created_at": datetime.utcnow(),
+    }
+
+
 def _append_franchise_week_news(
     franchise_id: ObjectId,
     franchise_doc: dict[str, Any],
     week: int,
     results: list[dict[str, Any]],
     ts_weekly_gains: list[dict[str, Any]],
+    new_lean_events: list[dict[str, str]] | None = None,
 ) -> None:
     """Build the completed week's news stories and prepend them to franchise_doc['season_news'].
 
@@ -8624,11 +8724,50 @@ def _append_franchise_week_news(
             rank_by_team_id[str(team_id)] = int(rank)
 
     team_name_map = _format_team_name_map()
+
+    recruiting_leans_story = None
+    if new_lean_events:
+        recruit_ids = list({str(e.get("recruit_id") or "") for e in new_lean_events})
+        recruit_by_id = {
+            doc["recruit_id"]: doc
+            for doc in franchise_recruits_data_collection.find(
+                {"franchise_id": str(franchise_id), "recruit_id": {"$in": recruit_ids}},
+                {"recruit_id": 1, "name": 1, "archetype": 1, "position_ratings": 1},
+            )
+        }
+        event_team_oids = []
+        for e in new_lean_events:
+            try:
+                event_team_oids.append(ObjectId(str(e.get("team_id"))))
+            except Exception:
+                continue
+        conference_by_team_id = {
+            str(t["_id"]): str(t.get("conference"))
+            for t in db.teams.find({"_id": {"$in": event_team_oids}}, {"conference": 1})
+            if t.get("conference") is not None
+        }
+        user_conference = None
+        _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+        if user_team_object_id:
+            user_team_doc = db.teams.find_one({"_id": user_team_object_id}, {"conference": 1})
+            if user_team_doc and user_team_doc.get("conference") is not None:
+                user_conference = str(user_team_doc.get("conference"))
+        recruiting_leans_story = _build_recruiting_leans_story(
+            week,
+            new_lean_events,
+            rank_by_team_id,
+            team_name_map,
+            recruit_by_id,
+            conference_by_team_id,
+            user_conference,
+        )
+
     stories = [
         story
         for story in (
             _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map),
             _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map),
+            recruiting_leans_story,
         )
         if story
     ]

@@ -28,4 +28,21 @@
     -"{PS Player Name} of {Player Team Name -- school only, no mascot} increased by {increase cumulative total} attribute points this week. His strongest gains were in {list full attribute handle of the highest gain, if there is a tie, list all that are tied using proper grammar of commas and "and" preceding the final attribute}. He's now a {RT value} rated {highest rated position abbreviation -- PG, SG, SF, PF, or C}.
 -Limit the list to the top 10 by Cum Gain. if there is a tie that pushes the list beyond 10, list all that are in the tie then stop after that.
 
+##Headline: Updated Recruiting Leans Announced
+- Criteria: List lean announcement from all recruits with RT > 49 and list lean announcements for all teams in the user's conference -- in that order. If a recruit with RT > 49 announces a lean with a team from teh user's conference, he is listed in both places.
+-Content
+    "Top Rated Recruit Announcements"
+    "{Recruit Name} who is a {recruit's RT} rated {recruit's archetype} has announced a lean twoard {team name}."
+    (list all highly rated recrtuits in this manner)
+    "  " (empty line)
+    "Conference {User Conference} Lean Announcements" (ex: "Conference 1 Lean Announcements)
+    "{Team Name}"
+    "{Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT})"
+    "{Team Name}"
+    "{Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT})"
+    "{Team Name}"
+    "{Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT})"
+
+    For user conferecne list teams from lowest natl_rank to highest. Only list recruits who have declared a lean to the team that week.
+
 
