@@ -37,7 +37,7 @@
         tableWrap.className = 'gob-data-grid-scroll scroll-x';
         var table = document.createElement('table');
         table.className = 'gob-data-grid recruiting-results-table';
-        table.innerHTML = '<thead><tr><th>Team</th><th>Recruit</th><th>Home Region</th><th>Archetype</th><th>HT</th><th>WT</th><th>Pos</th><th>RT</th></tr></thead><tbody></tbody>';
+        table.innerHTML = '<thead><tr><th>Team</th><th>Recruit</th><th>Home Region</th><th>Archetype</th><th>HT</th><th>WT</th><th>Pos</th><th>YR</th><th>RT</th></tr></thead><tbody></tbody>';
         var tbody = table.querySelector('tbody');
 
         (conferenceBlock.teams || []).forEach(function (teamRow) {
@@ -51,12 +51,13 @@
               '<td>' + formatHeight(teamRow.visit.height) + '</td>',
               '<td>' + (teamRow.visit.weight != null ? teamRow.visit.weight : '--') + '</td>',
               '<td>' + (teamRow.visit.pos || '--') + '</td>',
-              '<td class="' + (teamRow.visit.rt != null && typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(teamRow.visit.rt) : '') + '">' + (teamRow.visit.rt != null ? teamRow.visit.rt : '--') + '</td>'
+              '<td>' + Recruiting.formatYearAbbrev(teamRow.visit.year || 'JH') + '</td>',
+              '<td class="' + (teamRow.visit.rt != null && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(teamRow.visit.rt, teamRow.visit.year) : '') + '">' + (teamRow.visit.rt != null ? teamRow.visit.rt : '--') + '</td>'
             ].join('');
           } else {
             tr.innerHTML = [
               '<td>' + teamRow.team_name + '</td>',
-              '<td colspan="7" class="recruiting-no-visit">no visit</td>'
+              '<td colspan="8" class="recruiting-no-visit">no visit</td>'
             ].join('');
           }
           tbody.appendChild(tr);

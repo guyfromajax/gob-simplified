@@ -12,7 +12,21 @@
             - Key `3` is always `None` at init
 2. Upon new franchise init and the start of each new season within a franchise instance, create **300** new recruits per recruit generation (`generate_recruits_list(count=300)`).
 
+**Recruit Distribution By Year**
+Junior = random.randint(5,15)
+Sophomore = random.randint(5,15)
+Freshman = random.randint(10,30)
+JH = 300 - (junior + sophomore + freshman)
+- Year is stored as the full string: `"JH"`, `"Freshman"`, `"Sophomore"`, `"Junior"`; table columns display the abbreviation: `JH` / `FR` / `SO` / `JR`.
+- **Year carry-through & aging:** signed recruits (and signed walk-ons) keep their rolled year through `week_35_recruiting_results`; at season transition they enter the roster advanced one step: JH → Freshman, Freshman → Sophomore, Sophomore → Junior, Junior → Senior. JH therefore never appears on an active roster. Unsigned recruits are wiped at season init and a fresh 300 generated.
+**Macro UI note, we'll need to add a year column to all pages taht dispaly comprehensive recruit data
+    - Recruits tab in teh FCC, recruits page, recruiting orders page, recruiting invites page, invites results page, and please do a sweep to see if you find any others. Rule -- if we're showing all of the recruits' attributes we should also show the year otherwise no year
+        - so teh Recruits container in the Coach's Office tab on the FCC would be excluded, as would the Tranining Report invte result.
+    - Exception to the rule: the recruiting-orders **top grids** (weeks 20-26 and week 35) also get a Year column even though they don't show full attributes (the user is committing roster spots, so year matters).
+    - Column position: Year sits **after `POS`**, before the attribute columns (mirrors roster tables). In top grids it sits after `POS`/`RT` equivalent position.
+
 **Recruit RT color scale (UI display)**
+Note this scale applies to JH recruits only. Freshamn, sophomore and junior recruits will use the standard color scale.
 
 Recruit RT text uses `/js/shared/rtBucket.js` → `getRecruitRtBucketClass(rt)` with `/css/rt-buckets.css` (same class names and hex colors as the player Attribute Bar Scale, recruit-specific breakpoints):
 
@@ -120,21 +134,21 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - **National rank:** lower `natl_rank` is better (#1 is best). A **better-ranked opponent** means the opponent’s `natl_rank` is **less than** the team’s.
 - **Quality loss margin:** “loss by 8 points or less” means the team’s score is **8 or fewer** points below the opponent’s (i.e. **inclusive** of an 8-point loss).
 - if the team wins their game that week
-    - 50% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random
-    - 25% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random
+    - 40% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random. 
 - if the team **loses** to a **better-ranked** opponent (`opponent.natl_rank < team.natl_rank`) **and** the loss margin is **at most 8 points** (inclusive):
-    - 25% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random
-    - 15% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 15% chance hits, choose one recruit in their region who meets that criteria at random.
+    - 40% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random
+    - 20% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 20% chance hits, choose one recruit in their region who meets that criteria at random.
 
 ##Weeks 11-15##
 - same logic applies to user team and all computer teams
 - **Bye weeks:** no lean updates from this block.
 - **Quality loss** uses the same rank and margin rules as weeks 1–10.
 - if the team wins their game that week
-    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random
+    - 70% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 70% chance hits, choose one recruit in their region who meets that criteria at random
     - 50% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random. 
 - if the team loses to a better-ranked opponent and the loss margin is at most 8 points (inclusive):
-    - 30% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 30% chance hits, choose one recruit in their region who meets that criteria at random
+    - 40% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random
     - 25% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random.
 
 ##Weeks 16-19##
@@ -142,10 +156,10 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - **Bye weeks:** no lean updates from this block.
 - **Quality loss** uses the same rank and margin rules as weeks 1–10.
 - if the team wins their game that week
-    - 70% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 70% chance hits, choose one recruit in their region who meets that criteria at random
+    - 80% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 80% chance hits, choose one recruit in their region who meets that criteria at random
     - 60% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random. 
 - if the team loses to a better-ranked opponent and the loss margin is at most 8 points (inclusive):
-    - 35% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 35% chance hits, choose one recruit in their region who meets that criteria at random
+    - 50% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random
     - 30% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 30% chance hits, choose one recruit in their region who meets that criteria at random. 
 
 
@@ -211,7 +225,7 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
   - sub-head copy under the header:
     - `Available Roster Spots: X, Points Remaining: Z`
     - `X = 15 - returning_non_graduating_player_count`
-    - `Z = 20 - currently assigned recruiting points`
+    - `Z = 50 - currently assigned recruiting points`
     - `Points Remaining` updates in real time as the user edits point inputs, including unsaved edits
   - top grid columns:
     - `Priority`, `Name`, `Home Region`, `Archetype`, `HT`, `WT`, `POS`, `RT`, `Current Lean`, `Points`, `Playing Time`, `Adjust`, `Remove`
@@ -219,8 +233,8 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
   - if that field is empty, auto-fill with all recruits who currently have the user team in any lean slot, sorted RT descending
   - point inputs default to `0`
   - revisits preload saved point values
-  - teams have a 20-point total budget in week `35`
-  - point inputs only accept integers and block keystrokes that would push the board above 20 total points
+  - teams have a 50-point total budget in week `35`
+  - point inputs only accept integers and block keystrokes that would push the board above 50 total points
   - checkboxes default empty on preload and on fresh add
   - `Playing Time` can be checked independently; scholarship is dormant and always saved as `false`
   - drag/drop uses insert-and-push behavior
@@ -231,7 +245,7 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - save behavior
   - saves the user board to `FTD.recruiting_orders_week_35`
   - on the user's first save only, generate CPU week-35 boards for any CPU team whose `recruiting_orders_week_35` is still empty
-  - backend rejects boards whose assigned recruiting points exceed 20 total
+  - backend rejects boards whose assigned recruiting points exceed 50 total
   - confirmation modal copy:
     - `Recruiting orders are saved. You can now run recruiting.`
 
@@ -247,10 +261,16 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
             - if one RT pool cannot fill its share, roll the unused slots over to the other pool
             - no playing time promises
         - Points assignments
-            - choose one random player from the <= 24 group and assign him 1 point
-            - choose one random player from the >= 25 list and assign him random amount of 1-3 points
+            - choose one random player from the <= 24 group and assign him 3 points
+            - choose one random player from the >= 25 list and assign him random amount of 5-7 points
             - if one of those groups has no qualifying player on the board, skip that step
-            - assign all remaining points to players on the lean list. if only one player is on the lean list, he gets all of the points. If 2-3 players are on the lean list, give the highest RT 80% of remaining points and distrubute the remaining evenly. Otherewise assign 60% of teh points to oen of the 3 highest RT players on the lean list and distribure the rest evenly among the players on the lean list. If there are not enough points to give every player at least one, distribute points to random players on the lean list until you run out of points and the remaining players will receive 0.
+            - assign all remaining points to players on the lean list:
+                - if only one player is on the lean list, he gets all of the remaining points.
+                - if 2-3 players are on the lean list, give the highest RT 80% of remaining points and distribute the remainder evenly.
+                - if 4+ players are on the lean list:
+                    - (a) assign a random amount between 40-60% of the remaining points to one of the 4 highest RT players on the lean list (chosen at random)
+                    - (b) if the roll in (a) was < 50%, assign a random amount between 40-60% of the still-remaining points to one of the 3 highest RT players remaining on the lean list (chosen at random)
+                    - (c) then shuffle all remaining players on the team's lean list, and assign each a random amount of 1-4 recruiting points until all points are assigned. If you reach the end of the lean list and still have points remaining, assign all remaining points to one random player from the lean list -- incrementally adding them to his existing value. If you run out of points before reaching the end of the lean list, all remaining players get 0.
             - if there are no lean-list players on the board, fallback to the top 5 RT in-region players on the board and split the remaining points evenly among them
         - out-of-region players who are on that CPU team's lean list can receive points assignments
 
@@ -263,8 +283,8 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
             - on the player's lean list receive multipliers:
                 -1 = 5x, 2 = 3x, 3 = 2x 
             - playing time offer
-                - if only one or two teams makes a playing time offer = 7 points per team
-                - if > 2 teams make a playing time offer = 4 points per team
+                - if only one or two teams makes a playing time offer = 15 points per team
+                - if > 2 teams make a playing time offer = 7 points per team
             - teams receive one point for having the player on their Top Grid list
             - teams receive points for the number of points they assign in their recruiting orders
             - subtotal = top-grid point + assigned recruiting points + playing-time points
@@ -273,19 +293,19 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 
         - choose the top 4 teams in terms of points value
         - if there are ties / more than 4 teams with nonzero value, randomly choose among lower-ranked teams to fill the remaining top-4 slots
-        - total value is the total number of points of chosen teams. Example:
+        - total value is the total number of points of chosen teams. Example (using the 15-point playing-time value, since only two teams made PT offers):
             - for player A the following:
                 - lean list: 1. Team 1, 2. Team 2, 3. null
                 - playing time offers: Team 1 and Team 7
-                - points per team:
-                    - Team 1 (assigned 10 of their points in recruiting orders): 18 points x 5 multiplier = 90
-                    - Team 7 (assigned 2 of their points in recruiting orders): 10 points x 1 = 10
-                    - Team 2 (assigned 5 of their points in recruiting orders): 6 points x 3 multiplier = 18
-                    - Team 9 (assigned 5 of their points in recruiting orders): 6 points x 1 = 6
-                    - total points = 124
-                - value = random.randint(1,124)
+                - points per team (subtotal = 1 top-grid point + assigned points + PT points):
+                    - Team 1 (assigned 10 of their points in recruiting orders): (1 + 10 + 15) = 26 points x 5 multiplier = 130
+                    - Team 7 (assigned 2 of their points in recruiting orders): (1 + 2 + 15) = 18 points x 1 = 18
+                    - Team 2 (assigned 5 of their points in recruiting orders): (1 + 5) = 6 points x 3 multiplier = 18
+                    - Team 9 (assigned 5 of their points in recruiting orders): (1 + 5) = 6 points x 1 = 6
+                    - total points = 172
+                - value = random.randint(1,172)
                     - Win ranges:
-                        - Team 1: 1-90, Team 7: 91-100, Team 2: 101-118, Team 9: 119-124
+                        - Team 1: 1-130, Team 7: 131-148, Team 2: 149-166, Team 9: 167-172
 
 
     - team eligibility for recruits
@@ -293,18 +313,31 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
     - when run recruiting completes:
         - advance franchise week from `35` to `36`
         - persist signed results on the franchise doc in `week_35_recruiting_results`
-        - redirect user to `recruiting.html`
+        - redirect user to the FCC, displaying the modal that announces the user team's recruiting results.
 
 - generate walkons
     - after recruiting has run, generate walks for all teams who do not have 15 players on their roster
-        - walks do not receive scholarships or pt promises
-        - the core 12 attribures (SC through FT) are assigned numbers random.randint(1,22), with a max of 3 attributes > 19
-        - height = random.randint(66-72)
-        - weight = random.randing(155 - 179)
-        - year = freshman
+        - walks do not receive pt promises
+        - walk on year 
+            - JH: 60%
+            - Freshman: 20%
+            - Sophomore: 10%
+            - Junior: 10%
+        - the core 12 attribures (SC through FT) are assigned numbers based on year
+            - JH: random.randint(1,32), with a max of 3 attributes > 29, height = random.randint(66-72), weight = random.randing(155 - 179)
+            - Freshman: random.randint(1,42), with a max of 3 attributes > 39, height = random.randint(66-74), weight = random.randing(155 - 189)
+            - Sophmore: random.randint(1,52), with a max of 3 attributes > 44, height = random.randint(67-75), weight = random.randing(165 - 199)
+            - Junior: random.randint(1,62), with a max of 3 attributes > 49, height = random.randint(68-77), weight = random.randing(175 - 209)
+        - year = the rolled year above; signed walk-ons advance one step at season transition like recruits (JH → Freshman, ..., Junior → Senior)
         - archetype = `Walk On`
         - names use the same name generator as recruit generation
         - position ratings are derived from their generated attributes
+
+- season 1 init walk-ons (franchise init, 3 per team)
+    - use this same walk-on generation logic (year roll + year-based attributes/height/weight)
+    - because these players land directly on an active season-1 roster, **instantly upgrade the rolled year one step** at generation: JH → Freshman, Freshman → Sophomore, Sophomore → Junior, Junior → Senior
+    - attributes/height/weight are rolled from the **pre-upgrade** year's ranges (same as a signed walk-on entering next season)
+    - net effect: season-1 walk-on year distribution is Freshman 60%, Sophomore 20%, Junior 10%, Senior 10%; JH never appears on a roster
 
 - jersey numbers
     - all recruits and walkons receive a jeresey number at random according to their highest RT position. Jersey numbers already assinged to a teammate are excluded. 
@@ -321,3 +354,93 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
   - walk-on -> signed team name + ` (walk on)`
   - unsigned recruit -> `--`
 - `Run Recruiting` is the catalyst that advances week `35` -> `36`
+
+**Recruit Init Attribute Logic**
+
+- **Code:** `RecruitManager` in `BackEnd/models/franchise_manager.py` — `_select_archetype()`, `_generate_recruit_profile(archetype)`, `_generate_weight(height)`, with post-processing in `generate_recruits_list()`. Expected ranges are encoded in `tests/test_recruit_archetypes.py`.
+
+1. **Archetype selection** (`_select_archetype`) — weighted random choice (`random.choices`):
+
+| Archetype | Weight |
+|-----------|--------|
+| Five-Star | 1 |
+| Four-Star | 4 |
+| Average | 13.6 |
+| Below Average | 13.6 |
+| All other archetypes (each) | 3.6 |
+
+Other archetypes: Defensive Wizard, All-Around Scorer, Classic PG, Classic SG, Classic SF, Classic PF, Classic C, Pure Shooter, Intangibles, Athlete, Inside Defender, Outside Defender, Outside Dual Threat, Driver, Outside C, Three & D.
+
+2. **Attribute range tiers** — every attribute is rolled with `random.randint` from one of four tiers:
+
+-JH
+| Tier | Range |
+|------|-------|
+| STRONG | 20-80 |
+| SECONDARY | 10-60 |
+| STANDARD | 1–40 |
+| WEAK | 1–20 |
+
+-Freshman
+| Tier | Range |
+|------|-------|
+| STRONG | 30-80 |
+| SECONDARY | 20-60 |
+| STANDARD | 10–40 |
+| WEAK | 10–20 |
+
+-Sophomore
+| Tier | Range |
+|------|-------|
+| STRONG | 40-85 |
+| SECONDARY | 30-70 |
+| STANDARD | 10–50 |
+| WEAK | 10–30 |
+
+-Junior
+| Tier | Range |
+|------|-------|
+| STRONG | 60-95 |
+| SECONDARY | 40-80 |
+| STANDARD | 10–60 |
+| WEAK | 10–50 |
+
+The 13 rolled attributes: `SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, CH`. Each archetype defines strong attrs, secondary attrs, and a height range; all attributes not listed roll STANDARD (except Below Average, where everything rolls WEAK).
+
+| Archetype | Strong | Secondary | Height (in) |
+|-----------|--------|-----------|-------------|
+| Five-Star | all 13 | — | 69–80 |
+| Four-Star | — | all 13 | 66–78 |
+| Defensive Wizard | ID, OD | ST, AG | 66–75 |
+| All-Around Scorer | SH, SC | ST, AG | 66–75 |
+| Classic PG | BH, PS | OD, IQ | 66–72 |
+| Classic SG | SH | OD | 66–74 |
+| Classic SF | SC, OD | AG | 69–75 |
+| Classic PF | RB | ST | 70–76 |
+| Classic C | ID, ST | RB, SC | 72–78 |
+| Pure Shooter | SH, FT | — | 66–73 |
+| Intangibles | IQ, ND, CH | — | 66–75 |
+| Athlete | AG, ST, ND | — | 66–75 |
+| Inside Defender | ST, ID | — | 71–80 |
+| Outside Defender | AG, OD | — | 66–74 |
+| Average | — | — | 66–75 |
+| Below Average | all WEAK | — | 66–74 |
+| Outside Dual Threat | SH, AG | — | 66–75 |
+| Driver | SC, AG | — | 66–75 |
+| Outside C | ST, SH | — | 72–77 |
+| Three & D | SH | ID, OD | 69–75 |
+
+3. **Height & weight** — height rolls uniformly within the archetype's range; weight derives from height (`_generate_weight`):
+
+| Height | Weight (lbs) |
+|--------|--------------|
+| < 72 | 150–181 |
+| 72–75 | 170–194 |
+| 76–80 | 195–231 |
+| > 80 | 209–260 |
+
+4. **Post-processing** (in `generate_recruits_list`, after the profile roll):
+- `Player.randomize_game_attributes(attributes)` sets `NG = 1.0`, `MO = 0`, `CH = random.randint(1, 100)`, `EM = random.randint(1, 100)`.
+  - **Quirk:** this overwrites the archetype-rolled `CH` value — e.g. the `Intangibles` archetype's STRONG `CH` roll is discarded and replaced with a uniform 1–100 roll.
+- `compute_position_ratings(recruit, profile="recruit")` derives position ratings from the final attributes + height.
+- `year` comes from the **Recruit Distribution By Year** roll (see top of doc) and selects which tier table applies; `created_at` timestamped; names come from the franchise name generator (`choose_franchise_first_name` + random last name).

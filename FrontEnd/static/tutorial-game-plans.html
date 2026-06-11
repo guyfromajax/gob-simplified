@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Game Plans — Mastering GOB | Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <style>
+  /* ===================== GAME PLANS LESSON (page-specific) ===================== */
+
+  .crumb { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-2); margin-bottom: 14px; flex-wrap: wrap; }
+  .crumb a:hover { color: var(--text); }
+  .crumb .sep { color: var(--muted-3); }
+  .crumb .here { color: var(--orange); font-weight: 600; }
+
+  .lesson-hero { padding: 4px 4px 0; margin-bottom: 30px; }
+  .lesson-hero h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 7vw, 86px); line-height: .92; letter-spacing: .01em; margin: 0 0 14px; color: var(--text); }
+  .lesson-hero .intro { font-size: 16px; color: var(--muted); margin: 0; line-height: 1.45; max-width: 72ch; text-wrap: pretty; }
+
+  .gp-group { margin-bottom: 26px; }
+  .gp-group:last-child { margin-bottom: 0; }
+
+  .dial-card {
+    padding: 16px 17px 15px; border-radius: 12px;
+    border: 1px solid var(--panel-border); border-left: 3px solid var(--ac);
+    background: var(--panel-flat);
+  }
+  .dial-card--feature { margin-bottom: 10px; padding: 18px 19px 17px; }
+  .dial-name { font-weight: 700; font-size: 14.5px; color: var(--text); margin-bottom: 10px; }
+
+  .dial-slider { position: relative; height: 28px; margin: 0 0 6px; }
+  .dial-track {
+    position: absolute; left: 0; right: 0; top: 50%; height: 6px;
+    transform: translateY(-50%); border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55); border: 1px solid var(--hair);
+  }
+  .dial-knob {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .dial-labels {
+    display: flex; justify-content: space-between; gap: 6px;
+    font-size: 10px; font-weight: 600; letter-spacing: .02em;
+    color: var(--muted-2); line-height: 1.25;
+  }
+  .dial-labels span { flex: 1; }
+  .dial-labels span:first-child { text-align: left; }
+  .dial-labels span:nth-child(2) { text-align: center; }
+  .dial-labels span:last-child { text-align: right; }
+
+  .dial-desc { margin: 12px 0 0; font-size: 12.5px; color: var(--muted-2); line-height: 1.45; text-wrap: pretty; }
+  .dial-desc + .dial-desc { margin-top: 8px; }
+
+  .gp-dials { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .handoff { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
+  .handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+  .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
+  .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  @media (max-width: 900px) {
+    .gp-dials { grid-template-columns: 1fr; }
+    .handoff { flex-direction: column; align-items: flex-start; }
+    .dial-labels { font-size: 9.5px; }
+  }
+  </style>
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="strategy">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back To Tutorial Home</button>
+      <span class="spacer"></span>
+    </header>
+
+    <section class="lesson-hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#cat-strategy">Strategy</a>
+        <span class="sep">›</span>
+        <span class="here">Game Plans</span>
+      </nav>
+      <h1>GAME PLANS</h1>
+      <p class="intro">The dials you set before every game — how your team attacks, defends, and controls tempo.</p>
+    </section>
+
+    <section class="lsec" id="game-plan">
+
+      <!-- OFFENSE -->
+      <div class="gp-group" style="--ac:#f79420;">
+        <div class="lsec-eyebrow-only">
+          <span class="eyebrow"><span class="tick" style="background:#f79420;"></span> Offense</span>
+        </div>
+
+        <article class="dial-card dial-card--feature" style="--ac:#f79420;">
+          <div class="dial-name">Offense</div>
+          <div class="dial-slider" aria-hidden="true">
+            <div class="dial-track"></div>
+            <div class="dial-knob"></div>
+          </div>
+          <div class="dial-labels">
+            <span>100% Motion</span>
+            <span>50/50</span>
+            <span>100% Set Plays</span>
+          </div>
+          <p class="dial-desc">Determines your mix of motion offense vs structured set plays. Leaning toward motion increases read-and-react freedom. Leaning toward sets emphasizes designed execution and called actions.</p>
+        </article>
+
+        <div class="gp-dials">
+          <article class="dial-card" style="--ac:#f79420;">
+            <div class="dial-name">Inside</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>Never</span>
+              <span>Normal</span>
+              <span>Most</span>
+            </div>
+            <p class="dial-desc">Controls how frequently you prioritize inside scoring. This influences both the number of Inside Set Plays you call and how aggressively your team looks to establish paint touches within motion offense. All things being equal, inside shots tend to be your most high-percentage shots.</p>
+          </article>
+
+          <article class="dial-card" style="--ac:#f79420;">
+            <div class="dial-name">Attack</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>Never</span>
+              <span>Normal</span>
+              <span>Most</span>
+            </div>
+            <p class="dial-desc">Controls how often your team looks to generate attack shots — drives, cuts, and downhill pressure. A higher setting increases Attack Set Plays and pushes motion offense toward rim pressure. Attack shots tend to draw the most defensive fouls, and are best executed by your most athletic players.</p>
+          </article>
+
+          <article class="dial-card" style="--ac:#f79420;">
+            <div class="dial-name">Outside</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>Never</span>
+              <span>Normal</span>
+              <span>Most</span>
+            </div>
+            <p class="dial-desc">Controls how frequently your team prioritizes perimeter scoring. This affects both Outside Set Plays and your shot selection tendencies within motion offense. Outside shots are your lowest percentage shots, but they tend to have the most impact on the game.</p>
+          </article>
+
+          <article class="dial-card" style="--ac:#f79420;">
+            <div class="dial-name">Fast Breaks</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>100% Half-Court Sets</span>
+              <span>50/50</span>
+              <span>100% Fast Breaks</span>
+            </div>
+            <p class="dial-desc">Determines how aggressively your team pushes in transition. Higher settings increase fast break attempts. Lower settings favor entering structured half-court offense.</p>
+          </article>
+        </div>
+      </div>
+
+      <!-- DEFENSE -->
+      <div class="gp-group" style="--ac:#4a90d9;">
+        <div class="lsec-eyebrow-only">
+          <span class="eyebrow"><span class="tick" style="background:#4a90d9;"></span> Defense</span>
+        </div>
+
+        <article class="dial-card dial-card--feature" style="--ac:#4a90d9;">
+          <div class="dial-name">Defense</div>
+          <div class="dial-slider" aria-hidden="true">
+            <div class="dial-track"></div>
+            <div class="dial-knob"></div>
+          </div>
+          <div class="dial-labels">
+            <span>100% Man</span>
+            <span>50/50</span>
+            <span>100% Zone</span>
+          </div>
+          <p class="dial-desc">Determines your mix of man-to-man vs zone defense. Adjusting this shifts how your team protects the rim, contests perimeter shots, and handles defensive rotations.</p>
+          <p class="dial-desc">Man defense generates more individual matchups and high-impact plays. It's ideal if you have disciplined defenders who can win their assignments and recover quickly.</p>
+          <p class="dial-desc">Zone defense offers structural advantages. Players fatigue less, commit fewer fouls, and receive more consistent help support. However, zones are more vulnerable to perimeter shooting and can concede offensive rebounds due to the lack of fixed box-out assignments. Zone schemes are also executed more effectively by high-IQ defenders who anticipate and rotate instinctively.</p>
+        </article>
+
+        <div class="gp-dials">
+          <article class="dial-card" style="--ac:#4a90d9;">
+            <div class="dial-name">Aggression</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>Passive</span>
+              <span>Normal</span>
+              <span>Aggressive</span>
+            </div>
+            <p class="dial-desc">Controls how aggressively your team attempts to create disruption. Higher aggression increases steal attempts and playmaking risks across the floor. It also increases fatigue rate and foul likelihood.</p>
+          </article>
+
+          <article class="dial-card" style="--ac:#4a90d9;">
+            <div class="dial-name">Half-Court Trap</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>Never</span>
+              <span>Normal</span>
+              <span>Most</span>
+            </div>
+            <p class="dial-desc">Determines how frequently your team executes half-court traps. Trapping increases turnover potential and can disrupt offensive chemistry, but defenders fatigue faster and are more prone to fouls.</p>
+          </article>
+
+          <article class="dial-card" style="--ac:#4a90d9;">
+            <div class="dial-name">Full-Court Press</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>Never</span>
+              <span>Normal</span>
+              <span>Most</span>
+            </div>
+            <p class="dial-desc">Determines how frequently your team applies full-court pressure. Presses amplify turnover potential and disruption more than half-court traps, but also carry greater fatigue cost and foul risk.</p>
+          </article>
+
+          <article class="dial-card" style="--ac:#4a90d9;">
+            <div class="dial-name">Rebounding</div>
+            <div class="dial-slider" aria-hidden="true">
+              <div class="dial-track"></div>
+              <div class="dial-knob"></div>
+            </div>
+            <div class="dial-labels">
+              <span>100% Crash the Boards</span>
+              <span>50/50</span>
+              <span>100% Get Back on D</span>
+            </div>
+            <p class="dial-desc">Determines how aggressively your team attacks the offensive glass. Higher settings send more players to crash for second-chance opportunities. Lower settings prioritize defensive balance and transition coverage.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">Next up</div>
+        <div class="nx">Playbooks</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial-playbooks.html">Start lesson</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial.html#topics">All topics</a>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var toastTimer;
+    function sfx(f) {
+      if (window.GOB && window.GOB.playSound) window.GOB.playSound(f);
+    }
+    document.body.addEventListener('click', function (e) {
+      var el = e.target.closest('[data-soon]');
+      if (!el) return;
+      e.preventDefault();
+      sfx('click-tiny.wav');
+      var label = el.getAttribute('data-soon-label') || 'This lesson';
+      var t = document.getElementById('toast');
+      if (!t) return;
+      t.querySelector('.tt').textContent = 'Coming soon';
+      t.querySelector('.ts').textContent = label + ' is part of the next build pass.';
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3000);
+    });
+    if (window.GOB) window.GOB.markSeen('game-plans');
+  })();
+  </script>
+</body>
+</html>

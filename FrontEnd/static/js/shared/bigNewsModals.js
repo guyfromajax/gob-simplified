@@ -263,7 +263,10 @@
     });
   }
 
-  function rtClass(rt) {
+  function rtClass(rt, year) {
+    if (typeof getRecruitRtBucketClassForYear === 'function') {
+      return getRecruitRtBucketClassForYear(rt, year);
+    }
     if (typeof getRecruitRtBucketClass === 'function') {
       return getRecruitRtBucketClass(rt);
     }
@@ -309,7 +312,7 @@
       var rtWrap = document.createElement('div');
       rtWrap.className = 'rc__rt';
       var rtNum = document.createElement('div');
-      rtNum.className = 'rc__rtnum ' + rtClass(r.rt);
+      rtNum.className = 'rc__rtnum ' + rtClass(r.rt, r.year);
       rtNum.textContent = r.rt != null ? String(r.rt) : '--';
       var rtLabel = document.createElement('div');
       rtLabel.className = 'rc__rtlabel';

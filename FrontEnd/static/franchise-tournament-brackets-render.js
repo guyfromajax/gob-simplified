@@ -233,10 +233,30 @@
     });
   }
 
+  function activeTierForWeek(week) {
+    const w = Number(week || 0);
+    if (w >= 32) return 'national';
+    if (w >= 30) return 'region';
+    if (w >= 27) return 'conference';
+    return null;
+  }
+
+  function appendAllTournamentsLink(section, href) {
+    if (!section || !href) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'fcc-tournament-section-link-wrap';
+    const link = document.createElement('a');
+    link.className = 'fcc-standings-full-link';
+    link.href = href;
+    link.textContent = 'See All Tournaments';
+    wrap.appendChild(link);
+    section.appendChild(wrap);
+  }
+
   /**
    * @param {HTMLElement} container
    * @param {object} topData - /franchise/command-center/data payload
-   * @param {{ userTeamId: string|null, teamIdToNameMap: object, teamIdMetaMap: object, mode: 'fcc'|'all', titleEl?: HTMLElement|null }} opts
+   * @param {{ userTeamId: string|null, teamIdToNameMap: object, teamIdMetaMap: object, mode: 'fcc'|'all', titleEl?: HTMLElement|null, allTournamentsHref?: string }} opts
    */
   function appendFranchiseBracketSections(container, topData, opts) {
     if (!container || !topData) return false;
@@ -274,6 +294,15 @@
     }
 
     appendSectionsToContainer(container, sections);
+
+    if (mode === 'fcc' && opts.allTournamentsHref) {
+      const activeTier = activeTierForWeek(week);
+      if (activeTier) {
+        const activeSection = container.querySelector(`.fcc-tournament-section[data-tb-tier="${activeTier}"]`);
+        if (activeSection) appendAllTournamentsLink(activeSection, opts.allTournamentsHref);
+      }
+    }
+
     return true;
   }
 

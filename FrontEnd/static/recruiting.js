@@ -30,6 +30,7 @@
       case 'height': return row.heightRaw;
       case 'weight': return row.weight != null ? row.weight : -1;
       case 'pos': return row.pos;
+      case 'year': return Recruiting.getYearSortValue(row.year);
       case 'rt': return row.rt != null ? row.rt : -1;
       case 'signed': return row.signedDisplay === '--' ? '' : row.signedDisplay;
       default: return row[key];
@@ -58,6 +59,8 @@
         heightRaw: Number(player.height) || 0,
         weight: player.weight,
         pos: player.pos || '--',
+        year: player.year || 'JH',
+        yearDisplay: Recruiting.formatYearAbbrev(player.year || 'JH'),
         attrs: (function () {
           var attrs = player.attributes || {};
           return {
@@ -101,6 +104,8 @@
           height: recruit.height,
           weight: recruit.weight,
           pos: recruit.pos,
+          year: recruit.year,
+          yearDisplay: recruit.yearDisplay,
           attrs: recruit.attrs,
           rt: recruit.rt,
           heightRaw: recruit.heightRaw,
@@ -130,6 +135,7 @@
       '<th data-sort-key="height">HT</th>',
       '<th data-sort-key="weight">WT</th>',
       '<th data-sort-key="pos">POS</th>',
+      '<th data-sort-key="year">YR</th>',
       '<th data-sort-key="SC">SC</th>',
       '<th data-sort-key="SH">SH</th>',
       '<th data-sort-key="ID">ID</th>',
@@ -149,9 +155,12 @@
   }
 
   function appendStandardRow(tbody, row, isWeek36) {
-    // RT colored per recruit RT scale (see /css/rt-buckets.css, getRecruitRtBucketClass).
-    var rtClass = typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(row.rt) : '';
+    // RT color scale: recruit breakpoints for JH, player breakpoints for FR/SO/JR.
+    var rtClass = typeof window.getRecruitRtBucketClassForYear === 'function'
+      ? window.getRecruitRtBucketClassForYear(row.rt, row.year)
+      : (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(row.rt) : '');
     var rtCell = '<td class="' + rtClass + '">' + (row.rt != null ? row.rt : '--') + '</td>';
+    var yearCell = '<td>' + (row.yearDisplay || '--') + '</td>';
     var tr = document.createElement('tr');
     tr.innerHTML = isWeek36 ? [
       '<td>' + row.name + '</td>',
@@ -159,6 +168,7 @@
       '<td>' + (row.height || '--') + '</td>',
       '<td>' + (row.weight != null ? row.weight : '--') + '</td>',
       '<td>' + (row.pos || '--') + '</td>',
+      yearCell,
       '<td>' + row.attrs.SC + '</td>',
       '<td>' + row.attrs.SH + '</td>',
       '<td>' + row.attrs.ID + '</td>',
@@ -179,6 +189,7 @@
       '<td>' + (row.height || '--') + '</td>',
       '<td>' + (row.weight != null ? row.weight : '--') + '</td>',
       '<td>' + (row.pos || '--') + '</td>',
+      yearCell,
       '<td>' + row.attrs.SC + '</td>',
       '<td>' + row.attrs.SH + '</td>',
       '<td>' + row.attrs.ID + '</td>',

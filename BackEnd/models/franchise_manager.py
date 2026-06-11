@@ -153,25 +153,59 @@ def get_franchise_name_assets() -> tuple[tuple[str, ...], tuple[str, ...], tuple
     return tuple(first_names), tuple(last_names), tuple(first_name_weights)
 
 
+# Recruit/walk-on year progression. JH never appears on an active roster:
+# signed recruits and walk-ons advance one step when they enter a roster.
+RECRUIT_YEAR_ADVANCE = {
+    "jh": "Freshman",
+    "freshman": "Sophomore",
+    "sophomore": "Junior",
+    "junior": "Senior",
+}
+
+
+def advance_recruit_year(year: str | None) -> str:
+    """Advance a recruit/walk-on year one step (JH→Freshman ... Junior→Senior)."""
+    return RECRUIT_YEAR_ADVANCE.get(str(year or "").strip().lower(), "Freshman")
+
+
+# Walk-on year roll weights and per-year generation ranges:
+# (attr_max, attr_cap, height_range, weight_range) — at most 3 attributes may exceed attr_cap.
+WALK_ON_YEAR_WEIGHTS = [("JH", 60), ("Freshman", 20), ("Sophomore", 10), ("Junior", 10)]
+WALK_ON_YEAR_PROFILES = {
+    "JH": (32, 29, (66, 72), (155, 179)),
+    "Freshman": (42, 39, (66, 74), (155, 189)),
+    "Sophomore": (52, 44, (67, 75), (165, 199)),
+    "Junior": (62, 49, (68, 77), (175, 209)),
+}
+
+
 def generate_walk_on_profile() -> dict:
-    """Generate a single walk-on player profile (low, small Freshman).
+    """Generate a single walk-on player profile.
 
     Shared by season-1 franchise init (3/team) and the week-35 roster fill.
-    Attributes roll 1–32 with at most 3 exceeding 29; archetype "Walk On".
+    Year rolls JH 60% / Freshman 20% / Sophomore 10% / Junior 10%; attribute,
+    height, and weight ranges scale with the rolled year. At most 3 attributes
+    may exceed the year's cap; archetype "Walk On".
     """
     from BackEnd.models.player import Player
     from BackEnd.utils.position_ratings import compute_position_ratings
 
     first_names, last_names, first_name_weights = get_franchise_name_assets()
+    year = random.choices(
+        [y for y, _ in WALK_ON_YEAR_WEIGHTS],
+        weights=[w for _, w in WALK_ON_YEAR_WEIGHTS],
+        k=1,
+    )[0]
+    attr_max, attr_cap, height_range, weight_range = WALK_ON_YEAR_PROFILES[year]
     attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
     attrs: dict = {}
-    over_29 = 0
+    over_cap = 0
     for key in attr_keys:
-        value = random.randint(1, 32)
-        if value > 29 and over_29 >= 3:
-            value = random.randint(1, 29)
-        if value > 29:
-            over_29 += 1
+        value = random.randint(1, attr_max)
+        if value > attr_cap and over_cap >= 3:
+            value = random.randint(1, attr_cap)
+        if value > attr_cap:
+            over_cap += 1
         attrs[key] = value
     attrs = Player.randomize_game_attributes(attrs)
     # Walk-ons get a tighter CH init (1–90) than the default 1–100; other ranges unchanged.
@@ -180,8 +214,8 @@ def generate_walk_on_profile() -> dict:
     first_name = choose_franchise_first_name(first_names, first_name_weights)
     last_name = random.choice(last_names).title()
     name = f"{first_name} {last_name}"
-    height = random.randint(66, 72)
-    weight = random.randint(155, 179)
+    height = random.randint(height_range[0], height_range[1])
+    weight = random.randint(weight_range[0], weight_range[1])
     position_ratings = compute_position_ratings(
         {"attributes": attrs, "height": height, "name": name},
         profile="recruit",
@@ -194,7 +228,7 @@ def generate_walk_on_profile() -> dict:
         "height": height,
         "weight": weight,
         "archetype": "Walk On",
-        "year": "Freshman",
+        "year": year,
         "Home Region": "",
     }
 
@@ -354,7 +388,10 @@ class FranchiseManager:
                         "team_id": str(team_obj_id) if team_obj_id is not None else None,
                         "height": wo["height"],
                         "weight": wo["weight"],
-                        "year": "Freshman",
+                        # Season-1 walk-ons land directly on an active roster, so the
+                        # rolled year is instantly upgraded one step (JH→Freshman, ...,
+                        # Junior→Senior); attributes were rolled from the pre-upgrade year.
+                        "year": advance_recruit_year(wo.get("year")),
                         "jersey": None,
                         "archetype": "Walk On",
                     },
@@ -933,12 +970,35 @@ class RecruitManager:
             logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
             self.first_name_weights = [1.0] * len(self.first_names)
 
+    def _roll_year_distribution(self, count):
+        """Roll the per-pool recruit year counts and return a shuffled list of years.
+
+        Junior = randint(5,15), Sophomore = randint(5,15), Freshman = randint(10,30),
+        JH = remainder of the pool. Sized for the canonical 300 pool but degrades
+        gracefully for smaller counts.
+        """
+        junior = random.randint(5, 15)
+        sophomore = random.randint(5, 15)
+        freshman = random.randint(10, 30)
+        years = (
+            ["Junior"] * junior
+            + ["Sophomore"] * sophomore
+            + ["Freshman"] * freshman
+        )
+        if len(years) >= count:
+            random.shuffle(years)
+            return years[:count]
+        years += ["JH"] * (count - len(years))
+        random.shuffle(years)
+        return years
+
     def generate_recruits_list(self, count=40):
         """Generate and return a list of recruits (does not save to DB)."""
         from BackEnd.utils.position_ratings import compute_position_ratings
-        
+
+        years = self._roll_year_distribution(count)
         recruits = []
-        for _ in range(count):
+        for year in years:
             first_name = choose_franchise_first_name(self.first_names, self.first_name_weights)
             last_name = random.choice(self.last_names)
             # Format last name to title case (only first letter capitalized)
@@ -948,8 +1008,8 @@ class RecruitManager:
             # Select archetype with weighted probabilities
             archetype = self._select_archetype()
             
-            # Generate attributes, height, and weight based on archetype
-            attributes, height, weight = self._generate_recruit_profile(archetype)
+            # Generate attributes, height, and weight based on archetype + year tiers
+            attributes, height, weight = self._generate_recruit_profile(archetype, year)
             
             # Randomize EM, CH, MO for recruits
             from BackEnd.models.player import Player
@@ -970,7 +1030,7 @@ class RecruitManager:
                 "height": height,
                 "weight": weight,
                 "archetype": archetype,
-                "year": "Freshman", 
+                "year": year,
                 "created_at": datetime.utcnow()
             })
         
@@ -1017,13 +1077,20 @@ class RecruitManager:
         
         return random.choices(archetypes, weights=weights, k=1)[0]
     
-    def _generate_recruit_profile(self, archetype):
-        """Generate attributes, height, and weight for a recruit based on archetype."""
-        # Define attribute ranges
-        STRONG = (20, 80)
-        SECONDARY = (10, 60)
-        STANDARD = (1, 40)
-        WEAK = (1, 20)
+    # Attribute tier ranges by recruit year: (STRONG, SECONDARY, STANDARD, WEAK).
+    # Older recruits roll higher floors and ceilings; heights stay archetype-based.
+    YEAR_TIER_RANGES = {
+        "JH": ((20, 80), (10, 60), (1, 40), (1, 20)),
+        "Freshman": ((30, 80), (20, 60), (10, 40), (10, 20)),
+        "Sophomore": ((40, 85), (30, 70), (10, 50), (10, 30)),
+        "Junior": ((60, 95), (40, 80), (10, 60), (10, 50)),
+    }
+
+    def _generate_recruit_profile(self, archetype, year="JH"):
+        """Generate attributes, height, and weight for a recruit based on archetype and year."""
+        STRONG, SECONDARY, STANDARD, WEAK = self.YEAR_TIER_RANGES.get(
+            year, self.YEAR_TIER_RANGES["JH"]
+        )
         
         # All attributes start as STANDARD
         ALL_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]

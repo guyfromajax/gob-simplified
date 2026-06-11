@@ -13,7 +13,9 @@ Single reference for **absolute clamp ranges** applied to player and team attrib
 | **Min** | 1 |
 | **Max** | None |
 
-Applies to all trainable player attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, CH). EM, MO, NG are not clamped by this system.
+Applies to all trainable player attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, CH). EM and NG are not clamped by this system.
+
+**MO (Momentum)** has its own hard bound, **−10 to +10**, enforced canonically on every `Player` load (`Player._extract_attributes` via `clamp_mo`, `BackEnd/models/player.py`) and at its write sites (init resets to 0; the Culture-Builder training bump clamps to the same range). So no persisted or legacy MO value can reach the engine/UI outside scale.
 
 ---
 

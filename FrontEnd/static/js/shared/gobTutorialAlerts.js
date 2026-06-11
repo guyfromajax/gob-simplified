@@ -10,12 +10,12 @@
   var ORDER = ['player-attributes', 'training', 'team-attributes', 'game-plans', 'playbooks', 'scouting', 'recruiting'];
 
   var LIVE = {
-    'player-attributes': '/player-attributes.html',
+    'player-attributes': '/tutorial-player-attributes.html',
     'training': '/tutorial-training.html',
-    'team-attributes': '/team-attributes.html',
-    'game-plans': '/game-plans.html',
+    'team-attributes': '/tutorial-team-attributes.html',
+    'game-plans': '/tutorial-game-plans.html',
     'playbooks': '/tutorial-playbooks.html',
-    'scouting': '/scouting.html',
+    'scouting': '/tutorial-scouting.html',
     'recruiting': '/tutorial-recruiting.html'
   };
 

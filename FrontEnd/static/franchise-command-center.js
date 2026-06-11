@@ -1070,7 +1070,7 @@ function buildHomeRecruitRowHtml(recruit) {
       <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
+      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
     </div>
   `;
   if (!isNewLeanRecruit(recruit)) return rowHtml;
@@ -1085,8 +1085,8 @@ function buildHomeRecruitRowHtml(recruit) {
 function buildFccInviteBlockHtml(recruit, week, wide) {
   if (!recruit) return '';
   const isAssigned = recruit.status === 'assigned';
-  const rtClass = typeof window.getRecruitRtBucketClass === 'function'
-    ? window.getRecruitRtBucketClass(recruit.rt)
+  const rtClass = typeof window.getRecruitRtBucketClassForYear === 'function'
+    ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year)
     : '';
   const weightDisplay = recruit.weight != null ? recruit.weight : '--';
   const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
@@ -1259,8 +1259,6 @@ function bindResourcesLinks() {
   if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
   const scheduleFullLink = document.getElementById('schedule-full-link');
   if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
-  const tournamentAllBracketsLink = document.getElementById('tournament-all-brackets-link');
-  if (tournamentAllBracketsLink) tournamentAllBracketsLink.href = `/brackets.html${q()}`;
   const tournamentScheduleLink = document.getElementById('tournament-schedule-link');
   if (tournamentScheduleLink) tournamentScheduleLink.href = `/schedule.html${q()}`;
   const statsNavBtn = document.getElementById('stats-nav-btn');
@@ -1766,7 +1764,7 @@ function renderFccRecruits() {
 
   if (useSignedRecruits) {
     if (!signedRecruitsDataCache.length) {
-      tbody.innerHTML = '<tr><td colspan="19">No recruits or walk-ons joined your team.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="20">No recruits or walk-ons joined your team.</td></tr>';
       return;
     }
     const rows = RecruitingCommon.sortRecruits(signedRecruitsDataCache, recruitSortState);
@@ -1780,6 +1778,7 @@ function renderFccRecruits() {
         '<td>' + recruit.height + '</td>',
         '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
         '<td>' + recruit.pos + '</td>',
+        '<td>' + (recruit.yearDisplay || '--') + '</td>',
         '<td>' + recruit.attrs.SC + '</td>',
         '<td>' + recruit.attrs.SH + '</td>',
         '<td>' + recruit.attrs.ID + '</td>',
@@ -1792,7 +1791,7 @@ function renderFccRecruits() {
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
+        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
       ].join('');
       tbody.appendChild(tr);
     });
@@ -1800,7 +1799,7 @@ function renderFccRecruits() {
   }
 
   if (!leanRecruitsDataCache.length) {
-    tbody.innerHTML = '<tr><td colspan="20">No recruits currently have your team on their lean list.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="21">No recruits currently have your team on their lean list.</td></tr>';
     return;
   }
   RecruitingCommon.renderRecruitTableRows(
@@ -1834,6 +1833,8 @@ function initFccRecruits(topData) {
       heightRaw: Number(player.height) || 0,
       weight: player.weight != null ? Number(player.weight) : null,
       pos: player.pos || '--',
+      year: player.year || 'JH',
+      yearDisplay: RecruitingCommon.formatYearAbbrev(player.year || 'JH'),
       rt: player.rt != null ? Number(player.rt) : null,
       leanDisplay: '',
       leanSortValue: '',
@@ -4629,6 +4630,7 @@ async function renderTournamentBracket() {
       teamIdMetaMap,
       mode: 'fcc',
       titleEl,
+      allTournamentsHref: buildResourceUrl('brackets.html'),
     });
   } else {
     container.innerHTML = '<p class="fcc-tournament-empty-msg">Bracket UI not loaded.</p>';

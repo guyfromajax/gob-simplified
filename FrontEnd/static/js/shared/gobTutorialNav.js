@@ -49,8 +49,8 @@
   function rememberOrigin() {
     try {
       var ref = document.referrer;
-      // any in-tutorial page (hub + per-topic sub-pages); extend as sub-pages ship
-      var fromTutorial = ref && /tutorial|player-attributes|tutorial-training|team-attributes|tutorial-recruiting|tutorial-playbooks|game-plans|scouting/i.test(ref);
+      // Tutorial hub (/tutorial.html) and every lesson sub-page (/tutorial-*.html).
+      var fromTutorial = ref && /\/tutorial[.-]/i.test(ref);
       // Only set origin if we arrived from OUTSIDE the tutorial and none stored yet
       if (ref && !fromTutorial && !sessionStorage.getItem(ORIGIN_KEY)) {
         sessionStorage.setItem(ORIGIN_KEY, ref);
@@ -123,17 +123,17 @@
   }
 
   function isLessonSubPage() {
-    return /\/(player-attributes|tutorial-training|team-attributes|game-plans|tutorial-playbooks|scouting|tutorial-recruiting)\.html$/i.test(location.pathname || '');
+    return /\/tutorial-(player-attributes|training|team-attributes|game-plans|playbooks|scouting|recruiting)\.html$/i.test(location.pathname || '');
   }
 
   var ALERT_RESUME_KEY = 'gob_tut_alert_resume';
   var PATH_TO_LESSON = {
-    '/player-attributes.html': 'player-attributes',
+    '/tutorial-player-attributes.html': 'player-attributes',
     '/tutorial-training.html': 'training',
-    '/team-attributes.html': 'team-attributes',
-    '/game-plans.html': 'game-plans',
+    '/tutorial-team-attributes.html': 'team-attributes',
+    '/tutorial-game-plans.html': 'game-plans',
     '/tutorial-playbooks.html': 'playbooks',
-    '/scouting.html': 'scouting',
+    '/tutorial-scouting.html': 'scouting',
     '/tutorial-recruiting.html': 'recruiting'
   };
 

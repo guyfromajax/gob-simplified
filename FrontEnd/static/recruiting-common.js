@@ -3,7 +3,22 @@
 
   var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
-  function recruitRtClass(rt) {
+  // Year sort order (youngest first) and table display abbreviations.
+  var YEAR_SORT_ORDER = { 'JH': 0, 'Freshman': 1, 'Sophomore': 2, 'Junior': 3, 'Senior': 4 };
+  var YEAR_ABBREV = { 'JH': 'JH', 'Freshman': 'FR', 'Sophomore': 'SO', 'Junior': 'JR', 'Senior': 'SR' };
+
+  function formatYearAbbrev(year) {
+    return YEAR_ABBREV[year] || (year ? String(year) : '--');
+  }
+
+  function getYearSortValue(year) {
+    return YEAR_SORT_ORDER[year] != null ? YEAR_SORT_ORDER[year] : -1;
+  }
+
+  function recruitRtClass(rt, year) {
+    if (typeof global.getRecruitRtBucketClassForYear === 'function') {
+      return global.getRecruitRtBucketClassForYear(rt, year);
+    }
     return typeof global.getRecruitRtBucketClass === 'function' ? global.getRecruitRtBucketClass(rt) : '';
   }
 
@@ -109,6 +124,8 @@
         heightRaw: Number(recruit.height) || 0,
         weight: recruit.weight != null ? Number(recruit.weight) : null,
         pos: best.pos || '--',
+        year: recruit.year || 'JH',
+        yearDisplay: formatYearAbbrev(recruit.year || 'JH'),
         rt: best.rating != null ? Number(best.rating) : null,
         lean: lean,
         leanDisplay: getLeanDisplay(lean, teamNameMap),
@@ -138,6 +155,7 @@
       case 'height': return recruit.heightRaw;
       case 'weight': return recruit.weight != null ? recruit.weight : -1;
       case 'pos': return recruit.pos;
+      case 'year': return getYearSortValue(recruit.year);
       case 'rt': return recruit.rt != null ? recruit.rt : -1;
       case 'lean': return recruit.leanSortValue;
       default: return recruit[key];
@@ -213,6 +231,7 @@
         '<td>' + recruit.height + '</td>',
         '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
         '<td>' + recruit.pos + '</td>',
+        '<td>' + recruit.yearDisplay + '</td>',
         '<td>' + recruit.attrs.SC + '</td>',
         '<td>' + recruit.attrs.SH + '</td>',
         '<td>' + recruit.attrs.ID + '</td>',
@@ -225,7 +244,7 @@
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + recruitRtClass(recruit.rt) + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
+        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
         '<td>' + (recruit.leanDisplay || '--') + '</td>',
         onActionClick ? '<td><button class="recruiting-row-action-btn" type="button">' + (getActionLabel ? getActionLabel(recruit, selectedIds.has(recruit.recruitId)) : '+') + '</button></td>' : ''
       ].join('');
@@ -266,6 +285,8 @@
   global.RecruitingCommon = {
     ATTR_KEYS: ATTR_KEYS,
     arraysEqual: arraysEqual,
+    formatYearAbbrev: formatYearAbbrev,
+    getYearSortValue: getYearSortValue,
     bindSortableHeaders: bindSortableHeaders,
     buildFccUrl: buildFccUrl,
     buildRecruitingUrl: buildRecruitingUrl,

@@ -185,6 +185,7 @@ def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch)
 
 
 def test_week35_team_score_applies_subtotal_then_lean_multiplier():
+    # subtotal = 1 (top grid) + 10 (assigned) + 15 (PT, <=2 offers) = 26; lean #1 -> x5
     score = franchise_routes._week_35_team_score(
         "team-1",
         {"points": 10, "scholarship": False, "playing_time": True},
@@ -193,7 +194,7 @@ def test_week35_team_score_applies_subtotal_then_lean_multiplier():
         pt_offer_count=2,
     )
 
-    assert score == 90
+    assert score == 130
 
 
 def test_save_recruiting_orders_week35_rejects_points_over_budget(monkeypatch):
@@ -219,8 +220,8 @@ def test_save_recruiting_orders_week35_rejects_points_over_budget(monkeypatch):
             franchise_routes.SaveRecruitingOrdersRequest(
                 franchise_id=franchise_id,
                 order_entries=[
-                    {"id": "r1", "points": 12, "scholarship": True, "playing_time": False},
-                    {"id": "r2", "points": 9, "scholarship": False, "playing_time": False},
+                    {"id": "r1", "points": 30, "scholarship": True, "playing_time": False},
+                    {"id": "r2", "points": 25, "scholarship": False, "playing_time": False},
                 ],
             ),
             user={"user_id": "test-user-123"},
@@ -228,4 +229,4 @@ def test_save_recruiting_orders_week35_rejects_points_over_budget(monkeypatch):
         assert False, "Expected HTTPException for over-budget recruiting points"
     except franchise_routes.HTTPException as exc:
         assert exc.status_code == 400
-        assert "20 total recruiting points" in exc.detail
+        assert "50 total recruiting points" in exc.detail

@@ -621,7 +621,8 @@ def apply_training_points(
             em_improvement = random.randint(2, 5)
             mo_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
-            attrs["MO"] = min(10, attrs.get("MO", 0) + mo_improvement)
+            # MO is bounded to its defined scale: -10 (floor) to +10 (cap).
+            attrs["MO"] = max(-10, min(10, attrs.get("MO", 0) + mo_improvement))
             # Update anchors
             attrs["anchor_EM"] = attrs["EM"]
             attrs["anchor_MO"] = attrs["MO"]

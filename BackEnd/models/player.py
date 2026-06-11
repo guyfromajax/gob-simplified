@@ -7,6 +7,19 @@ import random
 
 DEBUG_SERIALIZATION = os.getenv("DEBUG_SERIALIZATION")
 
+# MO (Momentum) is defined on a fixed -10..+10 scale (see Player_Attribute_System.md
+# / Attribute_Clamp_System.md). This is the canonical hard bound, enforced on every
+# Player load so no persisted/legacy value can ever exceed the scale.
+MO_MIN, MO_MAX = -10, 10
+
+
+def clamp_mo(value):
+    """Clamp a Momentum value to its defined -10..+10 scale (0 on bad input)."""
+    try:
+        return max(MO_MIN, min(MO_MAX, int(value)))
+    except (TypeError, ValueError):
+        return 0
+
 
 class Player:
     def __init__(self, data):
@@ -42,7 +55,12 @@ class Player:
         if not attr_data:
             attr_data = {k: data.get(k, 0) for k in ALL_ATTRS}
         attrs = {k: attr_data.get(k, 0) for k in ALL_ATTRS}
-        
+
+        # Hard-bound MO to its defined scale before anchors are derived, so every
+        # Player the engine/UI uses (and any value re-persisted from one) stays in range.
+        if "MO" in attrs:
+            attrs["MO"] = clamp_mo(attrs["MO"])
+
         for k in list(attrs):
             attrs[f"anchor_{k}"] = attrs[k]
 

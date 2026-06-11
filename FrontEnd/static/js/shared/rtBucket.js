@@ -6,6 +6,8 @@
  *
  * Recruit RT (recruiting surfaces): getRecruitRtBucketClass
  *   0–29  red, 30–39 yellow, 40–49 green, 50+ blue
+ *   Applies to JH recruits only — FR/SO/JR recruits use the player scale
+ *   (getRecruitRtBucketClassForYear handles the year switch).
  *
  * Loaded as a classic script (no module export) for ES modules and IIFE pages.
  */
@@ -28,6 +30,13 @@
     return 'rt-elite';
   }
 
+  function getRecruitRtBucketClassForYear(rt, year) {
+    var normalized = String(year || 'JH').trim().toUpperCase();
+    if (normalized === 'JH') return getRecruitRtBucketClass(rt);
+    return getRtBucketClass(rt);
+  }
+
   global.getRtBucketClass = getRtBucketClass;
   global.getRecruitRtBucketClass = getRecruitRtBucketClass;
+  global.getRecruitRtBucketClassForYear = getRecruitRtBucketClassForYear;
 })(typeof window !== 'undefined' ? window : this);

@@ -1249,6 +1249,13 @@ body.has-auth-bar #franchise-container {
   color: #f7f9ff;
 }
 
+.fcc-tournament-section-link-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding: 0 4px 4px;
+}
+
 .fcc-tb-tier-body {
   width: 100%;
   min-width: 0;

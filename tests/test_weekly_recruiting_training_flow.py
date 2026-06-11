@@ -40,9 +40,12 @@ def test_team_was_newly_added_to_lean_detects_additions_not_rank_moves():
     team_id = "team-a"
     prior = {"1": "team-b", "2": None, "3": None}
     added = {"1": "team-b", "2": team_id, "3": None}
-    moved_up = {"1": team_id, "2": "team-b", "3": None}
     assert franchise_routes._team_was_newly_added_to_lean(prior, added, team_id) is True
-    assert franchise_routes._team_was_newly_added_to_lean(prior, moved_up, team_id) is False
+
+    # Rank move: team-a was already on the list and moved up — not a new addition.
+    prior_with_team = {"1": "team-b", "2": team_id, "3": None}
+    moved_up = {"1": team_id, "2": "team-b", "3": None}
+    assert franchise_routes._team_was_newly_added_to_lean(prior_with_team, moved_up, team_id) is False
 
 
 def test_fcc_current_week_invite_recruit_skips_outside_window_and_processed_weeks(monkeypatch):
@@ -104,6 +107,7 @@ def test_fcc_current_week_invite_recruit_returns_assigned_visit_after_processing
         "archetype": "Shooter",
         "height": "6'3\"",
         "weight": 195,
+        "year": "JH",
         "rt": 52,
         "status": "assigned",
     }
@@ -153,6 +157,7 @@ def test_fcc_current_week_invite_recruit_returns_top_remaining_order(monkeypatch
         "archetype": "Slasher",
         "height": "6'5\"",
         "weight": 210,
+        "year": "JH",
         "rt": 44,
         "status": "pending",
     }

@@ -18,7 +18,7 @@
   var availableRosterSpots = 0;
   var mode = 'visits';
   var userTeamId = context.teamId || '';
-  var WEEK_35_POINTS_BUDGET = 20;
+  var WEEK_35_POINTS_BUDGET = 50;
   var FILTER_STORAGE_KEY = 'gob-recruiting-orders-v2-filters';
 
   window.addEventListener('pageshow', function (event) {
@@ -363,6 +363,7 @@
         '<td>' + escapeHtml(recruit.height) + '</td>',
         '<td>' + (recruit.weight != null ? escapeHtml(recruit.weight) : '--') + '</td>',
         '<td>' + escapeHtml(recruit.pos) + '</td>',
+        '<td>' + escapeHtml(recruit.yearDisplay) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.SC) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.SH) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.ID) + '</td>',
@@ -375,7 +376,7 @@
         '<td>' + escapeHtml(recruit.attrs.ND) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.IQ) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.FT) + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
+        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
         '<td>' + getLeanCellHtml(recruit) + '</td>',
         '<td>' + (rank
           ? '<button class="picked-rank-badge" type="button" data-action="scroll-to-pick" data-recruit-id="' + escapeHtml(recruit.recruitId) + '">' + rank + '</button>'
@@ -384,7 +385,7 @@
       tbody.appendChild(tr);
     });
     if (!sorted.length) {
-      tbody.innerHTML = '<tr><td colspan="21">No recruits match the current filters.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="22">No recruits match the current filters.</td></tr>';
     }
     tbody.querySelectorAll('button[data-action="add-recruit"]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
@@ -421,6 +422,7 @@
         '<th>HT</th>',
         '<th>WT</th>',
         '<th>POS</th>',
+        '<th>YR</th>',
         '<th>RT</th>',
         '<th>Current Lean</th>',
         '<th>Points</th>',
@@ -439,6 +441,7 @@
       '<th>Home Region</th>',
       '<th>Archetype</th>',
       '<th>Pos</th>',
+      '<th>YR</th>',
       '<th>RT</th>',
       '<th>Current Lean</th>',
       '<th>Adjust</th>',
@@ -470,7 +473,8 @@
       '<td>' + (recruit ? recruit.height : '--') + '</td>',
       '<td>' + (recruit && recruit.weight != null ? recruit.weight : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
-      '<td class="' + (recruit && typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td>' + (recruit ? recruit.yearDisplay : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
@@ -486,7 +490,8 @@
       '<td>' + (recruit ? recruit.homeRegion : '--') + '</td>',
       '<td>' + (recruit ? recruit.archetype : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
-      '<td class="' + (recruit && typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td>' + (recruit ? recruit.yearDisplay : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
@@ -568,7 +573,7 @@
       '<div class="slot-grip" aria-hidden="true">' + buildGripHtml() + '</div>',
       '<div class="slot-body">',
       '<div class="slot-name" title="' + escapeHtml(recruit.name) + '">' + formatInviteListNameDisplay(recruit.name) + '</div>',
-      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt ' + (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(recruit.rt) : '') + '">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
+      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.yearDisplay) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt ' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
       '</div>',
       isUserInLeanTopThree(recruit) ? '<span class="lean-dot is-solid" aria-label="Your team is on this recruit\u2019s lean list"></span>' : '<span></span>',
       '<button class="slot-remove" type="button" data-action="remove" data-index="' + index + '" aria-label="Remove ' + escapeHtml(recruit.name) + '">×</button>'
@@ -1036,7 +1041,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ franchise_id: context.franchiseId })
       }).then(function () {
-        navigateAway(Recruiting.buildRecruitingUrl('recruiting.html', context, { from: 'fcc' }));
+        // Land on the FCC so the recruiting-results modal (first FCC entry
+        // after week-35 signings) announces the user's signed recruits.
+        navigateAway(Recruiting.buildFccUrl(context));
       }).catch(function (err) {
         console.error(err);
         runBtn.textContent = 'Run Recruiting';
@@ -1118,7 +1125,7 @@
 
   function init() {
     if (!context.franchiseId || !context.teamId) {
-      document.getElementById('recruits-body').innerHTML = '<tr><td colspan="21">Missing franchise context.</td></tr>';
+      document.getElementById('recruits-body').innerHTML = '<tr><td colspan="22">Missing franchise context.</td></tr>';
       return;
     }
 
@@ -1178,7 +1185,7 @@
       })
       .catch(function (err) {
         console.error(err);
-        document.getElementById('recruits-body').innerHTML = '<tr><td colspan="21">Failed to load recruits.</td></tr>';
+        document.getElementById('recruits-body').innerHTML = '<tr><td colspan="22">Failed to load recruits.</td></tr>';
       });
   }
 

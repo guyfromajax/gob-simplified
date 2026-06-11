@@ -97,7 +97,7 @@ RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 FCC_PENDING_NEW_LEAN_RECRUITS_FIELD = "fcc_pending_new_lean_recruit_ids"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 AWARDS_FIELD = "awards"
-WEEK_35_RECRUITING_POINTS_BUDGET = 20
+WEEK_35_RECRUITING_POINTS_BUDGET = 50
 SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
 RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
 RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
@@ -2409,6 +2409,7 @@ def _build_recruiting_results_modal_payload(
                 "archetype": player.get("archetype") or "--",
                 "height": player.get("height"),
                 "weight": player.get("weight"),
+                "year": player.get("year") or "JH",
                 "rt": player.get("rt"),
             }
         )
@@ -7008,6 +7009,7 @@ def _fcc_recruit_invite_payload(
         "archetype": recruit_doc.get("archetype") or "--",
         "height": format_height(recruit_doc.get("height")) or "--",
         "weight": int(weight) if isinstance(weight, (int, float)) else None,
+        "year": recruit_doc.get("year") or "JH",
         "rt": _recruit_rt(recruit_doc),
         "status": status,
     }
@@ -7379,11 +7381,11 @@ def _apply_team_to_recruit_performance_lean(lean_doc: dict | None, team_id: str)
 def _game_performance_lean_chances_for_week(week: int) -> dict[str, tuple[float, float]] | None:
     """Returns win and quality_loss (low_rt, high_rt) probability pairs; None if not a performance-lean week."""
     if 1 <= week <= 10:
-        return {"win": (0.50, 0.25), "quality_loss": (0.25, 0.15)}
+        return {"win": (0.60, 0.40), "quality_loss": (0.40, 0.20)}
     if 11 <= week <= 15:
-        return {"win": (0.60, 0.50), "quality_loss": (0.30, 0.25)}
+        return {"win": (0.70, 0.50), "quality_loss": (0.40, 0.25)}
     if 16 <= week <= 19:
-        return {"win": (0.70, 0.60), "quality_loss": (0.35, 0.30)}
+        return {"win": (0.80, 0.60), "quality_loss": (0.50, 0.30)}
     if 27 <= week <= 34:
         return {"win": (0.90, 0.75), "quality_loss": (0.60, 0.50)}
     return None
@@ -7868,6 +7870,7 @@ def _build_recruiting_results_payload(franchise_doc: dict, week: int) -> dict:
                         "height": recruit_doc.get("height"),
                         "weight": recruit_doc.get("weight"),
                         "pos": best_pos.get("pos", "--"),
+                        "year": recruit_doc.get("year") or "JH",
                         "rt": best_pos.get("rating"),
                     }
                 team_rows.append({
@@ -8515,7 +8518,9 @@ def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: di
         "home_region": recruit_doc.get("Home Region", "--"),
         "height": recruit_doc.get("height"),
         "weight": recruit_doc.get("weight"),
-        "year": "Freshman",
+        # Carry the rolled year through signing (recruits and walk-ons both roll a
+        # year at generation); it advances one step at the season transition.
+        "year": recruit_doc.get("year") or "JH",
         "position_ratings": (recruit_doc.get("position_ratings") or {}).copy(),
         "attributes": (recruit_doc.get("attributes") or {}).copy(),
         "pos": best_pos.get("pos", "--"),
@@ -8600,12 +8605,15 @@ def _build_cpu_week_35_orders(
 
     points_remaining = WEEK_35_RECRUITING_POINTS_BUDGET
     if selected_low:
-        assigned = add_points_to_entry(selected_low[0].get("recruit_id"), 1)
+        assigned = add_points_to_entry(
+            random.choice(selected_low).get("recruit_id"),
+            min(points_remaining, 3),
+        )
         points_remaining -= assigned
     if selected_high and points_remaining > 0:
         assigned = add_points_to_entry(
             random.choice(selected_high).get("recruit_id"),
-            min(points_remaining, random.randint(1, 3)),
+            min(points_remaining, random.randint(5, 7)),
         )
         points_remaining -= assigned
 
@@ -8647,16 +8655,35 @@ def _build_cpu_week_35_orders(
                 entry["points"] += base + (1 if index < extra else 0)
             points_remaining = 0
         else:
-            lead_pool = lean_entries[:3]
-            chosen = random.choice(lead_pool)
-            lead_points = math.floor(points_remaining * 0.6)
-            remainder = points_remaining - lead_points
-            chosen["points"] += lead_points
-            others = lean_entries
-            base = remainder // len(others)
-            extra = remainder % len(others)
-            for index, entry in enumerate(others):
-                entry["points"] += base + (1 if index < extra else 0)
+            # 4+ lean players:
+            # (a) 40-60% of remaining points to one of the 4 highest RT lean players
+            first_pct = random.randint(40, 60)
+            first_points = math.floor(points_remaining * first_pct / 100)
+            first_chosen = random.choice(lean_entries[:4])
+            first_chosen["points"] += first_points
+            points_remaining -= first_points
+            chunk_recipients = {id(first_chosen)}
+            # (b) if the roll in (a) was < 50%, a second 40-60% chunk of the
+            # still-remaining points goes to one of the 3 highest RT remaining
+            if first_pct < 50 and points_remaining > 0:
+                remaining_sorted = [entry for entry in lean_entries if id(entry) not in chunk_recipients]
+                second_points = math.floor(points_remaining * random.randint(40, 60) / 100)
+                second_chosen = random.choice(remaining_sorted[:3])
+                second_chosen["points"] += second_points
+                points_remaining -= second_points
+                chunk_recipients.add(id(second_chosen))
+            # (c) shuffle the remaining lean players and deal 1-4 points each until
+            # exhausted; leftover after the full list goes to one random lean player
+            dealt_pool = [entry for entry in lean_entries if id(entry) not in chunk_recipients]
+            random.shuffle(dealt_pool)
+            for entry in dealt_pool:
+                if points_remaining <= 0:
+                    break
+                deal = min(points_remaining, random.randint(1, 4))
+                entry["points"] += deal
+                points_remaining -= deal
+            if points_remaining > 0:
+                random.choice(lean_entries)["points"] += points_remaining
             points_remaining = 0
     return _normalize_week_35_recruiting_orders(entries)
 
@@ -8777,9 +8804,9 @@ def _week_35_team_score(
     subtotal = 1 + assigned_points
     if entry.get("playing_time"):
         if 1 <= pt_offer_count <= 2:
-            subtotal += 7
+            subtotal += 15
         elif pt_offer_count > 2:
-            subtotal += 4
+            subtotal += 7
     multiplier = 1
     if lean.get("1") == team_id:
         multiplier = 5
@@ -9017,7 +9044,10 @@ def save_recruiting_orders(
         if any(recruit_id not in valid_recruit_ids for recruit_id in recruit_ids):
             raise HTTPException(status_code=400, detail="Recruiting orders include an invalid recruit id")
         if sum(int(entry.get("points", 0) or 0) for entry in order_entries) > WEEK_35_RECRUITING_POINTS_BUDGET:
-            raise HTTPException(status_code=400, detail="Recruiting orders cannot exceed 20 total recruiting points")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Recruiting orders cannot exceed {WEEK_35_RECRUITING_POINTS_BUDGET} total recruiting points",
+            )
 
         orders_payload = _normalize_week_35_recruiting_orders(order_entries)
         franchise_team_data_collection.update_one(
@@ -11710,6 +11740,7 @@ def finish_season(req: FinishSeasonRequest):
     def advance_year(year_value: str | None) -> str:
         year = str(year_value or "").strip().lower()
         mapping = {
+            "jh": "Freshman",
             "freshman": "Sophomore",
             "sophomore": "Junior",
             "junior": "Senior",
@@ -11776,7 +11807,9 @@ def finish_season(req: FinishSeasonRequest):
                 "team_id": team_id,
                 "height": signed_player.get("height"),
                 "weight": signed_player.get("weight"),
-                "year": "Freshman",
+                # Signed recruits/walk-ons enter the roster advanced one year:
+                # JH -> Freshman, ..., Junior -> Senior.
+                "year": advance_year(signed_player.get("year")),
                 "jersey": signed_player.get("jersey"),
                 "archetype": signed_player.get("archetype"),
             },

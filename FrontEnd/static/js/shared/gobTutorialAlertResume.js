@@ -9,12 +9,12 @@
   var VALID_ENTRY_SOURCES = { 'tutorial-alert': true, 'training-page': true };
 
   var PATH_TO_LESSON = {
-    '/player-attributes.html': 'player-attributes',
+    '/tutorial-player-attributes.html': 'player-attributes',
     '/tutorial-training.html': 'training',
-    '/team-attributes.html': 'team-attributes',
-    '/game-plans.html': 'game-plans',
+    '/tutorial-team-attributes.html': 'team-attributes',
+    '/tutorial-game-plans.html': 'game-plans',
     '/tutorial-playbooks.html': 'playbooks',
-    '/scouting.html': 'scouting',
+    '/tutorial-scouting.html': 'scouting',
     '/tutorial-recruiting.html': 'recruiting'
   };
 
