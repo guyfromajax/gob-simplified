@@ -353,6 +353,7 @@
     wrap.className = 'fcc-tb-mu-wrap';
     var card = document.createElement('div');
     card.className = 'fcc-tb-mu';
+    if (opts.championship) card.classList.add('fcc-tb-mu--championship');
 
     if (!m) {
       card.classList.add('fcc-tb-mu--tbd');
@@ -366,8 +367,12 @@
     var aid = m.away_team;
     var chipH = natChips ? natChips[String(hid)] : null;
     var chipA = natChips ? natChips[String(aid)] : null;
-    var homeIsBye = String(hid) === BYE_SENTINEL || isByeId(hid);
-    var awayIsBye = String(aid) === BYE_SENTINEL || isByeId(aid);
+    // Byes only exist in the first round. For later/upcoming rounds (e.g. the
+    // region championship awaiting its finalists) empty slots must read as TBD,
+    // never "BYE".
+    var suppressBye = !!opts.suppressBye;
+    var homeIsBye = !suppressBye && (String(hid) === BYE_SENTINEL || isByeId(hid));
+    var awayIsBye = !suppressBye && (String(aid) === BYE_SENTINEL || isByeId(aid));
 
     if (!isRealTeamId(hid) && !isRealTeamId(aid) && !homeIsBye && !awayIsBye) {
       card.classList.add('fcc-tb-mu--tbd');
@@ -396,8 +401,6 @@
     if ((topSlot.isUser || botSlot.isUser) && !card.classList.contains('fcc-tb-mu--tbd')) {
       card.classList.add('fcc-tb-mu--user');
     }
-    if (opts.championship) card.classList.add('fcc-tb-mu--championship');
-
     card.appendChild(createTeamRowEl(topSlot, userTeamId));
     card.appendChild(createTeamRowEl(botSlot, userTeamId));
     if (!opts.revealMode) {
@@ -746,8 +749,8 @@
     var fin = bracket.final && bracket.final[0] ? bracket.final[0] : null;
     var slotOpts = { revealMode: revealMode };
     var finOpts = revealMode
-      ? { championship: true, revealMode: true }
-      : { championship: true, showCrown: true, showChampion: true, revealMode: false };
+      ? { championship: true, revealMode: true, suppressBye: true }
+      : { championship: true, showCrown: true, showChampion: true, revealMode: false, suppressBye: true };
 
     var frame = document.createElement('div');
     frame.className = 'fcc-tb-region fcc-tb-region--full fcc-tb-enter';
@@ -760,16 +763,21 @@
     c0.appendChild(createMatchupEl(r1[1], seeds, teamIdToNameMap, teamIdMetaMap, userTeamId, rankMap, null, slotOpts));
 
     var c1 = document.createElement('div');
-    c1.className = 'fcc-tb-region-col';
+    c1.className = 'fcc-tb-region-col fcc-tb-region-col--champ';
     c1.appendChild(colHeadDual('WEEK 31 · CHAMPIONSHIP'));
-    c1.appendChild(buildTrophyBlock('★ REGION ★'));
+    // Trophy + championship matchup (+ nameplate) live in a body that fills the
+    // column and centers vertically against the two round-1 matchups on the left.
+    var champBody = document.createElement('div');
+    champBody.className = 'fcc-tb-region-champ-body';
+    champBody.appendChild(buildTrophyBlock('★ REGION ★'));
     var champWrap = document.createElement('div');
     champWrap.className = 'fcc-tb-mu-wrap fcc-tb-mu-wrap--champ fcc-tb-mu-wrap--region4-champ';
     champWrap.appendChild(
       createMatchupEl(fin, seeds, teamIdToNameMap, teamIdMetaMap, userTeamId, rankMap, null, finOpts)
     );
-    c1.appendChild(champWrap);
-    if (!revealMode) appendChampionNameplate(c1, fin, tier, teamIdToNameMap);
+    champBody.appendChild(champWrap);
+    if (!revealMode) appendChampionNameplate(champBody, fin, tier, teamIdToNameMap);
+    c1.appendChild(champBody);
 
     var c2 = document.createElement('div');
     c2.className = 'fcc-tb-region-col fcc-tb-region-col--spacer';

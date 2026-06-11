@@ -1623,6 +1623,18 @@ body.has-auth-bar #franchise-container {
   min-width: 0;
 }
 
+/* Championship column: header stays top-aligned with ROUND 1; the trophy +
+   championship matchup fill the remaining height and center vertically against
+   the two round-1 matchups on the left. */
+.fcc-tb-region-champ-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+}
+
 .fcc-tb-region-col--solo {
   max-width: 420px;
   margin: 0 auto;
