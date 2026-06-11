@@ -573,6 +573,29 @@ input[type="reset"] {
   min-width: 1360px;
 }
 
+/* Pin the action (Add / rank) column to the right edge so it's never clipped
+   on narrow widths or while the stat columns scroll horizontally. Scoped to the
+   recruit-pool table only — the shared gob-data-grid macro is untouched.
+   Targets column 22 by position so the full-width empty-state cell is skipped.
+   The .gob-data-grid co-selector raises specificity above the macro's
+   odd-row / :hover backgrounds so scrolled cells can't bleed through. */
+.recruiting-table.gob-data-grid thead th:nth-child(22),
+.recruiting-table.gob-data-grid tbody td:nth-child(22) {
+  position: sticky;
+  right: 0;
+  background: #1f2534;
+  box-shadow: -10px 0 12px -8px rgba(0, 0, 0, 0.35);
+}
+
+.recruiting-table.gob-data-grid thead th:nth-child(22) {
+  z-index: 3; /* above other sticky headers (macro z-index: 2) */
+  background: #262b3b;
+}
+
+.recruiting-table.gob-data-grid tbody td:nth-child(22) {
+  z-index: 1;
+}
+
 .orders-grid-table {
   width: 100%;
   min-width: 980px;
