@@ -9182,6 +9182,7 @@ def get_recruiting_data(
         "saved_order_entries_week_35": _week_35_order_entries(saved_week_35_orders),
         "available_roster_spots": _calculate_available_roster_spots(fid, user_team_id),
         "available_scholarships": _calculate_available_scholarships(fid, user_team_id),
+        "week_35_points_budget": WEEK_35_RECRUITING_POINTS_BUDGET,
         "recruits": recruits,
         "team_name_map": team_name_map,
         "week_35_recruiting_results": week_35_results,

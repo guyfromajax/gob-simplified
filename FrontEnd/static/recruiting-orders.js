@@ -20,6 +20,14 @@
   var userTeamId = context.teamId || '';
   var WEEK_35_POINTS_BUDGET = 50;
   var FILTER_STORAGE_KEY = 'gob-recruiting-orders-v2-filters';
+  // Focus-list (week 35) ordering: 'custom' (manual drag/arrow) or a sorted column.
+  var focusSortState = { key: null, direction: null };
+  var orderMode = 'custom';
+  var FOCUS_SORT_NUMERIC = { rt: 1, points: 1, height: 1, weight: 1 };
+  var FOCUS_SORT_LABELS = {
+    name: 'Recruit', homeRegion: 'Region', archetype: 'Archetype', height: 'HT',
+    weight: 'WT', pos: 'POS', year: 'YR', rt: 'RT', lean: 'Lean', points: 'Points'
+  };
 
   window.addEventListener('pageshow', function (event) {
     if (event.persisted) {
@@ -210,15 +218,33 @@
     var saveBtn = document.getElementById('save-btn');
     var runBtn = document.getElementById('run-btn');
     var hasCurrent = currentEntries.length > 0;
-    var hasSaved = savedEntries.length > 0;
+
+    if (isWeek35Mode()) {
+      // Saved state = current list matches what's saved on the server AND non-empty.
+      var savedClean = hasCurrent && savedEntries.length > 0 && !hasUnsavedChanges();
+      if (savedClean) {
+        saveBtn.textContent = 'Saved ✓';
+        saveBtn.disabled = true;
+        saveBtn.classList.add('is-saved');
+        saveBtn.classList.remove('is-dead');
+      } else {
+        saveBtn.textContent = 'Save Orders';
+        saveBtn.disabled = !hasCurrent;
+        saveBtn.classList.toggle('is-dead', !hasCurrent);
+        saveBtn.classList.remove('is-saved');
+      }
+      // Run is gated on a clean save (no unsaved changes) with ≥1 recruit.
+      runBtn.style.display = 'inline-flex';
+      runBtn.disabled = !savedClean;
+      runBtn.classList.toggle('is-dead', !savedClean);
+      return;
+    }
+
     saveBtn.textContent = 'Save Orders';
     saveBtn.disabled = !hasCurrent;
     saveBtn.classList.toggle('is-dead', !hasCurrent);
-    runBtn.style.display = isWeek35Mode() ? 'inline-flex' : 'none';
-    if (isWeek35Mode()) {
-      runBtn.disabled = !(hasCurrent || hasSaved);
-      runBtn.classList.toggle('is-dead', !(hasCurrent || hasSaved));
-    }
+    saveBtn.classList.remove('is-saved');
+    runBtn.style.display = 'none';
   }
 
   function getSelectedIds() {
@@ -265,21 +291,29 @@
     var poolTitle = document.getElementById('recruit-pool-title');
     var poolFiltersEl = document.getElementById('recruit-pool-filters');
     var picksToggle = document.getElementById('show-only-picks-toggle');
+    var focusDock = document.getElementById('focus-budget-dock');
     if (table) table.classList.toggle('orders-grid-table-week36', isWeek35Mode());
     if (isWeek35Mode()) {
       if (title) title.textContent = 'Recruiting Focus List';
-      if (help) help.textContent = '';
-      if (status) status.textContent = 'Available Roster Spots: ' + availableRosterSpots + ', Points Remaining: ' + getWeek35PointsRemaining();
-      if (visitsDock) visitsDock.hidden = true;
+      if (help) help.textContent = 'Rank recruits, assign points, and set playing time. Click any column header to sort; drag or use the arrows for a custom order.';
+      if (status) status.textContent = '';
+      if (focusDock) focusDock.hidden = false;
+      // .recruiting-visits-dock-contents sets display:contents, which overrides
+      // the [hidden] attribute — force-hide with an inline style in week 35.
+      if (visitsDock) { visitsDock.hidden = true; visitsDock.style.display = 'none'; }
       if (ordersTableSection) ordersTableSection.hidden = false;
       if (poolTitle) poolTitle.textContent = 'All Recruits';
       if (poolFiltersEl) poolFiltersEl.hidden = true;
       if (picksToggle) picksToggle.hidden = true;
+      updateFocusBudget();
+      updateOrderStatus();
+      applyFocusCaret();
     } else {
       if (title) title.textContent = 'Recruiting Orders';
       if (help) help.textContent = '';
       if (status) status.textContent = '';
-      if (visitsDock) visitsDock.hidden = false;
+      if (focusDock) focusDock.hidden = true;
+      if (visitsDock) { visitsDock.hidden = false; visitsDock.style.display = ''; }
       if (ordersTableSection) ordersTableSection.hidden = true;
       if (poolTitle) poolTitle.textContent = 'Recruit Pool';
       if (poolFiltersEl) poolFiltersEl.hidden = false;
@@ -295,6 +329,156 @@
 
   function getWeek35PointsRemaining() {
     return Math.max(0, WEEK_35_POINTS_BUDGET - getWeek35AssignedPoints());
+  }
+
+  /* ---- Focus list (week 35): column sorting + Order status ---- */
+
+  function bindFocusSortHeaders() {
+    var table = document.getElementById('orders-grid-table');
+    if (!table) return;
+    table.querySelectorAll('thead th[data-sort-key]').forEach(function (th) {
+      if (th.dataset.focusBound === '1') return;
+      th.dataset.focusBound = '1';
+      th.addEventListener('click', function () {
+        applyFocusSort(th.dataset.sortKey);
+      });
+    });
+  }
+
+  function applyFocusCaret() {
+    var table = document.getElementById('orders-grid-table');
+    if (!table) return;
+    table.querySelectorAll('thead th[data-sort-key]').forEach(function (th) {
+      var active = orderMode === 'sorted' && th.dataset.sortKey === focusSortState.key;
+      th.classList.toggle('sorted', active);
+      th.classList.toggle('sorted-asc', active && focusSortState.direction === 'asc');
+      th.classList.toggle('sorted-desc', active && focusSortState.direction === 'desc');
+    });
+  }
+
+  // Reorder currentEntries by a recruit field (or entry points). The array order
+  // IS the priority, so this also renumbers priority on the next render.
+  function sortCurrentEntriesBy(key, direction) {
+    if (key === 'points') {
+      currentEntries.sort(function (a, b) {
+        var av = Number((a || {}).points || 0);
+        var bv = Number((b || {}).points || 0);
+        return direction === 'asc' ? av - bv : bv - av;
+      });
+      return;
+    }
+    var byId = {};
+    currentEntries.forEach(function (entry) { byId[entry.id] = entry; });
+    var recruitList = currentEntries
+      .map(function (entry) { return recruitMap[entry.id]; })
+      .filter(Boolean);
+    var sorted = Recruiting.sortRecruits(recruitList, { key: key, direction: direction });
+    currentEntries = sorted
+      .map(function (recruit) { return byId[recruit.recruitId]; })
+      .filter(Boolean);
+  }
+
+  function applyFocusSort(key) {
+    if (!key) return;
+    if (focusSortState.key !== key) {
+      focusSortState.key = key;
+      // First click: numeric high→low, text A→Z.
+      focusSortState.direction = FOCUS_SORT_NUMERIC[key] ? 'desc' : 'asc';
+    } else {
+      focusSortState.direction = focusSortState.direction === 'asc' ? 'desc' : 'asc';
+    }
+    orderMode = 'sorted';
+    sortCurrentEntriesBy(focusSortState.key, focusSortState.direction);
+    Recruiting.playSound('click-tiny.wav');
+    rerender();
+  }
+
+  // Any manual reorder (drag / arrow / add) drops back to Custom + clears caret.
+  function setCustomOrder() {
+    orderMode = 'custom';
+    focusSortState.key = null;
+    focusSortState.direction = null;
+  }
+
+  function updateOrderStatus() {
+    var el = document.getElementById('focus-order-status');
+    if (!el) return;
+    if (orderMode === 'sorted' && focusSortState.key) {
+      var label = FOCUS_SORT_LABELS[focusSortState.key] || focusSortState.key;
+      var arrow = focusSortState.direction === 'asc' ? '↑' : '↓';
+      el.textContent = 'Order: ' + label + ' ' + arrow;
+    } else {
+      el.textContent = 'Order: Custom';
+    }
+  }
+
+  /* ---- Focus list (week 35): live budget bar + position tally ---- */
+
+  function renderFocusPosTally() {
+    var el = document.getElementById('focus-pos-tally');
+    if (!el) return;
+    var counts = getPositionCounts();
+    el.innerHTML = ['PG', 'SG', 'SF', 'PF', 'C'].map(function (pos) {
+      var count = counts[pos] || 0;
+      return '<span class="focus-pos' + (count ? '' : ' is-zero') + '">' + pos + ' <b>' + count + '</b></span>';
+    }).join('');
+  }
+
+  function updateFocusBudget() {
+    var bar = document.getElementById('focus-budget-bar');
+    if (!bar) return;
+    var total = WEEK_35_POINTS_BUDGET;
+    var assigned = getWeek35AssignedPoints();
+    var remaining = total - assigned;
+    var assignedEl = document.getElementById('focus-budget-assigned');
+    var totalEl = document.getElementById('focus-budget-total');
+    var remainingEl = document.getElementById('focus-budget-remaining');
+    var spotsEl = document.getElementById('focus-budget-spots');
+    var fillEl = document.getElementById('focus-budget-fill');
+    if (assignedEl) assignedEl.textContent = String(assigned);
+    if (totalEl) totalEl.textContent = String(total);
+    if (remainingEl) remainingEl.textContent = String(remaining);
+    if (spotsEl) spotsEl.textContent = String(availableRosterSpots);
+    if (fillEl) fillEl.style.width = (total > 0 ? Math.min(100, Math.round((assigned / total) * 100)) : 0) + '%';
+    bar.classList.remove('is-ontrack', 'is-low', 'is-complete', 'is-over');
+    if (assigned > total) bar.classList.add('is-over');
+    else if (assigned === total) bar.classList.add('is-complete');
+    else if (remaining <= 5) bar.classList.add('is-low');
+    else bar.classList.add('is-ontrack');
+    renderFocusPosTally();
+  }
+
+  function flashRowOverBudget(index) {
+    var row = document.querySelector('#orders-grid-body tr[data-index="' + index + '"]');
+    if (!row) return;
+    row.classList.remove('is-over-budget');
+    void row.offsetWidth; // restart animation
+    row.classList.add('is-over-budget');
+    window.setTimeout(function () { row.classList.remove('is-over-budget'); }, 900);
+  }
+
+  // Refresh after a per-recruit points/PT edit that doesn't trigger a full rerender.
+  function afterFocusEntryEdit() {
+    updateFocusBudget();
+    updateActionButtons();
+  }
+
+  function stepPoints(index, delta) {
+    var entry = currentEntries[index];
+    if (!entry) return;
+    var current = Number(entry.points || 0);
+    var next = Math.max(0, current + delta);
+    var totalWithoutCurrent = getWeek35AssignedPoints() - current;
+    if (next + totalWithoutCurrent > WEEK_35_POINTS_BUDGET) {
+      next = Math.max(0, WEEK_35_POINTS_BUDGET - totalWithoutCurrent);
+      if (next === current) { flashRowOverBudget(index); return; }
+      flashRowOverBudget(index);
+    }
+    entry.points = next;
+    var input = document.querySelector('.recruiting-points-input[data-index="' + index + '"]');
+    if (input) input.value = String(next);
+    Recruiting.playSound('click-tiny.wav');
+    afterFocusEntryEdit();
   }
 
   function renderRecruitList() {
@@ -415,17 +599,17 @@
     if (isWeek35Mode()) {
       head.innerHTML = [
         '<tr>',
-        '<th>Priority</th>',
-        '<th>Recruit</th>',
-        '<th>Home Region</th>',
-        '<th>Archetype</th>',
-        '<th>HT</th>',
-        '<th>WT</th>',
-        '<th>POS</th>',
-        '<th>YR</th>',
-        '<th>RT</th>',
-        '<th>Current Lean</th>',
-        '<th>Points</th>',
+        '<th>#</th>',
+        '<th class="is-sortable" data-sort-key="name">Recruit</th>',
+        '<th class="is-sortable" data-sort-key="homeRegion">Home Region</th>',
+        '<th class="is-sortable" data-sort-key="archetype">Archetype</th>',
+        '<th class="is-sortable" data-sort-key="height">HT</th>',
+        '<th class="is-sortable" data-sort-key="weight">WT</th>',
+        '<th class="is-sortable" data-sort-key="pos">POS</th>',
+        '<th class="is-sortable" data-sort-key="year">YR</th>',
+        '<th class="is-sortable" data-sort-key="rt">RT</th>',
+        '<th class="is-sortable" data-sort-key="lean">Current Lean</th>',
+        '<th class="is-sortable" data-sort-key="points">Points</th>',
         '<th>Playing Time</th>',
         '<th>Adjust</th>',
         '<th>Remove</th>',
@@ -476,7 +660,11 @@
       '<td>' + (recruit ? recruit.yearDisplay : '--') + '</td>',
       '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
-      '<td><input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '></td>',
+      '<td class="points-cell"><div class="points-stepper">' +
+        '<button type="button" class="points-step points-step-dec" data-action="points-dec" data-index="' + index + '"' + (recruit ? '' : ' disabled') + ' aria-label="Decrease points">−</button>' +
+        '<input class="recruiting-points-input" inputmode="numeric" type="text" data-action="points" data-index="' + index + '" value="' + pointsValue + '"' + (recruit ? '' : ' disabled') + '>' +
+        '<button type="button" class="points-step points-step-inc" data-action="points-inc" data-index="' + index + '"' + (recruit ? '' : ' disabled') + ' aria-label="Increase points">+</button>' +
+      '</div></td>',
       '<td><input class="recruiting-checkbox" type="checkbox" data-action="playing_time" data-index="' + index + '"' + (recruit && !!entry.playing_time ? ' checked' : '') + (recruit ? '' : ' disabled') + '></td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
@@ -627,6 +815,7 @@
     var currentEntry = currentEntries[index];
     currentEntries[index] = currentEntries[targetIndex];
     currentEntries[targetIndex] = currentEntry;
+    setCustomOrder();
     Recruiting.playSound('click-tiny.wav');
     rerender();
   }
@@ -675,6 +864,7 @@
     }
     currentEntries.push(defaultEntryForRecruit(recruitId));
     lastAddedRecruitId = recruitId;
+    setCustomOrder();
     Recruiting.playSound('click-tiny.wav');
     rerender();
   }
@@ -799,12 +989,15 @@
         var normalized = String(control.value || '').replace(/[^\d]/g, '');
         var parsed = Number(normalized || 0);
         var totalWithoutCurrent = getWeek35AssignedPoints() - Number(currentEntries[index].points || 0);
+        var clamped = false;
         if (parsed + totalWithoutCurrent > WEEK_35_POINTS_BUDGET) {
           parsed = Math.max(0, WEEK_35_POINTS_BUDGET - totalWithoutCurrent);
+          clamped = true;
         }
         currentEntries[index].points = parsed;
         control.value = String(parsed);
-        setOrdersScreenCopy();
+        if (clamped) flashRowOverBudget(index);
+        afterFocusEntryEdit();
       });
       control.addEventListener('change', function () {
         if (control.tagName !== 'INPUT') return;
@@ -816,6 +1009,7 @@
         }
         if (action === 'playing_time') {
           currentEntries[index].playing_time = control.checked;
+          updateActionButtons();
         }
       });
       if (control.tagName === 'BUTTON') {
@@ -825,6 +1019,8 @@
           if (action === 'up') moveRecruit(index, -1);
           if (action === 'down') moveRecruit(index, 1);
           if (action === 'remove') removeRecruitAt(index);
+          if (action === 'points-dec') stepPoints(index, -1);
+          if (action === 'points-inc') stepPoints(index, 1);
         });
       }
     });
@@ -848,6 +1044,7 @@
         var toIndex = Number(row.dataset.index);
         if (Number.isNaN(fromIndex) || Number.isNaN(toIndex) || fromIndex === toIndex || !currentEntries[fromIndex]) return;
         insertMove(fromIndex, toIndex);
+        setCustomOrder();
         Recruiting.playSound('click-tiny.wav');
         rerender();
       });
@@ -991,7 +1188,6 @@
     }).then(function (response) {
       savedEntries = cloneEntries(currentEntries);
       updateActionButtons();
-      saveBtn.textContent = 'Save Orders';
       if (onSuccess) onSuccess(response);
       return response;
     }).catch(function (err) {
@@ -1006,13 +1202,8 @@
     if (!currentEntries.length) return;
     Recruiting.playSound('confirm-2-lowervol.wav');
     saveOrders(function () {
-      var subtitle = isWeek35Mode()
-        ? 'Recruiting orders are saved. You can now run recruiting.'
-        : 'Recruiting orders are saved.';
-      showToast('Orders Saved', subtitle);
-      window.setTimeout(function () {
-        navigateAway(resolveBackUrl());
-      }, 400);
+      // Stay on the page; the Saved ✓ state + enabled Run reflect success.
+      showToast('Saved ✓', 'Focus list saved — you can now run recruiting.');
     }).catch(function () {
       showModal({
         title: 'Save Failed',
@@ -1154,6 +1345,7 @@
         mode = 'week35';
         userTeamId = data.team_id || context.teamId || '';
         availableRosterSpots = Number(data.available_roster_spots || 0);
+        WEEK_35_POINTS_BUDGET = Number(data.week_35_points_budget || WEEK_35_POINTS_BUDGET);
         recruits = Recruiting.normalizeRecruits(data.recruits || [], data.team_name_map || {});
         if (!isWeek35Mode()) loadVisitPreferences();
         recruitMap = {};
@@ -1162,17 +1354,23 @@
         });
 
         buildTopGridHead();
+        bindFocusSortHeaders();
         setOrdersScreenCopy();
 
         if (isWeek35Mode()) {
-          currentEntries = getSavedWeek35Entries(data.saved_order_entries_week_35);
-          if (!currentEntries.length) {
+          var savedFocus = getSavedWeek35Entries(data.saved_order_entries_week_35);
+          if (savedFocus.length) {
+            currentEntries = savedFocus;
+            savedEntries = cloneEntries(currentEntries); // genuinely saved on the server
+          } else {
+            // Autofill is a suggestion, not a saved order — Run stays gated until Save.
             currentEntries = getWeek35AutofillEntries(data.team_id);
+            savedEntries = [];
           }
         } else {
           currentEntries = getSavedVisitEntries(data.saved_orders);
+          savedEntries = cloneEntries(currentEntries);
         }
-        savedEntries = cloneEntries(currentEntries);
 
         Recruiting.bindSortableHeaders(
           document.getElementById('recruits-table'),
