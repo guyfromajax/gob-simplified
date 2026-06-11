@@ -42,6 +42,30 @@
       </div>
     </header>
 
+    <!-- Before you submit: requirements bar -->
+    <section class="req-bar" id="requirements-bar" aria-label="Before you submit">
+      <span class="req-bar-title">Before you submit</span>
+      <div class="req-bar-chips">
+        <div class="req-chip req-chip--points" id="req-points">
+          <span class="req-chip-check" aria-hidden="true"></span>
+          <div class="req-chip-body">
+            <span class="req-chip-label">Training Points</span>
+            <span class="req-chip-value"><span id="req-points-used">0</span> / <span id="req-points-total">24</span></span>
+            <span class="req-meter"><span class="req-meter-fill" id="req-points-meter"></span></span>
+          </div>
+        </div>
+        <div class="req-chip req-chip--focus" id="req-focus">
+          <span class="req-chip-check" aria-hidden="true"></span>
+          <div class="req-chip-body">
+            <span class="req-chip-label">Coaching Focus</span>
+            <span class="req-chip-value" id="req-focus-value">Not selected</span>
+          </div>
+          <button type="button" class="req-focus-nudge" id="req-focus-nudge" hidden>Choose one →</button>
+        </div>
+      </div>
+      <div class="req-readout" id="req-readout">0 of 2 ready</div>
+    </section>
+
     <!-- Main Content: Player Drills and Team Drills -->
     <div class="main-content-grid">
       <!-- Player Drills Section -->
@@ -262,10 +286,12 @@
     <!-- Coaching Style / Focus Section -->
     <div class="coaching-section">
       <h2 class="coaching-title">Coaching Style / Focus</h2>
+      <p class="coaching-subtitle">Sets what you emphasize across drills, scrimmages and locker-room talks. Required to submit — pick one focus to pair with your drills.</p>
       <div class="archetypes-grid">
         <!-- Authoritarian -->
         <div class="archetype-block" data-archetype="authoritarian">
           <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
             <span class="archetype-name">Authoritarian</span>
           </div>
           <div class="archetype-options">
@@ -291,6 +317,7 @@
         <!-- Systems Coach -->
         <div class="archetype-block" data-archetype="systems-coach">
           <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
             <span class="archetype-name">Systems Coach</span>
           </div>
           <div class="archetype-options">
@@ -316,6 +343,7 @@
         <!-- Player Maximizer -->
         <div class="archetype-block" data-archetype="player-maximizer">
           <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
             <span class="archetype-name">Player Maximizer</span>
           </div>
           <div class="archetype-options">
@@ -333,6 +361,7 @@
         <!-- Culture Builder -->
         <div class="archetype-block" data-archetype="culture-builder">
           <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
             <span class="archetype-name">Culture Builder</span>
           </div>
           <div class="archetype-options">

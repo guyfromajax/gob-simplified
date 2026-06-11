@@ -592,7 +592,9 @@ function updatePointsRemaining() {
     submitBtn.disabled = true;
     submitBtn.style.opacity = '0.4';
   }
-  
+
+  updateRequirementsBar();
+
   return remaining;
 }
 
@@ -1452,6 +1454,346 @@ function wireCustomTrainingPlaybook() {
   }
   syncPlaybookModeToggleUi();
 }
+
+/* ============================================================
+   Training polish: tooltips, attribute chips, requirements bar
+   ============================================================ */
+
+const ARCH_COLORS = {
+  'authoritarian': '#C0392B',
+  'systems-coach': '#D4A017',
+  'player-maximizer': '#3A8C4A',
+  'culture-builder': '#7B5EA7'
+};
+const ARCH_NAMES = {
+  'authoritarian': 'Authoritarian',
+  'systems-coach': 'Systems Coach',
+  'player-maximizer': 'Player Maximizer',
+  'culture-builder': 'Culture Builder'
+};
+const PM_LEAF_NAMES = {
+  'player-maximizer-top-3': 'Top 3',
+  'player-maximizer-attributes-4-6': 'Attributes 4–6',
+  'player-maximizer-positional-focus': 'Positional Focus',
+  'player-maximizer-custom': 'Custom'
+};
+
+function archKeyFromValue(value) {
+  if (!value) return null;
+  if (value.startsWith('authoritarian')) return 'authoritarian';
+  if (value.startsWith('systems-coach')) return 'systems-coach';
+  if (value.startsWith('player-maximizer')) return 'player-maximizer';
+  if (value.startsWith('culture-builder')) return 'culture-builder';
+  return null;
+}
+
+/* --- Tooltip copy registries (source of truth: training tutorial) --- */
+const DRILL_TOOLTIPS = {
+  'offense-inside':      { code: 'SC', color: '#f79420', attr: 'Inside Scoring',   desc: "Sharpens scoring around the rim and in the post." },
+  'offense-outside':     { code: 'SH', color: '#f79420', attr: 'Outside Shooting', desc: "Develops perimeter and mid-range shooting touch." },
+  'defense-inside':      { code: 'ID', color: '#4a90d9', attr: 'Inside Defense',   desc: "Builds post defense, rim protection and interior toughness." },
+  'defense-outside':     { code: 'OD', color: '#4a90d9', attr: 'Outside Defense',  desc: "Hones on-ball perimeter defense and closeouts." },
+  'technical-passing':   { code: 'PS', color: '#7b5ea7', attr: 'Passing',          desc: "Improves court vision, timing and passing accuracy." },
+  'technical-ball-handling': { code: 'BH', color: '#7b5ea7', attr: 'Ball Handling', desc: "Tightens handle and ball security under pressure." },
+  'technical-rebounding':{ code: 'RB', color: '#7b5ea7', attr: 'Rebounding',       desc: "Drills boxing out and finishing on the glass." },
+  'weight-strength':     { code: 'ST', color: '#aeb8cc', attr: 'Strength',         desc: "Adds physical strength for finishing and holding position." },
+  'weight-agility':      { code: 'AG', color: '#aeb8cc', attr: 'Agility',          desc: "Builds quickness, lateral speed and body control." },
+  'general-conditioning':{ code: 'ND', color: '#aeb8cc', attr: 'Conditioning',     desc: "Builds team-wide stamina so legs stay fresh deep into games." },
+  'general-free-throws': { code: 'FT', color: '#d4a017', attr: 'Free Throws',      desc: "Reps from the line to convert when it matters most." },
+  'general-film-study':  { code: 'IQ', color: '#d4a017', attr: 'Basketball IQ',    desc: "Film Study gives coaches better insight into upcoming opponents — especially tendencies from their most recent game." },
+  'general-breaks':      { desc: "Breaks boost the effectiveness of all drills and reduce fatigue heading into the next game. But too many run the risk of straining team chemistry and weakening your team's Fight and Discipline attributes. Strong-chemistry teams absorb more downtime with less risk." },
+  'team-offense-install':       { desc: "Walk through new or existing offensive plays — no active defense. Pairs well with Film Study to tailor your sets to an opponent's defensive tendencies." },
+  'team-defense-install':       { desc: "Walk through new or existing defensive schemes — no active offense. Pairs well with Film Study to tailor your coverage to an opponent's offensive tendencies." },
+  'fast-break-offense-install': { desc: "Walk through new or existing fast break plays — no active defense. Pairs well with Film Study to attack an opponent's transition defense." },
+  'fast-break-defense-install': { desc: "Walk through new or existing fast break defenses — no active offense. Pairs well with Film Study to counter an opponent's fast break tendencies." },
+  'press-defense-install':      { desc: "Walk through new or existing press and trap schemes — no active offense. Pairs well with Film Study to exploit an opponent's press-break tendencies." },
+  'press-offense-install':      { desc: "Walk through new or existing press and trap breaks — no active defense. Pairs well with Film Study to counter an opponent's pressing tendencies." },
+  'team-scrimmages':            { desc: "Scrimmages sharpen execution and reinforce system cohesion — a multiplying effect on the Installs you run. They tend to lift chemistry, but an intense scrimmage can occasionally boil over, and over-scrimmaging risks fatigue." }
+};
+
+const FOCUS_TOOLTIPS = {
+  'authoritarian-discipline': { name: 'Discipline', desc: "Demand structure and accountability, with zero tolerance for slippage." },
+  'authoritarian-rebounding': { name: 'Rebounding', desc: "Make dominating the glass a non-negotiable team identity." },
+  'authoritarian-execution':  { name: 'Execution',  desc: "Accept nothing less than precision and total attention to detail." },
+  'authoritarian-teamwork':   { name: 'Teamwork',   desc: "Subordinate every ego to the team's success." },
+  'systems-coach-offense':     { name: 'Offense',      desc: "Drill offensive execution into the team's DNA." },
+  'systems-coach-defense':     { name: 'Defense',      desc: "Make disciplined defensive execution the team's standard." },
+  'systems-coach-fast-breaks': { name: 'Fast Breaks',  desc: "Master transition on both ends as a tactical edge." },
+  'systems-coach-press-trap':  { name: 'Press / Trap', desc: "Make pressure defense and press-breaks a system strength." },
+  'culture-builder-inspire':    { name: 'Inspire',              desc: "Convince every player they can exceed their own ceiling." },
+  'culture-builder-confidence': { name: 'Confidence',           desc: "Build unshakable self-belief through relentless positivity." },
+  'culture-builder-community':  { name: 'Community Engagement', desc: "Root the team in its community and rally collective passion." },
+  'culture-builder-teamwork':   { name: 'Team Building',        desc: "Forge a brotherhood that plays for each other." },
+  'player-maximizer-choose-attributes': {
+    name: 'Choose Attributes',
+    desc: "Opens a per-player attribute picker. Pick a development mode for the whole roster:",
+    modes: [
+      ['Top 3', "Sharpen what each player already does best."],
+      ['Attributes 4–6', "Take each player from good to great in emerging skills."],
+      ['Positional Focus', "Build positional identity around each player's core strengths."],
+      ['Custom', "Develop each player around the attributes you choose."]
+    ]
+  }
+};
+
+/* --- Shared tooltip element + positioning --- */
+let trainingTooltipEl = null;
+let trainingTooltipTrigger = null;
+let lastPointerType = 'mouse';
+
+document.addEventListener('pointerdown', function (e) {
+  lastPointerType = e.pointerType || 'mouse';
+}, true);
+
+function ensureTrainingTooltipEl() {
+  if (trainingTooltipEl) return trainingTooltipEl;
+  trainingTooltipEl = document.createElement('div');
+  trainingTooltipEl.className = 'training-tooltip';
+  trainingTooltipEl.setAttribute('role', 'tooltip');
+  document.body.appendChild(trainingTooltipEl);
+  return trainingTooltipEl;
+}
+
+function positionTrainingTooltip(trigger) {
+  const tt = ensureTrainingTooltipEl();
+  const r = trigger.getBoundingClientRect();
+  const tw = tt.offsetWidth;
+  const th = tt.offsetHeight;
+  const gap = 10;
+  const margin = 8;
+  let left = r.left + r.width / 2 - tw / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - margin - tw));
+  let top = r.top - th - gap;
+  let flip = false;
+  if (top < margin) {
+    top = r.bottom + gap;
+    flip = true;
+  }
+  tt.style.left = Math.round(left) + 'px';
+  tt.style.top = Math.round(top) + 'px';
+  tt.classList.toggle('flip', flip);
+  const arrowLeft = (r.left + r.width / 2) - left;
+  tt.style.setProperty('--arrow-left', Math.round(Math.max(12, Math.min(tw - 12, arrowLeft))) + 'px');
+}
+
+function showTrainingTooltip(trigger) {
+  const html = trigger && trigger.__ttHtml;
+  if (!html) return;
+  const tt = ensureTrainingTooltipEl();
+  tt.innerHTML = html;
+  trainingTooltipTrigger = trigger;
+  positionTrainingTooltip(trigger);
+  requestAnimationFrame(function () {
+    if (trainingTooltipTrigger === trigger) tt.classList.add('is-visible');
+  });
+}
+
+function hideTrainingTooltip() {
+  if (!trainingTooltipEl) return;
+  trainingTooltipEl.classList.remove('is-visible');
+  trainingTooltipTrigger = null;
+}
+
+function registerTrainingTooltip(trigger, html, focusEl) {
+  if (!trigger || !html) return;
+  trigger.__ttHtml = html;
+  trigger.classList.add('has-tooltip');
+  trigger.addEventListener('pointerenter', function (e) {
+    if (e.pointerType !== 'touch') showTrainingTooltip(trigger);
+  });
+  trigger.addEventListener('pointerleave', function (e) {
+    if (e.pointerType !== 'touch') hideTrainingTooltip();
+  });
+  trigger.addEventListener('click', function () {
+    if (lastPointerType === 'touch') {
+      if (trainingTooltipTrigger === trigger) hideTrainingTooltip();
+      else showTrainingTooltip(trigger);
+    }
+  });
+  if (focusEl) {
+    focusEl.addEventListener('focus', function () { showTrainingTooltip(trigger); });
+    focusEl.addEventListener('blur', function () { hideTrainingTooltip(); });
+  }
+}
+
+// Dismiss on scroll and on outside tap
+window.addEventListener('scroll', hideTrainingTooltip, true);
+document.addEventListener('click', function (e) {
+  if (lastPointerType === 'touch' && trainingTooltipTrigger && !trainingTooltipTrigger.contains(e.target)) {
+    hideTrainingTooltip();
+  }
+}, true);
+
+function buildDrillTooltipHtml(d) {
+  let head = '';
+  if (d.code) {
+    head = '<div class="tt-head"><span class="attr-chip" style="background:' + d.color + '">' + d.code +
+      '</span><span class="tt-attr">' + d.attr + '</span></div>';
+  }
+  return head + '<div class="tt-desc">' + d.desc + '</div>';
+}
+
+function buildFocusTooltipHtml(value, f) {
+  const archKey = archKeyFromValue(value);
+  const archColor = ARCH_COLORS[archKey] || '#f79420';
+  const archName = ARCH_NAMES[archKey] || '';
+  let modes = '';
+  if (f.modes) {
+    modes = '<ul class="tt-modes">' + f.modes.map(function (m) {
+      return '<li class="tt-mode"><b>' + m[0] + '</b> — ' + m[1] + '</li>';
+    }).join('') + '</ul>';
+  }
+  return '<div class="tt-eyebrow" style="color:' + archColor + '">' + archName + '</div>' +
+    '<div class="tt-name">' + f.name + '</div>' +
+    '<div class="tt-desc">' + f.desc + '</div>' + modes;
+}
+
+/* --- Attribute code chips on single-attribute drills --- */
+function injectAttributeChip(slider, d) {
+  if (!d || !d.code) return;
+  const label = slider.closest('.slider-label');
+  const lt = label && label.querySelector('.label-text');
+  if (!lt || lt.querySelector('.attr-chip')) return;
+  const chip = document.createElement('span');
+  chip.className = 'attr-chip';
+  chip.style.background = d.color;
+  chip.textContent = d.code;
+  chip.setAttribute('aria-hidden', 'true');
+  lt.appendChild(chip);
+}
+
+/* Hover/tap target for a drill row — its label text, or the drill title for bare installs. */
+function triggerForSlider(slider) {
+  const label = slider.closest('.slider-label');
+  const lt = label && label.querySelector('.label-text');
+  if (lt && lt.textContent.trim()) return lt;
+  const group = slider.closest('.drill-group');
+  const title = group && group.querySelector('.drill-title');
+  return title || label;
+}
+
+function setupTrainingTooltips() {
+  Object.keys(DRILL_TOOLTIPS).forEach(function (id) {
+    const slider = document.getElementById(id);
+    if (!slider) return;
+    const d = DRILL_TOOLTIPS[id];
+    injectAttributeChip(slider, d);
+    const trigger = triggerForSlider(slider);
+    if (trigger) registerTrainingTooltip(trigger, buildDrillTooltipHtml(d), slider);
+  });
+
+  document.querySelectorAll('.archetype-option').forEach(function (opt) {
+    const radio = opt.querySelector('input[name="coaching-focus"]');
+    if (!radio) return;
+    const f = FOCUS_TOOLTIPS[radio.value];
+    if (!f) return;
+    registerTrainingTooltip(opt, buildFocusTooltipHtml(radio.value, f), radio);
+  });
+}
+
+/* --- Requirements bar --- */
+const reqBarEl = document.getElementById('requirements-bar');
+const reqPointsChip = document.getElementById('req-points');
+const reqPointsUsedEl = document.getElementById('req-points-used');
+const reqPointsTotalEl = document.getElementById('req-points-total');
+const reqPointsMeterEl = document.getElementById('req-points-meter');
+const reqFocusChip = document.getElementById('req-focus');
+const reqFocusValueEl = document.getElementById('req-focus-value');
+const reqFocusNudgeBtn = document.getElementById('req-focus-nudge');
+const reqReadoutEl = document.getElementById('req-readout');
+
+function friendlyFocusName(radio) {
+  const v = radio.value;
+  if (v === CHOOSE_ATTRIBUTES_VALUE) {
+    if (playerMaximizerResolvedFocus && PM_LEAF_NAMES[playerMaximizerResolvedFocus]) {
+      return PM_LEAF_NAMES[playerMaximizerResolvedFocus];
+    }
+    return 'Choose Attributes';
+  }
+  if (PM_LEAF_NAMES[v]) return PM_LEAF_NAMES[v];
+  return getFocusLabelText(radio) || v;
+}
+
+function updateRequirementsBar() {
+  if (!reqBarEl) return;
+  const total = TOTAL_POINTS;
+  const used = calculateTotalPoints();
+  const pointsComplete = (total - used) === 0;
+
+  if (reqPointsUsedEl) reqPointsUsedEl.textContent = used;
+  if (reqPointsTotalEl) reqPointsTotalEl.textContent = total;
+  if (reqPointsMeterEl) {
+    const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+    reqPointsMeterEl.style.width = pct + '%';
+  }
+  if (reqPointsChip) reqPointsChip.classList.toggle('is-complete', pointsComplete);
+
+  const checked = document.querySelector('input[name="coaching-focus"]:checked');
+  const focusSelected = !!checked;
+  const focusComplete = focusSelected && isPlayerMaximizerSubmitReady();
+
+  if (focusSelected) {
+    const archKey = archKeyFromValue(checked.value);
+    const archColor = ARCH_COLORS[archKey] || '#f79420';
+    const archName = ARCH_NAMES[archKey] || '';
+    const focusName = friendlyFocusName(checked);
+    if (reqFocusValueEl) reqFocusValueEl.textContent = archName ? (focusName + ' · ' + archName) : focusName;
+    if (reqFocusChip) reqFocusChip.style.setProperty('--arch', archColor);
+  } else {
+    if (reqFocusValueEl) reqFocusValueEl.textContent = 'Not selected';
+    if (reqFocusChip) reqFocusChip.style.removeProperty('--arch');
+  }
+  if (reqFocusChip) reqFocusChip.classList.toggle('is-selected', focusComplete);
+
+  const nudge = pointsComplete && !focusSelected;
+  if (reqFocusChip) reqFocusChip.classList.toggle('is-nudge', nudge);
+  if (reqFocusNudgeBtn) reqFocusNudgeBtn.hidden = !nudge;
+
+  const readyCount = (pointsComplete ? 1 : 0) + (focusComplete ? 1 : 0);
+  if (reqReadoutEl) {
+    reqReadoutEl.textContent = readyCount === 2 ? 'Ready to submit' : (readyCount + ' of 2 ready');
+    reqReadoutEl.classList.toggle('is-ready', readyCount === 2);
+  }
+}
+
+function scrollToCoachingFocus() {
+  const sec = document.querySelector('.coaching-section');
+  if (!sec) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  sec.classList.remove('coaching-flash');
+  void sec.offsetWidth; // restart animation
+  sec.classList.add('coaching-flash');
+  window.setTimeout(function () { sec.classList.remove('coaching-flash'); }, 1600);
+}
+
+if (reqFocusNudgeBtn) {
+  reqFocusNudgeBtn.addEventListener('click', function () {
+    playSound('click-tiny.wav');
+    scrollToCoachingFocus();
+  });
+}
+
+/* Keep the requirements bar docked just below the sticky header. */
+function positionRequirementsBar() {
+  const header = document.querySelector('.training-header');
+  if (!reqBarEl || !header) return;
+  const headerTop = parseFloat(getComputedStyle(header).top) || 0;
+  reqBarEl.style.top = Math.round(headerTop + header.offsetHeight + 8) + 'px';
+}
+
+window.addEventListener('resize', positionRequirementsBar);
+if (typeof ResizeObserver !== 'undefined') {
+  const headerForObserve = document.querySelector('.training-header');
+  if (headerForObserve) {
+    new ResizeObserver(positionRequirementsBar).observe(headerForObserve);
+  }
+}
+
+// Wire up tooltips/chips and prime the requirements bar
+setupTrainingTooltips();
+positionRequirementsBar();
+updateRequirementsBar();
 
 // Initialize training points on page load
 (async function initTrainingPage() {

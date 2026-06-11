@@ -7,6 +7,11 @@
 ##Micro Movements
 9. Dunks! I need DUNKS!
 
+##Upgrade Recruiting Experience
+4. Better UX on Recruiting Day orders
+5. Better flow from Recruiting buttons pressed
+11. More action in on Signing Day
+
 ##Bugs 
 2. 3 pointer on P/T Break does not register as a 3
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
@@ -14,16 +19,12 @@
 40. Batted ball out of bounds is not animating or executing properly
 
 ##New Features
-11. More action in recruiting
-15. Traning page hover tool tips
-59. Better UX on training page
 35. Verify Special Stats are tracking properly
 36. Season & Career Stats for Players for special stats
 44. Customize computer teams more strategically
 45. Improve FCC API
 57. Player Momentum System
 60. Universal distance-based rebound helper
-61. News feed
 62. Leaderboard -- change Rank to Titles
 
 ##User Account
@@ -42,6 +43,8 @@
 109. More dynamic HCO animations
 110. Geek Points syste
 
+##Started and will continually be in progress
+61. News feed
 
 
 

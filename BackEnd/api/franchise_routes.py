@@ -4082,13 +4082,23 @@ def _finalize_franchise_week_after_cpu_games(
     _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
     _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
     # Training-squad weekly progression (weeks 2–26) + milestone development report.
+    ts_weekly_gains: list[dict[str, Any]] = []
     try:
-        _apply_training_squad_progression_and_report(
+        ts_weekly_gains = _apply_training_squad_progression_and_report(
             franchise_id, franchise_doc, week, user_team_id_str
-        )
+        ) or []
     except Exception:
         logger.exception(
             "[TS-PROGRESSION] failed; continuing. franchise_id=%s week=%s",
+            franchise_id_str, week,
+        )
+    # Weekly news (upset report + practice-squad all-stars). Must run before the
+    # rank update below so the upset criteria use entering-week natl_rank values.
+    try:
+        _append_franchise_week_news(franchise_id, franchise_doc, week, results, ts_weekly_gains)
+    except Exception:
+        logger.exception(
+            "[NEWS] weekly news generation failed; continuing. franchise_id=%s week=%s",
             franchise_id_str, week,
         )
     try:
@@ -4113,6 +4123,8 @@ def _finalize_franchise_week_after_cpu_games(
         update_fields["training_squad_reports"] = franchise_doc["training_squad_reports"]
     if "training_squad_report_baseline" in franchise_doc:
         update_fields["training_squad_report_baseline"] = franchise_doc["training_squad_report_baseline"]
+    if "season_news" in franchise_doc:
+        update_fields["season_news"] = franchise_doc["season_news"]
 
     if week == ScheduleManager.REGULAR_SEASON_WEEKS:
         ftd_docs = list(
@@ -5797,6 +5809,7 @@ def command_center_data(
                     last_training_report_week = None
         response["last_training_report_week"] = last_training_report_week
         response["season_inbox"] = list(franchise_doc.get("season_inbox") or []) if franchise_doc else []
+        response["news_headlines"] = _franchise_news_headlines(franchise_doc) if franchise_doc else []
         if franchise_doc:
             try:
                 from BackEnd.utils.franchise_championship_moments import list_moments
@@ -8331,15 +8344,18 @@ def _apply_training_squad_progression_and_report(
     franchise_doc: dict[str, Any],
     completed_week: int,
     user_team_id_str: Any,
-) -> None:
+) -> list[dict[str, Any]]:
     """Weeks 2–26: evolve every training-squad player's 13 attrs (CH-gated band) for
     user AND CPU teams (persisted to FPD; ratings recomputed). On report weeks
     (6/11/16/21/26) build the user's Training Squad Development report (delta vs the
     previous report) onto franchise_doc, with an inbox link. franchise_doc fields set
     here (season_inbox, training_squad_reports, training_squad_report_baseline) are
-    persisted by the caller's update_fields."""
+    persisted by the caller's update_fields.
+
+    Returns this week's per-player gain records (all teams) for the news system:
+    [{player_id, name, deltas, total_gain, rt, pos}, ...]."""
     if completed_week < 2 or completed_week > ScheduleManager.REGULAR_SEASON_WEEKS:
-        return
+        return []
     from BackEnd.utils.position_ratings import compute_position_ratings
 
     ftd_docs = list(franchise_team_data_collection.find(
@@ -8350,7 +8366,7 @@ def _apply_training_squad_progression_and_report(
     for d in ftd_docs:
         all_ts_ids.extend([str(pid) for pid in (d.get("training_squad_players") or []) if pid])
     if not all_ts_ids:
-        return
+        return []
     fpd_docs = list(franchise_players_data_collection.find(
         {"franchise_id": str(franchise_id), "player_id": {"$in": all_ts_ids}},
     ))
@@ -8375,31 +8391,45 @@ def _apply_training_squad_progression_and_report(
 
     # Evolve every training-squad player (all teams), recompute ratings.
     lo_clamp = 1  # PLAYER_ATTR_CLAMP[0] — min 1, no max
+    weekly_gains: list[dict[str, Any]] = []
     for d in fpd_docs:
         attrs = d.get("attributes") or {}
         band_lo, band_hi = _ts_progression_band(attrs.get("anchor_CH", attrs.get("CH")))
+        deltas: dict[str, int] = {}
         for key in TRAINING_SQUAD_ATTR_KEYS:
             base = attrs.get("anchor_" + key, attrs.get(key))
             if base is None:
                 continue
             new_val = max(lo_clamp, int(base) + random.randint(band_lo, band_hi))
+            deltas[key] = new_val - int(base)
             attrs[key] = new_val
             attrs["anchor_" + key] = new_val
         meta = d.get("meta") or {}
+        player_name = (str(meta.get("first_name", "")) + " " + str(meta.get("last_name", ""))).strip()
         new_ratings = compute_position_ratings({
             "attributes": attrs,
             "height": meta.get("height"),
-            "name": (str(meta.get("first_name", "")) + " " + str(meta.get("last_name", ""))).strip(),
+            "name": player_name,
         })
         franchise_players_data_collection.update_one(
             {"_id": d["_id"]},
             {"$set": {"attributes": attrs, "position_ratings": new_ratings, "updated_at": datetime.utcnow()}},
         )
         d["attributes"] = attrs  # keep in-memory copy current for the report
+        best = _best_position(new_ratings or {})
+        weekly_gains.append({
+            "player_id": str(d.get("player_id") or ""),
+            "name": player_name or str(d.get("player_id") or ""),
+            "team_id": str(meta.get("team_id") or ""),
+            "deltas": deltas,
+            "total_gain": sum(deltas.values()),
+            "rt": best.get("rating"),
+            "pos": best.get("pos", "--"),
+        })
 
     # Report (user only) on milestone weeks.
     if completed_week not in TRAINING_SQUAD_REPORT_WEEKS or not user_ts_ids:
-        return
+        return weekly_gains
     players_report = []
     new_baseline: dict[str, Any] = {}
     for pid in user_ts_ids:
@@ -8430,6 +8460,192 @@ def _apply_training_squad_progression_and_report(
         "message": "Week #" + str(int(completed_week)) + " Training Squad Development report",
     })
     franchise_doc["season_inbox"] = season_inbox
+    return weekly_gains
+
+
+# ---------------------------------------------------------------------------
+# Franchise News (see _documentation_master/projects/News_System.md)
+# Stories live on the franchise doc as `season_news` (newest first) and are
+# cleared at season rollover in finish_season.
+# ---------------------------------------------------------------------------
+
+NEWS_UPSET_RANK_GAP = 9  # winner_rank - loser_rank must exceed this
+NEWS_PS_ALL_STARS_MIN_GAIN = 6  # weekly cumulative attribute gain must exceed this
+
+NEWS_ATTRIBUTE_FULL_NAMES = {
+    "SC": "Scoring",
+    "SH": "Shooting",
+    "ID": "Inside Defense",
+    "OD": "Outside Defense",
+    "PS": "Passing",
+    "BH": "Ball Handling",
+    "RB": "Rebounding",
+    "ST": "Strength",
+    "AG": "Agility",
+    "FT": "Free Throws",
+    "ND": "Endurance",
+    "IQ": "Basketball IQ",
+    "CH": "Clutch",
+}
+
+
+def _join_with_and(items: list[str]) -> str:
+    """Grammatical list join: 'A', 'A and B', 'A, B, and C'."""
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return items[0] + " and " + items[1]
+    return ", ".join(items[:-1]) + ", and " + items[-1]
+
+
+def _build_week_upset_report_story(
+    week: int,
+    results: list[dict[str, Any]],
+    rank_by_team_id: dict[str, int],
+    team_name_map: dict[str, str],
+) -> dict[str, Any] | None:
+    """Week {n} Upset Report: games where the winner's entering-week natl_rank was
+    more than NEWS_UPSET_RANK_GAP spots worse than the loser's. None when no games qualify."""
+    upsets: list[tuple[int, str]] = []
+    for row in results or []:
+        away_id = str(row.get("away_id") or "")
+        home_id = str(row.get("home_id") or "")
+        away_score = int(row.get("away_score") or 0)
+        home_score = int(row.get("home_score") or 0)
+        if not away_id or not home_id or away_score == home_score:
+            continue
+        if away_score > home_score:
+            winner_id, loser_id = away_id, home_id
+            winner_score, loser_score = away_score, home_score
+        else:
+            winner_id, loser_id = home_id, away_id
+            winner_score, loser_score = home_score, away_score
+        winner_rank = rank_by_team_id.get(winner_id)
+        loser_rank = rank_by_team_id.get(loser_id)
+        if winner_rank is None or loser_rank is None:
+            continue
+        gap = int(winner_rank) - int(loser_rank)
+        if gap <= NEWS_UPSET_RANK_GAP:
+            continue
+        line = (
+            f"#{winner_rank}. {team_name_map.get(winner_id, winner_id)} upset "
+            f"#{loser_rank}. {team_name_map.get(loser_id, loser_id)} "
+            f"by a score of {winner_score}-{loser_score}."
+        )
+        upsets.append((gap, line))
+    if not upsets:
+        return None
+    upsets.sort(key=lambda item: item[0], reverse=True)
+    return {
+        "story_id": f"w{week}-upset-report",
+        "week": int(week),
+        "type": "upset_report",
+        "headline": f"Week {week} Upset Report",
+        "lines": [line for _, line in upsets],
+        "created_at": datetime.utcnow(),
+    }
+
+
+NEWS_PS_ALL_STARS_MAX_LIST = 10
+
+
+def _build_ps_all_stars_story(
+    week: int,
+    weekly_gains: list[dict[str, Any]],
+    team_name_map: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    """Practice Squad All-Stars: training-squad players (league-wide) whose weekly
+    cumulative attribute gain exceeds NEWS_PS_ALL_STARS_MIN_GAIN. None when nobody
+    qualifies. Listed top NEWS_PS_ALL_STARS_MAX_LIST by cumulative gain; a tie at the
+    cutoff extends the list to include everyone tied with the last spot."""
+    team_name_map = team_name_map or {}
+    qualifiers = [
+        g for g in (weekly_gains or [])
+        if int(g.get("total_gain") or 0) > NEWS_PS_ALL_STARS_MIN_GAIN
+    ]
+    if not qualifiers:
+        return None
+    qualifiers.sort(key=lambda g: int(g.get("total_gain") or 0), reverse=True)
+    if len(qualifiers) > NEWS_PS_ALL_STARS_MAX_LIST:
+        cutoff = int(qualifiers[NEWS_PS_ALL_STARS_MAX_LIST - 1].get("total_gain") or 0)
+        qualifiers = [g for g in qualifiers if int(g.get("total_gain") or 0) >= cutoff]
+    lines = []
+    for g in qualifiers:
+        deltas = g.get("deltas") or {}
+        max_gain = max(deltas.values()) if deltas else 0
+        top_attrs = [
+            NEWS_ATTRIBUTE_FULL_NAMES.get(key, key)
+            for key in TRAINING_SQUAD_ATTR_KEYS
+            if deltas.get(key) == max_gain
+        ]
+        rt = g.get("rt")
+        team_name = team_name_map.get(str(g.get("team_id") or ""), "")
+        of_team = f" of {team_name}" if team_name else ""
+        lines.append(
+            f"{g.get('name')}{of_team} increased by {int(g.get('total_gain') or 0)} attribute points this week. "
+            f"His strongest gains were in {_join_with_and(top_attrs)}. "
+            f"He's now a {rt if rt is not None else '--'} rated {g.get('pos', '--')}."
+        )
+    return {
+        "story_id": f"w{week}-ps-all-stars",
+        "week": int(week),
+        "type": "ps_all_stars",
+        "headline": "Practice Squad All-Stars",
+        "lines": lines,
+        "created_at": datetime.utcnow(),
+    }
+
+
+def _append_franchise_week_news(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+    week: int,
+    results: list[dict[str, Any]],
+    ts_weekly_gains: list[dict[str, Any]],
+) -> None:
+    """Build the completed week's news stories and prepend them to franchise_doc['season_news'].
+
+    Must run BEFORE _apply_regular_season_rank_prestige_updates so FTD natl_rank
+    still holds the entering-week ranks the games were played under.
+    """
+    if week < 1 or week > ScheduleManager.REGULAR_SEASON_WEEKS:
+        return
+    rank_by_team_id: dict[str, int] = {}
+    for doc in franchise_team_data_collection.find(
+        {"franchise_id": franchise_id},
+        {"team_id": 1, "natl_rank": 1},
+    ):
+        team_id = doc.get("team_id")
+        rank = doc.get("natl_rank")
+        if team_id is not None and rank is not None:
+            rank_by_team_id[str(team_id)] = int(rank)
+
+    team_name_map = _format_team_name_map()
+    stories = [
+        story
+        for story in (
+            _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map),
+            _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map),
+        )
+        if story
+    ]
+    if not stories:
+        return
+    franchise_doc["season_news"] = stories + list(franchise_doc.get("season_news") or [])
+
+
+def _franchise_news_headlines(franchise_doc: dict[str, Any], limit: int = 5) -> list[dict[str, Any]]:
+    """Latest headlines for the Coach's Office News card (season_news is newest first)."""
+    return [
+        {
+            "story_id": story.get("story_id"),
+            "headline": story.get("headline"),
+            "week": story.get("week"),
+        }
+        for story in (franchise_doc.get("season_news") or [])[:limit]
+    ]
 
 
 def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
@@ -8969,6 +9185,19 @@ def get_recruiting_data(
         "team_name_map": team_name_map,
         "week_35_recruiting_results": week_35_results,
         "week_35_recruiting_ran": bool(franchise_doc.get("week_35_recruiting_ran", False)),
+    }
+
+
+@router.get("/franchise/news")
+def get_franchise_news(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Season news feed for the standalone news page (newest first; cleared at season rollover)."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    return {
+        "week": int(franchise_doc.get("week", 1) or 1),
+        "news": franchise_doc.get("season_news") or [],
     }
 
 
@@ -11963,6 +12192,7 @@ def finish_season(req: FinishSeasonRequest):
             "week": 1,
             "results": {},
             "season_inbox": [],
+            "season_news": [],
             "schedule": schedule,
             "eos_tournament_active": False,
             "conference_tournaments": {},

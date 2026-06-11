@@ -17,11 +17,11 @@
   --radius-sm: 4px;
   --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   
-  /* Archetype colors */
-  --color-authoritarian: #ff4444;
-  --color-systems-coach: #d4a017;
-  --color-player-maximizer: #2d8f2d;
-  --color-culture-builder: #9b59b6;
+  /* Archetype colors (brief / tutorial canonical) */
+  --color-authoritarian: #C0392B;
+  --color-systems-coach: #D4A017;
+  --color-player-maximizer: #3A8C4A;
+  --color-culture-builder: #7B5EA7;
 }
 
 * {
@@ -1391,6 +1391,412 @@ body.training-page .custom-focus-cancel-btn {
   background: transparent;
   color: rgba(255, 255, 255, 0.84);
   cursor: pointer;
+}
+
+/* ============================================================
+   Training polish: requirements bar, coaching cards, tooltips
+   ============================================================ */
+
+/* --- Per-archetype color hook (brief / tutorial canonical) --- */
+body.training-page .archetype-block[data-archetype="authoritarian"] { --arch: #C0392B; }
+body.training-page .archetype-block[data-archetype="systems-coach"] { --arch: #D4A017; }
+body.training-page .archetype-block[data-archetype="player-maximizer"] { --arch: #3A8C4A; }
+body.training-page .archetype-block[data-archetype="culture-builder"] { --arch: #7B5EA7; }
+
+/* --- Feature 3: Before-you-submit requirements bar --- */
+body.training-page .req-bar {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 96px;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 30%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.97), rgba(30, 35, 44, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+body.training-page .req-bar-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.66);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+body.training-page .req-bar-chips {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+body.training-page .req-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 240px;
+  min-height: 56px;
+  padding: 8px 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+body.training-page .req-chip-check {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+body.training-page .req-chip-check::after {
+  content: "✓";
+  font-size: 12px;
+  font-weight: 900;
+  color: transparent;
+  line-height: 1;
+}
+
+body.training-page .req-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+body.training-page .req-chip-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+body.training-page .req-chip-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  color: #ffffff;
+}
+
+body.training-page .req-meter {
+  display: block;
+  margin-top: 5px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+body.training-page .req-meter-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: width 0.2s ease, background 0.18s ease;
+}
+
+/* Points complete → orange (not green) */
+body.training-page .req-chip--points.is-complete {
+  border-color: #f79420;
+  background: rgba(247, 148, 32, 0.1);
+}
+body.training-page .req-chip--points.is-complete .req-chip-check {
+  background: #f79420;
+  border-color: #f79420;
+}
+body.training-page .req-chip--points.is-complete .req-chip-check::after { color: #10131a; }
+body.training-page .req-chip--points.is-complete .req-meter-fill { background: #f79420; }
+
+/* Focus selected → tint to the chosen archetype color */
+body.training-page .req-chip--focus.is-selected {
+  border-color: var(--arch, #f79420);
+  background: color-mix(in srgb, var(--arch, #f79420) 12%, transparent);
+}
+body.training-page .req-chip--focus.is-selected .req-chip-check {
+  background: var(--arch, #f79420);
+  border-color: var(--arch, #f79420);
+}
+body.training-page .req-chip--focus.is-selected .req-chip-check::after { color: #ffffff; }
+
+/* Nudge: points done but no focus yet */
+body.training-page .req-chip--focus.is-nudge {
+  border-color: #f79420;
+  animation: reqNudgePulse 1.4s ease-in-out infinite;
+}
+@keyframes reqNudgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(247, 148, 32, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(247, 148, 32, 0.3); }
+}
+
+body.training-page .req-focus-nudge {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #f79420;
+  background: rgba(247, 148, 32, 0.16);
+  color: #ffd9a8;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+body.training-page .req-focus-nudge:hover {
+  background: rgba(247, 148, 32, 0.28);
+  color: #ffffff;
+}
+
+body.training-page .req-readout {
+  flex: 0 0 auto;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.66);
+  white-space: nowrap;
+}
+body.training-page .req-readout.is-ready { color: #6cd07f; }
+
+/* Flash when the nudge scrolls to the coaching section */
+@keyframes coachingFlash {
+  0% { box-shadow: 0 0 0 0 rgba(247, 148, 32, 0); }
+  18% { box-shadow: 0 0 0 3px rgba(247, 148, 32, 0.6); }
+  100% { box-shadow: 0 0 0 0 rgba(247, 148, 32, 0); }
+}
+body.training-page .coaching-section.coaching-flash {
+  border-radius: 14px;
+  animation: coachingFlash 1.5s ease-out;
+}
+
+/* --- Feature 5: equal-height Player / Team drill panels --- */
+body.training-page .player-drills-section,
+body.training-page .team-drills-section { height: 100%; }
+body.training-page .player-drills-section .section-container,
+body.training-page .team-drills-section .section-container { flex: 1 1 auto; }
+
+/* --- Feature 1: Coaching Focus premium card treatment --- */
+body.training-page .coaching-subtitle {
+  margin: 8px 0 2px;
+  max-width: 780px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+body.training-page .archetype-block[data-archetype] {
+  background: color-mix(in srgb, var(--arch) 10%, rgba(42, 48, 58, 0.92));
+  border: 1px solid color-mix(in srgb, var(--arch) 28%, rgba(255, 255, 255, 0.12));
+  border-left: 3px solid var(--arch);
+  padding: 14px 16px 16px;
+  border-radius: 14px;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+body.training-page .archetype-block[data-archetype].active {
+  box-shadow: 0 0 0 1px var(--arch), 0 10px 26px color-mix(in srgb, var(--arch) 32%, transparent);
+}
+/* Active panel glows rather than dims */
+body.training-page .archetype-block.sub-option-selected,
+body.training-page .archetype-block.header-selected { opacity: 1; }
+
+body.training-page .archetype-block[data-archetype] .archetype-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  min-height: auto;
+  background: transparent;
+  border-radius: 0;
+}
+
+body.training-page .archetype-block[data-archetype] .archetype-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: var(--arch);
+  text-shadow: none;
+}
+
+body.training-page .arch-dot {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--arch);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--arch) 60%, transparent);
+}
+
+/* Selectable option rows */
+body.training-page .archetype-block[data-archetype] .archetype-option span {
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.82);
+  transition: background 0.16s ease, color 0.16s ease, filter 0.16s ease;
+}
+
+body.training-page .archetype-block[data-archetype] .archetype-option span::before {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+body.training-page .archetype-block[data-archetype] .archetype-option:hover span {
+  background: color-mix(in srgb, var(--arch) 14%, transparent);
+  color: #ffffff;
+  filter: none;
+}
+
+/* Strong selected state: filled in the archetype color + checkmark + bold label */
+body.training-page .archetype-block[data-archetype] .archetype-option input[type="radio"]:checked + span {
+  background: var(--arch);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+body.training-page .archetype-block[data-archetype] .archetype-option input[type="radio"]:checked + span::before {
+  content: "✓";
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--arch);
+}
+
+/* --- Feature 2: attribute code chips --- */
+body.training-page .attr-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 16px;
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #10131a;
+  vertical-align: middle;
+}
+
+body.training-page .has-tooltip { cursor: help; }
+
+/* --- Feature 2: hover / focus tooltip --- */
+.training-tooltip {
+  position: fixed;
+  z-index: 2000;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(16, 19, 26, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  color: #f4f6ff;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.training-tooltip.is-visible { opacity: 1; transform: translateY(0); }
+
+.training-tooltip::after {
+  content: "";
+  position: absolute;
+  left: var(--arrow-left, 50%);
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: rgba(16, 19, 26, 0.98);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  transform: translateX(-50%) rotate(45deg);
+}
+.training-tooltip.flip::after {
+  bottom: auto;
+  top: -5px;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.training-tooltip .tt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.training-tooltip .tt-attr { font-weight: 700; color: #ffffff; font-size: 13px; }
+.training-tooltip .tt-eyebrow {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.training-tooltip .tt-name { font-weight: 700; color: #ffffff; font-size: 13px; margin-bottom: 4px; }
+.training-tooltip .tt-desc { color: rgba(255, 255, 255, 0.82); }
+.training-tooltip .tt-modes {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.training-tooltip .tt-mode { display: block; }
+.training-tooltip .tt-mode b { color: #ffffff; font-weight: 700; }
+.training-tooltip .attr-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 16px;
+  margin-left: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  color: #10131a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .training-tooltip { transition: none; transform: none; }
+  .training-tooltip.is-visible { transform: none; }
+  body.training-page .req-chip--focus.is-nudge { animation: none; }
+  body.training-page .coaching-section.coaching-flash { animation: none; }
+  body.training-page .req-meter-fill { transition: none; }
 }
 
 @media (max-width: 1100px) {
