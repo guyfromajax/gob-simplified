@@ -9,7 +9,7 @@
   var recruitMap = {};
   var currentEntries = [];
   var savedEntries = [];
-  var poolFilters = { regions: [], search: '', rtMin: 35, leansOnly: false };
+  var poolFilters = { regions: [], search: '', rtMin: 0, leansOnly: false };
   var showOnlyMine = false;
   var lastAddedRecruitId = null;
   var dragFromIndex = null;

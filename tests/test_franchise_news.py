@@ -24,12 +24,16 @@ def _result_row(away_id, home_id, away_score, home_score):
 
 
 def test_upset_report_qualification_boundary_and_format():
-    ranks = {"t1": 25, "t2": 14, "t3": 20, "t4": 12, "t5": 60, "t6": 3}
-    names = {"t1": "Alpha", "t2": "Beta", "t3": "Gamma", "t4": "Delta", "t5": "Epsilon", "t6": "Zeta"}
+    ranks = {"t1": 35, "t2": 14, "t3": 30, "t4": 12, "t5": 60, "t6": 3, "t7": 100, "t8": 20}
+    names = {
+        "t1": "Alpha", "t2": "Beta", "t3": "Gamma", "t4": "Delta",
+        "t5": "Epsilon", "t6": "Zeta", "t7": "Eta", "t8": "Theta",
+    }
     results = [
-        _result_row("t1", "t2", 80, 72),   # gap 11 -> qualifies (away winner)
-        _result_row("t4", "t3", 70, 75),   # gap 8 -> excluded (home winner, 20-12=8)
-        _result_row("t6", "t5", 90, 95),   # gap 57 -> qualifies (home winner)
+        _result_row("t1", "t2", 80, 72),   # gap 21 -> qualifies (away winner), loser rank 14
+        _result_row("t4", "t3", 70, 75),   # gap 18 -> excluded (home winner, 30-12=18)
+        _result_row("t6", "t5", 90, 95),   # gap 57 -> qualifies (home winner), loser rank 3
+        _result_row("t7", "t8", 66, 60),   # gap 80 -> qualifies (away winner), loser rank 20
     ]
 
     story = franchise_routes._build_week_upset_report_story(5, results, ranks, names)
@@ -39,18 +43,19 @@ def test_upset_report_qualification_boundary_and_format():
     assert story["week"] == 5
     assert story["type"] == "upset_report"
     assert story["story_id"] == "w5-upset-report"
-    # Sorted by rank gap descending: t5 over t6 (gap 57) first.
+    # Ascending by losing team's natl_rank (3, 14, 20) — not by rank gap.
     assert story["lines"] == [
         "#60. Epsilon upset #3. Zeta by a score of 95-90.",
-        "#25. Alpha upset #14. Beta by a score of 80-72.",
+        "#35. Alpha upset #14. Beta by a score of 80-72.",
+        "#100. Eta upset #20. Theta by a score of 66-60.",
     ]
 
 
 def test_upset_report_returns_none_when_no_games_qualify():
     ranks = {"t1": 10, "t2": 5}
     names = {"t1": "Alpha", "t2": "Beta"}
-    # Gap of exactly 9 must NOT qualify (criteria is > 9).
-    ranks_boundary = {"t1": 14, "t2": 5}
+    # Gap of exactly 19 must NOT qualify (criteria is > 19).
+    ranks_boundary = {"t1": 24, "t2": 5}
     results = [_result_row("t1", "t2", 80, 72)]
 
     assert franchise_routes._build_week_upset_report_story(3, results, ranks, names) is None
@@ -73,7 +78,7 @@ def test_ps_all_stars_qualification_and_line_format():
     team_names = {"t1": "Morristown", "t2": "Lancaster"}
     gains = [
         _gain_record("Al Smith", {"SC": 4, "SH": 3, "ID": 1}, rt=38, pos="SG", team_id="t1"),  # total 8 -> qualifies
-        _gain_record("Bo Jones", {"SC": 3, "SH": 3}, rt=30, pos="C", team_id="t1"),            # total 6 -> excluded (> 6 required)
+        _gain_record("Bo Jones", {"SC": 2, "SH": 2}, rt=30, pos="C", team_id="t1"),            # total 4 -> excluded (> 4 required)
         _gain_record("Cy Brown", {"SC": 4, "SH": 4, "RB": 4}, rt=51, pos="PF", team_id="t2"),  # total 12 -> qualifies, 3-way tie
     ]
 

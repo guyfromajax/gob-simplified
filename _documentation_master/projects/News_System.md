@@ -16,13 +16,14 @@
 
 **Regular Season Games Run**
 ##Headline: "Week {week #} Upset Report"
-- Criteria: List all games where the winning team had a natl_rank value > 9 of the team it beat. If no games qualify, this news is not generated for that week.
+- Criteria: List all games where the winning team had a natl_rank value > 19 of the team it beat. If no games qualify, this news is not generated for that week.
 - Content
     "#{winning team rank}. {winning team name} upset #{losing team rank}.{losing team name} by a score of {final score}.
     - list each game on its own line
+    - list games in ascending order of the natl_rank of the losing team, starting with teh lowest
 
 ##Headline: "Practice Squad All-Stars"
-- Criteria: create a list of all Practice Squad players who ahve a total attrbute gain > 6 for the week. If no PS players qualify, this news is not generated for that week.
+- Criteria: create a list of all Practice Squad players who ahve a total attrbute gain > 4 for the week. If no PS players qualify, this news is not generated for that week.
 - Content
     -"{PS Player Name} of {Player Team Name -- school only, no mascot} increased by {increase cumulative total} attribute points this week. His strongest gains were in {list full attribute handle of the highest gain, if there is a tie, list all that are tied using proper grammar of commas and "and" preceding the final attribute}. He's now a {RT value} rated {highest rated position abbreviation -- PG, SG, SF, PF, or C}.
 -Limit the list to the top 10 by Cum Gain. if there is a tie that pushes the list beyond 10, list all that are in the tie then stop after that.

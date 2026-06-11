@@ -8469,8 +8469,8 @@ def _apply_training_squad_progression_and_report(
 # cleared at season rollover in finish_season.
 # ---------------------------------------------------------------------------
 
-NEWS_UPSET_RANK_GAP = 9  # winner_rank - loser_rank must exceed this
-NEWS_PS_ALL_STARS_MIN_GAIN = 6  # weekly cumulative attribute gain must exceed this
+NEWS_UPSET_RANK_GAP = 19  # winner_rank - loser_rank must exceed this
+NEWS_PS_ALL_STARS_MIN_GAIN = 4  # weekly cumulative attribute gain must exceed this
 
 NEWS_ATTRIBUTE_FULL_NAMES = {
     "SC": "Scoring",
@@ -8534,10 +8534,11 @@ def _build_week_upset_report_story(
             f"#{loser_rank}. {team_name_map.get(loser_id, loser_id)} "
             f"by a score of {winner_score}-{loser_score}."
         )
-        upsets.append((gap, line))
+        upsets.append((int(loser_rank), line))
     if not upsets:
         return None
-    upsets.sort(key=lambda item: item[0], reverse=True)
+    # Ascending by the losing team's natl_rank (biggest-name victim first).
+    upsets.sort(key=lambda item: item[0])
     return {
         "story_id": f"w{week}-upset-report",
         "week": int(week),
