@@ -681,20 +681,6 @@ body.has-auth-bar #franchise-container {
   font-weight: 700;
 }
 
-.fcc-home-news-see-all {
-  display: inline-block;
-  margin-top: 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-}
-
-.fcc-home-news-see-all:hover {
-  text-decoration: underline;
-}
-
 /* News tab: full-season list of stories grouped by week */
 .fcc-news-tab-list {
   display: flex;

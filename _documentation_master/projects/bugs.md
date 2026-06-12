@@ -7,11 +7,6 @@
 ##Micro Movements
 9. Dunks! I need DUNKS!
 
-##Upgrade Recruiting Experience
-4. Better UX on Recruiting Day orders
-5. Better flow from Recruiting buttons pressed
-11. More action in on Signing Day
-
 ##Bugs 
 2. 3 pointer on P/T Break does not register as a 3
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
@@ -26,8 +21,7 @@
 57. Player Momentum System
 60. Universal distance-based rebound helper
 62. Leaderboard -- change Rank to Titles
-
-##User Account
+11. More action in on Signing Day
 22. User account -- link X & Facebook?
 
 ##Full Product Readiness
@@ -35,16 +29,20 @@
 101. EOG/EOQ Perfection
 102. Team court images
 103. Player images
-104. Media & Beat reporters
 105. More responsive front end
 106. Monetization plan
 107. Stripe
 108. Message board
 109. More dynamic HCO animations
-110. Geek Points syste
+110. Geek Points system
 
 ##Started and will continually be in progress
-61. News feed
+61. News feed, Media & Beat Reporters
+
+##Full Season Playthrough ideas (6-11-26)
+1. Training Camp News Report
+2. Week 20 Recruiting Report to Inbox
+3. Recruiting Round Up Results
 
 
 

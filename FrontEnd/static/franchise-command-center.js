@@ -1167,31 +1167,22 @@ function renderHomeRecruitingCard() {
 function renderHomeNewsCard() {
   const body = document.getElementById('home-news-body');
   if (!body) return;
+  const seeAllLink = document.getElementById('home-news-see-all-link');
+  if (seeAllLink) seeAllLink.href = buildStandaloneNewsUrl(null);
   const headlines = (commandCenterTopDataCache?.news_headlines || []).slice(0, 5);
-  const query = new URLSearchParams();
-  if (franchiseId) query.set('franchise_id', franchiseId);
-  if (userTeamId) query.set('team_id', userTeamId);
-  const newsUrl = (storyId) => {
-    const q = new URLSearchParams(query);
-    if (storyId) q.set('story', storyId);
-    const qs = q.toString();
-    return `/news.html${qs ? `?${qs}` : ''}`;
-  };
-  const seeAllLink = `<a class="fcc-home-news-see-all" href="${newsUrl(null)}">See All News</a>`;
   if (!headlines.length) {
-    body.innerHTML = `${createEmptyHomeState('No News To Report')}${seeAllLink}`;
+    body.innerHTML = createEmptyHomeState('No News To Report');
     return;
   }
   body.innerHTML = `
     <div class="fcc-home-list-scroll">
       ${headlines.map((item) => `
-        <a class="fcc-home-news-row" href="${newsUrl(item.story_id)}">
+        <a class="fcc-home-news-row" href="${buildStandaloneNewsUrl(item.story_id)}">
           <span class="fcc-home-news-headline">${escapeHomeHtml(item.headline || '--')}</span>
           <span class="fcc-home-list-meta">Wk ${escapeHomeHtml(item.week ?? '--')}</span>
         </a>
       `).join('')}
     </div>
-    ${seeAllLink}
   `;
 }
 

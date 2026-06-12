@@ -8749,7 +8749,15 @@ def _append_franchise_week_news(
         user_conference = None
         _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         if user_team_object_id:
-            user_team_doc = db.teams.find_one({"_id": user_team_object_id}, {"conference": 1})
+            try:
+                user_team_oid = ObjectId(str(user_team_object_id))
+            except Exception:
+                user_team_oid = None
+            user_team_doc = (
+                db.teams.find_one({"_id": user_team_oid}, {"conference": 1})
+                if user_team_oid
+                else None
+            )
             if user_team_doc and user_team_doc.get("conference") is not None:
                 user_conference = str(user_team_doc.get("conference"))
         recruiting_leans_story = _build_recruiting_leans_story(

@@ -257,6 +257,71 @@ def test_recruiting_leans_returns_none_when_nothing_qualifies():
     ) is None
 
 
+def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypatch):
+    """franchise.user_team_object_id is stored as an ObjectId *string*; the news flow
+    must still resolve the user's conference so the conference leans section generates."""
+    import types
+
+    franchise_id = ObjectId()
+    user_team_oid = ObjectId()
+    rival_oid = ObjectId()
+
+    class _FakeFtdCollection:
+        def find(self, _query, _projection=None):
+            return [
+                {"team_id": str(user_team_oid), "natl_rank": 30},
+                {"team_id": str(rival_oid), "natl_rank": 8},
+            ]
+
+    class _FakeTeamsCollection:
+        def __init__(self, docs):
+            self._docs = {doc["_id"]: doc for doc in docs}
+
+        def find(self, query, _projection=None):
+            return [self._docs[oid] for oid in query["_id"]["$in"] if oid in self._docs]
+
+        def find_one(self, query, _projection=None):
+            # Like real Mongo: an ObjectId _id never matches a string key.
+            return self._docs.get(query["_id"])
+
+    class _FakeRecruitsCollection:
+        def find(self, _query, _projection=None):
+            return [_recruit_doc("r1", "Al Low", 31, archetype="Slasher")]
+
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", _FakeFtdCollection())
+    monkeypatch.setattr(franchise_routes, "franchise_recruits_data_collection", _FakeRecruitsCollection())
+    monkeypatch.setattr(
+        franchise_routes,
+        "_format_team_name_map",
+        lambda team_ids=None: {str(rival_oid): "Rival U"},
+    )
+    monkeypatch.setattr(
+        franchise_routes,
+        "db",
+        types.SimpleNamespace(teams=_FakeTeamsCollection([
+            {"_id": user_team_oid, "conference": 4},
+            {"_id": rival_oid, "conference": 4},
+        ])),
+    )
+
+    franchise_doc = {
+        "user_team_id": "Morristown",
+        "user_team_object_id": str(user_team_oid),
+    }
+    events = [{"recruit_id": "r1", "team_id": str(rival_oid)}]
+
+    franchise_routes._append_franchise_week_news(franchise_id, franchise_doc, 3, [], [], events)
+
+    stories = franchise_doc.get("season_news") or []
+    leans_story = next((s for s in stories if s.get("type") == "recruiting_leans"), None)
+    assert leans_story is not None
+    assert leans_story["lines"] == [
+        "Conference 4 Lean Announcements",
+        "Rival U",
+        "Al Low (31)",
+    ]
+
+
 def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
     franchise_id = ObjectId()
     team_a, team_b = str(ObjectId()), str(ObjectId())
