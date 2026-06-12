@@ -468,7 +468,7 @@
   }
 
   // ----- variation builders -----
-  function buildVariationA(moment) {
+  function buildVariationA(moment, hasBoxScore) {
     const phase = moment.type === 'region_championship' ? 'REGION' : 'CONFERENCE';
     const num = moment.type === 'region_championship'
       ? (moment.region || '')
@@ -509,13 +509,13 @@
         </div>
         <div class="cm-va-actions">
           <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
-          <button type="button" class="cm-btn ghost" data-cm-action="boxscore">Box Score</button>
+          ${hasBoxScore ? `<button type="button" class="cm-btn ghost" data-cm-action="boxscore">Box Score</button>` : ''}
         </div>
       </div>
     `;
   }
 
-  function buildVariationB(moment) {
+  function buildVariationB(moment, hasBoxScore) {
     const winner = moment.winner_team_name || '';
     const loser = moment.loser_team_name || '';
     const winnerShort = (winner || '').toUpperCase();
@@ -548,7 +548,7 @@
           </div>
           <div class="cm-vb-actions">
             <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
-            <button type="button" class="cm-btn dark" data-cm-action="boxscore">Box Score</button>
+            ${hasBoxScore ? `<button type="button" class="cm-btn dark" data-cm-action="boxscore">Box Score</button>` : ''}
           </div>
         </div>
       </div>
@@ -656,13 +656,13 @@
     }
   }
 
-  function buildVariationHtml(moment) {
+  function buildVariationHtml(moment, hasBoxScore) {
     switch (moment.type) {
       case 'conference_championship':
       case 'region_championship':
-        return buildVariationA(moment);
+        return buildVariationA(moment, hasBoxScore);
       case 'national_championship':
-        return buildVariationB(moment);
+        return buildVariationB(moment, hasBoxScore);
       case 'trophy_spotlight':
         return buildVariationC(moment);
       case 'banner_raise':
@@ -686,7 +686,16 @@
       const existing = root.querySelector('.cm-variation');
       if (existing) existing.remove();
 
-      const html = buildVariationHtml(moment);
+      // Resolve the Box Score target up front so the button is only rendered
+      // when there's an actual game to open. Sim'd-from-a-distance championships
+      // carry no game_id (no play-by-play game doc exists), so the builder
+      // returns '' and we omit the button rather than render a dead one.
+      let resolvedBoxScoreUrl = (options && options.boxScoreUrl) || '';
+      if (!resolvedBoxScoreUrl && options && typeof options.boxScoreUrlBuilder === 'function') {
+        try { resolvedBoxScoreUrl = options.boxScoreUrlBuilder(moment) || ''; } catch (_) { resolvedBoxScoreUrl = ''; }
+      }
+
+      const html = buildVariationHtml(moment, !!resolvedBoxScoreUrl);
       if (!html) { resolve(); return; }
       const tmp = document.createElement('div');
       tmp.innerHTML = html.trim();
@@ -722,12 +731,8 @@
           return;
         }
         if (action === 'boxscore') {
-          let url = opts.boxScoreUrl;
-          if (typeof opts.boxScoreUrlBuilder === 'function') {
-            try { url = opts.boxScoreUrlBuilder(moment); } catch (_) {}
-          }
-          if (url) {
-            window.location.href = url;
+          if (resolvedBoxScoreUrl) {
+            window.location.href = resolvedBoxScoreUrl;
             return;
           }
         }

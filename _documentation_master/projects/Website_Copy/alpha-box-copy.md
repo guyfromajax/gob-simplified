@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **May 30 Update** Perfected player location tracking. Improved execution of fast breaks. Increased the effect of AG on player movement speed. Improved Lineup Screen UI/UX for more focused and intuitive information presentation. Fixed a number of edge-case bugs.
+- **June 12 Update** Added Tutorial System, News System, Practice Squad, and improved recruiting UX. Also updated recruiting logic so recruits are more likely to declare leans throughout the season. Expanded Recruiting Day points from 20 to 50 to offer more variety in recruiting strategy.
 
 Source:
 - `FrontEnd/static/mode-select.html`
