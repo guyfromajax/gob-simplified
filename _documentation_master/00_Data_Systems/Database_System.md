@@ -1,114 +1,75 @@
 # Database System
 
-## Overview
+Top-level map of the MongoDB layer: every collection, what owns it, and the identity conventions used across the app. For the offensive/defensive play storage model, see `O_&_D_Plays_Collections.md` (canonical).
 
-The database layer uses:
-- universal collections for baseline definitions
-- mode-specific documents for team-owned state and progression
+## Environment & Connection
 
-Relevant collections:
-- `plays`
-- `defenses`
-- `teams`
-- `players`
-- `games`
-- `tournaments`
-- `franchise_team_data`
-- `franchises`
+- `BackEnd/db.py` defines nearly all collection handles; all code imports them from there. Two exceptions are created at point of use: `feedback_submissions` (`BackEnd/api/feedback_routes.py`) and `distant_training` (read via `db["distant_training"]` in `BackEnd/api/franchise_routes.py`).
+- `MONGO_URI` selects the cluster; the database name comes from `MONGO_DB_NAME`, else the URI path (e.g. `/gob-staging`), else defaults to `gob` (prod).
+- `.env.local` (if present) overrides `.env` for local dev.
+- If `MONGO_URI` is unset or the client fails to init, `db.py` falls back to **mongomock** (used by tests).
 
-The older docs described offensive play storage as "references only." That is no longer fully accurate.
+## Collection Inventory
 
-Current offensive model:
-- universal `plays` holds the canonical baseline play doc
-- mode-specific team docs hold lightweight team-owned play copies
-- those team-owned copies carry mutable values like `effectiveness`, `momentum`, `cloaking`, and `target_shooter`
+### Universal / seeded (baseline definitions; read-mostly at runtime)
 
-## Current Identity Rules
+| Collection | Purpose |
+|---|---|
+| `teams` | 128 base teams: name (school), mascot, colors, `conference`, `region`, prestige baselines |
+| `players` | Baseline player pool keyed to base teams |
+| `plays` | Canonical offensive play docs (skeletons, baselines) — see `O_&_D_Plays_Collections.md` |
+| `defenses` | Canonical defenses (`defense_id`, `defense_type`, `zone_definitions`, `shift_triggers`) — seeded by `scripts/init_defenses_collection.py` and siblings |
+| `fcp_skeletons` | Fast Court Press setup/animation skeletons |
+| `hct_skeletons` | Half-court transition skeletons |
+| `distant_training` | CPU-team training templates (`training_type`: tc/regular), seeded by `scripts/generate_distant_training_templates.py` |
 
-Use this consistently:
-- Mongo `_id` stays `ObjectId` in the universal collection
-- `play_id` is the stringified `_id` used everywhere else in app/runtime logic
-- `name` is display text, not the canonical identity
+### Mode state (created and written at runtime)
 
-This now matches the general app pattern used for team/player identifiers.
+| Collection | Purpose |
+|---|---|
+| `games` | Live + completed game documents (per-game team/play/defense state) |
+| `tournaments` | Tournament-mode master docs |
+| `franchises` | Franchise master doc: week, schedule `results`, `season_news`, `season_inbox`, recruiting flags, user team fields |
+| `franchise_team_data` (FTD) | Per-franchise, per-team state: plays copies, playbook settings, scouting, `natl_rank`, recruiting orders |
+| `franchise_players_data` (FPD) | Per-franchise player docs: meta, attributes, position ratings, season/career stats |
+| `franchise_recruits_data` (FRD) | Per-franchise recruit pool: attributes, archetype, `year`, `Home Region`, `Lean` |
+| `franchise_state` | **Deprecated** single-state doc; only read as a backward-compat fallback for user-team resolution |
+| `training_sessions` | Training run log |
 
-## Universal Offensive Play Schema
+### Accounts & platform
 
-Universal play docs include:
-- `_id`
-- `name`
-- `play_type`
-- `play_focus`
-- `target_shooter`
-- `skeletons`
-- optional `copy`
-- baseline `effectiveness`
-- baseline `momentum`
-- baseline `cloaking`
+| Collection | Purpose |
+|---|---|
+| `users` | Auth + profile; career `record`, coaching `archetypes`, `lead_archetype` (see `00_General_Systems/Coaching_Archetype_System.md`) |
+| `password_reset_tokens` | Password reset flow |
+| `alpha_otps` | OTP codes for gated alpha signup |
+| `access_code_requests` | "Request Access Code" submissions (admin fulfills manually) |
+| `alpha_feedback` | Alpha feedback survey responses (lazily created on first insert) |
+| `press_conference_sessions` | Press conference session state |
+| `community_highlights` | Community highlights feed entries |
+| `feedback_submissions` | User feedback form submissions (`BackEnd/api/feedback_routes.py`) |
 
-Set-play note:
-- set-play skeletons in staging now use role aliases like `target_shooter` and `pos1` through `pos4`
-- runtime remaps those aliases back to real lineup positions before role assignment
+Note: Mongo creates collections lazily on first write. As of 2026-06, `training_sessions`, `franchise_state` (deprecated), and `alpha_feedback` are defined in code but have never been written on prod `gob`, so they don't appear there.
 
-## Team-Owned Offensive Play Schema
+## Identity Conventions
 
-Current team play copies include:
+- Mongo `_id` stays `ObjectId` inside a collection; app/runtime logic uses the **stringified** `_id` (team ids, player ids, `play_id`).
+- `name` is display text, never canonical identity.
+- Franchise child collections are keyed by `franchise_id` + entity id, with unique compound indexes (see below). **Type caution:** FTD stores `franchise_id` as `ObjectId`; FPD/FRD store it as a **string**. Queries must match the stored type, and `db.teams` lookups must convert string ids back to `ObjectId`.
+- Defense identity is migrating from name-based to `defense_id` (see `tasks/Defense_ID_Migration.md`); most persisted settings are still defense-name keyed.
 
-```json
-{
-  "play_id": "mongo_object_id_as_string",
-  "name": "Base Post Play",
-  "play_type": "set_play",
-  "play_focus": "inside",
-  "target_shooter": "C",
-  "effectiveness": 0,
-  "momentum": 0,
-  "cloaking": 0,
-  "game_stats": {},
-  "season_stats": {}
-}
-```
+## Indexes (ensured at startup, idempotent)
 
-Important notes:
-- some stored team `plays` maps are still keyed by play name during the compatibility phase
-- runtime helpers support both name-keyed and `play_id`-keyed team `plays` maps
-
-## Playbook Settings Schema
-
-Current offensive playbook persistence is `play_id`-first:
-
-```json
-{
-  "motion": {"play_id": 33},
-  "set_plays": {"play_id": 50},
-  "fast_breaks": {"Covert Release": 25, "Rim Runner": 25},
-  "man_defense": {"Man": 100},
-  "zone_defense": {"2-3 Zone": 40},
-  "pc_order": {
-    "offense": ["play_id"],
-    "defense": ["Man", "2-3 Zone"]
-  },
-  "_meta": {"offense_sort": "usage_desc"},
-  "position_filters": {"standard": ["play_id"]},
-  "even_distribution_all": true
-}
-```
-
-Notes:
-- offensive percentages, offensive Playcall Center ordering, and position filters are now `play_id`-based
-- defensive weighting is still defense-name keyed
-- legacy split set-play maps, `slot_assignments`, and `motion_dropdowns` may still appear in older documents as compatibility fields
-
-## Training / Reporting Persistence
-
-Training report offensive deltas are now keyed by `play_id`:
-- `plays_effectiveness_changes`
-
-UI/report rows still display the play `name`.
+- `franchise_team_data`: unique `(franchise_id, team_id)`
+- `franchise_players_data`: unique `(franchise_id, player_id)`
+- `franchise_recruits_data`: unique `(franchise_id, recruit_id)`
+- `games`: `franchise_id`
+- `franchises`: `user_id`
+- `users`: unique sparse `username_lower`
 
 ## Related Docs
 
-- `docs/docs_1_systems/00_Data_Systems/O_&_D_Plays_Collections.md`
-- `docs/docs_1_systems/03_Data_Persistence/Data_Persistence_System.md`
-- `docs/docs_1_systems/06_GMO_Supporting_Systems/Mode_Init_System.md`
-- `docs/docs_1_systems/06_GMO_Supporting_Systems/Playbooks_Page.md`
+- `_documentation_master/00_Data_Systems/O_&_D_Plays_Collections.md` — play/defense storage model (canonical)
+- `_documentation_master/00_Data_Systems/Games_Collection.md`
+- `_documentation_master/03_Data_Persistence/Data_Persistence_System.md`
+- `_documentation_master/06_GMO_Supporting_Systems/Mode_Init_System.md`

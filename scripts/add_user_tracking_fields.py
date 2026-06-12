@@ -3,7 +3,7 @@
 Backfill the `record` and `archetypes` tracking sub-documents onto every user.
 
 Context:
-  The User Archetype System (see _documentation_master/projects/User_Archetype_System.md)
+  The Coaching Archetype System (see _documentation_master/00_General_Systems/Coaching_Archetype_System.md)
   adds per-user career tracking: a `record` block (wins / losses / total_games /
   win_rate / discount_wins / discount_losses) and an `archetypes` block (the 18
   coaching archetypes + a derived `total`). New signups are born with these

@@ -42,8 +42,34 @@
       border-radius: 14px; padding: 14px 16px;
     }
     .alb-card-head {
+      position: relative;
       display: flex; align-items: center; gap: 10px;
       padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .alb-card-head.has-tip { cursor: help; }
+    .alb-card-head.has-tip:focus-visible { outline: 2px solid rgba(247,148,32,0.6); outline-offset: 3px; border-radius: 6px; }
+
+    /* Hover/focus definition tooltip for each archetype header. Text mirrors the
+       archetype `description` shown on coaching-archetypes.html. */
+    .alb-tip {
+      position: absolute; left: 0; bottom: calc(100% + 9px);
+      width: max-content; max-width: 260px;
+      background: #1b2233; border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px; padding: 9px 11px;
+      font-size: 12.5px; line-height: 1.45; font-weight: 400;
+      color: rgba(255,255,255,0.88); white-space: normal;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+      opacity: 0; visibility: hidden; transform: translateY(4px);
+      transition: opacity 0.14s ease, transform 0.14s ease;
+      z-index: 20; pointer-events: none;
+    }
+    .alb-tip::after {
+      content: ''; position: absolute; top: 100%; left: 18px;
+      border: 6px solid transparent; border-top-color: #1b2233;
+    }
+    .alb-card-head.has-tip:hover .alb-tip,
+    .alb-card-head.has-tip:focus-within .alb-tip {
+      opacity: 1; visibility: visible; transform: translateY(0);
     }
     .alb-card-badge { width: 28px; height: 28px; flex: 0 0 auto; display: inline-flex; align-items: center; }
     .alb-card-name { font-family: var(--bebas); font-size: 18px; letter-spacing: 0.03em; color: #fff; }
@@ -118,6 +144,7 @@
         var rows = boards[key] || [];
         var name = window.GOBArchetype ? window.GOBArchetype.nameFor(key) : key;
         var badge = window.GOBArchetype ? window.GOBArchetype.badgeHtml(key, 28) : '';
+        var desc = window.GOBArchetype && window.GOBArchetype.descFor ? window.GOBArchetype.descFor(key) : '';
         var body = rows.length
           ? rows.map(function (r) {
               return '<div class="alb-row' + (r.is_current_user ? ' is-current' : '') + '">'
@@ -126,9 +153,15 @@
                 + '<span class="alb-pct">' + r.pct + '%</span></div>';
             }).join('')
           : '<div class="alb-empty">No coaches yet.</div>';
+        var headTip = desc
+          ? '<span class="alb-tip" role="tooltip">' + escapeHtml(desc) + '</span>'
+          : '';
+        var headAttrs = desc
+          ? ' class="alb-card-head has-tip" tabindex="0" aria-label="' + escapeHtml(name + ': ' + desc) + '"'
+          : ' class="alb-card-head"';
         return '<div class="alb-card">'
-          + '<div class="alb-card-head"><span class="alb-card-badge">' + badge + '</span>'
-          + '<span class="alb-card-name">' + escapeHtml(name) + '</span></div>'
+          + '<div' + headAttrs + '><span class="alb-card-badge">' + badge + '</span>'
+          + '<span class="alb-card-name">' + escapeHtml(name) + '</span>' + headTip + '</div>'
           + body + '</div>';
       }).join('');
     }

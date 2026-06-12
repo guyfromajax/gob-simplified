@@ -3072,7 +3072,28 @@ async function init() {
       showTs();
     }
   }
-  
+
+  // Lowest-priority coaching-archetype "you have evolved" modal. Runs only after
+  // the rest of the modal sequence has settled (championship moments resolved +
+  // tutorial-return alerts settled + a short delay so any synchronous reveal /
+  // feedback / region-bye / big-news overlay has rendered). On a clean visit it
+  // shows; if anything else claimed the visit it's skipped permanently. The
+  // pending flag is consumed either way (inside ArchetypeEvolutionModal.run).
+  if (window.ArchetypeEvolutionModal) {
+    const runEvo = () => setTimeout(() => {
+      window.ArchetypeEvolutionModal.run(fccHasCompetingModal(topData));
+    }, 1200);
+    const settleThenEvo = () => {
+      const taEvo = window.GOBTutorialAlerts;
+      if (taEvo && typeof taEvo.whenReturnAlertsSettled === 'function') {
+        taEvo.whenReturnAlertsSettled(runEvo);
+      } else {
+        runEvo();
+      }
+    };
+    championshipMomentsDone.then(settleThenEvo, settleThenEvo);
+  }
+
   if (topData && (topData.team_id || topData.team) && userTeamId) {
     console.log('Loading franchise roster for team_id:', userTeamId, 'franchiseId:', franchiseId);
     if (!franchiseId) {
@@ -3209,6 +3230,41 @@ function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
 function getChampionshipSeenKey(franchiseIdValue, gameId) {
   if (!franchiseIdValue || !gameId) return null;
   return `fcc_championship_seen_${franchiseIdValue}_${gameId}`;
+}
+
+// True if any higher-priority FCC modal/prompt claims this visit, so the
+// lowest-priority archetype-evolution modal must yield. Combines a DOM check
+// (same overlay selectors RegionByeModal.blockerVisible uses, for modals already
+// rendered) with a data check from topData/me (for modals eligible this visit
+// that may not have rendered yet — avoids a render-timing race). Conservative:
+// when in doubt it returns true, so the evolution modal over-yields rather than
+// stacking on another modal.
+function fccHasCompetingModal(topData) {
+  if (typeof document !== 'undefined' && document.querySelector(
+      '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
+      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.fcc-modal-overlay,.bn-overlay.show')) {
+    return true;
+  }
+  if (Array.isArray(topData?.pending_championship_moments) && topData.pending_championship_moments.length) return true;
+  const summary = topData?.championship_summary;
+  if (summary && summary.game_id) {
+    const seenKey = getChampionshipSeenKey(franchiseId, summary.game_id);
+    const seen = seenKey && typeof localStorage !== 'undefined' && localStorage.getItem(seenKey) === '1';
+    if (!seen) return true;
+  }
+  if (topData?.region_bye_modal_eligible) return true;
+  if (topData?.bracket_reveal_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
+  if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;
+  const me = window.__gobAuthMeData;
+  if (me) {
+    if (me.archetype_reveal_seen === false) return true; // first-archetype reveal still pending
+    if (!me.alpha_feedback_submitted && me.archetype_reveal_seen !== false) {
+      const games = parseInt(me.alpha_feedback_games, 10) || 0;
+      const level = parseInt(me.alpha_feedback_prompt_level, 10) || 0;
+      if ((games >= 8 && level < 8) || (games >= 4 && level < 4)) return true;
+    }
+  }
+  return false;
 }
 
 function buildFccBoxScoreUrlForMoment(moment) {

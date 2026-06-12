@@ -1,6 +1,6 @@
 # simulate-quarter API + observability cleanup
 
-Backlog of high-leverage cleanups surfaced while wiring the User Archetype System
+Backlog of high-leverage cleanups surfaced while wiring the Coaching Archetype System
 (the per-quarter stash hook lives in `simulate_quarter_endpoint`). Captured to
 revisit later — **not** yet actioned. Do this work behind existing tests, and
 verify before deleting (see caveat).

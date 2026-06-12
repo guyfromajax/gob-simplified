@@ -25,7 +25,7 @@
      - *Auth core:* `_id` (ObjectId), `email`, `password_hash`, `role`, `subscription`, `username` (optional), `username_lower` (for uniqueness), `created_at`, `updated_at`, `last_login_at`, `version`
      - *Geek points:* `geek_points` (int total), `geek_points_by_team` (optional dict: canonical `team_id` → int; lazy-created on first award per team)
      - *Profile / UX:* `account_settings` (`{ display_color }`), `fte` (bool, legacy FTE flag), `fte_v2_complete` (bool), `tutorial_state` (`{ step, team_pick, started_at, completed_at }`)
-     - *Coaching-archetype tracking:* `record` (`{ wins, losses, total_games, win_rate, discount_wins, discount_losses }`), `archetypes` (18 per-archetype counters + `total`), `lead_archetype` (string key, `""` when no games), `archetype_reveal_seen` (bool). Shapes are the single source of truth in `BackEnd/utils/user_tracking.py` — see [`projects/User_Archetype_System.md`](../projects/User_Archetype_System.md).
+     - *Coaching-archetype tracking:* `record` (`{ wins, losses, total_games, win_rate, discount_wins, discount_losses }`), `archetypes` (18 per-archetype counters + `total`), `lead_archetype` (string key, `""` when no games), `archetype_reveal_seen` (bool). Shapes are the single source of truth in `BackEnd/utils/user_tracking.py` — see [`00_General_Systems/Coaching_Archetype_System.md`](Coaching_Archetype_System.md).
      - *Titles / championships:* `championships_total` (dict: `kind` → int count) and `championships_by_team` (dict: canonical `team_id` → `kind` → int). The four title `kind` keys:
        - `conf_rs` — regular-season conference championship (1-seed at week 26)
        - `conf_t` — conference tournament title
@@ -183,7 +183,7 @@ Stale/invalid tokens in `localStorage` caused UI to show "logged in" state even 
 
 - **BackEnd/api/auth_routes.py** – All `/api/auth/*` endpoints (signup, login, logout, me, config, set-username, account-settings, archetype-reveal-seen, leaderboard, fte-complete, tutorial-advance/complete, reset)
 - **BackEnd/api/leaderboard_routes.py** – `/api/leaderboard/by-team` (coach leaderboards; rows carry `lead_archetype`)
-- **BackEnd/utils/user_tracking.py** – single source of truth for the `record` / `archetypes` / `lead_archetype` shapes on the user doc (see `projects/User_Archetype_System.md`)
+- **BackEnd/utils/user_tracking.py** – single source of truth for the `record` / `archetypes` / `lead_archetype` shapes on the user doc (see `00_General_Systems/Coaching_Archetype_System.md`)
 - **BackEnd/utils/auth.py** – Password hashing, JWT creation, `get_current_user`, `get_user_by_email`
 - **BackEnd/utils/otp_validator.py** – Alpha OTP validation and consumption
 - **BackEnd/utils/rate_limiter.py** – Rate limit config; auth endpoints use `AUTH_RATE_LIMIT`

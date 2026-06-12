@@ -57,6 +57,7 @@ Current play copy shape:
   "play_type": "set_play",
   "play_focus": "inside",
   "target_shooter": "C",
+  "motion_focus": null,
   "effectiveness": 0,
   "momentum": 0,
   "cloaking": 0,
@@ -105,7 +106,8 @@ Training/report notes:
 
 ## Related Docs
 
-- `docs/docs_1_systems/05_GP_Supporting_Systems/HCO_Turn_Resolution_System.md`
-- `docs/docs_1_systems/05_GP_Supporting_Systems/Sim_Playcalling_System.md`
-- `docs/docs_1_systems/06_GMO_Supporting_Systems/Playbooks_Page.md`
-- `docs/docs_1_systems/06_GMO_Supporting_Systems/Play_Builder_System.md`
+- `_documentation_master/00_Data_Systems/Database_System.md`
+- `_documentation_master/05_GP_Supporting_Systems/HCO_Turn_Resolution_System.md`
+- `_documentation_master/05_GP_Supporting_Systems/Sim_Playcalling_System.md`
+- `_documentation_master/06_GMO_Supporting_Systems/Playbooks_Page.md`
+- `_documentation_master/06_GMO_Supporting_Systems/Play_Builder_System.md`

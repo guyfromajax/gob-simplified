@@ -70,6 +70,8 @@ from BackEnd.utils.franchise_geek_points import (
 from BackEnd.utils.community_highlights import (
     build_community_highlight_pending,
     flush_community_highlight_pending_after_week,
+    lead_archetype_for_user,
+    record_archetype_change_if_any,
     user_geek_points_delta_for_user_game_block,
     user_geek_points_snapshot_for_franchise,
 )
@@ -2690,6 +2692,12 @@ def save_result(req: FranchiseResultRequest):
         logger.error(f"❌ [SAVE-RESULT] Game not found: {game_id}")
         raise HTTPException(status_code=404, detail="Game not found")
 
+    # Snapshot the user's lead coaching archetype before finalize_game commits this
+    # game's archetype counts; compared after to flag a first-time/changed archetype
+    # for the community-highlights feed (consumed by the phase-B flush).
+    archetype_owner_user_id = franchise_doc.get("user_id")
+    lead_archetype_before = lead_archetype_for_user(archetype_owner_user_id)
+
     logger.info(f"🔍 [SAVE-RESULT] Documents found, extracting team info")
     home = game_doc.get("homeTeam", {}) or {}
     away = game_doc.get("awayTeam", {}) or {}
@@ -2792,6 +2800,10 @@ def save_result(req: FranchiseResultRequest):
         req.game_id, mode="franchise", franchise_id=req.franchise_id
     )
     logger.info(f"🔍 [SAVE-RESULT] finalize_game() completed")
+
+    # Flag a coaching-archetype change (established for the first time, or evolved)
+    # for the community-highlights feed. No-op when unchanged.
+    record_archetype_change_if_any(franchise_id, archetype_owner_user_id, lead_archetype_before)
 
     # Run team attribute update once and set team_attribute_changes on game doc for box score display
     _finalize_team_attributes_for_game(
@@ -7397,9 +7409,9 @@ def _apply_team_to_recruit_performance_lean(lean_doc: dict | None, team_id: str)
 def _game_performance_lean_chances_for_week(week: int) -> dict[str, tuple[float, float]] | None:
     """Returns win and quality_loss (low_rt, high_rt) probability pairs; None if not a performance-lean week."""
     if 1 <= week <= 10:
-        return {"win": (0.60, 0.40), "quality_loss": (0.40, 0.20)}
+        return {"win": (0.50, 0.25), "quality_loss": (0.40, 0.20)}
     if 11 <= week <= 15:
-        return {"win": (0.70, 0.50), "quality_loss": (0.40, 0.25)}
+        return {"win": (0.60, 0.40), "quality_loss": (0.40, 0.25)}
     if 16 <= week <= 19:
         return {"win": (0.80, 0.60), "quality_loss": (0.50, 0.30)}
     if 27 <= week <= 34:

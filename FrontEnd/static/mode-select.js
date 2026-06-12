@@ -410,6 +410,22 @@ function chDebutCopyHtml(entry) {
   );
 }
 
+// Archetype-evolution entry: badge sits right after the bold username (our
+// standard), then the established/evolved copy. Name resolves from the manifest.
+function chArchetypeCopyHtml(entry) {
+  var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
+  var userStrong = '<strong class="ch-username">' + uname + '</strong>';
+  var badge = coachArchetypeBadge(entry, 22); // reads entry.lead_archetype
+  var name = (window.GOBArchetype && window.GOBArchetype.nameFor)
+    ? window.GOBArchetype.nameFor(entry.lead_archetype)
+    : entry.lead_archetype;
+  var nameEsc = escapeHtmlMs(name || '');
+  if (entry.is_first) {
+    return userStrong + badge + ' has established his coaching archetype as ' + nameEsc + '.';
+  }
+  return userStrong + badge + ' has evolved his coaching archetype to ' + nameEsc + '.';
+}
+
 function chAnnouncementHtml(entry) {
   var u = String(entry.username || entry.user_name || 'Coach');
   var raw = String(entry.announcement_line || '');
@@ -443,6 +459,21 @@ function renderCommunityHighlights(data) {
         '<div class="community-highlight-row-inner">' +
         '<div class="community-highlight-copy">' +
         debutCopy +
+        '</div>' +
+        '</div>' +
+        '</div>'
+      );
+    }
+
+    // Archetype evolution: standard row chrome, no GP block (no game).
+    if (type === 'archetype_evolution') {
+      return (
+        '<div class="community-highlight-row" style="' +
+        chRowChromeStyle(entry) +
+        '">' +
+        '<div class="community-highlight-row-inner">' +
+        '<div class="community-highlight-copy">' +
+        chArchetypeCopyHtml(entry) +
         '</div>' +
         '</div>' +
         '</div>'
@@ -500,6 +531,13 @@ async function loadCommunityHighlights() {
       '<div class="community-highlights-empty">Sign in to see community highlights.</div>';
     return;
   }
+  // Ensure the archetype name/badge manifest is loaded so archetype-evolution rows
+  // render the proper display name (not a humanized key).
+  try {
+    if (window.GOBArchetype && window.GOBArchetype.ensureManifest) {
+      await window.GOBArchetype.ensureManifest();
+    }
+  } catch (e) {}
   renderCommunityHighlights(data);
 }
 

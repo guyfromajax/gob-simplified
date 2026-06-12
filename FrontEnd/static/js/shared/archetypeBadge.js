@@ -22,6 +22,7 @@
   var DEFAULT_SIZE = 22;
   var manifestPromise = null;
   var nameByKey = {};
+  var descByKey = {};
 
   function humanize(key) {
     return String(key || '')
@@ -36,7 +37,12 @@
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (m) {
           if (m && Array.isArray(m.archetypes)) {
-            m.archetypes.forEach(function (a) { if (a && a.id) nameByKey[a.id] = a.name; });
+            m.archetypes.forEach(function (a) {
+              if (a && a.id) {
+                nameByKey[a.id] = a.name;
+                if (a.description) descByKey[a.id] = a.description;
+              }
+            });
             window.__gobArchetypeManifest = m;
           }
           return m;
@@ -47,6 +53,7 @@
   }
 
   function nameFor(key) { return nameByKey[key] || humanize(key); }
+  function descFor(key) { return descByKey[key] || ''; }
   function svgUrl(key) { return BASE + '/svg/' + encodeURIComponent(String(key)) + '.svg'; }
 
   function escapeHtml(s) {
@@ -121,6 +128,7 @@
     createBadge: createBadge,
     svgUrl: svgUrl,
     nameFor: nameFor,
+    descFor: descFor,
     leadFrom: leadFrom,
   };
 })();

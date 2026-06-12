@@ -7,7 +7,7 @@ defaults, the backfill migration, the per-game commit in finalize_game, and the
 /api/auth/me serializer) should build them from here so the shape can never
 drift across call sites.
 
-See `_documentation_master/projects/User_Archetype_System.md` for the spec.
+See `_documentation_master/00_General_Systems/Coaching_Archetype_System.md` for the spec.
 """
 
 from __future__ import annotations
@@ -67,6 +67,9 @@ def default_user_tracking() -> dict:
     `lead_archetype` is the denormalized "highest count" key the UI reads to pick
     the coach's badge ("" until they have games). `archetype_reveal_seen` gates the
     one-time first-archetype reveal modal (false → eligible to see it).
+    `archetype_evolution_pending` holds the new archetype key when a coach's lead
+    archetype *changes* (set in save_result); the FCC "you have evolved" modal
+    consumes + clears it ("" → nothing pending).
 
     Alpha-feedback fields gate the alpha survey + its post-game prompt modal:
       `alpha_feedback_submitted` — true once the user submits the 12-question survey.
@@ -89,6 +92,7 @@ def default_user_tracking() -> dict:
         "archetypes": default_archetypes(),
         "lead_archetype": "",
         "archetype_reveal_seen": False,
+        "archetype_evolution_pending": "",
         "alpha_feedback_submitted": False,
         "alpha_feedback_games": 0,
         "alpha_feedback_prompt_level": 0,

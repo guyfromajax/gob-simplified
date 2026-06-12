@@ -1,4 +1,6 @@
+# Account Modal — Player View Toggle (feature brief)
 
+**Status (2026-06):** Sections 1–2 (Username, Scouting Ambience) are live in the account modal (`FrontEnd/static/js/shared/authBarInit.js`) and account page (`account.html`). Section 3 (Player View 4-point sprite toggle + sprite display) is **planned, not yet built** — that's the work this brief specs. Sprite rendering rules also relate to `05_Animation_System/Player_Sprite_System.md`.
 
 **Modal Layout**
 

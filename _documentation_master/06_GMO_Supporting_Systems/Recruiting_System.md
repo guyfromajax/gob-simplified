@@ -134,8 +134,8 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - **National rank:** lower `natl_rank` is better (#1 is best). A **better-ranked opponent** means the opponent’s `natl_rank` is **less than** the team’s.
 - **Quality loss margin:** “loss by 8 points or less” means the team’s score is **8 or fewer** points below the opponent’s (i.e. **inclusive** of an 8-point loss).
 - if the team wins their game that week
-    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random
-    - 40% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 50% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 60% chance hits, choose one recruit in their region who meets that criteria at random
+    - 25% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random. 
 - if the team **loses** to a **better-ranked** opponent (`opponent.natl_rank < team.natl_rank`) **and** the loss margin is **at most 8 points** (inclusive):
     - 40% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random
     - 20% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 20% chance hits, choose one recruit in their region who meets that criteria at random.
@@ -145,8 +145,8 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - **Bye weeks:** no lean updates from this block.
 - **Quality loss** uses the same rank and margin rules as weeks 1–10.
 - if the team wins their game that week
-    - 70% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 70% chance hits, choose one recruit in their region who meets that criteria at random
-    - 50% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random. 
+    - 60% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 70% chance hits, choose one recruit in their region who meets that criteria at random
+    - 40% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random. 
 - if the team loses to a better-ranked opponent and the loss margin is at most 8 points (inclusive):
     - 40% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 40% chance hits, choose one recruit in their region who meets that criteria at random
     - 25% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 25% chance hits, choose one recruit in their region who meets that criteria at random.
@@ -161,6 +161,8 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - if the team loses to a better-ranked opponent and the loss margin is at most 8 points (inclusive):
     - 50% chance that a recruit with RT < 30 in their region will add them to their lean list. If the 50% chance hits, choose one recruit in their region who meets that criteria at random
     - 30% chance that a recruit with RT >= 30 in their region will add them to their lean list. If the 30% chance hits, choose one recruit in their region who meets that criteria at random. 
+
+
 
 
 ##Weeks 20-26##

@@ -63,6 +63,10 @@
     document.head.appendChild(style);
   }
 
+  // Shared so the archetype-evolution modal reuses the exact same styling (single
+  // CSS source of truth — no duplication/drift).
+  window.GOBArchRevealInjectStyles = injectStyles;
+
   function markSeen() {
     try {
       if (window.__gobAuthMeData) window.__gobAuthMeData.archetype_reveal_seen = true;

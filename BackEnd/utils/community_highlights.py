@@ -90,6 +90,56 @@ def user_geek_points_snapshot_for_franchise(franchise_doc: dict) -> int:
     return _user_geek_points_total(franchise_doc.get("user_id"))
 
 
+# Marker stashed on the franchise doc by save_result when the user's just-played
+# game changed their lead coaching archetype; consumed by the phase-B flush.
+ARCHETYPE_PENDING_FIELD = "post_game_status.community_highlight_archetype_pending"
+
+
+def lead_archetype_for_user(owner_user_id: Any) -> str:
+    """Current denormalized lead_archetype key for a user ('' when none/no games)."""
+    if not owner_user_id:
+        return ""
+    try:
+        oid = ObjectId(str(owner_user_id))
+    except Exception:
+        return ""
+    u = users_collection.find_one({"_id": oid}, {"lead_archetype": 1})
+    return str((u or {}).get("lead_archetype") or "")
+
+
+def record_archetype_change_if_any(
+    franchise_id: ObjectId,
+    owner_user_id: Any,
+    lead_before: str,
+) -> None:
+    """After the user's game commits a new lead_archetype, stash a from/to marker
+    on the franchise when it changed. The phase-B flush turns this into a feed row.
+    Detection lives here (where the change actually happens, in save_result) so a
+    genuine first-time establishment fires while pre-existing archetypes do not."""
+    lead_after = lead_archetype_for_user(owner_user_id)
+    if not lead_after or lead_after == (lead_before or ""):
+        return
+    try:
+        franchises_collection.update_one(
+            {"_id": franchise_id},
+            {"$set": {ARCHETYPE_PENDING_FIELD: {"from": lead_before or "", "to": lead_after}}},
+        )
+    except Exception:
+        logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to record archetype change marker")
+
+    # A true *evolution* (changed from a prior archetype, not first-time
+    # establishment) also queues the FCC "you have evolved" modal. First-time
+    # establishment (lead_before empty) stays with the existing first-reveal modal.
+    if lead_before and owner_user_id:
+        try:
+            users_collection.update_one(
+                {"_id": ObjectId(str(owner_user_id))},
+                {"$set": {"archetype_evolution_pending": lead_after}},
+            )
+        except Exception:
+            logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to set archetype_evolution_pending")
+
+
 def _user_scores_from_row(user_team_id_str: Any, user_row: dict) -> tuple[int, int]:
     ut = str(user_team_id_str or "").strip()
     away_id = str(user_row.get("away_id") or "")
@@ -481,6 +531,29 @@ def push_debut_entry(
     _push_entries([entry])
 
 
+def _build_archetype_entry(
+    *,
+    display_username: str,
+    lead_archetype: str,
+    is_first: bool,
+    primary: str,
+    secondary: str,
+) -> dict[str, Any]:
+    """Standard-row variant announcing a coach's lead archetype change. The archetype
+    display name + badge are resolved on the frontend from the icon manifest."""
+    now = datetime.now(timezone.utc)
+    return {
+        "at": now.isoformat(),
+        "entry_type": "archetype_evolution",
+        "variant": "standard_row",
+        "username": display_username,
+        "lead_archetype": str(lead_archetype),
+        "is_first": bool(is_first),
+        "primary_color": primary,
+        "secondary_color": secondary,
+    }
+
+
 def _build_championship_entry(
     *,
     display_username: str,
@@ -540,7 +613,10 @@ def flush_community_highlight_pending_after_week(
         logger.warning("[COMMUNITY_HIGHLIGHTS] No user team; skip flush franchise=%s", franchise_id)
         franchises_collection.update_one(
             {"_id": franchise_id},
-            {"$unset": {"post_game_status.community_highlight_pending": ""}},
+            {"$unset": {
+                "post_game_status.community_highlight_pending": "",
+                "post_game_status.community_highlight_archetype_pending": "",
+            }},
         )
         return
 
@@ -672,6 +748,22 @@ def flush_community_highlight_pending_after_week(
             )
         )
 
+    # Lead-archetype evolution row: the user's just-played game changed their lead
+    # coaching archetype (marker set in save_result). Appended below the game row.
+    archetype_pending = (fresh.get("post_game_status") or {}).get(
+        "community_highlight_archetype_pending"
+    )
+    if isinstance(archetype_pending, dict) and archetype_pending.get("to"):
+        entries.append(
+            _build_archetype_entry(
+                display_username=display_username,
+                lead_archetype=str(archetype_pending.get("to")),
+                is_first=not str(archetype_pending.get("from") or ""),
+                primary=primary,
+                secondary=secondary,
+            )
+        )
+
     try:
         _push_entries(entries)
     except Exception:
@@ -679,7 +771,10 @@ def flush_community_highlight_pending_after_week(
 
     franchises_collection.update_one(
         {"_id": franchise_id},
-        {"$unset": {"post_game_status.community_highlight_pending": ""}},
+        {"$unset": {
+            "post_game_status.community_highlight_pending": "",
+            "post_game_status.community_highlight_archetype_pending": "",
+        }},
     )
 
 

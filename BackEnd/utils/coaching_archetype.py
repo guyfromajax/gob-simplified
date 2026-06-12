@@ -1,7 +1,7 @@
 """Coaching archetype classifier — backend source of truth.
 
 Given a team's 5 active starters, pick the one Coaching Archetype that describes
-the lineup, per `_documentation_master/projects/User_Archetype_System.md`:
+the lineup, per `_documentation_master/00_General_Systems/Coaching_Archetype_System.md`:
 
   1. Total each of the 11 attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ)
      across the 5 starters.

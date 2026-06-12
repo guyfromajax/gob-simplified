@@ -1,5 +1,7 @@
 ## Box Score System ✅ **COMPLETE** (January 2025; doc synced to code April 2026)
 
+> **Note (2026-06):** Tournament mode and Single Game mode are **sunset**. References to `tournament_id` / tournament flows below describe code paths that still exist but are no longer user-reachable; they'll be removed with the sunset-code purge.
+
 **Base Constants**
 
 1. **Data Sources**:

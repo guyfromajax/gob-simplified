@@ -151,6 +151,7 @@ class UserResponse(BaseModel):
     archetypes: Optional[dict] = None  # 18 coaching-archetype counters + total
     lead_archetype: Optional[str] = None  # denormalized top archetype key for the badge ("" if none)
     archetype_reveal_seen: Optional[bool] = None  # gates the one-time first-archetype reveal
+    archetype_evolution_pending: Optional[str] = None  # archetype key to announce in the FCC "you have evolved" modal ("" = none)
     alpha_feedback_submitted: Optional[bool] = None  # true once the alpha survey is submitted
     alpha_feedback_games: Optional[int] = None  # forward-only non-tutorial games since launch (prompt trigger)
     alpha_feedback_prompt_level: Optional[int] = None  # highest prompt threshold shown (0 / 4 / 8; 2 / 5 legacy)
@@ -666,6 +667,21 @@ async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
     return {"archetype_reveal_seen": True, "message": "Archetype reveal marked seen"}
 
 
+@router.patch("/archetype-evolution-seen")
+async def clear_archetype_evolution_pending(user: dict = Depends(get_current_user)):
+    """Clear the pending archetype-evolution modal for this account.
+
+    Called by the FCC whether the "you have evolved" modal was shown OR skipped
+    because a higher-priority modal claimed the visit — either way the change is
+    consumed and never shown again.
+    """
+    users_collection.update_one(
+        {"_id": ObjectId(user["user_id"])},
+        {"$set": {"archetype_evolution_pending": "", "updated_at": datetime.now(timezone.utc)}}
+    )
+    return {"archetype_evolution_pending": "", "message": "Archetype evolution cleared"}
+
+
 class AlphaFeedbackPromptSeen(BaseModel):
     # The threshold just shown (4 or 8; 2 / 5 legacy). Stored via $max so the prompt
     # level only advances — each variant fires once, and out-of-order calls can't lower it.
@@ -912,6 +928,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     if lead_archetype is None:
         lead_archetype = compute_lead_archetype(archetypes)
     archetype_reveal_seen = bool(db_user.get("archetype_reveal_seen")) if db_user else False
+    archetype_evolution_pending = str(db_user.get("archetype_evolution_pending") or "") if db_user else ""
     # Alpha-feedback gating (read-only here). Missing → unsubmitted / 0 games / no prompt yet.
     alpha_feedback_submitted = bool(db_user.get("alpha_feedback_submitted")) if db_user else False
     alpha_feedback_games = int(db_user.get("alpha_feedback_games", 0) or 0) if db_user else 0
@@ -951,6 +968,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         archetypes=archetypes,
         lead_archetype=lead_archetype,
         archetype_reveal_seen=archetype_reveal_seen,
+        archetype_evolution_pending=archetype_evolution_pending,
         alpha_feedback_submitted=alpha_feedback_submitted,
         alpha_feedback_games=alpha_feedback_games,
         alpha_feedback_prompt_level=alpha_feedback_prompt_level,

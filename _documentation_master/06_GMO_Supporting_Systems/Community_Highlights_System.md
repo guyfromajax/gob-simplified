@@ -72,12 +72,18 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
 - **Trigger:** User finishes their **franchise** week for the human-played game: **phase B** has run and DB state (including rank/GP side effects for that flow) is committed.
 - **Content:** Templates above; standard rows include **scores**; special rows add **announcement + details** and optional POTG on championship details.
 
+- **Trigger:** User's main coaching archetype (`users.lead_archetype`) changes for the franchise game they just played. Detected in `save_result` (snapshot lead archetype before `finalize_game`, compare after) so a genuine first-time establishment fires while pre-existing archetypes do not. Change is stashed on `post_game_status.community_highlight_archetype_pending` (`{from, to}`) and the feed row is pushed by the **phase-B** flush (consistent with all other highlight rows). Fires on **every** change (incl. A→B→A churn). Appended **below** the game row.
+  - **Content:** Standard Row design, **no GP block**. Archetype **badge** sits to the right of the bold username (our standard). Display name resolves on the frontend from the icon manifest.
+  - **Copy (first-time / established):** "{username} has established his coaching archetype as {lead archetype name}."
+  - **Copy (subsequent / evolved):** "{username} has evolved his coaching archetype to {lead archetype name}."
+
 ---
 
 ## References (implementation)
 
 - Mode Select shell: `FrontEnd/static/mode-select.html` (`community-highlights-section`); rendering: `FrontEnd/static/mode-select.js` (`renderCommunityHighlights`), styles: `FrontEnd/static/mode-select.css`.
 - Pending + flush: `BackEnd/utils/community_highlights.py` (`build_community_highlight_pending`, `flush_community_highlight_pending_after_week`, `_build_standard_entry` / `_user_regular_season_record` for **`user_team_record`** on standard rows).
+- Archetype-evolution row: `BackEnd/utils/community_highlights.py` (`lead_archetype_for_user`, `record_archetype_change_if_any`, `_build_archetype_entry`); detection in `save_result` (`BackEnd/api/franchise_routes.py`); render in `FrontEnd/static/mode-select.js` (`chArchetypeCopyHtml`, `archetype_evolution` branch in `renderCommunityHighlights`). Entry shape: `entry_type:"archetype_evolution"`, `lead_archetype` (key), `is_first` (bool).
 - Phase A wiring: `BackEnd/api/franchise_routes.py` — `_complete_week_process_user_game_block` (passes `game_id`, `eos_game_meta` into pending), `complete_week_phase_a`, monolithic `complete_week`.
 - Phase B / rank: `BackEnd/api/franchise_routes.py` — `_complete_week_finish_cpu_and_persist`, `_apply_regular_season_rank_prestige_updates`.
 - FTD: `franchise_team_data_collection` — `natl_rank`.
