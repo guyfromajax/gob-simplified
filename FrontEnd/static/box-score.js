@@ -240,6 +240,9 @@ async function loadGameData(gameId) {
 
 // Fetch and merge full rosters with game data to ensure all 12 players are shown
 async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode, homeTeamId = null, awayTeamId = null) {
+  if (mode === 'practice_squad') {
+    return;
+  }
   console.log('🔍 [BOX-SCORE DEBUG] mergeFullRosters() called:', {
     homeTeamName,
     awayTeamName,

@@ -8720,6 +8720,25 @@ def _build_recruiting_leans_story(
     }
 
 
+def _build_ps_game_results_news_story(
+    franchise_doc: dict[str, Any],
+    week: int,
+    franchise_id: ObjectId,
+) -> dict[str, Any] | None:
+    from BackEnd.practice_squad.manager import build_game_results_story
+
+    ps_state = franchise_doc.get("practice_squad") or {}
+    if not ps_state.get("initialized") or week < 2 or week > 19:
+        return None
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    return build_game_results_story(
+        ps_state,
+        week,
+        franchise_id=str(franchise_id),
+        team_id=str(user_team_object_id) if user_team_object_id else None,
+    )
+
+
 def _append_franchise_week_news(
     franchise_id: ObjectId,
     franchise_doc: dict[str, Any],
@@ -8796,6 +8815,7 @@ def _append_franchise_week_news(
         story
         for story in (
             _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map),
+            _build_ps_game_results_news_story(franchise_doc, week, franchise_id),
             _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map),
             recruiting_leans_story,
         )
@@ -9369,6 +9389,170 @@ def get_franchise_news(
     return {
         "week": int(franchise_doc.get("week", 1) or 1),
         "news": franchise_doc.get("season_news") or [],
+    }
+
+
+@router.get("/franchise/practice-squad/standings")
+def get_practice_squad_standings(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    ps = franchise_doc.get("practice_squad") or {}
+    if not ps.get("initialized"):
+        return {"initialized": False, "standings": {}, "teams": {}, "week": int(franchise_doc.get("week", 1) or 1)}
+    return {
+        "initialized": True,
+        "week": int(franchise_doc.get("week", 1) or 1),
+        "standings": ps.get("standings") or {},
+        "teams": ps.get("teams") or {},
+        "tier_names": {str(i): n for i, n in enumerate(["", "All-Americans", "All-Stars", "Varsity", "JV", "Squad", "Scrubs"]) if i},
+    }
+
+
+@router.get("/franchise/practice-squad/schedule")
+def get_practice_squad_schedule(
+    franchise_id: str,
+    week: int | None = None,
+    user: dict = Depends(get_current_user),
+):
+    from BackEnd.practice_squad.manager import _completed_games_for_week
+
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    ps = franchise_doc.get("practice_squad") or {}
+    current_week = int(franchise_doc.get("week", 1) or 1)
+    if not ps.get("initialized"):
+        return {"initialized": False, "week": current_week, "games": [], "weeks": []}
+    schedule = ps.get("schedule") or {}
+    teams = ps.get("teams") or {}
+    weeks_available = sorted(set(list(int(w) for w in schedule.keys()) + list(range(16, 20))))
+
+    def _enrich(games: list) -> list:
+        out = []
+        for g in games:
+            row = dict(g)
+            row["home_display"] = (teams.get(row.get("home_team_id")) or {}).get("display_name")
+            row["away_display"] = (teams.get(row.get("away_team_id")) or {}).get("display_name")
+            out.append(row)
+        return out
+
+    if week is not None:
+        games = list(schedule.get(str(week)) or [])
+        if week >= 16:
+            completed = _completed_games_for_week(ps, week)
+            from BackEnd.practice_squad.manager import _games_for_week
+            upcoming = [g for g in _games_for_week(ps, week) if g.get("status") not in ("completed", "forfeit")]
+            games = completed + upcoming
+        return {"initialized": True, "week": week, "games": _enrich(games)}
+    return {"initialized": True, "week": current_week, "weeks": weeks_available}
+
+
+@router.get("/franchise/practice-squad/brackets")
+def get_practice_squad_brackets(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    ps = franchise_doc.get("practice_squad") or {}
+    return {
+        "initialized": bool(ps.get("initialized")),
+        "week": int(franchise_doc.get("week", 1) or 1),
+        "tournaments": ps.get("tournaments") or {},
+        "championship": ps.get("championship") or {},
+        "teams": ps.get("teams") or {},
+    }
+
+
+@router.get("/franchise/practice-squad/team")
+def get_practice_squad_team(
+    franchise_id: str,
+    ps_team_id: str = Query(...),
+    user: dict = Depends(get_current_user),
+):
+    """Roster + ps_season_stats for a Practice Squad pseudo-team."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    ps = franchise_doc.get("practice_squad") or {}
+    team = (ps.get("teams") or {}).get(ps_team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Practice Squad team not found")
+
+    fid = str(franchise_id)
+    tier = int(team.get("tier") or 0)
+    roster_slots = list(team.get("roster") or [])
+    if tier == 6:
+        player_ids = set()
+        for week_roster in (ps.get("scrubs_rosters") or {}).values():
+            for slot in week_roster or []:
+                pid = str(slot.get("player_id") or "")
+                if pid:
+                    player_ids.add(pid)
+        roster_slots = []
+        seen: set[str] = set()
+        for week_roster in (ps.get("scrubs_rosters") or {}).values():
+            for slot in week_roster or []:
+                pid = str(slot.get("player_id") or "")
+                if pid and pid not in seen:
+                    seen.add(pid)
+                    roster_slots.append(slot)
+
+    fpd_ids = [str(s["player_id"]) for s in roster_slots if s.get("source") == "fpd"]
+    frd_ids = [str(s["player_id"]) for s in roster_slots if s.get("source") == "frd"]
+
+    fpd_map = {
+        d["player_id"]: d
+        for d in franchise_players_data_collection.find(
+            {"franchise_id": fid, "player_id": {"$in": fpd_ids}}
+        )
+    } if fpd_ids else {}
+    frd_map = {
+        d["recruit_id"]: d
+        for d in franchise_recruits_data_collection.find(
+            {"franchise_id": fid, "recruit_id": {"$in": frd_ids}}
+        )
+    } if frd_ids else {}
+
+    team_name_map = _format_team_name_map()
+    players = []
+    for slot in roster_slots:
+        pid = str(slot.get("player_id") or "")
+        source = slot.get("source")
+        if source == "fpd":
+            doc = fpd_map.get(pid) or {}
+            meta = doc.get("meta") or {}
+            parent_id = str(meta.get("team_id") or "")
+            parent_name = team_name_map.get(parent_id, "")
+            players.append({
+                "player_id": pid,
+                "source": "fpd",
+                "name": slot.get("name") or f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
+                "parent_team_name": parent_name,
+                "position_ratings": doc.get("position_ratings") or {},
+                "attributes": doc.get("attributes") or {},
+                "year": meta.get("year") or "",
+                "archetype": meta.get("archetype") or "",
+                "height": meta.get("height"),
+                "weight": meta.get("weight"),
+                "stats": doc.get("ps_season_stats") or {},
+            })
+        else:
+            doc = frd_map.get(pid) or {}
+            players.append({
+                "player_id": pid,
+                "source": "frd",
+                "name": slot.get("name") or doc.get("name") or "",
+                "parent_team_name": None,
+                "position_ratings": doc.get("position_ratings") or {},
+                "attributes": doc.get("attributes") or {},
+                "year": doc.get("year") or "",
+                "archetype": doc.get("archetype") or "",
+                "height": doc.get("height"),
+                "weight": doc.get("weight"),
+                "stats": doc.get("ps_season_stats") or {},
+            })
+
+    return {
+        "team": team,
+        "players": players,
     }
 
 
@@ -10377,6 +10561,33 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
         cuts_ran_this_call = True
 
+    ps_fields: dict[str, Any] = {}
+    season_news_prepend: list[dict[str, Any]] = []
+    camp_done = cuts_ran_this_call or bool(training_status.get("cpu_training_camp_cuts_applied"))
+
+    if week == 1 and camp_done and not (franchise_doc.get("practice_squad") or {}).get("initialized"):
+        from BackEnd.practice_squad.manager import (
+            build_roster_announcement_story,
+            initialize_practice_squad,
+        )
+
+        ps_state = initialize_practice_squad(franchise_id, franchise_doc)
+        ps_fields["practice_squad"] = ps_state
+        franchise_doc["practice_squad"] = ps_state
+        roster_story = build_roster_announcement_story(
+            ps_state,
+            franchise_id=str(franchise_id),
+            team_id=str(team_id),
+        )
+        season_news_prepend.append(roster_story)
+
+    if week >= 2 and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
+        from BackEnd.practice_squad.manager import run_practice_squad_week
+
+        ps_state = run_practice_squad_week(franchise_id, franchise_doc, week)
+        ps_fields["practice_squad"] = ps_state
+        franchise_doc["practice_squad"] = ps_state
+
     session_type = training_status.get("session_type", "in-season")
     distant_update: dict[str, Any] = {
         "training_status.training_completed": True,
@@ -10385,6 +10596,11 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
     }
     if cuts_ran_this_call:
         distant_update["training_status.cpu_training_camp_cuts_applied"] = True
+    distant_update.update(ps_fields)
+    if season_news_prepend:
+        existing_news = list(franchise_doc.get("season_news") or [])
+        franchise_doc["season_news"] = season_news_prepend + existing_news
+        distant_update["season_news"] = franchise_doc["season_news"]
     db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
     return {
         "status": "success",
@@ -12355,6 +12571,9 @@ def finish_season(req: FinishSeasonRequest):
         franchise_recruits_data_collection.insert_many(frd_docs)
 
     db.games.delete_many({"franchise_id": str(franchise_id)})
+    from BackEnd.practice_squad.stats import clear_ps_season_stats_for_franchise
+
+    clear_ps_season_stats_for_franchise(str(franchise_id))
     awards_reset = {}
     db.franchises.update_one(
         {"_id": franchise_id},
@@ -12364,6 +12583,7 @@ def finish_season(req: FinishSeasonRequest):
             "results": {},
             "season_inbox": [],
             "season_news": [],
+            "practice_squad": {},
             "schedule": schedule,
             "eos_tournament_active": False,
             "conference_tournaments": {},

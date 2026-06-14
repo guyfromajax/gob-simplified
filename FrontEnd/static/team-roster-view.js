@@ -2,9 +2,10 @@
 // Supports both Franchise and Tournament modes
 
 const urlParams = new URLSearchParams(window.location.search);
-const mode = urlParams.get('mode'); // 'franchise' or 'tournament'
+const mode = urlParams.get('mode'); // 'franchise' or 'tournament' or 'practice_squad'
 const teamId = urlParams.get('team_id'); // Team ObjectId or name
 const teamName = urlParams.get('team_name'); // Team display name
+const psTeamId = urlParams.get('ps_team_id');
 const franchiseId = urlParams.get('franchise_id');
 const tournamentId = urlParams.get('tournament_id');
 const returnTab = urlParams.get('return_tab'); // 'standings-tab' or 'schedule-tab'
@@ -127,6 +128,57 @@ function setupBackButton() {
 
 async function loadRoster() {
   try {
+    if (mode === 'practice_squad' && franchiseId && psTeamId) {
+      const url = API_CONFIG.buildUrl('/franchise/practice-squad/team')
+        + '?franchise_id=' + encodeURIComponent(franchiseId)
+        + '&ps_team_id=' + encodeURIComponent(psTeamId);
+      const headers = window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {};
+      const response = await fetch(url, { headers });
+      if (!response.ok) throw new Error('Failed to load Practice Squad team');
+      const data = await response.json();
+      const team = data.team || {};
+      const titleEl = document.querySelector('.section-title');
+      if (titleEl) titleEl.textContent = team.display_name || 'Practice Squad';
+      const teamBannerEl = document.getElementById('team-banner');
+      if (teamBannerEl) teamBannerEl.style.display = 'none';
+
+      rosterData = (data.players || []).map(p => {
+        const attrs = p.attributes || {};
+        const posRatings = p.position_ratings || {};
+        let highestRT = -Infinity;
+        let highestPos = null;
+        Object.entries(posRatings).forEach(([pos, rating]) => {
+          if (typeof rating === 'number' && rating > highestRT) {
+            highestRT = rating;
+            highestPos = pos;
+          }
+        });
+        const heightInches = p.height || 0;
+        const displayName = p.parent_team_name
+          ? `${p.name} (${p.parent_team_name})`
+          : p.name;
+        return {
+          _id: p.player_id,
+          name: displayName,
+          jersey: null,
+          pos: highestPos || getBestPosition(posRatings).pos || '--',
+          year: p.year || '--',
+          height: `${Math.floor(heightInches / 12)}'${heightInches % 12}"`,
+          weight: p.weight || '--',
+          attributes: attrs,
+          position_ratings: posRatings,
+          highestRT: highestRT !== -Infinity ? highestRT : null,
+          highestPos: highestPos || '--',
+          psStats: p.stats || {},
+        };
+      });
+      rosterData.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+      trainingSquadData = [];
+      document.getElementById('training-squad-section')?.style.setProperty('display', 'none');
+      renderRoster();
+      return;
+    }
+
     // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
     if (!teamName && !teamId) {
       document.getElementById('roster-body').innerHTML = '<tr><td colspan="18">Team name required</td></tr>';
@@ -230,6 +282,16 @@ async function loadRoster() {
 
 async function loadStats() {
   try {
+    if (mode === 'practice_squad') {
+      statsData = rosterData.map(p => ({
+        _id: p._id,
+        name: p.name,
+        stats: p.psStats || {},
+      }));
+      renderStats();
+      return;
+    }
+
     // Skip stats loading if in base mode (no franchise/tournament) or
     // FTE v2 tutorial mode — tutorial users haven't played any games yet,
     // so the table would be empty + the franchise/tournament branches
@@ -400,22 +462,26 @@ function renderRosterInto(data, tbodyId) {
       return Math.floor(rawVal / 10);
     };
     
-    // Name with link
+    // Name with link (Practice Squad: plain text, no jersey)
     const nameTd = document.createElement('td');
-    const nameLink = document.createElement('a');
-    nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-    nameLink.style.color = 'inherit';
-    nameLink.style.textDecoration = 'none';
-    nameLink.addEventListener('mouseenter', () => {
-      nameLink.style.textDecoration = 'underline';
-    });
-    nameLink.addEventListener('mouseleave', () => {
+    if (mode === 'practice_squad') {
+      nameTd.textContent = p.name;
+    } else {
+      const nameLink = document.createElement('a');
+      nameLink.href = buildPlayerDetailUrl(p._id);
+      nameLink.textContent =
+        typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
+      nameLink.style.color = 'inherit';
       nameLink.style.textDecoration = 'none';
-    });
-    nameTd.appendChild(nameLink);
-    if (p.hasPlayingTimePromise) {
+      nameLink.addEventListener('mouseenter', () => {
+        nameLink.style.textDecoration = 'underline';
+      });
+      nameLink.addEventListener('mouseleave', () => {
+        nameLink.style.textDecoration = 'none';
+      });
+      nameTd.appendChild(nameLink);
+    }
+    if (mode !== 'practice_squad' && p.hasPlayingTimePromise) {
       const ptp = document.createElement('span');
       ptp.textContent = ' (PTP)';
       ptp.style.color = '#bb2f35';

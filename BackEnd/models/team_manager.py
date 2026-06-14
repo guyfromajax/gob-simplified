@@ -250,7 +250,7 @@ def _get_cached_play_names():
     return _plays_names_cache
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False, franchise_id=None):
+    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False, franchise_id=None, roster_override=None, synthetic_team_id=None):
         import time
         import logging
         self.name = name
@@ -260,7 +260,14 @@ class TeamManager:
         self.franchise_id = franchise_id  # ✅ FRANCHISE MODE: Store franchise_id for loading trained attributes
         
         roster_start = time.time()
-        self.players = self._load_roster()
+        if roster_override is not None:
+            from BackEnd.models.player import Player
+            self.players = {}
+            for pdata in roster_override:
+                player = Player(dict(pdata))
+                self.players[str(player.player_id)] = player
+        else:
+            self.players = self._load_roster()
         roster_time = (time.time() - roster_start) * 1000
 
         lineup_start = time.time()
@@ -269,11 +276,14 @@ class TeamManager:
 
         # Load BASE team data from universal teams collection (name, team_id, colors, mascot)
         team_doc_start = time.time()
-        team_doc = teams_collection.find_one({"name": name})
+        team_doc = teams_collection.find_one({"name": name}) if roster_override is None else None
         team_doc_time = (time.time() - team_doc_start) * 1000
-        if not team_doc:
+        if not team_doc and roster_override is None:
             print(f"⚠️ No team document found for team: {name}")
-        self.team_id = team_doc.get("team_id") if team_doc else None
+        if synthetic_team_id is not None:
+            self.team_id = synthetic_team_id
+        else:
+            self.team_id = team_doc.get("team_id") if team_doc else None
         self.primary_color = team_doc.get("primary_color", "#000000") if team_doc else "#000000"
         self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
         self.mascot = team_doc.get("mascot", "") if team_doc else ""

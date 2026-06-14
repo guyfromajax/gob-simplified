@@ -1,0 +1,1 @@
+"""Practice Squad games package."""

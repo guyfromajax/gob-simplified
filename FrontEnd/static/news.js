@@ -57,7 +57,50 @@
     container.innerHTML = '<div class="news-week-card"><div class="news-empty">' + escapeHtml(message) + '</div></div>';
   }
 
+  function renderRichLines(richLines) {
+    if (!richLines || !richLines.length) return '';
+    return richLines.map(function (item) {
+      var type = item.type || 'text';
+      if (type === 'gap') {
+        return '<div class="news-story-gap"></div>';
+      }
+      if (type === 'heading') {
+        return '<p class="news-story-line news-story-heading"><strong>' + escapeHtml(item.text) + '</strong></p>';
+      }
+      if (type === 'link') {
+        return '<p class="news-story-line"><a class="news-inline-link" href="' + escapeHtml(item.href) + '">' + escapeHtml(item.label) + '</a></p>';
+      }
+      if (type === 'team_roster') {
+        return [
+          '<p class="news-story-line">',
+          '<a class="news-inline-link" href="' + escapeHtml(item.href) + '">' + escapeHtml(item.label) + '</a>',
+          '</p>',
+          '<p class="news-story-line news-story-players">' + escapeHtml(item.players_line) + '</p>'
+        ].join('');
+      }
+      if (type === 'game_result') {
+        var line = escapeHtml(item.text);
+        if (item.box_score_href) {
+          line += ' <a class="news-inline-link" href="' + escapeHtml(item.box_score_href) + '">Box Score</a>';
+        }
+        return '<p class="news-story-line">' + line + '</p>';
+      }
+      return '<p class="news-story-line">' + escapeHtml(item.text || '') + '</p>';
+    }).join('');
+  }
+
   function renderStoryView(container, story) {
+    var bodyHtml = '';
+    if (story.rich_lines && story.rich_lines.length) {
+      bodyHtml = renderRichLines(story.rich_lines);
+    } else {
+      bodyHtml = (story.lines || []).map(function (line) {
+        if (!String(line == null ? '' : line).trim()) {
+          return '<div class="news-story-gap"></div>';
+        }
+        return '<p class="news-story-line">' + escapeHtml(line) + '</p>';
+      }).join('');
+    }
     container.innerHTML = [
       '<div>',
       '<a class="brand-back-link news-back-to-list" href="' + buildNewsUrl(null) + '">Back to All News</a>',
@@ -65,12 +108,7 @@
       '<div class="news-story-meta">Week ' + escapeHtml(story.week) + '</div>',
       '<h2 class="news-story-headline">' + escapeHtml(story.headline) + '</h2>',
       '<div class="news-story-body">',
-      (story.lines || []).map(function (line) {
-        if (!String(line == null ? '' : line).trim()) {
-          return '<div class="news-story-gap"></div>';
-        }
-        return '<p class="news-story-line">' + escapeHtml(line) + '</p>';
-      }).join(''),
+      bodyHtml,
       '</div>',
       '</section>',
       '</div>'

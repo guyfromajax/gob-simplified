@@ -1843,6 +1843,13 @@ function renderFccRecruits() {
     params.set('return_url', getCurrentRelativeUrl());
     fullListLink.href = `/recruiting.html?${params.toString()}`;
   }
+  const psLink = document.getElementById('fcc-ps-season-link');
+  if (psLink) {
+    const psParams = new URLSearchParams();
+    psParams.set('franchise_id', franchiseId);
+    psParams.set('team_id', userTeamId);
+    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
+  }
   if (lastCol) {
     lastCol.textContent = 'Current Lean';
     lastCol.dataset.sortKey = 'lean';
