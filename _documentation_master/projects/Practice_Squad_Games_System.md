@@ -47,10 +47,10 @@
 
 ## News (`season_news`)
 
-1. Week N Upset Report  
-2. Week N Practice Squad Game Results (at complete-week; links to standings + box scores)  
-3. Practice Squad All-Stars (TS attribute gains)  
-4. Updated Recruiting Leans  
+1. Week N Upset Report (complete-week)  
+2. Week N Practice Squad Game Results (end of distant-CPU training, weeks 2–19; visible when user returns to FCC via training report; links to standings + box scores)  
+3. Practice Squad All-Stars (TS attribute gains; complete-week)  
+4. Updated Recruiting Leans (complete-week)  
 
 **Roster announcement (week 1):** region headings; team name links to roster page; one comma-separated line of `Name (RT)` per team (Teams 1–5 only).
 

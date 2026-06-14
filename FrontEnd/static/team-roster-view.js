@@ -18,6 +18,10 @@ let rosterSortColumn = 'RT';
 let rosterSortDirection = 'desc';
 let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
+/** @type {'single' | 'full'} */
+let attrDisplayMode = 'single';
+
+const ROSTER_ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
 function formatYearForDisplay(year) {
   if (typeof GOB_PlayerYear !== 'undefined' && GOB_PlayerYear.formatDisplay) {
@@ -120,6 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup sorting
   setupRosterSorting();
   setupStatsSorting();
+  setupAttrDisplayToggle();
 });
 
 function setupBackButton() {
@@ -457,6 +462,48 @@ function getBestPosition(positionRatings) {
   return { pos: bestPos || '--', rating: bestRating !== -Infinity ? bestRating : null };
 }
 
+function getRawAttrValue(attrs, attr) {
+  const rawVal = attrs[`anchor_${attr}`] ?? attrs[attr];
+  if (rawVal == null || rawVal === '') return null;
+  const num = Number(rawVal);
+  return Number.isNaN(num) ? null : num;
+}
+
+function formatAttrForDisplay(attrs, attr) {
+  const rawVal = getRawAttrValue(attrs, attr);
+  if (rawVal == null) return '--';
+  if (attrDisplayMode === 'full') {
+    return String(Math.round(rawVal));
+  }
+  return Math.floor(rawVal / 10);
+}
+
+function getAttrSortValue(attrs, attr) {
+  const rawVal = getRawAttrValue(attrs, attr);
+  if (rawVal == null) return -Infinity;
+  if (attrDisplayMode === 'full') {
+    return rawVal;
+  }
+  return Math.floor(rawVal / 10);
+}
+
+function setupAttrDisplayToggle() {
+  const singleBtn = document.getElementById('attr-display-single');
+  const fullBtn = document.getElementById('attr-display-full');
+  if (!singleBtn || !fullBtn) return;
+
+  const setMode = (mode) => {
+    attrDisplayMode = mode;
+    singleBtn.classList.toggle('active', mode === 'single');
+    fullBtn.classList.toggle('active', mode === 'full');
+    renderRoster();
+    renderTrainingSquadView();
+  };
+
+  singleBtn.addEventListener('click', () => setMode('single'));
+  fullBtn.addEventListener('click', () => setMode('full'));
+}
+
 function renderRoster() {
   renderRosterInto(rosterData, 'roster-body');
 }
@@ -480,12 +527,6 @@ function renderRosterInto(data, tbodyId) {
   data.forEach(p => {
     const tr = document.createElement('tr');
     const attrs = p.attributes || {};
-    
-    // Format attributes: 0-9 displays 0, 10-19 displays 1, etc.
-    const formatAttr = (attr) => {
-      const rawVal = attrs[`anchor_${attr}`] ?? attrs[attr] ?? 0;
-      return Math.floor(rawVal / 10);
-    };
     
     // Name with link (Practice Squad: plain text, no jersey)
     const nameTd = document.createElement('td');
@@ -533,18 +574,9 @@ function renderRosterInto(data, tbodyId) {
     addCell(p.year);
     addCell(p.height);
     addCell(p.weight);
-    addCell(formatAttr('SC'));
-    addCell(formatAttr('SH'));
-    addCell(formatAttr('ID'));
-    addCell(formatAttr('OD'));
-    addCell(formatAttr('PS'));
-    addCell(formatAttr('BH'));
-    addCell(formatAttr('RB'));
-    addCell(formatAttr('AG'));
-    addCell(formatAttr('ST'));
-    addCell(formatAttr('ND'));
-    addCell(formatAttr('IQ'));
-    addCell(formatAttr('FT'));
+    ROSTER_ATTR_KEYS.forEach((attr) => {
+      addCell(formatAttrForDisplay(attrs, attr));
+    });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     addCell(
       p.highestRT !== null ? p.highestRT : '-',
@@ -697,12 +729,8 @@ function sortRoster() {
       val2 = parseInt(b.weight) || 0;
     } else {
       // Attribute columns
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      const rawValA = attrsA[`anchor_${rosterSortColumn}`] ?? attrsA[rosterSortColumn] ?? 0;
-      const rawValB = attrsB[`anchor_${rosterSortColumn}`] ?? attrsB[rosterSortColumn] ?? 0;
-      val1 = Math.floor(rawValA / 10);
-      val2 = Math.floor(rawValB / 10);
+      val1 = getAttrSortValue(a.attributes || {}, rosterSortColumn);
+      val2 = getAttrSortValue(b.attributes || {}, rosterSortColumn);
     }
     
     if (rosterSortDirection === 'desc') {

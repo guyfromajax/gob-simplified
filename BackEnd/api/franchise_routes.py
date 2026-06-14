@@ -4116,6 +4116,7 @@ def _finalize_franchise_week_after_cpu_games(
             franchise_id_str, week,
         )
     # Weekly news (upset report + practice-squad all-stars + recruiting leans).
+    # PS game-results news publishes at distant-CPU training, not here.
     # Must run before the rank update below so the upset criteria use
     # entering-week natl_rank values.
     try:
@@ -8721,6 +8722,19 @@ def _build_recruiting_leans_story(
     }
 
 
+def _prepend_season_news_stories(
+    franchise_doc: dict[str, Any], stories: list[dict[str, Any]]
+) -> None:
+    """Prepend stories to season_news, skipping any story_id already present."""
+    if not stories:
+        return
+    existing = list(franchise_doc.get("season_news") or [])
+    existing_ids = {s.get("story_id") for s in existing}
+    to_add = [s for s in stories if s.get("story_id") not in existing_ids]
+    if to_add:
+        franchise_doc["season_news"] = to_add + existing
+
+
 def _build_ps_game_results_news_story(
     franchise_doc: dict[str, Any],
     week: int,
@@ -8812,11 +8826,11 @@ def _append_franchise_week_news(
             user_conference,
         )
 
+    # PS game-results news publishes at distant-CPU training (see _franchise_training_distant_phase_only).
     stories = [
         story
         for story in (
             _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map),
-            _build_ps_game_results_news_story(franchise_doc, week, franchise_id),
             _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map),
             recruiting_leans_story,
         )
@@ -10588,6 +10602,9 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
         ps_state = run_practice_squad_week(franchise_id, franchise_doc, week)
         ps_fields["practice_squad"] = ps_state
         franchise_doc["practice_squad"] = ps_state
+        ps_results_story = _build_ps_game_results_news_story(franchise_doc, week, franchise_id)
+        if ps_results_story:
+            season_news_prepend.append(ps_results_story)
 
     session_type = training_status.get("session_type", "in-season")
     distant_update: dict[str, Any] = {
@@ -10599,8 +10616,7 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
         distant_update["training_status.cpu_training_camp_cuts_applied"] = True
     distant_update.update(ps_fields)
     if season_news_prepend:
-        existing_news = list(franchise_doc.get("season_news") or [])
-        franchise_doc["season_news"] = season_news_prepend + existing_news
+        _prepend_season_news_stories(franchise_doc, season_news_prepend)
         distant_update["season_news"] = franchise_doc["season_news"]
     db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
     return {

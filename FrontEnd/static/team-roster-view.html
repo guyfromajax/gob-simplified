@@ -115,6 +115,46 @@
       color: #f7f9ff;
     }
 
+    .roster-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .roster-section-header .section-title {
+      margin-bottom: 0;
+    }
+
+    .roster-attr-toggle-wrap {
+      margin-bottom: 0;
+    }
+
+    .roster-attr-toggle-wrap .rankings-toggle {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.42);
+      font-family: 'Bebas Neue', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    }
+
+    .roster-attr-toggle-wrap .rankings-toggle.active {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.24);
+      color: #ffffff;
+    }
+
+    .roster-attr-toggle-wrap .rankings-toggle:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.72);
+    }
+
     .team-roster-section {
       margin-top: 22px;
     }
@@ -308,7 +348,13 @@
 
     <!-- Roster Grid -->
     <div id="roster-table-container" class="team-roster-section">
-      <div class="section-title">Player Attributes</div>
+      <div class="roster-section-header">
+        <div class="section-title">Player Attributes</div>
+        <div class="rankings-toggle-wrap roster-attr-toggle-wrap">
+          <button type="button" id="attr-display-single" class="rankings-toggle active">Single Digit</button>
+          <button type="button" id="attr-display-full" class="rankings-toggle">Full Value</button>
+        </div>
+      </div>
       <div class="fcc-data-card">
         <div class="fcc-data-card-body">
           <div class="scroll-x">
