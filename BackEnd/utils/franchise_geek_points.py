@@ -1,7 +1,7 @@
 """
 Franchise mode: award geek_points on the owning user's document when their team wins or loses.
 
-Point ranges are documented in docs/docs_1_systems/00_General_Systems/Geek_Points_System.md
+Point ranges are documented in _documentation_master/00_General_Systems/Geek_Points_System.md
 """
 from __future__ import annotations
 

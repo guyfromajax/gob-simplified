@@ -17,10 +17,10 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | Was | Now |
 |-----|-----|
 | Sound Design / SFX Manager / SFX Brief | [`05_Features/SFX_System.md`](../05_Features/SFX_System.md) |
-| UESS Legacy Audit | [`00_General_Systems/UESS_Backlog.md`](../00_General_Systems/UESS_Backlog.md) + UESS §12 |
+| UESS Legacy Audit | [`projects/UESS_Backlog.md`](../UESS_Backlog.md) + UESS §12 |
 | Movement Rate Refactor (shipped) | [`Z-Completed/Movement_Rate_Refactor.md`](./Z-Completed/Movement_Rate_Refactor.md) |
 | Fast Break Refactor (open legacy work) | [`Z-Completed/Fast_Break_Refactor.md`](./Z-Completed/Fast_Break_Refactor.md) + `bugs.md` |
-| `Animation_System_Updated.md` | Redirect stub → UESS / Step_By_Step / Advance_Triggers |
+| `Animation_System_Updated.md` | Redirect stub → UESS / Step_By_Step (Advance_Triggers merged into Step_By_Step, June 2026) |
 
 ## Completed archive
 
@@ -32,6 +32,7 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | [Z-Completed/SFX_System.md](./Z-Completed/SFX_System.md) | Superseded by SFX_System |
 | [Z-Completed/SFX_Manager_Implementation.md](./Z-Completed/SFX_Manager_Implementation.md) | Superseded by SFX_System |
 | [Z-Completed/SFX_Brief.md](./Z-Completed/SFX_Brief.md) | Creative brief archive |
+| [Z-Completed/Unified_State_Persistence_Work_Plan.md](./Z-Completed/Unified_State_Persistence_Work_Plan.md) | State/persistence contract implementation, phases 1–5.7 (Feb-2026 settings entry superseded by April two-stage model) |
 
 ## Website copy
 

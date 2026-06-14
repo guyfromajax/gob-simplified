@@ -457,7 +457,11 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
     if made:
         stealer.record_stat("FGA")
         apply_scoring(game, off_team, stealer, 2, ["FGM"])
-        stealer.record_stat("PIP", amount=2)
+        # Fast-break make stat policy (parity with shot_manager FB path):
+        # FB_PTS for any fast-break make, POT because After Steal is always
+        # steal-initiated. PIP is intentionally NOT recorded on fast breaks.
+        stealer.record_stat("FB_PTS", amount=2)
+        stealer.record_stat("POT", amount=2)
         text_outcome = (
             f"and scores, gets fouled!" if has_and_one else "and finishes!"
         )

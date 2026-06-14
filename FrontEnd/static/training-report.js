@@ -1804,7 +1804,7 @@ function renderTrainingNotes() {
     return;
   }
 
-  // Structured sections: { title, body } (Training_Notes_System.md)
+  // Structured sections: { title, body } (Training_System.md → Training Notes Section)
   const first = training_notes[0];
   if (first && typeof first === 'object' && first.title != null) {
     const sectionMap = new Map();

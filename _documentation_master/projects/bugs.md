@@ -1,3 +1,13 @@
+<!--
+SEARCH TAG: [CODE-CLEANUP]
+Every outstanding code-level fix/cleanup item surfaced during the documentation sweep (and the
+ongoing code-cleanup backlog) is tagged with the literal token [CODE-CLEANUP]. To get the complete
+list across the whole repo, run:  rg "\[CODE-CLEANUP\]"
+This includes items in this file (Future Cleanup, P0, Fast Break backlog, FB test follow-up) plus
+inline notes left in individual system docs. (Sunset-mode code removal also carries its own
+"SUNSET MODE" tag inside the docs that describe those paths, and is cross-linked from here.)
+-->
+
 ##End of Game / End of Quarter perfection
 6. Don't animate rebound / BIP on Final Shot FT
 18. Final Turn perfection (Run clock to 0:00 for Final Shot), airhorn on ending
@@ -43,11 +53,27 @@
 1. Training Camp News Report
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
+4. Add recruits to roster after recruiting
 
 
 
 
-## Fast Break animation backlog (legacy path)
+## Stale FB test suite (found + cleaned up 6-12-26, was not a product bug)
+
+15 tests across 4 FB test files were failing because they asserted **pre-refactor** fast-break behavior (test files last touched Dec 2025–Mar 2026; FB engine rewritten May–Jun 2026): mock players missing the `MIN` stat key, hard-coded coordinates from the old outlet logic, and stale role-plumbing assertions.
+
+**Resolved 6-12-26:** deleted `test_fast_break_comprehensive.py`, `test_fast_break_miss_dreb_flow.py`, `test_fast_break_position_logic.py` (fully red); trimmed the two stale tests from `test_fast_break_outlet_pass.py` (its two edge-case tests still pass and were kept). FB suite is now green.
+
+**Open follow-up [CODE-CLEANUP]:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
+
+## P0 — HCO contract clock overruns with invalid elapsed time (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
+
+Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`), copied here so they're visible in the bug tracker:
+
+1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. Magnitude indicates timer baseline/state contamination, not normal jitter. Mitigation applied (Option A): turn-boundary guards use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`); needs validation in live runs before closing.
+2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6` on a `DEAD BALL` batch sub-turn. Same timer-source class as #1 but a distinct enforcement site (`step pass` guard); track separately.
+
+## Fast Break animation backlog (legacy path) [CODE-CLEANUP]
 
 Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Break_Refactor.md). **UESS schema path is primary** for `covert_release`, `rim_runner`, `triangle`, `after_steal` when `animation_steps` exist.
 
@@ -60,28 +86,52 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 
 ## Future Cleanup (Non-Critical Warnings)
 
-### State Telemetry Violations (Phase 1.3)
+### Coordinate flip off-by-one: backend `100 − x` vs frontend `101 − x` (found 6-12-26 during doc sweep) [CODE-CLEANUP]
+- **Issue**: Two different mirror-flip conventions coexist. Backend `getAwayTeamCoords()` (`BackEnd/utils/shared.py`) flips with `x = 100 − x`; legacy frontend helpers in `turnAnimation.js` (4 sites: skeleton position conversion, FCP defensive setup, and two local `flipCoords` helpers) flip with `x = 101 − x`.
+- **Impact**: Low/medium — a 1-grid-spot horizontal discrepancy whenever a frontend-flipped coordinate is compared to or layered on a backend-flipped one. On a 1–100 grid, `101 − x` is the symmetric mirror (1↔100); `100 − x` maps 1→99, drifting everything 1 spot. Not known to cause a visible bug today, but it's a trap for any future code that mixes the two.
+- **Action**: Pick one convention (likely `101 − x` if the grid is 1–100) and unify; at minimum, audit the 4 frontend `101 − x` sites against the backend coords they consume. As UESS schema playback takes over, the legacy frontend flip sites should shrink toward dead code anyway.
+- **Priority**: Low (documented in `05_GP_Supporting_Systems/BIP_System.md` → "Coordinate System and `opp` Field")
+
+### Sunset mode code removal (Single Game + Tournament) — surfaced during doc sweep 6-13-26 [CODE-CLEANUP]
+- **Issue**: Single Game and Tournament modes are sunset (not user-facing), but their code paths still exist throughout the backend/frontend (e.g. `init_game()` mode branches for `single`/`tournament` in `BackEnd/api/api.py`, tournament master-copy seeding, single-game empty-playbook init, plus tournament/single routes and frontend pages).
+- **Decision (prior)**: When tournaments / single games are reintroduced, build fresh from current architecture rather than reviving these early-build paths (lots of legacy bloat). So this code is removable, not preserve-for-reuse.
+- **Action**: Future cleanup — remove sunset `single`/`tournament` code paths once the team commits to the rebuild-from-scratch plan. Docs that describe these paths are tagged "SUNSET MODE" (e.g. `Game_Init_System.md` Tournament / Single sections; `Lineup_Selection_Screen.md`) and point here.
+- **Priority**: Low (dead-end paths; not causing bugs, just bloat/confusion). Do as a deliberate sweep, not piecemeal.
+
+### Steal → HCO setup: backend computes positioning that the frontend no longer renders (found 6-13-26 during doc sweep) [CODE-CLEANUP]
+- **Issue**: `resolve_half_court_offense_logic` (~L4820, `BackEnd/.../half_court_offense*`) still computes detailed Steal → HCO setup positioning — moving the stealer away from the basket plus a bespoke PG reposition for other players — and emits fields like `is_steal_hco_setup`, `ball_handler_hco_setup_*`, and `other_players_hco_setup_movements`. The frontend has removed all of the corresponding animation code (`animateStealHCOSetup()`) and stopped reading those fields.
+- **Impact**: Low — backend is doing compute-but-unrendered work. No visible bug, just wasted computation and a misleading contract (emitted fields nothing consumes).
+- **Action**: Remove the Steal → HCO setup positioning computation and its emitted fields from the backend resolver (or, if the visual is wanted back, re-add the frontend animation). Confirm no other consumer reads `is_steal_hco_setup` / `ball_handler_hco_setup_*` / `other_players_hco_setup_movements` first.
+- **Priority**: Low (dead/unrendered compute, not causing bugs)
+
+### Legacy steal-entry Fast Break dead code + unused `STEAL_ENTRY_*` constants (found 6-13-26 during doc sweep) [CODE-CLEANUP]
+- **Issue**: All steals are short-circuited to the UESS-migrated `after_steal` resolver early in `resolve_fast_break_logic` (~L1056), which makes the legacy steal-entry movement block later in the same function (~L1195–1360) unreachable dead code. The `STEAL_ENTRY_MOVE_*` / `STEAL_ENTRY_Y_*` constants that block relied on are now unused on the rendered path in both `BackEnd/constants/fast_break_constants.py` and `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`.
+- **Impact**: Low — unreachable code + orphaned constants. No runtime effect, just bloat/confusion for anyone reading the FB resolver.
+- **Action**: Delete the unreachable steal-entry block in `resolve_fast_break_logic` and remove the unused `STEAL_ENTRY_*` constants from both the backend and frontend constants files. Verify nothing on the live `after_steal` path references those constants before removing.
+- **Priority**: Low (dead code; tie in with the FB-coverage follow-up noted in the "Stale FB test suite" item above)
+
+### State Telemetry Violations (Phase 1.3) [CODE-CLEANUP]
 - **Issue**: `game_id` is being read/written to `gameStore` when it should come from URL according to State & Persistence Contract
 - **Location**: Multiple locations detected by Phase 1.3 telemetry
 - **Impact**: Low - telemetry is working as intended, detecting contract violations
 - **Action**: Future cleanup - refactor to use URL as source of truth for `game_id` instead of `gameStore`
 - **Priority**: Low (informational only, not causing bugs)
 
-### Missing Rebound Data Warning
+### Missing Rebound Data Warning [CODE-CLEANUP]
 - **Issue**: ShotAnimationSystem reports "Rebound data missing, skipping embedded rebound" for some MISS shots
 - **Location**: `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
 - **Impact**: Low - may be expected if rebound is handled in separate turn, but worth monitoring
 - **Action**: Investigate if this is expected behavior or if rebound data should always be present
 - **Priority**: Low (monitoring only)
 
-### Invalid State Transition Warning
+### Invalid State Transition Warning [CODE-CLEANUP]
 - **Issue**: State machine attempts no-op transition (HalfCourt -> HalfCourt)
 - **Location**: `FrontEnd/static/js/phaser/animation/AnimationEngine.js` → `handleBaselineInbound()`
 - **Impact**: Low - harmless but indicates unnecessary `safeTransition()` call
 - **Action**: Review `handleBaselineInbound()` to avoid calling `safeTransition()` when already in target state
 - **Priority**: Low (code cleanup)
 
-### Missing Team Background Images (404s)
+### Missing Team Background Images (404s) [CODE-CLEANUP]
 - **Issue**: 404 errors for team background images (e.g., `south_lancaster-background.png`, `little_york-background.png`)
 - **Location**: `FrontEnd/static/images/teams/{team_slug}/` (`{team_slug}_background.png`; see `docs/docs_1_systems/00_General_Systems/Team_Images_System.md` and `FrontEnd/static/common.js` asset helpers)
 - **Impact**: Low - missing assets, doesn't affect functionality

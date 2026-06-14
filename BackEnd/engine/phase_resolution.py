@@ -638,7 +638,7 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     # The flip happens in game_manager.py simulate_macro_turn() before setup_side_inbound()
     # This ensures consistent behavior: all possession flips for SIP transitions happen in one place
 
-    # next_play_type so turn_manager._should_reset_shot_clock resets on D_FOUL → SIDE_INBOUND (Real_Time_Clock_System.md)
+    # next_play_type so turn_manager._should_reset_shot_clock resets on D_FOUL → SIDE_INBOUND (Shot_Clock_System.md)
     next_play_type = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
     result = {
         "result_type": "FOUL",
@@ -4561,8 +4561,8 @@ def resolve_half_court_offense_logic(game):
     if final_skeleton:
         final_skeleton = copy.deepcopy(final_skeleton)
     
-    # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Real_Time_Clock_System.md).
-    # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (Real_Time_Clock_System.md — Second Chance System).
+    # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Shot_Clock_System.md).
+    # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (Shot_Clock_System.md — Second Chance System).
     if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
         steps = final_skeleton["steps"]
         if steps:
@@ -4583,7 +4583,7 @@ def resolve_half_court_offense_logic(game):
                     chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
                     discipline = int(off_team.team_attributes.get("discipline", 0))
 
-                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation (Real_Time_Clock_System.md)
+                    # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation (Shot_Clock_System.md)
                     if is_motion_play and i >= 3:
                         recalibration_score = (chemistry * 5) + (discipline * 3)
                         die_roll = random.randint(1, 100)
@@ -4601,7 +4601,7 @@ def resolve_half_court_offense_logic(game):
                     # No recalibration (or failed recalibration): violation vs shot-at-1
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
                     iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
-                    intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Real_Time_Clock_System.md)
+                    intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Shot_Clock_System.md)
                     violation_threshold = 60 + chemistry + discipline + intelligence
                     x = random.randint(1, 100)
                     if x > violation_threshold:
@@ -5375,7 +5375,7 @@ def resolve_half_court_offense_logic(game):
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
     
-    # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Real_Time_Clock_System.md)
+    # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Shot_Clock_System.md)
     if "_shot_at_one_second_time_elapsed" in game_state:
         shot_result["time_elapsed"] = game_state.pop("_shot_at_one_second_time_elapsed")
     

@@ -44,7 +44,7 @@ This document is the execution plan for wiring **real questions**, **qualificati
 
 **Acceptance:** Reviewer can trace each `trigger.condition` in the question bank to either a snapshot field or an explicit “franchise query at build time” row.
 
-**Started:** Types in `BackEnd/models/pgpc_snapshot.py`; context stub in `BackEnd/pgpc_context.py` (also imported from `BackEnd.utils.shared`); tests in `tests/test_pgpc_context.py`. **Opening lineup:** `BackEnd/opening_lineup_snapshot.py` + DB/summarize restore (see `docs/docs_1_systems/05_GP_Supporting_Systems/Special_Tracking_System.md`).
+**Started:** Types in `BackEnd/models/pgpc_snapshot.py`; context stub in `BackEnd/pgpc_context.py` (also imported from `BackEnd.utils.shared`); tests in `tests/test_pgpc_context.py`. **Opening lineup:** `BackEnd/opening_lineup_snapshot.py` + DB/summarize restore (see `_documentation_master/03_Data_Persistence/Data_Persistence_System.md`, "Special Gameplay-Tracking Fields").
 
 ---
 

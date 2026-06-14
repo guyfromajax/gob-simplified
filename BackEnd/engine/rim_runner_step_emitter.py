@@ -18,8 +18,9 @@ shared across four of them; outlet-denied forks at step 1.
     lead-in ("No Fast Break" announcement, implicit end → caller transitions
     to HCO).
 - **Outlet Denied → HCO settle**: step 0 → step 1 defender close-out
-    ("FB Outlet Pass Denied!" announcement) → step 2 receiver cutback +
-    drift → step 3 recovery pass (implicit end → HCO).
+    ("FB Outlet Pass Denied!" announcement) → implicit end → HCO. The
+    cutback + recovery-pass beats live on the next HCO turn's Reset step
+    (destination-turn pattern, signalled via ``hco_setup``).
 
 Edge case: when rebounder == outlet receiver (``skip_outlet_pass == true``),
 step 1 is skipped — the burst step chains directly to the branch's step 2
@@ -37,7 +38,7 @@ Triangle reuses burst, outlet, and ``append_lane_pass_to_rr_resolution_steps``
 for the open-lane pass-ahead path; full Triangle setup uses
 ``triangle_step_emitter.py``.
 
-See ``_documentation_master/05_Animation_System/Advance_Triggers.md`` —
+See ``_documentation_master/00_General_Systems/Step_By_Step_System.md`` —
 "Rim Runner" — for the per-step trigger spec.
 """
 
@@ -588,9 +589,10 @@ def _build_outlet_pass_step(
     next_step_index: int,
 ) -> Optional[AnimationStep]:
     """Step 1: outlet pass (rebounder → outlet receiver). Pass rate gated on
-    outlet quality — sharp (``outlet_score >= 50``) flies at
-    ``FB_PASS_GRID_SPOTS_PER_GAME_SECOND``; sloppy at hardcoded 22 grid/sec.
-    Floored at 0.5 game-sec for very short passes.
+    outlet quality — sharp (``outlet_score >= FB_OUTLET_QUALITY_THRESHOLD``)
+    flies at ``FB_PASS_GRID_SPOTS_PER_GAME_SECOND``; sloppy at
+    ``FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY``.
+    Floored at ``FB_PASS_MIN_GAME_SECONDS`` for very short passes.
 
     Per-player movement: passer / receiver stationary at their burst
     endpoints; all other movers continue toward their step 0 burst

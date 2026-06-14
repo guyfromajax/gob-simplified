@@ -323,8 +323,8 @@ HCO_STRING_SPOTS = {
 # ---- HCO Setup Positions ---------------------------------------------------
 # Used by Fast Break Defensive Stop step-back step (and any future pre-HCO
 # transition setup). See:
-#   _documentation_master/05_Animation_System/Advance_Triggers.md
-#   (Covert Release → Defensive Stop branch).
+#   _documentation_master/00_General_Systems/Step_By_Step_System.md
+#   (Covert Release → CR Defensive Stop sub-step logic).
 #
 # Convention: BH(s) excluded from pos slots via the standard alias mapping
 # (`_alias_map` in dynamic_hct.py / `_build_set_play_alias_map` in

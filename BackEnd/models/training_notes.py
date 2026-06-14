@@ -1,5 +1,5 @@
 """
-Structured Training Report notes per Training_Notes_System.md.
+Structured Training Report notes (see Training_System.md → Training Notes Section).
 
 Produces a list of {title, body} sections. Player Energy Levels reuses legacy
 conditioning/scrimmage strings from apply_training_points.

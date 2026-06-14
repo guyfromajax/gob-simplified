@@ -365,7 +365,7 @@ def calc_skeleton_step_timing_contract(
     off_lineup=None,
 ):
     """
-    Build per-step clock timing per Real_Time_Clock_System.md movement rates.
+    Build per-step clock timing. Movement/step-timing authority: UESS_System.md (§3.4/§5/§9.3).
     phase_type: 'HCO' | 'HCT' | 'FCP' | None. Drive→16, HCO non-drive→16, HCO shoot stationary→1,
     HCT/FCP non-drive→20, fallback→24. Pass in-air added per step. Bring-up uses OF 24 when enabled.
 

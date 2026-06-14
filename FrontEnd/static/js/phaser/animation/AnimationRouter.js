@@ -523,7 +523,7 @@ export class AnimationRouter {
         noImpactResultTypes.has(turnData?.result_type);
       const isOpeningTipTurn = turnData?.result_type === 'OPENING_TIP';
 
-      // Clocks: game clock never forced; shot clock uses contract only (backend authority — Real_Time_Clock_System §101–102).
+      // Clocks: game clock never forced; shot clock uses contract only (backend authority — Shot_Clock_System.md, live clock end-of-turn snap).
       if (this.scene?.gameClock || this.scene?.shotClock) {
         const applyClockControl = (clockRef) => {
           if (!clockRef) return;

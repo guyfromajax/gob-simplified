@@ -68,8 +68,8 @@ def default_user_tracking() -> dict:
     the coach's badge ("" until they have games). `archetype_reveal_seen` gates the
     one-time first-archetype reveal modal (false → eligible to see it).
     `archetype_evolution_pending` holds the new archetype key when a coach's lead
-    archetype *changes* (set in save_result); the FCC "you have evolved" modal
-    consumes + clears it ("" → nothing pending).
+    archetype *changes* (set in the complete-week user-game block / save_result);
+    the FCC "you have evolved" modal consumes + clears it ("" → nothing pending).
 
     Alpha-feedback fields gate the alpha survey + its post-game prompt modal:
       `alpha_feedback_submitted` — true once the user submits the 12-question survey.

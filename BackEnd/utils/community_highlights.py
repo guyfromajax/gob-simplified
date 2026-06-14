@@ -90,8 +90,9 @@ def user_geek_points_snapshot_for_franchise(franchise_doc: dict) -> int:
     return _user_geek_points_total(franchise_doc.get("user_id"))
 
 
-# Marker stashed on the franchise doc by save_result when the user's just-played
-# game changed their lead coaching archetype; consumed by the phase-B flush.
+# Marker stashed on the franchise doc by the complete-week user-game block (and
+# the legacy save_result endpoint) when the user's just-played game changed their
+# lead coaching archetype; consumed by the phase-B flush.
 ARCHETYPE_PENDING_FIELD = "post_game_status.community_highlight_archetype_pending"
 
 
@@ -114,8 +115,9 @@ def record_archetype_change_if_any(
 ) -> None:
     """After the user's game commits a new lead_archetype, stash a from/to marker
     on the franchise when it changed. The phase-B flush turns this into a feed row.
-    Detection lives here (where the change actually happens, in save_result) so a
-    genuine first-time establishment fires while pre-existing archetypes do not."""
+    Called right after finalize_game in the complete-week user-game block (and the
+    legacy save_result endpoint) so a genuine first-time establishment fires while
+    pre-existing archetypes do not."""
     lead_after = lead_archetype_for_user(owner_user_id)
     if not lead_after or lead_after == (lead_before or ""):
         return
@@ -749,7 +751,8 @@ def flush_community_highlight_pending_after_week(
         )
 
     # Lead-archetype evolution row: the user's just-played game changed their lead
-    # coaching archetype (marker set in save_result). Appended below the game row.
+    # coaching archetype (marker set by record_archetype_change_if_any in the
+    # complete-week user-game block). Appended below the game row.
     archetype_pending = (fresh.get("post_game_status") or {}).get(
         "community_highlight_archetype_pending"
     )

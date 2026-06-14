@@ -1,6 +1,7 @@
 /**
  * AG → movement speed (px/s) for player tweens. Pure helpers + agility lookup.
- * See docs/docs_1_systems/05_Animation_System/AG_Implementation.md.
+ * Fallback path only — backend per-player game-seconds are authoritative when
+ * present. See _documentation_master/00_General_Systems/UESS_System.md §9.3.
  */
 
 /** Linear intercept: speed at AG 0 before global game-speed scale */

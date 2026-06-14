@@ -376,8 +376,8 @@ def build_hct_animation_steps(
             next_step = _resolve_step_3_next(turn_result)
 
         # Advance trigger: per step, identify the gating player (whose arrival
-        # at their target coord ends the step). Per HCT scoping in
-        # Animation_System_Updated.md → Advance_Triggers.md.
+        # at their target coord ends the step). Per the HCT trigger table in
+        # Step_By_Step_System.md.
         if i == 0:
             gate_id = _slowest_setup_player_id(start_coords, end_coords) or ball_handler_id
         elif i == 1:

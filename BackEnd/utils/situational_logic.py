@@ -1,6 +1,6 @@
 """
 Situational Logic (Q4/OT): Quick Shot / Slow It Down and Force Foul.
-See docs/docs_1_systems/05_GP_Supporting_Systems/Situational_Logic_System.md.
+See _documentation_master/05_GP_Supporting_Systems/Situational_Logic_System.md.
 
 All logic applies only when quarter >= 4 (Q4 and OT). Time remaining is in the quarter (seconds).
 Temp overrides (Fast Break, FCP, HCT) revert when the situation ends (re-evaluated each turn).

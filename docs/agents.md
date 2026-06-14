@@ -150,10 +150,8 @@ Cross-cutting rules for safe feature work. **Subsystem behavior** remains docume
 ### Further reading
 
 - **Fragility patterns** (Jan 2025 examples; use as pattern guide, not a live bug list): `docs/To Do/Archive/codebase_fragility_analysis.md`
-- **FrontEnd page / modal map:** `docs/docs_1_systems/00_General_Systems/Active_Page_Analysis.md`
-- **HOME vs display coords / `player.coords`:** `docs/docs_1_systems/00_General_Systems/Coordinate_Orientation_Audit.md`
-- **AG → movement speed:** `docs/docs_1_systems/05_Animation_System/AG_Implementation.md`
-- **Manual QA before releases:** `docs/docs_1_systems/00_General_Systems/Manual_QA_Checklist.md`
+- **AG → movement speed:** `_documentation_master/00_General_Systems/UESS_System.md` §3.4 / §9.3
+- **Manual QA before releases:** `_documentation_master/00_General_Systems/Manual_QA_Checklist.md`
 
 ---
 

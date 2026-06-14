@@ -2161,7 +2161,7 @@ export function createGameScene(Phaser) {
             this.simData.clock = liveClock;
           }
         }
-        // Same code path for both clocks: get incoming value (explicit then contract end), then sync. Game: monotonic check. Shot: backend authority only (Real_Time_Clock_System §101–102).
+        // Same code path for both clocks: get incoming value (explicit then contract end), then sync. Game: monotonic check. Shot: backend authority only (Shot_Clock_System.md — live clock end-of-turn snap).
         const incomingGameSec = typeof turn.time_remaining === 'number'
           ? Math.max(0, Math.floor(turn.time_remaining))
           : (turn.clock || turn.game_clock)

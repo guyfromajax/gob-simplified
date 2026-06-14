@@ -5,12 +5,13 @@ schema-conformant steps composed of existing step types:
 
 - **PG = BH** (1 step) — Parallel Movement with ``fixed_duration`` T = 2.0
   game-sec. BH (= PG) holds ball stationary; other 9 players drift to random
-  lane spots at cruise.
+  lane spots at the ``standard`` rate.
 
 - **PG ≠ BH** (2 steps):
   - **PG converge** (Parallel Movement, gated on PG arrival): BH stationary
     holding ball; PG sprints to a random spot within 10 grid Euclidean of BH
-    (over-and-back clamped); other 8 drift to random lane spots at cruise.
+    (over-and-back clamped); other 8 drift to random lane spots at the
+    ``standard`` rate.
   - **Inbound pass** (Pass, gated on ball reaches PG): BH passes to PG; PG
     stationary at converge target; other 8 continue toward lane spots.
 
@@ -19,7 +20,8 @@ HCO seam: CR FB Defensive Stop, RR FB Hold-up + Outlet Denied, DREB → HCO,
 Steal → HCO. The helper is call-site agnostic — same API for source-turn
 and (future) HCO-turn consumption.
 
-Spec: ``_documentation_master/05_Animation_System/Step_Types_System.md``.
+Spec: ``_documentation_master/00_General_Systems/Step_By_Step_System.md``
+(§ Universal step patterns → Reset step spec).
 """
 
 from __future__ import annotations

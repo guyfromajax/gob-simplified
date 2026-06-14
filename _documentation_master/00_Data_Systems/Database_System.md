@@ -58,6 +58,17 @@ Note: Mongo creates collections lazily on first write. As of 2026-06, `training_
 - Franchise child collections are keyed by `franchise_id` + entity id, with unique compound indexes (see below). **Type caution:** FTD stores `franchise_id` as `ObjectId`; FPD/FRD store it as a **string**. Queries must match the stored type, and `db.teams` lookups must convert string ids back to `ObjectId`.
 - Defense identity is migrating from name-based to `defense_id` (see `tasks/Defense_ID_Migration.md`); most persisted settings are still defense-name keyed.
 
+## Adding New Teams & Players (manual seeding)
+
+**New team** — provide: `name`, `team_id`, `primary_color`, `secondary_color` (see `teams` fields above; `player_ids` and optional `mascot` round out the doc).
+
+**New player** — provide:
+
+- `first_name`, `last_name`, `team`
+- attributes (`SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT`); anchor values set equal to these. `EM`, `MO`, `CH` initialized at 0 (game/mode init overwrites `CH` and `EM` 1–100, `MO` stays 0)
+- `jersey`, `year`, `height`, `weight`
+- headshot: until specified otherwise, all new players use `/static/images/players/generic_headshot.png` (set `photo` to that path)
+
 ## Indexes (ensured at startup, idempotent)
 
 - `franchise_team_data`: unique `(franchise_id, team_id)`

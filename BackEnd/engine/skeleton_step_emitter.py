@@ -1395,10 +1395,10 @@ def build_skeleton_animation_steps(
             },
         }
         # Mid-skeleton pass steps: stamp ``ball_motion_style="pass"`` so the
-        # ball tweens at the canonical half-court pass rate (30 grid/game-sec
-        # = PASS_GRID_SPOTS_PER_GAME_SECOND) independent of step T (which is
-        # gated by the slowest offensive player and would otherwise drag the ball
-        # below 30). Detected via ownership transfer on this step.
+        # ball tweens at the canonical half-court pass rate
+        # (PASS_GRID_SPOTS_PER_GAME_SECOND) independent of step T (which is
+        # gated by the slowest offensive player and would otherwise drag the
+        # ball below the pass rate). Detected via ownership transfer on this step.
         #
         # Also stamp ``ball_arrival_coord`` — the meet-point where the ball
         # intercepts the receiver (their interpolated position at ball

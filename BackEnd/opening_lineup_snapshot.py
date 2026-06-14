@@ -1,7 +1,7 @@
 """
 Immutable Q1 opening-five snapshot for PGPC and related features.
 
-See docs/docs_1_systems/05_GP_Supporting_Systems/Special_Tracking_System.md
+See _documentation_master/03_Data_Persistence/Data_Persistence_System.md ("Special Gameplay-Tracking Fields")
 """
 
 from __future__ import annotations

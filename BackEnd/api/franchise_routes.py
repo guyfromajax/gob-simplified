@@ -3459,6 +3459,11 @@ def _complete_week_process_user_game_block(
         _clear_fcc_pending_new_lean_recruits(franchise_doc, franchise_id)
 
     gp_before = user_geek_points_snapshot_for_franchise(franchise_doc)
+    # Snapshot the user's lead coaching archetype before finalize_game commits this
+    # game's archetype counts; compared after to flag a first-time/changed archetype
+    # (community-highlights feed row + FCC "you have evolved" modal).
+    archetype_owner_user_id = franchise_doc.get("user_id")
+    lead_archetype_before = lead_archetype_for_user(archetype_owner_user_id)
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
@@ -3819,7 +3824,12 @@ def _complete_week_process_user_game_block(
                 logger.error(f"❌ [COMPLETE_WEEK] User game found but _id is empty: {user_game}")
         else:
             logger.error(f"❌ [COMPLETE_WEEK] User's game not found in games collection. Query: week={req.week}, team1_id={team1_id}, team2_id={team2_id}, franchise_id={req.franchise_id}")
-    
+
+    # Flag a coaching-archetype change (established for the first time, or evolved)
+    # now that finalize_game has folded this game's archetype periods into the
+    # user's counters. No-op when the lead archetype didn't change.
+    record_archetype_change_if_any(franchise_id, archetype_owner_user_id, lead_archetype_before)
+
     gp_delta = user_geek_points_delta_for_user_game_block(franchise_doc, gp_before)
     return user_res, user_row, gp_delta, eos_matchup_for_user, ch_game_id
 

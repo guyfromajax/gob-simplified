@@ -28,8 +28,8 @@ Covert Release shape:
 Edge case: when the rebounder == release player (no distinct outlet passer),
 the outlet pass step is skipped.
 
-See ``_documentation_master/05_Animation_System/Advance_Triggers.md`` —
-"Fast Break / Covert Release" — for the per-step trigger spec.
+See ``_documentation_master/00_General_Systems/Step_By_Step_System.md`` —
+"Covert Release" — for the per-step trigger spec.
 """
 
 import math
@@ -339,23 +339,20 @@ def _build_outlet_pass_step(
             defender 1 takes the cut-off, defender 2 takes the same-side
             lowPost spot.
         See ``Fast_Break_System.md`` — Covert Release — for full spec.
-      - All other players (non-passer, non-receiver, non-getback): sprint
-        toward the attacking basket (HOME_RIM / AWAY_RIM). Schema's
-        interrupted-coord logic clamps each player's end coord to
-        ``sprint rate × step T`` along the start→basket path. At the
-        current FB pass speed (36 grid/game-sec), a typical 40-grid outlet
-        completes in ~1.1 game-sec, so sprinters get a ~15-grid head start
-        without surpassing the stationary receiver at midcourt.
+      - All other players (non-passer, non-receiver, non-getback): drift a
+        random 1-6 grid spots toward the attacking basket along x (y held)
+        at ``standard`` rate. The small drift keeps the visual focus on the
+        pass + receiver; they ramp up to sprint on step 1 once the receiver
+        has caught the ball.
 
     Ball tweens passer → receiver over the full step T.
     """
     # Outlet pass T: Euclidean ball-flight time at FB pass rate, varied by
-    # outlet quality. Good outlets (`outlet_score >= 50`) zip at the canonical
-    # FB pass rate; poor outlets are noticeably slower so the ball hangs in
-    # the air and the play feels sloppier.
-    #   - good: 30 grid/game-sec (= FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
-    #   - poor: 22 grid/game-sec
-    # Floor at 0.5 game-sec so the visual beat is perceptible for short passes.
+    # outlet quality. Good outlets (`outlet_score >= FB_OUTLET_QUALITY_THRESHOLD`)
+    # zip at FB_PASS_GRID_SPOTS_PER_GAME_SECOND; poor outlets use the slower
+    # FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY so the ball hangs in the air
+    # and the play feels sloppier.
+    # Floor at FB_PASS_MIN_GAME_SECONDS so the beat is perceptible for short passes.
     from BackEnd.constants import (
         FB_OUTLET_QUALITY_THRESHOLD,
         FB_PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -935,7 +932,7 @@ def _build_step_back_step(
     shot_clock_remaining_at_start: float,
 ) -> Optional[AnimationStep]:
     """Build the step-back / HCO-setup step (step 2 in the DEFENSIVE_STOP
-    branch). See module docstring + Advance_Triggers.md for the spec.
+    branch). See module docstring + Step_By_Step_System.md for the spec.
     """
     import logging
     fb_bh = fb_roles.get("ball_handler")

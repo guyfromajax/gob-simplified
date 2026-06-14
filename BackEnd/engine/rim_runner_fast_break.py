@@ -1043,7 +1043,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     # Distance gate: outlet defender must be within 10 grid Euclidean of the
     # outlet passer (rebounder) to meaningfully contest the pass. Beyond
     # that, denial is geometrically implausible — auto-success regardless of
-    # attribute rolls. See Animation_System_Updated.md / Advance_Triggers.md.
+    # attribute rolls. See Step_By_Step_System.md (RR Outlet Denied sub-step logic).
     outlet_within_range = True
     if outlet_defender and rebounder:
         rc = getattr(rebounder, "coords", None) or {}

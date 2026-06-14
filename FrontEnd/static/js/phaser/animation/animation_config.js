@@ -19,7 +19,8 @@ const defaults = {
     duration: 150,
     easing: 'Sine.easeInOut',
     arc: null,
-    // Hold after ball placed with inbound passer (SIP/BIP); applied twice in sequence
+    // Hold after ball placed with inbound passer. SIP only (single application);
+    // BIP no longer holds here (May 2026 responsiveness update).
     holdAfterPlaceMs: 200,
   },
   shot: {

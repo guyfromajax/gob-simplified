@@ -35,7 +35,7 @@ Attached to every turn that receives a clock contract (all normal and bypass tur
 ### game_time_elapsed (time_elapsed)
 
 - **What it is:** Game seconds consumed by the turn (deducted from game clock). Stored on the turn result as `time_elapsed`.
-- **How it’s computed:** Depends on turn type (skeleton steps, fast-break segments, OREB, opening tip, etc.). See `time_elapsed_system.md` and `Real_Time_Clock_System.md`. Not modified by the clock sync system.
+- **How it’s computed:** Depends on turn type (skeleton steps, fast-break segments, OREB, opening tip, etc.); ledger-derived per UESS. See `_documentation_master/00_General_Systems/UESS_System.md` (§5 clock authority) for elapsed-time derivation, and `_documentation_master/05_GP_Supporting_Systems/Shot_Clock_System.md` for shot-clock policy. Not modified by the clock sync system.
 
 ### real_time_elapsed_ms
 

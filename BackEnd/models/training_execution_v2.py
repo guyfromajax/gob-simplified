@@ -166,7 +166,7 @@ def execute_training(
     training_report["plays_data"] = updated_plays
     training_report["scouting_data"] = updated_scouting_data
 
-    # Structured Training Notes (Training_Notes_System.md); replaces flat energy-only list
+    # Structured Training Notes (Training_System.md → Training Notes Section); replaces flat energy-only list
     _legacy_energy = list(training_report.get("training_notes", []))
     from BackEnd.models.training_notes import build_structured_training_report_notes
 

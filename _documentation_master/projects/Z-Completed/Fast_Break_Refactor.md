@@ -295,7 +295,7 @@ Dual-path helpers + AG=50 invariant mean the only true regression risk is Phase 
 - [`Movement_Rate_Refactor.md`](Movement_Rate_Refactor.md) — predecessor refactor, source of patterns reused here.
 - [`Animation_Cleanup.md`](Animation_Cleanup.md) — broader animation tech-debt queue.
 - [`05_Animation_System/Core_Animation_System.md`](../05_Animation_System/Core_Animation_System.md) — tween-duration-authority section (added during Movement Rate Refactor).
-- [`05_Animation_System/AG_Implementation.md`](../05_Animation_System/AG_Implementation.md) — AG curve canon (v2).
+- [`UESS_System.md`](../../00_General_Systems/UESS_System.md) §3.4 / §9.3 — AG curve + archetype rate canon (`AG_Implementation.md` deleted June 2026).
 - [`05_Animation_System/Transition_Systems.md`](../05_Animation_System/Transition_Systems.md) — hold/delay reference.
 - Frontend: [`fastBreak.js`](../../FrontEnd/static/js/phaser/animation/fastBreak.js), [`AnimationEngine.js`](../../FrontEnd/static/js/phaser/animation/AnimationEngine.js), [`turnAnimation.js`](../../FrontEnd/static/js/phaser/animation/turnAnimation.js).
 - Backend: [`phase_resolution.py`](../../BackEnd/engine/phase_resolution.py), [`rim_runner_fast_break.py`](../../BackEnd/engine/rim_runner_fast_break.py), [`animator.py`](../../BackEnd/models/animator.py), [`shot_manager.py`](../../BackEnd/models/shot_manager.py), [`shared.py`](../../BackEnd/utils/shared.py), [`fast_break_constants.py`](../../BackEnd/constants/fast_break_constants.py).

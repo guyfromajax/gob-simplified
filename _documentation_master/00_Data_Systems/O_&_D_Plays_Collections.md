@@ -110,4 +110,4 @@ Training/report notes:
 - `_documentation_master/05_GP_Supporting_Systems/HCO_Turn_Resolution_System.md`
 - `_documentation_master/05_GP_Supporting_Systems/Sim_Playcalling_System.md`
 - `_documentation_master/06_GMO_Supporting_Systems/Playbooks_Page.md`
-- `_documentation_master/06_GMO_Supporting_Systems/Play_Builder_System.md`
+- `_documentation_master/06_GMO_Supporting_Systems/Offense_Plays_System.md` (includes the Play Builder section)
