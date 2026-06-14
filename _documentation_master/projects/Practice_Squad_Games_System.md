@@ -36,6 +36,9 @@
 - Per-game randomized CPU defaults (strategy, team attrs, scouting, plays).
 - Game docs: `games` collection, `mode: "practice_squad"`.
 - Stats → `ps_season_stats` on FPD/FRD only (not season/career).
+- After each sim, `apply_ps_game_stats()` reads the saved game box score and `$inc`s into `ps_season_stats`.
+- **Game `_id` type:** PS games persist with a **string** `_id` (`generate_game_id()`). Rollup must query string first, then ObjectId (see `stats._load_game_doc`). Using ObjectId-only lookup silently skipped all rollups before 2026-06-14.
+- **One-time backfill:** `practice_squad.ps_season_stats_backfilled` on franchises that simmed before the fix. `ensure_ps_season_stats_backfilled()` clears and rebuilds from all `mode=practice_squad` games; runs on next roster API load or next training week hook.
 
 ## Persistence
 
@@ -44,6 +47,13 @@
 | Rosters, schedule, standings, brackets, scrubs weekly | `franchises.practice_squad` |
 | Box scores | `games` (`mode=practice_squad`) |
 | Player PS stats | `FPD.ps_season_stats` / `FRD.ps_season_stats` |
+| Stats backfill flag | `franchises.practice_squad.ps_season_stats_backfilled` |
+
+## Known fixes
+
+| Date | Issue | Fix |
+|---|---|---|
+| 2026-06-14 | Season stats table all zeros on PS roster pages | `apply_ps_game_stats` queried games by ObjectId while PS saves string `_id`; added `_load_game_doc` + one-time `backfill_ps_season_stats` |
 
 ## News (`season_news`)
 

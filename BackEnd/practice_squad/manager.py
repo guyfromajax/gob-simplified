@@ -38,7 +38,7 @@ from BackEnd.practice_squad.schedule import (
     tournament_games_for_week,
 )
 from BackEnd.practice_squad.sim import run_ps_full_simulation
-from BackEnd.practice_squad.stats import apply_ps_game_stats
+from BackEnd.practice_squad.stats import apply_ps_game_stats, ensure_ps_season_stats_backfilled
 from BackEnd.tournament import bracket_engine
 from BackEnd.utils.game_id_utils import generate_game_id
 
@@ -304,6 +304,7 @@ def _sim_one_game(
     home_name = home_team.get("display_name") or str(home_id)
     away_name = away_team.get("display_name") or str(away_id)
 
+    summary: dict[str, Any] = {}
     try:
         away_score, home_score, summary = run_ps_full_simulation(
             home_display_name=home_name,
@@ -319,6 +320,7 @@ def _sim_one_game(
         logger.error("PS sim failed %s vs %s: %s", home_id, away_id, ex, exc_info=True)
         away_score = random.randint(50, 80)
         home_score = random.randint(50, 80)
+        summary = {}
 
     game_id = generate_game_id()
     summary = dict(summary)
@@ -396,6 +398,8 @@ def run_practice_squad_week(
 
     if week not in PS_ACTIVE_WEEKS:
         return ps_state
+
+    ps_state = ensure_ps_season_stats_backfilled(str(franchise_id), ps_state)
 
     if int(ps_state.get("trained_week") or 0) == week:
         return ps_state

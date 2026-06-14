@@ -9487,6 +9487,14 @@ def get_practice_squad_team(
     """Roster + ps_season_stats for a Practice Squad pseudo-team."""
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     ps = franchise_doc.get("practice_squad") or {}
+    if ps.get("initialized") and not ps.get("ps_season_stats_backfilled"):
+        from BackEnd.practice_squad.stats import ensure_ps_season_stats_backfilled
+
+        ps = ensure_ps_season_stats_backfilled(str(franchise_id), ps)
+        db.franchises.update_one(
+            {"_id": franchise_doc["_id"]},
+            {"$set": {"practice_squad": ps}},
+        )
     team = (ps.get("teams") or {}).get(ps_team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Practice Squad team not found")
