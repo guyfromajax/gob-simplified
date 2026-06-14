@@ -80,18 +80,21 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _dedupe_requests(docs: list[dict]) -> list[dict]:
+def _dedupe_requests(docs: list[dict]) -> tuple[list[dict], list]:
+    """Return (oldest-per-email winners, ids of the older duplicate docs)."""
     by_email: dict[str, list[dict]] = defaultdict(list)
     for doc in docs:
         email = (doc.get("email") or "").lower().strip()
         if email:
             by_email[email].append(doc)
     winners: list[dict] = []
+    duplicate_ids: list = []
     for email, rows in by_email.items():
         rows.sort(key=lambda d: d.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))
         winners.append(rows[0])
+        duplicate_ids.extend(r["_id"] for r in rows[1:])
     winners.sort(key=lambda d: d.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))
-    return winners
+    return winners, duplicate_ids
 
 
 def main() -> int:
@@ -112,14 +115,26 @@ def main() -> int:
     users = db[USERS]
 
     pending = list(requests.find({"status": "pending"}).sort("created_at", 1))
-    deduped = _dedupe_requests(pending)
-    available = _count_available(db) if args.execute else None
+    deduped, duplicate_ids = _dedupe_requests(pending)
+    available = _count_available(db)
 
     print(f"Target: {db_name}")
     print(f"Pending requests: {len(pending)}")
     print(f"After de-dupe (oldest per email): {len(deduped)}")
-    if args.execute:
-        print(f"Available OTPs: {available}")
+    print(f"Duplicate requests (older dupes per email): {len(duplicate_ids)}")
+    print(f"Available OTPs: {available}")
+
+    # Mark the non-winner duplicate requests so a re-run cannot double-send to
+    # the same email (the winner is handled below).
+    if duplicate_ids:
+        if args.execute:
+            requests.update_many(
+                {"_id": {"$in": duplicate_ids}},
+                {"$set": {"status": "skipped", "skip_reason": "duplicate_email"}},
+            )
+            print(f"Marked {len(duplicate_ids)} duplicate request(s) skipped/duplicate_email")
+        else:
+            print(f"Would mark {len(duplicate_ids)} duplicate request(s) skipped/duplicate_email")
 
     send_queue = 0
     for doc in deduped:
@@ -167,6 +182,11 @@ def main() -> int:
 
     if args.dry_run:
         print(f"Would send: {send_queue}")
+        if send_queue > available:
+            print(
+                f"WARNING: only {available} OTP(s) available; "
+                f"{send_queue - available} request(s) would hit no_otp_capacity at execute"
+            )
     else:
         print(f"Sent: {send_queue}")
     return 0

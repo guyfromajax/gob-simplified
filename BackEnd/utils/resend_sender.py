@@ -16,8 +16,18 @@ FEEDBACK_TO_EMAIL = os.getenv("FEEDBACK_TO_EMAIL", "jamie@geekedoutgames.com")
 ALPHA_EMAIL_FROM = os.getenv("ALPHA_EMAIL_FROM", FEEDBACK_FROM_EMAIL)
 
 
-def send_resend_html_email(*, to: list[str], subject: str, html: str, from_email: str | None = None) -> bool:
-    """Send a single HTML email via Resend."""
+def send_resend_html_email(
+    *,
+    to: list[str],
+    subject: str,
+    html: str,
+    from_email: str | None = None,
+    headers: dict | None = None,
+) -> bool:
+    """Send a single HTML email via Resend.
+
+    headers: optional custom email headers (e.g. List-Unsubscribe).
+    """
     if not RESEND_API_KEY:
         logger.warning("[RESEND] RESEND_API_KEY not set - skipping email send")
         return False
@@ -28,6 +38,8 @@ def send_resend_html_email(*, to: list[str], subject: str, html: str, from_email
         "subject": subject,
         "html": html,
     }
+    if headers:
+        payload["headers"] = headers
 
     try:
         with httpx.Client(timeout=10.0) as client:
