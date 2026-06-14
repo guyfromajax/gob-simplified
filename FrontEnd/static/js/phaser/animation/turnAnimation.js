@@ -2464,154 +2464,6 @@ async function runDefensiveReboundSetup({
 }
 
 /**
- * Run offensive rebound kickout outlet setup animation
- * Similar to runDefensiveReboundSetup but for OREB kickout scenarios
- * 
- * @param {Object} params
- * @param {Object} params.scene - Phaser scene
- * @param {Object} params.ballSprite - Ball sprite
- * @param {Object} params.playerSprites - Player sprites dict
- * @param {string} params.rebounderId - Rebounder player ID
- * @param {string} params.pgId - Point guard player ID
- * @param {Object} [params.turnData] - Turn data (optional, for determining offense team)
- */
-async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprites, rebounderId, pgId, turnData }) {
-  animationDebugLog('runOffensiveReboundKickoutSetup called with:', { rebounderId, pgId });
-  if (!scene || !playerSprites || rebounderId == null || pgId == null) return;
-
-  const rebounderSprite = playerSprites[rebounderId];
-  const pgSprite = playerSprites[pgId];
-  if (!rebounderSprite || !pgSprite) {
-    animationDebugWarn('runOffensiveReboundKickoutSetup: Missing sprites', {
-      rebounderId,
-      pgId,
-      hasRebounder: !!rebounderSprite,
-      hasPG: !!pgSprite
-    });
-    return;
-  }
-
-  // Attach ball to rebounder
-  if (ballSprite) {
-    attachBallToPlayer(scene, ballSprite, rebounderSprite);
-  }
-
-  // ✅ Determine if away team is on offense
-  const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id || scene.offenseTeamId;
-  const homeTeamId = scene.simData?.home_team_id;
-  const isAwayOffense = offenseTeamId && homeTeamId && offenseTeamId !== homeTeamId;
-
-  // ✅ Helper function to flip coordinates for away team offense
-  const flipCoords = (coords) => {
-    return { x: 101 - coords.x, y: coords.y };
-  };
-
-  const width = scene.game.config.width;
-  const height = scene.game.config.height;
-  const { HCO_STRING_SPOTS } = await import('../../utils/courtPositions.js');
-
-  // PG moves to one of: key, deep key, upper midWing, deep upper wing, lower midWing, deep lower wing (randomized)
-  const pgSpotOptions = [
-    "key",
-    "deep key",
-    "upper midWing",
-    "deep upper wing",
-    "lower midWing",
-    "deep lower wing"
-  ];
-  const selectedPGSpot = pgSpotOptions[Math.floor(Math.random() * pgSpotOptions.length)];
-  let pgSpot = HCO_STRING_SPOTS[selectedPGSpot];
-  
-  if (!pgSpot) {
-    animationDebugWarn('runOffensiveReboundKickoutSetup: Invalid PG spot selected', { selectedPGSpot });
-    return;
-  }
-
-  // ✅ Apply coordinate flipping for away team offense
-  if (isAwayOffense) {
-    pgSpot = flipCoords(pgSpot);
-  }
-
-  // Determine PG's vertical half for rebounder constraint (based on original spot name, not flipped coords)
-  const isPGUpperHalf = selectedPGSpot.includes("upper");
-  const isPGLowerHalf = selectedPGSpot.includes("lower");
-  const isPGCentral = selectedPGSpot === "key" || selectedPGSpot === "deep key";
-
-  // Rebounder moves to: topLane, upper apex, lower apex, or key (if PG not at key)
-  // Constraint: Rebounder must be on same vertical half as PG (or central)
-  let rebounderSpotOptions = [];
-  
-  // Always allow topLane and key (vertically central)
-  rebounderSpotOptions.push("topLane");
-  if (selectedPGSpot !== "key") {
-    rebounderSpotOptions.push("key");
-  }
-
-  // Add vertical half options based on PG position
-  // If PG is central (key/deep key), rebounder can go to any vertical spot
-  // If PG is upper half, rebounder can't go to lower apex
-  // If PG is lower half, rebounder can't go to upper apex
-  if (isPGCentral || isPGUpperHalf) {
-    rebounderSpotOptions.push("upper apex");
-  }
-  if (isPGCentral || isPGLowerHalf) {
-    rebounderSpotOptions.push("lower apex");
-  }
-
-  // Select random rebounder spot from valid options
-  const selectedRebounderSpot = rebounderSpotOptions[Math.floor(Math.random() * rebounderSpotOptions.length)];
-  let rebounderSpot = HCO_STRING_SPOTS[selectedRebounderSpot];
-  
-  if (!rebounderSpot) {
-    animationDebugWarn('runOffensiveReboundKickoutSetup: Invalid rebounder spot selected', { selectedRebounderSpot });
-    return;
-  }
-
-  // ✅ Apply coordinate flipping for away team offense
-  if (isAwayOffense) {
-    rebounderSpot = flipCoords(rebounderSpot);
-  }
-
-  animationDebugLog('runOffensiveReboundKickoutSetup: Selected spots', {
-    pgSpot: selectedPGSpot,
-    pgCoords: pgSpot,
-    rebounderSpot: selectedRebounderSpot,
-    rebounderCoords: rebounderSpot,
-    isAwayOffense,
-    offenseTeamId,
-    homeTeamId
-  });
-
-  // Animate both players to their spots
-  const promises = [];
-  
-  // Animate PG to outlet position
-  const pgPx = gridToPixels(pgSpot.x, pgSpot.y, width, height);
-  const pgDuration = getPlayerDuration(pgSprite, pgPx.x, pgPx.y, true);
-  promises.push(
-    tweenPlayerTo(scene, pgSprite, pgPx, {
-      duration: pgDuration,
-      easing: 'Linear',
-    })
-  );
-
-  // Animate rebounder to outlet position
-  const rebounderPx = gridToPixels(rebounderSpot.x, rebounderSpot.y, width, height);
-  const rebounderDuration = getPlayerDuration(rebounderSprite, rebounderPx.x, rebounderPx.y, true);
-  promises.push(
-    tweenPlayerTo(scene, rebounderSprite, rebounderPx, {
-      duration: rebounderDuration,
-      easing: 'Linear',
-    })
-  );
-
-  // Wait for both animations to complete
-  await Promise.all(promises);
-
-  animationDebugLog('runOffensiveReboundKickoutSetup: Outlet positioning complete');
-}
-
-/**
  * Animate the fouling defender moving to within 1-2 x spots and ±1 y spots of the receiver (Quick Foul after BIP/SIP).
  * Used in the same turn as the inbound pass so ball and defender move together.
  */
@@ -2642,6 +2494,32 @@ async function runInboundSetup({
 }) {
   const baselineInboundSetupStartMs = Date.now();
   const baselineInboundLeadInStartMs = Date.now();
+  const requiredPositions = ["PG", "SG", "SF", "PF", "C"];
+  const hasCoord = (coord) =>
+    Number.isFinite(Number(coord?.x)) && Number.isFinite(Number(coord?.y));
+  const hasCompleteDestinations = (destinations) =>
+    destinations &&
+    requiredPositions.every((pos) => hasCoord(destinations[pos]));
+
+  if (
+    !hasCoord(turnData?.ball_spot) ||
+    !hasCompleteDestinations(turnData?.oDestinations) ||
+    !hasCompleteDestinations(turnData?.dDestinations)
+  ) {
+    console.error("[UESS CONTRACT] BASELINE_INBOUND missing backend coordinates", {
+      has_ball_spot: hasCoord(turnData?.ball_spot),
+      offense_positions: requiredPositions.filter((pos) =>
+        hasCoord(turnData?.oDestinations?.[pos])
+      ),
+      defense_positions: requiredPositions.filter((pos) =>
+        hasCoord(turnData?.dDestinations?.[pos])
+      ),
+      result_type: turnData?.result_type ?? null,
+      current_turn: turnData?.current_turn ?? null,
+    });
+    return;
+  }
+
   // ✅ CRITICAL: ALWAYS set scene.offenseTeamId to match newOffenseSide BEFORE doing anything else
   // This ensures that any code that reads scene.offenseTeamId will get the correct value
   const expectedOffenseTeamId = newOffenseSide === "home" ? homeTeamId : awayTeamId;
@@ -2721,252 +2599,63 @@ async function runInboundSetup({
   const scoringTeamKey = isAwayOffense ? "home" : "away";
   const inboundTeamId = isAwayOffense ? awayTeamId : homeTeamId;
   const scoringTeamId = isAwayOffense ? homeTeamId : awayTeamId;
-  const defaultBallSpot = isAwayOffense ? { x: 98, y: 16 } : { x: 3, y: 16 };
-  const ballSpot = turnData?.ball_spot ?? defaultBallSpot;
-
-  const homeOffsetRanges = {
-    PG: { x: [8, 12], y: [-2, 2] },
-    SG: { x: [12, 16], y: [-4, 4] },
-    PF: { x: [10, 14], y: [6, 10] },
-    C: { x: [10, 14], y: [-10, -6] }
-  };
-  const awayOffsetRanges = {
-    PG: { x: [-12, -8], y: [-2, 2] },
-    SG: { x: [-16, -12], y: [-4, 4] },
-    PF: { x: [-14, -10], y: [6, 10] },
-    C: { x: [-14, -10], y: [-10, -6] }
-  };
-  const ranges = isAwayOffense ? awayOffsetRanges : homeOffsetRanges;
-  const inboundDest = {};
-  for (const pos of ["PG", "SG", "PF", "C"]) {
-    if (pos === "PF" || pos === "C") {
-      // PF and C go to half court area
-      inboundDest[pos] = {
-        x: Phaser.Math.Between(40, 60),
-        y: Phaser.Math.Between(15, 35)
-      };
-    } else {
-      // PG and SG use offset-based positioning
-      inboundDest[pos] = {
-        x: ballSpot.x + Phaser.Math.Between(ranges[pos].x[0], ranges[pos].x[1]),
-        y: ballSpot.y + Phaser.Math.Between(ranges[pos].y[0], ranges[pos].y[1])
-      };
-    }
-  }
+  const ballSpot = turnData.ball_spot;
+  const offenseTargets = turnData.oDestinations;
+  const defenseTargets = turnData.dDestinations;
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
-  // If FCP/HCT is next, position defenders in press formation
-  const fcpDefensiveSetup = {};
-  if (skipRetreat) {
-    // Define defensive positions based on pressure type
-    // FCP (Full Court Press): Aggressive full court pressure
-    // HCT (Half Court Trap): Trap at half court line
-    
-    let basePositions;
-    if (pressureType === "HCT") {
-      // HCT: Half court trap positions (defenders closer to midcourt)
-      basePositions = {
-        PG: { x: 60, y: 25 },   // Just past midcourt
-        SG: { x: 55, y: 35 },   // Upper side of half court
-        SF: { x: 55, y: 15 },   // Lower side of half court
-        PF: { x: 45, y: 30 },   // Opposite side upper
-        C: { x: 45, y: 20 }     // Opposite side lower
-      };
-    } else {
-      // FCP: Full court press positions (defenders spread across court)
-      basePositions = {
-        PG: { x: 80, y: 25 },   // Deep in offensive zone
-        SG: { x: 73, y: 40 },   // Upper wing
-        SF: { x: 73, y: 10 },   // Lower wing
-        PF: { x: 37, y: 36 },   // Protecting opposite end
-        C: { x: 35, y: 15 }     // Protecting opposite end
-      };
-    }
-
-    // Apply positioning logic based on which team is defending
-    // Midcourt is X=50
-    // Left basket (away) is X=9, Right basket (home) is X=91
-    for (const pos of ['PG', 'SG', 'SF', 'PF', 'C']) {
-      let coords = basePositions[pos];
-      
-      if (isAwayOffense) {
-        // AWAY on offense (attacking LEFT basket X=9), HOME defending LEFT basket
-        // No flip needed - positions are already oriented correctly
-        fcpDefensiveSetup[pos] = coords;
-      } else {
-        // HOME on offense (attacking RIGHT basket X=91), AWAY defending RIGHT basket
-        // Flip X coordinates: 101 - x
-        fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };
-      }
-    }
-  }
-
-  // Retreat scoring team toward midcourt (unless FCP is next)
-  const usePayloadHcoSetup =
-    !skipRetreat &&
-    !pressureType &&
-    turnData?.next_play_type === "HCO" &&
-    turnData?.oDestinations &&
-    turnData?.dDestinations;
-
   const retreatPromises = [];
   const retreatSprites = [];
-  if (usePayloadHcoSetup) {
-    for (const [id, sprite] of Object.entries(playerSprites)) {
-      const info = scene.playerInfo?.[id];
-      if (!info) continue;
-      const targetPos = turnData.dDestinations?.[info.pos];
-      if (
-        !targetPos ||
-        !(
-          sprite.team_id === scoringTeamId ||
-          (!scoringTeamId && sprite.team === scoringTeamKey)
-        )
-      ) {
-        continue;
-      }
-      const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
-      const duration = getPlayerDuration(sprite, targetPx.x, targetPx.y, false);
-      retreatSprites.push(sprite);
-      retreatPromises.push(
-        new Promise((resolve) => {
-          let timeoutId;
-          const tween = scene.tweens.add({
-            targets: sprite,
-            x: targetPx.x,
-            y: targetPx.y,
-            duration,
-            ease: "Linear",
-            onComplete: () => {
-              if (timeoutId) clearTimeout(timeoutId);
-              resolve();
-            },
-            onStop: () => {
-              if (timeoutId) clearTimeout(timeoutId);
-              resolve();
-            }
-          });
-          const timeoutMs = Math.max(duration * 2, 1000);
-          timeoutId = setTimeout(() => {
-            if (tween && tween.isPlaying && tween.isPlaying()) {
-              scene.tweens.killTweensOf(sprite);
-            }
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (
+      !info ||
+      !(
+        sprite.team_id === scoringTeamId ||
+        (!scoringTeamId && sprite.team === scoringTeamKey)
+      )
+    ) {
+      continue;
+    }
+
+    const targetPos = defenseTargets[info.pos];
+    const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
+    const duration = getPlayerDuration(
+      sprite,
+      targetPx.x,
+      targetPx.y,
+      skipRetreat,
+    );
+    retreatSprites.push(sprite);
+    retreatPromises.push(
+      new Promise((resolve) => {
+        let timeoutId;
+        const tween = scene.tweens.add({
+          targets: sprite,
+          x: targetPx.x,
+          y: targetPx.y,
+          duration,
+          ease: "Linear",
+          onComplete: () => {
+            if (timeoutId) clearTimeout(timeoutId);
             resolve();
-          }, timeoutMs);
-        })
-      );
-    }
-  } else if (!skipRetreat) {
-    for (const [id, sprite] of Object.entries(playerSprites)) {
-      const info = scene.playerInfo?.[id];
-      if (!info) continue;
-      if (
-        sprite.team_id === scoringTeamId ||
-        (!scoringTeamId && sprite.team === scoringTeamKey)
-      ) {
-        // Base x-coord for midcourt retreat (uniform for all defensive players)
-        const baseX = isAwayOffense ? 45 : 55;
-        // Randomize x-coord by ±10 from base for more organic feel
-        const xOffset = Phaser.Math.Between(-10, 10);
-        const targetXGrid = baseX + xOffset;
-        const clampedTarget = clampGridCoords(
-          { x: targetXGrid, y: 25 },
-          turnData,
-          { action: "retreat_to_midcourt", playerId: id }
-        );
-        const targetX = gridToPixels(
-          clampedTarget.x,
-          clampedTarget.y,
-          width,
-          height
-        ).x;
-        // Use distance-based duration for consistent speed (same as HCO step movements)
-        // Use regular speed (not transition) for retreat - should match inbound setup speed
-        const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y, false);
-        retreatSprites.push(sprite);
-        retreatPromises.push(
-          new Promise((resolve) => {
-            let timeoutId;
-            const tween = scene.tweens.add({
-              targets: sprite,
-              x: targetX,
-              y: sprite.y,
-              duration: retreatDuration,
-              ease: "Linear", // Match HCO step movements for consistent feel
-              onComplete: () => {
-                if (timeoutId) clearTimeout(timeoutId);
-                resolve();
-              },
-              onStop: () => {
-                if (timeoutId) clearTimeout(timeoutId);
-                resolve();
-              }
-            });
-            
-            // Timeout safety: force resolve after 2x duration + buffer
-            const timeoutMs = Math.max(retreatDuration * 2, 1000);
-            timeoutId = setTimeout(() => {
-              if (tween && tween.isPlaying && tween.isPlaying()) {
-                scene.tweens.killTweensOf(sprite);
-              }
-              resolve();
-            }, timeoutMs);
-          })
-        );
-      }
-    }
-  } else if (Object.keys(fcpDefensiveSetup).length > 0) {
-    // Move defending players to FCP press positions
-    for (const [id, sprite] of Object.entries(playerSprites)) {
-      const info = scene.playerInfo?.[id];
-      if (!info) continue;
-      
-      // Check if this is a defending player
-      if (
-        sprite.team_id === scoringTeamId ||
-        (!scoringTeamId && sprite.team === scoringTeamKey)
-      ) {
-        const targetPos = fcpDefensiveSetup[info.pos];
-        if (targetPos) {
-          const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
-          // Use distance-based duration for consistent speed (same as HCO step movements)
-          // isTransition=true allows longer durations for transition movements
-          const fcpDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
-          retreatSprites.push(sprite);
-          retreatPromises.push(
-            new Promise((resolve) => {
-              let timeoutId;
-              const tween = scene.tweens.add({
-                targets: sprite,
-                x: targetPx.x,
-                y: targetPx.y,
-                duration: fcpDuration,
-                ease: "Linear", // Match HCO step movements for consistent feel
-                onComplete: () => {
-                  if (timeoutId) clearTimeout(timeoutId);
-                  resolve();
-                },
-                onStop: () => {
-                  if (timeoutId) clearTimeout(timeoutId);
-                  resolve();
-                }
-              });
-              
-              // Timeout safety: force resolve after 2x duration + buffer
-              const timeoutMs = Math.max(fcpDuration * 2, 1000);
-              timeoutId = setTimeout(() => {
-                if (tween && tween.isPlaying && tween.isPlaying()) {
-                  scene.tweens.killTweensOf(sprite);
-                }
-                resolve();
-              }, timeoutMs);
-            })
-          );
-        }
-      }
-    }
+          },
+          onStop: () => {
+            if (timeoutId) clearTimeout(timeoutId);
+            resolve();
+          },
+        });
+        const timeoutMs = Math.max(duration * 2, 1000);
+        timeoutId = setTimeout(() => {
+          if (tween && tween.isPlaying && tween.isPlaying()) {
+            scene.tweens.killTweensOf(sprite);
+          }
+          resolve();
+        }, timeoutMs);
+      }),
+    );
   }
 
   // Identify SF/PG/SG/PF/C and freeze other inbound players
@@ -3054,91 +2743,22 @@ async function runInboundSetup({
 
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
-  // ✅ SS&S: For FCP/HCT, use step 0 positions from backend-provided skeleton data
-  // Backend includes offense_setup_positions in BASELINE_INBOUND turn when next_defensive_setup is FCP/HCT
-  // This positions offensive players in their press-break formation from the start
-  let useSkeletonPositions = false;
-  let skeletonPositions = {};
-  
-  if (skipRetreat && pressureType && turnData?.offense_setup_positions) {
-    // Backend provided skeleton step 0 positions - convert to coords format
-    const posActions = turnData.offense_setup_positions;
-    
-    // ✅ FIX: Helper function to flip coordinates for away team offense
-    const flipCoords = (coords) => {
-      return { x: 101 - coords.x, y: coords.y };
-    };
-    
-    for (const [pos, actionData] of Object.entries(posActions)) {
-      // ✅ FIX: Check coords first (has opp logic applied by backend), then fall back to location
-      if (actionData.coords) {
-        // Backend already applied opp logic and coordinate flipping - use as-is
-        skeletonPositions[pos] = actionData.coords;
-      } else if (actionData.location) {
-        // Convert location string to coords (using HCO_STRING_SPOTS)
-        const { HCO_STRING_SPOTS } = await import('../../utils/courtPositions.js');
-        let coords = HCO_STRING_SPOTS[actionData.location];
-        if (coords) {
-          // ✅ FIX: Apply opp logic if opp field is set
-          const hasOpp = actionData.opp === true;
-          if (hasOpp) {
-            // Player with opp=True should be on opposite side (defensive side)
-            if (!isAwayOffense) {
-              // Home team offense - ball handlers go to away side (defensive side)
-              coords = flipCoords(coords);
-            }
-            // Away team offense - ball handlers stay on home side (no flip needed)
-          } else {
-            // Player without opp field stays on same side as normal offense
-            if (isAwayOffense) {
-              // Away team offense - outlet players go to away side (offensive side)
-              coords = flipCoords(coords);
-            }
-            // Home team offense - outlet players stay on home side (no flip needed)
-          }
-          skeletonPositions[pos] = coords;
-        }
-      }
-    }
-    
-    // Only use skeleton positions if we have positions for key players (SF and PG at minimum)
-    if (skeletonPositions.SF && skeletonPositions.PG) {
-      useSkeletonPositions = true;
-    }
-  }
-  
-  // ✅ NEW APPROACH: Don't skip inbound pass for FCP/HCT anymore
-  // Players are positioned at skeleton step 0 locations (from backend setup positions)
-  // We'll animate the inbound pass here, then skeleton starts from old step 1
-
-  // Use skeleton positions if available, otherwise fall back to baseline inbound positions
-  const payloadOffenseTargets = usePayloadHcoSetup ? turnData.oDestinations : null;
-  const pgDest = useSkeletonPositions && skeletonPositions.PG
-    ? skeletonPositions.PG
-    : payloadOffenseTargets?.PG ?? inboundDest.PG;
-  const sgDest = useSkeletonPositions && skeletonPositions.SG
-    ? skeletonPositions.SG
-    : payloadOffenseTargets?.SG ?? inboundDest.SG;
-  const pfDest = useSkeletonPositions && skeletonPositions.PF
-    ? skeletonPositions.PF
-    : payloadOffenseTargets?.PF ?? inboundDest.PF;
-  const cDest = useSkeletonPositions && skeletonPositions.C
-    ? skeletonPositions.C
-    : payloadOffenseTargets?.C ?? inboundDest.C;
-  const sfDest = useSkeletonPositions && skeletonPositions.SF
-    ? skeletonPositions.SF
-    : payloadOffenseTargets?.SF ?? ballSpot;
+  const pgDest = offenseTargets.PG;
+  const sgDest = offenseTargets.SG;
+  const pfDest = offenseTargets.PF;
+  const cDest = offenseTargets.C;
+  const sfDest = offenseTargets.SF;
 
   const pgDestPx = gridToPixels(pgDest.x, pgDest.y, width, height);
-  animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) [BACKEND]`);
   const sgDestPx = gridToPixels(sgDest.x, sgDest.y, width, height);
-  animationDebugLog(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  animationDebugLog(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y}) [BACKEND]`);
   const pfDestPx = gridToPixels(pfDest.x, pfDest.y, width, height);
-  animationDebugLog(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  animationDebugLog(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y}) [BACKEND]`);
   const cDestPx = gridToPixels(cDest.x, cDest.y, width, height);
-  animationDebugLog(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  animationDebugLog(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y}) [BACKEND]`);
   const sfDestPx = gridToPixels(sfDest.x, sfDest.y, width, height);
-  animationDebugLog(`inboundDest assigned for SF: (${sfDestPx.x},${sfDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  animationDebugLog(`inboundDest assigned for SF: (${sfDestPx.x},${sfDestPx.y}) [BACKEND]`);
 
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
@@ -5943,28 +5563,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   
                   // Handle made putbacks
                   if (evt.result === "MAKE") {
-                    // Possession flips after made putback
-                    const shooterTeamId = rebounderSprite.team_id;
-                    const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
-                    const newOffenseSide = shooterTeamIsHome ? "away" : "home";
-                    
-                    // Check for defensive pressure
-                    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-                    const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-                    if (skipRetreat) {
-                      // Skip defensive retreat for FCP/HCT after putback
-                    }
-                    
-                    await runInboundSetup({
-                      scene,
-                      ballSprite,
-                      playerSprites,
-                      newOffenseSide,
-                      homeTeamId,
-                      awayTeamId,
-                      skipRetreat,
-                      pressureType,
-                    });
+                    console.error(
+                      "[UESS CONTRACT] Legacy putback event missing dedicated next turn",
+                      {
+                        result_type: turnData?.result_type ?? null,
+                        next_play_type: turnData?.next_play_type ?? null,
+                        next_defensive_setup:
+                          turnData?.next_defensive_setup ?? null,
+                      },
+                    );
                   }
                   // Handle missed putbacks
                   else if (evt.result === "MISS" && evt.rebound) {
@@ -6114,7 +5721,7 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
+export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY, opts = {}) {
   return getPlayerMovementDurationMs(sprite, targetX, targetY, {

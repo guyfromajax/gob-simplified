@@ -18,7 +18,7 @@
 3. **Coordinate System**:
    - **Home Orientation**: `HCO_STRING_SPOTS` coordinates in home team orientation
    - **Inbound Spots**: Home offense uses `inbound_left` (x=3), away offense uses `inbound_right` (x=97)
-   - **Coordinate Flipping Formula**: backend `getAwayTeamCoords` uses `x = 100 - x`; legacy frontend flip helpers in `turnAnimation.js` use `x = 101 - x` (known off-by-one between the two conventions)
+   - **Coordinate Flipping Formula**: backend `getAwayTeamCoords` uses the canonical `x = 100 - x`; BIP payload coordinates arrive in final display orientation
    - **Opposite Side Logic**: `opp=True` (ball handlers), `opp=False` (outlet players)
 
 **BIP System Flow (6 Steps)**
@@ -123,12 +123,9 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 **Frontend Execution:**
 - `runInboundSetup()` called with `skipRetreat=true`, `pressureType="HCT"`
 - **Defensive players:** Animate directly to the backend `dDestinations` (HCT initial alignment above; no retreat)
-- **Offensive players:** Animate to skeleton step 0 positions from `offense_setup_positions`
-  - **Critical:** Frontend checks `coords` field first (has `opp` logic applied)
-  - Falls back to `location` field if `coords` missing
-  - Applies `opp` logic when using `location`:
-    - `opp=True`: Flip coords for home offense (ball handlers go to away side)
-    - `opp=False`: Flip coords for away offense (outlet players go to away side)
+- **Offensive players:** Animate directly to backend `oDestinations`
+- Missing `ball_spot`, `oDestinations`, or `dDestinations` is a UESS contract
+  failure; the frontend does not synthesize replacement positions
 - **Inbound pass:** SF → PG **is** animated in `runInboundSetup()` for HCT (same as HCO). HCT turn animation starts at step 1; clocks start when the receiver has the ball (see **Inbound pass and clock start** above).
 - **HCT Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
   - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
@@ -162,8 +159,9 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 **Frontend Execution:**
 - `runInboundSetup()` called with `skipRetreat=true`, `pressureType="FCP"`
 - **Defensive players:** Animate directly to the backend `dDestinations` (randomized FCP alignment above; no retreat)
-- **Offensive players:** Animate to `offense_setup_positions` coords
-  - Frontend checks `coords` field first; falls back to `location` field with manual `opp` application (legacy shapes only)
+- **Offensive players:** Animate directly to backend `oDestinations`
+- The frontend does not read `offense_setup_positions`, convert location
+  strings, or apply `opp` orientation logic
 - **Inbound pass:** SF → PG **is** animated in `runInboundSetup()` for FCP (same as HCO). FCP turn animation starts at step 1; clocks start when the receiver has the ball (see **Inbound pass and clock start** above).
 - **FCP Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
   - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
@@ -234,15 +232,16 @@ For Q2, Q3, and Q4:
 - Home team attacks right basket (x=91), away team attacks left basket (x=9)
 - Midcourt is x=50
 
-**Opposite Side Logic (`opp` field) — legacy:** no longer part of the BIP→HCT/FCP setup path (HCT uses authored `HCT_SETUP_POSITIONS` coords; FCP uses randomized ranges; both ship pre-computed `coords`). The `opp` machinery below applies only to legacy skeleton shapes that still carry `location` + `opp` fields.
+**Opposite Side Logic (`opp` field) — backend-only legacy input:** no longer part of frontend BIP execution. HCT uses authored `HCT_SETUP_POSITIONS` coordinates and FCP uses randomized ranges; both emit final display-oriented `oDestinations`.
 - **Purpose:** Determines which offensive players go to opposite side (defensive side) during press break
 - **`opp=True`:** Ball handlers (usually PG) - go to opposite side to break press
 - **`opp=False`:** Outlet players (SG, SF, PF, C) - stay on normal offense side
 - **Backend:** `apply_opposite_side_logic()` converts locations to coords and stores in `coords` field
-- **Frontend:** Prioritizes `coords` field (backend-applied logic), falls back to `location` with manual `opp` application
+- **Frontend:** Does not inspect `opp`; it renders `oDestinations` directly
 
 **Coordinate Flipping:**
-- Backend formula: `x = 100 - x` (`getAwayTeamCoords` in `shared.py`); legacy frontend helpers use `x = 101 - x`
+- Backend formula: `x = 100 - x` (`getAwayTeamCoords` in `shared.py`);
+  frontend BIP code performs no gameplay-coordinate mirroring
 - Applied for:
   - Away team offense (normal flip)
   - Home team offense with `opp=True` (ball handlers go to away side)

@@ -13,7 +13,7 @@ import {
 } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "./BallControllerAdapter.js";
-import { runInboundSetup, getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
+import { getPlayerDuration, horizontalGridUnitsForDurationMs } from "./turnAnimation.js";
 import { pauseTweensOfPlayerSprites } from "../utils/playerSpriteTweenPause.js";
 import { getAnimationEndGridForPlayer } from "../utils/animationEndFromTurn.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
@@ -3185,25 +3185,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       return;
     }
     
-    // Inbound setup (only for non-BASELINE_INBOUND cases)
-    const newOffenseSide = isHomeOffense ? "away" : "home";
-    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-    const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-    
-    // ✅ SS&S: Possession flip removed from frontend (Fix 2 - Pattern A)
-    // Backend now flips possession before creating BASELINE_INBOUND turn
-    // Frontend just reads offense_team_id from turnData (handled by universal transition)
-    
-    await runInboundSetup({ 
-      scene, 
-      ballSprite, 
-      playerSprites, 
-      newOffenseSide,
-      homeTeamId: scene.simData?.home_team_id,
-      awayTeamId: scene.simData?.away_team_id,
-      skipRetreat,
-      pressureType
+    console.error("[UESS CONTRACT] Fast-break make missing dedicated next turn", {
+      result_type: turnData?.result_type ?? null,
+      next_play_type: turnData?.next_play_type ?? null,
+      next_defensive_setup: turnData?.next_defensive_setup ?? null,
     });
+    return;
   } else if (turnData.result_type === "BLOCK") {
     // Block - announce, bounce from block spot, then same rebound flow as miss
     const { announceGameEvent } = await import('../utils/gameAnnouncements.js');

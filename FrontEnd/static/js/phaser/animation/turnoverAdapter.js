@@ -1,5 +1,4 @@
 import runFastBreakSequence from "./fastBreak.js";
-import { runInboundSetup } from "./turnAnimation.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import {
   clearCurrentOwner,
@@ -50,13 +49,12 @@ export async function handleTurnover(scene, { playerSprites, ballSprite, turnDat
     return;
   }
 
-  let newOffenseSide = "home";
-  if (offenseId != null) {
-    const sample = Object.values(playerSprites).find(
-      (s) => String(s.team_id) === String(offenseId)
-    );
-    if (sample) newOffenseSide = sample.team === "away" ? "away" : "home";
-  }
-
-  await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
+  console.error(
+    "[UESS CONTRACT] Dead-ball turnover missing dedicated inbound turn",
+    {
+      result_type: turnData?.result_type ?? null,
+      turnover_type: turnData?.turnover_type ?? null,
+      next_play_type: turnData?.next_play_type ?? null,
+    },
+  );
 }

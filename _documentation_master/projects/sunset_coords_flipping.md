@@ -19,9 +19,34 @@
   rim targets, block targets, and bounce targets were already backend-owned and
   display-oriented, so that path was not changed.
 
-Remaining work in this project includes OREB kickout, BIP pressure fallback,
-general inbound fallback, broader parity coverage, and removal of any legacy
-frontend coordinate logic once each caller is proven covered.
+Remaining work in this project includes broader parity coverage and removal of
+any other legacy frontend coordinate logic once each caller is proven covered.
+
+### 2026-06-14: OREB kickout frontend fallback removed
+
+- Deterministic backend tests cover normal and post-block kickouts for home and
+  away offense.
+- Every covered kickout emits rebound capture, backend-owned positioning, and
+  backend-owned pass steps with canonical home/away parity.
+- The frontend random outlet selection, `HCO_STRING_SPOTS` lookup, `101 - x`
+  mirror, and legacy kickout pass fallback were deleted.
+- A step-less `OREB_KICKOUT` now reports a UESS contract error instead of
+  silently inventing replacement gameplay coordinates.
+
+### 2026-06-14: General BIP frontend fallback removed
+
+- `runInboundSetup()` now requires backend `ball_spot`, complete
+  `oDestinations`, and complete `dDestinations` before mutating animation
+  state.
+- HCO, FCP, and HCT BIP setup all render the same backend destination fields.
+- Frontend random defender retreat, `offense_setup_positions` interpretation,
+  `location`/`opp` conversion, and `101 - x` mirroring were removed.
+- Legacy make, free-throw, putback, and dead-ball turnover callers no longer
+  synthesize a BIP without a dedicated backend turn. Missing routes report a
+  UESS contract error and fail closed.
+- Deterministic tests cover the baseline ball spot plus full FCP/HCT horizontal
+  home/away parity, and static guards prohibit restoring frontend BIP
+  coordinate selection.
 
 ## Why This Project Exists
 
@@ -97,12 +122,73 @@ The migration must establish and enforce these rules:
 The following locations are the initial audit targets in
 `FrontEnd/static/js/phaser/animation/turnAnimation.js`:
 
-- `runOffensiveReboundKickoutSetup()` near the current `flipCoords` helper
-  around line 2505.
-- Legacy inbound pressure defender setup around line 2800.
-- BIP `offense_setup_positions` fallback conversion around line 3068.
-- `runFinalTurnAlignment()` near the current `flipCoords` helper around line
-  6057.
+- OREB kickout legacy setup: removed after backend schema parity coverage.
+- Legacy inbound pressure defender setup: converted to render backend
+  `dDestinations` directly; static formations and frontend flipping removed.
+- BIP general setup fallback: removed after backend payload and caller tracing.
+- Final Turn `runFinalTurnAlignment()`: converted to render backend
+  destinations directly; frontend orientation logic removed.
+
+### Remaining frontend audit targets
+
+These are candidates discovered by the repository-wide follow-up scan. They
+are not yet classified as confirmed bugs. Each must be traced through its
+backend producer, runtime caller, and position-sync behavior before editing.
+
+1. **Fast Break defensive-stop fallback**
+   - File: `FrontEnd/static/js/phaser/animation/fastBreak.js`
+   - Function: `animateDefensiveStop()`
+   - The function treats animation coordinates as home-oriented for away
+     offense and applies `100 - x` for display.
+   - It can reject a backend ball-handler endpoint and replace it with a
+     frontend-selected top-of-key destination.
+   - Trace whether current defensive-stop payloads are already display-oriented
+     and whether this fallback is reachable.
+
+2. **Countdown-window player movement**
+   - File: `FrontEnd/static/js/phaser/animation/countdownAnimation.js`
+   - Functions: `animateCountdownTransition()`, `animateAdvanceUpCourt()`, and
+     `animateSideInboundMovement()`
+   - Active code selects random offensive and defensive destinations and
+     mirrors home-authored spots with `100 - x` for away offense.
+   - Trace whether these tweens are cosmetic and fully discarded before
+     gameplay resumes, or whether their endpoints affect sprite state,
+     ownership, later animations, or backend-coordinate reconciliation.
+
+3. **Fast Break shot, rebound, and get-back fallbacks**
+   - File: `FrontEnd/static/js/phaser/animation/fastBreak.js`
+   - Candidate branches select attacking rims, shot spots, rebound positions,
+     non-participant locations, and get-back bands using frontend team-side
+     logic and `Phaser.Math.Between`.
+   - Trace each branch separately. Some may be unreachable legacy fallbacks;
+     others may still replace missing backend payload fields.
+
+4. **Schema shot-stop fallback**
+   - File: `FrontEnd/static/js/phaser/animation/animationPlayback.js`
+   - Function: `runShotAttempt()`
+   - When a schema-rendered arc is absent, the frontend derives the attacking
+     rim or made-shot sweet spot from the shooter sprite's team.
+   - Trace whether supported shot payloads always provide schema ball-flight
+     steps and whether this branch can still own gameplay ball endpoints.
+
+5. **Generic defensive-stop transition**
+   - File: `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+   - Function: `runDefensiveStopTransition()`
+   - The frontend selects a top-of-key target, chooses the nearest defender,
+     and creates a contest offset based on the inferred offense side.
+   - Establish whether the function is reachable. If active, replace its
+     gameplay positioning with backend-emitted endpoints; if unreachable,
+     remove it after proving no supported caller depends on it.
+
+### Documentation-only discrepancy found
+
+- `_documentation_master/06_Gameplay_Systems/SIP_System.md` still documents
+  `x = 101 - x`.
+- Current SIP backend generation uses backend-owned, display-oriented
+  coordinates and the frontend renders `oDestinations`, `dDestinations`, and
+  `ball_spot`.
+- Correct this documentation after the SIP code trace confirms there is no
+  remaining supported frontend orientation branch.
 
 Line numbers will drift. Search for `101 -`, `flipCoords`, frontend
 `Phaser.Math.Between` destination generation, and imports of
@@ -216,30 +302,34 @@ same-vertical-half selection rules. Make the schema path authoritative for:
 - Movement timing.
 - Pass ownership.
 
-Remove frontend random spot selection, `HCO_STRING_SPOTS` gameplay lookup, and
-coordinate flipping from `runOffensiveReboundKickoutSetup()`. If this helper is
-only a legacy fallback, either make it a renderer of explicit payload endpoints
-or delete it after proving all callers use schema playback.
+Completed: backend schema coverage proved the helper was only a legacy
+fallback. Frontend random spot selection, `HCO_STRING_SPOTS` gameplay lookup,
+coordinate flipping, and the fallback pass path were deleted.
 
 ### BIP pressure setup
 
 Backend BIP payloads already emit display-oriented destinations and migrated
 `animation_steps`.
 
-- Use backend `coords` exactly as supplied.
-- Remove the frontend static FCP/HCT defender formations.
-- Remove frontend `location` plus `opp` interpretation once no supported
-  payload depends on it.
+- Completed: the legacy fallback uses backend `dDestinations` exactly as
+  supplied.
+- Completed: the frontend static FCP/HCT defender formations and `101 - x`
+  mirror were removed.
+- Completed: frontend `location` plus `opp` interpretation was removed after
+  proving supported BIP payloads provide complete `oDestinations`.
 - Do not retain random or static frontend positioning as a silent fallback.
 
 ### General inbound fallback
 
-Trace all callers of `runInboundSetup()` and related helpers. Dedicated BIP and
-SIP turns should render their own backend steps. For remaining legacy callers:
+Completed:
 
-- Add explicit backend destination payloads first.
-- Convert the helper into a renderer of those endpoints.
-- Delete frontend destination generation only after caller coverage is tested.
+- The dedicated `BASELINE_INBOUND` turn is the only supported caller of
+  `runInboundSetup()`.
+- `PassAnimationSystem.executeInboundSequence()` passes the complete backend
+  payload to the renderer.
+- Legacy callers after makes, free throws, putbacks, and dead-ball turnovers
+  fail closed when the required dedicated next turn is absent.
+- SIP remains independently owned by `runSideInboundSetup()`.
 
 ### Step 3 acceptance gates
 

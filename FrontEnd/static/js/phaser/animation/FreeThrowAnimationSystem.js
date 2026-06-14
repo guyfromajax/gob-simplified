@@ -606,22 +606,6 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // ✅ EXACT HCO PATTERN: Use shooter sprite to determine newOffenseSide
-    // Copied from ShotAnimationSystem.handleMadeShot line 725-776
-    const shooterSprite = this.playerSprites[turnData.shooter_id];
-    const shooterTeamId = shooterSprite?.team_id;
-    const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
-    // After made shot/FT, possession flips to opposite team
-    const newOffenseSide = isHomeOffense ? 'away' : 'home';
-    
-    // Execute inbound pass using the existing system
-    const { runInboundSetup } = await import('./turnAnimation.js');
-    
-    // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
-    // This ensures pressureSequenceActive is set so subsequent STEAL turns are recognized as FCP/HCT
-    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-    const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-    
     // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
     // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
     // Calling it here causes double inbound passes and double setup animations
@@ -630,20 +614,12 @@ export class FreeThrowAnimationSystem {
       // This prevents double inbound passes and double setup animations
       return;
     }
-    
-    await runInboundSetup({
-      scene: this.scene,
-      ballSprite: this.ballController.ballSprite,
-      playerSprites: this.playerSprites,
-      newOffenseSide: newOffenseSide,
-      homeTeamId: this.scene.simData?.home_team_id,
-      awayTeamId: this.scene.simData?.away_team_id,
-      skipRetreat,
-      pressureType,
-      turnData: turnData
-    });
 
-    // ✅ REMOVED: Free throw inbound pass completed logging (cluttering console)
+    console.error("[UESS CONTRACT] Final made free throw missing BASELINE_INBOUND", {
+      shooter_id: turnData?.shooter_id ?? null,
+      next_play_type: turnData?.next_play_type ?? null,
+      next_defensive_setup: turnData?.next_defensive_setup ?? null,
+    });
   }
 
   /**

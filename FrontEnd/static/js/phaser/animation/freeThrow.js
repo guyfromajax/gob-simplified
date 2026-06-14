@@ -36,8 +36,6 @@ export async function runFreeThrowSequence(
     || (await import("./ballTween.js")).cancelBallTweenAndClearOwner;
   // ✅ STEP 3 MIGRATION: Import new ball animation functions
   const { animateShotToRim, animateBallToPosition } = await import("./ballAnimationSimple.js");
-  const inboundSetup =
-    helpers.runInboundSetup || (await import("./turnAnimation.js")).runInboundSetup;
   const rebound =
     helpers.animateRebound || (await import("./ballManager.js")).animateRebound;
 
@@ -275,42 +273,6 @@ export async function runFreeThrowSequence(
             },
             ["shotResult"]
           );
-          // ✅ EXACT HCO PATTERN: Use shooter sprite to determine newOffenseSide
-          // Copied from ShotAnimationSystem.handleMadeShot line 725-776
-          const shooterSprite = playerSprites[turnData.shooter_id];
-          const shooterTeamId = shooterSprite?.team_id;
-          const isHomeOffense = shooterTeamId === scene.simData?.home_team_id;
-          // After made shot/FT, possession flips to opposite team
-          const newOffenseSide = isHomeOffense ? "away" : "home";
-          
-          console.log('🔄 [FREE THROW INBOUND] Calculated newOffenseSide from shooter sprite', {
-            shooter_id: turnData.shooter_id,
-            shooterTeamId,
-            isHomeOffense,
-            newOffenseSide,
-            home_team_id: scene.simData?.home_team_id
-          });
-          
-          animationDebugLog('Final free throw made - inbound setup:', {
-            possession_flips: possessionChanged,
-            original_offense_team_id: turnData.offense_team_id,
-            possession_team_id: turnData.possession_team_id,
-            scene_offenseTeamId: scene.offenseTeamId,
-            finalOffenseTeamId,
-            newOffenseSide,
-            home_team_id: scene.simData?.home_team_id,
-            away_team_id: scene.simData?.away_team_id,
-            shooter_team_id: turnData.shooter_team_id,
-            next_defensive_setup: turnData.next_defensive_setup
-          });
-          
-          // Check if FCP/HCT is coming next - if so, skip retreat animation
-          const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-          const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-          if (skipRetreat) {
-            console.log(`${turnData.next_defensive_setup} detected after FT - skipping defensive retreat to midcourt`);
-          }
-          
           // ✅ FIX: Don't call inboundSetup() here if next_play_type === "BASELINE_INBOUND"
           // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
           // Calling it here causes double inbound passes and double setup animations
@@ -320,17 +282,11 @@ export async function runFreeThrowSequence(
             nextStateResolved = States.Inbound;
             return;
           }
-          
-          // Now call inboundSetup with the correct offense team (possession already flipped above)
-          await inboundSetup({
-            scene,
-            ballSprite,
-            playerSprites,
-            newOffenseSide,
-            homeTeamId: scene.simData?.home_team_id,
-            awayTeamId: scene.simData?.away_team_id,
-            skipRetreat,
-            pressureType,
+
+          console.error("[UESS CONTRACT] Final made free throw missing BASELINE_INBOUND", {
+            shooter_id: turnData?.shooter_id ?? null,
+            next_play_type: turnData?.next_play_type ?? null,
+            next_defensive_setup: turnData?.next_defensive_setup ?? null,
           });
           nextStateResolved = States.Inbound;
         } else {

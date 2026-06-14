@@ -208,8 +208,6 @@ function createOrebIdleWatchdog(scene, turnData, unitId, options = {}) {
  */
 export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUpdate }) {
   const { shootBall } = await import('./ballManager.js');
-  const { animateKickoutReset } = await import('./ballManager.js');
-  const { runInboundSetup } = await import('./turnAnimation.js');
   
   appendToTextScroll(turnData.text);
   
@@ -400,37 +398,19 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         return;
       }
       
-      const shooterTeamId = rebounderSprite.team_id;
-      const homeTeamId = scene.simData?.home_team_id;
-      const awayTeamId = scene.simData?.away_team_id;
-      const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
-      const newOffenseSide = shooterTeamIsHome ? "away" : "home";
-      
-      // ✅ FIX: Call onPutbackEnd() before inbound setup (state clearing pattern)
-      // This ensures putback state is cleared before transitioning to inbound pass
+      // Clear putback state before reporting the missing backend route.
       const { getBallController } = await import('./BallControllerAdapter.js');
       const ballController = getBallController();
       if (ballController) {
         ballController.onPutbackEnd();
       }
-      
-      // Check for defensive pressure
-      const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-      const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-      
-      orebIdleWatchdog.setInterrupt("route_transition", true);
-      await runInboundSetup({
-        scene,
-        ballSprite,
-        playerSprites,
-        newOffenseSide,
-        homeTeamId,
-        awayTeamId,
-        skipRetreat,
-        pressureType,
+
+      console.error("[UESS CONTRACT] Putback make missing dedicated next turn", {
+        result_type: turnData?.result_type ?? null,
+        next_play_type: turnData?.next_play_type ?? null,
+        next_defensive_setup: turnData?.next_defensive_setup ?? null,
       });
-      orebIdleWatchdog.setInterrupt("route_transition", false);
-      orebIdleWatchdog.markProgress();
+      return;
     }
     // Handle putback miss with rebound
     else if (turnData.rebound_type) {
@@ -522,99 +502,10 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         sourceResultType: turnData?.result_type ?? null,
       },
     });
-  } else if (turnData.result_type === "OREB_KICKOUT") {
-    // Handle kickout with outlet animation step
-    orebIdleWatchdog.setInterrupt("route_transition", true);
-    await handleOrebKickout(scene, {
-      playerSprites,
-      ballSprite,
-      rebounderId,
-      turnData
-    });
-    orebIdleWatchdog.setInterrupt("route_transition", false);
-    orebIdleWatchdog.markProgress();
-    const outRoute = String(turnData?.next_play_type || "").toUpperCase();
-    enforceOrebUnitContract({
-      scene,
-      turnData,
-      unitId: "oreb.out.to_*",
-      advanceTrigger: "route committed",
-      visualSettleTrigger: "OREB final settle complete",
-      authorizingEventReceived: outRoute.length > 0,
-      visualSettled: true,
-      unitStartMs: Date.now(),
-      maxWaitGameSeconds: getOrebBudgetGameSeconds("action"),
-      context: {
-        route: outRoute || null,
-        sourceResultType: turnData?.result_type ?? null,
-      },
-    });
   }
   } finally {
     orebIdleWatchdog.stop();
   }
-}
-
-/**
- * Handle OREB kickout with outlet animation step
- * Similar to DREB outlet setup, but for offensive rebounds
- * 
- * Flow: Rebound animation → Outlet positioning → Pass to PG → HCO
- */
-async function handleOrebKickout(scene, { playerSprites, ballSprite, rebounderId, turnData }) {
-  const { animateKickoutReset } = await import('./ballManager.js');
-  const { runOffensiveReboundKickoutSetup } = await import('./turnAnimation.js');
-  
-  const pgId = turnData.pgId;
-  if (!pgId) {
-    console.warn('handleOrebKickout: No PG ID provided', turnData);
-    return;
-  }
-
-  // OREB hold: rebounder holds until 1 game s remains, then acts (1 game s = 350ms real)
-  const holdStartMs = Date.now();
-  const orebHoldSeconds = Number(turnData.oreb_hold_seconds);
-  const hasHoldWindow = Number.isFinite(orebHoldSeconds) && orebHoldSeconds > 0;
-  if (hasHoldWindow && scene.time) {
-    const holdMs = orebHoldSeconds * 350;
-    await new Promise((resolve) => scene.time.delayedCall(holdMs, resolve));
-  }
-  enforceOrebUnitContract({
-    scene,
-    turnData,
-    unitId: "oreb.phase.hold",
-    advanceTrigger: "hold boundary reached",
-    visualSettleTrigger: "no active attach/tween conflicts",
-    authorizingEventReceived: true,
-    visualSettled: scene?.passInFlight !== true,
-    unitStartMs: holdStartMs,
-    maxWaitGameSeconds: getOrebBudgetGameSeconds("decision"),
-    context: {
-      holdSeconds: hasHoldWindow ? orebHoldSeconds : 0,
-      holdApplied: hasHoldWindow && !!scene?.time,
-      branch: "oreb_kickout",
-    },
-  });
-
-  // Step 1: Run outlet positioning animation (PG and rebounder move to outlet spots)
-  await runOffensiveReboundKickoutSetup({
-    scene,
-    ballSprite,
-    playerSprites,
-    rebounderId,
-    pgId,
-    turnData  // ✅ Pass turnData to determine offense team for coordinate flipping
-  });
-
-  // Step 2: Execute kickout pass to PG
-  await animateKickoutReset(
-    scene,
-    ballSprite,
-    rebounderId,
-    pgId,
-    turnData.pass || {},
-    500
-  );
 }
 
 function getResultType(turn = {}) {

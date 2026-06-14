@@ -1093,8 +1093,22 @@ export class AnimationEngine {
   }
 
   async handlePutback(turnData, context) {
+    if (
+      turnData?.result_type === "OREB_KICKOUT"
+      && (!Array.isArray(turnData?.animation_steps) || turnData.animation_steps.length === 0)
+    ) {
+      console.error(
+        "[UESS CONTRACT] OREB_KICKOUT reached the legacy handler without animation_steps",
+        {
+          rebounderId: turnData?.rebounderId ?? null,
+          pgId: turnData?.pgId ?? null,
+          turn_index: turnData?.index ?? this.scene?.currentTurn ?? null,
+        },
+      );
+      return;
+    }
     // ✅ PHASE 2.6: Use existing handleOrebTurn function (moved from animateGameTurns.js)
-    // handleOrebTurn handles PUTBACK_MAKE, PUTBACK_MISS, and OREB_KICKOUT
+    // OREB_KICKOUT is schema-only; this fallback handles putback outcomes.
     const { handleOrebTurn } = await import('./animateGameTurns.js');
     await handleOrebTurn(this.scene, {
       playerSprites: context.playerSprites,

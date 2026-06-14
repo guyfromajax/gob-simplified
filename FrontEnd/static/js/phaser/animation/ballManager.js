@@ -1,7 +1,6 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { runInboundSetup as baseRunInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, getMadeShotSweetSpotGrid } from "./courtConstants.js";
 import {
@@ -41,12 +40,6 @@ import { buildGameplayPassSfxContext, playShotLaunchSfx, playShotResultSfx, play
  * - debug logging
  */
 
-function runInboundSetup(opts) {
-  const scene = opts.scene;
-  if (scene.possessionFlipInProgress || scene.stateMachine?.is(States.FastBreak)) return Promise.resolve();
-  return baseRunInboundSetup(opts);
-}
-
 function runPass(scene, cfg = {}) {
   const debugEnabled = isAnimationDebugEnabled();
 
@@ -81,7 +74,7 @@ function runPass(scene, cfg = {}) {
 }
 
 // ✅ STEP 3 MIGRATION: Removed tweenBallTo from exports (now using animateBallToPosition/animateShotToRim)
-export { attachBallToPlayer, cancelBallTweenAndClearOwner, runPass, runInboundSetup };
+export { attachBallToPlayer, cancelBallTweenAndClearOwner, runPass };
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;

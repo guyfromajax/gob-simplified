@@ -5,7 +5,7 @@
 The frontend animation system has accumulated multiple layered/competing subsystems over several refactor passes. Today's HCT debugging surfaced a clear example: BIP setup tween done in `handleBaselineInbound` was being silently overridden by legacy `runInboundSetup`'s own player-positioning logic. The competing systems are a real source of bugs and onboarding friction, but the system mostly works in production — so the cleanup approach is **incremental and risk-graded**, not rip-and-replace.
 
 Animation lives primarily in `FrontEnd/static/js/phaser/animation/`. The two largest files:
-- `turnAnimation.js` (~5750 lines after this session's cleanup) — main step-loop animator + legacy helpers (`runInboundSetup`, `runSideInboundSetup`, `runDefensiveReboundSetup`, `runOffensiveReboundKickoutSetup`)
+- `turnAnimation.js` — main step-loop animator + remaining legacy inbound/rebound helpers.
 - `AnimationEngine.js` (~1620 lines) — top-level handler dispatch (`handleBaselineInbound`, `handleSideInbound`, `handleSteal`, `handleFastBreak`, `handleDefault`, etc.)
 
 Plus subsystem classes (`PassAnimationSystem`, `ShotAnimationSystem`, `ReboundAnimationSystem`, `FreeThrowAnimationSystem`, `HCOAnimationSystem`), the ball-attachment layer (`BallController`, `BallControllerAdapter`, plus older `attachBallToPlayer` / `setBallHolderId` / `currentBallOwnerRef` paths), and the pressure-rework phasing system (`phase1_scaffold` / `phase2_split` / `phase3_lead_in`).
