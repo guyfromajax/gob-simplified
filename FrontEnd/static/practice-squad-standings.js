@@ -27,6 +27,16 @@
     });
   }
 
+  function currentReturnUrl() {
+    return encodeURIComponent(window.location.pathname + window.location.search);
+  }
+
+  function boxScoreUrl(gameId) {
+    return '/box-score.html?game_id=' + encodeURIComponent(gameId)
+      + '&mode=practice_squad&' + q()
+      + '&return_url=' + currentReturnUrl();
+  }
+
   function rosterUrl(psTeamId) {
     return '/team-roster-view.html?mode=practice_squad&ps_team_id=' + encodeURIComponent(psTeamId) + '&' + q()
       + '&return_url=' + encodeURIComponent(window.location.pathname + window.location.search);
@@ -74,8 +84,7 @@
       if (g.status === 'completed' && g.game_id) {
         text = (g.home_display || g.home_team_id) + ' ' + g.home_score + ', '
           + (g.away_display || g.away_team_id) + ' ' + g.away_score;
-        text += ' <a href="/box-score.html?game_id=' + encodeURIComponent(g.game_id)
-          + '&mode=practice_squad&' + q() + '">Box Score</a>';
+        text += ' <a href="' + boxScoreUrl(g.game_id) + '">Box Score</a>';
       } else if (g.status === 'forfeit') {
         text += ' (forfeit)';
       }

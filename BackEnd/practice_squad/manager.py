@@ -6,6 +6,7 @@ import logging
 import random
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from bson import ObjectId
 
@@ -534,6 +535,10 @@ def build_game_results_story(
     if team_id:
         q += f"&team_id={team_id}"
 
+    story_id = f"w{week}-ps-game-results"
+    news_return = f"/news.html?{q}&story={story_id}"
+    return_url = quote(news_return, safe="")
+
     rich_lines: list[dict[str, Any]] = [
         {
             "type": "link",
@@ -556,12 +561,12 @@ def build_game_results_story(
             {
                 "type": "game_result",
                 "text": f"{home_name} {hs}, {away_name} {aw}",
-                "box_score_href": f"/box-score.html?game_id={gid}&mode=practice_squad&{q}",
+                "box_score_href": f"/box-score.html?game_id={gid}&mode=practice_squad&{q}&return_url={return_url}",
             }
         )
 
     return {
-        "story_id": f"w{week}-ps-game-results",
+        "story_id": story_id,
         "week": week,
         "type": "ps_game_results",
         "headline": f"Week {week} Practice Squad Game Results",
