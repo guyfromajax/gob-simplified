@@ -244,33 +244,57 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
       }
     };
 
-    const tween = scene.tweens.add({
-      targets: sprite,
-      x: target.x,
-      y: target.y,
-      duration,
-      ease: easing,
-      onUpdate: () => {
-        const ballSprite = scene.ballSprite;
-        if (
-          ballSprite &&
-          getCurrentOwner(scene) === sprite.playerId &&
-          ballSprite.setPosition
-        ) {
-          const pos = playerBallPos(sprite);
-          ballSprite.setPosition(pos.x, pos.y);
-          ballSprite.setVisible(true);
-        }
-      },
-      onComplete: () => finalize('complete')
-    });
+    if (
+      !scene.tweens ||
+      typeof scene.tweens.add !== 'function' ||
+      !Number.isFinite(Number(target.x)) ||
+      !Number.isFinite(Number(target.y)) ||
+      !Number.isFinite(Number(duration)) ||
+      Number(duration) < 0
+    ) {
+      finalize('invalid', new Error('tweenPlayerTo received an invalid tween request'));
+      return;
+    }
+
+    let tween;
+    try {
+      tween = scene.tweens.add({
+        targets: sprite,
+        x: target.x,
+        y: target.y,
+        duration,
+        ease: easing,
+        onUpdate: () => {
+          const ballSprite = scene.ballSprite;
+          if (
+            ballSprite &&
+            getCurrentOwner(scene) === sprite.playerId &&
+            ballSprite.setPosition
+          ) {
+            const pos = playerBallPos(sprite);
+            ballSprite.setPosition(pos.x, pos.y);
+            ballSprite.setVisible(true);
+          }
+        },
+        onComplete: () => finalize('complete'),
+        onStop: () => finalize('stop', new Error('tween stopped')),
+      });
+    } catch (err) {
+      finalize('create_error', err);
+      return;
+    }
+
+    if (!tween) {
+      finalize('create_failed', new Error('scene.tweens.add did not create a tween'));
+      return;
+    }
+
     if (tween) {
       tween.__debugTag = debugTag;
       tween.__debugPlayerId = sprite?.playerId ?? null;
       tween.__debugTarget = { x: target.x, y: target.y };
       tween.__debugStart = startPosition;
     }
-    tween?.once?.('stop', () => finalize('stop', new Error('tween stopped')));
   });
 }
 
