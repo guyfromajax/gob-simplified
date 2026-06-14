@@ -42,15 +42,93 @@
       + '&return_url=' + encodeURIComponent(window.location.pathname + window.location.search);
   }
 
+  function formatWinPct(w, l) {
+    var wins = Number(w) || 0;
+    var losses = Number(l) || 0;
+    var total = wins + losses;
+    if (total <= 0) return '.000';
+    return (wins / total).toFixed(3).replace(/^0/, '');
+  }
+
+  function buildStandingsCard(titleText, rows) {
+    var card = document.createElement('section');
+    card.className = 'fcc-standings-card';
+
+    var title = document.createElement('div');
+    title.className = 'fcc-standings-card-title';
+    title.textContent = titleText;
+    card.appendChild(title);
+
+    var headerRow = document.createElement('div');
+    headerRow.className = 'fcc-standings-row fcc-standings-row-header';
+    headerRow.innerHTML = [
+      '<span class="fcc-standings-col-team">Team</span>',
+      '<span class="fcc-standings-col-stat">W</span>',
+      '<span class="fcc-standings-col-stat">L</span>',
+      '<span class="fcc-standings-col-stat">Win%</span>'
+    ].join('');
+    card.appendChild(headerRow);
+
+    var body = document.createElement('div');
+    body.className = 'fcc-standings-card-body';
+
+    if (!rows.length) {
+      var emptyRow = document.createElement('div');
+      emptyRow.className = 'fcc-standings-row';
+      var emptyCell = document.createElement('span');
+      emptyCell.className = 'fcc-standings-col-team';
+      emptyCell.textContent = 'No data';
+      emptyRow.appendChild(emptyCell);
+      body.appendChild(emptyRow);
+    } else {
+      rows.forEach(function (r) {
+        var row = document.createElement('div');
+        row.className = 'fcc-standings-row';
+
+        var teamCell = document.createElement('span');
+        teamCell.className = 'fcc-standings-col-team';
+        var link = document.createElement('a');
+        link.href = rosterUrl(r.tid);
+        link.textContent = r.name;
+        teamCell.appendChild(link);
+        row.appendChild(teamCell);
+
+        var wCell = document.createElement('span');
+        wCell.className = 'fcc-standings-col-stat';
+        wCell.textContent = String(r.w);
+        row.appendChild(wCell);
+
+        var lCell = document.createElement('span');
+        lCell.className = 'fcc-standings-col-stat';
+        lCell.textContent = String(r.l);
+        row.appendChild(lCell);
+
+        var pctCell = document.createElement('span');
+        pctCell.className = 'fcc-standings-col-stat';
+        pctCell.textContent = formatWinPct(r.w, r.l);
+        row.appendChild(pctCell);
+
+        body.appendChild(row);
+      });
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
   function renderStandings(data) {
     var root = document.getElementById('ps-standings-root');
+    root.innerHTML = '';
+
     if (!data.initialized) {
       root.innerHTML = '<p>Practice Squad has not started yet (available after Week 1 Training Camp).</p>';
       return;
     }
+
     var standings = data.standings || {};
     var teams = data.teams || {};
-    root.innerHTML = TIER_ORDER.map(function (tier) {
+
+    TIER_ORDER.forEach(function (tier) {
       var tierRows = standings[tier] || {};
       var rows = Object.keys(tierRows).map(function (tid) {
         var team = teams[tid] || {};
@@ -65,17 +143,9 @@
         if (b.w !== a.w) return b.w - a.w;
         return a.l - b.l;
       });
-      var body = rows.map(function (r) {
-        return '<tr><td><a class="ps-team-link" href="' + rosterUrl(r.tid) + '">' + r.name + '</a></td><td>' + r.w + '</td><td>' + r.l + '</td></tr>';
-      }).join('');
-      return [
-        '<section class="ps-tier-block fcc-data-card"><div class="fcc-data-card-body">',
-        '<h2 class="ps-tier-title">' + (TIER_LABELS[tier] || tier) + '</h2>',
-        '<table class="roster-table"><thead><tr><th>Team</th><th>W</th><th>L</th></tr></thead><tbody>',
-        body || '<tr><td colspan="3">No data</td></tr>',
-        '</tbody></table></div></section>'
-      ].join('');
-    }).join('');
+
+      root.appendChild(buildStandingsCard(TIER_LABELS[tier] || tier, rows));
+    });
   }
 
   function renderScheduleWeek(week, games) {
@@ -107,10 +177,16 @@
   function init() {
     var back = document.getElementById('back-btn');
     if (back) {
-      back.href = franchiseId
-        ? '/news.html?' + q()
-        : '/franchise-command-center.html?' + q();
+      if (franchiseId && typeof resolveFranchiseLockerRoomUrl === 'function') {
+        back.href = resolveFranchiseLockerRoomUrl({ params: params, franchiseId: franchiseId, teamId: teamId });
+        back.textContent = 'Back to Locker Room';
+      } else if (franchiseId) {
+        back.href = '/franchise-command-center.html?' + q();
+      } else {
+        back.href = '/mode-select.html';
+      }
     }
+
     var bracketLink = document.getElementById('ps-bracket-link');
     if (bracketLink && franchiseId) {
       bracketLink.href = '/practice-squad-bracket.html?' + q();
