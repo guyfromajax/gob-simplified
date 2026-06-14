@@ -3287,12 +3287,14 @@ class TurnManager:
 
     def _build_final_turn_offense_alignment(self):
         """Final Turn offense: BH 60% PG / 30% SG / 10% SF; PG/SG deep wings; SF/PF corners; C key.
-        Returns (oDestinations, position_to_spot, bh_pos). Always in home-side convention; frontend
-        flips when away offense (one attacking side, both teams there)."""
+        Returns display-oriented (oDestinations, position_to_spot, bh_pos). Spot names remain
+        home-authored skeleton inputs; only the emitted coordinate map is mirrored for away offense."""
         from BackEnd.constants import HCO_STRING_SPOTS
+        from BackEnd.utils.shared import get_away_player_coords
         game = self.game
         off_team = game.offense_team
         off_lineup = off_team.lineup
+        is_away_offense = off_team.team_id == game.away_team.team_id
         # Ball handler position: 60% PG, 30% SG, 10% SF
         r = random.random()
         bh_pos = "PG" if r < 0.60 else ("SG" if r < 0.90 else "SF")
@@ -3324,23 +3326,29 @@ class TurnManager:
         for pos in ["PG", "SG", "SF", "PF", "C"]:
             spot = position_to_spot.get(pos, "key")
             coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
-            o_destinations[pos] = dict(coords)
+            o_destinations[pos] = (
+                get_away_player_coords(coords) if is_away_offense else dict(coords)
+            )
         return (o_destinations, position_to_spot, bh_pos)
 
     def _build_final_turn_defense_alignment(self):
         """Final Turn defense: 50/50 2-3 or 3-2 zone, ball-at-key positions. Returns (dDestinations, zone_playcall).
-        Always in home-side convention; frontend flips when away offense (one attacking side, both teams there)."""
+        Destinations are emitted in final display orientation for the current offense."""
         from BackEnd.constants import HCO_STRING_SPOTS
+        from BackEnd.utils.shared import get_away_player_coords
         from BackEnd.utils.shared_defense import ZONE_23_NORMAL, ZONE_32_NORMAL
         game = self.game
         def_team = game.defense_team
+        is_away_offense = game.offense_team.team_id == game.away_team.team_id
         zone_playcall = random.choice(["2-3-zone", "3-2-zone"])
         zone_map = ZONE_23_NORMAL if zone_playcall == "2-3-zone" else ZONE_32_NORMAL
         d_destinations = {}
         for pos, spots in zone_map.items():
             spot = spots[0] if spots else "key"
             coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
-            d_destinations[pos] = dict(coords)
+            d_destinations[pos] = (
+                get_away_player_coords(coords) if is_away_offense else dict(coords)
+            )
         return (d_destinations, zone_playcall)
 
     def _build_final_hold_result(self, time_remaining_sec):

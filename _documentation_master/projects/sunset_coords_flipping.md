@@ -1,8 +1,27 @@
 # Sunset Frontend Coordinate Flipping
 
-**Status:** Planned migration  
+**Status:** In progress
 **Created:** 2026-06-14  
 **Objective:** Make the backend the sole authority for gameplay coordinates and remove frontend coordinate selection and orientation logic.
+
+## Implementation Progress
+
+### 2026-06-14: Final Turn alignment slice completed
+
+- Final Turn `oDestinations` and `dDestinations` now leave the backend in final
+  display orientation.
+- Away-offense alignment uses the canonical `x_away = 100 - x_home` mirror.
+- `runFinalTurnAlignment()` renders backend coordinates directly and no longer
+  derives offense orientation or applies `101 - x`.
+- Deterministic tests assert home/away parity for offense alignment, defense
+  alignment, representative MAKE/MISS variants, AIRBALL, and BLOCK endpoints.
+- The active schema shot path was traced before editing. Shooter endpoints,
+  rim targets, block targets, and bounce targets were already backend-owned and
+  display-oriented, so that path was not changed.
+
+Remaining work in this project includes OREB kickout, BIP pressure fallback,
+general inbound fallback, broader parity coverage, and removal of any legacy
+frontend coordinate logic once each caller is proven covered.
 
 ## Why This Project Exists
 
@@ -355,4 +374,3 @@ This project is complete only when:
 7. No supported path silently falls back to frontend gameplay logic.
 8. Conflicting documentation is corrected.
 9. The coordinate-flip item is removed from `projects/bugs.md`.
-

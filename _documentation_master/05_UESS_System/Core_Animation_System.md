@@ -153,14 +153,14 @@ Pre-refactor, backend computed `step_clock_seconds[]` from pace constants × gri
 - `../00_General_Systems/UESS_System.md` §3.4 / §9.3 — canonical AG curve and archetype rate table.
 - `_documentation_master/projects/Z-Completed/Movement_Rate_Refactor.md` — phase-by-phase implementation history.
 
-## Coordinate Flipping (Court Side)
+## Coordinate Orientation (Court Side)
 
-**Rule:** One attacking side — both offense and defense are drawn on the same (attacking) half of the court. No flip when the home team is on offense; flip when the away team is on offense.
+**Rule:** One attacking side — both offense and defense are drawn on the same attacking half. The backend performs any required orientation before emitting gameplay coordinates.
 
 - **Home team on offense:** Use backend positions as-is. Both teams set up on the home side.
-- **Away team on offense:** Flip coordinates for both offense and defense (e.g. `x → 101 − x`, `y` unchanged) so the whole setup is on the away (attacking) side.
+- **Away team on offense:** Backend-authored templates are mirrored with `x_away = 100 - x_home`, with `y` unchanged, before payload emission.
 
-Backend sends positions in a single convention (e.g. home-side) where applicable (e.g. Final Turn alignment, HCO string spots). The frontend derives “away offense” (e.g. `offenseTeamId !== homeTeamId`) and applies one flip to both offense and defense when true. This keeps the rule consistent across turn types (HCO entry, Final Turn setup, etc.) without special cases.
+Backend-authoritative gameplay payloads send final display-oriented coordinates. Reusable templates such as HCO string spots may remain home-authored internally, but the backend mirrors them with `x_away = 100 - x_home` before emission when the away team is attacking. Final Turn follows this contract. The frontend converts grid coordinates to pixels and must not infer orientation or mirror gameplay coordinates. Remaining legacy-path migrations are tracked in `../projects/sunset_coords_flipping.md`.
 
 ## Universal Court Clamp Policy
 
@@ -317,4 +317,3 @@ All turn types route through AnimationRouter. **Schema turns short-circuit** at 
 - `Transition_Systems.md` — Hold times and delay reference
 - `_documentation_master/projects/Z-Completed/Movement_Rate_Refactor.md` — Phase-by-phase implementation history of the May 2026 backend-authority shift
 - `docs/Animation_System/animation_system.md` — Older comprehensive doc (may have stale claims; cross-reference against the docs above)
-

@@ -6042,9 +6042,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
 /**
  * Phase 4: Final Turn alignment — tween offense and defense to oDestinations/dDestinations.
- * When away team is on offense, flip both offense and defense coords so the whole setup is on the
- * away (attacking) half; backend sends home-side coords. If the live owner differs from the step-0
- * handler, preserve the live owner so ShotAnimationSystem can animate the step-0 entry pass.
+ * Coordinates are final display-oriented backend values. If the live owner differs from the
+ * step-0 handler, preserve the live owner so ShotAnimationSystem can animate the entry pass.
  */
 export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
   if (scene?.skipToEnd || !turnData) return;
@@ -6052,9 +6051,6 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
   const dDestinations = turnData.dDestinations || turnData.d_destinations || {};
   const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
   const offenseTeamId = resolveOffenseTeamId({ scene, turnData, playerSprites });
-  const homeTeamId = scene.simData?.home_team_id;
-  const isAwayOffense = offenseTeamId && homeTeamId && String(offenseTeamId) !== String(homeTeamId);
-  const flipCoords = (coords) => ({ x: 101 - coords.x, y: coords.y });
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
@@ -6093,12 +6089,10 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
 
   const promises = [];
   Object.entries(oDestinations).forEach(([pos, coords]) => {
-    const c = isAwayOffense ? flipCoords(coords) : coords;
-    promises.push(addTween(offenseSprites[pos], c, pos));
+    promises.push(addTween(offenseSprites[pos], coords, pos));
   });
   Object.entries(dDestinations).forEach(([pos, coords]) => {
-    const c = isAwayOffense ? flipCoords(coords) : coords;
-    promises.push(addTween(defenseSprites[pos], c, pos));
+    promises.push(addTween(defenseSprites[pos], coords, pos));
   });
 
   await Promise.all(promises);
