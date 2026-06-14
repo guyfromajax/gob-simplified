@@ -51,22 +51,34 @@
       var ref = document.referrer;
       // Tutorial hub (/tutorial.html) and every lesson sub-page (/tutorial-*.html).
       var fromTutorial = ref && /\/tutorial[.-]/i.test(ref);
-      // Only set origin if we arrived from OUTSIDE the tutorial and none stored yet
-      if (ref && !fromTutorial && !sessionStorage.getItem(ORIGIN_KEY)) {
+      // A new external entry starts a new tutorial visit and replaces any
+      // origin left behind by an earlier visit in this tab.
+      if (ref && !fromTutorial) {
         sessionStorage.setItem(ORIGIN_KEY, ref);
       }
     } catch (e) {}
   }
+
+  function consumeOrigin() {
+    try {
+      var origin = sessionStorage.getItem(ORIGIN_KEY);
+      if (origin) sessionStorage.removeItem(ORIGIN_KEY);
+      return origin;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function goBack() {
     playSound('x-back.mp3');
     if (!isTutorialHub()) {
       location.href = HUB;
       return;
     }
-    var origin = sessionStorage.getItem(ORIGIN_KEY);
+    var origin = consumeOrigin();
     if (origin) { location.href = origin; return; }
     if (window.history.length > 1) { window.history.back(); return; }
-    location.href = HUB;
+    location.href = '/homepage.html';
   }
 
   /* ---- icon library (shared) ---- */
@@ -199,7 +211,9 @@
     loadAlertResumeScript();
     var back = document.querySelector('[data-gob-back]');
     if (back) {
-      if (!isTutorialHub()) {
+      if (isTutorialHub()) {
+        back.innerHTML = '<span class="chev">‹</span> Back';
+      } else {
         back.innerHTML = '<span class="chev">‹</span> Back To Tutorial Home';
       }
       back.addEventListener('click', goBack);

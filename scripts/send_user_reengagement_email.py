@@ -47,6 +47,11 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Restrict to a single exact email (for test sends); still respects suppression",
     )
+    parser.add_argument(
+        "--exclude",
+        default="",
+        help="Comma-separated emails to exclude (e.g. internal/test accounts)",
+    )
     return parser.parse_args()
 
 
@@ -79,10 +84,14 @@ def main() -> int:
     suppress_recent = recent_alpha_send_email_set(days=args.recent_days)
     suppress_unsub = unsubscribed_email_set()
     suppress_campaign = campaign_sent_email_set(args.campaign)
+    exclude = {normalize_email(e) for e in args.exclude.split(",") if e.strip()}
 
     recipients = [
         e for e in all_emails
-        if e not in suppress_recent and e not in suppress_unsub and e not in suppress_campaign
+        if e not in suppress_recent
+        and e not in suppress_unsub
+        and e not in suppress_campaign
+        and e not in exclude
     ]
 
     if args.only:
@@ -100,7 +109,8 @@ def main() -> int:
     print(f"Users with email: {len(all_emails)}")
     print(f"Suppressed — recent alpha ({args.recent_days}d): {len(suppress_recent & set(all_emails))}"
           f" | unsubscribed: {len(suppress_unsub & set(all_emails))}"
-          f" | already sent campaign: {len(suppress_campaign & set(all_emails))}")
+          f" | already sent campaign: {len(suppress_campaign & set(all_emails))}"
+          f" | excluded: {len(exclude & set(all_emails))}")
     print(f"Eligible recipients: {len(recipients)}")
 
     if args.execute and not _mailing_address().strip():
