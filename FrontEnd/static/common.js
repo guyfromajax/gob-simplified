@@ -45,12 +45,19 @@ function getTeamAssetPath(teamNameOrSlug, assetKey) {
   return base;
 }
 
-// Map full year strings to abbreviations
+// Map stored year values to UI abbreviations (JH, FR, SO, JR, SR, GR)
 const yearMap = {
-  senior: 'SR',
-  junior: 'JR',
-  sophomore: 'SO',
+  jh: 'JH',
   freshman: 'FR',
+  fr: 'FR',
+  sophomore: 'SO',
+  so: 'SO',
+  junior: 'JR',
+  jr: 'JR',
+  senior: 'SR',
+  sr: 'SR',
+  graduate: 'GR',
+  grad: 'GR',
 };
 
 // Convert a numeric height (in inches) to feet-inches format

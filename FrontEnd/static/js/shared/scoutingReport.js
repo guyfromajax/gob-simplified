@@ -74,7 +74,11 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
     const cells = [
       r.position || '—',
       playerLabel,
-      r.year != null && r.year !== '' ? String(r.year) : '—',
+      (typeof GOB_PlayerYear !== 'undefined'
+        ? GOB_PlayerYear.formatDisplay(r.year)
+        : (typeof yearMap !== 'undefined' && r.year
+          ? (yearMap[String(r.year).toLowerCase()] || String(r.year).toUpperCase())
+          : (r.year != null && r.year !== '' ? String(r.year) : '—'))),
       scoutingFormatHeight(r.height),
       r.weight != null && r.weight !== '' ? String(r.weight) : '—',
     ];

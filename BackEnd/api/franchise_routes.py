@@ -28,6 +28,7 @@ from BackEnd.db import (
     franchise_recruits_data_collection,
 )
 from BackEnd.utils.shared import format_height, summarize_game_state
+from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
@@ -9528,7 +9529,7 @@ def get_practice_squad_team(
                 "parent_team_name": parent_name,
                 "position_ratings": doc.get("position_ratings") or {},
                 "attributes": doc.get("attributes") or {},
-                "year": meta.get("year") or "",
+                "year": format_player_year_display(meta.get("year")) if meta.get("year") else None,
                 "archetype": meta.get("archetype") or "",
                 "height": meta.get("height"),
                 "weight": meta.get("weight"),
@@ -9543,7 +9544,7 @@ def get_practice_squad_team(
                 "parent_team_name": None,
                 "position_ratings": doc.get("position_ratings") or {},
                 "attributes": doc.get("attributes") or {},
-                "year": doc.get("year") or "",
+                "year": format_player_year_display(doc.get("year")) if doc.get("year") else None,
                 "archetype": doc.get("archetype") or "",
                 "height": doc.get("height"),
                 "weight": doc.get("weight"),

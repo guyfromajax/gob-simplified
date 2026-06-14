@@ -4,15 +4,37 @@
   var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
   // Year sort order (youngest first) and table display abbreviations.
-  var YEAR_SORT_ORDER = { 'JH': 0, 'Freshman': 1, 'Sophomore': 2, 'Junior': 3, 'Senior': 4 };
-  var YEAR_ABBREV = { 'JH': 'JH', 'Freshman': 'FR', 'Sophomore': 'SO', 'Junior': 'JR', 'Senior': 'SR' };
+  var YEAR_SORT_ORDER = { 'JH': 0, 'Freshman': 1, 'Sophomore': 2, 'Junior': 3, 'Senior': 4, 'Graduate': 5 };
+  var YEAR_ABBREV = { 'JH': 'JH', 'Freshman': 'FR', 'Sophomore': 'SO', 'Junior': 'JR', 'Senior': 'SR', 'Graduate': 'GR' };
+
+  function normalizeYear(year) {
+    if (global.GOB_PlayerYear && typeof global.GOB_PlayerYear.normalizeYear === 'function') {
+      return global.GOB_PlayerYear.normalizeYear(year);
+    }
+    if (year == null || year === '') return null;
+    var raw = String(year).trim();
+    if (!raw || raw === '--') return null;
+    var aliases = {
+      jh: 'JH', freshman: 'Freshman', fr: 'Freshman',
+      sophomore: 'Sophomore', so: 'Sophomore',
+      junior: 'Junior', jr: 'Junior',
+      senior: 'Senior', sr: 'Senior',
+      graduate: 'Graduate', grad: 'Graduate'
+    };
+    if (aliases[raw.toLowerCase()]) return aliases[raw.toLowerCase()];
+    if (/^[a-zA-Z]+$/.test(raw)) return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    return raw;
+  }
 
   function formatYearAbbrev(year) {
-    return YEAR_ABBREV[year] || (year ? String(year) : '--');
+    var normalized = normalizeYear(year);
+    if (!normalized) return '--';
+    return YEAR_ABBREV[normalized] || normalized;
   }
 
   function getYearSortValue(year) {
-    return YEAR_SORT_ORDER[year] != null ? YEAR_SORT_ORDER[year] : -1;
+    var normalized = normalizeYear(year);
+    return normalized != null && YEAR_SORT_ORDER[normalized] != null ? YEAR_SORT_ORDER[normalized] : -1;
   }
 
   function recruitRtClass(rt, year) {
@@ -124,7 +146,7 @@
         heightRaw: Number(recruit.height) || 0,
         weight: recruit.weight != null ? Number(recruit.weight) : null,
         pos: best.pos || '--',
-        year: recruit.year || 'JH',
+        year: normalizeYear(recruit.year || 'JH') || 'JH',
         yearDisplay: formatYearAbbrev(recruit.year || 'JH'),
         rt: best.rating != null ? Number(best.rating) : null,
         lean: lean,
@@ -286,6 +308,13 @@
     ATTR_KEYS: ATTR_KEYS,
     arraysEqual: arraysEqual,
     formatYearAbbrev: formatYearAbbrev,
+    normalizeYear: normalizeYear,
+    formatYearDisplay: function (year) {
+      if (global.GOB_PlayerYear && typeof global.GOB_PlayerYear.formatDisplay === 'function') {
+        return global.GOB_PlayerYear.formatDisplay(year);
+      }
+      return formatYearAbbrev(year);
+    },
     getYearSortValue: getYearSortValue,
     bindSortableHeaders: bindSortableHeaders,
     buildFccUrl: buildFccUrl,

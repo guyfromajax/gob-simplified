@@ -53,6 +53,7 @@ try:
         deserialize_computer_timeouts,
         sanitize_turn_animation_payload,
     )
+    from BackEnd.utils.player_year import format_player_year_display
     from BackEnd.utils import stat_updater
     from pydantic import BaseModel
     from fastapi import HTTPException
@@ -5477,7 +5478,7 @@ try:
                 "first_name": p.get("first_name", ""),
                 "last_name": p.get("last_name", ""),
                 "name": player_name,
-                "year": p.get("year"),
+                "year": format_player_year_display(p.get("year")) if p.get("year") else None,
                 "height": p.get("height"),
                 "weight": p.get("weight"),
                 "jersey": p.get("jersey"),
@@ -5556,7 +5557,7 @@ try:
                             "first_name": ts_meta.get("first_name", ""),
                             "last_name": ts_meta.get("last_name", ""),
                             "name": ts_name,
-                            "year": ts_meta.get("year"),
+                            "year": format_player_year_display(ts_meta.get("year")) if ts_meta.get("year") else None,
                             "height": ts_meta.get("height"),
                             "weight": ts_meta.get("weight"),
                             "jersey": ts_meta.get("jersey"),
@@ -6133,10 +6134,17 @@ try:
         players = []
         order = ["PG", "SG", "SF", "PF", "C"]
         year_map = {
+            "jh": "JH",
             "senior": "SR",
+            "sr": "SR",
             "junior": "JR",
+            "jr": "JR",
             "sophomore": "SO",
+            "so": "SO",
             "freshman": "FR",
+            "fr": "FR",
+            "graduate": "GR",
+            "grad": "GR",
         }
         for p in players_cursor:
             attrs = p.get("attributes", {})

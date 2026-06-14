@@ -109,19 +109,25 @@
   }
 
   function formatYear(year) {
+    if (typeof GOB_PlayerYear !== 'undefined' && GOB_PlayerYear.formatDisplay) {
+      return GOB_PlayerYear.formatDisplay(year);
+    }
     if (!year) return 'N/A';
     const yearStr = String(year).toLowerCase();
     const yearMap = {
-      'senior': 'Senior',
-      'junior': 'Junior',
-      'sophomore': 'Sophomore',
-      'freshman': 'Freshman',
-      'sr': 'Senior',
-      'jr': 'Junior',
-      'so': 'Sophomore',
-      'fr': 'Freshman'
+      senior: 'SR',
+      junior: 'JR',
+      sophomore: 'SO',
+      freshman: 'FR',
+      sr: 'SR',
+      jr: 'JR',
+      so: 'SO',
+      fr: 'FR',
+      jh: 'JH',
+      graduate: 'GR',
+      grad: 'GR',
     };
-    return yearMap[yearStr] || year;
+    return yearMap[yearStr] || (yearStr ? yearStr.toUpperCase() : 'N/A');
   }
 
   function normalizePhotoUrl(photoUrl, staticPrefix = '') {

@@ -19,6 +19,31 @@ let rosterSortDirection = 'desc';
 let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
 
+function formatYearForDisplay(year) {
+  if (typeof GOB_PlayerYear !== 'undefined' && GOB_PlayerYear.formatDisplay) {
+    return GOB_PlayerYear.formatDisplay(year);
+  }
+  if (typeof RecruitingCommon !== 'undefined' && RecruitingCommon.formatYearDisplay) {
+    return RecruitingCommon.formatYearDisplay(year);
+  }
+  if (!year) return '--';
+  if (typeof yearMap !== 'undefined') {
+    const abbr = yearMap[String(year).toLowerCase()];
+    if (abbr) return abbr;
+  }
+  const s = String(year).trim();
+  return s ? s.toUpperCase() : '--';
+}
+
+function yearSortValue(year) {
+  if (typeof GOB_PlayerYear !== 'undefined' && GOB_PlayerYear.getSortValue) {
+    return GOB_PlayerYear.getSortValue(year);
+  }
+  const order = { JH: 0, Freshman: 1, Sophomore: 2, Junior: 3, Senior: 4, Graduate: 5, FR: 1, SO: 2, JR: 3, SR: 4 };
+  const normalized = formatYearForDisplay(year);
+  return order[normalized] != null ? order[normalized] : (order[String(year).toUpperCase()] != null ? order[String(year).toUpperCase()] : 0);
+}
+
 function getRosterReturnStorageKey() {
   return [
     'roster_return_url',
@@ -162,7 +187,7 @@ async function loadRoster() {
           name: displayName,
           jersey: null,
           pos: highestPos || getBestPosition(posRatings).pos || '--',
-          year: p.year || '--',
+          year: formatYearForDisplay(p.year),
           height: `${Math.floor(heightInches / 12)}'${heightInches % 12}"`,
           weight: p.weight || '--',
           attributes: attrs,
@@ -229,7 +254,7 @@ async function loadRoster() {
         name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
         jersey: p.jersey,
         pos: p.position || getBestPosition(posRatings).pos || '--',
-        year: p.year || '--',
+        year: formatYearForDisplay(p.year),
         height: heightDisplay,
         heightRaw: heightInches,
         weight: p.weight || '--',
@@ -260,7 +285,7 @@ async function loadRoster() {
         name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
         jersey: p.jersey,
         pos: getBestPosition(posRatings).pos || '--',
-        year: p.year || '--',
+        year: formatYearForDisplay(p.year),
         height: `${Math.floor(heightInches / 12)}'${heightInches % 12}"`,
         weight: p.weight || '--',
         attributes: attrs,
@@ -662,9 +687,8 @@ function sortRoster() {
       val1 = a.highestRT ?? -Infinity;
       val2 = b.highestRT ?? -Infinity;
     } else if (rosterSortColumn === 'year') {
-      const yearOrder = { 'FR': 1, 'SO': 2, 'JR': 3, 'SR': 4 };
-      val1 = yearOrder[a.year] || 0;
-      val2 = yearOrder[b.year] || 0;
+      val1 = yearSortValue(a.year);
+      val2 = yearSortValue(b.year);
     } else if (rosterSortColumn === 'height') {
       val1 = a.heightRaw || 0;
       val2 = b.heightRaw || 0;

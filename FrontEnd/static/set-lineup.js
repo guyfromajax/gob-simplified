@@ -2631,9 +2631,11 @@ function createCardFront(player) {
   if (player.year) {
     const yearDisplay = document.createElement('div');
     yearDisplay.className = 'player-year-display';
-    // Format: capitalize first letter, rest lowercase
-    const yearText = player.year.toLowerCase();
-    const yearFormatted = yearText.charAt(0).toUpperCase() + yearText.slice(1);
+    const yearFormatted = (typeof GOB_PlayerYear !== 'undefined' && GOB_PlayerYear.formatDisplay)
+      ? GOB_PlayerYear.formatDisplay(player.year)
+      : (typeof yearMap !== 'undefined' && yearMap[String(player.year).toLowerCase()]
+        ? yearMap[String(player.year).toLowerCase()]
+        : String(player.year).toUpperCase());
     yearDisplay.textContent = yearFormatted;
     
     // Custom colors by year

@@ -156,7 +156,11 @@
       }
 
       addCell(player.pos || '--');
-      addCell(player.year || '--');
+      addCell(typeof GOB_PlayerYear !== 'undefined'
+        ? GOB_PlayerYear.formatDisplay(player.year)
+        : (typeof yearMap !== 'undefined' && player.year
+          ? (yearMap[String(player.year).toLowerCase()] || String(player.year).toUpperCase())
+          : (player.year || '--')));
       addCell(player.height || '--');
       addCell(player.weight || '--');
       ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'].forEach(function (key) {
@@ -349,7 +353,11 @@
           name: player.name || [player.first_name || '', player.last_name || ''].join(' ').trim(),
           pos: best.pos,
           highestRT: best.rating,
-          year: player.year || '--',
+          year: (typeof GOB_PlayerYear !== 'undefined'
+            ? GOB_PlayerYear.formatDisplay(player.year)
+            : (typeof yearMap !== 'undefined' && player.year
+              ? (yearMap[String(player.year).toLowerCase()] || String(player.year).toUpperCase())
+              : (player.year || '--'))),
           height: formatHeight(player.height),
           weight: player.weight || '--',
           attributes: player.attributes || {},

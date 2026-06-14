@@ -59,6 +59,23 @@ Recruit RT text (recruiting surfaces only): **0–29** red, **30–39** yellow, 
 
 Since recruits gained year values (JH/FR/SO/JR), the recruit-specific breakpoints apply to **JH recruits only**; FR/SO/JR recruits use the standard player Attribute Bar Scale. Use `getRecruitRtBucketClassForYear(rt, year)`, which handles the switch (`getRecruitRtBucketClass` is the JH-only bucket function).
 
+### Class Year Display
+Player class year is **always shown as a two-letter abbreviation** in UI/UX — never spelled out (e.g. never "Senior" or "Freshman" in tables, cards, modals, or detail views).
+
+| Stored value | Display |
+|---|---|
+| JH (junior high / recruit) | **JH** |
+| Freshman | **FR** |
+| Sophomore | **SO** |
+| Junior | **JR** |
+| Senior | **SR** |
+| Graduate (when applicable) | **GR** |
+
+- Use uppercase abbreviations only.
+- Empty or unknown year → **`--`**.
+- Canonical formatters: backend `format_player_year_display()` / `format_player_year_abbrev()` in `BackEnd/utils/player_year.py`; frontend `GOB_PlayerYear.formatDisplay()` in `/js/shared/playerYear.js`.
+- Internal data may store full words or abbreviations; display code must normalize through these helpers — do not hand-format year strings in individual screens.
+
 ### Color Usage Rules
 - `#0b0d14` is the default page background for all in-game screens (near-black with faint cool undertone). See Page Background System.
 - `#27408E` is the brand accent color — used for atmospheric moments (community section, leaderboard backgrounds, franchise card atmosphere). It is no longer the default shell background.

@@ -692,7 +692,17 @@ function getTrainingReportPlayerPortraitUrl(player) {
 }
 
 function getTrainingReportPlayerYear(player) {
-  return String(player?.year || player?.class_year || '').trim();
+  const raw = player?.year || player?.class_year || '';
+  if (typeof GOB_PlayerYear !== 'undefined' && GOB_PlayerYear.formatDisplay) {
+    return GOB_PlayerYear.formatDisplay(raw);
+  }
+  if (typeof yearMap !== 'undefined' && raw) {
+    const abbr = yearMap[String(raw).toLowerCase()];
+    if (abbr) return abbr;
+  }
+  const s = String(raw).trim();
+  if (!s) return '';
+  return s.toUpperCase();
 }
 
 function normalizeTrainingReportText(value) {
