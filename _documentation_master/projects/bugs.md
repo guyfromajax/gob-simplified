@@ -58,14 +58,6 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
 
 
-## Stale FB test suite (found + cleaned up 6-12-26, was not a product bug)
-
-15 tests across 4 FB test files were failing because they asserted **pre-refactor** fast-break behavior (test files last touched Dec 2025–Mar 2026; FB engine rewritten May–Jun 2026): mock players missing the `MIN` stat key, hard-coded coordinates from the old outlet logic, and stale role-plumbing assertions.
-
-**Resolved 6-12-26:** deleted `test_fast_break_comprehensive.py`, `test_fast_break_miss_dreb_flow.py`, `test_fast_break_position_logic.py` (fully red); trimmed the two stale tests from `test_fast_break_outlet_pass.py` (its two edge-case tests still pass and were kept). FB suite is now green.
-
-**Open follow-up [CODE-CLEANUP]:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
-
 ## P0 — HCO contract clock overruns with invalid elapsed time (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
 
 Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`), copied here so they're visible in the bug tracker:

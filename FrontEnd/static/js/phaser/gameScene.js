@@ -39,6 +39,76 @@ const DEBUG_SKIP =
   (typeof process !== 'undefined' && process.env.DEBUG_SKIP) ||
   false;
 
+function getUessTimingDiagnostics() {
+  if (typeof window === 'undefined') return null;
+  if (!window.__UESS_TIMING_DIAGNOSTICS__) {
+    window.__UESS_TIMING_DIAGNOSTICS__ = {
+      pauseStartedAtMs: null,
+      pauseAccumulatedMs: 0,
+      hiddenStartedAtMs: null,
+      hiddenAccumulatedMs: 0,
+      pauseTransitions: 0,
+      visibilityTransitions: 0,
+      lastPauseTransitionAtMs: null,
+      lastVisibilityTransitionAtMs: null,
+      pauseIntervals: [],
+      hiddenIntervals: [],
+    };
+  }
+  return window.__UESS_TIMING_DIAGNOSTICS__;
+}
+
+function setUessTimingState(kind, active) {
+  const diagnostics = getUessTimingDiagnostics();
+  if (!diagnostics) return;
+  const now = Date.now();
+  const startKey = kind === 'pause' ? 'pauseStartedAtMs' : 'hiddenStartedAtMs';
+  const accumulatedKey =
+    kind === 'pause' ? 'pauseAccumulatedMs' : 'hiddenAccumulatedMs';
+  const transitionsKey =
+    kind === 'pause' ? 'pauseTransitions' : 'visibilityTransitions';
+  const lastTransitionKey =
+    kind === 'pause' ? 'lastPauseTransitionAtMs' : 'lastVisibilityTransitionAtMs';
+
+  if (active && diagnostics[startKey] == null) {
+    diagnostics[startKey] = now;
+    diagnostics[transitionsKey] += 1;
+    diagnostics[lastTransitionKey] = now;
+  } else if (!active && diagnostics[startKey] != null) {
+    const interval = {
+      startMs: diagnostics[startKey],
+      endMs: now,
+    };
+    diagnostics[accumulatedKey] += Math.max(0, interval.endMs - interval.startMs);
+    const intervalsKey = kind === 'pause' ? 'pauseIntervals' : 'hiddenIntervals';
+    if (!Array.isArray(diagnostics[intervalsKey])) {
+      diagnostics[intervalsKey] = [];
+    }
+    diagnostics[intervalsKey].push(interval);
+    if (diagnostics[intervalsKey].length > 100) {
+      diagnostics[intervalsKey].splice(
+        0,
+        diagnostics[intervalsKey].length - 100
+      );
+    }
+    diagnostics[startKey] = null;
+    diagnostics[transitionsKey] += 1;
+    diagnostics[lastTransitionKey] = now;
+  }
+}
+
+if (
+  typeof document !== 'undefined' &&
+  typeof window !== 'undefined' &&
+  !window.__UESS_VISIBILITY_DIAGNOSTICS_INSTALLED__
+) {
+  window.__UESS_VISIBILITY_DIAGNOSTICS_INSTALLED__ = true;
+  setUessTimingState('hidden', document.hidden === true);
+  document.addEventListener('visibilitychange', () => {
+    setUessTimingState('hidden', document.hidden === true);
+  });
+}
+
 /** URL flag: ?debug_pc=1|true|yes — forwards to API so Railway logs without DEBUG_PC env. */
 function isDebugPlaycall() {
   if (typeof window === 'undefined') return false;
@@ -2513,6 +2583,7 @@ export function createGameScene(Phaser) {
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           this.isPaused = !this.isPaused;
           if (this.isPaused) {
+            setUessTimingState('pause', true);
             syncSceneTimePaused(this, true);
             // Pause all tweens
             if (this.tweens) {
@@ -2529,6 +2600,7 @@ export function createGameScene(Phaser) {
             pauseGameplayTrack();
             syncPauseButtonDom(true);
           } else {
+            setUessTimingState('pause', false);
             syncSceneTimePaused(this, false);
             // Resume all tweens
             if (this.tweens) {

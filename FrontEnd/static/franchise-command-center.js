@@ -426,12 +426,36 @@ async function hydrateFccDisplayColorPreference() {
   }
 }
 
+// Render the logged-in user's handle + lead-archetype badge in the header top-left.
+// Username comes from the page's existing /api/auth/me data (window.__gobAuthMeData);
+// the badge reuses the shared GOBArchetype utility (graceful no-badge when no archetype).
+function renderFccUserIdentity(meData) {
+  const nameEl = document.getElementById('fcc-username');
+  const badgeHost = document.getElementById('fcc-username-badge');
+  if (!nameEl || !badgeHost) return;
+  const username = meData && meData.username ? String(meData.username) : '';
+  nameEl.textContent = username;
+  nameEl.title = username;
+  badgeHost.innerHTML = '';
+  const lead = window.GOBArchetype ? window.GOBArchetype.leadFrom(meData) : '';
+  if (lead && window.GOBArchetype) {
+    const badge = window.GOBArchetype.createBadge(lead, 26);
+    if (badge) badgeHost.appendChild(badge);
+  }
+}
+
+if (window.__gobAuthMeData) {
+  renderFccUserIdentity(window.__gobAuthMeData);
+}
+
 window.addEventListener('gob:auth-me-loaded', (event) => {
   syncFccDisplayColorFromAccountSettings(event.detail || {});
+  renderFccUserIdentity(event.detail || window.__gobAuthMeData);
 });
 
 window.addEventListener('gob:account-settings-updated', (event) => {
   syncFccDisplayColorFromAccountSettings(event.detail || {});
+  renderFccUserIdentity(event.detail || window.__gobAuthMeData);
 });
 
 let standingsDataCache = null;

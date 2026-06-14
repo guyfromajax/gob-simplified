@@ -240,6 +240,44 @@ def _safe_id(p: Any) -> Optional[str]:
     return str(pid) if pid is not None else None
 
 
+def _record_after_steal_fast_break_stats(
+    game: Any,
+    turn_result: Dict[str, Any],
+    stealer: Any,
+    defenders: List[Any],
+) -> None:
+    """Record the completion stats skipped by the After Steal early return."""
+    from BackEnd.constants.fast_break_play_types import ensure_fast_break_plays
+    from BackEnd.engine.phase_resolution import _record_fast_break_stats
+
+    _record_fast_break_stats(
+        {
+            "outlet_receiver": None,
+            "ball_handler": stealer,
+            "defense": defenders,
+        },
+        turn_result,
+        game,
+    )
+
+    result_type = turn_result.get("result_type")
+    off_scouting = game.offense_team.scouting_data
+    def_scouting = game.defense_team.scouting_data
+
+    if result_type == "MAKE":
+        off_scouting["offense"]["Fast_Break_Success"] += 1
+        ensure_fast_break_plays(off_scouting["offense"])[AFTER_STEAL]["S"] += 1
+    elif result_type == "FOUL":
+        foul_team = turn_result.get("foul_team") or game.game_state.get("foul_team")
+        if foul_team == "DEFENSE":
+            off_scouting["offense"]["Fast_Break_Success"] += 1
+            ensure_fast_break_plays(off_scouting["offense"])[AFTER_STEAL]["S"] += 1
+        elif foul_team == "OFFENSE":
+            def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
+    elif result_type in ("MISS", "BLOCK", "TURNOVER"):
+        def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
+
+
 # --- Main resolver ---------------------------------------------------------
 
 
@@ -673,12 +711,9 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         "fast_break_play": AFTER_STEAL,
     }
 
-    # Track FB stat aggregates (parity with rim_runner_fast_break and CR).
-    off_scouting = off_team.scouting_data
-    from BackEnd.constants.fast_break_play_types import ensure_fast_break_plays
-    fb_plays = ensure_fast_break_plays(off_scouting["offense"])
-    if made:
-        fb_plays[AFTER_STEAL]["S"] += 1
+    # Attempt aggregates were recorded before the caller short-circuited here.
+    # Apply only the completion stats from the shared Fast Break path.
+    _record_after_steal_fast_break_stats(game, turn_result, stealer, defenders)
 
     # time_elapsed: drive step + post-shot sub-step approximations.
     # Schema emitter recomputes precise per-step T; this is for legacy clock

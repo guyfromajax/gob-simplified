@@ -3697,7 +3697,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     const eventName = isPressureSkeletonTurn
       ? String(event || "").replace(/^hco_/, "pressure_")
       : event;
-    scene?.events?.emit?.("animTelemetry", {
+    const row = {
       event: eventName,
       branchKind: isPressureSkeletonTurn ? "pressure_step_movement" : "hco_step_movement",
       turnId: turnData?.turn_count ?? turnData?.id ?? null,
@@ -3708,7 +3708,107 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       quarter: turnData?.quarter ?? scene?.quarter ?? null,
       timestampMs: Date.now(),
       ...payload,
+    };
+    scene?.events?.emit?.("animTelemetry", row);
+    const scope = getDrebTelemetryScope();
+    if (scope) {
+      scope.__HCO_CLOCK_DIAGNOSTIC_LAST__ = row;
+      if (!Array.isArray(scope.__HCO_CLOCK_DIAGNOSTIC_BUFFER__)) {
+        scope.__HCO_CLOCK_DIAGNOSTIC_BUFFER__ = [];
+      }
+      scope.__HCO_CLOCK_DIAGNOSTIC_BUFFER__.push(row);
+      if (scope.__HCO_CLOCK_DIAGNOSTIC_BUFFER__.length > 100) {
+        scope.__HCO_CLOCK_DIAGNOSTIC_BUFFER__.splice(
+          0,
+          scope.__HCO_CLOCK_DIAGNOSTIC_BUFFER__.length - 100
+        );
+      }
+    }
+    if (String(eventName).includes("clock_overrun")) {
+      console.error("[UESS HCO CLOCK DIAGNOSTIC]", row);
+    } else if (String(eventName).includes("pass_pending")) {
+      console.warn("[UESS HCO PASS PENDING]", row);
+    }
+  };
+  const getTimingDiagnosticSnapshot = (sinceMs = null) => {
+    const scope = getDrebTelemetryScope();
+    const diagnostics = scope?.__UESS_TIMING_DIAGNOSTICS__ || {};
+    const now = Date.now();
+    const pauseStartedAtMs =
+      diagnostics.pauseStartedAtMs == null
+        ? null
+        : Number(diagnostics.pauseStartedAtMs);
+    const hiddenStartedAtMs =
+      diagnostics.hiddenStartedAtMs == null
+        ? null
+        : Number(diagnostics.hiddenStartedAtMs);
+    const overlapMs = (intervals, activeStartMs) => {
+      if (!Number.isFinite(Number(sinceMs))) return null;
+      const startBoundary = Number(sinceMs);
+      let total = 0;
+      for (const interval of Array.isArray(intervals) ? intervals : []) {
+        const start = Math.max(startBoundary, Number(interval?.startMs) || 0);
+        const end = Math.min(now, Number(interval?.endMs) || 0);
+        if (end > start) total += end - start;
+      }
+      if (Number.isFinite(activeStartMs)) {
+        const start = Math.max(startBoundary, activeStartMs);
+        if (now > start) total += now - start;
+      }
+      return Math.max(0, total);
+    };
+    const activeTweens = scene?.tweens?.getAll?.() || [];
+    const describeTween = (tween) => ({
+      debugTag: tween?.__debugTag ?? null,
+      debugPlayerId: tween?.__debugPlayerId ?? null,
+      isPlaying:
+        typeof tween?.isPlaying === "function"
+          ? tween.isPlaying()
+          : tween?.isPlaying ?? null,
+      isPaused:
+        typeof tween?.isPaused === "function"
+          ? tween.isPaused()
+          : tween?.isPaused ?? null,
+      progress:
+        Number.isFinite(Number(tween?.progress))
+          ? Number(Number(tween.progress).toFixed(3))
+          : null,
+      totalDuration:
+        Number.isFinite(Number(tween?.totalDuration))
+          ? Math.round(Number(tween.totalDuration))
+          : null,
     });
+    return {
+      scenePaused: scene?.isPaused === true,
+      documentHidden:
+        typeof document !== "undefined" ? document.hidden === true : null,
+      pauseAccumulatedMs:
+        Math.max(0, Number(diagnostics.pauseAccumulatedMs) || 0) +
+        (Number.isFinite(pauseStartedAtMs) ? Math.max(0, now - pauseStartedAtMs) : 0),
+      hiddenAccumulatedMs:
+        Math.max(0, Number(diagnostics.hiddenAccumulatedMs) || 0) +
+        (Number.isFinite(hiddenStartedAtMs) ? Math.max(0, now - hiddenStartedAtMs) : 0),
+      pauseOverlapSinceMs: overlapMs(
+        diagnostics.pauseIntervals,
+        pauseStartedAtMs
+      ),
+      hiddenOverlapSinceMs: overlapMs(
+        diagnostics.hiddenIntervals,
+        hiddenStartedAtMs
+      ),
+      diagnosticSinceMs: Number.isFinite(Number(sinceMs)) ? Number(sinceMs) : null,
+      pauseTransitions: Number(diagnostics.pauseTransitions) || 0,
+      visibilityTransitions: Number(diagnostics.visibilityTransitions) || 0,
+      lastPauseTransitionAtMs: diagnostics.lastPauseTransitionAtMs ?? null,
+      lastVisibilityTransitionAtMs:
+        diagnostics.lastVisibilityTransitionAtMs ?? null,
+      tweenManagerPaused:
+        typeof scene?.tweens?.isPaused === "function"
+          ? scene.tweens.isPaused()
+          : null,
+      activeTweenCount: activeTweens.length,
+      activeTweens: activeTweens.slice(0, 12).map(describeTween),
+    };
   };
   const resolveHcoStepStrictMode = () => {
     const scope = getDrebTelemetryScope();
@@ -4597,6 +4697,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         hardFailThresholdSeconds == null
           ? null
           : Number(hardFailThresholdSeconds.toFixed(2)),
+      timingDiagnostics: getTimingDiagnosticSnapshot(turnStartMs),
       ...context,
     };
     if (ownerMissing) {
@@ -5326,6 +5427,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (passInfo) {
       const { handlePassAnimation } = await import("./passDetection.js");
       const passStartMs = Date.now();
+      let passSettled = false;
+      const passDiagnosticIntervalMs = 5000;
+      const passDiagnosticTimer =
+        typeof setInterval === "function"
+          ? setInterval(() => {
+              if (passSettled) return;
+              const passElapsedMs = Date.now() - passStartMs;
+              emitHcoStepTelemetry("hco_step_pass_pending", {
+                stepIndex,
+                passElapsedMs,
+                passElapsedGameSeconds: Number(
+                  (passElapsedMs / clockSecondMs).toFixed(2)
+                ),
+                passerId: passInfo?.passerId ?? null,
+                receiverId: passInfo?.receiverId ?? null,
+                timingDiagnostics: getTimingDiagnosticSnapshot(passStartMs),
+              });
+            }, passDiagnosticIntervalMs)
+          : null;
       if (defensiveStarters.length > 0) {
         defensivePromiseArray = defensiveStarters.map((start) => start());
       }
@@ -5335,7 +5455,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         playerSprites,
         enablePassSfx: PASS_SFX_TURN_TYPES.has(String(turnData?.current_turn || turnData?.result_type || "")),
       });
-      await passPromise;
+      try {
+        await passPromise;
+      } finally {
+        passSettled = true;
+        if (passDiagnosticTimer != null && typeof clearInterval === "function") {
+          clearInterval(passDiagnosticTimer);
+        }
+      }
       if (isStepContractTurn && activeStepStrictMode !== "off") {
         const receiverId = String(passInfo?.receiverId ?? "");
         const receiverSprite = receiverId ? playerSprites?.[receiverId] : null;
@@ -5408,6 +5535,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           maxWaitGameSeconds: stepBudgetGameSeconds,
           jitterSlackSeconds: Number(jitterSlackSeconds.toFixed(3)),
           hardFailThresholdSeconds: Number(hardFailThresholdSeconds.toFixed(3)),
+          passPromiseSettled: passSettled,
+          timingDiagnostics: getTimingDiagnosticSnapshot(stepStartMs),
         };
         if (pressureStepBudgetFloored) {
           passContext.pressureStepBudgetFloored = true;
