@@ -112,6 +112,42 @@ def test_fcp_miss_dreb_promotes_to_discrete_dreb_turn(monkeypatch):
     _assert_promotes_to_discrete_dreb(game, fcp_miss, rebounder, "FAST_BREAK")
 
 
+def test_emergency_foul_out_reentry_does_not_interrupt_dreb_promotion(monkeypatch):
+    game = build_mock_game()
+    _seed_player_ids_and_coords(game)
+    game.game_state["offensive_state"] = "HCO"
+    game.game_state["time_remaining"] = 480
+    game.game_state["shot_clock_remaining"] = 24
+    game.game_state["allow_fouled_out_lineup_reentry"] = True
+    game.offense_team = game.home_team
+    game.defense_team = game.away_team
+
+    rebounder = game.defense_team.lineup["C"]
+    shooter = game.offense_team.lineup["SG"]
+    defender = game.defense_team.lineup["SG"]
+    for _ in range(5):
+        rebounder.record_stat("F")
+    game.game_state["emergency_fouled_out_lineup_player_ids"] = [
+        rebounder.player_id
+    ]
+    hco_miss = _miss_with_loose_ball(
+        game,
+        current_turn="HCO",
+        next_play_type="FAST_BREAK",
+        rebounder=rebounder,
+        shooter=shooter,
+        defender=defender,
+    )
+
+    monkeypatch.setattr(game.turn_manager, "run_micro_turn", lambda: hco_miss)
+
+    result = game.simulate_macro_turn()
+
+    assert result is hco_miss
+    assert result.get("fouled_out") is not True
+    _assert_promotes_to_discrete_dreb(game, hco_miss, rebounder, "FAST_BREAK")
+
+
 def test_after_steal_fast_break_miss_dreb_promotes_to_discrete_dreb_turn(monkeypatch):
     game = build_mock_game()
     _seed_player_ids_and_coords(game)

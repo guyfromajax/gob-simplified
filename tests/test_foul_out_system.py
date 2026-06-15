@@ -12,7 +12,11 @@ Tests:
 
 import pytest
 from tests.test_utils import build_mock_game
-from BackEnd.engine.phase_resolution import resolve_non_shooting_foul, check_and_handle_foul_out
+from BackEnd.engine.phase_resolution import (
+    check_and_handle_foul_out,
+    resolve_free_throw_logic,
+    resolve_non_shooting_foul,
+)
 from BackEnd.models.turn_manager import TurnManager
 
 
@@ -299,6 +303,58 @@ class TestFoulOutCheck:
         assert result["foul_count"] == 5
         # Lineup removal and sub happen in check_and_handle_foul_out; eligibility is F >= 5 elsewhere
 
+    def test_fallback_foul_out_preserves_player_shooter_for_free_throw(
+        self,
+        monkeypatch,
+    ):
+        game = build_mock_game()
+        shooter = game.offense_team.lineup["PG"]
+        foul_player = game.defense_team.lineup["PG"]
+        game.defense_team.team_fouls = 5
+        game.game_state.update({
+            "offensive_state": "FREE_THROW",
+            "shooter": shooter,
+            "last_ball_handler": shooter,
+            "free_throws_remaining": 1,
+            "one_and_one": False,
+        })
+        for _ in range(5):
+            foul_player.record_stat("F")
+
+        monkeypatch.setattr(
+            "BackEnd.engine.phase_resolution.check_and_handle_foul_out",
+            lambda player, game_state, team: {
+                "fouled_out": True,
+                "foul_count": 5,
+                "foul_player_id": player.player_id,
+                "foul_player_name": player.name,
+                "foul_player_photo": None,
+                "foul_player_team": team.name,
+            },
+        )
+
+        result = {
+            "result_type": "FOUL",
+            "next_play_type": "FREE_THROW",
+            "shooter": shooter.name,
+        }
+
+        game._check_lineups_for_foul_out(result)
+
+        context = game.game_state["foul_out_context"]
+        assert context["shooter"] is shooter
+
+        timeout_turn = game.turn_manager.setup_timeout_turn(
+            timeout_reason="FOUL_OUT",
+            foul_out_player=foul_player,
+            foul_out_context=context,
+        )
+
+        assert timeout_turn["next_play_type"] == "FREE_THROW"
+        assert game.game_state["shooter"] is shooter
+        free_throw_result = resolve_free_throw_logic(game)
+        assert free_throw_result["shooter"] is shooter
+
 
 class TestGameStatePreservation:
     """Test that game state is preserved through foul out."""
@@ -400,4 +456,3 @@ class TestFouledOutEligibility:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

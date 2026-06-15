@@ -182,14 +182,32 @@ def _ensure_complete_lineup(
         str(pid)
         for pid in ((game_state or {}).get("locked_exhausted_lineup_player_ids") or [])
     }
+    emergency_player_ids = {
+        str(pid)
+        for pid in (
+            (game_state or {}).get("emergency_fouled_out_lineup_player_ids") or []
+        )
+    }
+    allow_fouled_out_reentry = bool(
+        (game_state and game_state.get("allow_fouled_out_lineup_reentry"))
+        or not getattr(team, "is_user_team", False)
+    )
+    foul_out_exempt_player_ids = (
+        locked_player_ids
+        | (emergency_player_ids if allow_fouled_out_reentry else set())
+    )
 
-    # First, remove any fouled-out players (5+ fouls) from the lineup, except
-    # players in the server-validated exhausted user lineup.
+    # First, remove fouled-out players unless they were explicitly retained
+    # by one of the exhausted-roster exceptions.
     for pos, player in list(team.lineup.items()):
         if player and hasattr(player, "get_stat"):
             foul_count = player.get_stat("F", "game")
             player_id = str(getattr(player, "player_id", ""))
-            if foul_count is not None and foul_count >= 5 and player_id not in locked_player_ids:
+            if (
+                foul_count is not None
+                and foul_count >= 5
+                and player_id not in foul_out_exempt_player_ids
+            ):
                 team.lineup[pos] = None
 
     # Now find missing positions (including those we just cleared)
@@ -225,14 +243,19 @@ def _ensure_complete_lineup(
             and (p.get_stat("F", "game") or 0) >= 5
             and getattr(p, "player_id", None) not in current_player_ids
         ]
-        allow_fouled_out_reentry = bool(
-            (game_state and game_state.get("allow_fouled_out_lineup_reentry"))
-            or not getattr(team, "is_user_team", False)
-        )
         shortfall = len(missing) - len(available_players)
         if allow_fouled_out_reentry and len(fouled_out_players) >= shortfall:
             emergency_players = random.sample(fouled_out_players, shortfall)
             available_players.extend(emergency_players)
+            if game_state is not None:
+                game_state["emergency_fouled_out_lineup_player_ids"] = sorted(
+                    emergency_player_ids
+                    | {
+                        str(getattr(player, "player_id", ""))
+                        for player in emergency_players
+                        if getattr(player, "player_id", None) is not None
+                    }
+                )
             logging.warning(
                 "Computer-team lineup exhaustion: Team '%s' randomly re-admitted %s "
                 "fouled-out player(s) to complete the lineup: %s",

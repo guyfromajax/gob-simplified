@@ -1,49 +1,60 @@
 
 **The System**
-- We'll cue the user with modals at key points during their early experience with the game. 
+- We'll cue the user with modals at key points during their early experience with the game.
 - These will be one-time per user only. Once a user sees a modal, it will never show again.
-- If a user chooses not to proceed to with the tutorial, add a glow effect behind teh Tutorials button in the top nav bar with the next tutorial noted in a call out coming from the button. Example, "Next: Player Attributes".
+- If a user chooses not to proceed with the tutorial, add a glow effect behind the Tutorials button in the top nav bar with the next tutorial noted in a callout coming from the button. Example, "Next: Player Attributes".
 - Modal Buttons
-    - Tutorials (primary design)
+    - Start lesson (primary design)
     - I'll Do This Later (ghost design)
--Modal timing and copy for each is noted below
--Note, if a user has already viewed a tutorial, we will still present them with the modal per the logic below, but we will not show the glow effect with teh callout next to the Tutorial button if they choose to skip it.
+- Modal timing and copy for each is noted below.
+- Note: if a user has already viewed a tutorial, we will still present them with the modal per the logic below, but we will not show the glow effect with the callout next to the Tutorial button if they choose to skip it.
 
+**Counter gates (locked franchise only)** — eligibility uses forward-only counters, not franchise week. Week labels in copy are the curriculum map; thresholds are:
+
+| Alert | Trigger | Counter threshold |
+|-------|---------|-------------------|
+| Player Attributes | Run Training click | `training_returns === 0` (first training) |
+| Training | Run Training click | `training_returns >= 1` |
+| Team Attributes | FCC load after training | `training_returns >= 2` |
+| Game Plan | Play Next Game click | `games >= 3` |
+| Playbooks | FCC load after training | `training_returns >= 4` |
+| Scouting | FCC load after a game | `games >= 6` |
+| Recruiting | FCC load after a game | `games >= 7` (body copy uses live `{n} games in`) |
 
 **Player Attributes**
--When: after the user completes their fte game and they land back on the mode-selet screen.
--Modal Copy
-    "Nice work, Coach. Before you start your first franchise, get to know Player Attributes — they're the foundation for every decision ahead."
+- When: first Run Training click on the locked franchise (`training_returns === 0`)
+- Modal Copy
+    "Hey Coach, you're about to run training for the first time, and this will impact your players' attributes. We suggest you read the Player Attributes tutorial first — player attributes are the core of the game and will impact everything moving forward."
 
 **Training**
--When: when teh user presses the Run Training button for the first time in their first frandchise instance
--Modal Copy
-    "You're about to run training for the first time, Coach. Take a minute with the Training tutorial first."
+- When: Run Training click when `training_returns >= 1`
+- Modal Copy
+    "You're about to run training. Take a minute with the Training tutorial first."
 
 **Team Attributes**
--When: when the user returns from their first training and lands back on the FCC
--Modal Copy
+- When: FCC load when `training_returns >= 2` (typically after 2nd training return)
+- Modal Copy
     "You just evolved some of your team's attributes, Coach. The Team Attributes tutorial breaks down the impact of those changes."
 
 **Game Plan**
--When: when teh user presses the Play Next Game button for the first time in their first frandchise instance
--Modal Copy
-    "Your first game is next, Coach. Run through the Game Plan tutorial before you tip off."
+- When: Play Next Game click when `games >= 3`
+- Modal Copy
+    "You're about to tip off for a big game, Coach. Run through the Game Plan tutorial before the game begins for a few extra pointers."
 
 **Playbooks**
--When: when the user returns from their week 2 training in their first franchise instance and lands on the FCC.
--Modal Copy
-    "Hey Coach, we think you're ready for the Playbooks tutorial."
+- When: FCC load when `training_returns >= 4`
+- Modal Copy
+    "Hey Coach, we think you're ready for the Playbooks tutorial. Playbooks add a deeper level of control and coaching customization."
 
 **Scouting**
--When: when user returns to the FCC after completing their week 3 game of their first franchise instance.
--Modal Copy
+- When: FCC load when `games >= 6`
+- Modal Copy
     "You've seen the Scouting Report tab by now, Coach. The Scouting tutorial covers how to read it and turn it into an edge."
 
 **Recruiting**
--When: when user returns to the FCC after completing their week 6 game of their first franchise instance.
--Modal Copy
-    "Six games in, Coach. Time to get smart on Recruiting — it's how you build your program for the long haul."
+- When: FCC load when `games >= 7`
+- Modal Copy (dynamic)
+    "{n} games in, Coach. Time to get smart on Recruiting — it's how you build your program for the long haul." (`n` = `tutorial_alerts_games`)
 
 
 ---
@@ -68,8 +79,8 @@ When a user taps **Start lesson** on a contextual alert modal (primary CTA only)
 
 | Alert # | Lesson | Return destination |
 |--------:|--------|-------------------|
-| 1 | Player Attributes | `/mode-select.html` |
-| 2 | Training | `/training.html?…` (full query string captured at Run Training intercept) |
+| 1 | Player Attributes | `/training.html?…` (full query string captured at Run Training intercept) |
+| 2 | Training | `/training.html?…` (same) |
 | 3 | Team Attributes | Current FCC URL (`franchise_id`, `team_id`, etc.) |
 | 4 | Game Plans | Set Lineup URL for the upcoming game (captured at Play Next Game intercept) |
 | 5 | Playbooks | Current FCC URL |
@@ -117,14 +128,13 @@ FCC return URLs are captured at modal show time; `tut_alert` is stripped from th
 Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server-side** (cross-device).
 
 **Flow**
-- Player Attributes: `onAuthMeLoaded` on mode-select, gated on `fte_v2_complete`.
-- Training: `interceptTraining()` wraps the Run Training click; stores `/training.html?…` as resume URL.
-- Game Plans: `interceptPlayNextGame()` wraps Play Next Game after matchup URL is built; stores set-lineup URL as resume URL.
-- Team Attributes / Playbooks (training_returns) + Scouting / Recruiting (games): evaluated by `onFccDomReady` on **every FCC load** (not gated on a URL param). `training_returns` increments client-side from `tut_alert=training_return`; `games` is read from the server count. Resume URL = current FCC URL at modal show.
+- Player Attributes + Training: `interceptTraining()` wraps Run Training; stores `/training.html?…` as resume URL. Player Attributes when `training_returns === 0`; Training when `training_returns >= 1`.
+- Game Plans: `interceptPlayNextGame()` when `games >= 3`; stores set-lineup URL as resume URL.
+- Team Attributes / Playbooks (`training_returns >= 2` / `>= 4`) + Scouting / Recruiting (`games >= 6` / `>= 7`): evaluated by `onFccDomReady` on **every FCC load**. `training_returns` increments client-side from `tut_alert=training_return`; `games` is read from the server count. Resume URL = current FCC URL at modal show.
   - *Why param-independent:* the franchise game→FCC return navigates via `return_url`, which the box-score never tags with `tut_alert=game_complete`. The old param-gated path therefore never incremented `games` nor evaluated Scouting/Recruiting — so both are now server-counted and evaluated unconditionally. See bug history 2026-06-09 (counter).
 - On **Start lesson**: `stashAlertResume(alertId, returnUrl)` → `sessionStorage` → lesson sub-page reads via `GOBTutorialAlertResume`.
 - On skip ("I'll Do This Later") with the lesson still unseen → nav-bar glow + "Next: <Topic>" callout (`applyNavGlow`); no resume context is set.
-- **"I'll do this later" advance** (when the modal blocked an underlying navigation): Training → `/training.html`; Game Plans → set-lineup URL; Player Attributes → FCC when an active franchise exists on mode-select (`GOBModeSelect.getFranchiseCommandCenterUrlForLater`); Team Attributes / Playbooks / Scouting / Recruiting → no extra navigation (user is already on FCC). Close ✕ / backdrop dismiss without advancing.
+- **"I'll do this later" advance** (when the modal blocked an underlying navigation): Training / Player Attributes → `/training.html`; Game Plans → set-lineup URL; Team Attributes / Playbooks / Scouting / Recruiting → no extra navigation (user is already on FCC). Close ✕ / backdrop dismiss without advancing.
 
 **Alert-resume footer (implementation)**
 - `gobTutorialAlertResume.js` maps pathname → lesson id; activates only when `sessionStorage.gob_tut_alert_resume.lessonId` matches.
@@ -136,12 +146,12 @@ Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server
 **Modal — Coach Card (premium takeover)**
 - One component for all 7 alerts: `GOB.showTip({alertMode:true, ...})` in `gobTutorialNav.js` (`showAlertCard`); styles `.gob-talert-*` in `css/gob-tutorial.css`. See Styleguide → *Tutorial Alert (Coach Card)*.
 - Two-column card (256px branded rail + content), full-screen blurred scrim. Rail: whistle "TUTORIAL" mark, Coach Sammy portrait (2px orange ring), "Lesson N of 7" + 7-dot progress. Content: lesson title headline, body copy, "Start lesson" (→ lesson page) + "I'll do this later".
-- **Lesson numbering** is the hub's 7-lesson curriculum order via `LESSON_INDEX` (gobTutorialAlerts.js): Player Attributes 1, Training 2, Team Attributes 3, Game Plans 4 (fires on first Play Next Game, `checkPlayNextGame`), Playbooks 5, Scouting 6, Recruiting 7. Dots: past = dim orange, current = pill, future = faint.
+- **Lesson numbering** is the hub's 7-lesson curriculum order via `LESSON_INDEX` (gobTutorialAlerts.js): Player Attributes 1, Training 2, Team Attributes 3, Game Plans 4 (`games >= 3` on Play Next Game), Playbooks 5, Scouting 6, Recruiting 7. Dots: past = dim orange, current = pill, future = faint.
 - **Coach art:** lesson 1 → generic white Sammy; lessons 2–7 → selected team uniform via `portraitFor()` (mirrors `teamCoachAsset.js`; team from `localStorage.franchise_user_team`; generic fallback).
 - **Entrance:** `.is-entering` animates scrim fade + card rise, removed on `animationend` (800ms fallback); resting state never `opacity:0`; honors reduced-motion.
 
 **Gotchas (load-bearing — see bug history below)**
-- **A gate may only reference state reachable on the screen it fires on.** The yield to archetype-reveal / alpha-feedback (`shouldYieldToOtherModals`) is **scoped to FCC** (`isFcc()`), because those modals only mount on FCC. On mode-select (where Player Attributes fires) there is nothing to yield to, so the gate must not apply — otherwise the alert defers forever against a blocker that can never clear. This is the core design rule: **one alert, one screen, gates that only depend on state present on that screen.**
+- **A gate may only reference state reachable on the screen it fires on.** The yield to archetype-reveal / alpha-feedback (`shouldYieldToOtherModals`) is **scoped to FCC** (`isFcc()`), because those modals only mount on FCC. Player Attributes fires on Run Training (FCC) and does not yield to blockers that only exist on other pages.
 - **Yield, don't drop.** Where yielding *is* legitimate (FCC alerts), the alert stays queued and retries — `drainQueue` gates on `canShowAlert()` *before* dequeuing, retries via `scheduleDrainRetry()`, and is re-driven by `gob:auth-me-loaded` (fires when the blocking modal closes).
 - **Never swallow a click.** `interceptTraining` and `interceptPlayNextGame` only block navigation when an alert *actually shows*; if it can't (yield / scripts not loaded / none eligible) the underlying action proceeds — otherwise Run Training / Play Next Game looks like a dead button.
 - **Resume context is modal-primary only.** Hub, glow, and direct links never call `stashAlertResume`; those entries keep **Next up** + **Back To Tutorial Home**.
@@ -150,8 +160,9 @@ Lesson-completion (`seen`) stays **local** (`GOB.isSeen`); dismissal is **server
 
 **Bug history**
 - 2026-06-08: Run Training was a hard no-op when an alert yielded (`interceptTraining` returned "blocked" unconditionally); fixed by only blocking when a modal actually shows.
-- 2026-06-09: Player Attributes never appeared on mode-select. Root cause: `shouldYieldToOtherModals` yielded whenever `archetype_reveal_seen === false`, but the archetype-reveal modal only mounts on FCC — so on mode-select a new user (reveal not yet seen) yielded against a blocker that could never clear. Fixed by scoping the yield to FCC only.
-- 2026-06-09 (sweep): Same bug class hit **training / team-attributes / playbooks** on FCC. The reveal only renders when `lead_archetype` is set (≥1 real game), but the yield fired on `archetype_reveal_seen === false` alone — so the early-franchise alerts (which fire *before* the first game) yielded against a reveal that couldn't appear. Fixed: yield to the reveal only when `archetype_reveal_seen === false && lead_archetype` (mirrors `archetypeReveal.maybeShow`). Also bounded the drain-retry and made it re-pull `/api/auth/me` (blocker modals PATCH the server but don't refresh our cache), so legitimate yields resolve instead of spinning on stale state. scouting/recruiting were already safe (fire post-game, reveal already seen).
+- 2026-06-09: Player Attributes never appeared on mode-select. Root cause: yield gate scoped incorrectly. Fixed by scoping yield to FCC; Player Attributes later moved to Run Training intercept (2026-06-14).
+- 2026-06-09 (sweep): Same bug class hit **training / team-attributes / playbooks** on FCC. The reveal only renders when `lead_archetype` is set (≥1 real game), but the yield fired on `archetype_reveal_seen === false` alone — so the early-franchise alerts (which fire *before* the first game) yielded against a reveal that couldn't appear. Fixed: yield to the reveal only when `archetype_reveal_seen === false && lead_archetype` (mirrors `archetypeReveal.maybeShow`). Also bounded the drain-retry and made it re-pull `/api/auth/me` (blocker modals PATCH the server but don't refresh our cache), so legitimate yields resolve instead of spinning on stale state.
 - 2026-06-09: Team Attributes (and post-game scouting/recruiting) alert missing after training/game. Root cause: `training.js` attaches `return_url` (FCC) to the training-report redirect; training-report's "Go To Locker Room" called `resolveFranchiseLockerRoomUrl({ extraParams: { tut_alert: … } })`, but that helper returned `return_url` **without** merging `extraParams` — so `tut_alert` never reached the FCC and `processFccReturn` never ran. Fixed: merge `extraParams` into a safe `return_url` when both are present (`common.js`).
-- 2026-06-09 (counter): **Scouting (`games≥3`) and Recruiting (`games≥6`) never fired.** `tutorial_alerts_games` was incremented only via `tut_alert=game_complete`, attached solely to box-score's fallback "Go To Locker Room" branch — but franchise games return via the earlier `return_url` branch, which never carries the param. So the counter never left 0, and the FCC only *evaluated* these alerts when the (absent) param was present. The first five alerts were unaffected (none read the `games` counter). Fixed (server-authoritative): increment `tutorial_alerts_games` in `user_game_commit.py` per finalized game, scoped to the enrolled franchise; and `onFccDomReady` now evaluates FCC-return alerts on every load instead of only when a `tut_alert` param is present. Removed the client-side `games` increment + the dead `processFccReturn`.
-- 2026-06-09 (re-show on Later): **Player Attributes modal reappeared after "I'll Do This Later" on mode-select.** Root cause: `onAuthMeLoaded` runs more than once per page (the `gob:auth-me-loaded` event AND authBarInit's explicit `.then(() => onAuthMeLoaded(meData))` with the same `/me` response). `markDismissed` patches dismissal into a *new* `meCache` object (`patchMe` uses `Object.assign` copies), so the original `meData` captured in authBarInit's closure stayed stale; the second call overwrote `meCache` with it, `dismissed()` went false again, and `evaluateAndShow` re-enqueued the alert while the first modal was open (queue dedupe couldn't see it — the first instance was already dequeued; the `showing` gate just held the duplicate). Pressing Later ran `finish()` → `drainQueue()` → the duplicate popped instantly. Fixed: (1) page-local `presented` set in `gobTutorialAlerts.js`, checked in `eligibleIds`/`enqueue`/`drainQueue`, set in `showAlert` — an id can never re-show within a page session regardless of cache state; (2) authBarInit's explicit call now passes live `window.__gobAuthMeData` instead of the stale closure object. Bug class applied to any alert shown between the two `onAuthMeLoaded` calls, not just Player Attributes.
+- 2026-06-09 (counter): **Scouting and Recruiting never fired at old thresholds.** Fixed (server-authoritative): increment `tutorial_alerts_games` in `user_game_commit.py`; evaluate FCC-return alerts on every load. Thresholds updated 2026-06-14 to `games >= 6` / `>= 7`.
+- 2026-06-14: Counter thresholds aligned to curriculum week map (training_returns 0/1/2/4; games 3/6/7). Player Attributes moved from mode-select to first Run Training intercept. Scouting/recruiting pushed to games ≥ 6 / ≥ 7 to avoid alpha-feedback overlap at games ≥ 4.
+- 2026-06-09 (re-show on Later): **Player Attributes modal reappeared after "I'll Do This Later" on mode-select.** Root cause: `onAuthMeLoaded` runs more than once per page (the `gob:auth-me-loaded` event AND authBarInit's explicit `.then(() => onAuthMeLoaded(meData))` with the same `/me` response). `markDismissed` patches dismissal into a *new* `meCache` object (`patchMe` uses `Object.assign` copies), so the original `meData` captured in authBarInit's closure stayed stale; the second call overwrote `meCache` with it, `dismissed()` went false again, and `evaluateAndShow` re-enqueued the alert while the first modal was open (queue dedupe couldn't see it — the first instance was already dequeued; the `showing` gate just held the duplicate). Pressing Later ran `finish()` → `drainQueue()` → the duplicate popped instantly. Fixed: (1) page-local `presented` set in `gobTutorialAlerts.js`, checked in `eligibleIds`/`enqueue`/`drainQueue`, set in `showAlert` — an id can never re-show within a page session regardless of cache state; (2) authBarInit's explicit call now passes live `window.__gobAuthMeData` instead of the stale closure object. Bug class applied to any alert shown between duplicate `onAuthMeLoaded` calls.

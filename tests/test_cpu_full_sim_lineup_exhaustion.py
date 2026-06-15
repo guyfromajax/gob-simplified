@@ -55,19 +55,42 @@ def test_cpu_full_sim_randomly_readmits_fouled_out_player(monkeypatch):
     team, fouled_out = _exhausted_team()
     selected = fouled_out[-1]
     monkeypatch.setattr(main.random, "sample", lambda population, count: [selected])
+    game_state = {
+        "quarter": 4,
+        "time_remaining": 46,
+        "allow_fouled_out_lineup_reentry": True,
+    }
 
     main._ensure_complete_lineup(
         team,
-        {
-            "quarter": 4,
-            "time_remaining": 46,
-            "allow_fouled_out_lineup_reentry": True,
-        },
+        game_state,
     )
 
     assert all(team.lineup.get(pos) is not None for pos in main.POSITION_LIST)
     assert team.lineup["SF"] is selected
     assert team.lineup["SF"].get_stat("F", "game") == 5
+    assert game_state["emergency_fouled_out_lineup_player_ids"] == [
+        selected.player_id
+    ]
+
+
+def test_emergency_readmitted_player_remains_after_additional_foul(monkeypatch):
+    team, fouled_out = _exhausted_team()
+    selected = fouled_out[-1]
+    game_state = {
+        "quarter": 4,
+        "time_remaining": 46,
+        "allow_fouled_out_lineup_reentry": True,
+    }
+    monkeypatch.setattr(main.random, "sample", lambda population, count: [selected])
+    main._ensure_complete_lineup(team, game_state)
+    selected.record_stat("F")
+
+    result = check_and_handle_foul_out(selected, game_state, team)
+
+    assert result["fouled_out"] is False
+    assert result["foul_count"] == 6
+    assert team.lineup["SF"] is selected
 
 
 def test_computer_team_in_user_game_randomly_readmits_fouled_out_player(monkeypatch):

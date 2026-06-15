@@ -7,7 +7,10 @@ from BackEnd.constants import POSITION_LIST, PLAYCALLS, BOX_SCORE_KEYS
 from copy import deepcopy
 import random
 
-from BackEnd.utils.shared import sync_lineup_coords_from_turn
+from BackEnd.utils.shared import (
+    resolve_game_player_reference,
+    sync_lineup_coords_from_turn,
+)
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
     build_phase_post_stopper_snapshot,
@@ -392,11 +395,25 @@ class GameManager:
             str(pid)
             for pid in (self.game_state.get("locked_exhausted_lineup_player_ids") or [])
         }
+        emergency_player_ids = {
+            str(pid)
+            for pid in (
+                self.game_state.get("emergency_fouled_out_lineup_player_ids") or []
+            )
+        }
         for team in [self.home_team, self.away_team]:
+            allow_emergency_reentry = bool(
+                self.game_state.get("allow_fouled_out_lineup_reentry")
+                or not getattr(team, "is_user_team", False)
+            )
+            exempt_player_ids = (
+                locked_player_ids
+                | (emergency_player_ids if allow_emergency_reentry else set())
+            )
             for player in (team.lineup or {}).values():
                 if not player:
                     continue
-                if str(getattr(player, "player_id", "")) in locked_player_ids:
+                if str(getattr(player, "player_id", "")) in exempt_player_ids:
                     continue
                 foul_count = (player.get_stat("F", "game") or 0) if hasattr(player, "get_stat") else 0
                 if foul_count >= 5:
@@ -411,12 +428,35 @@ class GameManager:
                     result["foul_count"] = foul_out_info.get("foul_count", foul_count)
                     next_play_type = result.get("next_play_type", "SIDE_INBOUND")
                     is_defensive = team == self.defense_team
+                    existing_context = self.game_state.get("foul_out_context") or {}
+                    shooter = None
+                    if next_play_type == "FREE_THROW":
+                        shooter_references = (
+                            existing_context.get("shooter"),
+                            self.game_state.get("shooter"),
+                            self.game_state.get("last_ball_handler"),
+                            result.get("shooter_id"),
+                            result.get("shooter"),
+                        )
+                        for reference in shooter_references:
+                            shooter = resolve_game_player_reference(self, reference)
+                            if shooter is not None:
+                                break
                     self.game_state["foul_out_context"] = {
-                        "foul_type": "DEFENSIVE" if is_defensive else "OFFENSIVE",
-                        "is_shooting_foul": False,
-                        "is_bonus": team.team_fouls >= 5 if is_defensive else False,
+                        "foul_type": existing_context.get(
+                            "foul_type",
+                            "DEFENSIVE" if is_defensive else "OFFENSIVE",
+                        ),
+                        "is_shooting_foul": existing_context.get(
+                            "is_shooting_foul",
+                            False,
+                        ),
+                        "is_bonus": existing_context.get(
+                            "is_bonus",
+                            team.team_fouls >= 5 if is_defensive else False,
+                        ),
                         "next_play_type": next_play_type,
-                        "shooter": result.get("shooter") if next_play_type == "FREE_THROW" else None,
+                        "shooter": shooter,
                     }
                     logging.info(
                         f"✅ FOUL OUT (end-of-turn check): {foul_out_info.get('foul_player_name', 'Unknown')} "

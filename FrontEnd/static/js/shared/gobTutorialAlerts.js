@@ -67,11 +67,11 @@
   }
 
   var BODIES = {
-    'player-attributes': 'Nice work, Coach. Before you start your first franchise, get to know Player Attributes — they\'re the foundation for every decision ahead.',
-    'training': 'You\'re about to run training for the first time, Coach. Take a minute with the Training tutorial first.',
+    'player-attributes': 'Hey Coach, you\'re about to run training for the first time, and this will impact your players\' attributes. We suggest you read the Player Attributes tutorial first — player attributes are the core of the game and will impact everything moving forward.',
+    'training': 'You\'re about to run training. Take a minute with the Training tutorial first.',
     'team-attributes': 'You just evolved some of your team\'s attributes, Coach. The Team Attributes tutorial breaks down the impact of those changes.',
-    'game-plans': 'Your first game is next, Coach. Run through the Game Plan tutorial before you tip off.',
-    'playbooks': 'Hey Coach, we think you\'re ready for the Playbooks tutorial.',
+    'game-plans': 'You\'re about to tip off for a big game, Coach. Run through the Game Plan tutorial before the game begins for a few extra pointers.',
+    'playbooks': 'Hey Coach, we think you\'re ready for the Playbooks tutorial. Playbooks add a deeper level of control and coaching customization.',
     'scouting': 'You\'ve seen the Scouting Report tab by now, Coach. The Scouting tutorial covers how to read it and turn it into an edge.'
   };
 
@@ -195,7 +195,7 @@
   }
 
   function recruitingBody(games) {
-    var n = parseInt(games, 10) || 6;
+    var n = parseInt(games, 10) || 0;
     return n + ' games in, Coach. Time to get smart on Recruiting — it\'s how you build your program for the long haul.';
   }
 
@@ -210,9 +210,8 @@
     var me = meCache || window.__gobAuthMeData;
     if (!me) return false;
     /* These modals (archetype reveal, alpha feedback) only ever mount on the
-       FCC. On any other screen — notably mode-select, where Player Attributes
-       fires — there is nothing to yield to, and yielding here would defer the
-       alert against a blocker that can never clear. Only gate on FCC. */
+       FCC. Player Attributes fires via Run Training on the FCC; yielding only
+       applies on FCC loads where those blockers can appear. */
     if (!isFcc()) return false;
     /* Only yield to the archetype reveal if it will ACTUALLY render this visit:
        it requires a lead_archetype (>= 1 real game) — see archetypeReveal.js.
@@ -230,10 +229,6 @@
     return false;
   }
 
-  function isModeSelect() {
-    return /\/mode-select\.html$/i.test(window.location.pathname || '');
-  }
-
   function isFcc() {
     return (window.location.pathname || '').indexOf('franchise-command-center') !== -1;
   }
@@ -246,7 +241,6 @@
   }
 
   function defaultReturnUrl(id) {
-    if (id === 'player-attributes') return '/mode-select.html';
     if (isFcc()) return currentRelativeReturnUrl();
     return window.location.pathname + window.location.search + (window.location.hash || '');
   }
@@ -315,18 +309,19 @@
       if (presented[id] || dismissed(id)) return;
 
       if (id === 'player-attributes') {
-        if (opts.checkPlayerAttributes && meCache && meCache.fte_v2_complete && isModeSelect()) out.push(id);
+        if (opts.checkTrainingClick && trainingReturns === 0 && meCache && meCache.fte_v2_complete) out.push(id);
         return;
       }
 
       if (!franchiseId || !franchiseLocked(franchiseId)) return;
 
-      if (id === 'training' && opts.checkTrainingClick) out.push(id);
-      if (id === 'game-plans' && opts.checkPlayNextGame) out.push(id);
-      if (id === 'team-attributes' && opts.checkFccReturn && trainingReturns >= 1) out.push(id);
-      if (id === 'playbooks' && opts.checkFccReturn && trainingReturns >= 2) out.push(id);
-      if (id === 'scouting' && opts.checkFccReturn && games >= 3) out.push(id);
-      if (id === 'recruiting' && opts.checkFccReturn && games >= 6) out.push(id);
+      /* Counter thresholds match curriculum week numbers (see Tutorial_Alerts_System.md). */
+      if (id === 'training' && opts.checkTrainingClick && trainingReturns >= 1) out.push(id);
+      if (id === 'game-plans' && opts.checkPlayNextGame && games >= 3) out.push(id);
+      if (id === 'team-attributes' && opts.checkFccReturn && trainingReturns >= 2) out.push(id);
+      if (id === 'playbooks' && opts.checkFccReturn && trainingReturns >= 4) out.push(id);
+      if (id === 'scouting' && opts.checkFccReturn && games >= 6) out.push(id);
+      if (id === 'recruiting' && opts.checkFccReturn && games >= 7) out.push(id);
     });
 
     return out;
@@ -500,10 +495,6 @@
   function onAuthMeLoaded(me) {
     meCache = me || window.__gobAuthMeData || null;
     applyNavGlow();
-
-    if (meCache && meCache.fte_v2_complete && isModeSelect()) {
-      evaluateAndShow({ checkPlayerAttributes: true });
-    }
 
     /* A fresh auth-me usually means a blocking modal (archetype reveal / alpha
        feedback) just resolved — retry any alert deferred by the yield gate. */

@@ -67,6 +67,17 @@ def test_missing_shooter_returns_400():
     assert excinfo.value.status_code == 400
 
 
+def test_string_shooter_reference_resolves_to_unique_live_player():
+    game, shooter = _setup_game(one_and_one=False)
+    game.game_state["shooter"] = shooter.name
+    game.game_state["last_ball_handler"] = None
+
+    result = resolve_free_throw_logic(game)
+
+    assert result["shooter"] is shooter
+    assert game.game_state["shooter"] is shooter
+
+
 def test_free_throw_animation_empty_offense_lineup():
     game = build_mock_game()
     shooter = game.offense_team.lineup["PG"]

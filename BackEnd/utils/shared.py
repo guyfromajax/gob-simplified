@@ -1431,6 +1431,65 @@ def get_name_safe(p):
         return p.get("name", "")
     return getattr(p, "name", "")
 
+
+def resolve_game_player_reference(game, reference):
+    """Resolve a Player-like reference without guessing between duplicate names."""
+    if reference is None:
+        return None
+    if hasattr(reference, "attributes") and hasattr(reference, "record_stat"):
+        return reference
+
+    reference_id = None
+    reference_name = None
+    if isinstance(reference, dict):
+        reference_id = reference.get("player_id") or reference.get("playerId") or reference.get("_id")
+        reference_name = reference.get("name")
+    elif isinstance(reference, str):
+        reference_id = reference
+        reference_name = reference
+    else:
+        reference_id = getattr(reference, "player_id", None)
+        reference_name = getattr(reference, "name", None)
+
+    candidates = []
+    seen = set()
+    for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
+        if team is None:
+            continue
+        players = []
+        if hasattr(team, "get_all_players"):
+            players.extend(team.get_all_players() or [])
+        players.extend((getattr(team, "lineup", None) or {}).values())
+        for player in players:
+            if player is None:
+                continue
+            key = id(player)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(player)
+
+    if reference_id is not None:
+        id_matches = [
+            player
+            for player in candidates
+            if str(getattr(player, "player_id", "")) == str(reference_id)
+        ]
+        if len(id_matches) == 1:
+            return id_matches[0]
+
+    if reference_name:
+        name_matches = [
+            player
+            for player in candidates
+            if getattr(player, "name", None) == reference_name
+        ]
+        if len(name_matches) == 1:
+            return name_matches[0]
+
+    return None
+
+
 def default_rebounder_dict():
     return {
         "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},

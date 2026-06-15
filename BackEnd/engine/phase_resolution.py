@@ -38,6 +38,7 @@ from BackEnd.utils.shared import (
     FREE_THROW_REBOUND_MAX_X_DELTA,
     apply_coords_from_animations_list,
     get_away_player_coords,
+    resolve_game_player_reference,
 )
 from BackEnd.utils.position_snapshot_ledger import (
     attach_position_snapshots,
@@ -264,7 +265,21 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
         str(pid)
         for pid in ((game_state or {}).get("locked_exhausted_lineup_player_ids") or [])
     }
-    if str(getattr(foul_player, "player_id", "")) in locked_player_ids:
+    emergency_player_ids = {
+        str(pid)
+        for pid in (
+            (game_state or {}).get("emergency_fouled_out_lineup_player_ids") or []
+        )
+    }
+    allow_emergency_reentry = bool(
+        (game_state and game_state.get("allow_fouled_out_lineup_reentry"))
+        or not getattr(foul_team, "is_user_team", False)
+    )
+    exempt_player_ids = (
+        locked_player_ids
+        | (emergency_player_ids if allow_emergency_reentry else set())
+    )
+    if str(getattr(foul_player, "player_id", "")) in exempt_player_ids:
         return {"fouled_out": False, "foul_count": foul_count}
     fouled_out = foul_count >= 5
     
@@ -2183,9 +2198,14 @@ def resolve_fast_break_logic(game: "GameManager"):
 
 def resolve_free_throw_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    shooter = game_state.get("shooter") or game_state.get("last_ball_handler")
+    shooter_reference = game_state.get("shooter") or game_state.get("last_ball_handler")
+    shooter = resolve_game_player_reference(game, shooter_reference)
     if shooter is None:
-        raise HTTPException(status_code=400, detail="No shooter set for free throw")
+        raise HTTPException(
+            status_code=400,
+            detail="Free throw shooter could not be resolved to a player",
+        )
+    game_state["shooter"] = shooter
     attrs = shooter.attributes
 
     # FT outcome calculation

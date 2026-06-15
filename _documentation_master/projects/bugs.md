@@ -13,6 +13,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 18. Final Turn perfection (Run clock to 0:00 for Final Shot), airhorn on ending
 48. Double block announce on Final Shot
 49. No OREB putback attempts on missed final shot
+50. Consistently sound airhorn at EOQ
 
 ##Micro Movements
 9. Dunks! I need DUNKS!
@@ -33,6 +34,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 62. Leaderboard -- change Rank to Titles
 11. More action in on Signing Day
 22. User account -- link X & Facebook?
+23. Other players move on motion drives to the basket
 
 ##Full Product Readiness
 100. Press & Trap Plays
@@ -54,9 +56,18 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
 4. Add recruits to roster after recruiting
+5. Recruits + Practice Squad Weekly Games (run during Training)
 
 
 
+
+## Stale FB test suite (found + cleaned up 6-12-26, was not a product bug)
+
+15 tests across 4 FB test files were failing because they asserted **pre-refactor** fast-break behavior (test files last touched Dec 2025–Mar 2026; FB engine rewritten May–Jun 2026): mock players missing the `MIN` stat key, hard-coded coordinates from the old outlet logic, and stale role-plumbing assertions.
+
+**Resolved 6-12-26:** deleted `test_fast_break_comprehensive.py`, `test_fast_break_miss_dreb_flow.py`, `test_fast_break_position_logic.py` (fully red); trimmed the two stale tests from `test_fast_break_outlet_pass.py` (its two edge-case tests still pass and were kept). FB suite is now green.
+
+**Open follow-up [CODE-CLEANUP]:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
 
 ## P0 — HCO contract clock overruns with invalid elapsed time (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
 
@@ -100,7 +111,7 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - **Issue**: All steals are short-circuited to the UESS-migrated `after_steal` resolver early in `resolve_fast_break_logic` (~L1056), which makes the legacy steal-entry movement block later in the same function (~L1195–1360) unreachable dead code. The `STEAL_ENTRY_MOVE_*` / `STEAL_ENTRY_Y_*` constants that block relied on are now unused on the rendered path in both `BackEnd/constants/fast_break_constants.py` and `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`.
 - **Impact**: Low — unreachable code + orphaned constants. No runtime effect, just bloat/confusion for anyone reading the FB resolver.
 - **Action**: Delete the unreachable steal-entry block in `resolve_fast_break_logic` and remove the unused `STEAL_ENTRY_*` constants from both the backend and frontend constants files. Verify nothing on the live `after_steal` path references those constants before removing.
-- **Priority**: Low (dead code)
+- **Priority**: Low (dead code; tie in with the FB-coverage follow-up noted in the "Stale FB test suite" item above)
 
 ### State Telemetry Violations (Phase 1.3) [CODE-CLEANUP]
 - **Issue**: `game_id` is being read/written to `gameStore` when it should come from URL according to State & Persistence Contract
