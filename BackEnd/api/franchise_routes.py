@@ -8290,6 +8290,59 @@ def _week_1_cut_requirement(
     return {"roster_count": roster_count, "cut_count": cut_count, "cut_required": cut_count > 0}
 
 
+def _maybe_initialize_practice_squad_week_1(
+    franchise_id: ObjectId,
+    franchise_doc: dict[str, Any],
+    *,
+    user_team_object_id: Any,
+    defer_if_user_cut_pending: bool = True,
+) -> dict[str, Any] | None:
+    """
+    Build locked PS rosters after week-1 training camp cuts.
+
+    CPU teams are cut during distant-CPU training; the user assigns their training
+    squad via cut-players. Init is deferred until that assignment when
+    defer_if_user_cut_pending=True (default). When the user roster is already
+    legal (no cut required), init runs immediately from distant-CPU.
+    """
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week != 1:
+        return None
+    if (franchise_doc.get("practice_squad") or {}).get("initialized"):
+        return None
+    training_status = franchise_doc.get("training_status", {}) or {}
+    if not bool(training_status.get("cpu_training_camp_cuts_applied")):
+        return None
+    if defer_if_user_cut_pending:
+        cut_state = _week_1_cut_requirement(franchise_doc, franchise_id, user_team_object_id)
+        if cut_state.get("cut_required"):
+            return None
+
+    from BackEnd.practice_squad.manager import (
+        build_roster_announcement_story,
+        initialize_practice_squad,
+    )
+
+    ps_state = initialize_practice_squad(franchise_id, franchise_doc)
+    roster_story = build_roster_announcement_story(
+        ps_state,
+        franchise_id=str(franchise_id),
+        team_id=str(user_team_object_id) if user_team_object_id else None,
+    )
+    _prepend_season_news_stories(franchise_doc, [roster_story])
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {
+            "$set": {
+                "practice_squad": ps_state,
+                "season_news": franchise_doc.get("season_news") or [],
+            }
+        },
+    )
+    franchise_doc["practice_squad"] = ps_state
+    return ps_state
+
+
 def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str | None = None) -> None:
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
@@ -10144,11 +10197,24 @@ def cut_franchise_players(
         },
     )
 
+    ps_initialized = False
+    if int(franchise_doc.get("week", 1) or 1) == 1:
+        ps_initialized = (
+            _maybe_initialize_practice_squad_week_1(
+                fid,
+                franchise_doc,
+                user_team_object_id=user_team_object_id,
+                defer_if_user_cut_pending=False,
+            )
+            is not None
+        )
+
     return {
         "status": "success",
         "cut_count": required_cut_count,
         "cut_names": cut_names,
         "remaining_roster_count": len(remaining_roster_ids),
+        "practice_squad_initialized": ps_initialized,
     }
 
 
@@ -10588,21 +10654,15 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
     season_news_prepend: list[dict[str, Any]] = []
     camp_done = cuts_ran_this_call or bool(training_status.get("cpu_training_camp_cuts_applied"))
 
-    if week == 1 and camp_done and not (franchise_doc.get("practice_squad") or {}).get("initialized"):
-        from BackEnd.practice_squad.manager import (
-            build_roster_announcement_story,
-            initialize_practice_squad,
+    if camp_done:
+        ps_state = _maybe_initialize_practice_squad_week_1(
+            franchise_id,
+            franchise_doc,
+            user_team_object_id=team_id,
+            defer_if_user_cut_pending=True,
         )
-
-        ps_state = initialize_practice_squad(franchise_id, franchise_doc)
-        ps_fields["practice_squad"] = ps_state
-        franchise_doc["practice_squad"] = ps_state
-        roster_story = build_roster_announcement_story(
-            ps_state,
-            franchise_id=str(franchise_id),
-            team_id=str(team_id),
-        )
-        season_news_prepend.append(roster_story)
+        if ps_state:
+            ps_fields["practice_squad"] = ps_state
 
     if week >= 2 and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
         from BackEnd.practice_squad.manager import run_practice_squad_week

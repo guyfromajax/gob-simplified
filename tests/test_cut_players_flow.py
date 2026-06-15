@@ -39,3 +39,84 @@ def test_week_1_cut_requirement_only_applies_after_training_completed(monkeypatc
 
     assert inactive == {"roster_count": 0, "cut_count": 0, "cut_required": False}
     assert active == {"roster_count": 15, "cut_count": 3, "cut_required": True}
+
+
+def test_maybe_initialize_practice_squad_week_1_defers_when_user_cut_pending(monkeypatch):
+    franchise_id = object()
+    team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    franchise_doc = {
+        "week": 1,
+        "training_status": {"cpu_training_camp_cuts_applied": True, "training_completed": True},
+        "practice_squad": {},
+    }
+
+    class _FakeCollection:
+        def find_one(self, *_args, **_kwargs):
+            return {"players": ["p1"] * 15}
+
+    called = {"init": False}
+
+    def _fake_init(*_args, **_kwargs):
+        called["init"] = True
+        return {"initialized": True}
+
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", _FakeCollection())
+    monkeypatch.setattr(
+        "BackEnd.practice_squad.manager.initialize_practice_squad",
+        _fake_init,
+    )
+
+    result = franchise_routes._maybe_initialize_practice_squad_week_1(
+        franchise_id,
+        franchise_doc,
+        user_team_object_id=team_id,
+        defer_if_user_cut_pending=True,
+    )
+
+    assert result is None
+    assert called["init"] is False
+
+
+def test_maybe_initialize_practice_squad_week_1_runs_after_user_cut(monkeypatch):
+    franchise_id = object()
+    team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    franchise_doc = {
+        "week": 1,
+        "training_status": {"cpu_training_camp_cuts_applied": True, "training_completed": True},
+        "practice_squad": {},
+        "season_news": [],
+    }
+
+    class _FakeCollection:
+        def find_one(self, *_args, **_kwargs):
+            return {"players": ["p1"] * 12}
+
+        def update_one(self, *_args, **_kwargs):
+            return None
+
+    ps_state = {"initialized": True, "teams": {}}
+
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", _FakeCollection())
+    monkeypatch.setattr(
+        franchise_routes.db.franchises,
+        "update_one",
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        "BackEnd.practice_squad.manager.initialize_practice_squad",
+        lambda *_a, **_k: ps_state,
+    )
+    monkeypatch.setattr(
+        "BackEnd.practice_squad.manager.build_roster_announcement_story",
+        lambda *_a, **_k: {"story_id": "ps_rosters", "headline": "PS Rosters"},
+    )
+
+    result = franchise_routes._maybe_initialize_practice_squad_week_1(
+        franchise_id,
+        franchise_doc,
+        user_team_object_id=team_id,
+        defer_if_user_cut_pending=False,
+    )
+
+    assert result == ps_state
+    assert franchise_doc["practice_squad"] == ps_state

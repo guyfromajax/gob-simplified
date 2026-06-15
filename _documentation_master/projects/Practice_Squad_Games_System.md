@@ -12,7 +12,8 @@
 ## Overview
 
 - Runs **weeks 2–19** during `/franchise/run-training/distant-cpu` (after user training + distant CPU training).
-- **Week 1 end:** after Training Camp cuts, build locked rosters (Teams 1–5), schedule, standings; publish **Practice Squad Rosters Announced** news.
+- **Week 1 end:** after Training Camp cuts **and the user's training squad assignment**, build locked rosters (Teams 1–5), schedule, standings; publish **Practice Squad Rosters Announced** news.
+- **Init timing:** CPU camp cuts run at distant-CPU training; PS init is **deferred** until `POST /franchise/cut-players` succeeds when the user still has `cut_required`. If the user roster is already legal (no assignment needed), init runs at distant-CPU instead.
 - **No backfill** for franchises mid-season before this feature shipped.
 - Cleared on **season rollover** (`practice_squad` doc field + `ps_season_stats` on FPD/FRD).
 
@@ -53,6 +54,7 @@
 
 | Date | Issue | Fix |
 |---|---|---|
+| 2026-06-14 | User training squad players missing from PS rosters | PS init moved from distant-CPU to after user's `cut-players` assignment so `training_squad_players` is populated first |
 | 2026-06-14 | Season stats table all zeros on PS roster pages | `apply_ps_game_stats` queried games by ObjectId while PS saves string `_id`; added `_load_game_doc` + one-time `backfill_ps_season_stats` |
 
 ## News (`season_news`)
