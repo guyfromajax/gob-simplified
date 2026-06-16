@@ -6,6 +6,11 @@ from unittest.mock import patch
 
 from BackEnd.engine.attack_drive_clearance import (
     _is_in_blast_radius,
+    _perimeter_offense_threshold,
+    _perimeter_defense_threshold,
+    _defender_help_threshold,
+    _compute_drive_scores,
+    READ_THRESHOLD_FLOOR,
     build_attack_drive_sequence,
     build_attack_drive_clearance,
 )
@@ -201,3 +206,35 @@ def test_attack_drive_dish_candidate_uses_nested_coords_from_step():
 
     assert result["attack_drive_meta"]["dish_receiver_pos"] == "PF"
     assert result["steps"][0]["pos_actions"]["PF"]["location"] == "midLane"
+
+
+def test_read_thresholds_use_team_efficiency_and_floor():
+    off_team = SimpleNamespace(
+        team_attributes={"team_chemistry": 7, "offensive_efficiency": -10},
+    )
+    def_team = SimpleNamespace(
+        team_attributes={"team_chemistry": 7, "defensive_efficiency": -10},
+    )
+    assert _perimeter_offense_threshold(off_team) == 150 - (-3)
+    assert _perimeter_defense_threshold(def_team) == 125 - (-3)
+    assert _defender_help_threshold(def_team) == 100 - (-3)
+
+    high_off = SimpleNamespace(
+        team_attributes={"team_chemistry": 200, "offensive_efficiency": 200},
+    )
+    assert _perimeter_offense_threshold(high_off) == READ_THRESHOLD_FLOOR
+
+
+def test_drive_contest_uses_doubled_def_chem_and_efficiency():
+    driver = SimpleNamespace(attributes={"BH": 50, "AG": 50, "IQ": 50, "CH": 50})
+    defender = SimpleNamespace(attributes={"OD": 50, "AG": 50, "IQ": 50, "CH": 50})
+    off_team = SimpleNamespace(team_attributes={"offensive_efficiency": 0, "team_chemistry": 0})
+    def_team = SimpleNamespace(team_attributes={"defensive_efficiency": 5, "team_chemistry": 10})
+
+    with patch("BackEnd.engine.attack_drive_clearance.calculate_ball_handling_score", return_value=100.0), patch(
+        "BackEnd.engine.attack_drive_clearance.calculate_defender_pressure_score",
+        return_value=100.0,
+    ), patch("BackEnd.engine.attack_drive_clearance.random.randint", return_value=1):
+        _, _, offense_wins = _compute_drive_scores(driver, defender, off_team, def_team, "man")
+
+    assert offense_wins is False

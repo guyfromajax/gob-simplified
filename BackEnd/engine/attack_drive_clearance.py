@@ -39,6 +39,11 @@ _BLAST_RADIUS_SPOTS = frozenset(
 _CENTRAL_DRIVE_DESTINATIONS = frozenset({"midLane", "basketSpot"})
 ATTACK_DRIVE_CONTEST_RADIUS = 10.0
 ATTACK_DRIVE_INSIDE_RADIUS = 15.0
+PERIMETER_OFFENSE_READ_BASE = 150
+PERIMETER_DEFENSE_READ_BASE = 125
+HELP_READ_BASE = 100
+READ_THRESHOLD_FLOOR = -3
+DRIVE_CONTEST_DEF_BONUS_MULTIPLIER = 2
 
 _PERIMETER_SPOTS = frozenset(
     {
@@ -255,20 +260,27 @@ def _offensive_positions_from_step(
 
 
 def _perimeter_offense_threshold(off_team: Any) -> int:
-    chem = int((getattr(off_team, "team_attributes", {}) or {}).get("team_chemistry") or 0)
-    return 150 - chem
+    attrs = getattr(off_team, "team_attributes", {}) or {}
+    chem = int(attrs.get("team_chemistry") or 0)
+    off_eff = int(attrs.get("offensive_efficiency") or 0)
+    raw = PERIMETER_OFFENSE_READ_BASE - (chem + off_eff)
+    return max(READ_THRESHOLD_FLOOR, raw)
 
 
 def _perimeter_defense_threshold(def_team: Any) -> int:
-    chem = int((getattr(def_team, "team_attributes", {}) or {}).get("team_chemistry") or 0)
-    return 150 - chem
+    attrs = getattr(def_team, "team_attributes", {}) or {}
+    chem = int(attrs.get("team_chemistry") or 0)
+    def_eff = int(attrs.get("defensive_efficiency") or 0)
+    raw = PERIMETER_DEFENSE_READ_BASE - (chem + def_eff)
+    return max(READ_THRESHOLD_FLOOR, raw)
 
 
 def _defender_help_threshold(def_team: Any) -> int:
     attrs = getattr(def_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
     execution = int(attrs.get("defensive_efficiency") or 0)
-    return 100 - (chem + execution)
+    raw = HELP_READ_BASE - (chem + execution)
+    return max(READ_THRESHOLD_FLOOR, raw)
 
 
 def _reverse_matchups(matchups: Dict[str, str]) -> Dict[str, str]:
@@ -439,7 +451,8 @@ def _compute_drive_scores(
     off_score += off_eff * random.randint(1, 3)
     def_score = float(calculate_defender_pressure_score(defender, defense_playcall))
     def_score += def_eff * random.randint(1, 3)
-    offense_wins = off_score > def_score + def_chem
+    def_bonus = DRIVE_CONTEST_DEF_BONUS_MULTIPLIER * (def_chem + def_eff)
+    offense_wins = off_score > def_score + def_bonus
     return off_score, def_score, offense_wins
 
 

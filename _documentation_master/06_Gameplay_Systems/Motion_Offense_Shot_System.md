@@ -8,6 +8,8 @@
 4. **Attack Drive Geometry** (`BackEnd/engine/attack_drive_clearance.py`):
    - `ATTACK_DRIVE_CONTEST_RADIUS = 10` — guarded / contested (euclidean grid spots)
    - `ATTACK_DRIVE_INSIDE_RADIUS = 15` — dish receiver inside vs outside classification
+   - Read bases / floor: `PERIMETER_OFFENSE_READ_BASE = 150`, `PERIMETER_DEFENSE_READ_BASE = 125`, `HELP_READ_BASE = 100`, `READ_THRESHOLD_FLOOR = -3`
+   - `DRIVE_CONTEST_DEF_BONUS_MULTIPLIER = 2` — defense chemistry + efficiency bonus on drive contest
 5. **Drive Destinations**:
    - **Upper locations** → `["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot"]`
    - **Lower locations** → `["lower lowPost", "lower midPost", "lower bird", "midLane", "basketSpot"]`
@@ -120,7 +122,7 @@ When attack is selected, teammates in the **drive lane** clear on the drive step
 
 **Defensive reactions (clearance layer):**
 - Man: BH defender sticks to drive destination unless beaten by drive contest (below)
-- Double on clearance dish spacer: dish defender **read** (not 50/50): `player_read > 100 - (def_chemistry + defensive_efficiency)`
+- Double on clearance dish spacer: dish defender **read** (not 50/50): `player_read > 100 - (def_chemistry + defensive_efficiency)` (floor **−3**)
 - Help defender: **always evaluated**; same help threshold; rotates to dish spacer or collapse point
 
 ---
@@ -129,7 +131,7 @@ When attack is selected, teammates in the **drive lane** clear on the drive step
 
 During the **same drive step**, perimeter players (key, midWing, wing, midCorner, corner, deep spots) who were **not** already assigned clearance movement execute a read.
 
-**Offense read:** `player_read > 150 - offense_team_chemistry` → `cut` to an **open tangential** spot (single-pass, random player order; vacated spots become open for later players in that pass).
+**Offense read:** `player_read > 150 - (offense_team_chemistry + offensive_efficiency)` (floor **−3**) → `cut` to an **open tangential** spot (single-pass, random player order; vacated spots become open for later players in that pass).
 
 **Tangents:**
 
@@ -146,7 +148,7 @@ During the **same drive step**, perimeter players (key, midWing, wing, midCorner
 
 If no open tangent → player stays put.
 
-**Defender follow:** Defender of a relocating player (man matchup or zone shell assignment) reads `player_read > 150 - defense_team_chemistry` → `cut` to guard new spot. Openness is inferred dynamically at shot time from coords (no explicit flag).
+**Defender follow:** Defender of a relocating player (man matchup or zone shell assignment) reads `player_read > 125 - (defense_team_chemistry + defensive_efficiency)` (floor **−3**) → `cut` to guard new spot. Openness is inferred dynamically at shot time from coords (no explicit flag).
 
 ---
 
@@ -156,7 +158,7 @@ If no open tangent → player stays put.
 
 **Defense drive score:** `calculate_defender_pressure_score(primary_defender, defense_call) + defensive_efficiency × random(1,3)`
 
-**Offense wins:** `offense_score > defense_score + defense_team_chemistry`
+**Offense wins:** `offense_score > defense_score + 2 × (defense_team_chemistry + defensive_efficiency)`
 
 | Outcome | Primary defender |
 |---------|------------------|
@@ -198,6 +200,58 @@ Clearance midLane spacer can also be the driver dish target.
 | `motion_attack_defense_bonus` | +100 defense score when double-teamed driver shoots |
 
 Contest defenders assigned by closest-in-range geometry at shot resolve time (after `apply_coords_from_animations_list`).
+
+### Tuning Reference — Numbers & Read Thresholds
+
+High-level design knobs for attack-drive logic. **Code lives in** `attack_drive_clearance.py` (and `shared.py` for score helpers). Change the doc first, then sync constants in code.
+
+**Read score (all reads):** `player_read = (IQ × 0.8 + CH × 0.2) × random(1, 6)` — pass if **read > threshold**
+
+**Perimeter relocation (offense)**
+- Threshold: **150 − (offense team chemistry + offensive efficiency)**; floor **−3**
+- Pass → cut to open tangential spot (random player order, single pass)
+
+**Perimeter follow (defense)**
+- Threshold: **125 − (defense team chemistry + defensive efficiency)**; floor **−3**
+- Pass → defender cuts to guard relocated offensive player
+
+**Help / double-team read (defense)**
+- Threshold: **100 − (defense chemistry + defensive efficiency)**; floor **−3**
+- Applies to: clearance midLane spacer double, help rotation to collapse point
+- No 50/50 — read gate only
+
+**Drive contest (primary defender stick vs beaten)**
+- Offense score: `calculate_ball_handling_score(driver)` + **offensive efficiency × random(1, 3)**
+  - Ball handling helper: **(BH × 0.5 + AG × 0.2 + IQ × 0.2 + CH × 0.1) × random(1, 6)**
+- Defense score: `calculate_defender_pressure_score(primary)` + **defensive efficiency × random(1, 3)**
+  - Pressure helper: **(OD × 0.3 + AG × 0.3 + IQ × 0.2 + CH × 0.2) × random(1, 6)**; zone × **0.9**
+- Offense wins if: **offense score > defense score + 2 × (defense chemistry + defensive efficiency)**
+- **Defense wins** → primary `guard_ball` at drive destination
+- **Offense wins** → primary `cut` to **halfway** point (start → destination midpoint)
+
+**Geometry (post-drive)**
+- **Contest radius:** 10 euclidean grid spots (defender counts as guarding driver/receiver)
+- **Inside vs outside dish shot:** receiver ≤ **15** euclidean from basket → Inside; else Outside
+
+**Driver shoot vs dish (after geometry count)**
+- **0 defenders** at spot → 100% shoot
+- **1 defender** → **75%** shoot / **25%** dish
+- **2+ defenders** (double team) → **25%** shoot / **75%** dish
+- When dish chosen → **75%** prefer interior target (midLane → lowPost → midPost) / **25%** random teammate
+
+**Shot resolution bonuses (at `resolve_shot`)**
+- Unguarded driver or dish receiver → **99%** make (OREB uncontested path)
+- Double-team + driver shoots → **+100** defense shot score bonus (× **0.2** applied to final shot score)
+- Charge / blocking foul on attack shots → see [`Shot_System.md`](Shot_System.md) (`CHARGE_THRESHOLD` **−240**, `BLOCKING_FOUL_THRESHOLD` **+220**)
+
+**Lane clearance (evac spacing)**
+- Evac x range: home **77–87** / away **13–23**
+- Evac y range: upper half **19–25** / lower half **26–32**
+- Min separation between evac coords: **3** euclidean
+
+**Skeleton timing hints (not animation duration)**
+- Drive → next step: **+300** ms
+- Drive → dish shoot: **+600** ms
 
 ### Execution Flow Details
 
