@@ -4498,9 +4498,10 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         # Reuse Motion offense logic: drive to basket then shoot (two steps, shooter only in those steps)
         valid_destinations = _determine_attack_drive_destination(shot_wing)
         destination = random.choice(valid_destinations) if valid_destinations else "basketSpot"
-        drive_shoot_steps = _create_attack_drive_shoot_steps(
+        drive_result = _create_attack_drive_shoot_steps(
             shooter_pos, shot_wing, destination, timestamp=600, is_away_offense=is_away_offense
         )
+        drive_shoot_steps = drive_result.get("steps", []) if isinstance(drive_result, dict) else drive_result
         skeleton = {"steps": [step0, step1] + drive_shoot_steps}
     else:
         # Outside: shoot at wing (single step 2)

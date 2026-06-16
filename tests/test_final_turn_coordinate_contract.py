@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from BackEnd.engine import phase_resolution
 from BackEnd.engine.skeleton_step_emitter import _variant_flight_end
 from BackEnd.models.turn_manager import TurnManager
 
@@ -99,3 +100,85 @@ def test_final_turn_block_target_uses_backend_display_oriented_bounce_spot():
     assert home == {"x": 84.0, "y": 28.0}
     assert away == {"x": 16.0, "y": 28.0}
     assert away["x"] == 100 - home["x"]
+
+
+def test_final_turn_attack_shot_unwraps_attack_drive_steps(monkeypatch):
+    lineup = {
+        pos: SimpleNamespace(
+            player_id=f"home_{pos}",
+            attributes={
+                "SC": 10 if pos == "PG" else 1,
+                "AG": 10 if pos == "PG" else 1,
+                "SH": 1,
+            },
+        )
+        for pos in POSITIONS
+    }
+    defense_lineup = {
+        pos: SimpleNamespace(player_id=f"away_{pos}", attributes={})
+        for pos in POSITIONS
+    }
+    home = SimpleNamespace(team_id="home", lineup=lineup)
+    away = SimpleNamespace(team_id="away", lineup=defense_lineup)
+    captured = {}
+
+    game = SimpleNamespace(
+        quarter=2,
+        game_state={
+            "defense_playcall": "man",
+            "time_remaining": 7,
+        },
+        home_team=home,
+        away_team=away,
+        offense_team=home,
+        defense_team=away,
+        turn_manager=SimpleNamespace(
+            assign_roles=lambda off_call, def_call, skeleton: captured.setdefault(
+                "roles",
+                {
+                    "shooter": lineup["PG"],
+                    "shooter_pos": "PG",
+                },
+            )
+        ),
+        shot_manager=SimpleNamespace(resolve_shot=lambda roles: {"result_type": "MISS"}),
+    )
+
+    monkeypatch.setattr(
+        "BackEnd.utils.situational_logic.get_score_delta",
+        lambda game: 0,
+    )
+    random_values = iter([0.99, 0, 0, 0, 0, 0, 0])
+    monkeypatch.setattr(random, "random", lambda: next(random_values, 0))
+    monkeypatch.setattr(random, "choice", lambda values: values[0])
+    monkeypatch.setattr(random, "shuffle", lambda values: None)
+    monkeypatch.setattr(
+        phase_resolution,
+        "set_shooter_coords_from_skeleton_last_step",
+        lambda game, skeleton, roles: None,
+    )
+    monkeypatch.setattr(
+        phase_resolution,
+        "build_skeleton_pre_resolve_shot_snapshot",
+        lambda *args, **kwargs: {},
+    )
+    monkeypatch.setattr(
+        phase_resolution,
+        "attach_position_snapshots",
+        lambda *args, **kwargs: None,
+    )
+
+    result = phase_resolution.resolve_final_turn_shot_logic(
+        game,
+        o_destinations={},
+        d_destinations={},
+        position_to_spot={pos: "key" for pos in POSITIONS},
+        bh_pos="PG",
+    )
+
+    assert result["final_turn"] is True
+    assert result["time_elapsed"] == 7
+    assert isinstance(result["skeleton"]["steps"], list)
+    assert len(result["skeleton"]["steps"]) == 4
+    assert result["skeleton"]["steps"][2]["pos_actions"]["PG"]["action"] == "drive"
+    assert result["skeleton"]["steps"][3]["pos_actions"]["PG"]["action"] == "shoot"
