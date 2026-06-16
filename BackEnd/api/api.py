@@ -2145,6 +2145,54 @@ try:
                     # logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
                     pass
     
+    @app.get("/api/game/{game_id}/ft-lock")
+    def get_game_ft_lock(game_id: str):
+        """Free-throw shooter lock state for the Set Lineup screen.
+
+        When the first turn out of the Set Lineup screen is a free throw, the
+        designated shooter must not be removable from the active lineup. The
+        screen calls this on a timeout resume and uses it to lock that player's
+        slot (see Timeout_System.md § Designated Free Throw Shooter Lock).
+
+        Reads the persisted saved doc first (the screen renders before resume
+        applies state), falling back to live GameManager state.
+        """
+        from BackEnd.db import games_collection
+        from bson import ObjectId
+
+        next_is_ft = False
+        shooter_id = None
+
+        doc = games_collection.find_one({"_id": game_id})
+        if not doc:
+            try:
+                doc = games_collection.find_one({"_id": ObjectId(game_id)})
+            except Exception:
+                doc = None
+        if doc:
+            next_is_ft = doc.get("timeout_next_play_type") == "FREE_THROW"
+            shooter_id = doc.get("timeout_shooter_id")
+
+        if not next_is_ft:
+            gm = ongoing_games.get(game_id)
+            if gm is not None:
+                gs = getattr(gm, "game_state", {}) or {}
+                next_is_ft = (
+                    gs.get("offensive_state") == "FREE_THROW"
+                    or gs.get("timeout_next_play_type") == "FREE_THROW"
+                )
+                shooter = gs.get("shooter")
+                shooter_id = (
+                    shooter_id
+                    or getattr(shooter, "player_id", None)
+                    or gs.get("timeout_shooter_id")
+                )
+
+        return {
+            "next_turn_is_free_throw": bool(next_is_ft),
+            "ft_shooter_id": str(shooter_id) if shooter_id else None,
+        }
+
     @app.get("/api/game/{game_id}/playbook-settings")
     def get_game_playbook_settings(game_id: str, team_id: str):
         """

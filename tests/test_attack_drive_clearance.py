@@ -28,13 +28,26 @@ def test_build_clearance_assigns_dish_and_evac():
             "C": {"location": "key", "action": "drift"},
         }
     }
-    off_lineup = {p: SimpleNamespace(player_id=f"off-{p}") for p in ["PG", "SG", "SF", "PF", "C"]}
-    def_lineup = {p: SimpleNamespace(player_id=f"def-{p}", attributes={"IQ": 8, "CH": 8}) for p in ["PG", "SG", "SF", "PF", "C"]}
+    def_lineup = {
+        p: SimpleNamespace(
+            player_id=f"def-{p}",
+            attributes={"IQ": 8, "CH": 8, "OD": 8, "AG": 8, "BH": 8},
+        )
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
+    off_lineup = {
+        p: SimpleNamespace(
+            player_id=f"off-{p}",
+            attributes={"IQ": 8, "CH": 8, "BH": 8, "AG": 8},
+        )
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
     game = SimpleNamespace(
         game_state={"defense_playcall": "man"},
+        offense_team=SimpleNamespace(team_attributes={"team_chemistry": 10, "offensive_efficiency": 5}),
         defense_team=SimpleNamespace(
             is_user_team=False,
-            team_attributes={"team_chemistry": 10},
+            team_attributes={"team_chemistry": 10, "defensive_efficiency": 5},
             strategy_calls={"aggression_call": "normal"},
         ),
     )
@@ -81,13 +94,26 @@ def test_midlane_drive_skips_dish_slot():
             "C": {"location": "lower corner", "action": "drift"},
         }
     }
-    off_lineup = {p: SimpleNamespace(player_id=f"off-{p}") for p in ["PG", "SG", "SF", "PF", "C"]}
-    def_lineup = {p: SimpleNamespace(player_id=f"def-{p}", attributes={"IQ": 5, "CH": 5}) for p in ["PG", "SG", "SF", "PF", "C"]}
+    off_lineup = {
+        p: SimpleNamespace(
+            player_id=f"off-{p}",
+            attributes={"IQ": 8, "CH": 8, "BH": 8, "AG": 8},
+        )
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
+    def_lineup = {
+        p: SimpleNamespace(
+            player_id=f"def-{p}",
+            attributes={"IQ": 5, "CH": 5, "OD": 8, "AG": 8},
+        )
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
     game = SimpleNamespace(
         game_state={"defense_playcall": "2-3 Zone"},
+        offense_team=SimpleNamespace(team_attributes={"team_chemistry": 10, "offensive_efficiency": 5}),
         defense_team=SimpleNamespace(
             is_user_team=False,
-            team_attributes={"team_chemistry": 10},
+            team_attributes={"team_chemistry": 10, "defensive_efficiency": 5},
             strategy_calls={"aggression_call": "normal"},
         ),
     )

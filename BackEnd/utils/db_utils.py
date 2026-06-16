@@ -171,18 +171,41 @@ def _player_slot_rating(player: Player, pos: str) -> float:
 def build_unified_autoset_lineup_from_eligible(
     eligible_players: List[Player],
     team_chemistry: float,
+    force_include_ids: Optional[List[str]] = None,
 ) -> Dict[str, Player]:
     """
     Canonical autoset selection after eligibility + waterfall: shuffle role order,
     then for each fill slot use team-chemistry pool size N: top N by slot rating,
     random if N > 1 else top player.
+
+    ``force_include_ids`` lists player ids that MUST appear in the returned five
+    (e.g. the pending free-throw shooter, who cannot be benched while owed FTs —
+    see Timeout_System.md § Designated Free Throw Shooter Lock). Each forced
+    player is seated into their best-rated open slot first; the remaining slots
+    fill normally.
     """
     pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
     position_order = ["PG", "SG", "SF", "PF", "C"]
     random.shuffle(position_order)
     assigned_ids = set()
     lineup: Dict[str, Player] = {}
+
+    # Seat forced-include players first (FT shooter safeguard).
+    force_set = {str(x) for x in (force_include_ids or [])}
+    if force_set:
+        for p in eligible_players:
+            if str(p.player_id) not in force_set or p.player_id in assigned_ids:
+                continue
+            open_positions = [pos for pos in position_order if pos not in lineup]
+            if not open_positions:
+                break
+            best_pos = max(open_positions, key=lambda pos: _player_slot_rating(p, pos))
+            lineup[best_pos] = p
+            assigned_ids.add(p.player_id)
+
     for fill_idx, pos in enumerate(position_order):
+        if pos in lineup:
+            continue  # pre-seated by force-include
         n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
         available = [p for p in eligible_players if p.player_id not in assigned_ids]
         rated = [(p, _player_slot_rating(p, pos)) for p in available]
@@ -269,6 +292,25 @@ def autoset_lineup_player_ids_from_payload(
     return {pos: pl.player_id for pos, pl in lineup_players.items()}
 
 
+def pending_ft_shooter_id(game_state) -> Optional[str]:
+    """Return the designated free-throw shooter's player id when a free throw
+    is pending, else None. Used to keep that shooter in the active lineup
+    (autoset guard + Set Lineup screen lock). Reads either the live
+    ``game_state['shooter']`` object or the persisted ``timeout_shooter_id``.
+    """
+    if not game_state:
+        return None
+    is_ft = (
+        game_state.get("offensive_state") == "FREE_THROW"
+        or game_state.get("timeout_next_play_type") == "FREE_THROW"
+    )
+    if not is_ft:
+        return None
+    shooter = game_state.get("shooter")
+    sid = getattr(shooter, "player_id", None) or game_state.get("timeout_shooter_id")
+    return str(sid) if sid else None
+
+
 def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> Dict[str, Player]:
     """Build a starting lineup using existing player objects when available.
 
@@ -325,7 +367,18 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
             tc = float(team.team_attributes.get("team_chemistry", 15))
         except (TypeError, ValueError):
             tc = 15.0
-    return build_unified_autoset_lineup_from_eligible(eligible_players, tc)
+
+    # FT shooter safeguard: if a free throw is pending and the designated
+    # shooter is on THIS team, force-include them so autoset can't bench the
+    # player who's about to shoot (Timeout_System.md § Designated FT Shooter Lock).
+    force_include = []
+    shooter_id = pending_ft_shooter_id(game_state)
+    if shooter_id and any(str(p.player_id) == shooter_id for p in eligible_players):
+        force_include = [shooter_id]
+
+    return build_unified_autoset_lineup_from_eligible(
+        eligible_players, tc, force_include_ids=force_include
+    )
 
 
 def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dict[str, Player]:

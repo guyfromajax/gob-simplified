@@ -637,19 +637,57 @@ class ShotManager:
         sx, sy = _shooter_xy_from_roles(roles, shooter)
         bx, by = _attacking_basket_xy(off_team, self.game)
         geometry_has_contest = False
-        for candidate in (def_lineup or {}).values():
-            if candidate is None:
-                continue
-            candidate_x, candidate_y = _player_xy(candidate)
-            if abs(candidate_x - sx) <= CONTEST_DEFENDER_DX_MAX and abs(candidate_y - sy) <= CONTEST_DEFENDER_DY_MAX:
-                geometry_has_contest = True
-                break
-        has_contest = bool(defender or second_defender) if game_state.get("offensive_state") == "HCO" else geometry_has_contest
+        motion_geometry = bool(roles.get("motion_attack_geometry_contest"))
+        motion_uncontested = bool(roles.get("motion_attack_uncontested"))
+        contest_radius = None
+        if motion_geometry:
+            from BackEnd.engine.attack_drive_clearance import ATTACK_DRIVE_CONTEST_RADIUS
+            import math
+            contest_radius = ATTACK_DRIVE_CONTEST_RADIUS
+            contest_pairs: list = []
+            for candidate in (def_lineup or {}).values():
+                if candidate is None:
+                    continue
+                candidate_x, candidate_y = _player_xy(candidate)
+                dist = math.hypot(candidate_x - sx, candidate_y - sy)
+                if dist <= contest_radius:
+                    contest_pairs.append((candidate, dist))
+            contest_pairs.sort(key=lambda pair: pair[1])
+            geometry_has_contest = len(contest_pairs) > 0
+            if contest_pairs:
+                defender = contest_pairs[0][0]
+                roles["defender"] = defender
+                if len(contest_pairs) >= 2:
+                    second_defender = contest_pairs[1][0]
+                    roles["second_defender"] = second_defender
+                else:
+                    second_defender = None
+                    roles.pop("second_defender", None)
+            else:
+                defender = None
+                second_defender = None
+                roles["defender"] = None
+                roles.pop("second_defender", None)
+        else:
+            for candidate in (def_lineup or {}).values():
+                if candidate is None:
+                    continue
+                candidate_x, candidate_y = _player_xy(candidate)
+                if abs(candidate_x - sx) <= CONTEST_DEFENDER_DX_MAX and abs(candidate_y - sy) <= CONTEST_DEFENDER_DY_MAX:
+                    geometry_has_contest = True
+                    break
+        if motion_geometry:
+            has_contest = geometry_has_contest
+        else:
+            has_contest = bool(defender or second_defender) if game_state.get("offensive_state") == "HCO" else geometry_has_contest
+        if motion_uncontested:
+            has_contest = False
         rim_unguarded_99 = (
             _shot_in_rim_box(sx, sy, bx, by)
             and not has_contest
             and shot_type in ("inside", "attack")
             and not is_three
+            and not motion_geometry
         )
 
         # Get shooter location for debug logs
@@ -666,6 +704,35 @@ class ShotManager:
             shot_score = 0
             shot_score_pre_defense = 0
             shot_defense_score_for_sfx = 0
+        elif motion_uncontested:
+            (
+                shot_score,
+                shot_score_pre_defense,
+                shot_defense_score_for_sfx,
+                d_foul,
+                foul_player,
+            ) = self.calculate_shot_score(
+                shooter,
+                passer,
+                screener,
+                None,
+                shot_type,
+                defense_call,
+                is_three,
+                is_paint,
+                None,
+                shooter_location_str,
+                apply_defense=False,
+            )
+            made = random.randint(1, 100) < 100
+            self.game_state["no_defender_shots"] = int(
+                self.game_state.get("no_defender_shots", 0) or 0
+            ) + 1
+            increment_no_defender_shot_breakdown(
+                self.game_state,
+                self.game_state.get("offensive_state"),
+                "motion_attack_drive",
+            )
         else:
             if has_contest and defender:
                 defense_applied_defenders.append(defender)
@@ -697,6 +764,10 @@ class ShotManager:
                 shot_score -= motion_attack_penalty
                 # Clear penalty after use
                 game_state.pop("motion_attack_penalty", None)
+
+            motion_defense_bonus = int(roles.get("motion_attack_defense_bonus") or 0)
+            if motion_defense_bonus > 0 and has_contest:
+                shot_score -= motion_defense_bonus * 0.2
 
             # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y < x
             block_spot = None

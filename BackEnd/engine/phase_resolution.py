@@ -3966,84 +3966,58 @@ def _create_attack_drive_shoot_steps(
     game=None,
 ):
     """
-    Create two steps for attack drive and shoot.
-    Step 1: Player drives to destination (teammates clear lane when applicable)
-    Step 2: Player shoots at destination
-    
-    This two-step approach ensures:
-    - Proper drive animation from start to destination
-    - Correct shot location detection (frontend finds shoot action at destination)
-    - Accurate 3-point detection (uses final location)
-    
-    Args:
-        ball_handler_pos: Position of ball handler (e.g., "PG")
-        start_location: Starting location (e.g., "upper midCorner")
-        destination_location: Drive destination (e.g., "basketSpot")
-        timestamp: Timestamp for first step
-        is_away_offense: Whether away team is on offense (for coordinate flipping)
-        selected_step: Motion skeleton step before drive (for clearance detection)
-        off_lineup: Offensive lineup dict (for clearance + defense metadata)
-        def_lineup: Defensive lineup dict
-        game: GameManager (for matchups / zone / chemistry reads)
-    
-    Returns:
-        list: [drive_step, shoot_step] - Two steps to append to skeleton
+    Create motion attack drive steps: drive (+ clearance/perimeter/contest), then
+    shoot or pass/receive + shoot based on driver decision.
     """
-    final_location = destination_location
-
-    drive_pos_actions = {
-        ball_handler_pos: {
-            "location": final_location,
-            "action": "drive",
-        }
-    }
-    shoot_pos_actions = {
-        ball_handler_pos: {
-            "location": final_location,
-            "action": "shoot",
-        }
-    }
-    attack_drive_meta = {
-        "start_location": start_location,
-        "intended_destination": destination_location,
-        "final_location": final_location,
-        "stopped_short": False,
-        "driver_gate": True,
-        "gate_driver_pos": ball_handler_pos,
-        "defender_overrides": {},
-    }
-
     if (
         selected_step
         and off_lineup
         and def_lineup
         and game is not None
     ):
-        from BackEnd.engine.attack_drive_clearance import build_attack_drive_clearance
+        from BackEnd.engine.attack_drive_clearance import build_attack_drive_sequence
 
-        clearance = build_attack_drive_clearance(
+        result = build_attack_drive_sequence(
             selected_step=selected_step,
             ball_handler_pos=ball_handler_pos,
+            start_location=start_location,
             destination_location=destination_location,
+            timestamp=timestamp,
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             game=game,
             is_away_offense=is_away_offense,
         )
-        drive_pos_actions = clearance["drive_pos_actions"]
-        shoot_pos_actions = clearance["shoot_pos_actions"]
-        attack_drive_meta.update(clearance["attack_drive_meta"])
+        return result
 
+    final_location = destination_location
     drive_step = {
         "timestamp": timestamp,
-        "pos_actions": drive_pos_actions,
+        "pos_actions": {
+            ball_handler_pos: {
+                "location": final_location,
+                "action": "drive",
+            }
+        },
         "events": [],
-        "_attack_drive": dict(attack_drive_meta),
+        "_attack_drive": {
+            "driver_gate": True,
+            "gate_driver_pos": ball_handler_pos,
+            "start_location": start_location,
+            "intended_destination": destination_location,
+            "final_location": final_location,
+            "stopped_short": False,
+            "defender_overrides": {},
+        },
     }
-
     shoot_step = {
         "timestamp": timestamp + 300,
-        "pos_actions": shoot_pos_actions,
+        "pos_actions": {
+            ball_handler_pos: {
+                "location": final_location,
+                "action": "shoot",
+            }
+        },
         "events": [{"type": "shot"}],
         "_attack_drive": {
             "start_location": start_location,
@@ -4052,8 +4026,17 @@ def _create_attack_drive_shoot_steps(
             "stopped_short": False,
         },
     }
-
-    return [drive_step, shoot_step]
+    return {
+        "steps": [drive_step, shoot_step],
+        "shooter": off_lineup.get(ball_handler_pos) if off_lineup else None,
+        "shooter_pos": ball_handler_pos,
+        "shooter_location": final_location,
+        "resolved_shot_type": "attack",
+        "playcall": "Attack",
+        "motion_attack_uncontested": False,
+        "motion_attack_geometry_contest": False,
+        "motion_attack_defense_bonus": 0,
+    }
 
 
 def _apply_attack_penalty(shot_location, is_away_offense):
@@ -4363,8 +4346,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
         valid_destinations = _determine_attack_drive_destination(ball_handler_location)
         destination = random.choice(valid_destinations)
         
-        # Create drive + shoot steps (two steps: drive then shoot)
-        drive_shoot_steps = _create_attack_drive_shoot_steps(
+        drive_result = _create_attack_drive_shoot_steps(
             ball_handler_pos,
             ball_handler_location,
             destination,
@@ -4375,15 +4357,30 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
             def_lineup=def_lineup,
             game=game,
         )
-        new_steps.extend(drive_shoot_steps)
+        new_steps.extend(drive_result["steps"])
         
-        # Get final location from shoot step (second step)
-        shoot_step = drive_shoot_steps[1]  # Second step has the shoot action
-        final_location = shoot_step["_attack_drive"]["final_location"]
-        shooter_location = final_location
+        shooter = drive_result.get("shooter") or ball_handler
+        shooter_pos = drive_result.get("shooter_pos") or ball_handler_pos
+        shooter_location = drive_result.get("shooter_location") or destination
+        selected_shot_type = drive_result.get("resolved_shot_type") or "attack"
+        playcall_override = drive_result.get("playcall")
         
-        # Calculate attack penalty if stopped short
-        attack_penalty = _apply_attack_penalty(final_location, is_away_offense)
+        attack_penalty = _apply_attack_penalty(shooter_location, is_away_offense)
+        _playcall_map = {"inside": "Inside", "outside": "Outside", "attack": "Attack"}
+        skeleton["steps"] = truncated_steps + new_steps
+        
+        return {
+            "skeleton": skeleton,
+            "shooter": shooter,
+            "shooter_pos": shooter_pos,
+            "shooter_location": shooter_location,
+            "shot_type": selected_shot_type,
+            "playcall": playcall_override or _playcall_map.get(selected_shot_type, "Attack"),
+            "attack_penalty": attack_penalty,
+            "motion_attack_uncontested": drive_result.get("motion_attack_uncontested", False),
+            "motion_attack_geometry_contest": drive_result.get("motion_attack_geometry_contest", False),
+            "motion_attack_defense_bonus": drive_result.get("motion_attack_defense_bonus", 0),
+        }
     
     # Phase 7: Append new steps to truncated skeleton
     skeleton["steps"] = truncated_steps + new_steps
@@ -5409,6 +5406,12 @@ def resolve_half_court_offense_logic(game):
             roles["motion_shot_type"] = motion_shot_info["shot_type"]
             roles["motion_playcall"] = motion_shot_info["playcall"]
             roles["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
+            if motion_shot_info.get("motion_attack_geometry_contest"):
+                roles["motion_attack_geometry_contest"] = True
+            if motion_shot_info.get("motion_attack_uncontested"):
+                roles["motion_attack_uncontested"] = True
+            if motion_shot_info.get("motion_attack_defense_bonus"):
+                roles["motion_attack_defense_bonus"] = motion_shot_info["motion_attack_defense_bonus"]
             
             # ✅ FIX: Re-derive passer from modified skeleton (Motion plays add pass/receive steps)
             # Use the same criteria as Set Plays: last pass to shooter within 5 steps, pass/receive in same step

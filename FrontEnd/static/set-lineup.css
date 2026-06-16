@@ -347,6 +347,33 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   background: rgba(247,148,32,0.1);
 }
 
+/* FT shooter lock: player owed free throws can't be removed (reorder still ok).
+   See Timeout_System.md § Designated Free Throw Shooter Lock. */
+.slot.ft-shooter-locked {
+  position: relative;
+  border-style: solid;
+  border-color: rgba(247,148,32,0.6);
+}
+.slot.ft-shooter-locked .remove {
+  display: none !important;
+}
+.ft-shooter-lock-overlay {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 4;
+  pointer-events: none; /* never block drag-to-reorder */
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #07101f;
+  background: linear-gradient(180deg, #F7B500, #F79420);
+  border-radius: 4px;
+  padding: 2px 7px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+
 .slot-pos {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 15px;

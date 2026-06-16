@@ -234,6 +234,25 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 - `FrontEnd/static/set-lineup.js` `renderRoster()` and `renderPlayerView()`: Apply visual indicators
 - `FrontEnd/static/set-lineup.css`: Styles for `.ineligible` class
 
+### Designated Free Throw Shooter Lock (added 2026-06-16)
+
+**Rule:** When the first turn out of the Set Lineup screen is a **free throw**, the designated FT shooter **cannot be removed** from the active lineup. They **can** still be reordered (slid up/down) into different positions.
+
+**Why it can occur on the user's own lineup:** on any foul-out stoppage the user is shown their own Set Lineup screen. If the user's team is the one owed the free throws, their FT shooter is in the active lineup and must not be benched before shooting.
+
+**Designated shooter source:** `pending_ft_shooter_id(game_state)` (`BackEnd/utils/db_utils.py`) — pending when `offensive_state == "FREE_THROW"` or `timeout_next_play_type == "FREE_THROW"`; shooter id from live `game_state["shooter"]` or persisted `timeout_shooter_id`. Covers all pending FTs (shooting, bonus/one-and-one, technical).
+
+**Computer-sim autoset guard:** `build_lineup_from_mongo()` derives the pending FT shooter and passes it as `force_include_ids` to `build_unified_autoset_lineup_from_eligible()`, which seats forced players into their best open slot before normal fill. This also covers the user-pressed Autoset (same `/api/autoset-lineup` → `build_lineup_from_mongo` path).
+
+**Live-game UX lock:** `set-lineup.js` calls `GET /api/game/{game_id}/ft-lock` on timeout resume → `{ next_turn_is_free_throw, ft_shooter_id }`. When active, `updateSlotDisplay()` hides/disables that slot's remove button and renders a `Free Throw Shooter` overlay (`.ft-shooter-lock-overlay`); `clearSlot()` hard-refuses removal as a backstop. The slot stays draggable so reordering (a swap, which keeps the shooter in the lineup) still works; `assignToSlot()` already bails on a filled slot so a bench player can't overwrite the locked shooter.
+
+**Key Files:**
+- `BackEnd/utils/db_utils.py` `pending_ft_shooter_id()`, `build_lineup_from_mongo()`, `build_unified_autoset_lineup_from_eligible(force_include_ids=...)`
+- `BackEnd/api/api.py` `GET /api/game/{game_id}/ft-lock`
+- `FrontEnd/static/set-lineup.js` `loadFtShooterLock()`, `isFtLockedPlayer()`, `updateSlotDisplay()`, `clearSlot()`
+- `FrontEnd/static/set-lineup.css`: `.slot.ft-shooter-locked`, `.ft-shooter-lock-overlay`
+- Autoset algorithm detail: see `Lineup_Selection_Screen.md` § Auto-Set Lineup Feature
+
 ### Possession Flip Logic
 
 **Offensive Fouls:** Possession flips during SIP setup (not during foul resolution)

@@ -1,26 +1,31 @@
-## Motion Offense Shot Resolution System ✅ **COMPLETE** (January 2025)
+## Motion Offense Shot Resolution System ✅ **COMPLETE** (January 2025; attack-drive expansion June 2026)
 
 **Base Constants**
 
 1. **Shot Types**: Inside, Outside, Attack
 2. **Playcall Mapping**: `{"inside": "Inside", "outside": "Outside", "attack": "Attack"}`
-3. **Drive Step Timestamp Offset**: 300ms between drive and shoot steps
-4. **Drive Destinations**:
+3. **Skeleton Timestamp Offsets**: +300ms between drive and next step; +600ms drive → dish shoot (game-clock hints only — UESS emitter uses distance-based step T)
+4. **Attack Drive Geometry** (`BackEnd/engine/attack_drive_clearance.py`):
+   - `ATTACK_DRIVE_CONTEST_RADIUS = 10` — guarded / contested (euclidean grid spots)
+   - `ATTACK_DRIVE_INSIDE_RADIUS = 15` — dish receiver inside vs outside classification
+5. **Drive Destinations**:
    - **Upper locations** → `["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot"]`
    - **Lower locations** → `["lower lowPost", "lower midPost", "lower bird", "midLane", "basketSpot"]`
    - **Central locations** → All destinations (both upper and lower)
-5. **Key Functions**:
-   - `resolve_motion_offense_shot()` - Main shot resolution function
-   - `_create_attack_drive_shoot_steps()` - Creates two-step drive + shoot sequence
-   - `_determine_attack_drive_destination()` - Determines valid drive destinations
-   - `_check_inside_shot_possibility()` - Checks if inside shot is possible
-   - `_check_attack_shot_possibility()` - Checks if attack shot is possible
-   - `_check_outside_shot_possibility()` - Checks if outside shot is possible
-   - `_build_shot_type_weighted_list()` - Builds weighted list for shot type selection
-   - `_apply_attack_penalty()` - Calculates penalty if player stopped short
-6. **Key Files**:
-   - `BackEnd/engine/phase_resolution.py` - Main implementation
-   - `BackEnd/models/animator.py` - Animation processing
+6. **Key Functions**:
+   - `resolve_motion_offense_shot()` — Main shot resolution function
+   - `build_attack_drive_sequence()` — Full HCO attack drive (clearance, perimeter reads, contest, dish/shoot)
+   - `_create_attack_drive_shoot_steps()` — Delegates to `build_attack_drive_sequence()` when `selected_step` + lineups + game are available
+   - `_determine_attack_drive_destination()` — Determines valid drive destinations
+   - `_check_inside_shot_possibility()` / `_check_attack_shot_possibility()` / `_check_outside_shot_possibility()`
+   - `_build_shot_type_weighted_list()` — Builds weighted list for shot type selection
+   - `_apply_attack_penalty()` — Calculates penalty if player stopped short
+7. **Key Files**:
+   - `BackEnd/engine/phase_resolution.py` — Motion shot resolution entry
+   - `BackEnd/engine/attack_drive_clearance.py` — Attack drive logic (backend-only, UESS)
+   - `BackEnd/engine/skeleton_step_emitter.py` — `attack_drive_driver` gate, pass/shoot gates
+   - `BackEnd/models/shot_manager.py` — Motion attack geometry contest + uncontested (OREB rule)
+   - `BackEnd/models/animator.py` — Skeleton → animations; `_attack_drive` defender overrides
 
 **Motion Offense Shot Resolution Flow (8 Steps)**
 
@@ -32,7 +37,7 @@
 6. **Execute Shot**:
    - **Inside**: Ball handler shoots from current location OR passes to inside receiver who shoots
    - **Outside**: Ball handler shoots from current location OR passes to outside receiver who shoots
-   - **Attack**: Create two steps (drive action → shoot action) and append to skeleton
+   - **Attack**: Drive step (all concurrent movement) → shoot **or** pass/receive → shoot (see Attack Drive section)
 7. **Append Steps**: Add new shot steps to truncated skeleton
 8. **Return Results**: Modified skeleton with shot steps, shooter info, shot type, playcall, and attack penalty
 
@@ -66,65 +71,133 @@ Motion offense shots are determined dynamically based on:
 
 3. **Attack Shots:**
    - Ball handler at non-lane spot chooses to drive
-   - **Two-step process** (critical for proper animation):
-     - **Step 1:** `action: "drive"` to destination lane spot
-     - **Step 2:** `action: "shoot"` at destination lane spot
-   - Uses `playcall = "Attack"` for shot calculation
-   - **Note:** Two-step approach ensures proper drive animation and accurate shot location detection
+   - **HCO motion path** (when `selected_step` + lineups available): full drive sequence via `build_attack_drive_sequence()`
+   - **Shoot path:** drive step → shoot step (+300ms skeleton offset)
+   - **Dish path:** drive step → pass/receive step (+300ms) → shoot step (+600ms)
+   - Driver shoot uses `playcall = "Attack"`; dish to interior receiver may resolve as **Inside**; dish to perimeter resolves as **Outside**
+   - **Final Turn:** unchanged fallback (simple drive → shoot, no expansion)
 
 ### Attack Drive Implementation
 
-**Function:** `_create_attack_drive_shoot_steps()`
+**Primary function:** `build_attack_drive_sequence()` in `BackEnd/engine/attack_drive_clearance.py`
 
-**Returns:** List of two steps `[drive_step, shoot_step]`
+**Entry:** `_create_attack_drive_shoot_steps()` in `phase_resolution.py` delegates when HCO motion context is available.
 
-**Drive Step:**
-```python
-{
-    "timestamp": timestamp,
-    "pos_actions": {
-        ball_handler_pos: {
-            "location": destination_location,  # e.g., "basketSpot"
-            "action": "drive"
-        }
-    },
-    "events": []
-}
-```
+**UESS contract:** All logic backend-only. One drive step holds all concurrent offensive/defensive movement. Step T is distance-based via `skeleton_step_emitter` (`attack_drive_driver` gate on drive; `shooter` gate on shoot; pass step gates on ball arrival). Skeleton `timestamp` offsets are game-clock ordering hints, not animation pause durations.
 
-**Shoot Step:**
-```python
-{
-    "timestamp": timestamp + 300,
-    "pos_actions": {
-        ball_handler_pos: {
-            "location": destination_location,  # Same as drive step
-            "action": "shoot"
-        }
-    },
-    "events": [{"type": "shot"}],
-    "_attack_drive": {
-        "start_location": start_location,
-        "intended_destination": destination_location,
-        "final_location": final_location,
-        "stopped_short": False
-    }
-}
-```
+**Step outcomes:**
 
-**Why Two Steps?**
+| Path | Steps | Notes |
+|------|-------|-------|
+| Driver shoots | `[drive, shoot]` | All 5 offense on drive step; shoot step everyone stationary except shooter |
+| Driver dishes | `[drive, pass/receive, shoot]` | Pass + receive same step; receiver shoots on step 3 |
 
-1. **Proper Animation:** Frontend animator needs separate `drive` action to create movement animation from start → destination
-2. **Accurate Shot Location:** Frontend shot detection finds `shoot` action at final location (not start location)
-3. **3-Point Detection:** Shot location detection uses final step's location, ensuring correct 3-point classification
-4. **Visual Clarity:** Users see the drive animation before the shot, making the play more realistic
+**Drive step metadata (`_attack_drive` on drive step):**
+- `driver_gate: True`, `gate_driver_pos` — emitter gates step T on driver arrival
+- `defender_overrides` — man/zone reactions (contest, help, double, perimeter follow, beaten primary)
+- `dish_receiver_pos` — clearance midLane spacer (spacing, not driver dish)
+- `double_team`, `help_read_success`, `drive_offense_wins`, `defender_count`, `driver_shoots`, `dish_target_pos`
 
-**Drive Destinations:**
+**Drive Destinations** (unchanged):
 
 Based on starting location:
 - **Upper locations** → `["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot"]`
 - **Lower locations** → `["lower lowPost", "lower midPost", "lower bird", "midLane", "basketSpot"]`
 - **Central locations** → All destinations (both upper and lower)
+
+---
+
+### Attack Drive — Lane Clearance (blast radius)
+
+When attack is selected, teammates in the **drive lane** clear on the drive step before the driver arrives.
+
+**Blast radius:** Same-half `lowPost`, `midPost`, `bird` spots; destination spot itself; central destinations (`midLane`, `basketSpot`) only block a teammate **on** the destination.
+
+**Offensive reactions:**
+- One in-way teammate (closest x to basket; random tie-break) → `cut` to **midLane** if destination ≠ midLane
+- Others in blast radius → **evac** coords (home x 77–87 / away x 13–23; y opposite vertical half; ≥3 euclidean separation)
+- Driver → `drive`; everyone else not moving → `stationary`
+
+**Defensive reactions (clearance layer):**
+- Man: BH defender sticks to drive destination unless beaten by drive contest (below)
+- Double on clearance dish spacer: dish defender **read** (not 50/50): `player_read > 100 - (def_chemistry + defensive_efficiency)`
+- Help defender: **always evaluated**; same help threshold; rotates to dish spacer or collapse point
+
+---
+
+### Attack Drive — Perimeter Relocation Reads
+
+During the **same drive step**, perimeter players (key, midWing, wing, midCorner, corner, deep spots) who were **not** already assigned clearance movement execute a read.
+
+**Offense read:** `player_read > 150 - offense_team_chemistry` → `cut` to an **open tangential** spot (single-pass, random player order; vacated spots become open for later players in that pass).
+
+**Tangents:**
+
+| Spot | Open tangents |
+|------|----------------|
+| key | upper midWing, lower midWing |
+| midWing | key or wing (same vertical half) |
+| wing | midWing or midCorner (same half) |
+| midCorner | wing or corner (same half) |
+| corner | midCorner (same half) |
+| deep key | key, upper midWing, lower midWing |
+| deep wing | key, wing, midWing (same half) |
+| deep baseline | corner, midCorner, wing (same half) |
+
+If no open tangent → player stays put.
+
+**Defender follow:** Defender of a relocating player (man matchup or zone shell assignment) reads `player_read > 150 - defense_team_chemistry` → `cut` to guard new spot. Openness is inferred dynamically at shot time from coords (no explicit flag).
+
+---
+
+### Attack Drive — Drive Contest
+
+**Offense drive score:** `calculate_ball_handling_score(driver) + offensive_efficiency × random(1,3)`
+
+**Defense drive score:** `calculate_defender_pressure_score(primary_defender, defense_call) + defensive_efficiency × random(1,3)`
+
+**Offense wins:** `offense_score > defense_score + defense_team_chemistry`
+
+| Outcome | Primary defender |
+|---------|------------------|
+| Offense wins | `cut` to halfway grid point between driver start and drive destination |
+| Defense wins | `guard_ball` at drive destination |
+
+---
+
+### Attack Drive — Driver Decision (post-drive geometry)
+
+After all drive-step movement is resolved, count defenders whose **end coords** are within **10 euclidean grid spots** of the driver at the destination. Any defender counts.
+
+| Defenders at spot | Shoot / dish odds | Shot resolution |
+|-------------------|-------------------|-----------------|
+| 0 (unguarded) | Always shoot | OREB uncontested rule (`apply_defense=False`, 99% make) |
+| 1 | 75% shoot / 25% dish | Contested `calculate_shot_score` when shooting |
+| 2+ (double team) | 25% shoot / 75% dish | If shoot: **+100 defense shot score bonus** (×0.2 impact on final score) |
+
+**Dish target selection** (when dish chosen):
+1. 75% branch — interior priority after drive completes: **midLane** → random **lowPost** → random **midPost** (one preferred interior target)
+2. 25% branch — random teammate except driver
+
+Clearance midLane spacer can also be the driver dish target.
+
+**Dish shot type:** Inside if receiver end coord ≤ **15 euclidean** from attacking basket; else Outside. Updates `shot_type` / `playcall` returned from `resolve_motion_offense_shot()`.
+
+**Unguarded dish receiver:** OREB uncontested rule (same as unguarded driver shoot).
+
+---
+
+### Attack Drive — Shot Resolution Flags
+
+`resolve_motion_offense_shot()` returns and `resolve_hco_outcome()` stamps on `roles`:
+
+| Flag | Purpose |
+|------|---------|
+| `motion_attack_geometry_contest` | Use euclidean ≤10 contest (not role-based HCO contest) |
+| `motion_attack_uncontested` | OREB 99% make path in `shot_manager.resolve_shot()` |
+| `motion_attack_defense_bonus` | +100 defense score when double-teamed driver shoots |
+
+Contest defenders assigned by closest-in-range geometry at shot resolve time (after `apply_coords_from_animations_list`).
 
 ### Execution Flow Details
 
@@ -179,11 +252,11 @@ Based on starting location:
 **Attack Shot Execution:**
 - Determine valid drive destinations using `_determine_attack_drive_destination(ball_handler_location)`
 - Randomly select destination from valid destinations
-- Create two steps using `_create_attack_drive_shoot_steps()`:
-  - Drive step: Player moves to destination with `action: "drive"`
-  - Shoot step: Player shoots at destination with `action: "shoot"` (300ms later)
-- Calculate attack penalty using `_apply_attack_penalty()` if player was stopped short
-- Update shooter location to final destination
+- Call `_create_attack_drive_shoot_steps()` → `build_attack_drive_sequence()` when HCO context available
+- Possible skeleton append: 2 steps (drive + shoot) or 3 steps (drive + pass/receive + shoot)
+- Shooter may change on dish; `shot_type` / `playcall` may become Inside or Outside on dish
+- Calculate attack penalty using `_apply_attack_penalty()` on final shooter location
+- Return motion attack flags for geometry contest / uncontested / double-team defense bonus
 
 **Phase 7: Append Steps**
 - Append all new steps to truncated skeleton
@@ -193,12 +266,9 @@ Based on starting location:
 - Map shot type to playcall: `{"inside": "Inside", "outside": "Outside", "attack": "Attack"}`
 - Return dictionary with:
   - `skeleton`: Modified skeleton with shot steps
-  - `shooter`: Player object who will take the shot
-  - `shooter_pos`: Position of shooter (e.g., "PG", "C")
-  - `shooter_location`: Location where shot will be taken
-  - `shot_type`: "inside", "outside", or "attack"
-  - `playcall`: "Inside", "Outside", or "Attack" (for shot calculation)
-  - `attack_penalty`: Penalty value if attack shot was stopped short (0 otherwise)
+  - `shooter`, `shooter_pos`, `shooter_location`
+  - `shot_type`, `playcall`, `attack_penalty`
+  - **Attack drive only:** `motion_attack_uncontested`, `motion_attack_geometry_contest`, `motion_attack_defense_bonus`
 
 ### Attack Penalty System
 
@@ -212,59 +282,69 @@ Based on starting location:
 - Penalty = `abs(shot_coords["x"] - basket_coords["x"])`
 - Penalty is subtracted from shot score during shot calculation
 
-**Note:** Currently, defensive stop logic is not fully implemented (TODO in code), so `stopped_short` is always `False`. Penalty calculation is prepared for future implementation.
+**Note:** `stopped_short` is not yet implemented; penalty applies to non-ideal shot locations regardless.
 
 ### Integration with Shot Detection
 
 **3-Point Detection:**
-- Uses `shooter_location` from final step (shoot step for attack shots)
+- Uses `shooter_location` from final step (shoot step)
 - Compares location against `THREE_POINT_SPOTS` constant
-- Two-step approach ensures correct location is detected (not start location for attack shots)
+- Dish to perimeter receiver correctly classifies as outside / three-point when applicable
 
 **Shot Calculation:**
-- Uses `playcall` parameter ("Inside", "Outside", "Attack") for shot calculation
-- `playcall` determines which attribute weights to use:
-  - Inside: SC=6, ST=2, IQ=1, CH=1
-  - Attack: SC=5, AG=2, ST=1, IQ=1, CH=1
-  - Outside: SH=8, IQ=1, CH=1
-- Applies attack penalty if `attack_penalty > 0` (subtracted from shot score)
-- Uses base shot calculation (no variant modifier for Motion plays, unlike Set Plays)
+- Uses `playcall` / `motion_shot_type` for attribute weights (Inside / Attack / Outside)
+- Motion attack drives with `motion_attack_geometry_contest`: contest via euclidean ≤10 at resolve time
+- Unguarded motion attack (driver or dish receiver): OREB rule — `apply_defense=False`, 99% make
+- Double-team driver shoot: +100 defense score bonus
+- Applies attack penalty if `attack_penalty > 0`
+- No variant modifier for Motion plays (unlike Set Plays)
+
+See also: [`Shot_System.md`](Shot_System.md) for general shot resolution; uncontested paths documented there.
 
 ### Key Files
 
 **Backend:**
-- `BackEnd/engine/phase_resolution.py` (line numbers approximate; verified present 2026-06-13)
-  - `resolve_motion_offense_shot()` (~line 4142) - Main shot resolution function
-  - `_create_attack_drive_shoot_steps()` (~line 3937) - Creates drive + shoot steps
-  - `_determine_attack_drive_destination()` (~line 3874) - Determines valid drive destinations
-  - `_check_inside_shot_possibility()` (~line 3696) - Checks if inside shot is possible
-  - `_check_attack_shot_possibility()` (~line 3739) - Checks if attack shot is possible
-  - `_check_outside_shot_possibility()` (~line 3747) - Checks if outside shot is possible
-  - `_build_shot_type_weighted_list()` (~line 3771) - Builds weighted list for shot type selection
-  - `_apply_attack_penalty()` (~line 4000) - Calculates penalty if stopped short
-  - `_create_pass_receive_step()` (~line 3895) - Creates pass/receive step
-  - `_create_shoot_step()` (~line 3918) - Creates shoot step
-- Attribute weights live in `BackEnd/constants/__init__.py` → `PLAYCALL_ATTRIBUTE_WEIGHTS` (Inside/Attack/Outside).
+- `BackEnd/engine/phase_resolution.py`
+  - `resolve_motion_offense_shot()` — Main shot resolution function
+  - `_create_attack_drive_shoot_steps()` — Delegates to attack drive sequence builder
+  - `_determine_attack_drive_destination()`, `_check_*_shot_possibility()`, `_build_shot_type_weighted_list()`, `_apply_attack_penalty()`
+  - `_create_pass_receive_step()`, `_create_shoot_step()`
+- `BackEnd/engine/attack_drive_clearance.py` ✅ **June 2026**
+  - `build_attack_drive_sequence()` — Full drive resolver (clearance, perimeter, contest, dish/shoot)
+  - `build_attack_drive_clearance()` — Legacy wrapper returning pos_actions only (tests)
+  - Constants: `ATTACK_DRIVE_CONTEST_RADIUS`, `ATTACK_DRIVE_INSIDE_RADIUS`
+- `BackEnd/engine/skeleton_step_emitter.py` — UESS step emission; `attack_drive_driver` / shooter gates
+- `BackEnd/models/shot_manager.py` — `resolve_shot()` motion attack geometry + uncontested handling
+- `BackEnd/utils/shared.py` — `calculate_ball_handling_score()`, `calculate_defender_pressure_score()`, `player_read()`
+- Attribute weights: `BackEnd/constants/__init__.py` → `PLAYCALL_ATTRIBUTE_WEIGHTS`
 
 **Animation (backend → frontend data):**
-- `BackEnd/models/animator.py` - Converts skeleton steps to animation data
-  - Processes `drive` action to create movement animation
-  - Processes `shoot` action to trigger shot animation
-  - Processes `pass` and `receive` actions for pass animations
+- `BackEnd/models/animator.py` — Skeleton → animations; `_attack_drive_defender_override()` on drive steps
+
+**Tests:**
+- `tests/test_attack_drive_clearance.py`
+
+### UESS Coord Notes (attack drive)
+
+| Step | All 10 end coords |
+|------|-------------------|
+| Drive | 5 offense explicit in `pos_actions`; 5 defense via `defender_overrides` + emitter defaults |
+| Pass/receive | Passer + receiver explicit; others stationary at prior step end (emitter chain) |
+| Shoot | All 5 offense explicit (stationary + shooter) |
+
+Step N+1 `start.coords` = step N `end.coords` per player (emitter). Pass/receive step T is distance-based (ball + movers), not skeleton timestamp.
+
+**QA focus:** Dish turns — verify no teleport at step boundaries; `final_ball_handler_id` correct after pass step.
 
 ### Differences from Set Play Shot Resolution
 
 **Motion Offense:**
 - Shot type determined dynamically during resolution
-- Shot location determined by player positions and strategy settings
+- Attack drives: multi-layer backend logic on single concurrent drive step (HCO only)
 - Uses `base_loop` skeleton (no variants)
 - No variant modifier applied to shot threshold
-- Attack shots use two-step drive + shoot process
 
 **Set Plays:**
 - Shot location predetermined in skeleton
-- Shot type determined from skeleton analysis (location + drive detection)
-- Uses variant skeletons (`successful`, `mid_play_change`, `contested`, `broken`)
-- Variant modifier applied to shot threshold
-- Attack shots detected from skeleton (drive action before shoot action)
-
+- Shot type from skeleton analysis (location + drive detection)
+- Uses variant skeletons and variant modifier on shot threshold

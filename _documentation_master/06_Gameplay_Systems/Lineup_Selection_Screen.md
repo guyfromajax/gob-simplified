@@ -95,6 +95,8 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 ## Auto-Set Lineup Feature
 
+> **FT shooter safeguard:** when a free throw is pending and the designated shooter is on this team, `build_lineup_from_mongo()` force-includes them (`force_include_ids` → seated into their best open slot first) so autoset never benches the player owed free throws. See `Timeout_System.md` § Designated Free Throw Shooter Lock.
+
 **Canonical algorithm (all callers)**
 
 1. **Eligibility:** `is_player_eligible_for_lineup()` + waterfall (relax NG, then quarter foul limits) until ≥5 players qualify. Fouled out (**F ≥ 5**) always excluded.

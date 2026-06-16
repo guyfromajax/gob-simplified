@@ -21,6 +21,27 @@ const awayTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('away'
 const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
+// FT shooter lock: when the first turn out of Set Lineup is a free throw, the
+// designated shooter cannot be removed from the active lineup (reorder still ok).
+// See Timeout_System.md § Designated Free Throw Shooter Lock.
+let ftLockActive = false;
+let ftLockShooterId = null;
+function isFtLockedPlayer(playerId) {
+  return ftLockActive && ftLockShooterId != null && playerId != null
+    && String(playerId) === ftLockShooterId;
+}
+async function loadFtShooterLock() {
+  try {
+    if (!gameId || urlParams.get('resume_from_timeout') !== 'true') return;
+    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}/ft-lock`), { headers: API_CONFIG.getAuthHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.next_turn_is_free_throw && data.ft_shooter_id) {
+      ftLockShooterId = String(data.ft_shooter_id);
+      ftLockActive = true;
+    }
+  } catch (e) { /* non-fatal: lock is a safeguard, never block lineup screen */ }
+}
 const userTeamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('user_team_id', urlParams.get('user_team_id')) : urlParams.get('user_team_id');
 const teamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('team_id', urlParams.get('team_id')) : urlParams.get('team_id');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
@@ -1581,25 +1602,36 @@ function updateSlotDisplay(slot) {
     `;
     
     slotContent.classList.remove('empty');
-    
-    // Show remove button
+
+    // Show remove button — unless this player is the locked FT shooter, who
+    // cannot be removed (but can still be reordered via drag).
+    const ftLocked = isFtLockedPlayer(playerId);
     if (remove) {
-      remove.hidden = false;
+      remove.hidden = ftLocked;
+      remove.disabled = ftLocked;
     }
-    
+    slot.classList.toggle('ft-shooter-locked', ftLocked);
+    if (ftLocked) {
+      const overlay = document.createElement('div');
+      overlay.className = 'ft-shooter-lock-overlay';
+      overlay.textContent = 'Free Throw Shooter';
+      slotContent.appendChild(overlay);
+    }
+
     slot.classList.add('filled');
-    slot.draggable = true;
+    slot.draggable = true;  // reorder remains allowed even when FT-locked
     slot.setAttribute('draggable', 'true');
   } else {
     // Empty slot
     slotContent.innerHTML = '<span class="slot-empty-copy">Drag a player here</span>';
     slotContent.classList.add('empty');
-    
+
     if (remove) {
       remove.hidden = true;
     }
-    
+
     slot.classList.remove('filled');
+    slot.classList.remove('ft-shooter-locked');
     slot.draggable = false;
     slot.setAttribute('draggable', 'false');
   }
@@ -1624,6 +1656,11 @@ function updateAllSlotDisplays() {
 function clearSlot(slot) {
   const pos = slot.dataset.pos;
   const removedId = lineup[pos];
+  // FT shooter safeguard: cannot remove the player owed free throws.
+  if (isFtLockedPlayer(removedId)) {
+    if (typeof showToast === 'function') showToast('Free throw shooter must stay in the lineup');
+    return;
+  }
   delete lineup[pos];
   if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
     rimRunnerPlayerId = null;
@@ -2111,6 +2148,7 @@ async function init() {
     };
   };
   
+  await loadFtShooterLock(); // FT shooter lock state before slots render
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
   refreshLineupAvailabilityDisplay(); // Keep left-side roster/card disabled state in sync with restored lineup
