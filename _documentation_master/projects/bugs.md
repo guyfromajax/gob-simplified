@@ -27,7 +27,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
 
 ##New Features
-44. Customize computer teams more strategically
+44. Customize computer teams Playbooks more strategically
 45. Improve FCC API
 57. Player Momentum System
 60. Universal distance-based rebound helper
@@ -35,6 +35,8 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 11. More action on Signing Day
 22. User account -- link X & Facebook?
 24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
+25. Fast Break and P/T callouts in the Scouting Report
+26. Non-rebounder movment on OREBs
 
 
 ##Full Product Readiness

@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from BackEnd.engine.attack_drive_clearance import (
     _is_in_blast_radius,
+    build_attack_drive_sequence,
     build_attack_drive_clearance,
 )
 
@@ -129,4 +130,74 @@ def test_midlane_drive_skips_dish_slot():
     )
 
     assert result["attack_drive_meta"]["dish_receiver_pos"] is None
-    assert result["drive_pos_actions"]["SG"]["action"] == "cut"
+    assert result["drive_pos_actions"]["PG"]["action"] == "drive"
+    assert result["drive_pos_actions"]["PG"]["location"] == "midLane"
+    assert all(
+        action.get("location") != "midLane"
+        for pos, action in result["drive_pos_actions"].items()
+        if pos != "PG"
+    )
+
+
+def test_attack_drive_dish_candidate_uses_nested_coords_from_step():
+    selected_step = {
+        "timestamp": 5400,
+        "events": [],
+        "pos_actions": {
+            "C": {"action": "stationary", "location": "lower corner"},
+            "PF": {"action": "cut", "location": "lower lowPost"},
+            "PG": {"action": "handle_ball", "location": "lower wing"},
+            "SF": {"action": "stationary", "location": "upper corner"},
+            "SG": {"action": "stationary", "location": "upper wing"},
+        },
+    }
+    off_lineup = {
+        p: SimpleNamespace(
+            player_id=f"off-{p}",
+            attributes={"IQ": 8, "CH": 8, "BH": 8, "AG": 8},
+        )
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
+    def_lineup = {
+        p: SimpleNamespace(
+            player_id=f"def-{p}",
+            attributes={"IQ": 8, "CH": 8, "OD": 8, "AG": 8, "BH": 8},
+        )
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
+    game = SimpleNamespace(
+        game_state={"defense_playcall": "man"},
+        offense_team=SimpleNamespace(
+            team_attributes={"team_chemistry": 10, "offensive_efficiency": 5},
+        ),
+        defense_team=SimpleNamespace(
+            is_user_team=False,
+            team_attributes={"team_chemistry": 10, "defensive_efficiency": 5},
+            strategy_calls={"aggression_call": "normal"},
+        ),
+    )
+
+    with patch(
+        "BackEnd.engine.attack_drive_clearance.get_matchups_for_defending_team",
+        return_value={"PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF", "C": "C"},
+    ), patch(
+        "BackEnd.engine.attack_drive_clearance.random.random",
+        return_value=0.1,
+    ), patch(
+        "BackEnd.engine.attack_drive_clearance.player_read",
+        return_value=200,
+    ):
+        result = build_attack_drive_sequence(
+            selected_step=selected_step,
+            ball_handler_pos="PG",
+            start_location="lower wing",
+            destination_location="lower lowPost",
+            timestamp=5700,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            game=game,
+            is_away_offense=True,
+        )
+
+    assert result["attack_drive_meta"]["dish_receiver_pos"] == "PF"
+    assert result["steps"][0]["pos_actions"]["PF"]["location"] == "midLane"

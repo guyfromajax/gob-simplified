@@ -222,8 +222,12 @@ def _select_clearance_dish_candidate(
         return None
     basket_x = 10.0 if is_away_offense else 90.0
 
+    def coords(c: Dict[str, Any]) -> Dict[str, Any]:
+        nested = c.get("coords")
+        return nested if isinstance(nested, dict) else c
+
     def dist(c: Dict[str, Any]) -> float:
-        return abs(float(c["x"]) - basket_x)
+        return abs(float(coords(c)["x"]) - basket_x)
 
     best = min(dist(c) for c in candidates)
     tied = [c for c in candidates if dist(c) == best]
