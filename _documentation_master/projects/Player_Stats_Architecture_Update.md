@@ -1,6 +1,26 @@
 # Player Stats Architecture Update
 
-> **Status (2026-06-12):** Unimplemented proposal — moved from `03_Data_Persistence/` to `projects/`. Verified against code: no shared franchise player resolver exists, and the inconsistent season-stat reads this doc flags (`season_stats`, `stats.season`, etc.) are still present across ~10 frontend files (`box-score.js`, `rosterStatsRenderer.js`, `franchise-command-center.js`, …). The plan below remains valid future work.
+> **Status (2026-06-16):** Mostly unimplemented — partial groundwork now exists, but every core objective below is still open. The plan remains valid future work. See **Current State** for the code-traced breakdown.
+
+## Current State (2026-06-16, code-traced)
+
+Re-verified against code. Some shared infrastructure has emerged since the 2026-06-12 note (so the earlier "no shared resolver exists" is no longer strictly true), but it's narrow and bypassed, and the season/career naming is still mixed.
+
+| # | Plan item | Status | Evidence |
+|---|-----------|--------|----------|
+| 1 | Canonical franchise player view shape | ❌ Not done | No single contract. `/player` emits `season`/`career` at root; `/franchise/roster` emits no stats; `/franchise/team-player-stats` nests under `stats`. Frontend has ~5 distinct read patterns. |
+| 2 | One centralized backend resolver, reused everywhere | ⚠️ Partial | `BackEnd/utils/roster_builder.py::build_roster_players` exists and `/franchise/roster` uses it — but it merges only attributes/position_ratings/meta, **not season/career**. `/player` ignores it and does an inline merge (`BackEnd/api/api.py` ~6046-6095). |
+| 3 | Standardize season/career field naming (`season` + `career`) | ❌ Not done | Backend mixed: root `season`/`career` vs nested `stats` vs single `value`. Frontend mixed: `stats.season`, `season_stats`, `season`, `stats`, `game_stats\|\|season_stats`. |
+| 4 | Decide where derived values live | ⚠️ Partial | `getBestPosition()` (`common.js:75`) is a shared, ~95%-consistent resolver. But `rt` (`player.rt ?? player.RT`) and momentum (4-level fallback in `player-detail.js`) are still recomputed inconsistently. |
+| 5 | Audit frontend consumers | ✅ Audit done / ❌ alignment not done | Inconsistency confirmed across box-score, player-detail, set-lineup, tournament, training-report, team-roster-view, FCC, rosterStatsRenderer. |
+| 6 | Remove redundant fallback logic | ❌ Not done | Heavy fallback chains remain (box-score 3-level; player-detail `season\|\|stats.season`, RT, MO chains; set-lineup hybrid). |
+
+**Groundwork that now exists (but doesn't satisfy the plan):**
+- `build_roster_players` (`BackEnd/utils/roster_builder.py`) — shared roster merge, but carries no season/career stats.
+- `RosterLoader.loadRosterWithStats()` (`FrontEnd/static/js/shared/rosterLoader.js`) — normalizes to `player.stats = { season }`; used by FCC + tournament, but many pages bypass it and read raw fields.
+- `getBestPosition()` (`FrontEnd/static/common.js:75`) — canonical position resolver.
+
+**Net:** implementation-order steps 1, 3, and the alignment half of 5, plus 6, are not done; step 2 is partial; step 4 is partial. The two parallel half-solutions (stats-less `build_roster_players`, frequently-bypassed `RosterLoader`) are themselves new inconsistency to reconcile.
 
 ## Problem
 

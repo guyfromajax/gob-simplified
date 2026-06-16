@@ -3954,10 +3954,20 @@ def _create_shoot_step(shooter_pos, shooter_location, timestamp):
     }
 
 
-def _create_attack_drive_shoot_steps(ball_handler_pos, start_location, destination_location, timestamp, is_away_offense=False):
+def _create_attack_drive_shoot_steps(
+    ball_handler_pos,
+    start_location,
+    destination_location,
+    timestamp,
+    is_away_offense=False,
+    selected_step=None,
+    off_lineup=None,
+    def_lineup=None,
+    game=None,
+):
     """
     Create two steps for attack drive and shoot.
-    Step 1: Player drives to destination
+    Step 1: Player drives to destination (teammates clear lane when applicable)
     Step 2: Player shoots at destination
     
     This two-step approach ensures:
@@ -3971,49 +3981,78 @@ def _create_attack_drive_shoot_steps(ball_handler_pos, start_location, destinati
         destination_location: Drive destination (e.g., "basketSpot")
         timestamp: Timestamp for first step
         is_away_offense: Whether away team is on offense (for coordinate flipping)
+        selected_step: Motion skeleton step before drive (for clearance detection)
+        off_lineup: Offensive lineup dict (for clearance + defense metadata)
+        def_lineup: Defensive lineup dict
+        game: GameManager (for matchups / zone / chemistry reads)
     
     Returns:
         list: [drive_step, shoot_step] - Two steps to append to skeleton
     """
-    from BackEnd.constants import HCO_STRING_SPOTS
-    
-    # Get destination coordinates
-    dest_coords = HCO_STRING_SPOTS.get(destination_location, {"x": 50, "y": 25})
-    
-    # TODO: Add defensive stop logic here (player may be stopped short)
-    # For now, assume player reaches destination
     final_location = destination_location
-    
-    # Step 1: Drive to destination
+
+    drive_pos_actions = {
+        ball_handler_pos: {
+            "location": final_location,
+            "action": "drive",
+        }
+    }
+    shoot_pos_actions = {
+        ball_handler_pos: {
+            "location": final_location,
+            "action": "shoot",
+        }
+    }
+    attack_drive_meta = {
+        "start_location": start_location,
+        "intended_destination": destination_location,
+        "final_location": final_location,
+        "stopped_short": False,
+        "driver_gate": True,
+        "gate_driver_pos": ball_handler_pos,
+        "defender_overrides": {},
+    }
+
+    if (
+        selected_step
+        and off_lineup
+        and def_lineup
+        and game is not None
+    ):
+        from BackEnd.engine.attack_drive_clearance import build_attack_drive_clearance
+
+        clearance = build_attack_drive_clearance(
+            selected_step=selected_step,
+            ball_handler_pos=ball_handler_pos,
+            destination_location=destination_location,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            game=game,
+            is_away_offense=is_away_offense,
+        )
+        drive_pos_actions = clearance["drive_pos_actions"]
+        shoot_pos_actions = clearance["shoot_pos_actions"]
+        attack_drive_meta.update(clearance["attack_drive_meta"])
+
     drive_step = {
         "timestamp": timestamp,
-        "pos_actions": {
-            ball_handler_pos: {
-                "location": final_location,
-                "action": "drive"
-            }
-        },
-        "events": []
+        "pos_actions": drive_pos_actions,
+        "events": [],
+        "_attack_drive": dict(attack_drive_meta),
     }
-    
-    # Step 2: Shoot at destination (300ms after drive starts)
+
     shoot_step = {
         "timestamp": timestamp + 300,
-        "pos_actions": {
-            ball_handler_pos: {
-                "location": final_location,
-                "action": "shoot"
-            }
-        },
+        "pos_actions": shoot_pos_actions,
         "events": [{"type": "shot"}],
         "_attack_drive": {
             "start_location": start_location,
             "intended_destination": destination_location,
             "final_location": final_location,
-            "stopped_short": False  # TODO: Implement defensive stop logic
-        }
+            "stopped_short": False,
+        },
     }
-    
+
     return [drive_step, shoot_step]
 
 
@@ -4326,7 +4365,15 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
         
         # Create drive + shoot steps (two steps: drive then shoot)
         drive_shoot_steps = _create_attack_drive_shoot_steps(
-            ball_handler_pos, ball_handler_location, destination, last_timestamp + 300, is_away_offense
+            ball_handler_pos,
+            ball_handler_location,
+            destination,
+            last_timestamp + 300,
+            is_away_offense,
+            selected_step=selected_step,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            game=game,
         )
         new_steps.extend(drive_shoot_steps)
         

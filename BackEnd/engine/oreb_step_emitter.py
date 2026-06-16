@@ -41,21 +41,31 @@ from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import (
     AWAY_RIM_COORDS,
+    BANK_MAKE_SETTLE_GAME_SECONDS,
+    BANK_MISS_GRAZE_GAME_SECONDS,
     BOUNCE_STEP_GAME_SECONDS,
     HCO_STEP_T_FLOOR_GAME_SECONDS,
     HOME_RIM_COORDS,
     MADE_SHOT_SWEET_SPOT_AWAY_RIM,
     MADE_SHOT_SWEET_SPOT_HOME_RIM,
+    RATTLE_HOP_GAME_SECONDS,
+    RATTLE_MAKE_SETTLE_GAME_SECONDS,
     SHOT_BALL_GRID_PER_GAME_SECOND,
 )
 from BackEnd.engine.skeleton_step_emitter import (
+    _RATTLE_VARIANTS,
+    _build_ball_motion_sub_step,
     _build_make_hold_sub_step,
+    _rattle_hop_targets,
     _stamp_shooting_foul_on_miss_end,
+    _variant_flight_end,
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
     _player_lookup_by_id,
+    rattle_hop_sfx,
+    rattle_make_settle_sfx,
     rebound_attemptor_ids,
     shot_followup_timed_sfx,
     shot_launch_sfx,
@@ -362,20 +372,25 @@ def _build_ball_flight_step(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     turn_result: Optional[Dict[str, Any]] = None,
+    flight_end: Optional[GridCoord] = None,
 ) -> AnimationStep:
     """Putback ball-flight step. Ball travels from shot_spot (= shooter
-    coord) to MSSS (make) or rim (miss). Game clock burns; shot clock
-    pinned. All 10 players hold position (no overlay motion per D2).
+    coord) to ``flight_end`` — defaults to MSSS (make) / rim (miss), but
+    callers pass a variant-specific terminal (rattle start, bank point) so
+    the post-flight rim-action sub-steps continue from the right spot.
+    Game clock burns; shot clock pinned. All 10 players hold position.
 
     Stamps the same SFX cues as the skeleton emitter's [ball_flight]
     (audit bug 4 — putback shots were silent because OREB has its own
     builder that didn't wire SFX):
       - ``sfx_on_ball_release`` — shot launch SFX (tier by shot score)
-      - ``sfx_on_ball_arrival`` — variant-aware arrival cue
+      - ``sfx_on_ball_arrival`` — variant-aware arrival cue (None for
+        RATTLE — those fire per-hop on the rim-action sub-steps)
       - ``timed_sfx`` — secondary swish for BANK_MAKE / BACK_OF_RIM
     """
     shot_spot = start_coords.get(shooter_id) or {"x": 50.0, "y": 25.0}
-    flight_end = _sweet_spot_coords(is_away_offense) if is_make else _rim_coords(is_away_offense)
+    if flight_end is None:
+        flight_end = _sweet_spot_coords(is_away_offense) if is_make else _rim_coords(is_away_offense)
     dist = _euclid(shot_spot, flight_end)
     t = dist / float(SHOT_BALL_GRID_PER_GAME_SECOND) if dist > 0 else 0.0
 
@@ -399,16 +414,20 @@ def _build_ball_flight_step(
         )
 
     shot_variant = (turn_result or {}).get("shot_variant") if turn_result else None
+    # The SFX helpers branch on a normalized MAKE/MISS (the PUTBACK_MAKE/MISS
+    # result_type would miss the make/miss fallback in shot_result_sfx and the
+    # BANK_MAKE/BACK_OF_RIM follow-up in shot_followup_timed_sfx).
+    sfx_result = "MAKE" if is_make else "MISS"
     launch_sfx = shot_launch_sfx(
         (turn_result or {}).get("shot_score_pre_defense") if turn_result else None
     )
     arrival_sfx = shot_result_sfx(
         shot_variant,
-        result_type,
+        sfx_result,
         bank_miss_sfx_file=(turn_result or {}).get("shot_variant_bank_miss_sfx_file")
         if turn_result else None,
     )
-    timed_sfx = shot_followup_timed_sfx(shot_variant, result_type)
+    timed_sfx = shot_followup_timed_sfx(shot_variant, sfx_result)
 
     start_block: Dict[str, Any] = {
         "coords": {pid: dict(c) for pid, c in start_coords.items()},
@@ -458,10 +477,18 @@ def _build_bounce_step(
     next_step: NextStep,
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
+    ball_start: Optional[GridCoord] = None,
 ) -> AnimationStep:
-    """Putback bounce step (miss only). Ball travels from rim to
-    ``bounce_target`` over a fixed 300 ms wall-clock. Players hold."""
-    rim = _rim_coords(is_away_offense)
+    """Putback bounce step (miss only). Ball travels from its current
+    position (``ball_start``, default rim) to ``bounce_target`` over a
+    fixed 300 ms wall-clock. Players hold.
+
+    ``ball_start`` defaults to the rim for the legacy swish/clank/back-of-rim
+    flight (which ends at the rim), but variant misses pass the ball's actual
+    post-rim-action spot (last rattle hop, bank-miss graze) so the bounce
+    doesn't teleport.
+    """
+    rim = dict(ball_start) if ball_start is not None else _rim_coords(is_away_offense)
     t = float(BOUNCE_STEP_GAME_SECONDS)
 
     actions, archetypes, destinations = _stationary_maps(start_coords)
@@ -659,11 +686,23 @@ def build_oreb_animation_steps(
     steps.append(shoot_step)
     elapsed += shoot_step["end"]["time_elapsed"]
 
-    # Decide flight step's `next` based on outcome.
-    if is_make:
-        flight_next: NextStep = {"kind": "next_step", "index": 3}  # → hold
-    else:
-        flight_next = {"kind": "next_step", "index": 3}  # → bounce
+    # --- [ball_flight] + variant rim action -------------------------------
+    # Rattle / bank variants terminate the flight at their start point
+    # (rattle start coord / bank point) so the per-hop / settle / graze
+    # sub-steps continue from there. Other variants (swish, clank,
+    # back-of-rim, airball) keep the legacy MSSS (make) / rim (miss) target.
+    norm_result = "MAKE" if is_make else "MISS"
+    shot_variant = turn_result.get("shot_variant")
+    variant_upper = (shot_variant or "").upper()
+    is_rattle = variant_upper in _RATTLE_VARIANTS
+    is_bank_make = variant_upper == "BANK_MAKE"
+    is_bank_miss = variant_upper == "BANK_MISS"
+
+    flight_end_override: Optional[GridCoord] = None
+    if is_rattle or is_bank_make or is_bank_miss:
+        flight_end_override = _variant_flight_end(
+            shot_variant, norm_result, is_away_offense, turn_result,
+        )
 
     flight_step = _build_ball_flight_step(
         start_coords=shoot_step["end"]["coords"],
@@ -673,25 +712,110 @@ def build_oreb_animation_steps(
         result_type=result_type,
         clock_remaining=clock_remaining - elapsed,
         shot_clock_remaining=shot_clock_remaining - elapsed,
-        next_step=flight_next,
+        next_step={"kind": "next_step", "index": 3},  # placeholder; rewired below
         off_lineup=off_lineup,
         def_lineup=def_lineup,
         turn_result=turn_result,
+        flight_end=flight_end_override,
     )
     steps.append(flight_step)
     elapsed += flight_step["end"]["time_elapsed"]
 
+    # Cursor tracks ball + clock as we append variant rim-action sub-steps
+    # after the flight. All 10 players hold; game clock burns, shot pinned.
+    cursor_ball = dict(flight_step["end"]["ball"]["coords"])
+    cursor_coords = dict(flight_step["end"]["coords"])
+    cursor_clock = dict(flight_step["end"]["clock"])
+    prev_step = flight_step
+
+    def _append_variant_step(*, ball_end, step_t, trigger_kind, sfx_arrival=None):
+        """Append a stationary ball-motion sub-step (rattle hop / settle /
+        bank graze) and rewire the previous step's next pointer to it."""
+        nonlocal cursor_ball, cursor_coords, cursor_clock, prev_step
+        idx = len(steps)
+        trigger: AdvanceTrigger = {
+            "condition": "fixed_duration",
+            "T_game_seconds": float(step_t),
+            "metadata": {"target_coords": dict(ball_end), "kind": trigger_kind},
+        }
+        step = _build_ball_motion_sub_step(
+            start_coords_seed=dict(cursor_coords),
+            overlay_players={},  # putback: all players hold
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_t=float(step_t),
+            ball_start_coord=dict(cursor_ball),
+            ball_end_coord=dict(ball_end),
+            clock_start=dict(cursor_clock),
+            advance_trigger=trigger,
+            ball_motion_style=None,
+            next_step={"kind": "next_step", "index": idx + 1},  # placeholder
+            sfx_on_ball_arrival=sfx_arrival,
+        )
+        prev_step["end"]["next"] = {"kind": "next_step", "index": idx}
+        steps.append(step)
+        cursor_ball = dict(ball_end)
+        cursor_coords = dict(step["end"]["coords"])
+        cursor_clock = dict(step["end"]["clock"])
+        prev_step = step
+
+    if is_rattle:
+        # Per-hop sub-steps — rattle-leather.wav fires at each hop arrival
+        # (this is the SFX/rim-action that was missing on putbacks).
+        for hop_target in _rattle_hop_targets(variant_upper, is_away_offense, turn_result):
+            _append_variant_step(
+                ball_end=hop_target,
+                step_t=RATTLE_HOP_GAME_SECONDS,
+                trigger_kind="rattle_hop",
+                sfx_arrival=rattle_hop_sfx(),
+            )
+        if is_make:
+            # Settle into MSSS with the terminal swish at arrival.
+            _append_variant_step(
+                ball_end=_sweet_spot_coords(is_away_offense),
+                step_t=RATTLE_MAKE_SETTLE_GAME_SECONDS,
+                trigger_kind="rattle_settle",
+                sfx_arrival=rattle_make_settle_sfx(),
+            )
+    elif is_bank_make:
+        # Bank → MSSS settle. Arrival SFX (bb-rim-swish + delayed swish) is
+        # already on the flight step via arrival_sfx + timed_sfx.
+        _append_variant_step(
+            ball_end=_sweet_spot_coords(is_away_offense),
+            step_t=BANK_MAKE_SETTLE_GAME_SECONDS,
+            trigger_kind="bank_settle",
+        )
+    elif is_bank_miss:
+        # Bank → rim-graze (per-shot rolled offsets). bb-clank already played
+        # on the flight step's arrival cue.
+        msss = _sweet_spot_coords(is_away_offense)
+        graze: GridCoord = {
+            "x": float(msss["x"]) + float(
+                turn_result.get("shot_variant_backboard_miss_rim_offset_x") or 0
+            ),
+            "y": float(msss["y"]) + float(
+                turn_result.get("shot_variant_backboard_miss_rim_offset_y") or 0
+            ),
+        }
+        _append_variant_step(
+            ball_end=graze,
+            step_t=BANK_MISS_GRAZE_GAME_SECONDS,
+            trigger_kind="bank_graze",
+        )
+
     if is_make:
-        # [hold] step — 1000 ms "It's Good!" beat (clocks paused).
+        # [hold] step — 1000 ms "It's Good!" beat (clocks paused). Ball is at
+        # MSSS by now (settle steps moved it there for rattle / bank makes).
         hold_step = _build_make_hold_sub_step(
-            prev_end_coords=dict(flight_step["end"]["coords"]),
-            prev_clock=dict(flight_step["end"]["clock"]),
+            prev_end_coords=dict(cursor_coords),
+            prev_clock=dict(cursor_clock),
             ball_coord=_sweet_spot_coords(is_away_offense),
             shooter_id=str(rebounder_id),
             away_offense=is_away_offense,
             turn_result=turn_result,
             next_step=_shot_attempt_turn_stop(turn_result, "MAKE"),
         )
+        prev_step["end"]["next"] = {"kind": "next_step", "index": len(steps)}
         steps.append(hold_step)
         return steps
 
@@ -702,25 +826,28 @@ def build_oreb_animation_steps(
     sbx = turn_result.get("ball_bounce_x")
     sby = turn_result.get("ball_bounce_y")
     if sbx is None or sby is None:
-        # No second-bounce coords on the turn — emit ball_flight ending the turn.
-        flight_step["end"]["next"] = _shot_attempt_turn_stop(turn_result, "MISS")
+        # No second-bounce coords — end the turn at the last rim-action
+        # sub-step (the flight, or the final hop / graze for variants).
+        prev_step["end"]["next"] = _shot_attempt_turn_stop(turn_result, "MISS")
         # Shooting-foul-on-miss announcement attaches to the terminal step
         # so the FE plays "Shooting Foul!" before turn_stop. Mirrors skeleton
         # emitter behavior on HCO miss + defensive shooting foul.
-        _stamp_shooting_foul_on_miss_end(flight_step, turn_result)
+        _stamp_shooting_foul_on_miss_end(prev_step, turn_result)
         return steps
     bounce_target: GridCoord = {"x": float(sbx), "y": float(sby)}
 
     bounce_step = _build_bounce_step(
-        start_coords=flight_step["end"]["coords"],
+        start_coords=cursor_coords,
         is_away_offense=is_away_offense,
         bounce_target=bounce_target,
-        clock_remaining=clock_remaining - elapsed,
-        shot_clock_remaining=shot_clock_remaining - elapsed,
+        clock_remaining=cursor_clock["clock_remaining"],
+        shot_clock_remaining=cursor_clock["shot_clock_remaining"],
         next_step=_shot_attempt_turn_stop(turn_result, "MISS"),
         off_lineup=off_lineup,
         def_lineup=def_lineup,
+        ball_start=cursor_ball,
     )
+    prev_step["end"]["next"] = {"kind": "next_step", "index": len(steps)}
     steps.append(bounce_step)
     # Shooting-foul-on-miss announcement attaches to the bounce step's end
     # so the FE plays "Shooting Foul!" before turn_stop. Mirrors skeleton

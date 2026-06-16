@@ -4154,6 +4154,7 @@ class TurnManager:
                     "shot_variant_backboard_y_offset",
                     "shot_variant_backboard_miss_rim_offset_x",
                     "shot_variant_backboard_miss_rim_offset_y",
+                    "shot_variant_bank_miss_sfx_file",
                 ):
                     if _vk in oreb_event and _vk not in pm:
                         pm[_vk] = oreb_event[_vk]
@@ -4323,6 +4324,7 @@ class TurnManager:
                     "shot_variant_backboard_y_offset",
                     "shot_variant_backboard_miss_rim_offset_x",
                     "shot_variant_backboard_miss_rim_offset_y",
+                    "shot_variant_bank_miss_sfx_file",
                 ):
                     if _vk in oreb_event and _vk not in result:
                         result[_vk] = oreb_event[_vk]

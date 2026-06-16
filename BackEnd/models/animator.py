@@ -41,6 +41,16 @@ from BackEnd.constants.fast_break_constants import (
     OUTLET_PASSER_MOVE_X,
 )
 
+
+def _attack_drive_defender_override(skeleton_step, def_pos):
+    """Return drive-step defender override coords/action when present."""
+    if not skeleton_step:
+        return None
+    meta = skeleton_step.get("_attack_drive") or {}
+    overrides = meta.get("defender_overrides") or {}
+    return overrides.get(def_pos)
+
+
 class Animator:
     def __init__(self, game):
         self.game = game
@@ -1849,48 +1859,50 @@ class Animator:
                     })
                 
                 # Assign defensive coordinates for this defender at this step
-                # Use assign_all_zone_defenders which handles overlaps and priorities
-                # ✅ Pass is_away_offense as-is - zone functions expect coords in original flipped state
-                # They will unflip internally, calculate in home orientation, and return home orientation coords
-                defender_coords_dict, defender_to_offensive_player = assign_all_zone_defenders(
-                    zone_boundaries,
-                    offensive_players,
-                    ball_handler_coords,
-                    current_ball_spot,
-                    aggression,
-                    is_away_offense
+                step_override = _attack_drive_defender_override(
+                    skeleton_steps[step_index] if step_index < len(skeleton_steps) else None,
+                    def_pos,
                 )
-                
-                # Store defender assignments for this step (for shot resolution)
-                if not hasattr(self.game, 'zone_defender_assignments_by_step'):
-                    self.game.zone_defender_assignments_by_step = {}
-                self.game.zone_defender_assignments_by_step[step_index] = defender_to_offensive_player
-                
-                def_coords = defender_coords_dict.get(def_pos)
-                if not def_coords:
-                    # Fallback: use center of zone
-                    zone_coords_list = zone_boundaries.get(def_pos, [])
-                    if zone_coords_list:
-                        # Average of zone coordinates (zone boundaries are in away orientation if away offense)
-                        avg_x = sum(c[0] for c in zone_coords_list) / len(zone_coords_list)
-                        avg_y = sum(c[1] for c in zone_coords_list) / len(zone_coords_list)
-                        def_coords = {"x": int(avg_x), "y": int(avg_y)}
-                    else:
-                        def_coords = {"x": 50, "y": 25}
-                
-                # Check if this defender is guarding the ball handler
-                zone_coords_for_check = zone_boundaries.get(def_pos, [])
-                is_guarding_bh = ball_handler_coords and _point_in_zone(ball_handler_coords, zone_coords_for_check, False)
-                
-                # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
-                # (assign_bh_defender_coords now returns home orientation when away team has ball)
-                # (assign_non_bh_defender_coords returns home orientation directly)
-                # When away team is on offense, we need to flip ALL defensive coords to away orientation
-                # to match the offensive coords (which are also in away orientation)
-                # This ensures all players (offense and defense) are positioned on the away side of the court
-                if is_away_offense:
-                    def_coords_before_flip = def_coords.copy()
-                    def_coords = get_away_player_coords(def_coords)
+                if step_override and step_override.get("coords"):
+                    def_coords = dict(step_override["coords"])
+                    is_guarding_bh = step_override.get("action") == "guard_ball"
+                else:
+                    # Use assign_all_zone_defenders which handles overlaps and priorities
+                    # ✅ Pass is_away_offense as-is - zone functions expect coords in original flipped state
+                    # They will unflip internally, calculate in home orientation, and return home orientation coords
+                    defender_coords_dict, defender_to_offensive_player = assign_all_zone_defenders(
+                        zone_boundaries,
+                        offensive_players,
+                        ball_handler_coords,
+                        current_ball_spot,
+                        aggression,
+                        is_away_offense
+                    )
+                    
+                    # Store defender assignments for this step (for shot resolution)
+                    if not hasattr(self.game, 'zone_defender_assignments_by_step'):
+                        self.game.zone_defender_assignments_by_step = {}
+                    self.game.zone_defender_assignments_by_step[step_index] = defender_to_offensive_player
+                    
+                    def_coords = defender_coords_dict.get(def_pos)
+                    if not def_coords:
+                        # Fallback: use center of zone
+                        zone_coords_list = zone_boundaries.get(def_pos, [])
+                        if zone_coords_list:
+                            # Average of zone coordinates (zone boundaries are in away orientation if away offense)
+                            avg_x = sum(c[0] for c in zone_coords_list) / len(zone_coords_list)
+                            avg_y = sum(c[1] for c in zone_coords_list) / len(zone_coords_list)
+                            def_coords = {"x": int(avg_x), "y": int(avg_y)}
+                        else:
+                            def_coords = {"x": 50, "y": 25}
+                    
+                    # Check if this defender is guarding the ball handler
+                    zone_coords_for_check = zone_boundaries.get(def_pos, [])
+                    is_guarding_bh = ball_handler_coords and _point_in_zone(ball_handler_coords, zone_coords_for_check, False)
+                    
+                    # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
+                    if is_away_offense:
+                        def_coords = get_away_player_coords(def_coords)
                 
                 # Get timestamp
                 if step_index < len(skeleton_steps):
@@ -1906,7 +1918,9 @@ class Animator:
                 # Determine action (guard_ball if ball handler in zone, otherwise guard_offball)
                 zone_coords = zone_boundaries.get(def_pos, [])
                 action = "guard_offball"
-                if ball_handler_coords and _point_in_zone(ball_handler_coords, zone_coords, is_away_offense):
+                if step_override and step_override.get("action"):
+                    action = step_override["action"]
+                elif ball_handler_coords and _point_in_zone(ball_handler_coords, zone_coords, is_away_offense):
                     action = "guard_ball"
                 
                 def_movement.append({
@@ -2010,8 +2024,12 @@ class Animator:
             if off_coords_list:
                 off_coords = off_coords_list[0]
                 
-                # Calculate initial defensive position
-                if off_pos_to_guard == ball_handler_pos:
+                step0_skeleton = skeleton_steps[0] if skeleton_steps else {}
+                override0 = _attack_drive_defender_override(step0_skeleton, def_pos)
+                if override0 and override0.get("coords"):
+                    def_coords = dict(override0["coords"])
+                    def_action = override0.get("action") or "guard_offball"
+                elif off_pos_to_guard == ball_handler_pos:
                     # Ball handler defender - extract ball handler's spot from first skeleton step
                     first_step = skeleton_steps[0] if skeleton_steps else {}
                     bh_action = first_step.get("pos_actions", {}).get(ball_handler_pos, {})
@@ -2059,7 +2077,15 @@ class Animator:
                 def_movement.append({
                     "timestamp": 0,
                     "coords": def_coords,
-                    "action": "guard_ball" if off_pos_to_guard == ball_handler_pos else "guard_offball"
+                    "action": (
+                        def_action
+                        if override0 and override0.get("coords")
+                        else (
+                            "guard_ball"
+                            if off_pos_to_guard == ball_handler_pos
+                            else "guard_offball"
+                        )
+                    ),
                 })
             
             # Subsequent steps: Track offensive player
@@ -2079,9 +2105,12 @@ class Animator:
                     # If no one has ball at this step, use previous ball handler
                     if not current_ball_handler_pos:
                         current_ball_handler_pos = ball_handler_pos
-                    
-                    # Calculate defensive position for this step
-                    if off_pos_to_guard == current_ball_handler_pos:
+
+                    override = _attack_drive_defender_override(skeleton_step, def_pos)
+                    if override and override.get("coords"):
+                        def_coords = dict(override["coords"])
+                        def_action = override.get("action") or "guard_offball"
+                    elif off_pos_to_guard == current_ball_handler_pos:
                         # Ball handler defender - extract CURRENT ball handler's spot from skeleton step
                         bh_action = skeleton_step.get("pos_actions", {}).get(current_ball_handler_pos, {})
                         bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
@@ -2126,7 +2155,15 @@ class Animator:
                     def_movement.append({
                         "timestamp": timestamp,
                         "coords": def_coords,
-                        "action": "guard_ball" if off_pos_to_guard == current_ball_handler_pos else "guard_offball"
+                        "action": (
+                            def_action
+                            if override and override.get("coords")
+                            else (
+                                "guard_ball"
+                                if off_pos_to_guard == current_ball_handler_pos
+                                else "guard_offball"
+                            )
+                        ),
                     })
                 else:
                     # No more offensive movement - stay at last position

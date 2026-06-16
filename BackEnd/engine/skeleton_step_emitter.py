@@ -74,6 +74,7 @@ _ACTION_MAP: Dict[str, PlayerAction] = {
     "pass": "pass",
     "receive": "receive",
     "cut": "cut",
+    "drive": "cut",
     "screen": "screen",
     "shoot": "shoot",
     "stationary": "stationary",
@@ -1251,6 +1252,15 @@ def build_skeleton_animation_steps(
                 gate_id = _player_id_at_pos(off_lineup, shooter_pos)
                 gate_kind = "shooter"
 
+        # 1b) Motion attack drive step — gate on the driver explicitly.
+        if gate_id is None and turn_type == "HCO":
+            attack_meta = skeleton_steps[i].get("_attack_drive") or {}
+            if attack_meta.get("driver_gate"):
+                driver_pos = attack_meta.get("gate_driver_pos")
+                if driver_pos:
+                    gate_id = _player_id_at_pos(off_lineup, driver_pos)
+                    gate_kind = "attack_drive_driver"
+
         # 2) FCP stopper action step (truncated final skeleton step before
         # the appended event marker). Gate on the players involved in the
         # stop action.
@@ -1313,6 +1323,8 @@ def build_skeleton_animation_steps(
         # spot. Applying the generic HCO floor here creates visible dead-air
         # between the shooter settling and the [ball_flight] sub-step.
         if gate_kind == "shooter" and not is_pass_step:
+            t = max(0.05, natural_t)
+        elif gate_kind == "attack_drive_driver" and not is_pass_step:
             t = max(0.05, natural_t)
         else:
             t = max(HCO_STEP_T_FLOOR_GAME_SECONDS, natural_t, ball_pass_t)
