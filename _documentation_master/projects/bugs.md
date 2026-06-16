@@ -14,6 +14,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 48. Double block announce on Final Shot
 49. No OREB putback attempts on missed final shot
 50. Consistently sound airhorn at EOQ
+42. Quick Foul bug, wrong team fouled
 
 ##Micro Movements
 9. Dunks! I need DUNKS!
@@ -24,21 +25,20 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 37. Player Foul Out Next Step bug
 40. Batted ball out of bounds is not animating or executing properly
 
+
 ##New Features
-35. Verify Special Stats are tracking properly
-36. Season & Career Stats for Players for special stats
 44. Customize computer teams more strategically
 45. Improve FCC API
 57. Player Momentum System
 60. Universal distance-based rebound helper
 62. Leaderboard -- change Rank to Titles
-11. More action in on Signing Day
+11. More action on Signing Day
 22. User account -- link X & Facebook?
-23. Other players move on motion drives to the basket
+24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
+
 
 ##Full Product Readiness
 100. Press & Trap Plays
-101. EOG/EOQ Perfection
 102. Team court images
 103. Player images
 105. More responsive front end
@@ -47,16 +47,15 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 108. Message board
 109. More dynamic HCO animations
 110. Geek Points system
-
-##Started and will continually be in progress
-61. News feed, Media & Beat Reporters
+111. Marketing Screenshot Tool Build
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
 4. Add recruits to roster after recruiting
-5. Recruits + Practice Squad Weekly Games (run during Training)
+5. Add a new hire news story for user team
+6. Add a badass design appraoch to New Stories
 
 
 

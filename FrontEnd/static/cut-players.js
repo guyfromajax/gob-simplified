@@ -175,6 +175,7 @@
       checkbox.className = 'cut-player-checkbox';
       checkbox.checked = selectedIds.has(player._id);
       checkbox.addEventListener('change', function () {
+        playSound('click-tiny.wav');
         if (checkbox.checked) selectedIds.add(player._id);
         else selectedIds.delete(player._id);
         updateStatus();
@@ -403,7 +404,10 @@
       if (lastTh) lastTh.textContent = 'Cut';
     }
     document.getElementById('back-btn').addEventListener('click', attemptLeave);
-    document.getElementById('submit-btn').addEventListener('click', submitCuts);
+    document.getElementById('submit-btn').addEventListener('click', function () {
+      playSound('confirm-2-lowervol.wav');
+      submitCuts();
+    });
     window.addEventListener('beforeunload', function (e) {
       if (allowLeave || !selectedIds.size) return;
       e.preventDefault();

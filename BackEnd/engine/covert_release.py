@@ -8,7 +8,7 @@ Coordinates are in HOME orientation (x 0–100); x is mirrored when the future F
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     pass
@@ -54,26 +54,32 @@ def select_covert_release_position(
     shot_step_index: Optional[int],
     shooter_pos: Optional[str],
     off_team: Any,
+    exclude_positions: Optional[Set[str]] = None,
 ) -> Optional[str]:
     """
-    Farthest-from-rim defender (by x in HOME orientation), excluding the shooter matchup.
+    Farthest-from-rim defender (by x in HOME orientation), excluding the shooter
+    matchup and any positions in ``exclude_positions`` (e.g. shot defender).
     Home team shooting → away defense → minimize x. Away shooting → home defense → maximize x.
     """
     guard_pos = get_defender_position_guarding_shooter(
         game, shooter, def_lineup, shot_step_index, shooter_pos
     )
+    blocked = set(exclude_positions or set())
+    if guard_pos is not None:
+        blocked.add(guard_pos)
 
     candidates: List[str] = []
     for pos, player in def_lineup.items():
         if player is None:
             continue
-        if guard_pos is not None and pos == guard_pos:
+        if pos in blocked:
             continue
         candidates.append(pos)
     if not candidates:
-        candidates = [pos for pos, p in def_lineup.items() if p is not None]
-        if guard_pos is not None and len(candidates) > 1:
-            candidates = [p for p in candidates if p != guard_pos]
+        candidates = [
+            pos for pos, p in def_lineup.items()
+            if p is not None and pos not in blocked
+        ]
     if not candidates:
         return None
 

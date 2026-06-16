@@ -1167,13 +1167,18 @@ class ShotManager:
                     getattr(def_team, "playbook_settings", None),
                 )
                 if shot_fb_pk == COVERT_RELEASE:
+                    shot_defender_pos = get_player_position(def_lineup, defender) if defender else None
+                    release_exclude: set = set()
+                    if shot_defender_pos:
+                        release_exclude.add(shot_defender_pos)
                     rp = cr.select_covert_release_position(
-                        def_team.lineup,
+                        def_lineup,
                         self.game,
                         shooter,
                         shot_step_index,
                         shooter_pos,
                         off_team,
+                        exclude_positions=release_exclude,
                     )
                     if rp:
                         defense_release_list = [rp]
@@ -1211,42 +1216,30 @@ class ShotManager:
             offense_getback_list = []
             offense_rebounders = list(off_team.lineup.keys())
         else:
-            offense_getback_chances = {
-                0: {"none": 1.0, "one": 0.0, "two": 0.0},
-                1: {"none": 0.5, "one": 0.5, "two": 0.0},
-                2: {"none": 0.25, "one": 0.75, "two": 0.0},
-                3: {"none": 0.1, "one": 0.8, "two": 0.1},
-                4: {"none": 0.0, "one": 0.5, "two": 0.5}
-            }
+            from BackEnd.utils.getback_selection import (
+                roll_num_getback,
+                select_offense_getback_list,
+            )
 
-            chances = offense_getback_chances[offense_reb_value]
             rand = random.random()
+            num_getback = roll_num_getback(offense_reb_value, rand)
 
-            if rand < chances["none"]:
-                num_getback = 0
-            elif rand < chances["none"] + chances["one"]:
-                num_getback = 1
-            else:
-                num_getback = 2
+            is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+            offense_getback_list = select_offense_getback_list(
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                game=self.game,
+                roles=roles,
+                shooter_pos=shooter_pos,
+                num_getback=num_getback,
+                shot_step_index=shot_step_index,
+                is_home_team_shooting=is_home_team_shooting,
+                defense_playcall=defense_call,
+            )
 
-            # Note: 0 get-back defenders with a release player is still a valid Fast Break
-            # It's just an easy layup opportunity for the outlet receiver
-            # No minimum enforcement needed
-
-            offense_getback_list = []
-            if num_getback >= 1:
-                if shooter_pos != "PG":
-                    offense_getback_list.append("PG")
-                else:
-                    offense_getback_list.append("SG")
-
-            if num_getback >= 2:
-                if shooter_pos != "SG" and "SG" not in offense_getback_list:
-                    offense_getback_list.append("SG")
-                else:
-                    offense_getback_list.append("SF")
-
-            offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
+            offense_rebounders = [
+                pos for pos in off_lineup.keys() if pos not in offense_getback_list
+            ]
         
         # Get names for debug logging
         getback_player_names = [get_name_safe(off_team.lineup.get(pos)) for pos in offense_getback_list if off_team.lineup.get(pos)]
