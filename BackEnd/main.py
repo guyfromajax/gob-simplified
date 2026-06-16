@@ -1224,7 +1224,7 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
         import traceback
         traceback.print_exc()
 
-    # print(f"*********gm:\n{gm}")
+    gm.print_game_statistics()
     return gm
 
 

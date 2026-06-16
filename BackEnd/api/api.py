@@ -4134,6 +4134,8 @@ try:
             # Scrimmage simulations should not generate aggregate stats.
             # Finalizing with ``mode="scrimmage"`` is a no-op but documents intent.
             stat_updater.finalize_game(game_id, mode="scrimmage")
+            if gm:
+                gm.print_game_statistics()
         
         # Return frontend summary WITH animations for real-time play
         turns = frontend_summary.get("turns", [])
@@ -4801,6 +4803,8 @@ try:
                 and quarter_before_increment >= 4  # End-of-regulation or later
                 and gm.score.get(gm.home_team.name, 0) != gm.score.get(gm.away_team.name, 0)
             )
+            if is_final:
+                gm.print_game_statistics()
             
             # ✅ PERFORMANCE: Save game state every 25 turns (reduced from 10 for better performance)
             # Still save on quarter complete to ensure quarter number is persisted

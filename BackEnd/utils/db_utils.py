@@ -429,8 +429,10 @@ def autoset_strategy_settings(team: TeamManager):
     old_inside = team.strategy_settings.get('inside', 'MISSING') if hasattr(team, 'strategy_settings') and team.strategy_settings else 'MISSING'
     # logging.warning(f"🔍 [AUTOSET STRATEGY] Autosetting strategy for COMPUTER team: {team.name}, old inside: {old_inside}")
     
-    # Regenerate strategy settings using the same logic as initialization
-    new_strategy_settings = team._init_strategy_settings()
+    # Regenerate strategy settings from the team's current five active players
+    # (Game_Init_System.md § Computer Team Strategy Logic). Falls back to the
+    # legacy random init internally if five players can't be resolved.
+    new_strategy_settings = team._compute_strategic_strategy_settings()
     team.strategy_settings = new_strategy_settings
     
     new_inside = new_strategy_settings.get('inside', 'MISSING')

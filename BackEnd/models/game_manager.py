@@ -211,6 +211,15 @@ class GameManager:
             "free_throws_remaining": 0,
             "no_defender_shots": 0,
             "no_defender_shots_breakdown": {},
+            "motion_attack_shot_tracker": {
+                "total": 0,
+                "driver_shoot": 0,
+                "driver_dish": 0,
+                "driver_shoot_with_defender": 0,
+                "driver_shoot_without_defender": 0,
+                "dish_shot_with_defender": 0,
+                "dish_shot_without_defender": 0,
+            },
             "one_and_one": False,
             "last_ball_handler": None,
             "foul_team": None,
@@ -1906,3 +1915,4 @@ class GameManager:
         
         # Print defense score statistics
         self.shot_manager.print_defense_score_stats()
+        self.shot_manager.print_motion_attack_shot_stats()

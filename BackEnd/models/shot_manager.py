@@ -46,6 +46,8 @@ from BackEnd.utils.shared import (
     height_to_block_score,
     calculate_block_spot,
     increment_no_defender_shot_breakdown,
+    increment_motion_attack_shot_tracker,
+    format_motion_attack_shot_tracker,
 )
 from BackEnd.utils.defense_utils import (
     defender_player_from_random_slot_fallback,
@@ -668,6 +670,12 @@ class ShotManager:
                 second_defender = None
                 roles["defender"] = None
                 roles.pop("second_defender", None)
+            if roles.get("motion_attack_driver_shoots") is not None:
+                increment_motion_attack_shot_tracker(
+                    self.game_state,
+                    driver_shoots=bool(roles.get("motion_attack_driver_shoots")),
+                    has_shot_defender=defender is not None,
+                )
         else:
             for candidate in (def_lineup or {}).values():
                 if candidate is None:
@@ -2778,3 +2786,12 @@ class ShotManager:
         print(f"Min: {min(self.defense_scores):.2f}")
         print(f"Max: {max(self.defense_scores):.2f}")
         print("="*50)
+
+    def print_motion_attack_shot_stats(self):
+        """Print cumulative motion attack drive shot counters for the game."""
+        tracker = self.game_state.get("motion_attack_shot_tracker")
+        summary = format_motion_attack_shot_tracker(
+            tracker if isinstance(tracker, dict) else None
+        )
+        print(summary)
+        logging.info(summary.replace("\n", " | "))

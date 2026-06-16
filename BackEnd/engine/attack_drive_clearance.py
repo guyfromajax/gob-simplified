@@ -1113,6 +1113,7 @@ def build_attack_drive_sequence(
         "motion_attack_uncontested": uncontested,
         "motion_attack_geometry_contest": True,
         "motion_attack_defense_bonus": defense_bonus,
+        "motion_attack_driver_shoots": bool(driver_shoots),
         "attack_drive_meta": attack_drive_meta,
         "drive_pos_actions": drive_pos_actions,
         "attack_drive_meta_legacy": attack_drive_meta,

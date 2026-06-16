@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from typing import Any
 
 from BackEnd.main import simulate_quarter
@@ -10,6 +11,38 @@ from BackEnd.models.game_manager import GameManager
 from BackEnd.models.player import Player
 from BackEnd.models.team_manager import TeamManager
 from BackEnd.utils.shared import summarize_game_state
+
+# Practice Squad games use fixed team attributes instead of the franchise-mode
+# roll, so every PS matchup is on equal developmental footing. Source of truth:
+# Practice_Squad_Games_System.md § Practice Squad Team Attribute Values.
+PS_TEAM_CHEMISTRY = 20
+PS_SHOT_THRESHOLD = 50
+PS_REBOUND_MODIFIER = 0.2  # exact middle of the 0.0–0.4 range; matches normal franchise teams
+PS_ATTR_RANGE = (-5, 5)    # discipline/fight/efficiencies/opp modifiers
+
+
+def ps_team_attributes() -> dict:
+    """Fixed Practice Squad team attributes (Practice_Squad_Games_System.md).
+
+    team_chemistry / shot_threshold / rebound_modifier are constants; the eight
+    efficiency & opponent-modifier attrs each get an independent randint(-5, 5).
+    Call once per team so home and away roll independently. Returns the same
+    11-key schema as ``TeamManager.init_team_attributes``.
+    """
+    lo, hi = PS_ATTR_RANGE
+    return {
+        "shot_threshold": PS_SHOT_THRESHOLD,
+        "discipline": random.randint(lo, hi),
+        "fight": random.randint(lo, hi),
+        "rebound_modifier": PS_REBOUND_MODIFIER,
+        "offensive_efficiency": random.randint(lo, hi),
+        "team_chemistry": PS_TEAM_CHEMISTRY,
+        "defensive_efficiency": random.randint(lo, hi),
+        "fb_efficiency": random.randint(lo, hi),
+        "pt_efficiency": random.randint(lo, hi),
+        "fb_opp_modifier": random.randint(lo, hi),
+        "pt_opp_modifier": random.randint(lo, hi),
+    }
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +142,8 @@ def run_ps_full_simulation(
         away_display_name,
         mode="single",
         franchise_id=None,
-        home_team_attributes=TeamManager.init_team_attributes(mode="franchise"),
-        away_team_attributes=TeamManager.init_team_attributes(mode="franchise"),
+        home_team_attributes=ps_team_attributes(),
+        away_team_attributes=ps_team_attributes(),
         home_roster_override=home_payloads,
         away_roster_override=away_payloads,
         home_synthetic_team_id=home_team_id,

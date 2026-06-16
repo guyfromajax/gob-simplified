@@ -4380,6 +4380,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
             "motion_attack_uncontested": drive_result.get("motion_attack_uncontested", False),
             "motion_attack_geometry_contest": drive_result.get("motion_attack_geometry_contest", False),
             "motion_attack_defense_bonus": drive_result.get("motion_attack_defense_bonus", 0),
+            "motion_attack_driver_shoots": drive_result.get("motion_attack_driver_shoots"),
         }
     
     # Phase 7: Append new steps to truncated skeleton
@@ -5412,6 +5413,8 @@ def resolve_half_court_offense_logic(game):
                 roles["motion_attack_uncontested"] = True
             if motion_shot_info.get("motion_attack_defense_bonus"):
                 roles["motion_attack_defense_bonus"] = motion_shot_info["motion_attack_defense_bonus"]
+            if motion_shot_info.get("motion_attack_driver_shoots") is not None:
+                roles["motion_attack_driver_shoots"] = motion_shot_info["motion_attack_driver_shoots"]
             
             # ✅ FIX: Re-derive passer from modified skeleton (Motion plays add pass/receive steps)
             # Use the same criteria as Set Plays: last pass to shooter within 5 steps, pass/receive in same step

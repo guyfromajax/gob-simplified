@@ -92,6 +92,82 @@ def weighted_random_from_dict(weight_dict: dict) -> str:
     return random.choice(list(weight_dict.keys()))
 
 
+def empty_motion_attack_shot_tracker() -> dict:
+    return {
+        "total": 0,
+        "driver_shoot": 0,
+        "driver_dish": 0,
+        "driver_shoot_with_defender": 0,
+        "driver_shoot_without_defender": 0,
+        "dish_shot_with_defender": 0,
+        "dish_shot_without_defender": 0,
+    }
+
+
+def increment_motion_attack_shot_tracker(
+    game_state: dict,
+    *,
+    driver_shoots: bool,
+    has_shot_defender: bool,
+) -> None:
+    """Cumulative motion attack drive shot counters (driver shoot vs dish, contested vs open)."""
+    if not isinstance(game_state, dict):
+        return
+    tracker = game_state.get("motion_attack_shot_tracker")
+    if not isinstance(tracker, dict):
+        tracker = empty_motion_attack_shot_tracker()
+        game_state["motion_attack_shot_tracker"] = tracker
+
+    tracker["total"] = int(tracker.get("total", 0) or 0) + 1
+    if driver_shoots:
+        tracker["driver_shoot"] = int(tracker.get("driver_shoot", 0) or 0) + 1
+        sub_key = (
+            "driver_shoot_with_defender"
+            if has_shot_defender
+            else "driver_shoot_without_defender"
+        )
+    else:
+        tracker["driver_dish"] = int(tracker.get("driver_dish", 0) or 0) + 1
+        sub_key = (
+            "dish_shot_with_defender"
+            if has_shot_defender
+            else "dish_shot_without_defender"
+        )
+    tracker[sub_key] = int(tracker.get(sub_key, 0) or 0) + 1
+
+
+def format_motion_attack_shot_tracker(tracker: dict | None) -> str:
+    if not isinstance(tracker, dict):
+        tracker = empty_motion_attack_shot_tracker()
+    lines = [
+        "",
+        "=" * 50,
+        "MOTION ATTACK SHOT TRACKER",
+        "=" * 50,
+        f"Total motion attack shots: {int(tracker.get('total', 0) or 0)}",
+        f"Driver shoots: {int(tracker.get('driver_shoot', 0) or 0)}",
+        f"Driver dishes: {int(tracker.get('driver_dish', 0) or 0)}",
+        (
+            "Driver shoot — with shot defender: "
+            f"{int(tracker.get('driver_shoot_with_defender', 0) or 0)}"
+        ),
+        (
+            "Driver shoot — without shot defender: "
+            f"{int(tracker.get('driver_shoot_without_defender', 0) or 0)}"
+        ),
+        (
+            "Dish shot — with shot defender: "
+            f"{int(tracker.get('dish_shot_with_defender', 0) or 0)}"
+        ),
+        (
+            "Dish shot — without shot defender: "
+            f"{int(tracker.get('dish_shot_without_defender', 0) or 0)}"
+        ),
+        "=" * 50,
+    ]
+    return "\n".join(lines)
+
+
 def increment_no_defender_shot_breakdown(game_state: dict, turn_type: str, shot_type: str) -> tuple[str, int]:
     """Track no-defender shots by `turn_type|shot_type`."""
     if not isinstance(game_state, dict):

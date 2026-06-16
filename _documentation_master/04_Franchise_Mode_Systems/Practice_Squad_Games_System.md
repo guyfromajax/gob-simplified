@@ -88,3 +88,10 @@
 | Training hook | `BackEnd/api/franchise_routes.py` → `_franchise_training_distant_phase_only` |
 | Week news | `_append_franchise_week_news` |
 | API | `/franchise/practice-squad/*` |
+
+
+**Practice Squad Team Attraibute Values**
+- Team Chemistry: 20
+- Shot Threshold: 50
+- Rebound Modifier: 0.2
+- Discipline, Fight, Offense Efficiency, Defense Efficiency, FB Efficiency, P/T Efficinecy, FB Opp Modifier, P/T Opp Modifier: each gets it's own random.randint(-5,5)

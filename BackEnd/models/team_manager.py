@@ -319,7 +319,13 @@ class TeamManager:
             import logging
             if strategy_settings is not None:
                 logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.name} - strategy_settings provided but invalid (type={type(strategy_settings)}, len={len(strategy_settings) if isinstance(strategy_settings, dict) else 'N/A'}), using defaults")
-            self.strategy_settings = self._init_strategy_settings()
+            # Computer teams derive a strategic game plan from their projected
+            # starting five (Game_Init_System.md § Computer Team Strategy Logic);
+            # user teams keep the legacy random defaults (never auto-set).
+            if not self.is_user_team:
+                self.strategy_settings = self._compute_strategic_strategy_settings()
+            else:
+                self.strategy_settings = self._init_strategy_settings()
         
         # ✅ SS&S: Initialize strategy_calls with call fields (None = use normal selection, value = use this call and clear after)
         # Use provided strategy_calls (from saved game) or initialize fresh
@@ -468,6 +474,163 @@ class TeamManager:
             # tempo is initialized per game, not per team
             "tempo": TeamManager.init_tempo_random()
         }
+
+    # --- Strategic (player-based) CPU strategy settings -----------------------
+    # Game_Init_System.md § Computer Team Strategy Logic. Derives a computer
+    # team's game-plan sliders from its five active players instead of pure
+    # randomization. Used for COMPUTER teams at game init (projected starting
+    # five) and at every quarter break / timeout / foul-out (the rebuilt
+    # lineup). User-team settings are never auto-set.
+
+    # Legacy weighted distributions, reused as the "standard logic" fallback.
+    @staticmethod
+    def _strategy_roll_balanced():
+        return random.choices([0, 1, 2, 3, 4], weights=[5, 15, 60, 15, 5], k=1)[0]
+
+    @staticmethod
+    def _strategy_roll_aggression():
+        return random.choices([0, 1, 2, 3, 4], weights=[10, 20, 40, 20, 10], k=1)[0]
+
+    @staticmethod
+    def _strategy_roll_trap_press():
+        return random.choices([0, 1, 2, 3, 4], weights=[34, 40, 20, 5, 1], k=1)[0]
+
+    @staticmethod
+    def _strategy_roll_rebounding():
+        return random.choices([0, 1, 2, 3, 4], weights=[5, 10, 15, 30, 40], k=1)[0]
+
+    @staticmethod
+    def _strategy_attr(player, key):
+        """Player attribute value for strategy math. Mirrors the Scouting Report
+        tab: prefer the ``anchor_<attr>`` baseline, fall back to the raw attr.
+        """
+        attrs = getattr(player, "attributes", {}) or {}
+        try:
+            return float(attrs.get(f"anchor_{key}", attrs.get(key, 0)) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _resolve_strategy_active_five(self):
+        """The five players strategy is derived from: the current 5-man lineup
+        when set (in-game quarter break / timeout / foul-out), otherwise the
+        projected starting five from the roster (game init — same selection the
+        FCC Scouting Report uses: greedy best (player, open position) by rating).
+        """
+        lineup_players = [p for p in (self.lineup or {}).values() if p is not None]
+        if len(lineup_players) >= 5:
+            return lineup_players[:5]
+
+        players = [p for p in self.players.values() if p is not None]
+        positions = ("PG", "SG", "SF", "PF", "C")
+        assigned: set = set()
+        filled: set = set()
+        chosen: list = []
+        while len(filled) < 5:
+            best = None  # (rt, player, pos)
+            for p in players:
+                pid = str(getattr(p, "player_id", "") or "")
+                if not pid or pid in assigned:
+                    continue
+                pr = getattr(p, "position_ratings", {}) or {}
+                for pos in positions:
+                    if pos in filled:
+                        continue
+                    try:
+                        rt = float(pr.get(pos))
+                    except (TypeError, ValueError):
+                        continue
+                    if best is None or rt > best[0]:
+                        best = (rt, p, pos)
+            if best is None:
+                break
+            _, bp, bpos = best
+            chosen.append(bp)
+            filled.add(bpos)
+            assigned.add(str(getattr(bp, "player_id", "") or ""))
+        return chosen
+
+    def _compute_strategic_strategy_settings(self):
+        """Compute CPU strategy settings from the five active players.
+        Falls back to the legacy random init if five players can't be resolved.
+        """
+        five = self._resolve_strategy_active_five()
+        if len(five) < 5:
+            return self._init_strategy_settings()
+
+        def cum(key):
+            return sum(self._strategy_attr(p, key) for p in five)
+
+        settings = {}
+
+        # Point 5: legacy logic for offense / rebounding / play_calling / tempo.
+        settings["offense"] = self._strategy_roll_balanced()
+        settings["rebounding"] = self._strategy_roll_rebounding()
+        settings["play_calling"] = self._strategy_roll_balanced()
+        settings["tempo"] = TeamManager.init_tempo_random()
+
+        # Point 2: offense-type tendencies (inside / attack / outside).
+        scores = {
+            "inside": cum("SC"),
+            "outside": cum("SH"),
+            "attack": (cum("SC") + cum("AG")) / 2.0,
+        }
+        ranked = sorted(scores, key=lambda k: scores[k])  # [lowest, middle, highest]
+        lowest_k, middle_k, highest_k = ranked[0], ranked[1], ranked[2]
+        middle_v = scores[middle_k]
+        strong_k = highest_k if (scores[highest_k] - 70 > middle_v) else None
+        weak_k = lowest_k if (scores[lowest_k] + 70 < middle_v) else None
+        for k in ("inside", "attack", "outside"):
+            if k == strong_k:
+                settings[k] = random.randint(3, 4)
+            elif k == weak_k:
+                settings[k] = random.randint(0, 1)
+            else:
+                settings[k] = random.randint(1, 3)
+
+        # Point 3: endurance-based hustle settings (hc_trap / fc_press /
+        # fast_breaks / aggression). Independent rolls; fallbacks use legacy.
+        cum_nd = cum("ND")
+        endurance_d = cum("AG") + cum("OD")
+        endurance_o = cum("AG") + cum("SC")
+        intelligence = cum("IQ")
+        if cum_nd < 200:  # weak endurance
+            settings["hc_trap"] = random.randint(0, 2)
+            settings["fc_press"] = random.randint(0, 2)
+            settings["fast_breaks"] = random.randint(0, 2)
+            settings["aggression"] = random.randint(0, 2)
+        elif cum_nd > 350:  # strong endurance
+            if endurance_d > 600:
+                settings["hc_trap"] = random.randint(0, 4)
+                settings["fc_press"] = random.randint(0, 4)
+            else:
+                settings["hc_trap"] = self._strategy_roll_trap_press()
+                settings["fc_press"] = self._strategy_roll_trap_press()
+            settings["fast_breaks"] = (
+                random.randint(1, 4) if endurance_o > 600 else self._strategy_roll_balanced()
+            )
+            settings["aggression"] = (
+                random.randint(2, 4) if intelligence > 300 else self._strategy_roll_aggression()
+            )
+        else:  # middle endurance → legacy standard rolls
+            settings["hc_trap"] = self._strategy_roll_trap_press()
+            settings["fc_press"] = self._strategy_roll_trap_press()
+            settings["fast_breaks"] = self._strategy_roll_balanced()
+            settings["aggression"] = self._strategy_roll_aggression()
+
+        # Point 4: defensive strength scale.
+        d_ability = cum("AG") + cum("ID") + cum("OD")
+        if d_ability > 1200:
+            settings["defense"] = random.randint(0, 2)
+        elif d_ability > 900:
+            settings["defense"] = random.randint(0, 3)
+        elif d_ability > 700:
+            settings["defense"] = random.randint(0, 4)
+        elif d_ability > 500:
+            settings["defense"] = random.randint(1, 4)
+        else:
+            settings["defense"] = random.randint(2, 4)
+
+        return settings
 
     @staticmethod
     def init_team_attributes(mode="single", tournament_seed=None, shot_threshold_override=None):

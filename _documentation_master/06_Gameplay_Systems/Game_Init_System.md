@@ -270,3 +270,71 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 ---
 
 **Last updated:** May 2026 — Player-level data ingestion section added (`roster_loader` → `Player(data)` → `summarize_game_state` projection); `height` added to per-player game-doc projection for v2 player sprite. Prior: April 2026 — `franchise_id` always on game doc when provided; GET + enrich scoreboard pipeline; `team_scoreboard_meta` + frontend merge; FTD name-resolution at `init-game`; scouting template merge for defense `used` / full row shape.
+
+
+**Computer Team Strategy Logic**
+1. Identify active players to determing logic
+  -Game init settings are calculatd using the active five starters using the same logic we use for them in teh Scouting Reprot tab of the FCC
+  -Updatd game plan settings at each quarter break, timeout and player foul out instance are set using the five active players coming out of the break (LMK if we need to adjust order of calculating this per our current code)
+
+
+2. Determine any outlier offense strengths or weaknesses
+  - Inside Offense Score = cum SC of all active starters
+  - Outside Offense Score = cum SH of all active starters
+  - Attack Offense Score = (cum SC of all active starters + cum AG of all active starters) / 2
+
+  - Middle Value = the middle value of those three.
+    - if the Higest Value - 70 > Middle Value, that represents a strong tendency (i.e. if Outside Offense Score is the upper value in this scenario, then Outside offense is a strong tendency)
+    - if the lowest value + 70 < middle value, that is a weak tendency
+
+  - if strong tendency exists, set that Offense type (inside, attack or outside) at random.rantint(3,4)
+  - always set the middle value and any non strong or weak tendencies at random.randint(1,3)
+  - if weak tendence exists, set it at random.randint(0,1)
+
+3. Determine endurance based settings
+  -Get cum ND score by adding the ND of teh five active startes
+    -if cum ND < 200 = weak endurance
+    -elif cum ND > 350 = strong endurance
+    -else middle endurance
+
+  -Get cum Endurance D score by adding the AG + OD of all five active players
+  -Get cum Endurance O score by adding the AG + SC of all give active players
+  -Get cum Intelligence score by adding the IQ of all five active players
+
+  -if weak endurance
+    - HC Traps FC Presses, and Fast Breaks, and Aggression each get their own roll of random.randint(0,2)
+  -elif strong endurance
+    - if Cum Endurance D > 600: FC Press and HC Trap each get their own roll of random.randint(0,4)
+    - if Cum Endurance O > 600: Fast Breaks gets a random roll of random.randint(1,4)
+    - if cum Intelligence > 300: Aggression get a random roll of random.randint(2,4)
+
+  - if HC Trap, FC Press, Aggression, or Fast Break did not receive a roll per the above crieria, they get aour standard logic for rolls. Please verify but I belive these are random.randint(0,4) except for HC Trap and FC Press which tend to skew lower, right?
+
+4. Determine Defensive Strengths Scale
+  - Get cum D Ability by add the AG + ID + OD of the five active players
+  - if cum D Ability > 1200: defense = random.randint(0,2)
+  - elif cum D Ability > 900: defense = random.randint(0,3)
+  - elif cum D Ability > 700: defense = random.randint(0,4)
+  - elif cum D Ability > 500: defense = random.randint(1,4)
+  - else: defense = random.randint(2,4)
+
+5. Leave as is with current logic for now for
+  -offense
+  -rebounding
+
+### Implementation notes (finalized 2026-06-16)
+
+**Scope:** computer teams only (user game plan is never auto-set). Applied at **game init** and at every **quarter break / timeout / foul-out**. `offense`, `rebounding`, `play_calling`, and `tempo` keep their legacy rolls.
+
+**Active five (point 1):** at game init the lineup isn't built yet, so the five come from the **projected starting five** (greedy best (player, open position) by rating — same selection as the FCC Scouting Report). At in-game events the lineup is already rebuilt first, so the actual five active players are used (no ordering change needed).
+
+**Attribute source:** cumulative sums use each player's **`anchor_<attr>` baseline** (fallback to raw `<attr>`), matching the Scouting Report tab — so tendencies reflect talent, not transient in-game fatigue/momentum.
+
+**"Standard logic for rolls" = the existing legacy weighted distributions** (not flat `randint(0,4)`):
+- `fast_breaks` → weights `[5,15,60,15,5]`
+- `hc_trap`, `fc_press` → weights `[34,40,20,5,1]` (skew low), rolled **independently** (legacy shared a single roll; now separate)
+- `aggression` → weights `[10,20,40,20,10]`
+
+**Point 3 correction:** in the strong-endurance branch, if `cum Intelligence ≤ 300`, **aggression** also falls back to its standard roll (it was accidentally omitted from the original else).
+
+**Code:** `TeamManager._compute_strategic_strategy_settings()` / `_resolve_strategy_active_five()` (`BackEnd/models/team_manager.py`); applied at construction (computer teams) and via `autoset_strategy_settings()` (`BackEnd/utils/db_utils.py`).
