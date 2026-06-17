@@ -692,7 +692,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 
 - **D2.** Pass-to-side branch full sequence (which teammate, y range, timing). *(Now specified in §6 — promote to build when Cut 2 lands.)*
 - **D3.** x=64 transition trigger logic + BH read at x=64 (shot vs HCO). *(Specified in §7.)*
-- **D4.** Shot-attempt branch decision tree: SH > 80 / SC+AG > 105 / pass-with-teammates; drive target by y; inside-spot teammate assignment. *(Specified in §7. **Partial** — 2D-2a built the Attack-Basket fork + shoot-in-place leaf; drive/dish = 2D-2b, top-level pass = 2D-2c.)*
+- **D4.** ✅ **Built (2D-2a + 2D-2b + 2D-2c)** — the full §7 shot-attempt tree: the Attack-Basket fork + shoot-in-place (2D-2a); the shoot/drive/pass optimal logic (SH>80 / SC+AG>105 / pass) + drive target by y + inside-spot teammate relocation + 50/50 drive→dish (2D-2b); and the top-level pass (2D-2c) — receiver selection (closest past-x=64 + open-rim override) with post-catch resolution (AB catch → attack via D18 bridge if defenders≤offenders, else Kick-Out→HCO; past-x=64 off-band → re-enter loop).
 - **D5.** ✅ Built (2D-2a). Rim-protection collapse: on a shot attempt each defender moves (standard pace, interrupted to release time) toward the (x∈[77,87], y∈[19,31]) band; release coords computed in `resolve_hct_attack_basket_shot`. (No collision handling yet.)
 - **D6.** ✅ Built (2D-2a). Shot-defender = nearest defender ending within 4 x / 6 y of the shooter **at the shot release**, evaluated on the engine-computed D5 release coords (deterministic — sidesteps the prior "spotty" runtime-snapshot timing). Contested → defended shot score; else open (still rolled vs. threshold, no auto-make).
 - **D7.** ✅ Resolved (§7 "HCO transition branch — execution") — HCT→HCO supports a
@@ -713,10 +713,11 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 - **D12.** Per-tick energy decay vs. once-per-turn.
 - **D13.** Determinism / seeded RNG for replays.
 - **D14.** Distant sim path: "decisions only, no movement" short-circuit for franchise CPU sim.
-- **D15.** When step-N movement of *other* defenders / offensive teammates kicks in (first cut: only PG defender moves at converge). **Note (render vs. model):** the emitter now progresses off-ball offense toward their setup spots at sprint, interrupted per step and carried forward (the `_build_loop_step` interrupted-coord clamp — fixes the off-ball "jet"), so they *render* as still-en-route. But the **engine** still seeds `off_coords` for all five at the full setup targets and re-asserts them every segment — i.e., its internal model treats off-ball offense as already arrived. Harmless today (no engine decision reads off-ball offensive positions), but D15 (and any logic that does read them — e.g. the "defenders > offenders in the Attack Basket Area" HCO trigger, pass targeting) must switch the engine to track each off-ball player's *actual* lagging position rather than the assumed setup spot.
+- **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own `standard` AG rate, **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance**, **hold**, and **broken-HCT drive** segments. Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Initial **converge** and the **pass-defense formation** still snap by design (initial engagement / D19 set-and-persist).
+- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / broken-HCT drive / pass flight / reception), excluding the BH and any mid-catch receiver. Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
 - **D16.** Result-type stats parity vs. skeleton path (box-score / scouting / season totals).
 - **D17.** ✅ Resolved — read thresholds: §4 loop reads attack>200 / pass>120; §5 broken-HCT reads attack>175 / pass>110 (intentional rescale — open floor invites attack); §7 goal-achievement read now >200 (was 190; optimal-vs-random gate, a different decision type than the §4/§5 action gates).
-- **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via `_psa_is_behind`; emitter appends the drive + `_build_post_shot_sub_steps`. ⚠️ Won't fire in normal play until step-N defender movement (D15) lets the offense beat the trap (the PG re-converges every segment today, so `moment == "none"` is rarely reached).
+- **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via `_psa_is_behind`; emitter appends the drive + `_build_post_shot_sub_steps`. ✅ Now reachable in normal play: D15's interrupted defender movement lets a quicker BH out-run the PG so `moment == "none"` can occur.
 - **D19.** Pass-movement defender-target persistence: how defender pass-defense targets carry across loop iterations so they don't re-pose / thrash each tick. Cut-2 detail; not a blocker.
 
 ### Answered
@@ -774,9 +775,10 @@ Design is complete. These are the remaining work items.
   to a backcourt teammate (x<50 home / x>50 away). **Guard built (preventive):**
   `_select_pass_receiver` drops any backcourt teammate from the two-closest pool
   when the BH is past half-court, so a legal teammate is chosen when one exists.
-  **Still TODO:** detect an *actual* over-and-back (no legal option, or a forced
-  backward pass) and process it as a dead-ball turnover; extend the guard to the
-  2D-2c top-level-pass selection.
+  The 2D-2c top-level pass is forward-only (pool = teammates past x=64), so it
+  satisfies the guard by construction. **Still TODO:** detect an *actual*
+  over-and-back (no legal option, or a forced backward pass) and process it as a
+  dead-ball turnover.
 - Mid-flight pass interception — stealing a pass in the air (D11).
 - Pass-defender target persistence — keep defenders' pass-defense targets steady across loop iterations so they don't jitter each tick (D19).
 
@@ -784,12 +786,13 @@ Design is complete. These are the remaining work items.
 - The full §4 loop: continuous detection, repeated reads, neutral-advance iterations.
 - Pass branch / pass-to-side movement (D2).
 - x=64 transition read — shot vs HCO (D3).
-- Shot-attempt decision tree: shoot / drive / pass (D4). *(Partial — 2D-2a built the Attack-Basket fork + shoot-in-place; drive/dish = 2D-2b, top-level pass = 2D-2c.)*
+- ✅ **Shot-attempt decision tree: shoot / drive / pass (D4) — built (2D-2a/2b/2c).** Shoot-in-place, drive + 50/50 drive→dish, and the top-level pass (receiver selection + AB-catch attack/HCO + off-band re-entry).
 - ✅ **Rim-protection collapse (D5) — built (Phase 2D-2a).** Defenders close toward the rim band on a shot attempt.
 - ✅ **Shot-defender pick at the shot release (D6) — built (Phase 2D-2a).** Nearest defender within 4 x / 6 y of the shooter, on deterministic engine coords.
-- ✅ **Broken-HCT fast break (D18) — built (Phase 2D-1).** Real make/miss rim attempt via `dynamic_hct_shot.resolve_hct_fast_break_shot` (reuses the Steal-FB contest core). *(Won't trigger until D15 lets the offense beat the trap.)*
+- ✅ **Broken-HCT fast break (D18) — built (Phase 2D-1).** Real make/miss rim attempt via `dynamic_hct_shot.resolve_hct_fast_break_shot` (reuses the Steal-FB contest core). *(Reachable now that D15 lets the offense beat the trap.)*
+- ✅ **Interrupted defender movement (D15) — built (Cut 2).** Defenders chase at their own rate (interrupted, position-tracking) instead of snapping onto the BH, so a quicker BH gains real separation and broken-HCT fires.
+- ✅ **Off-ball offense position tracking (D15b) — built (Cut 2).** Engine tracks each teammate's actual lagging position (walk-up replay + per-segment hustle), so the Attack-Basket count and pass-targeting reads use real coords.
 - 10-second violation runtime wiring (D9).
-- Step-N movement for the other defenders / teammates, not just the PG defender (D15).
 - Stats parity with the existing skeleton path (D16).
 
 **Infrastructure / later polish:**

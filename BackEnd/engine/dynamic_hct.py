@@ -33,23 +33,30 @@ reaches the topLane spot (perfect-PSA spot behind the BH), the engine emits
 ``dynamic_hct_shot.resolve_hct_fast_break_shot`` for a real make/miss rim attempt.
 Phase 2D-2a added the §7 in-Attack-Basket shot: when the BH reaches the Attack
 Basket Area (x>64, y 10-30) and a goal-achievement read favours a shot, the
-engine emits ``result_type = "ATTACK_BASKET_SHOT"`` + an ``ab_seed``; the wrapper
-hands off to ``dynamic_hct_shot.resolve_hct_attack_basket_shot`` (D5 rim collapse
-+ D6 shot-defender + a rolled, shoot-in-place make/miss). Drive / top-level pass
-(2D-2b/2D-2c), fouls/steals, and remaining stat parity arrive next.
+engine emits a shot result + an ``ab_seed`` and the wrapper hands off to
+``dynamic_hct_shot``: ``ATTACK_BASKET_SHOT`` → shoot-in-place (2D-2a), or
+``ATTACK_BASKET_DRIVE`` → drive / 50-50 drive→dish (2D-2b), both via D5 rim
+collapse + D6 shot-defender + a rolled make/miss. The §7 shoot/drive/pass read
+(`_choose_shot_attempt`) picks the leaf; the **pass** leaf (2D-2c) emits a real
+top-level pass (`_select_top_level_pass_receiver`) and resolves the receiver's
+catch — attack via the D18 bridge / Kick-Out→HCO inside the Attack Basket Area,
+or loop re-entry past x=64 off-band. Fouls/steals and remaining stat parity
+arrive next.
 """
 from __future__ import annotations
 
 import logging
 import math
 import random
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
     STANDARD_GRID_PER_GAME_SEC,
     HCO_STRING_SPOTS,
     HCT_SETUP_POSITIONS,
     RESET_INBOUND_PASS_GRID_PER_GAME_SECOND,
+    HOME_RIM_COORDS,
+    AWAY_RIM_COORDS,
 )
 from BackEnd.utils.shared import (
     ag_to_grid_per_game_sec,
@@ -60,6 +67,8 @@ from BackEnd.utils.shared import (
     get_away_player_coords,
 )
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
+from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+from BackEnd.utils.transition_bridge import _interrupted_coord
 
 
 # 10-second violation gate (per Dynamic_HCT_Turns.md "Special Situations").
@@ -113,6 +122,13 @@ ATTACK_BASKET_Y_MIN, ATTACK_BASKET_Y_MAX = 10, 30
 
 # §7 goal-achievement read: read > this → make the optimal choice, else random.
 GOAL_ACHIEVEMENT_READ_THRESHOLD = 200
+
+# §7 shot-attempt optimal tree: SH > this → shoot; elif SC+AG > this → drive; else pass.
+SHOOT_SH_THRESHOLD = 80
+DRIVE_SCAG_THRESHOLD = 105
+
+# §7 top-level pass: open-rim override radius (euclidean grid spots).
+TOP_PASS_OPEN_RIM_RADIUS = 9
 
 # §7 / D5 rim-protection cluster the defenders collapse into on a shot attempt
 # (x from midLane−3 toward the basket, y within ±6 of basket-y). The resolver
@@ -495,6 +511,73 @@ def _select_pass_receiver(
     return random.choice(candidates)
 
 
+def _choose_shot_attempt(
+    player,
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+) -> str:
+    """§7 shot-attempt tree: returns "shoot" / "drive" / "pass".
+
+    Optimal: SH>80 → shoot; elif SC+AG>105 → drive; else pass. With no defender
+    in range the BH always drives (or passes to a teammate closer to the basket —
+    the pass leaf is 2D-2c). Otherwise a read gates optimal-vs-random: read>200 →
+    the optimal option, else a random option.
+    """
+    attrs = getattr(player, "attributes", {}) or {}
+    sh = attrs.get("SH", 0)
+    sc = attrs.get("SC", 0)
+    ag = attrs.get("AG", 0)
+    if sh > SHOOT_SH_THRESHOLD:
+        optimal = "shoot"
+    elif sc + ag > DRIVE_SCAG_THRESHOLD:
+        optimal = "drive"
+    else:
+        optimal = "pass"
+    if not _in_range_defenders(bh_xy, def_coords):
+        return "drive"
+    if _player_read(player) > GOAL_ACHIEVEMENT_READ_THRESHOLD:
+        return optimal
+    return random.choice(("shoot", "drive", "pass"))
+
+
+def _select_top_level_pass_receiver(
+    bh_pos: str,
+    off_coords: Dict[str, Dict[str, int]],
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+):
+    """§7 top-level pass receiver (distinct from the §6 backcourt pass).
+
+    Candidate pool = teammates past x=64 (toward the basket). Default = the
+    teammate closest to the BH. Open-rim override: a teammate within 9 euclidean
+    of the basket with **no** defender within 9 of him receives instead (random
+    among qualifiers). Returns the receiver position, or ``None`` if no teammate
+    is past x=64 (caller falls back to a solo finish). The forward-only pool
+    means the over-and-back guard is satisfied by construction.
+    """
+    rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+    basket = {"x": float(rim["x"]), "y": float(rim["y"])}
+
+    def _past_64(c: Dict[str, Any]) -> bool:
+        return (100 - c["x"]) > 64 if is_away_offense else c["x"] > 64
+
+    pool = [p for p in POSITIONS if p != bh_pos and _past_64(off_coords[p])]
+    if not pool:
+        return None
+    open_rim = [
+        p
+        for p in pool
+        if _euclid(off_coords[p], basket) <= TOP_PASS_OPEN_RIM_RADIUS
+        and all(
+            _euclid(off_coords[p], def_coords[d]) > TOP_PASS_OPEN_RIM_RADIUS
+            for d in POSITIONS
+        )
+    ]
+    if open_rim:
+        return random.choice(open_rim)
+    return min(pool, key=lambda p: _euclid(off_coords[bh_pos], off_coords[p]))
+
+
 def _determine_shift(bh_y: float) -> str:
     """§6 shift trigger on ball-handler y."""
     if bh_y < SHIFT_LOWER_Y:
@@ -504,31 +587,153 @@ def _determine_shift(bh_y: float) -> str:
     return "normal"
 
 
-def _position_defense(
+def _defense_targets(
     bh_xy: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
     is_away_offense: bool,
-) -> None:
-    """§6 defensive formation around the BH (in place).
+) -> Dict[str, Dict[str, int]]:
+    """§6 defensive formation targets around the BH (pure — no mutation).
 
     Upper/lower shift → two designated trappers form the standard HC trap
     (reusing ``compute_hct_trap_formation``) plus a center defender; normal
-    shift → the defensive PG pressures the BH. Non-engaged defenders hold.
+    shift → the defensive PG pressures the BH. Non-engaged defenders hold at
+    their current spot (target == current position).
     """
+    targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
     shift = _determine_shift(bh_xy["y"])
     if shift in ("upper", "lower"):
         trap = compute_hct_trap_formation(bh_xy, shift, is_away_offense=is_away_offense)
         for pos, xy in trap.items():
-            def_coords[pos] = _clamp_xy(xy)
+            targets[pos] = _clamp_xy(xy)
         # Center defender (remaining backcourt guard): y=25, x ±4 toward basket.
         backcourt = {"PG", "SG", "SF"}
         center_candidates = [p for p in backcourt if p not in trap]
         if center_candidates:
             center_pos = center_candidates[0]
             cx = bh_xy["x"] + _basket_dir(is_away_offense) * 4
-            def_coords[center_pos] = _clamp_xy({"x": int(cx), "y": 25})
+            targets[center_pos] = _clamp_xy({"x": int(cx), "y": 25})
     else:
-        def_coords["PG"] = _converge_xy(bh_xy, is_away_offense)
+        targets["PG"] = _converge_xy(bh_xy, is_away_offense)
+    return targets
+
+
+def _position_defense(
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+) -> None:
+    """Snap the defense onto its §6 targets in place (instantaneous reposition —
+    used where the defense is *set* at once, e.g. the pass-defense formation)."""
+    for pos, tgt in _defense_targets(bh_xy, def_coords, is_away_offense).items():
+        def_coords[pos] = dict(tgt)
+
+
+def _move_defense(
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+    seconds: float,
+    def_lineup: Dict[str, Any],
+) -> None:
+    """D15: move each defender toward its §6 target at the player's *standard*
+    rate, **interrupted** by the segment duration, tracking actual positions.
+
+    A quicker ball handler therefore gains real separation (the defense no
+    longer teleports back onto him every step), which is what lets the offense
+    beat the trap and reach the broken-HCT / fast-break branches. Matches the
+    emitter's interrupted-coord render so the engine model and animation agree.
+    Mutates ``def_coords`` in place.
+    """
+    targets = _defense_targets(bh_xy, def_coords, is_away_offense)
+    for pos in POSITIONS:
+        rate = _ag_grid_per_game_sec(def_lineup.get(pos), "standard")
+        if rate <= 0:
+            def_coords[pos] = _clamp_xy(targets[pos])
+            continue
+        def_coords[pos] = _clamp_xy(
+            _interrupted_coord(def_coords[pos], targets[pos], rate, seconds)
+        )
+
+
+def _prior_final_coords(game: Any) -> Dict[str, Dict[str, Any]]:
+    """The prior turn's per-player final (BIP-end) coords, keyed by player_id.
+
+    Empty when there is no prior turn (first possession / offline tests), in
+    which case the engine assumes off-ball offense have arrived at setup.
+    """
+    turns = getattr(game, "turns", None) or []
+    if not turns:
+        return {}
+    last = turns[-1]
+    return (last.get("final_coords") or {}) if isinstance(last, dict) else {}
+
+
+def _walk_up_loop_start_offense(
+    prior_coords: Dict[str, Dict[str, Any]],
+    off_lineup: Dict[str, Any],
+    off_targets: Dict[str, Dict[str, int]],
+    bh_pos: str,
+    bh_target: Dict[str, Any],
+) -> Dict[str, Dict[str, int]]:
+    """D15b: off-ball offense *actual* positions at the start of the §4 loop.
+
+    They begin the possession at their prior-turn final coords and hustle toward
+    their setup spots at ``sprint`` during the BH-gated walk-up (duration = the
+    BH's standard-rate travel to ``bh_target``), so by loop start they may still
+    be en route. Mirrors the emitter's ``build_walk_up_step`` so the engine model
+    matches the render. Falls back to the setup target (assume arrived) per
+    player whenever prior coords are unavailable. The BH is the gate → he reaches
+    his setup target, so he always starts the loop arrived.
+    """
+    coords: Dict[str, Dict[str, int]] = {pos: dict(off_targets[pos]) for pos in POSITIONS}
+    if not prior_coords:
+        return coords
+    bh_player = off_lineup.get(bh_pos)
+    bh_prior = prior_coords.get(_player_id(bh_player))
+    if not bh_prior:
+        return coords
+    bh_rate = _ag_grid_per_game_sec(bh_player, "standard")
+    walk_t = _euclid(bh_prior, bh_target) / bh_rate if bh_rate > 0 else 0.0
+    for pos in POSITIONS:
+        if pos == bh_pos:
+            continue
+        player = off_lineup.get(pos)
+        p_prior = prior_coords.get(_player_id(player))
+        if not p_prior:
+            continue
+        rate = _ag_grid_per_game_sec(player, "sprint")
+        if rate <= 0:
+            continue
+        coords[pos] = _clamp_xy(
+            _interrupted_coord(p_prior, off_targets[pos], rate, walk_t)
+        )
+    return coords
+
+
+def _move_offense(
+    off_coords: Dict[str, Dict[str, int]],
+    off_targets: Dict[str, Dict[str, int]],
+    seconds: float,
+    off_lineup: Dict[str, Any],
+    bh_pos: str,
+    exclude: Optional[set] = None,
+) -> None:
+    """D15b: off-ball offense keep hustling toward their setup spots at ``sprint``,
+    interrupted by the segment duration, tracking actual positions across
+    segments. The ball handler (and any ``exclude`` positions, e.g. a pass
+    receiver mid-catch) are moved by the segment logic, not here. Mutates
+    ``off_coords`` in place. Matches the emitter's off-ball interrupted render.
+    """
+    skip = {bh_pos} | (exclude or set())
+    for pos in POSITIONS:
+        if pos in skip:
+            continue
+        rate = _ag_grid_per_game_sec(off_lineup.get(pos), "sprint")
+        if rate <= 0:
+            continue
+        off_coords[pos] = _clamp_xy(
+            _interrupted_coord(off_coords[pos], off_targets[pos], rate, seconds)
+        )
 
 
 def _segment(
@@ -606,7 +811,8 @@ def _psa_is_behind(bh_xy: Dict[str, Any], is_away_offense: bool) -> bool:
 
 
 def _emit_broken_hct_drive(
-    bh_xy, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos
+    bh_xy, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos, def_lineup,
+    off_targets, off_lineup,
 ) -> Tuple[str, Dict[str, Any], float]:
     """Open-floor attack (§5 broken HCT). Returns ``(mode, segment, seconds)``.
 
@@ -623,7 +829,11 @@ def _emit_broken_hct_drive(
         mode = "HCO"
     seconds = max(0.3, _euclid(bh_xy, target) / bh_drive_rate)
     off_coords[bh_pos] = target
-    _position_defense(target, def_coords, is_away_offense)
+    # D15: the defense trails the open-floor drive at its own rate (interrupted),
+    # so it does not snap onto the now-deep BH — preserving the fast-break gap.
+    _move_defense(target, def_coords, is_away_offense, seconds, def_lineup)
+    # D15b: off-ball offense keep hustling toward their setup spots.
+    _move_offense(off_coords, off_targets, seconds, off_lineup, bh_pos)
     return (
         mode,
         _segment("hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos),
@@ -681,10 +891,14 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     bh_drive_rate = ag_to_grid_per_game_sec(bh_attrs.get("AG", 50))
 
     # --- Running per-player coords (start of the loop = walk-up end) ----------
-    off_coords: Dict[str, Dict[str, int]] = {
-        pos: {"x": int(off_targets[pos]["x"]), "y": int(off_targets[pos]["y"])}
-        for pos in POSITIONS
-    }
+    # D15b: off-ball offense start the loop at their *actual* walk-up positions
+    # (they may still be hustling up from the backcourt), not snapped to setup —
+    # so reads that consult their positions (Attack-Basket count, pass targeting)
+    # use real coords. The BH is the walk-up gate, so he starts arrived.
+    prior_coords = _prior_final_coords(game)
+    off_coords: Dict[str, Dict[str, int]] = _walk_up_loop_start_offense(
+        prior_coords, off_lineup, off_targets, bh_pos, bh_target
+    )
     def_coords: Dict[str, Dict[str, int]] = {
         pos: {"x": int(def_targets[pos]["x"]), "y": int(def_targets[pos]["y"])}
         for pos in POSITIONS
@@ -713,6 +927,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         0.4,
         calc_ag_segment_seconds(pg_initial, def_coords["PG"], pg_def, archetype="standard"),
     )
+    # D15b: off-ball offense keep hustling toward setup during the converge beat.
+    _move_offense(off_coords, off_targets, converge_seconds, off_lineup, bh_pos)
     loop_segments.append(
         _segment("hct_converge", off_coords, def_coords, converge_seconds, ("def", "PG"), bh_pos)
     )
@@ -729,7 +945,11 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         advance_seconds = max(0.3, _euclid(bh_xy, new_bh) / bh_drive_rate)
         off_coords[bh_pos] = new_bh
         bh_xy = off_coords[bh_pos]
-        _position_defense(bh_xy, def_coords, is_away_offense)
+        # D15: defenders chase at their own rate (interrupted), so a quicker BH
+        # gains separation rather than the defense snapping back onto him.
+        _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup)
+        # D15b: off-ball offense keep hustling toward their setup spots.
+        _move_offense(off_coords, off_targets, advance_seconds, off_lineup, bh_pos)
         loop_segments.append(
             _segment("hct_advance", off_coords, def_coords, advance_seconds, ("off", bh_pos), bh_pos)
         )
@@ -740,7 +960,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         ``mode`` is "HCO" (drove to the perfect PSA spot) or "FAST_BREAK"
         (drove to topLane; caller seeds the D18 shot resolver)."""
         mode, seg, sec = _emit_broken_hct_drive(
-            bh_xy, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos
+            bh_xy, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos, def_lineup,
+            off_targets, off_lineup,
         )
         loop_segments.append(seg)
         return mode, sec
@@ -814,11 +1035,79 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                     result_type = "HCO"
                     text_suffix = " they pull it back out to set up the half court offense"
                     break
-                # Shot attempt. 2D-2a first slice: shoot from the BH's spot
-                # (drive / top-level pass options arrive in 2D-2b / 2D-2c).
+                # Shot attempt — §7 shoot / drive / pass tree.
+                attempt = _choose_shot_attempt(ball_handler, bh_xy, def_coords)
+                if attempt == "pass":
+                    # §7 top-level pass to a teammate past x=64.
+                    receiver_pos = _select_top_level_pass_receiver(
+                        bh_pos, off_coords, def_coords, is_away_offense
+                    )
+                    if receiver_pos is not None:
+                        # Flight: persist the pass-defense formation around the
+                        # receiver, then the ball travels (forward pool → no
+                        # over-and-back). Receiver becomes the new BH.
+                        pass_def_coords = {p: dict(def_coords[p]) for p in POSITIONS}
+                        _position_defense(
+                            off_coords[receiver_pos], pass_def_coords, is_away_offense
+                        )
+                        for p in POSITIONS:
+                            def_coords[p] = dict(pass_def_coords[p])
+                        pass_seconds = max(
+                            0.3,
+                            _euclid(off_coords[bh_pos], off_coords[receiver_pos])
+                            / PASS_GRID_PER_GAME_SEC,
+                        )
+                        # D15b: off-ball offense keep hustling during the flight;
+                        # the receiver holds to catch.
+                        _move_offense(
+                            off_coords, off_targets, pass_seconds, off_lineup, bh_pos,
+                            exclude={receiver_pos},
+                        )
+                        loop_segments.append(
+                            _pass_segment(
+                                bh_pos, receiver_pos, off_coords, def_coords, pass_seconds
+                            )
+                        )
+                        shot_clock -= pass_seconds
+                        bh_pos = receiver_pos
+                        bh_xy = off_coords[bh_pos]
+                        ball_handler = off_lineup.get(bh_pos)
+
+                        if _in_attack_basket_area(bh_xy, is_away_offense):
+                            # Catch inside the Attack Basket Area → act on the
+                            # AB offender/defender ratio.
+                            off_in2 = _count_in_attack_basket(off_coords, is_away_offense)
+                            def_in2 = _count_in_attack_basket(def_coords, is_away_offense)
+                            if def_in2 <= off_in2:
+                                # Numbers advantage → attack the rim (D18 bridge).
+                                _seed_fast_break()
+                                result_type = "FAST_BREAK_SHOT"
+                                text_suffix = " quick pass inside — they attack the rim!"
+                            else:
+                                # Outnumbered → hold → HCO (Kick-Out entry: the
+                                # receiver is inside the Attack Basket Area).
+                                result_type = "HCO"
+                                text_suffix = " they kick it back out & set up the half court offense"
+                            break
+                        # Caught past x=64 but outside the AB band → the receiver
+                        # is the new BH; re-enter the loop (settles to HCO today;
+                        # the full detect→read re-entry is the 2D-3 item).
+                        continue
+                    # No forward teammate to receive → fall back to the
+                    # offense-optimal solo finish.
+                    bh_attrs = getattr(ball_handler, "attributes", {}) or {}
+                    attempt = (
+                        "drive"
+                        if (bh_attrs.get("SC", 0) + bh_attrs.get("AG", 0)) > DRIVE_SCAG_THRESHOLD
+                        else "shoot"
+                    )
                 _seed_attack_basket_shot()
-                result_type = "ATTACK_BASKET_SHOT"
-                text_suffix = " they go to work in the paint"
+                if attempt == "drive":
+                    result_type = "ATTACK_BASKET_DRIVE"
+                    text_suffix = " they attack the rim"
+                else:
+                    result_type = "ATTACK_BASKET_SHOT"
+                    text_suffix = " they go to work in the paint"
                 break
             # Past the PSA but outside the Attack Basket y-band — settle into
             # HCO (the "re-enter the loop as a new BH" treatment is a 2D-3 item).
@@ -863,7 +1152,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             # §5 hold resolution: BH holds the ball for random(1,3)s while the
             # defense keeps closing. Outcome depends on what reaches the BH.
             hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
-            _position_defense(bh_xy, def_coords, is_away_offense)
+            # D15: defense keeps closing during the hold at its own rate.
+            _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup)
+            # D15b: off-ball offense keep hustling toward their setup spots.
+            _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
             loop_segments.append(
                 _segment("hct_hold", off_coords, def_coords, hold_seconds, ("off", bh_pos), bh_pos)
             )
@@ -920,6 +1212,12 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         pass_seconds = max(
             0.3, _euclid(off_coords[passer_pos], off_coords[receiver_pos]) / PASS_GRID_PER_GAME_SEC
         )
+        # D15b: off-ball offense keep hustling during the flight; the receiver
+        # holds to catch.
+        _move_offense(
+            off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
+            exclude={receiver_pos},
+        )
         loop_segments.append(
             _pass_segment(passer_pos, receiver_pos, off_coords, def_coords, pass_seconds)
         )
@@ -930,6 +1228,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         bh_pos = receiver_pos
         bh_xy = off_coords[bh_pos]
         recv_hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
+        # D15b: off-ball offense keep hustling toward setup during the reception.
+        _move_offense(off_coords, off_targets, recv_hold_seconds, off_lineup, bh_pos)
         loop_segments.append(
             _segment(
                 "hct_reception", off_coords, def_coords, recv_hold_seconds, ("off", bh_pos), bh_pos

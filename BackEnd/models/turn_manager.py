@@ -2451,23 +2451,13 @@ class TurnManager:
         # ✅ SS&S: GameManager is single source of truth during gameplay
         # Check GameManager first, only fall back to DB if not found
         
-        # Only load playbook settings for user teams (CPU teams use equal weights)
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
-        
-        # Determine which team and mode
-        is_offense_user = offense_team.is_user_team
-        is_defense_user = defense_team.is_user_team
-        
-        if not (is_offense_user or is_defense_user):
-            # CPU vs CPU - use equal weights
-            return None
-        
+
         # ✅ STEP 1: Check GameManager first (single source of truth during gameplay)
-        # ✅ FIX: Always check GameManager first - attribute is always set during initialization (even if empty dict)
-        # Empty dict {} means "no settings configured" which is valid - return it to avoid DB lookup
-        # This prevents 37 DB lookups per quarter when playbook_settings exists but is empty
-        if is_offense_user:
+        # Empty dict {} means "no settings configured" which is valid - return it to avoid DB lookup.
+        # CPU teams may now carry customized playbook_settings too, so do not gate this by is_user_team.
+        if str(team_id) == str(getattr(offense_team, "team_id", None)):
             has_attr = hasattr(offense_team, 'playbook_settings')
             logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings OFFENSE: hasattr={has_attr}, team={offense_team.name}, team_id={getattr(offense_team, 'team_id', 'NO_ID')}")
             if has_attr:
@@ -2477,7 +2467,7 @@ class TurnManager:
                 return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
             else:
                 logging.error(f"🔴🔴🔴 [DIAG] OFFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={offense_team.name}, dir(team)={[x for x in dir(offense_team) if not x.startswith('_')][:10]}")
-        elif is_defense_user:
+        elif str(team_id) == str(getattr(defense_team, "team_id", None)):
             has_attr = hasattr(defense_team, 'playbook_settings')
             logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr={has_attr}, team={defense_team.name}, team_id={getattr(defense_team, 'team_id', 'NO_ID')}")
             if has_attr:
@@ -2487,9 +2477,13 @@ class TurnManager:
                 return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
             else:
                 logging.error(f"🔴🔴🔴 [DIAG] DEFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={defense_team.name}, dir(team)={[x for x in dir(defense_team) if not x.startswith('_')][:10]}")
+        else:
+            return None
         
         # ✅ STEP 2: Fall back to DB if GameManager doesn't have settings (shouldn't happen, but safety net)
-        logging.error(f"🔴🔴🔴 [DIAG] FALLING BACK TO DB - GameManager missing playbook_settings! offense_user={is_offense_user}, defense_user={is_defense_user}")
+        is_offense_team = str(team_id) == str(getattr(offense_team, "team_id", None))
+        is_defense_team = str(team_id) == str(getattr(defense_team, "team_id", None))
+        logging.error(f"🔴🔴🔴 [DIAG] FALLING BACK TO DB - GameManager missing playbook_settings! offense_team={is_offense_team}, defense_team={is_defense_team}")
         from BackEnd.db import games_collection, tournaments_collection, franchises_collection
         from bson import ObjectId
         
@@ -2566,7 +2560,7 @@ class TurnManager:
             teams_obj_lookup = lookup_doc.get("teams", {})
 
             # Get playbook settings for the appropriate team
-            if is_offense_user:
+            if is_offense_team:
                 team_obj = teams_obj_lookup.get(resolved_team_id, {})
                 playbook_settings = team_obj.get("playbook_settings")
                 if playbook_settings:
@@ -2574,7 +2568,7 @@ class TurnManager:
                 else:
                     logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found for offense team: team_id={resolved_team_id}")
                 return playbook_settings
-            elif is_defense_user:
+            elif is_defense_team:
                 # For defense, we need the defense team's ID
                 def_team_id = defense_team.team_id
                 resolved_def_team_id = def_team_id
@@ -2748,7 +2742,7 @@ class TurnManager:
         team_id = defense_team.team_id
         playbook_settings = self._load_playbook_settings(team_id)
 
-        if playbook_settings and defense_team.is_user_team:
+        if playbook_settings:
             zone_settings = playbook_settings.get("zone_defense", {})
             weights = {}
             for zid in zone_ids:

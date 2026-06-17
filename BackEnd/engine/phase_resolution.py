@@ -7265,10 +7265,18 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     # and chose a shot. The resolver applies the D5 rim collapse + D6 shot
     # defender and produces a real MAKE/MISS turn; the emitter appends the shot
     # + post-shot steps after the loop segments.
-    if dyn.get("result_type") == "ATTACK_BASKET_SHOT":
-        from BackEnd.engine.dynamic_hct_shot import resolve_hct_attack_basket_shot
+    if dyn.get("result_type") in ("ATTACK_BASKET_SHOT", "ATTACK_BASKET_DRIVE"):
+        from BackEnd.engine.dynamic_hct_shot import (
+            resolve_hct_attack_basket_shot,
+            resolve_hct_attack_basket_drive,
+        )
 
-        shot = resolve_hct_attack_basket_shot(game, dyn)
+        resolver = (
+            resolve_hct_attack_basket_drive
+            if dyn["result_type"] == "ATTACK_BASKET_DRIVE"
+            else resolve_hct_attack_basket_shot
+        )
+        shot = resolver(game, dyn)
         if not shot.get("_hct_ab_bail"):
             return _assemble_hct_ab_shot_result(
                 game, dyn, shot, def_scouting, text, off_lineup, def_lineup

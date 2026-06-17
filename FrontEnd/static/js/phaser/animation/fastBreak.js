@@ -2,7 +2,7 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenPlayerTo, runPass, cancelBallTweenAndClearOwner, getBallDuration } from "./ballTween.js";
-import { animateShotToRim } from "./ballAnimationSimple.js";
+import { animateBallToPosition, animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import {
   HOME_RIM_COORDS,
@@ -52,6 +52,15 @@ const GRID_MIN_X = CLAMP_BOUNDS.minX;
 const GRID_MAX_X = CLAMP_BOUNDS.maxX;
 const GRID_MIN_Y = CLAMP_BOUNDS.minY;
 const GRID_MAX_Y = CLAMP_BOUNDS.maxY;
+
+async function animateBallToBackendGrid(scene, ballSprite, grid, width, height, duration = 300) {
+  const targetPx = gridToPixels(grid.x, grid.y, width, height);
+  await animateBallToPosition(scene, targetPx, {
+    duration,
+    easing: "Sine.easeOut",
+  });
+  return { grid: { x: grid.x, y: grid.y } };
+}
 
 /**
  * Phase 2 resolution kind for fast break turns — mirrors Rim Runner payload contract
@@ -2901,10 +2910,12 @@ async function animateFastBreakShotWithStopper(scene, turnData, playerSprites, b
     safeTransition(scene.stateMachine, States.Rebound);
     
     const { bounceFromRim, animateRebound } = await import('./ballManager.js');
-    const bounceOriginGrid = (turnData.result_type === "BLOCK" && hasBlockSpotWithStopper)
+    const backendBlockGrid = (turnData.result_type === "BLOCK" && hasBlockSpotWithStopper)
       ? { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y }
-      : basket;
-    const miss = await bounceFromRim(scene, ballSprite, bounceOriginGrid, isHomeOffense, 300);
+      : null;
+    const miss = backendBlockGrid
+      ? await animateBallToBackendGrid(scene, ballSprite, backendBlockGrid, width, height, 300)
+      : await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
@@ -3203,7 +3214,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const blockSpotGrid = hasBlockSpot
       ? { x: turnData.ball_bounce_x, y: turnData.ball_bounce_y }
       : basket;
-    const miss = await bounceFromRim(scene, ballSprite, blockSpotGrid, isHomeOffense, 300);
+    const miss = hasBlockSpot
+      ? await animateBallToBackendGrid(scene, ballSprite, blockSpotGrid, width, height, 300)
+      : await bounceFromRim(scene, ballSprite, blockSpotGrid, isHomeOffense, 300);
 
     // Reuse same rebound / DREB setup as MISS (below)
     const currentIndex = scene.currentTurn || 0;

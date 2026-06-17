@@ -421,6 +421,98 @@ def _build_ab_shot_step(
     return {"start": start, "end": end}
 
 
+def _build_ab_drive_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    driver_id: str,
+    driver_target: GridCoord,
+    teammate_targets: Dict[str, GridCoord],
+    defender_end: Dict[str, GridCoord],
+    driver_shoots: bool,
+    seconds: float,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+) -> AnimationStep:
+    """The §7 / 2D-2b drive step: the driver sprints to his rim target; x>64
+    teammates cut to their inside spots; the defenders collapse (D5). Gate =
+    the driver reaching his rim target. When ``driver_shoots`` he ends in shot
+    motion (no dish); otherwise he ends handling the ball for the dish pass.
+    """
+    t = float(seconds)
+    off_ids = {_player_id_at_pos(off_lineup, p) for p in _OFFENSE_POSITIONS}
+    def_ids = {_player_id_at_pos(def_lineup, p) for p in _OFFENSE_POSITIONS}
+
+    end_coords: Dict[str, GridCoord] = {pid: dict(c) for pid, c in start_coords.items()}
+    end_coords[driver_id] = {"x": float(driver_target["x"]), "y": float(driver_target["y"])}
+    for oid, coord in (teammate_targets or {}).items():
+        if oid in end_coords:
+            end_coords[oid] = {"x": float(coord["x"]), "y": float(coord["y"])}
+    for did, coord in (defender_end or {}).items():
+        if did in end_coords:
+            end_coords[did] = {"x": float(coord["x"]), "y": float(coord["y"])}
+
+    destinations: Dict[str, Optional[GridCoord]] = {}
+    actions: Dict[str, PlayerAction] = {}
+    archetype: Dict[str, PlayerArchetype] = {}
+    for pid, sc in start_coords.items():
+        ec = end_coords.get(pid, sc)
+        moved = (
+            int(round(ec["x"])) != int(round(sc["x"]))
+            or int(round(ec["y"])) != int(round(sc["y"]))
+        )
+        destinations[pid] = dict(ec)
+        if pid == driver_id:
+            actions[pid] = "shoot" if driver_shoots else "handle_ball"
+            archetype[pid] = "sprint"
+        elif pid in def_ids:
+            actions[pid] = "guard_ball" if moved else "guard_offball"
+            archetype[pid] = "sprint" if moved else "stationary"
+        elif moved and pid in off_ids:
+            actions[pid] = "cut"
+            archetype[pid] = "sprint"
+        else:
+            actions[pid] = "stationary"
+            archetype[pid] = "stationary"
+
+    ball: BallState = {"owner_player_id": driver_id}
+    trigger: AdvanceTrigger = {
+        "condition": "player_reaches_position",
+        "T_game_seconds": t,
+        "metadata": {
+            "target_player_id": driver_id,
+            "target_coords": {"x": float(driver_target["x"]), "y": float(driver_target["y"])},
+            "reason": "hct_ab_drive",
+        },
+    }
+    start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball,
+        "clock": {
+            "clock_remaining": clock_remaining_at_start,
+            "shot_clock_remaining": shot_clock_remaining_at_start,
+        },
+        "advance_trigger": trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball,
+        "time_elapsed": t,
+        "clock": {
+            "clock_remaining": clock_remaining_at_start - t,
+            "shot_clock_remaining": shot_clock_remaining_at_start - t,
+        },
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
 def build_dynamic_hct_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -641,10 +733,14 @@ def build_dynamic_hct_animation_steps(
             for s in steps
         ]
 
-    # --- §7 / 2D-2a in-Attack-Basket shot + post-shot sub-steps ----------
-    if is_ab_shot and ab_shooter_id in prev_end_coords:
+    # --- §7 in-Attack-Basket shot/drive + post-shot sub-steps ------------
+    ab_mode = turn_result.get("hct_ab_mode") or "shoot"
+    ab_driver_id = str(turn_result.get("hct_ab_driver_id") or "")
+    defender_end = turn_result.get("hct_ab_defender_end") or {}
+
+    if is_ab_shot and ab_mode == "shoot" and ab_shooter_id in prev_end_coords:
+        # 2D-2a — shoot in place.
         shooter_target = turn_result.get("hct_ab_shooter_target") or {}
-        defender_end = turn_result.get("hct_ab_defender_end") or {}
         t_shot = float(turn_result.get("hct_ab_t_shot") or 0.8)
         shot_step = _build_ab_shot_step(
             off_lineup=off_lineup,
@@ -663,6 +759,78 @@ def build_dynamic_hct_animation_steps(
         )
         steps.append(shot_step)
         step_clock_seconds.append(round(float(shot_step["end"]["time_elapsed"]), 2))
+        _build_post_shot_sub_steps(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense,
+        )
+        step_clock_seconds = [
+            round(float((s.get("end") or {}).get("time_elapsed") or 0.0), 2)
+            for s in steps
+        ]
+
+    elif is_ab_shot and ab_mode in ("drive", "drive_dish") and ab_driver_id in prev_end_coords:
+        # 2D-2b — drive (and optional drive→dish).
+        driver_target = turn_result.get("hct_ab_driver_target") or {}
+        teammate_targets = turn_result.get("hct_ab_teammate_targets") or {}
+        t_drive = float(turn_result.get("hct_ab_t_drive") or 0.6)
+        is_dish = ab_mode == "drive_dish"
+        drive_step = _build_ab_drive_step(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            start_coords=prev_end_coords,
+            driver_id=ab_driver_id,
+            driver_target={
+                "x": float(driver_target.get("x", 0)),
+                "y": float(driver_target.get("y", 0)),
+            },
+            teammate_targets=teammate_targets,
+            defender_end=defender_end,
+            driver_shoots=not is_dish,
+            seconds=t_drive,
+            clock_remaining_at_start=prev_clock_end["clock_remaining"],
+            shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
+            next_step_index=len(steps) + 1,
+        )
+        steps.append(drive_step)
+        step_clock_seconds.append(round(float(drive_step["end"]["time_elapsed"]), 2))
+
+        if is_dish:
+            receiver_id = str(turn_result.get("hct_ab_dish_receiver_id") or "")
+            receiver_target = turn_result.get("hct_ab_dish_receiver_target") or {}
+            t_shot = float(turn_result.get("hct_ab_t_shot") or 0.8)
+            pass_clock = drive_step["end"]["clock"]
+            pass_step = build_pass_step(
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                start_coords=drive_step["end"]["coords"],
+                passer_id=ab_driver_id,
+                receiver_id=receiver_id,
+                continuing_targets=None,
+                clock_remaining_at_start=pass_clock["clock_remaining"],
+                shot_clock_remaining_at_start=pass_clock["shot_clock_remaining"],
+                next_step_index=len(steps) + 1,
+                metadata_reason="hct_ab_dish",
+            )
+            steps.append(pass_step)
+            step_clock_seconds.append(round(float(pass_step["end"]["time_elapsed"]), 2))
+
+            shot_clock = pass_step["end"]["clock"]
+            shot_step = _build_ab_shot_step(
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                start_coords=pass_step["end"]["coords"],
+                shooter_id=receiver_id,
+                shooter_target={
+                    "x": float(receiver_target.get("x", 0)),
+                    "y": float(receiver_target.get("y", 0)),
+                },
+                defender_end=defender_end,
+                seconds=t_shot,
+                clock_remaining_at_start=shot_clock["clock_remaining"],
+                shot_clock_remaining_at_start=shot_clock["shot_clock_remaining"],
+                next_step_index=len(steps) + 1,
+            )
+            steps.append(shot_step)
+            step_clock_seconds.append(round(float(shot_step["end"]["time_elapsed"]), 2))
 
         _build_post_shot_sub_steps(
             steps, turn_result, off_lineup, def_lineup, is_away_offense,

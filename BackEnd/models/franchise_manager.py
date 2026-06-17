@@ -418,6 +418,13 @@ class FranchiseManager:
         playbook_settings = _get_cached_playbook_settings()
         _perf["initialize_playbook_settings"] = (time.time() - _t0) * 1000
 
+        from BackEnd.utils.cpu_playbook_customization import build_user_schedule_cpu_playbook_groups
+
+        cpu_playbook_schedule = build_user_schedule_cpu_playbook_groups(
+            self.schedule,
+            user_team_object_id,
+        )
+
         # Initialize training status - training camp happens at week 1 before games are played
         training_status = {
             "training_completed": False,
@@ -443,6 +450,7 @@ class FranchiseManager:
             "applied_games": [],
             "rank_prestige_system_version": FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
             "rank_prestige_last_applied_week": 0,
+            "cpu_playbook_schedule": cpu_playbook_schedule,
             "training_status": training_status,
             # Add missing document-level fields (matches Tournament pattern)
             "created_at": datetime.utcnow(),

@@ -146,15 +146,55 @@ Built as sub-slices (shoot → drive → pass), starting with the most common ou
   > band (≈ y 10-18). Unlike D18 this fires in normal play (the neutral advance
   > jitters y by ±6), though a central advance hits the PSA → HCO first.
 
-#### 2D-2b — drive + drive→dish  ⏳ TODO
+#### 2D-2b — drive + drive→dish  ✅ DONE
 
-- Optimal tree (D4): SH>80 shoot / SC+AG>105 drive / else pass; drive target by
-  starting y (upper/lower lowPost / basketSpot); 50/50 drive→dish.
+- **Engine**: the AB "attack" leaf now runs the §7 shoot/drive/pass tree
+  (`_choose_shot_attempt`): optimal = SH>80 shoot / SC+AG>105 drive / else pass,
+  gated by a read (>200 optimal, else random over the three); no defender in
+  range → always drive. shoot→`ATTACK_BASKET_SHOT` (2D-2a); drive→
+  `ATTACK_BASKET_DRIVE`; pass (top-level, 2D-2c) falls back to the offense-optimal
+  of {drive, shoot} until 2D-2c lands.
+- **Resolver** (`resolve_hct_attack_basket_drive`): driver drives to a rim target
+  by starting y (y>30 upper lowPost / y<20 lower lowPost / else basketSpot);
+  x>64 teammates relocate to distinct inside spots (upper/lower half by their y,
+  midLane central, no shared spot). If ≥1 inside teammate → 50/50 finish-vs-dish;
+  dish → closest-to-basket inside teammate shoots an **inside** shot, else the
+  driver shoots an **attack** shot at the rim. Shared D5 collapse + D6 pick +
+  shot roll + make/miss tail were **refactored out** of the 2D-2a resolver into
+  `_collapse_defenders_and_pick` / `_roll_ab_shot` / `_finalize_ab_shot` (reused
+  by both).
+- **Wrapper**: routes both `ATTACK_BASKET_SHOT` and `ATTACK_BASKET_DRIVE`.
+- **Emitter**: `_build_ab_drive_step` (driver sprints to rim, teammates cut to
+  inside spots, defenders collapse). No-dish → driver ends in shot motion → post-
+  shot. Dish → drive step (driver `handle_ball`) + `build_pass_step` (driver→
+  receiver) + `_build_ab_shot_step` (receiver shoots in place) + post-shot.
+- Verified offline (shoot/drive/pass decision incl. no-defender + random gate;
+  drive make + drive→dish miss/rebound; drive target by y; emitter chains for
+  drive and drive→dish with monotonic clocks) and 2D-2a regression re-checked.
 
-#### 2D-2c — top-level pass  ⏳ TODO
+#### 2D-2c — top-level pass  ✅ DONE
 
-- Receiver selection (closest + open-rim override); receiver post-catch actions
-  (attack / Kick-Out→HCO / re-enter loop).
+- **Engine**: the §7 "pass" leaf now emits a real top-level pass.
+  `_select_top_level_pass_receiver` — pool = teammates past x=64; default = the
+  closest to the BH; open-rim override = a teammate within 9 of the basket with
+  no defender within 9 (random among qualifiers). The pass reuses the proven §6
+  primitives (`_position_defense` D19 formation + `_pass_segment`), then the
+  receiver becomes the new BH. **Receiver post-catch resolution:**
+  - Catches inside the Attack Basket Area → AB offender/defender count:
+    `defenders ≤ offenders` → **attack** via the D18 fast-break bridge
+    (`_seed_fast_break` → `FAST_BREAK_SHOT`); `defenders > offenders` → **HCO**
+    (Kick-Out entry, since the receiver is inside the AB area).
+  - Catches past x=64 but outside the AB y-band → receiver re-enters the loop
+    (settles to HCO today; full detect→read re-entry is the 2D-3 item).
+  - No teammate past x=64 → falls back to the offense-optimal solo finish.
+- The forward-only candidate pool means the over-and-back guard is satisfied by
+  construction. No resolver/emitter changes — both branches reuse existing
+  paths (`FAST_BREAK_SHOT` → the D18 resolver/emitter; `HCO` → the HCO entry
+  orchestrator's kickout step).
+- Verified offline (receiver selection incl. open-rim + away orientation;
+  pass→FAST_BREAK, pass→HCO, pass→off-band, each emitting the pass segment).
+
+**2D-2 in-Attack-Basket shot tree is complete (shoot / drive / drive→dish / pass).**
 
 ### 2D-3 — top-level pass  ⏳ TODO
 
@@ -170,8 +210,9 @@ Built as sub-slices (shoot → drive → pass), starting with the most common ou
 
 - 10-second-violation runtime wiring (D9).
 - Step-N movement for the other defenders / teammates, not just the PG defender (D15).
-  - ✅ *Partial (render):* `_build_loop_step` now clamps every mover to its archetype rate via the interrupted-coord pattern (`start + rate × T`) and carries the result forward, so off-ball offense progress toward setup at sprint across loop steps instead of being snapped to the full target each segment (fixes the off-ball "jet"). Off-ball offense use the `sprint` archetype; BH/defenders use `standard`. This is also a universal "no one exceeds their archetype rate within a step" safety net.
-  - ⏳ *Still TODO (model):* the engine seeds `off_coords` at the full setup targets and re-asserts them every segment. D15 — and any decision that reads off-ball offensive positions (Attack-Basket offenders>defenders trigger, pass targeting) — must have the engine track each off-ball player's actual lagging position instead.
+  - ✅ *Render:* `_build_loop_step` clamps every mover to its archetype rate via the interrupted-coord pattern (`start + rate × T`) and carries the result forward, so off-ball offense progress toward setup at sprint across loop steps instead of being snapped to the full target each segment (fixes the off-ball "jet"). Off-ball offense use the `sprint` archetype; BH/defenders use `standard`. This is also a universal "no one exceeds their archetype rate within a step" safety net.
+  - ✅ **DONE (engine model — defender side):** `_defense_targets` (pure §6 target computation) + `_move_defense` (interrupted, position-tracking, per-defender `standard` AG rate via `_interrupted_coord`) replace the per-segment snap in the **advance / hold / broken-HCT-drive** segments. A quicker BH now gains real separation → the chasing defender trails (not "ahead") → `_detect_moment == "none"` → broken-HCT/D18 reachable in normal play (verified via offline checks). Converge + pass-defense formation still snap by design.
+  - ✅ **DONE (engine model — offense side, D15b):** `_walk_up_loop_start_offense` seeds loop-start off-ball coords by replaying the BH-gated walk-up (off-ball at `sprint`, interrupted; reads the prior turn's `final_coords`, mirrors `build_walk_up_step`); `_move_offense` advances them toward setup each time-advancing segment (converge / advance / hold / broken-HCT drive / pass flight / reception), excluding the BH + any mid-catch receiver. The Attack-Basket count (`_count_in_attack_basket`) and pass-targeting (`_select_pass_receiver`, `_select_top_level_pass_receiver`) now read real lagging coords (verified). Falls back to "arrived at setup" with no prior-turn coords. Engine + render stay aligned (emitter consumes the engine's tracked coords; its interrupted clamp is now a no-op safety net).
 - Stats parity vs. the skeleton path (D16).
 
 ## Deferred (not in Cut 2, per design owner)

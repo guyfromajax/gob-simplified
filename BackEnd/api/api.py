@@ -91,6 +91,107 @@ try:
     from BackEnd.models.player import Player
     
     logger = logging.getLogger(__name__)
+
+
+    def _refresh_cpu_playbooks_for_franchise_game_init(franchise_id_str: str) -> list[str]:
+        """Refresh this week's scheduled CPU playbook group before FTD is snapshotted into a game."""
+        try:
+            franchise_oid = ObjectId(franchise_id_str)
+        except Exception:
+            logger.warning("⚠️ [CPU PLAYBOOK INIT] Invalid franchise_id=%s", franchise_id_str)
+            return []
+
+        franchise_doc = franchises_collection.find_one(
+            {"_id": franchise_oid},
+            {"schedule": 1, "cpu_playbook_schedule": 1, "week": 1, "user_team_object_id": 1},
+        )
+        if not franchise_doc:
+            return []
+
+        from BackEnd.utils.cpu_playbook_customization import (
+            build_user_schedule_cpu_playbook_groups,
+            group_for_cpu_playbook_week,
+            refresh_cpu_playbook_group_for_game_init,
+        )
+
+        week = int(franchise_doc.get("week", 1) or 1)
+        group_num = group_for_cpu_playbook_week(week)
+        if group_num is None:
+            return []
+
+        user_team_id = str(franchise_doc.get("user_team_object_id") or "")
+        if not user_team_id:
+            return []
+
+        schedule_meta = franchise_doc.get("cpu_playbook_schedule") or {}
+        if not schedule_meta.get("groups"):
+            schedule_meta = build_user_schedule_cpu_playbook_groups(
+                franchise_doc.get("schedule") or [],
+                user_team_id,
+            )
+            franchises_collection.update_one(
+                {"_id": franchise_oid},
+                {"$set": {"cpu_playbook_schedule": schedule_meta}},
+            )
+            franchise_doc["cpu_playbook_schedule"] = schedule_meta
+
+        target_ids = [
+            str(tid)
+            for tid in (schedule_meta.get("groups") or {}).get(str(group_num), [])
+            if str(tid) != user_team_id
+        ]
+        if not target_ids:
+            return []
+
+        team_oids = []
+        for tid in target_ids:
+            try:
+                team_oids.append(ObjectId(tid))
+            except Exception:
+                logger.warning("⚠️ [CPU PLAYBOOK INIT] Invalid target team_id=%s", tid)
+
+        team_docs = list(teams_collection.find({"_id": {"$in": team_oids}}, {"name": 1}))
+        team_name_by_id = {str(doc.get("_id")): doc.get("name") for doc in team_docs}
+
+        from BackEnd.models.team_manager import TeamManager
+
+        teams_by_id = {}
+        for tid in target_ids:
+            team_name = team_name_by_id.get(tid)
+            if not team_name:
+                continue
+            try:
+                teams_by_id[tid] = TeamManager(
+                    team_name,
+                    mode="franchise",
+                    is_user_team=False,
+                    franchise_id=franchise_id_str,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "⚠️ [CPU PLAYBOOK INIT] Could not build TeamManager for team_id=%s name=%s: %s",
+                    tid,
+                    team_name,
+                    exc,
+                )
+
+        refreshed = refresh_cpu_playbook_group_for_game_init(
+            franchise_id=franchise_oid,
+            franchise_doc=franchise_doc,
+            week=week,
+            user_team_id=user_team_id,
+            teams_by_id=teams_by_id,
+            franchise_team_data_collection=franchise_team_data_collection,
+        )
+        if refreshed:
+            logger.warning(
+                "✅ [CPU PLAYBOOK INIT] Refreshed CPU playbooks franchise_id=%s week=%s group=%s teams=%s",
+                franchise_id_str,
+                week,
+                group_num,
+                refreshed,
+            )
+        return refreshed
     
     
     # ============================================================================
@@ -3209,6 +3310,8 @@ try:
                             # ✅ FTD: Load team data from FTD collection instead of franchise doc
                             from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
 
+                            _refresh_cpu_playbooks_for_franchise_game_init(str(body.franchise_id))
+
                             home_ftd = load_ftd_data_for_team(
                                 body.franchise_id,
                                 None,  # team_id will be resolved from team_name
@@ -5733,6 +5836,8 @@ try:
 
         if mode == "franchise" and franchise_id:
             from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
+
+            _refresh_cpu_playbooks_for_franchise_game_init(str(franchise_id))
 
             home_ftd_row = load_ftd_data_for_team(franchise_id, None, home_team)
             away_ftd_row = load_ftd_data_for_team(franchise_id, None, away_team)

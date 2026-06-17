@@ -48,6 +48,16 @@ any other legacy frontend coordinate logic once each caller is proven covered.
   home/away parity, and static guards prohibit restoring frontend BIP
   coordinate selection.
 
+### 2026-06-17: Fast Break block landing fallback fixed
+
+- Legacy Fast Break `BLOCK` branches now render backend `ball_bounce_x/y`
+  directly as the block/landing spot.
+- The frontend no longer routes backend block coords through `bounceFromRim()`,
+  which treated the supplied coordinate as a rim/origin and invented a second
+  frontend landing spot with `bounceArea` variance.
+- Normal Fast Break `MISS` behavior still uses the legacy bounce helper until
+  the broader Fast Break shot/rebound/get-back audit is completed.
+
 ## Why This Project Exists
 
 The animation system currently has two horizontal mirror formulas:
@@ -160,6 +170,9 @@ backend producer, runtime caller, and position-sync behavior before editing.
    - Candidate branches select attacking rims, shot spots, rebound positions,
      non-participant locations, and get-back bands using frontend team-side
      logic and `Phaser.Math.Between`.
+   - 2026-06-17 update: confirmed and fixed the `BLOCK` landing branch where
+     backend `ball_bounce_x/y` was incorrectly passed through `bounceFromRim()`
+     and shifted again by frontend variance.
    - Trace each branch separately. Some may be unreachable legacy fallbacks;
      others may still replace missing backend payload fields.
 
