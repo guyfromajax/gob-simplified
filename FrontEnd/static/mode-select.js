@@ -28,7 +28,7 @@ const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss
 const leaderboardHost = document.getElementById('community-leaderboard');
 const communityHighlightsBody = document.querySelector('.community-highlights-body');
 const leaderboardGeekPointsToggle = document.getElementById('leaderboard-view-geek-points');
-const leaderboardRankToggle = document.getElementById('leaderboard-view-rank');
+const leaderboardTitlesToggle = document.getElementById('leaderboard-view-titles');
 
 // Primary/secondary from scripts/align_core8_team_colors.py (Mongo teams.primary_color / secondary_color)
 const A1_CONFERENCE_TEAMS = [
@@ -225,9 +225,18 @@ function escapeHtmlMs(text) {
 }
 
 function setLeaderboardView(view) {
-  currentLeaderboardView = view === 'rank' ? 'rank' : 'geek_points';
+  currentLeaderboardView = view === 'titles' ? 'titles' : 'geek_points';
   if (leaderboardGeekPointsToggle) leaderboardGeekPointsToggle.classList.toggle('active', currentLeaderboardView === 'geek_points');
-  if (leaderboardRankToggle) leaderboardRankToggle.classList.toggle('active', currentLeaderboardView === 'rank');
+  if (leaderboardTitlesToggle) leaderboardTitlesToggle.classList.toggle('active', currentLeaderboardView === 'titles');
+}
+
+// Title-count display: total titles with national titles in parens, e.g. "7 (0)".
+function displayTitlesValue(entry) {
+  var total = parseInt(entry && entry.total_titles, 10);
+  var natl = parseInt(entry && entry.national_titles, 10);
+  if (!Number.isFinite(total)) total = 0;
+  if (!Number.isFinite(natl)) natl = 0;
+  return total + ' (' + natl + ')';
 }
 
 function renderGeekPointsLeaderboard(leaderboardData, currentUsername) {
@@ -273,32 +282,40 @@ function coachArchetypeBadge(entry, size) {
   } catch (e) { return ''; }
 }
 
-function renderRankLeaderboard(leaderboardData, currentUsername) {
+function renderTitlesLeaderboard(leaderboardData, currentUsername) {
   if (!leaderboardHost) return;
   const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  const topFive = Array.isArray(leaderboardData && leaderboardData.rank_top) ? leaderboardData.rank_top.slice(0, 5) : [];
+  const topFive = Array.isArray(leaderboardData && leaderboardData.titles_top) ? leaderboardData.titles_top.slice(0, 5) : [];
+  const currentTopEntry = currentUserNormalized
+    ? topFive.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
+    : null;
+  const currentPinnedEntry = (!currentTopEntry && leaderboardData && leaderboardData.titles_current_user)
+    ? leaderboardData.titles_current_user
+    : null;
   const rows = topFive.map(function (entry) {
     const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
-    const natlRank = parseInt(entry.natl_rank, 10);
-    const displayRank = Number.isFinite(natlRank) ? natlRank : '--';
-    const teamColor = safeText(entry.team_primary_color, '#27408E');
     return `
       <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
         <div class="community-rank">${entry.rank}.</div>
-        <div class="community-username">
-          <span class="community-username-fragment">${escapeHtmlMs(entry.username)}</span>${coachArchetypeBadge(entry, 22)}
-          <span class="community-username-fragment"> (</span><span class="community-team-name" style="color: ${escapeHtmlMs(teamColor)};">${escapeHtmlMs(entry.team_name)}</span><span class="community-username-fragment">):</span>
-        </div>
-        <div class="community-score">${displayRank}</div>
+        <div class="community-username">${escapeHtmlMs(entry.username)}${coachArchetypeBadge(entry, 22)}</div>
+        <div class="community-score">${displayTitlesValue(entry)}</div>
       </div>
     `;
   }).join('');
-  leaderboardHost.innerHTML = rows || '<div class="community-leaderboard-empty">No franchise rank data yet</div>';
+  const pinned = currentPinnedEntry ? `
+    <div class="community-leaderboard-separator"></div>
+    <div class="community-leaderboard-row is-current-user">
+      <div class="community-rank">${currentPinnedEntry.rank}.</div>
+      <div class="community-username">${escapeHtmlMs(currentPinnedEntry.username)}${coachArchetypeBadge(currentPinnedEntry, 22)}</div>
+      <div class="community-score">${displayTitlesValue(currentPinnedEntry)}</div>
+    </div>
+  ` : '';
+  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No titles won yet</div>';
 }
 
 function renderCommunityLeaderboard(leaderboardData, currentUsername) {
-  if (currentLeaderboardView === 'rank') {
-    renderRankLeaderboard(leaderboardData, currentUsername);
+  if (currentLeaderboardView === 'titles') {
+    renderTitlesLeaderboard(leaderboardData, currentUsername);
     return;
   }
   renderGeekPointsLeaderboard(leaderboardData, currentUsername);
@@ -548,9 +565,9 @@ function wireLeaderboardViewToggles(currentUsername) {
       renderCommunityLeaderboard(currentLeaderboardData, currentUsername);
     });
   }
-  if (leaderboardRankToggle) {
-    leaderboardRankToggle.addEventListener('click', function () {
-      setLeaderboardView('rank');
+  if (leaderboardTitlesToggle) {
+    leaderboardTitlesToggle.addEventListener('click', function () {
+      setLeaderboardView('titles');
       renderCommunityLeaderboard(currentLeaderboardData, currentUsername);
     });
   }
@@ -575,10 +592,10 @@ async function loadLeadersByTeam() {
   var title = document.querySelector('.leaders-by-team-title');
   if (!grid) return;
 
-  var leaderboardView = currentLeaderboardView === 'rank' ? 'rank' : 'geek_points';
+  var leaderboardView = currentLeaderboardView === 'titles' ? 'titles' : 'geek_points';
   if (title) {
-    title.textContent = leaderboardView === 'rank'
-      ? 'Leaders By Team (Rank)'
+    title.textContent = leaderboardView === 'titles'
+      ? 'Leaders By Team (Titles)'
       : 'Leaders By Team (Geek Points)';
   }
   grid.innerHTML = '<div style="padding:24px;color:rgba(255,255,255,0.3);font-family:Inter,sans-serif;font-size:13px;grid-column:1/-1;text-align:center;">Loading...</div>';
@@ -602,8 +619,8 @@ async function loadLeadersByTeam() {
 
       var leadersHtml = leaders.length > 0
         ? leaders.map(function (entry, i) {
-            var value = leaderboardView === 'rank'
-              ? (Number.isFinite(parseInt(entry.natl_rank, 10)) ? String(parseInt(entry.natl_rank, 10)) : '--')
+            var value = leaderboardView === 'titles'
+              ? displayTitlesValue(entry)
               : displayLbtPoints(entry.geek_points);
             return (
               '<div class="lbt-leader-row">' +

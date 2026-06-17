@@ -180,13 +180,13 @@ class LeaderboardEntry(BaseModel):
     lead_archetype: str = ""  # coach's badge key ("" = no badge)
 
 
-class LeaderboardRankEntry(BaseModel):
-    """Franchise rank leaderboard entry."""
+class LeaderboardTitlesEntry(BaseModel):
+    """Franchise titles leaderboard entry. total_titles = conf_rs + conf_t +
+    region + national; national_titles shown in parentheses on the UI."""
     rank: int
     username: str
-    team_name: str
-    team_primary_color: str = "#27408E"
-    natl_rank: int
+    total_titles: int
+    national_titles: int
     is_current_user: bool = False
     lead_archetype: str = ""  # coach's badge key ("" = no badge)
 
@@ -195,7 +195,8 @@ class LeaderboardResponse(BaseModel):
     """Leaderboard response."""
     top: list[LeaderboardEntry]
     current_user: Optional[LeaderboardEntry] = None
-    rank_top: list[LeaderboardRankEntry] = []
+    titles_top: list[LeaderboardTitlesEntry] = []
+    titles_current_user: Optional[LeaderboardTitlesEntry] = None
 
 
 class ResetRequest(BaseModel):
@@ -997,6 +998,7 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             "email": 1,
             "geek_points": 1,
             "lead_archetype": 1,
+            "championships_total": 1,
         }
     ))
 
@@ -1012,11 +1014,24 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
         except Exception:
             geek_points = 0
 
+        champs = doc.get("championships_total") or {}
+
+        def _champ(kind: str) -> int:
+            try:
+                return int(champs.get(kind, 0) or 0)
+            except Exception:
+                return 0
+
+        national_titles = _champ("national")
+        total_titles = _champ("conf_rs") + _champ("conf_t") + _champ("region") + national_titles
+
         entries.append({
             "_id": str(doc.get("_id", "")),
             "username": username,
             "geek_points": geek_points,
             "lead_archetype": str(doc.get("lead_archetype") or ""),
+            "total_titles": total_titles,
+            "national_titles": national_titles,
         })
 
     entries.sort(key=lambda entry: (-entry["geek_points"], entry["username"].lower()))
@@ -1035,106 +1050,41 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
         if ranked.is_current_user:
             current_user_entry = ranked
 
-    franchise_docs = list(franchises_collection.find(
-        {},
-        {
-            "_id": 1,
-            "user_id": 1,
-            "user_team_id": 1,
-            "user_team_object_id": 1,
-        }
-    ))
-    users_by_id = {entry["_id"]: entry for entry in entries}
-    latest_franchise_by_user_id = {}
-    for franchise_doc in franchise_docs:
-        user_id = str(franchise_doc.get("user_id") or "").strip()
-        if not user_id:
-            continue
-        existing = latest_franchise_by_user_id.get(user_id)
-        if existing is None or franchise_doc["_id"] > existing["_id"]:
-            latest_franchise_by_user_id[user_id] = franchise_doc
-    team_ids = []
-    for doc in latest_franchise_by_user_id.values():
-        team_oid = str(doc.get("user_team_object_id") or "").strip()
-        if team_oid:
-            try:
-                team_ids.append(ObjectId(team_oid))
-            except Exception:
-                pass
-    teams_by_id = {}
-    if team_ids:
-        teams_by_id = {
-            str(doc["_id"]): doc
-            for doc in teams_collection.find(
-                {"_id": {"$in": team_ids}},
-                {"name": 1, "primary_color": 1},
-            )
-        }
-
-    rank_entries_raw = []
-    for user_id, franchise_doc in latest_franchise_by_user_id.items():
-        if not user_id:
-            continue
-        user_entry = users_by_id.get(user_id)
-        if not user_entry:
-            continue
-
-        team_object_id = str(franchise_doc.get("user_team_object_id") or "").strip()
-        team_name = str(franchise_doc.get("user_team_id") or "").strip()
-        if not team_object_id or not team_name:
-            continue
-
-        try:
-            ftd_doc = franchise_team_data_collection.find_one(
-                {
-                    "franchise_id": franchise_doc["_id"],
-                    "team_id": ObjectId(team_object_id),
-                },
-                {"natl_rank": 1},
-            )
-        except Exception:
-            continue
-        if not ftd_doc:
-            continue
-
-        natl_rank_raw = ftd_doc.get("natl_rank")
-        try:
-            natl_rank = int(natl_rank_raw)
-        except Exception:
-            continue
-        if natl_rank <= 0:
-            continue
-
-        team_doc = teams_by_id.get(team_object_id) or {}
-        team_primary_color = str(team_doc.get("primary_color") or "#27408E")
-
-        rank_entries_raw.append({
-            "_id": user_entry["_id"],
-            "username": user_entry["username"],
-            "team_name": team_name,
-            "team_primary_color": team_primary_color,
-            "natl_rank": natl_rank,
-            "lead_archetype": user_entry.get("lead_archetype", ""),
-        })
-
-    rank_entries_raw.sort(key=lambda entry: (entry["natl_rank"], entry["username"].lower()))
-    ranked_rank_entries = [
-        LeaderboardRankEntry(
+    # Titles leaderboard: total titles (conf_rs + conf_t + region + national)
+    # desc, then national titles desc, then username. Top 5 + pinned current
+    # user. Sourced directly from users.championships_total (no franchise join).
+    titles_sorted = sorted(
+        entries,
+        key=lambda entry: (
+            -entry["total_titles"],
+            -entry["national_titles"],
+            entry["username"].lower(),
+        ),
+    )
+    ranked_titles_entries = []
+    titles_current_user_entry = None
+    for index, entry in enumerate(titles_sorted, start=1):
+        ranked = LeaderboardTitlesEntry(
             rank=index,
             username=entry["username"],
-            team_name=entry["team_name"],
-            team_primary_color=entry["team_primary_color"],
-            natl_rank=entry["natl_rank"],
+            total_titles=entry["total_titles"],
+            national_titles=entry["national_titles"],
             is_current_user=(entry["_id"] == current_user_id),
             lead_archetype=entry.get("lead_archetype", ""),
         )
-        for index, entry in enumerate(rank_entries_raw, start=1)
-    ]
+        ranked_titles_entries.append(ranked)
+        if ranked.is_current_user:
+            titles_current_user_entry = ranked
 
     return LeaderboardResponse(
         top=ranked_entries[:10],
         current_user=(None if current_user_entry and current_user_entry.rank <= 10 else current_user_entry),
-        rank_top=ranked_rank_entries[:5],
+        titles_top=ranked_titles_entries[:5],
+        titles_current_user=(
+            None
+            if titles_current_user_entry and titles_current_user_entry.rank <= 5
+            else titles_current_user_entry
+        ),
     )
 
 

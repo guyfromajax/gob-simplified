@@ -31,8 +31,12 @@ Phase 2D-1 added the broken-HCT **fast break (D18)**: when the open-floor attack
 reaches the topLane spot (perfect-PSA spot behind the BH), the engine emits
 ``result_type = "FAST_BREAK_SHOT"`` + a ``fb_seed``; the wrapper hands off to
 ``dynamic_hct_shot.resolve_hct_fast_break_shot`` for a real make/miss rim attempt.
-The in-Attack-Basket §7 shot tree, top-level pass, fouls/steals, and remaining
-stat parity arrive in Phases 2D-2/2D-3/2F.
+Phase 2D-2a added the §7 in-Attack-Basket shot: when the BH reaches the Attack
+Basket Area (x>64, y 10-30) and a goal-achievement read favours a shot, the
+engine emits ``result_type = "ATTACK_BASKET_SHOT"`` + an ``ab_seed``; the wrapper
+hands off to ``dynamic_hct_shot.resolve_hct_attack_basket_shot`` (D5 rim collapse
++ D6 shot-defender + a rolled, shoot-in-place make/miss). Drive / top-level pass
+(2D-2b/2D-2c), fouls/steals, and remaining stat parity arrive next.
 """
 from __future__ import annotations
 
@@ -100,6 +104,21 @@ PSA_PERFECT_SPOT = {"x": 60, "y": 25}
 # §5 broken-HCT topLane spot: the open-floor attack target when the perfect PSA
 # spot is *behind* the ball handler. Reaching it triggers the fast break (D18).
 TOPLANE_SPOT = HCO_STRING_SPOTS["topLane"]  # (74, 25)
+
+# §7 Attack Basket Area (§2): x 64→basket, y 10-30. Goal-achievement zone — the
+# BH either attempts a shot or transitions to HCO when he reaches it. The x>64
+# half is shared with `_past_primary_safe_area`; PSA wins the x=64/y19-32 overlap
+# (PSA is checked first), so the Attack Basket Area is effectively x>64.
+ATTACK_BASKET_Y_MIN, ATTACK_BASKET_Y_MAX = 10, 30
+
+# §7 goal-achievement read: read > this → make the optimal choice, else random.
+GOAL_ACHIEVEMENT_READ_THRESHOLD = 200
+
+# §7 / D5 rim-protection cluster the defenders collapse into on a shot attempt
+# (x from midLane−3 toward the basket, y within ±6 of basket-y). The resolver
+# (`dynamic_hct_shot`) owns the actual collapse + shot-defender (D6) geometry.
+RIM_PROTECT_X_MIN, RIM_PROTECT_X_MAX = 77, 87
+RIM_PROTECT_Y_MIN, RIM_PROTECT_Y_MAX = 19, 31
 
 # §4 read thresholds (attack / pass; else hold).
 READ_ATTACK_THRESHOLD = 200
@@ -357,10 +376,28 @@ def _in_primary_safe_area(xy: Dict[str, Any], is_away_offense: bool) -> bool:
 
 
 def _past_primary_safe_area(xy: Dict[str, Any], is_away_offense: bool) -> bool:
-    """BH advanced beyond the PSA into the deep front court (Attack Basket band
-    + §7 are deferred to Phase 2D; 2A resolves this as an HCO entry)."""
+    """BH advanced beyond the PSA into the deep front court. Splits into the
+    Attack Basket Area (§7 goal achievement) and the off-band remainder."""
     x = xy["x"]
     return x < (100 - PSA_X_MAX) if is_away_offense else x > PSA_X_MAX
+
+
+def _in_attack_basket_area(xy: Dict[str, Any], is_away_offense: bool) -> bool:
+    """§7 Attack Basket Area: past the PSA (x>64 home / x<36 away) AND within the
+    y 10-30 band. PSA is checked first by the caller, so the y19-32 overlap at
+    x=64 resolves to the PSA."""
+    if not (ATTACK_BASKET_Y_MIN <= xy["y"] <= ATTACK_BASKET_Y_MAX):
+        return False
+    return _past_primary_safe_area(xy, is_away_offense)
+
+
+def _count_in_attack_basket(
+    coords: Dict[str, Dict[str, int]], is_away_offense: bool
+) -> int:
+    """Number of players (by position) inside the Attack Basket Area."""
+    return sum(
+        1 for p in POSITIONS if _in_attack_basket_area(coords[p], is_away_offense)
+    )
 
 
 def _clamp_xy(xy: Dict[str, Any]) -> Dict[str, int]:
@@ -646,6 +683,9 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     # Set when a broken-HCT attack reaches the topLane spot → D18 fast break.
     # Carries the post-drive offense/defense coords for the shot resolver.
     fb_seed: Dict[str, Any] = {}
+    # Set when the BH reaches the Attack Basket Area and a shot is chosen (§7).
+    # Carries the offense/defense coords for the in-Attack-Basket shot resolver.
+    ab_seed: Dict[str, Any] = {}
 
     # --- Initial converge: position the defense around the BH (§6) -----------
     pg_initial = dict(def_coords["PG"])
@@ -695,6 +735,17 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             "def_coords": {p: dict(def_coords[p]) for p in POSITIONS},
         }
 
+    def _seed_attack_basket_shot() -> None:
+        """Snapshot the offense/defense coords (at the moment the BH reaches the
+        Attack Basket Area) for the §7 shot resolver. The resolver applies the
+        D5 rim-protection collapse + D6 shot-defender pick on these coords."""
+        nonlocal ab_seed
+        ab_seed = {
+            "shooter_pos": bh_pos,
+            "off_coords": {p: dict(off_coords[p]) for p in POSITIONS},
+            "def_coords": {p: dict(def_coords[p]) for p in POSITIONS},
+        }
+
     def _resolve_attack(moment: str, in_range: List[str]) -> Tuple[str, float]:
         """Pick the contesting defender(s) per §5 and resolve the banded outcome."""
         if moment == "trap":
@@ -723,10 +774,35 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             text_suffix = " 10-second violation!"
             break
 
-        # 2) Zone precedence (§2 HCO entry triggers; Attack-Basket §7 → 2D).
-        if _in_primary_safe_area(bh_xy, is_away_offense) or _past_primary_safe_area(
-            bh_xy, is_away_offense
-        ):
+        # 2) Zone precedence (§2 HCO entry triggers + §7 goal achievement).
+        if _in_primary_safe_area(bh_xy, is_away_offense):
+            result_type = "HCO"
+            text_suffix = " they break the trap & establish their half court offense"
+            break
+        if _past_primary_safe_area(bh_xy, is_away_offense):
+            if _in_attack_basket_area(bh_xy, is_away_offense):
+                # §7 goal achievement: shot attempt vs. HCO, decided by the
+                # offender/defender count inside the Attack Basket Area + a read.
+                off_in = _count_in_attack_basket(off_coords, is_away_offense)
+                def_in = _count_in_attack_basket(def_coords, is_away_offense)
+                hco_is_optimal = def_in > off_in  # ties (offenders ≥ defenders) → attack
+                read = _player_read(ball_handler)
+                if read > GOAL_ACHIEVEMENT_READ_THRESHOLD:
+                    go_hco = hco_is_optimal
+                else:
+                    go_hco = bool(random.getrandbits(1))
+                if go_hco:
+                    result_type = "HCO"
+                    text_suffix = " they pull it back out to set up the half court offense"
+                    break
+                # Shot attempt. 2D-2a first slice: shoot from the BH's spot
+                # (drive / top-level pass options arrive in 2D-2b / 2D-2c).
+                _seed_attack_basket_shot()
+                result_type = "ATTACK_BASKET_SHOT"
+                text_suffix = " they go to work in the paint"
+                break
+            # Past the PSA but outside the Attack Basket y-band — settle into
+            # HCO (the "re-enter the loop as a new BH" treatment is a 2D-3 item).
             result_type = "HCO"
             text_suffix = " they break the trap & establish their half court offense"
             break
@@ -864,4 +940,6 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         "loop_segments": loop_segments,
         # Set only for result_type == "FAST_BREAK_SHOT" (§5 broken-HCT → D18).
         "fb_seed": fb_seed,
+        # Set only for result_type == "ATTACK_BASKET_SHOT" (§7 in-AB shot tree).
+        "ab_seed": ab_seed,
     }

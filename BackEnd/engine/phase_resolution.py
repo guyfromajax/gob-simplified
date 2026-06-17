@@ -7160,6 +7160,71 @@ def _assemble_hct_fb_shot_result(
     return shot
 
 
+def _assemble_hct_ab_shot_result(
+    game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+):
+    """Merge a resolved in-Attack-Basket shot (§7 / 2D-2a) with the HCT loop
+    intermediate data into a downstream-ready turn_result.
+
+    Mirrors ``_assemble_hct_fb_shot_result``; the only difference is the shot
+    step's duration source (``hct_ab_t_shot`` vs. the FB drive's
+    ``hct_fb_t_shooter``).
+    """
+    off_team = game.offense_team
+    result_type = shot["result_type"]
+    ball_handler = shot.get("shooter")
+    defender = shot.get("defender")
+
+    text = text + shot.get("text_suffix", "")
+
+    _record_hct_stats(
+        {"ball_handler": ball_handler, "shooter": ball_handler, "defender": defender},
+        {"result_type": result_type},
+        game,
+        off_lineup,
+        def_lineup,
+    )
+
+    loop_segments = dyn.get("loop_segments") or []
+    shot["text"] = text
+    shot["passer"] = ""
+    shot["screener"] = ""
+    shot.setdefault("foul_team", shot.get("foul_team"))
+    shot.setdefault("foul_player_id", shot.get("foul_player_id"))
+    shot.setdefault("fouled_out", shot.get("fouled_out", False))
+    shot.setdefault("foul_count", shot.get("foul_count", 0))
+    shot["victim_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["defender_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["events"] = []
+    shot["skeleton"] = {}
+    shot["roles"] = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+        "passer": "",
+        "screener": "",
+    }
+
+    # Emitter intermediate data (same keys as the non-shot path).
+    shot["hct_bh_pos"] = dyn["bh_pos"]
+    shot["hct_bh_target"] = dyn["bh_target"]
+    shot["hct_other_offense_targets"] = dyn["other_offense_targets"]
+    shot["hct_def_initial_targets"] = dyn["def_initial_targets"]
+    shot["hct_loop_segments"] = loop_segments
+
+    # Engine-portion time totals; the emitter overwrites these once it appends
+    # the shot + post-shot sub-steps.
+    shot["time_elapsed"] = round(
+        sum(s["seconds"] for s in loop_segments) + float(shot.get("hct_ab_t_shot", 0) or 0),
+        2,
+    )
+    shot["step_clock_seconds"] = [s["seconds"] for s in loop_segments]
+    shot["resolution_step_index"] = max(0, len(loop_segments) - 1)
+    shot["executed_step_count"] = len(loop_segments)
+    shot.setdefault("offense_team_id", off_team.team_id)
+    return shot
+
+
 def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     """
     Dynamic HCT entry point — first cut. Calls into ``dynamic_hct`` to compute
@@ -7195,6 +7260,21 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         # Resolver bailed (missing seed) — settle into a plain HCO break.
         dyn["result_type"] = "HCO"
         dyn["fb_seed"] = {}
+
+    # §7 / 2D-2a — in-Attack-Basket shot: the BH reached the Attack Basket Area
+    # and chose a shot. The resolver applies the D5 rim collapse + D6 shot
+    # defender and produces a real MAKE/MISS turn; the emitter appends the shot
+    # + post-shot steps after the loop segments.
+    if dyn.get("result_type") == "ATTACK_BASKET_SHOT":
+        from BackEnd.engine.dynamic_hct_shot import resolve_hct_attack_basket_shot
+
+        shot = resolve_hct_attack_basket_shot(game, dyn)
+        if not shot.get("_hct_ab_bail"):
+            return _assemble_hct_ab_shot_result(
+                game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+            )
+        dyn["result_type"] = "HCO"
+        dyn["ab_seed"] = {}
 
     result_type = dyn["result_type"]
     ball_handler = dyn["ball_handler"]

@@ -25,7 +25,11 @@ Spec context: ``_documentation_master/05_Animation_System/Step_By_Step_System.md
 
 from typing import Any, Dict, List, Optional
 
-from BackEnd.utils.animation_step_helpers import stamp_tween_durations
+from BackEnd.utils.animation_step_helpers import (
+    _ag_grid_per_game_sec,
+    _player_lookup_by_id,
+    stamp_tween_durations,
+)
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -39,7 +43,11 @@ from BackEnd.utils.animation_step_schema import (
     StepStart,
 )
 from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
-from BackEnd.utils.transition_bridge import build_pass_step, build_walk_up_step
+from BackEnd.utils.transition_bridge import (
+    _interrupted_coord,
+    build_pass_step,
+    build_walk_up_step,
+)
 
 
 _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
@@ -108,14 +116,23 @@ def _build_loop_step(
     next_step: NextStep,
     reason: str,
 ) -> AnimationStep:
-    """Generic dynamic-HCT loop step. Movers go to their ``end_coords``;
-    holders keep their start coord. Gate = ``gate_id`` reaching its end coord.
+    """Generic dynamic-HCT loop step. Movers progress toward their
+    ``end_coords`` target, clamped to their archetype rate over the step
+    duration (interrupted coord = start + rate × T); holders keep their start
+    coord. Gate = ``gate_id`` reaching its end coord.
 
     ``bh_id`` is the segment's ball owner (changes after a pass). Actions by
     role: ball owner → handle_ball, defender nearest the ball owner →
     guard_ball, other offense → stationary, other defenders → guard_offball.
-    Archetype is ``standard`` for anyone who moved this segment, else
-    ``stationary``.
+    Move-rate archetype by role: ball owner / defenders → ``standard``;
+    off-ball offense → ``sprint`` (they keep hustling toward their setup
+    spots). Anyone who didn't move this segment is ``stationary``.
+
+    The interrupted-coord clamp is the universal safety net that prevents any
+    player from being rendered faster than their archetype within a step — in
+    particular the off-ball offense, who the BH-gated walk-up leaves partway
+    to their setup spots and who would otherwise be snapped the full remaining
+    distance over a short defender-gated segment ("the jet").
     """
     t = float(seconds)
     off_ids = {_player_id_at_pos(off_lineup, p) for p in _OFFENSE_POSITIONS}
@@ -143,24 +160,48 @@ def _build_loop_step(
     step_end_coords: Dict[str, GridCoord] = {}
 
     for pid, sc in start_coords.items():
-        ec = end_coords.get(pid, sc)
-        moved = int(round(ec["x"])) != int(round(sc["x"])) or int(round(ec["y"])) != int(round(sc["y"]))
-        destinations[pid] = dict(ec)
-        step_end_coords[pid] = dict(ec)
-        archetype[pid] = "standard" if moved else "stationary"
+        target = end_coords.get(pid, sc)
+        # Role + action, plus the archetype rate this player moves at.
         if pid == bh_id:
-            actions[pid] = "handle_ball"
+            action: PlayerAction = "handle_ball"
+            move_arch: PlayerArchetype = "standard"
         elif pid == guard_ball_id:
-            actions[pid] = "guard_ball"
+            action = "guard_ball"
+            move_arch = "standard"
         elif pid in off_ids:
-            actions[pid] = "stationary"
+            # Off-ball offense are still hustling toward their setup spots —
+            # the walk-up gates on the BH only and interrupts them partway, so
+            # they keep progressing at sprint across loop steps rather than
+            # being snapped to the full target every segment.
+            action = "stationary"
+            move_arch = "sprint"
         else:
-            actions[pid] = "guard_offball"
+            action = "guard_offball"
+            move_arch = "standard"
+
+        # Universal speed clamp: no player may travel past their archetype
+        # rate within the step. If the intended target is farther than the
+        # rate covers in T, end at the interrupted coord (= start + rate × T)
+        # and carry it forward next step — mirrors build_walk_up_step and
+        # kills the off-ball "jet". Gate players (whose T == their natural
+        # travel time) still reach their full target.
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, move_arch)
+        ec = _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
+
+        moved = (
+            int(round(ec["x"])) != int(round(sc["x"]))
+            or int(round(ec["y"])) != int(round(sc["y"]))
+        )
+        destinations[pid] = dict(target)
+        step_end_coords[pid] = dict(ec)
+        actions[pid] = action
+        archetype[pid] = move_arch if moved else "stationary"
 
     ball: BallState = {"owner_player_id": bh_id}
 
     gate_start = start_coords.get(gate_id)
-    gate_target = end_coords.get(gate_id) or gate_start or {"x": 50.0, "y": 25.0}
+    gate_target = step_end_coords.get(gate_id) or gate_start or {"x": 50.0, "y": 25.0}
     gate_moves = bool(gate_start) and (
         int(round(gate_target["x"])) != int(round(gate_start["x"]))
         or int(round(gate_target["y"])) != int(round(gate_start["y"]))
@@ -296,6 +337,90 @@ def _build_fb_drive_step(
     return {"start": start, "end": end}
 
 
+def _build_ab_shot_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    shooter_id: str,
+    shooter_target: GridCoord,
+    defender_end: Dict[str, GridCoord],
+    seconds: float,
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step_index: int,
+) -> AnimationStep:
+    """The §7 / 2D-2a in-Attack-Basket shot step: the shooter rises and shoots
+    from his spot (no translation); the defenders collapse to their D5
+    rim-protection release coords (computed by the resolver); everyone else
+    holds. Gate = the shot-motion beat (``fixed_duration``).
+    ``_build_post_shot_sub_steps`` continues the shot from here.
+    """
+    t = float(seconds)
+    off_ids = {_player_id_at_pos(off_lineup, p) for p in _OFFENSE_POSITIONS}
+    def_ids = {_player_id_at_pos(def_lineup, p) for p in _OFFENSE_POSITIONS}
+
+    end_coords: Dict[str, GridCoord] = {pid: dict(c) for pid, c in start_coords.items()}
+    end_coords[shooter_id] = {
+        "x": float(shooter_target["x"]),
+        "y": float(shooter_target["y"]),
+    }
+    for did, coord in (defender_end or {}).items():
+        if did in end_coords:
+            end_coords[did] = {"x": float(coord["x"]), "y": float(coord["y"])}
+
+    destinations: Dict[str, Optional[GridCoord]] = {}
+    actions: Dict[str, PlayerAction] = {}
+    archetype: Dict[str, PlayerArchetype] = {}
+    for pid, sc in start_coords.items():
+        ec = end_coords.get(pid, sc)
+        moved = (
+            int(round(ec["x"])) != int(round(sc["x"]))
+            or int(round(ec["y"])) != int(round(sc["y"]))
+        )
+        destinations[pid] = dict(ec)
+        if pid == shooter_id:
+            actions[pid] = "shoot"
+            archetype[pid] = "stationary"  # shoots in place
+        elif pid in def_ids:
+            actions[pid] = "guard_ball" if moved else "guard_offball"
+            archetype[pid] = "standard" if moved else "stationary"
+        else:
+            actions[pid] = "stationary"
+            archetype[pid] = "sprint" if (moved and pid in off_ids) else "stationary"
+
+    ball: BallState = {"owner_player_id": shooter_id}
+    trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": t,
+        "metadata": {"reason": "hct_ab_shot"},
+    }
+    start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball,
+        "clock": {
+            "clock_remaining": clock_remaining_at_start,
+            "shot_clock_remaining": shot_clock_remaining_at_start,
+        },
+        "advance_trigger": trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball,
+        "time_elapsed": t,
+        "clock": {
+            "clock_remaining": clock_remaining_at_start - t,
+            "shot_clock_remaining": shot_clock_remaining_at_start - t,
+        },
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
 def build_dynamic_hct_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -326,10 +451,16 @@ def build_dynamic_hct_animation_steps(
         == getattr(getattr(game, "away_team", None), "team_id", None)
     )
 
-    # §7/D18 — a broken-HCT fast break ends the turn in a real shot. The loop
-    # segments stay non-terminal; the drive + post-shot sub-steps are appended.
+    # §7 — an HCT possession can end in a real shot. Two shot paths today:
+    #   • D18 broken-HCT fast break (drive to the rim) — `hct_fb_*` seed.
+    #   • 2D-2a in-Attack-Basket shoot-in-place — `hct_ab_*` seed.
+    # Either way the loop segments stay non-terminal and the shot + post-shot
+    # sub-steps are appended after them.
     fb_shooter_id = turn_result.get("hct_fb_shooter_id")
+    ab_shooter_id = turn_result.get("hct_ab_shooter_id")
     is_fb_shot = bool(fb_shooter_id)
+    is_ab_shot = bool(ab_shooter_id)
+    is_shot = is_fb_shot or is_ab_shot
 
     bh_id = _player_id_at_pos(off_lineup, bh_pos)
     pg_def_id = _player_id_at_pos(def_lineup, "PG")
@@ -409,7 +540,7 @@ def build_dynamic_hct_animation_steps(
         # post-shot sub-steps that follow own the terminal pointer.
         next_step: NextStep = (
             _resolve_final_step_next(turn_result)
-            if (is_last and not is_fb_shot)
+            if (is_last and not is_shot)
             else {"kind": "next_step", "index": next_index}
         )
 
@@ -441,7 +572,7 @@ def build_dynamic_hct_animation_steps(
                     next_step_index=next_index,
                     metadata_reason="hct_pass",
                 )
-                if is_last:
+                if is_last and not is_shot:
                     step["end"]["next"] = _resolve_final_step_next(turn_result)
             else:
                 # Degenerate pass input — fall back to a generic hold beat.
@@ -505,6 +636,37 @@ def build_dynamic_hct_animation_steps(
             steps, turn_result, off_lineup, def_lineup, is_away_offense,
         )
         # Recompute per-step clock list to include the appended sub-steps.
+        step_clock_seconds = [
+            round(float((s.get("end") or {}).get("time_elapsed") or 0.0), 2)
+            for s in steps
+        ]
+
+    # --- §7 / 2D-2a in-Attack-Basket shot + post-shot sub-steps ----------
+    if is_ab_shot and ab_shooter_id in prev_end_coords:
+        shooter_target = turn_result.get("hct_ab_shooter_target") or {}
+        defender_end = turn_result.get("hct_ab_defender_end") or {}
+        t_shot = float(turn_result.get("hct_ab_t_shot") or 0.8)
+        shot_step = _build_ab_shot_step(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            start_coords=prev_end_coords,
+            shooter_id=str(ab_shooter_id),
+            shooter_target={
+                "x": float(shooter_target.get("x", 0)),
+                "y": float(shooter_target.get("y", 0)),
+            },
+            defender_end=defender_end,
+            seconds=t_shot,
+            clock_remaining_at_start=prev_clock_end["clock_remaining"],
+            shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
+            next_step_index=len(steps) + 1,
+        )
+        steps.append(shot_step)
+        step_clock_seconds.append(round(float(shot_step["end"]["time_elapsed"]), 2))
+
+        _build_post_shot_sub_steps(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense,
+        )
         step_clock_seconds = [
             round(float((s.get("end") or {}).get("time_elapsed") or 0.0), 2)
             for s in steps

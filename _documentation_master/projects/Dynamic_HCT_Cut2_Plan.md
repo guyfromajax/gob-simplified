@@ -109,10 +109,52 @@ Built as vertical slices because this is the first HCT path that produces a
   > wired and tested but won't trigger in normal play until **step-N defender
   > movement (D15, Phase 2F)** lets the offense actually beat the trap.
 
-### 2D-2 — in-Attack-Basket shot-attempt tree  ⏳ TODO
+### 2D-2 — in-Attack-Basket shot-attempt tree
 
-- Shot-attempt decision tree (D4): shoot / drive / pass; drive targets; inside spots.
-- Rim-protection cluster (D5); shot-defender pick at shot moment (D6).
+Built as sub-slices (shoot → drive → pass), starting with the most common outcome.
+
+#### 2D-2a — Attack-Basket fork + shoot-in-place  ✅ DONE
+
+- **Engine** (`dynamic_hct.py`): split the zone-precedence check — PSA → HCO
+  (unchanged); `_in_attack_basket_area` (past PSA AND y 10-30) → §7 goal
+  achievement; past-PSA-but-off-band → HCO (a 2D-3 "re-enter loop" item).
+  §7 fork: `_count_in_attack_basket` offense/defense; `defenders>offenders` →
+  HCO is optimal (ties → attack); a goal-achievement read (`>200` → optimal,
+  else random) picks HCO vs. shot. Shot → `result_type="ATTACK_BASKET_SHOT"`
+  + `ab_seed` (shooter pos + off/def coords). Drive / top-level-pass options
+  are deferred to 2D-2b / 2D-2c (this slice always shoots in place).
+- **Resolver** (`dynamic_hct_shot.py::resolve_hct_attack_basket_shot`): **D5**
+  rim-protection collapse (each defender interrupted toward the x∈[77,87],
+  y∈[19,31] band at standard pace over the shot beat) + **D6** shot-defender
+  pick (nearest defender ending within 4x/6y of the shooter). Contested →
+  `calculate_shot_score(apply_defense=True)`, uncontested → `apply_defense=False`;
+  **made = shot_score ≥ threshold either way (no auto-make — half-court shots
+  are rolled, unlike the FB layup rule)**. Full MAKE/MISS turn (scoring /
+  rebound / defensive-foul-FT / possession / `next_play_type`), `shot_type`
+  inside/outside by distance-to-rim. Emits `hct_ab_*` seed for the emitter.
+- **Wrapper** (`phase_resolution`): `ATTACK_BASKET_SHOT` → resolver →
+  `_assemble_hct_ab_shot_result` (sibling of the FB assembler).
+- **Emitter** (`dynamic_hct_step_emitter`): loop segments stay non-terminal;
+  `_build_ab_shot_step` (shooter `shoot` in place, defenders to their D5
+  release coords, `fixed_duration` gate) + shared `_build_post_shot_sub_steps`.
+- **Clock** (`turn_manager`): already realigns MAKE/MISS/BLOCK HCT turns
+  generically (added in 2D-1) — no change needed.
+- Verified with an offline smoke test (zone helpers, D5/D6 geometry, contested
+  make + uncontested miss, full walk-up→loop→shot→post-shot emitter chain).
+
+  > Reachability: reached when the BH advances past x=64 at a y outside the PSA
+  > band (≈ y 10-18). Unlike D18 this fires in normal play (the neutral advance
+  > jitters y by ±6), though a central advance hits the PSA → HCO first.
+
+#### 2D-2b — drive + drive→dish  ⏳ TODO
+
+- Optimal tree (D4): SH>80 shoot / SC+AG>105 drive / else pass; drive target by
+  starting y (upper/lower lowPost / basketSpot); 50/50 drive→dish.
+
+#### 2D-2c — top-level pass  ⏳ TODO
+
+- Receiver selection (closest + open-rim override); receiver post-catch actions
+  (attack / Kick-Out→HCO / re-enter loop).
 
 ### 2D-3 — top-level pass  ⏳ TODO
 
@@ -128,6 +170,8 @@ Built as vertical slices because this is the first HCT path that produces a
 
 - 10-second-violation runtime wiring (D9).
 - Step-N movement for the other defenders / teammates, not just the PG defender (D15).
+  - ✅ *Partial (render):* `_build_loop_step` now clamps every mover to its archetype rate via the interrupted-coord pattern (`start + rate × T`) and carries the result forward, so off-ball offense progress toward setup at sprint across loop steps instead of being snapped to the full target each segment (fixes the off-ball "jet"). Off-ball offense use the `sprint` archetype; BH/defenders use `standard`. This is also a universal "no one exceeds their archetype rate within a step" safety net.
+  - ⏳ *Still TODO (model):* the engine seeds `off_coords` at the full setup targets and re-asserts them every segment. D15 — and any decision that reads off-ball offensive positions (Attack-Basket offenders>defenders trigger, pass targeting) — must have the engine track each off-ball player's actual lagging position instead.
 - Stats parity vs. the skeleton path (D16).
 
 ## Deferred (not in Cut 2, per design owner)
