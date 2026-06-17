@@ -16,15 +16,17 @@ Shot clock reset triggers (authoritative policy):
 
 - **Possession change** (except timeout turns).
 - **Non-shooting defensive foul** where next turn is `SIDE_INBOUND`/`SIP` and possession does not change (defensive aliases accepted: `DEFENSIVE`, `DEFENSE`, `D_FOUL` from `foul_type`/`foul_team`).
-- **OREB possession renewal** event.
+- **OREB possession renewal** event — **except after a blocked shot** (see below).
 
 Inbound receive by itself does **not** reset shot clock.
+
+**Blocked shot → OREB does NOT reset.** A `BLOCK` stops the shot clock at the moment of the block; if the offense rebounds it (OREB), the ensuing possession — putback **or** kickout→HCO — continues from the **remaining** shot-clock time (pure carryover, no floor). Mirrors real-rule behavior for a block that doesn't reset. Normal `MISS`/`FREE_THROW` → OREB still reset.
 
 ### Shot clock reset instances
 
 1. Possession change (except `TIMEOUT`).
 2. Non-shooting defensive foul with next turn `SIDE_INBOUND`/`SIP`, no possession change.
-3. OREB possession renewal.
+3. OREB possession renewal — **only when the shot was `MISS` or `FREE_THROW`; a `BLOCK` → OREB carries the remaining clock over (no reset).**
 
 ### Shot clock carryover between turns
 
@@ -77,6 +79,15 @@ else:                       shot attempt = True
 If a shot attempt results, the ball handler shoots from his location at the point the turn ends, with **+100 added to the shot threshold** when calculating shot success.
 
 > Variable names above are illustrative (intent only); the code does not require these exact names.
+
+**Coverage:** this violation-vs-forced-shot logic is **not universal** — it applies to the clock-enforced states `HCO`, `FCP`, `HCT`, `FAST_BREAK` (a turn-start check when `shot_clock_remaining <= 0`, plus the HCO mid-skeleton check above). `OREB`/putback is handled separately (below).
+
+### OREB shot clock → dead-ball turnover
+
+The OREB possession needs enough **carried** shot clock (no reset after a block — see § Shot clock reset instances) to reach a shot. Checked once at the top of the OREB turn (`resolve_offensive_rebound_turn`):
+
+- If the carried `shot_clock_remaining` `<= ~2s` (the pre-shot window — too little to reach the putback shot, or to run the block→HCO reset into a shot), the possession is **killed as a clean dead-ball / `SHOT_CLOCK` turnover** — *always a turnover, never the HCO 50/50 forced-shot path*. Covers both the entry case (already ≤0) and the clock expiring mid-progression before the next shot. Applies to **both** the miss→OREB→putback path and the block→OREB→HCO path (the gate fires before the HCO handoff).
+- **OREB credit:** the offensive rebound is credited only if `shot_clock_remaining > 0` at the start of the OREB turn. The board is recorded upstream (on the block/miss turn); if the clock had already expired (`== 0`), it is uncredited (`record_stat("OREB", -1)`).
 
 ---
 

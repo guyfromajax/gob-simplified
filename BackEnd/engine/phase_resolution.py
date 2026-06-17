@@ -7092,6 +7092,74 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
 USE_DYNAMIC_HCT = True
 
 
+def _assemble_hct_fb_shot_result(
+    game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+):
+    """Merge a resolved broken-HCT fast-break shot (§7 / D18) with the HCT loop
+    intermediate data into a downstream-ready turn_result.
+
+    ``shot`` is the ``resolve_hct_fast_break_shot`` output (MAKE/MISS shot turn
+    fields + ``hct_fb_*`` drive seed). We add the pre-shot loop animation data
+    (walk-up targets + ``loop_segments``) so ``build_dynamic_hct_animation_steps``
+    can render entry → loop → drive → post-shot in one turn.
+    """
+    off_team = game.offense_team
+    result_type = shot["result_type"]
+    ball_handler = shot.get("shooter")
+    defender = shot.get("defender")
+
+    text = text + shot.get("text_suffix", "")
+
+    # HCT scouting parity (HCT_A/_S offense, HCT_A_D/_S_D defense) — the same
+    # helper the HCO/skeleton path uses; MAKE → offense success, MISS → defense.
+    _record_hct_stats(
+        {"ball_handler": ball_handler, "shooter": ball_handler, "defender": defender},
+        {"result_type": result_type},
+        game,
+        off_lineup,
+        def_lineup,
+    )
+
+    loop_segments = dyn.get("loop_segments") or []
+    shot["text"] = text
+    shot["passer"] = ""
+    shot["screener"] = ""
+    shot.setdefault("foul_team", shot.get("foul_team"))
+    shot.setdefault("foul_player_id", shot.get("foul_player_id"))
+    shot.setdefault("fouled_out", shot.get("fouled_out", False))
+    shot.setdefault("foul_count", shot.get("foul_count", 0))
+    shot["victim_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["defender_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["events"] = []
+    shot["skeleton"] = {}
+    shot["roles"] = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+        "passer": "",
+        "screener": "",
+    }
+
+    # Emitter intermediate data (same keys as the non-shot path).
+    shot["hct_bh_pos"] = dyn["bh_pos"]
+    shot["hct_bh_target"] = dyn["bh_target"]
+    shot["hct_other_offense_targets"] = dyn["other_offense_targets"]
+    shot["hct_def_initial_targets"] = dyn["def_initial_targets"]
+    shot["hct_loop_segments"] = loop_segments
+
+    # Engine-portion time totals; the emitter overwrites these once it appends
+    # the drive + post-shot sub-steps.
+    shot["time_elapsed"] = round(
+        sum(s["seconds"] for s in loop_segments) + float(shot.get("hct_fb_t_shooter", 0) or 0),
+        2,
+    )
+    shot["step_clock_seconds"] = [s["seconds"] for s in loop_segments]
+    shot["resolution_step_index"] = max(0, len(loop_segments) - 1)
+    shot["executed_step_count"] = len(loop_segments)
+    shot.setdefault("offense_team_id", off_team.team_id)
+    return shot
+
+
 def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     """
     Dynamic HCT entry point — first cut. Calls into ``dynamic_hct`` to compute
@@ -7111,6 +7179,23 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     def_lineup = def_team.lineup
 
     dyn = compute_dynamic_hct_turn(game)
+
+    # §7 / D18 — broken-HCT fast break: the engine reached the topLane spot and
+    # hands off to the shot resolver, which produces a real MAKE/MISS shot turn
+    # (scoring / rebound / foul / possession). The HCT loop segments remain for
+    # the pre-shot animation; the emitter appends the drive + post-shot steps.
+    if dyn.get("result_type") == "FAST_BREAK_SHOT":
+        from BackEnd.engine.dynamic_hct_shot import resolve_hct_fast_break_shot
+
+        shot = resolve_hct_fast_break_shot(game, dyn)
+        if not shot.get("_hct_fb_bail"):
+            return _assemble_hct_fb_shot_result(
+                game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+            )
+        # Resolver bailed (missing seed) — settle into a plain HCO break.
+        dyn["result_type"] = "HCO"
+        dyn["fb_seed"] = {}
+
     result_type = dyn["result_type"]
     ball_handler = dyn["ball_handler"]
     defender = dyn["defender"]
@@ -7199,11 +7284,13 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "screener": "",
         "offense_team_id": off_team.team_id,
         "possession_flips": possession_flips,
-        # Engine-portion totals only; emitter adds walk-up duration.
-        "time_elapsed": dyn["converge_seconds"] + dyn["attack_seconds"],
-        "step_clock_seconds": [dyn["converge_seconds"], dyn["attack_seconds"]],
-        "resolution_step_index": 1,  # 2 engine steps → last index is 1
-        "executed_step_count": 2,
+        # Engine-portion totals only; the emitter overwrites time_elapsed /
+        # step_clock_seconds / resolution_step_index / executed_step_count with
+        # the full walk-up + N-segment totals once steps are assembled.
+        "time_elapsed": round(sum(s["seconds"] for s in dyn["loop_segments"]), 2),
+        "step_clock_seconds": [s["seconds"] for s in dyn["loop_segments"]],
+        "resolution_step_index": max(0, len(dyn["loop_segments"]) - 1),
+        "executed_step_count": len(dyn["loop_segments"]),
         "events": [],
         "skeleton": {},
         "roles": roles,
@@ -7218,11 +7305,7 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "hct_bh_target": dyn["bh_target"],
         "hct_other_offense_targets": dyn["other_offense_targets"],
         "hct_def_initial_targets": dyn["def_initial_targets"],
-        "hct_converge_target": dyn["converge_target"],
-        "hct_converge_seconds": dyn["converge_seconds"],
-        "hct_attack_bh_target": dyn["attack_bh_target"],
-        "hct_attack_def_target": dyn["attack_def_target"],
-        "hct_attack_seconds": dyn["attack_seconds"],
+        "hct_loop_segments": dyn["loop_segments"],
     }
 
 

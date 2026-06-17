@@ -13,6 +13,12 @@ from unittest.mock import patch
 from tests.test_utils import build_mock_game
 
 
+def _ensure_min_stats(game):
+    for team in (game.home_team, game.away_team):
+        for player in team.lineup.values():
+            player.stats["game"].setdefault("MIN", 0)
+
+
 @pytest.mark.integration
 class TestOrebKickout:
     """Test offensive rebound kickout flow."""
@@ -24,12 +30,13 @@ class TestOrebKickout:
         Required fields:
         - result_type: "OREB_KICKOUT"
         - rebounderId: player ID
-        - pgId: point guard player ID
+        - kickout_deferred_to_hco_entry: True
         - possession_flips: False (kickout keeps possession)
         - next_turn: "HCO"
         - current_turn: "OREB"
         """
         game = build_mock_game()
+        _ensure_min_stats(game)
         
         # High threshold to force miss on initial shot
         game.offense_team.team_attributes["shot_threshold"] = 1000
@@ -62,8 +69,8 @@ class TestOrebKickout:
             assert "rebounderId" in oreb_turn, "Missing rebounderId"
             assert oreb_turn["rebounderId"] is not None, "rebounderId should not be None"
             
-            assert "pgId" in oreb_turn, "Missing pgId"
-            assert oreb_turn["pgId"] is not None, "pgId should not be None"
+            assert oreb_turn.get("pgId") is None, "pgId should defer to HCO initiator"
+            assert oreb_turn.get("kickout_deferred_to_hco_entry") is True
             
             assert oreb_turn.get("possession_flips") == False, \
                 "Kickout should not flip possession"
@@ -87,12 +94,6 @@ class TestOrebKickout:
             assert isinstance(oreb_turn["rebounderId"], str), "rebounderId should be string"
             assert len(oreb_turn["rebounderId"]) > 0, "rebounderId should not be empty"
             
-            assert isinstance(oreb_turn["pgId"], str), "pgId should be string"
-            assert len(oreb_turn["pgId"]) > 0, "pgId should not be empty"
-            
-            # Validate rebounder and PG are different players
-            assert oreb_turn["rebounderId"] != oreb_turn["pgId"], \
-                "Rebounder and PG should be different players"
     
     def test_oreb_kickout_multiple_instances(self):
         """
@@ -100,6 +101,7 @@ class TestOrebKickout:
         This test validates that the same structure is maintained when OREB kickouts occur.
         """
         game = build_mock_game()
+        _ensure_min_stats(game)
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls on both teams
         game.offense_team.team_attributes["foul_modifier"] = 200
@@ -123,14 +125,14 @@ class TestOrebKickout:
                 # Validate all required fields are present and consistent
                 assert oreb_turn.get("result_type") == "OREB_KICKOUT"
                 assert "rebounderId" in oreb_turn and oreb_turn["rebounderId"] is not None
-                assert "pgId" in oreb_turn and oreb_turn["pgId"] is not None
+                assert oreb_turn.get("pgId") is None
+                assert oreb_turn.get("kickout_deferred_to_hco_entry") is True
                 assert oreb_turn.get("possession_flips") == False
                 assert oreb_turn.get("next_turn") == "HCO"
                 assert oreb_turn.get("current_turn") == "OREB"
                 
                 # Validate field types
                 assert isinstance(oreb_turn["rebounderId"], str)
-                assert isinstance(oreb_turn["pgId"], str)
                 assert isinstance(oreb_turn.get("time_elapsed"), (int, float))
                 assert isinstance(oreb_turn.get("text"), str)
         else:
@@ -138,20 +140,15 @@ class TestOrebKickout:
             # This test just ensures the validation logic is sound
             pass
     
-    def test_oreb_kickout_pg_validation(self):
+    def test_oreb_kickout_defers_receiver_to_hco_entry(self):
         """
-        Test that pgId is correctly set to the actual PG in the lineup.
+        Test that OREB reset does not force a PG receiver before HCO resolves its skeleton.
         """
         game = build_mock_game()
+        _ensure_min_stats(game)
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls
         game.offense_team.team_attributes["foul_modifier"] = 200
-        
-        # Get the actual PG from the lineup
-        pg = game.offense_team.lineup.get("PG")
-        assert pg is not None, "Lineup should have a PG"
-        expected_pg_id = getattr(pg, "player_id", None)
-        assert expected_pg_id is not None, "PG should have a player_id"
         
         # Force OREB kickout
         # Provide enough random values for all calls
@@ -164,14 +161,15 @@ class TestOrebKickout:
             oreb_turn = game.turn_manager.resolve_offensive_rebound_turn()
             
             if oreb_turn and oreb_turn.get("result_type") == "OREB_KICKOUT":
-                assert oreb_turn["pgId"] == expected_pg_id, \
-                    f"pgId should match lineup PG: expected {expected_pg_id}, got {oreb_turn['pgId']}"
+                assert oreb_turn.get("pgId") is None
+                assert oreb_turn.get("kickout_deferred_to_hco_entry") is True
     
     def test_oreb_kickout_no_errors(self):
         """
         Test that OREB kickout resolution doesn't raise exceptions.
         """
         game = build_mock_game()
+        _ensure_min_stats(game)
         game.offense_team.team_attributes["shot_threshold"] = 1000
         # High foul threshold to avoid fouls
         game.offense_team.team_attributes["foul_modifier"] = 200
@@ -190,4 +188,3 @@ class TestOrebKickout:
             assert oreb_turn is not None, "OREB turn should be created without errors"
             assert oreb_turn.get("result_type") == "OREB_KICKOUT", \
                 "Should create OREB_KICKOUT turn"
-

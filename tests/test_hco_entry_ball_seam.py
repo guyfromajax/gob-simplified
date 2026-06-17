@@ -58,7 +58,7 @@ def _animations_from_coords(step0_coords, step1_coords):
 
 
 def test_hco_skeleton_step0_inherits_prepended_ball_owner():
-    """After Handoff→Walk Up, skeleton step 0 must not re-stamp PG on a pass play."""
+    """Stale HCO setup metadata must not override the skeleton step-0 initiator."""
     game = _build_game()
     pg_id = str(game.offense_team.lineup["PG"].player_id)
     sg_id = str(game.offense_team.lineup["SG"].player_id)
@@ -102,6 +102,12 @@ def test_hco_skeleton_step0_inherits_prepended_ball_owner():
     turn_result = {
         "current_turn": "HCO",
         "result_type": "MAKE",
+        "hco_setup": {
+            "inbound_pass": {
+                "from_player_id": pg_id,
+                "to_player_id": pg_id,
+            },
+        },
         "skeleton": {"steps": skeleton_steps},
         "animations": animations,
         "step_clock_seconds": [1.0, 1.0],

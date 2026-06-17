@@ -124,24 +124,14 @@ def _assert_complete_kickout(result):
     assert result["result_type"] == "OREB_KICKOUT"
     steps = result.get("animation_steps")
     assert isinstance(steps, list)
-    assert len(steps) == 3
+    assert len(steps) == 1
 
     rebounder_id = str(result["rebounderId"])
-    pg_id = str(result["pgId"])
     assert steps[0]["end"]["ball"]["owner_player_id"] == rebounder_id
-    assert steps[1]["start"]["ball"]["owner_player_id"] == rebounder_id
-    assert steps[1]["end"]["ball"]["owner_player_id"] == rebounder_id
-    assert steps[2]["start"]["ball"]["from_player_id"] == rebounder_id
-    assert steps[2]["start"]["ball"]["to_player_id"] == pg_id
-    assert steps[2]["end"]["ball"]["owner_player_id"] == pg_id
-    assert (
-        steps[1]["start"]["advance_trigger"]["metadata"]["reason"]
-        == "oreb_kickout_positioning"
-    )
-    assert (
-        steps[2]["start"]["advance_trigger"]["metadata"]["reason"]
-        == "oreb_kickout_pass"
-    )
+    assert steps[0]["end"]["next"] == {"kind": "next_step", "index": 999}
+    assert result.get("pgId") is None
+    assert result.get("kickout_deferred_to_hco_entry") is True
+    assert steps[0]["start"]["advance_trigger"]["condition"] == "player_reaches_position"
 
 
 @pytest.mark.parametrize("from_block", [False, True])

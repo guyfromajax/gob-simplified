@@ -236,7 +236,7 @@ def _apply_hco_setup_entry_ids(
     to_id = inbound.get("to_player_id")
     if from_id and not current_bh_id:
         current_bh_id = str(from_id)
-    if to_id:
+    if to_id and not step0_bh_id:
         step0_bh_id = str(to_id)
     return current_bh_id, step0_bh_id
 

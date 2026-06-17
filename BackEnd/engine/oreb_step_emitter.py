@@ -5,10 +5,9 @@ turns. The OREB turn produces one of three outcomes; each renders as a
 distinct sub-step sequence:
 
   OREB_KICKOUT
-      [rebound_capture] → [kickout_positioning] → [kickout_pass]
-      → implicit turn end (next_step past array). The kickout pair is
-      built by ``transition_bridge.build_kickout_step`` (same primitive
-      HCO uses for its kickout entry).
+      [rebound_capture] → implicit turn end. The following HCO turn owns
+      the kickout / handoff / walk-up entry to its skeleton-derived
+      initiator.
 
   PUTBACK_MAKE
       [rebound_capture] → [putback_shoot] → [ball_flight] → [hold]
@@ -84,9 +83,6 @@ from BackEnd.utils.animation_step_schema import (
     PlayerAction,
     PlayerArchetype,
 )
-from BackEnd.utils.transition_bridge import build_kickout_step
-
-
 _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 
@@ -631,42 +627,11 @@ def build_oreb_animation_steps(
     elapsed = capture_step["end"]["time_elapsed"]
 
     if result_type == "OREB_KICKOUT":
-        pg_id = str(turn_result.get("pgId") or "")
-        if not pg_id or pg_id == rebounder_id or pg_id not in start_coords:
-            # Can't kick out to a missing PG; return capture step only.
-            return steps
-        # ``build_kickout_step`` produces 2 sub-steps (positioning + pass).
-        # OREB is emitted before the next HCO skeleton exists, so the shared
-        # kickout target helper falls back to organic HCO lane drift for
-        # non-core players.
-        kickout_steps = build_kickout_step(
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            start_coords=capture_step["end"]["coords"],
-            bh_id=rebounder_id,
-            receiver_id=pg_id,
-            setup_coords=None,
-            is_away_offense=is_away_offense,
-            clock_remaining_at_start=clock_remaining - elapsed,
-            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
-            next_step_index=1,  # placeholder; rewired below
-            metadata_reason="oreb_kickout",
-        )
-        if not kickout_steps:
-            return steps
-        # Rewire next-pointers across the appended kickout sub-steps.
-        first_kickout_idx = len(steps)
-        for offset, kstep in enumerate(kickout_steps):
-            if offset < len(kickout_steps) - 1:
-                kstep["end"]["next"] = {
-                    "kind": "next_step",
-                    "index": first_kickout_idx + offset + 1,
-                }
-            else:
-                # Last kickout sub-step: implicit end of turn.
-                kstep["end"]["next"] = {"kind": "next_step", "index": 999}
-        capture_step["end"]["next"] = {"kind": "next_step", "index": first_kickout_idx}
-        steps.extend(kickout_steps)
+        # OREB resolves before the following HCO turn selects its skeleton.
+        # End with the rebounder holding the ball; the universal HCO entry
+        # orchestrator will route from this carrier to the real step-0
+        # initiator once that skeleton exists.
+        capture_step["end"]["next"] = {"kind": "next_step", "index": 999}
         return steps
 
     # PUTBACK_MAKE / PUTBACK_MISS share [putback_shoot] + [ball_flight];

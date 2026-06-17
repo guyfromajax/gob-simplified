@@ -505,6 +505,17 @@ class GameManager:
         result_type_upper = str(result.get("result_type") or "").upper()
         current_turn_upper = str(result.get("current_turn") or "").upper()
 
+        # HCT → HCO transitions must NOT force the PG as the entry receiver.
+        # Dynamic HCT (Cut 2) can end with a non-PG ball handler (after a pass),
+        # and the HCO entry orchestrator already derives the real step-0
+        # initiator from the skeleton (target_shooter / pos1..pos4). Stamping
+        # hco_setup here would override that with the PG (D7). Suppress it; the
+        # universal `final_ball_handler_id` stamp still gives the orchestrator
+        # the correct current ball handler. Other transition types still flow
+        # through (see HCO_Transition_System_ToDo.md).
+        if current_turn_upper == "HCT":
+            return
+
         # 1. STEAL: stealer has the ball.
         if result_type_upper == "STEAL":
             bh_id = result.get("stealer_id") or result.get("stealerId")

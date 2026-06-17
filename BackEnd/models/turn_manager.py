@@ -38,7 +38,6 @@ from BackEnd.utils.shared import (
     get_player_position,
     serialize_lineup,
     getAwayTeamCoords,
-    calc_pass_segment_seconds,
 )
 from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
 from BackEnd.utils.defense_utils import defender_player_from_random_slot_fallback
@@ -1454,6 +1453,20 @@ class TurnManager:
                     anim_steps = build_dynamic_hct_animation_steps(result, self.game)
                     if anim_steps is not None:
                         result["animation_steps"] = anim_steps
+                        # Align time_elapsed with the schema's game-clock burn
+                        # for MAKE/MISS/BLOCK HCT shot turns (§7 fast break),
+                        # mirroring the FCP realignment above — the legacy
+                        # step_clock_seconds sum omits the [ball_flight] +
+                        # [bounce] sub-step durations.
+                        hct_result_type = (result.get("result_type") or "").upper()
+                        if hct_result_type in ("MAKE", "MISS", "BLOCK") and anim_steps:
+                            first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
+                            last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
+                            cs_start = first_clock.get("clock_remaining")
+                            cs_end = last_clock.get("clock_remaining")
+                            if cs_start is not None and cs_end is not None:
+                                schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
+                                result["time_elapsed"] = int(round(schema_game_burn))
                 except Exception as e:
                     logging.warning(
                         "build_dynamic_hct_animation_steps failed: %s", e
@@ -3870,11 +3883,54 @@ class TurnManager:
         
         rebounder = pending_oreb["rebounder"]
         game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
-        
+
+        # Shot-clock gate (Shot_Clock_System.md § Shot clock 0 → dead-ball turnover):
+        # The OREB possession needs enough carried shot clock to reach a shot. If
+        # the shot clock is at/near 0 entering the OREB turn, the possession is
+        # killed as a dead-ball (shot-clock) turnover BEFORE any putback / kickout
+        # / block→HCO handoff — a clean turnover, never HCO's 50/50. Unified ~2s
+        # window covers both the putback and block→HCO paths, and catches the
+        # clock expiring mid-progression before the next shot.
+        entry_shot_clock = int(
+            game_state.get(
+                "shot_clock_remaining",
+                min(30, int(game_state.get("time_remaining", 480) or 0)),
+            ) or 0
+        )
+        OREB_MIN_SHOT_CLOCK_FOR_ATTEMPT = 2  # ≤ this can't reach a shot → turnover
+        if entry_shot_clock <= OREB_MIN_SHOT_CLOCK_FOR_ATTEMPT:
+            # Credit the offensive rebound only if the shot clock was > 0 at the
+            # start of the OREB turn (the board was secured with time on the
+            # clock). It was recorded upstream on the block/miss turn, so uncredit
+            # it here when the clock had already expired.
+            if entry_shot_clock <= 0 and rebounder is not None:
+                try:
+                    rebounder.record_stat("OREB", -1)
+                except Exception:
+                    pass
+            self.game.update_team_stats()
+            sc_violation = self._build_shot_clock_violation_result("OREB")
+            sc_violation["rebounderId"] = getattr(rebounder, "player_id", None)
+            sc_violation["quarter"] = self.game.quarter
+            sc_violation["deltas"] = {}
+            sc_violation["player_energy"] = {
+                p.player_id: {"NG": p.attributes.get("NG", 1.0), "team": t.name}
+                for t in (self.game.home_team, self.game.away_team)
+                for _pos, p in t.lineup.items()
+                if p
+            }
+            sc_violation["score"] = dict(self.game.score)
+            sc_violation["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
+            sc_violation["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
+            sc_violation["team_totals"] = {
+                self.game.home_team.name: self.game.home_team.get_team_game_stats(),
+                self.game.away_team.name: self.game.away_team.get_team_game_stats(),
+            }
+            return self._stamp_oreb_animation_steps(sc_violation)
+
         # OREB after block: go straight to HCO, no putback attempt (SS&S: one place to enforce)
         if from_block:
             game_state["offensive_state"] = "HCO"
-            pg = off_team.lineup.get("PG")
             deltas = {}
             for team in (self.game.home_team, self.game.away_team):
                 for player in team.get_all_players():
@@ -3898,15 +3954,10 @@ class TurnManager:
                         "team": team.name
                     }
             self.game.update_team_stats()
-            # OREB: collapse+attach 3 game s; add pass time (rebounder -> PG)
+            # OREB reset: capture the board and let the following HCO entry
+            # route from the rebounder to the play's real step-0 initiator.
             _base = 3
-            _pass_sec = 0.0
-            if rebounder and pg:
-                rc = getattr(rebounder, "coords", None) or {}
-                pc = getattr(pg, "coords", None) or {}
-                if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
-                    _pass_sec = calc_pass_segment_seconds(rc, pc)
-            _oreb_te = round(_base + _pass_sec)
+            _oreb_te = round(_base)
             from BackEnd.utils.position_snapshot_ledger import (
                 attach_position_snapshots,
                 build_oreb_kickout_snapshot,
@@ -3926,7 +3977,8 @@ class TurnManager:
                 "next_turn": "HCO",
                 "animations": [],
                 "rebounderId": getattr(rebounder, "player_id", None),
-                "pgId": getattr(pg, "player_id", None) if pg else None,
+                "pgId": None,
+                "kickout_deferred_to_hco_entry": True,
                 "quarter": self.game.quarter,
                 "deltas": deltas,
                 "player_energy": player_energy,
@@ -4333,8 +4385,7 @@ class TurnManager:
         else:
             # Kickout
             self.logger.log("kickoutStart")
-            pg = off_team.lineup.get("PG")
-            text = f"{get_name_safe(rebounder)} kicks it out to reset."
+            text = f"{get_name_safe(rebounder)} secures the offensive rebound to reset."
             game_state["offensive_state"] = "HCO"
             
             # Compute stat deltas (same as run_micro_turn)
@@ -4365,15 +4416,10 @@ class TurnManager:
             
             # Update team stats before sending
             self.game.update_team_stats()
-            # OREB: collapse+attach 3 game s; add pass time (rebounder -> PG)
+            # OREB reset: capture the board and let the following HCO entry
+            # route from the rebounder to the play's real step-0 initiator.
             _base_kickout = 3
-            _pass_sec_kickout = 0.0
-            if rebounder and pg:
-                rc = getattr(rebounder, "coords", None) or {}
-                pc = getattr(pg, "coords", None) or {}
-                if isinstance(rc, dict) and isinstance(pc, dict) and "x" in rc and "y" in rc and "x" in pc and "y" in pc:
-                    _pass_sec_kickout = calc_pass_segment_seconds(rc, pc)
-            _oreb_te_kickout = round(_base_kickout + _pass_sec_kickout)
+            _oreb_te_kickout = round(_base_kickout)
             kick_payload = {
                 "result_type": "OREB_KICKOUT",
                 "ball_handler": getattr(rebounder, "player_id", None),
@@ -4384,10 +4430,12 @@ class TurnManager:
                 "oreb_action_seconds": 1,
                 "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                 "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
+                "next_play_type": "HCO",
                 "next_turn": "HCO",  # ✅ SS&S: Kickouts continue to HCO
                 "animations": [],
                 "rebounderId": getattr(rebounder, "player_id", None),
-                "pgId": getattr(pg, "player_id", None) if pg else None,
+                "pgId": None,
+                "kickout_deferred_to_hco_entry": True,
                 "quarter": self.game.quarter,
                 # Add fields needed by frontend for stat display
                 "deltas": deltas,
@@ -4480,12 +4528,14 @@ class TurnManager:
                 and free_throws_remaining <= 0
             ):
                 return True
-            # Rule 3: offensive rebound possession renewal resets.
-            # Apply on rebound capture outcomes (MISS/BLOCK/FREE_THROW with rebound_type=OREB)
-            # and literal OREB result types; avoid repeated resets on OREB continuation turns.
+            # Rule 3: offensive rebound possession renewal resets — EXCEPT a
+            # blocked shot that is offensive-rebounded. A BLOCK already stops the
+            # shot clock at the block, and the ensuing OREB (putback OR kickout)
+            # continues from the remaining time with NO reset (Shot_Clock_System.md
+            # § Shot clock reset instances). MISS/FREE_THROW → OREB still reset.
             if rt == "OREB":
                 return True
-            if rebound_type == "OREB" and rt in {"MISS", "BLOCK", "FREE_THROW"}:
+            if rebound_type == "OREB" and rt in {"MISS", "FREE_THROW"}:
                 return True
             return False
 
