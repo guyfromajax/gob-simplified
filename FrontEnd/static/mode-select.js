@@ -228,6 +228,12 @@ function setLeaderboardView(view) {
   currentLeaderboardView = view === 'titles' ? 'titles' : 'geek_points';
   if (leaderboardGeekPointsToggle) leaderboardGeekPointsToggle.classList.toggle('active', currentLeaderboardView === 'geek_points');
   if (leaderboardTitlesToggle) leaderboardTitlesToggle.classList.toggle('active', currentLeaderboardView === 'titles');
+  var subtitle = document.querySelector('.ms-leaderboard-subtitle');
+  if (subtitle) {
+    subtitle.textContent = currentLeaderboardView === 'titles'
+      ? 'Total Titles (National Titles)'
+      : 'Earn Geek Points after each game based on your coaching performance.';
+  }
 }
 
 // Title-count display: total titles with national titles in parens, e.g. "7 (0)".

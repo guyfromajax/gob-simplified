@@ -467,13 +467,32 @@ def _select_trappers(
 
 
 def _select_pass_receiver(
-    bh_pos: str, off_coords: Dict[str, Dict[str, int]]
+    bh_pos: str,
+    off_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
 ) -> str:
     """§6 pass: the ball goes to one of the two teammates closest to the BH
-    (chosen at random between those two)."""
+    (chosen at random between those two).
+
+    Over-and-back guard: once the BH has crossed half-court he may not pass to a
+    teammate still in the backcourt (x<50 home / x>50 away) without an
+    over-and-back violation. For now we *prevent* it — if one of the two closest
+    teammates would be a violation and the other would not, the legal teammate
+    is chosen. (Detecting an actual over-and-back and processing it as a
+    dead-ball turnover is a later item; see the §11 outstanding list.)
+    """
     others = [p for p in POSITIONS if p != bh_pos]
     others.sort(key=lambda p: _euclid(off_coords[bh_pos], off_coords[p]))
-    return random.choice(others[:2])
+    candidates = others[:2]
+    if _crossed_half_court(off_coords[bh_pos]["x"], is_away_offense):
+        legal = [
+            p
+            for p in candidates
+            if _crossed_half_court(off_coords[p]["x"], is_away_offense)
+        ]
+        if legal:
+            candidates = legal
+    return random.choice(candidates)
 
 
 def _determine_shift(bh_y: float) -> str:
@@ -886,7 +905,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         # decision == "pass" → §6 pass branch. The ball goes to one of the two
         # teammates closest to the BH; the receiver becomes the new ball handler
         # and the loop continues from him (enables a non-PG HCT-end BH → D7).
-        receiver_pos = _select_pass_receiver(bh_pos, off_coords)
+        receiver_pos = _select_pass_receiver(bh_pos, off_coords, is_away_offense)
         passer_pos = bh_pos
 
         # D19 — compute the pass-defense formation ONCE (around the receiver) and

@@ -770,6 +770,13 @@ Design is complete. These are the remaining work items.
 
 **Deferred features (build later, on purpose):**
 - Fouls, steals, and dead-ball turnover outcomes (D8).
+- **Over-and-back violation (D20).** Once the BH has crossed x=50 he may not pass
+  to a backcourt teammate (x<50 home / x>50 away). **Guard built (preventive):**
+  `_select_pass_receiver` drops any backcourt teammate from the two-closest pool
+  when the BH is past half-court, so a legal teammate is chosen when one exists.
+  **Still TODO:** detect an *actual* over-and-back (no legal option, or a forced
+  backward pass) and process it as a dead-ball turnover; extend the guard to the
+  2D-2c top-level-pass selection.
 - Mid-flight pass interception — stealing a pass in the air (D11).
 - Pass-defender target persistence — keep defenders' pass-defense targets steady across loop iterations so they don't jitter each tick (D19).
 
