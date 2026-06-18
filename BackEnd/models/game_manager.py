@@ -654,6 +654,24 @@ class GameManager:
             except Exception as e:
                 logging.error(f"⚠️ Shot-clock violation MO failed: {e}")
 
+        # Stamp current derived Team Momentum (−50..+50) on every turn so the
+        # court momentum bar renders live — the frontend reads
+        # turn.home_team_momentum / turn.away_team_momentum (Phase 3). Also
+        # stamp per-player MO (player_id → MO) so the player tooltip shows live
+        # momentum, mirroring how player_energy carries live NG.
+        if isinstance(turn_result, dict):
+            try:
+                from BackEnd.utils.player_momentum import team_momentum
+                turn_result["home_team_momentum"] = team_momentum(self.home_team)
+                turn_result["away_team_momentum"] = team_momentum(self.away_team)
+                player_mo = {}
+                for team in (self.home_team, self.away_team):
+                    for p in team.get_all_players():
+                        player_mo[str(p.player_id)] = int(p.attributes.get("MO", 0) or 0)
+                turn_result["player_momentum"] = player_mo
+            except Exception as e:
+                logging.error(f"⚠️ Team momentum stamp failed: {e}")
+
         if isinstance(turn_result, dict):
             sync_lineup_coords_from_turn(self, turn_result)
 

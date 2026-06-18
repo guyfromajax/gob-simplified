@@ -3,7 +3,7 @@ import random
 import logging
 
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
-from BackEnd.utils.player_momentum import mo_shot_roll
+from BackEnd.utils.player_momentum import mo_shot_roll, team_momentum
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
@@ -2110,6 +2110,8 @@ def summarize_game_state(game, exclude_animations=True):
         "name": game.home_team.name,
         "team_id": game.home_team.team_id,
         "score": game.score.get(game.home_team.name, 0),
+        # Derived Team Momentum (sum of 5 active MO, −50..+50) for the court bar.
+        "team_momentum": team_momentum(game.home_team),
         "colors": {
             "primary_color": game.home_team.primary_color,
             "secondary_color": game.home_team.secondary_color,
@@ -2120,6 +2122,7 @@ def summarize_game_state(game, exclude_animations=True):
         "name": game.away_team.name,
         "team_id": game.away_team.team_id,
         "score": game.score.get(game.away_team.name, 0),
+        "team_momentum": team_momentum(game.away_team),
         "colors": {
             "primary_color": game.away_team.primary_color,
             "secondary_color": game.away_team.secondary_color,

@@ -400,6 +400,11 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
     teamColor: resolveSecondaryStripeColor(team),
     decisionPillText: typeof meta?.decisionPillText === 'string' ? meta.decisionPillText : '',
     decisionPillTone: meta?.decisionPillTone === 'bad' ? 'bad' : (meta?.decisionPillTone === 'good' ? 'good' : ''),
+    // Momentum callout extras (Player_Momentum_System.md): right-side MO chip +
+    // hot/cold flavor (drives the headline sigil + chip color). Cyan for cold —
+    // never the red "bad" pill treatment.
+    moValue: (typeof meta?.moValue === 'number' && Number.isFinite(meta.moValue)) ? meta.moValue : null,
+    moFlavor: meta?.moFlavor === 'cold' ? 'cold' : (meta?.moFlavor === 'hot' ? 'hot' : ''),
     sfx: sfxFile,
   };
   if (String(text || '').trim() === 'Great Stop!' && !photoUrl && !lastName) {

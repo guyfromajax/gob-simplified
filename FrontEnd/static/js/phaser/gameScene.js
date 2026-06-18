@@ -15,6 +15,7 @@ import { animateCountdownTransition } from './animation/countdownAnimation.js';
 import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
 import { createGameClock, parseClockToSeconds } from './utils/gameClock.js';
 import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAttributes.js';
+import { showSecondaryAnnouncement, getSecondaryColorForTeam } from './utils/announcements.js';
 import { resolveTeamsSlotLookupKey } from './utils/loadGameStats.js';
 import { getGameMode } from '../shared/getGameMode.js';
 
@@ -186,6 +187,68 @@ function updateMomentumBar(teamSide, value) {
     posEl.style.width = `${v}%`;
     negEl.style.width = '0%';
   }
+}
+
+/** Box-score momentum glyphs — inline SVG with explicit fills (independent of
+ *  the energy-driven name color). Material "whatshot" flame + "ac_unit" snowflake. */
+function moFlameSvg() {
+  return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+    + '<path fill="#FF9A2E" d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>'
+    + '</svg>';
+}
+function moSnowflakeSvg() {
+  return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">'
+    + '<path fill="#A6ECFF" d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/>'
+    + '</svg>';
+}
+/** Show/hide a box-score momentum glyph: flame at MO>=+5, snowflake at MO<=-5, else hidden. */
+function setBoxScoreMoGlyph(glyphEl, mo) {
+  if (!glyphEl) return;
+  const v = Number(mo) || 0;
+  if (v >= 5) {
+    glyphEl.innerHTML = moFlameSvg();
+    glyphEl.style.display = 'inline-flex';
+  } else if (v <= -5) {
+    glyphEl.innerHTML = moSnowflakeSvg();
+    glyphEl.style.display = 'inline-flex';
+  } else if (glyphEl.style.display !== 'none') {
+    glyphEl.innerHTML = '';
+    glyphEl.style.display = 'none';
+  }
+}
+
+/** Momentum secondary-callout headline: warm at |MO|==4, hot/cold at >=5. */
+function momentumCalloutHeadline(sign, mag) {
+  const hot = sign > 0;
+  if (mag === 4) return hot ? 'Getting Warm!' : 'Getting Cold!';
+  return hot ? 'Red Hot!' : 'Ice Cold!';
+}
+/** True if the secondary ribbon is currently showing/exiting — momentum callouts
+ *  are lowest priority and YIELD (drop) to any other secondary announcement. */
+function isSecondaryRibbonBusy() {
+  if (typeof document === 'undefined') return false;
+  const overlay = document.getElementById('announcement-overlay-secondary');
+  return !!(overlay && !overlay.classList.contains('hidden'));
+}
+/** Fire a momentum callout through the existing secondary ribbon (silent).
+ *  Drops if any other secondary announcement is showing. */
+function fireMomentumCallout(scene, playerId, teamSide, sign, mo) {
+  if (isSecondaryRibbonBusy()) return;
+  const sprite = scene.playerSprites?.[playerId];
+  const playerData = sprite
+    ? {
+        playerId,
+        photo: sprite.photo || null,
+        teamName: sprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, sprite.team_id),
+      }
+    : { playerId };
+  const headline = momentumCalloutHeadline(sign, Math.abs(mo));
+  showSecondaryAnnouncement(headline, teamSide, playerData, {
+    moValue: mo,
+    moFlavor: sign > 0 ? 'hot' : 'cold',
+    sfx: null, // silent for now (no SFX hook)
+  });
 }
 
 /** Solid left-pointing chevron (offense advantage); currentColor fill */
@@ -500,6 +563,12 @@ function momentumValueForTeam(teamObj, turn, side) {
       : Number(turn?.away_momentum_bar ?? turn?.away_momentum ?? turn?.away_team_momentum);
   if (Number.isFinite(fromTurn)) {
     return Math.max(-50, Math.min(50, fromTurn));
+  }
+  // Derived Team Momentum (−50..+50) from the game summary team object —
+  // used for the initial render / resume when the turn lacks the stamp.
+  const fromTeam = Number(teamObj?.team_momentum);
+  if (Number.isFinite(fromTeam)) {
+    return Math.max(-50, Math.min(50, fromTeam));
   }
   const attrs = teamObj?.attributes || teamObj?.team_attributes || {};
   const m = Number(attrs.momentum ?? teamObj?.momentum_score);
@@ -1445,8 +1514,9 @@ export function createGameScene(Phaser) {
         const ng = stats.NG ?? 1.0;
         const ngPercent = Math.round(ng * 100);
         
-        // Get momentum from player attributes
-        const momentum = player.attributes?.MO ?? player.MO ?? '--';
+        // Get LIVE momentum: playerStats.MO is refreshed every turn from
+        // turn.player_momentum; fall back to the load-time player attribute.
+        const momentum = stats.MO ?? player.attributes?.MO ?? player.MO ?? '--';
         
         // Get emotion score (EM) from player attributes
         const em = player.attributes?.EM ?? player.EM ?? 50;
@@ -1615,7 +1685,16 @@ export function createGameScene(Phaser) {
           const defAttemptsTd = document.createElement('td');
           const defTd = document.createElement('td');
           
-          nameTd.textContent = formatName(player?.name, player?.jersey) || '';
+          // Name lives in its own span so the momentum glyph (sibling) survives
+          // textContent updates on substitution. Energy color is set on the <td>
+          // and inherits to the text span; the glyph uses its own SVG fills.
+          const nameTextSpan = document.createElement('span');
+          nameTextSpan.className = 'bs-name-text';
+          nameTextSpan.textContent = formatName(player?.name, player?.jersey) || '';
+          const moGlyphSpan = document.createElement('span');
+          moGlyphSpan.className = 'bs-mo-glyph';
+          moGlyphSpan.style.display = 'none';
+          nameTd.append(nameTextSpan, moGlyphSpan);
           nameTd.style.cursor = 'pointer';
           nameTd.dataset.playerId = playerId;
           
@@ -1665,8 +1744,9 @@ export function createGameScene(Phaser) {
           
           tr.append(nameTd, ptsTd, rebTd, astTd, foulsTd, stlTd, blkTd, toTd, defAttemptsTd, defTd);
           bodyEl.appendChild(tr);
-          this.rowRefs[teamKey][pos] = { 
-            nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd, foulsCell: foulsTd,
+          this.rowRefs[teamKey][pos] = {
+            nameCell: nameTd, nameTextCell: nameTextSpan, moGlyph: moGlyphSpan,
+            ptsCell: ptsTd, rebCell: rebTd, astCell: astTd, foulsCell: foulsTd,
             stlCell: stlTd, blkCell: blkTd, toCell: toTd, defAttemptsCell: defAttemptsTd, defCell: defTd
           };
           if (playerId) {
@@ -1713,7 +1793,8 @@ export function createGameScene(Phaser) {
           const info = this.playerInfo[playerId];
           const row = this.rowRefs[teamKey][pos];
           if (info && row) {
-            row.nameCell.textContent = formatName(info.name, info.jersey);
+            // Update only the text span so the momentum glyph sibling survives.
+            (row.nameTextCell || row.nameCell).textContent = formatName(info.name, info.jersey);
             const stats = this.playerStats[playerId] || { 
               PTS: 0, F: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, DEF_A: 0, DEF_S: 0 
             };
@@ -2059,6 +2140,45 @@ export function createGameScene(Phaser) {
             }
           }
           syncSpriteAttributesFromPlayerEnergy(this.playerSprites, turn.player_energy);
+        }
+
+        // Store live per-player MO for the tooltip (mirrors player_energy → NG).
+        if (turn.player_momentum) {
+          for (const [playerId, mo] of Object.entries(turn.player_momentum)) {
+            const ps = this.playerStats[playerId];
+            if (ps) ps.MO = Number(mo) || 0;
+          }
+          // Refresh box-score momentum glyphs by lineup slot (robust to subs):
+          // each row's glyph reflects the current occupant's MO (flame/snowflake
+          // at |MO|>=5, hidden otherwise). Name color stays energy-driven.
+          // Also evaluate momentum callouts for the 10 on-court players.
+          this.moCallout = this.moCallout || {};
+          ['home', 'away'].forEach(teamKey => {
+            positions.forEach(pos => {
+              const row = this.rowRefs?.[teamKey]?.[pos];
+              const pid = this.currentLineup?.[teamKey]?.[pos];
+              const mo = pid ? (this.playerStats?.[pid]?.MO ?? 0) : 0;
+              if (row && row.moGlyph) setBoxScoreMoGlyph(row.moGlyph, mo);
+              if (!pid) return;
+
+              // Streak tracking: announce once per crossing on the way UP at
+              // |MO| 4 and each of 5..10; never when cooling. Reset when the
+              // player drops below |MO| 4 or flips sign / crosses 0. announcedMag
+              // is the streak's high-water mark, so re-climbing doesn't re-fire,
+              // and a single big jump fires only the most extreme level reached.
+              const mag = Math.abs(mo);
+              const sign = mo > 0 ? 1 : (mo < 0 ? -1 : 0);
+              let st = this.moCallout[pid];
+              if (!st || mag < 4 || sign !== st.sign) {
+                st = { sign, announcedMag: 0 };
+              }
+              if (mag >= 4 && sign !== 0 && mag > st.announcedMag) {
+                st.announcedMag = mag; // advance even if the callout yields/drops
+                fireMomentumCallout(this, pid, teamKey, sign, mo);
+              }
+              this.moCallout[pid] = st;
+            });
+          });
         }
       };
 

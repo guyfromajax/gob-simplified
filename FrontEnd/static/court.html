@@ -811,6 +811,18 @@
       transition: width 0.5s ease;
     }
     
+    /* Box-score momentum glyph (flame/snowflake) — sits beside the name; its
+       SVG uses explicit fills so the energy-driven name color is untouched. */
+    .bs-name-text { vertical-align: middle; }
+    .bs-mo-glyph {
+      display: none;
+      align-items: center;
+      margin-left: 5px;
+      vertical-align: middle;
+      line-height: 0;
+    }
+    .bs-mo-glyph svg { display: block; }
+
     .player-stats-panel.home .player-box-score h3,
     .player-stats-panel.away .player-box-score h3 {
       color: #fff;
@@ -3030,6 +3042,52 @@
       background: #a32020;
     }
 
+    /* Momentum MO-value chip — right side (grid column 3), shown on momentum
+       callouts in place of the decision pill. Gold for hot, cyan for cold.
+       NEVER uses the red "bad" treatment (red is reserved for negative energy). */
+    .sec-mo-chip {
+      grid-column: 3;
+      justify-self: end;
+      align-self: end;
+      margin: 0 4px 6px 0;
+      height: 22px;
+      padding: 0 10px;
+      border-radius: 16px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-sizing: border-box;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.35);
+      z-index: 2;
+      white-space: nowrap;
+    }
+    .sec-mo-chip.hot {
+      color: #FFE9C2;
+      border-color: rgba(255,170,50,0.65);
+      background: linear-gradient(135deg, rgba(255,122,20,0.30) 0%, rgba(255,154,46,0.45) 100%);
+    }
+    .sec-mo-chip.cold {
+      color: #EAFBFF;
+      border-color: rgba(90,200,245,0.65);
+      background: linear-gradient(135deg, rgba(44,154,214,0.30) 0%, rgba(92,205,245,0.45) 100%);
+    }
+    /* Flame/snowflake sigil beside the headline (gold hot / cyan cold). */
+    .sec-headline .sec-headline-sigil {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+      margin-right: 10px;
+      line-height: 0;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+    }
+    .sec-headline .sec-headline-sigil svg { display: block; }
+
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
     /* Controls strip is a child of #playcall-center (in-flow, below #playcall-main-row) */
     #game-controls-strip {
@@ -4021,7 +4079,7 @@
           </div>
         </div>
         <div class="momentum-bar-wrap">
-          <div class="momentum-bar-label">MOMENTUM</div>
+          <div class="momentum-bar-label">TEAM MOMENTUM</div>
           <div class="momentum-bar" id="away-momentum-bar">
             <div class="momentum-center-tick"></div>
             <div class="momentum-fill-neg" id="away-momentum-neg" style="width:0%"></div>
@@ -4191,6 +4249,7 @@
           </div>
           <div class="sec-headline"></div>
           <span class="sec-decision-pill"></span>
+          <span class="sec-mo-chip"></span>
         </div>
       </div>
 
@@ -4224,7 +4283,7 @@
           </div>
         </div>
         <div class="momentum-bar-wrap">
-          <div class="momentum-bar-label">MOMENTUM</div>
+          <div class="momentum-bar-label">TEAM MOMENTUM</div>
           <div class="momentum-bar" id="home-momentum-bar">
             <div class="momentum-center-tick"></div>
             <div class="momentum-fill-neg" id="home-momentum-neg" style="width:0%"></div>
@@ -6357,6 +6416,18 @@
         return '#' + toHex(r * f) + toHex(g * f) + toHex(b * f);
       }
 
+      // Flame (hot) / snowflake (cold) sigil for the momentum callout headline.
+      // Explicit fills (gold / cyan) — never the red verdict color.
+      function secMomentumSigilSvg(flavor) {
+        if (flavor === 'hot') {
+          return '<span class="sec-headline-sigil"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path fill="#FFB24D" d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg></span>';
+        }
+        if (flavor === 'cold') {
+          return '<span class="sec-headline-sigil"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path fill="#A6ECFF" d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg></span>';
+        }
+        return '';
+      }
+
       window.showSecondaryAnnouncementOverlay = function(data) {
         var overlay = document.getElementById('announcement-overlay-secondary');
         if (!overlay) return;
@@ -6384,8 +6455,10 @@
         var subtitleHtml = subtitleRaw
           ? '<span class="sec-subtitle">' + subtitleRaw.toUpperCase() + '</span>'
           : '';
+        var moFlavor = (data && (data.moFlavor === 'hot' || data.moFlavor === 'cold')) ? data.moFlavor : '';
+        var sigilHtml = moFlavor ? secMomentumSigilSvg(moFlavor) : '';
         if (headlineEl) {
-          headlineEl.innerHTML = (hasExclaim
+          headlineEl.innerHTML = sigilHtml + (hasExclaim
             ? upper + '<span class="ann-accent">!</span>'
             : upper) + subtitleHtml;
         }
@@ -6416,6 +6489,22 @@
           } else {
             pill.textContent = '';
             pill.style.display = 'none';
+          }
+        }
+
+        // Momentum MO-value chip (right side). Shown only on momentum callouts;
+        // gold for hot, cyan for cold. Uses a unicode minus to match "MO −8".
+        var moChip = overlay.querySelector('.sec-mo-chip');
+        if (moChip) {
+          moChip.classList.remove('hot', 'cold');
+          var moVal = (data && typeof data.moValue === 'number' && isFinite(data.moValue)) ? data.moValue : null;
+          if (moVal !== null && moFlavor) {
+            moChip.textContent = 'MO ' + (moVal >= 0 ? '+' : '−') + Math.abs(moVal);
+            moChip.classList.add(moFlavor);
+            moChip.style.display = 'flex';
+          } else {
+            moChip.textContent = '';
+            moChip.style.display = 'none';
           }
         }
 

@@ -1,83 +1,161 @@
 # Player Momentum System
 
-**Current state:** Player MO exists as an attribute but is **display-only** — nothing in live gameplay reads or changes it. "Team momentum" is a separate, small legacy in-game system. This doc maps everything that touches either value today, as the starting point for designing the real system.
+Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 
-> Two different things — don't conflate:
-> - **Player MO** — per-player attribute, range **−10 to +10** (`player.attributes["MO"]`)
-> - **Team momentum** — per-team in-game value, range **-50 to 50** (`team_attributes["momentum"]`)
+- **Player MO** — per-player attribute, range **−10..+10** (`player.attributes["MO"]`). Changed by in-game events; reset at breaks; zeroed at game end.
+- **Team Momentum** — **derived** sum of a team's 5 active (lineup) players' MO, range **−50..+50**. Computed on demand; never stored.
+
+> **Tuning contract:** every value below is a named constant in `BackEnd/constants/momentum.py`, documented here 1:1. To retune, change the value in **both** this doc and `momentum.py` — the code reads the constant directly, so no other edits are needed. Player MO is always clamped to `[MO_MIN, MO_MAX]` via `player.clamp_mo`.
+
+`anchor_MO` is the **training** baseline (a separate attribute). Gameplay never reads or writes `anchor_MO`.
 
 ---
 
-## Player MO (−10 to +10)
+## Tunable constants (`BackEnd/constants/momentum.py`)
 
-| When | Effect | Where |
+| Constant | Value | Meaning |
 |---|---|---|
-| Game init | Set to **0** for every player, all modes | `player.py:121` (`randomize_game_attributes`) |
-| Load | Clamped to −10..+10 | `player.py:16` (`clamp_mo`) |
-| **Training — Culture Builder "Inspire"** | **+1 or +2** per player (`randint(1,2)`), clamped; also updates `anchor_MO` | `training_execution_v2.py:624` |
-| Gameplay | **Nothing** — never read or written during a game | (none) |
-| Display | Red/green pill (−10..+10) | `set-lineup.js`, `training-report.js`, `player-detail.js` |
-| Persistence | Saved on the player snapshot in game/franchise/tournament docs; restored on load | `shared.py` (serialize), `api.py` / `franchise_routes.py` (load/write) |
+| `MO_MIN` / `MO_MAX` | −10 / 10 | Per-player MO clamp range |
+| `MO_BLOCK_DELTA` | 1 | Block: blocker +, blocked shooter − |
+| `MO_STEAL_DELTA` | 1 | Steal: stealer +, victim − |
+| `MO_AND_ONE_DELTA` | 1 | Made shot + shooting foul → shooter + |
+| `MO_CHARGE_DELTA` | 1 | Charge: drawer +, charging player − |
+| `MO_OREB_DELTA` | 1 | + on qualifying OREB |
+| `MO_OREB_THRESHOLD` | 5 | OREB number that starts awarding (5th and each after) |
+| `MO_DUNK_DELTA` | 1 | **Deferred** — dunks not wired yet (hook only) |
+| `MO_CONSECUTIVE_THRESHOLD` | 3 | Nth consecutive make/miss that starts awarding |
+| `MO_CONSECUTIVE_DELTA` | 1 | + per consecutive make / − per consecutive miss |
+| `MO_SHOT_ROLL_BASE` | (1, 6) | Default shot roll |
+| `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
+| `MO_SHOT_ROLL_NEGATIVE` | (1, 5) | Unfavorable roll when MO < 0 and chance hits |
+| `MO_SHOT_IMPACT_PCT_PER_LEVEL` | 10 | P(modified roll) = \|MO\| × this (%) |
+| `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
+| `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
+| `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
+| `MO_RESET_REDUCTION_MIN` / `_MAX` | 4 / 7 | Break decay toward 0 for active players (randint range) |
+| `MO_HALFTIME_HIGH_RESET` | (1, 3) | Halftime: MO == +MO_MAX → randint(1, 3) |
+| `MO_HALFTIME_LOW_RESET` | (−3, −1) | Halftime: MO == −MO_MAX → randint(−3, −1) |
+| `MO_FINAL_SHOT_BONUS` | 1 | + after reset if player made the quarter's Final Shot |
+| `MO_TEAM_MIN` / `MO_TEAM_MAX` | −50 / 50 | Team Momentum range (= 5 × per-player range) |
 
-- MO is **excluded from trainable attributes** (no training-point allocation) — "Inspire" is the only thing that moves it.
-- A per-archetype `momentum_score` training amplifier is a **TODO, not implemented** (`training_execution_v2.py` ~L724).
+Helpers live in `BackEnd/utils/player_momentum.py`; the per-player mutator is `Player.add_momentum(delta)` (`player.py`, clamps to ±10, never touches `anchor_MO`).
 
 ---
 
-## Team momentum (0 to 10) — in-game only
+## Player MO events
 
-In-memory during a game (`team_attributes["momentum"]`), **not persisted**, defaults to 0.
+Each event applies its delta via `add_momentum` (clamped). All file refs are functions, not fixed lines.
 
-| When | Effect | Where |
+| Event | Effect | Where |
 |---|---|---|
-| **Block** | Offense **−1** (floor 0), defense **+1** (cap 10) | `shot_manager.py:899-900` |
-| **3-point shot** | `threshold += THREE_POINT_SHOT_THRESHOLD_INCREASE − randint(1,5) × momentum` → higher momentum = easier 3s | `shot_manager.py:606-608` |
+| **Block** | blocker **+1**, blocked shooter **−1** | `shot_manager.py` (block path) |
+| **Steal** | stealer **+1**, victim **−1** | `phase_resolution.py` (turnover `STEAL`) |
+| **Charge** | charge-drawer **+1**, charging player **−1** | `shot_manager.py` (charge return) |
+| **And-1** (made shot + shooting foul) | shooter **+1** | `shot_manager.py` (main + block-recon), `shared.py` (putback) |
+| **5th+ OREB** | rebounder **+1** on `OREB` ≥ `MO_OREB_THRESHOLD` | `player.py` `record_stat` |
+| **Consecutive shots** | see below | `player.py` `record_shot_result` |
+| **Dunk** | **deferred** (constant + intent only) | — |
 
-That's the entire team-momentum system today: **blocks shift it, and it only affects 3-point shooting.** (Likely an early-build vestige — reconcile/remove when the real momentum system is designed.)
+Doubly-good/bad cases are intentional: a block is **−1 MO + a `False`** on the shooter's streak list; an and-1 is **+1 MO + a `True`** on the streak list.
+
+### Consecutive shots (`Shot_Result_List`)
+
+A per-game, per-player boolean array (`True` = make, `False` = miss). Self-relative over the whole game — a player's streak is his own shots only, not the team's.
+
+- On the **3rd** identical result in a row, and **each one after**: `+MO_CONSECUTIVE_DELTA` per consecutive make, `−MO_CONSECUTIVE_DELTA` per consecutive miss.
+- **Qualifying shots:** HCO, HCT, FCP, Fast Break, and OREB **putbacks**. **Blocks count as a miss** (`False`). **Free throws are excluded** (never appended).
+- Recorded by `Player.record_shot_result(made)`; appended at each shot resolution in `shot_manager.py` and `shared.py` (putback).
+- `Shot_Result_List` lives in `stats["game"]` (list-typed) — see *Persistence*.
 
 ---
 
-## Other "momentum"-named fields (NOT the above — don't confuse)
+## Player MO impact (shot attempts)
 
-- **Play / Defense `momentum`** (0..10) — static field on each play/defense; random 0–10 in tournament/gameplan init; **display only** (FCC, training report, coaching grid). `add_momentum_field_to_plays_defenses.py`, `team_manager.py`, `gameplan_routes.py`.
-- **Team `momentum_score`** (−10..+10) — separate team-level attribute; random 0–20 at dev init; clamp defined but **no live logic uses it**.
+The base shooter roll and the OREB putback roll are **MO-aware** — `random.randint(1, 6)` is replaced by `mo_shot_roll(attributes)`:
 
-**Team Momentum**
-- Only has a non-zero value during gameplay
-- It is an aggregate value of the five active players' MO attribute scores in the lineup, so it's range is -50 to 50, since each player has a MO value range of -10 to 10.
-- The court.html screen, MO bar display should treate 0 is teh middle, extend proportioally to -50 on the left with a red fill and proportionally to 50 on teh right with a green fill.
+- **MO > 0:** `|MO| × MO_SHOT_IMPACT_PCT_PER_LEVEL`% chance to roll `MO_SHOT_ROLL_POSITIVE` `(2,6)` instead of base. (MO 1 → 10%, … MO 10 → 100%.)
+- **MO < 0:** same chance to roll `MO_SHOT_ROLL_NEGATIVE` `(1,5)` instead of base. (MO −1 → 10%, … MO −10 → 100%.)
+- **Else:** `MO_SHOT_ROLL_BASE` `(1,6)`.
 
-**Player Momentum Moments**
-- Blocked shot (blocking player +1 MO, player who's shot is blocked -1 MO)
-- Player consecutive shot attempts
-    - Note a player's consectuive shots are relative to himself only, not the broader team. he does not need to take consecutive shots among the team to qualify, we simply track each players' shots throughout the entire game.
-    - if a player makes his third consecutive shot, + 1 MO and +1 MO for each consecutive make after that.
-    - if a player misses his third consecutive shot, -1 MO, and -1 MO for each consecutive miss after that.
-    - Qualifying shot details
-        - Blocks count as a miss (these are doubly negative for the shooter as he gets a -1 to MO for the block per the point above, and a False added to his consecutive shot list)
-        - Shot attempts in HCO, HCT, FCP, OREB Putback, and Fast Break quality to track makes and misses. Shot attempts in Free Throws do not.
-- Steal (stealing player +1 MO, player stole from -1 MO)
-- And 1 Made Shots: if a player is fouled and he makes his shot, +1 MO. Note this can be doubly good for the shooter as he also gets the True added to his consecutive shots list.
-- Dunk (these are not wired yet but will be soon), +1 MO (can be doubly good for the shooter, same as And 1 make). Note if he dunks AND gets fouled, he gets credit for both to his MO, so technically this is a +2 (+1 each for the dunk and the AND 1)
-- Charge, -1 to the fouling player, +1 to the player who drew the charge (please verify that we identify a player as drawing the charge, if not I'll add this)
-- Shot Clock violation: (40% chance - offense team momentum) for each offensive player that he'll recieve -1 MO (each player gets his own roll) and (40% chance + defense team momentum) for each defensive player that he'll get a +1 MO (each player gets his own roll)
-- if a player gets his 5th OREB of the game, +1 MO. Each subsequent OREB after tha tis +1 MO.
+Wired at `shot_manager.py` (shooter base roll) and `shared.py` `oreb_shot_attempt` (putback roll). Passer/dribble/defense rolls are unaffected.
 
-**Player Momentum Impact**
-- Shot Attempts
-    - if a player has a MO > 0, he has a chance for the random calculation for his shot attempt to be random.randint(2,6) instead of random.randint(1.6). This scales by his MO value.
-        - MO 1: 10% chance of the improved scale, MO 2: 20% of the improved scale...up to MO 10: 100% chance of improved scale.
-    - if a player has a MO < 0, he has a chance for the random calculation for his shot attempt to be random.randint(1,5) instead of random.randint(1,6). This scales by his MO value.
-        - MO -1: 10% chance of the reduced scale, MO -2: 20% of the reduced scale...up to MO -10: 100% chance of reduced scale.
+---
 
-**Players' MO Resets**
-- All player's MO resets at all quarter breaks and timeouts. They do not reset in a player foul out situation.
-- Reset logic
-    - All bench players are set to 0
-    - All active players with MO > 0 get their MO reduced by random.randint(4,7), with the lowest value that can be reset to being zero. I.e. if player has +1 MO and he rolls a 7 for his reduction, he's reset to 0, not -6.
-    - All active plyaers with MO < 0 get their MO increased by random.randint(4,7), with the highest vlaue that can be rest to being zero. I.e. if a player has -3 MO and he rolls a 7 for his increase, he's reset to 0, not 4.
-- During the halftime break, from Q2 to Q3, all players' MO resets to 0 with two exceptions:
-    - MO 10 resets to random.randint(1,3)
-    - MO -10 resets to random.randint(-3,-1)
-- If a player makes a Final Shot at a quarter break, add +1 to his MO, based on whatever the above calculations result in for him, to start the next quarter.
-- **End of game:** every player's MO resets to 0 (both teams, active + bench) so no in-game momentum persists past the game. Wired at the live game-final detection (`is_final`) before the final save — see `End_Of_Game_System.md`. Code: `reset_all_player_momentum()` in `BackEnd/utils/player_momentum.py`.
+## Team Momentum (derived)
+
+`team_momentum(team)` (`player_momentum.py`) = sum of the 5 active lineup players' MO, clamped to `[MO_TEAM_MIN, MO_TEAM_MAX]`. No stored value — computed on demand wherever needed (shot-clock-violation odds, court bar).
+
+**Exposure to frontend** (all stamped in `GameManager._append_turn`, *after* the turn's MO changes apply):
+- `home_team_momentum` / `away_team_momentum` — derived team values for the court bar.
+- `player_momentum` — `{player_id: MO}` for every player, so the tooltip shows live MO (mirrors `player_energy` → NG).
+- `summarize_game_state` also adds `team_momentum` to each team object (initial render / resume).
+
+---
+
+## Shot-clock violation MO
+
+On any shot-clock violation, each **active** player rolls independently:
+
+- **Offense:** `MO_SHOTCLOCK_OFFENSE_DELTA` (−1) at `clamp(MO_SHOTCLOCK_BASE_PCT − offenseTeamMO, 0, 100)`%.
+- **Defense:** `MO_SHOTCLOCK_DEFENSE_DELTA` (+1) at `clamp(MO_SHOTCLOCK_BASE_PCT + defenseTeamMO, 0, 100)`%.
+
+Team MO is snapshotted before any change. Applied by `apply_shot_clock_violation_momentum(offense, defense)`, called once per violation in `GameManager._append_turn` (the single funnel where every violation path converges on `turnover_type == "SHOT_CLOCK"`, before `switch_possession`, so `offense_team` is still the violator). A `_mo_sc_applied` guard prevents double-application.
+
+---
+
+## Resets (`apply_player_momentum_resets`)
+
+Resets **never** run on a foul-out timeout.
+
+| Trigger | Bench | Active MO > 0 | Active MO < 0 | Where |
+|---|---|---|---|---|
+| **Timeout, Q1→Q2, Q3→Q4, OT breaks** | → 0 | `max(0, MO − randint(MIN,MAX))` | `min(0, MO + randint(MIN,MAX))` | `main.py` `simulate_quarter`; `game_manager.py` `call_timeout` |
+| **Halftime (Q2→Q3)** | → 0 (rails apply) | → 0 unless rail | → 0 unless rail | same (`is_halftime=True`) |
+
+- Decay (`MIN`/`MAX` = 4/7) moves active players **toward** 0, never crossing it.
+- **Halftime rails:** MO `+MO_MAX` → `randint(1,3)`; MO `−MO_MAX` → `randint(−3,−1)`; everyone else → 0.
+- **Final-Shot bonus:** the player who made the quarter's Final Shot gets `+MO_FINAL_SHOT_BONUS` **after** the reset. Flagged via `game_state["mo_final_shot_maker_id"]` in `phase_resolution.py` `resolve_final_turn_shot_logic`; consumed and cleared in the reset.
+- **End of game:** `reset_all_player_momentum(game)` zeros **every** player's MO (both teams, active + bench) at the live game-final detection (`is_final` in `api.py`), before the final save — no in-game momentum persists past the game. Distant-sim (CPU) games never change MO, so need no reset. See `End_Of_Game_System.md`.
+
+---
+
+## Persistence
+
+- Player MO is serialized on the player snapshot (`attributes.MO`) in `summarize_game_state` and restored on load/resume (`api.py` / `franchise_routes.py`).
+- `Shot_Result_List` rides the game doc in `stats["game"]` — restored on timeout/quarter resume, reset each game. It is **not** a `BOX_SCORE_KEY` and is excluded from team-stat summation (list-typed). See `Game_Init_System.md` → *Per-game stat arrays*.
+- EOG reset runs before persistence, so saved docs (and any franchise writeback) record MO 0.
+
+---
+
+## Frontend (court momentum bar)
+
+`FrontEnd/static/court.html` has a per-team bar (`home/away-momentum-neg`, `-pos`, center tick): **0 centered**, red fill (`#ff4444`) extends **left** to −50, green fill (`#34EC27`) extends **right** to +50.
+
+Driven by `gameScene.js`: `momentumValueForTeam()` reads `turn.{home,away}_team_momentum` (then the summary `team_momentum` fallback), and `updateMomentumBar(side, value)` maps the −50..+50 value to fill widths each scoreboard update.
+
+The **player tooltip** momentum bar reads live MO: each turn's `player_momentum` is folded into `playerStats[id].MO`, and the tooltip reads `playerStats.MO` (falling back to the load-time `player.attributes.MO`).
+
+---
+
+## Key files
+
+| File | Role |
+|---|---|
+| `BackEnd/constants/momentum.py` | All tunable constants (source of truth) |
+| `BackEnd/utils/player_momentum.py` | `mo_shot_roll`, `team_momentum`, `apply_shot_clock_violation_momentum`, `apply_player_momentum_resets`, `reset_all_player_momentum` |
+| `BackEnd/models/player.py` | `clamp_mo`, `add_momentum`, `record_shot_result`, 5th-OREB hook, `Shot_Result_List` init/reset |
+| `BackEnd/models/shot_manager.py` | Block / charge / and-1 deltas; MO-aware base shot roll |
+| `BackEnd/utils/shared.py` | Putback and-1 + MO-aware putback roll; `summarize_game_state` team momentum |
+| `BackEnd/engine/phase_resolution.py` | Steal delta; Final-Shot maker flag |
+| `BackEnd/models/game_manager.py` | `_append_turn` (shot-clock violation MO + per-turn team-momentum stamp); `call_timeout` reset |
+| `BackEnd/main.py` | `simulate_quarter` quarter/halftime reset |
+| `BackEnd/api/api.py` | EOG reset at `is_final` |
+| `FrontEnd/static/court.html`, `js/phaser/gameScene.js` | Team momentum bar + player tooltip bar |
+
+---
+
+## Not covered here
+
+- **Training "Inspire"** (Culture Builder): +1/+2 MO and updates `anchor_MO` at `training_execution_v2.py:628`. This is the only thing that moves the **training** baseline; it is not gameplay momentum.
+- Per-archetype `momentum_score` training amplifier — still a TODO, not implemented.
+- Legacy team-`momentum`/`momentum_score` fields and the old block/3PT team-momentum logic — **removed** (2026-06-18); superseded by derived Team Momentum above.
