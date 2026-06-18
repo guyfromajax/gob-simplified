@@ -494,7 +494,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
         "DOUBLE_DRIBBLE": "Double Dribble!",
         "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
         "BAD_PASS": "BAD PASS!",
-        "SHOT_CLOCK": "Shot Clock Violation!"
+        "SHOT_CLOCK": "Shot Clock Violation!",
+        "TEN_SECOND": "10-Second Violation!"
       };
       turnoverText = typeMap[turnoverType] || "TURNOVER!";
     }
@@ -505,7 +506,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       "DOUBLE_DRIBBLE": "Double Dribble!",
       "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
       "BAD_PASS": "BAD PASS!",
-      "SHOT_CLOCK": "Shot Clock Violation!"
+      "SHOT_CLOCK": "Shot Clock Violation!",
+      "TEN_SECOND": "10-Second Violation!"
     };
     turnoverText = typeMap[turnoverType] || "TURNOVER!";
   }

@@ -79,6 +79,27 @@ def _resolve_final_step_next(turn_result: Dict[str, Any]) -> NextStep:
             "event": "DEAD_BALL_TURNOVER",
             "payload": {"victim_id": turn_result.get("victim_id")},
         }
+    # D8 — emergent steal: ball changes hands, possession flips.
+    if result_type == "STEAL":
+        return {
+            "kind": "turn_stop",
+            "event": "STEAL",
+            "payload": {
+                "stealer_id": turn_result.get("stealer_id"),
+                "victim_id": turn_result.get("victim_id"),
+            },
+        }
+    # D8 — emergent foul (offensive charge or defensive reach-in).
+    if result_type == "FOUL":
+        return {
+            "kind": "turn_stop",
+            "event": "FOUL",
+            "payload": {
+                "foul_team": turn_result.get("foul_team"),
+                "fouler_id": turn_result.get("foul_player_id"),
+                "victim_id": turn_result.get("victim_id"),
+            },
+        }
     # HCO continuation: implicit end-of-turn.
     return {"kind": "next_step", "index": 999}
 

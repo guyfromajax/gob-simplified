@@ -123,7 +123,7 @@ one of these is true; nothing else triggers HCO:
 | DEAD BALL (turnover) | SIDE_INBOUND → SIP | Yes | Built |
 | HCO transition | HCO | No | Built |
 | Shot attempt | (shot resolution) | depends on make/miss | §7 — target |
-| 10-second violation | SIP | Yes | §8 — constant defined, not wired |
+| 10-second violation | SIP | Yes | ✅ Built (D9) |
 | Offensive foul | — | — | §8 — TODO |
 | Steal | — | Yes | §8 — TODO |
 
@@ -388,8 +388,14 @@ by what reaches the BH **before the hold window elapses**:
   the perfect Primary Safe Area spot (60, 25), or topLane if that's behind him;
   teammates fill the Attack Basket Area; defenders per that section). No new read.
 
-> Note: pressure-with-no-steal currently has no contest/turnover effect — it just
-> burns the hold and returns to the loop. Outcomes will be added later.
+> **D8 reconciliation (✅ built — see `Dynamic_HCT_D8_Scoping.md`):** the old 50/50
+> steal → 50/50 foul hardcode has been **replaced** by the same attribute-driven
+> `_resolve_moment` calculation that Attack uses, so a defender's steal/foul/TO odds
+> come from attributes (and team `discipline`/`pt_efficiency`/`pt_opp_modifier`/`fight`
+> + the `aggression` dial) regardless of whether the contact came from an attack or a
+> hold. Hold keeps its own *structure* (1–3s window, who-arrives gating, "no defender
+> arrives → broken-HCT"); only the contest math is unified. A pressure-with-no-event
+> moment simply returns to the loop for a fresh read (the BH retains).
 
 ---
 
@@ -649,7 +655,11 @@ boundary (see §4 "Time terminals"), not only at the turn boundary.
   BH's x < 50 (home offense) / > 50 (away offense), announce "10-Second Violation"
   and run the standard dead-ball turnover flow → SIP. Once the ball crosses half
   court this rule no longer applies (only the shot-clock-0 terminal remains).
-  *(Constant defined; runtime check not yet wired — D9.)*
+  *(✅ Built — D9. Both clock terminals are checked at the top of each loop
+  iteration; the engine tags `turnover_type` ("SHOT_CLOCK" / "TEN_SECOND"), the
+  wrapper carries it onto the DEAD BALL result (possession flips → SIDE_INBOUND),
+  and the FE announcement typeMaps render "Shot Clock Violation!" / "10-Second
+  Violation!". A defense-forced dead ball stays untyped → generic FE announce.)*
 - **Offensive foul**: *TODO — define trigger formula.*
 - **Steal**: *TODO — define trigger formula + mid-flight pass interception (D11).*
 
@@ -662,8 +672,8 @@ boundary (see §4 "Time terminals"), not only at the turn boundary.
   on entry. HCT_A / HCT_S (offense) and HCT_A_D / HCT_S_D (defense) per existing conventions.
 - **Possession flip**: `result_type in ("DEAD BALL", "STEAL")` flips possession.
 - **next_turn**: HCO → HCO; DEAD BALL → SIDE_INBOUND (and `offensive_state` reset to HCO if currently FCP/HCT).
-- **Box-score / scouting / season-total parity**: confirm dynamic path doesn't drift
-  vs. the skeleton path (D16).
+- **Box-score / scouting / season-total parity**: ✅ confirmed for produced outcomes
+  (D16, Cut 2); foul/steal-stat parity folded into D8.
 
 ---
 
@@ -706,8 +716,8 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
   = the initiator. **Build note**: gate the PG-override suppression for the HCT path.
   Other transitions (DREB / Steal / CR FB / RR FB → HCO) need the same upgrade — tracked
   separately in `HCO_Transition_System_ToDo.md` (do not solve here).
-- **D8.** Foul / steal emergent outcomes (currently only DEAD BALL / HCO). *(Reserved as TODO in §8.)*
-- **D9.** 10-second violation gate (constant defined; runtime check not wired).
+- **D8.** ✅ **Core built (Cut 2 / D8a) → `Dynamic_HCT_D8_Scoping.md`.** Attribute-driven foul / steal / turnover emergent outcomes: `STEAL`, `DEAD BALL`, and `O_FOUL` in the defense-wins region; `D_FOUL` (reach-in) in the offense-wins region. Implemented in `_resolve_moment` + the loop's `_apply_moment_outcome`, wired through the wrapper (F / STL / TO stats, foul-out, bonus→FREE_THROW routing, steal→fast-break, possession flips) and the emitter (`STEAL` / `FOUL` turn-stops). Hold's defender-reaches path now shares the same contest engine. Aggression (`AGG_MULT`) raises event/steal/foul rates; offense `fight` symmetrically suppresses defense-wins events. **Deferred to D8b:** mid-flight interception (D11), over-and-back detection (D20), and final coefficient calibration.
+- **D9.** ✅ **Built (Cut 2)** — shot-clock (≤0) and 10-second (≤20 & not past half court) terminals checked each loop iteration; engine tags `turnover_type` ("SHOT_CLOCK"/"TEN_SECOND"), wrapper carries it onto the DEAD BALL turnover (possession flips → SIDE_INBOUND), FE announces "Shot Clock Violation!" / "10-Second Violation!".
 - **D10.** ✅ Resolved — standalone x=73/x=27 trap-break HCO trigger removed; HCO entry now governed solely by the two §2 triggers (PSA, or Attack Basket Area with defenders>offenders).
 - **D11.** Pass interceptions mid-flight (stolen pass).
 - **D12.** Per-tick energy decay vs. once-per-turn.
@@ -715,7 +725,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 - **D14.** Distant sim path: "decisions only, no movement" short-circuit for franchise CPU sim.
 - **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own `standard` AG rate, **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance**, **hold**, and **broken-HCT drive** segments. Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Initial **converge** and the **pass-defense formation** still snap by design (initial engagement / D19 set-and-persist).
 - **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / broken-HCT drive / pass flight / reception), excluding the BH and any mid-catch receiver. Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
-- **D16.** Result-type stats parity vs. skeleton path (box-score / scouting / season totals).
+- **D16.** ✅ **In-scope portion built (Cut 2).** Bookkeeping parity vs. the skeleton path for the outcomes the dynamic loop actually produces. Already present: `["used"]` (shared pre-branch), `_record_hct_stats` (HCT_A/_S + HCT_A_D/_S_D) on HCO / DEAD BALL / all three shot types, `TO` + `["success"]` on the violation/forced turnovers, and full box score on dynamic shots (`FGA`/`FGM`/`PTS` via `apply_scoring`, defensive-foul `F`+FTs, rebound stats). Added: the **defensive-success scouting bump** (`def_team.scouting_data["defense"]["HCT"]["success"] += 1`) on a clean dynamic-shot stop (miss, no shooting foul) in both shot resolvers, matching the skeleton SHOT-miss path. **Deferred to D8:** loop-level `O_FOUL`/`D_FOUL` (`F`, `team_fouls`, foul-out, bonus→FREE_THROW) and `STEAL` (`STL`, `last_stealer`, steal→fast-break) stats — the dynamic loop doesn't emit those outcomes yet, so their parity is folded into D8.
 - **D17.** ✅ Resolved — read thresholds: §4 loop reads attack>200 / pass>120; §5 broken-HCT reads attack>175 / pass>110 (intentional rescale — open floor invites attack); §7 goal-achievement read now >200 (was 190; optimal-vs-random gate, a different decision type than the §4/§5 action gates).
 - **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via `_psa_is_behind`; emitter appends the drive + `_build_post_shot_sub_steps`. ✅ Now reachable in normal play: D15's interrupted defender movement lets a quicker BH out-run the PG so `moment == "none"` can occur.
 - **D19.** Pass-movement defender-target persistence: how defender pass-defense targets carry across loop iterations so they don't re-pose / thrash each tick. Cut-2 detail; not a blocker.
@@ -744,10 +754,10 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 20. **Goal-achievement read threshold** — set to >200 (D17); optimal-vs-random gate, distinct from §4/§5 action gates. ✓
 21. **Coord orientation** — home-on-offense; flip via `get_away_player_coords` when away offense. ✓
 22. **Trap radius** — 11 everywhere (line-109 "12" was a typo). ✓
-23. **BH stuck** — addressed via 10-sec violation when wired (D9). ✓
+23. **BH stuck** — addressed via the 10-sec violation (✅ wired — D9). ✓
 24. **Pass branch scope** — fully specified in §6 (target). ✓
 25. **Energy decay** — applied once at HCT entry (per-tick decay deferred — D12). ✓
-26. **Stat tracking parity** — first cut maintains HCT used/success + BH TO; full parity check open (D16). ✓
+26. **Stat tracking parity** — ✅ parity confirmed for produced outcomes (HCT used/success, HCT_A/_S, BH TO, dynamic-shot box score + defensive-success bump on a clean stop); foul/steal-stat parity folded into D8 (D16). ✓
 27. **BH selection** — always PG for first cut (BIP receiver). Future: personnel/scouting-driven. ✓
 
 **First-cut emitter contract (preserved)**
@@ -760,7 +770,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 - G (step-3 dead-ball animation) — BH animates to a random point along his path to deep key; defender follows; announce there. ✓
 - H (HCO handoff — first cut) — other 9 hold through step 3; HCO step 0 animates them next turn. ✓
 - I (pass-to-side) — specified in §6 (build deferred — D2). ✓
-- J (10-sec violation) — shot clock = 20, BH hasn't passed x=50; runtime wiring deferred (D9). ✓
+- J (10-sec violation) — shot clock = 20, BH hasn't passed x=50; ✅ runtime wired (D9). ✓
 - K (BH = PG) — first cut only. ✓
 
 ---
@@ -770,7 +780,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 Design is complete. These are the remaining work items.
 
 **Deferred features (build later, on purpose):**
-- Fouls, steals, and dead-ball turnover outcomes (D8).
+- ✅ Fouls, steals, and dead-ball turnover outcomes (D8a — built; see `Dynamic_HCT_D8_Scoping.md`). Remaining D8b: mid-flight interception (D11), over-and-back classification (D20), coefficient calibration.
 - **Over-and-back violation (D20).** Once the BH has crossed x=50 he may not pass
   to a backcourt teammate (x<50 home / x>50 away). **Guard built (preventive):**
   `_select_pass_receiver` drops any backcourt teammate from the two-closest pool
@@ -792,8 +802,8 @@ Design is complete. These are the remaining work items.
 - ✅ **Broken-HCT fast break (D18) — built (Phase 2D-1).** Real make/miss rim attempt via `dynamic_hct_shot.resolve_hct_fast_break_shot` (reuses the Steal-FB contest core). *(Reachable now that D15 lets the offense beat the trap.)*
 - ✅ **Interrupted defender movement (D15) — built (Cut 2).** Defenders chase at their own rate (interrupted, position-tracking) instead of snapping onto the BH, so a quicker BH gains real separation and broken-HCT fires.
 - ✅ **Off-ball offense position tracking (D15b) — built (Cut 2).** Engine tracks each teammate's actual lagging position (walk-up replay + per-segment hustle), so the Attack-Basket count and pass-targeting reads use real coords.
-- 10-second violation runtime wiring (D9).
-- Stats parity with the existing skeleton path (D16).
+- ✅ **Shot-clock + 10-second violation wiring (D9) — built (Cut 2).** Clock terminals tagged + announced (turnover → SIDE_INBOUND, possession flips).
+- ✅ **Stats parity with the skeleton path (D16) — built (Cut 2).** Bookkeeping matches for the outcomes the dynamic loop produces (used/success, HCT_A/_S, dynamic-shot box score, defensive-success bump on a clean stop); foul/steal-stat parity folded into D8.
 
 **Infrastructure / later polish:**
 - Per-tick energy decay instead of once-per-turn (D12).

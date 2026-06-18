@@ -242,6 +242,9 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         shooter.record_stat("FGA")
         possession_flips = False
         if not d_foul:
+            # D16 parity: a clean defensive stop (miss, no shooting foul) counts
+            # as an HCT defensive success, matching the skeleton SHOT-miss path.
+            def_team.scouting_data["defense"]["HCT"]["success"] += 1
             basket_x = float(rim["x"])
             bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
             penalize_player_ids = {shooter_id} if shooter_id else set()
@@ -593,6 +596,9 @@ def _finalize_ab_shot(
         shooter.record_stat("FGA")
         possession_flips = False
         if not d_foul:
+            # D16 parity: a clean defensive stop (miss, no shooting foul) counts
+            # as an HCT defensive success, matching the skeleton SHOT-miss path.
+            def_team.scouting_data["defense"]["HCT"]["success"] += 1
             bounce_spot = calculate_bounce_spot(
                 game, basket_x=float(rim["x"]), basket_y=25,
             )

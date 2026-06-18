@@ -7289,14 +7289,81 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     defender = dyn["defender"]
     text = text + dyn.get("text_suffix", "")
 
+    # D9 — §8 violation subtype for a DEAD BALL terminal ("SHOT_CLOCK" /
+    # "TEN_SECOND"); empty for a defense-forced dead ball. Drives the FE
+    # turnover announcement (gameAnnouncements/announcements typeMap) and
+    # carries through turnoverAdapter. SHOT_CLOCK/TEN_SECOND are clock-style
+    # violations → no steal, SIDE_INBOUND, possession flips.
+    turnover_type = dyn.get("turnover_type", "")
+
+    # D8 — emergent foul/steal attribution (literal: the engine names the
+    # involved defender / ball handler; see Dynamic_HCT_D8_Scoping.md §3.5).
+    foul_team = dyn.get("foul_team") or None
+    foul_player = dyn.get("foul_player")
+    stealer = dyn.get("stealer") or defender
+    foul_out_info = {"fouled_out": False, "foul_count": 0}
+
     # Stat tracking parity with the skeleton path.
     if result_type == "DEAD BALL":
         if ball_handler is not None:
             ball_handler.record_stat("TO")
         def_scouting["defense"]["HCT"]["success"] += 1
+    elif result_type == "STEAL":
+        if ball_handler is not None:
+            ball_handler.record_stat("TO")
+        if stealer is not None:
+            stealer.record_stat("STL")
+        def_scouting["defense"]["HCT"]["success"] += 1
+        # Steal aftermath continuity (mirrors the skeleton path). The steal
+        # location (where the ball changed hands) seeds the stealer's start
+        # coords for the next possession's Steal HCO / fast-break setup.
+        game_state["last_stealer"] = stealer
+        game_state["last_rebound"] = ""
+        steal_coords = dyn.get("steal_coords") or {}
+        if steal_coords:
+            game_state["last_stealer_coords"] = dict(steal_coords)
+    elif result_type == "FOUL":
+        # foul_player is literal from the engine; fall back to skeleton selection
+        # only if the engine couldn't name one.
+        if foul_player is None:
+            foul_player = select_foul_player(
+                foul_team or "DEFENSE", ball_handler, off_lineup, def_lineup
+            )
+        game_state["foul_team"] = foul_team
+        foul_player.record_stat("F")
+        foul_charged_team = off_team if foul_team == "OFFENSE" else def_team
+        foul_charged_team.team_fouls += 1
+        foul_out_info = check_and_handle_foul_out(
+            foul_player, game_state, foul_charged_team
+        )
+        if foul_team == "OFFENSE":
+            # Charge — defensive success, possession flips to a side inbound.
+            def_scouting["defense"]["HCT"]["success"] += 1
+        else:
+            # Reach-in — offense keeps it; bonus routing decides FT vs inbound.
+            if def_team.team_fouls >= 10:
+                game_state["offensive_state"] = "FREE_THROW"
+                game_state["free_throws"] = 2
+                game_state["free_throws_remaining"] = 2
+                game_state["one_and_one"] = False
+                game_state["last_ball_handler"] = ball_handler
+                game_state["shooter"] = ball_handler
+            elif def_team.team_fouls >= 5:
+                game_state["offensive_state"] = "FREE_THROW"
+                game_state["free_throws"] = 2
+                game_state["free_throws_remaining"] = 1
+                game_state["one_and_one"] = True
+                game_state["last_ball_handler"] = ball_handler
+                game_state["shooter"] = ball_handler
+            else:
+                game_state["offensive_state"] = "HCO"
+                game_state["free_throws"] = 0
+                game_state["free_throws_remaining"] = 0
 
     # Possession flip + next play type per existing HCT conventions.
-    possession_flips = result_type in ("DEAD BALL", "STEAL")
+    possession_flips = result_type in ("DEAD BALL", "STEAL") or (
+        result_type == "FOUL" and foul_team == "OFFENSE"
+    )
     if result_type == "HCO":
         next_play_type = "HCO"
         game_state["offensive_state"] = "HCO"
@@ -7304,6 +7371,26 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         next_play_type = "SIDE_INBOUND"
         if game_state.get("offensive_state") in ("FCP", "HCT"):
             game_state["offensive_state"] = "HCO"
+    elif result_type == "STEAL":
+        # Steal → fast break chance off the takeaway, else settle into HCO.
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
+        if random.random() < p_steal:
+            next_play_type = "FAST_BREAK"
+            game_state["offensive_state"] = "FAST_BREAK"
+        else:
+            next_play_type = "HCO"
+            game_state["offensive_state"] = "HCO"
+    elif result_type == "FOUL":
+        # Defensive foul in bonus already set FREE_THROW above; otherwise the
+        # whistle resumes from a side inbound.
+        if game_state.get("offensive_state") != "FREE_THROW":
+            next_play_type = "SIDE_INBOUND"
+            if game_state.get("offensive_state") in ("FCP", "HCT"):
+                game_state["offensive_state"] = "HCO"
+        else:
+            next_play_type = "FREE_THROW"
     else:
         next_play_type = None
 
@@ -7314,6 +7401,8 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "passer": "",
         "screener": "",
     }
+    if result_type == "FOUL" and foul_player is not None:
+        roles["foul_player"] = foul_player
     hct_roles = {
         "ball_handler": ball_handler,
         "shooter": ball_handler,
@@ -7327,6 +7416,7 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     if dyn.get("bail"):
         return {
             "result_type": result_type,
+            "turnover_type": turnover_type,
             "text": text,
             "current_turn": "HCT",
             "next_play_type": next_play_type,
@@ -7361,6 +7451,7 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     # ``step_clock_seconds`` with the full 3-step totals.
     return {
         "result_type": result_type,
+        "turnover_type": turnover_type,
         "text": text,
         "current_turn": "HCT",
         "next_play_type": next_play_type,
@@ -7382,12 +7473,13 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "events": [],
         "skeleton": {},
         "roles": roles,
-        "foul_team": None,
-        "foul_player_id": None,
+        "foul_team": foul_team,
+        "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
+        "stealer_id": getattr(stealer, "player_id", None) if (result_type == "STEAL" and stealer) else None,
         "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
         "defender_id": getattr(defender, "player_id", None) if defender else None,
-        "fouled_out": False,
-        "foul_count": 0,
+        "fouled_out": foul_out_info.get("fouled_out", False),
+        "foul_count": foul_out_info.get("foul_count", 0),
         # Intermediate data for the emitter.
         "hct_bh_pos": dyn["bh_pos"],
         "hct_bh_target": dyn["bh_target"],

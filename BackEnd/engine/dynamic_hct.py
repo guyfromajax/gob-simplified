@@ -165,6 +165,48 @@ PASS_GRID_PER_GAME_SEC = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND)
 # Defensive backstop only — the shot-clock terminal is the real loop bound.
 MAX_LOOP_ITERATIONS = 15
 
+# --- D8: attribute-driven foul / steal / turnover moment outcomes -----------
+# See _documentation_master/projects/Dynamic_HCT_D8_Scoping.md §3. One tunable
+# block so balancing is a single-file edit. Team attrs (discipline / pt_eff /
+# pt_opp / fight) are centered at 0 (±10); player attrs are ~0-100.
+#
+# Even-matchup baseline split among defense-wins events (→ 50% / 30% / 20%).
+HCT_D8_DB_W0 = 50.0
+HCT_D8_STEAL_W0 = 30.0
+HCT_D8_OFOUL_W0 = 20.0
+# Game-plan aggression dial → steal weight + event-fire rate + D_FOUL prob.
+HCT_D8_AGG_MULT = {"passive": 0.7, "normal": 1.0, "aggressive": 1.3}
+HCT_D8_GLOBAL_SCALAR = 1.0        # master per-moment event-frequency knob
+HCT_D8_DEF_WIN_BASE = 0.35        # base P(any event) when defense fully wins
+HCT_D8_P_EVENT_MAX = 0.60         # cap on per-moment event prob
+HCT_D8_M_REF = 25.0               # margin that counts as a "decisive" win
+HCT_D8_REF = 50.0                 # league-average attribute (centering)
+HCT_D8_F_MIN, HCT_D8_F_MAX = 0.3, 2.5   # clamp on each attribute factor
+HCT_D8_S_SENS = 1.2               # steal sensitivity to (defender − BH) gap
+HCT_D8_DB_SENS = 1.0              # dead-ball sensitivity to weak BH handle
+HCT_D8_O_SENS_IQ = 0.8            # charge sensitivity to (defender IQ − BH IQ)
+HCT_D8_O_SENS_DISC = 0.5          # charge sensitivity to team discipline
+HCT_D8_DISC_SCALE = 20.0          # discipline normalizer (team attrs ≈ ±10)
+HCT_D8_W_PTEFF = 0.04             # def pt_efficiency → steal factor
+HCT_D8_W_PTOPP = 0.04             # off pt_opp_modifier → resist self-TO
+HCT_D8_W_FIGHT = 0.04             # OFFENSE fight → fewer D-wins events (= W_DISC_REACH)
+HCT_D8_DFOUL_BASE = 0.12          # base P(D_FOUL) on a decisive blow-by
+HCT_D8_P_DFOUL_MAX = 0.25         # cap on D_FOUL prob
+HCT_D8_W_DISC_REACH = 0.04        # team discipline → fewer reach fouls
+HCT_D8_W_AG_BEATEN = 0.6          # defender AG deficit vs BH → reach foul
+
+
+def _clampf(value: float, lo: float, hi: float) -> float:
+    """Clamp a float to [lo, hi]."""
+    return max(lo, min(hi, value))
+
+
+def _aggression_call(def_team) -> str:
+    """Resolved per-turn defensive aggression call ∈ {passive, normal, aggressive}."""
+    calls = getattr(def_team, "strategy_calls", {}) or {}
+    call = calls.get("aggression_call", "normal")
+    return call if call in HCT_D8_AGG_MULT else "normal"
+
 
 def _flip(coords: Dict[str, Any]) -> Dict[str, Any]:
     """Flip a coord dict around x=50 (no-op for y)."""
@@ -331,22 +373,37 @@ def _read_decision(player, broken: bool = False) -> str:
     return "hold"
 
 
+def _steal_credit_defender(bh_defender, trapper):
+    """Pick which defender is credited for a steal: the one with the higher
+    steal composite (OD·0.4 + AG·0.4 + IQ·0.2). For a lone defender, that's him."""
+    if trapper is None:
+        return bh_defender
+
+    def _steal_score(d):
+        a = getattr(d, "attributes", {}) or {}
+        return a.get("OD", 0) * 0.4 + a.get("AG", 0) * 0.4 + a.get("IQ", 0) * 0.2
+
+    return trapper if _steal_score(trapper) > _steal_score(bh_defender) else bh_defender
+
+
 def _resolve_moment(
     off_team,
     def_team,
     ball_handler,
     bh_defender,
     trapper=None,
-) -> Tuple[str, float]:
-    """§5 Pressure / Trap banded outcome.
+) -> Tuple[str, float, Any]:
+    """§5 Pressure / Trap banded outcome (D8 attribute-driven).
 
-    Returns ``(outcome, score_ratio)`` where ``outcome`` ∈
-    {"DEAD BALL", "POS_O", "NEUTRAL"}; ``score_ratio`` is the 0..1 turnover
-    point along the BH's drive path (only meaningful for DEAD BALL).
+    Returns ``(outcome, score_ratio, credited_player)`` where ``outcome`` ∈
+    {"DEAD BALL", "STEAL", "O_FOUL", "D_FOUL", "POS_O", "NEUTRAL"}.
+    ``score_ratio`` is the 0..1 turnover point along the BH's drive path (only
+    meaningful for DEAD BALL/STEAL). ``credited_player`` is the defender to
+    credit (STEAL/D_FOUL) or ``None``.
 
-    Pressure (``trapper is None``): ``d = pressure(bh_defender) + pt_eff*r``.
-    Trap (``trapper`` given): ``d = pressure(bh_defender) + 0.5*pressure(trapper)
-    + pt_eff*r`` (§5 Trap Moment).
+    Structure: the existing banded gate decides who *wins* the moment; D8 then
+    derives the foul/steal/turnover outcome from attributes + team attrs +
+    aggression. See ``Dynamic_HCT_D8_Scoping.md`` §3.
     """
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
@@ -355,6 +412,8 @@ def _resolve_moment(
     pt_opp = float(off_attrs.get("pt_opp_modifier", 0) or 0)
     off_chem = int((off_attrs.get("team_chemistry", 0) or 0) / 4)
     def_chem = int((def_attrs.get("team_chemistry", 0) or 0) / 4)
+    discipline = float(def_attrs.get("discipline", 0) or 0)
+    fight_off = float(off_attrs.get("fight", 0) or 0)
 
     d_score = calculate_defender_pressure_score(bh_defender, "man")
     if trapper is not None:
@@ -366,11 +425,73 @@ def _resolve_moment(
     # team attribute doesn't auto-zero the handling score.
     o_score = base_handling * (pt_opp * random.randint(1, 6)) if pt_opp > 0 else base_handling
 
+    agg = HCT_D8_AGG_MULT.get(_aggression_call(def_team), 1.0)
+    bh = getattr(ball_handler, "attributes", {}) or {}
+    ref = HCT_D8_REF
+
+    # --- Defense wins the moment → STEAL / DEAD BALL / O_FOUL / no-event -----
     if d_score > o_score + 2 * (off_chem + pt_opp):
-        return "DEAD BALL", random.uniform(0.2, 0.8)
+        m = d_score - o_score
+        m_norm = _clampf(m / HCT_D8_M_REF, 0.0, 1.0)
+        # OFFENSE fight resists ALL D-wins events (same scale as discipline on D_FOUL).
+        p_event = _clampf(
+            HCT_D8_DEF_WIN_BASE * m_norm * agg
+            * (1.0 - HCT_D8_W_FIGHT * fight_off) * HCT_D8_GLOBAL_SCALAR,
+            0.0, HCT_D8_P_EVENT_MAX,
+        )
+        if random.random() >= p_event:
+            # No-event: BH retains; fall through to the normal advance/re-read.
+            return "NEUTRAL", 1.0, None
+
+        credited = _steal_credit_defender(bh_defender, trapper)
+        cd = getattr(credited, "attributes", {}) or {}
+        def_steal = cd.get("OD", 0) * 0.4 + cd.get("AG", 0) * 0.4 + cd.get("IQ", 0) * 0.2
+        bh_secure = bh.get("CH", 0) * 0.4 + bh.get("BH", 0) * 0.4 + bh.get("IQ", 0) * 0.2
+        bh_handle = bh.get("BH", 0) * 0.4 + bh.get("CH", 0) * 0.3 + bh.get("IQ", 0) * 0.3
+
+        steal_factor = _clampf(
+            (1.0 + HCT_D8_S_SENS * (def_steal - bh_secure) / ref
+             + HCT_D8_W_PTEFF * pt_eff) * agg,
+            HCT_D8_F_MIN, HCT_D8_F_MAX,
+        )
+        db_factor = _clampf(
+            1.0 + HCT_D8_DB_SENS * (ref - bh_handle) / ref - HCT_D8_W_PTOPP * pt_opp,
+            HCT_D8_F_MIN, HCT_D8_F_MAX,
+        )
+        ofoul_factor = _clampf(
+            1.0 + HCT_D8_O_SENS_IQ * (cd.get("IQ", 0) - bh.get("IQ", 0)) / ref
+            + HCT_D8_O_SENS_DISC * discipline / HCT_D8_DISC_SCALE,
+            HCT_D8_F_MIN, HCT_D8_F_MAX,
+        )
+        steal_w = HCT_D8_STEAL_W0 * steal_factor
+        db_w = HCT_D8_DB_W0 * db_factor
+        ofoul_w = HCT_D8_OFOUL_W0 * ofoul_factor
+
+        choice = random.choices(
+            ["STEAL", "DEAD BALL", "O_FOUL"], weights=[steal_w, db_w, ofoul_w]
+        )[0]
+        if choice == "STEAL":
+            return "STEAL", random.uniform(0.2, 0.8), credited
+        if choice == "O_FOUL":
+            return "O_FOUL", 1.0, None
+        return "DEAD BALL", random.uniform(0.2, 0.8), None
+
+    # --- Offense wins the moment → POS_O, with a small D_FOUL on the blow-by --
     if o_score >= d_score + 2 * (def_chem + pt_eff):
-        return "POS_O", 1.0
-    return "NEUTRAL", 1.0
+        beaten_norm = _clampf((o_score - d_score) / HCT_D8_M_REF, 0.0, 1.0)
+        ag_gap = _clampf(bh.get("AG", 0) - (getattr(bh_defender, "attributes", {}) or {}).get("AG", 0), 0.0, ref)
+        p_dfoul = _clampf(
+            HCT_D8_DFOUL_BASE * beaten_norm
+            * (1.0 - HCT_D8_W_DISC_REACH * discipline)
+            * (1.0 + HCT_D8_W_AG_BEATEN * ag_gap / ref)
+            * agg * HCT_D8_GLOBAL_SCALAR,
+            0.0, HCT_D8_P_DFOUL_MAX,
+        )
+        if random.random() < p_dfoul:
+            return "D_FOUL", 1.0, bh_defender
+        return "POS_O", 1.0, None
+
+    return "NEUTRAL", 1.0, None
 
 
 def _basket_dir(is_away_offense: bool) -> int:
@@ -913,6 +1034,20 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     loop_segments: List[Dict[str, Any]] = []
     result_type = "HCO"
     text_suffix = ""
+    # Violation subtype for a DEAD BALL terminal (D9 announce / classification):
+    # "SHOT_CLOCK" (clock hit 0) or "TEN_SECOND" (didn't cross half court in
+    # time). Empty for a defense-forced dead ball (FE renders a generic
+    # travel/double-dribble) and for non-turnover outcomes.
+    turnover_type = ""
+    # D8 — set for the emergent foul/steal terminals. ``foul_team`` is
+    # "OFFENSE" (charge) or "DEFENSE" (reach); ``foul_player`` / ``stealer``
+    # carry the credited Player so the wrapper can record stats + route.
+    foul_team: str = ""
+    foul_player: Any = None
+    stealer: Any = None
+    # On-court location where a STEAL changed hands (the BH's spot) — seeds the
+    # stealer's start for the next possession's Steal HCO / fast-break setup.
+    steal_coords: Dict[str, Any] = {}
     # Set when a broken-HCT attack reaches the topLane spot → D18 fast break.
     # Carries the post-drive offense/defense coords for the shot resolver.
     fb_seed: Dict[str, Any] = {}
@@ -986,7 +1121,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             "def_coords": {p: dict(def_coords[p]) for p in POSITIONS},
         }
 
-    def _resolve_attack(moment: str, in_range: List[str]) -> Tuple[str, float]:
+    def _resolve_attack(moment: str, in_range: List[str]) -> Tuple[str, float, Any]:
         """Pick the contesting defender(s) per §5 and resolve the banded outcome."""
         if moment == "trap":
             bh_def_pos, trapper_pos = _select_trappers(in_range, "PG" in in_range)
@@ -1000,17 +1135,83 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             def_lineup.get(trapper_pos) if trapper_pos else None,
         )
 
+    def _emit_stopper(reason: str) -> float:
+        """D8 — terminal whistle/steal beat: the defense collapses onto the BH
+        for a short hold. Mutates ``def_coords`` and appends the segment."""
+        _position_defense(bh_xy, def_coords, is_away_offense)
+        secs = 0.5
+        loop_segments.append(
+            _segment(reason, off_coords, def_coords, secs, ("def", "PG"), bh_pos)
+        )
+        return secs
+
+    def _apply_moment_outcome(
+        outcome: str, score_ratio: float, credited: Any
+    ) -> bool:
+        """D8 — translate a resolved moment into loop state. Returns ``True`` if
+        the outcome is terminal (caller should ``break``), ``False`` if the BH
+        retains and the loop should advance/continue."""
+        nonlocal result_type, text_suffix, turnover_type
+        nonlocal foul_team, foul_player, stealer, steal_coords
+        if outcome == "STEAL":
+            steal_coords = dict(bh_xy)
+            sec = _emit_stopper("hct_steal")
+            nonlocal_shot_clock_dec(sec)
+            result_type = "STEAL"
+            stealer = credited
+            text_suffix = " — picked his pocket, steal!"
+            return True
+        if outcome == "O_FOUL":
+            sec = _emit_stopper("hct_foul")
+            nonlocal_shot_clock_dec(sec)
+            result_type = "FOUL"
+            foul_team = "OFFENSE"
+            foul_player = ball_handler
+            text_suffix = " — offensive foul on the ball handler!"
+            return True
+        if outcome == "D_FOUL":
+            sec = _emit_stopper("hct_foul")
+            nonlocal_shot_clock_dec(sec)
+            result_type = "FOUL"
+            foul_team = "DEFENSE"
+            foul_player = credited
+            text_suffix = " — reach-in foul on the defense!"
+            return True
+        if outcome == "DEAD BALL":
+            seg, sec = _emit_dead_ball_drive(
+                bh_xy, score_ratio, is_away_offense, bh_drive_rate,
+                off_coords, def_coords, bh_pos,
+            )
+            loop_segments.append(seg)
+            nonlocal_shot_clock_dec(sec)
+            result_type = "DEAD BALL"
+            # Forced (defense-induced) dead ball — left untyped so the FE renders
+            # its generic travel/double-dribble announce.
+            text_suffix = " they force a turnover!"
+            return True
+        # POS_O / NEUTRAL → not terminal.
+        return False
+
+    def nonlocal_shot_clock_dec(amount: float) -> None:
+        nonlocal shot_clock
+        shot_clock -= amount
+
     # --- §4 loop ------------------------------------------------------------
     for _ in range(MAX_LOOP_ITERATIONS):
         # 1) Time terminals (checked at the top of each iteration).
         if shot_clock <= 0:
-            result_type = "DEAD BALL"  # shot-clock violation (proper announce: D9)
+            # D9 — shot-clock violation: turnover → SIP, possession flips.
+            result_type = "DEAD BALL"
+            turnover_type = "SHOT_CLOCK"
             text_suffix = " shot clock violation!"
             break
         if shot_clock <= HCT_SHOT_CLOCK_VIOLATION_THRESHOLD and not _crossed_half_court(
             bh_xy["x"], is_away_offense
         ):
-            result_type = "DEAD BALL"  # 10-second violation (proper announce: D9)
+            # D9 — 10-second violation: didn't cross half court in time → turnover
+            # → SIP, possession flips. Only applies while still in the backcourt.
+            result_type = "DEAD BALL"
+            turnover_type = "TEN_SECOND"
             text_suffix = " 10-second violation!"
             break
 
@@ -1109,11 +1310,13 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                     result_type = "ATTACK_BASKET_SHOT"
                     text_suffix = " they go to work in the paint"
                 break
-            # Past the PSA but outside the Attack Basket y-band — settle into
-            # HCO (the "re-enter the loop as a new BH" treatment is a 2D-3 item).
-            result_type = "HCO"
-            text_suffix = " they break the trap & establish their half court offense"
-            break
+            # 2D-3: past the PSA but outside the Attack-Basket y-band (a deep
+            # corner / baseline-extended spot — not a goal-achievement zone).
+            # Instead of force-settling to HCO, fall through to a normal
+            # detect → read → act iteration so the BH (or a pass receiver who
+            # caught here) keeps working from the corner. Forward progress is
+            # guaranteed by the segment emitted below and bounded by the shot
+            # clock + MAX_LOOP_ITERATIONS.
 
         # 3) Detect the moment (§5) and read (reduced thresholds if no defender).
         moment, in_range = _detect_moment(bh_xy, def_coords, is_away_offense)
@@ -1133,15 +1336,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                     result_type = "HCO"
                     text_suffix = " open floor — they break the trap & establish their half court offense"
                 break
-            outcome, score_ratio = _resolve_attack(moment, in_range)
-            if outcome == "DEAD BALL":
-                seg, sec = _emit_dead_ball_drive(
-                    bh_xy, score_ratio, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos
-                )
-                loop_segments.append(seg)
-                shot_clock -= sec
-                result_type = "DEAD BALL"
-                text_suffix = " they force a turnover!"
+            outcome, score_ratio, credited = _resolve_attack(moment, in_range)
+            if _apply_moment_outcome(outcome, score_ratio, credited):
                 break
             # POS_O / NEUTRAL → advance below.
             _advance()
@@ -1164,15 +1360,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             moment2, in_range2 = _detect_moment(bh_xy, def_coords, is_away_offense)
             if moment2 == "trap":
                 # A second defender arrived during the hold → Trap Moment.
-                outcome, score_ratio = _resolve_attack("trap", in_range2)
-                if outcome == "DEAD BALL":
-                    seg, sec = _emit_dead_ball_drive(
-                        bh_xy, score_ratio, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos
-                    )
-                    loop_segments.append(seg)
-                    shot_clock -= sec
-                    result_type = "DEAD BALL"
-                    text_suffix = " they force a turnover!"
+                outcome, score_ratio, credited = _resolve_attack("trap", in_range2)
+                if _apply_moment_outcome(outcome, score_ratio, credited):
                     break
                 _advance()
                 shot_clock -= loop_segments[-1]["seconds"]
@@ -1189,9 +1378,13 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                     result_type = "HCO"
                     text_suffix = " open floor — they break the trap & establish their half court offense"
                 break
-            # Pressure (single defender on the BH): 50% steal attempt /
-            # 50% pressure-no-steal. Steal + foul outcomes are stubbed (D8) →
-            # no stopping action, return to the loop for a fresh read.
+            # Pressure (single defender reached the holding BH): D8 unifies the
+            # hold contest with the attribute-driven moment model (same engine as
+            # Attack). Terminal outcomes end the turn; otherwise the BH retains
+            # and we re-read next iteration.
+            outcome, score_ratio, credited = _resolve_attack("pressure", in_range2)
+            if _apply_moment_outcome(outcome, score_ratio, credited):
+                break
             continue
 
         # decision == "pass" → §6 pass branch. The ball goes to one of the two
@@ -1245,6 +1438,12 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     # step plus one schema step per loop segment.
     return {
         "result_type": result_type,
+        "turnover_type": turnover_type,
+        # D8 — emergent foul/steal participants (empty/None for other terminals).
+        "foul_team": foul_team,
+        "foul_player": foul_player,
+        "stealer": stealer,
+        "steal_coords": steal_coords,
         "ball_handler": ball_handler,
         "defender": defender,
         "text_suffix": text_suffix,
