@@ -1196,6 +1196,17 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         nonlocal shot_clock
         shot_clock -= amount
 
+    def _park_passer(pos: str) -> None:
+        """Freeze a player who just passed at his current spot.
+
+        The off-ball setup pull (`_move_offense`) still aims the *original* BH
+        at his x=44 bring-up target (`off_targets[PG]`), so once he gives up the
+        ball he'd otherwise be dragged backward across half court. Re-pointing
+        his target at his current coords keeps him stationary. First cut: hold in
+        place; revisit if the prototype wants him to space into the offense.
+        """
+        off_targets[pos] = dict(off_coords[pos])
+
     # --- §4 loop ------------------------------------------------------------
     for _ in range(MAX_LOOP_ITERATIONS):
         # 1) Time terminals (checked at the top of each iteration).
@@ -1244,6 +1255,9 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                         bh_pos, off_coords, def_coords, is_away_offense
                     )
                     if receiver_pos is not None:
+                        # Once he passes, the ex-BH is off-ball — freeze him so
+                        # the stale x=44 setup pull doesn't drag him backward.
+                        _park_passer(bh_pos)
                         # Flight: persist the pass-defense formation around the
                         # receiver, then the ball travels (forward pool → no
                         # over-and-back). Receiver becomes the new BH.
@@ -1392,6 +1406,9 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         # and the loop continues from him (enables a non-PG HCT-end BH → D7).
         receiver_pos = _select_pass_receiver(bh_pos, off_coords, is_away_offense)
         passer_pos = bh_pos
+        # Once he passes, the ex-BH is off-ball — freeze him so the stale x=44
+        # setup pull doesn't drag him back across half court.
+        _park_passer(passer_pos)
 
         # D19 — compute the pass-defense formation ONCE (around the receiver) and
         # persist it across the flight + reception segments so defenders don't
