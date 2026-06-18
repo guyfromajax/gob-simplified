@@ -179,6 +179,10 @@ function updateMomentumBar(teamSide, value) {
   const negEl = document.getElementById(`${teamSide}-momentum-neg`);
   const posEl = document.getElementById(`${teamSide}-momentum-pos`);
   if (!negEl || !posEl) return;
+  // Sticky: a null/undefined value means "this update carried no momentum info"
+  // (e.g. a tween onUpdate frame or a partial scoreboard payload). Leave the bar
+  // exactly as it was rather than blanking it to 0. A real 0 still paints empty.
+  if (value === null || value === undefined) return;
   const v = Math.max(-50, Math.min(50, Number(value) || 0));
   if (v < 0) {
     negEl.style.width = `${Math.abs(v)}%`;
@@ -578,7 +582,8 @@ function momentumValueForTeam(teamObj, turn, side) {
     }
     return Math.max(-50, Math.min(50, m));
   }
-  return 0;
+  // No authoritative source on this update → null so the bar stays as-is (sticky).
+  return null;
 }
 
 function isHcoTurnContext(turn) {
@@ -3822,7 +3827,11 @@ export function createGameScene(Phaser) {
             away_team_fouls: turnData.away_team_fouls,
             clock: turnData.clock,
             shot_clock_remaining: turnData.shot_clock_remaining,
-            time_remaining: turnData.time_remaining
+            time_remaining: turnData.time_remaining,
+            // Forward the backend-stamped derived Team Momentum so the bar
+            // refreshes once per turn (undefined-safe; sticky holds otherwise).
+            home_team_momentum: turnData.home_team_momentum,
+            away_team_momentum: turnData.away_team_momentum
           });
           
           // Track latest scores for game completion check
