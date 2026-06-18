@@ -348,7 +348,72 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
             break
         step += 1
 
-    if eligible_players is None or len(eligible_players) < 5:
+    if eligible_players is None:
+        eligible_players = []
+
+    if len(eligible_players) < 5:
+        allow_fouled_out_reentry = bool(
+            game_state
+            and (
+                game_state.get("allow_fouled_out_lineup_reentry")
+                or (
+                    isinstance(team, TeamManager)
+                    and not getattr(team, "is_user_team", False)
+                )
+            )
+        )
+        if allow_fouled_out_reentry and isinstance(team, TeamManager):
+            existing_ids = {str(getattr(p, "player_id", "")) for p in eligible_players}
+            emergency_ids = {
+                str(pid)
+                for pid in ((game_state or {}).get("emergency_fouled_out_lineup_player_ids") or [])
+            }
+            fouled_out_players = [
+                p
+                for p in team.get_all_players()
+                if str(getattr(p, "player_id", "")) not in existing_ids
+                and getattr(p, "get_stat", None)
+                and (p.get_stat("F", "game") or 0) >= 5
+            ]
+            previously_readmitted = [
+                p
+                for p in fouled_out_players
+                if str(getattr(p, "player_id", "")) in emergency_ids
+            ]
+            shortfall = 5 - len(eligible_players)
+            emergency_players = previously_readmitted[:shortfall]
+            remaining_shortfall = shortfall - len(emergency_players)
+            if remaining_shortfall > 0:
+                remaining_pool = [
+                    p
+                    for p in fouled_out_players
+                    if str(getattr(p, "player_id", "")) not in {
+                        str(getattr(ep, "player_id", "")) for ep in emergency_players
+                    }
+                ]
+                if len(remaining_pool) >= remaining_shortfall:
+                    emergency_players.extend(
+                        random.sample(remaining_pool, remaining_shortfall)
+                    )
+            if len(emergency_players) >= shortfall:
+                eligible_players.extend(emergency_players)
+                game_state["emergency_fouled_out_lineup_player_ids"] = sorted(
+                    emergency_ids
+                    | {
+                        str(getattr(player, "player_id", ""))
+                        for player in emergency_players
+                        if getattr(player, "player_id", None) is not None
+                    }
+                )
+                logging.warning(
+                    "Computer-team lineup exhaustion: Team '%s' randomly re-admitted %s "
+                    "fouled-out player(s) to complete the lineup: %s",
+                    team_name,
+                    shortfall,
+                    [getattr(p, "player_id", None) for p in emergency_players],
+                )
+
+    if len(eligible_players) < 5:
         total = len(list(team.get_all_players())) if isinstance(team, TeamManager) else players_collection.count_documents({"team": team_name})
         raise ValueError(
             f"Team '{team_name}' has fewer than 5 eligible players even after relaxing NG and foul limits. "

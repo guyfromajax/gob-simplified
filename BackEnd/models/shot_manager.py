@@ -1,5 +1,11 @@
 import random
 import logging
+from BackEnd.constants.momentum import (
+    MO_BLOCK_DELTA,
+    MO_CHARGE_DELTA,
+    MO_AND_ONE_DELTA,
+)
+from BackEnd.utils.player_momentum import mo_shot_roll
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
@@ -599,13 +605,10 @@ class ShotManager:
 
         shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
         
-        # Three-point threshold: 100 - (random(1-5) * momentum)
-        # Higher momentum = easier three-pointers
+        # Three-point shots get the base threshold increase (harder than 2s).
         skip_three_point_threshold = bool(game_state.pop("fast_break_force_threshold_no_three_bonus", False))
         if is_three and not skip_three_point_threshold:
-            momentum = off_team.team_attributes.get("momentum", 0)
-            three_point_modifier = THREE_POINT_SHOT_THRESHOLD_INCREASE - (random.randint(1, 5) * momentum) 
-            shot_threshold += three_point_modifier
+            shot_threshold += THREE_POINT_SHOT_THRESHOLD_INCREASE
         if playcall == "Set":
             playcall = "Attack"
 
@@ -889,6 +892,12 @@ class ShotManager:
                                 "next_play_type": "FREE_THROW",
                                 "shooter": shooter,
                             }
+                        # Momentum: a made-through-the-foul here is an and-one →
+                        # track it as a made attempt + and-one bonus. A miss that
+                        # drew the foul is excluded from Shot_Result_List.
+                        if made_from_foul:
+                            shooter.record_shot_result(True)
+                            shooter.add_momentum(MO_AND_ONE_DELTA)
                         if not made_from_foul:
                             self._ensure_schema_miss_bounce_for_free_throw(
                                 result, roles, shooter, off_team,
@@ -897,8 +906,10 @@ class ShotManager:
                     elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
                         # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
                         defender.record_stat("BLK")
-                        off_team.team_attributes["momentum"] = max(0, off_team.team_attributes.get("momentum", 0) - 1)
-                        def_team.team_attributes["momentum"] = min(10, def_team.team_attributes.get("momentum", 0) + 1)
+                        # Momentum: blocker +, blocked shooter − (the shooter also
+                        # gets a False on his Shot_Result_List via the miss path).
+                        defender.add_momentum(MO_BLOCK_DELTA)
+                        shooter.add_momentum(-MO_BLOCK_DELTA)
                         is_away_offense = off_team.team_id == self.game.away_team.team_id
                         # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
                         shot_spot = roles.get("shot_spot")
@@ -966,6 +977,10 @@ class ShotManager:
                         "resolution_step_index": timing_contract["resolution_step_index"],
                         "executed_step_count": timing_contract["executed_step_count"],
                     }
+                    # Momentum: charge drawer (defender) +, charging player −.
+                    if defender:
+                        defender.add_momentum(MO_CHARGE_DELTA)
+                    shooter.add_momentum(-MO_CHARGE_DELTA)
                     return result
 
                 # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)
@@ -1131,6 +1146,14 @@ class ShotManager:
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
+
+        # Shot_Result_List: record make (True) / clean miss or block (False);
+        # skip a miss that drew a shooting foul (Player_Momentum_System.md).
+        if made or not d_foul:
+            shooter.record_shot_result(made)
+        # And-one momentum: made shot that drew a shooting foul → shooter +.
+        if made and d_foul:
+            shooter.add_momentum(MO_AND_ONE_DELTA)
 
         # ==================== PLAYER POSITIONING (FOR ALL SHOTS) ====================
         # Players release for fast break / get back on defense when shot is TAKEN,
@@ -2248,8 +2271,10 @@ class ShotManager:
         playcall_for_weights = shot_type.capitalize() if shot_type in ["inside", "attack", "outside"] else "Base"
         weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall_for_weights, {})
 
-        # Base shot score based on shooter attributes and playcall weights
-        shot_score += sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
+        # Base shot score based on shooter attributes and playcall weights.
+        # The base roll is MO-aware (Player_Momentum_System.md): high momentum
+        # skews the roll up, low momentum skews it down.
+        shot_score += sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * mo_shot_roll(attrs)
 
         # Passing or dribbling bonus
         if passer:

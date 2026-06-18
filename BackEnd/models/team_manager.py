@@ -858,6 +858,10 @@ class TeamManager:
                         totals[stat] = []
                     if isinstance(val, list):
                         totals[stat].extend(val)
+                elif isinstance(val, list):
+                    # Other per-player game arrays (e.g. Shot_Result_List) are
+                    # per-player only — not aggregated into team totals.
+                    continue
                 else:
                     # Regular stat - sum numeric values
                     totals[stat] = totals.get(stat, 0) + val

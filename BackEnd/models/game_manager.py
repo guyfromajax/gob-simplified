@@ -363,7 +363,16 @@ class GameManager:
                     recharge_amount = random.choice(timeout_recharge_amounts)
                     if hasattr(player, "recharge_energy"):
                         player.recharge_energy(recharge_amount)
-        
+
+        # ✅ Player Momentum reset on timeouts — but NOT on foul-outs
+        # (Player_Momentum_System.md).
+        if timeout_reason != "FOUL_OUT":
+            try:
+                from BackEnd.utils.player_momentum import apply_player_momentum_resets
+                apply_player_momentum_resets(self, is_halftime=False)
+            except Exception as e:
+                logging.error(f"⚠️ TIMEOUT: Player momentum reset failed: {e}")
+
         self.turn_manager._attach_clock_contract(
             timeout_turn,
             clock_start=int(self.game_state.get("time_remaining", 0)),
@@ -627,6 +636,23 @@ class GameManager:
 
         self.turns.append(turn_result)
         self.text_log.append(text if text is not None else turn_result.get("text", ""))
+
+        # Player Momentum (Player_Momentum_System.md): a shot-clock violation
+        # rolls MO for every active player on both teams (offense −1, defense
+        # +1). This funnel runs once per turn and BEFORE switch_possession, so
+        # self.offense_team is still the violating offense. Guard flag prevents
+        # any double-application.
+        if (
+            isinstance(turn_result, dict)
+            and turn_result.get("turnover_type") == "SHOT_CLOCK"
+            and not turn_result.get("_mo_sc_applied")
+        ):
+            turn_result["_mo_sc_applied"] = True
+            try:
+                from BackEnd.utils.player_momentum import apply_shot_clock_violation_momentum
+                apply_shot_clock_violation_momentum(self.offense_team, self.defense_team)
+            except Exception as e:
+                logging.error(f"⚠️ Shot-clock violation MO failed: {e}")
 
         if isinstance(turn_result, dict):
             sync_lineup_coords_from_turn(self, turn_result)

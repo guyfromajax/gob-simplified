@@ -298,7 +298,7 @@ Mirrors a subset of the FCC pattern:
 - `defenseMatchupsAnnouncePlayed_{gameId}` — Game-announced flag (prevents re-announcing)
 
 **FCC Session Cache**
-- `fcc_session_cache_{franchiseId}` — Serialized FCC top-level data snapshot (mirrors `commandCenterTopDataCache` / `standingsDataCache` etc.)
+- `fcc-shell:{franchiseId}:{teamId|unknown}` — Serialized FCC top-level data snapshot (mirrors `commandCenterTopDataCache` / `standingsDataCache` etc.). Restored data is used only as a behind-the-overlay warm paint on FCC entry; the full-page loading overlay remains visible until authoritative `/franchise/command-center/data` returns and current UI state is applied.
 
 **Generic ResourceCache**
 - `resource:*` (dynamic pattern) — `ResourceCache` module entries; see §8
@@ -411,4 +411,3 @@ Plus state-contract logs from the same module:
 3. **Cache size limits:**
    - Implement LRU eviction for `ongoing_games`
    - Prevent memory bloat from abandoned games
-

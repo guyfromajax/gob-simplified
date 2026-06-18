@@ -1,6 +1,12 @@
 # BackEnd/models/player.py
 
 from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, MALLEABLE_ATTRS
+from BackEnd.constants.momentum import (
+    MO_CONSECUTIVE_THRESHOLD,
+    MO_CONSECUTIVE_DELTA,
+    MO_OREB_THRESHOLD,
+    MO_OREB_DELTA,
+)
 import uuid
 import os
 import random
@@ -136,6 +142,11 @@ class Player:
         # Outlet_Score_List is an array (game-specific), initialize as empty array
         for level in ["game", "season", "career"]:
             stats[level]["Outlet_Score_List"] = []
+        # Shot_Result_List: per-game field-goal/putback outcomes (True=made,
+        # False=miss/block). Shooting-foul misses & free throws excluded. Game-
+        # only — never aggregated to season/career (intentionally not in
+        # BOX_SCORE_KEYS). See Player_Momentum_System.md.
+        stats["game"]["Shot_Result_List"] = []
         return stats
 
     def record_stat(self, stat, amount=1):
@@ -146,6 +157,14 @@ class Player:
         elif stat in {"OREB", "DREB"}:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
+            # Momentum: a player's 5th OREB of the game (and each one after) → +MO.
+            if stat == "OREB" and amount > 0 and s["OREB"] >= MO_OREB_THRESHOLD:
+                self.add_momentum(MO_OREB_DELTA)
+
+    def add_momentum(self, delta):
+        """Apply a clamped change to this player's in-game momentum (MO).
+        Writes attributes["MO"] only (never anchor_MO); clamped to ±10."""
+        self.attributes["MO"] = clamp_mo(self.attributes.get("MO", 0) + int(delta))
 
     def get_fatigue_decay_amount(self, omit_zeros=False):
         """
@@ -227,6 +246,32 @@ class Player:
     def reset_stats(self):
         self.stats["game"] = {stat: 0 for stat in BOX_SCORE_KEYS}
         self.stats["game"]["Outlet_Score_List"] = []  # Outlet_Score_List is an array, not an integer
+        self.stats["game"]["Shot_Result_List"] = []  # per-game shot outcomes (array, not numeric)
+
+    def record_shot_result(self, made):
+        """Append a field-goal/putback outcome to the per-game Shot_Result_List
+        (True=made, False=missed/blocked). Callers exclude shooting-foul misses
+        and free throws. Defensive: ensures the entry is a list before append.
+
+        Momentum: on the player's 3rd consecutive make (and each after) → +MO;
+        3rd consecutive miss (and each after) → −MO. Streak is the trailing run
+        of identical results in Shot_Result_List (self-relative, whole game;
+        excluded shots are simply absent, so they don't break a streak)."""
+        srl = self.stats["game"].get("Shot_Result_List")
+        if not isinstance(srl, list):
+            srl = []
+            self.stats["game"]["Shot_Result_List"] = srl
+        made = bool(made)
+        srl.append(made)
+
+        run = 0
+        for prior in reversed(srl):
+            if prior == made:
+                run += 1
+            else:
+                break
+        if run >= MO_CONSECUTIVE_THRESHOLD:
+            self.add_momentum(MO_CONSECUTIVE_DELTA if made else -MO_CONSECUTIVE_DELTA)
 
     def get_stat(self, stat, level="game"):
         return self.stats.get(level, {}).get(stat, 0)

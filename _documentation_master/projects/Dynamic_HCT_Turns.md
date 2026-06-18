@@ -91,30 +91,81 @@ These are produced by `hct_initial_defender_coords` and the
 - **Offense's goal**: get the ball past x=64 and either attempt a shot within the
   HCT turn (first goal) or transition to HCO turn (secondary goal).
 
+> ### ⚠️ Behavior Change 1 (D21) — PSA is no longer a trap breaker
+> The **Primary Safe Area is demoted to a *target area only***. Reaching it does
+> **not** break the trap — the trap steps/turns **continue** while the offense is in
+> the PSA. The **only trap-break area is the Attack Basket Area**, which keeps the
+> existing Fast-Break-or-HCO resolution logic (§7). This replaces the prior "reach
+> the PSA → HCO (100%)" trigger. See the trace at the end of this section for the
+> derived consequences (broken-HCT drive retargeting; deep-corner edge).
+
 **Offense goal spots**
 - **Primary Safe Area (PSA)**: x: 57–64 and y: 19–32 (perfect spot: x=60, y=25).
-- **Attack Basket Area**: x: 64 to basket-x and y: 10–30. The shared boundary x=64
-  resolves to the **PSA** (PSA wins the overlap; Attack Basket is effectively x>64).
+  **Target area only (D21)** — the offense aims to advance the ball into the front
+  court through here, but arrival does **not** resolve the possession; the loop
+  continues and the trap persists.
+- **Attack Basket Area**: x: 64 to basket-x and **y: 10–40** (the band spans the
+  **lower wing y (10) → upper wing y (40)**; corrected from the earlier erroneous
+  10–30). The **trap-break area** — the only zone whose arrival resolves the HCT
+  possession (shot / Fast Break / HCO). (The x=64 boundary belongs to the PSA band;
+  the Attack Basket Area is effectively x>64.)
 
-**HCO entry triggers (the only two).** An HCT turn transitions to HCO **only** when
-one of these is true; nothing else triggers HCO:
-1. The BH **reaches the Primary Safe Area** → HCO (100%).
-2. The BH or PR **reaches the Attack Basket Area** AND `defenders > offenders`
-   (counted within the Attack Basket Area) → HCO. If `defenders ≤ offenders`
-   (ties → attack) the receiver attacks the basket instead (§7).
+**Trap-break / HCO trigger (the only one, D21).** An HCT possession resolves out of
+the trap **only** when the BH or PR **reaches the Attack Basket Area**; there the §7
+goal-achievement logic decides:
+1. `defenders > offenders` (counted within the Attack Basket Area) → **HCO**.
+2. `defenders ≤ offenders` (ties → attack) → **shot / drive / inside pass** (which may
+   bridge to a **Fast Break** rim attempt, §7).
+
+Reaching the PSA — or being anywhere else past half court outside the Attack Basket
+Area — does **not** break the trap.
 
 **Zone precedence (checked at the top of each loop iteration):**
-1. In PSA → HCO (trigger 1).
-2. In Attack Basket Area → §7 goal achievement (HCO if `defenders > offenders`, else shot/attack).
-3. At x > 64 but **outside** both zones (e.g. y outside the Attack Basket band) →
-   **not a goal**; continue the §4 loop (BH read → decision). *(This supersedes the
-   old "Situational" goal spot — a numbers advantage now only matters within the
-   Attack Basket Area, not as a standalone x>64 zone.)*
+1. In Attack Basket Area → §7 goal achievement (HCO if `defenders > offenders`, else shot/attack/FB).
+2. Anywhere else (incl. the **PSA band**, and x > 64 *outside* the Attack-Basket
+   y-band) → **not a trap break**; continue the §4 loop (BH read → decision). The
+   trap persists.
 
 **Defense goal spots**
 - **Primary**: x: 50–57 and (y < 10 or y > 40). Defense executes a trap here if two
   defenders are within trap distance (11) of the ball handler.
 - **Secondary**: x ≥ midCorner-spot-x and (y < 10 or y > 40). Same trap condition.
+
+### D21 trace — does the change hold up?
+
+**Holds up:**
+- **Zone precedence** simplifies cleanly to a single resolution zone (Attack Basket
+  Area). Everywhere else (incl. the PSA band) just continues the loop — the defense
+  formation (`_defense_targets`) is BH-relative, so the trap naturally follows the BH
+  into the front court and **continues through the PSA** with no extra wiring.
+- **Termination is still bounded.** The PSA was a frequent easy terminal; with it
+  gone, possessions end via (a) Attack Basket Area resolution, (b) a D8/DEAD-BALL/
+  STEAL/FOUL moment, (c) shot-clock / 10-second violation, or (d) the
+  `MAX_LOOP_ITERATIONS` backstop → HCO. The shot clock strictly decreases per segment,
+  so the loop cannot run forever.
+- **AB resolution is unchanged** — the §7 goal-achievement (HCO if `defenders >
+  offenders`, else shot/drive/inside-pass/FB) is reused exactly as-is.
+
+**Falters / requires a derived decision (folded into this doc):**
+- **Broken-HCT drive target (resolved → AB).** The open-floor drive previously pulled
+  up at the PSA perfect spot and called HCO — i.e. the exact PSA trap-break we're
+  removing. Under D21 it must instead **drive into the Attack Basket Area** and resolve
+  via §7 (FB if numbers, else HCO). Documented in §5; this is the one engine path that
+  changes beyond deleting the PSA check.
+
+**Watch items (no breakage, but likely need tuning once you run it):**
+- **Longer possessions → more moments.** Removing the easy PSA exit means more
+  advance/hold/trap iterations per possession, which **increases D8 foul/steal/turnover
+  frequency and shot-clock pressure**. Expect the outcome mix to shift away from "clean
+  HCO trap-breaks" toward AB shots/FB, turnovers, and the occasional clock violation.
+  Likely needs D8 coefficient + read-threshold recalibration.
+- **Deep-corner edge.** The AB band is `y 10–40` (widened from 10–30, D22). A BH who
+  reaches high x with y *outside* 10–40 (a deep baseline corner) has **no natural
+  resolution** until the clock /
+  iteration backstop fires (settles to HCO). This case existed before but the PSA
+  often caught the BH first; now it surfaces more. Mitigation options (not yet
+  applied): widen the AB y-band, or add a "deep-x ⇒ treat as AB" fallback so any real
+  rim penetration always resolves. Flagging for the prototype run.
 
 **Terminal conditions (turn enders)**
 
@@ -211,9 +262,10 @@ return int(((attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)) * random.ra
 
 When no terminal fires, the BH advances **random(6,12)** x toward the basket and
 **random(−6,6)** y, defenders re-pose (§6), and the loop re-detects + re-reads.
-If the advance lands the BH in the Primary Safe Area → **HCO (100%)** (HCO entry
-trigger 1, §2). If the advance lands him in the Attack Basket Area → §7 goal
-achievement. Otherwise → run another read → attack/pass/hold iteration.
+If the advance lands the BH in the **Attack Basket Area** → §7 goal achievement
+(trap break: HCO / shot / FB). Landing in the **PSA** (or anywhere else past half
+court outside the Attack Basket Area) is **not** a trap break (D21) → run another
+read → attack/pass/hold iteration; the trap continues.
 
 ### Time terminals (checked every iteration)
 
@@ -306,9 +358,10 @@ ball_handling_score = calculate_ball_handling_score
   BH commits a dead-ball turnover (double dribble / travel) → dead-ball announce + next-step progression.
 - elif `o_score >= d_score + 2*(def_chemistry + def_pt_efficiency)` → **positive o**:
   the BH beats the pressure/trap and **advances** toward the basket (he dribbles
-  forward; e.g. toward the deep key / PSA). He transitions to HCO **only if** an HCO
-  entry trigger is met at the next zone check (§2: in PSA, or in the Attack Basket
-  Area with `defenders > offenders`); otherwise he continues the §4 loop.
+  forward; e.g. through the PSA toward the Attack Basket Area). He resolves the
+  possession **only if** the trap-break trigger is met at the next zone check (D21:
+  reaches the **Attack Basket Area** → §7 HCO/shot/FB); reaching the PSA or any other
+  spot is not a break — he continues the §4 loop and the trap persists.
 - else → **neutral**: BH advances per §4 advance rule, then re-reads (or holds-up / attacks if in range).
 
 ### Trap Moment (two defenders)
@@ -337,31 +390,54 @@ open floor invites attack):
 - else → **hold**
 
 `pass` and `hold` route to their normal handling (§6 pass movement; hold per §5).
-`attack` triggers the **broken-HCT** resolution:
+`attack` triggers the **broken-HCT cutoff** resolution (D21 — replaces the old
+"drive to the PSA → HCO" branch).
 
-**Offense**
-- BH targets the perfect Primary Safe Area spot **(60, 25)**. If that spot is
-  *behind* the BH (he is already past it toward the basket), he targets the
-  **topLane** spot instead.
-- The four teammates each target a **random** spot inside the **Attack Basket Area**
-  (§2: x 64 → basket-x, y 10–30), constrained by their *starting* y:
-  - starting y > 28 → must pick a spot in the **upper** half (upper = y > 25)
-  - starting y < 22 → must pick a spot in the **lower** half (lower = y < 26)
-  - central starting y (22–28) → may pick upper **or** lower
+#### Broken-HCT cutoff model (D21)
 
-**Defense**
-- The defender **closest to the BH** targets directly in front of the BH's x target
-  — same y, **2 x-spots closer to the basket**.
-- All other defenders target the **midLane** spot (to defend a potential pass).
+The open-floor attack is a **race to the rim against a single cutoff defender**:
 
-**Resolution / exit**
-- When the BH reaches the perfect Primary Safe Area spot (60, 25) → **enter HCO** via
-  the existing HCO entry logic (§7 "HCO transition branch — execution"): Handoff step
-  by default (`build_handoff_step`, `metadata_reason="hco_entry_handoff"`), which
-  auto-branches — *hold-beat* if the BH is the play's step-0 initiator, else a
-  converge+pass handoff to the skeleton-derived initiator.
-- When the BH reaches the **topLane** spot → execute a **Fast Break** scenario (§7
-  Fast-break-from-broken-HCT, D18 — the Steal-FB-equivalent rim attempt).
+1. **BH targets the topLane spot (74, 25)** — inside the Attack Basket Area, so a
+   clean arrival resolves via §7. He drives there at his open-floor drive pace.
+2. **Closest defender attempts a cutoff.** Solve the interception geometry along the
+   BH's straight path to topLane: for each point `P` on the path, compare the BH's
+   travel time to `P` (`dist / bh_drive_rate`) against the defender's travel time to
+   `P` (`dist / defender_rate`, defender speed from his **AG**-based rate). The
+   **meet point** is the *first* `P` the defender can reach **no later than** the BH.
+3. **No meet point exists (no angle)** → the BH reaches topLane untouched → run the
+   standard §7 **FB / HCO** resolution (count offenders vs defenders in the Attack
+   Basket Area: `defenders ≤ offenders` → Fast Break rim attempt, D18;
+   `defenders > offenders` → HCO via the existing entry primitive).
+4. **A meet point exists (defender has an angle)** → BH and defender **collide at the
+   meet point**; resolve with the **D8 `_resolve_moment` contest, steal excluded**
+   (its weight re-normalized into the others — a full-speed drive collision is a
+   charge/block/lost-handle situation, not a pickpocket):
+   - **normal progression** (BH wins) → he gathers and **picks up his dribble** (see
+     *Dribble-alive state* below); re-enters the §4 loop **limited to pass/hold**.
+   - **O_FOUL** (charge) → offensive foul on the BH → turnover (process per D8).
+   - **D_FOUL** (block) → defensive foul on the cutoff defender (process per D8:
+     team-foul / bonus → FT, etc.).
+   - **DEAD BALL** → lost-handle turnover → SIP, possession flips.
+5. **Off-ball movement (the other 8 players)** during this action — **hold position
+   (test cut).** For now every player except the BH and the cutoff defender **stays
+   put** for the duration of the drive/contest, so the cutoff can be tested in
+   isolation. (The previous "teammates fill the Attack Basket Area; non-cutoff
+   defenders take midLane" rule is **superseded**; richer off-ball motion TBD.)
+
+#### Dribble-alive state (D21)
+
+A BH who wins a broken-HCT cutoff collision has **used his dribble**:
+- While dribble-dead, his reads (both §4-loop and §5-broken) collapse to **pass or
+  hold only** — the **attack/drive option is removed**. (Implementation: skip the
+  attack tier; e.g. read > pass-threshold → pass, else hold.)
+- Because he cannot drive, the **"hold → no defender reaches" case no longer routes
+  to a broken-HCT drive**. Instead he simply **re-reads (pass or hold)** while all
+  other players keep moving that beat — so if he holds for one or more beats a
+  defender will eventually reach him (pressure / trap contest), which keeps the loop
+  bounded.
+- **Reset:** the restriction lifts the moment **possession transfers to another
+  player** (a completed pass makes the receiver the new, dribble-alive BH) or **the
+  turn ends**.
 
 ### Hold resolution (universal)
 
@@ -383,10 +459,12 @@ by what reaches the BH **before the hold window elapses**:
   during the hold window** → execute a **Trap Moment** (§5). This fires even if the
   first defender already attempted (and failed) a steal earlier in the same window
   (as long as the possession hasn't already ended via a successful steal or a foul).
-- **No defender reaches the BH before the window elapses** → enter the **broken-HCT
-  resolution** directly (the §5 "No defenders in range" attack execution: BH heads to
-  the perfect Primary Safe Area spot (60, 25), or topLane if that's behind him;
-  teammates fill the Attack Basket Area; defenders per that section). No new read.
+- **No defender reaches the BH before the window elapses**:
+  - **Dribble alive** → enter the **broken-HCT cutoff resolution** directly (the §5
+    "No defenders in range" attack execution: BH races to topLane vs the closest
+    cutoff defender → FB/HCO or a meet-point contest, D21). No new read.
+  - **Dribble dead** (he picked it up on an earlier cutoff win) → he **cannot drive**,
+    so he simply **re-reads (pass or hold)** while everyone keeps moving (D21).
 
 > **D8 reconciliation (✅ built — see `Dynamic_HCT_D8_Scoping.md`):** the old 50/50
 > steal → 50/50 foul hardcode has been **replaced** by the same attribute-driven
@@ -432,15 +510,82 @@ system. Key helpers: `hct_initial_defender_coords`, `compute_hct_trap_formation`
 
 **Shift triggers**: ball handler y < 20 → Lower Shift; y > 30 → Upper Shift; else Normal.
 
+> **D22 override:** the **PF/C rows above no longer drive their in-loop placement** —
+> the PF and C now follow the ball-reactive **"Defensive PF/C coverage"** model below
+> for the whole possession. The `HCT_STANDARD_*` PF/C entries remain only as the
+> initial/centroid reference. The PG/SG/SF rows are unchanged.
+
 ### Standard HC Trap
 
 - HC Traps put two defenders on the BH during a shift.
 - Each trapper sits 1–4 x-spots ahead of the BH (toward the basket); one at BH_y+2,
   the other at BH_y−2. Defenders cannot stack on the same spot (see
   `compute_hct_trap_formation` + `resolve_hct_defender_collisions`).
-- *(Superseded — D10.)* The old standalone "trap breaks → HCO at x=73 (home) / x=27
-  (away)" trigger is removed. HCO entry is now governed solely by the two §2 triggers
-  (reach the PSA, or reach the Attack Basket Area with `defenders > offenders`).
+- *(Superseded — D10, then D21.)* The old standalone "trap breaks → HCO at x=73
+  (home) / x=27 (away)" trigger is removed (D10); the PSA trap-break trigger is also
+  removed (D21). HCO entry is now governed **solely by the Attack Basket Area
+  resolution** (reach the Attack Basket Area → §7: HCO if `defenders > offenders`,
+  else shot/FB).
+
+### Defensive PF / C coverage (D22 — Behavior Change 2)
+
+The defensive **PF and C** get a dedicated, ball-reactive coverage model for the whole
+HCT possession — **replacing** their old static `HCT_STANDARD_NORMAL`-centroid anchor
+(they no longer just sit there). The **PG / SG / SF keep their existing §6 behavior**
+(trap / pressure / pass defense); this rule is **PF/C only**.
+
+**Shared conventions**
+- **Movement:** PF/C move toward their target at their **AG-based sprint rate**,
+  interrupted + position-tracking (re-evaluated each segment, D15-style).
+- **"The ball" = the ball-handler's position.** During a pass *inside* the ABA, the
+  **receiver** governs (switch on the catch).
+- **ABA** = x>64, **y 10–40** (corrected, D22).
+- **Ball band** (by the ball's y): **center 22–28**, **upper >28**, **lower <22**.
+- **ABA half** (only for counting offenders): **lower half = y 1–25**, **upper half =
+  y 26–50**.
+- Role default: **C = upper-half defender, PF = lower-half defender.**
+- **Cutoff/defend the BH** reuses the §5 interception/meet-point solver against the
+  BH's current target; if the BH is stationary (shooting) the defender closes out to
+  the BH's spot. *(Hook: once the upcoming "BH drifts to basketSpot" behavior exists,
+  the center-band PF cutoff targets that drift; until then it defends the BH's §7
+  target / current spot — confirmed.)*
+- All named spots **flip in x** (`x → 100 − x`) when the away team is on offense; the
+  y bands/halves are unchanged.
+- Reference spots: `key (64,25)`, `topLane (74,25)`, `midLane (80,25)`,
+  `basketSpot (87,25)`, `upper wing (73,40)`, `upper bird (85,36)`,
+  `lower wing (73,10)`, `lower bird (85,15)`, key↔topLane midpoint `(69,25)`.
+
+**A) Ball IS in the ABA**
+1. **Center band (ball y 22–28):** C → **basketSpot**; PF → **defend the BH** (cutoff
+   solver toward his target; basketSpot-drift cutoff once that behavior lands).
+2. **Upper band (ball y >28):** C → **defend the BH** (cutoff solver); PF → **midLane**.
+3. **Lower band (ball y <22):** PF → **defend the BH** (cutoff solver); C → **midLane**.
+
+**B) Ball is NOT in the ABA** (anywhere else, incl. the backcourt)
+1. **Center band (ball y 22–28):** PF → **key↔topLane midpoint (69,25)**; C → **midLane**.
+2. **Upper band (ball y >28):**
+   - PF → **topLane**.
+   - C → **upper wing** **if no offender is in the ABA's upper half** (offenders with
+     y ≥ 26 and inside the ABA).
+   - **Else** (≥1 such offender):
+     a. Pick the **upper-half ABA offender closest to the basket**.
+     b. If that offender's **x > upper bird x (85)** (home) / **x < 15** (away) → C
+        sits on the straight **BH→offender** line at the point **60% from the BH /
+        40% from the offender** (deny the entry pass).
+     c. Else (offender x ≤ 85 home / ≥ 15 away) → C sits at **upper bird**.
+3. **Lower band (ball y <22):** mirror of (2) with **PF/C roles swapped** and
+   **upper→lower** spots:
+   - C → **topLane**.
+   - PF → **lower wing** if no offender is in the ABA's lower half (y ≤ 25, inside ABA).
+   - Else: pick the lower-half ABA offender closest to the basket; if its x > lower
+     bird x (85 home / <15 away) → PF on the BH→offender line at 60%-from-BH; else →
+     PF at **lower bird**.
+
+> **Sequencing note:** today the ABA resolves in a single beat (the BH's §7
+> shot/HCO fires the moment he enters), so the "Ball IS in the ABA" PF/C rules mostly
+> inform **shot-contest positioning** (the C at basketSpot naturally becomes the rim
+> shot-defender). They become fully load-bearing once the planned interactive ABA
+> (BH drift / multi-beat finish) lands.
 
 ### Pass Movements
 
@@ -500,7 +645,7 @@ While the pass is animating:
 ## §7 — Goal Achievement (Attack Basket Area)
 
 Triggered when the offense reaches the **Attack Basket Area** (§2: x 64→basket,
-y 10–30). They will either attempt a shot or transition to HCO.
+y 10–40). They will either attempt a shot or transition to HCO.
 
 - **Defender count** = # of defenders within the Attack Basket Area; **Offender
   count** = # of offenders within the Attack Basket Area.
@@ -511,9 +656,10 @@ y 10–30). They will either attempt a shot or transition to HCO.
 
 ### HCO transition branch — execution (reuse existing HCO entry logic)
 
-All HCT→HCO transitions (both §2 triggers, and the broken-HCT exit) use the
-**existing HCO entry primitives** rather than a bespoke choreography. The prior
-"back up to deep key + pass to step-0 BH" sequence is removed.
+All HCT→HCO transitions (the Attack Basket Area resolution, and the broken-HCT exit
+that funnels into it — D21: the PSA no longer triggers HCO) use the **existing HCO
+entry primitives** rather than a bespoke choreography. The prior "back up to deep key
++ pass to step-0 BH" sequence is removed.
 
 **No need to call the HCO playcall at HCT-end.** The next HCO turn resolves its own
 playcall, and its entry orchestrator derives the **real step-0 ball handler (the play
@@ -590,7 +736,7 @@ backcourt pass-to rule (different candidate pool / intent).
   two or more qualify, choose one **at random**.
 
 **Receiver's action after the catch:**
-- **If the receiver catches inside the Attack Basket Area** (x 64→basket, y 10–30) →
+- **If the receiver catches inside the Attack Basket Area** (x 64→basket, y 10–40) →
   act on the offender/defender ratio **counted within the Attack Basket Area**:
   - `defenders ≤ offenders` → **attack the basket** (fast-break scenario — same
     bridge as §7 Fast-break-from-broken-HCT, D18).
@@ -718,16 +864,18 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
   separately in `HCO_Transition_System_ToDo.md` (do not solve here).
 - **D8.** ✅ **Core built (Cut 2 / D8a) → `Dynamic_HCT_D8_Scoping.md`.** Attribute-driven foul / steal / turnover emergent outcomes: `STEAL`, `DEAD BALL`, and `O_FOUL` in the defense-wins region; `D_FOUL` (reach-in) in the offense-wins region. Implemented in `_resolve_moment` + the loop's `_apply_moment_outcome`, wired through the wrapper (F / STL / TO stats, foul-out, bonus→FREE_THROW routing, steal→fast-break, possession flips) and the emitter (`STEAL` / `FOUL` turn-stops). Hold's defender-reaches path now shares the same contest engine. Aggression (`AGG_MULT`) raises event/steal/foul rates; offense `fight` symmetrically suppresses defense-wins events. **Deferred to D8b:** mid-flight interception (D11), over-and-back detection (D20), and final coefficient calibration.
 - **D9.** ✅ **Built (Cut 2)** — shot-clock (≤0) and 10-second (≤20 & not past half court) terminals checked each loop iteration; engine tags `turnover_type` ("SHOT_CLOCK"/"TEN_SECOND"), wrapper carries it onto the DEAD BALL turnover (possession flips → SIDE_INBOUND), FE announces "Shot Clock Violation!" / "10-Second Violation!".
-- **D10.** ✅ Resolved — standalone x=73/x=27 trap-break HCO trigger removed; HCO entry now governed solely by the two §2 triggers (PSA, or Attack Basket Area with defenders>offenders).
+- **D10.** ✅ Resolved — standalone x=73/x=27 trap-break HCO trigger removed; superseded by D21 (HCO entry now via the Attack Basket Area resolution only).
+- **D21.** ✅ **Built (Behavior Change 1).** PSA demoted to a target area only — no longer a trap breaker. The **Attack Basket Area is the sole trap-break zone**, keeping the existing §7 FB/HCO resolution; the "reach PSA → HCO (100%)" zone-precedence trigger is removed (`_in_primary_safe_area` deleted). The broken-HCT open-floor attack is now a **cutoff race** (`_do_broken_hct_cutoff` + `_cutoff_meet_point`): BH drives to topLane (74,25); the **closest defender** solves an interception/meet-point geometry (BH drive pace vs defender AG `standard` rate); **no angle** → reach topLane → §7 FB/HCO by ABA count; **angle** → both collide at the meet point and resolve via D8 `_resolve_moment(exclude_steal=True)` (normal progression / O_FOUL charge / D_FOUL block / DEAD BALL). A normal-progression win makes the BH **dribble-dead** (`dribble_alive=False` → pass/hold-only reads in `_read_decision`, no drive in `_choose_shot_attempt`, no broken-HCT drive; resets to True on any pass-transfer). During the cutoff action only the BH + cutoff defender move; the other 8 **hold position** (test cut). **Open item:** the §2 deep-corner watch item.
+- **D22.** ✅ **Built (Behavior Change 2).** (a) **ABA y-band corrected** to **10–40** (`ATTACK_BASKET_Y_MAX = 40`; lower wing → upper wing y; was erroneously 10–30). (b) **Defensive PF/C ball-reactive coverage** (`_pf_c_targets` / `_pfc_help_denial`, wired through `_defense_targets` → `_move_defense` / `_position_defense`) replaces their static NORMAL-centroid anchor for the whole possession (PG/SG/SF unchanged): ball-in-ABA → on-ball close-out + basketSpot/midLane anchor by band; ball-not-in-ABA → topLane / midLane / key-topLane-midpoint anchors plus a wing/bird/pass-denial help rule keyed to the closest deep ABA offender (tie-break → higher x). PF/C move at **AG sprint**, re-evaluated each beat. The in-ABA "defend the BH" close-out currently converges between BH and basket; the §5 interception solver hooks in once the interactive-ABA "BH drift to basketSpot" behavior is defined (forward dep, not yet built).
 - **D11.** Pass interceptions mid-flight (stolen pass).
 - **D12.** Per-tick energy decay vs. once-per-turn.
 - **D13.** Determinism / seeded RNG for replays.
 - **D14.** Distant sim path: "decisions only, no movement" short-circuit for franchise CPU sim.
-- **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own `standard` AG rate, **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance**, **hold**, and **broken-HCT drive** segments. Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Initial **converge** and the **pass-defense formation** still snap by design (initial engagement / D19 set-and-persist).
-- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / broken-HCT drive / pass flight / reception), excluding the BH and any mid-catch receiver. Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
+- **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own AG rate (backcourt `standard`; **PF/C `sprint`**, D22), **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance** and **hold** segments (the D21 cutoff moves only the cutoff defender). Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Initial **converge** and the **pass-defense formation** still snap by design (initial engagement / D19 set-and-persist).
+- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / pass flight / reception), excluding the BH and any mid-catch receiver. The D21 broken-HCT cutoff is the exception — the off-ball 8 **hold position** during it (test cut). Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
 - **D16.** ✅ **In-scope portion built (Cut 2).** Bookkeeping parity vs. the skeleton path for the outcomes the dynamic loop actually produces. Already present: `["used"]` (shared pre-branch), `_record_hct_stats` (HCT_A/_S + HCT_A_D/_S_D) on HCO / DEAD BALL / all three shot types, `TO` + `["success"]` on the violation/forced turnovers, and full box score on dynamic shots (`FGA`/`FGM`/`PTS` via `apply_scoring`, defensive-foul `F`+FTs, rebound stats). Added: the **defensive-success scouting bump** (`def_team.scouting_data["defense"]["HCT"]["success"] += 1`) on a clean dynamic-shot stop (miss, no shooting foul) in both shot resolvers, matching the skeleton SHOT-miss path. **Deferred to D8:** loop-level `O_FOUL`/`D_FOUL` (`F`, `team_fouls`, foul-out, bonus→FREE_THROW) and `STEAL` (`STL`, `last_stealer`, steal→fast-break) stats — the dynamic loop doesn't emit those outcomes yet, so their parity is folded into D8.
 - **D17.** ✅ Resolved — read thresholds: §4 loop reads attack>200 / pass>120; §5 broken-HCT reads attack>175 / pass>110 (intentional rescale — open floor invites attack); §7 goal-achievement read now >200 (was 190; optimal-vs-random gate, a different decision type than the §4/§5 action gates).
-- **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via `_psa_is_behind`; emitter appends the drive + `_build_post_shot_sub_steps`. ✅ Now reachable in normal play: D15's interrupted defender movement lets a quicker BH out-run the PG so `moment == "none"` can occur.
+- **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via the **cutoff race** (`_do_broken_hct_cutoff`; a clean arrival with a numbers edge seeds the FB, D21); emitter appends the drive + `_build_post_shot_sub_steps`. ✅ Now reachable in normal play: D15's interrupted defender movement lets a quicker BH out-run the PG so `moment == "none"` can occur.
 - **D19.** Pass-movement defender-target persistence: how defender pass-defense targets carry across loop iterations so they don't re-pose / thrash each tick. Cut-2 detail; not a blocker.
 
 ### Answered
@@ -737,7 +885,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 3. **Offensive movement before x=64** — BH advances at challenged-open-floor pace (16 units/sec) toward (44, target_y in 21–29). Other 4 offenders move toward pos1–4 ranges (geometric alias map). ✓
 4. **Defense behavior** — defenders target zone-Normal centroids in step 1 (defensive PG override = exact center court). Trap engages at converge via PG-defender. ✓
 5. **End conditions (first cut)** — DEAD BALL → SIP; HCO → HCO turn. Other end conditions deferred. ✓
-6. **x=73 vs x=64** — ✅ resolved: x=73 trap-break trigger removed (D10); x=64 belongs to the PSA; HCO entry = the two §2 triggers only. ✓
+6. **x=73 vs x=64** — ✅ resolved: x=73 trap-break trigger removed (D10); x=64 belongs to the PSA; HCO entry = the Attack Basket Area resolution only (D21 — PSA no longer a trigger). ✓
 7. **Foul / steal integration** — DEAD BALL is emergent from the contested score formula. Other outcomes deferred. ✓
 8. **Read frequency** — at instigation points only for first cut; continuous (each segment boundary) is the target (§5). ✓
 9. **Defender count == 0 override** — deferred (post-first-cut). ✓

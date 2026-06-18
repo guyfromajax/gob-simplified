@@ -4,6 +4,7 @@ import copy
 import time
 import json
 from typing import TYPE_CHECKING
+from BackEnd.constants.momentum import MO_STEAL_DELTA
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
     get_name_safe, 
@@ -2504,6 +2505,10 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
 
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
+        # Momentum: stealer +, victim −.
+        defender.add_momentum(MO_STEAL_DELTA)
+        if ball_handler:
+            ball_handler.add_momentum(-MO_STEAL_DELTA)
         text = f"{stealer_name} jumps the pass"
         # Stealing team = def_team; single roll uses their aggression only.
         p_steal = fast_break_probability_from_slider(
@@ -4537,6 +4542,13 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     shot_result["dDestinations"] = d_destinations
     shot_result["skeleton"] = skeleton
     shot_result["final_turn"] = True
+    # Player Momentum: flag a made Final Shot so the next break reset adds the
+    # Final-Shot bonus on top of the reset (Player_Momentum_System.md).
+    if shot_result.get("result_type") == "MAKE":
+        _fs_shooter = roles.get("shooter") if isinstance(roles, dict) else None
+        _fs_id = getattr(_fs_shooter, "player_id", None)
+        if _fs_id is not None:
+            game_state["mo_final_shot_maker_id"] = _fs_id
     shot_result["current_turn"] = shot_result.get("current_turn", "HCO")
     shot_result["offense_team_id"] = off_team.team_id
     return shot_result

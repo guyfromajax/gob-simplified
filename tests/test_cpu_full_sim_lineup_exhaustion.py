@@ -1,6 +1,7 @@
 import pytest
 
 import BackEnd.main as main
+from BackEnd.utils import db_utils
 from BackEnd.engine.phase_resolution import check_and_handle_foul_out
 from BackEnd.models.player import Player
 from BackEnd.models.team_manager import TeamManager
@@ -69,6 +70,26 @@ def test_cpu_full_sim_randomly_readmits_fouled_out_player(monkeypatch):
     assert all(team.lineup.get(pos) is not None for pos in main.POSITION_LIST)
     assert team.lineup["SF"] is selected
     assert team.lineup["SF"].get_stat("F", "game") == 5
+    assert game_state["emergency_fouled_out_lineup_player_ids"] == [
+        selected.player_id
+    ]
+
+
+def test_build_lineup_from_mongo_readmits_fouled_out_player_when_enabled(monkeypatch):
+    team, fouled_out = _exhausted_team()
+    selected = fouled_out[-1]
+    monkeypatch.setattr(db_utils.random, "sample", lambda population, count: [selected])
+    game_state = {
+        "quarter": 4,
+        "time_remaining": 46,
+        "allow_fouled_out_lineup_reentry": True,
+    }
+
+    lineup = db_utils.build_lineup_from_mongo(team, game_state)
+
+    assert len(lineup) == 5
+    assert selected in lineup.values()
+    assert selected.get_stat("F", "game") == 5
     assert game_state["emergency_fouled_out_lineup_player_ids"] == [
         selected.player_id
     ]

@@ -7,6 +7,7 @@ Full-page loader shown on **initial navigation** to key gameplay and command sur
 - **Overlay:** Dark, near-opaque full-viewport layer (`#page-load-overlay`, z-index 999999).
 - **When:** Shown as early as possible on load; removed only after the page's primary data fetch and UI bind complete.
 - **In-page navigation:** Switching tabs on FCC does **not** re-show the overlay (no full document load).
+- **FCC cache rule:** FCC may restore `sessionStorage` shell data during init, but that render stays behind the overlay. The overlay is hidden only after authoritative `/franchise/command-center/data` has returned and current top-level FCC state has been applied, preventing stale cached content from flashing as current.
 
 ## Two variants
 

@@ -4518,6 +4518,13 @@ try:
                 getattr(gm, "quarter", 1) >= 4
                 and home_score != away_score
             )
+            if is_final:
+                # End of game: zero all players' MO (Player_Momentum_System.md).
+                try:
+                    from BackEnd.utils.player_momentum import reset_all_player_momentum
+                    reset_all_player_momentum(gm)
+                except Exception as e:
+                    logging.error(f"⚠️ EOG: Player momentum reset failed: {e}")
             next_quarter = gm.quarter if is_final or gm.quarter > 4 else gm.quarter + 1
             logging.warning(
                 "🧭 [SIM TURN EARLY RETURN TRACE] reason=quarter_complete game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s",
@@ -4908,7 +4915,14 @@ try:
             )
             if is_final:
                 gm.print_game_statistics()
-            
+                # End of game: reset every player's MO to 0 before the save so no
+                # in-game momentum persists past the game (Player_Momentum_System.md).
+                try:
+                    from BackEnd.utils.player_momentum import reset_all_player_momentum
+                    reset_all_player_momentum(gm)
+                except Exception as e:
+                    logging.error(f"⚠️ EOG: Player momentum reset failed: {e}")
+
             # ✅ PERFORMANCE: Save game state every 25 turns (reduced from 10 for better performance)
             # Still save on quarter complete to ensure quarter number is persisted
             # 25 turns is still sufficient for crash recovery (saves ~13 times per game vs 32)

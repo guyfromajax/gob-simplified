@@ -414,7 +414,17 @@ def simulate_quarter(
         except Exception as e:
             logging.error(f"⚠️ QUARTER BREAK: Failed to rebuild computer team lineup: {e}")
             # Don't fail quarter start if lineup rebuild fails - use existing lineup
-    
+
+    # ✅ Player Momentum reset at quarter breaks (Q2+; Q3 start = halftime).
+    # Idempotent per quarter so a mid-quarter timeout resume can't re-trigger it.
+    try:
+        if gm.quarter >= 2 and gm.game_state.get("mo_last_reset_quarter") != gm.quarter:
+            from BackEnd.utils.player_momentum import apply_player_momentum_resets
+            apply_player_momentum_resets(gm, is_halftime=(gm.quarter == 3))
+            gm.game_state["mo_last_reset_quarter"] = gm.quarter
+    except Exception as e:
+        logging.error(f"⚠️ QUARTER BREAK: Player momentum reset failed: {e}")
+
     # Final check - log final lineup state
     logging.info(f"🏀 simulate_quarter: FINAL home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
     

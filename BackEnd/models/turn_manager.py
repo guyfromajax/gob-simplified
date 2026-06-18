@@ -1819,7 +1819,7 @@ class TurnManager:
                 prev = pre_stats.get(player.player_id, {})
                 diff = {}
                 for stat in player.stats["game"]:
-                    if stat == "REB" or stat == "Outlet_Score_List":
+                    if stat == "REB" or stat == "Outlet_Score_List" or stat == "Shot_Result_List":
                         continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
                     current_val = player.stats["game"].get(stat, 0)
                     prev_val = prev.get(stat, 0)
@@ -3931,7 +3931,7 @@ class TurnManager:
                     prev = pre_stats.get(player.player_id, {})
                     diff = {}
                     for stat in player.stats["game"]:
-                        if stat == "REB" or stat == "Outlet_Score_List":
+                        if stat == "REB" or stat == "Outlet_Score_List" or stat == "Shot_Result_List":
                             continue
                         current_val = player.stats["game"].get(stat, 0)
                         prev_val = prev.get(stat, 0)
@@ -4113,7 +4113,7 @@ class TurnManager:
                         prev = pre_stats.get(player.player_id, {})
                         diff = {}
                         for stat in player.stats["game"]:
-                            if stat == "REB" or stat == "Outlet_Score_List":
+                            if stat == "REB" or stat == "Outlet_Score_List" or stat == "Shot_Result_List":
                                 continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
                             current_val = player.stats["game"].get(stat, 0)
                             prev_val = prev.get(stat, 0)
@@ -4311,7 +4311,7 @@ class TurnManager:
                         prev = pre_stats.get(player.player_id, {})
                         diff = {}
                         for stat in player.stats["game"]:
-                            if stat == "REB" or stat == "Outlet_Score_List":
+                            if stat == "REB" or stat == "Outlet_Score_List" or stat == "Shot_Result_List":
                                 continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
                             current_val = player.stats["game"].get(stat, 0)
                             prev_val = prev.get(stat, 0)
@@ -4389,7 +4389,7 @@ class TurnManager:
                     prev = pre_stats.get(player.player_id, {})
                     diff = {}
                     for stat in player.stats["game"]:
-                        if stat == "REB" or stat == "Outlet_Score_List":
+                        if stat == "REB" or stat == "Outlet_Score_List" or stat == "Shot_Result_List":
                             continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
                         current_val = player.stats["game"].get(stat, 0)
                         prev_val = prev.get(stat, 0)

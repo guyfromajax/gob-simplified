@@ -2990,7 +2990,9 @@ async function init() {
     if (userScheduleDataCache) {
       void renderHomeTab();
     }
-    hideFccLoadingOverlay();
+    // Keep the full-page overlay visible until authoritative command-center
+    // data returns. Cached rendering is only a behind-the-overlay warm paint;
+    // showing it directly causes a stale-data flash on FCC entry.
   }
   const topDataStartTime = performance.now();
   const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);

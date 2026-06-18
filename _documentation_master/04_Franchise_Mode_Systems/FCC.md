@@ -884,6 +884,37 @@ Confirmation modal shown before calling:
 
 ---
 
+## FCC Page Load
+
+FCC uses a full-screen `#page-load-overlay` during initial document load. The
+overlay is part of the page HTML and is visible before the JavaScript controller
+finishes fetching live data.
+
+The frontend may restore cached FCC data from `sessionStorage` during init. This
+cached render is a warm paint only:
+
+- it can populate the shell and cards behind the overlay
+- it must not be shown as current data before the authoritative load completes
+- `#page-load-overlay` remains visible until `/franchise/command-center/data`
+  has returned and the current top shell / CTA / home basics have rendered
+
+This avoids the stale-data flash where users briefly saw previous-week or
+previous-state FCC content for 1-3 seconds while fresh data loaded.
+
+After authoritative top data returns:
+
+1. FCC compares cached week to fresh week.
+2. Week-sensitive home caches are invalidated if the week changed.
+3. fresh top data becomes `commandCenterTopDataCache`.
+4. shell buttons, Inbox, recruits, modal gates, roster/standings, and home-card
+   dependencies continue hydrating.
+5. the overlay is hidden by the existing final page-load cleanup.
+
+In-page tab switches do not show the full-page overlay. Individual tabs may show
+local loading states while their lazy data fetches resolve.
+
+---
+
 ## Data Wiring
 
 ## Core frontend state
@@ -911,7 +942,7 @@ Key FCC state variables in the controller:
 
 FCC persists a shell-level session cache in `sessionStorage` under:
 
-- `fcc-shell:{franchiseId}`
+- `fcc-shell:{franchiseId}:{teamId|unknown}`
 
 Cached payload includes:
 
@@ -924,6 +955,9 @@ Cached payload includes:
 - opponent rosters
 
 Week-sensitive home caches are invalidated when the cached week differs from the freshly loaded week.
+
+The session cache is not authoritative. It is used for behind-the-overlay warm
+rendering and fast tab rehydration, then refreshed from live endpoints.
 
 ---
 

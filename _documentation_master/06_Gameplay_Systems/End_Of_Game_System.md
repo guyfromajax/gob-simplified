@@ -170,6 +170,10 @@ Team attributes will adjust at the end of game based on the notes below. Note th
 
 The End of Game System handles game completion, displays final scores, and provides navigation to the Box Score page and appropriate Command Center (Tournament, Franchise, or Mode Select for Single Game).
 
+### Player Momentum Reset (June 2026)
+
+When a game is detected final, **every player's MO (momentum) is reset to 0** on both teams (active + bench) before the final save, so no in-game momentum persists past the game. Fires at the live `is_final` detection in `BackEnd/api/api.py` (both the quarter-complete turn path and the already-over early-return). Code: `reset_all_player_momentum()` in `BackEnd/utils/player_momentum.py`. Distant-sim (CPU) games never change MO, so they need no reset. See `projects/Player_Momentum_System.md` for the full momentum system.
+
 ### Game Completion Flow
 
 **Trigger:**

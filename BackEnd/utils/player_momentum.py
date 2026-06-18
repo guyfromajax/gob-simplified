@@ -1,0 +1,126 @@
+"""Player Momentum (MO) break resets.
+
+Applied at quarter breaks, timeouts, and halftime — NOT at foul-outs.
+See _documentation_master/projects/Player_Momentum_System.md. All tunables
+live in BackEnd/constants/momentum.py.
+"""
+import random
+
+from BackEnd.constants.momentum import (
+    MO_MIN,
+    MO_MAX,
+    MO_RESET_REDUCTION_MIN,
+    MO_RESET_REDUCTION_MAX,
+    MO_HALFTIME_HIGH_RESET,
+    MO_HALFTIME_LOW_RESET,
+    MO_FINAL_SHOT_BONUS,
+    MO_SHOT_ROLL_BASE,
+    MO_SHOT_ROLL_POSITIVE,
+    MO_SHOT_ROLL_NEGATIVE,
+    MO_SHOT_IMPACT_PCT_PER_LEVEL,
+    MO_SHOTCLOCK_BASE_PCT,
+    MO_SHOTCLOCK_OFFENSE_DELTA,
+    MO_SHOTCLOCK_DEFENSE_DELTA,
+    MO_TEAM_MIN,
+    MO_TEAM_MAX,
+)
+
+
+def mo_shot_roll(attributes) -> int:
+    """MO-aware replacement for the base ``random.randint(1, 6)`` shot roll
+    (shooter base roll + OREB putback roll). With MO > 0 there is a
+    ``|MO| × MO_SHOT_IMPACT_PCT_PER_LEVEL`` % chance to roll the favorable
+    range; with MO < 0 the same chance to roll the unfavorable range;
+    otherwise the standard base roll. See Player_Momentum_System.md."""
+    mo = int((attributes or {}).get("MO", 0) or 0)
+    if mo > 0 and random.randint(1, 100) <= min(100, mo * MO_SHOT_IMPACT_PCT_PER_LEVEL):
+        return random.randint(*MO_SHOT_ROLL_POSITIVE)
+    if mo < 0 and random.randint(1, 100) <= min(100, -mo * MO_SHOT_IMPACT_PCT_PER_LEVEL):
+        return random.randint(*MO_SHOT_ROLL_NEGATIVE)
+    return random.randint(*MO_SHOT_ROLL_BASE)
+
+
+def team_momentum(team) -> int:
+    """Derived Team Momentum = sum of the team's 5 active (lineup) players'
+    MO, clamped to [MO_TEAM_MIN, MO_TEAM_MAX]. Computed on demand — there is
+    no stored team-momentum value. See Player_Momentum_System.md."""
+    lineup = getattr(team, "lineup", {}) or {}
+    total = sum(
+        int(p.attributes.get("MO", 0) or 0) for p in lineup.values() if p is not None
+    )
+    return max(MO_TEAM_MIN, min(MO_TEAM_MAX, total))
+
+
+def apply_shot_clock_violation_momentum(offense_team, defense_team) -> None:
+    """On a shot-clock violation: each active offensive player has a
+    ``clamp(BASE − offenseTeamMO, 0, 100)`` % chance of −1 MO; each active
+    defensive player a ``clamp(BASE + defenseTeamMO, 0, 100)`` % chance of
+    +1 MO. Team MO is snapshotted before any change. See
+    Player_Momentum_System.md. Pass the violating offense + its opponent."""
+    if offense_team is None or defense_team is None:
+        return
+    off_mo = team_momentum(offense_team)
+    def_mo = team_momentum(defense_team)
+    off_pct = max(0, min(100, MO_SHOTCLOCK_BASE_PCT - off_mo))
+    def_pct = max(0, min(100, MO_SHOTCLOCK_BASE_PCT + def_mo))
+    for p in (getattr(offense_team, "lineup", {}) or {}).values():
+        if p is not None and random.randint(1, 100) <= off_pct:
+            p.add_momentum(MO_SHOTCLOCK_OFFENSE_DELTA)
+    for p in (getattr(defense_team, "lineup", {}) or {}).values():
+        if p is not None and random.randint(1, 100) <= def_pct:
+            p.add_momentum(MO_SHOTCLOCK_DEFENSE_DELTA)
+
+
+def _reset_value(mo: int, is_active: bool, is_halftime: bool) -> int:
+    if is_halftime:
+        # Everyone → 0 except the rails (applies to active and bench alike).
+        if mo >= MO_MAX:
+            return random.randint(*MO_HALFTIME_HIGH_RESET)
+        if mo <= MO_MIN:
+            return random.randint(*MO_HALFTIME_LOW_RESET)
+        return 0
+    # Normal break (timeout / Q1→Q2 / Q3→Q4 / OT): bench → 0; active decay
+    # toward 0 by randint(MIN,MAX), never crossing 0.
+    if not is_active:
+        return 0
+    if mo > 0:
+        return max(0, mo - random.randint(MO_RESET_REDUCTION_MIN, MO_RESET_REDUCTION_MAX))
+    if mo < 0:
+        return min(0, mo + random.randint(MO_RESET_REDUCTION_MIN, MO_RESET_REDUCTION_MAX))
+    return 0
+
+
+def reset_all_player_momentum(game) -> None:
+    """End of game: zero every player's MO on both teams (so no in-game momentum
+    leaks past the game). See Player_Momentum_System.md / End_Of_Game_System.md."""
+    for team in (game.home_team, game.away_team):
+        for player in team.get_all_players():
+            player.attributes["MO"] = 0
+    gs = getattr(game, "game_state", None)
+    if isinstance(gs, dict):
+        gs["mo_final_shot_maker_id"] = None
+
+
+def apply_player_momentum_resets(game, is_halftime: bool = False) -> None:
+    """Reset every player's MO for a break. Active = the team's 5 lineup
+    players; everyone else is bench. Then apply the Final-Shot bonus to the
+    player flagged as having made the quarter's final shot (if any)."""
+    for team in (game.home_team, game.away_team):
+        lineup = getattr(team, "lineup", {}) or {}
+        active_ids = {
+            getattr(p, "player_id", None) for p in lineup.values() if p is not None
+        }
+        for player in team.get_all_players():
+            mo = int(player.attributes.get("MO", 0) or 0)
+            is_active = getattr(player, "player_id", None) in active_ids
+            player.attributes["MO"] = _reset_value(mo, is_active, is_halftime)
+
+    # Final-Shot bonus: applied AFTER the reset (Player_Momentum_System.md).
+    maker_id = game.game_state.get("mo_final_shot_maker_id")
+    if maker_id:
+        for team in (game.home_team, game.away_team):
+            for player in team.get_all_players():
+                if getattr(player, "player_id", None) == maker_id:
+                    player.add_momentum(MO_FINAL_SHOT_BONUS)
+                    break
+        game.game_state["mo_final_shot_maker_id"] = None

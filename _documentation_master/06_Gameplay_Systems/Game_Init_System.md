@@ -200,6 +200,17 @@ Independent of mode (single / tournament / franchise), every game begins by load
 
 **Not on the game doc:** `weight`, `year`, `position_ratings`, `anchor_*` attributes, `metadata`. These live on the in-memory `Player` only. To expose any of them to the frontend or persist them, they need to be added to the `players.append({…})` blocks in `summarize_game_state`.
 
+### Per-game stat arrays in `stats["game"]` (list-typed)
+
+Most `stats["game"]` entries are numeric, but a few are **lists** scoped to a single game (they ride `stats["game"]`, so they persist into the game doc and restore on timeout resume, and are wiped at game init — never aggregated to season/career):
+
+| Key | Meaning | Init / reset | Written | Read |
+|---|---|---|---|---|
+| `Outlet_Score_List` | fast-break outlet scores | `player.py` `_init_stats` / `reset_stats` | `phase_resolution.py` | averaged into `Outlet_Score` |
+| `Shot_Result_List` | per-shot outcomes: `True`=made FG/putback, `False`=miss/block; **shooting-foul misses & free throws excluded** | `player.py` `_init_stats` / `reset_stats` (game level only) | `Player.record_shot_result()` from `resolve_shot` (guard `made or not d_foul`) + the putback branch in `shared.py` | Player Momentum System (see `projects/Player_Momentum_System.md`) |
+
+**Gotcha when adding a list-typed game stat:** code that iterates the *actual* `stats["game"]` keys and does numeric math must skip it, or it crashes on list ops. The two such iterators are the per-turn delta loops (`turn_manager.py`, skip-list) and team aggregation (`team_manager.update_team_stats`, skips lists). Code that iterates `BOX_SCORE_KEYS` instead is safe (these keys are intentionally **not** in `BOX_SCORE_KEYS`). `record_shot_result()` is defensive (re-creates the list if a reset left it non-list).
+
 ### Frontend access path
 
 The simulate-quarter response body uses `summarize_game_state(gm, exclude_animations=False)` as its payload. Whatever lands on the per-player dict in `summarize_game_state` flows directly to `simData.players` on the frontend (which becomes `actualPlayers` in `loadPhaserPlayers`, which becomes the `player` arg destructured by `createPhaserPlayer`).
@@ -308,7 +319,7 @@ When simulation starts a **new** in-process game for franchise mode (no existing
     - if Cum Endurance O > 600: Fast Breaks gets a random roll of random.randint(1,4)
     - if cum Intelligence > 300: Aggression get a random roll of random.randint(2,4)
 
-  - if HC Trap, FC Press, Aggression, or Fast Break did not receive a roll per the above crieria, they get aour standard logic for rolls. Please verify but I belive these are random.randint(0,4) except for HC Trap and FC Press which tend to skew lower, right?
+  - if HC Trap, FC Press, Aggression, or Fast Break did not receive a roll per the above crieria, they get aour standard logic for rolls.
 
 4. Determine Defensive Strengths Scale
   - Get cum D Ability by add the AG + ID + OD of the five active players

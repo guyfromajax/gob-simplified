@@ -1,6 +1,9 @@
 import math
 import random
 import logging
+
+from BackEnd.constants.momentum import MO_AND_ONE_DELTA
+from BackEnd.utils.player_momentum import mo_shot_roll
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
@@ -818,7 +821,7 @@ def oreb_shot_attempt(player_attrs):
         player_attrs["SC"] * 0.5 +
         player_attrs["ST"] * 0.3 +
         player_attrs["CH"] * 0.2
-    ) * random.randint(1, 6)
+    ) * mo_shot_roll(player_attrs)
 
 
 def _oreb_putback_distance(a_coords, b_coords):
@@ -1070,6 +1073,11 @@ def resolve_offensive_rebound(game, rebounder):
             )
         rebounder.record_stat("FGA")
 
+        # Shot_Result_List: record make (True) / clean miss (False); skip a miss
+        # that drew a shooting foul (Player_Momentum_System.md).
+        if made or not d_foul:
+            rebounder.record_shot_result(made)
+
         # Roll the shot variant + extras for the putback (per D1 — putbacks
         # now get variant-driven rim effects). Same selector + extras helper
         # the main shot path uses, just called directly here rather than
@@ -1129,6 +1137,8 @@ def resolve_offensive_rebound(game, rebounder):
             if d_foul and foul_player:
                 from BackEnd.engine.phase_resolution import check_and_handle_foul_out
 
+                # And-one momentum: made putback that drew a shooting foul.
+                rebounder.add_momentum(MO_AND_ONE_DELTA)
                 foul_player.record_stat("F")
                 def_team.team_fouls += 1
                 game.game_state["foul_team"] = "DEFENSE"

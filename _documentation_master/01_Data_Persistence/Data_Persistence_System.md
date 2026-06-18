@@ -545,6 +545,7 @@ Game Plan (`strategy_settings`) and Playbook (`playbook_settings`) settings use 
 - **User's team–scoped data** (Team tab, roster, Training link, Game Plan link): use **`team_id`** (the user's team ObjectId string, e.g. `userTeamId`) as the canonical key. Do **not** wire by team name.
 - **Team tab:** `/franchise/team-data?franchise_id=...&team_id=...`; roster for top-scorer lookup: `/roster/{team_id}?franchise_id=...`. Both use the same `team_id` from URL or command-center/data.
 - **Backend:** `/roster/{team_identifier}` and `/franchise/team-data` accept `team_id` (path or query); roster supports ObjectId string in path. This keeps FCC aligned with FTD keying by `(franchise_id, team_id)`.
+- **Page-load cache display:** FCC can restore `sessionStorage` shell data for a warm render, but the full-page `#page-load-overlay` remains visible until authoritative `/franchise/command-center/data` returns. Cached FCC data is not presented as current data during initial load.
 
 **FCC Play Next Game → set-lineup URL ("your team" resolution):**
 - Same approach as tournament: **do not** rely on `localStorage` `franchise_user_team` for building the set-lineup URL. Use **API-sourced** user team first, then **id-derived** fallback.
