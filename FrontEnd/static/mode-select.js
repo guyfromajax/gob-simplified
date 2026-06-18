@@ -362,15 +362,19 @@ function chRowChromeStyle(entry) {
   return '--ch-primary:' + primary + ';--ch-secondary:' + secondary;
 }
 
+function chUsernameHtml(entry) {
+  var uname = escapeHtmlMs((entry && (entry.username || entry.user_name)) || 'Coach');
+  return '<strong class="ch-username">' + uname + '</strong>' + coachArchetypeBadge(entry || {}, 18);
+}
+
 function chStandardCopyHtml(entry) {
-  var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
   var ut = escapeHtmlMs(entry.user_team_name || '?');
   var opp = escapeHtmlMs(entry.opponent_name || '?');
   var beatLost = entry.user_won ? 'beat' : 'lost to';
   var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
   var recRaw = entry.user_team_record != null && String(entry.user_team_record).trim() !== '' ? String(entry.user_team_record).trim() : '';
   var rec = recRaw ? escapeHtmlMs(recRaw) : '';
-  var userStrong = '<strong class="ch-username">' + uname + '</strong>';
+  var userStrong = chUsernameHtml(entry);
   var usc = entry.user_score;
   var osc = entry.opponent_score;
   var hasScores =
@@ -405,11 +409,10 @@ function chStandardCopyHtml(entry) {
 //   "Username (bold) has completed his onboarding game. Coaching
 //    {team} he defeated/lost to {opp} by a score of {us}-{them}."
 function chDebutCopyHtml(entry) {
-  var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
   var ut = escapeHtmlMs(entry.user_team_name || '?');
   var opp = escapeHtmlMs(entry.opponent_name || '?');
   var verb = entry.user_won ? 'defeated' : 'lost to';
-  var userStrong = '<strong class="ch-username">' + uname + '</strong>';
+  var userStrong = chUsernameHtml(entry);
   var usc = entry.user_score;
   var osc = entry.opponent_score;
   var hasScores =
@@ -436,17 +439,15 @@ function chDebutCopyHtml(entry) {
 // Archetype-evolution entry: badge sits right after the bold username (our
 // standard), then the established/evolved copy. Name resolves from the manifest.
 function chArchetypeCopyHtml(entry) {
-  var uname = escapeHtmlMs(entry.username || entry.user_name || 'Coach');
-  var userStrong = '<strong class="ch-username">' + uname + '</strong>';
-  var badge = coachArchetypeBadge(entry, 22); // reads entry.lead_archetype
+  var userStrong = chUsernameHtml(entry);
   var name = (window.GOBArchetype && window.GOBArchetype.nameFor)
     ? window.GOBArchetype.nameFor(entry.lead_archetype)
     : entry.lead_archetype;
   var nameEsc = escapeHtmlMs(name || '');
   if (entry.is_first) {
-    return userStrong + badge + ' has established his coaching archetype as ' + nameEsc + '.';
+    return userStrong + ' has established his coaching archetype as ' + nameEsc + '.';
   }
-  return userStrong + badge + ' has evolved his coaching archetype to ' + nameEsc + '.';
+  return userStrong + ' has evolved his coaching archetype to ' + nameEsc + '.';
 }
 
 function chAnnouncementHtml(entry) {
@@ -454,7 +455,7 @@ function chAnnouncementHtml(entry) {
   var raw = String(entry.announcement_line || '');
   if (raw.indexOf(u + ',') === 0) {
     var rest = raw.slice(u.length);
-    return '<strong class="ch-username">' + escapeHtmlMs(u) + '</strong>' + escapeHtmlMs(rest);
+    return chUsernameHtml(entry) + escapeHtmlMs(rest);
   }
   return escapeHtmlMs(raw);
 }

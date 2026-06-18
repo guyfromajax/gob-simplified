@@ -108,6 +108,18 @@ def lead_archetype_for_user(owner_user_id: Any) -> str:
     return str((u or {}).get("lead_archetype") or "")
 
 
+def _lead_archetype_for_display_username(display_username: str) -> str:
+    """Best-effort backfill for older stored feed rows that predate lead_archetype."""
+    username = str(display_username or "").strip()
+    if not username:
+        return ""
+    user_doc = users_collection.find_one(
+        {"username": username},
+        {"lead_archetype": 1},
+    )
+    return str((user_doc or {}).get("lead_archetype") or "")
+
+
 def record_archetype_change_if_any(
     franchise_id: ObjectId,
     owner_user_id: Any,
@@ -394,6 +406,7 @@ def _push_entries(entries: list[dict[str, Any]]) -> None:
 def _build_standard_entry(
     *,
     display_username: str,
+    lead_archetype: str,
     ut_name: str,
     opp_name: str,
     user_won: bool,
@@ -412,6 +425,7 @@ def _build_standard_entry(
         "entry_type": "standard",
         "variant": "standard_row",
         "username": display_username,
+        "lead_archetype": str(lead_archetype or ""),
         "user_team_name": ut_name,
         "opponent_name": opp_name,
         "user_won": user_won,
@@ -429,6 +443,7 @@ def _build_standard_entry(
 def _build_conference_rs_entry(
     *,
     display_username: str,
+    lead_archetype: str,
     ut_name: str,
     conference_num: int,
     announcement_line: str,
@@ -443,6 +458,7 @@ def _build_conference_rs_entry(
         "entry_type": "conference_rs_title",
         "variant": "standard_row",
         "username": display_username,
+        "lead_archetype": str(lead_archetype or ""),
         "user_team_name": ut_name,
         "conference_num": int(conference_num),
         "announcement_line": announcement_line,
@@ -467,6 +483,7 @@ def _team_colors_by_name(team_name: str) -> tuple[str, str]:
 def _build_debut_entry(
     *,
     display_username: str,
+    lead_archetype: str,
     user_team_name: str,
     opponent_name: str,
     user_won: bool,
@@ -481,6 +498,7 @@ def _build_debut_entry(
         "entry_type": "debut",
         "variant": "debut",
         "username": display_username,
+        "lead_archetype": str(lead_archetype or ""),
         "user_team_name": user_team_name,
         "opponent_name": opponent_name,
         "user_won": bool(user_won),
@@ -512,16 +530,18 @@ def push_debut_entry(
         try:
             user_doc = users_collection.find_one(
                 {"_id": ObjectId(str(owner_user_id))},
-                {"username": 1, "email": 1},
+                {"username": 1, "email": 1, "lead_archetype": 1},
             )
         except Exception:
             user_doc = None
     display_username = _display_username_for_highlight(user_doc)
+    lead_archetype = str((user_doc or {}).get("lead_archetype") or "")
 
     primary, secondary = _team_colors_by_name(user_team_name)
 
     entry = _build_debut_entry(
         display_username=display_username,
+        lead_archetype=lead_archetype,
         user_team_name=user_team_name,
         opponent_name=opponent_name,
         user_won=user_won,
@@ -559,6 +579,7 @@ def _build_archetype_entry(
 def _build_championship_entry(
     *,
     display_username: str,
+    lead_archetype: str,
     ut_name: str,
     kind: str,
     scope_label: str,
@@ -576,6 +597,7 @@ def _build_championship_entry(
         "variant": variant,
         "tournament_kind": kind,
         "username": display_username,
+        "lead_archetype": str(lead_archetype or ""),
         "user_team_name": ut_name,
         "scope_label": scope_label,
         "announcement_line": announcement_line,
@@ -604,11 +626,12 @@ def flush_community_highlight_pending_after_week(
         try:
             user_doc = users_collection.find_one(
                 {"_id": ObjectId(str(owner_id))},
-                {"username": 1, "email": 1},
+                {"username": 1, "email": 1, "lead_archetype": 1},
             )
         except Exception:
             user_doc = None
     display_username = _display_username_for_highlight(user_doc)
+    lead_archetype = str((user_doc or {}).get("lead_archetype") or "")
 
     _u_name, user_team_id_str = get_user_team_from_franchise_doc(fresh)
     if not user_team_id_str:
@@ -679,6 +702,7 @@ def flush_community_highlight_pending_after_week(
         entries.append(
             _build_championship_entry(
                 display_username=display_username,
+                lead_archetype=lead_archetype,
                 ut_name=ut_name,
                 kind=kind,
                 scope_label=scope_label,
@@ -694,6 +718,7 @@ def flush_community_highlight_pending_after_week(
         entries.append(
             _build_standard_entry(
                 display_username=display_username,
+                lead_archetype=lead_archetype,
                 ut_name=ut_name,
                 opp_name=opp_name,
                 user_won=user_won,
@@ -740,6 +765,7 @@ def flush_community_highlight_pending_after_week(
         entries.append(
             _build_conference_rs_entry(
                 display_username=display_username,
+                lead_archetype=lead_archetype,
                 ut_name=ut_name,
                 conference_num=conf_num,
                 announcement_line=rs_announce,
@@ -785,4 +811,11 @@ def list_community_highlight_entries() -> list[dict[str, Any]]:
     doc = community_highlights_collection.find_one({"_id": FEED_DOC_ID})
     if not doc:
         return []
-    return list(doc.get("entries") or [])
+    entries = list(doc.get("entries") or [])
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("lead_archetype"):
+            continue
+        lead = _lead_archetype_for_display_username(entry.get("username") or entry.get("user_name") or "")
+        if lead:
+            entry["lead_archetype"] = lead
+    return entries

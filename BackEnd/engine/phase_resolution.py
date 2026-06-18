@@ -4,7 +4,12 @@ import copy
 import time
 import json
 from typing import TYPE_CHECKING
-from BackEnd.constants.momentum import MO_STEAL_DELTA
+from BackEnd.constants.momentum import (
+    MO_STEAL_DELTA,
+    MO_FT_ALL_MISS_DELTA,
+    MO_FT_MISS_MIN_ATTEMPTS,
+    MO_SET_PLAY_DELTA,
+)
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
     get_name_safe, 
@@ -2209,6 +2214,15 @@ def resolve_free_throw_logic(game):
     game_state["shooter"] = shooter
     attrs = shooter.attributes
 
+    # Momentum: track this trip's FT attempts/makes across the per-FT calls so a
+    # player who attempts >1 FT and misses them ALL takes a flat MO penalty at
+    # trip end (Player_Momentum_System.md). Counters live in game_state so they
+    # survive a mid-trip timeout/resume; cleared when the trip concludes.
+    if not game_state.get("mo_ft_trip_active"):
+        game_state["mo_ft_trip_active"] = True
+        game_state["mo_ft_trip_attempts"] = 0
+        game_state["mo_ft_trip_makes"] = 0
+
     # FT outcome calculation
     # Formula: (FT * 0.8) + (CH * 0.2)
     ft_shot_score = (attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)
@@ -2224,6 +2238,9 @@ def resolve_free_throw_logic(game):
             ft_made_on_second_chance = True
 
     shooter.record_stat("FTA")
+    game_state["mo_ft_trip_attempts"] = game_state.get("mo_ft_trip_attempts", 0) + 1
+    if makes_shot:
+        game_state["mo_ft_trip_makes"] = game_state.get("mo_ft_trip_makes", 0) + 1
     text += f"{get_name_safe(shooter)} steps to the line... "
     possession_flips = False
 
@@ -2320,6 +2337,15 @@ def resolve_free_throw_logic(game):
 
     # If no FTs remain, determine next state
     if game_state["free_throws_remaining"] <= 0:
+        # Momentum: trip concluded — penalize a player who attempted >1 FT and
+        # missed them all (flat, once per trip). Then clear the trip counters.
+        if (game_state.get("mo_ft_trip_attempts", 0) >= MO_FT_MISS_MIN_ATTEMPTS
+                and game_state.get("mo_ft_trip_makes", 0) == 0):
+            shooter.add_momentum(MO_FT_ALL_MISS_DELTA)
+        game_state["mo_ft_trip_active"] = False
+        game_state["mo_ft_trip_attempts"] = 0
+        game_state["mo_ft_trip_makes"] = 0
+
         # Check for defensive pressure if the last FT was made
         if makes_shot:
             from BackEnd.models.turn_manager import TurnManager
@@ -5460,7 +5486,18 @@ def resolve_half_court_offense_logic(game):
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
-    
+
+    # Player Momentum: a SET PLAY that resolves as the "successful" skeleton
+    # variant routes the ball to the target_shooter by design, so a make here is
+    # the target_shooter scoring on the set play → +MO_SET_PLAY_DELTA to the
+    # shooter (Player_Momentum_System.md). Motion plays have no target shooter.
+    if (not is_motion_play
+            and variant_result == "successful"
+            and shot_result.get("result_type") == "MAKE"):
+        _sp_shooter = roles.get("shooter")
+        if _sp_shooter is not None:
+            _sp_shooter.add_momentum(MO_SET_PLAY_DELTA)
+
     # Shot-at-1 path: set time_elapsed so shot clock ends at 1 (Shot_Clock_System.md)
     if "_shot_at_one_second_time_elapsed" in game_state:
         shot_result["time_elapsed"] = game_state.pop("_shot_at_one_second_time_elapsed")

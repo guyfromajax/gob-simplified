@@ -21,10 +21,13 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_AND_ONE_DELTA` | 1 | Made shot + shooting foul → shooter + |
 | `MO_CHARGE_DELTA` | 1 | Charge: drawer +, charging player − |
 | `MO_OREB_DELTA` | 1 | + on qualifying OREB |
-| `MO_OREB_THRESHOLD` | 5 | OREB number that starts awarding (5th and each after) |
+| `MO_OREB_THRESHOLD` | 3 | OREB number that starts awarding (3rd and each after) |
 | `MO_DUNK_DELTA` | 1 | **Deferred** — dunks not wired yet (hook only) |
 | `MO_CONSECUTIVE_THRESHOLD` | 3 | Nth consecutive make/miss that starts awarding |
 | `MO_CONSECUTIVE_DELTA` | 1 | + per consecutive make / − per consecutive miss |
+| `MO_FT_MISS_MIN_ATTEMPTS` | 2 | only FT trips with >1 attempt qualify for the penalty |
+| `MO_FT_ALL_MISS_DELTA` | −1 | flat, once per trip, when ALL attempted FTs miss |
+| `MO_SET_PLAY_DELTA` | 1 | target_shooter makes the shot in a successful set-play skeleton |
 | `MO_SHOT_ROLL_BASE` | (1, 6) | Default shot roll |
 | `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
 | `MO_SHOT_ROLL_NEGATIVE` | (1, 5) | Unfavorable roll when MO < 0 and chance hits |
@@ -32,7 +35,8 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
 | `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
 | `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
-| `MO_RESET_REDUCTION_MIN` / `_MAX` | 4 / 7 | Break decay toward 0 for active players (randint range) |
+| `MO_RESET_REDUCTION_MIN` / `_MAX` | 4 / 7 | Quarter + OT break decay toward 0 for active players (randint range) |
+| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 2 / 4 | Timeout decay toward 0 for active players (randint range) |
 | `MO_HALFTIME_HIGH_RESET` | (1, 3) | Halftime: MO == +MO_MAX → randint(1, 3) |
 | `MO_HALFTIME_LOW_RESET` | (−3, −1) | Halftime: MO == −MO_MAX → randint(−3, −1) |
 | `MO_FINAL_SHOT_BONUS` | 1 | + after reset if player made the quarter's Final Shot |
@@ -52,8 +56,10 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **Steal** | stealer **+1**, victim **−1** | `phase_resolution.py` (turnover `STEAL`) |
 | **Charge** | charge-drawer **+1**, charging player **−1** | `shot_manager.py` (charge return) |
 | **And-1** (made shot + shooting foul) | shooter **+1** | `shot_manager.py` (main + block-recon), `shared.py` (putback) |
-| **5th+ OREB** | rebounder **+1** on `OREB` ≥ `MO_OREB_THRESHOLD` | `player.py` `record_stat` |
+| **3rd+ OREB** | rebounder **+1** on `OREB` ≥ `MO_OREB_THRESHOLD` | `player.py` `record_stat` |
 | **Consecutive shots** | see below | `player.py` `record_shot_result` |
+| **Free Throws (all missed)** | shooter **−1** if he attempts **>1** FT in one trip and **misses all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
+| **Set Play make** | the **target_shooter** **+1** when he makes the shot in a **successful** set-play skeleton | `phase_resolution.py` `resolve_half_court_offense_logic` |
 | **Dunk** | **deferred** (constant + intent only) | — |
 
 Doubly-good/bad cases are intentional: a block is **−1 MO + a `False`** on the shooter's streak list; an and-1 is **+1 MO + a `True`** on the streak list.
@@ -66,6 +72,18 @@ A per-game, per-player boolean array (`True` = make, `False` = miss). Self-relat
 - **Qualifying shots:** HCO, HCT, FCP, Fast Break, and OREB **putbacks**. **Blocks count as a miss** (`False`). **Free throws are excluded** (never appended).
 - Recorded by `Player.record_shot_result(made)`; appended at each shot resolution in `shot_manager.py` and `shared.py` (putback).
 - `Shot_Result_List` lives in `stats["game"]` (list-typed) — see *Persistence*.
+
+### Free throws — whole-trip miss penalty
+
+- A **trip** is one visit to the line (one foul's FT sequence). If the shooter attempts **≥ `MO_FT_MISS_MIN_ATTEMPTS`** (2+) FTs in that trip and **makes none**, he takes a flat **`MO_FT_ALL_MISS_DELTA`** (−1) — **once**, at trip end.
+- A single-FT trip never triggers it (e.g. an and-1's lone FT, or a missed 1-and-1 front end where the second was never unlocked).
+- Free throws are **not** added to `Shot_Result_List`, so this is independent of the consecutive-shot streak.
+- Counters (`mo_ft_trip_attempts` / `mo_ft_trip_makes`) accumulate across the per-FT calls in `game_state` and clear when the trip concludes.
+
+### Set plays — target shooter make bonus
+
+- When a **set play** (not Motion offense) resolves as the **`successful`** skeleton variant and the resulting shot is a **MAKE**, the shooter gets **`MO_SET_PLAY_DELTA`** (+1). The successful variant routes the ball to the play's `target_shooter` by construction, so the make is the target shooter scoring on the set play.
+- Stacks with other shot-make effects (e.g. consecutive-make bonus, and-1).
 
 ---
 
@@ -107,12 +125,13 @@ Team MO is snapshotted before any change. Applied by `apply_shot_clock_violation
 
 Resets **never** run on a foul-out timeout.
 
-| Trigger | Bench | Active MO > 0 | Active MO < 0 | Where |
-|---|---|---|---|---|
-| **Timeout, Q1→Q2, Q3→Q4, OT breaks** | → 0 | `max(0, MO − randint(MIN,MAX))` | `min(0, MO + randint(MIN,MAX))` | `main.py` `simulate_quarter`; `game_manager.py` `call_timeout` |
-| **Halftime (Q2→Q3)** | → 0 (rails apply) | → 0 unless rail | → 0 unless rail | same (`is_halftime=True`) |
+| Trigger | Decay range | Bench | Active MO > 0 | Active MO < 0 | Where |
+|---|---|---|---|---|---|
+| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **4/7** | → 0 | `max(0, MO − randint(4,7))` | `min(0, MO + randint(4,7))` | `main.py` `simulate_quarter` |
+| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **2/4** | → 0 | `max(0, MO − randint(2,4))` | `min(0, MO + randint(2,4))` | `game_manager.py` `call_timeout` |
+| **Halftime (Q2→Q3)** | n/a (→0 + rails) | → 0 (rails apply) | → 0 unless rail | → 0 unless rail | `main.py` `simulate_quarter` (`is_halftime=True`) |
 
-- Decay (`MIN`/`MAX` = 4/7) moves active players **toward** 0, never crossing it.
+- Decay moves active players **toward** 0 by the trigger's randint range, **never crossing** 0; bench → 0. The range is passed into `apply_player_momentum_resets(..., reduction_min, reduction_max)` (defaults to the quarter/OT range; `call_timeout` passes the timeout range).
 - **Halftime rails:** MO `+MO_MAX` → `randint(1,3)`; MO `−MO_MAX` → `randint(−3,−1)`; everyone else → 0.
 - **Final-Shot bonus:** the player who made the quarter's Final Shot gets `+MO_FINAL_SHOT_BONUS` **after** the reset. Flagged via `game_state["mo_final_shot_maker_id"]` in `phase_resolution.py` `resolve_final_turn_shot_logic`; consumed and cleared in the reset.
 - **End of game:** `reset_all_player_momentum(game)` zeros **every** player's MO (both teams, active + bench) at the live game-final detection (`is_final` in `api.py`), before the final save — no in-game momentum persists past the game. Distant-sim (CPU) games never change MO, so need no reset. See `End_Of_Game_System.md`.
@@ -146,7 +165,7 @@ The **player tooltip** momentum bar reads live MO: each turn's `player_momentum`
 | `BackEnd/models/player.py` | `clamp_mo`, `add_momentum`, `record_shot_result`, 5th-OREB hook, `Shot_Result_List` init/reset |
 | `BackEnd/models/shot_manager.py` | Block / charge / and-1 deltas; MO-aware base shot roll |
 | `BackEnd/utils/shared.py` | Putback and-1 + MO-aware putback roll; `summarize_game_state` team momentum |
-| `BackEnd/engine/phase_resolution.py` | Steal delta; Final-Shot maker flag |
+| `BackEnd/engine/phase_resolution.py` | Steal delta; Final-Shot maker flag; FT all-missed penalty (`resolve_free_throw_logic`); set-play make bonus (`resolve_half_court_offense_logic`) |
 | `BackEnd/models/game_manager.py` | `_append_turn` (shot-clock violation MO + per-turn team-momentum stamp); `call_timeout` reset |
 | `BackEnd/main.py` | `simulate_quarter` quarter/halftime reset |
 | `BackEnd/api/api.py` | EOG reset at `is_final` |

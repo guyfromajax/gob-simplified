@@ -11,7 +11,7 @@ Feed for the **Community Highlights** panel on **Mode Select** (`FrontEnd/static
 | **Audience** | **Universal** — every signed-in user sees the same feed (everyone’s entries). |
 | **Retention** | **20 rows maximum.** New rows insert at the top; when a 21st is added, **delete** the overflow from persistence so data does not grow beyond the visible list. |
 | **When to create an entry** | **Only after franchise `POST /franchise/complete-week/phase-b` completes successfully** — not after phase A. |
-| **Display name** | `username` from the user’s MongoDB `users` document (email local-part when unset), same idea as the alpha leaderboard. **Render the username in bold** everywhere it appears in highlight copy. |
+| **Display name** | `username` from the user’s MongoDB `users` document (email local-part when unset), same idea as the alpha leaderboard. **Render the username in bold** everywhere it appears in highlight copy, with the user’s lead coaching archetype icon immediately after the username when `lead_archetype` is available. |
 | **National rank** | User team’s **`natl_rank` from FTD** (`franchise_team_data`) **after** phase B persistence, with caveats below. |
 | **Geek Points (display)** | **Net GP earned from that completed user game only** — not season total, not lifetime account total. |
 | **Standard game copy** | One summary line: beat / lost, **scores**, **regular-season W–L** (weeks 1–26 results only), and national rank (`#--` when rank is missing or skipped). |
@@ -36,7 +36,7 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
 
 - **Order:** Every new entry is a **new row at the top**; existing rows shift down.
 - **Standard row (horizontal):**
-  - **Left (main copy):** **`{user_name}` (bold)**, coaching `{user_team_name}`, **beat** (win) / **lost to** (loss) `{opponent_team_name}` **`{user_score}`-`{opponent_score}`**. `{user_team_name}` is now **`{user_team_record}`** (regular-season wins-losses, e.g. `5-3`) **& ranked** **`{rank_label}`** (e.g. `#7` or `#--`) in the nation. Same sentence when scores are omitted (older payloads): beat/lost line without the numeric score pair, then record and rank. Reserve width so the GP column does not collide.
+  - **Left (main copy):** **`{user_name}` (bold)** + lead coaching archetype icon when available, coaching `{user_team_name}`, **beat** (win) / **lost to** (loss) `{opponent_team_name}` **`{user_score}`-`{opponent_score}`**. `{user_team_name}` is now **`{user_team_record}`** (regular-season wins-losses, e.g. `5-3`) **& ranked** **`{rank_label}`** (e.g. `#7` or `#--`) in the nation. Same sentence when scores are omitted (older payloads): beat/lost line without the numeric score pair, then record and rank. Reserve width so the GP column does not collide.
   - **Right:** `+/- {net GP for that game}` — **positive: bold gold**; **negative: bold red**. If the left block wraps to two lines, **vertically center** the GP block in the row.
   - **Persistence:** Each stored standard entry includes **`user_team_record`** (string `W-L`) computed at flush from franchise `results` weeks 1–26 via the same standings helper used for the conference RS highlight `Record:` line.
 
@@ -45,7 +45,7 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
 ## Special display rules
 
 - These **instances** occupy **two text rows** that read as **one card**: shared border and background (no “split” border between announcement and details).
-- **Row 1:** Announcement (`announcement_line`).
+- **Row 1:** Announcement (`announcement_line`); when the announcement begins with the username, render the username in bold and place the lead coaching archetype icon immediately after it.
 - **Row 2:** Details (`details_line`).
 - **Row chrome:** Conference **regular-season title**, **conference tournament win**, and **regional tournament win** use the **same team-gradient treatment** as normal highlights (`variant: standard_row`). **National tournament win** uses **`variant: national_gold`** (premium gold styling on Mode Select).
 
@@ -82,7 +82,7 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
 ## References (implementation)
 
 - Mode Select shell: `FrontEnd/static/mode-select.html` (`community-highlights-section`); rendering: `FrontEnd/static/mode-select.js` (`renderCommunityHighlights`), styles: `FrontEnd/static/mode-select.css`.
-- Pending + flush: `BackEnd/utils/community_highlights.py` (`build_community_highlight_pending`, `flush_community_highlight_pending_after_week`, `_build_standard_entry` / `_user_regular_season_record` for **`user_team_record`** on standard rows).
+- Pending + flush: `BackEnd/utils/community_highlights.py` (`build_community_highlight_pending`, `flush_community_highlight_pending_after_week`, `_build_standard_entry` / `_user_regular_season_record` for **`user_team_record`** on standard rows). New rows persist `lead_archetype` so `mode-select.js` can render the shared archetype icon next to every highlighted username; `list_community_highlight_entries` best-effort enriches older rows by username when the stored row predates that field.
 - Archetype-evolution row: `BackEnd/utils/community_highlights.py` (`lead_archetype_for_user`, `record_archetype_change_if_any`, `_build_archetype_entry`); detection in `_complete_week_process_user_game_block` + legacy `save_result` (`BackEnd/api/franchise_routes.py`); render in `FrontEnd/static/mode-select.js` (`chArchetypeCopyHtml`, `archetype_evolution` branch in `renderCommunityHighlights`). Entry shape: `entry_type:"archetype_evolution"`, `lead_archetype` (key), `is_first` (bool).
 - Phase A wiring: `BackEnd/api/franchise_routes.py` — `_complete_week_process_user_game_block` (passes `game_id`, `eos_game_meta` into pending), `complete_week_phase_a`, monolithic `complete_week`.
 - Phase B / rank: `BackEnd/api/franchise_routes.py` — `_complete_week_finish_cpu_and_persist`, `_apply_regular_season_rank_prestige_updates`.

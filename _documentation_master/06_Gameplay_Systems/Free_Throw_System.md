@@ -147,6 +147,8 @@ This secondary check provides a "second chance" mechanic that increases overall 
 - If offensive rebound: Stored for separate OREB turn processing
 - Time elapsed: 0 seconds (clock does not run during free throws)
 
+**Momentum (MO):** a shooter who attempts **>1** FT in one trip and **misses all** of them takes a flat **−1 MO** at trip end (`mo_ft_trip_attempts`/`mo_ft_trip_makes` counters in `resolve_free_throw_logic`). FTs are not tracked on `Shot_Result_List`. See [Player_Momentum_System.md](Player_Momentum_System.md).
+
 ### 1-and-1 Free Throw Logic
 
 **Front-End Handling:**

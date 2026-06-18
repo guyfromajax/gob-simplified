@@ -369,7 +369,17 @@ class GameManager:
         if timeout_reason != "FOUL_OUT":
             try:
                 from BackEnd.utils.player_momentum import apply_player_momentum_resets
-                apply_player_momentum_resets(self, is_halftime=False)
+                from BackEnd.constants.momentum import (
+                    MO_TIMEOUT_REDUCTION_MIN,
+                    MO_TIMEOUT_REDUCTION_MAX,
+                )
+                # Timeouts use the smaller decay range (Player_Momentum_System.md).
+                apply_player_momentum_resets(
+                    self,
+                    is_halftime=False,
+                    reduction_min=MO_TIMEOUT_REDUCTION_MIN,
+                    reduction_max=MO_TIMEOUT_REDUCTION_MAX,
+                )
             except Exception as e:
                 logging.error(f"⚠️ TIMEOUT: Player momentum reset failed: {e}")
 

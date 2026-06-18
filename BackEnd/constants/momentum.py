@@ -17,7 +17,14 @@ MO_AND_ONE_DELTA = 1          # made shot + shooting foul → shooter +
 MO_DUNK_DELTA = 1            # DEFERRED — dunks not wired yet (hook only)
 MO_CHARGE_DELTA = 1          # charge drawer +, charging player −
 MO_OREB_DELTA = 1
-MO_OREB_THRESHOLD = 5        # +MO_OREB_DELTA on a player's 5th OREB and each after
+MO_OREB_THRESHOLD = 3        # +MO_OREB_DELTA on a player's 3rd OREB and each after
+
+# --- Free throws: miss the whole trip → penalty ---
+MO_FT_MISS_MIN_ATTEMPTS = 2  # only trips with >1 FT attempted qualify
+MO_FT_ALL_MISS_DELTA = -1    # flat, once per trip, when ALL attempted FTs miss
+
+# --- Set play: target shooter makes the shot in a successful skeleton ---
+MO_SET_PLAY_DELTA = 1
 
 # --- Consecutive shots (read from per-game Shot_Result_List) ---
 MO_CONSECUTIVE_THRESHOLD = 3  # 3rd make/miss in a row, and each one after
@@ -35,10 +42,13 @@ MO_SHOTCLOCK_OFFENSE_DELTA = -1   # P = clamp(BASE − offenseTeamMO, 0, 100)%
 MO_SHOTCLOCK_DEFENSE_DELTA = 1    # P = clamp(BASE + defenseTeamMO, 0, 100)%
 
 # --- Resets ---
-# Timeouts + Q1→Q2 + Q3→Q4 + OT breaks: move each active player toward 0 by a
-# randint(MIN, MAX), never crossing 0. Bench → 0. Never on foul-out.
-MO_RESET_REDUCTION_MIN = 4
+# Move each active player toward 0 by a randint(MIN, MAX), never crossing 0.
+# Bench → 0. Never on foul-out. Quarter breaks (Q1→Q2, Q3→Q4) and OT breaks use
+# the larger range; timeouts use the smaller range.
+MO_RESET_REDUCTION_MIN = 4         # quarter + OT breaks
 MO_RESET_REDUCTION_MAX = 7
+MO_TIMEOUT_REDUCTION_MIN = 2       # timeouts
+MO_TIMEOUT_REDUCTION_MAX = 4
 # Halftime (Q2→Q3): everyone → 0, except the rails:
 MO_HALFTIME_HIGH_RESET = (1, 3)    # MO == +MO_MAX → randint(1, 3)
 MO_HALFTIME_LOW_RESET = (-3, -1)   # MO == −MO_MAX (−10) → randint(−3, −1)

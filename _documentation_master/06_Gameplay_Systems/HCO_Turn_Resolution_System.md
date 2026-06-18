@@ -91,6 +91,8 @@ Important:
 - `target_shooter` is not guaranteed to be the actual shooter in failed set-play variants
 - this is why the skeleton alias is `target_shooter`, not `shooter`
 
+**Momentum (MO):** when a set play resolves as the **`successful`** variant and the shot is a **MAKE**, the shooter (the target_shooter by construction in this variant) gets **+1 MO** (`MO_SET_PLAY_DELTA`, applied in `resolve_half_court_offense_logic` right after `resolve_shot`). Motion offense has no target shooter and no such bonus. See [Player_Momentum_System.md](Player_Momentum_System.md).
+
 ## Team Overrides
 
 HCO now supports team-specific `target_shooter` overrides because the runtime map prefers the team-owned play copy when present.

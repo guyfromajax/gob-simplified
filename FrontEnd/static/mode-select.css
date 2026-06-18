@@ -205,6 +205,10 @@ body.mode-select-page .community-highlight-copy .ch-username {
   font-weight: 700;
 }
 
+body.mode-select-page .community-highlight-row .lb-archetype-badge {
+  transform: translateY(-1px);
+}
+
 body.mode-select-page .community-highlight-row--national-gold {
   border: 1px solid rgba(212, 175, 55, 0.42);
   background: linear-gradient(
