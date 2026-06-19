@@ -7,12 +7,10 @@ live in BackEnd/constants/momentum.py.
 import random
 
 from BackEnd.constants.momentum import (
-    MO_MIN,
-    MO_MAX,
     MO_RESET_REDUCTION_MIN,
     MO_RESET_REDUCTION_MAX,
-    MO_HALFTIME_HIGH_RESET,
-    MO_HALFTIME_LOW_RESET,
+    MO_HALFTIME_REDUCTION_MIN,
+    MO_HALFTIME_REDUCTION_MAX,
     MO_FINAL_SHOT_BONUS,
     MO_SHOT_ROLL_BASE,
     MO_SHOT_ROLL_POSITIVE,
@@ -71,18 +69,11 @@ def apply_shot_clock_violation_momentum(offense_team, defense_team) -> None:
             p.add_momentum(MO_SHOTCLOCK_DEFENSE_DELTA)
 
 
-def _reset_value(mo: int, is_active: bool, is_halftime: bool,
-                 red_min: int, red_max: int) -> int:
-    if is_halftime:
-        # Everyone → 0 except the rails (applies to active and bench alike).
-        if mo >= MO_MAX:
-            return random.randint(*MO_HALFTIME_HIGH_RESET)
-        if mo <= MO_MIN:
-            return random.randint(*MO_HALFTIME_LOW_RESET)
-        return 0
-    # Normal break (timeout / Q1→Q2 / Q3→Q4 / OT): bench → 0; active decay
-    # toward 0 by randint(red_min, red_max), never crossing 0. Quarter/OT breaks
-    # pass the larger range; timeouts pass the smaller range.
+def _reset_value(mo: int, is_active: bool, red_min: int, red_max: int) -> int:
+    # Every break (timeout / Q1→Q2 / Q3→Q4 / OT / halftime) uses one mechanic:
+    # bench → 0; active decay toward 0 by randint(red_min, red_max), never
+    # crossing 0 — symmetric for + and − MO. The range encodes the break type
+    # (timeouts smallest, halftime largest); the caller selects it.
     if not is_active:
         return 0
     if mo > 0:
@@ -110,11 +101,14 @@ def apply_player_momentum_resets(
     reduction_max: int = MO_RESET_REDUCTION_MAX,
 ) -> None:
     """Reset every player's MO for a break. Active = the team's 5 lineup
-    players; everyone else is bench. ``reduction_min``/``reduction_max`` set the
-    active-player decay range — quarter/OT breaks use the default (larger)
-    range; timeouts pass the smaller MO_TIMEOUT_REDUCTION_* range. Then apply
-    the Final-Shot bonus to the player flagged as having made the quarter's
-    final shot (if any)."""
+    players; everyone else is bench (→ 0). Active players decay toward 0 by a
+    randint in the break's range (never crossing 0; symmetric for + and − MO):
+    quarter/OT breaks use the default range, timeouts pass the smaller
+    MO_TIMEOUT_REDUCTION_* range, and ``is_halftime`` selects the larger
+    MO_HALFTIME_REDUCTION_* range. Then apply the Final-Shot bonus to the player
+    flagged as having made the quarter's final shot (if any)."""
+    if is_halftime:
+        reduction_min, reduction_max = MO_HALFTIME_REDUCTION_MIN, MO_HALFTIME_REDUCTION_MAX
     for team in (game.home_team, game.away_team):
         lineup = getattr(team, "lineup", {}) or {}
         active_ids = {
@@ -124,7 +118,7 @@ def apply_player_momentum_resets(
             mo = int(player.attributes.get("MO", 0) or 0)
             is_active = getattr(player, "player_id", None) in active_ids
             player.attributes["MO"] = _reset_value(
-                mo, is_active, is_halftime, reduction_min, reduction_max
+                mo, is_active, reduction_min, reduction_max
             )
 
     # Final-Shot bonus: applied AFTER the reset (Player_Momentum_System.md).

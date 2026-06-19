@@ -45,7 +45,7 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 - Uses same transition system as other game flows
 - Database is single source of truth for timeout state
 - Works consistently across all game modes (franchise is live; **single / tournament are SUNSET** — see `Sunset_Modes.md`)
-- **Player Momentum (MO):** a regular timeout decays each active player's MO toward 0 by `randint(1,3)` (the smaller timeout range; bench → 0). **Foul-out timeouts do NOT reset MO.** See [Player_Momentum_System.md](Player_Momentum_System.md).
+- **Player Momentum (MO):** a regular timeout decays each active player's MO toward 0 by `randint(1,2)` (the smallest of the break decay ranges; bench → 0). **Foul-out timeouts do NOT reset MO.** See [Player_Momentum_System.md](Player_Momentum_System.md).
 
 ### Timeout Turn Creation
 

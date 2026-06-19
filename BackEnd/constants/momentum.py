@@ -42,16 +42,15 @@ MO_SHOTCLOCK_OFFENSE_DELTA = -1   # P = clamp(BASE − offenseTeamMO, 0, 100)%
 MO_SHOTCLOCK_DEFENSE_DELTA = 1    # P = clamp(BASE + defenseTeamMO, 0, 100)%
 
 # --- Resets ---
-# Move each active player toward 0 by a randint(MIN, MAX), never crossing 0.
-# Bench → 0. Never on foul-out. Quarter breaks (Q1→Q2, Q3→Q4) and OT breaks use
-# the larger range; timeouts use the smaller range.
-MO_RESET_REDUCTION_MIN = 2         # quarter + OT breaks
-MO_RESET_REDUCTION_MAX = 4
+# Move each active player toward 0 by a randint(MIN, MAX), never crossing 0
+# (applies symmetrically to + and − MO). Bench → 0. Never on foul-out. Each
+# break type uses its own range; halftime (the longest break) decays the most.
+MO_RESET_REDUCTION_MIN = 1         # quarter (Q1→Q2, Q3→Q4) + OT breaks
+MO_RESET_REDUCTION_MAX = 3
 MO_TIMEOUT_REDUCTION_MIN = 1       # timeouts
-MO_TIMEOUT_REDUCTION_MAX = 3
-# Halftime (Q2→Q3): everyone → 0, except the rails:
-MO_HALFTIME_HIGH_RESET = (1, 2)    # MO == +MO_MAX (+5) → randint(1, 2)
-MO_HALFTIME_LOW_RESET = (-2, -1)   # MO == −MO_MAX (−5) → randint(−2, −1)
+MO_TIMEOUT_REDUCTION_MAX = 2
+MO_HALFTIME_REDUCTION_MIN = 3      # halftime (Q2→Q3)
+MO_HALFTIME_REDUCTION_MAX = 5
 MO_FINAL_SHOT_BONUS = 1            # made the quarter's Final Shot → + after reset
 
 # --- Team momentum (DERIVED = sum of a team's 5 active players' MO) ---

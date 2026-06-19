@@ -35,10 +35,9 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
 | `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
 | `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
-| `MO_RESET_REDUCTION_MIN` / `_MAX` | 2 / 4 | Quarter + OT break decay toward 0 for active players (randint range) |
-| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 1 / 3 | Timeout decay toward 0 for active players (randint range) |
-| `MO_HALFTIME_HIGH_RESET` | (1, 2) | Halftime: MO == +MO_MAX → randint(1, 2) |
-| `MO_HALFTIME_LOW_RESET` | (−2, −1) | Halftime: MO == −MO_MAX → randint(−2, −1) |
+| `MO_RESET_REDUCTION_MIN` / `_MAX` | 1 / 3 | Quarter (Q1→Q2, Q3→Q4) + OT break decay toward 0 for active players (randint range) |
+| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 1 / 2 | Timeout decay toward 0 for active players (randint range) |
+| `MO_HALFTIME_REDUCTION_MIN` / `_MAX` | 3 / 5 | Halftime (Q2→Q3) decay toward 0 for active players (randint range) |
 | `MO_FINAL_SHOT_BONUS` | 1 | + after reset if player made the quarter's Final Shot |
 | `MO_TEAM_MIN` / `MO_TEAM_MAX` | −25 / 25 | Team Momentum range (= 5 × per-player range) |
 
@@ -127,15 +126,16 @@ Team MO is snapshotted before any change. Applied by `apply_shot_clock_violation
 
 Resets **never** run on a foul-out timeout.
 
+All breaks use **one mechanic**: bench → 0; active players decay **toward 0** by a randint in the break's range (never crossing 0; symmetric for + and − MO). Only the range differs per break type.
+
 | Trigger | Decay range | Bench | Active MO > 0 | Active MO < 0 | Where |
 |---|---|---|---|---|---|
-| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **2/4** | → 0 | `max(0, MO − randint(2,4))` | `min(0, MO + randint(2,4))` | `api.py` at quarter-complete (fallback: `main.py` `simulate_quarter`) |
-| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **1/3** | → 0 | `max(0, MO − randint(1,3))` | `min(0, MO + randint(1,3))` | `game_manager.py` `call_timeout` |
-| **Halftime (Q2→Q3)** | n/a (→0 + rails) | → 0 (rails apply) | → 0 unless rail | → 0 unless rail | `api.py` at quarter-complete (`is_halftime=True`) |
+| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **1/3** | → 0 | `max(0, MO − randint(1,3))` | `min(0, MO + randint(1,3))` | `api.py` at quarter-complete (fallback: `main.py` `simulate_quarter`) |
+| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **1/2** | → 0 | `max(0, MO − randint(1,2))` | `min(0, MO + randint(1,2))` | `game_manager.py` `call_timeout` |
+| **Halftime (Q2→Q3)** | `MO_HALFTIME_REDUCTION_*` = **3/5** | → 0 | `max(0, MO − randint(3,5))` | `min(0, MO + randint(3,5))` | `api.py` at quarter-complete (`is_halftime=True`) |
 
-- Decay moves active players **toward** 0 by the trigger's randint range, **never crossing** 0; bench → 0. The range is passed into `apply_player_momentum_resets(..., reduction_min, reduction_max)` (defaults to the quarter/OT range; `call_timeout` passes the timeout range).
+- The range is selected per break: quarter/OT use the default `MO_RESET_REDUCTION_*`; `call_timeout` passes the timeout range; `is_halftime=True` selects `MO_HALFTIME_REDUCTION_*` (the largest, since halftime is the longest break). Halftime no longer has a special "rails" rule — it's the same decay with a bigger range.
 - **Timing — applied *before* the set-lineup screen.** Quarter/halftime/OT decay fires at **quarter-complete** in `api.py` (right after the quarter increment, alongside the energy recharge, before the game-doc save) so the break lineup screen shows **post-decay** MO — same as timeouts. It is **idempotent** via `game_state["mo_last_reset_quarter"]`; `simulate_quarter` repeats the call as a fallback (skipped when already applied). See `Set_Lineup` / `Timeout_System.md`.
-- **Halftime rails:** MO `+MO_MAX` → `randint(1,2)`; MO `−MO_MAX` → `randint(−2,−1)`; everyone else → 0.
 - **Final-Shot bonus:** the player who made the quarter's Final Shot gets `+MO_FINAL_SHOT_BONUS` **after** the reset (so it's also reflected on the break lineup screen). Flagged via `game_state["mo_final_shot_maker_id"]` in `phase_resolution.py` `resolve_final_turn_shot_logic`; consumed and cleared in the reset.
 - **End of game:** `reset_all_player_momentum(game)` zeros **every** player's MO (both teams, active + bench) at the live game-final detection (`is_final` in `api.py`), before the final save — no in-game momentum persists past the game. Distant-sim (CPU) games never change MO, so need no reset. See `End_Of_Game_System.md`.
 
