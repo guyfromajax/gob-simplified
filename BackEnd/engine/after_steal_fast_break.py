@@ -86,6 +86,7 @@ from BackEnd.constants import (
     HOME_RIM_COORDS,
 )
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
+from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
@@ -471,6 +472,15 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             free_throws_remaining = 1
         else:
             free_throws_remaining = 2
+
+    # Player Momentum (Player_Momentum_System.md): this self-contained shot path
+    # bypasses ShotManager.resolve_shot, so record the FG attempt for the
+    # consecutive-shot streak here (skip a miss that drew a shooting foul) and
+    # apply the and-1 bonus on a made foul. Blocks/charges don't occur on this path.
+    if made or not d_foul:
+        stealer.record_shot_result(made)
+    if made and d_foul and foul_player:
+        stealer.add_momentum(MO_AND_ONE_DELTA)
 
     # Variant + extras for the rim animation (RATTLE / BANK / SWISH / etc.).
     shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", 100)

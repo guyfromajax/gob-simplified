@@ -44,6 +44,7 @@ import random
 from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -212,6 +213,15 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
         free_throws_remaining = 1 if made else 2
         has_and_one = made
+
+    # Player Momentum (Player_Momentum_System.md): self-contained HCT shot path
+    # bypasses ShotManager.resolve_shot — record the FG attempt for the
+    # consecutive-shot streak (skip a miss that drew a shooting foul) and apply
+    # the and-1 bonus on a made foul. Blocks/charges don't occur on this path.
+    if made or not d_foul:
+        shooter.record_shot_result(made)
+    if made and d_foul and foul_player:
+        shooter.add_momentum(MO_AND_ONE_DELTA)
 
     # --- Variant + extras ---------------------------------------------------
     shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", 100)
@@ -568,6 +578,15 @@ def _finalize_ab_shot(
         fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
         free_throws_remaining = 1 if made else 2
         has_and_one = made
+
+    # Player Momentum (Player_Momentum_System.md): self-contained AB shot path
+    # bypasses ShotManager.resolve_shot — record the FG attempt for the
+    # consecutive-shot streak (skip a miss that drew a shooting foul) and apply
+    # the and-1 bonus on a made foul. Blocks/charges don't occur on this path.
+    if made or not d_foul:
+        shooter.record_shot_result(made)
+    if made and d_foul and foul_player:
+        shooter.add_momentum(MO_AND_ONE_DELTA)
 
     shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", 100)
     try:

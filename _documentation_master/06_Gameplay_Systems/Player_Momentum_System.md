@@ -55,7 +55,7 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **Block** | blocker **+1**, blocked shooter **−1** | `shot_manager.py` (block path) |
 | **Steal** | stealer **+1**, victim **−1** | `phase_resolution.py` — all steal paths: `resolve_turnover_logic` (HCO + fast break), `resolve_full_court_press_logic` (FCP), `resolve_half_court_trap_logic` + `_resolve_half_court_trap_dynamic_first_cut` (HCT) |
 | **Charge** | charge-drawer **+1**, charging player **−1** | `shot_manager.py` (charge return) |
-| **And-1** (made shot + shooting foul) | shooter **+1** | `shot_manager.py` (main + block-recon), `shared.py` (putback) |
+| **And-1** (made shot + shooting foul) | shooter **+1** | `shot_manager.py` (main + block-recon via `resolve_shot`), `shared.py` (putback), `after_steal_fast_break.py`, `dynamic_hct_shot.py` (FB + AB shots) |
 | **3rd+ OREB** | rebounder **+1** on `OREB` ≥ `MO_OREB_THRESHOLD` | `player.py` `record_stat` |
 | **Consecutive shots** | see below | `player.py` `record_shot_result` |
 | **Free Throws (all missed)** | shooter **−1** if he attempts **>1** FT in one trip and **misses all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
@@ -70,7 +70,7 @@ A per-game, per-player boolean array (`True` = make, `False` = miss). Self-relat
 
 - On the **3rd** identical result in a row, and **each one after**: `+MO_CONSECUTIVE_DELTA` per consecutive make, `−MO_CONSECUTIVE_DELTA` per consecutive miss.
 - **Qualifying shots:** HCO, HCT, FCP, Fast Break, and OREB **putbacks**. **Blocks count as a miss** (`False`). **Free throws are excluded** (never appended).
-- Recorded by `Player.record_shot_result(made)`; appended at each shot resolution in `shot_manager.py` and `shared.py` (putback).
+- Recorded by `Player.record_shot_result(made)` at **every** FG shot resolution: `shot_manager.py` `resolve_shot` (HCO/FCP/HCT-skeleton/final-turn/rim-runner FB), `shared.py` (OREB putback), `after_steal_fast_break.py` (after-steal FB), and `dynamic_hct_shot.py` (HCT dynamic FB + attack-basket). The last two bypass `resolve_shot`, so they call it directly.
 - `Shot_Result_List` lives in `stats["game"]` (list-typed) — see *Persistence*.
 
 ### Free throws — whole-trip miss penalty
