@@ -7355,7 +7355,7 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     turnover_type = dyn.get("turnover_type", "")
 
     # D8 — emergent foul/steal attribution (literal: the engine names the
-    # involved defender / ball handler; see Dynamic_HCT_D8_Scoping.md §3.5).
+    # involved defender / ball handler; see Dynamic_HCT_Turns.md §5).
     foul_team = dyn.get("foul_team") or None
     foul_player = dyn.get("foul_player")
     stealer = dyn.get("stealer") or defender

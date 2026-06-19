@@ -3634,6 +3634,8 @@ def _complete_week_process_user_game_block(
         user_team_id_str=user_team_id_str,
         winner_team_id=user_winner_id,
         participant_team_ids=(team1_id, team2_id),
+        week=req.week,
+        eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
     )
     maybe_award_franchise_eos_title_championship(
@@ -4713,6 +4715,8 @@ def _complete_week_finish_cpu_and_persist(
             user_team_id_str=user_team_id_str,
             winner_team_id=winner_tid,
             participant_team_ids=matchup_ids,
+            week=week,
+            eos_game_meta=eos_meta,
         )
         maybe_award_franchise_eos_title_championship(
             owner_user_id=franchise_doc.get("user_id"),
@@ -12266,6 +12270,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                 user_team_id_str=user_team_id_str,
                 winner_team_id=winner_id,
                 participant_team_ids=(away_id, home_id),
+                week=week,
+                eos_game_meta=g,
             )
             maybe_award_franchise_eos_title_championship(
                 owner_user_id=franchise_doc.get("user_id"),
@@ -12323,6 +12329,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                 user_team_id_str=user_team_id_str,
                 winner_team_id=winner_id,
                 participant_team_ids=(away_id, home_id),
+                week=week,
+                eos_game_meta=g,
             )
             maybe_award_franchise_eos_title_championship(
                 owner_user_id=franchise_doc.get("user_id"),
@@ -12454,6 +12462,8 @@ def sim_championship(req: SimChampionshipRequest):
             user_team_id_str=user_team_id_str,
             winner_team_id=winner_id,
             participant_team_ids=(away_id, home_id),
+            week=week,
+            eos_game_meta={"phase": "national", "round": 3},
         )
         maybe_award_franchise_eos_title_championship(
             owner_user_id=franchise_doc.get("user_id"),

@@ -1,8 +1,8 @@
 """
 Dynamic HCT (Half Court Trap) turn resolution.
 
-Spec: ``_documentation_master/projects/Dynamic_HCT_Turns.md``.
-Build plan: ``_documentation_master/projects/Dynamic_HCT_Cut2_Plan.md``.
+Spec: ``_documentation_master/projects/Dynamic_HCT_Turns.md`` (single source of
+truth — the former Cut2 build-plan and D8 scoping docs are merged into it).
 
 Cut 2 / Phase 2A scope — the §4 loop spine:
   - Setup (segment 0): entry walk-up. BH advances from BIP receive coords to
@@ -170,7 +170,8 @@ PASS_GRID_PER_GAME_SEC = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND)
 MAX_LOOP_ITERATIONS = 15
 
 # --- D8: attribute-driven foul / steal / turnover moment outcomes -----------
-# See _documentation_master/projects/Dynamic_HCT_D8_Scoping.md §3. One tunable
+# See _documentation_master/projects/Dynamic_HCT_Turns.md §5 (Attribute-driven
+# contest model). One tunable
 # block so balancing is a single-file edit. Team attrs (discipline / pt_eff /
 # pt_opp / fight) are centered at 0 (±10); player attrs are ~0-100.
 #
@@ -413,7 +414,7 @@ def _resolve_moment(
 
     Structure: the existing banded gate decides who *wins* the moment; D8 then
     derives the foul/steal/turnover outcome from attributes + team attrs +
-    aggression. See ``Dynamic_HCT_D8_Scoping.md`` §3.
+    aggression. See ``Dynamic_HCT_Turns.md`` §5 (Attribute-driven contest model).
     """
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}

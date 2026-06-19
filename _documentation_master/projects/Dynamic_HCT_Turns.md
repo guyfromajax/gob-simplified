@@ -379,6 +379,122 @@ Outcome branches (DEAD BALL / HCO / neutral) are identical to the Pressure Momen
 > Implementation note: `pt_opp_modifier == 0` is treated as multiplier 1 (no-op) so
 > an unset team attribute doesn't auto-zero the handling score.
 
+### Attribute-driven contest model (D8 — ✅ built)
+
+> Merged from the former `Dynamic_HCT_D8_Scoping.md` (now retired). This is the
+> live model `_resolve_moment` + `_apply_moment_outcome` implement; it **extends**
+> the simple DEAD BALL / HCO / neutral bands above with emergent **steal / foul /
+> turnover** outcomes. **Status:** D8a built; **D8b open** = mid-flight interception
+> (D11), over-and-back detection (D20), and final coefficient calibration (§11).
+
+The `d_score`/`o_score` band gates stay the structural fork; inside each winning
+region we compute **attribute-derived event odds** instead of forcing one result.
+
+- `m = d_score − o_score` — contest margin (positive ⇒ defense winning).
+- **defense-wins** region (`m > GATE_D`, `GATE_D = 2*(off_chem + pt_opp)`) → {STEAL,
+  DEAD BALL, O_FOUL, no-event}.
+- **offense-wins** region (`o_score ≥ d_score + 2*(def_chem + pt_eff)`) → mostly
+  POS_O, small **D_FOUL**.
+- else **neutral** (no event — the re-read beat).
+
+**Design decisions (resolved with owner):** outcomes are **attribute-driven** (not a
+flat table); the check runs **every** moment, throttled by a global rate scalar;
+foul attribution is **literal** (the actual involved participant); the **aggression**
+dial is a trade-off multiplier `AGG_MULT` on the event-fire rate, the steal share,
+and `p_dfoul` (it does **not** change who wins the moment); **offense `fight`**
+(only offense) suppresses all defense-wins events at the gate, on the same scale as
+defense `discipline` suppresses D_FOUL. Hold's "a defender reaches the BH" path runs
+this **same** contest (the old 50/50 hardcode is gone).
+
+**Defense-wins — (a) does an event fire?**
+
+```
+m_norm  = clamp(m / M_REF, 0, 1)
+p_event = clamp(DEF_WIN_BASE * m_norm
+                * AGG_MULT[aggression_call]      # aggressive D forces MORE total events
+                * (1 - W_FIGHT * fight_off)      # gritty OFFENSE resists ALL D-wins events
+                * GLOBAL_SCALAR, 0, P_EVENT_MAX)
+# fight_off = OFFENSE team `fight` (centered 0, ±10). Defense `fight` is NOT used.
+```
+Roll `random() < p_event`; false → no-event (BH retains, normal re-read).
+
+**Defense-wins — (b) which event?** Anchored baseline weights × attribute factors
+(each centered at 1.0 for an even matchup), normalized, one draw:
+
+```
+DB_W0, STEAL_W0, OFOUL_W0 = 50, 30, 20            # even-matchup baseline split
+
+def_steal = OD*0.4 + AG*0.4 + IQ*0.2   [defender]   # strip ability
+bh_secure = CH*0.4 + BH*0.4 + IQ*0.2   [BH]         # ball security
+bh_handle = BH*0.4 + CH*0.3 + IQ*0.3   [BH]         # clean-handle (self-TO resistance)
+
+steal_factor = clamp((1 + S_SENS*(def_steal - bh_secure)/REF + W_PTEFF*pt_efficiency)
+                       * AGG_MULT[aggression_call], F_MIN, F_MAX)
+db_factor    = clamp(1 + DB_SENS*(REF - bh_handle)/REF - W_PTOPP*pt_opp_modifier, F_MIN, F_MAX)
+ofoul_factor = clamp(1 + O_SENS_IQ*(IQ[def]-IQ[BH])/REF + O_SENS_DISC*discipline/DISC_SCALE, F_MIN, F_MAX)
+
+P(event) = (W0 * factor) / Σ(all three)            # STEAL / DEAD BALL / O_FOUL
+```
+
+**Offense-wins — D_FOUL vs clean POS_O:**
+
+```
+beaten_norm = clamp((o_score - d_score) / M_REF, 0, 1)
+agility_gap = clamp(AG[BH] - AG[def], 0, REF)
+p_dfoul = clamp(DFOUL_BASE * beaten_norm
+              * (1 - W_DISC_REACH * discipline_def)     # undisciplined (<0) → more reach fouls
+              * (1 + W_AG_BEATEN  * agility_gap / REF)   # beaten/slow defender → reach
+              * AGG_MULT[aggression_call]
+              * GLOBAL_SCALAR, 0, P_DFOUL_MAX)
+```
+Roll `random() < p_dfoul` → D_FOUL (bonus → FTs, else SIDE_INBOUND); else POS_O.
+
+**Foul attribution (literal):** `D_FOUL` → the involved defender (`bh_defender`, or
+on a trap the credited participant); `O_FOUL` → the BH. Both: `record_stat("F")`,
+`team_fouls += 1`, foul-out check, bonus routing; `O_FOUL` also flips possession.
+
+**First-pass tunable constants** (one block; calibrate against sim output — §11):
+
+| Const | Meaning | First-pass |
+| --- | --- | --- |
+| `DB_W0 / STEAL_W0 / OFOUL_W0` | even-matchup baseline split (50/30/20) | `50 / 30 / 20` |
+| `AGG_MULT` | aggression dial (event rate + steal share + D_FOUL) | `passive 0.7 / normal 1.0 / aggressive 1.3` |
+| `GLOBAL_SCALAR` | master per-moment event-frequency knob | `1.0` |
+| `DEF_WIN_BASE` | base P(any event) on a full D-win | `0.35` |
+| `P_EVENT_MAX` | cap on per-moment event prob | `0.60` |
+| `M_REF` | margin counting as a "decisive" win | `25` |
+| `REF` | league-average attribute (centering) | `50` |
+| `F_MIN / F_MAX` | clamp on each attribute factor | `0.3 / 2.5` |
+| `S_SENS` | steal sensitivity to (defender − BH) gap | `1.2` |
+| `DB_SENS` | dead-ball sensitivity to weak BH handle | `1.0` |
+| `O_SENS_IQ` | charge sensitivity to (def IQ − BH IQ) | `0.8` |
+| `O_SENS_DISC` | charge sensitivity to team `discipline` | `0.5` |
+| `DISC_SCALE` | discipline normalizer | `20` |
+| `W_PTEFF` | def `pt_efficiency` → steal factor | `0.04` |
+| `W_PTOPP` | off `pt_opp_modifier` → resist self-TO | `0.04` |
+| `DFOUL_BASE` | base P(D_FOUL) on a decisive blow-by | `0.12` |
+| `P_DFOUL_MAX` | cap on D_FOUL prob | `0.25` |
+| `W_DISC_REACH` | team `discipline` → fewer reach fouls | `0.04` |
+| `W_FIGHT` | OFFENSE `fight` → fewer D-wins events | `0.04` (= `W_DISC_REACH`) |
+| `W_AG_BEATEN` | defender AG deficit vs BH → reach foul | `0.6` |
+
+**Resulting percentages (first-pass constants):**
+
+- *Does anything fire?* decisive D-win, normal aggression → ~35% an event fires
+  (~65% no-event); scales with margin, aggression (passive ~24.5% / aggressive
+  ~45.5%), and offense `fight` (`+10 → ~21%`, `−10 → ~49%`).
+- *Which event* (given one fires): even matchup → **STEAL 30% / DEAD BALL 50% /
+  O_FOUL 20%**; elite ball-stopper vs avg BH → ~40 / 39 / 21; weak handler vs avg
+  defender → ~32 / 50 / 17.
+- *Offense-wins → D_FOUL:* even decisive blow-by (`discipline = 0`) → ~12%;
+  undisciplined D + big AG gap → up to 25% (cap); disciplined D → ~7%. `AGG_MULT`
+  scales it (~15.6% aggressive / ~8.4% passive).
+
+> Centering caveat: `steal_factor` uses a player *difference* (scale-robust);
+> `db_factor` + the `ofoul` IQ term use absolute `REF` — set `REF` to the league-mean
+> attribute at calibration. `discipline` is centered at 0 (no reference needed).
+> All team attrs at 0 / unset → factor 1 (no-op).
+
 ### No defenders in range (broken HCT)
 
 When `detect_by_distance()` returns **none** (no defender within 11 of the BH), the
@@ -466,7 +582,7 @@ by what reaches the BH **before the hold window elapses**:
   - **Dribble dead** (he picked it up on an earlier cutoff win) → he **cannot drive**,
     so he simply **re-reads (pass or hold)** while everyone keeps moving (D21).
 
-> **D8 reconciliation (✅ built — see `Dynamic_HCT_D8_Scoping.md`):** the old 50/50
+> **D8 reconciliation (✅ built — see §5 *Attribute-driven contest model*):** the old 50/50
 > steal → 50/50 foul hardcode has been **replaced** by the same attribute-driven
 > `_resolve_moment` calculation that Attack uses, so a defender's steal/foul/TO odds
 > come from attributes (and team `discipline`/`pt_efficiency`/`pt_opp_modifier`/`fight`
@@ -591,6 +707,15 @@ HCT possession — **replacing** their old static `HCT_STANDARD_NORMAL`-centroid
 
 A pass goes to one of the two teammates closest to the BH. Execute the
 **Vertical-Half Pass Movement** if it qualifies, else the **Central Pass Movement**.
+
+> **Implementation note (approximated — follow-up):** the detailed per-player
+> Vertical-Half / Central spot assignments below are the **design target**, not yet
+> fully built. The current build renders the pass via the universal `build_pass_step`
+> primitive (offense holds spacing during the flight; defense re-forms on the receiver
+> via the persisted D19 `_position_defense` formation) and lets off-ball offense
+> keep hustling toward their **§4 setup spots** (D15b) rather than these pass-specific
+> spots. Replacing this approximation with the exact choreography below is an open
+> refinement (folded into the upcoming movement-authenticity work).
 
 #### Vertical-Half Pass Movement — qualifies if pass receiver's y > 29 or < 22
 
@@ -862,7 +987,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
   = the initiator. **Build note**: gate the PG-override suppression for the HCT path.
   Other transitions (DREB / Steal / CR FB / RR FB → HCO) need the same upgrade — tracked
   separately in `HCO_Transition_System_ToDo.md` (do not solve here).
-- **D8.** ✅ **Core built (Cut 2 / D8a) → `Dynamic_HCT_D8_Scoping.md`.** Attribute-driven foul / steal / turnover emergent outcomes: `STEAL`, `DEAD BALL`, and `O_FOUL` in the defense-wins region; `D_FOUL` (reach-in) in the offense-wins region. Implemented in `_resolve_moment` + the loop's `_apply_moment_outcome`, wired through the wrapper (F / STL / TO stats, foul-out, bonus→FREE_THROW routing, steal→fast-break, possession flips) and the emitter (`STEAL` / `FOUL` turn-stops). Hold's defender-reaches path now shares the same contest engine. Aggression (`AGG_MULT`) raises event/steal/foul rates; offense `fight` symmetrically suppresses defense-wins events. **Deferred to D8b:** mid-flight interception (D11), over-and-back detection (D20), and final coefficient calibration.
+- **D8.** ✅ **Core built (Cut 2 / D8a) → see §5 *Attribute-driven contest model*.** Attribute-driven foul / steal / turnover emergent outcomes: `STEAL`, `DEAD BALL`, and `O_FOUL` in the defense-wins region; `D_FOUL` (reach-in) in the offense-wins region. Implemented in `_resolve_moment` + the loop's `_apply_moment_outcome`, wired through the wrapper (F / STL / TO stats, foul-out, bonus→FREE_THROW routing, steal→fast-break, possession flips) and the emitter (`STEAL` / `FOUL` turn-stops). Hold's defender-reaches path now shares the same contest engine. Aggression (`AGG_MULT`) raises event/steal/foul rates; offense `fight` symmetrically suppresses defense-wins events. **Deferred to D8b:** mid-flight interception (D11), over-and-back detection (D20), and final coefficient calibration.
 - **D9.** ✅ **Built (Cut 2)** — shot-clock (≤0) and 10-second (≤20 & not past half court) terminals checked each loop iteration; engine tags `turnover_type` ("SHOT_CLOCK"/"TEN_SECOND"), wrapper carries it onto the DEAD BALL turnover (possession flips → SIDE_INBOUND), FE announces "Shot Clock Violation!" / "10-Second Violation!".
 - **D10.** ✅ Resolved — standalone x=73/x=27 trap-break HCO trigger removed; superseded by D21 (HCO entry now via the Attack Basket Area resolution only).
 - **D21.** ✅ **Built (Behavior Change 1).** PSA demoted to a target area only — no longer a trap breaker. The **Attack Basket Area is the sole trap-break zone**, keeping the existing §7 FB/HCO resolution; the "reach PSA → HCO (100%)" zone-precedence trigger is removed (`_in_primary_safe_area` deleted). The broken-HCT open-floor attack is now a **cutoff race** (`_do_broken_hct_cutoff` + `_cutoff_meet_point`): BH drives to topLane (74,25); the **closest defender** solves an interception/meet-point geometry (BH drive pace vs defender AG `standard` rate); **no angle** → reach topLane → §7 FB/HCO by ABA count; **angle** → both collide at the meet point and resolve via D8 `_resolve_moment(exclude_steal=True)` (normal progression / O_FOUL charge / D_FOUL block / DEAD BALL). A normal-progression win makes the BH **dribble-dead** (`dribble_alive=False` → pass/hold-only reads in `_read_decision`, no drive in `_choose_shot_attempt`, no broken-HCT drive; resets to True on any pass-transfer). During the cutoff action only the BH + cutoff defender move; the other 8 **hold position** (test cut). **Open item:** the §2 deep-corner watch item.
@@ -928,7 +1053,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 Design is complete. These are the remaining work items.
 
 **Deferred features (build later, on purpose):**
-- ✅ Fouls, steals, and dead-ball turnover outcomes (D8a — built; see `Dynamic_HCT_D8_Scoping.md`). Remaining D8b: mid-flight interception (D11), over-and-back classification (D20), coefficient calibration.
+- ✅ Fouls, steals, and dead-ball turnover outcomes (D8a — built; see §5 *Attribute-driven contest model* for the formulas + tunable constants). Remaining D8b: mid-flight interception (D11), over-and-back classification (D20), coefficient calibration.
 - **Over-and-back violation (D20).** Once the BH has crossed x=50 he may not pass
   to a backcourt teammate (x<50 home / x>50 away). **Guard built (preventive):**
   `_select_pass_receiver` drops any backcourt teammate from the two-closest pool

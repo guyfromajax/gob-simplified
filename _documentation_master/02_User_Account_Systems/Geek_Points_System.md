@@ -11,12 +11,12 @@ If the team document cannot be resolved for a rare edge case, the code may incre
 
 ## Franchise mode wins and losses
 
-When the **user’s franchise team** **wins** a game, the owning account receives a random geek-point award in the ranges below. When the user’s team **loses** a game they **played in**, the account receives **`random.randint(1, 2)`** geek points (same `$inc` pattern on `geek_points` and `geek_points_by_team.<team_id>`). Simmed games between two other teams do not award loss points (participation is verified).
+When the **user’s franchise team** wins or loses a game, the owning account receives a random geek-point award in the ranges below. Loss points only apply when the user's team participated in the game; simmed games between two other teams do not award loss points.
 
-Gameplay-mode multiplier:
+Gameplay-mode policy:
 
-- If the completed user game used **Sim Full Game** or **Sim Rest of Game** at any point, the user receives the base award listed below.
-- If the completed user game did **not** use Sim Full Game / Sim Rest of Game, the final base award is doubled.
+- Regular-season games use explicit bulk-sim vs non-bulk ranges.
+- EOS tournament games use a base range, then apply the EOS gameplay-mode multiplier: bulk-sim games receive the base value; non-bulk games receive `2 * base`.
 - The same final delta is applied to both `geek_points` and `geek_points_by_team.<team_id>`.
 
 The durable source for this decision is `games.bulk_sim_used`.
@@ -29,10 +29,10 @@ Implementation: `BackEnd/utils/franchise_geek_points.py` (`maybe_award_franchise
 
 | Event | Geek points |
 |--------|-------------|
-| Win, bulk-sim game | `random.randint(5, 15)` |
-| Win, non-bulk game | `2 * random.randint(5, 15)` |
+| Win, bulk-sim game | `random.randint(5, 12)` |
+| Win, non-bulk game | `random.randint(13, 20)` |
 | Loss, bulk-sim game | `random.randint(1, 2)` |
-| Loss, non-bulk game | `2 * random.randint(1, 2)` |
+| Loss, non-bulk game | `random.randint(3, 4)` |
 
 ### End-of-season tournaments (weeks 27–34)
 
@@ -53,7 +53,7 @@ For EOS games, apply the same gameplay-mode multiplier to the base value: bulk-s
 
 - Only the **franchise owner** (`franchise_doc.user_id` → `users._id`) is credited; guest or unauthenticated flows without a stored owner do not receive points.
 - Wins are detected by matching the game winner to the user’s team (`user_team_object_id` on the franchise document), including when team identifiers are stored as ObjectId strings or canonical `team_id` strings.
-- Losses award the flat 1–2 range above when the user’s team was a participant and did not win. Ties are handled by whichever team is recorded as the winner in the commit path.
+- Regular-season losses award `1–2` geek points for bulk-sim games and `3–4` geek points for non-bulk games when the user’s team was a participant and did not win. EOS losses use the EOS base-plus-multiplier policy above. Ties are handled by whichever team is recorded as the winner in the commit path.
 - `games.bulk_sim_used` is set by `/api/simulate-quarter` when the user advances via Sim Full Game or Sim Rest of Game. It is sticky once true.
 
 ## API

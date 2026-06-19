@@ -1,7 +1,7 @@
 """
 Franchise mode: award geek_points on the owning user's document when their team wins or loses.
 
-Point ranges are documented in _documentation_master/00_General_Systems/Geek_Points_System.md
+Point ranges are documented in _documentation_master/02_User_Account_Systems/Geek_Points_System.md
 """
 from __future__ import annotations
 
@@ -67,10 +67,15 @@ def teams_match_for_franchise(team_a: Any, team_b: Any) -> bool:
     return bool(oid_a and oid_b and oid_a == oid_b)
 
 
-def franchise_win_geek_points_delta(week: int, eos_game: dict | None) -> int:
+def franchise_win_geek_points_delta(
+    week: int,
+    eos_game: dict | None,
+    *,
+    bulk_sim_used: bool = False,
+) -> int:
     """Return random GP delta for a qualifying win, or 0 if no rule applies."""
     if week <= ft.REGULAR_SEASON_WEEKS:
-        return random.randint(5, 15)
+        return random.randint(5, 12) if bulk_sim_used else random.randint(13, 20)
 
     if not eos_game:
         return 0
@@ -80,27 +85,54 @@ def franchise_win_geek_points_delta(week: int, eos_game: dict | None) -> int:
 
     if phase == "conference":
         if rnd in (1, 2):
-            return random.randint(15, 20)
+            return apply_bulk_sim_geek_points_policy(
+                random.randint(15, 20),
+                bulk_sim_used=bulk_sim_used,
+            )
         if rnd == 3:
-            return random.randint(25, 35)
+            return apply_bulk_sim_geek_points_policy(
+                random.randint(25, 35),
+                bulk_sim_used=bulk_sim_used,
+            )
     elif phase == "region":
-        return random.randint(40, 50)
+        return apply_bulk_sim_geek_points_policy(
+            random.randint(40, 50),
+            bulk_sim_used=bulk_sim_used,
+        )
     elif phase == "national":
         if rnd in (1, 2):
-            return random.randint(50, 75)
+            return apply_bulk_sim_geek_points_policy(
+                random.randint(50, 75),
+                bulk_sim_used=bulk_sim_used,
+            )
         if rnd == 3:
-            return random.randint(125, 175)
+            return apply_bulk_sim_geek_points_policy(
+                random.randint(125, 175),
+                bulk_sim_used=bulk_sim_used,
+            )
 
     return 0
 
 
-def franchise_loss_geek_points_delta() -> int:
+def franchise_loss_geek_points_delta(
+    week: int,
+    eos_game: dict | None,
+    *,
+    bulk_sim_used: bool = False,
+) -> int:
     """Random GP for a franchise game loss (user's team played and did not win)."""
-    return random.randint(1, 2)
+    if week <= ft.REGULAR_SEASON_WEEKS:
+        return random.randint(1, 2) if bulk_sim_used else random.randint(3, 4)
+    if eos_game:
+        return apply_bulk_sim_geek_points_policy(
+            random.randint(1, 2),
+            bulk_sim_used=bulk_sim_used,
+        )
+    return 0
 
 
 def apply_bulk_sim_geek_points_policy(delta: int, *, bulk_sim_used: bool = False) -> int:
-    """Apply user gameplay-mode GP policy to a final base delta.
+    """Apply EOS gameplay-mode GP policy to a final base delta.
 
     Bulk-sim games keep the existing base award. Games without Sim Full Game /
     Sim Rest of Game receive a 2x award.
@@ -116,6 +148,8 @@ def maybe_award_franchise_loss_geek_points(
     user_team_id_str: str | None,
     winner_team_id: Any,
     participant_team_ids: tuple[Any, ...] | list[Any] | None,
+    week: int,
+    eos_game_meta: dict | None = None,
     bulk_sim_used: bool = False,
 ) -> None:
     """Increment geek_points when the user's franchise team loses a game they participated in."""
@@ -129,8 +163,9 @@ def maybe_award_franchise_loss_geek_points(
     if not played:
         return
 
-    delta = apply_bulk_sim_geek_points_policy(
-        franchise_loss_geek_points_delta(),
+    delta = franchise_loss_geek_points_delta(
+        week,
+        eos_game_meta,
         bulk_sim_used=bulk_sim_used,
     )
     if delta <= 0:
@@ -169,8 +204,9 @@ def maybe_award_franchise_win_geek_points(
     if not teams_match_for_franchise(winner_team_id, user_team_id_str):
         return
 
-    delta = apply_bulk_sim_geek_points_policy(
-        franchise_win_geek_points_delta(week, eos_game_meta),
+    delta = franchise_win_geek_points_delta(
+        week,
+        eos_game_meta,
         bulk_sim_used=bulk_sim_used,
     )
     if delta <= 0:
