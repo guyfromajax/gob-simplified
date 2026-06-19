@@ -36,9 +36,9 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
 | `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
 | `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
-| `MO_RESET_REDUCTION_MIN` / `_MAX` | 1 / 3 | Quarter (Q1→Q2, Q3→Q4) + OT break decay toward 0 for active players (randint range) |
-| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 1 / 2 | Timeout decay toward 0 for active players (randint range) |
-| `MO_HALFTIME_REDUCTION_MIN` / `_MAX` | 3 / 5 | Halftime (Q2→Q3) decay toward 0 for active players (randint range) |
+| `MO_RESET_REDUCTION_MIN` / `_MAX` | 1 / 2 | Quarter (Q1→Q2, Q3→Q4) + OT break decay toward 0 for active players (randint range) |
+| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 0 / 1 | Timeout decay toward 0 for active players (randint range) |
+| `MO_HALFTIME_REDUCTION_MIN` / `_MAX` | 2 / 3 | Halftime (Q2→Q3) decay toward 0 for active players (randint range) |
 | `MO_FINAL_SHOT_BONUS` | 1 | + after reset if player made the quarter's Final Shot |
 | `MO_TEAM_MIN` / `MO_TEAM_MAX` | −25 / 25 | Team Momentum range (= 5 × per-player range) |
 
@@ -132,9 +132,9 @@ All breaks use **one mechanic**: bench → 0; active players decay **toward 0** 
 
 | Trigger | Decay range | Bench | Active MO > 0 | Active MO < 0 | Where |
 |---|---|---|---|---|---|
-| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **1/3** | → 0 | `max(0, MO − randint(1,3))` | `min(0, MO + randint(1,3))` | `api.py` at quarter-complete (fallback: `main.py` `simulate_quarter`) |
-| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **1/2** | → 0 | `max(0, MO − randint(1,2))` | `min(0, MO + randint(1,2))` | `game_manager.py` `call_timeout` |
-| **Halftime (Q2→Q3)** | `MO_HALFTIME_REDUCTION_*` = **3/5** | → 0 | `max(0, MO − randint(3,5))` | `min(0, MO + randint(3,5))` | `api.py` at quarter-complete (`is_halftime=True`) |
+| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **1/2** | → 0 | `max(0, MO − randint(1,2))` | `min(0, MO + randint(1,2))` | `api.py` at quarter-complete (fallback: `main.py` `simulate_quarter`) |
+| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **0/1** | → 0 | `max(0, MO − randint(0,1))` | `min(0, MO + randint(0,1))` | `game_manager.py` `call_timeout` |
+| **Halftime (Q2→Q3)** | `MO_HALFTIME_REDUCTION_*` = **2/3** | → 0 | `max(0, MO − randint(2,3))` | `min(0, MO + randint(2,3))` | `api.py` at quarter-complete (`is_halftime=True`) |
 
 - The range is selected per break: quarter/OT use the default `MO_RESET_REDUCTION_*`; `call_timeout` passes the timeout range; `is_halftime=True` selects `MO_HALFTIME_REDUCTION_*` (the largest, since halftime is the longest break). Halftime no longer has a special "rails" rule — it's the same decay with a bigger range.
 - **Timing — applied *before* the set-lineup screen.** Quarter/halftime/OT decay fires at **quarter-complete** in `api.py` (right after the quarter increment, alongside the energy recharge, before the game-doc save) so the break lineup screen shows **post-decay** MO — same as timeouts. It is **idempotent** via `game_state["mo_last_reset_quarter"]`; `simulate_quarter` repeats the call as a fallback (skipped when already applied). See `Set_Lineup` / `Timeout_System.md`.

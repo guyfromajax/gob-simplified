@@ -47,11 +47,11 @@ MO_SHOTCLOCK_DEFENSE_DELTA = 1    # P = clamp(BASE + defenseTeamMO, 0, 100)%
 # (applies symmetrically to + and − MO). Bench → 0. Never on foul-out. Each
 # break type uses its own range; halftime (the longest break) decays the most.
 MO_RESET_REDUCTION_MIN = 1         # quarter (Q1→Q2, Q3→Q4) + OT breaks
-MO_RESET_REDUCTION_MAX = 3
-MO_TIMEOUT_REDUCTION_MIN = 1       # timeouts
-MO_TIMEOUT_REDUCTION_MAX = 2
-MO_HALFTIME_REDUCTION_MIN = 3      # halftime (Q2→Q3)
-MO_HALFTIME_REDUCTION_MAX = 5
+MO_RESET_REDUCTION_MAX = 2
+MO_TIMEOUT_REDUCTION_MIN = 0       # timeouts (0 = a timeout may leave MO unchanged)
+MO_TIMEOUT_REDUCTION_MAX = 1
+MO_HALFTIME_REDUCTION_MIN = 2      # halftime (Q2→Q3)
+MO_HALFTIME_REDUCTION_MAX = 3
 MO_FINAL_SHOT_BONUS = 1            # made the quarter's Final Shot → + after reset
 
 # --- Team momentum (DERIVED = sum of a team's 5 active players' MO) ---
