@@ -2,8 +2,8 @@
 
 Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 
-- **Player MO** — per-player attribute, range **−10..+10** (`player.attributes["MO"]`). Changed by in-game events; reset at breaks; zeroed at game end.
-- **Team Momentum** — **derived** sum of a team's 5 active (lineup) players' MO, range **−50..+50**. Computed on demand; never stored.
+- **Player MO** — per-player attribute, range **-5..+5** (`player.attributes["MO"]`). Changed by in-game events; reset at breaks; zeroed at game end.
+- **Team Momentum** — **derived** sum of a team's 5 active (lineup) players' MO, range **−25..+25**. Computed on demand; never stored.
 
 > **Tuning contract:** every value below is a named constant in `BackEnd/constants/momentum.py`, documented here 1:1. To retune, change the value in **both** this doc and `momentum.py` — the code reads the constant directly, so no other edits are needed. Player MO is always clamped to `[MO_MIN, MO_MAX]` via `player.clamp_mo`.
 
@@ -15,7 +15,7 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `MO_MIN` / `MO_MAX` | −10 / 10 | Per-player MO clamp range |
+| `MO_MIN` / `MO_MAX` | -5 / 5 | Per-player MO clamp range |
 | `MO_BLOCK_DELTA` | 1 | Block: blocker +, blocked shooter − |
 | `MO_STEAL_DELTA` | 1 | Steal: stealer +, victim − |
 | `MO_AND_ONE_DELTA` | 1 | Made shot + shooting foul → shooter + |
@@ -31,18 +31,18 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_SHOT_ROLL_BASE` | (1, 6) | Default shot roll |
 | `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
 | `MO_SHOT_ROLL_NEGATIVE` | (1, 5) | Unfavorable roll when MO < 0 and chance hits |
-| `MO_SHOT_IMPACT_PCT_PER_LEVEL` | 10 | P(modified roll) = \|MO\| × this (%) |
+| `MO_SHOT_IMPACT_PCT_PER_LEVEL` | 20 | P(modified roll) = \|MO\| × this (%) |
 | `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
 | `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
 | `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
-| `MO_RESET_REDUCTION_MIN` / `_MAX` | 4 / 7 | Quarter + OT break decay toward 0 for active players (randint range) |
-| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 2 / 4 | Timeout decay toward 0 for active players (randint range) |
-| `MO_HALFTIME_HIGH_RESET` | (1, 3) | Halftime: MO == +MO_MAX → randint(1, 3) |
-| `MO_HALFTIME_LOW_RESET` | (−3, −1) | Halftime: MO == −MO_MAX → randint(−3, −1) |
+| `MO_RESET_REDUCTION_MIN` / `_MAX` | 2 / 4 | Quarter + OT break decay toward 0 for active players (randint range) |
+| `MO_TIMEOUT_REDUCTION_MIN` / `_MAX` | 1 / 3 | Timeout decay toward 0 for active players (randint range) |
+| `MO_HALFTIME_HIGH_RESET` | (1, 2) | Halftime: MO == +MO_MAX → randint(1, 2) |
+| `MO_HALFTIME_LOW_RESET` | (−2, −1) | Halftime: MO == −MO_MAX → randint(−2, −1) |
 | `MO_FINAL_SHOT_BONUS` | 1 | + after reset if player made the quarter's Final Shot |
-| `MO_TEAM_MIN` / `MO_TEAM_MAX` | −50 / 50 | Team Momentum range (= 5 × per-player range) |
+| `MO_TEAM_MIN` / `MO_TEAM_MAX` | −25 / 25 | Team Momentum range (= 5 × per-player range) |
 
-Helpers live in `BackEnd/utils/player_momentum.py`; the per-player mutator is `Player.add_momentum(delta)` (`player.py`, clamps to ±10, never touches `anchor_MO`).
+Helpers live in `BackEnd/utils/player_momentum.py`; the per-player mutator is `Player.add_momentum(delta)` (`player.py`, clamps to `[MO_MIN, MO_MAX]` via `clamp_mo` — which imports the range from `momentum.py` — never touches `anchor_MO`).
 
 ---
 
@@ -53,7 +53,7 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | Event | Effect | Where |
 |---|---|---|
 | **Block** | blocker **+1**, blocked shooter **−1** | `shot_manager.py` (block path) |
-| **Steal** | stealer **+1**, victim **−1** | `phase_resolution.py` (turnover `STEAL`) |
+| **Steal** | stealer **+1**, victim **−1** | `phase_resolution.py` — all steal paths: `resolve_turnover_logic` (HCO + fast break), `resolve_full_court_press_logic` (FCP), `resolve_half_court_trap_logic` + `_resolve_half_court_trap_dynamic_first_cut` (HCT) |
 | **Charge** | charge-drawer **+1**, charging player **−1** | `shot_manager.py` (charge return) |
 | **And-1** (made shot + shooting foul) | shooter **+1** | `shot_manager.py` (main + block-recon), `shared.py` (putback) |
 | **3rd+ OREB** | rebounder **+1** on `OREB` ≥ `MO_OREB_THRESHOLD` | `player.py` `record_stat` |
@@ -82,8 +82,10 @@ A per-game, per-player boolean array (`True` = make, `False` = miss). Self-relat
 
 ### Set plays — target shooter make bonus
 
-- When a **set play** (not Motion offense) resolves as the **`successful`** skeleton variant and the resulting shot is a **MAKE**, the shooter gets **`MO_SET_PLAY_DELTA`** (+1). The successful variant routes the ball to the play's `target_shooter` by construction, so the make is the target shooter scoring on the set play.
+- When a **set play** (not Motion offense) runs the **`successful`** skeleton and the shot is a **MAKE**, the shooter gets **`MO_SET_PLAY_DELTA`** (+1). The successful skeleton routes the ball to the play's `target_shooter` by construction, so the make is the target shooter scoring.
+- **Keyed on the *executed* skeleton's `_variant`** (`skeleton.get("_variant") == "successful"`), **not** `variant_result` from `resolve_hco_outcome`. `get_skeleton_by_lean` **falls back to the successful skeleton** (incl. its multiple versions) when the resolved variant has no skeleton — so the successful skeleton can run even when the resolution outcome was a lower variant. (Keying on `variant_result` previously missed those makes.)
 - Stacks with other shot-make effects (e.g. consecutive-make bonus, and-1).
+- Fires only in the HCO path (`resolve_half_court_offense_logic`). FCP/HCT use their own shooter selection (no `target_shooter`/variant system), so the set-play bonus doesn't apply there.
 
 ---
 
@@ -91,8 +93,8 @@ A per-game, per-player boolean array (`True` = make, `False` = miss). Self-relat
 
 The base shooter roll and the OREB putback roll are **MO-aware** — `random.randint(1, 6)` is replaced by `mo_shot_roll(attributes)`:
 
-- **MO > 0:** `|MO| × MO_SHOT_IMPACT_PCT_PER_LEVEL`% chance to roll `MO_SHOT_ROLL_POSITIVE` `(2,6)` instead of base. (MO 1 → 10%, … MO 10 → 100%.)
-- **MO < 0:** same chance to roll `MO_SHOT_ROLL_NEGATIVE` `(1,5)` instead of base. (MO −1 → 10%, … MO −10 → 100%.)
+- **MO > 0:** `|MO| × MO_SHOT_IMPACT_PCT_PER_LEVEL`% chance to roll `MO_SHOT_ROLL_POSITIVE` `(2,6)` instead of base. (MO 1 → 20%, … MO 5 → 100%.)
+- **MO < 0:** same chance to roll `MO_SHOT_ROLL_NEGATIVE` `(1,5)` instead of base. (MO −1 → 20%, … MO -5 → 100%.)
 - **Else:** `MO_SHOT_ROLL_BASE` `(1,6)`.
 
 Wired at `shot_manager.py` (shooter base roll) and `shared.py` `oreb_shot_attempt` (putback roll). Passer/dribble/defense rolls are unaffected.
@@ -127,13 +129,14 @@ Resets **never** run on a foul-out timeout.
 
 | Trigger | Decay range | Bench | Active MO > 0 | Active MO < 0 | Where |
 |---|---|---|---|---|---|
-| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **4/7** | → 0 | `max(0, MO − randint(4,7))` | `min(0, MO + randint(4,7))` | `main.py` `simulate_quarter` |
-| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **2/4** | → 0 | `max(0, MO − randint(2,4))` | `min(0, MO + randint(2,4))` | `game_manager.py` `call_timeout` |
-| **Halftime (Q2→Q3)** | n/a (→0 + rails) | → 0 (rails apply) | → 0 unless rail | → 0 unless rail | `main.py` `simulate_quarter` (`is_halftime=True`) |
+| **Q1→Q2, Q3→Q4, OT breaks** | `MO_RESET_REDUCTION_*` = **2/4** | → 0 | `max(0, MO − randint(2,4))` | `min(0, MO + randint(2,4))` | `api.py` at quarter-complete (fallback: `main.py` `simulate_quarter`) |
+| **Timeouts** | `MO_TIMEOUT_REDUCTION_*` = **1/3** | → 0 | `max(0, MO − randint(1,3))` | `min(0, MO + randint(1,3))` | `game_manager.py` `call_timeout` |
+| **Halftime (Q2→Q3)** | n/a (→0 + rails) | → 0 (rails apply) | → 0 unless rail | → 0 unless rail | `api.py` at quarter-complete (`is_halftime=True`) |
 
 - Decay moves active players **toward** 0 by the trigger's randint range, **never crossing** 0; bench → 0. The range is passed into `apply_player_momentum_resets(..., reduction_min, reduction_max)` (defaults to the quarter/OT range; `call_timeout` passes the timeout range).
-- **Halftime rails:** MO `+MO_MAX` → `randint(1,3)`; MO `−MO_MAX` → `randint(−3,−1)`; everyone else → 0.
-- **Final-Shot bonus:** the player who made the quarter's Final Shot gets `+MO_FINAL_SHOT_BONUS` **after** the reset. Flagged via `game_state["mo_final_shot_maker_id"]` in `phase_resolution.py` `resolve_final_turn_shot_logic`; consumed and cleared in the reset.
+- **Timing — applied *before* the set-lineup screen.** Quarter/halftime/OT decay fires at **quarter-complete** in `api.py` (right after the quarter increment, alongside the energy recharge, before the game-doc save) so the break lineup screen shows **post-decay** MO — same as timeouts. It is **idempotent** via `game_state["mo_last_reset_quarter"]`; `simulate_quarter` repeats the call as a fallback (skipped when already applied). See `Set_Lineup` / `Timeout_System.md`.
+- **Halftime rails:** MO `+MO_MAX` → `randint(1,2)`; MO `−MO_MAX` → `randint(−2,−1)`; everyone else → 0.
+- **Final-Shot bonus:** the player who made the quarter's Final Shot gets `+MO_FINAL_SHOT_BONUS` **after** the reset (so it's also reflected on the break lineup screen). Flagged via `game_state["mo_final_shot_maker_id"]` in `phase_resolution.py` `resolve_final_turn_shot_logic`; consumed and cleared in the reset.
 - **End of game:** `reset_all_player_momentum(game)` zeros **every** player's MO (both teams, active + bench) at the live game-final detection (`is_final` in `api.py`), before the final save — no in-game momentum persists past the game. Distant-sim (CPU) games never change MO, so need no reset. See `End_Of_Game_System.md`.
 
 ---
@@ -148,11 +151,25 @@ Resets **never** run on a foul-out timeout.
 
 ## Frontend (court momentum bar)
 
-`FrontEnd/static/court.html` has a per-team bar (`home/away-momentum-neg`, `-pos`, center tick): **0 centered**, red fill (`#ff4444`) extends **left** to −50, green fill (`#34EC27`) extends **right** to +50.
+`FrontEnd/static/court.html` has a per-team bar (`home/away-momentum-neg`, `-pos`, center tick): **0 centered**, red fill (`#ff4444`) extends **left** to `MO_TEAM_MIN` (−25), green fill (`#34EC27`) extends **right** to `MO_TEAM_MAX` (+25).
 
-Driven by `gameScene.js`: `momentumValueForTeam()` reads `turn.{home,away}_team_momentum` (then the summary `team_momentum` fallback), and `updateMomentumBar(side, value)` maps the −50..+50 value to fill widths each scoreboard update.
+Driven by `gameScene.js`: `momentumValueForTeam()` reads `turn.{home,away}_team_momentum` (then the summary `team_momentum` fallback), and `updateMomentumBar(side, value)` maps the value over `±MO_TEAM_MAX_FE` (=25) to fill widths (rail fills the half-bar) each scoreboard update.
 
-The **player tooltip** momentum bar reads live MO: each turn's `player_momentum` is folded into `playerStats[id].MO`, and the tooltip reads `playerStats.MO` (falling back to the load-time `player.attributes.MO`).
+The **player tooltip** momentum bar (and the **set-lineup** bar) read live MO: each turn's `player_momentum` is folded into `playerStats[id].MO`, and the tooltip reads `playerStats.MO` (falling back to the load-time `player.attributes.MO`). Both scale the fill over `±MO_MAX` (=5).
+
+---
+
+## Frontend momentum display (icons / callouts / sprite FX)
+
+Per-player momentum is communicated three ways beyond the bars (live MO read from `playerStats[id].MO`). Display thresholds are on the **±5 scale** (constants `MO_GLYPH_THRESHOLD` = 4, `MO_WARM_MAG` = 3 in `gameScene.js`):
+
+| Surface | What | Where | Trigger (±5 scale) |
+|---|---|---|---|
+| **Box-score glyph** | flame (gold `#FF9A2E`) / snowflake (ice `#A6ECFF`) inline SVG beside the name; energy-driven name color untouched | `gameScene.js` `setBoxScoreMoGlyph` (driven per-turn by lineup slot) | shown at **\|MO\| ≥ 4** |
+| **Secondary callout** | ribbon: headline **Getting Warm!/Getting Cold!** (±3) and **Red Hot!/Ice Cold!** (±4, ±5), flame/snowflake sigil + right-side **MO chip** (gold hot / cyan cold) | `gameScene.js` `fireMomentumCallout` + streak tracking (`this.moCallout`); ribbon render in `court.html` (`secMomentumSigilSvg`, `.sec-mo-chip`); dispatched via `showSecondaryAnnouncement` (`announcements.js`) | fires **once on the way up** at \|MO\| **3 (warm), 4, 5 (hot)**; resets below ±3 / on sign flip; **yields** (drops) to any other secondary; **silent** (`sfx: null`) |
+| **On-court crown + glow** *(NOT built — Stage 2)* | flame crown (up) for **+4/+5**, icicle crown (down) for **−4/−5**, behind the marker + soft glow halo; binary on/off | design spec only (Claude Design "Stage 2"); not yet in code | binary at **\|MO\| ≥ 4** (same effect at 4 and 5) |
+
+At ±3 it's **callout-only** (no glyph, no crown); the persistent glyph/crown indicators start at ±4. Warm/hot and the crown are **sign-specific** (+ = hot/flame, − = cold/icicle).
 
 ---
 
@@ -167,9 +184,12 @@ The **player tooltip** momentum bar reads live MO: each turn's `player_momentum`
 | `BackEnd/utils/shared.py` | Putback and-1 + MO-aware putback roll; `summarize_game_state` team momentum |
 | `BackEnd/engine/phase_resolution.py` | Steal delta; Final-Shot maker flag; FT all-missed penalty (`resolve_free_throw_logic`); set-play make bonus (`resolve_half_court_offense_logic`) |
 | `BackEnd/models/game_manager.py` | `_append_turn` (shot-clock violation MO + per-turn team-momentum stamp); `call_timeout` reset |
-| `BackEnd/main.py` | `simulate_quarter` quarter/halftime reset |
-| `BackEnd/api/api.py` | EOG reset at `is_final` |
-| `FrontEnd/static/court.html`, `js/phaser/gameScene.js` | Team momentum bar + player tooltip bar |
+| `BackEnd/main.py` | `simulate_quarter` quarter/halftime reset (idempotent fallback) |
+| `BackEnd/api/api.py` | Quarter/halftime/OT break reset at quarter-complete (before lineup screen); EOG reset at `is_final` |
+| `BackEnd/models/player.py` | `clamp_mo` (imports `MO_MIN`/`MO_MAX`); `add_momentum`; `record_shot_result` |
+| `BackEnd/models/training_execution_v2.py` | Culture-Builder "Inspire" MO bump (clamps to `MO_MIN`/`MO_MAX`) |
+| `FrontEnd/static/court.html`, `js/phaser/gameScene.js` | Team momentum bar (`updateMomentumBar`, `±MO_TEAM_MAX_FE`); player tooltip bar (`÷MO_MAX`); box-score glyph (`setBoxScoreMoGlyph`); secondary callout (`fireMomentumCallout`, `secMomentumSigilSvg`, `.sec-mo-chip`) |
+| `FrontEnd/static/set-lineup.js`, `training-report.js` | Per-player MO bar/pill (scale `÷MO_MAX` = 5) |
 
 ---
 

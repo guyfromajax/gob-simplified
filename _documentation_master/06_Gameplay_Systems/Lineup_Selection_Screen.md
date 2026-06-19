@@ -45,7 +45,7 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Lineup Players Show:**
 - Stats: PTS, REB (OREB+DREB+REB), AST, Def% (DEF_S/DEF_A*100)
-- Attributes: EM (emoji), MO (visual bar -10 to +10), NG (color-coded %), Fouls
+- Attributes: EM (emoji), MO (visual bar -5 to +5), NG (color-coded %), Fouls
 
 **NG color bands (lineup bars and grid view aligned):** Red &lt;70%, Orange 70–80%, Yellow 80–89%, Green 90–100%.
 

@@ -5487,12 +5487,17 @@ def resolve_half_court_offense_logic(game):
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
 
-    # Player Momentum: a SET PLAY that resolves as the "successful" skeleton
+    # Player Momentum: a SET PLAY whose EXECUTED skeleton is the "successful"
     # variant routes the ball to the target_shooter by design, so a make here is
     # the target_shooter scoring on the set play → +MO_SET_PLAY_DELTA to the
     # shooter (Player_Momentum_System.md). Motion plays have no target shooter.
+    # NOTE: key on the executed skeleton's `_variant` (set in get_hco_skeleton),
+    # NOT `variant_result` from resolve_hco_outcome — get_skeleton_by_lean falls
+    # back to the successful skeleton when the resolved variant has none, so the
+    # successful skeleton can run even when variant_result is something else.
     if (not is_motion_play
-            and variant_result == "successful"
+            and skeleton
+            and skeleton.get("_variant") == "successful"
             and shot_result.get("result_type") == "MAKE"):
         _sp_shooter = roles.get("shooter")
         if _sp_shooter is not None:
@@ -6224,6 +6229,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Record STL stat for the defender (guarding ball handler)
         if defender:
             defender.record_stat("STL")
+            # Player Momentum: steal → stealer +, victim − (Player_Momentum_System.md).
+            defender.add_momentum(MO_STEAL_DELTA)
+            if ball_handler:
+                ball_handler.add_momentum(-MO_STEAL_DELTA)
         # Track FCP success: steal = defensive success
         def_scouting["defense"]["FCP"]["success"] += 1
         
@@ -7362,6 +7371,10 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
             ball_handler.record_stat("TO")
         if stealer is not None:
             stealer.record_stat("STL")
+            # Player Momentum: steal → stealer +, victim − (Player_Momentum_System.md).
+            stealer.add_momentum(MO_STEAL_DELTA)
+            if ball_handler is not None:
+                ball_handler.add_momentum(-MO_STEAL_DELTA)
         def_scouting["defense"]["HCT"]["success"] += 1
         # Steal aftermath continuity (mirrors the skeleton path). The steal
         # location (where the ball changed hands) seeds the stealer's start
@@ -7923,6 +7936,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Record STL stat for the defender (guarding ball handler)
         if defender:
             defender.record_stat("STL")
+            # Player Momentum: steal → stealer +, victim − (Player_Momentum_System.md).
+            defender.add_momentum(MO_STEAL_DELTA)
+            if ball_handler:
+                ball_handler.add_momentum(-MO_STEAL_DELTA)
         # Track HCT success: steal = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
         

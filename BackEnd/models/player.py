@@ -6,6 +6,8 @@ from BackEnd.constants.momentum import (
     MO_CONSECUTIVE_DELTA,
     MO_OREB_THRESHOLD,
     MO_OREB_DELTA,
+    MO_MIN,
+    MO_MAX,
 )
 import uuid
 import os
@@ -13,14 +15,13 @@ import random
 
 DEBUG_SERIALIZATION = os.getenv("DEBUG_SERIALIZATION")
 
-# MO (Momentum) is defined on a fixed -10..+10 scale (see Player_Attribute_System.md
-# / Attribute_Clamp_System.md). This is the canonical hard bound, enforced on every
-# Player load so no persisted/legacy value can ever exceed the scale.
-MO_MIN, MO_MAX = -10, 10
+# MO (Momentum) scale is the single source of truth in BackEnd/constants/momentum.py
+# (MO_MIN/MO_MAX). This is the canonical hard bound, enforced on every Player load so
+# no persisted/legacy value can ever exceed the scale. See Player_Momentum_System.md.
 
 
 def clamp_mo(value):
-    """Clamp a Momentum value to its defined -10..+10 scale (0 on bad input)."""
+    """Clamp a Momentum value to its defined [MO_MIN, MO_MAX] scale (0 on bad input)."""
     try:
         return max(MO_MIN, min(MO_MAX, int(value)))
     except (TypeError, ValueError):

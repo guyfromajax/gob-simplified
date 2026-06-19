@@ -175,6 +175,10 @@ function syncPauseButtonDom(isPaused) {
   }
 }
 
+// Team Momentum frontend range — mirrors BackEnd MO_TEAM_MAX (= 5 × MO_MAX).
+// Keep in sync with BackEnd/constants/momentum.py (Player_Momentum_System.md).
+const MO_TEAM_MAX_FE = 25;
+
 function updateMomentumBar(teamSide, value) {
   const negEl = document.getElementById(`${teamSide}-momentum-neg`);
   const posEl = document.getElementById(`${teamSide}-momentum-pos`);
@@ -183,13 +187,17 @@ function updateMomentumBar(teamSide, value) {
   // (e.g. a tween onUpdate frame or a partial scoreboard payload). Leave the bar
   // exactly as it was rather than blanking it to 0. A real 0 still paints empty.
   if (value === null || value === undefined) return;
-  const v = Math.max(-50, Math.min(50, Number(value) || 0));
+  const v = Math.max(-MO_TEAM_MAX_FE, Math.min(MO_TEAM_MAX_FE, Number(value) || 0));
+  const pct = Math.abs(v) / MO_TEAM_MAX_FE * 50; // rail fills the half-bar (50% of container)
   if (v < 0) {
-    negEl.style.width = `${Math.abs(v)}%`;
+    negEl.style.width = `${pct}%`;
     posEl.style.width = '0%';
-  } else {
-    posEl.style.width = `${v}%`;
+  } else if (v > 0) {
+    posEl.style.width = `${pct}%`;
     negEl.style.width = '0%';
+  } else {
+    negEl.style.width = '0%';
+    posEl.style.width = '0%';
   }
 }
 
@@ -205,14 +213,18 @@ function moSnowflakeSvg() {
     + '<path fill="#A6ECFF" d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/>'
     + '</svg>';
 }
-/** Show/hide a box-score momentum glyph: flame at MO>=+5, snowflake at MO<=-5, else hidden. */
+// Momentum display thresholds (±5 MO scale — Player_Momentum_System.md).
+const MO_GLYPH_THRESHOLD = 4;   // box-score flame/snowflake at |MO| >= 4
+const MO_WARM_MAG = 3;          // callout warm at |MO| == 3; hot at |MO| 4 and 5
+
+/** Show/hide a box-score momentum glyph: flame at MO>=+4, snowflake at MO<=-4, else hidden. */
 function setBoxScoreMoGlyph(glyphEl, mo) {
   if (!glyphEl) return;
   const v = Number(mo) || 0;
-  if (v >= 5) {
+  if (v >= MO_GLYPH_THRESHOLD) {
     glyphEl.innerHTML = moFlameSvg();
     glyphEl.style.display = 'inline-flex';
-  } else if (v <= -5) {
+  } else if (v <= -MO_GLYPH_THRESHOLD) {
     glyphEl.innerHTML = moSnowflakeSvg();
     glyphEl.style.display = 'inline-flex';
   } else if (glyphEl.style.display !== 'none') {
@@ -221,10 +233,10 @@ function setBoxScoreMoGlyph(glyphEl, mo) {
   }
 }
 
-/** Momentum secondary-callout headline: warm at |MO|==4, hot/cold at >=5. */
+/** Momentum secondary-callout headline: warm at |MO|==3, hot/cold at >=4 (±5 scale). */
 function momentumCalloutHeadline(sign, mag) {
   const hot = sign > 0;
-  if (mag === 4) return hot ? 'Getting Warm!' : 'Getting Cold!';
+  if (mag <= MO_WARM_MAG) return hot ? 'Getting Warm!' : 'Getting Cold!';
   return hot ? 'Red Hot!' : 'Ice Cold!';
 }
 /** True if the secondary ribbon is currently showing/exiting — momentum callouts
@@ -566,21 +578,21 @@ function momentumValueForTeam(teamObj, turn, side) {
       ? Number(turn?.home_momentum_bar ?? turn?.home_momentum ?? turn?.home_team_momentum)
       : Number(turn?.away_momentum_bar ?? turn?.away_momentum ?? turn?.away_team_momentum);
   if (Number.isFinite(fromTurn)) {
-    return Math.max(-50, Math.min(50, fromTurn));
+    return Math.max(-MO_TEAM_MAX_FE, Math.min(MO_TEAM_MAX_FE, fromTurn));
   }
-  // Derived Team Momentum (−50..+50) from the game summary team object —
+  // Derived Team Momentum (−25..+25) from the game summary team object —
   // used for the initial render / resume when the turn lacks the stamp.
   const fromTeam = Number(teamObj?.team_momentum);
   if (Number.isFinite(fromTeam)) {
-    return Math.max(-50, Math.min(50, fromTeam));
+    return Math.max(-MO_TEAM_MAX_FE, Math.min(MO_TEAM_MAX_FE, fromTeam));
   }
   const attrs = teamObj?.attributes || teamObj?.team_attributes || {};
   const m = Number(attrs.momentum ?? teamObj?.momentum_score);
   if (Number.isFinite(m)) {
     if (m >= 0 && m <= 10) {
-      return Math.round((m - 5) * 10);
+      return Math.round((m - 5) * 5);
     }
-    return Math.max(-50, Math.min(50, m));
+    return Math.max(-MO_TEAM_MAX_FE, Math.min(MO_TEAM_MAX_FE, m));
   }
   // No authoritative source on this update → null so the bar stays as-is (sticky).
   return null;
@@ -1550,13 +1562,13 @@ export function createGameScene(Phaser) {
           const moValue = typeof momentum === 'number' ? momentum : 0;
           
           if (moValue < 0) {
-            // Negative momentum: fill left side with red
-            const fillPercent = Math.abs(moValue) / 10 * 100; // -10 = 100%, -5 = 50%
+            // Negative momentum: fill left side with red (MO scale ±5)
+            const fillPercent = Math.min(100, Math.abs(moValue) / 5 * 100); // -5 = 100%
             leftBar.style.width = `${fillPercent}%`;
             rightBar.style.width = '0%';
           } else if (moValue > 0) {
-            // Positive momentum: fill right side with green
-            const fillPercent = moValue / 10 * 100; // +10 = 100%, +5 = 50%
+            // Positive momentum: fill right side with green (MO scale ±5)
+            const fillPercent = Math.min(100, moValue / 5 * 100); // +5 = 100%
             leftBar.style.width = '0%';
             rightBar.style.width = `${fillPercent}%`;
           } else {
@@ -2166,18 +2178,18 @@ export function createGameScene(Phaser) {
               if (row && row.moGlyph) setBoxScoreMoGlyph(row.moGlyph, mo);
               if (!pid) return;
 
-              // Streak tracking: announce once per crossing on the way UP at
-              // |MO| 4 and each of 5..10; never when cooling. Reset when the
-              // player drops below |MO| 4 or flips sign / crosses 0. announcedMag
+              // Streak tracking (±5 scale): announce once per crossing on the way
+              // UP at |MO| 3 (warm), 4 and 5 (hot); never when cooling. Reset when
+              // the player drops below |MO| 3 or flips sign / crosses 0. announcedMag
               // is the streak's high-water mark, so re-climbing doesn't re-fire,
               // and a single big jump fires only the most extreme level reached.
               const mag = Math.abs(mo);
               const sign = mo > 0 ? 1 : (mo < 0 ? -1 : 0);
               let st = this.moCallout[pid];
-              if (!st || mag < 4 || sign !== st.sign) {
+              if (!st || mag < MO_WARM_MAG || sign !== st.sign) {
                 st = { sign, announcedMag: 0 };
               }
-              if (mag >= 4 && sign !== 0 && mag > st.announcedMag) {
+              if (mag >= MO_WARM_MAG && sign !== 0 && mag > st.announcedMag) {
                 st.announcedMag = mag; // advance even if the callout yields/drops
                 fireMomentumCallout(this, pid, teamKey, sign, mo);
               }

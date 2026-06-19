@@ -1142,7 +1142,7 @@ function createMomentumPill(mo) {
   container.appendChild(centerLine);
   
   const moValue = typeof mo === 'number' ? mo : 0;
-  const maxValue = 10; // MO ranges from -10 to +10
+  const maxValue = 5; // MO ranges from -5 to +5 (BackEnd MO_MAX; Player_Momentum_System.md)
   
   // Fill based on value
   if (moValue > 0) {

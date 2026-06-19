@@ -4923,6 +4923,21 @@ try:
                 except Exception as e:
                     logging.error(f"⚠️ EOG: Player momentum reset failed: {e}")
 
+            # Quarter / halftime / OT break: apply the Player Momentum decay (and
+            # the Final-Shot bonus, which lives inside the reset) BEFORE the save,
+            # so the break lineup screen shows post-decay values — same timing as
+            # the energy recharge above and as timeouts. gm.quarter is already
+            # incremented here, so is_halftime = entering Q3. Idempotent via
+            # mo_last_reset_quarter: simulate_quarter skips if already applied.
+            if quarter_complete and not is_final:
+                try:
+                    if gm.game_state.get("mo_last_reset_quarter") != gm.quarter:
+                        from BackEnd.utils.player_momentum import apply_player_momentum_resets
+                        apply_player_momentum_resets(gm, is_halftime=(gm.quarter == 3))
+                        gm.game_state["mo_last_reset_quarter"] = gm.quarter
+                except Exception as e:
+                    logging.error(f"⚠️ QUARTER BREAK: Player momentum reset failed: {e}")
+
             # ✅ PERFORMANCE: Save game state every 25 turns (reduced from 10 for better performance)
             # Still save on quarter complete to ensure quarter number is persisted
             # 25 turns is still sufficient for crash recovery (saves ~13 times per game vs 32)

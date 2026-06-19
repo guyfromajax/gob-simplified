@@ -13,6 +13,7 @@ import random
 import logging
 from typing import List, Dict, Tuple, Optional, Any
 from BackEnd.constants import ALL_ATTRS
+from BackEnd.constants.momentum import MO_MIN, MO_MAX
 from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
 from BackEnd.utils.defense_identity import (
     DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
@@ -621,8 +622,9 @@ def apply_training_points(
             em_improvement = random.randint(2, 5)
             mo_improvement = random.randint(1, 2)
             attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
-            # MO is bounded to its defined scale: -10 (floor) to +10 (cap).
-            attrs["MO"] = max(-10, min(10, attrs.get("MO", 0) + mo_improvement))
+            # MO is bounded to its defined scale [MO_MIN, MO_MAX] (single source
+            # of truth in BackEnd/constants/momentum.py).
+            attrs["MO"] = max(MO_MIN, min(MO_MAX, attrs.get("MO", 0) + mo_improvement))
             # Update anchors
             attrs["anchor_EM"] = attrs["EM"]
             attrs["anchor_MO"] = attrs["MO"]

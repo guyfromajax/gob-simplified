@@ -6,9 +6,9 @@ code reads them directly. Player MO is clamped to [MO_MIN, MO_MAX] via
 ``player.clamp_mo``.
 """
 
-# --- Per-player MO scale (mirrors player.clamp_mo) ---
-MO_MIN = -10
-MO_MAX = 10
+# --- Per-player MO scale (single source of truth; player.clamp_mo imports these) ---
+MO_MIN = -5
+MO_MAX = 5
 
 # --- Event deltas ---
 MO_BLOCK_DELTA = 1            # blocker +, blocked shooter −
@@ -34,7 +34,7 @@ MO_CONSECUTIVE_DELTA = 1      # + per consecutive make / − per consecutive mis
 MO_SHOT_ROLL_BASE = (1, 6)        # default roll
 MO_SHOT_ROLL_POSITIVE = (2, 6)    # when MO > 0 and the chance hits
 MO_SHOT_ROLL_NEGATIVE = (1, 5)    # when MO < 0 and the chance hits
-MO_SHOT_IMPACT_PCT_PER_LEVEL = 10  # P(modified roll) = |MO| × this (%)
+MO_SHOT_IMPACT_PCT_PER_LEVEL = 20  # P(modified roll) = |MO| × this (%); 100% at |MO|=5
 
 # --- Shot-clock violation (per active player, independent roll) ---
 MO_SHOTCLOCK_BASE_PCT = 40
@@ -45,15 +45,15 @@ MO_SHOTCLOCK_DEFENSE_DELTA = 1    # P = clamp(BASE + defenseTeamMO, 0, 100)%
 # Move each active player toward 0 by a randint(MIN, MAX), never crossing 0.
 # Bench → 0. Never on foul-out. Quarter breaks (Q1→Q2, Q3→Q4) and OT breaks use
 # the larger range; timeouts use the smaller range.
-MO_RESET_REDUCTION_MIN = 4         # quarter + OT breaks
-MO_RESET_REDUCTION_MAX = 7
-MO_TIMEOUT_REDUCTION_MIN = 2       # timeouts
-MO_TIMEOUT_REDUCTION_MAX = 4
+MO_RESET_REDUCTION_MIN = 2         # quarter + OT breaks
+MO_RESET_REDUCTION_MAX = 4
+MO_TIMEOUT_REDUCTION_MIN = 1       # timeouts
+MO_TIMEOUT_REDUCTION_MAX = 3
 # Halftime (Q2→Q3): everyone → 0, except the rails:
-MO_HALFTIME_HIGH_RESET = (1, 3)    # MO == +MO_MAX → randint(1, 3)
-MO_HALFTIME_LOW_RESET = (-3, -1)   # MO == −MO_MAX (−10) → randint(−3, −1)
+MO_HALFTIME_HIGH_RESET = (1, 2)    # MO == +MO_MAX (+5) → randint(1, 2)
+MO_HALFTIME_LOW_RESET = (-2, -1)   # MO == −MO_MAX (−5) → randint(−2, −1)
 MO_FINAL_SHOT_BONUS = 1            # made the quarter's Final Shot → + after reset
 
 # --- Team momentum (DERIVED = sum of a team's 5 active players' MO) ---
-MO_TEAM_MIN = -50   # = 5 × MO_MIN
-MO_TEAM_MAX = 50    # = 5 × MO_MAX
+MO_TEAM_MIN = -25   # = 5 × MO_MIN
+MO_TEAM_MAX = 25    # = 5 × MO_MAX

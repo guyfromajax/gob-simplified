@@ -1560,12 +1560,12 @@ function updateSlotDisplay(slot) {
     let leftWidth = '0%';
     let rightWidth = '0%';
     if (moValue < 0) {
-      // Negative momentum: fill left side with red
-      const fillPercent = Math.min(100, Math.abs(moValue) / 10 * 100); // -10 = 100%, -5 = 50%
+      // Negative momentum: fill left side with red (MO scale ±5)
+      const fillPercent = Math.min(100, Math.abs(moValue) / 5 * 100); // -5 = 100%
       leftWidth = `${fillPercent}%`;
     } else if (moValue > 0) {
-      // Positive momentum: fill right side with green
-      const fillPercent = Math.min(100, moValue / 10 * 100); // +10 = 100%, +5 = 50%
+      // Positive momentum: fill right side with green (MO scale ±5)
+      const fillPercent = Math.min(100, moValue / 5 * 100); // +5 = 100%
       rightWidth = `${fillPercent}%`;
     }
     

@@ -1,6 +1,6 @@
 # Player Attribute System (**verified 2026-06-13**)
 
-> Frontend display-order/formatting doc. Verified vs `training-report.js`: emoji map (`getEmotionEmoji` L1103-1109: ≥80 😎 / ≥60 😊 / ≥40 😐 / ≥20 😕 / else 😡) and momentum-pill math (`createMomentumPill` L1112+: green=success / red=error / `(mo/10)*50%` fill, +10→50%) **match exactly**; NG `toFixed(2)`, integer floor for SC–FT (`createAttributeCell` L1046+). **Correction applied:** `ATTRIBUTE_ORDER` is **14 attributes (MO excluded)** at L53-55 — *not* 15 at L16-18. MO is rendered on the **lineup screen** (`set-lineup.js` L1528/L1568), not in the Training Report grid; `createAttributeCell` retains an MO branch but the Report's order array never feeds it MO.
+> Frontend display-order/formatting doc. Verified vs `training-report.js`: emoji map (`getEmotionEmoji` L1103-1109: ≥80 😎 / ≥60 😊 / ≥40 😐 / ≥20 😕 / else 😡) and momentum-pill math (`createMomentumPill` L1112+: green=success / red=error / `(mo/5)*50%` fill, +5→50%) **match exactly**; NG `toFixed(2)`, integer floor for SC–FT (`createAttributeCell` L1046+). **Correction applied:** `ATTRIBUTE_ORDER` is **14 attributes (MO excluded)** at L53-55 — *not* 15 at L16-18. MO is rendered on the **lineup screen** (`set-lineup.js` L1528/L1568), not in the Training Report grid; `createAttributeCell` retains an MO branch but the Report's order array never feeds it MO.
 
 ## Base Constants
 
@@ -27,7 +27,7 @@
 - **SC through FT (12 attributes)**: Integer values, no decimals
 - **NG**: Decimal with 2 places (0.00-1.00)
 - **EM**: Emoji display (0-100 range)
-- **MO**: Red/Green horizontal pill visualization (-10 to +10)
+- **MO**: Red/Green horizontal pill visualization (-5 to +5)
 
 **Key Files:**
 - `FrontEnd/static/training-report.js` - Attribute order constant and display logic
