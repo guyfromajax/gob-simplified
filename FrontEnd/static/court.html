@@ -3468,6 +3468,26 @@
       width: 0%;
     }
 
+    /* Numeric MO value over the bar. White + dark outline so it reads on the
+       red (neg), green (pos), and #333 (empty) fills. Positioned by sign in JS:
+       positive → right side, negative → left side. Hidden at 0. */
+    .momentum-bar-value {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      display: none;
+      align-items: center;
+      padding: 0 6px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 2px #000, 0 0 3px #000, 0 1px 1px #000;
+      z-index: 3;
+      pointer-events: none;
+    }
+
     /* ==================== PLAY TOOLTIP ==================== */
     #play-tooltip {
       position: fixed;
@@ -3904,6 +3924,7 @@
           <div class="momentum-bar-left" id="tooltip-momentum-left"></div>
           <div class="momentum-bar-center"></div>
           <div class="momentum-bar-right" id="tooltip-momentum-right"></div>
+          <div class="momentum-bar-value" id="tooltip-momentum-value"></div>
         </div>
       </div>
       <div class="tooltip-stat-row">

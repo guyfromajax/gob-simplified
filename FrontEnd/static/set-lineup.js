@@ -1603,6 +1603,15 @@ function updateSlotDisplay(slot) {
     
     slotContent.classList.remove('empty');
 
+    // MO bar hover tooltip: signed value only ("+3" / "-2"), no copy, hidden at 0.
+    // innerHTML was just replaced, so this is a fresh element (no listener buildup).
+    if (moValue !== 0) {
+      const moBar = slotContent.querySelector('.player-momentum .momentum-bar-container');
+      if (moBar) {
+        setupPositionRatingTooltip(moBar, moValue > 0 ? `+${moValue}` : `${moValue}`);
+      }
+    }
+
     // Show remove button — unless this player is the locked FT shooter, who
     // cannot be removed (but can still be reordered via drag).
     const ftLocked = isFtLockedPlayer(playerId);

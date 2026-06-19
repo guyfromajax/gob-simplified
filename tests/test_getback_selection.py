@@ -104,6 +104,46 @@ def test_shooter_never_gets_back():
     assert len(result) == 2
 
 
+def test_shooter_never_gets_back_when_position_is_stale():
+    off_lineup = {
+        "PG": _player(90, player_id="pg"),
+        "SG": _player(80, player_id="sg"),
+        "SF": _player(70, player_id="sf"),
+        "PF": _player(60, player_id="pf"),
+        "C": _player(50, player_id="c"),
+    }
+    def_lineup = {pos: _player(50, player_id=f"d{pos}") for pos in off_lineup}
+    roles = {
+        "shooter": off_lineup["PG"],
+        "steps": [
+            {
+                "pos_actions": {
+                    pos: {"location": "deep upper wing"}
+                    for pos in off_lineup
+                }
+            }
+        ],
+    }
+    game = SimpleNamespace(zone_defender_assignments_by_step={})
+
+    result = select_offense_getback_list(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        game=game,
+        roles=roles,
+        shooter_pos="C",
+        num_getback=2,
+        shot_step_index=0,
+        is_home_team_shooting=True,
+        defense_playcall="man",
+        shooter_id="pg",
+    )
+
+    assert "PG" not in result
+    assert "C" not in result
+    assert result == ["PF", "SF"]
+
+
 def test_matchup_must_be_at_qualifying_spot():
     off_lineup = {
         "PG": _player(90, player_id="pg"),
@@ -140,4 +180,4 @@ def test_matchup_must_be_at_qualifying_spot():
         defense_playcall="man",
     )
 
-    assert result == ["SG", "SF"]
+    assert result == ["PF", "SF"]

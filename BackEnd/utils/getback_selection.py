@@ -153,20 +153,32 @@ def select_offense_getback_list(
     shot_step_index: Optional[int],
     is_home_team_shooting: bool,
     defense_playcall: str,
+    shooter_id: Optional[str] = None,
 ) -> List[str]:
     """
     Pick up to ``num_getback`` offensive positions to retreat.
 
-    Eligibility: shooter excluded; defensive matchup must be at a qualifying
-    3pt/deep spot. Among eligible players, choose those farthest from the
-    attacking basket on x (1-2 based on roll).
+    Eligibility: shooter excluded by position and player id; defensive matchup
+    must be at a qualifying 3pt/deep spot. Among eligible players, choose those
+    farthest from the attacking basket on x (1-2 based on roll).
     """
     if num_getback <= 0 or not shooter_pos:
         return []
 
+    shooter_id_str = str(shooter_id) if shooter_id is not None else None
+    if not shooter_id_str:
+        shooter_obj = roles.get("shooter") if isinstance(roles, dict) else None
+        role_shooter_id = getattr(shooter_obj, "player_id", None)
+        shooter_id_str = str(role_shooter_id) if role_shooter_id is not None else None
+
     eligible: List[tuple[str, float]] = []
     for off_pos, off_player in off_lineup.items():
-        if not off_player or off_pos == shooter_pos:
+        off_player_id = getattr(off_player, "player_id", None) if off_player else None
+        if (
+            not off_player
+            or off_pos == shooter_pos
+            or (shooter_id_str and str(off_player_id) == shooter_id_str)
+        ):
             continue
         def_pos = _def_pos_for_offensive_player(
             game=game,

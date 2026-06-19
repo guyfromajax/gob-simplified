@@ -1256,16 +1256,18 @@ class ShotManager:
             num_getback = roll_num_getback(offense_reb_value, rand)
 
             is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+            shooter_pos_for_getback = roles.get("shooter_pos") or shooter_pos
             offense_getback_list = select_offense_getback_list(
                 off_lineup=off_lineup,
                 def_lineup=def_lineup,
                 game=self.game,
                 roles=roles,
-                shooter_pos=shooter_pos,
+                shooter_pos=shooter_pos_for_getback,
                 num_getback=num_getback,
                 shot_step_index=shot_step_index,
                 is_home_team_shooting=is_home_team_shooting,
                 defense_playcall=defense_call,
+                shooter_id=getattr(shooter, "player_id", None),
             )
 
             offense_rebounders = [

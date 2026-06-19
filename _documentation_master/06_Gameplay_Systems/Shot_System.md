@@ -147,7 +147,7 @@
     - If miss: Determine rebound (geography-based system)
 
 13. Player Positioning (for all shots)
-    - Determine offense get-back players (based on rebounding strategy setting; HCO only — HCT / FCP / Fast Break skip get-back)
+    - Determine offense get-back players (based on rebounding strategy setting; HCO only — HCT / FCP / Fast Break skip get-back). The shooter is never eligible to be a get-back player; backend selection excludes them by both shooter position and shooter `player_id`.
     - Determine defense release players (based on fast_breaks strategy setting + Covert Release eligibility)
     - Calculate post-shot coordinates for **every** player and populate the four overlay maps on the turn result:
       `offense_rebounder_coords`, `defense_rebounder_coords`, `offense_getback_coords`, `defense_release_coords`.

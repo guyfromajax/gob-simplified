@@ -1557,10 +1557,11 @@ export function createGameScene(Phaser) {
         // Update momentum bar (visual instead of text)
         const leftBar = document.getElementById('tooltip-momentum-left');
         const rightBar = document.getElementById('tooltip-momentum-right');
-        
+        const moValueEl = document.getElementById('tooltip-momentum-value');
+
         if (leftBar && rightBar) {
           const moValue = typeof momentum === 'number' ? momentum : 0;
-          
+
           if (moValue < 0) {
             // Negative momentum: fill left side with red (MO scale ±5)
             const fillPercent = Math.min(100, Math.abs(moValue) / 5 * 100); // -5 = 100%
@@ -1575,6 +1576,25 @@ export function createGameScene(Phaser) {
             // Zero momentum: no fill, just yellow line
             leftBar.style.width = '0%';
             rightBar.style.width = '0%';
+          }
+
+          // Numeric MO value: signed, positive on the right, negative on the
+          // left; hidden at 0 (per spec).
+          if (moValueEl) {
+            if (moValue > 0) {
+              moValueEl.textContent = `+${moValue}`;
+              moValueEl.style.left = 'auto';
+              moValueEl.style.right = '0';
+              moValueEl.style.display = 'flex';
+            } else if (moValue < 0) {
+              moValueEl.textContent = `${moValue}`;
+              moValueEl.style.right = 'auto';
+              moValueEl.style.left = '0';
+              moValueEl.style.display = 'flex';
+            } else {
+              moValueEl.textContent = '';
+              moValueEl.style.display = 'none';
+            }
           }
         }
         

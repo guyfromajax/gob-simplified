@@ -11,7 +11,7 @@ A unified system that handles rebound logic for all missed shot instances.
 
 - `offense_rebounder_coords` — non-get-back offensive players, clustered near the rim of the basket just attacked.
 - `defense_rebounder_coords` — non-release defensive players, clustered near the rim of the basket just attacked.
-- `offense_getback_coords` — offensive get-back retreaters (HCO only; HCT / FCP / Fast Break skip the get-back mechanic).
+- `offense_getback_coords` — offensive get-back retreaters (HCO only; HCT / FCP / Fast Break skip the get-back mechanic). The shot shooter is never a get-back retreater; backend selection excludes the shooter by both role position and `player_id` so stale position derivation cannot make the shooter eligible.
 - `defense_release_coords` — defensive release players running for the outlet on a Covert Release fast break.
 
 The MISS turn emitter absorbs these into the final step's `end.coords` via its `_apply_post_shot_overlay` helper. `sync_lineup_coords_from_turn` then writes them to `player.coords`. Overlay precedence is set in `TURN_COORDS_OVERLAY_KEYS` (rebounder maps applied first, get-back / release applied last — get-back / release win for the specific role-players they designate).
@@ -161,5 +161,4 @@ Notes:
 - HCT / FCP previously inherited HCO mechanics (get-back / release). The refactor drops those for HCT / FCP / Fast Break and aligns them on the frontcourt-half x-eligibility filter.
 - HCO retains its existing prefilter — the get-back / release mechanic is HCO-specific.
 - `choose_rebounder` is the per-team primitive. `determine_rebounder` is the whole-game wrapper that calls `choose_rebounder` once per team and then runs the weighted off-vs-def selection. See section above for algorithmic detail.
-
 

@@ -52,6 +52,68 @@ from BackEnd.utils.transition_bridge import (
 
 _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
+# Per-step coordinate trace for debugging HCT player-coord jank. When True, every
+# emitted step logs its label + each active player's start → destination (the
+# engine's intended target) → end (what the emitter actually renders). A
+# divergence between destination and end flags coord jank. Toggle off when done.
+LOG_HCT_STEP_COORDS = True
+
+
+def _fmt_xy(c: Optional[Dict[str, Any]]) -> str:
+    if not c:
+        return "(  -,  -)"
+    return f"({int(round(c['x'])):>3},{int(round(c['y'])):>3})"
+
+
+def _log_hct_step_trace(
+    steps: List[AnimationStep],
+    loop_segments: List[Dict[str, Any]],
+    prior_final_coords: Dict[str, GridCoord],
+    setup_coords: Dict[str, GridCoord],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> None:
+    """Trace every emitted HCT step's per-player coords for jank debugging.
+
+    For each step: ``Step N: <label>`` then, for all 10 active players,
+    ``start -> dest -> end`` where ``start`` is the prior step's rendered end,
+    ``dest`` is the engine's intended target for the step (the loop segment end),
+    and ``end`` is the coord the emitter actually renders. ``dest`` and ``end``
+    should match — a mismatch is the coord jank to chase.
+    """
+    if not LOG_HCT_STEP_COORDS:
+        return
+    pid_label: Dict[str, str] = {}
+    for side, lineup in (("OFF", off_lineup), ("DEF", def_lineup)):
+        for pos in _OFFENSE_POSITIONS:
+            pid = _player_id_at_pos(lineup, pos)
+            if pid:
+                pid_label[pid] = f"{side} {pos}"
+    n_loop = len(loop_segments)
+    lines: List[str] = []
+    prev_end: Dict[str, GridCoord] = dict(prior_final_coords or {})
+    for idx, step in enumerate(steps):
+        end = (step.get("end") or {}).get("coords") or {}
+        if idx == 0:
+            label = "walk-up (entry bring-up)"
+            dest = setup_coords
+        elif idx <= n_loop:
+            seg = loop_segments[idx - 1]
+            label = seg.get("step_label") or seg.get("reason") or "loop step"
+            dest = _seg_end_coords_by_id(seg, off_lineup, def_lineup)
+        else:
+            label = "shot / post-shot sub-step"
+            dest = end
+        lines.append(f"  Step {idx + 1}: {label}")
+        for pid, lab in pid_label.items():
+            lines.append(
+                f"      {lab}: start {_fmt_xy(prev_end.get(pid))}"
+                f"  ->  dest {_fmt_xy(dest.get(pid))}"
+                f"  ->  end {_fmt_xy(end.get(pid))}"
+            )
+        prev_end = end
+    print(f"[HCT STEP COORD TRACE] {len(steps)} steps\n" + "\n".join(lines))
+
 
 def _player_id_at_pos(lineup: Dict[str, Any], pos: str) -> Optional[str]:
     player = lineup.get(pos)
@@ -866,5 +928,9 @@ def build_dynamic_hct_animation_steps(
     turn_result["step_clock_seconds"] = step_clock_seconds
     turn_result["resolution_step_index"] = len(steps) - 1
     turn_result["executed_step_count"] = len(steps)
+
+    _log_hct_step_trace(
+        steps, loop_segments, prior_final_coords, setup_coords, off_lineup, def_lineup
+    )
 
     return steps

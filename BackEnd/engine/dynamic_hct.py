@@ -982,15 +982,18 @@ def _segment(
     seconds: float,
     gate: Tuple[str, str],
     ball_owner_pos: str = "PG",
+    label: str = "",
 ) -> Dict[str, Any]:
     """Snapshot a loop segment's per-player end coords + gate.
 
     ``gate`` is ``(side, pos)`` where side ∈ {"off", "def"} — the player whose
     arrival ends the step. ``ball_owner_pos`` is the offensive position holding
-    the ball at the end of the segment (changes after a pass).
+    the ball at the end of the segment (changes after a pass). ``label`` is a
+    human-readable step description for the per-step coord trace log.
     """
     return {
         "reason": reason,
+        "step_label": label or reason,
         "off_end": {p: dict(off_coords[p]) for p in POSITIONS},
         "def_end": {p: dict(def_coords[p]) for p in POSITIONS},
         "seconds": round(float(seconds), 2),
@@ -1005,6 +1008,7 @@ def _pass_segment(
     off_coords: Dict[str, Dict[str, int]],
     def_coords: Dict[str, Dict[str, int]],
     seconds: float,
+    label: str = "pass",
 ) -> Dict[str, Any]:
     """A ball-in-flight segment (§6 pass). Offense holds while the ball travels
     passer → receiver; the defense moves to ``def_coords``. The emitter renders
@@ -1013,7 +1017,7 @@ def _pass_segment(
     """
     seg = _segment(
         "hct_pass", off_coords, def_coords, seconds, ("off", receiver_pos),
-        ball_owner_pos=receiver_pos,
+        ball_owner_pos=receiver_pos, label=label,
     )
     seg["pass_from_pos"] = passer_pos
     seg["pass_to_pos"] = receiver_pos
@@ -1033,7 +1037,10 @@ def _emit_dead_ball_drive(
     _position_defense(attack_xy, def_coords, is_away_offense, off_coords)
     seconds = max(0.3, partial_elapsed)
     return (
-        _segment("hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos),
+        _segment(
+            "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
+            label="attack → forced dead-ball turnover (terminal)",
+        ),
         seconds,
     )
 
@@ -1176,11 +1183,14 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     # D15b: off-ball offense keep hustling toward setup during the converge beat.
     _move_offense(off_coords, off_targets, converge_seconds, off_lineup, bh_pos)
     loop_segments.append(
-        _segment("hct_converge", off_coords, def_coords, converge_seconds, ("def", "PG"), bh_pos)
+        _segment(
+            "hct_converge", off_coords, def_coords, converge_seconds, ("def", "PG"), bh_pos,
+            label="converge (defense closes on the BH)",
+        )
     )
     shot_clock -= converge_seconds
 
-    def _advance() -> None:
+    def _advance(label: str = "advance (BH dribbles forward)") -> None:
         """Neutral / beaten-pressure advance: BH dribbles forward, defense re-poses."""
         nonlocal bh_xy
         adv_x = bh_xy["x"] + _basket_dir(is_away_offense) * random.randint(
@@ -1197,7 +1207,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         # D15b: off-ball offense keep hustling toward their setup spots.
         _move_offense(off_coords, off_targets, advance_seconds, off_lineup, bh_pos)
         loop_segments.append(
-            _segment("hct_advance", off_coords, def_coords, advance_seconds, ("off", bh_pos), bh_pos)
+            _segment(
+                "hct_advance", off_coords, def_coords, advance_seconds, ("off", bh_pos), bh_pos,
+                label=label,
+            )
         )
 
     def _do_broken_hct_cutoff() -> str:
@@ -1225,7 +1238,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                 )
             bh_xy = off_coords[bh_pos]
             loop_segments.append(
-                _segment("hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos)
+                _segment(
+                    "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
+                    label="attack (broken-HCT cutoff drive — clean to topLane)",
+                )
             )
             nonlocal_shot_clock_dec(seconds)
             off_in = _count_in_attack_basket(off_coords, is_away_offense)
@@ -1241,7 +1257,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         def_coords[cutoff_pos] = dict(meet)
         bh_xy = off_coords[bh_pos]
         loop_segments.append(
-            _segment("hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos)
+            _segment(
+                "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
+                label="attack (broken-HCT cutoff drive — meet-point collision)",
+            )
         )
         nonlocal_shot_clock_dec(seconds)
 
@@ -1249,10 +1268,13 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             off_team, def_team, ball_handler, cutoff_def, None, exclude_steal=True,
         )
         if outcome in ("O_FOUL", "D_FOUL"):
-            _apply_moment_outcome(outcome, 1.0, credited)
+            _apply_moment_outcome(outcome, 1.0, credited, context="broken-HCT cutoff collision")
             return "TERMINAL"
         if outcome == "DEAD BALL":
-            sec = _emit_stopper("hct_dead_ball")
+            sec = _emit_stopper(
+                "hct_dead_ball",
+                "dead ball (terminal — broken-HCT cutoff collision)",
+            )
             nonlocal_shot_clock_dec(sec)
             result_type = "DEAD BALL"
             text_suffix = " — stripped at the point of attack, turnover!"
@@ -1295,34 +1317,36 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             def_lineup.get(trapper_pos) if trapper_pos else None,
         )
 
-    def _emit_stopper(reason: str) -> float:
+    def _emit_stopper(reason: str, label: str = "") -> float:
         """D8 — terminal whistle/steal beat: the defense collapses onto the BH
         for a short hold. Mutates ``def_coords`` and appends the segment."""
         _position_defense(bh_xy, def_coords, is_away_offense)
         secs = 0.5
         loop_segments.append(
-            _segment(reason, off_coords, def_coords, secs, ("def", "PG"), bh_pos)
+            _segment(reason, off_coords, def_coords, secs, ("def", "PG"), bh_pos, label=label)
         )
         return secs
 
     def _apply_moment_outcome(
-        outcome: str, score_ratio: float, credited: Any
+        outcome: str, score_ratio: float, credited: Any, context: str = "moment"
     ) -> bool:
         """D8 — translate a resolved moment into loop state. Returns ``True`` if
         the outcome is terminal (caller should ``break``), ``False`` if the BH
-        retains and the loop should advance/continue."""
+        retains and the loop should advance/continue. ``context`` labels the
+        producing moment (e.g. "single-defender pressure", "two-defender trap")
+        for the per-step coord trace."""
         nonlocal result_type, text_suffix, turnover_type
         nonlocal foul_team, foul_player, stealer, steal_coords
         if outcome == "STEAL":
             steal_coords = dict(bh_xy)
-            sec = _emit_stopper("hct_steal")
+            sec = _emit_stopper("hct_steal", f"steal (terminal — {context})")
             nonlocal_shot_clock_dec(sec)
             result_type = "STEAL"
             stealer = credited
             text_suffix = " — picked his pocket, steal!"
             return True
         if outcome == "O_FOUL":
-            sec = _emit_stopper("hct_foul")
+            sec = _emit_stopper("hct_foul", f"offensive foul (terminal — {context})")
             nonlocal_shot_clock_dec(sec)
             result_type = "FOUL"
             foul_team = "OFFENSE"
@@ -1330,7 +1354,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             text_suffix = " — offensive foul on the ball handler!"
             return True
         if outcome == "D_FOUL":
-            sec = _emit_stopper("hct_foul")
+            sec = _emit_stopper("hct_foul", f"defensive reach-in foul (terminal — {context})")
             nonlocal_shot_clock_dec(sec)
             result_type = "FOUL"
             foul_team = "DEFENSE"
@@ -1439,7 +1463,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                         )
                         loop_segments.append(
                             _pass_segment(
-                                bh_pos, receiver_pos, off_coords, def_coords, pass_seconds
+                                bh_pos, receiver_pos, off_coords, def_coords, pass_seconds,
+                                label=f"pass (top-level kick {bh_pos}\u2192{receiver_pos})",
                             )
                         )
                         shot_clock -= pass_seconds
@@ -1518,11 +1543,12 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                 if status == "TERMINAL":
                     break
                 continue  # RETAIN → dribble-dead, re-read next iteration
+            mlabel = "two-defender trap" if moment == "trap" else "single-defender pressure"
             outcome, score_ratio, credited = _resolve_attack(moment, in_range)
-            if _apply_moment_outcome(outcome, score_ratio, credited):
+            if _apply_moment_outcome(outcome, score_ratio, credited, context=mlabel):
                 break
             # POS_O / NEUTRAL → advance below.
-            _advance()
+            _advance(label=f"advance (BH beats the {mlabel})")
             shot_clock -= loop_segments[-1]["seconds"]
             continue
 
@@ -1535,7 +1561,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             # D15b: off-ball offense keep hustling toward their setup spots.
             _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
             loop_segments.append(
-                _segment("hct_hold", off_coords, def_coords, hold_seconds, ("off", bh_pos), bh_pos)
+                _segment(
+                    "hct_hold", off_coords, def_coords, hold_seconds, ("off", bh_pos), bh_pos,
+                    label="hold (BH holds the ball 1-3s while the defense closes)",
+                )
             )
             shot_clock -= hold_seconds
 
@@ -1543,9 +1572,11 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             if moment2 == "trap":
                 # A second defender arrived during the hold → Trap Moment.
                 outcome, score_ratio, credited = _resolve_attack("trap", in_range2)
-                if _apply_moment_outcome(outcome, score_ratio, credited):
+                if _apply_moment_outcome(
+                    outcome, score_ratio, credited, context="two-defender trap (after hold)"
+                ):
                     break
-                _advance()
+                _advance(label="advance (BH beats the two-defender trap after hold)")
                 shot_clock -= loop_segments[-1]["seconds"]
                 continue
             if moment2 == "none":
@@ -1572,7 +1603,9 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             # Attack). Terminal outcomes end the turn; otherwise the BH retains
             # and we re-read next iteration.
             outcome, score_ratio, credited = _resolve_attack("pressure", in_range2)
-            if _apply_moment_outcome(outcome, score_ratio, credited):
+            if _apply_moment_outcome(
+                outcome, score_ratio, credited, context="single-defender pressure (after hold)"
+            ):
                 break
             continue
 
@@ -1606,7 +1639,10 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             exclude={receiver_pos},
         )
         loop_segments.append(
-            _pass_segment(passer_pos, receiver_pos, off_coords, def_coords, pass_seconds)
+            _pass_segment(
+                passer_pos, receiver_pos, off_coords, def_coords, pass_seconds,
+                label=f"pass (backcourt outlet {passer_pos}\u2192{receiver_pos})",
+            )
         )
         shot_clock -= pass_seconds
 
@@ -1622,7 +1658,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         _move_offense(off_coords, off_targets, recv_hold_seconds, off_lineup, bh_pos)
         loop_segments.append(
             _segment(
-                "hct_reception", off_coords, def_coords, recv_hold_seconds, ("off", bh_pos), bh_pos
+                "hct_reception", off_coords, def_coords, recv_hold_seconds, ("off", bh_pos), bh_pos,
+                label=f"reception ({bh_pos} catches & holds)",
             )
         )
         shot_clock -= recv_hold_seconds

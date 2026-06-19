@@ -909,22 +909,41 @@ class GameManager:
         foul_out_player_data = result.get("foul_out_player", {})
         foul_out_player = None
         foul_out_player_id = foul_out_player_data.get("player_id") if isinstance(foul_out_player_data, dict) else None
+        if not foul_out_player_id:
+            foul_out_player_id = (
+                result.get("foul_player_id")
+                or result.get("fouler_id")
+            )
         if foul_out_player_id:
+            foul_out_player_id_str = str(foul_out_player_id)
             for team in [self.home_team, self.away_team]:
                 players = team.get_all_players() if hasattr(team, "get_all_players") else []
                 for player in players:
-                    if hasattr(player, "player_id") and player.player_id == foul_out_player_id:
+                    if hasattr(player, "player_id") and str(player.player_id) == foul_out_player_id_str:
                         foul_out_player = player
                         break
                 if foul_out_player:
                     break
                 if not foul_out_player:
                     for player in (team.lineup or {}).values():
-                        if player and hasattr(player, "player_id") and player.player_id == foul_out_player_id:
+                        if player and hasattr(player, "player_id") and str(player.player_id) == foul_out_player_id_str:
                             foul_out_player = player
                             break
                 if foul_out_player:
                     break
+
+        if foul_out_player:
+            foul_out_player_data = {
+                "player_id": getattr(foul_out_player, "player_id", None),
+                "name": getattr(foul_out_player, "name", None)
+                or (
+                    foul_out_player.get_name()
+                    if hasattr(foul_out_player, "get_name")
+                    else "Unknown"
+                ),
+                "photo": getattr(foul_out_player, "photo", None),
+                "team": getattr(foul_out_player, "team", None),
+            }
 
         foul_out_context = self.game_state.get("foul_out_context", {})
         if foul_out_context:

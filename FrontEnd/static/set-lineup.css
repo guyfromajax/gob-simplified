@@ -831,8 +831,19 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .roster-table tr.ineligible td,
 .roster-stats-table tr.ineligible td {
   background: rgba(255,255,255,0.08) !important;
-  color: rgba(255,255,255,0.36);
+  color: rgba(255,255,255,0.78);
   cursor: not-allowed;
+}
+
+.roster-table tr.ineligible td:first-child,
+.roster-table tr.ineligible td:first-child a,
+.roster-table tr.ineligible td.rt,
+.roster-table tr.ineligible .inline-rt,
+.roster-stats-table tr.ineligible td:first-child,
+.roster-stats-table tr.ineligible td:first-child a,
+.roster-stats-table tr.ineligible td.rt,
+.roster-stats-table tr.ineligible .inline-rt {
+  color: rgba(255,255,255,0.9);
 }
 
 .roster-table td:first-child,

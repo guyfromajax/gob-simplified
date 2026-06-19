@@ -1022,7 +1022,7 @@ All three flows use the same core systems:
 3. **Foul Out:**
    - Same as timeout (creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"`)
    - No timeout count reduction
-   - Includes `foul_out_player` data in timeout turn payload
+   - Includes real `foul_out_player` identity in timeout turn payload (`player_id`, `name`, `team`, optional `photo`). The backend must resolve this from the original foul result / `foul_player_id` before creating the timeout turn; `Unknown` placeholder payloads are an error fallback, not valid expected behavior.
 
 ### Key Files
 
