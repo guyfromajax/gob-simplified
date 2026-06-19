@@ -352,6 +352,7 @@ class TeamManager:
                 "trap_override": None,         # Future: HCT override
                 "press_trap_override": None,   # "press", "trap", "none", or None (playcall center)
             }
+        self.playbook_settings = {}
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"man": 0, "zone": 0}
         

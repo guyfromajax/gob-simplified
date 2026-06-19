@@ -8,6 +8,7 @@
 - `BackEnd/utils/cpu_playbook_customization.py`
 - `BackEnd/models/franchise_manager.py`
 - `BackEnd/api/api.py`
+- `BackEnd/api/franchise_routes.py`
 - `BackEnd/models/turn_manager.py`
 
 **Related docs:**
@@ -134,6 +135,19 @@ Flow:
 8. Persist the same baseline into the game document under `summary["teams"][team_id]["playbook_settings"]`.
 
 The greenfield Q1 `simulate-quarter` path also calls the refresh before loading FTD, preserving parity with `init-game`.
+
+### Complete-Week CPU Full Sims
+
+Some complete-week CPU games use the full turn-by-turn simulation path instead of the distant-score shortcut. Those games are created in `BackEnd/api/franchise_routes.py`, not through `POST /api/init-game`.
+
+For that path, the worker loads both teams' FTD rows directly, runs `prepare_ftd_for_new_game()`, builds a franchise-mode `GameManager`, and assigns:
+
+```text
+gm.home_team.playbook_settings = dict(home_prepared["playbook_settings"])
+gm.away_team.playbook_settings = dict(away_prepared["playbook_settings"])
+```
+
+This is required because full CPU sims generally do not have a live `game_id`. Runtime play selection should therefore read the in-memory `TeamManager.playbook_settings`; a `games` collection fallback is not a reliable source for these simulations.
 
 ---
 
@@ -388,6 +402,8 @@ This keeps the generation logic testable outside the large route files.
 ### Runtime Selectors
 
 `BackEnd/models/turn_manager.py` now loads `playbook_settings` by matching the requested `team_id` to either the offense or defense `TeamManager`, without requiring `is_user_team`.
+
+Every `TeamManager` initializes `playbook_settings` to `{}` so legacy/non-franchise paths have a safe baseline. Franchise game init and complete-week CPU full sims overwrite that baseline with FTD-customized playbooks when available.
 
 `BackEnd/constants/fast_break_play_types.py` already supports weighted DREB fast-break play selection from `playbook_settings.fast_breaks`.
 

@@ -10,7 +10,7 @@ from bson import ObjectId
 client = TestClient(app)
 
 
-def _fake_franchise_cpu_full_sim(_home_name: str, _away_name: str) -> tuple[int, int, dict]:
+def _fake_franchise_cpu_full_sim(*_args, **_kwargs) -> tuple[int, int, dict]:
     """Avoid full ``run_simulation`` (needs 5+ player rosters) in API tests."""
     return (54, 58, {})
 
@@ -529,4 +529,3 @@ def test_phase_b_http_idempotent_when_franchise_week_already_advanced(caplog):
         for r in caplog.records
     )
     db.franchises.delete_many({})
-

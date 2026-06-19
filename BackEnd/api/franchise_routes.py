@@ -18,7 +18,7 @@ from typing import Any, List, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
 from urllib.parse import urlencode
-from BackEnd.main import run_simulation
+from BackEnd.main import run_simulation, simulate_quarter
 
 from BackEnd.db import (
     db,
@@ -82,6 +82,8 @@ from BackEnd.utils.franchise_championships import (
 )
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.utils.team_play_utils import iter_team_plays
+from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
+from BackEnd.models.game_manager import GameManager
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
@@ -2904,16 +2906,106 @@ def _order_franchise_week_results_like_schedule(results: list, week_games: list)
 
 
 def _franchise_cpu_full_sim_max_workers() -> int:
-    """Phase 3: cap parallel turn-based CPU sims (full ``run_simulation`` path)."""
+    """Phase 3: cap parallel turn-based CPU sims."""
     try:
         return max(1, int(os.environ.get("FRANCHISE_CPU_SIM_MAX_WORKERS", "4")))
     except (TypeError, ValueError):
         return 4
 
 
-def _run_franchise_cpu_full_simulation_core(home_name: str, away_name: str) -> tuple[int, int, dict]:
-    """CPU-only turn-based sim; no DB writes (safe for ThreadPoolExecutor)."""
-    gm = run_simulation(home_name, away_name)
+_FRANCHISE_CPU_FULL_SIM_FTD_PROJECTION = {
+    "team_id": 1,
+    "team_attributes": 1,
+    "strategy_settings": 1,
+    "playbook_settings": 1,
+    "plays": 1,
+    "scouting_data": 1,
+}
+
+
+def _franchise_cpu_full_sim_ftd_doc(franchise_id: Any, team_id: Any) -> dict:
+    fid_candidates: list[Any] = [franchise_id]
+    if isinstance(franchise_id, str) and ObjectId.is_valid(franchise_id):
+        fid_candidates.append(ObjectId(franchise_id))
+
+    tid_candidates: list[Any] = [team_id]
+    tid_str = str(team_id) if team_id is not None else ""
+    if tid_str and ObjectId.is_valid(tid_str):
+        tid_candidates.append(ObjectId(tid_str))
+    if tid_str:
+        tid_candidates.append(tid_str)
+
+    seen: set[tuple[str, str]] = set()
+    for fid in fid_candidates:
+        for tid in tid_candidates:
+            key = (type(fid).__name__ + ":" + str(fid), type(tid).__name__ + ":" + str(tid))
+            if key in seen:
+                continue
+            seen.add(key)
+            doc = franchise_team_data_collection.find_one(
+                {"franchise_id": fid, "team_id": tid},
+                _FRANCHISE_CPU_FULL_SIM_FTD_PROJECTION,
+            )
+            if doc:
+                return doc
+    return {}
+
+
+def _run_franchise_cpu_full_simulation_core(
+    franchise_id: Any,
+    home_id: Any,
+    away_id: Any,
+    home_name: str,
+    away_name: str,
+) -> tuple[int, int, dict]:
+    """CPU-only turn-based franchise sim; hydrate FTD data and avoid DB writes."""
+    home_prepared = prepare_ftd_for_new_game(
+        _franchise_cpu_full_sim_ftd_doc(franchise_id, home_id)
+    )
+    away_prepared = prepare_ftd_for_new_game(
+        _franchise_cpu_full_sim_ftd_doc(franchise_id, away_id)
+    )
+
+    gm = GameManager(
+        home_name,
+        away_name,
+        home_strategy_settings=home_prepared.get("strategy_settings"),
+        away_strategy_settings=away_prepared.get("strategy_settings"),
+        home_team_attributes=home_prepared.get("team_attributes"),
+        away_team_attributes=away_prepared.get("team_attributes"),
+        home_scouting_data=home_prepared.get("scouting_data"),
+        away_scouting_data=away_prepared.get("scouting_data"),
+        home_plays_data=home_prepared.get("plays_data"),
+        away_plays_data=away_prepared.get("plays_data"),
+        mode="franchise",
+        franchise_id=str(franchise_id) if franchise_id is not None else None,
+    )
+    gm.home_team.playbook_settings = dict(home_prepared.get("playbook_settings") or {})
+    gm.away_team.playbook_settings = dict(away_prepared.get("playbook_settings") or {})
+    gm.game_state["allow_fouled_out_lineup_reentry"] = True
+
+    if not gm.home_team.lineup:
+        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team, gm.game_state)
+    if not gm.away_team.lineup:
+        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
+
+    gm.setup_opening_tip()
+
+    gm.quarter = 1
+    while True:
+        simulate_quarter(gm)
+
+        current_q = gm.quarter - 1
+        if current_q >= 4:
+            h_pts = gm.game_state["score"][gm.home_team.name]
+            a_pts = gm.game_state["score"][gm.away_team.name]
+            if h_pts != a_pts:
+                gm.quarter = current_q
+                gm.game_state["quarter"] = current_q
+                break
+            gm.home_team.points_by_quarter.append(0)
+            gm.away_team.points_by_quarter.append(0)
+
     away_score = int(gm.score.get(away_name, 0) or 0)
     home_score = int(gm.score.get(home_name, 0) or 0)
     summary = summarize_game_state(gm)
@@ -4902,7 +4994,14 @@ def _complete_week_finish_cpu_and_persist(
         future_meta = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for sched_idx, aid, hid, an, hn in full_jobs:
-                fut = executor.submit(_run_franchise_cpu_full_simulation_core, hn, an)
+                fut = executor.submit(
+                    _run_franchise_cpu_full_simulation_core,
+                    franchise_id,
+                    hid,
+                    aid,
+                    hn,
+                    an,
+                )
                 future_meta[fut] = (sched_idx, aid, hid, an, hn)
         sim_ok: dict[int, tuple[int, int, dict]] = {}
         sim_err: dict[int, Exception] = {}
