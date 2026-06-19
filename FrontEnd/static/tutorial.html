@@ -49,24 +49,14 @@
 
   .tile { display: flex; align-items: center; gap: 14px; padding: 13px 12px; border-radius: 11px; text-decoration: none; color: inherit; position: relative; border: 1px solid transparent; transition: background .14s, border-color .14s; }
   .tile:hover { background: rgba(255,255,255,0.04); }
-  /* recommended-order step badge (replaces the old icon chip) */
-  .tile .t-num { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 19px; letter-spacing: .02em; background: rgba(255,255,255,0.06); border: 1px solid var(--hair); color: var(--muted); }
   .tile .t-main { flex: 1; min-width: 0; }
   .tile .t-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .tile .t-name { font-weight: 700; font-size: 15px; color: var(--text); letter-spacing: -.01em; }
-  .tile .t-desc { font-size: 12.5px; color: var(--muted-2); margin-top: 2px; text-wrap: pretty; }
   .tile .t-go { color: var(--muted-3); font-size: 16px; transition: transform .14s, color .14s; }
   .tile:hover .t-go { transform: translateX(3px); color: var(--text); }
 
-  /* priority + tbd + seen states */
-  .tile--priority { background: rgba(247,148,32,0.06); border-color: rgba(247,148,32,0.28); }
-  .tile--priority:hover { background: rgba(247,148,32,0.10); }
-  .tile--priority .t-num { background: var(--orange); color: #15181f; border-color: transparent; }
+  /* tbd + seen states */
   .tile--tbd { opacity: .68; }
-  .tile--tbd .t-num { color: var(--muted-2); }
-
-  .tag-first { font-family: var(--body); font-size: 9.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: #15181f; background: var(--orange); padding: 2px 7px; border-radius: 5px; }
-  .tag-tbd { font-family: var(--body); font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: rgba(255,255,255,0.08); border: 1px solid var(--hair); padding: 2px 7px; border-radius: 5px; }
 
   .seen-check { width: 19px; height: 19px; border-radius: 50%; flex-shrink: 0; background: var(--green); color: #07210a; font-size: 12px; font-weight: 800; display: none; align-items: center; justify-content: center; }
   .tile.is-seen .seen-check { display: flex; }
@@ -76,6 +66,70 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(247,148,32,0); }
     15% { box-shadow: 0 0 0 3px rgba(247,148,32,0.5); background: rgba(247,148,32,0.12); }
     60% { box-shadow: 0 0 0 2px rgba(247,148,32,0.28); }
+  }
+
+  /* ADVANCED TOPICS */
+  .advanced-section {
+    margin-top: 48px;
+    padding-top: 34px;
+    border-top: 1px solid var(--hair);
+  }
+  .advanced-progress {
+    padding: 14px 18px;
+    margin-bottom: 18px;
+  }
+  .advanced-progress .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .advanced-progress .lbl {
+    font-family: var(--display);
+    font-size: 18px;
+    letter-spacing: .03em;
+    color: var(--text);
+  }
+  .advanced-progress .sub {
+    font-size: 12px;
+    color: var(--muted-2);
+  }
+  .advanced-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .advanced-topic {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.035);
+    opacity: .58;
+  }
+  .advanced-topic__name {
+    font-weight: 800;
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: -.01em;
+  }
+  .coming-soon {
+    flex-shrink: 0;
+    pointer-events: none;
+    cursor: default;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 7px 11px;
+    background: rgba(255,255,255,0.06);
+    color: var(--muted);
+    font-family: var(--display);
+    font-size: 14px;
+    letter-spacing: .05em;
+    line-height: 1;
   }
 
 
@@ -122,12 +176,27 @@
     <section class="section" id="topics">
       <div class="section-head">
         <div>
-          <span class="eyebrow"><span class="tick"></span> All Topics</span>
-          <h2>MASTER THE COMPLETE COACHING SYSTEM</h2>
+          <h2>Core Topics</h2>
         </div>
-        <p class="hint">The numbers mark the recommended order — but every lesson stands alone, so dip in anywhere.</p>
+        <p class="hint">Start anywhere — each core lesson is built to stand on its own.</p>
       </div>
       <div class="cats" id="cats"></div>
+    </section>
+
+    <section class="section advanced-section" id="advanced-topics">
+      <div class="section-head">
+        <div>
+          <h2>Advanced Topics</h2>
+        </div>
+      </div>
+      <div class="advanced-progress panel" aria-label="Advanced topics progress">
+        <div class="top">
+          <span class="lbl">Advanced Progress</span>
+          <span class="sub"><span id="advanced-seen-n">0</span> of <span id="advanced-total-n">3</span> topics complete</span>
+        </div>
+        <div class="bar"><i id="advanced-bar"></i></div>
+      </div>
+      <div class="advanced-list" id="advanced-topics-list"></div>
     </section>
 
   </div>

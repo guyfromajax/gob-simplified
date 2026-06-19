@@ -10,35 +10,25 @@
   var I = (window.GOB && window.GOB.icons) || {};
   function sfx(f) { if (window.GOB && window.GOB.playSound) window.GOB.playSound(f); }
 
-  /* ---- category + topic model ----
-     priority -> the one topic every coach must master first
-     (Recruiting & Scouting content is TBD/authored later, but they are
-      presented as normal Advanced lessons here — not flagged as TBD.)   */
+  /* ---- category + topic model ---- */
   // Grid fills left-to-right, top-to-bottom, so array order sets the layout:
   //   Players  | Training
   //   Team     | Strategy
   var CATS = [
     { id: 'players', name: 'Players', icon: I.player, topics: [
-      { id: 'player-attributes', name: 'Player Attributes', icon: I.player, depth: 'foundational', priority: true,
-        desc: 'The 14 attributes that determine the unique skill set of every player.' }
+      { id: 'player-attributes', name: 'Player Attributes', icon: I.player }
     ]},
     { id: 'training', name: 'Training', icon: I.training, topics: [
-      { id: 'training', name: 'Training', icon: I.training, depth: 'foundational',
-        desc: 'Player & team drills, playbook installs, scrimmages, and the coaching style that defines your team’s focus.' }
+      { id: 'training', name: 'Training', icon: I.training }
     ]},
     { id: 'team', name: 'Team', icon: I.team, topics: [
-      { id: 'team-attributes', name: 'Team Attributes', icon: I.shield, depth: 'foundational',
-        desc: 'Your program’s identity — compounding mindset traits vs. trained, decaying systems.' },
-      { id: 'recruiting', name: 'Recruiting', icon: I.recruiting, depth: 'advanced',
-        desc: 'Manage your recruiting pipeline by mastering invites, visits, and commitments.' }
+      { id: 'team-attributes', name: 'Team Attributes', icon: I.shield },
+      { id: 'recruiting', name: 'Recruiting', icon: I.recruiting }
     ]},
     { id: 'strategy', name: 'Strategy', icon: I.strategy, topics: [
-      { id: 'game-plans', name: 'Game Plans', icon: I.sliders, depth: 'foundational',
-        desc: 'The foundation of your strategy.' },
-      { id: 'playbooks', name: 'Playbooks', icon: I.playbook, depth: 'advanced',
-        desc: 'Learn how to build playbooks that match your coaching style.' },
-      { id: 'scouting', name: 'Scouting', icon: I.scout, depth: 'advanced',
-        desc: 'Learn how to study your upcoming opponents.' }
+      { id: 'game-plans', name: 'Game Plans', icon: I.sliders },
+      { id: 'playbooks', name: 'Playbooks', icon: I.playbook },
+      { id: 'scouting', name: 'Scouting', icon: I.scout }
     ]}
   ];
 
@@ -46,6 +36,13 @@
   var LEARNABLE = [];
   CATS.forEach(function (c) { c.topics.forEach(function (t) { if (t.tag !== 'tbd') LEARNABLE.push(t.id); }); });
   var TOTAL = LEARNABLE.length;
+
+  var ADVANCED_TOPICS = [
+    { id: 'momentum', name: 'Momentum', href: null, available: false },
+    { id: 'presses-traps', name: 'Presses & Traps', href: null, available: false },
+    { id: 'practice-squad', name: 'Practice Squad', href: null, available: false }
+  ];
+  var ADVANCED_TOTAL = ADVANCED_TOPICS.length;
 
   // recommended learning order for the “next up” cue
   var ORDER = ['player-attributes', 'training', 'team-attributes', 'game-plans', 'playbooks', 'scouting', 'recruiting'];
@@ -89,19 +86,12 @@
     host.innerHTML = CATS.map(function (c) {
       var tiles = c.topics.map(function (t) {
         var isTbd = t.tag === 'tbd';
-        var cls = 'tile' + (t.priority ? ' tile--priority' : '') + (isTbd ? ' tile--tbd' : '');
-        var badge = t.priority ? '<span class="tag-first">★ Master first</span>'
-                  : isTbd ? '<span class="tag-tbd">TBD</span>'
-                  : t.depth ? '<span class="depth ' + t.depth + '">' + t.depth + '</span>' : '';
-        // recommended-order step number (1–7 across all categories; non-contiguous within a panel)
-        var step = ORDER.indexOf(t.id) + 1;
+        var cls = 'tile' + (isTbd ? ' tile--tbd' : '');
         // live topics navigate to their sub-page; dead ones toast via [data-soon]
         var nav = LIVE[t.id] ? 'href="' + LIVE[t.id] + '"' : 'data-soon href="#"';
         return '<a class="' + cls + '" data-topic="' + t.id + '" ' + nav + '>' +
-            '<span class="t-num">' + step + '</span>' +
             '<span class="t-main">' +
-              '<span class="t-row"><span class="t-name">' + t.name + '</span>' + badge + '</span>' +
-              '<span class="t-desc">' + t.desc + '</span>' +
+              '<span class="t-row"><span class="t-name">' + t.name + '</span></span>' +
             '</span>' +
             '<span class="seen-check" aria-label="Reviewed">✓</span>' +
             '<span class="t-go">→</span>' +
@@ -118,6 +108,18 @@
     refreshSeen();
   }
 
+  function renderAdvancedTopics() {
+    var host = document.getElementById('advanced-topics-list');
+    if (!host) return;
+    host.innerHTML = ADVANCED_TOPICS.map(function (t) {
+      return '<div class="advanced-topic" data-advanced-topic="' + t.id + '">' +
+          '<span class="advanced-topic__name">' + t.name + '</span>' +
+          '<span class="coming-soon" aria-disabled="true">Coming soon</span>' +
+        '</div>';
+    }).join('');
+    refreshAdvancedProgress();
+  }
+
   /* ---- progress ---- */
   function refreshSeen() {
     var seen = (window.GOB ? window.GOB.seen() : []);
@@ -129,8 +131,21 @@
     set('pct', pct + '%'); set('seen-n', n); set('total-n', TOTAL);
     var bar = document.getElementById('bar'); if (bar) bar.style.width = pct + '%';
     updateNext();
+    refreshAdvancedProgress();
   }
   function set(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+
+  function refreshAdvancedProgress() {
+    var seen = (window.GOB ? window.GOB.seen() : []);
+    var n = ADVANCED_TOPICS.filter(function (t) {
+      return seen.indexOf(t.id) !== -1;
+    }).length;
+    var pct = ADVANCED_TOTAL ? Math.round((n / ADVANCED_TOTAL) * 100) : 0;
+    set('advanced-seen-n', n);
+    set('advanced-total-n', ADVANCED_TOTAL);
+    var bar = document.getElementById('advanced-bar');
+    if (bar) bar.style.width = pct + '%';
+  }
 
   /* ---- toast (styleguide: bottom-right, single reused node) ---- */
   var toastTimer;
@@ -186,5 +201,6 @@
   }
 
   renderCats();
+  renderAdvancedTopics();
   wire();
 })();

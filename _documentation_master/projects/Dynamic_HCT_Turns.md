@@ -97,13 +97,18 @@ These are produced by `hct_initial_defender_coords` and the
 - An HCT possession resolves out of the trap **only** when the BH or PR **reaches the
   ABA**; everywhere else past half court the loop continues and the trap persists.
 
-**Trap-break / HCO trigger.** On reaching the ABA, the §7 goal-achievement logic decides:
-1. `defenders > offenders` (counted within the ABA) → **HCO**.
-2. `defenders ≤ offenders` (ties → attack) → **shot / drive / inside pass** (which may
-   bridge to a **Fast Break** rim attempt, §7).
+**Trap-break / HCO trigger.** On reaching the ABA, the BH makes a read that chooses
+between **HCO** and a **Fast Break** (the two outcomes; the FB executor is in §7):
+- **Optimal choice** by ABA head-count: `defenders > offenders` (counted within the
+  ABA) → **HCO**; `defenders ≤ offenders` (ties → attack) → **Fast Break**.
+- **Read** (`player_read`):
+  - read > **200** → take the **optimal** choice.
+  - read **125–200** → **HCO**, *unless* the offense's `aggression` setting is
+    **"aggressive"** → then **Fast Break**.
+  - read ≤ **125** → **50/50** random (HCO or Fast Break).
 
 **Zone precedence (checked at the top of each loop iteration):**
-1. In ABA → §7 goal achievement (HCO if `defenders > offenders`, else shot/attack/FB).
+1. In ABA → §7 goal achievement (HCO or Fast Break per the read above).
 2. Anywhere else (past half court but outside the ABA y-band) → **not a trap break**;
    continue the §4 loop (BH read → decision). The trap persists.
 
@@ -188,8 +193,8 @@ while not terminal:
 - Defenders target their HCT normal alignment (§1 table). Defensive PG targets
   exact center court (50, 25).
 - The four non-BH offenders target spots within these ranges:
-  - **pos1**: x between upper wing and deep upper wing; y between upper deep baseline and upper deep wing.
-  - **pos2**: x between lower wing and deep lower wing; y between lower deep baseline and lower deep wing.
+  - **pos1**: x between deep upper wing and x 51 (x 49 for away offense); y between upper deep baseline and upper deep wing.
+  - **pos2**: x between deep lower wing and x 51 (x 49 for away offense); y between lower deep baseline and lower deep wing.
   - **pos3**: x between lower apex and lower wing; y between lower midPost and lower midCorner.
   - **pos4**: x between upper apex and upper wing; y between upper midPost and upper midCorner.
 - Setup ends the moment the BH arrives at his target; the 9 movers freeze wherever they are.
@@ -240,7 +245,7 @@ turn starts, so it can't catch the clock expiring mid-loop.)
 3. Once the ball has crossed half court, the 10-second rule no longer applies — only
    the `shot_clock ≤ 0` terminal remains.
 
-**Why this bounds the loop:** every segment (hold 1–3s, pass flight+hold, advance,
+**Why this bounds the loop:** every segment (hold 1–2s, pass flight+hold, advance,
 moment) consumes clock, so `shot_clock` strictly decreases to a terminal. Reuse the
 engine's existing `_build_shot_clock_violation_result` outcome shape, invoked from
 inside the loop. A hard iteration cap is therefore **optional** (defensive backstop
@@ -296,18 +301,31 @@ Any remaining in-range defenders revert to their zone / help assignments (§6).
 For exactly two in-range defenders, both trap (this already always includes the PG
 via the shift tables in §6).
 
+### Offense Situational Multiplier (OSM)
+
+The region gates below are scaled by an **OSM** keyed to *where the contest happens*:
+
+- **OSM = 1.0** when the BH is inside an **Optimal Trap Area** (§2 Primary/Secondary
+  bands) — the defense's ideal trapping ground, so it wins moments more easily there.
+- **OSM = 1.5** everywhere else (any contest outside an Optimal Trap Area) — the
+  offense gets more margin.
+
+OSM **replaces** the old fixed `2` coefficient in both gate terms (so the baseline
+shrinks from 2.0 → 1.5 / 1.0). It applies to the Pressure Moment, the Trap Moment,
+and the D8 contest gates below.
+
 ### Pressure Moment (one defender)
 
 ```
 outside_d_score    = calculate_defender_pressure_score
                      + (def_team.pt_efficiency * random.randint(1, 6))
 ball_handling_score = calculate_ball_handling_score
-                     * (off_team.pt_opp_modifier * random.randint(1, 6))
+                     + (off_team.pt_opp_modifier * random.randint(1, 6))
 ```
 
-- if `d_score > o_score + 2*(off_chemistry + off_pt_opp_modifier)` → **positive d (DEAD BALL)**:
+- if `d_score > o_score + OSM*(off_chemistry + off_pt_opp_modifier)` → **positive d (DEAD BALL)**:
   BH commits a dead-ball turnover (double dribble / travel) → dead-ball announce + next-step progression.
-- elif `o_score >= d_score + 2*(def_chemistry + def_pt_efficiency)` → **positive o**:
+- elif `o_score >= d_score + OSM*(def_chemistry + def_pt_efficiency)` → **positive o**:
   the BH beats the pressure/trap and **advances** toward the basket. He resolves the
   possession **only if** the trap-break trigger is met at the next zone check (reaches
   the **Attack Basket Area** → §7 HCO/shot/FB); reaching any other spot is not a
@@ -321,7 +339,7 @@ outside_d_score    = calculate_defender_pressure_score (BH defender)
                      + 0.5 * calculate_defender_pressure_score (trapper)
                      + (def_team.pt_efficiency * random.randint(1, 6))
 ball_handling_score = calculate_ball_handling_score
-                     * (off_team.pt_opp_modifier * random.randint(1, 6))
+                     + (off_team.pt_opp_modifier * random.randint(1, 6))
 ```
 
 Outcome branches (DEAD BALL / HCO / neutral) are identical to the Pressure Moment above.
@@ -341,11 +359,13 @@ The `d_score`/`o_score` band gates stay the structural fork; inside each winning
 region we compute **attribute-derived event odds** instead of forcing one result.
 
 - `m = d_score − o_score` — contest margin (positive ⇒ defense winning).
-- **defense-wins** region (`m > GATE_D`, `GATE_D = 2*(off_chem + pt_opp)`) → {STEAL,
+- **defense-wins** region (`m > GATE_D`, `GATE_D = OSM*(off_chem + pt_opp)`) → {STEAL,
   DEAD BALL, O_FOUL, no-event}.
-- **offense-wins** region (`o_score ≥ d_score + 2*(def_chem + pt_eff)`) → mostly
+- **offense-wins** region (`o_score ≥ d_score + OSM*(def_chem + pt_eff)`) → mostly
   POS_O, small **D_FOUL**.
 - else **neutral** (no event — the re-read beat).
+- `OSM` per the *Offense Situational Multiplier* above (1.0 in an Optimal Trap Area,
+  else 1.5).
 
 **Design decisions (resolved with owner):** outcomes are **attribute-driven** (not a
 flat table); the check runs **every** moment, throttled by a global rate scalar;
@@ -469,10 +489,9 @@ The open-floor attack is a **race to the rim against a single cutoff defender**:
    travel time to `P` (`dist / bh_drive_rate`) against the defender's travel time to
    `P` (`dist / defender_rate`, defender speed from his **AG**-based rate). The
    **meet point** is the *first* `P` the defender can reach **no later than** the BH.
-3. **No meet point exists (no angle)** → the BH reaches topLane untouched → run the
-   standard §7 **FB / HCO** resolution (count offenders vs defenders in the Attack
-   Basket Area: `defenders ≤ offenders` → Fast Break rim attempt, D18;
-   `defenders > offenders` → HCO via the existing entry primitive).
+3. **No meet point exists (no angle)** → the BH reaches topLane untouched → resolve via
+   **§7 goal achievement**: run the **§2 3-tier HCO/FB read** (same as any other ABA
+   arrival), then HCO or the unified **Fast Break executor** (D23) accordingly.
 4. **A meet point exists (defender has an angle)** → BH and defender **collide at the
    meet point**; resolve with the **D8 `_resolve_moment` contest, steal excluded**
    (its weight re-normalized into the others — a full-speed drive collision is a
@@ -506,7 +525,7 @@ A BH who wins a broken-HCT cutoff collision has **used his dribble**:
 
 ### Hold resolution (universal)
 
-`hold` = the BH keeps the ball without dribbling for **random(1, 3) game seconds**
+`hold` = the BH keeps the ball without dribbling for **random(1, 2) game seconds**
 (this duration is the hold segment's advance trigger). During the hold the BH stays
 put while all defenders keep moving toward their current targets. Outcome is driven
 by what reaches the BH **before the hold window elapses**:
@@ -536,7 +555,7 @@ by what reaches the BH **before the hold window elapses**:
 > `_resolve_moment` calculation that Attack uses, so a defender's steal/foul/TO odds
 > come from attributes (and team `discipline`/`pt_efficiency`/`pt_opp_modifier`/`fight`
 > + the `aggression` dial) regardless of whether the contact came from an attack or a
-> hold. Hold keeps its own *structure* (1–3s window, who-arrives gating, "no defender
+> hold. Hold keeps its own *structure* (1–2s window, who-arrives gating, "no defender
 > arrives → broken-HCT"); only the contest math is unified. A pressure-with-no-event
 > moment simply returns to the loop for a fresh read (the BH retains).
 
@@ -714,14 +733,17 @@ While the pass is animating:
 ## §7 — Goal Achievement (Attack Basket Area)
 
 Triggered when the offense reaches the **Attack Basket Area** (§2: x 64→basket,
-y 10–40). They will either attempt a shot or transition to HCO.
+y 10–40). The possession resolves as either a **Fast Break** or a **HCO transition**.
 
 - **Defender count** = # of defenders within the Attack Basket Area; **Offender
   count** = # of offenders within the Attack Basket Area.
-- If `Defender count > Offender count` → **HCO transition** is optimal (HCO entry
-  trigger 2, §2). Else (`offenders ≥ defenders`; **ties → attack**) → **shot
-  attempt** is optimal.
-- BH makes a read (`player_read`): if read > 200 he makes the optimal choice, else a random choice.
+- **Optimal choice**: `Defender count > Offender count` → **HCO** (HCO entry trigger 2,
+  §2); else (`offenders ≥ defenders`; **ties → attack**) → **Fast Break**.
+- The **3-tier read** that picks HCO vs Fast Break (incl. the `aggression`-keyed
+  middle tier and the 50/50 floor) is specified in **§2 — Trap-break / HCO trigger**.
+- **HCO** runs the *HCO transition branch* below. **Fast Break** runs the *Fast Break
+  execution* below (the single FB executor used for both this ABA resolution and the
+  broken-HCT topLane arrival).
 
 ### HCO transition branch — execution (reuse existing HCO entry logic)
 
@@ -766,89 +788,73 @@ The HCO entry orchestrator (`skeleton_step_emitter.py`) then runs universally:
   selector sets the entry *step type* only; the *receiver* is always the skeleton-derived
   initiator (above).
 
-### Shot-attempt branch
+### Fast Break execution
 
-BH has three options: attempt an outside shot from his location, drive to the
-basket, or pass to a teammate with x > 64.
-- If defender count = 0: the choice is always to drive, or pass to a teammate closer
-  to the basket; else use optimal logic.
-- **Optimal logic**: if BH SH > 80 → shoot; elif BH SC + AG > 105 → drive; else → pass.
-  - If the BH drives, his drive target depends on starting y: y > 30 → upper lowPost;
-    y < 20 → lower lowPost; else basketSpot.
-  - Any teammate with x > 64 targets a spot from (lower lowPost, upper lowPost,
-    midLane, upper midPost, lower midPost, upper midBaseline, lower midBaseline),
-    excluding the driver's target. Upper/lower logic mirrors the BH's; all teammates
-    can target midLane; no two teammates share a spot.
-  - If the BH has teammates in any of those locations: 50% he shoots (attack shot),
-    50% he passes (receiving teammate shoots an inside shot).
-  - BH makes a read score: read > 200 → optimal option, else random.
-  - Defenders behave in standard manner to get into position to defend the shot.
-  - **Critical**: track defender locations at the exact moment of the shot attempt.
-    If a defender is within 4 x and 6 y of the shooter, he is the shot defender.
-    All defenders target a spot in range (basket-x to midLane-x − 3) and y within ±6 of basket-y.
+The single FB executor, used for **both** entry points: (a) the ABA read chose
+*Fast Break* (§2), and (b) the broken-HCT cutoff race delivered the BH to **topLane**
+clean (§5). Roles: **BH** = ball carrier; **finisher** = a teammate leaking ahead.
+All players other than the BH, the contesting defender(s), and the finisher **hold**
+(or continue current movement) for the FB's duration — test-cut convention; richer
+off-ball motion TBD.
 
-> Implementation flag: prior attempts to snapshot defender locations at shot time
-> have been spotty/inconsistent — this is D6 in the tracker. Identify the failing
-> path before reimplementing.
+**Drive target (BH):** `basket_x ± random(2,3)` toward center, `y = random(19,31)`
+(the D18 / steal-FB target). Traversal time `t_bh = euclidean(start, target) / bh_rate`.
 
-#### Top-level pass (pass to a teammate with x > 64)
+**Count finishers** — `n_ahead` = non-BH offenders whose x is **at or beyond the BH's**
+(toward the basket: x ≥ BH_x home / ≤ BH_x away).
 
-This is the third shot-attempt option (and the `else → pass` result of the optimal
-logic) — distinct from the drive→dish pass above. It does **not** reuse §6's
-backcourt pass-to rule (different candidate pool / intent).
+#### A) `n_ahead == 0` — solo drive
 
-**Receiver selection** (candidate pool = teammates with x > 64):
-- **Default:** the teammate **closest to the BH**.
-- **Override (open rim):** if a teammate is **within 9 euclidean of the basket** AND
-  **no defender is within 9 euclidean of that teammate**, he receives instead. If
-  two or more qualify, choose one **at random**.
+Resolve in priority order:
+1. **Cutoff?** A defender can intercept along the drive path (`_cutoff_meet_point`:
+   defender arrival ≤ BH arrival at some point on the path) → resolve the collision via
+   the D8 meet-point contest (`_resolve_moment(exclude_steal=True)`):
+   - **normal progression** → BH is **stopped at the meet point** → he takes a
+     **contested pull-up** (`shot_type="attack"`, the HCO/§7 drive attack shot) with the
+     stopping defender as shot defender.
+   - **O_FOUL** (charge) → offensive foul → turnover.
+   - **D_FOUL** (block) → defensive foul (bonus → FTs).
+   - **DEAD BALL** (lost handle) → turnover → SIP.
+2. **Else, rim contest:** no cutoff but a defender can **meet him at the basket**
+   (rim-protector arrival ≤ `t_bh`, the D18 arrival test) → **contested FB shot** with
+   that defender as shot defender (`resolve_hct_fast_break_shot`).
+3. **Else** (no defender in range) → **uncontested FB shot** (auto-make shape).
 
-**Receiver's action after the catch:**
-- **If the receiver catches inside the Attack Basket Area** (x 64→basket, y 10–40) →
-  act on the offender/defender ratio **counted within the Attack Basket Area**:
-  - `defenders ≤ offenders` → **attack the basket** (fast-break scenario — same
-    bridge as §7 Fast-break-from-broken-HCT, D18).
-  - `defenders > offenders` → **hold → HCO**, entered via the **Kick Out step**
-    (`build_kickout_step`, same primitive as OREB→HCO; *not* the handoff step,
-    because the receiver starts inside the Attack Basket Area).
-- **If the receiver catches at x > 64 but *outside* the Attack Basket Area** → he
-  becomes the new BH and **re-enters the §4 loop** (detect → read attack/pass/hold →
-  resolve). *(Implies the goal-area trigger must be Attack-Basket-Area-based, not raw
-  x > 64 — see gap #6 / §2 zone precedence.)*
+#### B) `n_ahead > 0` — drive or dish
 
-### Fast-break-from-broken-HCT (D18)
+**Finisher setup (off-ball, set before the drive resolves):**
+- The **finisher** = the non-BH offender **closest to the basket**. He relocates to a
+  **lowPost on the opposite vertical half from the BH's drive target** (BH target upper
+  → finisher *lower* lowPost; BH target lower → finisher *upper* lowPost). If the BH
+  drives **center** (target y 22–28) → finisher to the **lowPost on his own starting
+  vertical half**.
+- **Secondary defender:** if a defender other than the BH defender exists, the
+  **next-closest-to-basket** defender targets the finisher with the **D6 shot-defense
+  offset** (`finisher_x ± 2` toward basket, same y) to contest a catch-and-shoot.
 
-Entry: the §5 "No defenders in range (broken HCT)" branch when the BH reaches the
-**topLane** spot. This is a *transition / numbers-advantage* break where the offense
-already has the ball in the backcourt and has beaten the trap.
+**Resolve the BH drive:**
+- **Cutoff?** (`_cutoff_meet_point`, as in A.1) → D8 meet-point contest:
+  - **O_FOUL** → turnover; **D_FOUL** → defensive foul; **DEAD BALL** → turnover → SIP.
+  - **normal progression (no foul/turnover)** →
+    - **75%** → BH **passes to the finisher**, who shoots an at-rim **FB shot**
+      (`resolve_hct_fast_break_shot`) — contested by the secondary defender if assigned
+      & in range, else uncontested.
+    - **25%** → BH **pulls up** at the meet point (contested `shot_type="attack"` shot,
+      cutoff defender as shot defender).
+- **No cutoff** → BH reaches the basket and shoots — **contested FB shot** if a rim
+  protector arrives in time, else **uncontested** (same terminal sub-cases as A.2 / A.3).
 
-**Execute the equivalent of a Steal Fast Break** (`after_steal_fast_break.py`): the
-dribbler attacks the basket and we resolve a single contested-vs-uncontested rim
-attempt against the one defender who can get back to protect the rim. The BH is
-already the carrier (no outlet pass), so we skip the steal/outlet seed and feed the
-current HCT end-state straight into the same resolution shape:
+#### Outcome + stats
 
-1. **Dribbler attacks the basket.** BH target = `basket_x ± random(2,3)` toward
-   center, `y = random(19,31)` (same as the steal FB BH target). Traversal time
-   `t_shooter = euclidean(bh_start, bh_target) / bh_sprint_rate`.
-2. **Shot defender = the defender closest to the basket.** Assign him the steal-FB
-   **shot-defense position** (the defender single target: `BH_target_x ± 2` toward
-   basket, same y — i.e. 2 grid spots closer to the rim than the BH's spot). His
-   traversal time = `euclidean(start, defender_target) / sprint_rate` (AG-based).
-3. **Reaches in time?** If the shot defender's arrival time `< t_shooter` (he beats
-   the BH to the rim-defense spot) → **CONTESTED** FB shot with him as the shot
-   defender (`calculate_shot_score(apply_defense=True)`; made if
-   `shot_score >= shot_threshold`). Otherwise → **UNCONTESTED** FB shot
-   (`apply_defense=False`; automatic make, matching the steal-FB / OREB-putback rule).
-4. **Outcome + stats** — make/miss handled exactly as the steal FB; possession flips
-   on a make/defensive-rebound per the standard shot turn; reuse the steal-FB stat
-   wiring (`shot_defender_id`, contested flag, etc.).
+All FB rim shots use `resolve_hct_fast_break_shot`'s make/miss → turn shape (scoring,
+rebound, defensive-foul FTs, possession flips on make / defensive rebound); the
+contested pull-up uses the `shot_type="attack"` resolver. Reuse the steal-FB stat
+wiring (`shot_defender_id`, contested flag, etc.). Foul/turnover outcomes from the
+meet-point contest process exactly as their D8 equivalents (O_FOUL / D_FOUL / DEAD BALL).
 
-> Reuse note: this is the steal-FB resolver minus the outlet/stealer seed — the BH is
-> the shooter from his broken-HCT topLane coords, and only the **closest-to-basket**
-> defender is evaluated as the lone rim protector (not all five sprinting to one spot).
-> Confirm at build whether to call `resolve_after_steal_fast_break` with HCT seed
-> coords or factor out its contest core into a shared helper.
+> Implementation flag (D6): snapshot defender/shooter coords at the **exact** moment of
+> the shot/contest — prior attempts at this have been spotty. The FB shot defender is
+> chosen by **arrival time** (above), not the old 4×/6y proximity snapshot.
 
 ---
 
@@ -916,7 +922,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 
 - **D2.** Pass-to-side branch full sequence (which teammate, y range, timing). *(Now specified in §6 — promote to build when Cut 2 lands.)*
 - **D3.** x=64 transition trigger logic + BH read at x=64 (shot vs HCO). *(Specified in §7.)*
-- **D4.** ✅ **Built (2D-2a + 2D-2b + 2D-2c)** — the full §7 shot-attempt tree: the Attack-Basket fork + shoot-in-place (2D-2a); the shoot/drive/pass optimal logic (SH>80 / SC+AG>105 / pass) + drive target by y + inside-spot teammate relocation + 50/50 drive→dish (2D-2b); and the top-level pass (2D-2c) — receiver selection (closest past-x=64 + open-rim override) with post-catch resolution (AB catch → attack via D18 bridge if defenders≤offenders, else Kick-Out→HCO; past-x=64 off-band → re-enter loop).
+- **D4.** ✅ **Built (2D-2a + 2D-2b + 2D-2c) — ⚠️ superseded by D23.** The original §7 shot-attempt tree: the Attack-Basket fork + shoot-in-place (2D-2a); the shoot/drive/pass optimal logic (SH>80 / SC+AG>105 / pass) + drive target by y + inside-spot teammate relocation + 50/50 drive→dish (2D-2b); and the top-level pass (2D-2c). **Now:** the ABA non-HCO resolution is the unified Fast Break executor (D23); the `shot_type="attack"` drive resolver is reused, shoot-in-place + top-level pass are retired.
 - **D5.** ✅ Built (2D-2a). Rim-protection collapse: on a shot attempt each defender moves (standard pace, interrupted to release time) toward the (x∈[77,87], y∈[19,31]) band; release coords computed in `resolve_hct_attack_basket_shot`. (No collision handling yet.)
 - **D6.** ✅ Built (2D-2a). Shot-defender = nearest defender ending within 4 x / 6 y of the shooter **at the shot release**, evaluated on the engine-computed D5 release coords (deterministic — sidesteps the prior "spotty" runtime-snapshot timing). Contested → defended shot score; else open (still rolled vs. threshold, no auto-make).
 - **D7.** ✅ Resolved (§7 "HCO transition branch — execution") — HCT→HCO supports a
@@ -999,8 +1005,8 @@ Design is complete. These are the remaining work items.
   to a backcourt teammate (x<50 home / x>50 away). **Guard built (preventive):**
   `_select_pass_receiver` drops any backcourt teammate from the two-closest pool
   when the BH is past half-court, so a legal teammate is chosen when one exists.
-  The 2D-2c top-level pass is forward-only (pool = teammates past x=64), so it
-  satisfies the guard by construction. **Still TODO:** detect an *actual*
+  The FB executor's dish is forward-only (finisher is at/ahead of the BH toward the
+  rim), so it satisfies the guard by construction. **Still TODO:** detect an *actual*
   over-and-back (no legal option, or a forced backward pass) and process it as a
   dead-ball turnover.
 - Mid-flight pass interception — stealing a pass in the air (D11).
@@ -1010,16 +1016,163 @@ Design is complete. These are the remaining work items.
 - The full §4 loop: continuous detection, repeated reads, neutral-advance iterations.
 - Pass branch / pass-to-side movement (D2).
 - x=64 transition read — shot vs HCO (D3).
-- ✅ **Shot-attempt decision tree: shoot / drive / pass (D4) — built (2D-2a/2b/2c).** Shoot-in-place, drive + 50/50 drive→dish, and the top-level pass (receiver selection + AB-catch attack/HCO + off-band re-entry).
+- ⚠️ **Shot-attempt decision tree: shoot / drive / pass (D4) — built (2D-2a/2b/2c), now superseded by D23.** The ABA non-HCO resolution is now the unified **Fast Break executor** (§7), not the shoot/drive/pass tree. The `shot_type="attack"` drive resolver is **kept** (reused for the FB contested pull-up); shoot-in-place + the top-level pass branch are **retired**.
 - ✅ **Rim-protection collapse (D5) — built (Phase 2D-2a).** Defenders close toward the rim band on a shot attempt.
 - ✅ **Shot-defender pick at the shot release (D6) — built (Phase 2D-2a).** Nearest defender within 4 x / 6 y of the shooter, on deterministic engine coords.
-- ✅ **Broken-HCT fast break (D18) — built (Phase 2D-1).** Real make/miss rim attempt via `dynamic_hct_shot.resolve_hct_fast_break_shot` (reuses the Steal-FB contest core). *(Reachable now that D15 lets the offense beat the trap.)*
+- ⚠️ **Broken-HCT fast break (D18) — built (Phase 2D-1), now folded into D23.** Real make/miss rim attempt via `dynamic_hct_shot.resolve_hct_fast_break_shot` (reuses the Steal-FB contest core). D23 makes this the **single FB executor** for both the broken-HCT topLane arrival *and* the ABA Fast-Break resolution; the resolver core is reused.
 - ✅ **Interrupted defender movement (D15) — built (Cut 2).** Defenders chase at their own rate (interrupted, position-tracking) instead of snapping onto the BH, so a quicker BH gains real separation and broken-HCT fires.
 - ✅ **Off-ball offense position tracking (D15b) — built (Cut 2).** Engine tracks each teammate's actual lagging position (walk-up replay + per-segment hustle), so the Attack-Basket count and pass-targeting reads use real coords.
 - ✅ **Shot-clock + 10-second violation wiring (D9) — built (Cut 2).** Clock terminals tagged + announced (turnover → SIDE_INBOUND, possession flips).
 - ✅ **Stats parity with the skeleton path (D16) — built (Cut 2).** Bookkeeping matches for the outcomes the dynamic loop produces (used/success, HCT_A/_S, dynamic-shot box score, defensive-success bump on a clean stop); foul/steal-stat parity folded into D8.
 
+**Behavior Change 3 (FB rework + OSM):**
+- **D23.** **Unified Fast Break executor + ABA HCO/FB read.**
+  - ✅ **Stage 1 built.** The §2 3-tier read (`_aba_hco_or_fb`, HIGH 200 / MID 125,
+    offense-`aggression`-keyed middle tier) now picks HCO vs Fast Break at the ABA
+    **and** on a clean broken-HCT topLane arrival. The non-HCO result routes through
+    one executor (`_do_fast_break`) → `resolve_hct_fast_break_shot` (drive + lone
+    rim-protector contested/uncontested attempt), folding in D18. The old D4
+    shoot-in-place + top-level-pass routing is **retired** (no longer produced by the
+    engine).
+  - ⏳ **Stage 2 pending** (the new nuance): count finishers (`n_ahead`); solo-drive
+    cutoff-along-the-path → contested pull-up (`shot_type="attack"`); drive-or-dish
+    (finisher opposite-half lowPost fill + secondary-defender D6 cover; 75% dish /
+    25% pull-up on a no-foul cutoff). Needs resolver overrides (forced shot defender +
+    finisher shooter) + emitter steps for the finisher relocation / dish pass.
+- **D24.** ✅ **Built — Offense Situational Multiplier (OSM).** The fixed `2` in both
+  contest gates (Pressure Moment, Trap Moment, D8 defense/offense gates, §5) is now
+  `OSM` = **1.0** inside an Optimal Trap Area (§2) / **1.5** elsewhere
+  (`_offense_situational_multiplier`). Behavior change to the built D8 math —
+  recalibrate the coefficients after prototype testing.
+
 **Infrastructure / later polish:**
 - Per-tick energy decay instead of once-per-turn (D12).
 - Seeded RNG / determinism for replays (D13).
 - Distant-sim short-circuit — "decisions only, no movement" for franchise CPU sim (D14).
+
+---
+
+## §12 — Quick Reference: The Core Step Loop (TL;DR)
+
+**One HCT turn = one whole possession.** The engine repeats a
+**check → detect → read → resolve → move** loop; each pass emits one animation step.
+It exits when the BH reaches the Attack Basket Area, a turnover/foul/steal fires, or
+a clock violation hits.
+
+### The loop, step by step
+
+| # | Step | What it does | Advance trigger |
+|---|------|--------------|-----------------|
+| 0 | **Walk-up** (once) | BH brings the ball up to `(44, y 21–29)`; the other 9 hustle toward setup spots | BH reaches his spot |
+| 1 | **Check clocks** | shot-clock ≤ 0 → violation; shot-clock ≤ 20 & behind half court → 10-sec violation | — (instant) |
+| 2 | **Detect** | Count defenders within **11** of the BH (and on the basket side) → none / pressure / trap | — (instant) |
+| 3 | **Read** | BH rolls a read score → **attack / pass / hold** | — (instant) |
+| 4 | **Resolve + move** | Run the chosen branch (below); everyone moves one beat | branch-specific (see below) |
+
+Then loop back to step 1.
+
+### Decision thresholds (the read)
+
+Read score = `int( (IQ·0.8 + CH·0.2) · random(1,6) )`, then:
+
+| Situation | attack if | pass if | else |
+|-----------|-----------|---------|------|
+| **Defender(s) near** (§4 loop) | read > **200** | read > **120** | hold |
+| **No defender near** (broken HCT) | read > **175** | read > **110** | hold |
+| **At the Attack Basket Area** (§7) | read > **200** → optimal (HCO/FB); **125–200** → HCO unless offense aggressive; **≤125** → 50/50 | | |
+
+### Player movement levels (per beat)
+
+| Mover | Speed | Notes |
+|-------|-------|-------|
+| BH walk-up | `CHALLENGED_OPEN_FLOOR` = **16** grid/sec | only during step 0 |
+| BH **advance** (beat the pressure/trap) | `+random(6,12)` x toward basket, `random(−6,6)` y | one neutral/won beat |
+| BH **drive / cutoff race** | `ATTACK_DRIVE` = **12** grid/sec | open-floor attack to topLane `(74,25)` |
+| BH **hold** | stationary for `random(1,3)` game-sec | defenders keep closing |
+| Backcourt defenders | AG-based **`standard`** rate | interrupted + position-tracking (real separation possible) |
+| Front defenders (PF/C) | AG-based **`sprint`** rate | ball-reactive coverage (§6 D22) |
+| Off-ball offense | AG-based **`sprint`** toward setup | except during the cutoff race → they **hold** |
+
+AG rates via `ag_to_grid_per_game_sec`; AG=50 reproduces the legacy constants.
+
+### Pressure vs. trap detection
+
+At each beat, look at defenders within **11** grid-spots of the BH whose x is on the
+basket side of the BH:
+
+- **0 in range →** broken HCT (open floor) — use the lower read thresholds; `attack`
+  becomes a **cutoff race** to topLane.
+- **1 in range →** **Pressure Moment** (on `attack`, or when one defender reaches the
+  BH during a `hold`).
+- **2+ in range →** **Trap Moment**. Two trappers = the defensive **PG** + the closest
+  other in-range defender (if the PG is out of range, the two closest). Trappers sit
+  **1–4 x-spots ahead** of the BH at **BH_y ± 2**.
+
+### Result algorithm (attack, or contact during a hold)
+
+**1. Score the contest** (higher = better for that side):
+
+```
+d_score = defender_pressure_score              (Trap: + 0.5 × 2nd trapper’s pressure_score)
+          + def_team.pt_efficiency × random(1,6)
+o_score = ball_handling_score + (off_team.pt_opp_modifier × random(1,6))
+```
+
+**2. Pick the region** (the structural fork):
+
+- **OSM** (Offense Situational Multiplier) = **1.0** inside an Optimal Trap Area,
+  **1.5** elsewhere — replaces the old fixed `2` in both gates (§5).
+
+- **Defense wins** — `d_score > o_score + OSM·(off_chem + off_pt_opp)`
+- **Offense wins** — `o_score ≥ d_score + OSM·(def_chem + def_pt_eff)` → BH **advances**;
+  resolves the possession **only** if that advance reaches the **Attack Basket Area**.
+- **Neither (neutral)** — BH advances one beat, then re-reads. *(no turnover/foul)*
+
+**3. Roll the outcome inside the winning region** (the D8 layer — full math in §5):
+
+- **Defense-wins →** roll *does an event fire?* `p ≈ DEF_WIN_BASE(0.35) × margin ×
+  aggression × (1 − fight_off)`. If yes, pick one by attribute-weighted odds
+  (even-matchup baseline **STEAL 30 / DEAD BALL 50 / O_FOUL 20**). If no event →
+  BH keeps it, loop continues.
+- **Offense-wins →** small **D_FOUL** (reach-in) chance `≈ DFOUL_BASE(0.12) × margin
+  × aggression × (undisciplined?) × (beaten/slow?)`; else a clean advance.
+
+**Dials:** `aggression` raises the event / steal / D_FOUL rates (it does **not** change
+who wins); offense **`fight`** symmetrically lowers all defense-wins events;
+`discipline` lowers D_FOUL; `pt_efficiency` / `pt_opp_modifier` nudge steal / self-TO.
+
+### Cutoff race (broken-HCT attack)
+
+BH sprints to topLane `(74,25)`; the closest defender solves an interception point
+(BH drive pace vs his AG rate). **No angle →** BH arrives → §7 FB/HCO by ABA head-count.
+**Angle →** collide at the meet point → resolve with the same contest **minus steal**
+(charge / block / lost-handle / clean win). A clean win makes the BH **dribble-dead**
+(pass/hold only until he gives it up).
+
+### The handful of knobs to tune
+
+| Knob | Where | First-pass |
+|------|-------|------------|
+| Read thresholds | §4 / §5 | attack 200/175, pass 120/110 |
+| Detection / trap radius | §1 | **11** |
+| Advance distance | §4 | x `+6..12`, y `±6` |
+| Hold window | §5 | `1–2` game-sec |
+| Move speeds | §1 | walk-up 16, drive 12, AG rates |
+| Win-margin gates (OSM) | §5 | `OSM·(chem+pt_*)`, OSM 1.0 in OTA / 1.5 else |
+| D8 event rate / split / D_FOUL | §5 table | base 0.35, 30/50/20, 0.12 |
+| Aggression / fight / discipline scaling | §5 | `AGG_MULT 0.7/1.0/1.3`, `W=0.04` |
+| Clock terminals | §1 / §8 | shot-clock 0, 10-sec at ≤20 behind half court |
+| Loop backstop | §1 | `MAX_LOOP_ITERATIONS = 15` |
+
+### Fast Break execution (summary)
+
+Full spec in **§7**. On a Fast Break (ABA read chose FB, or broken-HCT topLane arrival):
+- Count **finishers** — `n_ahead` = non-BH offenders at/ahead of the BH toward the rim.
+- **Solo (`n_ahead == 0`):** BH drives (`basket_x ± 2..3`, y 19–31); priority — cutoff
+  contest (`_cutoff_meet_point` → stop + contested pull-up / O_FOUL / D_FOUL / DEAD BALL)
+  → else rim-protector contest (`resolve_hct_fast_break_shot`) → else uncontested.
+- **With finisher (`n_ahead > 0`):** the closest-to-rim teammate fills the opposite-half
+  lowPost (own half if the BH drives center); a secondary defender (D6 offset) covers him.
+  On a cutoff with no foul/TO → **75%** dish → finisher FB shot, **25%** BH pull-up; no
+  cutoff → BH rim shot (contested by arrival, else uncontested).
+- **Knobs:** OSM gate (§5), the 75/25 dish split, finisher lowPost target, D6 cover offset.
