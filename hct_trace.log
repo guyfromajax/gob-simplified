@@ -1,0 +1,17 @@
+🔵 [DEBUG] db.py: Starting module
+🔧 [LOCAL DEV] Loaded .env.local
+🔵 [DEBUG] db.py: Collections initialized
+🔵 [DEBUG] db.py: Module initialization complete
+/Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pydantic/_internal/_fields.py:198: UserWarning: Field name "copy" in "PlayCreate" shadows an attribute in parent "BaseModel"
+  warnings.warn(
+🔶 [ALPHA] IS_ALPHA=False
+⚠️ [RATE LIMIT] Failed to enable rate limiting: No module named 'slowapi'
+Traceback (most recent call last):
+  File "/Users/jamesdavies/gob-simplified/BackEnd/api/api.py", line 309, in <module>
+    from slowapi.errors import RateLimitExceeded
+ModuleNotFoundError: No module named 'slowapi'
+INFO:     Started server process [62118]
+INFO:     Waiting for application startup.
+⚠️ [DB] ensure_games_franchise_index: Index already exists with a different name: games_franchise_id, full error: {'ok': 0.0, 'errmsg': 'Index already exists with a different name: games_franchise_id', 'code': 85, 'codeName': 'IndexOptionsConflict', '$clusterTime': {'clusterTime': Timestamp(1781879636, 1), 'signature': {'hash': b'@S\xbeZ\xe3\xf4\x94\xf7\xd0\x07n.1|Ll\x81h\xea\xef', 'keyId': 7605231962646642694}}, 'operationTime': Timestamp(1781879636, 1)}
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)

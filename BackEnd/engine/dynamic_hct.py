@@ -1118,6 +1118,18 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     off_targets, def_targets = _build_step_1_targets(bh_pos, is_away_offense)
     bh_target = off_targets[bh_pos]
 
+    # Snapshot the step-1 walk-up bring-up targets for every off-ball player NOW,
+    # keyed off the *original* BH (the walk-up always brings the ball up via the
+    # entry BH). Captured before ``bh_pos`` can be reassigned by a mid-turn pass
+    # and before ``off_targets`` is mutated by ``_park_passer``. Returning this
+    # (instead of recomputing with the final, post-pass ``bh_pos``) ensures a
+    # teammate who later becomes the BH via a pass still receives a walk-up
+    # target — otherwise he was excluded and left frozen at his pre-turn spot
+    # during the walk-up, then forced to catch up in large per-beat jumps.
+    walk_up_other_offense_targets = {
+        pos: dict(off_targets[pos]) for pos in POSITIONS if pos != bh_pos
+    }
+
     pg_def = def_lineup.get("PG")
 
     # AG-driven drive rate. At AG=50 this resolves to 16×0.75 = 12, matching the
@@ -1684,9 +1696,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         # Entry walk-up targets (segment 0).
         "bh_pos": bh_pos,
         "bh_target": bh_target,
-        "other_offense_targets": {
-            pos: off_targets[pos] for pos in POSITIONS if pos != bh_pos
-        },
+        "other_offense_targets": walk_up_other_offense_targets,
         "def_initial_targets": def_targets,
         # Variable-length loop segments (converge, advances, attack).
         "loop_segments": loop_segments,

@@ -56,7 +56,7 @@ _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 # emitted step logs its label + each active player's start → destination (the
 # engine's intended target) → end (what the emitter actually renders). A
 # divergence between destination and end flags coord jank. Toggle off when done.
-LOG_HCT_STEP_COORDS = True
+LOG_HCT_STEP_COORDS = False
 
 
 def _fmt_xy(c: Optional[Dict[str, Any]]) -> str:
