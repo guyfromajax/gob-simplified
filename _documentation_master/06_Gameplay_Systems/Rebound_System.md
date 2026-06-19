@@ -18,13 +18,24 @@ The MISS turn emitter absorbs these into the final step's `end.coords` via its `
 
 ### DREB animates rebound capture only (backend step); outlet is a separate client beat
 
-**Backend discrete `DREB` turn** (`result_type` / `current_turn` **`DREB`**, `animation_steps` from `dreb_step_emitter.py`): animates **only** the rebounder moving to the ball at the bounce spot. **It does not re-place the other nine players** — they stay where `shot_manager` put them on the prior **MISS/BLOCK** turn (placement authority above).
+**Backend discrete `DREB` turn** (`result_type` / `current_turn` **`DREB`**, `animation_steps` from `dreb_step_emitter.py`): animates the rebounder moving to the ball at the bounce spot. Non-captor players normally hold their post-shot coordinates, except for backend-stamped failed rebound attemptors (see below), who collapse toward randomized near-bounce spots.
 
 **Half-court outlet** (rebounder dribble / pass to outlet receiver per `dreb_outlet_pass`, teammates moving toward the new offense end — unit **`hco.lead_in.from_dreb_outlet`** in `turnAnimation.js` → `runDefensiveReboundSetup`) **is not** emitted as part of `dreb_step_emitter` steps. For discrete **DREB → HCO/HCT/FCP**, the client runs that setup **after** `AnimationEngine` finishes **`playTurn`** for the DREB row, using the **previous** MISS/BLOCK turn for **`dreb_outlet_pass`** and **`offense_getback`**. Skip when `DREB.next_play_type` is **FAST_BREAK** (fast break owns outlet) or when the shot turn has **`force_foul_after_dreb`**.
 
 **Embedded DREB** (MISS/BLOCK turn still owns rebound, no separate `DREB` row — e.g. many **FREE_THROW** misses, unmigrated FCP / FB variants): outlet still runs from **`ShotAnimationSystem.handleDefensiveRebound`** → **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP** on that same shot turn. **Rebound!** headline rules (including idempotency with discrete rows): **`Announcement_System.md`**.
 
 This replaces the earlier two-authorities-via-player-id-matching design, where the DREB step ran its own frontcourt-filter / random-near-bounce placement logic and tried to honor shot_manager's get-back / release maps via an exempt list. That coupling was brittle — any mismatch in the exempt set yanked role-players to the rim cluster. See [`UESS_System.md`](../00_General_Systems/UESS_System.md) and [`UESS_Backlog.md`](../projects/UESS_Backlog.md) for DREB emitter scoping.
+
+### Near-bounce failed rebound attemptors
+
+Missed **Fast Break** shots and missed **OREB putback** attempts stamp a backend-authored failed-attemptor list for the rebound-capture step.
+
+- **Helper:** `collect_near_bounce_rebound_attemptors()` in `BackEnd/utils/shared.py`.
+- **Rule:** after the authoritative `bounce_spot` and actual `rebounderId` are known, scan both current lineups and include every non-captor player whose Euclidean distance to the bounce spot is **≤ 15** grid units.
+- **Orientation:** the helper uses display-oriented rebound math for away-offense cases, matching `determine_rebounder` / `choose_rebounder` bounce calculations.
+- **Payload:** the prior miss turn carries `offense_rebounders` and `defense_rebounders` as player IDs. `dreb_step_emitter.py` / `oreb_step_emitter.py` pass those through `rebound_attemptor_ids()`.
+- **Animation:** the actual rebounder moves to the exact bounce spot. Failed attemptors move to backend-randomized nearby targets via `sample_rebound_collapse_target()` / `stamp_rebound_capture_player_motion()`, not to the exact ball spot.
+- **Frontend contract:** the frontend does not choose rebound attemptors. It renders the backend `animation_steps` payload.
 
 ## Free Throw Miss Rebounds
 
@@ -85,12 +96,12 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
 1. `resolve_offensive_rebound()` in `shared.py` (line 229) records the stat on the rebounder object returned by `determine_rebounder()`
 2. `resolve_offensive_rebound_turn()` in `turn_manager.py` looks up the player again by ID (line 2454) for delta computation
 
-**Solution:** After looking up the rebounder by ID in `turn_manager.py`, re-record the rebound stat on that player object to ensure it's on the same instance used for delta computation. This matches the pattern used in HCO misses and guarantees stat consistency.
+**Solution:** `resolve_offensive_rebound()` records the rebound stat on the canonical roster player returned by ID lookup, then `resolve_offensive_rebound_turn()` preserves that same rebound data on the `PUTBACK_MISS` result for deltas and follow-on DREB/OREB animation.
 
 **Implementation:**
-- Location: `BackEnd/models/turn_manager.py` line ~2464
-- After finding `new_rebounder` by ID lookup, call `new_rebounder.record_stat(rebound_type)`
-- This ensures the stat is recorded on the correct object instance, even if the lookup returns a different reference than the one used in `shared.py`
+- Stat recording: `BackEnd/utils/shared.py` (`resolve_offensive_rebound`) records on the canonical player instance.
+- Payload preservation: `BackEnd/models/turn_manager.py` copies `rebound_type`, `rebounderId`, `ballSpot`, `offense_rebounders`, and `defense_rebounders` from the putback-miss rebound data onto the `PUTBACK_MISS` turn.
+- This ensures stat deltas and the following discrete DREB/chained OREB animation read the same authoritative rebound result.
 
 **Why This Matters:**
 - Supports consecutive OREB scenarios: HCO miss => OREB => Putback Miss => OREB => Putback Miss => OREB => Putback Miss => DREB
@@ -161,4 +172,3 @@ Notes:
 - HCT / FCP previously inherited HCO mechanics (get-back / release). The refactor drops those for HCT / FCP / Fast Break and aligns them on the frontcourt-half x-eligibility filter.
 - HCO retains its existing prefilter — the get-back / release mechanic is HCO-specific.
 - `choose_rebounder` is the per-team primitive. `determine_rebounder` is the whole-game wrapper that calls `choose_rebounder` once per team and then runs the weighted off-vs-def selection. See section above for algorithmic detail.
-

@@ -1231,13 +1231,20 @@ def resolve_offensive_rebound(game, rebounder):
 
             # Use calculated bounce spot for frontend animation
             ballSpot = {"x": bounce_spot["x"], "y": bounce_spot["y"]}
+            rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                game,
+                bounce_spot,
+                pid_str,
+            )
 
             # Add rebound information for frontend animation (use normalized ID)
             event["rebound"] = {
                 "rebounderId": pid_str,
                 "rebounder_player_id": pid_str,
                 "rebound_type": new_stat,
-                "ballSpot": ballSpot
+                "ballSpot": ballSpot,
+                "offense_rebounders": rebound_attemptors["offense_rebounders"],
+                "defense_rebounders": rebound_attemptors["defense_rebounders"],
             }
 
         return event
@@ -1482,6 +1489,75 @@ def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_play
             closest_player = player
     
     return closest_player
+
+
+NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 15
+
+
+def collect_near_bounce_rebound_attemptors(
+    game,
+    bounce_spot,
+    rebounder_id=None,
+    *,
+    max_distance=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE,
+    exclude_player_ids=None,
+    coords_already_display_oriented=False,
+):
+    """Return backend-authored failed rebound attemptors near a miss bounce.
+
+    Used by rebound-capture schema turns. This helper does not choose the
+    rebound winner; it only identifies non-captors close enough to make a
+    failed play on the ball so the renderer can animate them near the bounce.
+    """
+    _game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    try:
+        bx = float((bounce_spot or {}).get("x"))
+        by = float((bounce_spot or {}).get("y"))
+        threshold = float(max_distance)
+    except (TypeError, ValueError, AttributeError):
+        return {"offense_rebounders": [], "defense_rebounders": []}
+
+    excluded = {str(pid) for pid in (exclude_player_ids or []) if pid is not None}
+    if rebounder_id is not None:
+        excluded.add(str(rebounder_id))
+
+    def _ids_near(lineup):
+        ids = []
+        for player in (lineup or {}).values():
+            if player is None:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid is None or str(pid) in excluded:
+                continue
+            coords = getattr(player, "coords", None) or {}
+            try:
+                px = float(coords.get("x"))
+                py = float(coords.get("y"))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            dist = ((px - bx) ** 2 + (py - by) ** 2) ** 0.5
+            if dist <= threshold:
+                ids.append(str(pid))
+        return ids
+
+    def _collect():
+        return {
+            "offense_rebounders": _ids_near(off_lineup),
+            "defense_rebounders": _ids_near(def_lineup),
+        }
+
+    if coords_already_display_oriented:
+        return _collect()
+
+    is_away_offense = (
+        off_team is not None
+        and getattr(game, "away_team", None) is not None
+        and off_team.team_id == game.away_team.team_id
+    )
+    with temp_lineup_court_absolute_for_away_rebound_math(game, is_away_offense):
+        return _collect()
+
 
 def generate_pass_chain(game, shooter_pos):
     

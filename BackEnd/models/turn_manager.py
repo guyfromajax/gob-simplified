@@ -4249,6 +4249,8 @@ class TurnManager:
                     result["rebound_type"] = rebound_type
                     result["rebounderId"] = rebound_data.get("rebounderId")
                     result["ballSpot"] = rebound_data.get("ballSpot")  # Add ballSpot for frontend animation
+                    result["offense_rebounders"] = rebound_data.get("offense_rebounders") or []
+                    result["defense_rebounders"] = rebound_data.get("defense_rebounders") or []
                     
                     # Set possession flip based on rebound type
                     possession_flips = (rebound_type == "DREB")

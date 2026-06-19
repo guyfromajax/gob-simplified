@@ -46,6 +46,7 @@ from BackEnd.utils.shared import (
     calculate_ball_handling_score,
     calculate_defender_pressure_score,
     calculate_bounce_spot,
+    collect_near_bounce_rebound_attemptors,
     determine_rebounder,
     temp_lineup_court_absolute_for_away_rebound_math,
     calculate_charge,
@@ -1752,8 +1753,14 @@ class ShotManager:
                         result["rebound_type"] = stat
                         result["offense_getback"] = []
                         result["defense_release"] = []
-                        result["offense_rebounders"] = [getattr(p, "player_id", None) for p in o_rebounder_lineup.values()]
-                        result["defense_rebounders"] = [getattr(p, "player_id", None) for p in d_rebounder_lineup.values()]
+                        geo_attemptors = collect_near_bounce_rebound_attemptors(
+                            self.game,
+                            bounce_spot,
+                            getattr(rebounder, "player_id", None),
+                            coords_already_display_oriented=True,
+                        )
+                        result["offense_rebounders"] = geo_attemptors["offense_rebounders"]
+                        result["defense_rebounders"] = geo_attemptors["defense_rebounders"]
                         result["offense_getback_coords"] = {}
                         result["defense_release_coords"] = {}
 

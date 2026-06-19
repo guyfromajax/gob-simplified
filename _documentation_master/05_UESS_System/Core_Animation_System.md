@@ -119,6 +119,8 @@ Specialized Handlers (execution)     ←  legacy turns
 
 Per-tween durations are now **backend-authoritative** for the synced turn types. Backend computes per-player game-seconds; frontend converts to wall-time via `clockSecondMs` (the gameClock tick rate). Visual and game-clock advance in lockstep by construction.
 
+Rebound-capture participation is also backend-authoritative. For schema-routed missed Fast Break and OREB putback rebounds, backend supplies the rebound winner plus failed-attemptor IDs/targets; the frontend renders `animation_steps` and does not select rebound attemptors.
+
 ### Authoritative source by turn type
 
 | Turn type | Authority | Field on payload |
