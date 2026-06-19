@@ -37,6 +37,11 @@ MO_SHOT_ROLL_POSITIVE = (2, 6)    # when MO > 0 and the chance hits
 MO_SHOT_ROLL_NEGATIVE = (1, 5)    # when MO < 0 and the chance hits
 MO_SHOT_IMPACT_PCT_PER_LEVEL = 20  # P(modified roll) = |MO| × this (%); 100% at |MO|=5
 
+# --- NG (energy) decay momentum bonus (Energy_System.md § Depletion) ---
+# MO > 0 gives a |MO| × this (%) chance to take the turn's NG decay from one ND
+# tier higher (less fatigue). Linear; 100% at |MO|=5. MO <= 0 → normal decay.
+MO_NG_DECAY_BONUS_PCT_PER_LEVEL = 20
+
 # --- Shot-clock violation (per active player, independent roll) ---
 MO_SHOTCLOCK_BASE_PCT = 40
 MO_SHOTCLOCK_OFFENSE_DELTA = -1   # P = clamp(BASE − offenseTeamMO, 0, 100)%

@@ -33,6 +33,7 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
 | `MO_SHOT_ROLL_NEGATIVE` | (1, 5) | Unfavorable roll when MO < 0 and chance hits |
 | `MO_SHOT_IMPACT_PCT_PER_LEVEL` | 20 | P(modified roll) = \|MO\| × this (%) |
+| `MO_NG_DECAY_BONUS_PCT_PER_LEVEL` | 20 | P(decay one ND tier higher) = \|MO\| × this (%); see Energy_System |
 | `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
 | `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
 | `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
@@ -99,6 +100,10 @@ The base shooter roll and the OREB putback roll are **MO-aware** — `random.ran
 - **Else:** `MO_SHOT_ROLL_BASE` `(1,6)`.
 
 Wired at `shot_manager.py` (shooter base roll) and `shared.py` `oreb_shot_attempt` (putback roll). Passer/dribble/defense rolls are unaffected.
+
+### NG (energy) decay bonus
+
+A player with **MO > 0** has a **`|MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL`%** chance (20% per level → 100% at MO 5) to take the turn's energy decay from **one ND tier higher** (less fatigue), capped at the top tier; MO ≤ 0 has no effect. Wired in `Player.get_fatigue_decay_amount()`. Full tier mechanics in **[Energy_System.md](Energy_System.md) § Depletion Calculation**.
 
 ---
 

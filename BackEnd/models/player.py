@@ -8,6 +8,7 @@ from BackEnd.constants.momentum import (
     MO_OREB_DELTA,
     MO_MIN,
     MO_MAX,
+    MO_NG_DECAY_BONUS_PCT_PER_LEVEL,
 )
 import uuid
 import os
@@ -26,6 +27,24 @@ def clamp_mo(value):
         return max(MO_MIN, min(MO_MAX, int(value)))
     except (TypeError, ValueError):
         return 0
+
+
+# Fatigue (NG) decay tiers by ND (Natural Durability), ordered high-ND → low-ND
+# (least → most depletion). A player's tier is the first whose threshold his ND
+# meets (last tier = ND < 9). The MO momentum bonus pulls the decay from one
+# tier higher (index − 1). See Energy_System.md § Depletion Calculation.
+_ND_DECAY_TIERS = [
+    (89, [0, 0.01]),
+    (79, [0, 0.01, 0.01]),
+    (69, [0, 0, 0.01, 0.01, 0.01]),
+    (59, [0, 0, 0.01, 0.01, 0.02]),
+    (49, [0, 0.01, 0.01, 0.01, 0.02]),
+    (39, [0, 0.01, 0.01, 0.02, 0.02]),
+    (29, [0, 0.01, 0.01, 0.02, 0.03]),
+    (19, [0, 0.01, 0.02, 0.02, 0.03]),
+    (9, [0, 0.01, 0.02, 0.02, 0.02, 0.03]),
+    (0, [0, 0.01, 0.02, 0.02, 0.03, 0.03]),
+]
 
 
 class Player:
@@ -180,27 +199,25 @@ class Player:
         """
         nd = self.attributes.get("ND", 50)  # Default to 50 if not set
 
-        if nd >= 89:
-            decay_list = [0, 0.01]
-        elif nd >= 79:
-            decay_list = [0, 0.01, 0.01]
-        elif nd >= 69:
-            decay_list = [0, 0, 0.01, 0.01, 0.01]
-        elif nd >= 59:
-            decay_list = [0, 0, 0.01, 0.01, 0.02]
-        elif nd >= 49:
-            decay_list = [0, 0.01, 0.01, 0.01, 0.02]
-        elif nd >= 39:
-            decay_list = [0, 0.01, 0.01, 0.02, 0.02]
-        elif nd >= 29:
-            decay_list = [0, 0.01, 0.01, 0.02, 0.03]
-        elif nd >= 19:
-            decay_list = [0, 0.01, 0.02, 0.02, 0.03]
-        elif nd >= 9:
-            decay_list = [0, 0.01, 0.02, 0.02, 0.02, 0.03]
-        else:
-            decay_list = [0, 0.01, 0.02, 0.02, 0.03, 0.03]
-        
+        # Ordered high-ND → low-ND tiers (threshold, decay_list). Higher ND = less
+        # depletion. The player's tier is the first whose threshold ND meets.
+        tier_index = next(
+            (i for i, (threshold, _) in enumerate(_ND_DECAY_TIERS) if nd >= threshold),
+            len(_ND_DECAY_TIERS) - 1,
+        )
+
+        # Momentum bonus (Player_Momentum_System.md / Energy_System.md): MO > 0
+        # gives a |MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL % chance to decay as if
+        # one ND tier higher (less fatigue) — one tier only, capped at the top.
+        # MO <= 0 → normal decay. Each player rolls independently.
+        mo = int(self.attributes.get("MO", 0) or 0)
+        if mo > 0 and tier_index > 0:
+            chance = min(100, mo * MO_NG_DECAY_BONUS_PCT_PER_LEVEL)
+            if random.randint(1, 100) <= chance:
+                tier_index -= 1
+
+        decay_list = list(_ND_DECAY_TIERS[tier_index][1])
+
         # ✅ FCP/HCT DEFENSIVE PLAYERS: Omit zeros for defensive players on pressure defense turns
         if omit_zeros:
             decay_list = [x for x in decay_list if x > 0]
