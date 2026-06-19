@@ -136,17 +136,6 @@ ATTACK_BASKET_Y_MIN, ATTACK_BASKET_Y_MAX = 10, 40
 GOAL_ACHIEVEMENT_READ_THRESHOLD = 200
 ABA_READ_MID_THRESHOLD = 125
 
-# §2 Optimal Trap Areas (the defense's ideal trapping ground): Primary x 50-57,
-# Secondary x ≥ wing-spot-x — both only in the deep sideline bands (y<10 or y>40).
-HCT_OTA_PRIMARY_X_MIN, HCT_OTA_PRIMARY_X_MAX = 50, 57
-HCT_OTA_WING_SPOT_X = 73  # secondary boundary = upper/lower wing x (home orientation)
-
-# D24 — Offense Situational Multiplier: scales the contest margin gates (§5). The
-# defense wins moments more easily in an Optimal Trap Area (OSM 1.0); the offense
-# gets more margin everywhere else (OSM 1.5). Replaces the old fixed `2`.
-HCT_OSM_IN_TRAP_AREA = 1.0
-HCT_OSM_DEFAULT = 1.5
-
 # §7 shot-attempt optimal tree: SH > this → shoot; elif SC+AG > this → drive; else pass.
 SHOOT_SH_THRESHOLD = 80
 DRIVE_SCAG_THRESHOLD = 105
@@ -202,7 +191,7 @@ HCT_D8_OFOUL_W0 = 20.0
 # Game-plan aggression dial → steal weight + event-fire rate + D_FOUL prob.
 HCT_D8_AGG_MULT = {"passive": 0.7, "normal": 1.0, "aggressive": 1.3}
 HCT_D8_GLOBAL_SCALAR = 1.0        # master per-moment event-frequency knob
-HCT_D8_DEF_WIN_BASE = 0.35        # base P(any event) when defense fully wins
+HCT_D8_DEF_WIN_BASE = 0.45        # base P(any event) when defense fully wins
 HCT_D8_P_EVENT_MAX = 0.60         # cap on per-moment event prob
 HCT_D8_M_REF = 25.0               # margin that counts as a "decisive" win
 HCT_D8_REF = 50.0                 # league-average attribute (centering)
@@ -420,7 +409,6 @@ def _resolve_moment(
     bh_defender,
     trapper=None,
     exclude_steal: bool = False,
-    osm: float = HCT_OSM_DEFAULT,
 ) -> Tuple[str, float, Any]:
     """§5 Pressure / Trap banded outcome (D8 attribute-driven).
 
@@ -462,7 +450,7 @@ def _resolve_moment(
     ref = HCT_D8_REF
 
     # --- Defense wins the moment → STEAL / DEAD BALL / O_FOUL / no-event -----
-    if d_score > o_score + osm * (off_chem + pt_opp):
+    if d_score > o_score + (off_chem + pt_opp):
         m = d_score - o_score
         m_norm = _clampf(m / HCT_D8_M_REF, 0.0, 1.0)
         # OFFENSE fight resists ALL D-wins events (same scale as discipline on D_FOUL).
@@ -509,7 +497,7 @@ def _resolve_moment(
         return "DEAD BALL", random.uniform(0.2, 0.8), None
 
     # --- Offense wins the moment → POS_O, with a small D_FOUL on the blow-by --
-    if o_score >= d_score + osm * (def_chem + pt_eff):
+    if o_score >= d_score + (def_chem + pt_eff):
         beaten_norm = _clampf((o_score - d_score) / HCT_D8_M_REF, 0.0, 1.0)
         ag_gap = _clampf(bh.get("AG", 0) - (getattr(bh_defender, "attributes", {}) or {}).get("AG", 0), 0.0, ref)
         p_dfoul = _clampf(
@@ -556,31 +544,6 @@ def _count_in_attack_basket(
     """Number of players (by position) inside the Attack Basket Area."""
     return sum(
         1 for p in POSITIONS if _in_attack_basket_area(coords[p], is_away_offense)
-    )
-
-
-def _in_optimal_trap_area(xy: Dict[str, Any], is_away_offense: bool) -> bool:
-    """§2 Optimal Trap Area — Primary (x 50-57) or Secondary (x ≥ wing-spot-x),
-    each only in the deep sideline bands (y<10 or y>40). x flips for away offense."""
-    y = xy["y"]
-    if ATTACK_BASKET_Y_MIN <= y <= ATTACK_BASKET_Y_MAX:
-        return False  # not a deep sideline band
-    x = xy["x"]
-    if is_away_offense:
-        if (100 - HCT_OTA_PRIMARY_X_MAX) <= x <= (100 - HCT_OTA_PRIMARY_X_MIN):
-            return True
-        return x <= (100 - HCT_OTA_WING_SPOT_X)
-    if HCT_OTA_PRIMARY_X_MIN <= x <= HCT_OTA_PRIMARY_X_MAX:
-        return True
-    return x >= HCT_OTA_WING_SPOT_X
-
-
-def _offense_situational_multiplier(xy: Dict[str, Any], is_away_offense: bool) -> float:
-    """D24 — OSM for the §5 contest gates: 1.0 inside an Optimal Trap Area, else 1.5."""
-    return (
-        HCT_OSM_IN_TRAP_AREA
-        if _in_optimal_trap_area(xy, is_away_offense)
-        else HCT_OSM_DEFAULT
     )
 
 
@@ -1358,7 +1321,6 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
 
         outcome, _ratio, credited = _resolve_moment(
             off_team, def_team, ball_handler, cutoff_def, None, exclude_steal=True,
-            osm=_offense_situational_multiplier(bh_xy, is_away_offense),
         )
         if outcome in ("O_FOUL", "D_FOUL"):
             _apply_moment_outcome(outcome, 1.0, credited, context="broken-HCT cutoff collision")
@@ -1441,7 +1403,6 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             ball_handler,
             def_lineup.get(bh_def_pos),
             def_lineup.get(trapper_pos) if trapper_pos else None,
-            osm=_offense_situational_multiplier(bh_xy, is_away_offense),
         )
 
     def _emit_stopper(reason: str, label: str = "") -> float:

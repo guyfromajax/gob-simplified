@@ -301,19 +301,6 @@ Any remaining in-range defenders revert to their zone / help assignments (§6).
 For exactly two in-range defenders, both trap (this already always includes the PG
 via the shift tables in §6).
 
-### Offense Situational Multiplier (OSM)
-
-The region gates below are scaled by an **OSM** keyed to *where the contest happens*:
-
-- **OSM = 1.0** when the BH is inside an **Optimal Trap Area** (§2 Primary/Secondary
-  bands) — the defense's ideal trapping ground, so it wins moments more easily there.
-- **OSM = 1.5** everywhere else (any contest outside an Optimal Trap Area) — the
-  offense gets more margin.
-
-OSM **replaces** the old fixed `2` coefficient in both gate terms (so the baseline
-shrinks from 2.0 → 1.5 / 1.0). It applies to the Pressure Moment, the Trap Moment,
-and the D8 contest gates below.
-
 ### Pressure Moment (one defender)
 
 ```
@@ -323,9 +310,9 @@ ball_handling_score = calculate_ball_handling_score
                      + (off_team.pt_opp_modifier * random.randint(1, 6))
 ```
 
-- if `d_score > o_score + OSM*(off_chemistry + off_pt_opp_modifier)` → **positive d (DEAD BALL)**:
+- if `d_score > o_score + (off_chemistry + off_pt_opp_modifier)` → **positive d (DEAD BALL)**:
   BH commits a dead-ball turnover (double dribble / travel) → dead-ball announce + next-step progression.
-- elif `o_score >= d_score + OSM*(def_chemistry + def_pt_efficiency)` → **positive o**:
+- elif `o_score >= d_score + (def_chemistry + def_pt_efficiency)` → **positive o**:
   the BH beats the pressure/trap and **advances** toward the basket. He resolves the
   possession **only if** the trap-break trigger is met at the next zone check (reaches
   the **Attack Basket Area** → §7 HCO/shot/FB); reaching any other spot is not a
@@ -344,9 +331,6 @@ ball_handling_score = calculate_ball_handling_score
 
 Outcome branches (DEAD BALL / HCO / neutral) are identical to the Pressure Moment above.
 
-> Implementation note: `pt_opp_modifier == 0` is treated as multiplier 1 (no-op) so
-> an unset team attribute doesn't auto-zero the handling score.
-
 ### Attribute-driven contest model (D8 — ✅ built)
 
 > Merged from the former `Dynamic_HCT_D8_Scoping.md` (now retired). This is the
@@ -359,13 +343,11 @@ The `d_score`/`o_score` band gates stay the structural fork; inside each winning
 region we compute **attribute-derived event odds** instead of forcing one result.
 
 - `m = d_score − o_score` — contest margin (positive ⇒ defense winning).
-- **defense-wins** region (`m > GATE_D`, `GATE_D = OSM*(off_chem + pt_opp)`) → {STEAL,
+- **defense-wins** region (`m > GATE_D`, `GATE_D = off_chem + pt_opp`) → {STEAL,
   DEAD BALL, O_FOUL, no-event}.
-- **offense-wins** region (`o_score ≥ d_score + OSM*(def_chem + pt_eff)`) → mostly
+- **offense-wins** region (`o_score ≥ d_score + (def_chem + pt_eff)`) → mostly
   POS_O, small **D_FOUL**.
 - else **neutral** (no event — the re-read beat).
-- `OSM` per the *Offense Situational Multiplier* above (1.0 in an Optimal Trap Area,
-  else 1.5).
 
 **Design decisions (resolved with owner):** outcomes are **attribute-driven** (not a
 flat table); the check runs **every** moment, throttled by a global rate scalar;
@@ -430,7 +412,7 @@ on a trap the credited participant); `O_FOUL` → the BH. Both: `record_stat("F"
 | `DB_W0 / STEAL_W0 / OFOUL_W0` | even-matchup baseline split (50/30/20) | `50 / 30 / 20` |
 | `AGG_MULT` | aggression dial (event rate + steal share + D_FOUL) | `passive 0.7 / normal 1.0 / aggressive 1.3` |
 | `GLOBAL_SCALAR` | master per-moment event-frequency knob | `1.0` |
-| `DEF_WIN_BASE` | base P(any event) on a full D-win | `0.35` |
+| `DEF_WIN_BASE` | base P(any event) on a full D-win | `0.45` |
 | `P_EVENT_MAX` | cap on per-moment event prob | `0.60` |
 | `M_REF` | margin counting as a "decisive" win | `25` |
 | `REF` | league-average attribute (centering) | `50` |
@@ -450,7 +432,7 @@ on a trap the credited participant); `O_FOUL` → the BH. Both: `record_stat("F"
 
 **Resulting percentages (first-pass constants):**
 
-- *Does anything fire?* decisive D-win, normal aggression → ~35% an event fires
+- *Does anything fire?* decisive D-win, normal aggression → ~45% an event fires
   (~65% no-event); scales with margin, aggression (passive ~24.5% / aggressive
   ~45.5%), and offense `fight` (`+10 → ~21%`, `−10 → ~49%`).
 - *Which event* (given one fires): even matchup → **STEAL 30% / DEAD BALL 50% /
@@ -1037,7 +1019,7 @@ Design is complete. These are the remaining work items.
 - ✅ **Shot-clock + 10-second violation wiring (D9) — built (Cut 2).** Clock terminals tagged + announced (turnover → SIDE_INBOUND, possession flips).
 - ✅ **Stats parity with the skeleton path (D16) — built (Cut 2).** Bookkeeping matches for the outcomes the dynamic loop produces (used/success, HCT_A/_S, dynamic-shot box score, defensive-success bump on a clean stop); foul/steal-stat parity folded into D8.
 
-**Behavior Change 3 (FB rework + OSM):**
+**Behavior Change 3 (FB rework):**
 - **D23.** **Unified Fast Break executor + ABA HCO/FB read.**
   - ✅ **Stage 1 built.** The §2 3-tier read (`_aba_hco_or_fb`, HIGH 200 / MID 125,
     offense-`aggression`-keyed middle tier) now picks HCO vs Fast Break at the ABA
@@ -1051,11 +1033,12 @@ Design is complete. These are the remaining work items.
     (finisher opposite-half lowPost fill + secondary-defender D6 cover; 75% dish /
     25% pull-up on a no-foul cutoff). Needs resolver overrides (forced shot defender +
     finisher shooter) + emitter steps for the finisher relocation / dish pass.
-- **D24.** ✅ **Built — Offense Situational Multiplier (OSM).** The fixed `2` in both
-  contest gates (Pressure Moment, Trap Moment, D8 defense/offense gates, §5) is now
-  `OSM` = **1.0** inside an Optimal Trap Area (§2) / **1.5** elsewhere
-  (`_offense_situational_multiplier`). Behavior change to the built D8 math —
-  recalibrate the coefficients after prototype testing.
+- **D24.** ❌ **Removed (reverted).** The Offense Situational Multiplier (a positional
+  `OSM` coefficient on the contest-gate margin terms) has been **removed entirely** —
+  both gates are now plain `d_score`/`o_score` + `(chem + pt_*)` with no multiplier.
+  (`_offense_situational_multiplier` / `_in_optimal_trap_area` and the `HCT_OSM_*` /
+  `HCT_OTA_*` constants are deleted.) The §2 *Optimal Trap Area* zones remain a
+  descriptive "ideal trapping ground" concept with no contest-math effect.
 
 **Infrastructure / later polish:**
 - Per-tick energy decay instead of once-per-turn (D12).
@@ -1133,17 +1116,14 @@ o_score = ball_handling_score + (off_team.pt_opp_modifier × random(1,6))
 
 **2. Pick the region** (the structural fork):
 
-- **OSM** (Offense Situational Multiplier) = **1.0** inside an Optimal Trap Area,
-  **1.5** elsewhere — replaces the old fixed `2` in both gates (§5).
-
-- **Defense wins** — `d_score > o_score + OSM·(off_chem + off_pt_opp)`
-- **Offense wins** — `o_score ≥ d_score + OSM·(def_chem + def_pt_eff)` → BH **advances**;
+- **Defense wins** — `d_score > o_score + (off_chem + off_pt_opp)`
+- **Offense wins** — `o_score ≥ d_score + (def_chem + def_pt_eff)` → BH **advances**;
   resolves the possession **only** if that advance reaches the **Attack Basket Area**.
 - **Neither (neutral)** — BH advances one beat, then re-reads. *(no turnover/foul)*
 
 **3. Roll the outcome inside the winning region** (the D8 layer — full math in §5):
 
-- **Defense-wins →** roll *does an event fire?* `p ≈ DEF_WIN_BASE(0.35) × margin ×
+- **Defense-wins →** roll *does an event fire?* `p ≈ DEF_WIN_BASE(0.45) × margin ×
   aggression × (1 − fight_off)`. If yes, pick one by attribute-weighted odds
   (even-matchup baseline **STEAL 30 / DEAD BALL 50 / O_FOUL 20**). If no event →
   BH keeps it, loop continues.
@@ -1172,8 +1152,8 @@ interception point (BH drive pace vs his AG rate). **No angle →** BH arrives �
 | Advance distance | §4 | x `+6..12`, y `±6` |
 | Hold window | §5 | `1–2` game-sec |
 | Move speeds | §1 | walk-up 16, drive 12, AG rates |
-| Win-margin gates (OSM) | §5 | `OSM·(chem+pt_*)`, OSM 1.0 in OTA / 1.5 else |
-| D8 event rate / split / D_FOUL | §5 table | base 0.35, 30/50/20, 0.12 |
+| Win-margin gates | §5 | `(chem + pt_*)` added to the loser's score (no multiplier) |
+| D8 event rate / split / D_FOUL | §5 table | base 0.45, 30/50/20, 0.12 |
 | Aggression / fight / discipline scaling | §5 | `AGG_MULT 0.7/1.0/1.3`, `W=0.04` |
 | Clock terminals | §1 / §8 | shot-clock 0, 10-sec at ≤20 behind half court |
 | Loop backstop | §1 | `MAX_LOOP_ITERATIONS = 15` |
@@ -1189,4 +1169,4 @@ Full spec in **§7**. On a Fast Break (ABA read chose FB, or broken-HCT topLane 
   lowPost (own half if the BH drives center); a secondary defender (D6 offset) covers him.
   On a cutoff with no foul/TO → **75%** dish → finisher FB shot, **25%** BH pull-up; no
   cutoff → BH rim shot (contested by arrival, else uncontested).
-- **Knobs:** OSM gate (§5), the 75/25 dish split, finisher lowPost target, D6 cover offset.
+- **Knobs:** the 75/25 dish split, finisher lowPost target, D6 cover offset.
