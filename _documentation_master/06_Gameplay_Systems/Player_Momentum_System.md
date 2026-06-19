@@ -25,8 +25,9 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_DUNK_DELTA` | 1 | **Deferred** — dunks not wired yet (hook only) |
 | `MO_CONSECUTIVE_THRESHOLD` | 3 | Nth consecutive make/miss that starts awarding |
 | `MO_CONSECUTIVE_DELTA` | 1 | + per consecutive make / − per consecutive miss |
-| `MO_FT_MISS_MIN_ATTEMPTS` | 2 | only FT trips with >1 attempt qualify for the penalty |
+| `MO_FT_MIN_ATTEMPTS` | 2 | only FT trips with >1 attempt qualify (make or miss) |
 | `MO_FT_ALL_MISS_DELTA` | −1 | flat, once per trip, when ALL attempted FTs miss |
+| `MO_FT_ALL_MAKE_DELTA` | 1 | flat, once per trip, when ALL attempted FTs make |
 | `MO_SET_PLAY_DELTA` | 1 | target_shooter makes the shot in a successful set-play skeleton |
 | `MO_SHOT_ROLL_BASE` | (1, 6) | Default shot roll |
 | `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
@@ -58,6 +59,7 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **3rd+ OREB** | rebounder **+1** on `OREB` ≥ `MO_OREB_THRESHOLD` | `player.py` `record_stat` |
 | **Consecutive shots** | see below | `player.py` `record_shot_result` |
 | **Free Throws (all missed)** | shooter **−1** if he attempts **>1** FT in one trip and **misses all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
+| **Free Throws (all made)** | shooter **+1** if he attempts **>1** FT in one trip and **makes all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Set Play make** | the **target_shooter** **+1** when he makes the shot in a **successful** set-play skeleton | `phase_resolution.py` `resolve_half_court_offense_logic` |
 | **Dunk** | **deferred** (constant + intent only) | — |
 
@@ -72,10 +74,10 @@ A per-game, per-player boolean array (`True` = make, `False` = miss). Self-relat
 - Recorded by `Player.record_shot_result(made)` at **every** FG shot resolution: `shot_manager.py` `resolve_shot` (HCO/FCP/HCT-skeleton/final-turn/rim-runner FB), `shared.py` (OREB putback), `after_steal_fast_break.py` (after-steal FB), and `dynamic_hct_shot.py` (HCT dynamic FB + attack-basket). The last two bypass `resolve_shot`, so they call it directly.
 - `Shot_Result_List` lives in `stats["game"]` (list-typed) — see *Persistence*.
 
-### Free throws — whole-trip miss penalty
+### Free throws — whole-trip outcome
 
-- A **trip** is one visit to the line (one foul's FT sequence). If the shooter attempts **≥ `MO_FT_MISS_MIN_ATTEMPTS`** (2+) FTs in that trip and **makes none**, he takes a flat **`MO_FT_ALL_MISS_DELTA`** (−1) — **once**, at trip end.
-- A single-FT trip never triggers it (e.g. an and-1's lone FT, or a missed 1-and-1 front end where the second was never unlocked).
+- A **trip** is one visit to the line (one foul's FT sequence). If the shooter attempts **≥ `MO_FT_MIN_ATTEMPTS`** (2+) FTs in that trip: **all missed** → flat **`MO_FT_ALL_MISS_DELTA`** (−1); **all made** → flat **`MO_FT_ALL_MAKE_DELTA`** (+1); a mix → nothing. Applied **once**, at trip end.
+- A single-FT trip never triggers either (e.g. an and-1's lone FT, or a 1-and-1 front end where the second was never unlocked).
 - Free throws are **not** added to `Shot_Result_List`, so this is independent of the consecutive-shot streak.
 - Counters (`mo_ft_trip_attempts` / `mo_ft_trip_makes`) accumulate across the per-FT calls in `game_state` and clear when the trip concludes.
 

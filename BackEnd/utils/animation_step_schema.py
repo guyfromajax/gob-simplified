@@ -42,6 +42,7 @@ PlayerArchetype = Literal[
     "standard",
     "shot_motion",
     "cruise",
+    "drift",
     "stationary",
 ]
 """Movement-rate selector. Multiplied with the player AG curve to produce

@@ -482,14 +482,19 @@ open floor invites attack):
 
 The open-floor attack is a **race to the rim against a single cutoff defender**:
 
-1. **BH targets the topLane spot (74, 25)** — inside the Attack Basket Area, so a
-   clean arrival resolves via §7. He drives there at his open-floor drive pace.
+1. **BH targets a y-keyed Attack Basket Area spot** (so a clean arrival resolves via
+   §7), chosen from his current y at the start of the drive:
+   - `19 ≤ y ≤ 32` → **topLane (74, 25)**.
+   - `y > 32` → **upper apex (80, 36)**.
+   - `y < 19` → **lower apex (80, 15)**.
+   (Spots flip in x for away offense; the y bands read the same.) He drives there at
+   his open-floor drive pace.
 2. **Closest defender attempts a cutoff.** Solve the interception geometry along the
-   BH's straight path to topLane: for each point `P` on the path, compare the BH's
-   travel time to `P` (`dist / bh_drive_rate`) against the defender's travel time to
-   `P` (`dist / defender_rate`, defender speed from his **AG**-based rate). The
+   BH's straight path to the target spot: for each point `P` on the path, compare the
+   BH's travel time to `P` (`dist / bh_drive_rate`) against the defender's travel time
+   to `P` (`dist / defender_rate`, defender speed from his **AG**-based rate). The
    **meet point** is the *first* `P` the defender can reach **no later than** the BH.
-3. **No meet point exists (no angle)** → the BH reaches topLane untouched → resolve via
+3. **No meet point exists (no angle)** → the BH reaches the spot untouched → resolve via
    **§7 goal achievement**: run the **§2 3-tier HCO/FB read** (same as any other ABA
    arrival), then HCO or the unified **Fast Break executor** (D23) accordingly.
 4. **A meet point exists (defender has an angle)** → BH and defender **collide at the
@@ -502,11 +507,15 @@ The open-floor attack is a **race to the rim against a single cutoff defender**:
    - **D_FOUL** (block) → defensive foul on the cutoff defender (process per D8:
      team-foul / bonus → FT, etc.).
    - **DEAD BALL** → lost-handle turnover → SIP, possession flips.
-5. **Off-ball movement (the other 8 players)** during this action — **hold position
-   (test cut).** For now every player except the BH and the cutoff defender **stays
-   put** for the duration of the drive/contest, so the cutoff can be tested in
-   isolation. (The previous "teammates fill the Attack Basket Area; non-cutoff
-   defenders take midLane" rule is **superseded**; richer off-ball motion TBD.)
+5. **Off-ball movement (the other 8 players)** during this action — **each rolls to
+   drift or hold.** Every player except the BH and the cutoff defender independently
+   rolls `HCT_DRIFT_PROBABILITY` (**50%**) to **drift toward the offensive rim** at
+   the `drift` archetype rate (**8** grid/game-sec, AG-scaled) for the step duration
+   (never overshooting the rim), or otherwise **hold** in place. Applies to **both
+   teams' off-ball players** and to **both** drive sub-cases (clean arrival and
+   meet-point collision). (The previous "teammates fill the Attack Basket Area;
+   non-cutoff defenders take midLane" rule is **superseded**; richer directional
+   off-ball motion TBD.)
 
 #### Dribble-alive state
 
@@ -545,8 +554,9 @@ by what reaches the BH **before the hold window elapses**:
   (as long as the possession hasn't already ended via a successful steal or a foul).
 - **No defender reaches the BH before the window elapses**:
   - **Dribble alive** → enter the **broken-HCT cutoff resolution** directly (the §5
-    "No defenders in range" attack execution: BH races to topLane vs the closest
-    cutoff defender → FB/HCO or a meet-point contest). No new read.
+    "No defenders in range" attack execution: BH races to his y-keyed ABA spot
+    (topLane / upper apex / lower apex) vs the closest cutoff defender → FB/HCO or a
+    meet-point contest). No new read.
   - **Dribble dead** (he picked it up on an earlier cutoff win) → he **cannot drive**,
     so he simply **re-reads (pass or hold)** while everyone keeps moving.
 
@@ -791,11 +801,13 @@ The HCO entry orchestrator (`skeleton_step_emitter.py`) then runs universally:
 ### Fast Break execution
 
 The single FB executor, used for **both** entry points: (a) the ABA read chose
-*Fast Break* (§2), and (b) the broken-HCT cutoff race delivered the BH to **topLane**
-clean (§5). Roles: **BH** = ball carrier; **finisher** = a teammate leaking ahead.
-All players other than the BH, the contesting defender(s), and the finisher **hold**
-(or continue current movement) for the FB's duration — test-cut convention; richer
-off-ball motion TBD.
+*Fast Break* (§2), and (b) the broken-HCT cutoff race delivered the BH to its y-keyed
+ABA spot clean (§5). Roles: **BH** = ball carrier; **finisher** = a teammate leaking
+ahead. During the FB **drive step**, every player other than the BH (driving to the
+rim) and the lone rim protector (contesting) independently rolls
+`HCT_DRIFT_PROBABILITY` (**50%**) to **drift toward the offensive rim** at the `drift`
+archetype rate (**8** grid/game-sec, AG-scaled, no overshoot) or otherwise **hold** —
+on both teams. (Richer directional off-ball motion, e.g. finisher relocation, TBD.)
 
 **Drive target (BH):** `basket_x ± random(2,3)` toward center, `y = random(19,31)`
 (the D18 / steal-FB target). Traversal time `t_bh = euclidean(start, target) / bh_rate`.
@@ -944,7 +956,7 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 - **D13.** Determinism / seeded RNG for replays.
 - **D14.** Distant sim path: "decisions only, no movement" short-circuit for franchise CPU sim.
 - **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own AG rate (backcourt `standard`; **PF/C `sprint`**, D22), **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance** and **hold** segments (the broken-HCT cutoff moves only the cutoff defender). Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Initial **converge** and the **pass-defense formation** still snap by design (initial engagement / D19 set-and-persist).
-- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / pass flight / reception), excluding the BH and any mid-catch receiver. The broken-HCT cutoff is the exception — the off-ball 8 **hold position** during it (test cut). Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
+- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / pass flight / reception), excluding the BH and any mid-catch receiver. The broken-HCT cutoff (and the FB drive step) is the exception — the off-ball 8 each **roll 50% to drift toward the rim (`drift`, 8 grid/sec) or hold** during it (`HCT_DRIFT_PROBABILITY`). Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
 - **D16.** ✅ **In-scope portion built (Cut 2).** Bookkeeping parity vs. the skeleton path for the outcomes the dynamic loop actually produces. Already present: `["used"]` (shared pre-branch), `_record_hct_stats` (HCT_A/_S + HCT_A_D/_S_D) on HCO / DEAD BALL / all three shot types, `TO` + `["success"]` on the violation/forced turnovers, and full box score on dynamic shots (`FGA`/`FGM`/`PTS` via `apply_scoring`, defensive-foul `F`+FTs, rebound stats). Added: the **defensive-success scouting bump** (`def_team.scouting_data["defense"]["HCT"]["success"] += 1`) on a clean dynamic-shot stop (miss, no shooting foul) in both shot resolvers, matching the skeleton SHOT-miss path. **Deferred to D8:** loop-level `O_FOUL`/`D_FOUL` (`F`, `team_fouls`, foul-out, bonus→FREE_THROW) and `STEAL` (`STL`, `last_stealer`, steal→fast-break) stats — the dynamic loop doesn't emit those outcomes yet, so their parity is folded into D8.
 - **D17.** ✅ Resolved — read thresholds: §4 loop reads attack>200 / pass>120; §5 broken-HCT reads attack>175 / pass>110 (intentional rescale — open floor invites attack); §7 goal-achievement read now >200 (was 190; optimal-vs-random gate, a different decision type than the §4/§5 action gates).
 - **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via the **cutoff race** (`_do_broken_hct_cutoff`; a clean arrival with a numbers edge seeds the FB); emitter appends the drive + `_build_post_shot_sub_steps`. ✅ Now reachable in normal play: D15's interrupted defender movement lets a quicker BH out-run the PG so `moment == "none"` can occur.
@@ -1087,11 +1099,12 @@ Read score = `int( (IQ·0.8 + CH·0.2) · random(1,6) )`, then:
 |-------|-------|-------|
 | BH walk-up | `CHALLENGED_OPEN_FLOOR` = **16** grid/sec | only during step 0 |
 | BH **advance** (beat the pressure/trap) | `+random(6,12)` x toward basket, `random(−6,6)` y | one neutral/won beat |
-| BH **drive / cutoff race** | `ATTACK_DRIVE` = **12** grid/sec | open-floor attack to topLane `(74,25)` |
-| BH **hold** | stationary for `random(1,3)` game-sec | defenders keep closing |
+| BH **drive / cutoff race** | `ATTACK_DRIVE` = **12** grid/sec | open-floor attack to y-keyed ABA spot (topLane `(74,25)` / upper apex `(80,36)` / lower apex `(80,15)`) |
+| BH **hold** | stationary for `random(1,2)` game-sec | defenders keep closing |
 | Backcourt defenders | AG-based **`standard`** rate | interrupted + position-tracking (real separation possible) |
 | Front defenders (PF/C) | AG-based **`sprint`** rate | ball-reactive coverage (§6 D22) |
-| Off-ball offense | AG-based **`sprint`** toward setup | except during the cutoff race → they **hold** |
+| Off-ball offense | AG-based **`sprint`** toward setup | except during the cutoff race / FB drive → see drift |
+| Off-ball **drift** (cutoff race + FB drive steps) | `drift` = **8** grid/sec toward the rim | per-player **50%** (`HCT_DRIFT_PROBABILITY`) to drift vs hold; both teams |
 
 AG rates via `ag_to_grid_per_game_sec`; AG=50 reproduces the legacy constants.
 
@@ -1101,7 +1114,7 @@ At each beat, look at defenders within **11** grid-spots of the BH whose x is on
 basket side of the BH:
 
 - **0 in range →** broken HCT (open floor) — use the lower read thresholds; `attack`
-  becomes a **cutoff race** to topLane.
+  becomes a **cutoff race** to the y-keyed ABA spot (topLane / upper apex / lower apex).
 - **1 in range →** **Pressure Moment** (on `attack`, or when one defender reaches the
   BH during a `hold`).
 - **2+ in range →** **Trap Moment**. Two trappers = the defensive **PG** + the closest
@@ -1143,8 +1156,9 @@ who wins); offense **`fight`** symmetrically lowers all defense-wins events;
 
 ### Cutoff race (broken-HCT attack)
 
-BH sprints to topLane `(74,25)`; the closest defender solves an interception point
-(BH drive pace vs his AG rate). **No angle →** BH arrives → §7 FB/HCO by ABA head-count.
+BH sprints to a y-keyed ABA spot (`19 ≤ y ≤ 32` → topLane `(74,25)`; `y > 32` → upper
+apex `(80,36)`; `y < 19` → lower apex `(80,15)`); the closest defender solves an
+interception point (BH drive pace vs his AG rate). **No angle →** BH arrives → §7 FB/HCO by ABA head-count.
 **Angle →** collide at the meet point → resolve with the same contest **minus steal**
 (charge / block / lost-handle / clean win). A clean win makes the BH **dribble-dead**
 (pass/hold only until he gives it up).

@@ -230,6 +230,7 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         from BackEnd.constants import (
             BURST_GRID_PER_GAME_SEC,
             CRUISE_GRID_PER_GAME_SEC,
+            DRIFT_GRID_PER_GAME_SEC,
             STANDARD_GRID_PER_GAME_SEC,
             SHOT_MOTION_GRID_PER_GAME_SEC,
             SPRINT_GRID_PER_GAME_SEC,
@@ -255,9 +256,39 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
         return BURST_GRID_PER_GAME_SEC * ag_scale
     if archetype == "cruise":
         return CRUISE_GRID_PER_GAME_SEC * ag_scale
+    if archetype == "drift":
+        return DRIFT_GRID_PER_GAME_SEC * ag_scale
     # Unknown / fallback → base rate. The canonical name is "standard"; any
     # unrecognized archetype string defensively resolves here.
     return STANDARD_GRID_PER_GAME_SEC * ag_scale
+
+
+def drift_or_hold_coord(
+    player: Any,
+    start: GridCoord,
+    basket: GridCoord,
+    seconds: float,
+    probability: float,
+    rng: Any = None,
+) -> Tuple[Dict[str, float], bool]:
+    """Per-player drift roll for HCT off-ball movement.
+
+    With chance ``probability`` the player **drifts** toward ``basket`` at the
+    ``"drift"`` archetype rate (AG-scaled) for ``seconds`` (never overshooting the
+    rim); otherwise he **holds** at ``start``. Returns ``(coord, drifted)``.
+    """
+    r = rng or random
+    sx, sy = float(start["x"]), float(start["y"])
+    if r.random() >= float(probability):
+        return {"x": sx, "y": sy}, False
+    rate = _ag_grid_per_game_sec(player, "drift")
+    travel = rate * float(seconds)
+    dx, dy = float(basket["x"]) - sx, float(basket["y"]) - sy
+    dist = (dx * dx + dy * dy) ** 0.5
+    if dist <= 1e-9 or travel <= 0:
+        return {"x": sx, "y": sy}, False
+    f = min(1.0, travel / dist)
+    return {"x": sx + dx * f, "y": sy + dy * f}, True
 
 
 # --- SFX tier helpers ------------------------------------------------------

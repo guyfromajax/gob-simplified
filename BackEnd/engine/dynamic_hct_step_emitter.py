@@ -25,9 +25,15 @@ Spec context: ``_documentation_master/05_Animation_System/Step_By_Step_System.md
 
 from typing import Any, Dict, List, Optional
 
+from BackEnd.constants import (
+    HOME_RIM_COORDS,
+    AWAY_RIM_COORDS,
+    HCT_DRIFT_PROBABILITY,
+)
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _player_lookup_by_id,
+    drift_or_hold_coord,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -349,21 +355,39 @@ def _build_fb_drive_step(
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     next_step_index: int,
+    is_away_offense: bool = False,
 ) -> AnimationStep:
-    """The §7/D18 fast-break drive step: the shooter sprints from his topLane
-    spot to the rim target ending in shot motion; the lone rim protector moves
-    to his contest spot; everyone else holds. Gate = shooter reaching the rim
-    target. ``_build_post_shot_sub_steps`` continues the shot from here.
+    """The §7/D18 fast-break drive step: the shooter sprints from his drive spot
+    to the rim target ending in shot motion; the lone rim protector moves to his
+    contest spot; every other (off-ball) player rolls ``HCT_DRIFT_PROBABILITY`` to
+    drift toward the rim or hold. Gate = shooter reaching the rim target.
+    ``_build_post_shot_sub_steps`` continues the shot from here.
     """
     t = float(seconds)
     off_ids = {_player_id_at_pos(off_lineup, p) for p in _OFFENSE_POSITIONS}
     def_ids = {_player_id_at_pos(def_lineup, p) for p in _OFFENSE_POSITIONS}
+    rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
 
     end_coords: Dict[str, GridCoord] = {pid: dict(c) for pid, c in start_coords.items()}
     end_coords[shooter_id] = {"x": float(bh_target["x"]), "y": float(bh_target["y"])}
     for did, coord in (defender_end or {}).items():
         if did in end_coords:
             end_coords[did] = {"x": float(coord["x"]), "y": float(coord["y"])}
+
+    # Off-ball players (not the shooter, not the rim protector) each roll to drift
+    # toward the rim or hold for this step.
+    involved = {shooter_id} | set(defender_end or {})
+    drifted_ids: set = set()
+    for pid, sc in start_coords.items():
+        if pid in involved:
+            continue
+        drift_xy, drifted = drift_or_hold_coord(
+            _player_lookup_by_id(off_lineup, def_lineup, pid),
+            sc, rim, t, HCT_DRIFT_PROBABILITY,
+        )
+        if drifted:
+            end_coords[pid] = drift_xy
+            drifted_ids.add(pid)
 
     destinations: Dict[str, Optional[GridCoord]] = {}
     actions: Dict[str, PlayerAction] = {}
@@ -379,11 +403,11 @@ def _build_fb_drive_step(
             actions[pid] = "shoot"
             archetype[pid] = "sprint"
         elif pid in def_ids:
-            actions[pid] = "guard_ball" if moved else "guard_offball"
-            archetype[pid] = "sprint" if moved else "stationary"
+            actions[pid] = "guard_ball" if (moved and pid not in drifted_ids) else "guard_offball"
+            archetype[pid] = "drift" if pid in drifted_ids else ("sprint" if moved else "stationary")
         else:
-            actions[pid] = "stationary"
-            archetype[pid] = "sprint" if (moved and pid in off_ids) else "stationary"
+            actions[pid] = "cut" if pid in drifted_ids else "stationary"
+            archetype[pid] = "drift" if pid in drifted_ids else ("sprint" if (moved and pid in off_ids) else "stationary")
 
     ball: BallState = {"owner_player_id": shooter_id}
     trigger: AdvanceTrigger = {
@@ -802,6 +826,7 @@ def build_dynamic_hct_animation_steps(
             clock_remaining_at_start=prev_clock_end["clock_remaining"],
             shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
             next_step_index=len(steps) + 1,
+            is_away_offense=is_away_offense,
         )
         steps.append(drive_step)
         step_clock_seconds.append(round(float(drive_step["end"]["time_elapsed"]), 2))

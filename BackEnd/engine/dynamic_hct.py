@@ -57,6 +57,7 @@ from BackEnd.constants import (
     RESET_INBOUND_PASS_GRID_PER_GAME_SECOND,
     HOME_RIM_COORDS,
     AWAY_RIM_COORDS,
+    HCT_DRIFT_PROBABILITY,
 )
 from BackEnd.utils.shared import (
     ag_to_grid_per_game_sec,
@@ -67,7 +68,7 @@ from BackEnd.utils.shared import (
     get_away_player_coords,
 )
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
-from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
 from BackEnd.utils.transition_bridge import _interrupted_coord
 
 
@@ -113,10 +114,15 @@ PSA_X_MIN, PSA_X_MAX = 57, 64
 PSA_Y_MIN, PSA_Y_MAX = 19, 32
 PSA_PERFECT_SPOT = {"x": 60, "y": 25}
 
-# §5 broken-HCT cutoff target: the open-floor attack drives to the topLane spot
-# (inside the Attack Basket Area) vs the closest defender (D21). Reaching it
-# clean → §7 FB/HCO.
-TOPLANE_SPOT = HCO_STRING_SPOTS["topLane"]  # (74, 25)
+# §5 broken-HCT cutoff target: the open-floor attack drives (vs the closest
+# defender, D21) to a spot inside the Attack Basket Area keyed to the BH's y:
+#   19 ≤ y ≤ 32 → topLane; y > 32 → upper apex; y < 19 → lower apex.
+# Reaching it clean → §7 FB/HCO.
+TOPLANE_SPOT = HCO_STRING_SPOTS["topLane"]      # (74, 25)
+UPPER_APEX_SPOT = HCO_STRING_SPOTS["upper apex"]  # (80, 36)
+LOWER_APEX_SPOT = HCO_STRING_SPOTS["lower apex"]  # (80, 15)
+BROKEN_HCT_DRIVE_Y_MIN = 19  # below → lower apex
+BROKEN_HCT_DRIVE_Y_MAX = 32  # above → upper apex; within [min, max] → topLane
 
 # §7 Attack Basket Area (§2): x 64→basket, y 10-40 (the band spans lower wing y
 # → upper wing y; corrected from the earlier erroneous 10-30, D22). The sole
@@ -1266,14 +1272,43 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             )
         )
 
+    def _apply_off_ball_drift(seconds: float, exclude: set) -> None:
+        """For every stationary player (not in ``exclude``), roll
+        ``HCT_DRIFT_PROBABILITY`` to drift toward the offensive rim at the
+        ``"drift"`` archetype rate for ``seconds`` (else hold). Mutates
+        ``off_coords`` / ``def_coords`` in place. ``exclude`` holds ``(side, pos)``
+        tuples for the players already moving this step."""
+        rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+        for side, coords, lineup in (
+            ("off", off_coords, off_lineup),
+            ("def", def_coords, def_lineup),
+        ):
+            for pos in POSITIONS:
+                if (side, pos) in exclude:
+                    continue
+                drifted_xy, drifted = drift_or_hold_coord(
+                    lineup.get(pos), coords[pos], rim, seconds, HCT_DRIFT_PROBABILITY
+                )
+                if drifted:
+                    coords[pos] = _clamp_xy(drifted_xy)
+
     def _do_broken_hct_cutoff() -> str:
-        """§5 / D21 broken-HCT cutoff race. The BH drives to topLane vs the
-        single closest defender; the other 8 hold (test cut). Returns:
+        """§5 / D21 broken-HCT cutoff race. The BH drives to a y-keyed ABA spot
+        (topLane / upper apex / lower apex) vs the single closest defender; the
+        other 8 hold (test cut). Returns:
         "FAST_BREAK" / "HCO" (clean arrival → §7 numbers), "TERMINAL" (a
         meet-point foul / dead ball — ``result_type`` already set), or "RETAIN"
         (the BH won the collision and is now dribble-dead → re-read)."""
         nonlocal bh_xy, dribble_alive, result_type, text_suffix
-        target = _clamp_xy(TOPLANE_SPOT if not is_away_offense else _flip(TOPLANE_SPOT))
+        # Drive target keyed to the BH's current y (home orientation; y bands read
+        # the same for away, only x flips via _flip).
+        if bh_xy["y"] > BROKEN_HCT_DRIVE_Y_MAX:
+            base_target = UPPER_APEX_SPOT
+        elif bh_xy["y"] < BROKEN_HCT_DRIVE_Y_MIN:
+            base_target = LOWER_APEX_SPOT
+        else:
+            base_target = TOPLANE_SPOT
+        target = _clamp_xy(base_target if not is_away_offense else _flip(base_target))
         cutoff_pos = min(POSITIONS, key=lambda p: _euclid(bh_xy, def_coords[p]))
         cutoff_def = def_lineup.get(cutoff_pos)
         def_rate = _ag_grid_per_game_sec(cutoff_def, "standard")
@@ -1282,7 +1317,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         )
 
         if meet is None:
-            # No angle → clean drive to topLane; cutoff defender trails.
+            # No angle → clean drive to the y-keyed ABA spot; cutoff defender trails.
             seconds = max(0.3, _euclid(bh_xy, target) / bh_drive_rate)
             off_coords[bh_pos] = target
             if def_rate > 0:
@@ -1290,10 +1325,12 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
                     _interrupted_coord(def_coords[cutoff_pos], target, def_rate, seconds)
                 )
             bh_xy = off_coords[bh_pos]
+            # Off-ball players each roll to drift toward the rim or hold.
+            _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", cutoff_pos)})
             loop_segments.append(
                 _segment(
                     "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
-                    label="attack (broken-HCT cutoff drive — clean to topLane)",
+                    label="attack (broken-HCT cutoff drive — clean to ABA spot)",
                 )
             )
             nonlocal_shot_clock_dec(seconds)
@@ -1309,6 +1346,8 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         off_coords[bh_pos] = meet
         def_coords[cutoff_pos] = dict(meet)
         bh_xy = off_coords[bh_pos]
+        # Off-ball players each roll to drift toward the rim or hold.
+        _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", cutoff_pos)})
         loop_segments.append(
             _segment(
                 "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,

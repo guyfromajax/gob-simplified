@@ -19,9 +19,10 @@ MO_CHARGE_DELTA = 1          # charge drawer +, charging player −
 MO_OREB_DELTA = 1
 MO_OREB_THRESHOLD = 3        # +MO_OREB_DELTA on a player's 3rd OREB and each after
 
-# --- Free throws: miss the whole trip → penalty ---
-MO_FT_MISS_MIN_ATTEMPTS = 2  # only trips with >1 FT attempted qualify
+# --- Free throws: whole-trip outcome (one shared attempt threshold) ---
+MO_FT_MIN_ATTEMPTS = 2       # only trips with >1 FT attempted qualify (make or miss)
 MO_FT_ALL_MISS_DELTA = -1    # flat, once per trip, when ALL attempted FTs miss
+MO_FT_ALL_MAKE_DELTA = 1     # flat, once per trip, when ALL attempted FTs make
 
 # --- Set play: target shooter makes the shot in a successful skeleton ---
 MO_SET_PLAY_DELTA = 1

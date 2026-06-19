@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 from BackEnd.constants.momentum import (
     MO_STEAL_DELTA,
     MO_FT_ALL_MISS_DELTA,
-    MO_FT_MISS_MIN_ATTEMPTS,
+    MO_FT_ALL_MAKE_DELTA,
+    MO_FT_MIN_ATTEMPTS,
     MO_SET_PLAY_DELTA,
 )
 from fastapi import HTTPException
@@ -2337,11 +2338,16 @@ def resolve_free_throw_logic(game):
 
     # If no FTs remain, determine next state
     if game_state["free_throws_remaining"] <= 0:
-        # Momentum: trip concluded — penalize a player who attempted >1 FT and
-        # missed them all (flat, once per trip). Then clear the trip counters.
-        if (game_state.get("mo_ft_trip_attempts", 0) >= MO_FT_MISS_MIN_ATTEMPTS
-                and game_state.get("mo_ft_trip_makes", 0) == 0):
-            shooter.add_momentum(MO_FT_ALL_MISS_DELTA)
+        # Momentum: trip concluded (>1 FT attempted) — flat, once per trip:
+        # all missed → penalty, all made → bonus (mixed → nothing). Then clear
+        # the trip counters. (Player_Momentum_System.md)
+        _ft_attempts = game_state.get("mo_ft_trip_attempts", 0)
+        _ft_makes = game_state.get("mo_ft_trip_makes", 0)
+        if _ft_attempts >= MO_FT_MIN_ATTEMPTS:
+            if _ft_makes == 0:
+                shooter.add_momentum(MO_FT_ALL_MISS_DELTA)
+            elif _ft_makes == _ft_attempts:
+                shooter.add_momentum(MO_FT_ALL_MAKE_DELTA)
         game_state["mo_ft_trip_active"] = False
         game_state["mo_ft_trip_attempts"] = 0
         game_state["mo_ft_trip_makes"] = 0

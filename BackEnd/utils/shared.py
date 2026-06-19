@@ -18,6 +18,7 @@ from BackEnd.constants import (
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
     CRUISE_GRID_PER_GAME_SEC,
+    DRIFT_GRID_PER_GAME_SEC,
     STANDARD_GRID_PER_GAME_SEC,
     SHOT_MOTION_GRID_PER_GAME_SEC,
     SPRINT_GRID_PER_GAME_SEC,
@@ -743,6 +744,7 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
         - archetype="sprint"         → SPRINT_GRID_PER_GAME_SEC (18 @ AG=50)
         - archetype="burst"          → BURST_GRID_PER_GAME_SEC (32 @ AG=50)
         - archetype="cruise"         → CRUISE_GRID_PER_GAME_SEC (13 @ AG=50)
+        - archetype="drift"          → DRIFT_GRID_PER_GAME_SEC (8 @ AG=50)
 
     When ``player`` is None (Phase 1/legacy call sites that haven't been
     migrated yet): falls back to the legacy per-archetype pace constants.
@@ -786,6 +788,8 @@ def calc_ag_segment_seconds(start, end, player=None, *, archetype="standard"):
         rate = BURST_GRID_PER_GAME_SEC * ag_scale
     elif archetype == "cruise":
         rate = CRUISE_GRID_PER_GAME_SEC * ag_scale
+    elif archetype == "drift":
+        rate = DRIFT_GRID_PER_GAME_SEC * ag_scale
     else:
         rate = STANDARD_GRID_PER_GAME_SEC * ag_scale
     return calc_isotropic_segment_seconds(start, end, rate)

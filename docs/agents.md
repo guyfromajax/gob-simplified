@@ -155,3 +155,19 @@ Cross-cutting rules for safe feature work. **Subsystem behavior** remains docume
 
 ---
 
+## Best Practices (complex feature installs)
+
+Captured from the Dynamic HCT Turns build — a large, stateful feature that landed close to right on the first install. Follow these for any complex feature so future installs have the same odds of going smoothly.
+
+1. **Spec-first, single source of truth.** Write/expand a spec doc as *the* authority before coding, then make code conform to it. With a clear written spec, coding becomes translation, not invention. Rule of thumb: if you can't state a rule in one sentence, it's not ready to code.
+2. **Resolve ambiguity before writing code.** On hard pieces, pause and ask targeted (ideally multiple-choice) questions until there's zero guessing. Minutes of questions prevent days of building the wrong thing.
+3. **Centralize the tunable knobs.** Put each magic number / threshold in one named constant, not scattered inline. Decide upfront "what will I want to tune later?" so later tweaks are one-line changes, not hunts.
+4. **Stage big features; verify each stage.** Split the feature into independently runnable stages and confirm each runs clean before building on it. Never write hundreds of lines before the first run.
+5. **Build observability in early.** Add logging/tracing as part of the build, not after. For anything with state moving over time, debug from evidence, not guesses.
+6. **Tight loop: change → run → trace → diagnose → fix.** Run the prototype constantly and feed real logs back. Short loops catch problems while context is fresh and the change set is small.
+7. **Consistency sweep after every change.** After each edit, ask "where else does this concept live?" (doc section vs section, code vs doc) and update all of them so drift doesn't accumulate.
+
+If you internalize only two: **#1 (spec-first single source of truth)** and **#2 (no coding until the rule is unambiguous)**. The other five keep those two honest.
+
+---
+

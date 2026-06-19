@@ -235,11 +235,16 @@ HCO_STEP_T_FLOOR_GAME_SECONDS = 0.5             # Min step T for HCO skeleton st
 # ---- Per-archetype absolute rates (grid/game-sec at AG=50) ----------------
 # Add a new archetype: define an absolute rate here, list it in
 # ``PlayerArchetype`` Literal, and add a branch in ``_ag_grid_per_game_sec``.
+DRIFT_GRID_PER_GAME_SEC       = 8   # archetype "drift"       — slow off-ball relocation (HCT drive/FB off-ball drift)
 CRUISE_GRID_PER_GAME_SEC      = 13  # archetype "cruise"      — BH bring-up / settle / transition pace
 SHOT_MOTION_GRID_PER_GAME_SEC = 14  # archetype "shot_motion" — shooter during shot
 STANDARD_GRID_PER_GAME_SEC    = 14  # archetype "standard"    — base / unaccelerated (AG curve anchor @ AG=50)
 SPRINT_GRID_PER_GAME_SEC      = 18  # archetype "sprint"      — max-effort movement (walk-up non-BH, converge)
 BURST_GRID_PER_GAME_SEC       = 32  # archetype "burst"       — peak explosive start (FB outlet)
+
+# Per stationary player, the chance to drift toward the offensive rim (vs. hold)
+# during the HCT broken-HCT drive step and the ABA Fast Break drive step.
+HCT_DRIFT_PROBABILITY = 0.5
 
 # Shot ball motion: ball flight rate during the [ball_flight] HCO sub-step.
 # FE mirrors this in animationPlayback.js (grid-distance / rate × tickMs).

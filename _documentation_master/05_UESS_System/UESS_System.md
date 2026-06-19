@@ -97,6 +97,7 @@ This preserves main-branch shot/SFX feel while keeping backend-emitted cues auth
 
 | Archetype | Rate @ AG=50 | Constant | Use |
 |---|---:|---|---|
+| `drift` | 8 | `DRIFT_GRID_PER_GAME_SEC` | Slow off-ball relocation (HCT off-ball drift toward rim on drive/FB steps) |
 | `cruise` | 13 | `CRUISE_GRID_PER_GAME_SEC` | BH bring-up, settle / transition pace |
 | `shot_motion` | 14 | `SHOT_MOTION_GRID_PER_GAME_SEC` | Shooter during shot |
 | `standard` | 14 | `STANDARD_GRID_PER_GAME_SEC` | Base / unaccelerated movement (AG curve anchor + fallback) |
