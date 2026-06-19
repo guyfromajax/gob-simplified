@@ -89,7 +89,9 @@
         var cls = 'tile' + (isTbd ? ' tile--tbd' : '');
         // live topics navigate to their sub-page; dead ones toast via [data-soon]
         var nav = LIVE[t.id] ? 'href="' + LIVE[t.id] + '"' : 'data-soon href="#"';
+        var orderNumber = ORDER.indexOf(t.id) + 1;
         return '<a class="' + cls + '" data-topic="' + t.id + '" ' + nav + '>' +
+            '<span class="order-circle" aria-hidden="true">' + orderNumber + '</span>' +
             '<span class="t-main">' +
               '<span class="t-row"><span class="t-name">' + t.name + '</span></span>' +
             '</span>' +
