@@ -99,17 +99,43 @@ function runReachIn(scene, sprite, flourish, ballSprite) {
   const ease = flourish?.ease || cfg.ease || "Back.easeOut";
   const halfMs = Math.max(1, totalMs / 2);
 
+  // Never stack reach-ins on the same sprite. Consecutive HCT contest moments can
+  // re-fire on the same on-ball defender; overlapping yoyo tweens on the same
+  // targets corrupt the "rest" position and leave the marker permanently offset.
+  if (sprite.__reachInTween && sprite.__reachInTween.isPlaying?.()) return;
+
   const resolved = resolveRenderTarget(sprite);
   if (!resolved) return;
 
+  // Snapshot the base positions so we ALWAYS restore to them on complete OR stop
+  // (a killed/interrupted relative tween otherwise leaves a residual offset — the
+  // "stuck ghost" bug). Absolute restore is the safety net.
+  let restore;
   let tweenProps;
   if (resolved.mode === "origin") {
-    // displayOrigin offset is inverted: to move the sprite toward +x/+y,
-    // DECREASE the origin. Relative tween yoyos back to the base origin.
-    tweenProps = { displayOriginX: `-=${dx}`, displayOriginY: `-=${dy}` };
+    const baseOX = Number(sprite.displayOriginX);
+    const baseOY = Number(sprite.displayOriginY);
+    // displayOrigin offset is inverted: to move the sprite toward +x/+y, DECREASE
+    // the origin.
+    tweenProps = { displayOriginX: baseOX - dx, displayOriginY: baseOY - dy };
+    restore = () => {
+      sprite.displayOriginX = baseOX;
+      sprite.displayOriginY = baseOY;
+      sprite.__reachInTween = null;
+    };
   } else {
     // child_local: translate every child by the same local delta toward the ball.
+    // The masked photo's clip follows it (createHeadshotMarkerV2 syncs the mask to
+    // photoChild), so the whole marker lunges coherently.
+    const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
     tweenProps = { x: `+=${dx}`, y: `+=${dy}` };
+    restore = () => {
+      for (const b of bases) {
+        b.c.x = b.x;
+        b.c.y = b.y;
+      }
+      sprite.__reachInTween = null;
+    };
   }
 
   const tween = scene.tweens.add({
@@ -119,10 +145,17 @@ function runReachIn(scene, sprite, flourish, ballSprite) {
     ease,
     yoyo: true,
     repeat: 0,
+    onComplete: restore,
+    onStop: restore,
   });
   // Belt-and-suspenders: never let this gate the turn boundary (child tweens are
   // already invisible to the boundary collector, which only inspects containers).
-  if (tween) tween.__uessBoundaryIgnore = true;
+  if (tween) {
+    tween.__uessBoundaryIgnore = true;
+    sprite.__reachInTween = tween;
+  } else {
+    restore();
+  }
 }
 
 /**

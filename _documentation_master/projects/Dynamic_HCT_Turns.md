@@ -1352,3 +1352,147 @@ passes and cuts to the ABA while a rover + key already exist).
 - `defense_targets(...)` → `_straight_pressure_targets` (sticky man deny/on-ball +
   rover + key/wing toggle + PF/C via `_pf_c_targets`); mutates the per-possession
   state for man→ABA role transitions. Standard inherits the base (`_defense_targets`).
+
+## §14 — Pass Contests (interceptions & bat-out-of-bounds)
+
+> **Status:** design spec (not yet built). A **universal** pass-contest primitive,
+> prototyped first in the HCT pass branch (§6), then generalized to other pass paths.
+> All passes are contestable; geometry makes the overwhelming majority complete cleanly.
+
+### 14.0 — Why this is "true to the sim"
+
+The sim already resolves a contested pass in exactly this shape — the **Rim Runner
+lane pass** (`rim_runner_fast_break.py`): a geometry gate (perpendicular distance to
+the pass line + a side gate) decides *who can* contest, an attribute roll decides
+*whether/how*, and the outcome is **tiered** (steal / bat-OOB / completion). We also
+already own an **arrival-time race solver** — the §5/D21 `_cutoff_meet_point` (walk
+the path, find the first point a defender reaches no later than the mover) — and a
+standardized **steal composite** (`_steal_credit_defender`: OD·0.4 + AG·0.4 + IQ·0.2).
+Pass contests reuse these rather than inventing a parallel system.
+
+### 14.1 — The primitive (contract)
+
+```
+resolve_pass_contest(passer, receiver_xy, ball_speed, candidate_defenders,
+                     offense_modifier) → { outcome, deflector, contact_point }
+    outcome ∈ {COMPLETE, INTERCEPT, BAT_OOB}
+```
+
+Pure & geometry-first (no Player/game dependency — caller adapts), so it is callable
+from any pass path and trivially unit-testable. `passer` is a descriptor
+`{xy, PS, CH, IQ}`; `ball_speed` is the pass rate (`PASS_GRID_PER_GAME_SEC`);
+`offense_modifier` is the turn-type offense rating that feeds the **passer safety gate**
+(§14.3). Resolution runs three stages in order — geometry gate → passer safety gate →
+interception band — short-circuiting to `COMPLETE` as soon as any stage clears the pass.
+
+### 14.2 — Stage 1: hybrid geometry gate (per candidate defender)
+
+A defender is an **eligible** contester iff **both** hold:
+1. **In the lane (spatial):** perpendicular distance from the defender to the
+   passer→receiver segment ≤ `PASS_LANE_DIST` (start at **8** grid, the RR value).
+   Prevents a far-but-fast defender from "teleport-stealing" purely on speed.
+2. **Reachable in time (temporal):** walk the segment (the D21 method) — at sample
+   point `s`, the ball arrives at `t_ball = (L·s)/ball_speed` and the defender at
+   `t_def = dist(def, point)/ag_rate(def)`. The defender is eligible at the **first**
+   `s` where `t_def − iq_headstart ≤ t_ball`. `iq_headstart` = anticipation, scaled
+   from IQ up to `PASS_IQ_ANTICIPATION_MAX_SEC` (a smart defender jumps the lane).
+   (Foot-speed `ag_rate` still drives this *physical* race — `CH` only enters the band.)
+
+Among eligible defenders, the **contester** is the one whose contact occurs
+**earliest along the flight** (smallest `s` → first hand on the ball). His
+`contact_point` is that sampled point.
+
+### 14.3 — Stage 2: passer safety gate (offense counter)
+
+Only if a contester exists. A good passer can defuse the lurking defender entirely
+(this **replaces** the old additive `off_modifier` on the band — the offensive counter
+is now its own explicit roll, not a threshold nudge):
+
+```
+pass_score = (PS·0.6 + CH·0.2 + IQ·0.2) × random(1,6)        # the PASSER's attributes
+if pass_score > PASS_SAFETY_BASE − offense_modifier:          # base 200
+    → COMPLETE  (no interception in play)
+```
+
+`offense_modifier` is the **turn-type** offense rating, resolved by
+`resolve_offense_pass_modifier(turn_type, off_team_attributes)`. A higher rating
+**lowers** the bar the passer must clear, so good offenses complete more passes — the
+offensive mirror of RR's *defensive* `fb_opp`:
+
+| turn type | `team_attributes` key |
+|---|---|
+| `HCO` | `offensive_efficiency` |
+| `HCT` | `pt_opp_modifier` |
+| `FAST_BREAK` | `fb_efficiency` |
+| all others | `offensive_efficiency` (fallback) |
+
+### 14.3b — Stage 3: interception band (what happens)
+
+Only if the passer fails the safety gate:
+
+```
+intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2) × random(1,6)     # hands/awareness, not foot-speed
+```
+
+- `intercept_score > PASS_INTERCEPT_TIER_HI`  (250) → **INTERCEPT**
+- `intercept_score > PASS_INTERCEPT_TIER_MID` (200) → **BAT_OOB**
+- else                                              → **COMPLETE**
+
+(The tiers are now fixed — all offensive influence lives in the §14.3 passer gate.)
+
+### 14.4 — Stage 4: outcomes & consequences
+
+| outcome | meaning | consequence |
+|---|---|---|
+| `COMPLETE` | clean catch (common) | existing behavior — receiver becomes BH and reads (§6) |
+| `INTERCEPT` | clean pick | **STEAL** terminal; possession flips; seed the transition from `contact_point`; credit via `_steal_credit_defender` |
+| `BAT_OOB` | knocked out of bounds | **DEAD BALL**; **offense retains** (matches Rim Runner) → `SIDE_INBOUND`; no possession flip |
+
+`contact_point` is the agreed backend/frontend contact grid (generalize
+`_compute_interception_contact_grid`).
+
+### 14.5 — HCT wiring (the prototype)
+
+In the §6 pass branch, after the receiver + `pass_seconds` are known, gather the five
+defenders as candidates (geometry filters them; in Straight Pressure the man-defenders
+sitting at **60% on the BH→man line are literally in the lane**, so interceptions
+emerge from the man-to-man positioning, not a bolted-on roll). Run
+`resolve_pass_contest` with the passer descriptor and `offense_modifier =
+resolve_offense_pass_modifier("HCT", off_team.team_attributes)` (HCT → `pt_opp_modifier`):
+
+- `COMPLETE` → unchanged (rate-limited close during flight + receiver read-and-react).
+- `INTERCEPT` → `result_type="STEAL"`, `stealer = _steal_credit_defender(...)`,
+  `steal_coords = contact_point`, seed the transition (same path as the existing HCT
+  steal terminal). Recorded as an **HCT** turn (`current_turn="HCT"`, `HCT_*_D`).
+- `BAT_OOB` → `result_type="DEAD BALL"`, `possession_flips=False`,
+  `next_play_type="SIDE_INBOUND"`.
+
+**Animation:** shorten the `_pass_segment` flight to `contact_point`; `INTERCEPT`
+attaches the ball to the deflector; `BAT_OOB` sends it out of bounds — reusing the RR
+interception / bat-OOB render vocabulary.
+
+### 14.6 — Knobs to tune
+
+- `PASS_LANE_DIST` (8) — spatial lane width.
+- `PASS_IQ_ANTICIPATION_MAX_SEC` — how much IQ buys as a reaction head-start.
+- Interception composite weights (OD 0.6 / CH 0.2 / IQ 0.2).
+- Passer-safety composite weights (PS 0.6 / CH 0.2 / IQ 0.2) and `PASS_SAFETY_BASE` (200).
+- `PASS_INTERCEPT_TIER_HI` (250) / `PASS_INTERCEPT_TIER_MID` (200) — set the
+  steal/bat/complete mix once the passer fails the safety gate.
+
+### 14.7 — Phasing
+
+1. **Extract + unit-test** `resolve_pass_contest` (geometry first; band with injected RNG). *(this PR)*
+2. Wire into the **HCT pass branch** (§14.5) — INTERCEPT + BAT_OOB terminals.
+3. Generalize to HCO / inbound pass paths; optionally refactor Rim Runner onto the
+   shared primitive (single source of truth).
+4. Animation polish (contact grid + OOB).
+
+### 14.8 — Open items
+
+- `PASS_SAFETY_BASE` (200) and the `offense_modifier` scale — confirm efficiency/opp
+  modifier magnitudes land the safe-pass rate where we want (tune in step 2).
+- Whether `BAT_OOB` should ever be a turnover (clean knock) vs always offense-retains
+  (current decision: **always offense-retains**, per RR parity).
+- A future 4th outcome — **tipped-but-live** (deflection that starts a scramble rather
+  than a dead ball) — deferred.

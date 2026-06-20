@@ -142,10 +142,17 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   container.staminaGfx = staminaGfx;
   container.headR = headR;
 
-  // Sync the scene-level mask to the container each frame; cleanup on destroy.
+  // Sync the scene-level mask to the MASKED PHOTO each frame; cleanup on destroy.
+  // The mask must track the photo's world position = container + photo's local
+  // offset. Normally photoChild sits at local (0,0) so this equals the container
+  // origin (unchanged behavior); but a render-space flourish (e.g. a defender
+  // reach-in, see flourishes.js) translates the marker's children in local space,
+  // and the mask has to follow the photo or the headshot slides out from under
+  // its clip circle (a faint detached "ghost" of the photo). Following photoChild
+  // keeps the mask locked to the photo through any child-local motion.
   const syncMask = () => {
-    maskGraphics.x = container.x;
-    maskGraphics.y = container.y;
+    maskGraphics.x = container.x + (photoChild?.x || 0);
+    maskGraphics.y = container.y + (photoChild?.y || 0);
   };
   scene.events.on("update", syncMask);
   container.once("destroy", () => {

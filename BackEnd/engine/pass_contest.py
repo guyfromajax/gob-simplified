@@ -1,0 +1,247 @@
+"""Universal pass-contest primitive (Dynamic_HCT_Turns.md §14).
+
+Resolves whether an in-flight pass is contested by a defender — completed cleanly,
+intercepted (STEAL), or batted out of bounds. Geometry-first and **pure**: it takes
+plain coord dicts + lightweight defender descriptors (no ``Player`` / ``game``
+dependency), so it is reusable from any pass path (HCT first, then HCO / inbounds /
+Rim Runner) and trivially unit-testable.
+
+Model (true to the sim — see §14.0):
+  Stage 1 — hybrid geometry gate (per defender): he must be *in the lane*
+    (perpendicular distance to the passer→receiver segment ≤ ``PASS_LANE_DIST``)
+    AND *reachable in time* (the D21 arrival-time walk: the first segment point he
+    can reach no later than the ball, minus an IQ anticipation head-start).
+  Stage 2 — passer safety gate (offense counter): ``pass_score = (PS·0.6 + CH·0.2 +
+    IQ·0.2)×rand(1,6)``; if it clears ``PASS_SAFETY_BASE − offense_modifier`` the pass
+    is safe (no interception in play). ``offense_modifier`` is turn-type based (see
+    ``resolve_offense_pass_modifier``).
+  Stage 3 — interception band: ``intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``
+    vs the fixed tiers → COMPLETE / INTERCEPT / BAT_OOB.
+
+The contester (when several are eligible) is the one whose contact occurs **earliest
+along the flight** (first hand on the ball).
+"""
+
+from __future__ import annotations
+
+import math
+import random
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+# --- Tunable knobs (§14.6) ---------------------------------------------------
+# Spatial lane width: a defender farther than this (perpendicular) from the pass
+# line is not "in the lane" and cannot contest, however fast he is.
+PASS_LANE_DIST = 8.0
+# Anticipation: IQ buys up to this many game-seconds of reaction head-start in the
+# arrival-time race (scaled linearly from IQ/100).
+PASS_IQ_ANTICIPATION_MAX_SEC = 0.15
+# Interception composite weights (defender — hands/awareness, not foot-speed).
+PASS_INTERCEPT_OD_WEIGHT = 0.6
+PASS_INTERCEPT_CH_WEIGHT = 0.2
+PASS_INTERCEPT_IQ_WEIGHT = 0.2
+# Passer "safe pass" composite weights (offense — passing skill).
+PASS_SAFETY_PS_WEIGHT = 0.6
+PASS_SAFETY_CH_WEIGHT = 0.2
+PASS_SAFETY_IQ_WEIGHT = 0.2
+# Random multiplier band on the composites (inclusive).
+PASS_INTERCEPT_ROLL_MIN = 1
+PASS_INTERCEPT_ROLL_MAX = 6
+# Passer safety gate base: if the passer's pass_score > (BASE − offense_modifier),
+# no interception is in play (a good passer evades the lurking defender).
+PASS_SAFETY_BASE = 200.0
+# Interception outcome thresholds: > hi → INTERCEPT, > mid → BAT_OOB.
+PASS_INTERCEPT_TIER_HI = 250.0
+PASS_INTERCEPT_TIER_MID = 200.0
+
+# Turn-type → offense team_attributes key feeding the passer safety gate's
+# ``offense_modifier`` (a higher offense rating lowers the bar the passer must clear,
+# so good offenses complete more passes). Unlisted turn types fall back to offense
+# efficiency.
+OFFENSE_PASS_MODIFIER_KEYS = {
+    "HCO": "offensive_efficiency",
+    "HCT": "pt_opp_modifier",
+    "FAST_BREAK": "fb_efficiency",
+}
+DEFAULT_OFFENSE_PASS_MODIFIER_KEY = "offensive_efficiency"
+
+COMPLETE = "COMPLETE"
+INTERCEPT = "INTERCEPT"
+BAT_OOB = "BAT_OOB"
+
+
+def _euclid(a: Dict[str, Any], b: Dict[str, Any]) -> float:
+    return math.hypot(float(b["x"]) - float(a["x"]), float(b["y"]) - float(a["y"]))
+
+
+def _project_onto_segment(
+    p: Dict[str, Any], a: Dict[str, Any], b: Dict[str, Any]
+) -> Tuple[float, Dict[str, float], float]:
+    """Project ``p`` onto segment a→b. Returns ``(t, proj_point, perp_dist)`` where
+    ``t`` is the clamped [0,1] position along the segment."""
+    ax, ay = float(a["x"]), float(a["y"])
+    bx, by = float(b["x"]), float(b["y"])
+    px, py = float(p["x"]), float(p["y"])
+    dx, dy = bx - ax, by - ay
+    len_sq = dx * dx + dy * dy
+    if len_sq < 1e-9:
+        return 0.0, {"x": ax, "y": ay}, math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / len_sq))
+    proj = {"x": ax + t * dx, "y": ay + t * dy}
+    perp = math.hypot(px - proj["x"], py - proj["y"])
+    return t, proj, perp
+
+
+def _iq_headstart(iq: float) -> float:
+    return max(0.0, min(1.0, float(iq) / 100.0)) * PASS_IQ_ANTICIPATION_MAX_SEC
+
+
+def _earliest_contact(
+    defender_xy: Dict[str, Any],
+    rate: float,
+    passer_xy: Dict[str, Any],
+    receiver_xy: Dict[str, Any],
+    seg_len: float,
+    ball_speed: float,
+    iq_headstart: float,
+) -> Optional[Tuple[float, Dict[str, float]]]:
+    """D21 arrival-time walk. Returns ``(s, contact_point)`` for the first sampled
+    point the defender reaches no later than the ball (within his head-start), or
+    ``None`` if he can never beat the ball to the line."""
+    if rate <= 0 or ball_speed <= 0 or seg_len <= 0:
+        return None
+    ax, ay = float(passer_xy["x"]), float(passer_xy["y"])
+    bx, by = float(receiver_xy["x"]), float(receiver_xy["y"])
+    steps = max(1, int(round(seg_len)))
+    for i in range(steps + 1):
+        s = i / steps
+        point = {"x": ax + (bx - ax) * s, "y": ay + (by - ay) * s}
+        t_ball = (seg_len * s) / ball_speed
+        t_def = _euclid(defender_xy, point) / rate - iq_headstart
+        if t_def <= t_ball:
+            return s, point
+    return None
+
+
+def _intercept_score(defender: Dict[str, Any], rng: Any) -> float:
+    od = float(defender.get("OD", 0) or 0)
+    ch = float(defender.get("CH", 0) or 0)
+    iq = float(defender.get("IQ", 0) or 0)
+    composite = (
+        od * PASS_INTERCEPT_OD_WEIGHT
+        + ch * PASS_INTERCEPT_CH_WEIGHT
+        + iq * PASS_INTERCEPT_IQ_WEIGHT
+    )
+    return composite * rng.randint(PASS_INTERCEPT_ROLL_MIN, PASS_INTERCEPT_ROLL_MAX)
+
+
+def _pass_score(passer: Dict[str, Any], rng: Any) -> float:
+    """The passer's 'safe pass' score (offense counter to the contest)."""
+    ps = float(passer.get("PS", 0) or 0)
+    ch = float(passer.get("CH", 0) or 0)
+    iq = float(passer.get("IQ", 0) or 0)
+    composite = (
+        ps * PASS_SAFETY_PS_WEIGHT
+        + ch * PASS_SAFETY_CH_WEIGHT
+        + iq * PASS_SAFETY_IQ_WEIGHT
+    )
+    return composite * rng.randint(PASS_INTERCEPT_ROLL_MIN, PASS_INTERCEPT_ROLL_MAX)
+
+
+def resolve_offense_pass_modifier(turn_type: Any, off_team_attributes: Any) -> float:
+    """Resolve the passer-safety-gate ``offense_modifier`` from the turn type and the
+    offense's ``team_attributes`` (HCO→offensive_efficiency, HCT→pt_opp_modifier,
+    FAST_BREAK→fb_efficiency, else→offensive_efficiency)."""
+    key = OFFENSE_PASS_MODIFIER_KEYS.get(turn_type, DEFAULT_OFFENSE_PASS_MODIFIER_KEY)
+    try:
+        return float((off_team_attributes or {}).get(key, 0) or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+
+
+def find_pass_contester(
+    passer_xy: Dict[str, Any],
+    receiver_xy: Dict[str, Any],
+    ball_speed: float,
+    defenders: Iterable[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Stage 1 (pure geometry). Return the eligible defender whose contact is earliest
+    along the flight, as ``{"defender", "contact_point", "s"}``, or ``None``.
+
+    Each defender descriptor is a dict: ``{"id", "xy", "rate", "OD", "AG", "IQ"}``.
+    """
+    seg_len = _euclid(passer_xy, receiver_xy)
+    if seg_len <= 0 or ball_speed <= 0:
+        return None
+
+    best: Optional[Dict[str, Any]] = None
+    for d in defenders:
+        xy = d.get("xy")
+        if not isinstance(xy, dict):
+            continue
+        _t, _proj, perp = _project_onto_segment(xy, passer_xy, receiver_xy)
+        if perp > PASS_LANE_DIST:  # spatial gate
+            continue
+        hit = _earliest_contact(
+            xy, float(d.get("rate", 0) or 0), passer_xy, receiver_xy,
+            seg_len, ball_speed, _iq_headstart(d.get("IQ", 0)),
+        )
+        if hit is None:  # temporal gate
+            continue
+        s, contact = hit
+        if best is None or s < best["s"]:
+            best = {"defender": d, "contact_point": contact, "s": s}
+    return best
+
+
+def resolve_pass_contest(
+    passer: Dict[str, Any],
+    receiver_xy: Dict[str, Any],
+    ball_speed: float,
+    defenders: Iterable[Dict[str, Any]],
+    *,
+    offense_modifier: float = 0.0,
+    rng: Any = random,
+) -> Dict[str, Any]:
+    """Resolve a pass contest (§14). Returns
+    ``{"outcome", "deflector", "contact_point"}`` where ``outcome`` is one of
+    ``COMPLETE`` / ``INTERCEPT`` / ``BAT_OOB``. ``deflector`` is the contesting
+    defender's id (``None`` on a clean completion).
+
+    ``passer`` is a descriptor ``{"xy", "PS", "CH", "IQ"}``. Resolution order:
+      1. Geometry — if no defender is eligible (in the lane + reachable), COMPLETE.
+      2. Passer safety gate — ``pass_score = (PS·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``;
+         if it exceeds ``PASS_SAFETY_BASE − offense_modifier`` the pass is safe
+         (COMPLETE, no interception in play). A higher ``offense_modifier`` (the
+         turn-type offense rating — see ``resolve_offense_pass_modifier``) lowers the
+         bar, so good offenses complete more passes.
+      3. Interception band — ``intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``
+         vs the fixed tiers (> hi → INTERCEPT, > mid → BAT_OOB, else COMPLETE).
+
+    ``rng`` is injectable for tests (called once for the gate, once for the band).
+    """
+    passer_xy = passer.get("xy") if isinstance(passer, dict) else None
+    if not isinstance(passer_xy, dict):
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+
+    contester = find_pass_contester(passer_xy, receiver_xy, ball_speed, defenders)
+    if contester is None:
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+
+    # Passer safety gate — a good passer evades the lurking defender entirely.
+    if _pass_score(passer, rng) > (PASS_SAFETY_BASE - offense_modifier):
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+
+    defender = contester["defender"]
+    score = _intercept_score(defender, rng)
+    if score > PASS_INTERCEPT_TIER_HI:
+        outcome = INTERCEPT
+    elif score > PASS_INTERCEPT_TIER_MID:
+        outcome = BAT_OOB
+    else:
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+
+    return {
+        "outcome": outcome,
+        "deflector": defender.get("id"),
+        "contact_point": contester["contact_point"],
+    }
