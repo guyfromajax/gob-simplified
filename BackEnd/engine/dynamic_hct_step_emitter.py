@@ -805,6 +805,20 @@ def build_dynamic_hct_animation_steps(
                 reason=reason,
             )
 
+        # Reach-in micro-movement: a contest moment (set by dynamic_hct's
+        # _stamp_reach_in) stamps the on-ball defender's render-space reach_in
+        # flourish on this step. FE-only visual; never mutates gameplay coords.
+        # See Flourish in animation_step_schema.py. Params are FE defaults
+        # (animation_config.js flourish block) — backend names the kind + target.
+        reach_in_pos = segment.get("reach_in_def_pos")
+        if reach_in_pos:
+            reach_in_id = _player_id_at_pos(def_lineup, reach_in_pos)
+            if reach_in_id:
+                step["start"].setdefault("flourish", {})[reach_in_id] = {
+                    "kind": "reach_in",
+                    "target": "ball",
+                }
+
         steps.append(step)
         step_clock_seconds.append(round(float(step["end"]["time_elapsed"]), 2))
         prev_end_coords = step["end"]["coords"]

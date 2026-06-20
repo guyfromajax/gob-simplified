@@ -133,6 +133,23 @@
  */
 
 /**
+ * @typedef {Object} Flourish
+ *   In-place character "micro-movement" rendered by the FE in RENDER SPACE
+ *   only — never mutates gameplay grid coords (cf. the arrival heartbeat).
+ *   Backend names the flourish + optional params; the FE owns the visual
+ *   vocabulary and supplies defaults (animation_config.js `flourish` block)
+ *   for any omitted field. First shipped: "reach_in" (defender steal attempt
+ *   on a Dynamic-HCT contest moment). Other kinds are accepted-but-unrendered
+ *   placeholders for now.
+ * @property {("reach_in"|"pump_fake"|"bite"|"gather"|"rattle"|"shot_dip"|"dribble"|"pickup"|"dunk")} kind
+ * @property {number} [amplitude_grid]   Lunge distance in GRID units (rendered, not gameplay). Omitted → FE default.
+ * @property {number} [duration_ms]      Wall-clock out-and-back duration. Omitted → FE default.
+ * @property {string} [ease]             Phaser ease (e.g. "Back.easeOut"). Omitted → FE default.
+ * @property {("ball"|"rim"|"x"|"y")} [target]   What the motion points at. "reach_in" uses "ball".
+ * @property {number} [cycles]           Oscillation count (rattle); ignored otherwise.
+ */
+
+/**
  * @typedef {Object} StepStart
  * @property {Object<PlayerId, GridCoord>}        coords
  * @property {Object<PlayerId, (GridCoord|null)>} destination
@@ -166,6 +183,12 @@
  * @property {TimedSfx[]} [timed_sfx]
  *   Optional. Follow-up cues fired at `delay_ms` after ball arrival (ball
  *   tween onComplete). Used for BANK_MAKE / BACK_OF_RIM delayed swish.
+ * @property {Object<PlayerId, Flourish>} [flourish]
+ *   Optional. Per-player in-place micro-movements rendered in RENDER SPACE
+ *   only (never mutates gameplay coords). FE fires them fire-and-forget in
+ *   PARALLEL with the step's player tweens — they do not gate step T or the
+ *   turn boundary. First use: defender "reach_in" on Dynamic-HCT steal
+ *   contest moments.
  */
 
 /**

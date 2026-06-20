@@ -174,6 +174,36 @@ class Announcement(TypedDict, total=False):
     Absent → ``"primary"``."""
 
 
+class Flourish(TypedDict, total=False):
+    """In-place character "micro-movement" rendered by the FE in RENDER SPACE
+    only — it never mutates the player's gameplay grid coords (cf. the arrival
+    heartbeat). The backend names the flourish + optional params; the FE owns
+    the visual vocabulary and supplies defaults (see ``animation_config.js``
+    ``flourish`` block) for any field omitted here.
+
+    First shipped: ``"reach_in"`` — an on-ball defender's reach-in steal
+    attempt on a Dynamic-HCT contest moment (stamped per pressure/trap moment,
+    regardless of outcome). The other kinds are accepted-but-unrendered
+    placeholders for now.
+    """
+
+    kind: Literal[
+        "reach_in", "pump_fake", "bite", "gather",
+        "rattle", "shot_dip", "dribble", "pickup", "dunk",
+    ]
+    amplitude_grid: float
+    """Lunge distance in GRID units (converted to px + rendered, NOT gameplay).
+    Omitted → FE default."""
+    duration_ms: float
+    """Wall-clock out-and-back duration. Omitted → FE default."""
+    ease: str
+    """Phaser ease, e.g. ``"Back.easeOut"``. Omitted → FE default."""
+    target: Literal["ball", "rim", "x", "y"]
+    """What the motion points at. ``"reach_in"`` uses ``"ball"``."""
+    cycles: int
+    """Oscillation count (``"rattle"``); ignored by other kinds."""
+
+
 # --- Step start / end -------------------------------------------------------
 
 
@@ -259,6 +289,13 @@ class StepStart(TypedDict, total=False):
     a ``setTimeout`` for each). Used for variant-specific follow-up cues
     that overlap the next sub-step's motion (BANK_MAKE swish at 100 ms,
     BACK_OF_RIM make swish at 150 ms). Empty / absent → no extra cues."""
+
+    flourish: Dict[PlayerId, Flourish]
+    """Optional. Per-player in-place micro-movements rendered in RENDER SPACE
+    only (never mutates gameplay coords). The FE fires these fire-and-forget
+    in PARALLEL with the step's player tweens — they do not gate step T or the
+    turn boundary. See ``Flourish`` above. First use: defender ``reach_in`` on
+    Dynamic-HCT steal contest moments."""
 
 
 class NextLinear(TypedDict):

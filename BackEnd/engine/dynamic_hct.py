@@ -1452,6 +1452,13 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     # On-court location where a STEAL changed hands (the BH's spot) — seeds the
     # stealer's start for the next possession's Steal HCO / fast-break setup.
     steal_coords: Dict[str, Any] = {}
+    # Reach-in micro-movement (render-space only): the on-ball defender position
+    # of the contest moment currently being resolved. Set by ``_resolve_attack``;
+    # consumed by ``_stamp_reach_in`` to tag the moment's emitted segment so the
+    # FE renders a defender reach-in on EVERY pressure/trap contest (any
+    # outcome). Never affects gameplay coords. See Flourish in
+    # animation_step_schema.py.
+    pending_reach_in_def_pos: Optional[str] = None
     # Set when a broken-HCT attack reaches the topLane spot → D18 fast break.
     # Carries the post-drive offense/defense coords for the shot resolver.
     fb_seed: Dict[str, Any] = {}
@@ -1664,10 +1671,15 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
 
     def _resolve_attack(moment: str, in_range: List[str]) -> Tuple[str, float, Any]:
         """Pick the contesting defender(s) per §5 and resolve the banded outcome."""
+        nonlocal pending_reach_in_def_pos
         if moment == "trap":
             bh_def_pos, trapper_pos = _select_trappers(in_range, "PG" in in_range)
         else:
             bh_def_pos, trapper_pos = in_range[0], None
+        # Render-space reach-in: the on-ball defender lunges on this contest
+        # moment regardless of outcome (on-ball defender only — the trapper does
+        # not reach). Stamped onto the moment's emitted segment by _stamp_reach_in.
+        pending_reach_in_def_pos = bh_def_pos
         return _resolve_moment(
             off_team,
             def_team,
@@ -1675,6 +1687,18 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             def_lineup.get(bh_def_pos),
             def_lineup.get(trapper_pos) if trapper_pos else None,
         )
+
+    def _stamp_reach_in() -> None:
+        """Tag the most recently emitted loop segment with the pending contest's
+        on-ball defender so the emitter stamps a render-space ``reach_in``
+        flourish (FE-only; never mutates gameplay coords). Call right after the
+        segment for a contest moment is appended (terminal stopper, dead-ball
+        drive, beaten-pressure advance, or the hold beat). Clears the pending
+        marker so it can't leak onto a later, unrelated segment."""
+        nonlocal pending_reach_in_def_pos
+        if pending_reach_in_def_pos and loop_segments:
+            loop_segments[-1]["reach_in_def_pos"] = pending_reach_in_def_pos
+        pending_reach_in_def_pos = None
 
     def _emit_stopper(reason: str, label: str = "") -> float:
         """D8 — terminal whistle/steal beat: the defense collapses onto the BH
@@ -1822,9 +1846,11 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             mlabel = "two-defender trap" if moment == "trap" else "single-defender pressure"
             outcome, score_ratio, credited = _resolve_attack(moment, in_range)
             if _apply_moment_outcome(outcome, score_ratio, credited, context=mlabel):
+                _stamp_reach_in()  # tag the terminal stopper/dead-ball segment
                 break
             # POS_O / NEUTRAL → advance below.
             _advance(label=f"advance (BH beats the {mlabel})")
+            _stamp_reach_in()  # tag the beaten-pressure advance segment
             shot_clock -= loop_segments[-1]["seconds"]
             continue
 
@@ -1851,8 +1877,10 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
                 if _apply_moment_outcome(
                     outcome, score_ratio, credited, context="two-defender trap (after hold)"
                 ):
+                    _stamp_reach_in()  # tag the terminal stopper/dead-ball segment
                     break
                 _advance(label="advance (BH beats the two-defender trap after hold)")
+                _stamp_reach_in()  # tag the beaten-trap advance segment
                 shot_clock -= loop_segments[-1]["seconds"]
                 continue
             if moment2 == "none":
@@ -1879,9 +1907,14 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             # Attack). Terminal outcomes end the turn; otherwise the BH retains
             # and we re-read next iteration.
             outcome, score_ratio, credited = _resolve_attack("pressure", in_range2)
-            if _apply_moment_outcome(
+            terminal = _apply_moment_outcome(
                 outcome, score_ratio, credited, context="single-defender pressure (after hold)"
-            ):
+            )
+            # Terminal → tag the stopper segment; non-terminal (BH retains, no
+            # advance segment here) → tag the hold beat so the reach-in renders
+            # during the hold the defender pressured.
+            _stamp_reach_in()
+            if terminal:
                 break
             continue
 

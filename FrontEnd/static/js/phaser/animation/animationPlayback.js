@@ -822,6 +822,23 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     });
   }
 
+  // step.start.flourish: in-place render-space micro-movements (e.g. defender
+  // reach-in on a steal contest). Fire-and-forget, in PARALLEL with the player
+  // tweens — must NOT block step T. Render-space only; never touches gameplay
+  // coords. Mirrors the announcement/sfx hook dispatch pattern.
+  const flourishMap = step.start?.flourish;
+  if (flourishMap && typeof flourishMap === "object") {
+    import("./flourishes.js")
+      .then(({ runFlourish }) => {
+        for (const [playerId, flourish] of Object.entries(flourishMap)) {
+          const sprite = sprites[playerId];
+          if (!sprite || !flourish) continue;
+          runFlourish(scene, sprite, flourish, { ballSprite });
+        }
+      })
+      .catch((err) => console.warn("flourish dispatch failed", err));
+  }
+
   for (const [playerId, startCoord] of Object.entries(step.start.coords)) {
     const sprite = sprites[playerId];
     const endCoord = step.end.coords[playerId];

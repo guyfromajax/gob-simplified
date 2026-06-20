@@ -101,6 +101,16 @@ const defaults = {
     minBpm: 75,
     maxBpm: 750,
   },
+  // Flourishes: in-place "micro-movements" rendered in RENDER SPACE only (like
+  // the heartbeat — never mutates gameplay x/y). Per-kind defaults used when the
+  // backend Flourish payload omits a field. See flourishes.js + animationStepSchema.js.
+  flourish: {
+    reachIn: {
+      amplitudePx: 11, // Lunge distance toward the ball (render-space px)
+      durationMs: 450, // Full out-and-back (yoyo)
+      ease: 'Back.easeOut',
+    },
+  },
   possession: {
     msPerTick: 1,
     minFrameDurationMs: 120,
@@ -144,6 +154,9 @@ export const animationConfig = {
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
   finalTurn: { ...defaults.finalTurn, ...(overrides.finalTurn || {}) },
   heartbeat: { ...defaults.heartbeat, ...(overrides.heartbeat || {}) },
+  flourish: {
+    reachIn: { ...defaults.flourish.reachIn, ...(overrides.flourish?.reachIn || {}) },
+  },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
     minFrameDurationMs:
