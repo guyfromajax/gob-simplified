@@ -230,6 +230,14 @@ def normalize_motion_dropdowns_to_play_ids(
     return normalized
 
 
+def _coerce_int(value: Any) -> int:
+    """Best-effort int coercion (non-numeric → 0)."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def normalize_string_keyed_map(
     raw_map: Dict[str, Any] | None,
     aliases: Dict[str, str] | None,
@@ -389,6 +397,18 @@ def build_simplified_playbook_settings(
         playbook_settings.get("hc_traps", playbook_settings.get("hc_trap_plays", {})),
         HCT_TRAP_ID_ALIASES,
     )
+    # Playbooks saved before hc_traps existed have no map → the display surfaces
+    # would render "No plays assigned" even though gameplay falls back to the
+    # 50/50 default (see _resolve_hct_trap_weights). Mirror that fallback here so
+    # the UI reflects what the team actually runs.
+    if not any(_coerce_int(value) > 0 for value in hc_traps.values()):
+        from BackEnd.constants.hct_trap_play_types import DEFAULT_HCT_TRAP_WEIGHTS
+
+        hc_traps = {
+            key: value
+            for key, value in DEFAULT_HCT_TRAP_WEIGHTS.items()
+            if value > 0
+        }
     zone_defense = normalize_string_keyed_map(
         playbook_settings.get("zone_defense", {}),
         DEFENSE_NAME_TO_ID,

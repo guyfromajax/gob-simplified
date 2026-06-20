@@ -217,13 +217,14 @@ async function loadRoster() {
       return;
     }
     
-    const displayTeamName = teamName || teamId;
-    let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(displayTeamName)}`);
+    const rosterLookup = (mode === 'franchise' && teamId) ? teamId : (teamName || teamId);
+    let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(rosterLookup)}`);
     const params = new URLSearchParams();
     
     // Support franchise, tournament, or base mode (no mode parameter)
     if (mode === 'franchise' && franchiseId) {
       params.append('franchise_id', franchiseId);
+      if (teamId) params.append('team_id', teamId);
     } else if (mode === 'tournament' && tournamentId) {
       params.append('tournament_id', tournamentId);
     }
