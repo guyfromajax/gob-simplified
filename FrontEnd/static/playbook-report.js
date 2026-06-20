@@ -213,6 +213,20 @@ function buildFastBreakRows(data) {
   renderList('fast-break-list', rows);
 }
 
+function buildHcTrapRows(data) {
+  const percentages = ((data || {}).simple_playbook_percentages || {}).hc_traps || {};
+  const rows = ensureArray(data.hc_traps)
+    .map((item) => ({
+      label: item.name,
+      value: Number(percentages[item.id] || 0),
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .map((item) => buildRow(item.label, formatPct(item.value)));
+
+  renderList('hc-trap-list', rows);
+}
+
 function buildPlayMap(data) {
   const byId = new Map();
   ensureArray(data.motion).forEach((play) => byId.set(String(play.play_id), { ...play, category: 'motion' }));
@@ -330,6 +344,7 @@ async function initPlaybookReport() {
   buildOffenseRows(data);
   buildDefenseRows(data);
   buildFastBreakRows(data);
+  buildHcTrapRows(data);
   buildPcRows(data);
 }
 

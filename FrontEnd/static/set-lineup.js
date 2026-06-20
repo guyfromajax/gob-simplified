@@ -415,6 +415,7 @@ const LINEUP_PLAYBOOK_SECTION_ORDER = [
   { key: 'man_defense', label: 'Man Defense' },
   { key: 'zone_defense', label: 'Zone Defense' },
   { key: 'fast_breaks', label: 'Fast Breaks' },
+  { key: 'hc_traps', label: 'HC Traps' },
 ];
 
 function getRT(player) {
@@ -584,6 +585,14 @@ function buildLineupPlaybookItems(data, key) {
       id: String(row?.id || ''),
       name: row?.name || 'Unknown',
       percentage: getLineupPlaybookPercentage(percentages, 'fast_breaks', row?.id),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || '',
+    }));
+  } else if (key === 'hc_traps') {
+    items = (data?.hc_traps || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: getLineupPlaybookPercentage(percentages, 'hc_traps', row?.id),
       effectiveness: Number(row?.effectiveness || 0),
       top_scorer: row?.top_scorer || '',
     }));

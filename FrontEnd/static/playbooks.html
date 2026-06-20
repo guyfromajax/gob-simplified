@@ -30,7 +30,7 @@
                 <h1>Playbook Settings</h1>
                 <p>Configure usage, focus, and Playcall Center order.</p>
               </div>
-              <div id="sections-ready-indicator" class="playbooks-sections-ready" aria-live="polite">0 / 5 sections ready</div>
+              <div id="sections-ready-indicator" class="playbooks-sections-ready" aria-live="polite">0 / 6 sections ready</div>
               <div class="playbooks-page-actions">
                 <button id="save-btn" class="playbooks-save-btn playbooks-save-btn-header" type="button" disabled>Save Playbooks</button>
               </div>
@@ -169,6 +169,28 @@
                         </tr>
                       </thead>
                       <tbody id="fast-breaks-rows"></tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section class="settings-card playbooks-edit-section">
+                  <div class="section-toolbar">
+                    <div class="section-heading-block">
+                      <h2>HC Traps</h2>
+                    </div>
+                    <div class="section-toolbar-actions">
+                      <div class="section-total" id="hc-traps-total"></div>
+                    </div>
+                  </div>
+                  <div class="table-wrap playbooks-table-wrap table-wrap-compact">
+                    <table class="playbook-table playbook-table-compact">
+                      <thead>
+                        <tr>
+                          <th class="col-name">Play</th>
+                          <th class="col-percent"><button class="sort-btn" type="button" data-section="hcTraps" data-sort-key="percentage">%</button></th>
+                        </tr>
+                      </thead>
+                      <tbody id="hc-traps-rows"></tbody>
                     </table>
                   </div>
                 </section>

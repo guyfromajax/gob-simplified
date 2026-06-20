@@ -293,6 +293,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
     from BackEnd.utils.shared import (
         apply_scoring,
         calculate_bounce_spot,
+        collect_near_bounce_rebound_attemptors,
         determine_rebounder,
         get_name_safe,
         increment_no_defender_shot_breakdown,
@@ -502,6 +503,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
     rebound_type: Optional[str] = None
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
+    rebound_attemptors: Optional[Dict[str, List[str]]] = None
     if made:
         stealer.record_stat("FGA")
         apply_scoring(game, off_team, stealer, 2, ["FGM"])
@@ -541,6 +543,12 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
                 "x": float(bounce_spot["x"]),
                 "y": float(bounce_spot["y"]),
             }
+            rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                game,
+                bounce_spot,
+                rebounder_pid,
+                coords_already_display_oriented=True,
+            )
 
             # Stat credit on the canonical roster player (parity with OREB
             # putback miss flow at shared.py:1126-1133).
@@ -691,6 +699,9 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             turn_result["rebounderId"] = rebounder_pid
             if rebound_ball_spot is not None:
                 turn_result["ballSpot"] = dict(rebound_ball_spot)
+            if rebound_attemptors is not None:
+                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
 
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)

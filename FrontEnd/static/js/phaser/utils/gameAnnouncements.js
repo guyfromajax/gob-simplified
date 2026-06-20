@@ -16,6 +16,7 @@ import {
   showSecondaryAnnouncement,
   buildSecondaryStopperPlayerData,
   getFastBreakPlayLabel,
+  getHctTrapPlayLabel,
   announceReboundHeadlineIfNeeded,
 } from './announcements.js';
 import { resolveStealSfxFile } from './gameSfx.js';
@@ -124,7 +125,9 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       break;
 
     case 'PRESSURE_HCT':
-      showSecondaryAnnouncement("Trap!", defenseTeam);
+      showSecondaryAnnouncement("Trap!", defenseTeam, null, {
+        eventSubtitle: getHctTrapPlayLabel(turnData?.hct_trap_play),
+      });
       break;
 
     // ========== FAST BREAK (secondary tier) ==========

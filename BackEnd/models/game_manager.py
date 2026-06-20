@@ -638,6 +638,10 @@ class GameManager:
                 ),
             )
             turn_result.setdefault("quarter", self.game_state.get("quarter", self.quarter))
+            # Surface the selected HCT trap play so the secondary "Trap!" announce
+            # can render its play-name subtitle (mirrors how fast_break_play feeds
+            # the "Fast Break!" subtitle). Fresh on the turn that selects HCT.
+            turn_result.setdefault("hct_trap_play", self.game_state.get("hct_trap_play"))
             if (
                 not isinstance(turn_result.get("uess_ownership_contract"), dict)
                 or "uess_ownership_contract_mode" not in turn_result

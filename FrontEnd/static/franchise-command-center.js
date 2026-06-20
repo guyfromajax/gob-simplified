@@ -1531,7 +1531,7 @@ const FCC_PLAYBOOK_SECTION_ORDER = [
   { key: 'man_defense', label: 'Man Defense' },
   { key: 'zone_defense', label: 'Zone Defense' },
   { key: 'fast_breaks', label: 'Fast Breaks' },
-  { key: 'press_trap', label: 'Press/Trap' }
+  { key: 'hc_traps', label: 'HC Traps' }
 ];
 
 function escapePlaybookHtml(value) {
@@ -1588,6 +1588,14 @@ function buildFccPlaybooksItems(data, key) {
       id: String(row?.id || ''),
       name: row?.name || 'Unknown',
       percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
+      effectiveness: Number(row?.effectiveness || 0),
+      top_scorer: row?.top_scorer || ''
+    }));
+  } else if (key === 'hc_traps') {
+    items = (data?.hc_traps || []).map((row) => ({
+      id: String(row?.id || ''),
+      name: row?.name || 'Unknown',
+      percentage: Number(percentages.hc_traps?.[row?.id] || 0),
       effectiveness: Number(row?.effectiveness || 0),
       top_scorer: row?.top_scorer || ''
     }));
@@ -1695,20 +1703,6 @@ function buildFccPlaybooksSectionMarkup(data, section) {
   const editButtonMarkup = section.key === 'motion'
     ? '<button id="fcc-edit-playbooks-btn" class="fcc-game-plan-edit-btn" type="button">Edit Playbooks</button>'
     : '';
-
-  if (section.key === 'press_trap') {
-    return `
-      <section class="fcc-playbooks-section">
-        <div class="fcc-playbooks-section-head-wrap">
-          <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
-          ${editButtonMarkup}
-        </div>
-        <div class="fcc-playbooks-section-body fcc-playbooks-placeholder-body">
-          <div class="fcc-playbooks-placeholder-copy">In Development</div>
-        </div>
-      </section>
-    `;
-  }
 
   const items = buildFccPlaybooksItems(data, section.key);
   const bodyMarkup = items.length

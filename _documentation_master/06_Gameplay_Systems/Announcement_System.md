@@ -64,6 +64,10 @@
 
    The Good Read / Bad Read decision pill (gold/red) ships on the secondary tier for the Fast Break! / No Fast Break RR decision. It uses the same visual vocabulary as the existing primary `.ann-decision-pill` and is anchored to the lower-right corner of the secondary ribbon.
 
+   **Play-name subtitle (`eventSubtitle`).** Secondary headlines that map to a selected play render the play name as a small-caps subtitle to the right of the headline at 50% font-size (same treatment/placement for all callers). Passed via `meta.eventSubtitle` to `showSecondaryAnnouncement`:
+   - **Fast Break!** → `getFastBreakPlayLabel(turnData.fast_break_play)` → e.g. "Fast Break!  Rim Runner".
+   - **Trap!** → `getHctTrapPlayLabel(turnData.hct_trap_play)` → e.g. "Trap!  Straight Pressure" (Standard Trap / Straight Pressure / Diamond). The key is surfaced onto every turn result in `GameManager._append_turn` from `game_state["hct_trap_play"]`, fresh on the turn that selects HCT (mirrors how `fast_break_play` feeds the FB subtitle). Both label mappers live in `announcements.js` and return `''` for unknown keys.
+
 **Announcement System Flow (2 Phases)**
 
 1. **Start Announcements** (`timing='start'`) — route to **secondary** tier (top-edge ribbon)

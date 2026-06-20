@@ -216,6 +216,7 @@
         motion: [],
         setPlays: [],
         fastBreaks: [],
+        hcTraps: [],
         manDefense: [],
         zoneDefense: [],
         pcOrder: { offense: [], defense: [] },
@@ -241,11 +242,13 @@
         motionRows: document.getElementById("motion-rows"),
         setPlaysRows: document.getElementById("set-plays-rows"),
         fastBreakRows: document.getElementById("fast-breaks-rows"),
+        hcTrapRows: document.getElementById("hc-traps-rows"),
         manDefenseRows: document.getElementById("man-defense-rows"),
         zoneDefenseRows: document.getElementById("zone-defense-rows"),
         motionTotal: document.getElementById("motion-total"),
         setPlaysTotal: document.getElementById("set-plays-total"),
         fastBreakTotal: document.getElementById("fast-breaks-total"),
+        hcTrapTotal: document.getElementById("hc-traps-total"),
         manDefenseTotal: document.getElementById("man-defense-total"),
         zoneDefenseTotal: document.getElementById("zone-defense-total"),
         pcOffense: document.getElementById("pc-order-offense"),
@@ -321,6 +324,7 @@
         if (Array.isArray(draft.motion)) this.state.motion = draft.motion;
         if (Array.isArray(draft.setPlays)) this.state.setPlays = draft.setPlays;
         if (Array.isArray(draft.fastBreaks)) this.state.fastBreaks = draft.fastBreaks;
+        if (Array.isArray(draft.hcTraps)) this.state.hcTraps = draft.hcTraps;
         if (Array.isArray(draft.manDefense)) this.state.manDefense = draft.manDefense;
         if (Array.isArray(draft.zoneDefense)) this.state.zoneDefense = draft.zoneDefense;
         if (draft.pcOrder && typeof draft.pcOrder === "object") {
@@ -451,6 +455,12 @@
         percentage: parseInteger(percentages.fast_breaks?.[row.id], 0),
       }));
 
+      this.state.hcTraps = (data.hc_traps || []).map((row) => ({
+        id: String(row.id),
+        name: row.name,
+        percentage: parseInteger(percentages.hc_traps?.[row.id], 0),
+      }));
+
       this.state.manDefense = (data.man_defense_rows || []).map((row) => ({
         id: String(row.id),
         name: row.name,
@@ -494,6 +504,7 @@
       this.renderMotionRows();
       this.renderSetPlayRows();
       this.renderFastBreakRows();
+      this.renderHcTrapRows();
       this.renderDefenseRows("man");
       this.renderDefenseRows("zone");
       this.renderPcLists();
@@ -569,6 +580,19 @@
         `;
         this.bindPercentEvents(tr, row.id, "fastBreaks");
         this.elements.fastBreakRows.appendChild(tr);
+      });
+    }
+
+    renderHcTrapRows() {
+      this.elements.hcTrapRows.innerHTML = "";
+      this.state.hcTraps.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="play-name-cell"><span class="play-name-text">${row.name}</span></td>
+          <td class="percent-cell">${this.renderPercentControl(row.id, row.percentage, "hcTraps")}</td>
+        `;
+        this.bindPercentEvents(tr, row.id, "hcTraps");
+        this.elements.hcTrapRows.appendChild(tr);
       });
     }
 
@@ -890,6 +914,7 @@
       if (sectionKey === "motion") return "motion";
       if (sectionKey === "setPlays") return "setPlays";
       if (sectionKey === "fastBreaks") return "fastBreaks";
+      if (sectionKey === "hcTraps") return "hcTraps";
       if (sectionKey === "manDefense") return "manDefense";
       if (sectionKey === "zoneDefense") return "zoneDefense";
       return sectionKey;
@@ -910,6 +935,7 @@
         motion: this.state.motion.reduce((sum, item) => sum + item.percentage, 0),
         setPlays: this.state.setPlays.reduce((sum, item) => sum + item.percentage, 0),
         fastBreaks: this.state.fastBreaks.reduce((sum, item) => sum + item.percentage, 0),
+        hcTraps: this.state.hcTraps.reduce((sum, item) => sum + item.percentage, 0),
         manDefense: this.state.manDefense.filter((item) => item.isActive !== false).reduce((sum, item) => sum + item.percentage, 0),
         zoneDefense: this.state.zoneDefense.reduce((sum, item) => sum + item.percentage, 0),
       };
@@ -926,13 +952,15 @@
       applyTotalState(this.elements.motionTotal, totals.motion);
       applyTotalState(this.elements.setPlaysTotal, totals.setPlays);
       applyTotalState(this.elements.fastBreakTotal, totals.fastBreaks);
+      applyTotalState(this.elements.hcTrapTotal, totals.hcTraps);
       applyTotalState(this.elements.manDefenseTotal, totals.manDefense);
       applyTotalState(this.elements.zoneDefenseTotal, totals.zoneDefense);
 
       const validSections = Object.values(totals).filter((total) => total === 100).length;
-      const allValid = validSections === Object.keys(totals).length;
+      const totalSections = Object.keys(totals).length;
+      const allValid = validSections === totalSections;
       if (this.elements.sectionsReadyIndicator) {
-        this.elements.sectionsReadyIndicator.textContent = `${validSections} / 5 sections ready`;
+        this.elements.sectionsReadyIndicator.textContent = `${validSections} / ${totalSections} sections ready`;
         this.elements.sectionsReadyIndicator.classList.toggle("valid", allValid);
         this.elements.sectionsReadyIndicator.classList.toggle("invalid", !allValid);
       }
@@ -955,6 +983,7 @@
           motion: toPercentMap(this.state.motion),
           set_plays: toPercentMap(this.state.setPlays),
           fast_breaks: toPercentMap(this.state.fastBreaks),
+          hc_traps: toPercentMap(this.state.hcTraps),
           man_defense: toPercentMap(this.state.manDefense),
           zone_defense: toPercentMap(this.state.zoneDefense),
           pc_order: {

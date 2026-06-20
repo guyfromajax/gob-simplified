@@ -440,6 +440,25 @@ export function getFastBreakPlayLabel(playKey) {
 }
 
 /**
+ * Map a backend `hct_trap_play` key to its display label for the secondary "Trap!"
+ * announcement subtitle ("Trap!  Straight Pressure"). Returns '' for unknown keys.
+ * Same eventSubtitle treatment/placement as the Fast Break play-name subtitle.
+ *
+ * Canonical keys mirror BackEnd/constants/hct_trap_play_types.py.
+ *
+ * @param {string|null|undefined} playKey
+ * @returns {string}
+ */
+export function getHctTrapPlayLabel(playKey) {
+  switch (playKey) {
+    case 'standard_trap': return 'Standard Trap';
+    case 'straight_pressure': return 'Straight Pressure';
+    case 'diamond': return 'Diamond';
+    default: return '';
+  }
+}
+
+/**
  * Primary "Rebound!" headline when the rebounder secures the ball (center overlay).
  * Idempotent per turn when `turnData` is provided: sets `turnData._reboundHeadlineShown`
  * after a successful display so ballManager, ShotAnimationSystem, FT/FB paths, and
@@ -566,7 +585,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       showSecondaryAnnouncement("Press!", defenseTeam);
     }
     if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'HCT') {
-      showSecondaryAnnouncement("Trap!", defenseTeam);
+      showSecondaryAnnouncement("Trap!", defenseTeam, null, {
+        eventSubtitle: getHctTrapPlayLabel(turnData.hct_trap_play),
+      });
     }
   } else if (timing === 'end') {
     // Announcements at turn end (after animation)
