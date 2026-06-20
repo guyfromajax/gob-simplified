@@ -28,11 +28,12 @@ This replaces the earlier two-authorities-via-player-id-matching design, where t
 
 ### Near-bounce failed rebound attemptors
 
-Missed **Fast Break** shots, missed **OREB putback** attempts, and clean-miss **Dynamic HCT** shot attempts stamp a backend-authored failed-attemptor list for the rebound-capture step.
+Missed **Fast Break** shots, missed **After-Steal Fast Break** shots, missed **OREB putback** attempts, and clean-miss **Dynamic HCT** shot attempts stamp a backend-authored failed-attemptor list for the rebound-capture step.
 
 - **Helper:** `collect_near_bounce_rebound_attemptors()` in `BackEnd/utils/shared.py`.
 - **Rule:** after the authoritative `bounce_spot` and actual `rebounderId` are known, scan both current lineups and include every non-captor player whose Euclidean distance to the bounce spot is **≤ 20** grid units.
 - **Orientation:** the helper uses display-oriented rebound math for away-offense cases, matching `determine_rebounder` / `choose_rebounder` bounce calculations.
+- **After-Steal FB:** `after_steal_fast_break.py` applies computed shot-end coords while selecting the rebounder and collecting failed attemptors. It also applies the pre-winner candidate filter below so only players within the near-bounce radius are eligible unless both teams filter empty.
 - **Dynamic HCT:** `dynamic_hct_shot.py` applies the HCT shot-moment seed coords only while selecting the rebounder and collecting failed attemptors, then restores runtime `player.coords`. This keeps rebound winner selection and failed-attemptor animation in the same coordinate frame without changing global rebound helpers.
 - **Payload:** the prior miss turn carries `offense_rebounders` and `defense_rebounders` as player IDs. `dreb_step_emitter.py` / `oreb_step_emitter.py` pass those through `rebound_attemptor_ids()`.
 - **Animation:** the actual rebounder moves to the exact bounce spot. Failed attemptors move to backend-randomized nearby targets via `sample_rebound_collapse_target()` / `stamp_rebound_capture_player_motion()`, not to the exact ball spot.
@@ -116,7 +117,7 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
    - medium (15–20): x offset `randint(2, 8)`, y `±8`
    - long (> 20): x offset `randint(2, 10)`, y `±10`
    - (defaults to medium when no shooter spot is provided). Bounce clamped to court bounds (x 0–100, y 0–50).
-2. **Filter eligible players** (per turn type — see the prefilter grid below). HCO removes get-back / release players; HCT / FCP / Fast Break use the frontcourt-half x filter; FT / OREB-chained use the `max_x_delta_from_bounce` x-gate.
+2. **Filter eligible players** (per turn type — see the prefilter grid below). HCO removes get-back / release players; regular Fast Break uses the frontcourt-half x filter; After-Steal FB uses the 20-grid Euclidean near-bounce candidate filter; FT uses the `max_x_delta_from_bounce` x-gate.
 3. **Discount shooter / putback player** (`penalize_player_ids` in `choose_rebounder`): their Euclidean distance to the bounce is multiplied by **1.2** (20% penalty), making them less likely to be their team's closest candidate.
 4. **Find the closest player to the bounce spot from each team** (`choose_rebounder` per team → `o_rebounder`, `d_rebounder`). Distance is fully accounted for here: each team's candidate is its closest eligible player.
 5. **Edge cases:** if neither team yields a candidate, fall back to the closest player across all players; if only one team has a candidate, that player rebounds.
@@ -157,19 +158,21 @@ otb_foul = random.randint(1,100)
 
 ## Rebounder selection per turn type (current state)
 
-Source-of-truth grid for which prefilter and rebounder-selection function each turn type uses. The frontcourt-half x filter for HCT / FCP / Fast Break is **implemented** (`shot_manager.py` ~L1585–1599: home offense → x ≥ 50, away offense → x ≤ 50); the FT x-gate (`FREE_THROW_REBOUND_MAX_X_DELTA`) is implemented in `determine_rebounder`. Established as part of the SS&S animation refactor (see [`UESS_System.md`](../00_General_Systems/UESS_System.md)).
+Source-of-truth grid for which prefilter and rebounder-selection function each turn type uses. The regular Fast Break frontcourt-half x filter is implemented in `shot_manager.py`; the FT x-gate (`FREE_THROW_REBOUND_MAX_X_DELTA`) is implemented in `determine_rebounder`; the After-Steal FB pre-winner near-bounce candidate filter is implemented in `after_steal_fast_break.py` via `filter_rebound_candidate_lineups_near_bounce()`. Established as part of the SS&S animation refactor (see [`UESS_System.md`](../00_General_Systems/UESS_System.md)).
 
 | Turn type | Prefilter | Rebounder selection |
 |---|---|---|
 | **HCO MISS** | Existing (`offense_rebounders` + `defense_rebounders` — excludes get-back / release) | `choose_rebounder` |
-| **HCT MISS** | Frontcourt-half x-eligibility filter (home offense → x ≥ 50, away offense → x ≤ 50) | `choose_rebounder` |
-| **FCP MISS** | Frontcourt-half x-eligibility filter (home offense → x ≥ 50, away offense → x ≤ 50) | `choose_rebounder` |
+| **HCT MISS** | All five offense + all five defense crash on legacy `shot_manager` HCT; Dynamic HCT shot paths use shot-moment coords | `choose_rebounder` / `determine_rebounder` depending on resolver |
+| **FCP MISS** | Same strategy-derived pool as HCO in current code | `choose_rebounder` |
 | **Fast Break MISS** | Frontcourt-half x-eligibility filter (home offense → x ≥ 50, away offense → x ≤ 50) | `choose_rebounder` |
+| **After-Steal Fast Break MISS** | Shot-end active lineups filtered by `filter_rebound_candidate_lineups_near_bounce()` at 20 Euclidean grid units; fallback to original pools if both teams empty | `determine_rebounder` with candidate pools |
 | **Free Throw MISS** | `max_x_delta_from_bounce` (FREE_THROW_REBOUND_MAX_X_DELTA) | `determine_rebounder` |
-| **OREB chained rebound** | `max_x_delta_from_bounce` (note: previously attempted but had stale-coord issues; revisited as part of this refactor) | `determine_rebounder` |
+| **OREB putback MISS chained rebound** | Full active lineups today; no hard pre-winner geo gate yet | `determine_rebounder` |
 | **defender_count == 0 edge case** | None (existing behavior preserved) | `determine_rebounder` |
 
 Notes:
-- HCT / FCP previously inherited HCO mechanics (get-back / release). The refactor drops those for HCT / FCP / Fast Break and aligns them on the frontcourt-half x-eligibility filter.
+- HCT / FCP do not currently share one unified prefilter. Treat the grid above as current code, not target design.
 - HCO retains its existing prefilter — the get-back / release mechanic is HCO-specific.
+- The near-bounce candidate filter is gameplay-side and position-key preserving. It is separate from `collect_near_bounce_rebound_attemptors()`, which is post-winner animation support.
 - `choose_rebounder` is the per-team primitive. `determine_rebounder` is the whole-game wrapper that calls `choose_rebounder` once per team and then runs the weighted off-vs-def selection. See section above for algorithmic detail.

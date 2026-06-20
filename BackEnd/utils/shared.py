@@ -1409,6 +1409,9 @@ def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
 # Free throw miss: only players within this many x-grid units of the bounce may rebound.
 FREE_THROW_REBOUND_MAX_X_DELTA = 20
 
+# Shared near-bounce Euclidean radius for rebound candidate/attemptor helpers.
+NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20
+
 
 def _filter_lineup_by_max_x_delta_from_bounce(lineup, bounce_x, max_x_delta):
     """Keep players whose |coords.x - bounce_x| <= max_x_delta (FT lane / rim-adjacent)."""
@@ -1431,6 +1434,58 @@ def _filter_lineup_by_max_x_delta_from_bounce(lineup, bounce_x, max_x_delta):
         if abs(px - bx) <= mxd:
             filtered[pos] = player
     return filtered
+
+
+def filter_rebound_candidate_lineups_near_bounce(
+    off_lineup,
+    def_lineup,
+    bounce_spot,
+    *,
+    max_distance=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE,
+    fallback_if_both_empty=True,
+):
+    """Filter pre-winner rebound candidate pools by Euclidean bounce distance.
+
+    This is the gameplay-side sibling to
+    ``collect_near_bounce_rebound_attemptors``. It preserves position keys so
+    callers can feed the returned lineups directly into ``choose_rebounder``.
+    If both sides filter to empty, optionally return the original path-specific
+    pools so rebound resolution can degrade to the prior behavior instead of
+    failing or producing an impossible empty-board state.
+    """
+    try:
+        bx = float((bounce_spot or {}).get("x"))
+        by = float((bounce_spot or {}).get("y"))
+        threshold = float(max_distance)
+    except (TypeError, ValueError, AttributeError):
+        return off_lineup or {}, def_lineup or {}
+
+    def _filter(lineup):
+        filtered = {}
+        for pos, player in (lineup or {}).items():
+            if player is None:
+                continue
+            coords = getattr(player, "coords", None) or {}
+            try:
+                px = float(coords.get("x"))
+                py = float(coords.get("y"))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            dist = ((px - bx) ** 2 + (py - by) ** 2) ** 0.5
+            if dist <= threshold:
+                filtered[pos] = player
+        return filtered
+
+    off_filtered = _filter(off_lineup)
+    def_filtered = _filter(def_lineup)
+    if fallback_if_both_empty and not off_filtered and not def_filtered:
+        logging.warning(
+            "filter_rebound_candidate_lineups_near_bounce: no candidates within %s of bounce=%s; using original pools",
+            max_distance,
+            bounce_spot,
+        )
+        return off_lineup or {}, def_lineup or {}
+    return off_filtered, def_filtered
 
 
 def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_player_ids=None):
@@ -1489,9 +1544,6 @@ def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_play
             closest_player = player
     
     return closest_player
-
-
-NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20
 
 
 def collect_near_bounce_rebound_attemptors(
@@ -1669,6 +1721,8 @@ def determine_rebounder(
     penalize_player_ids=None,
     *,
     max_x_delta_from_bounce=None,
+    offense_candidate_lineup=None,
+    defense_candidate_lineup=None,
 ):
     """
     Determine rebounder using geography-based system (closest to bounce spot).
@@ -1681,6 +1735,9 @@ def determine_rebounder(
         max_x_delta_from_bounce: If set (e.g. FREE_THROW_REBOUND_MAX_X_DELTA), only players with
             |coords.x - bounce_x| <= this value are eligible per team. If that removes everyone on
             both teams, falls back to full lineups with a warning.
+        offense_candidate_lineup / defense_candidate_lineup: Optional position-keyed
+            candidate pools supplied by path-specific logic before closest-player
+            selection. Defaults to the active offense/defense lineups.
     
     Returns:
         tuple: (rebounder, team, stat) where stat is "DREB" or "OREB"
@@ -1704,16 +1761,27 @@ def determine_rebounder(
     )
 
     def _core():
+        base_off_lineup = (
+            offense_candidate_lineup
+            if offense_candidate_lineup is not None
+            else off_lineup
+        )
+        base_def_lineup = (
+            defense_candidate_lineup
+            if defense_candidate_lineup is not None
+            else def_lineup
+        )
+
         if max_x_delta_from_bounce is not None:
             gs_diag = getattr(game, "game_state", None)
             if isinstance(gs_diag, dict):
                 gs_diag.pop("_ft_rebound_x_gate_fallback", None)
             bx = bounce_spot.get("x", 50)
             off_use = _filter_lineup_by_max_x_delta_from_bounce(
-                off_lineup, bx, max_x_delta_from_bounce
+                base_off_lineup, bx, max_x_delta_from_bounce
             )
             def_use = _filter_lineup_by_max_x_delta_from_bounce(
-                def_lineup, bx, max_x_delta_from_bounce
+                base_def_lineup, bx, max_x_delta_from_bounce
             )
             if not off_use and not def_use:
                 logging.warning(
@@ -1724,9 +1792,9 @@ def determine_rebounder(
                 )
                 if isinstance(gs_diag, dict):
                     gs_diag["_ft_rebound_x_gate_fallback"] = True
-                off_use, def_use = off_lineup, def_lineup
+                off_use, def_use = base_off_lineup, base_def_lineup
         else:
-            off_use, def_use = off_lineup, def_lineup
+            off_use, def_use = base_off_lineup, base_def_lineup
 
         o_rebounder = choose_rebounder(
             off_use, bounce_spot, exclude_player_ids, penalize_player_ids
@@ -1740,10 +1808,10 @@ def determine_rebounder(
                 "determine_rebounder: No valid rebounders found, using closest player from all players"
             )
             all_players_lineup = {}
-            for pos, player in off_lineup.items():
+            for pos, player in base_off_lineup.items():
                 if player is not None:
                     all_players_lineup[f"O_{pos}"] = player
-            for pos, player in def_lineup.items():
+            for pos, player in base_def_lineup.items():
                 if player is not None:
                     all_players_lineup[f"D_{pos}"] = player
 

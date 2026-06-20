@@ -327,6 +327,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         calculate_bounce_spot,
         collect_near_bounce_rebound_attemptors,
         determine_rebounder,
+        filter_rebound_candidate_lineups_near_bounce,
         get_name_safe,
         increment_no_defender_shot_breakdown,
     )
@@ -567,8 +568,18 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             penalize_player_ids = {stealer_id} if stealer_id else set()
             exclude_player_ids: set = set()
             with _temporary_lineup_coords(game, end_coords):
+                off_candidates, def_candidates = filter_rebound_candidate_lineups_near_bounce(
+                    off_lineup,
+                    def_lineup,
+                    bounce_spot,
+                )
                 new_rebounder, new_team, new_stat = determine_rebounder(
-                    game, bounce_spot, exclude_player_ids, penalize_player_ids,
+                    game,
+                    bounce_spot,
+                    exclude_player_ids,
+                    penalize_player_ids,
+                    offense_candidate_lineup=off_candidates,
+                    defense_candidate_lineup=def_candidates,
                 )
                 rebounder_pid = _safe_id(new_rebounder)
                 rebound_attemptors = collect_near_bounce_rebound_attemptors(

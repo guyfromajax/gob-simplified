@@ -172,3 +172,56 @@ def test_after_steal_miss_stamps_near_bounce_rebound_attemptors(monkeypatch):
     for team in (game.offense_team, game.defense_team):
         for player in team.lineup.values():
             assert player.coords == stale_coords[player.player_id]
+
+
+def test_after_steal_miss_filters_rebound_winner_candidates_to_near_bounce(monkeypatch):
+    game = build_mock_game()
+    _seed_lineup_ids_and_runtime_methods(game)
+    game.offense_team = game.home_team
+    game.defense_team = game.away_team
+    game.game_state["last_stealer"] = game.offense_team.lineup["PG"]
+    game.game_state["last_stealer_coords"] = {"x": 50.0, "y": 25.0}
+    game.game_state["offensive_state"] = "FAST_BREAK"
+
+    bounce = {"x": 89.0, "y": 25.0}
+    near_off = game.offense_team.lineup["SG"]
+
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_fast_break._sample_unique_offense_spots",
+        lambda *_args, **_kwargs: [
+            {"x": 80.0, "y": 25.0},  # SG: only near rebound candidate
+            {"x": 60.0, "y": 25.0},
+            {"x": 60.0, "y": 10.0},
+            {"x": 60.0, "y": 40.0},
+        ],
+    )
+    monkeypatch.setattr(
+        "BackEnd.utils.fast_break_shot_geometry.compute_fb_shot_geometry",
+        lambda **_kwargs: {
+            "shooter_target": {"x": 68.0, "y": 25.0},  # shooter outside radius
+            "defender_target": {"x": 90.0, "y": 25.0},
+            "defender_end_coords": {
+                player.player_id: {"x": 50.0, "y": 25.0}
+                for player in game.defense_team.lineup.values()
+            },
+            "first_arriver_id": game.defense_team.lineup["PG"].player_id,
+            "contested": True,
+            "shot_defender_id": game.defense_team.lineup["PG"].player_id,
+            "t_shooter_game_seconds": 999.0,
+        },
+    )
+    monkeypatch.setattr(
+        game.shot_manager,
+        "calculate_shot_score",
+        lambda *_args, **_kwargs: (1, 1, 0, False, None),
+    )
+    monkeypatch.setattr(
+        "BackEnd.utils.shared.calculate_bounce_spot",
+        lambda *_args, **_kwargs: bounce,
+    )
+
+    result = resolve_after_steal_fast_break(game)
+
+    assert result["result_type"] == "MISS"
+    assert result["rebound_type"] == "OREB"
+    assert result["rebounderId"] == near_off.player_id
