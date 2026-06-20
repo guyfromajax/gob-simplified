@@ -231,8 +231,13 @@ async function loadRoster() {
     if (params.toString()) {
       url += `?${params.toString()}`;
     }
-    
-    const response = await fetch(url);
+
+    // Send the auth token — the backend returns franchise-scoped data (team
+    // chemistry, training_squad / Practice Squad players) only for authenticated
+    // requests. Without it the response is a degraded/unauthenticated view with an
+    // empty training_squad, which is why the Practice Squad section never rendered.
+    const authHeaders = window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {};
+    const response = await fetch(url, { headers: authHeaders });
     if (!response.ok) throw new Error(`Failed to load roster: ${response.status}`);
     const data = await response.json();
     
@@ -390,11 +395,12 @@ async function loadStats() {
       document.getElementById('stats-body').innerHTML = '<tr><td colspan="23">Invalid mode or missing IDs</td></tr>';
       return;
     }
-    
-    const response = await fetch(url);
+
+    const statsHeaders = window.API_CONFIG ? API_CONFIG.getAuthHeaders() : {};
+    const response = await fetch(url, { headers: statsHeaders });
     if (!response.ok) throw new Error(`Failed to load stats: ${response.status}`);
     const data = await response.json();
-    
+
     statsData = [];
     
     if (mode === 'franchise') {
