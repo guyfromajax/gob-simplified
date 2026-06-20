@@ -17,6 +17,7 @@
 //   - Fire-and-forget: callers do NOT await it.
 
 import { animationConfig } from "./animation_config.js";
+import { playStealReachInSfx } from "../utils/gameSfx.js";
 
 /**
  * Resolve a render-space move target for a sprite/container, mirroring
@@ -106,6 +107,10 @@ function runReachIn(scene, sprite, flourish, ballSprite) {
 
   const resolved = resolveRenderTarget(sprite);
   if (!resolved) return;
+
+  // Steal cue: two quick clicks back-to-back, starting the instant the reach-in
+  // begins. Skipped flourishes (overlap guard above) intentionally don't re-fire it.
+  playStealReachInSfx(scene);
 
   // Snapshot the base positions so we ALWAYS restore to them on complete OR stop
   // (a killed/interrupted relative tween otherwise leaves a residual offset — the
