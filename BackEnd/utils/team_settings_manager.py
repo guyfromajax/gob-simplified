@@ -419,6 +419,7 @@ def _transform_playbook_api_response_to_db_structure(playbook_settings: dict) ->
             "set_play_attack": percentages.get("set_play_attack", {}),
             "set_play_outside": percentages.get("set_play_outside", {}),
             "fast_breaks": percentages.get("fast_breaks", percentages.get("fast_break", {})),
+            "hc_traps": percentages.get("hc_traps", percentages.get("hc_trap_plays", {})),
             "zone_defense": percentages.get("zone_defense", {}),
             "man_defense": percentages.get("man_defense", {}),
             "pc_order": playbook_settings.get("pc_order"),
@@ -545,11 +546,11 @@ def load_and_apply_team_settings_to_gamemanager(
                 # Check if request has valid playbook settings in canonical shape.
                 has_playbook_keys = any(
                     key in transformed_playbook
-                    for key in ["motion", "set_plays", "fast_breaks", "zone_defense", "man_defense", "pc_order"]
+                    for key in ["motion", "set_plays", "fast_breaks", "hc_traps", "zone_defense", "man_defense", "pc_order"]
                 )
                 has_nonempty_values = any(
                     bool(transformed_playbook.get(key))
-                    for key in ["motion", "set_plays", "fast_breaks", "zone_defense", "man_defense"]
+                    for key in ["motion", "set_plays", "fast_breaks", "hc_traps", "zone_defense", "man_defense"]
                 ) or bool((transformed_playbook.get("pc_order") or {}).get("offense")) or bool((transformed_playbook.get("pc_order") or {}).get("defense"))
                 has_valid_request_playbook = has_playbook_keys and has_nonempty_values
                 

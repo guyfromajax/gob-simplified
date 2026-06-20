@@ -1162,7 +1162,7 @@ interception point (BH drive pace vs his AG rate). **No angle →** BH arrives �
 | Win-margin gates | §5 | `(chem + pt_*)` added to the loser's score (no multiplier) |
 | D8 event rate / split / D_FOUL | §5 table | base 0.45, 30/50/20, 0.12 |
 | Aggression / fight / discipline scaling | §5 | `AGG_MULT 0.7/1.0/1.3`, `W=0.04` |
-| Clock terminals | §1 / §8 | shot-clock 0, 10-sec at ≤20 behind half court |
+| Clock terminals | §1 / §8 | shot-clock 0; 10-sec = 10 actual elapsed sec behind half court (disabled if <10s left in quarter) |
 | Loop backstop | §1 | `MAX_LOOP_ITERATIONS = 15` |
 
 ### Fast Break execution (summary)
@@ -1177,3 +1177,101 @@ Full spec in **§7**. On a Fast Break (ABA read chose FB, or broken-HCT topLane 
   On a cutoff with no foul/TO → **75%** dish → finisher FB shot, **25%** BH pull-up; no
   cutoff → BH rim shot (contested by arrival, else uncontested).
 - **Knobs:** the 75/25 dish split, finisher lowPost target, D6 cover offset.
+
+---
+
+## §13 — Multiple HCT Trap Plays — Architecture & Implementation Plan
+
+**Goal.** Turn today's single hardcoded trap into a *family* of selectable defensive
+plays. The current behavior becomes **Standard Trap**; two more follow later
+(**Straight Pressure**, **Diamond**). Selection, playbook storage, scouting, and
+gameplay wiring **exactly mirror the Fast Break play system**; behavior dispatch uses
+a pluggable play interface (the formalized version of FB's per-play modules).
+
+### 13.1 — The three layers (and what changes)
+
+| Layer | Today | Target |
+|-------|-------|--------|
+| **Selection** | `determine_defensive_pressure_type()` returns `"HCT"` (one flavor) | same fn also picks *which* trap and stashes it (SS&S) |
+| **Dispatch** | `offensive_state == "HCT"` → `compute_dynamic_hct_turn` (monolith) | `compute_dynamic_hct_turn` resolves an `HCTPlay` from a registry and drives the loop via its methods |
+| **Behavior** | ~2 dozen module constants in `dynamic_hct.py` + `HCT_STANDARD_*` tables | each lives on/under an `HCTPlay` implementation |
+
+`offensive_state` **stays `"HCT"`** (coarse mode). The chosen play is a *sub-selector*,
+so all existing routing, HCT stat parity, skeleton fallback, FE announcements, and
+possession-flip handling keep working untouched.
+
+### 13.2 — Selection pipeline (mirrors Fast Breaks)
+
+| Fast Break piece | HCT equivalent |
+|---|---|
+| `constants/fast_break_play_types.py` | new `constants/hct_trap_play_types.py` — keys, `HCT_TRAP_PLAY_KEYS`, `DEFAULT_HCT_TRAP_WEIGHTS` |
+| `playbook_settings["fast_breaks"]` weight map | `playbook_settings["hc_traps"]` weight map |
+| `play_key_for_fast_break_entry()` | `play_key_for_hct_trap()` (weighted-random over keys) |
+| `pending_dreb_fb_play_key` stash | `game_state["hct_trap_play"]` stash |
+| `scouting["offense"]["fast_break_plays"]` A/S | `scouting["defense"]["hct_trap_plays"]` A/S |
+| `ensure_fast_break_plays()` migration | `ensure_hct_trap_plays()` migration |
+
+Canonical keys: `standard_trap`, `straight_pressure`, `diamond`.
+
+**Two deliberate (and inherent) differences from FB — because a trap is a *defense*
+play:**
+1. Weights are read from the **defending** team's `playbook_settings`; per-play A/S
+   counters live under `scouting["defense"]`.
+2. In the playbook/UI, `hc_traps` is a **defensive** category — a sibling of
+   `zone_defense` / `man_defense`, not of `fast_breaks` (which is offensive). Only the
+   *machinery* mirrors FB.
+
+**Stash point (SS&S).** ~6 call sites do
+`offensive_state = determine_defensive_pressure_type()`. Rather than duplicating the
+trap-play pick at each, the single source of truth (`determine_defensive_pressure_type`)
+computes it **once** when it returns `"HCT"` and writes `game_state["hct_trap_play"]`.
+`compute_dynamic_hct_turn` reads that one synced value, with `play_key_for_hct_trap()`
+as the fallback if missing. (FB's select-once → stash → consume-with-fallback shape.)
+
+**Relationship to the existing gate.** `strategy_settings["hc_trap"]` (0–4) is
+untouched — it remains the *"how often do I trap at all"* frequency gate.
+`playbook_settings["hc_traps"]` only decides *which* trap once trapping is chosen.
+(Identical dual structure to FB's `strategy_settings["fast_breaks"]` slider vs
+`playbook_settings["fast_breaks"]` weights.)
+
+### 13.3 — The `HCTPlay` pluggable interface
+
+Base class with one implementation per play (Standard inherits the current logic
+verbatim). Methods map to the loop's existing phase seams:
+
+- `build_formation(...)` — trap formation + PF/C coverage (`HCT_STANDARD_*` tables).
+- `detect_pressure_and_trappers(...)` — detection radius + who commits.
+- `bh_decision(...)` — attack / pass / hold thresholds.
+- `resolve_moment(...)` — `o_score`/`d_score` gates, `DEF_WIN_BASE`, outcome split.
+- `movement(...)` / drift policy — rates, `HCT_DRIFT_PROBABILITY`.
+
+**Play-agnostic plumbing stays OUTSIDE the play** (so every play inherits it
+consistently): the time terminals (shot-clock 0 + the elapsed-based 10-second rule),
+HCT stat parity (`HCT_A/_S`, `HCT_A_D/_S_D`), schema/step emission, and possession
+flips. A registry maps key → `HCTPlay`; `compute_dynamic_hct_turn` becomes thin.
+
+### 13.4 — Playbook touchpoints (add `hc_traps`, mirroring `fast_breaks`)
+
+| Area | File(s) | Change |
+|---|---|---|
+| Default playbook | `gameplan_routes.py` (`initialize_playbook_settings`, success + error paths) | add `"hc_traps"` default weights |
+| Section enumerations | `gameplan_routes.py` (`_has_*` scan), `team_settings_manager.py` (section lists ×2) | add `"hc_traps"` |
+| Normalization | `api.py` (`normalize_string_keyed_map`), `team_settings_manager.py` | normalize/merge `hc_traps` like `fast_breaks` |
+| Persistence/migration | `team_settings_manager.py` merge + `ensure_hct_trap_plays()` | old saves get `hc_traps` defaults on load |
+| CPU teams | `cpu_playbook_customization.py` | `next_settings["hc_traps"] = _random_capped_three((...))` |
+| Frontend UI | *(frontend repo — separate, deferred)* | `HCT Traps` weight section in the defense group |
+
+API accepts/returns `hc_traps` immediately; until the frontend ships its slider
+section, teams run on defaults (100% Standard Trap during PR1 regardless).
+
+### 13.5 — PR boundary (refactor-first)
+
+- **PR1 (parity):** stand up the full pipeline (keys module, `hc_traps` settings +
+  defaults + CPU gen + normalization, selector, defense-side scouting counters,
+  `HCTPlay` interface + registry), but register **only `standard_trap`** carrying
+  today's logic verbatim. Default weights = 100% `standard_trap` → selection always
+  resolves to it → behavior provably unchanged. Verify via offline smoke (no crash,
+  no behavior delta vs current).
+- **PR2:** implement `straight_pressure` as a new `HCTPlay`; add to default weights.
+- **PR3:** implement `diamond` as a new `HCTPlay`; add to default weights.
+- **Frontend:** `HCT Traps` UI section (after backend lands).

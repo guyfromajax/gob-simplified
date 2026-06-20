@@ -944,6 +944,21 @@ def _record_hct_stats(hct_roles, turn_result, game, off_lineup, def_lineup):
             if is_hct_s_defense:
                 player.record_stat("HCT_S_D", 1)
 
+    # Per-trap-play A/S (defense-side, mirrors FB's offense-side fast_break_plays).
+    # _record_hct_stats is the single stats sink for an HCT turn, so counting here
+    # is exactly once per possession. Defense success criteria == HCT_S_D above.
+    play_key = game.game_state.get("hct_trap_play")
+    if play_key:
+        from BackEnd.constants.hct_trap_play_types import ensure_hct_trap_plays
+
+        def_scouting = getattr(game.defense_team, "scouting_data", None)
+        if isinstance(def_scouting, dict) and isinstance(def_scouting.get("defense"), dict):
+            hct_plays = ensure_hct_trap_plays(def_scouting["defense"])
+            if play_key in hct_plays:
+                hct_plays[play_key]["A"] += 1
+                if is_hct_s_defense:
+                    hct_plays[play_key]["S"] += 1
+
 
 def apply_fast_break_cg_time(turn_result, shot_attempted=False):
     """
@@ -7299,7 +7314,8 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     Deferred (post-first-cut): pass-to-side branch, x=64 transition / shoot,
     foul / steal outcomes, 10-second-violation gate, post-stopper snapshots.
     """
-    from BackEnd.engine.dynamic_hct import compute_dynamic_hct_turn
+    from BackEnd.constants.hct_trap_play_types import play_key_for_hct_trap
+    from BackEnd.engine.hct_trap_plays import get_hct_trap_play
 
     game_state = game.game_state
     off_team = game.offense_team
@@ -7307,7 +7323,15 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     off_lineup = off_team.lineup
     def_lineup = def_team.lineup
 
-    dyn = compute_dynamic_hct_turn(game)
+    # Resolve which trap play runs. Normally stashed at the SS&S choke point
+    # (TurnManager.determine_defensive_pressure_type); fall back to a fresh pick
+    # from the defending team's playbook for any path that bypassed it. Re-sync
+    # the resolved key so the stats sink (_record_hct_stats) attributes A/S to it.
+    play_key = game_state.get("hct_trap_play") or play_key_for_hct_trap(
+        getattr(def_team, "playbook_settings", None)
+    )
+    game_state["hct_trap_play"] = play_key
+    dyn = get_hct_trap_play(play_key).run(game)
 
     # §7 / D18 — broken-HCT fast break: the engine reached the topLane spot and
     # hands off to the shot resolver, which produces a real MAKE/MISS shot turn

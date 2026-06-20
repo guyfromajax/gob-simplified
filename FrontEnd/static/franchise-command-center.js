@@ -2275,19 +2275,37 @@ function renderTrainingResults(data) {
   }
 }
 
-function renderTrainingSquad(trainingSquad) {
+// Practice Squad Players section (the 3 cut players). After Week 35 Recruiting Day
+// the team's recruits join the list and the header becomes "Practice Squad + Recruits".
+// Renders an attributes table and a stats table (fed by ps_season_stats), mirroring
+// the team roster pages.
+function renderPracticeSquad(data) {
   const section = document.getElementById('training-squad-section');
   const tbody = document.getElementById('training-squad-body');
+  const statsBody = document.getElementById('ps-stats-body');
+  const titleEl = document.getElementById('ps-section-title');
   if (!section || !tbody) return;
-  // Undefined => not provided on this render (e.g. cache restore); leave as-is.
-  if (!Array.isArray(trainingSquad)) return;
-  if (!trainingSquad.length) {
+  // Neither field provided on this render (e.g. cache restore) => leave as-is.
+  if (!Array.isArray(data.training_squad) && !Array.isArray(data.practice_squad_recruits)) return;
+
+  const psPlayers = Array.isArray(data.training_squad) ? data.training_squad : [];
+  const recruits = Array.isArray(data.practice_squad_recruits) ? data.practice_squad_recruits : [];
+  const combined = psPlayers.concat(recruits);
+
+  if (!combined.length) {
     section.style.display = 'none';
     tbody.innerHTML = '';
+    if (statsBody) statsBody.innerHTML = '';
     return;
   }
+
+  if (titleEl) {
+    titleEl.textContent = data.practice_squad_recruiting_done ? 'Practice Squad + Recruits' : 'Practice Squad Players';
+  }
+
+  // Attributes table
   tbody.innerHTML = '';
-  trainingSquad.forEach(p => {
+  combined.forEach(p => {
     try {
       const best = getBestPosition(p.position_ratings || {});
       const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
@@ -2295,12 +2313,17 @@ function renderTrainingSquad(trainingSquad) {
       const tr = document.createElement('tr');
 
       const nameTd = document.createElement('td');
-      const nameLink = document.createElement('a');
-      nameLink.href = buildPlayerDetailUrl(p._id);
-      nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
-      nameLink.style.color = 'inherit';
-      nameLink.style.textDecoration = 'none';
-      nameTd.appendChild(nameLink);
+      if (p.is_recruit) {
+        // Recruits have no player-detail page until the season transition.
+        nameTd.textContent = fullName;
+      } else {
+        const nameLink = document.createElement('a');
+        nameLink.href = buildPlayerDetailUrl(p._id);
+        nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
+        nameLink.style.color = 'inherit';
+        nameLink.style.textDecoration = 'none';
+        nameTd.appendChild(nameLink);
+      }
       tr.appendChild(nameTd);
 
       const addCell = (content, extraClass) => {
@@ -2324,9 +2347,78 @@ function renderTrainingSquad(trainingSquad) {
       addCell(rt ?? '-', typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '');
       tbody.appendChild(tr);
     } catch (e) {
-      console.error('Error rendering training squad player:', p, e);
+      console.error('Error rendering practice squad player:', p, e);
     }
   });
+
+  // Stats table (ps_season_stats — regional Practice Squad games)
+  if (statsBody) {
+    statsBody.innerHTML = '';
+    combined.forEach(p => {
+      try {
+        const stats = p.ps_stats || {};
+        const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
+        const tr = document.createElement('tr');
+
+        const nameTd = document.createElement('td');
+        if (p.is_recruit) {
+          nameTd.textContent = fullName;
+        } else {
+          const nameLink = document.createElement('a');
+          nameLink.href = buildPlayerDetailUrl(p._id);
+          nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
+          nameLink.style.color = 'inherit';
+          nameLink.style.textDecoration = 'none';
+          nameTd.appendChild(nameLink);
+        }
+        tr.appendChild(nameTd);
+
+        const addCell = (content) => {
+          const td = document.createElement('td');
+          td.textContent = content;
+          tr.appendChild(td);
+        };
+
+        const tpm = stats['3PTM'] || 0;
+        const tpa = stats['3PTA'] || 0;
+        const fgm = stats.FGM || 0;
+        const fga = stats.FGA || 0;
+        const ftm = stats.FTM || 0;
+        const fta = stats.FTA || 0;
+        const defa = stats.DEF_A || 0;
+        const defs = stats.DEF_S || 0;
+        const scra = stats.SCR_A || 0;
+        const scrs = stats.SCR_S || 0;
+
+        addCell(stats.PTS || 0);
+        addCell(fgm);
+        addCell(fga);
+        addCell(fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0');
+        addCell(tpm);
+        addCell(tpa);
+        addCell(tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0');
+        addCell(ftm);
+        addCell(fta);
+        addCell(fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0');
+        addCell(stats.DREB || 0);
+        addCell(stats.OREB || 0);
+        addCell(stats.TREB || stats.REB || 0);
+        addCell(stats.AST || 0);
+        addCell(stats.STL || 0);
+        addCell(stats.BLK || 0);
+        addCell(stats.F || 0);
+        addCell(stats.TO || 0);
+        addCell(defa);
+        addCell(defa > 0 ? ((defs / defa) * 100).toFixed(1) : '0.0');
+        addCell(scra);
+        addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
+        statsBody.appendChild(tr);
+      } catch (e) {
+        console.error('Error rendering practice squad stats row:', p, e);
+      }
+    });
+  }
+
   section.style.display = '';
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
@@ -2452,8 +2544,8 @@ function renderTeam(data) {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }
 
-  // Training Squad (ineligible players) rendered below the active roster.
-  renderTrainingSquad(data.training_squad);
+  // Practice Squad Players (+ Recruits after Week 35) rendered below the active roster.
+  renderPracticeSquad(data);
 
   // Add click handlers to sortable headers
   const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th');
@@ -3140,7 +3232,7 @@ async function init() {
       const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
       const rosterEndTime = performance.now();
       console.log(`⏱️ [PERF] roster+state (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
-      renderTeam({ players: result.players });
+      renderTeam(result);
     } catch (error) {
       console.error('Failed to load franchise roster:', error);
     }

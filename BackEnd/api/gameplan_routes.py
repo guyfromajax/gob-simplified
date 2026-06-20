@@ -64,7 +64,7 @@ def _franchise_playbook_snapshot_meaningful(pb: dict | None) -> bool:
                 continue
             if any(isinstance(x, (int, float)) and x for x in section.values()):
                 return True
-    for sec in ("motion", "set_plays", "man_defense", "zone_defense", "fast_breaks"):
+    for sec in ("motion", "set_plays", "man_defense", "zone_defense", "fast_breaks", "hc_traps"):
         m = pb.get(sec)
         if isinstance(m, dict) and any(isinstance(v, (int, float)) and v for v in m.values()):
             return True
@@ -693,6 +693,7 @@ def initialize_playbook_settings():
             "motion": {},
             "set_plays": {},
             "fast_breaks": {},
+            "hc_traps": {},
             "zone_defense": {},
             "man_defense": {},
             "pc_order": {"offense": [], "defense": []},
@@ -759,6 +760,14 @@ def initialize_playbook_settings():
             "rim_runner": 33,
             "triangle": 34,
         }
+
+        # HCT traps (defensive play family). PR1: only Standard Trap is built, so
+        # default 100% to it (Straight Pressure / Diamond land in later cuts).
+        playbook_settings["hc_traps"] = {
+            "standard_trap": 100,
+            "straight_pressure": 0,
+            "diamond": 0,
+        }
         
         # Zone defense: Even distribution across supported zone IDs.
         zone_defenses = ["zone_23", "zone_32", "zone_131"]
@@ -822,6 +831,11 @@ def initialize_playbook_settings():
                 "covert_release": 33,
                 "rim_runner": 33,
                 "triangle": 34,
+            },
+            "hc_traps": {
+                "standard_trap": 100,
+                "straight_pressure": 0,
+                "diamond": 0,
             },
             "zone_defense": {"zone_23": 100, "zone_32": 0, "zone_131": 0},
             "man_defense": {"man_normal": 100, "man_pressure": 0, "man_loose": 0},
@@ -2824,6 +2838,7 @@ def get_playbooks(
         motion_percentages = simplified_playbook_settings.get("motion", {})
         set_play_percentages = simplified_playbook_settings.get("set_plays", {})
         fast_break_percentages = simplified_playbook_settings.get("fast_breaks", {})
+        hc_trap_percentages = simplified_playbook_settings.get("hc_traps", {})
         zone_defense_percentages = simplified_playbook_settings.get("zone_defense", {})
         man_defense_percentages = simplified_playbook_settings.get("man_defense", {})
         pc_order = simplified_playbook_settings.get("pc_order", {"offense": [], "defense": []})
@@ -2870,6 +2885,11 @@ def get_playbooks(
                 {"id": "rim_runner", "name": "Rim Runner"},
                 {"id": "covert_release", "name": "Covert Release"},
             ],
+            "hc_traps": [
+                {"id": "standard_trap", "name": "Standard Trap"},
+                {"id": "straight_pressure", "name": "Straight Pressure"},
+                {"id": "diamond", "name": "Diamond"},
+            ],
             "man_defense_rows": [
                 {
                     "id": defense_id,
@@ -2910,6 +2930,7 @@ def get_playbooks(
                 "motion": motion_percentages,
                 "set_plays": set_play_percentages,
                 "fast_breaks": fast_break_percentages,
+                "hc_traps": hc_trap_percentages,
                 "zone_defense": zone_defense_percentages,
                 "man_defense": man_defense_percentages,
             },
@@ -2995,6 +3016,10 @@ def save_playbooks(request: PlaybookSettingsRequest):
         playbook_settings["fast_breaks"] = normalize_string_keyed_map(
             playbook_settings.get("fast_breaks", {}),
             {"Triangle": "triangle", "Rim Runner": "rim_runner", "Covert Release": "covert_release"},
+        )
+        playbook_settings["hc_traps"] = normalize_string_keyed_map(
+            playbook_settings.get("hc_traps", {}),
+            {"Standard Trap": "standard_trap", "Straight Pressure": "straight_pressure", "Diamond": "diamond"},
         )
         playbook_settings["zone_defense"] = normalize_string_keyed_map(
             playbook_settings.get("zone_defense", {}),

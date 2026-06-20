@@ -20,6 +20,8 @@ let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
 /** @type {'single' | 'full'} */
 let attrDisplayMode = 'single';
+// True once Week 35 Recruiting Day has run — section becomes "Practice Squad + Recruits".
+let practiceSquadRecruitingDone = false;
 
 const ROSTER_ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
@@ -276,9 +278,10 @@ async function loadRoster() {
     // Default sort by RT descending
     rosterData.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
 
-    // Training squad (ineligible players) — same row shape, rendered below the roster.
-    trainingSquadData = (data.training_squad || []).map(p => {
-      const attrs = p.attributes || {};
+    // Practice Squad players (the 3 cut players) + Recruits (added after Week 35
+    // Recruiting Day). Both render in the same section below the roster, with the
+    // same row shape; recruits carry their Practice Squad season stats.
+    const mapPsRow = (p) => {
       const posRatings = p.position_ratings || {};
       let highestRT = -Infinity;
       Object.entries(posRatings).forEach(([, rating]) => {
@@ -293,14 +296,21 @@ async function loadRoster() {
         year: formatYearForDisplay(p.year),
         height: `${Math.floor(heightInches / 12)}'${heightInches % 12}"`,
         weight: p.weight || '--',
-        attributes: attrs,
+        attributes: p.attributes || {},
         position_ratings: posRatings,
         highestRT: highestRT !== -Infinity ? highestRT : null,
+        psStats: p.ps_stats || {},
+        isRecruit: !!p.is_recruit,
         hasPlayingTimePromise: false,
         isGraduating: false
       };
-    });
-    trainingSquadData.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+    };
+    const psPlayers = (data.training_squad || []).map(mapPsRow);
+    psPlayers.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+    const psRecruits = (data.practice_squad_recruits || []).map(mapPsRow);
+    psRecruits.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
+    trainingSquadData = psPlayers.concat(psRecruits);
+    practiceSquadRecruitingDone = !!data.practice_squad_recruiting_done;
 
     renderRoster();
     renderTrainingSquadView();
@@ -515,8 +525,84 @@ function renderTrainingSquadView() {
     section.style.display = 'none';
     return;
   }
+  const titleEl = document.getElementById('ps-section-title');
+  if (titleEl) {
+    titleEl.textContent = practiceSquadRecruitingDone ? 'Practice Squad + Recruits' : 'Practice Squad Players';
+  }
   renderRosterInto(trainingSquadData, 'ts-roster-body');
+  renderPracticeSquadStats();
   section.style.display = '';
+}
+
+// Practice Squad stats subsection — mirrors the Season Statistics table, fed by
+// each player's ps_season_stats (regional Practice Squad games). Percentages are
+// computed client-side from made/attempted, same as renderStats().
+function renderPracticeSquadStats() {
+  const tbody = document.getElementById('ps-stats-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  trainingSquadData.forEach(p => {
+    const stats = p.psStats || {};
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    if (p.isRecruit) {
+      nameTd.textContent = p.name;
+    } else {
+      const nameLink = document.createElement('a');
+      nameLink.href = buildPlayerDetailUrl(p._id);
+      nameLink.textContent =
+        typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
+      nameLink.style.color = 'inherit';
+      nameLink.style.textDecoration = 'none';
+      nameLink.addEventListener('mouseenter', () => { nameLink.style.textDecoration = 'underline'; });
+      nameLink.addEventListener('mouseleave', () => { nameLink.style.textDecoration = 'none'; });
+      nameTd.appendChild(nameLink);
+    }
+    tr.appendChild(nameTd);
+
+    const addCell = (content) => {
+      const td = document.createElement('td');
+      td.textContent = content;
+      tr.appendChild(td);
+    };
+
+    const tpm = stats['3PTM'] || 0;
+    const tpa = stats['3PTA'] || 0;
+    const fgm = stats.FGM || 0;
+    const fga = stats.FGA || 0;
+    const ftm = stats.FTM || 0;
+    const fta = stats.FTA || 0;
+    const defa = stats.DEF_A || 0;
+    const defs = stats.DEF_S || 0;
+    const scra = stats.SCR_A || 0;
+    const scrs = stats.SCR_S || 0;
+
+    addCell(stats.PTS || 0);
+    addCell(fgm);
+    addCell(fga);
+    addCell(fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0');
+    addCell(tpm);
+    addCell(tpa);
+    addCell(tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0');
+    addCell(ftm);
+    addCell(fta);
+    addCell(fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0');
+    addCell(stats.DREB || 0);
+    addCell(stats.OREB || 0);
+    addCell(stats.TREB || stats.REB || 0);
+    addCell(stats.AST || 0);
+    addCell(stats.STL || 0);
+    addCell(stats.BLK || 0);
+    addCell(stats.F || 0);
+    addCell(stats.TO || 0);
+    addCell(defa);
+    addCell(defa > 0 ? ((defs / defa) * 100).toFixed(1) : '0.0');
+    addCell(scra);
+    addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
+
+    tbody.appendChild(tr);
+  });
 }
 
 function renderRosterInto(data, tbodyId) {
@@ -528,9 +614,9 @@ function renderRosterInto(data, tbodyId) {
     const tr = document.createElement('tr');
     const attrs = p.attributes || {};
     
-    // Name with link (Practice Squad: plain text, no jersey)
+    // Name with link (Practice Squad team view & recruits: plain text, no jersey/detail page)
     const nameTd = document.createElement('td');
-    if (mode === 'practice_squad') {
+    if (mode === 'practice_squad' || p.isRecruit) {
       nameTd.textContent = p.name;
     } else {
       const nameLink = document.createElement('a');

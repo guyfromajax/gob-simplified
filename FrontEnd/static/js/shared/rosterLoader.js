@@ -17,7 +17,14 @@ function mergeRosterWithStateDoc(rosterData, stateDoc) {
     out.stats = { season: season };
     return out;
   });
-  return { players: players };
+  // Preserve other top-level roster fields (e.g. training_squad,
+  // practice_squad_recruits) so callers can render them alongside the roster.
+  var result = {};
+  for (var key in rosterData) {
+    if (Object.prototype.hasOwnProperty.call(rosterData, key)) result[key] = rosterData[key];
+  }
+  result.players = players;
+  return result;
 }
 
 /**
@@ -43,7 +50,8 @@ function loadRosterWithStats(rosterUrl, stateUrl) {
       return fetch(stateUrl, { headers: headers })
         .then(function (stateRes) {
           if (!stateRes.ok) {
-            return { players: rosterData.players || [] };
+            rosterData.players = rosterData.players || [];
+            return rosterData;
           }
           return stateRes.json().then(function (stateDoc) {
             return mergeRosterWithStateDoc(rosterData, stateDoc);

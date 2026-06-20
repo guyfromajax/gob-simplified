@@ -5197,6 +5197,34 @@ class TurnManager:
 
     def determine_defensive_pressure_type(self):
         """
+        Determine the defensive setup ('FCP', 'HCT', or 'HCO') for the next
+        possession AND, when it is HCT, pick which trap play runs.
+
+        SS&S choke point: rather than duplicating the trap-play pick at the ~6
+        callers that set ``offensive_state`` from this return value, we select it
+        ONCE here and sync it into ``game_state["hct_trap_play"]`` so every
+        downstream reader (``compute_dynamic_hct_turn``) uses the same value.
+        Mirrors the Fast Break select-once → stash → consume-with-fallback shape.
+        """
+        pressure_type = self._select_defensive_pressure_type()
+
+        if pressure_type == "HCT":
+            from BackEnd.constants.hct_trap_play_types import play_key_for_hct_trap
+
+            # After a made shot possession flips: the team that just scored
+            # (currently offense_team) becomes the defense and runs the trap, so
+            # the trap-play weights come from THAT team's playbook (mirrors how
+            # this fn already reads offense_team for the pressure decision).
+            trap_team = self.game.offense_team
+            playbook_settings = getattr(trap_team, "playbook_settings", None)
+            self.game.game_state["hct_trap_play"] = play_key_for_hct_trap(
+                playbook_settings
+            )
+
+        return pressure_type
+
+    def _select_defensive_pressure_type(self):
+        """
         Determine if defensive team should attempt FCP or HCT after a made shot.
         Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
         

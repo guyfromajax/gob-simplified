@@ -50,6 +50,14 @@ FAST_BREAK_ID_ALIASES = {
     "covert_release": "covert_release",
     "Covert Release": "covert_release",
 }
+HCT_TRAP_ID_ALIASES = {
+    "standard_trap": "standard_trap",
+    "Standard Trap": "standard_trap",
+    "straight_pressure": "straight_pressure",
+    "Straight Pressure": "straight_pressure",
+    "diamond": "diamond",
+    "Diamond": "diamond",
+}
 DEFENSE_NAME_TO_ID = {
     **{v: k for k, v in MAN_DEFENSE_ID_TO_NAME.items()},
     **{v: k for k, v in ZONE_DEFENSE_ID_TO_NAME.items()},
@@ -377,6 +385,10 @@ def build_simplified_playbook_settings(
         playbook_settings.get("fast_breaks", playbook_settings.get("fast_break", {})),
         FAST_BREAK_ID_ALIASES,
     )
+    hc_traps = normalize_string_keyed_map(
+        playbook_settings.get("hc_traps", playbook_settings.get("hc_trap_plays", {})),
+        HCT_TRAP_ID_ALIASES,
+    )
     zone_defense = normalize_string_keyed_map(
         playbook_settings.get("zone_defense", {}),
         DEFENSE_NAME_TO_ID,
@@ -424,6 +436,7 @@ def build_simplified_playbook_settings(
         "motion": motion,
         "set_plays": set_plays,
         "fast_breaks": fast_breaks,
+        "hc_traps": hc_traps,
         "man_defense": man_defense,
         "zone_defense": zone_defense,
         "pc_order": pc_order,
@@ -478,6 +491,7 @@ def build_legacy_playbook_settings_view(
         "set_play_attack": set_play_attack,
         "set_play_outside": set_play_outside,
         "fast_break": dict(simple_settings.get("fast_breaks", {}) or {}),
+        "hc_traps": dict(simple_settings.get("hc_traps", {}) or {}),
         "man_defense": {
             MAN_DEFENSE_ID_TO_NAME.get(key, key): value
             for key, value in (simple_settings.get("man_defense", {}) or {}).items()

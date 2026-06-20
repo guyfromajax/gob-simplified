@@ -42,6 +42,7 @@ try:
         franchises_collection,
         franchise_players_data_collection,
         franchise_team_data_collection,
+        franchise_recruits_data_collection,
     )
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -5725,7 +5726,7 @@ try:
                 if ts_ids:
                     ts_docs = list(franchise_players_data_collection.find(
                         {"franchise_id": str(franchise_id), "player_id": {"$in": ts_ids}},
-                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1},
+                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1, "ps_season_stats": 1},
                     ))
                     ts_by_id = {d["player_id"]: d for d in ts_docs}
                     for pid in ts_ids:
@@ -5750,9 +5751,64 @@ try:
                             "archetype": ts_meta.get("archetype"),
                             "position_ratings": d.get("position_ratings") or {},
                             "attributes": ts_attrs,
+                            # Practice Squad season stats (regional PS games). The 3
+                            # training-squad players ARE the team's Practice Squad players.
+                            "ps_stats": d.get("ps_season_stats") or {},
+                            "is_recruit": False,
                         })
             except Exception:
                 training_squad = []
+
+        # Practice Squad recruits: after Week 35 Recruiting Day, the team's signed
+        # recruits join this section ("Practice Squad + Recruits"). Their Practice
+        # Squad season stats carry over from the FRD records. Walk-on filler signings
+        # are excluded — they are not recruits and have no PS history.
+        practice_squad_recruits = []
+        practice_squad_recruiting_done = False
+        if franchise_id and team_doc.get("_id"):
+            try:
+                fr_doc = franchises_collection.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {"week_35_recruiting_ran": 1, "week_35_recruiting_results": 1},
+                ) or {}
+                practice_squad_recruiting_done = bool(fr_doc.get("week_35_recruiting_ran"))
+                if practice_squad_recruiting_done:
+                    team_id_str = str(team_doc["_id"])
+                    signed = (fr_doc.get("week_35_recruiting_results") or {}).get("signed_players") or []
+                    team_signed = [
+                        s for s in signed
+                        if str(s.get("team_id")) == team_id_str and not s.get("walk_on")
+                    ]
+                    recruit_ids = [s.get("recruit_id") for s in team_signed if s.get("recruit_id")]
+                    frd_stats = {}
+                    if recruit_ids:
+                        frd_docs = franchise_recruits_data_collection.find(
+                            {"franchise_id": str(franchise_id), "recruit_id": {"$in": recruit_ids}},
+                            {"recruit_id": 1, "ps_season_stats": 1},
+                        )
+                        frd_stats = {d["recruit_id"]: (d.get("ps_season_stats") or {}) for d in frd_docs}
+                    for s in team_signed:
+                        r_attrs = (s.get("attributes") or {}).copy()
+                        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+                            if attr_key in r_attrs and f"anchor_{attr_key}" not in r_attrs:
+                                r_attrs[f"anchor_{attr_key}"] = r_attrs[attr_key]
+                        practice_squad_recruits.append({
+                            "_id": s.get("recruit_id") or s.get("player_id"),
+                            "first_name": "",
+                            "last_name": "",
+                            "name": s.get("name", ""),
+                            "year": format_player_year_display(s.get("year")) if s.get("year") else None,
+                            "height": s.get("height"),
+                            "weight": s.get("weight"),
+                            "jersey": None,
+                            "archetype": s.get("archetype"),
+                            "position_ratings": s.get("position_ratings") or {},
+                            "attributes": r_attrs,
+                            "ps_stats": frd_stats.get(s.get("recruit_id"), {}),
+                            "is_recruit": True,
+                        })
+            except Exception:
+                practice_squad_recruits = []
 
         response_data = {
             "team": team.get("name", match if match else team_identifier),
@@ -5762,6 +5818,8 @@ try:
             "team_chemistry": roster_team_chemistry,
             "players": players,
             "training_squad": training_squad,
+            "practice_squad_recruits": practice_squad_recruits,
+            "practice_squad_recruiting_done": practice_squad_recruiting_done,
         }
         
         # ✅ DEBUG: Log response details for box score debugging
