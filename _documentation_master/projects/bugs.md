@@ -27,20 +27,15 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
 
 ##New Features
-44. Customize computer teams Playbooks more strategically
-45. Improve FCC API
-57. Player Momentum System
 60. Universal distance-based rebound helper
-62. Leaderboard -- change Rank to Titles
 11. More action on Signing Day
 22. User account -- link X & Facebook?
 24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
-25. Fast Break and P/T callouts in the Scouting Report
-26. Non-rebounder movment on OREBs
-
+25. Fast Break and P/T callouts in the Scouting Report of opponent
 
 ##Full Product Readiness
-100. Press & Trap Plays
+100. Dynamic Trap Plays -- need to add pass disruptions and interceptions, confirm fatigue, add Diamond Trap play
+101. Dynamic Press Plays
 102. Team court images
 103. Player images
 105. More responsive front end
@@ -48,14 +43,16 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 107. Stripe
 108. Message board
 109. More dynamic HCO animations
-110. Geek Points system
+110. Strategic Geek Points system
 111. Marketing Screenshot Tool Build
+112. Deeper in-game SFX: It's good, no good, three, deny, picked up his dribble
+113. Bring logic to screens
+114. Better defense stat tracking
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
-4. Add recruits to roster after recruiting
 5. Add a new hire news story for user team
 6. Add a badass design appraoch to New Stories
 

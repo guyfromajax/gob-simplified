@@ -41,7 +41,8 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Dict, List, Optional
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, List, Optional
 
 from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
@@ -64,6 +65,55 @@ def _clampf(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def _coords_by_player_id(
+    lineup: Dict[str, Any],
+    coords_by_pos: Dict[str, Any],
+) -> Dict[str, Dict[str, float]]:
+    """Convert position-keyed HCT coords into player-id keyed coords."""
+    out: Dict[str, Dict[str, float]] = {}
+    for pos, player in (lineup or {}).items():
+        pid = _safe_id(player)
+        coords = (coords_by_pos or {}).get(pos)
+        if pid is None or not isinstance(coords, dict):
+            continue
+        try:
+            out[pid] = {"x": float(coords["x"]), "y": float(coords["y"])}
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+@contextmanager
+def _temporary_lineup_coords(
+    game: Any,
+    coords_by_player_id: Dict[str, Dict[str, float]],
+) -> Iterator[None]:
+    """Temporarily apply HCT shot-moment coords for geography reads.
+
+    Dynamic HCT shot resolvers carry authoritative shot-moment positions in
+    seeds, while generic rebound helpers read ``player.coords``. This context
+    keeps rebound winner selection and failed-attemptor collection in the same
+    coordinate frame without leaking those temporary coords beyond resolution.
+    """
+    originals: Dict[str, tuple[Any, Any]] = {}
+    for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
+        for player in (getattr(team, "lineup", None) or {}).values():
+            pid = _safe_id(player)
+            if pid is None or pid not in coords_by_player_id:
+                continue
+            originals[pid] = (player, getattr(player, "coords", None))
+            player.coords = dict(coords_by_player_id[pid])
+    try:
+        yield
+    finally:
+        for player, coords in originals.values():
+            if coords is None:
+                if hasattr(player, "coords"):
+                    delattr(player, "coords")
+            else:
+                player.coords = coords
+
+
 def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any]:
     """Resolve the D18 broken-HCT fast-break rim attempt.
 
@@ -76,6 +126,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
     from BackEnd.utils.shared import (
         apply_scoring,
         calculate_bounce_spot,
+        collect_near_bounce_rebound_attemptors,
         determine_rebounder,
         get_name_safe,
         increment_no_defender_shot_breakdown,
@@ -243,6 +294,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
     rebound_type: Optional[str] = None
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
+    rebound_attemptors: Optional[Dict[str, List[str]]] = None
     if made:
         shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
@@ -259,11 +311,30 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
             bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
             penalize_player_ids = {shooter_id} if shooter_id else set()
             exclude_player_ids: set = set()
-            new_rebounder, new_team, new_stat = determine_rebounder(
-                game, bounce_spot, exclude_player_ids, penalize_player_ids,
+            shot_moment_coords = _coords_by_player_id(off_lineup, seed_off)
+            shot_moment_coords.update(_coords_by_player_id(def_lineup, seed_def))
+            shot_moment_coords[shooter_id] = {
+                "x": float(bh_target["x"]),
+                "y": float(bh_target["y"]),
+            }
+            shot_moment_coords.update(
+                {
+                    did: {"x": float(c["x"]), "y": float(c["y"])}
+                    for did, c in defender_end_coords.items()
+                }
             )
+            with _temporary_lineup_coords(game, shot_moment_coords):
+                new_rebounder, new_team, new_stat = determine_rebounder(
+                    game, bounce_spot, exclude_player_ids, penalize_player_ids,
+                )
+                rebounder_pid = _safe_id(new_rebounder)
+                rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                    game,
+                    bounce_spot,
+                    rebounder_pid,
+                    coords_already_display_oriented=True,
+                )
             rebound_type = str(new_stat) if new_stat else "DREB"
-            rebounder_pid = _safe_id(new_rebounder)
             rebound_ball_spot = {
                 "x": float(bounce_spot["x"]),
                 "y": float(bounce_spot["y"]),
@@ -369,6 +440,9 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         if rebound_type is not None:
             turn_result["rebound_type"] = rebound_type
             turn_result["rebounderId"] = rebounder_pid
+            if rebound_attemptors is not None:
+                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
             if rebound_ball_spot is not None:
                 turn_result["ballSpot"] = dict(rebound_ball_spot)
 
@@ -538,6 +612,7 @@ def _finalize_ab_shot(
     foul_player: Any,
     defender_end_coords: Dict[str, Dict[str, float]],
     t_shot: float,
+    shot_moment_coords: Optional[Dict[str, Dict[str, float]]] = None,
     extra_seed: Optional[Dict[str, Any]] = None,
     text_prefix: str = " they go to work in the paint",
 ) -> Dict[str, Any]:
@@ -547,6 +622,7 @@ def _finalize_ab_shot(
     from BackEnd.utils.shared import (
         apply_scoring,
         calculate_bounce_spot,
+        collect_near_bounce_rebound_attemptors,
         determine_rebounder,
         get_name_safe,
     )
@@ -606,6 +682,7 @@ def _finalize_ab_shot(
     rebound_type: Optional[str] = None
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
+    rebound_attemptors: Optional[Dict[str, List[str]]] = None
     if made:
         shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
@@ -622,11 +699,29 @@ def _finalize_ab_shot(
                 game, basket_x=float(rim["x"]), basket_y=25,
             )
             penalize_player_ids = {shooter_id} if shooter_id else set()
-            new_rebounder, new_team, new_stat = determine_rebounder(
-                game, bounce_spot, set(), penalize_player_ids,
+            shot_moment_coords = dict(shot_moment_coords or {})
+            shot_moment_coords[shooter_id] = {
+                "x": float(shot_spot["x"]),
+                "y": float(shot_spot["y"]),
+            }
+            shot_moment_coords.update(
+                {
+                    did: {"x": float(c["x"]), "y": float(c["y"])}
+                    for did, c in (defender_end_coords or {}).items()
+                }
             )
+            with _temporary_lineup_coords(game, shot_moment_coords):
+                new_rebounder, new_team, new_stat = determine_rebounder(
+                    game, bounce_spot, set(), penalize_player_ids,
+                )
+                rebounder_pid = _safe_id(new_rebounder)
+                rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                    game,
+                    bounce_spot,
+                    rebounder_pid,
+                    coords_already_display_oriented=True,
+                )
             rebound_type = str(new_stat) if new_stat else "DREB"
-            rebounder_pid = _safe_id(new_rebounder)
             rebound_ball_spot = {
                 "x": float(bounce_spot["x"]),
                 "y": float(bounce_spot["y"]),
@@ -729,6 +824,9 @@ def _finalize_ab_shot(
         if rebound_type is not None:
             turn_result["rebound_type"] = rebound_type
             turn_result["rebounderId"] = rebounder_pid
+            if rebound_attemptors is not None:
+                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
             if rebound_ball_spot is not None:
                 turn_result["ballSpot"] = dict(rebound_ball_spot)
 
@@ -808,6 +906,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
         made=made, shot_score=shot_score, shot_score_pre_defense=pre,
         shot_defense_score_for_sfx=sfx_score, d_foul=d_foul, foul_player=foul_player,
         defender_end_coords=defender_end_coords, t_shot=AB_SHOT_BEAT_SECONDS,
+        shot_moment_coords=_coords_by_player_id(off_lineup, seed_off),
         text_prefix=" they go to work in the paint",
     )
 
@@ -932,6 +1031,20 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
             "x": float(shot_spot["x"]), "y": float(shot_spot["y"]),
         }
 
+    shot_moment_coords = _coords_by_player_id(off_lineup, seed_off)
+    if driver_id is not None:
+        shot_moment_coords[driver_id] = {
+            "x": float(driver_target["x"]),
+            "y": float(driver_target["y"]),
+        }
+    shot_moment_coords.update(
+        {
+            oid: {"x": float(c["x"]), "y": float(c["y"])}
+            for oid, c in teammate_targets.items()
+            if oid is not None
+        }
+    )
+
     return _finalize_ab_shot(
         game,
         shooter=shooter, shooter_id=shooter_id,
@@ -940,5 +1053,6 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
         made=made, shot_score=shot_score, shot_score_pre_defense=pre,
         shot_defense_score_for_sfx=sfx_score, d_foul=d_foul, foul_player=foul_player,
         defender_end_coords=defender_end_coords, t_shot=AB_SHOT_BEAT_SECONDS,
+        shot_moment_coords=shot_moment_coords,
         extra_seed=extra_seed, text_prefix=" they attack the rim",
     )

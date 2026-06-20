@@ -16,7 +16,7 @@ def _sync_lineup_to_roster(game):
         }
 
 
-def test_collect_near_bounce_rebound_attemptors_uses_15_grid_radius():
+def test_collect_near_bounce_rebound_attemptors_uses_20_grid_radius():
     game = build_mock_game()
     _sync_lineup_to_roster(game)
     bounce = {"x": 89, "y": 25}
@@ -27,9 +27,9 @@ def test_collect_near_bounce_rebound_attemptors_uses_15_grid_radius():
     def_sg = game.defense_team.lineup["SG"]
 
     off_pg.coords = {"x": 80, "y": 25}   # 9 away: included
-    off_sg.coords = {"x": 70, "y": 25}   # 19 away: excluded
-    def_pg.coords = {"x": 89, "y": 40}   # 15 away: included
-    def_sg.coords = {"x": 89, "y": 41}   # 16 away: excluded
+    off_sg.coords = {"x": 68, "y": 25}   # 21 away: excluded
+    def_pg.coords = {"x": 89, "y": 45}   # 20 away: included
+    def_sg.coords = {"x": 89, "y": 46}   # 21 away: excluded
 
     actual_rebounder = game.defense_team.lineup["C"]
     actual_rebounder.coords = {"x": 89, "y": 24}

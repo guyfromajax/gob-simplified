@@ -1491,7 +1491,7 @@ def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_play
     return closest_player
 
 
-NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 15
+NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20
 
 
 def collect_near_bounce_rebound_attemptors(

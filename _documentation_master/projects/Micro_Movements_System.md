@@ -2,14 +2,16 @@
 
 **Shot Attempts**
 - Inside Shots
-    - Strong Inside Shot
-    - Fade Away Inside Shot
-    - Up & Under Inside Shot
-    - Under & Up Inside Shot
-    - Straign Inside Shot
+    - Strong Inside Shot (player sprite moves 1 x spot toward the basket then animates shot)
+    - Fade Away Inside Shot (player sprite moves 1 x spot away the basket then animates shot)
+    - Up & Under Inside Shot (player sprite moves 1 x spot toward the basket, then 2 x spots away from the basket then animates shot)
+    - Under & Up Inside Shot (player sprite moves 1 x spot away the basket, then 2 x spots toward from the basket then animates shot)
+    - Straight Inside Shot (player sprite does not move, then 2 x spots away from the basket then animates shot)
 - Attack Shots
     - Strong Attack Shots (any attack shot executed at a near basket spot)
+        (player sprite moves 1 x spot toward the basket then animates shot)
     - Pullup Attack Shot (any attack shot not attempted at a near basket spot)
+        (player sprite moves 1 x spot toward the basket then animates shot)
 - Outside Shots
     - Set Outside Shot
     - Set Outside Shot with Pump Fake

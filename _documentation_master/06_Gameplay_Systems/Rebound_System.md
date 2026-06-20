@@ -28,11 +28,12 @@ This replaces the earlier two-authorities-via-player-id-matching design, where t
 
 ### Near-bounce failed rebound attemptors
 
-Missed **Fast Break** shots and missed **OREB putback** attempts stamp a backend-authored failed-attemptor list for the rebound-capture step.
+Missed **Fast Break** shots, missed **OREB putback** attempts, and clean-miss **Dynamic HCT** shot attempts stamp a backend-authored failed-attemptor list for the rebound-capture step.
 
 - **Helper:** `collect_near_bounce_rebound_attemptors()` in `BackEnd/utils/shared.py`.
-- **Rule:** after the authoritative `bounce_spot` and actual `rebounderId` are known, scan both current lineups and include every non-captor player whose Euclidean distance to the bounce spot is **≤ 15** grid units.
+- **Rule:** after the authoritative `bounce_spot` and actual `rebounderId` are known, scan both current lineups and include every non-captor player whose Euclidean distance to the bounce spot is **≤ 20** grid units.
 - **Orientation:** the helper uses display-oriented rebound math for away-offense cases, matching `determine_rebounder` / `choose_rebounder` bounce calculations.
+- **Dynamic HCT:** `dynamic_hct_shot.py` applies the HCT shot-moment seed coords only while selecting the rebounder and collecting failed attemptors, then restores runtime `player.coords`. This keeps rebound winner selection and failed-attemptor animation in the same coordinate frame without changing global rebound helpers.
 - **Payload:** the prior miss turn carries `offense_rebounders` and `defense_rebounders` as player IDs. `dreb_step_emitter.py` / `oreb_step_emitter.py` pass those through `rebound_attemptor_ids()`.
 - **Animation:** the actual rebounder moves to the exact bounce spot. Failed attemptors move to backend-randomized nearby targets via `sample_rebound_collapse_target()` / `stamp_rebound_capture_player_motion()`, not to the exact ball spot.
 - **Frontend contract:** the frontend does not choose rebound attemptors. It renders the backend `animation_steps` payload.
