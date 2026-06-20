@@ -73,11 +73,14 @@ from BackEnd.utils.transition_bridge import _interrupted_coord
 
 
 # 10-second violation gate (per Dynamic_HCT_Turns.md "Special Situations").
-# When the shot clock reaches this threshold and the ball handler has not yet
-# crossed half-court, we announce "10-Second Violation" and run the standard
-# dead-ball-turnover flow → SIP. NOT WIRED in first cut; constant defined now
-# so the next iteration can plug in the runtime check without churn.
-HCT_SHOT_CLOCK_VIOLATION_THRESHOLD = 20
+# 10-second backcourt rule: if this many ACTUAL game-seconds elapse from the start
+# of the possession without the ball handler crossing half court, we announce a
+# "10-Second Violation" and run the standard dead-ball-turnover flow → SIP. Measured
+# as elapsed time (start shot clock − current), NOT an absolute shot-clock value, so
+# it stays correct when the shot clock is capped to a short quarter. It also cannot
+# fire if fewer than this many seconds remained in the quarter at possession start
+# (the period buzzer ends the possession first).
+HCT_TEN_SECOND_LIMIT = 10.0
 
 # Step 1 BH target: x = 44, y random in [21, 29].
 STEP_1_BH_TARGET_X = 44
@@ -1166,6 +1169,13 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     # segment so the loop is strictly bounded.
     game_state = getattr(game, "game_state", {}) or {}
     shot_clock = float(game_state.get("shot_clock_remaining", 30) or 30)
+    # 10-second rule is measured against ACTUAL elapsed time from possession start
+    # (not an absolute shot-clock threshold), and is disabled when the quarter has
+    # less than the limit remaining (the period buzzer ends it first).
+    shot_clock_start = shot_clock
+    quarter_remaining_start = float(
+        game_state.get("time_remaining", shot_clock) or shot_clock
+    )
 
     loop_segments: List[Dict[str, Any]] = []
     result_type = "HCO"
@@ -1488,11 +1498,15 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             turnover_type = "SHOT_CLOCK"
             text_suffix = " shot clock violation!"
             break
-        if shot_clock <= HCT_SHOT_CLOCK_VIOLATION_THRESHOLD and not _crossed_half_court(
-            bh_xy["x"], is_away_offense
+        if (
+            quarter_remaining_start >= HCT_TEN_SECOND_LIMIT
+            and (shot_clock_start - shot_clock) >= HCT_TEN_SECOND_LIMIT
+            and not _crossed_half_court(bh_xy["x"], is_away_offense)
         ):
-            # D9 — 10-second violation: didn't cross half court in time → turnover
-            # → SIP, possession flips. Only applies while still in the backcourt.
+            # D9 — 10-second violation: 10 ACTUAL game-seconds elapsed since
+            # possession start without crossing half court → turnover → SIP,
+            # possession flips. Only applies while still in the backcourt, and not
+            # when <10s remained in the quarter at possession start (buzzer first).
             result_type = "DEAD BALL"
             turnover_type = "TEN_SECOND"
             text_suffix = " 10-second violation!"

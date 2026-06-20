@@ -67,7 +67,9 @@ re-derived here):
   (AG=50 reproduces the legacy constants exactly).
 
 **Shot-clock / violation constant**
-- `HCT_SHOT_CLOCK_VIOLATION_THRESHOLD = 20` (10 seconds elapsed from a 30 start) — see §8.
+- `HCT_TEN_SECOND_LIMIT = 10.0` — actual game-seconds allowed to cross half court
+  (measured as elapsed time from possession start, not an absolute shot-clock value;
+  disabled when <10s remain in the quarter at possession start) — see §8.
 
 **Defense starting locations** (home-defending orientation; flipped for away offense)
 
@@ -864,11 +866,16 @@ boundary (see §4 "Time terminals"), not only at the turn boundary.
   position.
 - **10-second violation**: if the offense does not cross half court (x=50) within 10
   seconds, it is a 10-second violation, credited to the BH at the moment of the
-  turnover. Evaluate via the shot clock: if the shot clock reaches
-  `HCT_SHOT_CLOCK_VIOLATION_THRESHOLD` (20, i.e. 10 seconds elapsed from 30) and the
-  BH's x < 50 (home offense) / > 50 (away offense), announce "10-Second Violation"
-  and run the standard dead-ball turnover flow → SIP. Once the ball crosses half
-  court this rule no longer applies (only the shot-clock-0 terminal remains).
+  turnover. Evaluate via **actual elapsed time**: capture the shot clock at the start
+  of the possession (`shot_clock_start`); when `shot_clock_start − shot_clock ≥
+  HCT_TEN_SECOND_LIMIT` (10) and the BH's x < 50 (home offense) / > 50 (away offense),
+  announce "10-Second Violation" and run the standard dead-ball turnover flow → SIP.
+  Measuring elapsed time (rather than an absolute shot-clock value) keeps it correct
+  when the shot clock is capped to a short quarter (e.g. 13s left → shot clock 13,
+  which must **not** instantly trip the rule). It also **cannot fire** when fewer than
+  10s remained in the quarter at possession start (`time_remaining`), because the
+  period buzzer ends the possession first. Once the ball crosses half court this rule
+  no longer applies (only the shot-clock-0 terminal remains).
   *(✅ Built — D9. Both clock terminals are checked at the top of each loop
   iteration; the engine tags `turnover_type` ("SHOT_CLOCK" / "TEN_SECOND"), the
   wrapper carries it onto the DEAD BALL result (possession flips → SIDE_INBOUND),
