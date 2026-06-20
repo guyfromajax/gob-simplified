@@ -866,84 +866,235 @@ def _defense_targets(
 
 
 # --- Straight Pressure (§13.6 — play #2) ---------------------------------------
-# Deny spot: fraction of the way from the BH toward the denied outlet (mirrors the
-# D22 C/PF help-denial geometry). Help sag: fraction from the BH toward the rim.
+# Man-to-man backcourt scheme. The three backcourt defenders (PG/SG/SF) lock onto
+# a man at the converge and stick until a stop event, EXCEPT a man who enters the
+# ABA is released and the freed defender fills the next open role:
+#   rover/trapper (tracks the live BH) → key (sits at key, toggling to a wing by
+#   the BH's y, and mans up on any offender returning to the backcourt) → wings.
+# A real trap re-forms only via the rover (see ``StraightPressure.detect_moment``).
+# PF/C inherit the Standard D22 zone coverage (``_pf_c_targets``).
+#
+# Deny spot: fraction from the live BH toward the guarded man (ball-side denial).
 STRAIGHT_PRESSURE_DENY_FRACTION = 0.6
-STRAIGHT_PRESSURE_SAG_FRACTION = 0.25
-# The offense's two backcourt outlets that the off-ball backcourt defenders deny.
-STRAIGHT_PRESSURE_OUTLET_POSITIONS = ("SG", "SF")
-# The two off-ball backcourt defenders that do the denying (PG pressures on-ball).
-STRAIGHT_PRESSURE_DENY_DEFENDERS = ("SG", "SF")
+# Off-ball backcourt defenders (def PG always takes the ball handler).
+STRAIGHT_PRESSURE_OFFBALL_DEFENDERS = ("SG", "SF")
+# Backcourt boundary: an offender with x ≥ 64 (home) / x ≤ 36 (away) is frontcourt,
+# NOT a backcourt offender (distinct from the ABA y-band test).
+STRAIGHT_PRESSURE_BACKCOURT_X = 64
+# Key-role wing toggle thresholds (BH y): > upper → upper wing; < lower → lower.
+STRAIGHT_PRESSURE_KEY_UPPER_Y = 28
+STRAIGHT_PRESSURE_KEY_LOWER_Y = 22
 
 
-def _assign_deny(
-    deny_defenders: Tuple[str, str],
-    valid_outlets: List[str],
+def _is_backcourt_offender(xy: Dict[str, Any], is_away_offense: bool) -> bool:
+    """A backcourt offensive player: x < 64 (home) / x > 36 (away)."""
+    if is_away_offense:
+        return xy["x"] > (100 - STRAIGHT_PRESSURE_BACKCOURT_X)
+    return xy["x"] < STRAIGHT_PRESSURE_BACKCOURT_X
+
+
+def _match_off_pos(off_coords: Dict[str, Dict[str, int]], xy: Dict[str, Any]) -> str:
+    """The offensive position currently at ``xy`` (identity first, then value)."""
+    for p in POSITIONS:
+        if off_coords[p] is xy:
+            return p
+    for p in POSITIONS:
+        if off_coords[p]["x"] == xy["x"] and off_coords[p]["y"] == xy["y"]:
+            return p
+    return "PG"
+
+
+def _nearest_matchup_two(
+    defs: List[str],
+    men: List[str],
     def_coords: Dict[str, Dict[str, int]],
     off_coords: Dict[str, Dict[str, int]],
 ) -> Dict[str, str]:
-    """Nearest-matchup assignment (no double-up) of off-ball backcourt defenders to
-    valid offensive outlets. Returns ``{defender_pos: outlet_pos}``; defenders with
-    no outlet are omitted (caller sags them)."""
-    d1, d2 = deny_defenders
-    if len(valid_outlets) == 1:
-        o = valid_outlets[0]
-        nearest = min(deny_defenders, key=lambda d: _euclid(def_coords[d], off_coords[o]))
-        return {nearest: o}
-    o1, o2 = valid_outlets[0], valid_outlets[1]
-    straight = _euclid(def_coords[d1], off_coords[o1]) + _euclid(def_coords[d2], off_coords[o2])
-    crossed = _euclid(def_coords[d1], off_coords[o2]) + _euclid(def_coords[d2], off_coords[o1])
-    return {d1: o1, d2: o2} if straight <= crossed else {d1: o2, d2: o1}
+    """Pair two defenders to two men with the smaller total distance (no cross)."""
+    d1, d2 = defs
+    m1, m2 = men
+    straight = _euclid(def_coords[d1], off_coords[m1]) + _euclid(def_coords[d2], off_coords[m2])
+    crossed = _euclid(def_coords[d1], off_coords[m2]) + _euclid(def_coords[d2], off_coords[m1])
+    return {d1: m1, d2: m2} if straight <= crossed else {d1: m2, d2: m1}
 
 
-def _straight_pressure_defense_targets(
+def _straight_pressure_begin(
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    off_coords: Optional[Dict[str, Dict[str, int]]],
+    is_away_offense: bool,
+) -> Dict[str, Any]:
+    """Lock the initial man assignments + roles at the converge (§13.6).
+
+    def PG → the BH. The two off-ball defenders (SG/SF) cover, by nearest-matchup,
+    the two non-BH backcourt offenders closest to the BH (higher-y / lower-y). With
+    one such offender the spare defender roves; with none, one roves and one keys.
+    """
+    state: Dict[str, Any] = {
+        "assignment": {},     # def_pos -> off_pos (man defenders, incl. PG→BH)
+        "rover": None,        # def_pos or None
+        "key": None,          # def_pos or None
+        "wings": {},          # def_pos -> "upper" | "lower"
+        "entered_aba": set(),  # off positions that have visited the ABA
+    }
+    offball = list(STRAIGHT_PRESSURE_OFFBALL_DEFENDERS)
+    if off_coords is None:
+        state["assignment"]["PG"] = "PG"
+        state["rover"] = offball[0]
+        state["key"] = offball[1]
+        return state
+
+    bh_off = _match_off_pos(off_coords, bh_xy)
+    state["assignment"]["PG"] = bh_off
+
+    candidates = [
+        p
+        for p in POSITIONS
+        if p != bh_off and _is_backcourt_offender(off_coords[p], is_away_offense)
+    ]
+    candidates.sort(key=lambda p: _euclid(off_coords[p], bh_xy))
+
+    if len(candidates) >= 2:
+        two = sorted(candidates[:2], key=lambda p: off_coords[p]["y"])
+        lower_y, higher_y = two[0], two[1]
+        state["assignment"].update(
+            _nearest_matchup_two(offball, [higher_y, lower_y], def_coords, off_coords)
+        )
+    elif len(candidates) == 1:
+        man = candidates[0]
+        nearest = min(offball, key=lambda d: _euclid(def_coords[d], off_coords[man]))
+        other = offball[0] if offball[1] == nearest else offball[1]
+        state["assignment"][nearest] = man
+        state["rover"] = other
+    else:
+        rover = min(offball, key=lambda d: _euclid(def_coords[d], bh_xy))
+        other = offball[0] if offball[1] == rover else offball[1]
+        state["rover"] = rover
+        state["key"] = other
+    return state
+
+
+def _straight_pressure_assign_role(
+    state: Dict[str, Any],
+    def_pos: str,
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+) -> None:
+    """A freed defender (his man entered the ABA) fills the next open role:
+    rover → key → wings (future-proof: the current key + this defender split to
+    the two wings, each taking the nearer one)."""
+    if state["rover"] is None:
+        state["rover"] = def_pos
+    elif state["key"] is None:
+        state["key"] = def_pos
+    else:
+        kd = state["key"]
+        uw = _spot("upper wing", is_away_offense)
+        lw = _spot("lower wing", is_away_offense)
+        straight = _euclid(def_coords[kd], uw) + _euclid(def_coords[def_pos], lw)
+        crossed = _euclid(def_coords[kd], lw) + _euclid(def_coords[def_pos], uw)
+        state["wings"] = (
+            {kd: "upper", def_pos: "lower"}
+            if straight <= crossed
+            else {kd: "lower", def_pos: "upper"}
+        )
+        state["key"] = None
+
+
+def _straight_pressure_key_spot(
+    bh_xy: Dict[str, Any], is_away_offense: bool
+) -> Dict[str, int]:
+    """Key-role anchor: upper wing if BH y > 28, lower wing if BH y < 22, else key."""
+    if bh_xy["y"] > STRAIGHT_PRESSURE_KEY_UPPER_Y:
+        return _spot("upper wing", is_away_offense)
+    if bh_xy["y"] < STRAIGHT_PRESSURE_KEY_LOWER_Y:
+        return _spot("lower wing", is_away_offense)
+    return _spot("key", is_away_offense)
+
+
+def _straight_pressure_targets(
+    state: Dict[str, Any],
     bh_xy: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
     is_away_offense: bool,
     off_coords: Optional[Dict[str, Dict[str, int]]] = None,
 ) -> Dict[str, Dict[str, int]]:
-    """§13.6 Straight Pressure backcourt formation (pure — no mutation, no trap).
+    """§13.6 man-to-man targets. Mutates ``state`` for the man→ABA role transitions.
 
-    - def PG pressures the BH on-ball (always).
-    - def SG/SF deny the offense's two backcourt outlets (off SG/SF): each denies
-      the outlet he is closest to (no double-up) at ``STRAIGHT_PRESSURE_DENY_FRACTION``
-      from the BH toward that outlet; an outlet is valid only if it is *not* in the
-      ABA. With no valid outlet a defender sags to a help spot goal-side of the BH.
-    - def PF/C inherit the Standard D22 ABA-zone coverage (``_pf_c_targets``).
+    Each man defender converges on the BH if his man currently holds the ball, else
+    denies ball-side (on the BH→man line). The rover tracks the live BH; the key
+    sits at the key/wing toggle or mans up on a returning offender; wing defenders
+    sit on their wing. PF/C inherit the Standard D22 zone coverage.
     """
     targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
-    targets["PG"] = _converge_xy(bh_xy, is_away_offense)
 
-    rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
-    rim_xy = {"x": float(rim["x"]), "y": float(rim["y"])}
-    sag = _clamp_xy(_interpolate(bh_xy, rim_xy, STRAIGHT_PRESSURE_SAG_FRACTION))
+    if off_coords is None:
+        # Terminal collapse beat (stopper): man defenders + rover converge on the BH.
+        for d in state["assignment"]:
+            targets[d] = _converge_xy(bh_xy, is_away_offense)
+        if state["rover"] is not None:
+            targets[state["rover"]] = _converge_xy(bh_xy, is_away_offense)
+        return targets
 
-    valid_outlets: List[str] = []
-    if off_coords is not None:
-        valid_outlets = [
-            o
-            for o in STRAIGHT_PRESSURE_OUTLET_POSITIONS
-            if not _in_attack_basket_area(off_coords[o], is_away_offense)
+    bh_off = _match_off_pos(off_coords, bh_xy)
+
+    # Track which offenders have visited the ABA this possession.
+    for p in POSITIONS:
+        if _in_attack_basket_area(off_coords[p], is_away_offense):
+            state["entered_aba"].add(p)
+
+    # 1) Release any man defender whose man entered the ABA → fill the next role.
+    released = [
+        d
+        for d, m in state["assignment"].items()
+        if _in_attack_basket_area(off_coords[m], is_away_offense)
+    ]
+    for d in released:
+        del state["assignment"][d]
+        _straight_pressure_assign_role(state, d, def_coords, is_away_offense)
+
+    # 2) The key defender mans up on an offender returning to the backcourt from
+    #    the ABA (takes precedence over the key/wing toggle).
+    if state["key"] is not None:
+        guarded = set(state["assignment"].values())
+        returners = [
+            p
+            for p in POSITIONS
+            if p in state["entered_aba"]
+            and p != bh_off
+            and p not in guarded
+            and _is_backcourt_offender(off_coords[p], is_away_offense)
+            and not _in_attack_basket_area(off_coords[p], is_away_offense)
         ]
-    assignment = (
-        _assign_deny(STRAIGHT_PRESSURE_DENY_DEFENDERS, valid_outlets, def_coords, off_coords)
-        if valid_outlets
-        else {}
-    )
-    for d in STRAIGHT_PRESSURE_DENY_DEFENDERS:
-        outlet = assignment.get(d)
-        if outlet is not None:
-            targets[d] = _clamp_xy(
-                _interpolate(bh_xy, off_coords[outlet], STRAIGHT_PRESSURE_DENY_FRACTION)
-            )
+        if returners:
+            kd = state["key"]
+            man = min(returners, key=lambda p: _euclid(def_coords[kd], off_coords[p]))
+            state["assignment"][kd] = man
+            state["key"] = None
+
+    # 3) Compute targets per current assignments / roles.
+    for d, m in state["assignment"].items():
+        if m == bh_off:
+            targets[d] = _converge_xy(bh_xy, is_away_offense)  # man has the ball → on-ball
         else:
-            targets[d] = sag
+            targets[d] = _clamp_xy(
+                _interpolate(bh_xy, off_coords[m], STRAIGHT_PRESSURE_DENY_FRACTION)
+            )  # deny ball-side
+    if state["rover"] is not None:
+        targets[state["rover"]] = _converge_xy(bh_xy, is_away_offense)
+    if state["key"] is not None:
+        targets[state["key"]] = _clamp_xy(
+            _straight_pressure_key_spot(bh_xy, is_away_offense)
+        )
+    for d, side in state["wings"].items():
+        targets[d] = _clamp_xy(
+            _spot("upper wing" if side == "upper" else "lower wing", is_away_offense)
+        )
 
     # PF/C — identical D22 ball-reactive coverage as Standard Trap.
-    if off_coords is not None:
-        pfc = _pf_c_targets(bh_xy, off_coords, is_away_offense)
-        targets["PF"] = _clamp_xy(pfc["PF"])
-        targets["C"] = _clamp_xy(pfc["C"])
+    pfc = _pf_c_targets(bh_xy, off_coords, is_away_offense)
+    targets["PF"] = _clamp_xy(pfc["PF"])
+    targets["C"] = _clamp_xy(pfc["C"])
     return targets
 
 
@@ -1313,6 +1464,9 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     dribble_alive = True
 
     # --- Initial converge: position the defense around the BH (§6) -----------
+    # Initialize per-possession play state (man assignments / roles for plays that
+    # track them, e.g. Straight Pressure; Standard Trap returns ``self`` unchanged).
+    play = play.begin_possession(bh_xy, def_coords, off_coords, is_away_offense)
     pg_initial = dict(def_coords["PG"])
     _position_defense(bh_xy, def_coords, is_away_offense, off_coords, play=play)
     converge_seconds = max(
@@ -1740,22 +1894,18 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         # setup pull doesn't drag him back across half court.
         _park_passer(passer_pos)
 
-        # D19 — compute the pass-defense formation ONCE (around the receiver) and
-        # persist it across the flight + reception segments so defenders don't
-        # re-randomize/jitter between the two steps.
-        pass_def_coords = {p: dict(def_coords[p]) for p in POSITIONS}
-        _position_defense(
-            off_coords[receiver_pos], pass_def_coords, is_away_offense, off_coords, play=play
-        )
-
-        # 1) Flight: offense holds, the persisted defense closes, ball travels.
-        for p in POSITIONS:
-            def_coords[p] = dict(pass_def_coords[p])
+        # Pass flight: the ball travels passer→receiver while the defense closes
+        # at its OWN rate (rate-limited, NOT snapped) toward its targets anchored
+        # on the receiver (the incoming ball). A quicker close reaches the catch;
+        # a slow one leaves the receiver open. Off-ball offense keep hustling; the
+        # receiver holds to catch.
         pass_seconds = max(
             0.3, _euclid(off_coords[passer_pos], off_coords[receiver_pos]) / PASS_GRID_PER_GAME_SEC
         )
-        # D15b: off-ball offense keep hustling during the flight; the receiver
-        # holds to catch.
+        _move_defense(
+            off_coords[receiver_pos], def_coords, is_away_offense, pass_seconds,
+            def_lineup, off_coords, play=play,
+        )
         _move_offense(
             off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
             exclude={receiver_pos},
@@ -1768,23 +1918,21 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         )
         shot_clock -= pass_seconds
 
-        # 2) Reception/hold: receiver holds at the catch spot for random(1,2)s;
-        #    the persisted defense holds its formation. Receiver is now the BH
-        #    with a live dribble again (D21).
+        # The receiver becomes the BH with a live dribble (D21); the loop re-reads
+        # & reacts at the top next iteration — NO forced reception hold. His §5
+        # read decides attack / hold / pass: if no defender is in range he attempts
+        # a Trap Break drive to his y-keyed ABA spot (the shared broken-HCT cutoff)
+        # and the closest defender races to cut him off — identical to a primary BH.
         bh_pos = receiver_pos
         bh_xy = off_coords[bh_pos]
         ball_handler = off_lineup.get(bh_pos)
-        dribble_alive = True
-        recv_hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
-        # D15b: off-ball offense keep hustling toward setup during the reception.
-        _move_offense(off_coords, off_targets, recv_hold_seconds, off_lineup, bh_pos)
-        loop_segments.append(
-            _segment(
-                "hct_reception", off_coords, def_coords, recv_hold_seconds, ("off", bh_pos), bh_pos,
-                label=f"reception ({bh_pos} catches & holds)",
-            )
+        # The new BH drives at HIS OWN AG-rate (the cutoff race + advances now use
+        # the receiver's speed, not the original passer's).
+        bh_drive_rate = ag_to_grid_per_game_sec(
+            (getattr(ball_handler, "attributes", None) or {}).get("AG", 50)
         )
-        shot_clock -= recv_hold_seconds
+        dribble_alive = True
+        continue
     else:
         # Iteration backstop hit without a terminal — settle into HCO.
         result_type = "HCO"

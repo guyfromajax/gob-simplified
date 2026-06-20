@@ -34,6 +34,16 @@ class MockPlayer:
         """Get a stat value, matching Player.get_stat interface."""
         return self.stats.get(level, {}).get(stat, 0)
 
+    def record_shot_result(self, made):
+        """Record shot result, matching Player.record_shot_result interface."""
+        self.Shot_Result_List = getattr(self, "Shot_Result_List", [])
+        self.Shot_Result_List.append(bool(made))
+
+    def add_momentum(self, delta):
+        """Apply momentum delta, matching Player.add_momentum interface."""
+        current = self.attributes.get("MO", 0)
+        self.attributes["MO"] = max(0, min(10, current + delta))
+
     def get_name(self):
         return self.name
 
@@ -102,5 +112,3 @@ def build_mock_game():
     }
 
     return game
-
-

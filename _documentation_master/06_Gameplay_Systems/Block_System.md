@@ -22,8 +22,8 @@
 
 Gating: requires `has_contest` and a shot defender, and `shot_type` in (`inside`, `attack`). Two rolls, in order:
 
-1. **Aggression roll:** **x** = defense team’s aggression level (numeric **0–4**): `def_team.strategy_settings["aggression"]` (default 2). **y** = `random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)` (currently **1–4**). If **y < x** → block attempt → run block reconciliation.
-2. **Fight roll (secondary trigger):** if the aggression roll fails, **z** = `random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)` (currently **0–15**); if **z < defense `team_attributes["fight"]`** → block attempt anyway.
+1. **Aggression roll:** **x** = defense team’s aggression level (numeric **0–4**): `def_team.strategy_settings["aggression"]` (default 2). **y** = `random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)` (currently **0–4**). If **y <= x** → block attempt → run block reconciliation.
+2. **Fight roll (secondary trigger):** if the aggression roll fails, **z** = `random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)` (currently **0–10**); if **z <= defense `team_attributes["fight"]`** → block attempt anyway.
 
 If neither roll triggers → skip to standard shot reconciliation. Roll ranges are constants in `BackEnd/constants/__init__.py`.
 
@@ -115,7 +115,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 - **Shot type:** Reuse existing `shot_type` (inside / attack / outside) from `resolve_shot()`; only inside/attack enter block attempt.
 - **Shot score:** Reuse `calculate_shot_score()` output; block reconciliation uses that value (and possibly the same defender used there for block height/ID/IQ).
-- **Aggression:** Reuse `def_team.strategy_settings["aggression"]` and/or `strategy_calls["aggression_call"]`; add a single helper that maps to the numeric x used in “y < x”.
+- **Aggression:** Reuse `def_team.strategy_settings["aggression"]` and/or `strategy_calls["aggression_call"]`; add a single helper that maps to the numeric x used in “y <= x”.
 - **Rebound:** Reuse `determine_rebounder(game, bounce_spot, ...)` and existing rebound stat/delta flow; for blocks, pass the **block spot** as the bounce spot instead of calling `calculate_bounce_spot` for a shot.
 - **Bounce spot shape:** Block spot is `{"x": ..., "y": ...}` like `calculate_bounce_spot` return value so all existing rebound and animation code that expects `ball_bounce_x` / `ball_bounce_y` keeps working.
 - **Animation:** Dedicated `result_type: "BLOCK"`; BLOCK handler for ball animation only; treat BLOCK like MISS everywhere else (see §1.6). No change to rebound animation contract.
@@ -132,8 +132,8 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 1. **Align and lock** — All locked (shooter height scaled; momentum in team_attributes; BLOCK result_type both ends; BLOCK = MISS except animation + announcement).
 
 2. **Backend: block attempt and reconciliation**
-   - Add **block attempt** step in `resolve_shot()`: after `shot_type` and **pre–defense-penalty** shot_score (and motion attack penalty) are available. If `shot_type` in (`"inside"`, `"attack"`): x = `def_team.strategy_settings["aggression"]` (0–4), y = `random.randint(0, 10)`, if y < x run block reconciliation.
-   - **Block reconciliation:** Use **shot_score before defense penalty**. Inputs = that shot_score, shooter, defender, roles. Compute defender scaled height term, defense_block_score; **diff** = shot_score − defense_block_score. Compare using **`BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD`** and **`BLOCK_RECONCILIATION_BLOCK_THRESHOLD`** from `BackEnd/constants/__init__.py`. If **diff > shooting-foul threshold**: shooting foul; if **diff < block threshold**: block; else: fall back to standard shot (with normal defense penalty and threshold). Thresholds are independent (e.g. block threshold default -200).
+   - Add **block attempt** step in `resolve_shot()`: after `shot_type` and **pre–defense-penalty** shot_score (and motion attack penalty) are available. If `shot_type` in (`"inside"`, `"attack"`): x = `def_team.strategy_settings["aggression"]` (0–4), y = `random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)` (currently 0–4), if y <= x run block reconciliation. If that fails, run the secondary fight roll: z = `random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)` (currently 0–10); if z <= defense `team_attributes["fight"]`, run block reconciliation.
+   - **Block reconciliation:** Use **shot_score before defense penalty**. Inputs = that shot_score, shooter, defender, roles. Compute defender scaled height term, defense_block_score; **diff** = shot_score − defense_block_score. Compare using **`BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD`** and **`BLOCK_RECONCILIATION_BLOCK_THRESHOLD`** from `BackEnd/constants/__init__.py`. If **diff > shooting-foul threshold**: shooting foul; if **diff < block threshold**: block; else: fall back to standard shot (with normal defense penalty and threshold). Thresholds are independent (block threshold default -150).
    - **Height score:** One shared helper for “height inches → 0–10”; use `(height_score * 10) + random.randint(-9, 9)` for defender block score (and shooter_finish if confirmed).
    - **Block outcome:** Set result_type or flag so frontend does block animation (no shot arc). Compute block spot; call existing rebound flow with that spot; record BLK; FGA (and 3PTA if applicable) for shooter; no FGM; no points; momentum defense +1 / offense −1. **Possession flips only on DREB** (OREB does not flip possession). Reuse result shape (`ball_bounce_x`/`ball_bounce_y`, `rebounder_id`, `rebound_type`, etc.).
    - **Shooting foul from block:** Reuse existing shooting-foul and free-throw handling (game_state, next_play_type, stats, foul recording). Only the trigger is “block reconciliation said shooting foul”; the rest is existing paths.
@@ -148,7 +148,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
    - When applying defense +1 / offense −1 for a block, update the same structures used elsewhere for momentum (e.g. `team_attributes["momentum"]`) and include any required deltas in the turn result so persistence and UI stay consistent.
 
 6. **Tests and regression**
-   - Unit tests: block attempt (y < x vs y ≥ x), block reconciliation (shooting foul / block / else to standard shot), height_score mapping, block spot coordinates.
+   - Unit tests: block attempt (y <= x vs y > x), block reconciliation (shooting foul / block / else to standard shot), height_score mapping, block spot coordinates.
    - Integration: one inside and one attack shot path that triggers block and one that doesn’t; confirm rebound and possession; confirm no double FGA, correct BLK; confirm shooting-foul-from-block path uses existing foul/FT flow.
    - Regression: existing shot/charge/blocking foul/rebound flows unchanged when block attempt is false or when block reconciliation falls to “else”.
 
@@ -161,7 +161,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 | Item | Status |
 |------|--------|
-| Aggression | **Locked (updated):** x = `def_team.strategy_settings["aggression"]` (0–4); y = `random.randint(1, 4)` (`BLOCK_Y_ROLL_*`); block attempt if y < x. Secondary fight roll (z = 0–15 vs team `fight`) added later. |
+| Aggression | **Locked (updated):** x = `def_team.strategy_settings["aggression"]` (0–4); y = `random.randint(0, 4)` (`BLOCK_Y_ROLL_*`); block attempt if y <= x. Secondary fight roll: z = `random.randint(0, 10)` (`BLOCK_FIGHT_RANGE_*`); block attempt if z <= defense `team_attributes["fight"]`. |
 | height_score formula | **Locked:** `(height_score * 10) + random.randint(-9, 9)` for the scaled height term in defense_block_score (and shooter_finish if same). |
 | shot_score in block | **Locked:** Use shot_score **before** defense penalty; defense_block_score is the defense component in the block contest. |
 | Possession on block | **Locked:** Possession flips only on DREB; OREB does not flip possession. |
@@ -175,7 +175,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 ## 5. Summary
 
 - **Eligibility:** Inside and attack only (contested, with a shot defender); outside unchanged.
-- **Block attempt:** x = `def_team.strategy_settings["aggression"]` (0–4), y = random 1–4; if y < x → block reconciliation. Secondary trigger: z = random 0–15 vs defense team `fight`.
+- **Block attempt:** x = `def_team.strategy_settings["aggression"]` (0–4), y = random 0–4; if y <= x → block reconciliation. Secondary trigger: z = random 0–10; if z <= defense team `fight` → block reconciliation.
 - **Block reconciliation:** Use **shot_score before defense penalty**; defense_block_score uses scaled height `(height_score * 10) + random(-9, 9)` plus ID/IQ. shot_score − defense_block_score: > 150 → shooting foul; < −150 → block; else → standard shot.
 - **Block outcome:** No shot animation; block spot 2–15 back from shooter, y ±6; standard rebound; **possession flips only on DREB** (OREB does not flip); defense +1 / offense −1 momentum; BLK and FGA recorded.
 - **Animation:** Dedicated `result_type: "BLOCK"` in backend and frontend. BLOCK is treated like MISS everywhere except: (1) ball animation (block anim, no shot arc), (2) announcement ("BLOCK!" + blocker image via Announcement System). Audit: wherever code checks for MISS for non-animation behavior, include BLOCK.

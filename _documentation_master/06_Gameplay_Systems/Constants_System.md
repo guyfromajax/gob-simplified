@@ -34,8 +34,10 @@ This document lists all constants and variables that were previously on the depr
 |-----|---------------|--------|
 | `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | 150 | diff above this → shooting foul |
 | `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | -150 | diff below this → block |
-| `BLOCK_Y_ROLL_MIN` | 1 | Y random range min (block attempt roll) |
+| `BLOCK_Y_ROLL_MIN` | 0 | Y random range min (block attempt roll) |
 | `BLOCK_Y_ROLL_MAX` | 4 | Y random range max |
+| `BLOCK_FIGHT_RANGE_MIN` | 0 | Z random range min (secondary fight block attempt roll) |
+| `BLOCK_FIGHT_RANGE_MAX` | 10 | Z random range max |
 
 ---
 

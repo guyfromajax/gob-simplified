@@ -52,6 +52,20 @@ class HCTPlay:
     def label(self) -> str:
         return HCT_TRAP_PLAY_LABELS.get(self.key, self.key)
 
+    # --- Per-possession lifecycle ------------------------------------------
+    def begin_possession(
+        self,
+        bh_xy,
+        def_coords: CoordMap,
+        off_coords: Optional[CoordMap],
+        is_away_offense: bool,
+    ) -> "HCTPlay":
+        """Return the play handler for this possession. Stateless plays (Standard
+        Trap) return ``self``; stateful plays (Straight Pressure) return a fresh
+        instance carrying its locked man-assignment / role state so the shared
+        registry singleton stays stateless."""
+        return self
+
     # --- Behavior seams (default = Standard Trap) ---------------------------
     def detect_moment(
         self, bh_xy, def_coords: CoordMap, is_away_offense: bool
@@ -90,12 +104,37 @@ class StandardTrap(HCTPlay):
 
 
 class StraightPressure(HCTPlay):
-    """Play #2 (§13.6): single on-ball pressure, never a trap. Diverges from
-    Standard only in the backcourt (no double-team; off-ball backcourt defenders
-    deny the outlets). Frontcourt PF/C coverage, the ABA read, and the HCO/FB
-    transition are inherited from Standard."""
+    """Play #2 (§13.6): man-to-man backcourt pressure. The three backcourt
+    defenders (PG/SG/SF) lock onto a man at the converge and stick until a stop
+    event, except a man who enters the ABA is released and the freed defender
+    fills the next open role (rover/trapper → key → wings). A real trap re-forms
+    only via the rover. Frontcourt PF/C zone coverage, the ABA read, and the
+    HCO/FB transition are inherited from Standard.
+
+    State (man assignments + roles) is per-possession: ``begin_possession``
+    returns a fresh instance carrying ``self.state`` so the registry singleton
+    stays stateless and reentrant.
+    """
 
     key = STRAIGHT_PRESSURE
+
+    def __init__(self) -> None:
+        self.state: Optional[Dict[str, Any]] = None
+
+    def begin_possession(
+        self,
+        bh_xy,
+        def_coords: CoordMap,
+        off_coords: Optional[CoordMap],
+        is_away_offense: bool,
+    ) -> "StraightPressure":
+        from BackEnd.engine.dynamic_hct import _straight_pressure_begin
+
+        inst = StraightPressure()
+        inst.state = _straight_pressure_begin(
+            bh_xy, def_coords, off_coords, is_away_offense
+        )
+        return inst
 
     def detect_moment(
         self, bh_xy, def_coords: CoordMap, is_away_offense: bool
@@ -103,8 +142,14 @@ class StraightPressure(HCTPlay):
         from BackEnd.engine.dynamic_hct import _detect_moment
 
         kind, in_range = _detect_moment(bh_xy, def_coords, is_away_offense)
-        # Never escalate to a trap — cap at single-defender pressure.
-        return ("pressure" if kind == "trap" else kind), in_range
+        # A trap is allowed only when an active rover has reached the BH (is in
+        # range); otherwise cap at single-defender pressure (no double-team).
+        if kind == "trap":
+            rover = (self.state or {}).get("rover")
+            if rover is not None and rover in in_range:
+                return "trap", in_range
+            return "pressure", in_range
+        return kind, in_range
 
     def defense_targets(
         self,
@@ -113,10 +158,17 @@ class StraightPressure(HCTPlay):
         is_away_offense: bool,
         off_coords: Optional[CoordMap] = None,
     ) -> CoordMap:
-        from BackEnd.engine.dynamic_hct import _straight_pressure_defense_targets
+        from BackEnd.engine.dynamic_hct import (
+            _straight_pressure_begin,
+            _straight_pressure_targets,
+        )
 
-        return _straight_pressure_defense_targets(
-            bh_xy, def_coords, is_away_offense, off_coords
+        if self.state is None:
+            self.state = _straight_pressure_begin(
+                bh_xy, def_coords, off_coords, is_away_offense
+            )
+        return _straight_pressure_targets(
+            self.state, bh_xy, def_coords, is_away_offense, off_coords
         )
 
 

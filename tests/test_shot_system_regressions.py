@@ -130,7 +130,7 @@ def test_hco_assignment_overrides_geometry_for_defender_presence(monkeypatch):
     ):
         captured["defender"] = defender
         captured["apply_defense"] = apply_defense
-        return 0, 0, False, None
+        return 0, 0, 0, False, None
 
     monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
 
@@ -175,7 +175,7 @@ def test_fast_break_no_defender_path_does_not_crash(monkeypatch):
         apply_defense=True,
         **kwargs,
     ):
-        return 0, 0, False, None
+        return 0, 0, 0, False, None
 
     monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
 

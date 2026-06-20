@@ -69,7 +69,7 @@ def test_offensive_rebound_putback_updates_stats(monkeypatch):
         shooter_location=None,
         **kwargs,
     ):
-        return 0, 0, False, None
+        return 0, 0, 0, False, None
 
     monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calc)
 
@@ -264,5 +264,4 @@ def test_dreb_outlet_receiver_target_anchors_to_bounce_when_coords_stale(monkeyp
     # Toward HOME_RIM (91) from bounce-anchored x (~6..9): expect low 10s–20s, not ~72.
     assert target["x"] < 30
     assert target["x"] > bounce["x"]
-
 

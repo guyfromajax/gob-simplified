@@ -81,12 +81,12 @@ BLOCK_PROBABILITY = {
 # Thresholds are independent: adjust either without affecting the other.
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
 BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -150
-# Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y < aggression
-BLOCK_Y_ROLL_MIN = 1
+# Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y <= aggression
+BLOCK_Y_ROLL_MIN = 0
 BLOCK_Y_ROLL_MAX = 4
-# Secondary block attempt roll: z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX); attempt when z < defense fight
+# Secondary block attempt roll: z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX); attempt when z <= defense fight
 BLOCK_FIGHT_RANGE_MIN = 0
-BLOCK_FIGHT_RANGE_MAX = 15
+BLOCK_FIGHT_RANGE_MAX = 10
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 

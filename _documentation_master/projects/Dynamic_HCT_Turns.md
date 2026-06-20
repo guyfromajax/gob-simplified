@@ -668,11 +668,22 @@ A pass goes to one of the two teammates closest to the BH. Execute the
 > **Implementation note (approximated — follow-up):** the detailed per-player
 > Vertical-Half / Central spot assignments below are the **design target**, not yet
 > fully built. The current build renders the pass via the universal `build_pass_step`
-> primitive (offense holds spacing during the flight; defense re-forms on the receiver
-> via the persisted D19 `_position_defense` formation) and lets off-ball offense
-> keep hustling toward their **§4 setup spots** (D15b) rather than these pass-specific
-> spots. Replacing this approximation with the exact choreography below is an open
-> refinement (folded into the upcoming movement-authenticity work).
+> primitive (offense holds spacing during the flight) and lets off-ball offense keep
+> hustling toward their **§4 setup spots** (D15b) rather than these pass-specific spots.
+>
+> **Pass flight = rate-limited close, then read-and-react (shared across plays).** The
+> defense does **not** snap onto the receiver. During the flight the defenders close
+> at their **own rate** (`_move_defense`, interrupted by the flight duration) toward
+> their play-specific targets anchored on the receiver (the incoming ball) — Standard
+> re-forms the trap around the receiver, Straight Pressure keeps each man on his man
+> (the on-ball role + rover shift toward the receiver). On the catch the receiver
+> becomes the BH with a live dribble (D21) and the loop **re-reads at the top** —
+> there is **no forced reception hold**. His §5 read decides attack / hold / pass: if
+> no defender is in range he attempts a **Trap Break** drive to his y-keyed ABA spot
+> (the shared broken-HCT cutoff — lower apex / topLane / upper apex by his y) while the
+> closest defender races to cut him off, exactly as a primary BH would. The new BH also
+> drives at **his own** AG-rate. Replacing this with the exact choreography below is an
+> open refinement (folded into the upcoming movement-authenticity work).
 
 #### Vertical-Half Pass Movement — qualifies if pass receiver's y > 29 or < 22
 
@@ -944,12 +955,12 @@ These will block subsequent cuts but not the first one. Re-open as we widen scop
 - **D12.** Per-tick energy decay vs. once-per-turn.
 - **D13.** Determinism / seeded RNG for replays.
 - **D14.** Distant sim path: "decisions only, no movement" short-circuit for franchise CPU sim.
-- **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own AG rate (backcourt `standard`; **PF/C `sprint`**, D22), **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance** and **hold** segments (the broken-HCT cutoff moves only the cutoff defender). Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Initial **converge** and the **pass-defense formation** still snap by design (initial engagement / D19 set-and-persist).
-- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / pass flight / reception), excluding the BH and any mid-catch receiver. The broken-HCT cutoff (and the FB drive step) is the exception — the off-ball 8 each **roll 50% to drift toward the rim (`drift`, 8 grid/sec) or hold** during it (`HCT_DRIFT_PROBABILITY`). Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
+- **D15.** ✅ **Built (Cut 2) — defender side.** The engine now moves defenders with **rate-limited, interrupted, position-tracking** motion instead of snapping them onto the BH every segment. `_defense_targets` computes each defender's §6 desired spot (normal → PG converges; trap → two trappers + center; others hold); `_move_defense` advances each defender from its *actual* current spot toward that target at its own AG rate (backcourt `standard`; **PF/C `sprint`**, D22), **interrupted** by the segment duration (`_interrupted_coord`), matching the emitter's render. Wired into the **advance**, **hold**, and **pass-flight** segments (the broken-HCT cutoff moves only the cutoff defender). Consequence: a quicker BH gains **real separation** — the chasing defender trails (no longer "ahead"), so `_detect_moment` returns `"none"` and the **broken-HCT / fast-break (D18)** branch becomes reachable in normal play (verified). Only the initial **converge** still snaps by design (initial engagement); the pass defense now **closes at rate** during the flight (no snap) and the receiver reads-and-reacts on the catch (see §6 Pass Movements).
+- **D15b.** ✅ **Built (Cut 2) — offense side.** The engine now tracks each off-ball player's *actual* position instead of assuming they've arrived at setup. `_walk_up_loop_start_offense` seeds loop-start coords by replaying the BH-gated walk-up (off-ball move toward setup at `sprint` for the BH's standard-rate travel time, interrupted — mirrors the emitter's `build_walk_up_step`), reading the prior turn's `final_coords`; `_move_offense` then advances them toward setup each time-advancing segment (converge / advance / hold / pass flight), excluding the BH and any mid-catch receiver. The broken-HCT cutoff (and the FB drive step) is the exception — the off-ball 8 each **roll 50% to drift toward the rim (`drift`, 8 grid/sec) or hold** during it (`HCT_DRIFT_PROBABILITY`). Consequence: the position-dependent reads — the **Attack-Basket "defenders > offenders"** HCO trigger (`_count_in_attack_basket`) and **pass targeting** (`_select_pass_receiver`, `_select_top_level_pass_receiver`, whose pool = teammates past x=64) — now use real lagging coords, so a teammate who set up deep but hasn't arrived isn't counted/targeted as if present (verified). Falls back to "arrived at setup" when no prior-turn coords exist (first possession / offline tests). Engine and render stay aligned (the emitter consumes the engine's tracked segment coords; its interrupted clamp becomes a no-op safety net).
 - **D16.** ✅ **In-scope portion built (Cut 2).** Bookkeeping parity vs. the skeleton path for the outcomes the dynamic loop actually produces. Already present: `["used"]` (shared pre-branch), `_record_hct_stats` (HCT_A/_S + HCT_A_D/_S_D) on HCO / DEAD BALL / all three shot types, `TO` + `["success"]` on the violation/forced turnovers, and full box score on dynamic shots (`FGA`/`FGM`/`PTS` via `apply_scoring`, defensive-foul `F`+FTs, rebound stats). Added: the **defensive-success scouting bump** (`def_team.scouting_data["defense"]["HCT"]["success"] += 1`) on a clean dynamic-shot stop (miss, no shooting foul) in both shot resolvers, matching the skeleton SHOT-miss path. **Deferred to D8:** loop-level `O_FOUL`/`D_FOUL` (`F`, `team_fouls`, foul-out, bonus→FREE_THROW) and `STEAL` (`STL`, `last_stealer`, steal→fast-break) stats — the dynamic loop doesn't emit those outcomes yet, so their parity is folded into D8.
 - **D17.** ✅ Resolved — read thresholds: §4 loop reads attack>200 / pass>120; §5 broken-HCT reads attack>175 / pass>110 (intentional rescale — open floor invites attack); §7 goal-achievement read now >200 (was 190; optimal-vs-random gate, a different decision type than the §4/§5 action gates).
 - **D18.** ✅ **Built (Cut 2 / Phase 2D-1)** — Fast-break-from-broken-HCT executes the **equivalent of a Steal Fast Break** (§7): BH attacks the basket; shot defender = defender closest to the basket, assigned the steal-FB shot-defense spot; contested if he reaches in time, else uncontested (auto-make). Implemented in `engine/dynamic_hct_shot.py::resolve_hct_fast_break_shot` reusing `compute_fb_shot_geometry` (lone rim-protector race pool) + `ShotManager.calculate_shot_score`; produces a full MAKE/MISS shot turn (scoring / rebound / defensive-foul-FT / possession / `next_play_type`). Engine routes broken-HCT → topLane via the **cutoff race** (`_do_broken_hct_cutoff`; a clean arrival with a numbers edge seeds the FB); emitter appends the drive + `_build_post_shot_sub_steps`. ✅ Now reachable in normal play: D15's interrupted defender movement lets a quicker BH out-run the PG so `moment == "none"` can occur.
-- **D19.** Pass-movement defender-target persistence: how defender pass-defense targets carry across loop iterations so they don't re-pose / thrash each tick. Cut-2 detail; not a blocker.
+- **D19.** ✅ **Superseded.** Pass-defense no longer snaps-and-persists a formation around the receiver. The flight now uses **rate-limited** closing (`_move_defense` anchored on the receiver) and the catch hands off to the §5 read-and-react loop (no forced reception hold), so there is no per-tick re-pose to persist. The new BH also recomputes his **own** AG drive rate.
 
 ### Answered
 
@@ -1279,33 +1290,65 @@ Standard / Straight Pressure; Diamond stays 0 until PR3).
 
 ### 13.6 — Straight Pressure (play #2) spec
 
-Straight Pressure is **Standard Trap with one change: it never traps.** It diverges
-from Standard **only in the backcourt**; everything frontcourt/ABA is inherited.
+Straight Pressure is **man-to-man backcourt pressure.** The three backcourt
+defenders (PG/SG/SF) **lock onto a man at the converge** and stick to him until a
+stop event (ball reaches the ABA / foul / dead-ball TO / steal / forced HCO),
+**except** a man who enters the ABA is *released* and the freed defender fills a
+**help role** (rover → key → wings). It diverges from Standard **only in the
+backcourt**; everything frontcourt/ABA is inherited.
 
-**Backcourt (the only divergence):**
-- **On-ball:** def PG pressures the BH the whole way (`_converge_xy`) — identical to
-  Standard's normal-shift pressure.
-- **No trap, ever:** moment detection is capped at `pressure` (never `trap`), so a
-  second defender is never committed and the contest always resolves with
-  `trapper=None` (today's single-defender pressure math, **unchanged**).
-- **Off-ball backcourt (def SG/SF = pos1/pos2) — deny:** each denies one of the
-  offense's two backcourt outlets (off SG/SF = pos1/pos2). Assignment is
-  **nearest-matchup, no double-up** (the pairing with smaller total defender→outlet
-  distance). The denying defender sits on the **BH→outlet pass line at 60% from the
-  BH** toward that outlet (mirrors the D22 C/PF help-denial geometry). An outlet is a
-  **valid** deny target only if it is **not in the ABA** (still a backcourt/perimeter
-  outlet). If a defender has no valid outlet, he **sags to a help spot goal-side of
-  the BH** (25% from the BH toward the rim). *(Both the 60% deny fraction and 25% sag
-  fraction are tunable; the not-in-ABA validity test is the first-cut rule.)*
+**Backcourt membership.** An offensive player is a *backcourt offender* iff
+`x < 64` (home) / `x > 36` (away). This is the `_is_backcourt_offender` test —
+deliberately **x-based**, distinct from the ABA y-band test (a deep player at
+`x>64, y>40` is frontcourt, not a backcourt outlet).
+
+**Initial man assignment (locked at the converge, by positioning):**
+- **center/PG defender → the ball handler** (`_converge_xy`, on-ball).
+- The two off-ball defenders (def SG/SF) cover, by **nearest-matchup (no cross)**,
+  the **two non-BH backcourt offenders closest to the BH**, taking the **higher-y**
+  and **lower-y** of those two.
+  - **1 non-BH backcourt offender:** the off-ball defender **nearest** that man
+    takes him; the other becomes the **rover/trapper**.
+  - **0 non-BH backcourt offenders:** the off-ball defender **nearest the BH**
+    becomes the rover/trapper; the other becomes the **key** defender.
+
+**Sticky man defense + targets:**
+- A man defender whose man **holds the ball** plays **on-ball** (`_converge_xy`);
+  otherwise he **denies ball-side** — on the **BH→man line at 60% from the BH**
+  (`STRAIGHT_PRESSURE_DENY_FRACTION`). The on-ball role therefore *shifts to
+  whichever defender's man receives a pass* — defenders never abandon their man to
+  chase the ball.
+- **Rover/trapper** continuously tracks the **live ball-handler** (`_converge_xy`).
+- **Key defender** sits at the **key** (`HCO_STRING_SPOTS["key"]`, x=64), toggling
+  to **upper wing** if BH `y > 28` / **lower wing** if BH `y < 22`; **but** he
+  **mans up** on any offender **returning to the backcourt from the ABA** (this
+  takes precedence, then follows normal sticky-man rules).
+
+**Trap (re-introduced, rover-only):** moment detection allows a `trap` **only when
+an active rover has reached the BH** (the rover is in `MOMENT_RANGE`); otherwise it
+caps at `pressure`. With no rover, Straight Pressure never double-teams
+(`trapper=None`, single-defender math). A real trap uses the Standard trapper
+geometry + D8 contest math.
+
+**Role transitions (man enters the ABA → release):** the freed defender fills the
+first open role: **(1) rover** if none exists, else **(2) key** if none exists,
+else **(3) wings** — the current key defender and the freed defender each take the
+nearer of the two wing spots (future-proof; reachable e.g. after the original BH
+passes and cuts to the ABA while a rover + key already exist).
 
 **Inherited unchanged from Standard Trap:**
-- def PF/C (pos3/pos4) D22 ball-reactive ABA-zone coverage (`_pf_c_targets`).
+- def PF/C D22 ball-reactive ABA-zone coverage (`_pf_c_targets`).
 - The §2 3-tier ABA read and the §7 HCO/Fast-Break transition once the ball reaches
   the ABA.
 - Decision thresholds, movement rates/archetypes, broken-HCT cutoff, time terminals,
   stat parity, schema emission, possession flips.
 
 **Implementation seams (the `HCTPlay` methods Straight Pressure overrides):**
-- `detect_moment(...)` → call Standard detect, then downgrade `trap` → `pressure`.
-- `defense_targets(...)` → `_straight_pressure_defense_targets` (PG pressure + SG/SF
-  deny/sag + PF/C via `_pf_c_targets`); Standard inherits the base (`_defense_targets`).
+- `begin_possession(...)` → returns a fresh stateful `StraightPressure` carrying the
+  locked man-assignment / role state (`_straight_pressure_begin`); the registry
+  singleton stays stateless. Standard's base returns `self`.
+- `detect_moment(...)` → Standard detect, then `trap` → `pressure` **unless** an
+  active rover is in range.
+- `defense_targets(...)` → `_straight_pressure_targets` (sticky man deny/on-ball +
+  rover + key/wing toggle + PF/C via `_pf_c_targets`); mutates the per-possession
+  state for man→ABA role transitions. Standard inherits the base (`_defense_targets`).

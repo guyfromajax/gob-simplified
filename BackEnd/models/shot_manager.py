@@ -781,17 +781,17 @@ class ShotManager:
             if motion_defense_bonus > 0 and has_contest:
                 shot_score -= motion_defense_bonus * 0.2
 
-            # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y < x
+            # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y <= x
             block_spot = None
             block_defender_used = None
             if has_contest and shot_type in ("inside", "attack") and defender:
                 x = def_team.strategy_settings.get("aggression", 2)
                 y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
-                should_attempt_block_reconciliation = y < x
+                should_attempt_block_reconciliation = y <= x
                 if not should_attempt_block_reconciliation:
                     z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
                     defense_fight = def_team.team_attributes.get("fight", 0)
-                    should_attempt_block_reconciliation = z < defense_fight
+                    should_attempt_block_reconciliation = z <= defense_fight
                 if should_attempt_block_reconciliation:
                     # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                     shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
