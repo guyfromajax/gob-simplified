@@ -1262,7 +1262,8 @@ flips. A registry maps key → `HCTPlay`; `compute_dynamic_hct_turn` becomes thi
 | Frontend UI | *(frontend repo — separate, deferred)* | `HCT Traps` weight section in the defense group |
 
 API accepts/returns `hc_traps` immediately; until the frontend ships its slider
-section, teams run on defaults (100% Standard Trap during PR1 regardless).
+section, teams run on the default weights (PR1: 100% Standard Trap; PR2: 50/50
+Standard / Straight Pressure; Diamond stays 0 until PR3).
 
 ### 13.5 — PR boundary (refactor-first)
 
@@ -1272,6 +1273,39 @@ section, teams run on defaults (100% Standard Trap during PR1 regardless).
   today's logic verbatim. Default weights = 100% `standard_trap` → selection always
   resolves to it → behavior provably unchanged. Verify via offline smoke (no crash,
   no behavior delta vs current).
-- **PR2:** implement `straight_pressure` as a new `HCTPlay`; add to default weights.
+- **PR2:** implement `straight_pressure` as a new `HCTPlay` (spec in §13.6); add to default weights.
 - **PR3:** implement `diamond` as a new `HCTPlay`; add to default weights.
 - **Frontend:** `HCT Traps` UI section (after backend lands).
+
+### 13.6 — Straight Pressure (play #2) spec
+
+Straight Pressure is **Standard Trap with one change: it never traps.** It diverges
+from Standard **only in the backcourt**; everything frontcourt/ABA is inherited.
+
+**Backcourt (the only divergence):**
+- **On-ball:** def PG pressures the BH the whole way (`_converge_xy`) — identical to
+  Standard's normal-shift pressure.
+- **No trap, ever:** moment detection is capped at `pressure` (never `trap`), so a
+  second defender is never committed and the contest always resolves with
+  `trapper=None` (today's single-defender pressure math, **unchanged**).
+- **Off-ball backcourt (def SG/SF = pos1/pos2) — deny:** each denies one of the
+  offense's two backcourt outlets (off SG/SF = pos1/pos2). Assignment is
+  **nearest-matchup, no double-up** (the pairing with smaller total defender→outlet
+  distance). The denying defender sits on the **BH→outlet pass line at 60% from the
+  BH** toward that outlet (mirrors the D22 C/PF help-denial geometry). An outlet is a
+  **valid** deny target only if it is **not in the ABA** (still a backcourt/perimeter
+  outlet). If a defender has no valid outlet, he **sags to a help spot goal-side of
+  the BH** (25% from the BH toward the rim). *(Both the 60% deny fraction and 25% sag
+  fraction are tunable; the not-in-ABA validity test is the first-cut rule.)*
+
+**Inherited unchanged from Standard Trap:**
+- def PF/C (pos3/pos4) D22 ball-reactive ABA-zone coverage (`_pf_c_targets`).
+- The §2 3-tier ABA read and the §7 HCO/Fast-Break transition once the ball reaches
+  the ABA.
+- Decision thresholds, movement rates/archetypes, broken-HCT cutoff, time terminals,
+  stat parity, schema emission, possession flips.
+
+**Implementation seams (the `HCTPlay` methods Straight Pressure overrides):**
+- `detect_moment(...)` → call Standard detect, then downgrade `trap` → `pressure`.
+- `defense_targets(...)` → `_straight_pressure_defense_targets` (PG pressure + SG/SF
+  deny/sag + PF/C via `_pf_c_targets`); Standard inherits the base (`_defense_targets`).

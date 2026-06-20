@@ -2282,8 +2282,11 @@ function renderTrainingResults(data) {
 function renderPracticeSquad(data) {
   const section = document.getElementById('training-squad-section');
   const tbody = document.getElementById('training-squad-body');
+  // The stats table lives in a separate section at the bottom of the Player Stats tab.
   const statsBody = document.getElementById('ps-stats-body');
+  const statsSection = document.getElementById('ps-stats-section');
   const titleEl = document.getElementById('ps-section-title');
+  const statsTitleEl = document.getElementById('ps-stats-title');
   if (!section || !tbody) return;
   // Neither field provided on this render (e.g. cache restore) => leave as-is.
   if (!Array.isArray(data.training_squad) && !Array.isArray(data.practice_squad_recruits)) return;
@@ -2296,12 +2299,13 @@ function renderPracticeSquad(data) {
     section.style.display = 'none';
     tbody.innerHTML = '';
     if (statsBody) statsBody.innerHTML = '';
+    if (statsSection) statsSection.style.display = 'none';
     return;
   }
 
-  if (titleEl) {
-    titleEl.textContent = data.practice_squad_recruiting_done ? 'Practice Squad + Recruits' : 'Practice Squad Players';
-  }
+  const psTitle = data.practice_squad_recruiting_done ? 'Practice Squad + Recruits' : 'Practice Squad Players';
+  if (titleEl) titleEl.textContent = psTitle;
+  if (statsTitleEl) statsTitleEl.textContent = psTitle;
 
   // Attributes table
   tbody.innerHTML = '';
@@ -2420,6 +2424,7 @@ function renderPracticeSquad(data) {
   }
 
   section.style.display = '';
+  if (statsSection) statsSection.style.display = '';
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }

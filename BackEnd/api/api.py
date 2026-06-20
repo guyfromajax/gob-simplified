@@ -5716,13 +5716,53 @@ try:
         # roster. Returned separately so the UI lists them under a "Training Squad"
         # header with attributes (they have no season stats — they don't play).
         training_squad = []
+        practice_squad_recruits = []
+        practice_squad_recruiting_done = False
+        fr_doc = {}
         if franchise_id and team_doc.get("_id"):
             try:
-                ts_ftd = franchise_team_data_collection.find_one(
-                    {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
-                    {"training_squad_players": 1},
+                # Single franchise read covering both Practice Squad rosters and Week 35
+                # recruiting. Project only the small subfields we need (avoid pulling the
+                # PS schedule / standings / box scores).
+                fr_doc = franchises_collection.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {
+                        "practice_squad.initialized": 1,
+                        "practice_squad.teams": 1,
+                        "practice_squad.scrubs_pools": 1,
+                        "week_35_recruiting_ran": 1,
+                        "week_35_recruiting_results": 1,
+                    },
                 ) or {}
-                ts_ids = [str(pid) for pid in (ts_ftd.get("training_squad_players") or []) if pid]
+                ps = fr_doc.get("practice_squad") or {}
+
+                # Source the team's 3 Practice Squad players from the regional PS rosters.
+                # These carry parent_team_name for EVERY team (user and CPU), unlike
+                # training_squad_players which is only reliably set for the user's team.
+                ts_ids = []
+                if ps.get("initialized"):
+                    seen_ps = set()
+                    slot_groups = [tm.get("roster") or [] for tm in (ps.get("teams") or {}).values()]
+                    slot_groups.extend((pool or []) for pool in (ps.get("scrubs_pools") or {}).values())
+                    for slots in slot_groups:
+                        for s in slots:
+                            if s.get("source") != "fpd":
+                                continue
+                            if str(s.get("parent_team_name") or "") != str(match or ""):
+                                continue
+                            pid = str(s.get("player_id") or "")
+                            if pid and pid not in seen_ps:
+                                seen_ps.add(pid)
+                                ts_ids.append(pid)
+                # Fallback (PS not yet initialized this season): the cut players still
+                # live in training_squad_players until the PS is built.
+                if not ts_ids:
+                    ts_ftd = franchise_team_data_collection.find_one(
+                        {"franchise_id": ObjectId(franchise_id), "team_id": team_doc["_id"]},
+                        {"training_squad_players": 1},
+                    ) or {}
+                    ts_ids = [str(pid) for pid in (ts_ftd.get("training_squad_players") or []) if pid]
+
                 if ts_ids:
                     ts_docs = list(franchise_players_data_collection.find(
                         {"franchise_id": str(franchise_id), "player_id": {"$in": ts_ids}},
@@ -5751,8 +5791,7 @@ try:
                             "archetype": ts_meta.get("archetype"),
                             "position_ratings": d.get("position_ratings") or {},
                             "attributes": ts_attrs,
-                            # Practice Squad season stats (regional PS games). The 3
-                            # training-squad players ARE the team's Practice Squad players.
+                            # Practice Squad season stats (regional PS games).
                             "ps_stats": d.get("ps_season_stats") or {},
                             "is_recruit": False,
                         })
@@ -5763,14 +5802,8 @@ try:
         # recruits join this section ("Practice Squad + Recruits"). Their Practice
         # Squad season stats carry over from the FRD records. Walk-on filler signings
         # are excluded — they are not recruits and have no PS history.
-        practice_squad_recruits = []
-        practice_squad_recruiting_done = False
         if franchise_id and team_doc.get("_id"):
             try:
-                fr_doc = franchises_collection.find_one(
-                    {"_id": ObjectId(franchise_id)},
-                    {"week_35_recruiting_ran": 1, "week_35_recruiting_results": 1},
-                ) or {}
                 practice_squad_recruiting_done = bool(fr_doc.get("week_35_recruiting_ran"))
                 if practice_squad_recruiting_done:
                     team_id_str = str(team_doc["_id"])

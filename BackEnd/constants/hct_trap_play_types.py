@@ -53,12 +53,12 @@ HCT_TRAP_ID_ALIASES = {
     "Diamond": DIAMOND,
 }
 
-# PR1: only Standard Trap is implemented, so default weighting routes 100% to it
-# (selection always resolves to standard_trap → behavior is provably unchanged).
-# PR2/PR3 rebalance these once Straight Pressure / Diamond land.
+# PR2: Standard Trap + Straight Pressure are implemented → default 50/50 so both
+# run by default. Diamond stays 0 until PR3 (its key resolves to Standard via the
+# registry fallback if ever selected). Tunable per team via playbook hc_traps.
 DEFAULT_HCT_TRAP_WEIGHTS = {
-    STANDARD_TRAP: 100,
-    STRAIGHT_PRESSURE: 0,
+    STANDARD_TRAP: 50,
+    STRAIGHT_PRESSURE: 50,
     DIAMOND: 0,
 }
 

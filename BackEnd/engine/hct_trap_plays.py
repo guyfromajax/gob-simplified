@@ -23,14 +23,28 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from typing import List, Optional, Tuple
+
 from BackEnd.constants.hct_trap_play_types import (
     HCT_TRAP_PLAY_LABELS,
     STANDARD_TRAP,
+    STRAIGHT_PRESSURE,
 )
+
+# Type alias for clarity: a coord map is {position: {"x": int, "y": int}}.
+CoordMap = Dict[str, Dict[str, int]]
 
 
 class HCTPlay:
-    """Base interface for a selectable HCT defensive play."""
+    """Base interface for a selectable HCT defensive play.
+
+    The base implements the **Standard Trap** behavior at every seam by delegating
+    to the shared engine helpers, so a play that overrides nothing == Standard Trap.
+    Subclasses override only the seams that differ (Straight Pressure overrides
+    ``detect_moment`` + ``defense_targets``). The shared loop
+    (``compute_dynamic_hct_turn``) calls these seams; play-agnostic plumbing (time
+    terminals, stat parity, emission, possession flips) stays outside the play.
+    """
 
     key: str = ""
 
@@ -38,28 +52,79 @@ class HCTPlay:
     def label(self) -> str:
         return HCT_TRAP_PLAY_LABELS.get(self.key, self.key)
 
+    # --- Behavior seams (default = Standard Trap) ---------------------------
+    def detect_moment(
+        self, bh_xy, def_coords: CoordMap, is_away_offense: bool
+    ) -> Tuple[str, List[str]]:
+        """Classify the moment as 'none' | 'pressure' | 'trap' (+ in-range list)."""
+        from BackEnd.engine.dynamic_hct import _detect_moment
+
+        return _detect_moment(bh_xy, def_coords, is_away_offense)
+
+    def defense_targets(
+        self,
+        bh_xy,
+        def_coords: CoordMap,
+        is_away_offense: bool,
+        off_coords: Optional[CoordMap] = None,
+    ) -> CoordMap:
+        """Per-possession defensive formation targets around the BH (pure)."""
+        from BackEnd.engine.dynamic_hct import _defense_targets
+
+        return _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+
+    # --- Entry --------------------------------------------------------------
     def run(self, game) -> Dict[str, Any]:
         """Resolve one HCT possession, returning the engine intermediate dict
         (same shape as ``compute_dynamic_hct_turn``)."""
-        raise NotImplementedError
-
-
-class StandardTrap(HCTPlay):
-    """The original (and PR1's only) trap: today's dynamic HCT loop, verbatim."""
-
-    key = STANDARD_TRAP
-
-    def run(self, game) -> Dict[str, Any]:
         # Lazy import avoids a circular dependency (dynamic_hct ↔ this module).
         from BackEnd.engine.dynamic_hct import compute_dynamic_hct_turn
 
-        return compute_dynamic_hct_turn(game)
+        return compute_dynamic_hct_turn(game, self)
 
 
-# Registry: canonical key → play instance. Straight Pressure / Diamond are added
-# in later cuts; until then their keys resolve to Standard Trap via the fallback.
+class StandardTrap(HCTPlay):
+    """The original trap: today's dynamic HCT loop, verbatim (inherits all seams)."""
+
+    key = STANDARD_TRAP
+
+
+class StraightPressure(HCTPlay):
+    """Play #2 (§13.6): single on-ball pressure, never a trap. Diverges from
+    Standard only in the backcourt (no double-team; off-ball backcourt defenders
+    deny the outlets). Frontcourt PF/C coverage, the ABA read, and the HCO/FB
+    transition are inherited from Standard."""
+
+    key = STRAIGHT_PRESSURE
+
+    def detect_moment(
+        self, bh_xy, def_coords: CoordMap, is_away_offense: bool
+    ) -> Tuple[str, List[str]]:
+        from BackEnd.engine.dynamic_hct import _detect_moment
+
+        kind, in_range = _detect_moment(bh_xy, def_coords, is_away_offense)
+        # Never escalate to a trap — cap at single-defender pressure.
+        return ("pressure" if kind == "trap" else kind), in_range
+
+    def defense_targets(
+        self,
+        bh_xy,
+        def_coords: CoordMap,
+        is_away_offense: bool,
+        off_coords: Optional[CoordMap] = None,
+    ) -> CoordMap:
+        from BackEnd.engine.dynamic_hct import _straight_pressure_defense_targets
+
+        return _straight_pressure_defense_targets(
+            bh_xy, def_coords, is_away_offense, off_coords
+        )
+
+
+# Registry: canonical key → play instance. Diamond is added in PR3; until then its
+# key resolves to Standard Trap via the fallback.
 HCT_TRAP_PLAYS: Dict[str, HCTPlay] = {
     STANDARD_TRAP: StandardTrap(),
+    STRAIGHT_PRESSURE: StraightPressure(),
 }
 
 

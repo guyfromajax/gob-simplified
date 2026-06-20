@@ -383,10 +383,9 @@ def build_cpu_playbook_for_team(
     )
     next_settings["set_plays"] = _set_play_percentages(selected_set_ids)
     next_settings["fast_breaks"] = _random_capped_three(("covert_release", "rim_runner", "triangle"))
-    # PR1: only Standard Trap is built, so CPU teams run 100% Standard Trap.
-    # Switch to _random_capped_three(("standard_trap", "straight_pressure", "diamond"))
-    # once those plays land in later cuts.
-    next_settings["hc_traps"] = {"standard_trap": 100, "straight_pressure": 0, "diamond": 0}
+    # PR2: Standard Trap + Straight Pressure are built → CPU teams split 50/50.
+    # Add "diamond" to the mix once PR3 lands.
+    next_settings["hc_traps"] = {"standard_trap": 50, "straight_pressure": 50, "diamond": 0}
     next_settings["zone_defense"] = _random_capped_three(("zone_23", "zone_32", "zone_131"))
     next_settings["man_defense"] = {"man_normal": 100, "man_pressure": 0, "man_loose": 0}
 

@@ -865,16 +865,105 @@ def _defense_targets(
     return targets
 
 
+# --- Straight Pressure (§13.6 — play #2) ---------------------------------------
+# Deny spot: fraction of the way from the BH toward the denied outlet (mirrors the
+# D22 C/PF help-denial geometry). Help sag: fraction from the BH toward the rim.
+STRAIGHT_PRESSURE_DENY_FRACTION = 0.6
+STRAIGHT_PRESSURE_SAG_FRACTION = 0.25
+# The offense's two backcourt outlets that the off-ball backcourt defenders deny.
+STRAIGHT_PRESSURE_OUTLET_POSITIONS = ("SG", "SF")
+# The two off-ball backcourt defenders that do the denying (PG pressures on-ball).
+STRAIGHT_PRESSURE_DENY_DEFENDERS = ("SG", "SF")
+
+
+def _assign_deny(
+    deny_defenders: Tuple[str, str],
+    valid_outlets: List[str],
+    def_coords: Dict[str, Dict[str, int]],
+    off_coords: Dict[str, Dict[str, int]],
+) -> Dict[str, str]:
+    """Nearest-matchup assignment (no double-up) of off-ball backcourt defenders to
+    valid offensive outlets. Returns ``{defender_pos: outlet_pos}``; defenders with
+    no outlet are omitted (caller sags them)."""
+    d1, d2 = deny_defenders
+    if len(valid_outlets) == 1:
+        o = valid_outlets[0]
+        nearest = min(deny_defenders, key=lambda d: _euclid(def_coords[d], off_coords[o]))
+        return {nearest: o}
+    o1, o2 = valid_outlets[0], valid_outlets[1]
+    straight = _euclid(def_coords[d1], off_coords[o1]) + _euclid(def_coords[d2], off_coords[o2])
+    crossed = _euclid(def_coords[d1], off_coords[o2]) + _euclid(def_coords[d2], off_coords[o1])
+    return {d1: o1, d2: o2} if straight <= crossed else {d1: o2, d2: o1}
+
+
+def _straight_pressure_defense_targets(
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+    off_coords: Optional[Dict[str, Dict[str, int]]] = None,
+) -> Dict[str, Dict[str, int]]:
+    """§13.6 Straight Pressure backcourt formation (pure — no mutation, no trap).
+
+    - def PG pressures the BH on-ball (always).
+    - def SG/SF deny the offense's two backcourt outlets (off SG/SF): each denies
+      the outlet he is closest to (no double-up) at ``STRAIGHT_PRESSURE_DENY_FRACTION``
+      from the BH toward that outlet; an outlet is valid only if it is *not* in the
+      ABA. With no valid outlet a defender sags to a help spot goal-side of the BH.
+    - def PF/C inherit the Standard D22 ABA-zone coverage (``_pf_c_targets``).
+    """
+    targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
+    targets["PG"] = _converge_xy(bh_xy, is_away_offense)
+
+    rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+    rim_xy = {"x": float(rim["x"]), "y": float(rim["y"])}
+    sag = _clamp_xy(_interpolate(bh_xy, rim_xy, STRAIGHT_PRESSURE_SAG_FRACTION))
+
+    valid_outlets: List[str] = []
+    if off_coords is not None:
+        valid_outlets = [
+            o
+            for o in STRAIGHT_PRESSURE_OUTLET_POSITIONS
+            if not _in_attack_basket_area(off_coords[o], is_away_offense)
+        ]
+    assignment = (
+        _assign_deny(STRAIGHT_PRESSURE_DENY_DEFENDERS, valid_outlets, def_coords, off_coords)
+        if valid_outlets
+        else {}
+    )
+    for d in STRAIGHT_PRESSURE_DENY_DEFENDERS:
+        outlet = assignment.get(d)
+        if outlet is not None:
+            targets[d] = _clamp_xy(
+                _interpolate(bh_xy, off_coords[outlet], STRAIGHT_PRESSURE_DENY_FRACTION)
+            )
+        else:
+            targets[d] = sag
+
+    # PF/C — identical D22 ball-reactive coverage as Standard Trap.
+    if off_coords is not None:
+        pfc = _pf_c_targets(bh_xy, off_coords, is_away_offense)
+        targets["PF"] = _clamp_xy(pfc["PF"])
+        targets["C"] = _clamp_xy(pfc["C"])
+    return targets
+
+
 def _position_defense(
     bh_xy: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
     is_away_offense: bool,
     off_coords: Optional[Dict[str, Dict[str, int]]] = None,
+    play: Any = None,
 ) -> None:
     """Snap the defense onto its §6 targets in place (instantaneous reposition —
     used where the defense is *set* at once, e.g. the pass-defense formation).
-    ``off_coords`` feeds the D22 PF/C coverage."""
-    for pos, tgt in _defense_targets(bh_xy, def_coords, is_away_offense, off_coords).items():
+    ``off_coords`` feeds the D22 PF/C coverage. ``play`` selects the formation seam
+    (Standard Trap vs. Straight Pressure); ``None`` keeps the Standard default."""
+    targets = (
+        play.defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+        if play is not None
+        else _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+    )
+    for pos, tgt in targets.items():
         def_coords[pos] = dict(tgt)
 
 
@@ -885,6 +974,7 @@ def _move_defense(
     seconds: float,
     def_lineup: Dict[str, Any],
     off_coords: Optional[Dict[str, Dict[str, int]]] = None,
+    play: Any = None,
 ) -> None:
     """D15: move each defender toward its §6 target at the player's rate,
     **interrupted** by the segment duration, tracking actual positions.
@@ -894,8 +984,13 @@ def _move_defense(
     ball handler still gains real separation (the defense no longer teleports
     back onto him every step). Matches the emitter's interrupted-coord render.
     Mutates ``def_coords`` in place. ``off_coords`` feeds the D22 PF/C coverage.
+    ``play`` selects the formation seam (Standard vs. Straight Pressure).
     """
-    targets = _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+    targets = (
+        play.defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+        if play is not None
+        else _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+    )
     for pos in POSITIONS:
         arch = "sprint" if pos in ("PF", "C") else "standard"
         rate = _ag_grid_per_game_sec(def_lineup.get(pos), arch)
@@ -1038,16 +1133,18 @@ def _pass_segment(
 
 
 def _emit_dead_ball_drive(
-    bh_xy, score_ratio, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos
+    bh_xy, score_ratio, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos,
+    play: Any = None,
 ) -> Tuple[Dict[str, Any], float]:
     """BH drives partway toward the deep key, then commits a dead-ball turnover.
-    Mutates ``off_coords``/``def_coords`` and returns ``(segment, seconds)``."""
+    Mutates ``off_coords``/``def_coords`` and returns ``(segment, seconds)``.
+    ``play`` selects the defensive formation seam."""
     deep_key = DEEP_KEY_SPOT if not is_away_offense else _flip(DEEP_KEY_SPOT)
     path_distance = _euclid(bh_xy, deep_key)
     partial_elapsed = (path_distance * score_ratio) / bh_drive_rate
     attack_xy = _clamp_xy(_move_at_pace(bh_xy, deep_key, partial_elapsed, bh_drive_rate))
     off_coords[bh_pos] = attack_xy
-    _position_defense(attack_xy, def_coords, is_away_offense, off_coords)
+    _position_defense(attack_xy, def_coords, is_away_offense, off_coords, play=play)
     seconds = max(0.3, partial_elapsed)
     return (
         _segment(
@@ -1089,9 +1186,14 @@ def _cutoff_meet_point(
     return None
 
 
-def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
+def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     """
     Build the dynamic HCT turn for this engine state.
+
+    ``play`` is the selected ``HCTPlay`` (Standard Trap, Straight Pressure, …) that
+    supplies the play-specific seams (``detect_moment`` / ``defense_targets``). It is
+    normally passed by ``HCTPlay.run``; when ``None`` we resolve it from
+    ``game_state["hct_trap_play"]`` via the registry (defaults to Standard Trap).
 
     Returns a dict shaped for ``resolve_half_court_trap_logic`` to merge into
     its existing turn result:
@@ -1168,6 +1270,11 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     # Seed the running shot clock once (§4 Time terminals). Decremented per
     # segment so the loop is strictly bounded.
     game_state = getattr(game, "game_state", {}) or {}
+    if play is None:
+        # Back-compat / safety: resolve the selected play from the stashed key.
+        from BackEnd.engine.hct_trap_plays import get_hct_trap_play
+
+        play = get_hct_trap_play(game_state.get("hct_trap_play"))
     shot_clock = float(game_state.get("shot_clock_remaining", 30) or 30)
     # 10-second rule is measured against ACTUAL elapsed time from possession start
     # (not an absolute shot-clock threshold), and is disabled when the quarter has
@@ -1207,7 +1314,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
 
     # --- Initial converge: position the defense around the BH (§6) -----------
     pg_initial = dict(def_coords["PG"])
-    _position_defense(bh_xy, def_coords, is_away_offense, off_coords)
+    _position_defense(bh_xy, def_coords, is_away_offense, off_coords, play=play)
     converge_seconds = max(
         0.4,
         calc_ag_segment_seconds(pg_initial, def_coords["PG"], pg_def, archetype="standard"),
@@ -1235,7 +1342,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         bh_xy = off_coords[bh_pos]
         # D15: defenders chase at their own rate (interrupted), so a quicker BH
         # gains separation rather than the defense snapping back onto him.
-        _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords)
+        _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play)
         # D15b: off-ball offense keep hustling toward their setup spots.
         _move_offense(off_coords, off_targets, advance_seconds, off_lineup, bh_pos)
         loop_segments.append(
@@ -1418,7 +1525,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
     def _emit_stopper(reason: str, label: str = "") -> float:
         """D8 — terminal whistle/steal beat: the defense collapses onto the BH
         for a short hold. Mutates ``def_coords`` and appends the segment."""
-        _position_defense(bh_xy, def_coords, is_away_offense)
+        _position_defense(bh_xy, def_coords, is_away_offense, play=play)
         secs = 0.5
         loop_segments.append(
             _segment(reason, off_coords, def_coords, secs, ("def", "PG"), bh_pos, label=label)
@@ -1462,7 +1569,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         if outcome == "DEAD BALL":
             seg, sec = _emit_dead_ball_drive(
                 bh_xy, score_ratio, is_away_offense, bh_drive_rate,
-                off_coords, def_coords, bh_pos,
+                off_coords, def_coords, bh_pos, play=play,
             )
             loop_segments.append(seg)
             nonlocal_shot_clock_dec(sec)
@@ -1534,8 +1641,9 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             # clock + MAX_LOOP_ITERATIONS.
 
         # 3) Detect the moment (§5) and read (reduced thresholds if no defender;
-        #    attack tier removed once the BH is dribble-dead, D21).
-        moment, in_range = _detect_moment(bh_xy, def_coords, is_away_offense)
+        #    attack tier removed once the BH is dribble-dead, D21). The play seam
+        #    classifies the moment (Straight Pressure caps it at "pressure").
+        moment, in_range = play.detect_moment(bh_xy, def_coords, is_away_offense)
         decision = _read_decision(
             ball_handler, broken=(moment == "none"), dribble_alive=dribble_alive
         )
@@ -1571,7 +1679,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             # defense keeps closing. Outcome depends on what reaches the BH.
             hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
             # D15: defense keeps closing during the hold at its own rate.
-            _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords)
+            _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
             # D15b: off-ball offense keep hustling toward their setup spots.
             _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
             loop_segments.append(
@@ -1582,7 +1690,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
             )
             shot_clock -= hold_seconds
 
-            moment2, in_range2 = _detect_moment(bh_xy, def_coords, is_away_offense)
+            moment2, in_range2 = play.detect_moment(bh_xy, def_coords, is_away_offense)
             if moment2 == "trap":
                 # A second defender arrived during the hold → Trap Moment.
                 outcome, score_ratio, credited = _resolve_attack("trap", in_range2)
@@ -1637,7 +1745,7 @@ def compute_dynamic_hct_turn(game) -> Dict[str, Any]:
         # re-randomize/jitter between the two steps.
         pass_def_coords = {p: dict(def_coords[p]) for p in POSITIONS}
         _position_defense(
-            off_coords[receiver_pos], pass_def_coords, is_away_offense, off_coords
+            off_coords[receiver_pos], pass_def_coords, is_away_offense, off_coords, play=play
         )
 
         # 1) Flight: offense holds, the persisted defense closes, ball travels.

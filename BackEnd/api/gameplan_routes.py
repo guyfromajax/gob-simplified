@@ -761,11 +761,11 @@ def initialize_playbook_settings():
             "triangle": 34,
         }
 
-        # HCT traps (defensive play family). PR1: only Standard Trap is built, so
-        # default 100% to it (Straight Pressure / Diamond land in later cuts).
+        # HCT traps (defensive play family). PR2: Standard Trap + Straight Pressure
+        # are built → default 50/50 (Diamond lands in PR3).
         playbook_settings["hc_traps"] = {
-            "standard_trap": 100,
-            "straight_pressure": 0,
+            "standard_trap": 50,
+            "straight_pressure": 50,
             "diamond": 0,
         }
         
@@ -833,8 +833,8 @@ def initialize_playbook_settings():
                 "triangle": 34,
             },
             "hc_traps": {
-                "standard_trap": 100,
-                "straight_pressure": 0,
+                "standard_trap": 50,
+                "straight_pressure": 50,
                 "diamond": 0,
             },
             "zone_defense": {"zone_23": 100, "zone_32": 0, "zone_131": 0},
