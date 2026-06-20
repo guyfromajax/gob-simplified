@@ -388,6 +388,27 @@ export function resolveStealSfxFile() {
   return STEAL_SFX_FILES[STEAL_SFX_FILES.length - 1].file;
 }
 
+// Weighted 33/33/34 across three voice options. Tied to the "INTERCEPTION!"
+// announcement appearance (SFX_System.md "Interception Announce") — fired for
+// PASS interceptions (RR lane pass, HCT/HCO/FCP pass contests) instead of the
+// reach-in steal cue. Callers resolve a filename here and pass it via `meta.sfx`
+// so `court.html` plays the cue at overlay mount.
+const INTERCEPTION_SFX_FILES = Object.freeze([
+  { file: "braddock-interception.mp3", weight: 33 },
+  { file: "duke-interception.mp3", weight: 33 },
+  { file: "sammy-interception.mp3", weight: 34 },
+]);
+
+export function resolveInterceptionSfxFile() {
+  const total = INTERCEPTION_SFX_FILES.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of INTERCEPTION_SFX_FILES) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.file;
+  }
+  return INTERCEPTION_SFX_FILES[INTERCEPTION_SFX_FILES.length - 1].file;
+}
+
 // Fires at the moment the ball attaches to the rebounder sprite. DREB → defense
 // strong; OREB → inside strong.
 export function playReboundSfx(scene, reboundType) {
@@ -519,6 +540,7 @@ export function resolveSecondaryAnnounceCourtSfxFile(headline) {
 export function resolveAnnounceMetaCourtSfxFile(key) {
   switch (String(key || "").trim()) {
     case "steal": return resolveStealSfxFile();
+    case "interception": return resolveInterceptionSfxFile();
     case "block_announce": return "duke-its-blocked.wav";
     case "charge_announce": return "duke-charging.wav";
     case "fb_defensive_stop": return "duke-great-stop.wav";
@@ -605,6 +627,9 @@ export function playAnnouncementMetaCourtSfx(scene, key, headline = "") {
   switch (String(key || "").trim()) {
     case "steal":
       playGameSfx(scene, resolveStealSfxFile(), DEFAULT_VOLUME, { event: "steal" });
+      return true;
+    case "interception":
+      playGameSfx(scene, resolveInterceptionSfxFile(), DEFAULT_VOLUME, { event: "interception" });
       return true;
     case "block_announce":
       playBlockAnnounceCourtSfx(scene);

@@ -1646,12 +1646,12 @@ async function animateRimRunnerInterception(
   const { synchronizeBallState } = await import("./BallControllerAdapter.js");
   synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
   attachBallToPlayer(scene, ballSprite, stealer, { reason: "rim_runner_interception" });
-  // Steal voice is tied to the "Interception!" announcement appearance
-  // (SFX_System.md §Steal Announce), passed via `meta.sfx` on the
+  // Interception voice is tied to the "INTERCEPTION!" announcement appearance
+  // (SFX_System.md §Interception Announce), passed via `meta.sfx` on the
   // announcement payload below — court.html plays it at overlay mount.
 
   const { showAnnouncement, getSecondaryColorForTeam } = await import("../utils/announcements.js");
-  const { resolveStealSfxFile } = await import("../utils/gameSfx.js");
+  const { resolveInterceptionSfxFile } = await import("../utils/gameSfx.js");
   const stealerInfo = scene.playerInfo?.[stealerId];
   const stealerTeamId = stealer?.team_id;
   const homeTeamField = scene.simData?.home_team;
@@ -1668,7 +1668,7 @@ async function animateRimRunnerInterception(
       }
     : null;
   const defenseSide = stealer?.team === "home" ? "home" : "away";
-  showAnnouncement("Interception!", defenseSide, stealerPlayerData, { sfx: resolveStealSfxFile() });
+  showAnnouncement("INTERCEPTION!", defenseSide, stealerPlayerData, { sfx: resolveInterceptionSfxFile() });
   const holdMs = animationConfig.fastBreak?.defensiveStopHoldMs ?? 1000;
   await new Promise((resolve) => {
     if (scene.time?.delayedCall) scene.time.delayedCall(holdMs, resolve);

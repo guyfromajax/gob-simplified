@@ -166,10 +166,12 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 `_stamp_shooting_foul_on_miss_end` is the same helper used by `skeleton_step_emitter` on HCO miss + foul. It no-ops when `result_type != "MISS"`, when there are no free throws to come, or when no `foul_player_id` is set. The frontend detection in `ballManager.shootBall` (used by the legacy `handleOrebTurn` path) remains as defense-in-depth and will be redundant once all putback playback routes through the schema.
 
-**Steal Announcements:**
-- **"STEAL!"** - Triggered when `result_type === 'STEAL'` or (`result_type === 'TURNOVER'` and text includes "steal")
+**Steal / Interception Announcements:**
+- **"STEAL!"** - Triggered when `result_type === 'STEAL'` or (`result_type === 'TURNOVER'` and text includes "steal"). This is the reach-in / strip case.
+- **"INTERCEPTION!"** - Same trigger, but when the steal is a **pass interception**. Detected by `isPassInterception(turnData, context)` (`announcements.js`): true when `turnData.rim_runner_interception` (Rim Runner lane pass), `turnData.is_interception` (the §14 pass-contest INTERCEPT terminal — universal across HCT/HCO/FCP), `turnData.steal_kind/steal_type === 'INTERCEPTION'`, or `context.isInterception`. Swaps the headline **and** the voice cue (interception SFX instead of steal SFX). Reach-in steals are unaffected.
 - Takes priority over Fast Break announcement (suppresses Fast Break if steal-initiated)
 - Shows stealer's headshot; initials use the stealer's actual team colors (defense side on the turn, resolved per-player — not inferred from the `defenseTeam` context arg alone)
+- The Rim Runner lane-pass interception (`fastBreak.js::animateRimRunnerInterception`) shows **"INTERCEPTION!"** directly with the interception SFX.
 
 **Turnover Announcements:**
 - **Two pipelines:** the SS&S dispatcher `handleTurnoverAnnouncement()` in `gameAnnouncements.js` (called via `announceGameEvent('TURNOVER', ...)` from `finalizeTurnAfterAnimation()`), and the legacy `announceFromTurnData(turn, 'end', ...)` fallback in `announcements.js`. The legacy path is still invoked from several call sites in `animateGameTurns.js` for turns that haven't been announced inline.
@@ -223,7 +225,8 @@ The Announcement System provides visual feedback for game events using timing-ba
 | AND-1 (shooting foul on make) | `whistle-1-lowervol.wav` (default, overridable) | `announcements.js::showAndOneAnnouncement` |
 | **BLOCK!** | `duke-its-blocked.wav` | `gameAnnouncements.js::handleBlockAnnouncement` |
 | **Airball!** | *(none — `airball.wav` is shot-result SFX)* | schema `[ball_flight]` `step.end.announcement`; legacy `announceAirballIfNeeded()` |
-| **STEAL!** / **Interception!** | 33/33/34 random — `sammy-steal.wav` / `braddock-steal.wav` / `butler-steal.wav` (via `resolveStealSfxFile()`) | `handleStealAnnouncement`, `announceFromTurnData` STEAL branch, `fastBreak.js::animateRimRunnerInterception` |
+| **STEAL!** (reach-in / strip) | 33/33/34 random — `sammy-steal.wav` / `braddock-steal.wav` / `butler-steal.wav` (via `resolveStealSfxFile()`) | `handleStealAnnouncement`, `announceFromTurnData` STEAL branch |
+| **INTERCEPTION!** (pass interception) | 33/33/34 random — `braddock-interception.mp3` / `duke-interception.mp3` / `sammy-interception.mp3` (via `resolveInterceptionSfxFile()`; gated by `isPassInterception()`) | `handleStealAnnouncement`, `announceFromTurnData` STEAL branch, `fastBreak.js::animateRimRunnerInterception` |
 | Press! | random — `sammy-press.mp3` / `press-braddock.mp3` (once per turn) | secondary headline resolver |
 | Trap! | `trap-braddock.mp3` (once per turn) | secondary headline resolver |
 | Fast Break! | `fast-break-braddock.mp3` (once per turn) | secondary headline resolver |

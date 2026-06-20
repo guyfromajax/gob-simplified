@@ -18,8 +18,9 @@ import {
   getFastBreakPlayLabel,
   getHctTrapPlayLabel,
   announceReboundHeadlineIfNeeded,
+  isPassInterception,
 } from './announcements.js';
-import { resolveStealSfxFile } from './gameSfx.js';
+import { resolveStealSfxFile, resolveInterceptionSfxFile } from './gameSfx.js';
 import {
   pickOffensiveFoulAnnouncementText,
   pickDefensiveFoulAnnouncementText,
@@ -453,9 +454,13 @@ function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
     }
   }
 
-  // Steal voice tied to the "STEAL!" announce appearance — court.html plays
-  // `meta.sfx` at overlay mount per SFX_System.md §Steal Announce.
-  showAnnouncement("STEAL!", defenseTeam, playerData, { sfx: resolveStealSfxFile() });
+  // Steal voice tied to the announce appearance — court.html plays `meta.sfx` at
+  // overlay mount (SFX_System.md §Steal / §Interception Announce). A pass
+  // interception swaps the headline + voice; a reach-in/strip stays "STEAL!".
+  const interception = isPassInterception(turnData, context);
+  showAnnouncement(interception ? "INTERCEPTION!" : "STEAL!", defenseTeam, playerData, {
+    sfx: interception ? resolveInterceptionSfxFile() : resolveStealSfxFile(),
+  });
 
 }
 

@@ -154,8 +154,15 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 **Steal Announce**
 
-- Trigger: immediately when the **Steal** Announce appears.
+- Trigger: immediately when the **STEAL!** Announce appears (reach-in / strip — i.e. NOT a pass interception).
 - File: **33/33/34** random each show — `sammy-steal.wav` or `braddock-steal.wav` or `butler-steal.wav`
+- Resolver: `resolveStealSfxFile()` (gameSfx.js).
+
+**Interception Announce**
+
+- Trigger: immediately when the **INTERCEPTION!** Announce appears (a PASS interception — Rim Runner lane pass, or the HCT/HCO/FCP pass-contest primitive's INTERCEPT terminal).
+- File: **33/33/34** random each show — `braddock-interception.mp3` or `duke-interception.mp3` or `sammy-interception.mp3`
+- Resolver: `resolveInterceptionSfxFile()` (gameSfx.js). Legacy `meta.sfx` key: `"interception"`.
 
 **Charge Announce**
 

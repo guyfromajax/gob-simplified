@@ -12,11 +12,33 @@ import {
 } from './foulAnnouncementLanguage.js';
 import {
   resolveStealSfxFile,
+  resolveInterceptionSfxFile,
   resolveSecondaryAnnounceCourtSfxFile,
   resolveAnnounceMetaCourtSfxFile,
 } from './gameSfx.js';
 
 let currentAnnouncement = null;
+
+/**
+ * A "steal" that is specifically a PASS interception (vs a reach-in/strip) — it
+ * shows the "INTERCEPTION!" headline and plays the interception SFX instead of the
+ * steal cue. Universal across pass paths: the Rim Runner lane pass already flags
+ * `rim_runner_interception`; the HCT/HCO/FCP pass-contest primitive (§14) stamps
+ * `is_interception` on its INTERCEPT terminal. `context.isInterception` lets a
+ * caller force it directly.
+ */
+export function isPassInterception(turnData = {}, context = {}) {
+  const td = turnData || {};
+  const ctx = context || {};
+  const tag = String(td.steal_kind || td.steal_type || '').toUpperCase();
+  return Boolean(
+    ctx.isInterception ||
+    td.is_interception ||
+    td.interception ||
+    td.rim_runner_interception ||
+    tag === 'INTERCEPTION'
+  );
+}
 
 export function playAnnouncementSfx(kind) {
   const filename = kind === 'shot_clock_violation' ? 'whistle-3.mp3' : 'whistle-1-lowervol.wav';
@@ -693,10 +715,12 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
 
-      // Steal voice tied to "STEAL!" announce appearance (SFX_System.md
-      // §Steal Announce). court.html plays `meta.sfx` at overlay mount.
-      showAnnouncement("STEAL!", defenseTeam, playerData, {
-        sfx: resolveStealSfxFile(),
+      // Steal voice tied to the announce appearance (SFX_System.md §Steal /
+      // §Interception Announce). court.html plays `meta.sfx` at overlay mount.
+      // A pass interception swaps the headline + voice; a reach-in stays "STEAL!".
+      const interception = isPassInterception(turnData);
+      showAnnouncement(interception ? "INTERCEPTION!" : "STEAL!", defenseTeam, playerData, {
+        sfx: interception ? resolveInterceptionSfxFile() : resolveStealSfxFile(),
         ...(scene ? { scene } : {}),
       });
       return;
