@@ -529,7 +529,7 @@ The frontend uses `turnData.shot_spot` when present (FAST_BREAK handler) so the 
 2. Defensive rebound occurs (DREB)
 3. Transition to HCO (half court offense) via `runDefensiveReboundSetup()`
 
-**Rebound-capture attemptors:** missed Fast Break shots use the shared backend near-bounce attemptor contract from `Rebound_System.md`. After the backend resolves the bounce spot and actual `rebounderId`, `shot_manager.py` stamps `offense_rebounders` / `defense_rebounders` with every non-captor player within **15 Euclidean grid units** of the bounce. The promoted discrete `DREB` turn animates the winner to the ball and those failed attemptors to randomized near-bounce spots. The frontend does not calculate these candidates.
+**Rebound-capture attemptors:** missed Fast Break shots use the shared backend near-bounce attemptor contract from `Rebound_System.md`. After the backend resolves the bounce spot and actual `rebounderId`, `shot_manager.py` / migrated FB resolvers stamp `offense_rebounders` / `defense_rebounders` with every non-captor player within **20 Euclidean grid units** of the bounce. The promoted discrete `DREB` turn animates the winner to the ball and those failed attemptors to randomized near-bounce spots. The frontend does not calculate these candidates.
 
 **Critical Implementation Detail - turnData Handling:**
 - **Current Fast Break MISS turn** must be passed as `turnData` to `runDefensiveReboundSetup()`

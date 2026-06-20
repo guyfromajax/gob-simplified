@@ -13,21 +13,22 @@
     - Pullup Attack Shot (any attack shot not attempted at a near basket spot)
         (player sprite moves 1 x spot toward the basket then animates shot)
 - Outside Shots
-    - Set Outside Shot
-    - Set Outside Shot with Pump Fake
+    - Set Outside Shot (player shoots from his receiving locaiton)
+    - Set Outside Shot with Pump Fake (add a pump fake effect, defender bites?, then shoot from reception point)
     - Dribble & Shoot Outside Shot 
     - Dribble & Shoot Outside Shot with Pump Fake
-    - Fade Away Outside Shot
+    - Pump Fake & the Dribble & Shoot Outside Shot
 
 **Near Basket Spots for Shot Attempt Execution**
 - basketSpot, lower lowPost, upper lowPost
 - any spot within this geometric area: lower lowPost to basketSpot to upper lowPost to one x grid spot closer to teh basket than upper midPost (same y as upper midPost) to one x grid spot closer to the basket than midLane (same y as midLane) to one x grid spot closer to the basket than lower midPost (same y as lower midPost) 
 
+**Defend Shots**
+- Treat defense of inside, attack, and outside differently or the same
+- Special micro movement for blocks?
+
 **Steal Attempts**
 - Reach in to attempt steal (this can result in a steal or foul)
-
-**Blocks**
-- Defender
 
 **Man on Man Defense**
 - Post Up, have the post up offender and defender sprites rattling back and forth on each other

@@ -78,7 +78,8 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from BackEnd.constants import (
     AWAY_RIM_COORDS,
@@ -197,6 +198,37 @@ def _interpolated_position(
         "x": start["x"] + dx * frac,
         "y": start["y"] + dy * frac,
     }
+
+
+@contextmanager
+def _temporary_lineup_coords(
+    game: Any,
+    coords_by_player_id: Dict[str, Dict[str, float]],
+) -> Iterator[None]:
+    """Temporarily apply computed shot-end coords for geography reads.
+
+    The after-steal resolver computes the authoritative shot-moment positions
+    in ``after_steal_end_coords`` before rebound resolution, while shared
+    rebound helpers read ``player.coords``. Apply the computed frame only for
+    the rebound winner / failed-attemptor reads, then restore runtime coords.
+    """
+    originals: Dict[str, Tuple[Any, Any]] = {}
+    for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
+        for player in (getattr(team, "lineup", None) or {}).values():
+            pid = _safe_id(player)
+            if pid is None or pid not in coords_by_player_id:
+                continue
+            originals[pid] = (player, getattr(player, "coords", None))
+            player.coords = dict(coords_by_player_id[pid])
+    try:
+        yield
+    finally:
+        for player, coords in originals.values():
+            if coords is None:
+                if hasattr(player, "coords"):
+                    delattr(player, "coords")
+            else:
+                player.coords = coords
 
 
 def _clamp_defender_freeze(
@@ -534,21 +566,22 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             # miss pattern at shared.py:1113-1114); don't exclude anyone.
             penalize_player_ids = {stealer_id} if stealer_id else set()
             exclude_player_ids: set = set()
-            new_rebounder, new_team, new_stat = determine_rebounder(
-                game, bounce_spot, exclude_player_ids, penalize_player_ids,
-            )
+            with _temporary_lineup_coords(game, end_coords):
+                new_rebounder, new_team, new_stat = determine_rebounder(
+                    game, bounce_spot, exclude_player_ids, penalize_player_ids,
+                )
+                rebounder_pid = _safe_id(new_rebounder)
+                rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                    game,
+                    bounce_spot,
+                    rebounder_pid,
+                    coords_already_display_oriented=True,
+                )
             rebound_type = str(new_stat) if new_stat else "DREB"
-            rebounder_pid = _safe_id(new_rebounder)
             rebound_ball_spot = {
                 "x": float(bounce_spot["x"]),
                 "y": float(bounce_spot["y"]),
             }
-            rebound_attemptors = collect_near_bounce_rebound_attemptors(
-                game,
-                bounce_spot,
-                rebounder_pid,
-                coords_already_display_oriented=True,
-            )
 
             # Stat credit on the canonical roster player (parity with OREB
             # putback miss flow at shared.py:1126-1133).

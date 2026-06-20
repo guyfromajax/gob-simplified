@@ -111,10 +111,21 @@ def test_after_steal_miss_stamps_near_bounce_rebound_attemptors(monkeypatch):
     near_def = game.defense_team.lineup["SG"]
     dreb_rebounder = game.defense_team.lineup["C"]
 
-    near_off.coords = {"x": 80.0, "y": 25.0}
-    far_off.coords = {"x": 70.0, "y": 25.0}
-    near_def.coords = {"x": 89.0, "y": 40.0}
-    dreb_rebounder.coords = {"x": 89.0, "y": 24.0}
+    stale_coords = {
+        player.player_id: dict(player.coords)
+        for team in (game.offense_team, game.defense_team)
+        for player in team.lineup.values()
+    }
+
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_fast_break._sample_unique_offense_spots",
+        lambda *_args, **_kwargs: [
+            {"x": 80.0, "y": 25.0},  # SG: near bounce after drive step
+            {"x": 60.0, "y": 25.0},  # SF: outside 20-grid radius
+            {"x": 60.0, "y": 10.0},
+            {"x": 60.0, "y": 40.0},
+        ],
+    )
 
     monkeypatch.setattr(
         "BackEnd.utils.fast_break_shot_geometry.compute_fb_shot_geometry",
@@ -122,13 +133,16 @@ def test_after_steal_miss_stamps_near_bounce_rebound_attemptors(monkeypatch):
             "shooter_target": {"x": 88.0, "y": 25.0},
             "defender_target": {"x": 90.0, "y": 25.0},
             "defender_end_coords": {
-                player.player_id: dict(player.coords)
-                for player in game.defense_team.lineup.values()
+                game.defense_team.lineup["PG"].player_id: {"x": 50.0, "y": 25.0},
+                near_def.player_id: {"x": 89.0, "y": 40.0},
+                game.defense_team.lineup["SF"].player_id: {"x": 50.0, "y": 25.0},
+                game.defense_team.lineup["PF"].player_id: {"x": 50.0, "y": 25.0},
+                dreb_rebounder.player_id: {"x": 89.0, "y": 24.0},
             },
             "first_arriver_id": game.defense_team.lineup["PG"].player_id,
             "contested": True,
             "shot_defender_id": game.defense_team.lineup["PG"].player_id,
-            "t_shooter_game_seconds": 1.0,
+            "t_shooter_game_seconds": 999.0,
         },
     )
     monkeypatch.setattr(
@@ -155,3 +169,6 @@ def test_after_steal_miss_stamps_near_bounce_rebound_attemptors(monkeypatch):
     assert far_off.player_id not in result["offense_rebounders"]
     assert near_def.player_id in result["defense_rebounders"]
     assert dreb_rebounder.player_id not in result["defense_rebounders"]
+    for team in (game.offense_team, game.defense_team):
+        for player in team.lineup.values():
+            assert player.coords == stale_coords[player.player_id]

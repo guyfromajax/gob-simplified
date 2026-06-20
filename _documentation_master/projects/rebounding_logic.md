@@ -11,11 +11,17 @@ For animation contracts and outlet behavior, see `05_GP_Supporting_Systems/Rebou
 
 | Question | What decides it |
 |----------|-----------------|
-| **Potential rebounders** | Who is allowed to “crash” (lists: `offense_rebounders`, `defense_rebounders`) |
+| **Potential rebounders** | Who is eligible to compete for the rebound before the winner is selected |
 | **Actual rebounder** | Who gets the stat (`rebounderId`, OREB vs DREB) |
 | **Animations** | Where players stand and who moves on which turn |
 
-Lists drive **who can move** on rebound capture steps. They do **not** by themselves pick the winner (except when one side has nobody left—then the other side wins automatically).
+The `offense_rebounders` / `defense_rebounders` payload lists are animation support. They drive **who can move** on rebound capture steps after the winner is already known. They do **not** by themselves pick the winner, except on older HCO/FCP-style paths where the same strategy-derived position lists are also used as the winner pool.
+
+Current terminology:
+
+- **Candidate pool:** position-keyed lineups used before winner selection.
+- **Actual rebounder:** the one player selected from the candidate pool and credited with the stat.
+- **Failed attemptors:** player-id lists stamped after the rebounder is known so the DREB/OREB capture step can animate nearby non-captors.
 
 ---
 
@@ -33,6 +39,9 @@ The schema MISS path (`[shoot]` → `[ball_flight]` → `[bounce]`) moves overla
 **Discrete DREB turn (HCO, FCP, HCT, migrated fast break, FT DREB, putback miss → DREB)**  
 One step: rebounder sprints to the ball; everyone on the crash lists (minus the rebounder) takes a short move toward the bounce (±4 x, ±6 y jitter). Everyone else stays put.  
 DREB does **not** re-place all ten players—it uses where the prior turn left them.
+
+**Near-bounce failed attemptors**  
+For newer miss paths, the backend stamps failed attemptors with `collect_near_bounce_rebound_attemptors()` after the authoritative bounce spot and actual `rebounderId` are known. The helper includes non-captor players within **20 Euclidean grid units** of the bounce. This is an animation helper only; it does not decide the rebound winner.
 
 **Half-court outlet** (DREB → HCO/HCT/FCP) is a **client** beat after the DREB turn, not part of the DREB step.
 
@@ -81,11 +90,15 @@ Same pattern as fast break block in `shot_manager`: closest per team within the 
 
 ### Animations
 - Rim-cluster overlays for eligible players only on the MISS turn.
-- **DREB** discrete turn when promoted (migrated play keys) — attemptors only if lists are non-empty and IDs ≠ rebounder.
+- **DREB** discrete turn when promoted (migrated play keys) — failed attemptors are stamped from the near-bounce helper when available.
 - Sparse boards are expected when few players are in the frontcourt half.
 
-### After-steal fast break miss (related gap)
-Resolved in `after_steal_fast_break.py`: **`determine_rebounder` on full lineups**, no crash lists, no overlay maps. Visually you often see **only the rebounder** move on the follow-up rebound step. Same class of issue as putback miss → DREB.
+### After-steal fast break miss
+Resolved in `after_steal_fast_break.py`.
+
+**Potential rebounders / actual rebounder:** uses computed shot-end coordinates, then runs `determine_rebounder` on the active lineups. There is no hard 20-grid eligibility gate before winner selection today; distance still matters because each team's finalist is the player closest to the bounce.
+
+**Animations:** after the winner is known, the resolver stamps `offense_rebounders` / `defense_rebounders` with the near-bounce failed-attemptor helper using the same shot-end coordinate frame. The promoted DREB row can therefore animate nearby non-captors instead of only the actual rebounder.
 
 ---
 
@@ -165,16 +178,17 @@ Already chosen on the prior miss; OREB turn is putback (~90%) or kickout (~10%).
 ## OREB putback miss (second board)
 
 ### Potential rebounders
-**None stamped today.** `PUTBACK_MISS` has `rebounderId` and `ballSpot` only.
+The winner-selection pool is still full active lineups via `determine_rebounder`; there is no hard 20-grid eligibility gate before winner selection today.
 
 ### Actual rebounder
-`determine_rebounder` on **full lineups** (both teams), closest-to-bounce logic with **putback shooter 20% distance penalty**. No crash lists on the turn dict.
+`determine_rebounder` on **full lineups** (both teams), closest-to-bounce logic with **putback shooter 20% distance penalty**.
 
 ### Animations
 - OREB `[bounce]`: **everyone holds** position.
-- If next is **DREB**, `game_manager` builds a discrete DREB turn from the **putback miss** row → lists empty → **usually only the rebounder animates** (same symptom as after-steal FB).
+- The putback miss rebound payload now carries `offense_rebounders` / `defense_rebounders` from the near-bounce failed-attemptor helper.
+- If next is **DREB**, `game_manager` builds a discrete DREB turn from the **putback miss** row and passes those failed-attemptor lists into the DREB emitter.
 
-Fix direction (not implemented here): stamp crash lists + optional rim coords on putback miss the way FT or HCO does, before chaining DREB.
+Remaining gameplay hardening question: whether winner selection should also use a pre-rebound geo eligibility gate instead of full active lineups.
 
 ---
 
@@ -183,27 +197,39 @@ Fix direction (not implemented here): stamp crash lists + optional rim coords on
 | Miss type | Potential rebounders | Actual rebounder | MISS-turn crash animation | Follow-up rebound turn |
 |-----------|----------------------|------------------|---------------------------|-------------------------|
 | **HCO** | Strategy: crash vs get-back / release | Closest per team → weighted contest | Full overlays | DREB or OREB |
-| **Fast break** | Frontcourt half (x filter) | Closest in pool → weighted contest | Overlays for eligible only | DREB or OREB (often sparse) |
-| **After-steal FB** | None | Full court `determine_rebounder` | Minimal / none | OREB or HCO; often one mover |
+| **Fast break** | Frontcourt half (x filter) | Closest in pool → weighted contest | Near-bounce failed attemptors for DREB capture | DREB or OREB |
+| **After-steal FB** | Full active lineups at shot-end coords | Full-lineup `determine_rebounder` | Near-bounce failed attemptors for DREB capture | OREB or HCO |
 | **HCT** | All five both sides | Same as HCO | Full overlays | DREB or OREB |
 | **FCP** | Same as HCO | Same as HCO | Full overlays | DREB or OREB |
 | **Free throw (last)** | \|x − bounce\| ≤ 20 | `determine_rebounder` + x gate | FT schema + lists | OREB or DREB |
-| **Putback miss** | None | Full court `determine_rebounder` | OREB bounce: all hold | DREB: usually one mover |
+| **Putback miss** | Full active lineups | Full-lineup `determine_rebounder` | OREB bounce: all hold; DREB capture uses near-bounce failed attemptors | DREB or OREB |
 
 ---
 
 ## Constants worth knowing
 
 - **FT crash eligibility:** `FREE_THROW_REBOUND_MAX_X_DELTA = 20` (x-axis only) in `shared.py`
+- **Near-bounce failed-attemptor animation radius:** `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20` (Euclidean) in `shared.py`
 - **Shooter / putback penalty:** distance × 1.2 when picking each team’s closest player
 - **HCO defense baseline** in the final contest: ~70% before modifiers
 
 ---
 
-## Known gaps (animation)
+## Known gaps / proposed hardening
 
-1. **Putback miss → DREB** — no crash lists on `PUTBACK_MISS`.
-2. **After-steal fast break miss** — no crash lists or overlays.
-3. **HCT/FCP x-half-court filter** — documented as target in `Rebound_System.md`, not applied to HCT/FCP misses in `shot_manager` today (only `is_fast_break` misses use it).
+### Animation
+
+The main animation gaps that caused "only the rebounder moves" on after-steal FB misses and putback misses have been addressed by stamping near-bounce failed attemptors after the winner is known.
+
+### Winner-selection candidate pools
+
+Pre-rebound candidate eligibility is still uneven by path:
+
+1. **HCO/FCP:** strategy first (get-back / release), then closest per team. No hard geo gate.
+2. **Regular Fast Break:** attacking-half x filter, then closest per team.
+3. **After-steal FB / Dynamic HCT / OREB putback miss:** full active lineups at the relevant shot frame, then closest per team. No hard geo gate.
+4. **Free throw:** x-axis gate (`|coords.x - bounce_x| <= 20`), then closest per team.
+
+Proposed hardening: add a sibling pre-winner helper, separate from `collect_near_bounce_rebound_attemptors()`, that filters position-keyed candidate lineups near the bounce before `choose_rebounder()` runs. Keep the existing near-bounce helper for post-winner animation only.
 
 Track gameplay fixes in `projects/bugs.md` if you add backlog items there.
