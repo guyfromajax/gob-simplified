@@ -6,6 +6,7 @@ from BackEnd.engine.rim_runner_fast_break import (
 )
 from BackEnd.engine.rim_runner_step_emitter import (
     _build_burst_step,
+    _build_outlet_pass_step,
     is_lane_pass_to_rr_resolution_turn,
 )
 from BackEnd.engine.triangle_step_emitter import build_triangle_animation_steps
@@ -20,7 +21,7 @@ def _player(player_id, x, y, *, ag=50, iq=50, ch=50):
     )
 
 
-def test_rr_burst_destination_uses_wing_and_sprint_delta_without_dynamic_base():
+def test_rr_burst_destination_targets_home_basket_spot_without_dynamic_base():
     destination, dynamic_base = _resolve_rr_burst_destination(
         rr_x0=20,
         rr_y0=30,
@@ -31,7 +32,7 @@ def test_rr_burst_destination_uses_wing_and_sprint_delta_without_dynamic_base():
     )
 
     assert dynamic_base is None
-    assert destination == {"x": 30.0, "y": 40.0}
+    assert destination == {"x": 87.0, "y": 25.0}
 
 
 def test_rr_burst_destination_uses_outlet_receiver_target_for_home_midcourt_bounce():
@@ -45,7 +46,7 @@ def test_rr_burst_destination_uses_outlet_receiver_target_for_home_midcourt_boun
     )
 
     assert dynamic_base == 45.0
-    assert destination == {"x": 69.0, "y": 40.0}
+    assert destination == {"x": 87.0, "y": 25.0}
 
 
 def test_rr_burst_destination_uses_outlet_receiver_target_for_away_midcourt_bounce():
@@ -59,7 +60,7 @@ def test_rr_burst_destination_uses_outlet_receiver_target_for_away_midcourt_boun
     )
 
     assert dynamic_base == 55.0
-    assert destination == {"x": 33.0, "y": 10.0}
+    assert destination == {"x": 13.0, "y": 25.0}
 
 
 def test_triangle_corner_players_use_sprint_not_burst_payload():
@@ -104,7 +105,7 @@ def test_calc_ag_segment_seconds_supports_burst_archetype():
     assert burst_seconds == 1.0
 
 
-def test_rim_runner_burst_step_uses_payload_sprint_archetype():
+def test_rim_runner_burst_step_uses_fixed_one_second_sprint_advance():
     off_lineup = {
         "PG": _player("bh", 45, 15),
         "PF": _player("rr", 20, 40),
@@ -121,7 +122,7 @@ def test_rim_runner_burst_step_uses_payload_sprint_archetype():
             "rr_id": "rr",
             "outlet_receiver_id": "bh",
             "outlet_passer_id": "passer",
-            "rr_to": {"x": 30.0, "y": 40.0, "movement_archetype": "sprint"},
+            "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "sprint"},
             "receiver_to": {"x": 45.0, "y": 15.0},
             "other_players": [],
         }
@@ -140,8 +141,50 @@ def test_rim_runner_burst_step_uses_payload_sprint_archetype():
 
     assert step is not None
     assert step["start"]["archetype"]["rr"] == "sprint"
+    assert step["start"]["advance_trigger"]["condition"] == "fixed_duration"
+    assert step["end"]["time_elapsed"] == 1.0
     assert step["start"]["tween_durations"]["rr"] == step["end"]["time_elapsed"]
-    assert step["end"]["time_elapsed"] > 0.5
+    assert step["end"]["coords"]["rr"]["x"] < 87.0
+
+
+def test_rim_runner_outlet_pass_carries_forward_burst_archetype():
+    off_lineup = {
+        "PG": _player("bh", 45, 15),
+        "PF": _player("rr", 45, 25),
+        "C": _player("passer", 35, 25),
+    }
+    def_lineup = {}
+    start_coords = {
+        "bh": {"x": 45.0, "y": 15.0},
+        "rr": {"x": 45.0, "y": 25.0},
+        "passer": {"x": 35.0, "y": 25.0},
+    }
+    fb_roles = {
+        "outlet_score": 999,
+        "rim_runner_burst_phase": {
+            "rr_id": "rr",
+            "outlet_receiver_id": "bh",
+            "outlet_passer_id": "passer",
+            "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "burst"},
+            "receiver_to": {"x": 45.0, "y": 15.0},
+            "other_players": [],
+        }
+    }
+
+    step = _build_outlet_pass_step(
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        step_start_coords=start_coords,
+        is_away_offense=False,
+        clock_remaining_at_start=300,
+        shot_clock_remaining_at_start=20,
+        next_step_index=2,
+    )
+
+    assert step is not None
+    assert step["start"]["archetype"]["rr"] == "burst"
+    assert step["start"]["destination"]["rr"] == {"x": 87.0, "y": 25.0}
 
 
 def _full_lineups():

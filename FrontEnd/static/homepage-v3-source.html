@@ -714,7 +714,7 @@
   <!-- NAV -->
   <div id="auth-bar" class="auth-bar gob-hp-nav">
     <div class="auth-bar-left">
-      <a href="/" class="logo-link">
+      <a href="/homepage.html" class="logo-link">
         <img src="./images/geekedout_logo.png" alt="Geeked-Out Basketball" class="logo">
       </a>
       <a href="/tutorial.html" class="nav-tutorials-link" aria-label="Tutorials">
@@ -1155,6 +1155,17 @@
     const heroCta = document.getElementById('hero-cta');
     const navCta = document.getElementById('nav-cta');
     let heroBottom = 0;
+
+    function updateLogoDestination() {
+      let isLoggedIn = false;
+      try {
+        isLoggedIn = !!(localStorage.getItem('auth_token') && localStorage.getItem('auth_user'));
+      } catch (e) {}
+      document.querySelectorAll('.logo-link').forEach(link => {
+        link.href = isLoggedIn ? '/mode-select.html' : '/homepage.html';
+      });
+    }
+    updateLogoDestination();
 
     function measure() {
       if (heroCta) heroBottom = heroCta.getBoundingClientRect().bottom + window.scrollY;

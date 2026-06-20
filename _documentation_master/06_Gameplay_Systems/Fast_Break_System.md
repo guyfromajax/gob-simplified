@@ -156,8 +156,9 @@ When two defenders both retreat to basket defense, the second defender's spot is
 - **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** is **`rim_runner`**.
 - **Designation**: Optional per team — `game_state["rim_runner_by_team_id"][str(team_id)]` = player id (set from lineup / `simulate-quarter` payload). If omitted, finisher = offensive player **closest to the attacking basket** at DREB (with transfer rule when the designated player is the rebounder; see implementation). Lineup UI: optional Rim Runner select on **Set Lineup**; URL params `home_rim_runner_player_id` / `away_rim_runner_player_id` → game payload.
 - **Outlet chain (sim + animation)**: Offensive **outlet target** `(tx, ty)` uses fixed outlet x by side (`45` home offense, `55` away offense) and the opposite vertical lane from the rim runner: `ty = 15` when RR starts in the upper half (`rr.y > 24`), else `ty = 35`. The **outlet receiver** is the offensive player (not the rim runner) closest to that target. If that player is the **rebounder**, there is **no outlet pass** (`roles["outlet_passer"] = null`); the rebounder dribbles to `(tx, ty)` in parallel with the burst-phase animation. Otherwise **`outlet_passer`** = rebounder and **`outlet_receiver`** = that closest player. `roles["rim_runner_sequence"]` is **true** only for **`rim_runner`**, not **`triangle`**.
-- **RR destination (`rr_to`)**: RR targets the same-side wing on the offense side of the court: `upper wing` if RR's pre-sprint `y > 24`, else `lower wing`. Roll `movement_factor = random.randint(1, 100)` vs **`0.6*AG + 0.2*IQ + 0.2*CH`**. **Success**: RR moves at `burst` speed using a **20–25** grid x delta toward the wing. **Fail**: RR moves at `sprint` speed using a **9–14** grid x delta toward the wing. X is clamped at the wing destination, so RR cannot overshoot the wing. Y is the wing's y.
-- **Dynamic RR x base**: When the prior shot has `ball_bounce_x` in the mid-court band (**home** `25 < x < 50`; **away** `50 < x < 75`), RR's x delta is measured from the outlet receiver target x, not from RR's pre-burst x. Outside that band, RR's x delta is measured from RR's pre-burst x.
+- **RR destination (`rr_to`)**: RR targets the offense `basketSpot` (`HCO_STRING_SPOTS`, mirrored for away offense). Roll `movement_factor = random.randint(1, 100)` vs **`0.6*AG + 0.2*IQ + 0.2*CH`**. **Success**: RR uses the `burst` archetype. **Fail**: RR uses the `sprint` archetype. The old same-side-wing clamp and x-delta cap are sunset; RR movement is now controlled by backend UESS step timing and AG-scaled archetype rates.
+- **RR Step 0 advance**: Step 0 is a fixed **1.0 game-second** advance toward `rr_to`. Backend interruption math computes the RR end coord as `archetype_rate × AG_scale × 1.0` along the path to `basketSpot`; RR is not forced to the final target unless his rate/distance allows it. The outlet-pass step then continues RR toward the same `basketSpot` using the same `burst` / `sprint` archetype chosen in Step 0.
+- **Dynamic RR x base**: Retained only as diagnostic metadata (`dynamic_rr_x_base`) when the prior shot has `ball_bounce_x` in the mid-court band (**home** `25 < x < 50`; **away** `50 < x < 75`). It no longer changes `rr_to`, because `rr_to` is always `basketSpot`.
 - **`roles["rim_runner_burst_phase"]`**: Structured payload for the client: `rr_id`, `rr_from` / `rr_to`, `burst_success`, `burst_delta`, `movement_factor`, `burst_threshold`, `dynamic_rr_x_base`, `skip_outlet_pass`, `outlet_passer_id`, `outlet_receiver_id`, `receiver_to` `{x,y}`, `outlet_defender_id`, `outlet_defender_to` (closest outlet contest defender tweens to **passer x ± 2** same **y** as passer; home **+2**, away **−2`), `other_players` (everyone not passer, that defender, rim runner, or outlet receiver). **Offense (rebounding team):** **x** toward basket **`random.randint(1, 4)`**, **y** unchanged. **Defense — get-back** (from prior shot's `offense_getback`, excluding outlet contest defender): **x** **15** spots toward the attacking basket, clamped so they do not cross the rim **x**; **y** up to **6** toward the rim runner's burst **y** (`rr_to.y`), without crossing past the RR in either vertical direction. Present on **both** successful and **denied** outlet turns so the sprint/setup can still animate when **`rim_runner_outlet_failed`** is true.
 - **Resolution (high level)**: Dedicated module **`resolve_rim_runner_fast_break()`** — build **`rim_runner_burst_phase`** + outlet roles → outlet contest → on success, apply rim runner + ball handler **coords** to burst targets → sim **burst** (`fb_open`) → ball-handler IQ read → pass vs hold → if pass: open lane → fast break shot; if not open → intercept tiers / bat OOB (`rim_runner_bat_oob`, SIP) / completion to shot. Uses team attrs **`fb_efficiency`** / **`fb_opp_modifier`** (clamped **−10…+10**) and `random.randint(1,6)` where applicable.
 - **Outlet contest (step A)**: Offense: `(PS*0.5 + ST*0.3 + IQ*0.2) * d6` vs defense: `(IQ*0.5 + OD*0.3 + ST*0.2) * d6`; offense adds **`+3 × fb_efficiency`**, defense adds **`+2 × fb_opp_modifier`**; if offense **≤** defense, settle to HCO — turn is still `DEFENSIVE_STOP` with **`rim_runner_outlet_failed: true`**, `defender` = outlet contest defender, text *“Outlet denied — settling…”* (see **client** below: this path does **not** use the generic fast-break defensive-stop animation or **`Great Stop!`**).
@@ -184,12 +185,12 @@ When two defenders both retreat to basket defense, the second defender's spot is
   - **`pass_attempted = False`**: Triangle enters its own setup/decision flow below (`triangle_setup_phase` on roles).
 - **Triangle setup**:
   - Two remaining offensive players become corner players and sprint to `upper corner` / `lower corner` (`HCO_STRING_SPOTS` labels).
-  - Ball handler uses non-burst movement to `upper wing` if `y > 25`, else `lower wing`.
-  - Rim runner uses non-burst movement to same-side `upper lowPost` / `lower lowPost`.
-  - Trailer (rebounder / outlet passer) uses non-burst movement to the opposite wing.
+  - Ball handler sprints to `upper wing` if `y > 25`, else `lower wing`.
+  - Rim runner sprints to same-side `upper lowPost` / `lower lowPost`.
+  - Trailer (rebounder / outlet passer) sprints to the opposite wing.
   - Defenders: closest-by-x defender to the offensive basket tracks the rim runner via skeleton HCO man-matchup placement; second-closest-by-x tracks the ball handler the same way; the other three target random lane spots from `lower/upper lowPost`, `lower/upper midPost`, `lower/upper highPost`, `basketSpot`, `midLane`, `topLane`, `lower/upper bird`, and `lower/upper apex`.
-  - If defense `fb_opp_modifier > 5`, any non-get-back defenders use RR burst movement during this setup; otherwise defensive movement is non-burst.
-- **Triangle setup advance trigger**: rim runner and ball handler both reach their setup spots.
+  - RR defender, BH defender, and helper defenders all sprint to their setup targets.
+- **Triangle setup advance trigger**: BH reaches his setup spot; T is BH traversal at `sprint` rate, AG-scaled.
 - **Triangle decision tree**:
   - `decision = random.randint(1, 8)`
   - `1-2`: pass to RR at lowPost -> RR inside shot
@@ -741,10 +742,10 @@ The outlet passer tracks:
   -Lane Pass Branches (Shot, Interception, or OOB)
     -Step 2: Lane Pass
       -Movement:
-        -RR +6 x (sprint)
+        -RR continues toward `basketSpot` from his carried-forward coord
         -If Primary Defender & (Interceopt or Batted Ball): contact_grid spot
         -All other players: stationary
-      -Movmeent Speeds: sprint (all moving players)
+      -Movmeent Speeds: RR uses the same `burst` / `sprint` archetype selected in Step 0; primary defender uses `sprint`
       -AT: ball_reaches_player
         -Shot: RR
         -Steal or Batted Ball OOB: Primary Defender

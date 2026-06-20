@@ -229,18 +229,18 @@ Step 2: Outcome branch keyed off `result_type`
 ## Rim Runner (`rim_runner_step_emitter`)
 
 Step 0: Burst
-- AT: `player_reaches_position` (RR reaches `rr_to`)
+- AT: `fixed_duration`, `T_game_seconds = 1.0`
 - Archetypes: RR = `burst` on movement-check success, `sprint` on failure; outlet receiver = `sprint`; get-back defenders = `sprint`; outlet passer = `stationary`; others = drift toward attacking basket (per `rim_runner_burst_phase` payload)
-- RR destination (`rr_to`): upper or lower wing (depending on which is his vertical half) on the offense side of the court
-  - X & Y: roll `movement_factor` vs `0.6×AG + 0.2×IQ + 0.2×CH` — success → 20–25 x delta at `burst` speed; fail → 9–14 x delta at `sprint` speed; clamped at the wing destination; sign by home/away offense
-  - Vertical half (uses pre-sprint y): if `y > 24` → upper; else lower
-  - Dynamic override when prior shot has `ball_bounce_x` in mid-court band (home `25 < x < 50`; away `50 < x < 75`): X measured from `outlet_receiver_target + burst_delta`, not from RR's pre-burst x
+- RR destination (`rr_to`): offense `basketSpot` (`HCO_STRING_SPOTS`, mirrored for away offense)
+  - Roll `movement_factor` vs `0.6×AG + 0.2×IQ + 0.2×CH` — success → `burst`; fail → `sprint`
+  - Backend interruption math advances RR toward `basketSpot` for exactly 1.0 game-second at the chosen AG-scaled archetype rate; RR is not forced to `basketSpot` unless his rate/distance allows it
+  - Dynamic x-base metadata may be stamped when prior shot has `ball_bounce_x` in the mid-court band (home `25 < x < 50`; away `50 < x < 75`), but it no longer changes `rr_to`
 - Outlet receiver: fixed outlet x by side (`45` home offense, `55` away offense); y snaps to the opposite wing band from RR (`15` if RR starts upper, else `35`)
 - Outlet contest defender moves to `outlet_defender_to` (passer x ±2 toward basket, same y as passer)
 - Get-back defenders: defender 1 targets 2 x spots ahead of RR's burst-end position (same y as RR); defender 2 (if present) targets the same-side `lowPost` near the basket (`upper lowPost` if RR's burst-end y > 24, else `lower`; coords from `HCO_STRING_SPOTS`)
 - Other O (2 non-RR, non-receiver) and other D (non-getback): drift forward 1–4 x spots toward the offense's attacking basket; y unchanged
 
-Step 1 (outlet pass success): Outlet pass — AT: `ball_reaches_player` (receiver); T = passer→receiver distance ÷ FB pass rate. Passer stationary, releases ball at step start; receiver stationary at `receiver_to`; all other movers' tweens keep running through step 1 by default (the opt-in `UESS_FB_CRITICAL_EVENT_PATTERN` flag in `fastBreak.js` would freeze them at the step 0 boundary instead).
+Step 1 (outlet pass success): Outlet pass — AT: `ball_reaches_player` (receiver); T = passer→receiver distance ÷ FB pass rate. Passer stationary, releases ball at step start; receiver stationary at `receiver_to`; RR continues toward `basketSpot` using the same `burst` / `sprint` archetype chosen in Step 0; other movers' tweens keep running through step 1 by default (the opt-in `UESS_FB_CRITICAL_EVENT_PATTERN` flag in `fastBreak.js` would freeze them at the step 0 boundary instead).
 
 Step 1: Branch keyed off outlet contest outcome
 
@@ -266,7 +266,7 @@ Step 2: Branch keyed off RR read result (after successful outlet)
 
 ATs: lane pass = `ball_reaches_player` (RR for shot; primary defender for steal/bat OOB). Shoot motion = `player_reaches_position` (RR reaches shot spot). Shot motion is the terminal step — there is no separate "shot resolution" step; the playback engine's `runShotAttempt` handler renders the release after the shooter snaps to the shot spot at step end.
 
-Lane-pass step per-role movement (shot branch): RR tweens 6 x spots further toward basket from `rr_to`, arriving at the catch grid the same instant the ball arrives (co-arrival); outlet receiver/BH stationary, releases lane pass; everyone else stationary at their step 0 endpoints. The "Fast Break!" announcement plays on `step.start` (secondary style, offense side, passer headshot, decision-pill payload from the FB play label).
+Lane-pass step per-role movement (shot branch): RR moves toward the pass catch target while the ball flies from the outlet receiver/BH; outlet receiver/BH stationary, releases lane pass; everyone else stationary at the prior step endpoints. The "Fast Break!" announcement plays on `step.start` (secondary style, offense side, passer headshot, decision-pill payload from the FB play label).
 
 Interception branch: RR tweens to a partial position (`rr_to.x + 3` toward basket, same y — not the full catch spot); stealer tweens to the interception contact grid at `sprint`; "Interception!" `step.end` announcement (defense side, stealer headshot, `meta.sfx: "steal"`, 1000ms hold).
 
@@ -345,13 +345,12 @@ Step 2: RR read gate (stricter threshold: `fb_open = (burst_offense_score × 0.8
 - Miss → DREB: same discrete DREB promotion as other migrated FB misses (schema bounce on MISS turn, rebound capture on DREB turn).
 
 Step 3: Triangle setup ("Fast Break!" announcement) — only when `pass_attempted = False`
-- AT: `player_reaches_position` gated on the **BH** reaching his setup spot (`gate_player_id = bh_id` in `_build_parallel_move_step`; T = BH traversal at `standard` rate, AG-scaled)
+- AT: `player_reaches_position` gated on the **BH** reaching his setup spot (`gate_player_id = bh_id` in `_build_parallel_move_step`; T = BH traversal at `sprint` rate, AG-scaled)
 - Corner players: `sprint` to upper/lower corner (lower-y → lower corner)
-- BH: non-burst to wing (upper if y > 25 else lower)
-- RR: non-burst to same-side lowPost as BH wing
-- Trailer (rebounder/outlet passer): non-burst to opposite wing
-- Defenders: closest-by-x → RR, second-closest-by-x → BH (skeleton HCO man-matchup); other 3 → random lane spots
-- If defense `fb_opp_modifier > 5`: non-get-back defenders use `burst`
+- BH: `sprint` to wing (upper if y > 25 else lower)
+- RR: `sprint` to same-side lowPost as BH wing
+- Trailer (rebounder/outlet passer): `sprint` to opposite wing
+- Defenders: closest-by-x → RR, second-closest-by-x → BH (skeleton HCO man-matchup); other 3 → random lane spots; all use `sprint`
 
 Step 4: Decision branch keyed off `triangle_branch` (from `decision = randint(1, 8)`)
 
@@ -365,7 +364,7 @@ Step 4: Decision branch keyed off `triangle_branch` (from `decision = randint(1,
 | `triangle_drive_corner_kick` | 5-6, drive 5 | BH drive → BH → corner pass → Shoot motion → **[skeleton post-shot chain]** | `SHOT_ATTEMPT` | ✓ |
 | `triangle_enter_hco` | 7-8 | (no shot; live coords carry forward; if BH ≠ PG, BH → PG pass once PG reaches HCO step 0) | implicit end → next HCO | ✗ |
 
-Triangle branch-step ATs: pass steps (BH → RR / BH → corner) = `ball_reaches_player` (receiver; T = pass flight at `FB_PASS_GRID_SPOTS_PER_GAME_SECOND`, floored at `FB_PASS_MIN_GAME_SECONDS`); drive step (`triangle_bh_drive` / `triangle_drive_rr_feed` / `triangle_drive_corner_kick`) = `player_reaches_position` gated on **BH** reaching `triangle_drive_to` (BH at `standard` / `handle_ball`, RR rides along at `sprint` / `cut` to `triangle_rr_drive_to`); shot motion = `player_reaches_position` (shooter reaches shot spot).
+Triangle branch-step ATs: pass steps (BH → RR / BH → corner) = `ball_reaches_player` (receiver; T = pass flight at `FB_PASS_GRID_SPOTS_PER_GAME_SECOND`, floored at `FB_PASS_MIN_GAME_SECONDS`); drive step (`triangle_bh_drive` / `triangle_drive_rr_feed` / `triangle_drive_corner_kick`) = `player_reaches_position` gated on **BH** reaching `triangle_drive_to` (BH at `sprint` / `handle_ball`, RR rides along at `sprint` / `cut` to `triangle_rr_drive_to`); shot motion = `player_reaches_position` (shooter reaches shot spot).
 
 Triangle-specific shot rules inside `[skeleton post-shot chain]`:
 - Corner-3: shot defender only if any defender within Euclidean 6 of shooter

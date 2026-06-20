@@ -90,14 +90,12 @@ def _collect_setup_moves(
     """(player_id, target, archetype, action) for triangle setup tweens."""
     moves: List[Tuple[str, GridCoord, PlayerArchetype, PlayerAction]] = []
 
-    def add(pid: Any, target: Any, *, burst: bool = False) -> None:
+    def add(pid: Any, target: Any) -> None:
         sid = _safe_id(pid)
         coord = _coord_dict(target)
         if not sid or coord is None:
             return
-        arch: PlayerArchetype = "burst" if burst else "standard"
-        action: PlayerAction = "cut" if burst else "cut"
-        moves.append((sid, coord, arch, action))
+        moves.append((sid, coord, "sprint", "cut"))
 
     add(payload.get("ball_handler_id"), payload.get("ball_handler_to"))
     add(payload.get("rim_runner_id"), payload.get("rim_runner_to"))
@@ -105,21 +103,13 @@ def _collect_setup_moves(
     for corner in payload.get("corner_players") or []:
         if not isinstance(corner, dict):
             continue
-        add(
-            corner.get("player_id"),
-            corner.get("to"),
-            burst=bool(corner.get("burst")),
-        )
+        add(corner.get("player_id"), corner.get("to"))
     add(payload.get("rr_defender_id"), payload.get("rr_defender_to"))
     add(payload.get("bh_defender_id"), payload.get("bh_defender_to"))
     for helper in payload.get("helper_defenders") or []:
         if not isinstance(helper, dict):
             continue
-        add(
-            helper.get("player_id"),
-            helper.get("to"),
-            burst=bool(helper.get("burst")),
-        )
+        add(helper.get("player_id"), helper.get("to"))
     return moves
 
 
@@ -143,7 +133,8 @@ def _build_parallel_move_step(
         return None
 
     gate_player = _player_lookup_by_id(off_lineup, def_lineup, gate_player_id)
-    gate_rate = _ag_grid_per_game_sec(gate_player, "standard")
+    gate_archetype = next((m[2] for m in movers if m[0] == gate_player_id), "standard")
+    gate_rate = _ag_grid_per_game_sec(gate_player, gate_archetype)
     t = max(
         0.2,
         _traversal_seconds(step_start_coords[gate_player_id], gate_target, gate_rate),
@@ -172,7 +163,7 @@ def _build_parallel_move_step(
 
     if ball_owner_id in step_start_coords:
         actions[ball_owner_id] = "handle_ball"
-        archetype[ball_owner_id] = "standard"
+        archetype[ball_owner_id] = gate_archetype if ball_owner_id == gate_player_id else "standard"
 
     ball: BallState = {"owner_player_id": ball_owner_id}
     advance_trigger: AdvanceTrigger = {
@@ -462,7 +453,7 @@ def _build_triangle_decision_steps(
     drive_bh = _coord_dict(payload.get("triangle_drive_to"))
     drive_rr = _coord_dict(payload.get("triangle_rr_drive_to"))
     if bh_id and drive_bh:
-        movers.append((bh_id, drive_bh, "standard", "handle_ball"))
+        movers.append((bh_id, drive_bh, "sprint", "handle_ball"))
     if rr_id and drive_rr:
         movers.append((rr_id, drive_rr, "sprint", "cut"))
     if not movers or not bh_id:

@@ -69,6 +69,24 @@
     document.head.appendChild(link);
   }
 
+  function getLogoDestination(isLoggedIn) {
+    return isLoggedIn ? '/mode-select.html' : '/homepage.html';
+  }
+
+  function updateLogoDestination(isLoggedIn) {
+    document.querySelectorAll('.logo-link').forEach(function (link) {
+      link.setAttribute('href', getLogoDestination(isLoggedIn));
+    });
+  }
+
+  function hasStoredAuthCredentials() {
+    try {
+      return !!(typeof localStorage !== 'undefined' && localStorage.getItem('auth_token') && localStorage.getItem('auth_user'));
+    } catch (e) {
+      return false;
+    }
+  }
+
   function loadScriptOnce(src) {
     return new Promise(function (resolve, reject) {
       if (document.querySelector('script[src="' + src + '"]')) {
@@ -257,7 +275,7 @@
     bar.className = 'auth-bar';
     bar.innerHTML = [
       '<div class="auth-bar-left">',
-      '  <a href="/" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>',
+      '  <a href="/homepage.html" class="logo-link"><img src="/images/geekedout_logo.png" alt="Geeked-Out Basketball logo" class="logo"></a>',
       '  <a href="/tutorial.html" class="nav-tutorials-link" aria-label="Tutorials">',
       '    <svg class="nav-tutorials-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">',
       '      <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.25"/>',
@@ -341,6 +359,7 @@
       ensureFeedbackButton();
       ensureSettingsButton();
       ensureTutorialsNavSound();
+      updateLogoDestination(hasStoredAuthCredentials());
       document.body.classList.add('has-auth-bar');
       return;
     }
@@ -753,6 +772,7 @@
 
     var authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
     var authUser = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_user') : null;
+    updateLogoDestination(hasStoredAuthCredentials());
 
     if (authToken && authUser) {
       try {
@@ -765,6 +785,7 @@
                 // Token valid - show logged-in state
                 if (authLoggedOut) authLoggedOut.style.display = 'none';
                 if (authLoggedIn) authLoggedIn.style.display = 'flex';
+                updateLogoDestination(true);
                 res.json().then(function (meData) {
                   setAuthMeData(meData);
                   refreshAccountSettingsModal();
@@ -793,6 +814,7 @@
                 }
                 if (authLoggedOut) authLoggedOut.style.display = 'flex';
                 if (authLoggedIn) authLoggedIn.style.display = 'none';
+                updateLogoDestination(false);
               }
             })
             .catch(function () {
@@ -803,11 +825,13 @@
               }
               if (authLoggedOut) authLoggedOut.style.display = 'flex';
               if (authLoggedIn) authLoggedIn.style.display = 'none';
+              updateLogoDestination(false);
             });
         } else {
           // API_CONFIG not available - show from localStorage but don't validate
           if (authLoggedOut) authLoggedOut.style.display = 'none';
           if (authLoggedIn) authLoggedIn.style.display = 'flex';
+          updateLogoDestination(true);
           setAuthMeData({
             username: user.username || null,
             email: user.email || null,
@@ -822,7 +846,10 @@
         }
         if (authLoggedOut) authLoggedOut.style.display = 'flex';
         if (authLoggedIn) authLoggedIn.style.display = 'none';
+        updateLogoDestination(false);
       }
+    } else {
+      updateLogoDestination(false);
     }
 
     if (logoutBtn) {
@@ -838,6 +865,7 @@
         }
         if (authLoggedOut) authLoggedOut.style.display = 'flex';
         if (authLoggedIn) authLoggedIn.style.display = 'none';
+        updateLogoDestination(false);
         window.location.href = '/mode-select.html';
       });
     }

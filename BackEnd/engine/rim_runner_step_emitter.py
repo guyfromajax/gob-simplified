@@ -246,6 +246,12 @@ def _attacking_basket(is_away_offense: bool) -> GridCoord:
     return {"x": float(rim["x"]), "y": float(rim["y"])}
 
 
+def _rr_payload_archetype(phase: Dict[str, Any]) -> PlayerArchetype:
+    rr_to = phase.get("rr_to") if isinstance(phase, dict) else None
+    raw = rr_to.get("movement_archetype") if isinstance(rr_to, dict) else None
+    return raw if raw in ("burst", "sprint") else "sprint"
+
+
 def _stamp_tween_durations(
     start: StepStart,
     end_coords: Dict[str, GridCoord],
@@ -402,7 +408,8 @@ def _build_burst_step(
     """Step 0: burst phase. All burst movers (RR, outlet receiver, outlet
     defender, ``other_players``) fire in parallel toward their burst targets.
 
-    Gate: RR reaches ``rr_to``. T = RR traversal time at ``burst`` archetype.
+    Gate: fixed 1.0 game-second. RR targets the basket spot and advances
+    exactly one game-second at the payload's ``burst`` / ``sprint`` archetype.
     Other movers' end coords = ``rate × T`` along their path (interrupted-coord
     math); the receiver completes earlier and is clamped at ``receiver_to``
     so the outlet pass step starts with both RR and receiver settled at their
@@ -450,21 +457,14 @@ def _build_burst_step(
         )
         return None
 
-    # Gate on RR reaching rr_to at the backend-authored burst/sprint rate. Receiver always reaches
-    # receiver_to earlier (shorter distance, lower archetype) and clamps at
-    # destination via _interrupted_coord.
-    rr_start = all_start_coords[rr_id]
+    # RR targets rr_to but Step 0 is a fixed one-game-second advance, so the
+    # end coord is rate-capped instead of forced to the final target.
     rr_end_target: GridCoord = {
         "x": float(rr_to["x"]),
         "y": float(rr_to["y"]),
     }
-    rr_payload_archetype = rr_to.get("movement_archetype")
-    rr_archetype: PlayerArchetype = (
-        rr_payload_archetype if rr_payload_archetype in ("burst", "sprint") else "burst"
-    )
-    rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
-    rr_rate = _ag_grid_per_game_sec(rr_player, rr_archetype)
-    t = max(0.1, _traversal_seconds(rr_start, rr_end_target, rr_rate))
+    rr_archetype = _rr_payload_archetype(phase)
+    t = 1.0
 
     receiver_end_target: GridCoord = {
         "x": float(receiver_to["x"]),
@@ -501,7 +501,6 @@ def _build_burst_step(
         )
 
     _commit_mover(rr_id, rr_end_target, "sprint", rr_archetype)
-    end_coords[rr_id] = dict(rr_end_target)
 
     _commit_mover(receiver_id, receiver_end_target, "cut", receiver_archetype)
 
@@ -540,11 +539,13 @@ def _build_burst_step(
     ball_end: BallState = {"owner_player_id": ball_owner}
 
     advance_trigger: AdvanceTrigger = {
-        "condition": "player_reaches_position",
+        "condition": "fixed_duration",
         "T_game_seconds": float(t),
         "metadata": {
             "target_player_id": rr_id,
             "target_coords": dict(rr_end_target),
+            "reason": "rim_runner_fixed_burst_advance",
+            "movement_archetype": rr_archetype,
         },
     }
 
@@ -594,9 +595,10 @@ def _build_outlet_pass_step(
     ``FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY``.
     Floored at ``FB_PASS_MIN_GAME_SECONDS`` for very short passes.
 
-    Per-player movement: passer / receiver stationary at their burst
-    endpoints; all other movers continue toward their step 0 burst
-    destinations (drift reads continuously through the pass).
+    Per-player movement: passer / receiver stationary at their current
+    carried-forward coords; RR continues toward the basket target using the
+    same archetype chosen in step 0; all other movers continue toward their
+    step 0 burst destinations.
 
     Reusable by Triangle. Caller skips this step entirely when
     ``skip_outlet_pass == true`` (rebounder == receiver).
@@ -672,7 +674,7 @@ def _build_outlet_pass_step(
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         if pid == rr_id:
-            arch: PlayerArchetype = "sprint"
+            arch: PlayerArchetype = _rr_payload_archetype(phase)
             action: PlayerAction = "sprint"
         elif pid == defender_id:
             arch = "standard"
@@ -793,9 +795,9 @@ def _build_lane_pass_step(
 ) -> Optional[AnimationStep]:
     """Shot branch step 2: lane pass (BH → RR catch).
 
-    Gate: ball reaches RR at catch grid (RR.x_post_burst + 6 toward
-    attacking basket, RR.y_post_burst). RR sprints to catch grid; ball
-    flies passer → catch grid concurrently. Co-arrival at T.
+    Gate: ball reaches RR at the carried ``rr_to`` target. RR continues toward
+    the offense basket spot with the same ``burst`` / ``sprint`` archetype
+    selected in step 0; ball flies passer → RR target concurrently.
 
     ``step.start.announcement = "Fast Break!"`` secondary, offense side,
     passer headshot, decision pill + FB play subtitle.
@@ -810,14 +812,15 @@ def _build_lane_pass_step(
 
     bh_coord = step_start_coords[bh_id]
     rr_coord = step_start_coords[rr_id]
-    x_dir = -1 if is_away_offense else 1
+    rr_to = phase.get("rr_to") or {}
     catch_grid: GridCoord = {
-        "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
-        "y": float(rr_coord["y"]),
+        "x": float(rr_to.get("x", rr_coord["x"])),
+        "y": float(rr_to.get("y", rr_coord["y"])),
     }
 
     rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
-    rr_rate = _ag_grid_per_game_sec(rr_player, "sprint")
+    rr_archetype = _rr_payload_archetype(phase)
+    rr_rate = _ag_grid_per_game_sec(rr_player, rr_archetype)
     t = max(0.3, _traversal_seconds(rr_coord, catch_grid, rr_rate))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
@@ -833,7 +836,7 @@ def _build_lane_pass_step(
 
     actions[bh_id] = "pass"
     actions[rr_id] = "receive"
-    archetype[rr_id] = "sprint"
+    archetype[rr_id] = rr_archetype
     destinations[rr_id] = dict(catch_grid)
     end_coords[rr_id] = dict(catch_grid)
 
@@ -1060,15 +1063,15 @@ def _build_lane_pass_intercepted_step(
 
     bh_coord = step_start_coords[bh_id]
     rr_coord = step_start_coords[rr_id]
-    x_dir = -1 if is_away_offense else 1
 
     # RR moves to the full catch_grid even though the pass is cut off — matches
     # the shot-branch destination for consistency across all three lane-pass
     # variants. The contact_grid (where the defender intercepts) is computed
     # from the same target.
+    rr_to = phase.get("rr_to") or {}
     catch_target: GridCoord = {
-        "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
-        "y": float(rr_coord["y"]),
+        "x": float(rr_to.get("x", rr_coord["x"])),
+        "y": float(rr_to.get("y", rr_coord["y"])),
     }
     rr_partial: GridCoord = dict(catch_target)
     contact_grid = _compute_interception_contact_grid(bh_coord, catch_target)
@@ -1091,7 +1094,7 @@ def _build_lane_pass_intercepted_step(
 
     actions[bh_id] = "pass"
     actions[rr_id] = "cut"
-    archetype[rr_id] = "sprint"
+    archetype[rr_id] = _rr_payload_archetype(phase)
     destinations[rr_id] = dict(rr_partial)
     end_coords[rr_id] = dict(rr_partial)
 
@@ -1199,13 +1202,13 @@ def _build_lane_pass_batted_step(
 
     bh_coord = step_start_coords[bh_id]
     rr_coord = step_start_coords[rr_id]
-    x_dir = -1 if is_away_offense else 1
 
     # RR moves to the full catch_grid even though the pass gets batted —
     # matches the shot-branch destination.
+    rr_to = phase.get("rr_to") or {}
     catch_target: GridCoord = {
-        "x": float(max(4.0, min(97.0, rr_coord["x"] + 6 * x_dir))),
-        "y": float(rr_coord["y"]),
+        "x": float(rr_to.get("x", rr_coord["x"])),
+        "y": float(rr_to.get("y", rr_coord["y"])),
     }
     rr_partial: GridCoord = dict(catch_target)
     contact_grid = _compute_interception_contact_grid(bh_coord, catch_target)
@@ -1229,7 +1232,7 @@ def _build_lane_pass_batted_step(
 
     actions[bh_id] = "pass"
     actions[rr_id] = "cut"
-    archetype[rr_id] = "sprint"
+    archetype[rr_id] = _rr_payload_archetype(phase)
     destinations[rr_id] = dict(rr_partial)
     end_coords[rr_id] = dict(rr_partial)
 

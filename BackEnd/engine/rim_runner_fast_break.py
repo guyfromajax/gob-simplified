@@ -467,10 +467,6 @@ def _resolve_rr_burst_destination(
     is_away_offense: bool,
     most_recent_shot_turn: Optional[dict],
 ) -> Tuple[Dict[str, float], Optional[float]]:
-    rr_half = _rr_half_from_y(rr_y0)
-    rr_wing_to = _spot_coords(f"{rr_half} wing", is_away_offense)
-    x_dir = -1 if is_away_offense else 1
-
     dynamic_base_x = None
     try:
         bounce_x = float((most_recent_shot_turn or {}).get("ball_bounce_x"))
@@ -480,18 +476,11 @@ def _resolve_rr_burst_destination(
         if (not is_away_offense and 25 < bounce_x < 50) or (is_away_offense and 50 < bounce_x < 75):
             dynamic_base_x = float(outlet_receiver_target_x)
 
-    base_x = dynamic_base_x if dynamic_base_x is not None else float(rr_x0)
-    raw_x = float(base_x) + x_dir * dx_burst
-    wing_x = float(rr_wing_to["x"])
-    if is_away_offense:
-        clamped_x = max(raw_x, wing_x)
-    else:
-        clamped_x = min(raw_x, wing_x)
-
+    basket_spot = _spot_coords("basketSpot", is_away_offense)
     return (
         {
-            "x": float(max(4, min(97, int(round(clamped_x))))),
-            "y": float(rr_wing_to["y"]),
+            "x": float(basket_spot["x"]),
+            "y": float(basket_spot["y"]),
         },
         dynamic_base_x,
     )
