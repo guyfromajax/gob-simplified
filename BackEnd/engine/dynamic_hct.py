@@ -70,6 +70,11 @@ from BackEnd.utils.shared import (
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
 from BackEnd.utils.transition_bridge import _interrupted_coord
+from BackEnd.engine.pass_contest import (
+    INTERCEPT,
+    resolve_offense_pass_modifier,
+    resolve_pass_contest,
+)
 
 
 # 10-second violation gate (per Dynamic_HCT_Turns.md "Special Situations").
@@ -1283,6 +1288,54 @@ def _pass_segment(
     return seg
 
 
+def _resolve_hct_pass_contest(
+    off_team: Any,
+    passer: Any,
+    passer_xy: Dict[str, Any],
+    receiver_xy: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+) -> Dict[str, Any]:
+    """§14 — resolve the HCT outlet pass contest. Builds the passer + five
+    defender descriptors from live coords/attributes and the HCT offense modifier
+    (``pt_opp_modifier``), then delegates to the pure ``resolve_pass_contest``.
+    Returns ``{outcome, deflector, contact_point}`` (deflector is a def position
+    key)."""
+    p_attrs = getattr(passer, "attributes", None) or {}
+    passer_desc = {
+        "xy": passer_xy,
+        "PS": p_attrs.get("PS", 50),
+        "CH": p_attrs.get("CH", 50),
+        "IQ": p_attrs.get("IQ", 50),
+    }
+    defenders: List[Dict[str, Any]] = []
+    for pos in POSITIONS:
+        d = def_lineup.get(pos)
+        if d is None:
+            continue
+        d_attrs = getattr(d, "attributes", None) or {}
+        defenders.append(
+            {
+                "id": pos,
+                "xy": def_coords[pos],
+                "rate": ag_to_grid_per_game_sec(d_attrs.get("AG", 50)),
+                "OD": d_attrs.get("OD", 50),
+                "CH": d_attrs.get("CH", 50),
+                "IQ": d_attrs.get("IQ", 50),
+            }
+        )
+    offense_modifier = resolve_offense_pass_modifier(
+        "HCT", getattr(off_team, "team_attributes", None)
+    )
+    return resolve_pass_contest(
+        passer_desc,
+        receiver_xy,
+        PASS_GRID_PER_GAME_SEC,
+        defenders,
+        offense_modifier=offense_modifier,
+    )
+
+
 def _emit_dead_ball_drive(
     bh_xy, score_ratio, is_away_offense, bh_drive_rate, off_coords, def_coords, bh_pos,
     play: Any = None,
@@ -1452,6 +1505,10 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     # On-court location where a STEAL changed hands (the BH's spot) — seeds the
     # stealer's start for the next possession's Steal HCO / fast-break setup.
     steal_coords: Dict[str, Any] = {}
+    # §14 — set when the STEAL terminal is a PASS interception (vs a reach-in /
+    # strip). Threads through the wrapper to the turn dict so the FE shows the
+    # "INTERCEPTION!" announce + interception SFX (gameAnnouncements.isPassInterception).
+    is_interception: bool = False
     # Reach-in micro-movement (render-space only): the on-ball defender position
     # of the contest moment currently being resolved. Set by ``_resolve_attack``;
     # consumed by ``_stamp_reach_in`` to tag the moment's emitted segment so the
@@ -1927,6 +1984,37 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         # setup pull doesn't drag him back across half court.
         _park_passer(passer_pos)
 
+        # §14 — pass contest: a defender sitting in the outlet lane can pick it
+        # off. The geometry/attribute primitive returns COMPLETE / INTERCEPT /
+        # BAT_OOB. Phase 2 wires INTERCEPT → the (shipped) STEAL terminal; BAT_OOB
+        # is treated as a completion for now — its offense-retains out-of-bounds
+        # ball animation lands with the §14.7 Phase-4 polish.
+        contest = _resolve_hct_pass_contest(
+            off_team, ball_handler, off_coords[passer_pos], off_coords[receiver_pos],
+            def_lineup, def_coords,
+        )
+        if contest["outcome"] == INTERCEPT:
+            interceptor_pos = contest["deflector"]
+            interceptor = def_lineup.get(interceptor_pos)
+            contact = contest["contact_point"] or dict(off_coords[receiver_pos])
+            # Picked off in flight: the pass never completes. Reuse the STEAL
+            # terminal (possession flips, STL credit, fast-break-off-takeaway) and
+            # flag it as an interception so the FE swaps the headline + voice. The
+            # passer (current ``ball_handler``) eats the turnover; the contact spot
+            # seeds the stealer's next possession.
+            result_type = "STEAL"
+            stealer = interceptor or stealer
+            steal_coords = _clamp_xy(dict(contact))
+            is_interception = True
+            sec = _emit_stopper(
+                "hct_interception",
+                f"interception (terminal — {passer_pos}\u2192{receiver_pos} "
+                f"picked off by {interceptor_pos})",
+            )
+            shot_clock -= sec
+            text_suffix = " — pass picked off, intercepted!"
+            break
+
         # Pass flight: the ball travels passer→receiver while the defense closes
         # at its OWN rate (rate-limited, NOT snapped) toward its targets anchored
         # on the receiver (the incoming ball). A quicker close reaches the catch;
@@ -1981,6 +2069,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         "foul_player": foul_player,
         "stealer": stealer,
         "steal_coords": steal_coords,
+        "is_interception": is_interception,
         "ball_handler": ball_handler,
         "defender": defender,
         "text_suffix": text_suffix,

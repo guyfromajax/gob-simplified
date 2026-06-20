@@ -7568,6 +7568,8 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "foul_team": foul_team,
         "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
         "stealer_id": getattr(stealer, "player_id", None) if (result_type == "STEAL" and stealer) else None,
+        # §14 — STEAL that is a pass interception → FE shows "INTERCEPTION!" + SFX.
+        "is_interception": bool(dyn.get("is_interception")) if result_type == "STEAL" else False,
         "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
         "defender_id": getattr(defender, "player_id", None) if defender else None,
         "fouled_out": foul_out_info.get("fouled_out", False),

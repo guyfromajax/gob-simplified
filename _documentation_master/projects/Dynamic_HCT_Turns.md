@@ -1451,25 +1451,32 @@ intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2) × random(1,6)     # hands/aware
 `contact_point` is the agreed backend/frontend contact grid (generalize
 `_compute_interception_contact_grid`).
 
-### 14.5 — HCT wiring (the prototype)
+### 14.5 — HCT wiring (the prototype) — **INTERCEPT shipped**
 
-In the §6 pass branch, after the receiver + `pass_seconds` are known, gather the five
-defenders as candidates (geometry filters them; in Straight Pressure the man-defenders
-sitting at **60% on the BH→man line are literally in the lane**, so interceptions
-emerge from the man-to-man positioning, not a bolted-on roll). Run
-`resolve_pass_contest` with the passer descriptor and `offense_modifier =
-resolve_offense_pass_modifier("HCT", off_team.team_attributes)` (HCT → `pt_opp_modifier`):
+In the §6 pass branch, immediately after `receiver_pos` is chosen (before the flight),
+`dynamic_hct._resolve_hct_pass_contest` gathers the passer descriptor + all five
+defender descriptors from live coords/attributes and runs `resolve_pass_contest` with
+`offense_modifier = resolve_offense_pass_modifier("HCT", off_team.team_attributes)`
+(HCT → `pt_opp_modifier`). In Straight Pressure the man-defenders sitting at **60% on the
+BH→man line are literally in the lane**, so interceptions emerge from the man-to-man
+positioning, not a bolted-on roll.
 
 - `COMPLETE` → unchanged (rate-limited close during flight + receiver read-and-react).
-- `INTERCEPT` → `result_type="STEAL"`, `stealer = _steal_credit_defender(...)`,
-  `steal_coords = contact_point`, seed the transition (same path as the existing HCT
-  steal terminal). Recorded as an **HCT** turn (`current_turn="HCT"`, `HCT_*_D`).
-- `BAT_OOB` → `result_type="DEAD BALL"`, `possession_flips=False`,
-  `next_play_type="SIDE_INBOUND"`.
+- `INTERCEPT` → **wired.** Reuses the shipped HCT STEAL terminal: `result_type="STEAL"`,
+  `stealer` = the contesting defender, `steal_coords = contact_point`, and a new
+  `is_interception=True` flag threaded through `_resolve_half_court_trap_dynamic_first_cut`
+  onto the turn dict. The passer eats the TO; possession flips with the normal
+  fast-break-off-takeaway chance. Recorded as an **HCT** turn (`current_turn="HCT"`).
+  The FE swaps the headline to **"INTERCEPTION!"** + interception SFX via
+  `gameAnnouncements.isPassInterception` (reads `is_interception`).
+- `BAT_OOB` → **deferred (Phase 2b).** Currently treated as a `COMPLETE` (the pass goes
+  through), because offense-retains + side-inbound needs its out-of-bounds ball animation
+  and a generic batted-OOB announce; bundled with the §14.7 Phase-4 polish below.
 
-**Animation:** shorten the `_pass_segment` flight to `contact_point`; `INTERCEPT`
-attaches the ball to the deflector; `BAT_OOB` sends it out of bounds — reusing the RR
-interception / bat-OOB render vocabulary.
+**Animation (current cut):** INTERCEPT breaks *before* emitting the pass-flight segment
+and fires the existing steal-stopper collapse, so the takeaway reuses the shipped STEAL
+render path. The pass-flight-to-`contact_point` shortening (ball visibly picked off in
+flight) + the BAT_OOB out-of-bounds send are the Phase-4 polish.
 
 ### 14.6 — Knobs to tune
 
@@ -1482,11 +1489,14 @@ interception / bat-OOB render vocabulary.
 
 ### 14.7 — Phasing
 
-1. **Extract + unit-test** `resolve_pass_contest` (geometry first; band with injected RNG). *(this PR)*
-2. Wire into the **HCT pass branch** (§14.5) — INTERCEPT + BAT_OOB terminals.
+1. ✅ **Extract + unit-test** `resolve_pass_contest` (geometry first; band with injected RNG).
+2. ✅ **HCT pass branch — INTERCEPT** (§14.5): `is_interception` STEAL terminal + FE
+   "INTERCEPTION!" announce/SFX. **2b (pending):** the `BAT_OOB` terminal (offense-retains
+   → `SIDE_INBOUND`), bundled with step 4's OOB animation.
 3. Generalize to HCO / inbound pass paths; optionally refactor Rim Runner onto the
    shared primitive (single source of truth).
-4. Animation polish (contact grid + OOB).
+4. Animation polish: shorten the pass flight to `contact_point` (ball picked off in
+   flight) + the BAT_OOB out-of-bounds send.
 
 ### 14.8 — Open items
 
