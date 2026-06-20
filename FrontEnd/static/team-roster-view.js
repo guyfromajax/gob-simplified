@@ -20,7 +20,7 @@ let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
 /** @type {'single' | 'full'} */
 let attrDisplayMode = 'single';
-// True once Week 35 Recruiting Day has run — section becomes "Practice Squad + Recruits".
+// True once Week 35 Recruiting Day has run — recruits join the Practice Squad section.
 let practiceSquadRecruitingDone = false;
 
 const ROSTER_ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
@@ -534,7 +534,7 @@ function renderTrainingSquadView() {
   }
   const titleEl = document.getElementById('ps-section-title');
   if (titleEl) {
-    titleEl.textContent = practiceSquadRecruitingDone ? 'Practice Squad + Recruits' : 'Practice Squad Players';
+    titleEl.textContent = 'Practice Squad';
   }
   renderRosterInto(trainingSquadData, 'ts-roster-body');
   renderPracticeSquadStats();

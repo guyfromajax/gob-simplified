@@ -2269,8 +2269,8 @@ function renderTrainingResults(data) {
   }
 }
 
-// Practice Squad Players section (the 3 cut players). After Week 35 Recruiting Day
-// the team's recruits join the list and the header becomes "Practice Squad + Recruits".
+// Practice Squad section (the 3 cut players). After Week 35 Recruiting Day
+// the team's recruits join the list under the same "Practice Squad" header.
 // Renders an attributes table and a stats table (fed by ps_season_stats), mirroring
 // the team roster pages.
 function renderPracticeSquad(data) {
@@ -2297,7 +2297,7 @@ function renderPracticeSquad(data) {
     return;
   }
 
-  const psTitle = data.practice_squad_recruiting_done ? 'Practice Squad + Recruits' : 'Practice Squad Players';
+  const psTitle = 'Practice Squad';
   if (titleEl) titleEl.textContent = psTitle;
   if (statsTitleEl) statsTitleEl.textContent = psTitle;
 
@@ -2543,7 +2543,7 @@ function renderTeam(data) {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
   }
 
-  // Practice Squad Players (+ Recruits after Week 35) rendered below the active roster.
+  // Practice Squad (+ Recruits after Week 35) rendered below the active roster.
   renderPracticeSquad(data);
 
   // Add click handlers to sortable headers
