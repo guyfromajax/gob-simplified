@@ -1169,7 +1169,14 @@ export class ShotAnimationSystem {
           showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
         }
       } else {
-        showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+        // Made 3-pointer → random announcer "three" call at the announce mount
+        // (SFX_System.md "Made Three Announce"). points === 3 is the canonical
+        // signal; 2-pt makes carry no court SFX here.
+        const isThree = Number(turnData.points ?? turnData.points_scored) === 3;
+        showAnnouncement(
+          "It's Good!", teamStyle, shooterPlayerData,
+          isThree ? { sfx: "three_make", scene: this.scene } : null,
+        );
       }
     }
 

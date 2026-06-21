@@ -3175,7 +3175,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
       }
     } else {
-      showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+      // Made 3-pointer on the break → random "three" announcer call at the
+      // announce mount (SFX_System.md "Made Three Announce").
+      const isThree = Number(turnData?.points ?? turnData?.points_scored) === 3;
+      showAnnouncement(
+        "It's Good!", teamStyle, shooterPlayerData,
+        isThree ? { sfx: "three_make", scene } : null,
+      );
     }
 
     const makeHoldMs = animationConfig.fastBreak?.makeAnnouncementHoldMs ?? 1000;
