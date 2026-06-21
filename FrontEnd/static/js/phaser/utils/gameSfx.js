@@ -43,7 +43,7 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "sammy-steal.wav",
   "braddock-steal.wav",
   "butler-steal.wav",
-  "click-steal1.wav",
+  "click-steal.wav",
   "duke-its-blocked.wav",
   "duke-charging.wav",
   "duke-great-stop.wav",
@@ -229,12 +229,22 @@ export function playGameSfx(scene, filename, volume = DEFAULT_VOLUME, meta = {})
 }
 
 /**
- * Steal reach-in cue: plays `click-steal1.wav` once. Fired by the reach-in
- * flourish at the moment the steal micro-movement begins (see flourishes.js).
- * Audio is non-critical.
+ * Steal reach-in cue: plays `click-steal.wav` twice in quick succession (the
+ * second starts the moment the first finishes). Fired by the reach-in flourish
+ * at the start of the steal micro-movement (see flourishes.js). Audio is
+ * non-critical — if the first play never fires its `ended` event (e.g. autoplay
+ * blocked), the second simply doesn't play.
  */
 export function playStealReachInSfx(scene) {
-  playGameSfx(scene, "click-steal1.wav", DEFAULT_VOLUME, { event: "steal_reach_in" });
+  const filename = "click-steal.wav";
+  const first = playGameSfx(scene, filename, DEFAULT_VOLUME, { event: "steal_reach_in" });
+  if (first && typeof first.addEventListener === "function") {
+    first.addEventListener(
+      "ended",
+      () => playGameSfx(scene, filename, DEFAULT_VOLUME, { event: "steal_reach_in_2" }),
+      { once: true },
+    );
+  }
 }
 
 function toNumber(value) {
