@@ -29,6 +29,15 @@ FAST_BREAK_PLAY_KEYS = (
     TRIANGLE,
     AFTER_STEAL,
 )
+
+# UI labels (snake_case key → display name), parallel to HCT_TRAP_PLAY_LABELS.
+# Used by the FCC Scouting Report "Play Usage: Fast Breaks" panel.
+FAST_BREAK_PLAY_LABELS = {
+    COVERT_RELEASE: "Covert Release",
+    RIM_RUNNER: "Rim Runner",
+    TRIANGLE: "Triangle",
+    AFTER_STEAL: "After Steal",
+}
 DEFAULT_DREB_FAST_BREAK_WEIGHTS = {
     COVERT_RELEASE: 33,
     RIM_RUNNER: 33,

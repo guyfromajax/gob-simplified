@@ -10555,12 +10555,35 @@ def get_scouting_report(franchise_id: str, team_name: str):
     if not play_usage_unlocked:
         plays_data = []
 
+    # Fast Break (offense) and HCT trap (defense) play usage unlock at a higher
+    # Film Study tier (> 1); Half-Court Offense unlocks at > 0. Same per-game
+    # source as HCO — the opponent's saved last-game `scouting` snapshot.
+    from BackEnd.utils.scouting_utils import extract_play_counters_from_game_document
+    from BackEnd.constants.fast_break_play_types import FAST_BREAK_PLAY_LABELS
+    from BackEnd.constants.hct_trap_play_types import HCT_TRAP_PLAY_LABELS
+    extended_usage_unlocked = user_film_study > 1
+    fast_break_plays: list = []
+    hct_trap_plays: list = []
+    if extended_usage_unlocked:
+        fast_break_plays = extract_play_counters_from_game_document(
+            last_game, team_name, str(team_object_id), team_id_field,
+            side="offense", subkey="fast_break_plays", label_map=FAST_BREAK_PLAY_LABELS,
+        )
+        hct_trap_plays = extract_play_counters_from_game_document(
+            last_game, team_name, str(team_object_id), team_id_field,
+            side="defense", subkey="hct_trap_plays", label_map=HCT_TRAP_PLAY_LABELS,
+        )
+
     return {
         "team_attributes": team_attributes,
         "plays": plays_data,
         "projected_starting_five": projected_starting_five,
         "player_season_stats": player_season_stats,
         "play_usage_unlocked": play_usage_unlocked,
+        "fast_break_plays": fast_break_plays,
+        "hct_trap_plays": hct_trap_plays,
+        "fast_break_usage_unlocked": extended_usage_unlocked,
+        "hct_usage_unlocked": extended_usage_unlocked,
     }
 
 
@@ -11494,9 +11517,14 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     # Weeks > 1 only (week 1 has no prior game): when Film Study was run, the
     # opponent's prior-game Play Usage is unlocked in the FCC Scouting Report.
     if int(week) > 1 and _film_study > 0:
+        # Film Study > 0 unlocks Half-Court Offense usage; > 1 also unlocks Fast
+        # Breaks + Half-Court Traps. The note's parenthetical lists what was added.
+        _scope = "Half-Court Offense"
+        if _film_study > 1:
+            _scope = "Half-Court Offense, Fast Breaks, Half-Court Traps"
         _training_notes.append({
             "title": "Film Study",
-            "body": "Opponent's prior game play usage stats have been added to the scouting report in the command center (Half-Court Offense).",
+            "body": f"Opponent's prior game play usage stats have been added to the scouting report in the command center ({_scope}).",
         })
 
     training_report_data = {

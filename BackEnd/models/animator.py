@@ -214,20 +214,35 @@ class Animator:
         ball_handler_outlet_y = fb_roles.get("ball_handler_outlet_y")
         ball_handler_move_x = fb_roles.get("ball_handler_move_x", 7)  # Default 7 if not set
         
-        # Calculate additional movement from outlet position
-        # For defensive stops and shot attempts: 5-10 x spots (IN ADDITION to steal entry), ±3 y
-        # Direction: -1 for away offense (toward x=10), +1 for home offense (toward x=90)
-        # ✅ SS&S: Use direction directly, no coordinate flipping
-        move_distance = random.randint(BALL_HANDLER_MOVE_X_MIN, BALL_HANDLER_MOVE_X_MAX)
-        x_direction = -1 if is_away_offense else 1  # Away: -1 (toward x=10), Home: +1 (toward x=90)
-        additional_move_x = x_direction * move_distance
-        additional_move_y = random.randint(-BALL_HANDLER_MOVE_Y_RANGE, BALL_HANDLER_MOVE_Y_RANGE)
+        # Calculate additional movement from outlet position (pre-rolled by backend
+        # when drive-cutoff resolution ran, so animation matches the contest geometry).
+        if fb_roles.get("ball_handler_drive_roll_x") is not None:
+            additional_move_x = int(fb_roles["ball_handler_drive_roll_x"])
+            additional_move_y = int(fb_roles.get("ball_handler_drive_roll_y") or 0)
+        else:
+            move_distance = random.randint(BALL_HANDLER_MOVE_X_MIN, BALL_HANDLER_MOVE_X_MAX)
+            x_direction = -1 if is_away_offense else 1
+            additional_move_x = x_direction * move_distance
+            additional_move_y = random.randint(-BALL_HANDLER_MOVE_Y_RANGE, BALL_HANDLER_MOVE_Y_RANGE)
         
         # Calculate ball handler's final position (coordinates already in correct orientation)
         # When ball handler beats defender (hold_up but shot attempt), use shot spot near rim
         # so the shooter doesn't take the shot from the confrontation/stop spot.
         ball_handler_beats_defender = hold_up and fb_roles.get("ball_handler_beats_defender")
-        if ball_handler_beats_defender:
+        cutoff_meet_x = fb_roles.get("cutoff_meet_x")
+        cutoff_meet_y = fb_roles.get("cutoff_meet_y")
+        if (
+            hold_up
+            and cutoff_meet_x is not None
+            and cutoff_meet_y is not None
+            and not ball_handler_beats_defender
+        ):
+            # Drive-cutoff collision: BH ends at the meet point (shared with HCT cutoff).
+            bh_end = {
+                "x": max(4, min(97, int(cutoff_meet_x))),
+                "y": max(1, min(49, int(cutoff_meet_y))),
+            }
+        elif ball_handler_beats_defender:
             # Ball handler beat defender: shot spot near rim (same as no defensive stop attempt)
             rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
             shot_distance = random.randint(FB_SHOT_SPOT_X_MIN, FB_SHOT_SPOT_X_MAX)
@@ -324,14 +339,20 @@ class Animator:
                         build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                         mark_player_animated(player_id)
             else:
-                # Defensive stop (no shot): stopper 1–3 x toward basket from BH end, same y
+                # Defensive stop (no shot): stopper at meet point or 1–3 x toward basket from BH end
                 if stopper:
-                    stopper_offset = random.randint(STOPPER_OFFSET_MIN, STOPPER_OFFSET_MAX)
-                    if is_away_offense:
-                        stopper_x = max(4, bh_stop_x - stopper_offset)
+                    if cutoff_meet_x is not None and cutoff_meet_y is not None:
+                        end = {
+                            "x": max(4, min(97, int(cutoff_meet_x))),
+                            "y": max(1, min(49, int(cutoff_meet_y))),
+                        }
                     else:
-                        stopper_x = min(97, bh_stop_x + stopper_offset)
-                    end = {"x": stopper_x, "y": bh_stop_y}
+                        stopper_offset = random.randint(STOPPER_OFFSET_MIN, STOPPER_OFFSET_MAX)
+                        if is_away_offense:
+                            stopper_x = max(4, bh_stop_x - stopper_offset)
+                        else:
+                            stopper_x = min(97, bh_stop_x + stopper_offset)
+                        end = {"x": stopper_x, "y": bh_stop_y}
                     build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
                     mark_player_animated(getattr(stopper, "player_id", None))
 

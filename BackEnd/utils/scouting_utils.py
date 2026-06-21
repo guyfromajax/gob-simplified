@@ -11,6 +11,32 @@ from BackEnd.utils.roster_builder import build_roster_players, ATTR_KEYS as SCOU
 from BackEnd.utils.team_play_utils import iter_team_plays
 
 
+def _resolve_game_team_key(
+    teams_obj: Dict[str, Any],
+    team_name: str,
+    team_object_id: str,
+    team_id_field: Optional[str],
+) -> Optional[str]:
+    """Resolve a team's key in a game document's ``teams`` object. Keys may be
+    team_id strings (e.g. "LITTLE_YORK"), team names, or ObjectId strings."""
+    for key in teams_obj.keys():
+        if team_id_field and key == team_id_field:
+            return key
+        if key == team_name:
+            return key
+        try:
+            if len(key) == 24:  # ObjectId string length
+                key_obj_id = ObjectId(key)
+                if key_obj_id == ObjectId(team_object_id):
+                    return key
+                key_team_doc = teams_collection.find_one({"_id": key_obj_id})
+                if key_team_doc and key_team_doc.get("name") == team_name:
+                    return key
+        except Exception:
+            pass
+    return None
+
+
 def extract_plays_from_game_document(
     last_game: Dict[str, Any],
     team_name: str,
@@ -44,35 +70,8 @@ def extract_plays_from_game_document(
     if not teams_obj:
         return plays_data
     
-    # Game documents use team_id strings (like "LITTLE_YORK") as keys, not ObjectIds
-    # We need to find the team key by matching team name or team_id
-    team_key = None
-    
-    # Try multiple matching strategies
-    for key in teams_obj.keys():
-        # Strategy 1: Match by team_id field (e.g., "LITTLE_YORK")
-        if team_id_field and key == team_id_field:
-            team_key = key
-            break
-        # Strategy 2: Match by team name
-        if key == team_name:
-            team_key = key
-            break
-        # Strategy 3: Try to match by ObjectId (if key is an ObjectId string)
-        try:
-            if len(key) == 24:  # ObjectId string length
-                key_obj_id = ObjectId(key)
-                if key_obj_id == ObjectId(team_object_id):
-                    team_key = key
-                    break
-                # Also check if this ObjectId matches our team
-                key_team_doc = teams_collection.find_one({"_id": key_obj_id})
-                if key_team_doc and key_team_doc.get("name") == team_name:
-                    team_key = key
-                    break
-        except Exception:
-            pass
-    
+    # Game documents key teams by team_id string / name / ObjectId string.
+    team_key = _resolve_game_team_key(teams_obj, team_name, team_object_id, team_id_field)
     if not team_key:
         return plays_data
     
@@ -105,6 +104,51 @@ def extract_plays_from_game_document(
             })
     
     return plays_data
+
+
+def extract_play_counters_from_game_document(
+    last_game: Dict[str, Any],
+    team_name: str,
+    team_object_id: str,
+    team_id_field: Optional[str],
+    *,
+    side: str,
+    subkey: str,
+    label_map: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    """Per-play A/S counter extractor for the scouting report (Fast Break /
+    HCT trap), mirroring ``extract_plays_from_game_document``'s per-game
+    semantics. Reads the team's saved per-game ``scouting`` snapshot at
+    ``teams[key]["scouting"][side][subkey]`` — e.g. ``offense.fast_break_plays``
+    or ``defense.hct_trap_plays``. Returns rows shaped for ``renderPlayUsage``
+    (``name`` / ``times_run`` / ``successes``), only for plays actually run
+    (A > 0). ``A`` → ``times_run``, ``S`` → ``successes``.
+    """
+    rows: List[Dict[str, Any]] = []
+    if not last_game:
+        return rows
+    teams_obj = last_game.get("teams", {})
+    if not teams_obj:
+        return rows
+    team_key = _resolve_game_team_key(teams_obj, team_name, team_object_id, team_id_field)
+    if not team_key:
+        return rows
+    scouting = teams_obj.get(team_key, {}).get("scouting", {}) or {}
+    counters = (scouting.get(side) or {}).get(subkey) or {}
+    if not isinstance(counters, dict):
+        return rows
+    for play_key, label in label_map.items():
+        stats = counters.get(play_key) or {}
+        attempts = int(stats.get("A", 0) or 0)
+        successes = int(stats.get("S", 0) or 0)
+        if attempts > 0:
+            rows.append({
+                "play_key": play_key,
+                "name": label,
+                "times_run": attempts,
+                "successes": successes,
+            })
+    return rows
 
 
 SCOUTING_LINEUP_POSITIONS: Tuple[str, ...] = ("PG", "SG", "SF", "PF", "C")

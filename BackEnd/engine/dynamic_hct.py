@@ -67,6 +67,7 @@ from BackEnd.utils.shared import (
     clamp_animation_grid_coords,
     get_away_player_coords,
 )
+from BackEnd.engine.cutoff_resolution import best_cutoff_on_drive, resolve_cutoff_contest
 from BackEnd.constants.hct_trap_play_types import STANDARD_DIAMOND
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
@@ -1751,37 +1752,6 @@ def _emit_dead_ball_drive(
     )
 
 
-def _cutoff_meet_point(
-    mover_start: Dict[str, Any],
-    mover_target: Dict[str, Any],
-    mover_rate: float,
-    defender_xy: Dict[str, Any],
-    defender_rate: float,
-) -> Optional[Dict[str, int]]:
-    """§5 / D21 interception solver. Walk the mover's straight path to its target
-    and return the **first** point the defender can reach **no later than** the
-    mover (the cutoff / meet point), or ``None`` if the defender has no angle.
-
-    Compares arrival times at each sampled point: ``t_mover = dist_along / rate``
-    vs ``t_def = dist(defender, point) / rate``. Speeds come from attributes, so
-    a quicker player wins the race.
-    """
-    if mover_rate <= 0 or defender_rate <= 0:
-        return None
-    total = _euclid(mover_start, mover_target)
-    if total <= 0:
-        return None
-    steps = max(1, int(round(total)))
-    for i in range(steps + 1):
-        s = i / steps
-        point = _interpolate(mover_start, mover_target, s)
-        t_mover = (total * s) / mover_rate
-        t_def = _euclid(defender_xy, point) / defender_rate
-        if t_def <= t_mover:
-            return _clamp_xy(point)
-    return None
-
-
 def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     """
     Build the dynamic HCT turn for this engine state.
@@ -2018,24 +1988,28 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         else:
             base_target = TOPLANE_SPOT
         target = _clamp_xy(base_target if not is_away_offense else _flip(base_target))
-        cutoff_pos = min(POSITIONS, key=lambda p: _euclid(bh_xy, def_coords[p]))
-        cutoff_def = def_lineup.get(cutoff_pos)
-        def_rate = _ag_grid_per_game_sec(cutoff_def, "standard")
-        meet = _cutoff_meet_point(
-            bh_xy, target, bh_drive_rate, def_coords[cutoff_pos], def_rate
+        cutoff_pos, meet = best_cutoff_on_drive(
+            bh_xy, target, bh_drive_rate, def_coords, def_lineup,
+            get_defender_rate=lambda d: _ag_grid_per_game_sec(d, "standard"),
+            clamp_fn=_clamp_xy,
         )
+        cutoff_def = def_lineup.get(cutoff_pos) if cutoff_pos else None
 
-        if meet is None:
-            # No angle → clean drive to the y-keyed ABA spot; cutoff defender trails.
+        if meet is None or cutoff_pos is None:
+            # No angle → clean drive to the y-keyed ABA spot; nearest trail defender
+            # chases (cosmetic — no contest).
+            trail_pos = min(POSITIONS, key=lambda p: _euclid(bh_xy, def_coords[p]))
+            trail_def = def_lineup.get(trail_pos)
+            def_rate = _ag_grid_per_game_sec(trail_def, "standard")
             seconds = max(0.3, _euclid(bh_xy, target) / bh_drive_rate)
             off_coords[bh_pos] = target
             if def_rate > 0:
-                def_coords[cutoff_pos] = _clamp_xy(
-                    _interrupted_coord(def_coords[cutoff_pos], target, def_rate, seconds)
+                def_coords[trail_pos] = _clamp_xy(
+                    _interrupted_coord(def_coords[trail_pos], target, def_rate, seconds)
                 )
             bh_xy = off_coords[bh_pos]
             # Off-ball players each roll to drift toward the rim or hold.
-            _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", cutoff_pos)})
+            _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", trail_pos)})
             loop_segments.append(
                 _segment(
                     "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
@@ -2065,8 +2039,8 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         )
         nonlocal_shot_clock_dec(seconds)
 
-        outcome, _ratio, credited = _resolve_moment(
-            off_team, def_team, ball_handler, cutoff_def, None, exclude_steal=True,
+        outcome, _ratio, credited = resolve_cutoff_contest(
+            off_team, def_team, ball_handler, cutoff_def, exclude_steal=True,
         )
         # Single-defender cutoff collision — no trapper for the D_FOUL help bucket.
         pending_dfoul_trapper = None

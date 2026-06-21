@@ -87,9 +87,15 @@ SHOT_ATTEMPT_REBOUNDER_Y_RANGE = 10  # ±10 y-coords from rim (shot attempt)
 # Outlet Passer Movement
 OUTLET_PASSER_MOVE_X = 7  # Moves forward 7 x-coords toward basket (+7 for home, -7 for away)
 
-# Defensive Stop Determination
-DEFENSIVE_STOP_Y_RANGE = 6  # Steal → FB: defender must be within ±6 y of outlet receiver to force stop
-DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8  # DREB → outlet FB: ±8 y (Covert Release; see Fast_Break_System.md)
+# Defensive Stop Determination (legacy y-band — superseded by path cutoff for CR)
+DEFENSIVE_STOP_Y_RANGE = 6  # Steal → FB: legacy reference; steal uses after_steal resolver
+DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8  # Legacy y-band reference (path cutoff replaces geography gate)
+
+# Unified drive-cutoff tuning (``cutoff_resolution.best_cutoff_on_drive``)
+FB_CUTOFF_PATH_CORRIDOR_DREB = 14  # DREB/outlet — wider floor than HCT trap (~11 implicit)
+FB_CUTOFF_PATH_CORRIDOR_STEAL = 11  # Legacy steal-entry path through resolve_fast_break_logic
+FB_CUTOFF_DEFENDER_TIME_SLACK_DREB = 1.15  # Defenders get 15% arrival-time credit on DREB breaks
+FB_CUTOFF_DEFENDER_TIME_SLACK_STEAL = 1.0
 
 # Steal Entry Movement (Steal → Fast Break)
 STEAL_ENTRY_MOVE_X_MIN = 5  # Minimum x movement toward basket

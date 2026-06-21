@@ -3,7 +3,7 @@ import logging
 import copy
 import time
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 from BackEnd.constants.momentum import (
     MO_STEAL_DELTA,
     MO_FT_ALL_MISS_DELTA,
@@ -713,6 +713,10 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_Y_RANGE,
     DEFENSIVE_STOP_Y_RANGE,
     DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET,
+    FB_CUTOFF_DEFENDER_TIME_SLACK_DREB,
+    FB_CUTOFF_DEFENDER_TIME_SLACK_STEAL,
+    FB_CUTOFF_PATH_CORRIDOR_DREB,
+    FB_CUTOFF_PATH_CORRIDOR_STEAL,
     STEAL_ENTRY_MOVE_X_MIN,
     STEAL_ENTRY_MOVE_X_MAX,
     STEAL_ENTRY_MOVE_Y_RANGE,
@@ -1400,19 +1404,17 @@ def resolve_fast_break_logic(game: "GameManager"):
     # Defenders are already positioned on the court after the shot attempt
     # They don't move during the outlet pass - only the ball handler moves
     # So we compare ball handler's outlet position to defender's actual current position
-    # ✅ NEW: Defender must be ahead AND within ±6 y-coords to force defensive stop
-    # If multiple get-back players meet both conditions, the closest one forces the stop
-    # If no defender meets both conditions, it's a shot attempt and closest defender overall becomes shot defender
-    defender_ahead = False
-    closest_stopping_defender = None  # Defender who is ahead AND within ±6 y-coords
-    closest_stopping_distance = float('inf')
-
-    # CR Defensive Stop — aggression-based stop-attempt probability.
+    # Drive-cutoff geometry (shared with HCT via ``cutoff_resolution``).
+    # Each defender's outlet position is stored; earliest path intercept wins.
+    # Aggression gate (strategy_calls) rolls per-defender stop-attempt probability.
+    def_coords_cutoff: Dict[str, Dict[str, int]] = {}
+    closest_defender_overall = None  # Closest defender overall (for shot attempts, uses Euclidean distance)
+    closest_distance_overall = float('inf')
     # Per-CR spec (see _documentation_master/00_General_Systems/Step_By_Step_System.md
     # "CR Defensive Stop sub-step logic"). The defense team's strategy_calls
     # was already rolled by `set_strategy_calls()` at the start of the turn.
-    # Each defender that passes the geography gate also rolls against this
-    # probability; failures become race defenders rather than stop candidates.
+    # Each defender that can geometrically cut off the drive also rolls against
+    # this probability; failures are skipped for that drive (not stop candidates).
     _agg_call = (
         getattr(def_team, "strategy_calls", {}) or {}
     ).get("aggression_call", "normal")
@@ -1421,10 +1423,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         "normal": 0.5,
         "aggressive": 1.0,
     }.get(_agg_call, 0.5)
-    closest_defender_overall = None  # Closest defender overall (for shot attempts, uses Euclidean distance)
-    closest_distance_overall = float('inf')
     
-    # ✅ Find the most recent MISS/MAKE turn (the one that triggered this fast break)
+    # ✅ Find the most recent MISS/MAKE turn
     # Only use get-back coords from THIS turn, not from previous turns
     # ✅ SS&S: Use helper function to find most recent shot turn
     most_recent_shot_turn = _find_most_recent_shot_turn(game, max_turns=10)
@@ -1465,7 +1465,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Checking {len(def_lineup)} defenders for defensive stop")
     # logging.debug(f"  Ball handler outlet position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
     
-    for defender in def_lineup.values():
+    for pos, defender in def_lineup.items():
         # Use defender's actual coordinates (where they are on the court)
         # These defenders are the team that was on offense during the shot attempt
         # They might have get-back coordinates stored, so check those first
@@ -1507,23 +1507,10 @@ def resolve_fast_break_logic(game: "GameManager"):
             defender.outlet_coords = {}
         defender.outlet_coords["x"] = defender_outlet_x
         defender.outlet_coords["y"] = defender_outlet_y
-        
-        # Check if defender is ahead of ball handler (using outlet positions after both have moved)
-        # ✅ FIX: Compare in HOME orientation for both home and away offense
-        # Coordinates are stored in HOME orientation, so we compare directly in HOME orientation
-        # For away offense: basket is at x=10, smaller x is closer → defender ahead if x <= ball handler x
-        # For home offense: basket is at x=90, larger x is closer → defender ahead if x >= ball handler x
-        # ✅ Defender must also be within y-range (±6 steal, ±8 DREB/outlet) to force defensive stop
-        
-        # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Defender comparison for {defender_id}:")
-        # logging.debug(f"  defender_actual_x (start, HOME): {defender_actual_x}")
-        # logging.debug(f"  defender_actual_y (start, HOME): {defender_actual_y}")
-        # logging.debug(f"  defender_move_x: {defender_move_x}")
-        # logging.debug(f"  defender_outlet_x (after outlet step, HOME): {defender_outlet_x}")
-        # logging.debug(f"  defender_outlet_y (after outlet step, HOME): {defender_outlet_y}")
-        # logging.debug(f"  ball_handler_outlet_x (after outlet step, HOME): {ball_handler_outlet_x}")
-        # logging.debug(f"  ball_handler_outlet_y (after outlet step, HOME): {ball_handler_outlet_y}")
-        # logging.debug(f"  is_away_offense: {is_away_offense}")
+        def_coords_cutoff[pos] = {
+            "x": int(defender_outlet_x),
+            "y": int(defender_outlet_y),
+        }
         
         # Calculate distance for closest defender tracking (for shot attempts)
         x_distance = abs(defender_outlet_x - ball_handler_outlet_x)
@@ -1535,47 +1522,57 @@ def resolve_fast_break_logic(game: "GameManager"):
         if defender_id and defender_id in getback_player_ids and total_distance < closest_distance_overall:
             closest_distance_overall = total_distance
             closest_defender_overall = defender
-        
-        # Check if defender is ahead (x-coordinate check)
-        if is_away_offense:
-            # Away offense: basket at x=10 in HOME orientation, smaller x is closer to basket
-            # Defender ahead if defender_x <= ball_handler_x (defender is closer to x=10)
-            is_ahead = defender_outlet_x <= ball_handler_outlet_x
-            # logging.debug(f"  X Comparison (HOME orientation, away offense): {defender_outlet_x} <= {ball_handler_outlet_x} = {is_ahead}")
-        else:
-            # Home offense: basket at x=90 in HOME orientation, larger x is closer to basket
-            # Defender ahead if defender_x >= ball_handler_x (defender is closer to x=90)
-            is_ahead = defender_outlet_x >= ball_handler_outlet_x
-            # logging.debug(f"  X Comparison (HOME orientation, home offense): {defender_outlet_x} >= {ball_handler_outlet_x} = {is_ahead}")
-        
-        # ✅ Check if defender is within y-range of outlet receiver (see defensive_stop_y_range)
-        y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
-        is_within_y_range = y_diff <= defensive_stop_y_range
-        # logging.debug(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= {defensive_stop_y_range} = {is_within_y_range}")
-        
-        # Defender can force defensive stop if: ahead AND within y-range.
-        # CR adds an aggression gate: each geography-passing defender also
-        # rolls against the team's aggression-derived probability. Failures
-        # are NOT stop candidates (they become race defenders in the
-        # universal helper's race pool downstream).
-        if is_ahead and is_within_y_range:
-            if random.random() >= _stop_attempt_prob:
-                # Aggression roll failed — defender does not attempt a stop.
-                # Falls through to be picked up as a race defender by the
-                # universal helper at the shot resolution site.
-                continue
-            defender_ahead = True
-            # logging.debug(f"  ✅ Defender can force DEFENSIVE_STOP! (ahead AND within y-range AND aggression roll passed)")
-            # Find closest stopping defender (x-distance only, as per original logic)
-            x_distance_only = abs(defender_outlet_x - ball_handler_outlet_x)
-            if x_distance_only < closest_stopping_distance:
-                closest_stopping_distance = x_distance_only
-                closest_stopping_defender = defender
-        # elif is_ahead:
-        #     logging.debug(f"  ⚠️ Defender is ahead but NOT within y-range (y_diff={y_diff}), cannot force defensive stop")
-        # else:
-        #     logging.debug(f"  ❌ Defender is NOT ahead")
     
+    # --- Unified drive cutoff (shared with HCT ``cutoff_resolution``) ------------
+    from BackEnd.engine.cutoff_resolution import (
+        best_cutoff_on_drive,
+        map_cutoff_outcome_to_fb,
+        resolve_cutoff_contest,
+    )
+    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+    from BackEnd.utils.shared import ag_to_grid_per_game_sec
+
+    move_distance = random.randint(BALL_HANDLER_MOVE_X_MIN, BALL_HANDLER_MOVE_X_MAX)
+    additional_move_x = direction * move_distance
+    additional_move_y = random.randint(-BALL_HANDLER_MOVE_Y_RANGE, BALL_HANDLER_MOVE_Y_RANGE)
+    fb_roles["ball_handler_drive_roll_x"] = additional_move_x
+    fb_roles["ball_handler_drive_roll_y"] = additional_move_y
+
+    bh_start = {
+        "x": int(ball_handler_outlet_x),
+        "y": int(ball_handler_outlet_y),
+    }
+    drive_target = {
+        "x": max(4, min(97, int(ball_handler_outlet_x + additional_move_x))),
+        "y": max(1, min(49, int(ball_handler_outlet_y + additional_move_y))),
+    }
+    bh_drive_rate = ag_to_grid_per_game_sec(ball_handler, "sprint")
+
+    if rebound:
+        _cutoff_corridor = FB_CUTOFF_PATH_CORRIDOR_DREB
+        _cutoff_slack = FB_CUTOFF_DEFENDER_TIME_SLACK_DREB
+    else:
+        _cutoff_corridor = FB_CUTOFF_PATH_CORRIDOR_STEAL
+        _cutoff_slack = FB_CUTOFF_DEFENDER_TIME_SLACK_STEAL
+
+    cutoff_pos, cutoff_meet = best_cutoff_on_drive(
+        bh_start,
+        drive_target,
+        bh_drive_rate,
+        def_coords_cutoff,
+        def_lineup,
+        get_defender_rate=lambda d: _ag_grid_per_game_sec(d, "sprint"),
+        path_corridor=_cutoff_corridor,
+        defender_time_slack=_cutoff_slack,
+        stop_attempt_prob=_stop_attempt_prob,
+    )
+    closest_stopping_defender = (
+        def_lineup.get(cutoff_pos) if cutoff_pos else None
+    )
+    if cutoff_meet is not None:
+        fb_roles["cutoff_meet_x"] = cutoff_meet["x"]
+        fb_roles["cutoff_meet_y"] = cutoff_meet["y"]
+
     # ✅ If we found a stopping defender who wasn't in fb_roles["defense"], add them for animation
     if closest_stopping_defender and closest_stopping_defender not in fb_roles["defense"]:
         fb_roles["defense"].append(closest_stopping_defender)
@@ -1603,8 +1600,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         off_team.team_stats['two_defenders_back'] = off_team.team_stats.get('two_defenders_back', 0) + 1
     # ==================== END STAT TRACKING ====================
 
-    # ✅ NEW LOGIC: If any defender is ahead of ball handler → defensive stop
-    # Otherwise → shot attempt
+    # ✅ NEW LOGIC: Cutoff meet → D8 contest; otherwise shot attempt
     # logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Final determination:")
     # logging.debug(f"  d_count: {d_count}")
     # logging.debug(f"  defender_ahead: {defender_ahead}")
@@ -1622,74 +1618,60 @@ def resolve_fast_break_logic(game: "GameManager"):
         else:
             fb_roles["defender"] = None
             fb_roles["defender_count"] = 0
-    elif defender_ahead and closest_stopping_defender:
-        # ✅ Geography + aggression gates passed; one stopper candidate
-        # selected. Now run skill check: can ball handler beat the stopper?
-        # Per CR spec (Step_By_Step_System.md "CR Defensive Stop sub-step
-        # logic"):
-        #   break_score = (BH.AG + BH.BH + offense fb_efficiency) × die_off
-        #   stop_score  = (stopper.AG + stopper.OD + defense fb_opp_modifier) × die_def
-        # Separate die per side (different from the old shared-die formula).
-        die_off = random.randint(1, 6)
-        die_def = random.randint(1, 6)
-        fb_efficiency = (off_team.team_attributes or {}).get("fb_efficiency", 0)
-        fb_opp_modifier = (def_team.team_attributes or {}).get("fb_opp_modifier", 0)
-        break_score = (
-            ball_handler.attributes["AG"]
-            + ball_handler.attributes["BH"]
-            + fb_efficiency
-        ) * die_off
-        stop_score = (
-            closest_stopping_defender.attributes["AG"]
-            + closest_stopping_defender.attributes["OD"]
-            + fb_opp_modifier
-        ) * die_def
-
-        logging.debug(
-            f"  🎯 Skill Check: break_score={break_score:.1f} "
-            f"(AG={ball_handler.attributes['AG']}, BH={ball_handler.attributes['BH']}, "
-            f"fb_efficiency={fb_efficiency}, die_off={die_off}) vs "
-            f"stop_score={stop_score:.1f} "
-            f"(AG={closest_stopping_defender.attributes['AG']}, OD={closest_stopping_defender.attributes['OD']}, "
-            f"fb_opp_modifier={fb_opp_modifier}, die_def={die_def}) | "
-            f"aggression_call={_agg_call}"
+    elif cutoff_meet is not None and closest_stopping_defender:
+        outcome, _ratio, credited = resolve_cutoff_contest(
+            off_team,
+            def_team,
+            ball_handler,
+            closest_stopping_defender,
+            exclude_steal=True,
         )
-        
-        # Store closest stopping defender as stopper for animation (even if ball handler wins)
-        # This ensures defender animates to stopper position, showing the attempt
+        event_type, cutoff_flags = map_cutoff_outcome_to_fb(outcome)
         stopper_id = closest_stopping_defender.player_id
         best_defender = closest_stopping_defender
-        hold_up = True  # Set hold_up so defender animates to stopper position
-        closest_defender = closest_stopping_defender  # For compatibility with existing code
-        
-        if stop_score >= break_score:
-            # Defender wins skill check: defensive stop
-            event_type = "DEFENSIVE_STOP"
-            logging.debug(f"  ✅ Decision: DEFENSIVE_STOP (defender ahead AND within y-range AND wins skill check)")
-        else:
-            # Ball handler wins skill check: shot attempt (but defender still animates to stopper position)
-            event_type = "SHOT"
-            logging.debug(f"  ✅ Decision: SHOT (defender ahead AND within y-range BUT ball handler wins skill check - beats defender)")
-            # Store stopper info in fb_roles so frontend can animate defender to stopper position
-            fb_roles["stopper_id"] = stopper_id
-            fb_roles["ball_handler_beats_defender"] = True  # Flag for frontend animation
-            # Shot defender = closest get-back EXCLUDING the failed stopper (they cannot be shot defender)
+        hold_up = True
+        closest_defender = closest_stopping_defender
+        fb_roles["stopper_id"] = stopper_id
+
+        if cutoff_flags.get("ball_handler_beats_defender"):
+            fb_roles["ball_handler_beats_defender"] = True
             shot_def = None
-            shot_dist = float('inf')
+            shot_dist = float("inf")
             for d in def_lineup.values():
                 did = getattr(d, "player_id", None)
                 if not did or did not in getback_player_ids or did == stopper_id:
                     continue
                 ox = getattr(d, "outlet_coords", {}).get("x", 50)
                 oy = getattr(d, "outlet_coords", {}).get("y", 25)
-                td = ((ox - ball_handler_outlet_x) ** 2 + (oy - ball_handler_outlet_y) ** 2) ** 0.5
+                td = (
+                    (ox - ball_handler_outlet_x) ** 2
+                    + (oy - ball_handler_outlet_y) ** 2
+                ) ** 0.5
                 if td < shot_dist:
                     shot_dist = td
                     shot_def = d
             fb_roles["defender"] = shot_def
-            fb_roles["defender_count"] = 1 if shot_def else 0  # 0 if only get-back was the stopper
+            fb_roles["defender_count"] = 1 if shot_def else 0
+        elif event_type == "FOUL":
+            game_state["foul_team"] = cutoff_flags.get("foul_team", "DEFENSE")
+            fb_roles["foul_player"] = credited or closest_stopping_defender
+            fb_roles["defender"] = credited or closest_stopping_defender
+            fb_roles["defender_count"] = 1
+        elif event_type == "DEFENSIVE_STOP":
+            fb_roles["defender"] = closest_stopping_defender
+            fb_roles["defender_count"] = 1
+        elif event_type == "DEAD BALL":
+            fb_roles["defender"] = closest_stopping_defender
+            fb_roles["defender_count"] = 1
+
+        logging.debug(
+            "  🎯 Cutoff contest: outcome=%s → event_type=%s stopper=%s",
+            outcome,
+            event_type,
+            stopper_id,
+        )
     else:
-        # No defender ahead AND within y-range: shot attempt (no skill check needed)
+        # No cutoff meet: shot attempt (no separate skill check)
         # Shot defender only when 1 or 2 get-back players (closest among get-back only)
         event_type = "SHOT"
         if num_getback in (1, 2) and closest_defender_overall:
@@ -2045,6 +2027,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     elif event_type == "TURNOVER":
         turnover_type = random.choice(["STEAL", "DEAD BALL"])
         turn_result = resolve_turnover_logic(fb_roles, game, turnover_type)
+    elif event_type == "DEAD BALL":
+        turn_result = resolve_turnover_logic(
+            fb_roles, game, "DEAD BALL", from_resolution_system=True,
+        )
     elif event_type == "FOUL":
         turn_result = resolve_non_shooting_foul(fb_roles, game)
     

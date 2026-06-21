@@ -4,7 +4,7 @@
 
 **Base Constants**
 
-1. **Defensive Stop Y-Range**: `DEFENSIVE_STOP_Y_RANGE = 6` was the **steal → fast break** stop band (defender within ±6 y) — **now legacy**, since steal → FB uses the `after_steal` resolver (no ±6 stop band; see **After Steal** below). **`DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8`** is the live value for **DREB → outlet** fast breaks (Covert Release; wider band).
+1. **Defensive Stop (Covert Release)**: Legacy **`DEFENSIVE_STOP_Y_RANGE`** (±6 steal) and **`DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET = 8`** (±8 ahead/y band) are **superseded** for Covert Release DREB stops. Stops now use the shared **drive-cutoff** primitive in `BackEnd/engine/cutoff_resolution.py` (same D21 arrival-time race as HCT broken-trap drives). FB tuning: **`FB_CUTOFF_PATH_CORRIDOR_DREB = 14`**, **`FB_CUTOFF_PATH_CORRIDOR_STEAL = 11`**, **`FB_CUTOFF_DEFENDER_TIME_SLACK_DREB = 1.15`**, **`FB_CUTOFF_DEFENDER_TIME_SLACK_STEAL = 1.0`** (`BackEnd/constants/fast_break_constants.py`). Steal → FB on the legacy `resolve_fast_break_logic` steal-entry path still uses the FB corridor; primary steal → FB uses **`after_steal`** (separate resolver).
 2. **Ball Handler Movement (Defensive Stop/Shot)**: X: 5-10 spots toward basket, Y: ±3 spots
 3. **Stopper Positioning (defensive stop only)**: 1–3 spots in front of ball handler end, same **Y** (confrontation — not the rim shot spot)
 4. **Shot contest defender (all fast break shot attempts)**: Grid vs the shooter’s **final** spot (`_bh_final_x/y`, exposed as `shot_spot`). Shooter shot spot is now a tighter rim band: **x = basket.x ± uniform integer in [1, 4]** and **y = basket.y + uniform integer in [−3, +3]** (`FB_SHOT_SPOT_X_MIN/MAX`, `FB_SHOT_SPOT_Y_RANGE` in `BackEnd/constants/fast_break_constants.py`). Primary defender uses **x = shooter_x - 2** for home offense or **x = shooter_x + 2** for away offense, and **y = shooter_y + uniform integer in [−2, +2]** (`SHOT_DEFENDER_X_OFFSET`, `SHOT_DEFENDER_Y_RANGE`). In beat-stopper cases, the **second** contest defender uses the same **x** and **y = primary_y ± 3** based on his starting row (`SECONDARY_SHOT_DEFENDER_Y_OFFSET`). **Helpers:** `fast_break_shot_defender_end_coords(...)` and `fast_break_secondary_shot_defender_end_coords(...)`. **JS mirrors:** `fastBreakShotDefenderGridVsShooter()` and `fastBreakSecondaryShotDefenderGrid()` in `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` for fallbacks; `animateFastBreakShotWithStopper` prefers `turnData.shot_spot` / `defender_spot` from the backend when present.
@@ -41,30 +41,25 @@
    - **DREB Entry (Rim Runner / Triangle)**: After a **successful** outlet contest, sim coords for the rim runner and outlet ball handler are set from **`rim_runner_burst_phase`** (`rr_to`, `receiver_to`); `roles["ball_handler_outlet_x/y"]` match **`receiver_to`** for stop/shot geography and animation. **Denied** outlet: coords are **not** advanced (only the burst payload is present for the client).
    - **Steal Entry** *(legacy — not used by `after_steal`)*: Ball handler moves 5-10 x spots toward basket, ±4 y spots (clamped 3-47), using `last_stealer_coords` if available. Superseded — the after-steal resolver drives the stealer to a rim band instead (see **After Steal** below).
 
-5. **Check All Defenders for Defensive Stop**
+5. **Check All Defenders for Drive Cutoff**
    - Loop through **all defenders in `def_lineup`** (not just `fb_roles["defense"]`)
    - Get defender coordinates:
      - Priority: `offense_getback_coords` from most recent MISS/MAKE turn (if defender was a get-back player)
      - Fallback: `defender.coords`
-   - For each defender, check:
-     - **X-Coordinate Check (Ahead)**: 
-       - Home offense: `defender_x >= ball_handler_x` (basket at x=90)
-       - Away offense: `defender_x <= ball_handler_x` (basket at x=10)
-     - **Y-Coordinate Check (Within Range)**: `|defender_y - ball_handler_y| <= 8` (DREB/outlet entry). *(The `<= 6` "steal entry" band is legacy — steal → FB no longer uses this stop logic; see **After Steal**.)*
-   - Track closest stopping defender (x-distance only) and **closest defender overall among get-back players only** (Euclidean distance; only defenders in `offense_getback` from most recent shot are eligible for shot defender)
+   - Pre-roll BH drive target: **x** 5–10 toward basket, **y** ±3 (`ball_handler_drive_roll_x/y` in `fb_roles`; animator consumes same rolls)
+   - **`best_cutoff_on_drive()`** (`cutoff_resolution.py`): walk BH straight-line drive; each defender within **`path_corridor`** (14 DREB / 11 steal-entry) gets a D21 meet point with optional **`defender_time_slack`** (1.15 DREB / 1.0 steal). Earliest intercept along the path wins (tie → closer to meet point).
+   - **Aggression gate** (unchanged): `strategy_calls["aggression_call"]` → per-defender stop-attempt probability (passive 0% / normal 50% / aggressive 100%). Failed rolls skip that defender for this drive.
+   - Track **closest defender overall among get-back players only** (Euclidean distance; shot-defender pool when 1–2 get-back)
 
 6. **Determine Event Type**
    - **0 Defenders**: Always `SHOT`
-   - **Defender Ahead AND Within Y-Range**: Skill check between ball handler and defender
-     - **Geography Check**: Defender must be ahead AND within y-range (**±8** DREB/outlet; the **±6** "steal" band is legacy — steal → FB now uses the `after_steal` resolver, see **After Steal**) (determines if stop attempt is possible)
-     - **Skill Check** (if geography check passes):
-       - `break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * random(1-6)`
-       - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
-       - If `stop_score >= break_score` → `DEFENSIVE_STOP` (defender wins)
-       - If `break_score > stop_score` → `SHOT` (ball handler wins, beats defender)
-         - **Animation**: stopper + optional trail defender use the **unified shot contest spots** vs rim **`shot_spot`** (see **Shot contest grid**); not “1–3 from outlet start” on the sim
-         - **Shot defender**: Closest get-back (by distance) **excluding the failed stopper**; if no other get-back, no shot defender (defender_count = 0)
-   - **Otherwise**: `SHOT`. **Shot defender only when 1 or 2 get-back players**: closest get-back by Euclidean distance; if 0 or 3+ get-back, no shot defender (defender_count = 0)
+   - **Cutoff meet found** (after aggression gate): **`resolve_cutoff_contest()`** → D8 moment (`_resolve_moment`, steal excluded)
+     - **`POS_O`** → `SHOT` + `ball_handler_beats_defender = True` (BH reaches meet, beats stopper; animates to rim shot spot)
+     - **`NEUTRAL`** → `DEFENSIVE_STOP` (BH stalled at meet — hold-up to HCO)
+     - **`D_FOUL` / `O_FOUL`** → `FOUL` (non-shooting foul path; defensive stop scouting on O_FOUL)
+     - **`DEAD BALL`** → turnover (lost handle at meet)
+     - Meet coords stored as **`cutoff_meet_x/y`** for animator (stopper + BH end at collision point)
+   - **No meet**: `SHOT`. **Shot defender only when 1 or 2 get-back players**: closest get-back by Euclidean distance; if 0 or 3+ get-back, no shot defender (defender_count = 0)
 
 7. **Handle DEFENSIVE_STOP Result**
    - Set `offensive_state = "HCO"`
@@ -112,7 +107,7 @@ Use this subsection for **behavior and formulas by play key** (`covert_release`,
 #### Covert Release (`covert_release`)
 
 - **When**: DREB → `FAST_BREAK` and **`pending_dreb_fb_play_key`** (from the prior miss shot turn) is **`covert_release`** (50/50 vs Rim Runner until settings ship).
-- **What**: Release defender selection, IQ/AG bands, outlet receiver coords, then **defensive stop vs shot** per Steps 4–8 (geography + AG/BH vs AG/OD skill check, shot via `resolve_shot`).
+- **What**: Release defender selection, IQ/AG bands, outlet receiver coords, then **defensive stop vs shot** per Steps 4–8 (unified drive cutoff + D8 contest, shot via `resolve_shot`).
 - **Code**: `BackEnd/engine/covert_release.py`, `resolve_fast_break_logic()` (Covert branch), `shot_manager` for Covert-only release/get-back coords on the prior shot turn.
 
 ##### Get-back defender read on outlet pass (step 0)
@@ -370,43 +365,31 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 **Logic (HOME Orientation):**
 
-**Home Offense:**
-- Basket at x=90 (larger x is closer to basket)
-- Defender ahead if: `defender_x >= ball_handler_x`
-- **Defender must also be within y-range of outlet receiver** (±8 DREB/outlet — see `defensive_stop_y_range` in `resolve_fast_break_logic`; the ±6 "steal" band is legacy/superseded by `after_steal`)
-- If defender ahead AND within y-range → DEFENSIVE_STOP
-- Otherwise → SHOT
+**Home / Away orientation:** Drive target is always toward the attacking basket (home +x, away −x). Cutoff geometry is orientation-agnostic — it uses the BH start→target segment, not a fixed “ahead in x” gate.
 
-**Away Offense:**
-- Basket at x=10 (smaller x is closer to basket)
-- Defender ahead if: `defender_x <= ball_handler_x`
-- **Same y-range rule** (±6 vs ±8 by entry type)
-- If defender ahead AND within y-range → DEFENSIVE_STOP
-- Otherwise → SHOT
+**Drive Cutoff (Covert Release — replaces ahead/±y geography + AG/BH skill check):**
 
-**Multiple Get-Back Players:**
-- If multiple get-back players meet both conditions (ahead AND within y-range), the closest one (by x-distance) forces the defensive stop
-- If neither get-back player meets both conditions, and there are **1 or 2 get-back players**, the closest get-back (by Euclidean distance from outlet receiver) becomes the shot defender
+Shared module: `BackEnd/engine/cutoff_resolution.py` (also used by HCT `_do_broken_hct_cutoff`).
 
-**Shot Defender Selection (Get-Back Only, 1 or 2):**
-- There is a **potential shot defender only when there are 1 or 2 get-back players** on the defensive team (from `offense_getback` on the most recent shot).
-- **Pool**: Only get-back players are eligible. The closest get-back by Euclidean distance from outlet receiver becomes the shot defender.
-- **0 or 3+ get-back**: No shot defender is assigned (defender_count = 0); charge/block check is skipped; shot proceeds as uncontested (threshold logic still uses effective count).
-- **Ball handler beats defender**: The get-back defender who attempted the stop and lost is **excluded** from being the shot defender. The closest **remaining** get-back (by distance) becomes the shot defender; if there is no other get-back, no shot defender (defender_count = 0).
+1. BH drive from outlet position toward pre-rolled target (5–10 x toward basket, ±3 y).
+2. Each defender in `def_lineup` with coords (get-back priority) is evaluated if within **`path_corridor`** perpendicular distance of the drive segment.
+3. **Aggression gate**: each candidate rolls `stop_attempt_prob` from `strategy_calls["aggression_call"]` (passive 0 / normal 0.5 / aggressive 1.0).
+4. **`cutoff_meet_point()`**: D21 arrival-time race along the segment; defender wins a step if `t_def <= t_mover × defender_time_slack`.
+5. **`best_cutoff_on_drive()`**: earliest meet progress wins; tie-break closer defender-to-meet distance.
+6. On meet → **`resolve_cutoff_contest()`** (D8 `_resolve_moment`, steal excluded) → **`map_cutoff_outcome_to_fb()`**:
+   - `POS_O` → SHOT + `ball_handler_beats_defender`
+   - `NEUTRAL` → DEFENSIVE_STOP
+   - `D_FOUL` / `O_FOUL` → FOUL
+   - `DEAD BALL` → turnover
 
-**Skill Check Implementation:**
-- **Two-Step Process**: Geography determines if a stop attempt is possible, then skill check determines the outcome.
-  1. **Geography Check**: Defender must be ahead AND within y-range (**±8** DREB/outlet — determines if stop attempt is possible; the **±6** "steal" band is legacy/superseded by `after_steal`)
-  2. **Skill Check** (if geography check passes):
-     - `break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * random(1-6)`
-     - `stop_score = defender.attributes["AG"] + defender.attributes["OD"] * random(1-6)`
-     - If `stop_score >= break_score` → `DEFENSIVE_STOP` (defender successfully stops the break)
-     - If `break_score > stop_score` → `SHOT` (ball handler beats the defender)
-- **Animation Behavior When Ball Handler Wins**:
-  - **Stopper** tweens to the primary shooter-relative FB shot-defender spot
-  - Ball handler tweens to rim shot spot; **trail shot defender** (if assigned) uses the same **x** and a **±3 y** offset from the stopper so the sprites do not stack
-  - Flag `ball_handler_beats_defender = True` triggers `animateFastBreakShotWithStopper` on the client
-  - **Shot defender**: The failed stopper is excluded from the *pool*; the closest **other** get-back becomes the shot defender, or none if he was the only get-back
+**FB vs HCT tuning:** FB uses wider corridor (14 vs ~11 implicit) and 15% defender time slack on DREB (`FB_CUTOFF_*` constants). HCT uses standard AG rates; FB sprint rates for BH and cutoff defenders.
+
+**Animation when ball handler beats stopper (`POS_O`):**
+- Stopper at **`cutoff_meet_x/y`**; BH continues to rim **`shot_spot`**
+- Trail shot defender uses unified FB shot-contest grid (see **Shot contest grid**)
+- Failed stopper excluded from shot-defender pool
+
+**Multiple defenders on the drive lane:** Any defender with a valid meet is considered; the earliest intercept along the path wins (not merely closest-to-BH at outlet).
 
 **Critical Implementation Detail - Defender Assignment (Get-Back Only, 1 or 2):**
 - **Backend Calculation**: In `phase_resolution.py`, `closest_defender_overall` is tracked **only among defenders in `getback_player_ids`** (get-back players from the most recent shot). A shot defender is assigned only when `len(getback_player_ids) in (1, 2)`; otherwise `fb_roles["defender"] = None` and `fb_roles["defender_count"] = 0`. When `ball_handler_beats_defender` is True, the stopper is excluded and the closest remaining get-back is chosen (or none).
@@ -420,54 +403,26 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 - **Result**: Get-back players who are ahead are correctly detected, even if they weren't initially included in `fb_roles["defense"]`
 - **Animation**: If an ahead defender wasn't in the initial list, they're added to `fb_roles["defense"]` for animation purposes
 
-**Implementation:**
+**Implementation (simplified):**
 ```python
-# getback_player_ids = from most_recent_shot_turn.get("offense_getback", [])
-# ✅ Check ALL defenders in def_lineup for stop/shot geography; shot defender pool = get-back only
-closest_stopping_defender = None  # Defender who is ahead AND within ±6 y-coords
-closest_defender_overall = None   # Closest defender among GET-BACK PLAYERS ONLY (for shot attempts)
-closest_distance_overall = float('inf')
+from BackEnd.engine.cutoff_resolution import (
+    best_cutoff_on_drive, resolve_cutoff_contest, map_cutoff_outcome_to_fb,
+)
 
-for defender in def_lineup.values():
-    defender_id = defender.player_id
-    defender_outlet_x = get_defender_coords_x(defender, most_recent_shot_turn)
-    defender_outlet_y = get_defender_coords_y(defender, most_recent_shot_turn)
-    
-    x_distance = abs(defender_outlet_x - ball_handler_outlet_x)
-    y_distance = abs(defender_outlet_y - ball_handler_outlet_y)
-    total_distance = (x_distance ** 2 + y_distance ** 2) ** 0.5
-    
-    # Track closest defender overall ONLY among get-back players
-    if defender_id in getback_player_ids and total_distance < closest_distance_overall:
-        closest_distance_overall = total_distance
-        closest_defender_overall = defender
-    
-    # Check if defender is ahead (x-coordinate check) and within ±6 y
-    is_ahead = (defender_outlet_x <= ball_handler_outlet_x) if is_away_offense else (defender_outlet_x >= ball_handler_outlet_x)
-    is_within_y_range = abs(defender_outlet_y - ball_handler_outlet_y) <= 6
-    if is_ahead and is_within_y_range:
-        defender_ahead = True
-        x_distance_only = abs(defender_outlet_x - ball_handler_outlet_x)
-        if x_distance_only < closest_stopping_distance:
-            closest_stopping_distance = x_distance_only
-            closest_stopping_defender = defender
-
-num_getback = len(getback_player_ids)
-# Shot defender only when 1 or 2 get-back; when ball handler beats defender, exclude stopper from pool
-if defender_ahead and closest_stopping_defender:
-    # skill check...
-    if ball_handler_wins:
-        # Shot defender = closest get-back by distance EXCLUDING stopper_id (loop def_lineup, filter getback_player_ids and id != stopper_id)
-        fb_roles["defender"] = shot_def  # or None if no other get-back
-        fb_roles["defender_count"] = 1 if fb_roles["defender"] else 0
+# Build def_coords_cutoff from all def_lineup positions (get-back coords priority)
+cutoff_pos, cutoff_meet = best_cutoff_on_drive(
+    bh_start, drive_target, bh_drive_rate, def_coords_cutoff, def_lineup,
+    get_defender_rate=lambda d: ag_sprint_rate(d),
+    path_corridor=FB_CUTOFF_PATH_CORRIDOR_DREB,
+    defender_time_slack=FB_CUTOFF_DEFENDER_TIME_SLACK_DREB,
+    stop_attempt_prob=aggression_stop_prob,
+)
+if cutoff_meet and cutoff_pos:
+    outcome, _, credited = resolve_cutoff_contest(off_team, def_team, bh, def_lineup[cutoff_pos])
+    event_type, flags = map_cutoff_outcome_to_fb(outcome)
+    fb_roles["cutoff_meet_x/y"] = cutoff_meet
 else:
-    event_type = "SHOT"
-    if num_getback in (1, 2) and closest_defender_overall:
-        fb_roles["defender"] = closest_defender_overall
-        fb_roles["defender_count"] = num_getback
-    else:
-        fb_roles["defender"] = None
-        fb_roles["defender_count"] = 0
+    event_type = "SHOT"  # no geometric cutoff
 ```
 
 ### Animation Sequence

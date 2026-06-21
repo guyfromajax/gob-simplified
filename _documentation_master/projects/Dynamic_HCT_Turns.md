@@ -300,29 +300,28 @@ that can otherwise land off-court.
 
 ### Decision → moment mapping
 
-- **attack** → Pressure resolution if 1 defender in range; Trap resolution if 2+ in range (see Trapper selection).
+- **attack** → Pressure resolution if 1 defender in range; Trap resolution if 2+ in range (see Primary defender & trapper selection).
 - **hold** → time-boxed hold beat; outcome depends on what reaches the BH (see Hold resolution).
 - **pass** → no moment (run pass movement, §6).
 
-### Trapper selection (2+ defenders in range)
+### Primary defender & trapper selection
 
-A trap is always executed by **exactly two** defenders. When more than two are
-within trap range (11), pick the two trappers as follows:
+**Pressure (1 defender in range).** The contest credits **`in_range[0]`** — the
+nearest defender within `MOMENT_RANGE` (11 euclid spots). No band rule applies; the
+reach-in flourish and D_FOUL 60% bucket use this nearest defender.
 
-1. The **central backcourt defender** (defensive PG) is always one trapper.
-2. The second trapper is the **closest** of the other in-range defenders to the BH.
-   If two or more are tied for closest, choose one at random.
-
-**Fallback — PG not in range:** if the defensive PG is **not** within trap range
-(e.g. the BH has beaten him off the dribble and left him trailing), drop the
-PG-priority rule and pick the **two closest in-range defenders** to the BH; ties
-broken at random.
-
-Any remaining in-range defenders revert to their zone / help assignments (§6).
-For exactly two in-range defenders, both trap (this already always includes the PG
-via the shift tables in §6).
+**Trap (2+ defenders in range).** A trap is always executed by **exactly two**
+defenders. `_resolve_attack` calls **`play.select_trappers(in_range, bh_xy,
+def_coords, is_away_offense)`** → `(primary, trapper)`. The full band-based rule
+(live in all three plays, with Standard Diamond's band→role override) is documented
+under **On-ball primary / trapper** in the Attribute-driven contest model below.
+When more than two defenders are in range, the two selected trappers contest; any
+others revert to their zone / help assignments (§6).
 
 ### Pressure Moment (one defender)
+
+The credited defender is **`in_range[0]`** (nearest in range — see Primary defender &
+trapper selection above).
 
 ```
 outside_d_score    = calculate_defender_pressure_score
@@ -342,8 +341,11 @@ ball_handling_score = calculate_ball_handling_score
 
 ### Trap Moment (two defenders)
 
+Primary and trapper are chosen via **`play.select_trappers`** (§5). Contest math uses
+the primary defender's pressure score plus half the trapper's:
+
 ```
-outside_d_score    = calculate_defender_pressure_score (BH defender)
+outside_d_score    = calculate_defender_pressure_score (primary / on-ball defender)
                      + 0.5 * calculate_defender_pressure_score (trapper)
                      + (def_team.pt_efficiency * random.randint(1, 6))
 ball_handling_score = calculate_ball_handling_score
@@ -422,15 +424,16 @@ p_dfoul = clamp(DFOUL_BASE * beaten_norm
 ```
 Roll `random() < p_dfoul` → D_FOUL (bonus → FTs, else SIDE_INBOUND); else POS_O.
 
-**On-ball primary / trapper (universal, band-based — `_select_trappers`).** When a
-trap forms, the **primary (on-ball) defender** is the in-range defender whose *own*
-position sits in the **same vertical band as the ball** (`_diamond_band` buckets:
-center 20–30 / upper >30 / lower <20); ties → closest to the BH; none in-band →
-closest to the BH. The **trapper** is the next-closest in-range defender. This
-replaces the old "defensive PG is always on-ball" rule for **all three plays**, so the
-reach-in flourish and the 60% D_FOUL land on whoever is actually defending the ball's
-band (previously the PG ate nearly every reach-in). It is routed through the
-`HCTPlay.select_trappers` seam:
+**On-ball primary / trapper (trap moments only — `_select_trappers`).** On a **trap**
+(2+ in range), the **primary (on-ball) defender** is the in-range defender whose
+*own* position sits in the **same vertical band as the ball** (`_diamond_band`
+buckets: center 20–30 / upper >30 / lower <20); ties → closest to the BH; none
+in-band → closest to the BH. The **trapper** is the next-closest in-range defender.
+This replaces the old "defensive PG is always on-ball" rule for **trap** contests
+across all three plays, so the reach-in flourish and the 60% D_FOUL land on whoever
+is actually defending the ball's band (previously the PG ate nearly every reach-in).
+**Pressure** moments (1 in range) do **not** use this rule — they credit the nearest
+defender (`in_range[0]`). Routed through the `HCTPlay.select_trappers` seam:
 - **Standard Trap / Straight Pressure** use the geometric rule above (their trappers
   straddle the BH at `±2`, so the band-matching man is picked).
 - **Standard Diamond** overrides with **band→role** (`_diamond_select_trappers`):
@@ -519,7 +522,8 @@ open floor invites attack):
 
 #### Broken-HCT cutoff model
 
-The open-floor attack is a **race to the rim against a single cutoff defender**:
+The open-floor attack is a **race to the rim against the best cutoff defender on
+the drive path**:
 
 1. **BH targets a y-keyed Attack Basket Area spot** (so a clean arrival resolves via
    §7), chosen from his current y at the start of the drive:
@@ -528,11 +532,20 @@ The open-floor attack is a **race to the rim against a single cutoff defender**:
    - `y < 19` → **lower apex (80, 15)**.
    (Spots flip in x for away offense; the y bands read the same.) He drives there at
    his open-floor drive pace.
-2. **Closest defender attempts a cutoff.** Solve the interception geometry along the
-   BH's straight path to the target spot: for each point `P` on the path, compare the
-   BH's travel time to `P` (`dist / bh_drive_rate`) against the defender's travel time
-   to `P` (`dist / defender_rate`, defender speed from his **AG**-based rate). The
-   **meet point** is the *first* `P` the defender can reach **no later than** the BH.
+2. **Every defender gets a cutoff attempt; earliest intercept wins.** For each
+   defender, solve the interception geometry along the BH's straight path to the
+   target spot (`cutoff_meet_point` in `cutoff_resolution.py`): for each point `P` on the path, compare the
+   BH's travel time to `P` (`dist / bh_drive_rate`) against the defender's travel
+   time to `P` (`dist / defender_rate`, defender speed from his **AG**-based rate).
+   The **meet point** is the *first* `P` the defender can reach **no later than**
+   the BH. Among all defenders with a valid meet point, the **earliest intercept**
+   along the path wins (ties → the defender nearest his meet point). This replaces
+   the old "closest-to-BH defender only" rule so a help defender on the lane (e.g.
+   Standard Diamond pos4 at the key) can cut off a drive even when a backcourt
+   teammate is closer to the ball but has no angle. Implementation lives in
+   `BackEnd/engine/cutoff_resolution.py` (`cutoff_meet_point`, `best_cutoff_on_drive`,
+   `resolve_cutoff_contest`); Covert Release fast-break stops reuse the same geometry
+   with wider FB corridor / time-slack tuning (`FB_CUTOFF_*` in `fast_break_constants.py`).
 3. **No meet point exists (no angle)** → the BH reaches the spot untouched → resolve via
    **§7 goal achievement**: run the **§2 3-tier HCO/FB read** (same as any other ABA
    arrival), then HCO or the unified **Fast Break executor** (D23) accordingly.
@@ -596,8 +609,8 @@ by what reaches the BH **before the hold window elapses**:
 - **No defender reaches the BH before the window elapses**:
   - **Dribble alive** → enter the **broken-HCT cutoff resolution** directly (the §5
     "No defenders in range" attack execution: BH races to his y-keyed ABA spot
-    (topLane / upper apex / lower apex) vs the closest cutoff defender → FB/HCO or a
-    meet-point contest). No new read.
+    (topLane / upper apex / lower apex) vs the **earliest path intercept** among all
+    defenders → FB/HCO or a meet-point contest). No new read.
   - **Dribble dead** (he picked it up on an earlier cutoff win) → he **cannot drive**,
     so he simply **re-reads (pass or hold)** while everyone keeps moving.
 
@@ -1218,11 +1231,12 @@ who wins); offense **`fight`** symmetrically lowers all defense-wins events;
 ### Cutoff race (broken-HCT attack)
 
 BH sprints to a y-keyed ABA spot (`19 ≤ y ≤ 32` → topLane `(74,25)`; `y > 32` → upper
-apex `(80,36)`; `y < 19` → lower apex `(80,15)`); the closest defender solves an
-interception point (BH drive pace vs his AG rate). **No angle →** BH arrives → §7 FB/HCO by ABA head-count.
-**Angle →** collide at the meet point → resolve with the same contest **minus steal**
-(charge / block / lost-handle / clean win). A clean win makes the BH **dribble-dead**
-(pass/hold only until he gives it up).
+apex `(80,36)`; `y < 19` → lower apex `(80,15)`); every defender gets an interception
+solve — the **earliest meet point along the path** wins (BH drive pace vs each
+defender's AG rate). **No angle from anyone →** BH arrives → §7 FB/HCO by ABA
+head-count. **Angle →** collide at the meet point → resolve with the same contest
+**minus steal** (charge / block / lost-handle / clean win). A clean win makes the BH
+**dribble-dead** (pass/hold only until he gives it up).
 
 ### The handful of knobs to tune
 
@@ -1258,11 +1272,11 @@ Full spec in **§7**. On a Fast Break (ABA read chose FB, or broken-HCT topLane 
 
 ## §13 — Multiple HCT Trap Plays — Architecture & Implementation Plan
 
-**Goal.** Turn today's single hardcoded trap into a *family* of selectable defensive
-plays. The current behavior becomes **Standard Trap**; two more follow later
-(**Straight Pressure**, **Standard Diamond**). Selection, playbook storage, scouting, and
-gameplay wiring **exactly mirror the Fast Break play system**; behavior dispatch uses
-a pluggable play interface (the formalized version of FB's per-play modules).
+**Goal.** Turn the original single hardcoded trap into a *family* of three selectable
+defensive plays — **Standard Trap**, **Straight Pressure**, and **Standard Diamond**
+(all shipped). Selection, playbook storage, scouting, and gameplay wiring **exactly
+mirror the Fast Break play system**; behavior dispatch uses a pluggable play interface
+(the formalized version of FB's per-play modules).
 
 ### 13.1 — The three layers (and what changes)
 
@@ -1312,19 +1326,24 @@ untouched — it remains the *"how often do I trap at all"* frequency gate.
 
 ### 13.3 — The `HCTPlay` pluggable interface
 
-Base class with one implementation per play (Standard inherits the current logic
-verbatim). Methods map to the loop's existing phase seams:
+Base class with one implementation per play (Standard Trap inherits the shared engine
+helpers at every seam; overriding nothing == Standard Trap). Methods map to the
+loop's existing phase seams:
 
-- `build_formation(...)` — trap formation + PF/C coverage (`HCT_STANDARD_*` tables).
-- `detect_pressure_and_trappers(...)` — detection radius + who commits.
-- `bh_decision(...)` — attack / pass / hold thresholds.
-- `resolve_moment(...)` — `o_score`/`d_score` gates, `DEF_WIN_BASE`, outcome split.
-- `movement(...)` / drift policy — rates, `HCT_DRIFT_PROBABILITY`.
+- `begin_possession(...)` — per-possession setup (stateless plays return `self`;
+  Straight Pressure returns a fresh instance with locked man assignments).
+- `detect_moment(...)` — classify `'none' | 'pressure' | 'trap'` + in-range list.
+- `defense_targets(...)` — per-step defensive formation targets (pure).
+- `select_trappers(...)` — pick `(primary_on_ball, trapper)` for a **trap** moment
+  (§5 band-based rule; Standard Diamond overrides with band→role).
+- `run(game)` — entry point; delegates to `compute_dynamic_hct_turn(game, self)`.
 
 **Play-agnostic plumbing stays OUTSIDE the play** (so every play inherits it
 consistently): the time terminals (shot-clock 0 + the elapsed-based 10-second rule),
-HCT stat parity (`HCT_A/_S`, `HCT_A_D/_S_D`), schema/step emission, and possession
-flips. A registry maps key → `HCTPlay`; `compute_dynamic_hct_turn` becomes thin.
+HCT stat parity (`HCT_A/_S`, `HCT_A_D/_S_D`), schema/step emission, possession
+flips, and the D8 contest engine (`_resolve_moment` / `_apply_moment_outcome`). A
+registry maps key → `HCTPlay`; `compute_dynamic_hct_turn` drives the loop via the
+play's seams.
 
 ### 13.4 — Playbook touchpoints (add `hc_traps`, mirroring `fast_breaks`)
 
@@ -1334,12 +1353,14 @@ flips. A registry maps key → `HCTPlay`; `compute_dynamic_hct_turn` becomes thi
 | Section enumerations | `gameplan_routes.py` (`_has_*` scan), `team_settings_manager.py` (section lists ×2) | add `"hc_traps"` |
 | Normalization | `api.py` (`normalize_string_keyed_map`), `team_settings_manager.py` | normalize/merge `hc_traps` like `fast_breaks` |
 | Persistence/migration | `team_settings_manager.py` merge + `ensure_hct_trap_plays()` | old saves get `hc_traps` defaults on load |
-| CPU teams | `cpu_playbook_customization.py` | `next_settings["hc_traps"] = _random_capped_three((...))` |
-| Frontend UI | *(frontend repo — separate, deferred)* | `HCT Traps` weight section in the defense group |
+| CPU teams | `cpu_playbook_customization.py` | 50/50 Standard Trap / Straight Pressure; Standard Diamond at 0 unless projected starting SG `AG > 50` → 34/33/33 |
+| Frontend UI | FCC, Playbooks page, Set Lineup modal | `HCT Traps` weight section in the defense group (mirrors Fast Breaks) |
 
-API accepts/returns `hc_traps` immediately; until the frontend ships its slider
-section, teams run on the default weights (PR1: 100% Standard Trap; PR2: 50/50
-Standard / Straight Pressure; Standard Diamond stays 0 until PR3).
+**Default weights (current).** User teams: **34/33/33** across all three plays.
+CPU teams: **50/50/0** (Standard Trap / Straight Pressure / Standard Diamond)
+unless the projected starting SG has `AG > 50`, then **34/33/33**. Playbooks saved
+before `hc_traps` existed fall back to `DEFAULT_HCT_TRAP_WEIGHTS` on display and at
+runtime.
 
 ### 13.5 — PR boundary (refactor-first)
 
@@ -1405,6 +1426,8 @@ nearer of the two wing spots (future-proof; reachable e.g. after the original BH
 passes and cuts to the ABA while a rover + key already exist).
 
 **Inherited unchanged from Standard Trap:**
+- Trap primary/trapper selection via the base **`select_trappers`** seam (§5 geometric
+  band rule — **not** the old PG-always-on-ball rule).
 - def PF/C D22 ball-reactive ABA-zone coverage (`_pf_c_targets`).
 - The §2 3-tier ABA read and the §7 HCO/Fast-Break transition once the ball reaches
   the ABA.
@@ -1420,6 +1443,8 @@ passes and cuts to the ABA while a rover + key already exist).
 - `defense_targets(...)` → `_straight_pressure_targets` (sticky man deny/on-ball +
   rover + key/wing toggle + PF/C via `_pf_c_targets`); mutates the per-possession
   state for man→ABA role transitions. Standard inherits the base (`_defense_targets`).
+- `select_trappers(...)` → **inherited** from base (`_select_trappers`); Straight
+  Pressure does not override.
 
 ### 13.7 — Standard Diamond (play #3) spec
 

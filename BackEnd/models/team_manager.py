@@ -5,6 +5,7 @@ from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 from BackEnd.constants.fast_break_play_types import default_fast_break_plays
+from BackEnd.constants.hct_trap_play_types import default_hct_trap_plays
 
 # ✅ PERFORMANCE: Cache plays collection to avoid reloading during GameManager initialization
 # This dramatically speeds up GameManager creation (from ~16s to <1s)
@@ -157,7 +158,12 @@ def _create_scouting_data_template_base():
             "1-3-1-zone": create_fresh_defense(),
             "vs_Fast_Break": {"used": 0, "success": 0},
             "FCP": {"used": 0, "success": 0},
-            "HCT": {"used": 0, "success": 0}
+            "HCT": {"used": 0, "success": 0},
+            # Per-trap-play A/S (defense-side mirror of offense.fast_break_plays).
+            # Recorded in _record_hct_stats; explicit init for parity + safe
+            # Scouting Report reads on fresh teams (lazy ensure_hct_trap_plays
+            # still backfills older saves).
+            "hct_trap_plays": default_hct_trap_plays()
         }
     }
 

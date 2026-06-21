@@ -5049,16 +5049,33 @@ async function renderScoutingTab() {
     renderFccScoutingMeasures(teamData.team_attributes || {});
     if (typeof renderPlayUsage === 'function') {
       // Play Usage is gated on the user running this week's training with Film
-      // Study > 0 (backend sets play_usage_unlocked). Until then it's N/A with a
-      // hint. Absent flag → treat as unlocked (back-compat).
+      // Study (backend sets the *_unlocked flags). HCO unlocks at Film Study > 0;
+      // Fast Breaks + Half-Court Traps unlock at > 1. Until then each panel shows
+      // N/A with a hint. Absent HCO flag → treat as unlocked (back-compat).
       const playUsageUnlocked = playUsage.play_usage_unlocked !== false;
-      const playUsageEmptyMsg = playUsageUnlocked
-        ? 'No previous game data available. Opponent has not played a game yet this season.'
-        : "N/A — Run Film Study in training this week to scout this opponent's play usage.";
       renderPlayUsage(
         playUsageUnlocked ? (playUsage.plays || []) : [],
-        playUsageEmptyMsg,
+        playUsageUnlocked
+          ? 'No previous game data available. Opponent has not played a game yet this season.'
+          : "N/A — Run Film Study in training this week to scout this opponent's play usage.",
         'fcc-play-usage-body'
+      );
+
+      const extendedUnlocked = playUsage.fast_break_usage_unlocked === true;
+      const extendedHint = "N/A — Set Film Study above 1 in training this week to scout this opponent's play usage.";
+      renderPlayUsage(
+        extendedUnlocked ? (playUsage.fast_break_plays || []) : [],
+        extendedUnlocked
+          ? 'No fast break data available from the opponent\'s last game.'
+          : extendedHint,
+        'fcc-fast-break-usage-body'
+      );
+      renderPlayUsage(
+        (playUsage.hct_usage_unlocked === true) ? (playUsage.hct_trap_plays || []) : [],
+        (playUsage.hct_usage_unlocked === true)
+          ? 'No half-court trap data available from the opponent\'s last game.'
+          : extendedHint,
+        'fcc-hct-usage-body'
       );
     }
     status.style.display = 'none';
