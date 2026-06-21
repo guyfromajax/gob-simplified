@@ -726,6 +726,15 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       return;
     }
     
+    // Batted-OOB DEAD BALL — offense retains; announce the batted-ball headline
+    // and skip the turnover path (mirrors finalizeTurnAfterAnimation).
+    if ((turnData.bat_oob || turnData.rim_runner_bat_oob) &&
+        (turnData.result_type === 'DEAD BALL' || turnData.result_type === 'TURNOVER')) {
+      const offenseTeam = (turnData.offense_team_id === scene?.homeTeamId) ? 'home' : 'away';
+      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam, null, scene ? { scene } : {});
+      return;
+    }
+
     // Handle all turnover types: TURNOVER, DEAD BALL (from HCT/FCP), and non-steal STEAL results
     if (turnData.result_type === 'TURNOVER' || turnData.result_type === 'DEAD BALL') {
       // Non-steal turnovers - show victim's photo in offense team color

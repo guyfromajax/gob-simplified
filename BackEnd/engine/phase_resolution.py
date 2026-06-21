@@ -7391,8 +7391,12 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     stealer = dyn.get("stealer") or defender
     foul_out_info = {"fouled_out": False, "foul_count": 0}
 
+    # §14 — a batted-out-of-bounds pass is a DEAD BALL where the OFFENSE RETAINS
+    # (side inbound, no flip, no TO) — distinct from a forced-turnover DEAD BALL.
+    bat_oob = bool(dyn.get("bat_oob"))
+
     # Stat tracking parity with the skeleton path.
-    if result_type == "DEAD BALL":
+    if result_type == "DEAD BALL" and not bat_oob:
         if ball_handler is not None:
             ball_handler.record_stat("TO")
         def_scouting["defense"]["HCT"]["success"] += 1
@@ -7452,9 +7456,11 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
                 game_state["free_throws"] = 0
                 game_state["free_throws_remaining"] = 0
 
-    # Possession flip + next play type per existing HCT conventions.
-    possession_flips = result_type in ("DEAD BALL", "STEAL") or (
-        result_type == "FOUL" and foul_team == "OFFENSE"
+    # Possession flip + next play type per existing HCT conventions. A batted-OOB
+    # DEAD BALL is the exception — the offense keeps it (side inbound, no flip).
+    possession_flips = (
+        (result_type in ("DEAD BALL", "STEAL") and not bat_oob)
+        or (result_type == "FOUL" and foul_team == "OFFENSE")
     )
     if result_type == "HCO":
         next_play_type = "HCO"
@@ -7570,6 +7576,9 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "stealer_id": getattr(stealer, "player_id", None) if (result_type == "STEAL" and stealer) else None,
         # §14 — STEAL that is a pass interception → FE shows "INTERCEPTION!" + SFX.
         "is_interception": bool(dyn.get("is_interception")) if result_type == "STEAL" else False,
+        # §14 — DEAD BALL that is a batted-OOB pass → FE shows "Batted Ball Out Of
+        # Bounds!" (not a turnover) and the offense retains.
+        "bat_oob": bat_oob,
         "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
         "defender_id": getattr(defender, "player_id", None) if defender else None,
         "fouled_out": foul_out_info.get("fouled_out", False),

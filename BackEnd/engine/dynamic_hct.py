@@ -71,6 +71,7 @@ from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_f
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
 from BackEnd.utils.transition_bridge import _interrupted_coord
 from BackEnd.engine.pass_contest import (
+    BAT_OOB,
     INTERCEPT,
     resolve_offense_pass_modifier,
     resolve_pass_contest,
@@ -1509,6 +1510,10 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     # strip). Threads through the wrapper to the turn dict so the FE shows the
     # "INTERCEPTION!" announce + interception SFX (gameAnnouncements.isPassInterception).
     is_interception: bool = False
+    # §14 — set when a pass is batted out of bounds: a DEAD BALL where the OFFENSE
+    # RETAINS (side inbound, no flip, no TO) — matches Rim Runner. Threads to the
+    # turn dict so the FE announces "Batted Ball Out Of Bounds!" (not a turnover).
+    bat_oob: bool = False
     # Reach-in micro-movement (render-space only): the on-ball defender position
     # of the contest moment currently being resolved. Set by ``_resolve_attack``;
     # consumed by ``_stamp_reach_in`` to tag the moment's emitted segment so the
@@ -2015,6 +2020,24 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             text_suffix = " — pass picked off, intercepted!"
             break
 
+        if contest["outcome"] == BAT_OOB:
+            deflector_pos = contest["deflector"]
+            # Knocked out of bounds in flight: a DEAD BALL where the OFFENSE
+            # RETAINS (side inbound, no possession flip, no TO) — matches Rim
+            # Runner. The bat_oob flag drives the FE "Batted Ball Out Of Bounds!"
+            # announce and suppresses the turnover announce.
+            result_type = "DEAD BALL"
+            bat_oob = True
+            steal_coords = {}
+            sec = _emit_stopper(
+                "hct_bat_oob",
+                f"pass batted out of bounds ({passer_pos}\u2192{receiver_pos}, "
+                f"deflected by {deflector_pos})",
+            )
+            shot_clock -= sec
+            text_suffix = " — batted out of bounds, they keep it!"
+            break
+
         # Pass flight: the ball travels passer→receiver while the defense closes
         # at its OWN rate (rate-limited, NOT snapped) toward its targets anchored
         # on the receiver (the incoming ball). A quicker close reaches the catch;
@@ -2070,6 +2093,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         "stealer": stealer,
         "steal_coords": steal_coords,
         "is_interception": is_interception,
+        "bat_oob": bat_oob,
         "ball_handler": ball_handler,
         "defender": defender,
         "text_suffix": text_suffix,

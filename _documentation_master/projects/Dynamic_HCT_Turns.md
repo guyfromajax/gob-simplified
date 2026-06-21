@@ -1469,14 +1469,19 @@ positioning, not a bolted-on roll.
   fast-break-off-takeaway chance. Recorded as an **HCT** turn (`current_turn="HCT"`).
   The FE swaps the headline to **"INTERCEPTION!"** + interception SFX via
   `gameAnnouncements.isPassInterception` (reads `is_interception`).
-- `BAT_OOB` → **deferred (Phase 2b).** Currently treated as a `COMPLETE` (the pass goes
-  through), because offense-retains + side-inbound needs its out-of-bounds ball animation
-  and a generic batted-OOB announce; bundled with the §14.7 Phase-4 polish below.
+- `BAT_OOB` → **wired (Phase 2b).** `result_type="DEAD BALL"` with a `bat_oob=True` flag
+  threaded through `_resolve_half_court_trap_dynamic_first_cut`. The **offense RETAINS**
+  (matches Rim Runner): `possession_flips=False`, `next_play_type="SIDE_INBOUND"`, **no TO
+  recorded and no HCT-success credited** (it's a deflection, not a takeaway). The FE shows
+  **"Batted Ball Out Of Bounds!"** at turn start (`turnPreparation` `bat_oob` →
+  `BATTED_OOB`) and the turnover announce is **suppressed** when `bat_oob` is set
+  (`finalizeTurnAfterAnimation` + `announceFromTurnData` guards).
 
-**Animation (current cut):** INTERCEPT breaks *before* emitting the pass-flight segment
-and fires the existing steal-stopper collapse, so the takeaway reuses the shipped STEAL
-render path. The pass-flight-to-`contact_point` shortening (ball visibly picked off in
-flight) + the BAT_OOB out-of-bounds send are the Phase-4 polish.
+**Animation (current cut):** both deflections break *before* emitting the pass-flight
+segment and fire the existing stopper collapse beat, so INTERCEPT reuses the shipped STEAL
+render path and BAT_OOB reuses the DEAD-BALL stop. The pass-flight-to-`contact_point`
+shortening (ball visibly picked off / knocked away in flight) + the BAT_OOB out-of-bounds
+ball send are the remaining Phase-4 polish.
 
 ### 14.6 — Knobs to tune
 
@@ -1491,12 +1496,14 @@ flight) + the BAT_OOB out-of-bounds send are the Phase-4 polish.
 
 1. ✅ **Extract + unit-test** `resolve_pass_contest` (geometry first; band with injected RNG).
 2. ✅ **HCT pass branch — INTERCEPT** (§14.5): `is_interception` STEAL terminal + FE
-   "INTERCEPTION!" announce/SFX. **2b (pending):** the `BAT_OOB` terminal (offense-retains
-   → `SIDE_INBOUND`), bundled with step 4's OOB animation.
+   "INTERCEPTION!" announce/SFX.
+2b. ✅ **HCT pass branch — BAT_OOB**: `bat_oob` DEAD-BALL terminal (offense-retains →
+   `SIDE_INBOUND`, no flip / no TO) + FE "Batted Ball Out Of Bounds!" announce with the
+   turnover announce suppressed.
 3. Generalize to HCO / inbound pass paths; optionally refactor Rim Runner onto the
    shared primitive (single source of truth).
-4. Animation polish: shorten the pass flight to `contact_point` (ball picked off in
-   flight) + the BAT_OOB out-of-bounds send.
+4. Animation polish: shorten the pass flight to `contact_point` (ball picked off / knocked
+   away in flight) + the BAT_OOB out-of-bounds ball send.
 
 ### 14.8 — Open items
 

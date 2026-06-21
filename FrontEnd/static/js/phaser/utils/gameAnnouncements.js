@@ -144,6 +144,13 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
       break;
 
+    // Generic batted-ball-out-of-bounds (HCT §14 pass contest, etc.). Offense
+    // retains; this is NOT a turnover, so the turnover announce is suppressed
+    // (see finalizeTurnAfterAnimation / announceFromTurnData bat_oob guards).
+    case 'BATTED_OOB':
+      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
+      break;
+
     // ========== SITUATIONAL LOGIC (Q4/OT) — secondary tier ==========
     case 'SLOW_IT_DOWN':
       showSecondaryAnnouncement("Slow It Down", offenseTeam);

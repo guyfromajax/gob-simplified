@@ -167,6 +167,9 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     }
     if (turn.rim_runner_bat_oob) {
       announceGameEvent('RIM_RUNNER_BATTED_OOB', turn, scene);
+    } else if (turn.bat_oob) {
+      // Generic batted-OOB (e.g. HCT §14 pass contest) — offense retains.
+      announceGameEvent('BATTED_OOB', turn, scene);
     }
     
     // Pressure announcements (only for BASELINE_INBOUND setting up pressure)
@@ -363,7 +366,13 @@ export async function finalizeTurnAfterAnimation({
       stealerId: turn.stealer_id || turn.defender_id,
       victimId: turn.victim_id 
     });
-  } else if (turn.result_type === 'DEAD BALL' || turn.result_type === 'TURNOVER') {
+  } else if (
+    (turn.result_type === 'DEAD BALL' || turn.result_type === 'TURNOVER') &&
+    !turn.bat_oob &&
+    !turn.rim_runner_bat_oob
+  ) {
+    // Batted-OOB is a DEAD BALL where the offense RETAINS — not a turnover. Its
+    // headline is announced at turn start (BATTED_OOB), so skip the turnover one.
     announceGameEvent('TURNOVER', turn, scene, { 
       victimId: turn.victim_id,
       turnoverType: turn.turnover_type 
