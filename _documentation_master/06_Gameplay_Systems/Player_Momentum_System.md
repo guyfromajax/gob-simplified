@@ -28,12 +28,13 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_FT_MIN_ATTEMPTS` | 2 | only FT trips with >1 attempt qualify (make or miss) |
 | `MO_FT_ALL_MISS_DELTA` | −1 | flat, once per trip, when ALL attempted FTs miss |
 | `MO_FT_ALL_MAKE_DELTA` | 1 | flat, once per trip, when ALL attempted FTs make |
+| `MO_FT_SECOND_CHANCE_ROLL` | (1, 3) | FT second-chance threshold bump = MO × randint(\*this) pts (signed); see § Free Throw Impact |
 | `MO_SET_PLAY_DELTA` | 1 | target_shooter makes the shot in a successful set-play skeleton |
 | `MO_SHOT_ROLL_BASE` | (1, 6) | Default shot roll |
 | `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
 | `MO_SHOT_ROLL_NEGATIVE` | (1, 5) | Unfavorable roll when MO < 0 and chance hits |
 | `MO_SHOT_IMPACT_PCT_PER_LEVEL` | 20 | P(modified roll) = \|MO\| × this (%) |
-| `MO_NG_DECAY_BONUS_PCT_PER_LEVEL` | 20 | P(decay one ND tier higher) = \|MO\| × this (%); see Energy_System |
+| `MO_NG_DECAY_BONUS_PCT_PER_LEVEL` | 20 | P(decay from highest tier, ND>89) = \|MO\| × this (%); see Energy_System |
 | `MO_SHOTCLOCK_BASE_PCT` | 40 | Shot-clock-violation base roll % |
 | `MO_SHOTCLOCK_OFFENSE_DELTA` | −1 | Offense MO change; P = clamp(BASE − offenseTeamMO, 0, 100)% |
 | `MO_SHOTCLOCK_DEFENSE_DELTA` | 1 | Defense MO change; P = clamp(BASE + defenseTeamMO, 0, 100)% |
@@ -61,6 +62,7 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **Consecutive shots** | see below | `player.py` `record_shot_result` |
 | **Free Throws (all missed)** | shooter **−1** if he attempts **>1** FT in one trip and **misses all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Free Throws (all made)** | shooter **+1** if he attempts **>1** FT in one trip and **makes all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
+| **FT second-chance** | shooter MO shifts the miss→make threshold by **`MO × randint(1,3)`** pts (signed) — see *Free Throw Impact* | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Set Play make** | the **target_shooter** **+1** when he makes the shot in a **successful** set-play skeleton | `phase_resolution.py` `resolve_half_court_offense_logic` |
 | **Dunk** | **deferred** (constant + intent only) | — |
 
@@ -103,7 +105,15 @@ Wired at `shot_manager.py` (shooter base roll) and `shared.py` `oreb_shot_attemp
 
 ### NG (energy) decay bonus
 
-A player with **MO > 0** has a **`|MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL`%** chance (20% per level → 100% at MO 5) to take the turn's energy decay from **one ND tier higher** (less fatigue), capped at the top tier; MO ≤ 0 has no effect. Wired in `Player.get_fatigue_decay_amount()`. Full tier mechanics in **[Energy_System.md](Energy_System.md) § Depletion Calculation**.
+A player with **MO > 0** has a **`|MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL`%** chance (20% per level → 100% at MO 5) to take the turn's energy decay from **the highest tier (ND>89)** (less fatigue), capped at the top tier; MO ≤ 0 has no effect. Wired in `Player.get_fatigue_decay_amount()`. Full tier mechanics in **[Energy_System.md](Energy_System.md) § Depletion Calculation**.
+
+### Free Throw Impact
+
+When a shooter **misses the primary FT roll**, he gets a second-chance roll (miss → make). The base make chance is the crowd-tiered probability (**40% home / 30% / 20% away**, never a flat 50/50), shifted by the shooter's momentum:
+
+`threshold = base_pct (after crowd factor) + (MO × randint(*MO_FT_SECOND_CHANCE_ROLL))`, clamped to **[0, 100]**.
+
+A **1–100** roll **less than the threshold** upgrades the miss to a make. Positive MO raises the threshold (more second-chance makes); negative MO lowers it; **MO = 0 → no change**. Per attempt, using the shooter's MO. Wired in `resolve_free_throw_logic` (`phase_resolution.py`).
 
 ---
 

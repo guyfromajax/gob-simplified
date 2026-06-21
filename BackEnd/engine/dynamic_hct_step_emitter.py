@@ -5,7 +5,7 @@ Assembles a variable-length schema step list for a dynamic HCT turn:
   - **Step 0 — entry walk-up** — universal primitive (``build_walk_up_step``).
     BH cruises from BIP-end inbound position to the engage point ``(44, BH_y)``
     (home) / flipped for away; the other four offensive players sprint toward
-    randomized front-court targets; defenders settle into the HCT alignment.
+    randomized frontcourt targets; defenders settle into the HCT alignment.
     Gate = BH.
   - **Steps 1..N — loop segments** — one generic movement step per engine
     ``loop_segment`` (converge, advances, attack). Movers go to their segment

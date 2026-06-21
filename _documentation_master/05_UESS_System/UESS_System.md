@@ -121,7 +121,7 @@ Reusable across turn types. Live in [`BackEnd/utils/transition_bridge.py`](../..
 |---|---|---|
 | `build_walk_up_step` | All players move from start → end. BH dribbles. Gated on `gate_player_ids`. Non-gate movers interrupted at step T. | BIP setup walk-in, HCO entry walk-up, HCT entry walk-up |
 | `build_handoff_step` | BH → PG handoff. 1-step (BH = PG hold) or 2-step (PG converge + inbound pass). | HCO entry orchestrator |
-| `build_kickout_step` | BH (front-court) kicks back to step 0 BH. 2 sub-steps (positioning + pass). | HCO entry orchestrator, OREB Kickout |
+| `build_kickout_step` | BH (frontcourt) kicks back to step 0 BH. 2 sub-steps (positioning + pass). | HCO entry orchestrator, OREB Kickout |
 | `build_pass_step` | Passer + receiver stationary, ball arcs. Other 8 optionally drift. Gated on `ball_reaches_player`. | BIP inbound pass, future migrations |
 | `build_bip_animation_steps` | Composer: walk-up + pass for BIP turn. | BIP |
 | `build_sip_animation_steps` | Composer: walk-up + pass for SIP turn. Gates step 1 on all 10 players (no teleports). Pins clock — no game-clock burn. | SIP |

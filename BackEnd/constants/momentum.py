@@ -24,6 +24,12 @@ MO_FT_MIN_ATTEMPTS = 2       # only trips with >1 FT attempted qualify (make or 
 MO_FT_ALL_MISS_DELTA = -1    # flat, once per trip, when ALL attempted FTs miss
 MO_FT_ALL_MAKE_DELTA = 1     # flat, once per trip, when ALL attempted FTs make
 
+# --- Free throw second-chance threshold bump (per missed-first-roll attempt) ---
+# After a missed primary FT roll, the second-chance threshold (base %, crowd-tiered)
+# is bumped by shooter MO × randint(*this) percentage points (signed). Threshold
+# clamped to [0,100]; roll 1–100 < threshold = make. See Player_Momentum_System.md.
+MO_FT_SECOND_CHANCE_ROLL = (1, 3)
+
 # --- Set play: target shooter makes the shot in a successful skeleton ---
 MO_SET_PLAY_DELTA = 1
 
@@ -38,8 +44,8 @@ MO_SHOT_ROLL_NEGATIVE = (1, 5)    # when MO < 0 and the chance hits
 MO_SHOT_IMPACT_PCT_PER_LEVEL = 20  # P(modified roll) = |MO| × this (%); 100% at |MO|=5
 
 # --- NG (energy) decay momentum bonus (Energy_System.md § Depletion) ---
-# MO > 0 gives a |MO| × this (%) chance to take the turn's NG decay from one ND
-# tier higher (less fatigue). Linear; 100% at |MO|=5. MO <= 0 → normal decay.
+# MO > 0 gives a |MO| × this (%) chance to take the turn's NG decay from the
+# highest tier (ND>89, least fatigue). Linear; 100% at |MO|=5. MO <= 0 → normal decay.
 MO_NG_DECAY_BONUS_PCT_PER_LEVEL = 20
 
 # --- Shot-clock violation (per active player, independent roll) ---

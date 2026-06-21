@@ -749,7 +749,7 @@ def build_kickout_step(
     pass_speed_grid_per_game_sec: float = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND),
     metadata_reason: str = "kickout",
 ) -> List[AnimationStep]:
-    """Universal Kickout beat — current BH (in front court near basket)
+    """Universal Kickout beat — current BH (in frontcourt near basket)
     kicks the ball BACK to ``receiver_id`` (the HCO playcall's step 0 BH).
     Fires when HCO entry conditions detect BH past the offensive arc
     threshold (x >= 71 home / <= 29 away).

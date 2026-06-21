@@ -154,7 +154,7 @@ Energy depletion occurs during active gameplay when players are actively partici
 
 **Method:** `BackEnd/models/player.py` - `get_fatigue_decay_amount()` (ND tiers in the module-level `_ND_DECAY_TIERS` list)
 
-**Formula:** Based on player's ND (Natural Durability) attribute, returns a random amount from a weighted list. Optionally omits zero values for defensive players on FCP/HCT turns. A positive-MO player may decay from one tier higher (see *Momentum bonus* below).
+**Formula:** Based on player's ND (Natural Durability) attribute, returns a random amount from a weighted list. Optionally omits zero values for defensive players on FCP/HCT turns. A positive-MO player may decay from the highest tier (`ND > 89`) (see *Momentum bonus* below).
 
 **Parameters:**
 - `omit_zeros` (default: False): If True, removes all zero values from the depletion list before selection. Used for defensive players on FCP/HCT turns to ensure they always lose some energy.
@@ -170,14 +170,14 @@ Energy depletion occurs during active gameplay when players are actively partici
 - **ND ≥ 9**: `random.choice([0, 0.01, 0.02, 0.02, 0.02, 0.03])` (maximum depletion)
 - **ND < 9**: `random.choice([0, 0.01, 0.02, 0.02, 0.03, 0.03])` (maximum depletion)
 
-**Momentum bonus (MO):** a player with **MO > 0** has a chance to take the turn's decay from **one ND tier higher** (less fatigue) — e.g. a 35 ND (tier `ND ≥ 29`) can pull from the `ND ≥ 39` list. The chance is **|MO| × `MO_NG_DECAY_BONUS_PCT_PER_LEVEL`** (= 20) %, capped at 100; each player rolls independently each turn:
+**Momentum bonus (MO):** a player with **MO > 0** has a chance to take the turn's decay from **the highest tier (`ND > 89`)** (least fatigue) — e.g. a 35 ND (tier `ND ≥ 29`) pulls from the `ND ≥ 89` list. The chance is **|MO| × `MO_NG_DECAY_BONUS_PCT_PER_LEVEL`** (= 20) %, capped at 100; each player rolls independently each turn:
 
 | MO | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
 | chance | 20% | 40% | 60% | 80% | 100% |
 
-- Only **one** tier up (the magnitude of the bonus doesn't grow with MO — only the *chance* does), capped at the top tier (`ND ≥ 89`).
-- **MO ≤ 0 → no effect** (normal decay). Composes with `omit_zeros` (the higher tier's list still drops zeros for FCP/HCT defenders).
+- On a successful roll the decay always comes from the **top tier** (`ND ≥ 89`) regardless of the player's own tier (the magnitude doesn't grow with MO — only the *chance* does).
+- **MO ≤ 0 → no effect** (normal decay). Composes with `omit_zeros` (the top tier's list still drops zeros for FCP/HCT defenders).
 - Wired in `get_fatigue_decay_amount()` (`player.py`); constant in `BackEnd/constants/momentum.py`. See [Player_Momentum_System.md](Player_Momentum_System.md).
 
 **Key Points:**

@@ -31,8 +31,8 @@ def clamp_mo(value):
 
 # Fatigue (NG) decay tiers by ND (Natural Durability), ordered high-ND → low-ND
 # (least → most depletion). A player's tier is the first whose threshold his ND
-# meets (last tier = ND < 9). The MO momentum bonus pulls the decay from one
-# tier higher (index − 1). See Energy_System.md § Depletion Calculation.
+# meets (last tier = ND < 9). The MO momentum bonus pulls the decay from the
+# highest tier (index 0, ND>89). See Energy_System.md § Depletion Calculation.
 _ND_DECAY_TIERS = [
     (89, [0, 0.01]),
     (79, [0, 0.01, 0.01]),
@@ -207,14 +207,15 @@ class Player:
         )
 
         # Momentum bonus (Player_Momentum_System.md / Energy_System.md): MO > 0
-        # gives a |MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL % chance to decay as if
-        # one ND tier higher (less fatigue) — one tier only, capped at the top.
-        # MO <= 0 → normal decay. Each player rolls independently.
+        # gives a |MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL % chance to take the
+        # turn's decay from the HIGHEST tier (index 0, ND>89 — least fatigue),
+        # capped at the top tier. MO <= 0 → normal decay. Each player rolls
+        # independently.
         mo = int(self.attributes.get("MO", 0) or 0)
         if mo > 0 and tier_index > 0:
             chance = min(100, mo * MO_NG_DECAY_BONUS_PCT_PER_LEVEL)
             if random.randint(1, 100) <= chance:
-                tier_index -= 1
+                tier_index = 0
 
         decay_list = list(_ND_DECAY_TIERS[tier_index][1])
 

@@ -43,12 +43,12 @@ path over the legacy skeleton-driven HCT. Flip to `False` to revert.
 **Defensive Positions Legend**
 - PG: Backcourt center defender
 - pos1 & pos2: other backcourt defenders
-- pos3 & pos4: front court defenders
+- pos3 & pos4: frontcourt defenders
 
 **Offensive Positions Legend**
 - PG: ball handler
-- pos1 & pos2: back court offenders
-- pos3 & pos4: front court offenders
+- pos1 & pos2: backcourt offenders
+- pos3 & pos4: frontcourt offenders
 
 **Position assignment note.** We use the same ball-handler + pos1..pos4
 assignment scheme as the target-shooter + pos1..pos4 logic (mirrors
@@ -763,7 +763,7 @@ A pass goes to one of the two teammates closest to the BH. Execute the
     defensive PG → targets primary-defender location.
   - PG → targets trapper-defender location.
   - Third backcourt defender → targets center-defender spot.
-- Front court:
+- Frontcourt:
   - Defender in the same vertical half as the BH/PR → targets same y as BH/PR and an
     x halfway between BH/PR x and either (the x of any offensive player in the same
     vertical half whose x > 74) or, if none, halfway between BH/PR x and basket-x.
@@ -788,7 +788,7 @@ While the pass is animating:
     - Backcourt:
         - Primary defender = defensive PG → primary-defender location.
         - Other backcourt defenders → help-defender locations relative to their vertical half.
-    - Front court:
+    - Frontcourt:
         - pos4 → centroid of frontcourt high-post zone.
         - pos5 → centroid of paint/rim zone.
 - After reception: 

@@ -361,7 +361,7 @@ HCO_SETUP_HCO_BH_RADIUS = 10  # max grid units from FB BH for HCO BH placement
 # the legacy static `FCP_SETUP_POSITIONS` mapping. SF is NOT in these maps;
 # SF uses the dynamic chemistry-aware inbound logic (see HCO BIP / FCP setup
 # helper in `turn_manager.py`). All ranges expressed in HOME orientation
-# (x≈0..50 = back-court for home offense). For away offense, the build
+# (x≈0..50 = backcourt for home offense). For away offense, the build
 # function flips via ``getAwayTeamCoords``.
 # See FCP_HCT_System.md → "FCP Starting Alignment".
 FCP_OFFENSE_SETUP_RANGES = {

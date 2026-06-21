@@ -160,7 +160,7 @@ All coords below are in HOME orientation (home offense). For away offense, x is 
 | PG | random.randint(12, 18) | random.randint(15, 23) | Lower inbound receive option |
 | SG | random.randint(12, 18) | random.randint(27, 35) | Upper inbound receive option |
 | PF | random.randint(45, 55) | random.randint(20, 30) | Mid-court outlet |
-| C  | random.randint(60, 70) | random.randint(20, 30) | Front-court anchor |
+| C  | random.randint(60, 70) | random.randint(20, 30) | Frontcourt anchor |
 
 **Defense ranges** (`FCP_DEFENSE_SETUP_RANGES`):
 

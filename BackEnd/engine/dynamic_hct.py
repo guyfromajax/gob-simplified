@@ -617,7 +617,7 @@ def _crossed_half_court(x: float, is_away_offense: bool) -> bool:
 
 
 def _past_primary_safe_area(xy: Dict[str, Any], is_away_offense: bool) -> bool:
-    """BH advanced beyond the PSA band into the deep front court (x>64 home /
+    """BH advanced beyond the PSA band into the deep frontcourt (x>64 home /
     x<36 away). Gates the Attack Basket Area (§7 goal achievement)."""
     x = xy["x"]
     return x < (100 - PSA_X_MAX) if is_away_offense else x > PSA_X_MAX

@@ -854,7 +854,7 @@ def build_skeleton_animation_steps(
 
     # Run the HCO entry orchestrator universally for HCO turns. The decision
     # tree (Handoff / Kickout / Walk Up) is self-deciding — if the BH is
-    # already at step 0 position and in front court, nothing prepends. The
+    # already at step 0 position and in frontcourt, nothing prepends. The
     # ``turn_type`` parameter scopes this to HCO; FCP turns skip the
     # orchestrator (their entry seam is the BIP setup positions path).
     is_hco_turn = (turn_type == "HCO") and isinstance(prior_turn, dict)
@@ -986,11 +986,11 @@ def build_skeleton_animation_steps(
             kickout_appended = False
 
             # --- Handoff (BH ≠ PG: converge + pass) / Handoff hold (BH == PG:
-            # hold beat per tempo) / Kickout. Handoff fires in back court for
+            # hold beat per tempo) / Kickout. Handoff fires in backcourt for
             # both BH≠PG and BH==PG cases — `build_handoff_step` internally
             # branches on bh_id == receiver_id to emit the hold variant
             # (Step_By_Step §Handoff Step). Kickout fires only when BH ≠ PG
-            # AND in front court. ---
+            # AND in frontcourt. ---
             if in_back_court:
                 from BackEnd.utils.transition_bridge import build_handoff_step
                 handoff_steps = build_handoff_step(
@@ -1047,7 +1047,7 @@ def build_skeleton_animation_steps(
                         )
 
             # --- Walk Up (fires after Handoff, OR alone if BH = step0_bh in
-            # back court, OR as fallback when neither Handoff nor Kickout
+            # backcourt, OR as fallback when neither Handoff nor Kickout
             # fired — e.g. FB Defensive Stop → HCO where BH = step 0 BH
             # AND BH is in frontcourt). Skip only when Kickout actually
             # appended steps (not merely when the kickout branch was evaluated).

@@ -9,6 +9,7 @@ from BackEnd.constants.momentum import (
     MO_FT_ALL_MISS_DELTA,
     MO_FT_ALL_MAKE_DELTA,
     MO_FT_MIN_ATTEMPTS,
+    MO_FT_SECOND_CHANCE_ROLL,
     MO_SET_PLAY_DELTA,
 )
 from fastapi import HTTPException
@@ -2233,9 +2234,18 @@ def resolve_free_throw_logic(game):
     makes_shot = ft_primary_roll < ft_shot_score
     ft_made_on_second_chance = False
 
-    # Secondary check: miss → make (global default for home FT; away uses crowd tiers)
+    # Secondary check: miss → make. Base % is crowd-tiered (home default; away
+    # drops with crowd factor), nudged by the shooter's momentum
+    # (Player_Momentum_System.md § Free Throw Impact): threshold = base% +
+    # MO × randint(*MO_FT_SECOND_CHANCE_ROLL), clamped to [0,100]; a 1–100 roll
+    # below the threshold upgrades the miss to a make.
     if not makes_shot:
-        if random.random() < effective_ft_miss_to_make_second_chance(game, off_team):
+        second_chance_pct = effective_ft_miss_to_make_second_chance(game, off_team) * 100
+        ft_mo = int(attrs.get("MO", 0) or 0)
+        _sc_lo, _sc_hi = MO_FT_SECOND_CHANCE_ROLL
+        second_chance_threshold = second_chance_pct + ft_mo * random.randint(_sc_lo, _sc_hi)
+        second_chance_threshold = max(0, min(100, second_chance_threshold))
+        if random.randint(1, 100) < second_chance_threshold:
             makes_shot = True
             ft_made_on_second_chance = True
 
