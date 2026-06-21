@@ -1531,7 +1531,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         resolve_cutoff_contest,
     )
     from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
-    from BackEnd.utils.shared import ag_to_grid_per_game_sec
 
     move_distance = random.randint(BALL_HANDLER_MOVE_X_MIN, BALL_HANDLER_MOVE_X_MAX)
     additional_move_x = direction * move_distance
@@ -1547,7 +1546,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         "x": max(4, min(97, int(ball_handler_outlet_x + additional_move_x))),
         "y": max(1, min(49, int(ball_handler_outlet_y + additional_move_y))),
     }
-    bh_drive_rate = ag_to_grid_per_game_sec(ball_handler, "sprint")
+    bh_drive_rate = _ag_grid_per_game_sec(ball_handler, "sprint")
 
     if rebound:
         _cutoff_corridor = FB_CUTOFF_PATH_CORRIDOR_DREB
