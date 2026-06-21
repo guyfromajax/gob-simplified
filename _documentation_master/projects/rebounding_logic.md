@@ -41,10 +41,10 @@ One step: rebounder sprints to the ball; everyone on the crash lists (minus the 
 DREB does **not** re-place all ten players—it uses where the prior turn left them.
 
 **Near-bounce failed attemptors**  
-For newer miss paths, the backend stamps failed attemptors with `collect_near_bounce_rebound_attemptors()` after the authoritative bounce spot and actual `rebounderId` are known. The helper includes non-captor players within **20 Euclidean grid units** of the bounce. This is an animation helper only; it does not decide the rebound winner.
+For newer miss paths, the backend stamps failed attemptors with `collect_near_bounce_rebound_attemptors()` after the authoritative bounce spot and actual `rebounderId` are known. The default helper includes non-captor players within **20 Euclidean grid units** of the bounce. Fast Break paths use the Fast Break-specific **25 Euclidean grid unit** radius. This is an animation helper only; it does not decide the rebound winner.
 
 **Near-bounce candidate filtering**  
-`filter_rebound_candidate_lineups_near_bounce()` is the gameplay-side sibling helper. It runs before winner selection, preserves position-keyed lineups, and filters candidate pools to players within **20 Euclidean grid units** of the bounce. If both teams filter to empty, it falls back to the original path-specific pools so rebound resolution can degrade to prior behavior instead of creating an empty-board state. Adoption is path-by-path because HCO/FCP strategy pools, Fast Break half-court pools, HCT shot-frame pools, putback pools, and FT lane pools have different gameplay semantics.
+`filter_rebound_candidate_lineups_near_bounce()` is the gameplay-side sibling helper. It runs before winner selection, preserves position-keyed lineups, and filters candidate pools to players near the bounce. Default radius is **20 Euclidean grid units**; Fast Break paths use **25 Euclidean grid units**. If both teams filter to empty, it falls back to the original path-specific pools so rebound resolution can degrade to prior behavior instead of creating an empty-board state. Adoption is path-by-path because HCO/FCP strategy pools, Fast Break half-court pools, Dynamic HCT shot-frame pools, putback pools, and FT lane pools have different gameplay semantics.
 
 **Half-court outlet** (DREB → HCO/HCT/FCP) is a **client** beat after the DREB turn, not part of the DREB step.
 
@@ -86,10 +86,10 @@ Only players in the **attacking half** of the court by current `coords.x`:
 - Home offense: `x ≥ 50`
 - Away offense: `x ≤ 50`
 
-Everyone in that filtered set is on the crash list (often fewer than five per side). No get-back, no release lists.
+That attacking-half pool is then filtered through `filter_rebound_candidate_lineups_near_bounce()` at **25 Euclidean grid units** from the bounce. If both teams filter to empty, the helper falls back to the attacking-half pool. No get-back, no release lists.
 
 ### Actual rebounder
-Same pattern as fast break block in `shot_manager`: closest per team within the filtered pool (shooter penalized 20%), then attribute/team-bias random between the two finalists. Bounce from `calculate_bounce_spot` at the basket being attacked.
+Same pattern as fast break block in `shot_manager`: closest per team within the filtered candidate pool (shooter penalized 20%), then attribute/team-bias random between the two finalists. Bounce from `calculate_bounce_spot` at the basket being attacked.
 
 ### Animations
 - Rim-cluster overlays for eligible players only on the MISS turn.
@@ -99,7 +99,7 @@ Same pattern as fast break block in `shot_manager`: closest per team within the 
 ### After-steal fast break miss
 Resolved in `after_steal_fast_break.py`.
 
-**Potential rebounders / actual rebounder:** uses computed shot-end coordinates, filters active lineups through `filter_rebound_candidate_lineups_near_bounce()` at **20 Euclidean grid units**, then runs `determine_rebounder` on those filtered candidate pools. If both teams filter to empty, the helper falls back to the original active pools.
+**Potential rebounders / actual rebounder:** uses computed shot-end coordinates, filters active lineups through `filter_rebound_candidate_lineups_near_bounce()` at **25 Euclidean grid units**, then runs `determine_rebounder` on those filtered candidate pools. If both teams filter to empty, the helper falls back to the original active pools.
 
 **Animations:** after the winner is known, the resolver stamps `offense_rebounders` / `defense_rebounders` with the near-bounce failed-attemptor helper using the same shot-end coordinate frame. The promoted DREB row can therefore animate nearby non-captors instead of only the actual rebounder.
 
@@ -114,6 +114,8 @@ Uses `shot_manager.resolve_shot` while `offensive_state` is **HCT**.
 - **Defense:** All five crash (no Covert Release / outlet logic on HCT shots).
 
 Same **role-style** lists as HCO, but everyone crashes.
+
+For **Dynamic HCT** shot paths (`dynamic_hct_shot.py`), winner selection now applies `filter_rebound_candidate_lineups_near_bounce()` at **20 Euclidean grid units** inside the same temporary shot-moment coordinate frame used by the rebound and failed-attemptor helpers. Legacy HCT through `shot_manager` is being sunset and is not the target path.
 
 ### Actual rebounder
 **Same as HCO miss** — not the fast-break half-court x-filter. Closest crasher per team, then weighted contest.
@@ -181,17 +183,17 @@ Already chosen on the prior miss; OREB turn is putback (~90%) or kickout (~10%).
 ## OREB putback miss (second board)
 
 ### Potential rebounders
-The winner-selection pool is still full active lineups via `determine_rebounder`; there is no hard 20-grid eligibility gate before winner selection today.
+The winner-selection pool is filtered through `filter_rebound_candidate_lineups_near_bounce()` at **20 Euclidean grid units** before `determine_rebounder` runs. If both teams filter to empty, the helper falls back to full active lineups.
 
 ### Actual rebounder
-`determine_rebounder` on **full lineups** (both teams), closest-to-bounce logic with **putback shooter 20% distance penalty**.
+`determine_rebounder` on the filtered candidate pools, closest-to-bounce logic with **putback shooter 20% distance penalty**.
 
 ### Animations
 - OREB `[bounce]`: **everyone holds** position.
 - The putback miss rebound payload now carries `offense_rebounders` / `defense_rebounders` from the near-bounce failed-attemptor helper.
 - If next is **DREB**, `game_manager` builds a discrete DREB turn from the **putback miss** row and passes those failed-attemptor lists into the DREB emitter.
 
-Remaining gameplay hardening question: whether winner selection should also use a pre-rebound geo eligibility gate instead of full active lineups.
+This path now uses the same pre-winner geo eligibility helper as after-steal Fast Break misses.
 
 ---
 
@@ -200,12 +202,12 @@ Remaining gameplay hardening question: whether winner selection should also use 
 | Miss type | Potential rebounders | Actual rebounder | MISS-turn crash animation | Follow-up rebound turn |
 |-----------|----------------------|------------------|---------------------------|-------------------------|
 | **HCO** | Strategy: crash vs get-back / release | Closest per team → weighted contest | Full overlays | DREB or OREB |
-| **Fast break** | Frontcourt half (x filter) | Closest in pool → weighted contest | Near-bounce failed attemptors for DREB capture | DREB or OREB |
-| **After-steal FB** | Shot-end active lineups filtered to 20-grid Euclidean radius, fallback if both empty | Filtered-pool `determine_rebounder` | Near-bounce failed attemptors for DREB capture | OREB or HCO |
+| **Fast break** | Frontcourt half (x filter), then 25-grid Euclidean radius, fallback if both empty | Filtered-pool `determine_rebounder` | Near-bounce failed attemptors for DREB capture | DREB or OREB |
+| **After-steal FB** | Shot-end active lineups filtered to 25-grid Euclidean radius, fallback if both empty | Filtered-pool `determine_rebounder` | Near-bounce failed attemptors for DREB capture | OREB or HCO |
 | **HCT** | All five both sides | Same as HCO | Full overlays | DREB or OREB |
 | **FCP** | Same as HCO | Same as HCO | Full overlays | DREB or OREB |
 | **Free throw (last)** | \|x − bounce\| ≤ 20 | `determine_rebounder` + x gate | FT schema + lists | OREB or DREB |
-| **Putback miss** | Full active lineups | Full-lineup `determine_rebounder` | OREB bounce: all hold; DREB capture uses near-bounce failed attemptors | DREB or OREB |
+| **Putback miss** | Active lineups filtered to 20-grid Euclidean radius, fallback if both empty | Filtered-pool `determine_rebounder` | OREB bounce: all hold; DREB capture uses near-bounce failed attemptors | DREB or OREB |
 
 ---
 
@@ -214,6 +216,7 @@ Remaining gameplay hardening question: whether winner selection should also use 
 - **FT crash eligibility:** `FREE_THROW_REBOUND_MAX_X_DELTA = 20` (x-axis only) in `shared.py`
 - **Near-bounce candidate filter:** `filter_rebound_candidate_lineups_near_bounce()` with default `20` Euclidean grid units in `shared.py`
 - **Near-bounce failed-attemptor animation radius:** `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20` (Euclidean) in `shared.py`
+- **Fast Break geo radius:** `FAST_BREAK_REBOUND_GEO_DISTANCE = 25` (Euclidean) in `shared.py`, used for Fast Break pre-read and animation read
 - **Shooter / putback penalty:** distance × 1.2 when picking each team’s closest player
 - **HCO defense baseline** in the final contest: ~70% before modifiers
 
@@ -230,10 +233,11 @@ The main animation gaps that caused "only the rebounder moves" on after-steal FB
 Pre-rebound candidate eligibility is still uneven by path:
 
 1. **HCO/FCP:** strategy first (get-back / release), then closest per team. No hard geo gate.
-2. **Regular Fast Break:** attacking-half x filter, then closest per team.
-3. **After-steal FB:** shot-end active lineups filtered by the 20-grid Euclidean candidate helper, then closest per team.
-4. **Dynamic HCT / OREB putback miss:** full active lineups at the relevant shot frame, then closest per team. No hard geo gate yet.
-5. **Free throw:** x-axis gate (`|coords.x - bounce_x| <= 20`), then closest per team.
+2. **Regular Fast Break:** attacking-half x filter, then the 25-grid Euclidean candidate helper, then closest per team.
+3. **After-steal FB:** shot-end active lineups filtered by the 25-grid Euclidean candidate helper, then closest per team.
+4. **OREB putback miss:** active lineups filtered by the 20-grid Euclidean candidate helper, then closest per team.
+5. **Dynamic HCT:** shot-moment active lineups filtered by the 20-grid Euclidean candidate helper, then closest per team.
+6. **Free throw:** x-axis gate (`|coords.x - bounce_x| <= 20`), then closest per team.
 
 Proposed hardening: continue adopting `filter_rebound_candidate_lineups_near_bounce()` path-by-path. Keep `collect_near_bounce_rebound_attemptors()` for post-winner animation only.
 

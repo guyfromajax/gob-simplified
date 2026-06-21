@@ -48,6 +48,8 @@ from BackEnd.utils.shared import (
     calculate_bounce_spot,
     collect_near_bounce_rebound_attemptors,
     determine_rebounder,
+    FAST_BREAK_REBOUND_GEO_DISTANCE,
+    filter_rebound_candidate_lineups_near_bounce,
     temp_lineup_court_absolute_for_away_rebound_math,
     calculate_charge,
     height_to_block_score,
@@ -1700,6 +1702,12 @@ class ShotManager:
 
                         o_rebounder_lineup = _eligible_fb_lineup(off_lineup)
                         d_rebounder_lineup = _eligible_fb_lineup(def_lineup)
+                        o_rebounder_lineup, d_rebounder_lineup = filter_rebound_candidate_lineups_near_bounce(
+                            o_rebounder_lineup,
+                            d_rebounder_lineup,
+                            bounce_spot,
+                            max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
+                        )
                         shooter_id = getattr(shooter, "player_id", None)
                         exclude_player_ids = set()
                         penalize_player_ids = {shooter_id} if shooter_id else set()
@@ -1757,6 +1765,7 @@ class ShotManager:
                             self.game,
                             bounce_spot,
                             getattr(rebounder, "player_id", None),
+                            max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
                             coords_already_display_oriented=True,
                         )
                         result["offense_rebounders"] = geo_attemptors["offense_rebounders"]

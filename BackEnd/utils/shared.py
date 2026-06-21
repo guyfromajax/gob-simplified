@@ -1209,8 +1209,18 @@ def resolve_offensive_rebound(game, rebounder):
             exclude_player_ids = set()  # Don't exclude putback player anymore
             penalize_player_ids = {rebounder_id} if rebounder_id else set()  # Penalize putback player by 20% distance
 
+            off_candidates, def_candidates = filter_rebound_candidate_lineups_near_bounce(
+                off_lineup,
+                def_lineup,
+                bounce_spot,
+            )
             new_rebounder, new_team, new_stat = determine_rebounder(
-                game, bounce_spot, exclude_player_ids, penalize_player_ids
+                game,
+                bounce_spot,
+                exclude_player_ids,
+                penalize_player_ids,
+                offense_candidate_lineup=off_candidates,
+                defense_candidate_lineup=def_candidates,
             )
             
             # Get rebounder ID (support both Player and dict for robustness)
@@ -1411,6 +1421,7 @@ FREE_THROW_REBOUND_MAX_X_DELTA = 20
 
 # Shared near-bounce Euclidean radius for rebound candidate/attemptor helpers.
 NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20
+FAST_BREAK_REBOUND_GEO_DISTANCE = 25
 
 
 def _filter_lineup_by_max_x_delta_from_bounce(lineup, bounce_x, max_x_delta):

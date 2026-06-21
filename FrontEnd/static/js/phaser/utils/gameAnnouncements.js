@@ -397,7 +397,9 @@ function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) 
 
   const foulText = turnData?.otb_foul
     ? "Over The Back!"
-    : (turnData?.quick_foul ? "Quick Foul!" : pickDefensiveFoulAnnouncementText(turnData));
+    : (turnData?.quick_foul
+      ? "Quick Foul!"
+      : (turnData?.reach_in_foul ? "Reaching In!" : pickDefensiveFoulAnnouncementText(turnData)));
   showAnnouncement(foulText, offenseTeam, playerData, { sfx: 'whistle-1-lowervol.wav' });
 
 }

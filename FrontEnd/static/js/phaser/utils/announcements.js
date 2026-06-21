@@ -683,8 +683,10 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         // Defensive foul: situational Force Foul → "Quick Foul!"; else "DEFENSIVE FOUL!"
         // Bonus fouls (FOUL -> FREE_THROW) stay in this path and should not be reclassified as shooting fouls.
         let defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
+        // HCT reach-in: D_FOUL credited to the on-ball defender → "Reaching In!".
+        if (turnData.reach_in_foul) defensiveFoulText = "Reaching In!";
         if (isQuickFoul) defensiveFoulText = "Quick Foul!";
-        if (isBonusFoul && !isQuickFoul) defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
+        if (isBonusFoul && !isQuickFoul && !turnData.reach_in_foul) defensiveFoulText = pickDefensiveFoulAnnouncementText(turnData);
         showAnnouncement(defensiveFoulText, offenseTeam, playerData, foulMeta);
       }
 

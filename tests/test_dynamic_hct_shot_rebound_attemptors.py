@@ -49,26 +49,37 @@ def test_hct_fast_break_miss_stamps_near_bounce_attemptors_from_shot_seed(monkey
         "BackEnd.utils.shared.calculate_bounce_spot",
         lambda *args, **kwargs: {"x": 89, "y": 25},
     )
-    monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.0)
+    monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.99)
 
     near_off = game.offense_team.lineup["SG"]
     far_off = game.offense_team.lineup["SF"]
     near_def = game.defense_team.lineup["SG"]
-    actual_rebounder = game.defense_team.lineup["C"]
+    actual_rebounder = game.offense_team.lineup["SG"]
+    monkeypatch.setattr(
+        "BackEnd.utils.fast_break_shot_geometry.compute_fb_shot_geometry",
+        lambda **kwargs: {
+            "shooter_target": {"x": 60, "y": 25},
+            "defender_target": {"x": 90, "y": 25},
+            "defender_end_coords": {},
+            "first_arriver_id": None,
+            "contested": True,
+            "shot_defender_id": near_def.player_id,
+            "t_shooter_game_seconds": 1.0,
+        },
+    )
 
     # Deliberately stale runtime coords: the resolver should use the HCT seed
     # only during rebound selection/attemptor collection, then restore these.
     near_off.coords = {"x": 5, "y": 5}
     far_off.coords = {"x": 6, "y": 6}
     near_def.coords = {"x": 7, "y": 7}
-    actual_rebounder.coords = {"x": 8, "y": 8}
 
     dyn = {
         "fb_seed": {
             "shooter_pos": "PG",
             "off_coords": {
                 "PG": {"x": 75, "y": 25},
-                "SG": {"x": 80, "y": 25},  # 9 away: included
+                "SG": {"x": 80, "y": 25},  # actual rebounder
                 "SF": {"x": 60, "y": 25},  # 29 away: excluded
                 "PF": {"x": 45, "y": 35},
                 "C": {"x": 45, "y": 15},
@@ -78,7 +89,7 @@ def test_hct_fast_break_miss_stamps_near_bounce_attemptors_from_shot_seed(monkey
                 "SG": {"x": 89, "y": 45},  # 20 away: included
                 "SF": {"x": 55, "y": 30},
                 "PF": {"x": 50, "y": 25},
-                "C": {"x": 89, "y": 25},   # actual rebounder
+                "C": {"x": 60, "y": 25},   # would be closest def without filter fallback
             },
         }
     }
@@ -87,12 +98,11 @@ def test_hct_fast_break_miss_stamps_near_bounce_attemptors_from_shot_seed(monkey
 
     assert result["result_type"] == "MISS"
     assert result["rebounderId"] == actual_rebounder.player_id
-    assert near_off.player_id in result["offense_rebounders"]
+    assert near_off.player_id not in result["offense_rebounders"]
     assert far_off.player_id not in result["offense_rebounders"]
     assert near_def.player_id in result["defense_rebounders"]
-    assert actual_rebounder.player_id not in result["defense_rebounders"]
+    assert actual_rebounder.player_id not in result["offense_rebounders"]
     assert near_off.coords == {"x": 5, "y": 5}
-    assert actual_rebounder.coords == {"x": 8, "y": 8}
 
 
 def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(monkeypatch):
@@ -104,26 +114,26 @@ def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(m
         "BackEnd.utils.shared.calculate_bounce_spot",
         lambda *args, **kwargs: {"x": 89, "y": 25},
     )
+    monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.99)
 
     shooter = game.offense_team.lineup["PG"]
     near_off = game.offense_team.lineup["SG"]
     far_off = game.offense_team.lineup["SF"]
     near_def = game.defense_team.lineup["SG"]
-    actual_rebounder = game.defense_team.lineup["C"]
+    actual_rebounder = game.offense_team.lineup["SG"]
 
     original_near_off_coords = {"x": 10, "y": 10}
-    original_rebounder_coords = {"x": 12, "y": 12}
+    original_rebounder_coords = dict(original_near_off_coords)
     near_off.coords = dict(original_near_off_coords)
-    actual_rebounder.coords = dict(original_rebounder_coords)
 
     shot_moment_coords = {
         shooter.player_id: {"x": 87, "y": 25},
-        near_off.player_id: {"x": 80, "y": 25},  # 9 away: included
+        near_off.player_id: {"x": 80, "y": 25},  # actual rebounder
         far_off.player_id: {"x": 60, "y": 25},   # 29 away: excluded
     }
     defender_end_coords = {
         near_def.player_id: {"x": 89, "y": 45},       # 20 away: included
-        actual_rebounder.player_id: {"x": 89, "y": 25},  # actual rebounder
+        game.defense_team.lineup["C"].player_id: {"x": 60, "y": 25},
     }
 
     result = _finalize_ab_shot(
@@ -134,7 +144,7 @@ def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(m
         shot_defender_id=None,
         contested=False,
         shot_type="attack",
-        shot_spot={"x": 87, "y": 25},
+        shot_spot={"x": 60, "y": 25},
         made=False,
         shot_score=-100,
         shot_score_pre_defense=-100,
@@ -149,9 +159,8 @@ def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(m
 
     assert result["result_type"] == "MISS"
     assert result["rebounderId"] == actual_rebounder.player_id
-    assert near_off.player_id in result["offense_rebounders"]
+    assert near_off.player_id not in result["offense_rebounders"]
     assert far_off.player_id not in result["offense_rebounders"]
     assert near_def.player_id in result["defense_rebounders"]
-    assert actual_rebounder.player_id not in result["defense_rebounders"]
+    assert actual_rebounder.player_id not in result["offense_rebounders"]
     assert near_off.coords == original_near_off_coords
-    assert actual_rebounder.coords == original_rebounder_coords

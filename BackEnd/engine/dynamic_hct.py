@@ -158,13 +158,21 @@ TOP_PASS_OPEN_RIM_RADIUS = 9
 RIM_PROTECT_X_MIN, RIM_PROTECT_X_MAX = 77, 87
 RIM_PROTECT_Y_MIN, RIM_PROTECT_Y_MAX = 19, 31
 
-# §4 read thresholds (attack / pass; else hold).
+# §4 read thresholds (attack / pass; else low-tier roll).
 READ_ATTACK_THRESHOLD = 200
 READ_PASS_THRESHOLD = 120
 
 # §5 broken-HCT (no defender in range) reduced read thresholds.
 BROKEN_READ_ATTACK_THRESHOLD = 175
 BROKEN_READ_PASS_THRESHOLD = 110
+
+# §4 dynamic read mapping: a "strong handler" (BH + AG above this sum) drives on
+# a high read and passes on a mid read; a "weak handler" is INVERTED — a high
+# read kicks it out (pass) and a mid read forces a drive (attack).
+READ_STRONG_HANDLER_SUM = 80
+# §4 low tier (read below the pass threshold): no longer a hard hold — roll this
+# pool (50% hold, 25% attack, 25% pass).
+READ_LOW_TIER_CHOICES = ("hold", "hold", "attack", "pass")
 
 # §4 neutral-advance: BH moves +rand(ADV_X) toward basket, +rand(ADV_Y) in y.
 ADVANCE_X_MIN, ADVANCE_X_MAX = 6, 12
@@ -217,6 +225,15 @@ HCT_D8_DFOUL_BASE = 0.12          # base P(D_FOUL) on a decisive blow-by
 HCT_D8_P_DFOUL_MAX = 0.25         # cap on D_FOUL prob
 HCT_D8_W_DISC_REACH = 0.04        # team discipline → fewer reach fouls
 HCT_D8_W_AG_BEATEN = 0.6          # defender AG deficit vs BH → reach foul
+
+# §5 D_FOUL fouler spread: the on-ball defender's blow-by is the root cause, but
+# the foul itself sometimes lands on a teammate forced into an off-ball
+# compensating foul. The on-ball case is the only true "Reaching In".
+HCT_DFOUL_PRIMARY_P = 0.60        # on-ball (BH) defender → reach-in
+HCT_DFOUL_BACKCOURT_P = 0.30      # another backcourt defender (PG/SG/SF, incl. trapper)
+# remaining 0.10 → a frontcourt defender (PF/C); empty pools fall back to on-ball.
+HCT_BACKCOURT_POS = ("PG", "SG", "SF")
+HCT_FRONTCOURT_POS = ("PF", "C")
 
 
 def _clampf(value: float, lo: float, hi: float) -> float:
@@ -383,19 +400,37 @@ def _player_read(player) -> int:
 def _read_decision(player, broken: bool = False, dribble_alive: bool = True) -> str:
     """Map a read score to attack / pass / hold (§4).
 
-    ``broken=True`` applies the §5 reduced thresholds used when no defender is
-    in range (an open floor invites attack). ``dribble_alive=False`` (D21): the
-    BH has picked up his dribble, so the **attack tier is removed** — the read
-    collapses to pass (> pass threshold) or hold.
+    The mapping is **dynamic on the ball-handler's ``BH + AG``**:
+      - **Strong handler** (``BH + AG > READ_STRONG_HANDLER_SUM``): a high read
+        (``>= attack_t``) drives; a mid read (``> pass_t``) passes.
+      - **Weak handler** (``BH + AG <= READ_STRONG_HANDLER_SUM``): INVERTED — a
+        high read (``>= attack_t``) kicks it out (pass); a mid read (``> pass_t``)
+        forces a drive (attack).
+
+    ``broken=True`` applies the §5 reduced (open-floor) thresholds for BOTH
+    branches. The low tier (read below ``pass_t``) is no longer a hard hold — it
+    rolls ``READ_LOW_TIER_CHOICES`` (50% hold, 25% attack, 25% pass).
+    ``dribble_alive=False`` (D21): the BH has picked up his dribble, so any
+    ``attack`` result collapses to ``pass`` (no drive without a live dribble).
     """
     score = _player_read(player)
     attack_t = BROKEN_READ_ATTACK_THRESHOLD if broken else READ_ATTACK_THRESHOLD
     pass_t = BROKEN_READ_PASS_THRESHOLD if broken else READ_PASS_THRESHOLD
-    if dribble_alive and score > attack_t:
-        return "attack"
-    if score > pass_t:
-        return "pass"
-    return "hold"
+
+    attrs = getattr(player, "attributes", {}) or {}
+    strong_handler = (attrs.get("BH", 0) + attrs.get("AG", 0)) > READ_STRONG_HANDLER_SUM
+
+    if score >= attack_t:
+        decision = "attack" if strong_handler else "pass"
+    elif score > pass_t:
+        decision = "pass" if strong_handler else "attack"
+    else:
+        decision = random.choice(READ_LOW_TIER_CHOICES)
+
+    # D21: no live dribble → a drive is impossible; kick it out instead.
+    if decision == "attack" and not dribble_alive:
+        decision = "pass"
+    return decision
 
 
 def _steal_credit_defender(bh_defender, trapper):
@@ -409,6 +444,44 @@ def _steal_credit_defender(bh_defender, trapper):
         return a.get("OD", 0) * 0.4 + a.get("AG", 0) * 0.4 + a.get("IQ", 0) * 0.2
 
     return trapper if _steal_score(trapper) > _steal_score(bh_defender) else bh_defender
+
+
+def _select_d_foul_fouler(bh_defender, def_lineup, trapper=None) -> Tuple[Any, bool]:
+    """§5 reach-in foul attribution. The on-ball (BH) defender's blow-by is the
+    root cause of the foul, but the whistle lands on:
+
+      - 60% the on-ball defender himself (a true reach-in),
+      - 30% another backcourt defender (PG/SG/SF) who rotated to help — the
+        ``trapper`` (when one exists) is the compensating fouler; otherwise a
+        random other backcourt defender; falls back to the on-ball defender when
+        none exist,
+      - 10% a frontcourt defender (PF/C) committing an off-ball help foul to
+        compensate; falls back to the on-ball defender when none exist.
+
+    Returns ``(fouler, is_reach_in)`` where ``is_reach_in`` is True only when the
+    credited fouler is the on-ball defender — that flag drives the "Reaching In"
+    announcement on the front end.
+    """
+    roll = random.random()
+    if roll < HCT_DFOUL_PRIMARY_P:
+        return bh_defender, True
+    if roll < HCT_DFOUL_PRIMARY_P + HCT_DFOUL_BACKCOURT_P:
+        if trapper is not None and trapper is not bh_defender:
+            return trapper, False
+        others = [
+            def_lineup[p]
+            for p in HCT_BACKCOURT_POS
+            if def_lineup.get(p) is not None and def_lineup.get(p) is not bh_defender
+        ]
+        if others:
+            return random.choice(others), False
+        return bh_defender, True
+    frontcourt = [
+        def_lineup[p] for p in HCT_FRONTCOURT_POS if def_lineup.get(p) is not None
+    ]
+    if frontcourt:
+        return random.choice(frontcourt), False
+    return bh_defender, True
 
 
 def _resolve_moment(
@@ -1521,6 +1594,10 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     # strip). Threads through the wrapper to the turn dict so the FE shows the
     # "INTERCEPTION!" announce + interception SFX (gameAnnouncements.isPassInterception).
     is_interception: bool = False
+    # §5 — set when a defensive (D_FOUL) terminal is credited to the on-ball
+    # defender (a true reach-in). Threads to the turn dict so the FE announces
+    # "Reaching In!" rather than the generic off-ball defensive-foul language.
+    reach_in_foul: bool = False
     # §14 — set when a pass is batted out of bounds: a DEAD BALL where the OFFENSE
     # RETAINS (side inbound, no flip, no TO) — matches Rim Runner. Threads to the
     # turn dict so the FE announces "Batted Ball Out Of Bounds!" (not a turnover).
@@ -1538,6 +1615,11 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     # outcome). Never affects gameplay coords. See Flourish in
     # animation_step_schema.py.
     pending_reach_in_def_pos: Optional[str] = None
+    # §5 — the trapper (player) of the contest moment currently being resolved, set
+    # by ``_resolve_attack`` so a D_FOUL's 30% backcourt-help bucket can prefer the
+    # trapper (the most likely teammate to commit a compensating foul). ``None`` on
+    # single-defender pressure / broken-HCT cutoff moments.
+    pending_dfoul_trapper: Any = None
     # Set when a broken-HCT attack reaches the topLane spot → D18 fast break.
     # Carries the post-drive offense/defense coords for the shot resolver.
     fb_seed: Dict[str, Any] = {}
@@ -1619,7 +1701,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         "FAST_BREAK" / "HCO" (clean arrival → §7 numbers), "TERMINAL" (a
         meet-point foul / dead ball — ``result_type`` already set), or "RETAIN"
         (the BH won the collision and is now dribble-dead → re-read)."""
-        nonlocal bh_xy, dribble_alive, result_type, text_suffix
+        nonlocal bh_xy, dribble_alive, result_type, text_suffix, pending_dfoul_trapper
         # Drive target keyed to the BH's current y (home orientation; y bands read
         # the same for away, only x flips via _flip).
         if bh_xy["y"] > BROKEN_HCT_DRIVE_Y_MAX:
@@ -1679,6 +1761,8 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         outcome, _ratio, credited = _resolve_moment(
             off_team, def_team, ball_handler, cutoff_def, None, exclude_steal=True,
         )
+        # Single-defender cutoff collision — no trapper for the D_FOUL help bucket.
+        pending_dfoul_trapper = None
         if outcome in ("O_FOUL", "D_FOUL"):
             _apply_moment_outcome(outcome, 1.0, credited, context="broken-HCT cutoff collision")
             return "TERMINAL"
@@ -1750,7 +1834,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
 
     def _resolve_attack(moment: str, in_range: List[str]) -> Tuple[str, float, Any]:
         """Pick the contesting defender(s) per §5 and resolve the banded outcome."""
-        nonlocal pending_reach_in_def_pos
+        nonlocal pending_reach_in_def_pos, pending_dfoul_trapper
         if moment == "trap":
             bh_def_pos, trapper_pos = _select_trappers(in_range, "PG" in in_range)
         else:
@@ -1759,6 +1843,8 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         # moment regardless of outcome (on-ball defender only — the trapper does
         # not reach). Stamped onto the moment's emitted segment by _stamp_reach_in.
         pending_reach_in_def_pos = bh_def_pos
+        # §5 — remember the trapper so a D_FOUL prefers him for the 30% help bucket.
+        pending_dfoul_trapper = def_lineup.get(trapper_pos) if trapper_pos else None
         return _resolve_moment(
             off_team,
             def_team,
@@ -1798,7 +1884,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         producing moment (e.g. "single-defender pressure", "two-defender trap")
         for the per-step coord trace."""
         nonlocal result_type, text_suffix, turnover_type
-        nonlocal foul_team, foul_player, stealer, steal_coords
+        nonlocal foul_team, foul_player, stealer, steal_coords, reach_in_foul
         if outcome == "STEAL":
             steal_coords = dict(bh_xy)
             sec = _emit_stopper("hct_steal", f"steal (terminal — {context})")
@@ -1816,12 +1902,24 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             text_suffix = " — offensive foul on the ball handler!"
             return True
         if outcome == "D_FOUL":
-            sec = _emit_stopper("hct_foul", f"defensive reach-in foul (terminal — {context})")
+            # §5 — the on-ball defender's blow-by causes the foul, but the whistle
+            # spreads: 60% on-ball (reach-in), 30% another backcourt defender
+            # (trapper/help), 10% a frontcourt help foul to compensate.
+            fouler, is_reach_in = _select_d_foul_fouler(
+                credited, def_lineup, trapper=pending_dfoul_trapper,
+            )
+            reach_in_foul = is_reach_in
+            label = "reach-in" if is_reach_in else "off-ball help"
+            sec = _emit_stopper("hct_foul", f"defensive {label} foul (terminal — {context})")
             nonlocal_shot_clock_dec(sec)
             result_type = "FOUL"
             foul_team = "DEFENSE"
-            foul_player = credited
-            text_suffix = " — reach-in foul on the defense!"
+            foul_player = fouler
+            text_suffix = (
+                " — reach-in foul on the defense!"
+                if is_reach_in
+                else " — off-ball foul on the defense!"
+            )
             return True
         if outcome == "DEAD BALL":
             seg, sec = _emit_dead_ball_drive(
@@ -2117,6 +2215,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         "stealer": stealer,
         "steal_coords": steal_coords,
         "is_interception": is_interception,
+        "reach_in_foul": reach_in_foul,
         "bat_oob": bat_oob,
         "bat_oob_contact": bat_oob_contact,
         "bat_oob_deflector_pos": bat_oob_deflector_pos,

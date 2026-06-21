@@ -185,6 +185,70 @@ def test_fast_break_no_defender_path_does_not_crash(monkeypatch):
     assert game.game_state["no_defender_shots"] == 1
 
 
+def test_regular_fast_break_miss_uses_25_grid_rebound_geo_filter(monkeypatch):
+    game = _build_stub_game()
+    shot_manager = ShotManager(game)
+    game.game_state["offensive_state"] = "FAST_BREAK"
+    game.offense_team.team_attributes["shot_threshold"] = 1000
+    game.offense_team.team_attributes["rebound_modifier"] = 0
+    game.defense_team.team_attributes["rebound_modifier"] = 0
+
+    shooter = game.offense_team.lineup["PG"]
+    near_off = game.offense_team.lineup["SG"]
+    far_off = game.offense_team.lineup["SF"]
+    near_def = game.defense_team.lineup["SG"]
+
+    shooter.coords = {"x": 60, "y": 25}
+    near_off.coords = {"x": 65, "y": 25}  # 24 from bounce: eligible
+    far_off.coords = {"x": 63, "y": 25}   # 26 from bounce: excluded
+    for pos, player in game.offense_team.lineup.items():
+        if player not in (shooter, near_off, far_off):
+            player.coords = {"x": 60, "y": 25}
+    near_def.coords = {"x": 89, "y": 50}  # 25 from bounce: animation attemptor
+    for pos, player in game.defense_team.lineup.items():
+        if player is not near_def:
+            player.coords = {"x": 63, "y": 25}  # frontcourt, outside 25
+
+    roles = {
+        "shooter": shooter,
+        "passer": game.offense_team.lineup["C"],
+        "is_fast_break": True,
+    }
+
+    def fake_calculate(
+        self,
+        shooter,
+        passer,
+        screener,
+        defender,
+        shot_type,
+        defense_call,
+        is_three,
+        is_paint=False,
+        second_defender=None,
+        shooter_location=None,
+        apply_defense=True,
+        **kwargs,
+    ):
+        return 0, 0, 0, False, None
+
+    monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
+    monkeypatch.setattr(
+        "BackEnd.models.shot_manager.calculate_bounce_spot",
+        lambda *args, **kwargs: {"x": 89, "y": 25},
+    )
+    monkeypatch.setattr("BackEnd.models.shot_manager.random.random", lambda: 0.99)
+
+    result = shot_manager.resolve_shot(roles)
+
+    assert result["result_type"] == "MISS"
+    assert result["rebound_type"] == "OREB"
+    assert result["rebounderId"] == near_off.player_id
+    assert near_off.player_id not in result["offense_rebounders"]
+    assert far_off.player_id not in result["offense_rebounders"]
+    assert near_def.player_id in result["defense_rebounders"]
+
+
 def test_oreb_putback_uses_nearest_defender_without_distance_gate():
     game = _build_stub_game()
     rebounder = game.offense_team.lineup["PF"]

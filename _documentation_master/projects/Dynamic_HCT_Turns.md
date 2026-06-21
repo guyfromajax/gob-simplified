@@ -210,9 +210,28 @@ attrs = getattr(player, "attributes", {}) or {}
 return int(((attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)) * random.randint(1, 6))
 ```
 
-- read > 200 → **attack**
-- read > 120 → **pass**
-- else → **hold**
+The read → decision mapping is **dynamic on the ball-handler's `BH + AG`**
+(`READ_STRONG_HANDLER_SUM = 80`):
+
+**Strong handler — `BH + AG > 80`:**
+- read `>= 200` → **attack**
+- read `> 120` → **pass**
+- else → **low-tier roll** (see below)
+
+**Weak handler — `BH + AG <= 80` (INVERTED):**
+- read `>= 200` → **pass** (a great read tells a poor handler to kick it out)
+- read `> 120` → **attack** (a so-so read forces him to drive)
+- else → **low-tier roll**
+
+**Low tier** (read below the pass threshold): no longer a hard hold — roll
+`random.choice(["hold", "hold", "attack", "pass"])` = **50% hold, 25% attack,
+25% pass** (`READ_LOW_TIER_CHOICES`).
+
+Both branches use the §5 **broken** (open-floor, no defender in range) reduced
+thresholds (`175 / 110`) in place of `200 / 120` when broken.
+
+**Dribble-dead (D21):** with no live dribble a drive is impossible, so any
+`attack` result (from either branch or the low-tier roll) **collapses to `pass`**.
 
 *Future note: consider adding a defender component to disrupt the BH's read.*
 
@@ -403,9 +422,22 @@ p_dfoul = clamp(DFOUL_BASE * beaten_norm
 ```
 Roll `random() < p_dfoul` → D_FOUL (bonus → FTs, else SIDE_INBOUND); else POS_O.
 
-**Foul attribution (literal):** `D_FOUL` → the involved defender (`bh_defender`, or
-on a trap the credited participant); `O_FOUL` → the BH. Both: `record_stat("F")`,
-`team_fouls += 1`, foul-out check, bonus routing; `O_FOUL` also flips possession.
+**Foul attribution (`_select_d_foul_fouler`):** the on-ball defender's blow-by is the
+*cause* of every `D_FOUL`, but the whistle spreads — sometimes a teammate commits an
+off-ball foul to compensate for the beaten defender. The credited fouler is rolled:
+
+| Roll | Fouler | `reach_in_foul` | FE announce |
+| --- | --- | --- | --- |
+| **60%** | the on-ball (BH) defender — a true reach-in | `True` | **"Reaching In!"** |
+| **30%** | another backcourt defender (PG/SG/SF): the **trapper** when one exists, else a random other backcourt defender; falls back to the on-ball defender if none | `False` | weighted off-ball foul language |
+| **10%** | a frontcourt defender (PF/C), random if more than one; falls back to the on-ball defender if none | `False` | weighted off-ball foul language |
+
+Backcourt = `{PG, SG, SF}`, frontcourt = `{PF, C}` (the same split the formation uses).
+`reach_in_foul` threads through the wrapper → turn dict so the FE shows "Reaching In!"
+only for the on-ball case; off-ball help fouls keep the generic
+`pickDefensiveFoulAnnouncementText` language. `O_FOUL` → the BH. All fouls:
+`record_stat("F")`, `team_fouls += 1`, foul-out check, bonus routing; `O_FOUL` also
+flips possession.
 
 **First-pass tunable constants** (one block; calibrate against sim output — §11):
 
@@ -488,8 +520,10 @@ The open-floor attack is a **race to the rim against a single cutoff defender**:
    - **normal progression** (BH wins) → he gathers and **picks up his dribble** (see
      *Dribble-alive state* below); re-enters the §4 loop **limited to pass/hold**.
    - **O_FOUL** (charge) → offensive foul on the BH → turnover (process per D8).
-   - **D_FOUL** (block) → defensive foul on the cutoff defender (process per D8:
-     team-foul / bonus → FT, etc.).
+   - **D_FOUL** (block) → defensive foul (process per D8: team-foul / bonus → FT, etc.).
+     Attribution runs the same `_select_d_foul_fouler` spread (60/30/10), but with no
+     trapper on a single-defender cutoff the 30% bucket goes to a random other
+     backcourt defender.
    - **DEAD BALL** → lost-handle turnover → SIP, possession flips.
 5. **Off-ball movement (the other 8 players)** during this action — **each rolls to
    drift or hold.** Every player except the BH and the cutoff defender independently
@@ -1079,20 +1113,26 @@ a clock violation hits.
 | 0 | **Walk-up** (once) | BH brings the ball up to `(44, y 21–29)`; the other 9 hustle toward setup spots | BH reaches his spot |
 | 1 | **Check clocks** | shot-clock ≤ 0 → violation; shot-clock ≤ 20 & behind half court → 10-sec violation | — (instant) |
 | 2 | **Detect** | Count defenders within **11** of the BH (and on the basket side) → none / pressure / trap | — (instant) |
-| 3 | **Read** | BH rolls a read score → **attack / pass / hold** | — (instant) |
+| 3 | **Read** | BH rolls a read score → **attack / pass / hold** (dynamic on `BH+AG`; see below) | — (instant) |
 | 4 | **Resolve + move** | Run the chosen branch (below); everyone moves one beat | branch-specific (see below) |
 
 Then loop back to step 1.
 
 ### Decision thresholds (the read)
 
-Read score = `int( (IQ·0.8 + CH·0.2) · random(1,6) )`, then:
+Read score = `int( (IQ·0.8 + CH·0.2) · random(1,6) )`. The high/mid mapping is
+**dynamic on the BH's `BH + AG`** (strong `> 80` vs weak, the latter inverted),
+and the low tier rolls `["hold","hold","attack","pass"]` (50/25/25):
 
-| Situation | attack if | pass if | else |
+| Situation | high read (`>= attack_t`) | mid read (`> pass_t`) | low (else) |
 |-----------|-----------|---------|------|
-| **Defender(s) near** (§4 loop) | read > **200** | read > **120** | hold |
-| **No defender near** (broken HCT) | read > **175** | read > **110** | hold |
+| **Strong handler** (`BH+AG > 80`), defenders near | **attack** (200) | **pass** (120) | roll 50% hold / 25% attack / 25% pass |
+| **Strong handler**, broken HCT | **attack** (175) | **pass** (110) | roll (same) |
+| **Weak handler** (`BH+AG ≤ 80`), defenders near | **pass** (200) | **attack** (120) | roll (same) |
+| **Weak handler**, broken HCT | **pass** (175) | **attack** (110) | roll (same) |
 | **At the Attack Basket Area** (§7) | read > **200** → optimal (HCO/FB); **125–200** → HCO unless offense aggressive; **≤125** → 50/50 | | |
+
+*Dribble-dead (D21):* any `attack` result collapses to `pass`.
 
 ### Player movement levels (per beat)
 
@@ -1166,6 +1206,8 @@ interception point (BH drive pace vs his AG rate). **No angle →** BH arrives �
 | Knob | Where | First-pass |
 |------|-------|------------|
 | Read thresholds | §4 / §5 | attack 200/175, pass 120/110 |
+| Strong-handler cutoff | §4 | `BH + AG > 80` (`READ_STRONG_HANDLER_SUM`); weak = inverted mapping |
+| Low-tier read roll | §4 | `["hold","hold","attack","pass"]` (50/25/25) |
 | Detection / trap radius | §1 | **11** |
 | Advance distance | §4 | x `+6..12`, y `±6` |
 | Hold window | §5 | `1–2` game-sec |

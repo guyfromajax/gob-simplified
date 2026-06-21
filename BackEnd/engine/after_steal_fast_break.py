@@ -327,6 +327,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         calculate_bounce_spot,
         collect_near_bounce_rebound_attemptors,
         determine_rebounder,
+        FAST_BREAK_REBOUND_GEO_DISTANCE,
         filter_rebound_candidate_lineups_near_bounce,
         get_name_safe,
         increment_no_defender_shot_breakdown,
@@ -572,6 +573,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
                     off_lineup,
                     def_lineup,
                     bounce_spot,
+                    max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
                 )
                 new_rebounder, new_team, new_stat = determine_rebounder(
                     game,
@@ -586,6 +588,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
                     game,
                     bounce_spot,
                     rebounder_pid,
+                    max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
                     coords_already_display_oriented=True,
                 )
             rebound_type = str(new_stat) if new_stat else "DREB"

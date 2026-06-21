@@ -62,7 +62,7 @@ class TestPutbackMissReboundStats:
         # Force putback miss (threshold 1000 so shot_score >= 1000 is False)
         game.offense_team.team_attributes["shot_threshold"] = 1000
 
-        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **_kwargs):
             return rebounder_player, game.offense_team, "OREB"
 
         # Skip OTB randints; uncontested putback miss via randint(1,100) → 100; bounce uses 3 randints.
@@ -100,7 +100,7 @@ class TestPutbackMissReboundStats:
         }
         game.offense_team.team_attributes["shot_threshold"] = 1000
 
-        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **_kwargs):
             return rebounder_player, game.defense_team, "DREB"
 
         randint_returns = [1] + [100] * 40
@@ -132,7 +132,7 @@ class TestPutbackMissReboundStats:
         game.game_state["pending_oreb"] = {"rebounder": rebounder_player, "rebounder_id": rebounder_id}
         game.offense_team.team_attributes["shot_threshold"] = 1000
 
-        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **_kwargs):
             return rebounder_player, game.offense_team, "OREB"
 
         oreb_before = rebounder_player.stats["game"].get("OREB", 0)
@@ -169,11 +169,11 @@ class TestPutbackMissReboundStats:
         far_off = game.offense_team.lineup["SG"]
         near_def = game.defense_team.lineup["PG"]
         near_off.coords = {"x": 80, "y": 25}
-        far_off.coords = {"x": 70, "y": 25}
+        far_off.coords = {"x": 68, "y": 25}
         near_def.coords = {"x": 89, "y": 40}
         dreb_rebounder.coords = {"x": 89, "y": 24}
 
-        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None):
+        def fake_determine_rebounder(game_param, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **_kwargs):
             return dreb_rebounder, game.defense_team, "DREB"
 
         randint_returns = [1] + [100] * 40
@@ -194,3 +194,40 @@ class TestPutbackMissReboundStats:
         assert far_off.player_id not in result.get("offense_rebounders", [])
         assert near_def.player_id in result.get("defense_rebounders", [])
         assert dreb_rebounder.player_id not in result.get("defense_rebounders", [])
+
+    def test_putback_miss_filters_rebound_winner_candidates_to_near_bounce(self):
+        """Putback miss winner selection uses the near-bounce candidate pool."""
+        game = build_mock_game()
+        _sync_lineup_to_roster(game)
+
+        putback_shooter = game.offense_team.lineup["C"]
+        near_off = game.offense_team.lineup["SG"]
+        game.game_state["pending_oreb"] = {
+            "rebounder": putback_shooter,
+            "rebounder_id": putback_shooter.player_id,
+        }
+        game.offense_team.team_attributes["shot_threshold"] = 1000
+
+        bounce = {"x": 89, "y": 25}
+        putback_shooter.coords = {"x": 50, "y": 25}
+        near_off.coords = {"x": 80, "y": 25}
+        for pos, player in game.offense_team.lineup.items():
+            if player not in (putback_shooter, near_off):
+                player.coords = {"x": 60, "y": 25}
+        for player in game.defense_team.lineup.values():
+            player.coords = {"x": 50, "y": 25}
+
+        randint_returns = [1] + [100] * 40
+        with patch("BackEnd.utils.shared.resolve_over_the_back_foul", return_value=None):
+            with patch(
+                "BackEnd.utils.shared._resolve_oreb_putback_defender",
+                return_value=(None, False),
+            ):
+                with patch("BackEnd.utils.shared.calculate_bounce_spot", return_value=bounce):
+                    with patch("BackEnd.utils.shared.random.random", return_value=0.05):
+                        with patch("BackEnd.utils.shared.random.randint", side_effect=randint_returns):
+                            result = game.turn_manager.resolve_offensive_rebound_turn()
+
+        assert result.get("result_type") == "PUTBACK_MISS"
+        assert result.get("rebound_type") == "OREB"
+        assert result.get("rebounderId") == near_off.player_id

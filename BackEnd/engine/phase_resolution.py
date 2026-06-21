@@ -7576,6 +7576,9 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         "stealer_id": getattr(stealer, "player_id", None) if (result_type == "STEAL" and stealer) else None,
         # §14 — STEAL that is a pass interception → FE shows "INTERCEPTION!" + SFX.
         "is_interception": bool(dyn.get("is_interception")) if result_type == "STEAL" else False,
+        # §5 — D_FOUL credited to the on-ball defender (a true reach-in) → FE
+        # announces "Reaching In!"; off-ball help fouls keep the generic language.
+        "reach_in_foul": bool(dyn.get("reach_in_foul")) if (result_type == "FOUL" and foul_team == "DEFENSE") else False,
         # §14 — DEAD BALL that is a batted-OOB pass → FE shows "Batted Ball Out Of
         # Bounds!" (not a turnover) and the offense retains.
         "bat_oob": bat_oob,
