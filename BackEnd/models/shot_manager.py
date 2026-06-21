@@ -38,8 +38,7 @@ from BackEnd.utils.shared import (
     resolve_offensive_rebound,
     get_player_position,
     calculate_screen_score,
-    choose_rebounder,
-    calculate_rebound_score,
+    select_rebounder_by_score,
     get_name_safe,
     calculate_gravity_score,
     unpack_game_context,
@@ -49,7 +48,6 @@ from BackEnd.utils.shared import (
     collect_near_bounce_rebound_attemptors,
     determine_rebounder,
     FAST_BREAK_REBOUND_GEO_DISTANCE,
-    filter_rebound_candidate_lineups_near_bounce,
     temp_lineup_court_absolute_for_away_rebound_math,
     calculate_charge,
     height_to_block_score,
@@ -1702,54 +1700,22 @@ class ShotManager:
 
                         o_rebounder_lineup = _eligible_fb_lineup(off_lineup)
                         d_rebounder_lineup = _eligible_fb_lineup(def_lineup)
-                        o_rebounder_lineup, d_rebounder_lineup = filter_rebound_candidate_lineups_near_bounce(
-                            o_rebounder_lineup,
-                            d_rebounder_lineup,
-                            bounce_spot,
-                            max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
-                        )
                         shooter_id = getattr(shooter, "player_id", None)
                         exclude_player_ids = set()
                         penalize_player_ids = {shooter_id} if shooter_id else set()
-
-                        o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
-                        d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
-
-                        if o_rebounder is None and d_rebounder is None:
-                            d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
-                            if d_rebounder:
-                                rebounder = d_rebounder
-                                rebound_team = def_team
-                                stat = "DREB"
-                            else:
-                                raise ValueError("No players available for rebound")
-                        elif o_rebounder is None:
-                            rebounder = d_rebounder
-                            rebound_team = def_team
-                            stat = "DREB"
-                        elif d_rebounder is None:
-                            rebounder = o_rebounder
-                            rebound_team = off_team
-                            stat = "OREB"
-                        else:
-                            o_score = calculate_rebound_score(o_rebounder)
-                            d_score = calculate_rebound_score(d_rebounder)
-                            def_prob = 0.7
-                            player_advantage = len(d_rebounder_lineup) - len(o_rebounder_lineup)
-                            def_prob += (player_advantage * 0.05)
-                            off_mod = off_team.team_attributes["rebound_modifier"]
-                            def_mod = def_team.team_attributes["rebound_modifier"]
-                            bias = def_mod - off_mod
-                            new_prob = min(0.95, max(0.35, def_prob + bias))
-                            total_score = d_score + o_score
-                            d_weight = (d_score / total_score) if total_score > 0 else 0.5
-                            d_weight += (new_prob - 0.5)
-                            d_weight = min(0.95, max(0.05, d_weight))
-                            if is_zone_defense(game_state.get("defense_playcall", "")):
-                                d_weight *= 0.9
-                            rebound_team = def_team if random.random() < d_weight else off_team
-                            rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                            stat = "DREB" if rebound_team == def_team else "OREB"
+                        rebounder, rebound_team, stat = select_rebounder_by_score(
+                            off_team,
+                            def_team,
+                            o_rebounder_lineup,
+                            d_rebounder_lineup,
+                            bounce_spot,
+                            exclude_player_ids,
+                            penalize_player_ids,
+                            max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
+                            upper_half_distance=FAST_BREAK_REBOUND_GEO_DISTANCE * 0.5,
+                            fallback_off_lineup=o_rebounder_lineup,
+                            fallback_def_lineup=d_rebounder_lineup,
+                        )
 
                         result["ball_bounce_x"] = bounce_spot["x"]
                         result["ball_bounce_y"] = bounce_spot["y"]
@@ -1848,61 +1814,19 @@ class ShotManager:
                         exclude_player_ids = set()  # Don't exclude shooter anymore
                         penalize_player_ids = {shooter_id} if shooter_id else set()  # Penalize shooter by 20% distance
                     
-                        # Step 4: Choose closest player to bounce spot from each team
-                        o_rebounder = choose_rebounder(o_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if o_rebounder_lineup else None
-                        d_rebounder = choose_rebounder(d_rebounder_lineup, bounce_spot, exclude_player_ids, penalize_player_ids) if d_rebounder_lineup else None
-                    
-                        # Step 5: Handle edge cases (all players released/got back)
-                        if o_rebounder is None and d_rebounder is None:
-                            # Fallback: use any defensive player
-                            logging.warning("No eligible rebounders found, using fallback")
-                            d_rebounder = next((p for p in def_team.lineup.values() if p is not None), None)
-                            if d_rebounder:
-                                rebounder = d_rebounder
-                                rebound_team = def_team
-                                stat = "DREB"
-                            else:
-                                raise ValueError("No players available for rebound")
-                        elif o_rebounder is None:
-                            # All offensive players got back - automatic DREB
-                            rebounder = d_rebounder
-                            rebound_team = def_team
-                            stat = "DREB"
-                        elif d_rebounder is None:
-                            # All defensive players released - automatic OREB
-                            rebounder = o_rebounder
-                            rebound_team = off_team
-                            stat = "OREB"
-                        else:
-                            # Step 6: Calculate rebound scores for closest players
-                            o_score = calculate_rebound_score(o_rebounder)
-                            d_score = calculate_rebound_score(d_rebounder)
-                        
-                            # Step 7: Apply team bias with player advantage modifier
-                            def_prob = 0.7
-                            player_advantage = len(defense_rebounders) - len(offense_rebounders)
-                            def_prob += (player_advantage * 0.05)
-                        
-                            off_mod = off_team.team_attributes["rebound_modifier"]
-                            def_mod = def_team.team_attributes["rebound_modifier"]
-                            bias = def_mod - off_mod
-                            new_prob = min(0.95, max(0.35, def_prob + bias))
-                        
-                            # Step 8: Calculate final weights
-                            total_score = d_score + o_score
-                            d_weight = (d_score / total_score) if total_score > 0 else 0.5
-                            d_weight += (new_prob - 0.5)
-                            d_weight = min(0.95, max(0.05, d_weight))
-                        
-                            # Zone defense penalty (canonical `defense_playcall` slug, e.g. 2-3-zone)
-                            defense_playcall = game_state.get("defense_playcall", "man")
-                            if is_zone_defense(defense_playcall):
-                                d_weight *= 0.9
-                        
-                            # Step 9: Weighted random selection
-                            rebound_team = def_team if random.random() < d_weight else off_team
-                            rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                            stat = "DREB" if rebound_team == def_team else "OREB"
+                        rebounder, rebound_team, stat = select_rebounder_by_score(
+                            off_team,
+                            def_team,
+                            o_rebounder_lineup,
+                            d_rebounder_lineup,
+                            bounce_spot,
+                            exclude_player_ids,
+                            penalize_player_ids,
+                            upper_half_distance=12,
+                            fallback_off_lineup=off_lineup,
+                            fallback_def_lineup=def_lineup,
+                            fallback_start_distance=20,
+                        )
                     
                         # Store bounce spot for frontend animation
                         result["ball_bounce_x"] = bounce_spot["x"]
@@ -1988,38 +1912,6 @@ class ShotManager:
                 #     "offense_reb_value": offense_reb_value,
                 #     "note": "This should match frontend logs"
                 # })
-                
-                # ==================== OLD REBOUND SYSTEM (COMMENTED OUT) ====================
-                # rebounder_dict = {
-                #     "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
-                #     "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
-                # }
-                # o_pos = choose_rebounder(rebounder_dict, "offense")
-                # d_pos = choose_rebounder(rebounder_dict, "defense")
-                # o_rebounder = off_team.lineup[o_pos]
-                # d_rebounder = def_team.lineup[d_pos]
-                # o_score = calculate_rebound_score(o_rebounder)
-                # d_score = calculate_rebound_score(d_rebounder)
-                # off_mod = off_team.team_attributes["rebound_modifier"]
-                # def_mod = def_team.team_attributes["rebound_modifier"]
-                # bias = def_mod - off_mod
-                # def_prob = min(0.95, max(0.55, 0.75 + bias))
-                # total_score = d_score + o_score
-                # d_weight = (d_score / total_score) if total_score else 0.5
-                # d_weight += (def_prob - 0.5)
-                # d_weight = min(0.95, max(0.05, d_weight))
-                # if defense_call == "Zone":
-                #     d_weight *= 0.9
-                # o_weight = 1 - d_weight
-                # rebound_team = def_team if random.random() < d_weight else off_team
-                # rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                # stat = "DREB" if rebound_team == def_team else "OREB"
-                # self.game_state["last_rebound"] = stat
-                # rebounder.record_stat(stat)
-                # text += f"...{get_name_safe(rebounder)} grabs the rebound."
-                # result["rebounderId"] = getattr(rebounder, "player_id", None)
-                # result["rebound_type"] = stat
-                # ==================== END OLD REBOUND SYSTEM ====================
                 
                 # Fast-break miss paths set rebound transition in the dedicated FB branch above.
                 # Running this shared post-rebound transition block for FB can double-process state.
@@ -2751,11 +2643,19 @@ class ShotManager:
                 if not defender_lineup:
                     defender_lineup = def_lineup
                 
-                rebounder = choose_rebounder(defender_lineup, bounce_spot, exclude_player_ids, penalize_player_ids)
-                
-                # Fallback if no rebounder found
-                if rebounder is None:
-                    rebounder = fb_roles["defense"][0] if fb_roles.get("defense") else self.game.defense_team.lineup.get("PG")
+                rebounder, rebound_team, stat = select_rebounder_by_score(
+                    off_team,
+                    def_team,
+                    {},
+                    defender_lineup,
+                    bounce_spot,
+                    exclude_player_ids,
+                    penalize_player_ids,
+                    upper_half_distance=12,
+                    fallback_off_lineup={},
+                    fallback_def_lineup=defender_lineup,
+                    fallback_start_distance=20,
+                )
                 
                 rebounder.record_stat("DREB")
                 text += f"{shooter} misses the fast break shot -- {get_name_safe(rebounder)} grabs the rebound."

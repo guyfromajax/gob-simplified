@@ -128,7 +128,6 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         calculate_bounce_spot,
         collect_near_bounce_rebound_attemptors,
         determine_rebounder,
-        filter_rebound_candidate_lineups_near_bounce,
         get_name_safe,
         increment_no_defender_shot_breakdown,
     )
@@ -325,18 +324,15 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
                 }
             )
             with _temporary_lineup_coords(game, shot_moment_coords):
-                off_candidates, def_candidates = filter_rebound_candidate_lineups_near_bounce(
-                    off_lineup,
-                    def_lineup,
-                    bounce_spot,
-                )
                 new_rebounder, new_team, new_stat = determine_rebounder(
                     game,
                     bounce_spot,
                     exclude_player_ids,
                     penalize_player_ids,
-                    offense_candidate_lineup=off_candidates,
-                    defense_candidate_lineup=def_candidates,
+                    max_distance_from_bounce=20,
+                    upper_half_distance=10,
+                    offense_candidate_lineup=off_lineup,
+                    defense_candidate_lineup=def_lineup,
                 )
                 rebounder_pid = _safe_id(new_rebounder)
                 rebound_attemptors = collect_near_bounce_rebound_attemptors(
@@ -635,7 +631,6 @@ def _finalize_ab_shot(
         calculate_bounce_spot,
         collect_near_bounce_rebound_attemptors,
         determine_rebounder,
-        filter_rebound_candidate_lineups_near_bounce,
         get_name_safe,
     )
     from BackEnd.constants.shot_variants import (
@@ -723,18 +718,15 @@ def _finalize_ab_shot(
                 }
             )
             with _temporary_lineup_coords(game, shot_moment_coords):
-                off_candidates, def_candidates = filter_rebound_candidate_lineups_near_bounce(
-                    game.offense_team.lineup or {},
-                    game.defense_team.lineup or {},
-                    bounce_spot,
-                )
                 new_rebounder, new_team, new_stat = determine_rebounder(
                     game,
                     bounce_spot,
                     set(),
                     penalize_player_ids,
-                    offense_candidate_lineup=off_candidates,
-                    defense_candidate_lineup=def_candidates,
+                    max_distance_from_bounce=20,
+                    upper_half_distance=10,
+                    offense_candidate_lineup=game.offense_team.lineup or {},
+                    defense_candidate_lineup=game.defense_team.lineup or {},
                 )
                 rebounder_pid = _safe_id(new_rebounder)
                 rebound_attemptors = collect_near_bounce_rebound_attemptors(

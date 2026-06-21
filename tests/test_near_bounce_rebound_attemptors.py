@@ -1,6 +1,7 @@
 from BackEnd.utils.shared import (
     collect_near_bounce_rebound_attemptors,
     filter_rebound_candidate_lineups_near_bounce,
+    select_rebounder_by_score,
 )
 from tests.test_utils import build_mock_game
 
@@ -92,3 +93,67 @@ def test_filter_rebound_candidate_lineups_near_bounce_falls_back_when_both_empty
 
     assert off_filtered is game.offense_team.lineup
     assert def_filtered is game.defense_team.lineup
+
+
+def test_select_rebounder_by_score_checks_all_eligible_players_not_just_closest(monkeypatch):
+    game = build_mock_game()
+    _sync_lineup_to_roster(game)
+    bounce = {"x": 89, "y": 25}
+
+    low_close = game.offense_team.lineup["PG"]
+    high_far = game.offense_team.lineup["SG"]
+    defender = game.defense_team.lineup["PG"]
+
+    low_close.coords = {"x": 89, "y": 25}
+    low_close.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
+    high_far.coords = {"x": 77, "y": 25}
+    high_far.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+    defender.coords = {"x": 90, "y": 25}
+    defender.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
+
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
+
+    rebounder, team, stat = select_rebounder_by_score(
+        game.offense_team,
+        game.defense_team,
+        {"PG": low_close, "SG": high_far},
+        {"PG": defender},
+        bounce,
+        upper_half_distance=12,
+    )
+
+    assert rebounder is high_far
+    assert team is game.offense_team
+    assert stat == "OREB"
+
+
+def test_select_rebounder_by_score_uses_rebound_modifier_tiebreaker(monkeypatch):
+    game = build_mock_game()
+    _sync_lineup_to_roster(game)
+    bounce = {"x": 89, "y": 25}
+
+    off_player = game.offense_team.lineup["PG"]
+    def_player = game.defense_team.lineup["PG"]
+    off_player.coords = {"x": 89, "y": 25}
+    def_player.coords = {"x": 89, "y": 25}
+    off_player.attributes.update({"RB": 50, "ST": 50, "IQ": 50, "CH": 50, "MO": 0})
+    def_player.attributes.update({"RB": 50, "ST": 50, "IQ": 50, "CH": 50, "MO": 0})
+    game.offense_team.team_attributes["team_chemistry"] = 0
+    game.defense_team.team_attributes["team_chemistry"] = 0
+    game.offense_team.team_attributes["rebound_modifier"] = 0.1
+    game.defense_team.team_attributes["rebound_modifier"] = 0.2
+
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
+
+    rebounder, team, stat = select_rebounder_by_score(
+        game.offense_team,
+        game.defense_team,
+        {"PG": off_player},
+        {"PG": def_player},
+        bounce,
+        upper_half_distance=12,
+    )
+
+    assert rebounder is def_player
+    assert team is game.defense_team
+    assert stat == "DREB"

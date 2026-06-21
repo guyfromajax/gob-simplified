@@ -1573,3 +1573,15 @@ off in flight) is the remaining polish.
   (current decision: **always offense-retains**, per RR parity).
 - A future 4th outcome — **tipped-but-live** (deflection that starts a scramble rather
   than a dead ball) — deferred.
+
+**Standard Diamond HCT Play - Defense**
+- Defense Starting Positions (all in home offense orientation)
+  - PG: x: random.randint(44,50), y: random.randint(23,27)
+  - pos1: midLane (randomize y -5 to + 5)
+  - pos2: upper deepWing (randomize x & y each -3 to + 3)
+  - pos3: lower deepWing (randomize x & y each -3 to + 3)
+  - pos4: key
+- Starting offense positions -- same as other HCT plays
+
+  step 1: defense PG meets offense bh at defense PG staring x, offense bh starting y and offense bh executes a read
+  

@@ -50,11 +50,15 @@ def test_hct_fast_break_miss_stamps_near_bounce_attemptors_from_shot_seed(monkey
         lambda *args, **kwargs: {"x": 89, "y": 25},
     )
     monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.99)
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
 
     near_off = game.offense_team.lineup["SG"]
     far_off = game.offense_team.lineup["SF"]
     near_def = game.defense_team.lineup["SG"]
     actual_rebounder = game.offense_team.lineup["SG"]
+    near_off.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+    far_off.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+    near_def.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
     monkeypatch.setattr(
         "BackEnd.utils.fast_break_shot_geometry.compute_fb_shot_geometry",
         lambda **kwargs: {
@@ -121,6 +125,10 @@ def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(m
     far_off = game.offense_team.lineup["SF"]
     near_def = game.defense_team.lineup["SG"]
     actual_rebounder = game.offense_team.lineup["SG"]
+    near_off.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+    far_off.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+    near_def.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
 
     original_near_off_coords = {"x": 10, "y": 10}
     original_rebounder_coords = dict(original_near_off_coords)

@@ -201,13 +201,17 @@ def test_regular_fast_break_miss_uses_25_grid_rebound_geo_filter(monkeypatch):
     shooter.coords = {"x": 60, "y": 25}
     near_off.coords = {"x": 65, "y": 25}  # 24 from bounce: eligible
     far_off.coords = {"x": 63, "y": 25}   # 26 from bounce: excluded
+    near_off.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+    far_off.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
     for pos, player in game.offense_team.lineup.items():
         if player not in (shooter, near_off, far_off):
             player.coords = {"x": 60, "y": 25}
     near_def.coords = {"x": 89, "y": 50}  # 25 from bounce: animation attemptor
+    near_def.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
     for pos, player in game.defense_team.lineup.items():
         if player is not near_def:
             player.coords = {"x": 63, "y": 25}  # frontcourt, outside 25
+            player.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
 
     roles = {
         "shooter": shooter,
@@ -238,6 +242,7 @@ def test_regular_fast_break_miss_uses_25_grid_rebound_geo_filter(monkeypatch):
         lambda *args, **kwargs: {"x": 89, "y": 25},
     )
     monkeypatch.setattr("BackEnd.models.shot_manager.random.random", lambda: 0.99)
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
 
     result = shot_manager.resolve_shot(roles)
 

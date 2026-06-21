@@ -1209,18 +1209,15 @@ def resolve_offensive_rebound(game, rebounder):
             exclude_player_ids = set()  # Don't exclude putback player anymore
             penalize_player_ids = {rebounder_id} if rebounder_id else set()  # Penalize putback player by 20% distance
 
-            off_candidates, def_candidates = filter_rebound_candidate_lineups_near_bounce(
-                off_lineup,
-                def_lineup,
-                bounce_spot,
-            )
             new_rebounder, new_team, new_stat = determine_rebounder(
                 game,
                 bounce_spot,
                 exclude_player_ids,
                 penalize_player_ids,
-                offense_candidate_lineup=off_candidates,
-                defense_candidate_lineup=def_candidates,
+                max_distance_from_bounce=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE,
+                upper_half_distance=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE * 0.5,
+                offense_candidate_lineup=off_lineup,
+                defense_candidate_lineup=def_lineup,
             )
             
             # Get rebounder ID (support both Player and dict for robustness)
@@ -1459,7 +1456,7 @@ def filter_rebound_candidate_lineups_near_bounce(
 
     This is the gameplay-side sibling to
     ``collect_near_bounce_rebound_attemptors``. It preserves position keys so
-    callers can feed the returned lineups directly into ``choose_rebounder``.
+    callers can feed the returned lineups directly into rebound selection.
     If both sides filter to empty, optionally return the original path-specific
     pools so rebound resolution can degrade to the prior behavior instead of
     failing or producing an impossible empty-board state.
@@ -1497,6 +1494,155 @@ def filter_rebound_candidate_lineups_near_bounce(
         )
         return off_lineup or {}, def_lineup or {}
     return off_filtered, def_filtered
+
+
+def _rebound_distance(player, bounce_spot):
+    coords = getattr(player, "coords", None) or {}
+    try:
+        px = float(coords.get("x"))
+        py = float(coords.get("y"))
+        bx = float((bounce_spot or {}).get("x"))
+        by = float((bounce_spot or {}).get("y"))
+    except (TypeError, ValueError, AttributeError):
+        return float("inf")
+    return ((px - bx) ** 2 + (py - by) ** 2) ** 0.5
+
+
+def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids):
+    entries = []
+    excluded = {str(pid) for pid in (exclude_player_ids or set()) if pid is not None}
+    for player in (lineup or {}).values():
+        if player is None:
+            continue
+        pid = getattr(player, "player_id", None)
+        if pid is not None and str(pid) in excluded:
+            continue
+        entries.append(
+            {
+                "player": player,
+                "team": team,
+                "stat": None,
+                "distance": _rebound_distance(player, bounce_spot),
+            }
+        )
+    return entries
+
+
+def _entries_with_stat(off_entries, def_entries):
+    for entry in off_entries:
+        entry["stat"] = "OREB"
+    for entry in def_entries:
+        entry["stat"] = "DREB"
+    return off_entries + def_entries
+
+
+def _filter_entries_within_distance(entries, max_distance):
+    try:
+        threshold = float(max_distance)
+    except (TypeError, ValueError):
+        return entries
+    return [entry for entry in entries if entry["distance"] <= threshold]
+
+
+def _team_rebound_modifier(team):
+    try:
+        return float((getattr(team, "team_attributes", None) or {}).get("rebound_modifier", 0) or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+
+
+def _team_chemistry(team):
+    try:
+        return float((getattr(team, "team_attributes", None) or {}).get("team_chemistry", 0) or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+
+
+def select_rebounder_by_score(
+    off_team,
+    def_team,
+    off_lineup,
+    def_lineup,
+    bounce_spot,
+    exclude_player_ids=None,
+    penalize_player_ids=None,
+    *,
+    max_distance_from_bounce=None,
+    upper_half_distance=12,
+    fallback_off_lineup=None,
+    fallback_def_lineup=None,
+    fallback_start_distance=20,
+    fallback_step=5,
+):
+    """Select the rebound winner from all eligible players by final rebound value.
+
+    Eligibility is still owned by the caller/path. This helper evaluates every
+    player left in those pools instead of first reducing each team to the
+    closest player.
+    """
+    exclude_player_ids = exclude_player_ids or set()
+    penalized = {str(pid) for pid in (penalize_player_ids or set()) if pid is not None}
+
+    off_entries = _rebound_entries(off_lineup, off_team, bounce_spot, exclude_player_ids)
+    def_entries = _rebound_entries(def_lineup, def_team, bounce_spot, exclude_player_ids)
+    entries = _entries_with_stat(off_entries, def_entries)
+
+    if max_distance_from_bounce is not None:
+        entries = _filter_entries_within_distance(entries, max_distance_from_bounce)
+        fallback_start_distance = float(max_distance_from_bounce) + float(fallback_step)
+
+    if not entries:
+        fallback_off = fallback_off_lineup if fallback_off_lineup is not None else off_lineup
+        fallback_def = fallback_def_lineup if fallback_def_lineup is not None else def_lineup
+        fallback_entries = _entries_with_stat(
+            _rebound_entries(fallback_off, off_team, bounce_spot, exclude_player_ids),
+            _rebound_entries(fallback_def, def_team, bounce_spot, exclude_player_ids),
+        )
+        radius = float(fallback_start_distance)
+        while radius <= 150:
+            entries = _filter_entries_within_distance(fallback_entries, radius)
+            if entries:
+                break
+            radius += float(fallback_step)
+
+    if not entries:
+        raise ValueError("No players available for rebound")
+
+    if len(entries) == 1:
+        winner = entries[0]
+        return winner["player"], winner["team"], winner["stat"]
+
+    upper_count = sum(1 for entry in entries if entry["distance"] <= float(upper_half_distance))
+    lower_half_discount = 0.7 if upper_count >= 2 else 0.95
+
+    for entry in entries:
+        player = entry["player"]
+        team = entry["team"]
+        value = calculate_rebound_score(player) + (_team_chemistry(team) * _team_rebound_modifier(team))
+        if entry["distance"] > float(upper_half_distance):
+            value *= lower_half_discount
+        pid = getattr(player, "player_id", None)
+        if pid is not None and str(pid) in penalized:
+            value *= 0.8
+        entry["final_score"] = value
+
+    max_score = max(entry["final_score"] for entry in entries)
+    tied = [entry for entry in entries if entry["final_score"] == max_score]
+    if len(tied) > 1:
+        max_mod = max(_team_rebound_modifier(entry["team"]) for entry in tied)
+        tied = [entry for entry in tied if _team_rebound_modifier(entry["team"]) == max_mod]
+    if len(tied) > 1:
+        max_mo = max(float((getattr(entry["player"], "attributes", None) or {}).get("MO", 0) or 0) for entry in tied)
+        tied = [
+            entry
+            for entry in tied
+            if float((getattr(entry["player"], "attributes", None) or {}).get("MO", 0) or 0) == max_mo
+        ]
+    if len(tied) > 1:
+        max_chem = max(_team_chemistry(entry["team"]) for entry in tied)
+        tied = [entry for entry in tied if _team_chemistry(entry["team"]) == max_chem]
+    winner = tied[0] if len(tied) == 1 else random.choice(tied)
+    return winner["player"], winner["team"], winner["stat"]
 
 
 def choose_rebounder(lineup, bounce_spot, exclude_player_ids=None, penalize_player_ids=None):
@@ -1732,6 +1878,8 @@ def determine_rebounder(
     penalize_player_ids=None,
     *,
     max_x_delta_from_bounce=None,
+    max_distance_from_bounce=None,
+    upper_half_distance=12,
     offense_candidate_lineup=None,
     defense_candidate_lineup=None,
 ):
@@ -1746,8 +1894,14 @@ def determine_rebounder(
         max_x_delta_from_bounce: If set (e.g. FREE_THROW_REBOUND_MAX_X_DELTA), only players with
             |coords.x - bounce_x| <= this value are eligible per team. If that removes everyone on
             both teams, falls back to full lineups with a warning.
+        max_distance_from_bounce: If set, only players within this Euclidean
+            radius are initial candidates. If none qualify, the radius expands
+            by 5 until at least one candidate exists.
+        upper_half_distance: Euclidean distance threshold for upper-half
+            rebounder scoring. Players outside it receive the lower-half
+            discount.
         offense_candidate_lineup / defense_candidate_lineup: Optional position-keyed
-            candidate pools supplied by path-specific logic before closest-player
+            candidate pools supplied by path-specific logic before winner
             selection. Defaults to the active offense/defense lineups.
     
     Returns:
@@ -1783,6 +1937,9 @@ def determine_rebounder(
             else def_lineup
         )
 
+        fallback_off_lineup = base_off_lineup
+        fallback_def_lineup = base_def_lineup
+
         if max_x_delta_from_bounce is not None:
             gs_diag = getattr(game, "game_state", None)
             if isinstance(gs_diag, dict):
@@ -1803,65 +1960,24 @@ def determine_rebounder(
                 )
                 if isinstance(gs_diag, dict):
                     gs_diag["_ft_rebound_x_gate_fallback"] = True
-                off_use, def_use = base_off_lineup, base_def_lineup
+                off_use, def_use = {}, {}
         else:
             off_use, def_use = base_off_lineup, base_def_lineup
 
-        o_rebounder = choose_rebounder(
-            off_use, bounce_spot, exclude_player_ids, penalize_player_ids
+        return select_rebounder_by_score(
+            off_team,
+            def_team,
+            off_use,
+            def_use,
+            bounce_spot,
+            exclude_player_ids,
+            penalize_player_ids,
+            max_distance_from_bounce=max_distance_from_bounce,
+            upper_half_distance=upper_half_distance,
+            fallback_off_lineup=fallback_off_lineup,
+            fallback_def_lineup=fallback_def_lineup,
+            fallback_start_distance=20,
         )
-        d_rebounder = choose_rebounder(
-            def_use, bounce_spot, exclude_player_ids, penalize_player_ids
-        )
-
-        if o_rebounder is None and d_rebounder is None:
-            logging.warning(
-                "determine_rebounder: No valid rebounders found, using closest player from all players"
-            )
-            all_players_lineup = {}
-            for pos, player in base_off_lineup.items():
-                if player is not None:
-                    all_players_lineup[f"O_{pos}"] = player
-            for pos, player in base_def_lineup.items():
-                if player is not None:
-                    all_players_lineup[f"D_{pos}"] = player
-
-            closest_player = choose_rebounder(
-                all_players_lineup, bounce_spot, exclude_player_ids, penalize_player_ids
-            )
-
-            if closest_player is None:
-                raise ValueError("No players available for rebound")
-
-            closest_team_id = getattr(closest_player, "team_id", None)
-            if closest_team_id == off_team.team_id:
-                return closest_player, off_team, "OREB"
-            return closest_player, def_team, "DREB"
-
-        if o_rebounder is None:
-            return d_rebounder, def_team, "DREB"
-
-        if d_rebounder is None:
-            return o_rebounder, off_team, "OREB"
-
-        o_score = calculate_rebound_score(o_rebounder)
-        d_score = calculate_rebound_score(d_rebounder)
-
-        off_mod = off_team.team_attributes["rebound_modifier"]
-        def_mod = def_team.team_attributes["rebound_modifier"]
-        bias = def_mod - off_mod
-        def_prob = min(0.95, max(0.55, 0.75 + bias))
-
-        total_score = d_score + o_score
-        d_weight = (d_score / total_score) if total_score else 0.5
-        d_weight += (def_prob - 0.5)
-        d_weight = min(0.95, max(0.05, d_weight))
-
-        new_team = def_team if random.random() < d_weight else off_team
-        new_rebounder = d_rebounder if new_team == def_team else o_rebounder
-        new_stat = "DREB" if new_team == def_team else "OREB"
-
-        return new_rebounder, new_team, new_stat
 
     with temp_lineup_court_absolute_for_away_rebound_math(game, is_away_offense):
         return _core()
@@ -1927,7 +2043,12 @@ def scale_score_to_100(raw_score):
 
 def calculate_rebound_score(player):
     attr = player.attributes
-    return (attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["IQ"] * 0.2) * random.randint(1, 6)
+    return (
+        attr.get("RB", 0) * 0.5
+        + attr.get("ST", 0) * 0.3
+        + attr.get("IQ", 0) * 0.1
+        + attr.get("CH", 0) * 0.1
+    ) * random.randint(1, 6)
 
 def calculate_outlet_pass_score(outlet_passer):
     """
