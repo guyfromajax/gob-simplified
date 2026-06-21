@@ -207,7 +207,13 @@ function handleShotMakeAnnouncement(turnData, scene, context, offenseTeam) {
     }
   }
 
-  showAnnouncement("It's Good!", offenseTeam, playerData);
+  // Made 3-pointer → play a random announcer "three" call at overlay mount
+  // (SFX_System.md "Made Three Announce"). points === 3 is the canonical signal
+  // (backend stamps result["points"]); 2-pt makes carry no court SFX here.
+  const points = Number(turnData?.points ?? turnData?.points_scored ?? context?.points);
+  const meta = points === 3 ? { sfx: "three_make", scene } : null;
+
+  showAnnouncement("It's Good!", offenseTeam, playerData, meta);
 }
 
 function handleAndOneAnnouncement(turnData, scene, context, offenseTeam) {
@@ -333,8 +339,10 @@ function handleAirballAnnouncement(turnData, scene, context, offenseTeam) {
     }
   }
 
-  // No meta.sfx — airball.wav already fires from shot-result SFX at the same beat.
-  showAnnouncement('Airball!', offenseTeam, playerData);
+  // `airball.wav` fires from the shot-result SFX at ball-miss. The announcement
+  // additionally plays `airball-emotion.wav` (a reaction stinger) at overlay
+  // mount via meta.sfx — see SFX_System.md "Airball Announce".
+  showAnnouncement('Airball!', offenseTeam, playerData, { sfx: 'airball-emotion.wav', scene });
 }
 
 function handleShootingFoulAnnouncement(turnData, scene, context) {

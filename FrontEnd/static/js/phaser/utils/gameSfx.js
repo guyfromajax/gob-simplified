@@ -44,6 +44,11 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "braddock-steal.wav",
   "butler-steal.wav",
   "click-steal.wav",
+  "braddock-three.mp3",
+  "duke-three.mp3",
+  "sammy-three.mp3",
+  "block1.wav",
+  "airball-emotion.wav",
   "duke-its-blocked.wav",
   "duke-charging.wav",
   "duke-great-stop.wav",
@@ -253,6 +258,15 @@ function normalizeShotResult(result) {
 }
 
 export function playShotLaunchSfx(scene, turnData) {
+  // Blocked shots: the block cue is the shot-attempt SFX and takes precedence
+  // over the shot_score-scaled tiers below (SFX_System.md "Blocked Shot
+  // Attempt"). result_type is already known at release time — the backend
+  // resolves the full turn before animation.
+  if (String(turnData?.result_type || "").toUpperCase() === "BLOCK") {
+    playGameSfx(scene, "block1.wav", DEFAULT_VOLUME, { event: "shot_block" });
+    return;
+  }
+
   const preDefense = toNumber(turnData?.sfx?.shot_score_pre_defense ?? turnData?.shot_score_pre_defense);
   if (preDefense == null) return;
 
@@ -399,6 +413,27 @@ export function resolveInterceptionSfxFile() {
   return INTERCEPTION_SFX_FILES[INTERCEPTION_SFX_FILES.length - 1].file;
 }
 
+// One of three announcer-voice calls played at random when a made 3-pointer's
+// "It's Good!" announcement mounts (SFX_System.md "Made Three Announce"). Even
+// 33/33/34 split, mirroring the steal/interception cues. Callers resolve a file
+// here (via the "three_make" key) and pass it through meta.sfx so court.html
+// plays it at overlay mount, synced to the visual.
+const THREE_POINTER_SFX_FILES = Object.freeze([
+  { file: "braddock-three.mp3", weight: 33 },
+  { file: "duke-three.mp3", weight: 33 },
+  { file: "sammy-three.mp3", weight: 34 },
+]);
+
+export function resolveThreePointerSfxFile() {
+  const total = THREE_POINTER_SFX_FILES.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of THREE_POINTER_SFX_FILES) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.file;
+  }
+  return THREE_POINTER_SFX_FILES[THREE_POINTER_SFX_FILES.length - 1].file;
+}
+
 // Fires at the moment the ball attaches to the rebounder sprite. DREB → defense
 // strong; OREB → inside strong.
 export function playReboundSfx(scene, reboundType) {
@@ -531,6 +566,7 @@ export function resolveAnnounceMetaCourtSfxFile(key) {
   switch (String(key || "").trim()) {
     case "steal": return resolveStealSfxFile();
     case "interception": return resolveInterceptionSfxFile();
+    case "three_make": return resolveThreePointerSfxFile();
     case "block_announce": return "duke-its-blocked.wav";
     case "charge_announce": return "duke-charging.wav";
     case "fb_defensive_stop": return "duke-great-stop.wav";
@@ -620,6 +656,9 @@ export function playAnnouncementMetaCourtSfx(scene, key, headline = "") {
       return true;
     case "interception":
       playGameSfx(scene, resolveInterceptionSfxFile(), DEFAULT_VOLUME, { event: "interception" });
+      return true;
+    case "three_make":
+      playGameSfx(scene, resolveThreePointerSfxFile(), DEFAULT_VOLUME, { event: "three_make" });
       return true;
     case "block_announce":
       playBlockAnnounceCourtSfx(scene);

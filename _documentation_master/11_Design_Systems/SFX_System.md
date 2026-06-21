@@ -39,6 +39,10 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 - Else: `shot-standard.wav`
 - The `> 210` strong tier also stamps `hot_shot_trail` on the step metadata — FE `renderBallTransition` renders a hot trail on schema `[ball_flight]` steps (same threshold as `three-strong.wav`).
 
+**Blocked Shot Attempts (override)**
+- When the shot is blocked (`turnData.result_type === "BLOCK"`), the attempt SFX is `block1.wav` and **takes precedence over the `shot_score_pre_defense` tiers above** — the scale tiers are skipped.
+- Checked first in `playShotLaunchSfx` (gameSfx.js). The block result is already known at release time because the backend resolves the full turn before animation.
+
 **Free Throw Shot Attempts**
 - All: `shot-standard.wav`
 
@@ -163,6 +167,18 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - Trigger: immediately when the **INTERCEPTION!** Announce appears (a PASS interception — Rim Runner lane pass, or the HCT/HCO/FCP pass-contest primitive's INTERCEPT terminal).
 - File: **33/33/34** random each show — `braddock-interception.mp3` or `duke-interception.mp3` or `sammy-interception.mp3`
 - Resolver: `resolveInterceptionSfxFile()` (gameSfx.js). Legacy `meta.sfx` key: `"interception"`.
+
+**Made Three Announce**
+
+- Trigger: immediately when the **It's Good!** Announce appears for a made 3-pointer (`turnData.points === 3` in `handleShotMakeAnnouncement`, gameAnnouncements.js). 2-pt makes carry no court SFX here; FT makes and 3-pt and-1s are not covered.
+- File: **33/33/34** random each show — `braddock-three.mp3` or `duke-three.mp3` or `sammy-three.mp3`
+- Resolver: `resolveThreePointerSfxFile()` (gameSfx.js). `meta.sfx` key: `"three_make"` (passed on the "It's Good!" announce payload).
+
+**Airball Announce**
+
+- Trigger: immediately when the **Airball!** Announce appears (`handleAirballAnnouncement`, gameAnnouncements.js).
+- File: `airball-emotion.wav` (a reaction stinger), passed directly as `meta.sfx` on the announce payload → plays at overlay mount.
+- Note: distinct from `airball.wav`, which fires earlier from the **shot-result** SFX at ball-miss (see Shot Make/Miss). Both play for an airball — the result clank-tier at the miss, the emotion stinger at the announcement.
 
 **Charge Announce**
 
