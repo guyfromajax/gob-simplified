@@ -574,8 +574,13 @@ export async function shootBall({
                 showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
               }
             } else {
-              // Regular made shot
-              showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+              // Regular made shot. Made 3-pointer → random "three" announcer
+              // call at the announce mount (SFX_System.md "Made Three Announce").
+              const isThree = Number(turnData?.points ?? turnData?.points_scored) === 3;
+              showAnnouncement(
+                "It's Good!", teamStyle, shooterPlayerData,
+                isThree ? { sfx: "three_make", scene } : null,
+              );
             }
           } else if (result === "MISS" && isShootingFoul) {
             // ✅ FIX: Replicate AND-1 announcement pattern exactly (matches made shot flow)
