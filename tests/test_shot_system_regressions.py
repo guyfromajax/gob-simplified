@@ -331,6 +331,63 @@ def test_regular_fast_break_miss_uses_25_grid_rebound_geo_filter(monkeypatch):
     assert near_def.player_id in result["defense_rebounders"]
 
 
+def test_regular_fast_break_rebound_falls_back_when_frontcourt_x_filter_empty(monkeypatch):
+    game = _build_stub_game()
+    shot_manager = ShotManager(game)
+    game.game_state["offensive_state"] = "FAST_BREAK"
+    game.offense_team.team_attributes["shot_threshold"] = 1000
+    game.offense_team.team_attributes["rebound_modifier"] = 0
+    game.defense_team.team_attributes["rebound_modifier"] = 0
+
+    shooter = game.offense_team.lineup["PG"]
+    fallback_rebounder = game.defense_team.lineup["C"]
+
+    # Home offense fast-break rebound prefilter wants x >= 50. Force every
+    # active player to the other half so only the full-lineup fallback can
+    # recover a legal rebounder.
+    for player in list(game.offense_team.lineup.values()) + list(game.defense_team.lineup.values()):
+        player.coords = {"x": 10, "y": 25}
+        player.attributes.update({"RB": 1, "ST": 1, "IQ": 1, "CH": 1})
+    fallback_rebounder.attributes.update({"RB": 100, "ST": 100, "IQ": 100, "CH": 100})
+
+    roles = {
+        "shooter": shooter,
+        "passer": game.offense_team.lineup["C"],
+        "is_fast_break": True,
+    }
+
+    def fake_calculate(
+        self,
+        shooter,
+        passer,
+        screener,
+        defender,
+        shot_type,
+        defense_call,
+        is_three,
+        is_paint=False,
+        second_defender=None,
+        shooter_location=None,
+        apply_defense=True,
+        **kwargs,
+    ):
+        return 0, 0, 0, False, None
+
+    monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
+    monkeypatch.setattr(
+        "BackEnd.models.shot_manager.calculate_bounce_spot",
+        lambda *args, **kwargs: {"x": 89, "y": 25},
+    )
+    monkeypatch.setattr("BackEnd.models.shot_manager.random.random", lambda: 0.99)
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
+
+    result = shot_manager.resolve_shot(roles)
+
+    assert result["result_type"] == "MISS"
+    assert result["rebounderId"] == fallback_rebounder.player_id
+    assert result["rebound_type"] == "DREB"
+
+
 def test_oreb_putback_uses_nearest_defender_without_distance_gate():
     game = _build_stub_game()
     rebounder = game.offense_team.lineup["PF"]

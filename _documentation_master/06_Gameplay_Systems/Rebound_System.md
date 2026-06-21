@@ -132,6 +132,7 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
    - Lower-half player final score: `(rebound_function + (team_chemistry × rebound_modifier)) × lower_half_discount`
    - Shooter / putback shooter penalty: after the score above is calculated, apply the existing **20% discount** (`× 0.8`) to the shooter or putback shooter if he is in the eligible pool.
 6. **No eligible rebounder fallback:** if the eligible pool is empty, expand the Euclidean search radius by **5** until at least one rebounder is found. HCO / Free Throw fallback starts at **20**. Geo-gated paths start from their path radius, then expand by 5 from there.
+   - Path-specific prefilters may define the first-pass candidate pool, but fallback pools must use the full active lineups for that turn context. Otherwise a strict prefilter (for example the Fast Break frontcourt-half x filter) can leave the expansion step with no players to recover.
 7. **Determine the rebounder:** highest final score wins. If only one player is eligible, that player automatically gets the rebound.
 8. **Tie breakers:** if multiple players tie for highest final score:
    - team with higher `rebound_modifier`

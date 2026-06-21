@@ -1731,8 +1731,8 @@ class ShotManager:
                             penalize_player_ids,
                             max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
                             upper_half_distance=FAST_BREAK_REBOUND_GEO_DISTANCE * 0.5,
-                            fallback_off_lineup=o_rebounder_lineup,
-                            fallback_def_lineup=d_rebounder_lineup,
+                            fallback_off_lineup=off_lineup,
+                            fallback_def_lineup=def_lineup,
                         )
 
                         result["ball_bounce_x"] = bounce_spot["x"]
