@@ -8,7 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **June 14 Update** Added Tutorial System, News System, Practice Squads, Practice Squad/Recruits games, stat tracking & tournament, and improved recruiting UX. Also updated recruiting logic so recruits are more likely to declare leans throughout the season. Expanded Recruiting Day points from 20 to 50 to offer more variety in recruiting strategy.
+- **June 21 Update** Added Half-Court Trap plays. Made player attributes (RB, ST, IQ) and proximity to the ball bounce spot on missed shots more relevant to rebounding logic. Added the Player Momentum system. Added three Advanced Tutorial topics (Momentum, Presses & Traps, Practice Squads).
 
 Source:
 - `FrontEnd/static/mode-select.html`

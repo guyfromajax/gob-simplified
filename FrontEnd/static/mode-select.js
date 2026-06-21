@@ -7,7 +7,7 @@ function playSound(filename) {
 }
 
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
-const ALPHA_DISCLAIMER_VERSION = '2026-06-21-alpha-box';
+const ALPHA_DISCLAIMER_VERSION = '2026-06-21-hct-momentum-alpha-box';
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
