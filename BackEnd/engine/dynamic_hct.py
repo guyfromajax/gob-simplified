@@ -1514,6 +1514,12 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     # RETAINS (side inbound, no flip, no TO) — matches Rim Runner. Threads to the
     # turn dict so the FE announces "Batted Ball Out Of Bounds!" (not a turnover).
     bat_oob: bool = False
+    # §14.7 — bat-OOB deflection geometry threaded to the FE so the schema-playback
+    # hook (AnimationEngine._runHctBatOobBallSend) can fly the ball passer→contact
+    # →nearest sideline (reusing Rim Runner's imperative OOB ball-send). Grid coords
+    # of the pickoff point + the deflecting defender position.
+    bat_oob_contact: Dict[str, Any] = {}
+    bat_oob_deflector_pos: Any = None
     # Reach-in micro-movement (render-space only): the on-ball defender position
     # of the contest moment currently being resolved. Set by ``_resolve_attack``;
     # consumed by ``_stamp_reach_in`` to tag the moment's emitted segment so the
@@ -2029,6 +2035,13 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             result_type = "DEAD BALL"
             bat_oob = True
             steal_coords = {}
+            # §14.7 — geometry for the FE imperative ball-send (fly the ball
+            # passer→contact→nearest sideline). Fall back to the receiver spot
+            # if the contest didn't pin a contact point.
+            bat_oob_contact = _clamp_xy(
+                dict(contest["contact_point"] or off_coords[receiver_pos])
+            )
+            bat_oob_deflector_pos = deflector_pos
             sec = _emit_stopper(
                 "hct_bat_oob",
                 f"pass batted out of bounds ({passer_pos}\u2192{receiver_pos}, "
@@ -2094,6 +2107,8 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         "steal_coords": steal_coords,
         "is_interception": is_interception,
         "bat_oob": bat_oob,
+        "bat_oob_contact": bat_oob_contact,
+        "bat_oob_deflector_pos": bat_oob_deflector_pos,
         "ball_handler": ball_handler,
         "defender": defender,
         "text_suffix": text_suffix,

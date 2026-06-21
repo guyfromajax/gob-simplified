@@ -7579,6 +7579,14 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         # §14 — DEAD BALL that is a batted-OOB pass → FE shows "Batted Ball Out Of
         # Bounds!" (not a turnover) and the offense retains.
         "bat_oob": bat_oob,
+        # §14.7 — geometry for the FE imperative ball-send (AnimationEngine.
+        # _runHctBatOobBallSend): the grid contact point + deflecting defender id.
+        "bat_oob_contact": dict(dyn.get("bat_oob_contact") or {}) if bat_oob else None,
+        "bat_oob_deflector_id": (
+            getattr(def_lineup.get(dyn.get("bat_oob_deflector_pos")), "player_id", None)
+            if bat_oob and dyn.get("bat_oob_deflector_pos")
+            else None
+        ),
         "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
         "defender_id": getattr(defender, "player_id", None) if defender else None,
         "fouled_out": foul_out_info.get("fouled_out", False),

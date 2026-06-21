@@ -345,7 +345,96 @@ export class AnimationEngine {
     // remains importable in case any test/legacy caller still references
     // it, but the schema playback path no longer invokes it.
 
+    // §14.7 — HCT batted-out-of-bounds polish. The schema steps render the
+    // players (and the defensive collapse on the passer), but the schema
+    // pipeline can't fly a deflected ball off the court. After the steps
+    // settle, fly the ball passer→contact→nearest sideline by reusing Rim
+    // Runner's imperative OOB ball-send (Path B). Gated on `turnData.bat_oob`.
+    if (turnData?.bat_oob) {
+      await this._runHctBatOobBallSend(turnData, sprites, ballSprite);
+    }
+
     return true;
+  }
+
+  /**
+   * §14.7 — imperative ball-send for an HCT batted-out-of-bounds pass.
+   * Reuses Rim Runner's OOB helpers (animateBallToPosition + the
+   * nearest-sideline resolver): the deflector (if known) slides onto the
+   * contact point, then the ball flies passer→contact→nearest sideline.
+   * No-op (safe) if geometry/sprites are missing — the dead-ball / side
+   * inbound finalize still runs normally.
+   */
+  async _runHctBatOobBallSend(turnData, sprites = {}, ballSprite = null) {
+    const scene = this.scene;
+    const ball = ballSprite || scene?.ballSprite;
+    const contact = turnData?.bat_oob_contact;
+    if (
+      !scene
+      || !ball
+      || !contact
+      || typeof contact.x !== "number"
+      || typeof contact.y !== "number"
+    ) {
+      return;
+    }
+
+    const width = scene.game?.config?.width ?? 1229;
+    const height = scene.game?.config?.height ?? 768;
+
+    let mods;
+    try {
+      mods = await Promise.all([
+        import("./ballAnimationSimple.js"),
+        import("../utils/gridToPixels.js"),
+        import("./ballTween.js"),
+        import("./fastBreak.js"),
+      ]);
+    } catch (err) {
+      console.warn("[HCT BAT_OOB] helper import failed; skipping ball-send", err);
+      return;
+    }
+    const [
+      { animateBallToPosition },
+      { gridToPixels },
+      { getBallDuration, cancelBallTweenAndClearOwner, tweenPlayerTo },
+      { resolveNearestOutOfBoundsGrid },
+    ] = mods;
+
+    const contactPx = gridToPixels(contact.x, contact.y, width, height);
+
+    // Slide the deflecting defender onto the contact point so the bat reads as
+    // a defender knocking it away (optional — skipped if the sprite is absent).
+    const defId =
+      turnData?.bat_oob_deflector_id != null
+        ? String(turnData.bat_oob_deflector_id)
+        : null;
+    const defSp = defId ? sprites[defId] : null;
+    if (defSp && typeof tweenPlayerTo === "function") {
+      try {
+        const { getPlayerDuration } = await import("./turnAnimation.js");
+        await tweenPlayerTo(scene, defSp, contactPx, {
+          duration: getPlayerDuration(defSp, contactPx.x, contactPx.y, true),
+          easing: "Quad.easeOut",
+        });
+      } catch (err) {
+        // Defender slide is cosmetic — never block the ball-send on it.
+      }
+    }
+
+    // Ball: detach from its owner, then passer→contact→nearest sideline.
+    cancelBallTweenAndClearOwner(scene, ball);
+    await animateBallToPosition(scene, contactPx, {
+      duration: getBallDuration(ball, contactPx.x, contactPx.y),
+      easing: "Sine.easeInOut",
+    });
+
+    const oobGrid = resolveNearestOutOfBoundsGrid(contact);
+    const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
+    await animateBallToPosition(scene, oobPx, {
+      duration: getBallDuration(ball, oobPx.x, oobPx.y),
+      easing: "Quad.easeOut",
+    });
   }
 
   /**

@@ -1477,11 +1477,17 @@ positioning, not a bolted-on roll.
   `BATTED_OOB`) and the turnover announce is **suppressed** when `bat_oob` is set
   (`finalizeTurnAfterAnimation` + `announceFromTurnData` guards).
 
-**Animation (current cut):** both deflections break *before* emitting the pass-flight
-segment and fire the existing stopper collapse beat, so INTERCEPT reuses the shipped STEAL
-render path and BAT_OOB reuses the DEAD-BALL stop. The pass-flight-to-`contact_point`
-shortening (ball visibly picked off / knocked away in flight) + the BAT_OOB out-of-bounds
-ball send are the remaining Phase-4 polish.
+**Animation:** both deflections break *before* emitting the pass-flight segment and fire
+the existing stopper collapse beat, so INTERCEPT reuses the shipped STEAL render path and
+BAT_OOB reuses the DEAD-BALL stop. **BAT_OOB now also runs an imperative ball-send (Phase 4,
+Path B):** the engine threads the grid `bat_oob_contact` + `bat_oob_deflector_id` onto the
+turn dict, and after the HCT schema steps settle, `AnimationEngine._runHctBatOobBallSend`
+reuses Rim Runner's OOB helpers (`animateBallToPosition` + the exported
+`resolveNearestOutOfBoundsGrid`) to slide the deflector onto the contact point and fly the
+ball **passer → contact → nearest sideline**. The hook is gated on `turnData.bat_oob` and
+is a safe no-op when geometry/sprites are missing (the dead-ball / side-inbound finalize
+still runs). The INTERCEPT pass-flight-to-`contact_point` shortening (ball visibly picked
+off in flight) is the remaining polish.
 
 ### 14.6 — Knobs to tune
 
@@ -1502,8 +1508,11 @@ ball send are the remaining Phase-4 polish.
    turnover announce suppressed.
 3. Generalize to HCO / inbound pass paths; optionally refactor Rim Runner onto the
    shared primitive (single source of truth).
-4. Animation polish: shorten the pass flight to `contact_point` (ball picked off / knocked
-   away in flight) + the BAT_OOB out-of-bounds ball send.
+4. ✅ **BAT_OOB animation (Path B)**: imperative `passer → contact → nearest sideline`
+   ball-send via `AnimationEngine._runHctBatOobBallSend`, reusing Rim Runner's OOB helpers
+   (`animateBallToPosition` + exported `resolveNearestOutOfBoundsGrid`). The remaining
+   INTERCEPT polish (shorten the pass flight so the ball is visibly picked off in flight)
+   is still open.
 
 ### 14.8 — Open items
 

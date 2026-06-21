@@ -791,7 +791,7 @@ function resolveFbInterceptionContactGrid({
   };
 }
 
-function resolveNearestOutOfBoundsGrid(interceptorGrid) {
+export function resolveNearestOutOfBoundsGrid(interceptorGrid) {
   const candidates = [
     { edge: "left_sideline", x: GRID_MIN_X, y: interceptorGrid.y, distance: Math.abs(interceptorGrid.x - GRID_MIN_X) },
     { edge: "right_sideline", x: GRID_MAX_X, y: interceptorGrid.y, distance: Math.abs(GRID_MAX_X - interceptorGrid.x) },
