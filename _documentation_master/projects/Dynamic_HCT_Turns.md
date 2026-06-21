@@ -1402,6 +1402,14 @@ Among eligible defenders, the **contester** is the one whose contact occurs
 **earliest along the flight** (smallest `s` → first hand on the ball). His
 `contact_point` is that sampled point.
 
+**On-ball exclusion (HCT):** the defender(s) **guarding the passer cannot
+intercept his own outlet.** Before the geometry gate runs, `_resolve_hct_pass_contest`
+drops every defender within `MOMENT_RANGE` of the passer (the same range that defines
+the pressure/trap moment) from the candidate pool — in a trap the two committed
+trappers (a single man in pressure) are engaging the ball, not lurking in the lane, so
+they can't peel off to pick the pass they're contesting. Interceptions therefore come
+only from the *off-ball* defenders reading the outlet.
+
 ### 14.3 — Stage 2: passer safety gate (offense counter)
 
 Only if a contester exists. A good passer can defuse the lurking defender entirely

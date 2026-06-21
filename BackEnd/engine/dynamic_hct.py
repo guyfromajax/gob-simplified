@@ -1297,11 +1297,17 @@ def _resolve_hct_pass_contest(
     def_lineup: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
 ) -> Dict[str, Any]:
-    """§14 — resolve the HCT outlet pass contest. Builds the passer + five
-    defender descriptors from live coords/attributes and the HCT offense modifier
-    (``pt_opp_modifier``), then delegates to the pure ``resolve_pass_contest``.
-    Returns ``{outcome, deflector, contact_point}`` (deflector is a def position
-    key)."""
+    """§14 — resolve the HCT outlet pass contest. Builds the passer + the
+    eligible defender descriptors from live coords/attributes and the HCT offense
+    modifier (``pt_opp_modifier``), then delegates to the pure
+    ``resolve_pass_contest``. Returns ``{outcome, deflector, contact_point}``
+    (deflector is a def position key).
+
+    §14 rule — **the defender(s) guarding the passer cannot intercept his own
+    outlet.** In a trap two men are committed on the ball (a single in pressure);
+    they're engaging the passer, not sitting in the passing lane, so they're
+    removed from the interceptor pool. "Guarding" = within ``MOMENT_RANGE`` of the
+    passer (the same range that defines the pressure/trap moment)."""
     p_attrs = getattr(passer, "attributes", None) or {}
     passer_desc = {
         "xy": passer_xy,
@@ -1309,8 +1315,13 @@ def _resolve_hct_pass_contest(
         "CH": p_attrs.get("CH", 50),
         "IQ": p_attrs.get("IQ", 50),
     }
+    # On-ball defenders (trappers / pressure man) are ineligible to pick off the
+    # pass they're contesting.
+    guarding = set(_in_range_defenders(passer_xy, def_coords))
     defenders: List[Dict[str, Any]] = []
     for pos in POSITIONS:
+        if pos in guarding:
+            continue
         d = def_lineup.get(pos)
         if d is None:
             continue
