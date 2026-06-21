@@ -2150,7 +2150,7 @@ def _build_post_shot_sub_steps(
     # (= step start). Arrival cue fires at the ball's tween onComplete.
     # RATTLE variants leave the arrival cue empty — per-hop SFX fires from
     # the hop sub-steps below.
-    launch_sfx = shot_launch_sfx(turn_result.get("shot_score_pre_defense"))
+    launch_sfx = shot_launch_sfx(turn_result.get("shot_score_pre_defense"), result_type)
     arrival_sfx = shot_result_sfx(
         shot_variant,
         result_type,

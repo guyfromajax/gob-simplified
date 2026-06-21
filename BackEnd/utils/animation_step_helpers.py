@@ -361,7 +361,9 @@ def pass_arrival_sfx(receiver_player: Any) -> Dict[str, Any]:
 # --- Shot SFX helpers (SFX_System.md §Shot Audio) -----------------
 
 
-def shot_launch_sfx(shot_score_pre_defense: Any) -> Optional[Dict[str, Any]]:
+def shot_launch_sfx(
+    shot_score_pre_defense: Any, result_type: Any = None
+) -> Optional[Dict[str, Any]]:
     """Pick the shot-release SFX file from the pre-defense shot score tier.
 
     Tiers per ``SFX_System.md``:
@@ -369,9 +371,20 @@ def shot_launch_sfx(shot_score_pre_defense: Any) -> Optional[Dict[str, Any]]:
       - score > 210  → ``three-strong.wav``
       - else         → ``shot-standard.wav``
 
-    Returns ``None`` when the score is unavailable; caller omits the cue
-    rather than firing a default file.
+    Blocked shots override the score tiers: ``result_type == "BLOCK"`` →
+    ``block1.wav`` (SFX_System.md "Blocked Shot Attempts"). The block result is
+    already known here because the backend resolves the full turn before
+    emitting steps.
+
+    Returns ``None`` when the score is unavailable (and not a block); caller
+    omits the cue rather than firing a default file.
     """
+    if str(result_type or "").upper() == "BLOCK":
+        return {
+            "file": "block1.wav",
+            "volume": _SFX_DEFAULT_VOLUME,
+            "event": "shot_block",
+        }
     if shot_score_pre_defense is None:
         return None
     try:

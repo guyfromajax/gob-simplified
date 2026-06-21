@@ -240,7 +240,7 @@ Step 0: Burst
 - Get-back defenders: defender 1 targets 2 x spots ahead of RR's burst-end position (same y as RR); defender 2 (if present) targets the same-side `lowPost` near the basket (`upper lowPost` if RR's burst-end y > 24, else `lower`; coords from `HCO_STRING_SPOTS`)
 - Other O (2 non-RR, non-receiver) and other D (non-getback): drift forward 1–4 x spots toward the offense's attacking basket; y unchanged
 
-Step 1 (outlet pass success): Outlet pass — AT: `ball_reaches_player` (receiver); T = passer→receiver distance ÷ FB pass rate. Passer stationary, releases ball at step start; receiver stationary at `receiver_to`; RR continues toward `basketSpot` using the same `burst` / `sprint` archetype chosen in Step 0; other movers' tweens keep running through step 1 by default (the opt-in `UESS_FB_CRITICAL_EVENT_PATTERN` flag in `fastBreak.js` would freeze them at the step 0 boundary instead).
+Step 1 (outlet pass success): Outlet pass — AT: `ball_reaches_player` (receiver); T = passer→receiver distance ÷ FB pass rate. Passer stationary, releases ball at step start; receiver stationary at `receiver_to`; RR continues toward `basketSpot` using the same `burst` / `sprint` archetype chosen in Step 0 (**Triangle exception**: the RR is forced to `sprint` in this step regardless of the Step-0 roll — see Triangle in [Fast_Break_System.md](../06_Gameplay_Systems/Fast_Break_System.md)); other movers' tweens keep running through step 1 by default (the opt-in `UESS_FB_CRITICAL_EVENT_PATTERN` flag in `fastBreak.js` would freeze them at the step 0 boundary instead).
 
 Step 1: Branch keyed off outlet contest outcome
 

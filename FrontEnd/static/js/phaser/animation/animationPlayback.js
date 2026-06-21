@@ -335,6 +335,7 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     // shots now flow through this backend-resolved cue — see
     // `_build_post_shot_sub_steps` in `BackEnd/engine/skeleton_step_emitter.py`.
     const releaseSfx = step.start?.sfx_on_ball_release;
+    console.warn('[SHOT-SFX] ball_release | file=', releaseSfx?.file, '| event=', releaseSfx?.event);
     if (releaseSfx?.file) {
       playGameSfx(
         scene,

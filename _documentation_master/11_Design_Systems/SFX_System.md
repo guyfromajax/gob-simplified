@@ -40,8 +40,9 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 - The `> 210` strong tier also stamps `hot_shot_trail` on the step metadata — FE `renderBallTransition` renders a hot trail on schema `[ball_flight]` steps (same threshold as `three-strong.wav`).
 
 **Blocked Shot Attempts (override)**
-- When the shot is blocked (`turnData.result_type === "BLOCK"`), the attempt SFX is `block1.wav` and **takes precedence over the `shot_score_pre_defense` tiers above** — the scale tiers are skipped.
-- Checked first in `playShotLaunchSfx` (gameSfx.js). The block result is already known at release time because the backend resolves the full turn before animation.
+- When the shot is blocked (`result_type == "BLOCK"`), the attempt SFX is `block1.wav` and **takes precedence over the `shot_score_pre_defense` tiers above** — the scale tiers are skipped.
+- Live path (schema): backend `shot_launch_sfx(score, result_type)` in `animation_step_helpers.py` returns `block1.wav` for blocks, stamped as `sfx_on_ball_release` on the `[ball_flight]` step (`skeleton_step_emitter.py`). FE plays it at ball detach. The block result is known at emit time because the backend resolves the full turn before emitting steps.
+- The legacy FE `playShotLaunchSfx` (gameSfx.js) carries the same override for non-schema turns (no `animation_steps`), which don't run in the current flow.
 
 **Free Throw Shot Attempts**
 - All: `shot-standard.wav`

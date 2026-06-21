@@ -733,6 +733,9 @@ def build_triangle_animation_steps(
             clock_remaining_at_start=clock_remaining - elapsed,
             shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
             next_step_index=_next_step_index(steps),
+            # Triangle: RR settles out of the burst into a sprint once the
+            # outlet pass goes (Rim Runner keeps its carried-forward archetype).
+            rr_archetype_override="sprint",
         )
         if outlet_step is None:
             _tri_log.warning(

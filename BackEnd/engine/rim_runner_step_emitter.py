@@ -588,6 +588,7 @@ def _build_outlet_pass_step(
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     next_step_index: int,
+    rr_archetype_override: Optional[PlayerArchetype] = None,
 ) -> Optional[AnimationStep]:
     """Step 1: outlet pass (rebounder → outlet receiver). Pass rate gated on
     outlet quality — sharp (``outlet_score >= FB_OUTLET_QUALITY_THRESHOLD``)
@@ -599,6 +600,11 @@ def _build_outlet_pass_step(
     carried-forward coords; RR continues toward the basket target using the
     same archetype chosen in step 0; all other movers continue toward their
     step 0 burst destinations.
+
+    ``rr_archetype_override`` forces the RR's movement archetype for this step
+    only (Triangle passes ``"sprint"`` so the RR settles out of the burst once
+    the outlet pass goes); when ``None`` (Rim Runner) the carried-forward
+    step-0 archetype is used.
 
     Reusable by Triangle. Caller skips this step entirely when
     ``skip_outlet_pass == true`` (rebounder == receiver).
@@ -674,7 +680,7 @@ def _build_outlet_pass_step(
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         if pid == rr_id:
-            arch: PlayerArchetype = _rr_payload_archetype(phase)
+            arch: PlayerArchetype = rr_archetype_override or _rr_payload_archetype(phase)
             action: PlayerAction = "sprint"
         elif pid == defender_id:
             arch = "standard"
