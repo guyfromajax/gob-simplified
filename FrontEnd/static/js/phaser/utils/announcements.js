@@ -731,7 +731,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     if ((turnData.bat_oob || turnData.rim_runner_bat_oob) &&
         (turnData.result_type === 'DEAD BALL' || turnData.result_type === 'TURNOVER')) {
       const offenseTeam = (turnData.offense_team_id === scene?.homeTeamId) ? 'home' : 'away';
-      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam, null, scene ? { scene } : {});
+      showSecondaryAnnouncement("Batted Ball Out Of Bounds!", offenseTeam, null, scene ? { scene } : {});
       return;
     }
 

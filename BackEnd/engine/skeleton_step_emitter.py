@@ -1829,6 +1829,12 @@ def _build_make_hold_sub_step(
             "style": "primary",
             "player_data": {"playerId": str(shooter_id)},
         }
+        # Made 3-pointer → random announcer "three" call at the announce mount
+        # (SFX_System.md "Made Three Announce"). Backend decides WHEN (the
+        # 3-point condition); FE resolves the "three_make" key to a random file
+        # and plays it. Keeps the made-3 audio decision off the pure-renderer FE.
+        if int(turn_result.get("points") or 0) == 3:
+            announcement["meta"] = {"sfx": "three_make"}
 
     trigger: AdvanceTrigger = {
         "condition": "fixed_duration",

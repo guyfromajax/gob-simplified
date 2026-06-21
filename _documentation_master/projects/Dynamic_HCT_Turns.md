@@ -1482,7 +1482,8 @@ positioning, not a bolted-on roll.
   (matches Rim Runner): `possession_flips=False`, `next_play_type="SIDE_INBOUND"`, **no TO
   recorded and no HCT-success credited** (it's a deflection, not a takeaway). The FE shows
   **"Batted Ball Out Of Bounds!"** at turn start (`turnPreparation` `bat_oob` →
-  `BATTED_OOB`) and the turnover announce is **suppressed** when `bat_oob` is set
+  `BATTED_OOB`) on the **secondary tier** (top-edge ribbon, `showSecondaryAnnouncement`)
+  and the turnover announce is **suppressed** when `bat_oob` is set
   (`finalizeTurnAfterAnimation` + `announceFromTurnData` guards).
 
 **Animation:** both deflections break *before* emitting the pass-flight segment and fire

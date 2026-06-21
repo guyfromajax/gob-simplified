@@ -15,7 +15,7 @@
    - **Variants:**
      - **Standard** — Single player portrait (left), caption bar (#jersey lastName + position), and event text (right). Used for all single-player result events (made shot, rebound, block, steal, fouls, turnovers, etc.).
      - **Foul (AND-1)** — Shooter portrait (left), center panel ("It's Good!" + "+ Free Throw" + "And one"), fouler portrait (right). Used only for made shot with shooting foul.
-   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **DOUBLE TEAM!**, **Batted Ball Out Of Bounds!**, and other rare neutral cases. (Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot now route to the secondary tier — see below.)
+   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **DOUBLE TEAM!** and other rare neutral cases. (Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot/**Batted Ball Out Of Bounds!** now route to the secondary tier — see below.)
    - **Data shapes:** Standard `{ type: 'standard', eventText, photoUrl, jersey, lastName, position }`. Foul `{ type: 'foul', foulEventText, shooterPhotoUrl, shooterJersey, shooterLastName, foulerPhotoUrl, foulerJersey, foulerLastName }`.
 
    **Secondary — Top-Edge Ribbon** (`#announcement-overlay-secondary`):
@@ -59,6 +59,7 @@
    | **Slow It Down** | offense | no | `gameAnnouncements.js` → `SLOW_IT_DOWN` |
    | **Quick Shot** | offense | no | `gameAnnouncements.js` → `QUICK_SHOT` |
    | **Final Shot** | offense | no | `gameAnnouncements.js` → `FINAL_SHOT` |
+   | **Batted Ball Out Of Bounds!** | offense (retains) | no | `gameAnnouncements.js` → `BATTED_OOB` / `RIM_RUNNER_BATTED_OOB`; `announcements.js` `announceFromTurnData` bat_oob path |
 
    Everything else stays on the **primary** center-court overlay. **AND-1 and the foul card stay primary.**
 
@@ -289,7 +290,7 @@ When a steal leads to a fast break:
 - **Foul card (AND-1):** Shooter portrait (left, same dimensions), center panel with foul event text + `+ Free Throw` + `And one`, fouler portrait (right, **100×130px** with red border). Caption bars show jersey + last name; fouler caption uses red tint.
 
 **No-player announcements (primary):**
-- When `photoUrl` and `lastName` are both empty, the portrait zone is hidden (`.ann-card.standard-card.no-player .ann-portrait-zone { display: none }`) and the event text is centered. After the secondary-tier migration, this state is reached only for rare neutral / team-level events such as `DOUBLE TEAM!` and `Batted Ball Out Of Bounds!`. Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot now render in the secondary tier instead.
+- When `photoUrl` and `lastName` are both empty, the portrait zone is hidden (`.ann-card.standard-card.no-player .ann-portrait-zone { display: none }`) and the event text is centered. After the secondary-tier migration, this state is reached only for rare neutral / team-level events such as `DOUBLE TEAM!`. Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot/`Batted Ball Out Of Bounds!` now render in the secondary tier instead.
 
 #### Secondary — Top-Edge Ribbon
 
@@ -350,7 +351,7 @@ When a steal leads to a fast break:
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
   - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `AIRBALL`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
   - `announceAirballIfNeeded(turnData, scene, context)` — Legacy shot-path helper; schema playback uses backend-stamped `[ball_flight]` announcements instead.
-  - Secondary-tier cases (`PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`) call `showSecondaryAnnouncement()`; everything else calls `showAnnouncement()` / `showAndOneAnnouncement()`.
+  - Secondary-tier cases (`PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `BATTED_OOB`, `RIM_RUNNER_BATTED_OOB`) call `showSecondaryAnnouncement()`; everything else calls `showAnnouncement()` / `showAndOneAnnouncement()`. The `announceFromTurnData` bat_oob fallback path also routes through `showSecondaryAnnouncement()`.
 - `FrontEnd/static/js/phaser/animation/ballManager.js`
   - Shot make announcements (`"It's Good!"`, `"It's Good! And 1!"`) emitted when the ball reaches the rim.
   - `animateRebound` — calls `announceReboundHeadlineIfNeeded` when the rebounder tween completes (pass `turnData` from the MISS/BLOCK/rebound turn for idempotency).

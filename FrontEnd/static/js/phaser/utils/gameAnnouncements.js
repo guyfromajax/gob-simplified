@@ -141,14 +141,14 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       break;
 
     case 'RIM_RUNNER_BATTED_OOB':
-      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
+      showSecondaryAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
       break;
 
     // Generic batted-ball-out-of-bounds (HCT §14 pass contest, etc.). Offense
     // retains; this is NOT a turnover, so the turnover announce is suppressed
     // (see finalizeTurnAfterAnimation / announceFromTurnData bat_oob guards).
     case 'BATTED_OOB':
-      showAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
+      showSecondaryAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
       break;
 
     // ========== SITUATIONAL LOGIC (Q4/OT) — secondary tier ==========
@@ -207,13 +207,7 @@ function handleShotMakeAnnouncement(turnData, scene, context, offenseTeam) {
     }
   }
 
-  // Made 3-pointer → play a random announcer "three" call at overlay mount
-  // (SFX_System.md "Made Three Announce"). points === 3 is the canonical signal
-  // (backend stamps result["points"]); 2-pt makes carry no court SFX here.
-  const points = Number(turnData?.points ?? turnData?.points_scored ?? context?.points);
-  const meta = points === 3 ? { sfx: "three_make", scene } : null;
-
-  showAnnouncement("It's Good!", offenseTeam, playerData, meta);
+  showAnnouncement("It's Good!", offenseTeam, playerData);
 }
 
 function handleAndOneAnnouncement(turnData, scene, context, offenseTeam) {
