@@ -6617,6 +6617,9 @@
         }
         overlay.classList.remove('hidden');
 
+        // [3PT-SFX] TEMP DEBUG — remove once the made-3 cue is confirmed.
+        console.warn('[3PT-SFX] overlay mount | eventText=', data && data.eventText, '| sfx=', data && data.sfx);
+
         // SFX dispatch at mount — see secondary overlay's matching block for rationale.
         if (data && data.sfx && typeof window.playGameSfx === 'function') {
           var annFiles = Array.isArray(data.sfx) ? data.sfx : [data.sfx];

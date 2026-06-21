@@ -3178,6 +3178,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       // Made 3-pointer on the break → random "three" announcer call at the
       // announce mount (SFX_System.md "Made Three Announce").
       const isThree = Number(turnData?.points ?? turnData?.points_scored) === 3;
+      console.warn('[3PT-SFX] fastBreak make | points=', turnData?.points, '| points_scored=', turnData?.points_scored, '| isThree=', isThree);
       showAnnouncement(
         "It's Good!", teamStyle, shooterPlayerData,
         isThree ? { sfx: "three_make", scene } : null,

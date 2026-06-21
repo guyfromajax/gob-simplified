@@ -1173,6 +1173,7 @@ export class ShotAnimationSystem {
         // (SFX_System.md "Made Three Announce"). points === 3 is the canonical
         // signal; 2-pt makes carry no court SFX here.
         const isThree = Number(turnData.points ?? turnData.points_scored) === 3;
+        console.warn('[3PT-SFX] ShotAnimationSystem make | points=', turnData.points, '| points_scored=', turnData.points_scored, '| isThree=', isThree);
         showAnnouncement(
           "It's Good!", teamStyle, shooterPlayerData,
           isThree ? { sfx: "three_make", scene: this.scene } : null,
