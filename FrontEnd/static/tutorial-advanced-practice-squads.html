@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Practice Squads — Advanced Topics | Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <link rel="stylesheet" href="/css/gob-advanced.css">
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="training">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back</button>
+      <span class="spacer"></span>
+    </header>
+
+    <!-- LESSON HERO -->
+    <section class="lesson-hero" data-screen-label="Practice Squads — hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#advanced-topics">Advanced Topics</a>
+        <span class="sep">›</span>
+        <span class="here">Practice Squads</span>
+      </nav>
+      <div class="meta">
+        <span class="depth advanced">Advanced Topic</span>
+      </div>
+      <h1>PRACTICE SQUADS</h1>
+      <p class="intro">Each season you'll trim your roster down to a 12-man varsity squad — and the three players you set aside don't just disappear. They play a full season of their own, develop their attributes, and come back to you next year.</p>
+    </section>
+
+    <!-- WHAT ARE THEY -->
+    <section class="lsec" id="what">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> What Are Practice Squads?</span>
+      </div>
+
+      <div class="roster-math panel">
+        <div class="rm-tile"><div class="rm-num">15</div><div class="rm-lbl">Active roster<br>after Week&nbsp;1 camp</div></div>
+        <div class="rm-op">−</div>
+        <div class="rm-tile rm-tile--cut"><div class="rm-num">3</div><div class="rm-lbl">Assigned to<br>practice squad</div></div>
+        <div class="rm-op">=</div>
+        <div class="rm-tile rm-tile--keep"><div class="rm-num">12</div><div class="rm-lbl">Active roster<br>for the season</div></div>
+      </div>
+
+      <ul class="info-list list-panel panel" style="margin-top:14px;">
+        <li>After <strong>Week #1 training camp</strong> each season, you'll need to assign 3 of your players to your practice squad.</li>
+      </ul>
+    </section>
+
+    <!-- RULES -->
+    <section class="lsec" id="rules">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Practice Squad Rules</span>
+      </div>
+      <ul class="info-list list-panel panel">
+        <li>Once a player is assigned to your practice squad, he'll be <strong>unavailable for the rest of the season</strong> — but he'll be available to your team again the next season.</li>
+      </ul>
+    </section>
+
+    <!-- GAMES & SEASON -->
+    <section class="lsec" id="season">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Practice Squad Games &amp; Season</span>
+      </div>
+      <ul class="info-list list-panel panel">
+        <li>Practice Squad players and Recruits compete in a <strong>Practice Squad Season</strong>.</li>
+        <li>Practice Squad teams are built by <strong>Region</strong>. All recruits in each region and teams' practice squad players are put into a pool and allocated to one of six teams.</li>
+        <li>Each team plays two games against each team at the same level from the other regions — <strong>14 regular season games</strong> total.</li>
+        <li>There's a seeded <strong>8-team tournament</strong> at the end of the season.</li>
+        <li>The All-Americans champion plays the All-Stars champion to crown the <strong>ultimate Practice Squad Champion</strong>.</li>
+        <li>You can see Practice Squad game results, box scores, team standings, and player season stats via links in the <strong>News section</strong> of your Command Center.</li>
+      </ul>
+    </section>
+
+    <!-- TALENT TIERS -->
+    <section class="lsec" id="tiers">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Practice Squad Teams Talent Tiers</span>
+        <p>Within each region, the pool of players is sorted into six teams by talent — top to bottom.</p>
+      </div>
+
+      <div class="tier-list">
+        <div class="tier-row panel" style="--ring:rgba(74,144,217,.6);--ringtx:var(--lblue)">
+          <span class="tier-rank">1</span>
+          <div class="tier-main"><div class="tier-name">All-Americans</div><div class="tier-desc">Top 12 players in the region</div></div>
+          <span class="tier-bar"><i style="width:100%"></i></span>
+        </div>
+        <div class="tier-row panel" style="--ring:rgba(74,144,217,.6);--ringtx:var(--lblue)">
+          <span class="tier-rank">2</span>
+          <div class="tier-main"><div class="tier-name">All-Stars</div><div class="tier-desc">The next 12</div></div>
+          <span class="tier-bar"><i style="width:84%"></i></span>
+        </div>
+        <div class="tier-row panel">
+          <span class="tier-rank">3</span>
+          <div class="tier-main"><div class="tier-name">Varsity</div><div class="tier-desc">The next 12</div></div>
+          <span class="tier-bar"><i style="width:68%"></i></span>
+        </div>
+        <div class="tier-row panel">
+          <span class="tier-rank">4</span>
+          <div class="tier-main"><div class="tier-name">JV</div><div class="tier-desc">The next 12</div></div>
+          <span class="tier-bar"><i style="width:52%"></i></span>
+        </div>
+        <div class="tier-row panel">
+          <span class="tier-rank">5</span>
+          <div class="tier-main"><div class="tier-name">Squad</div><div class="tier-desc">The next 12</div></div>
+          <span class="tier-bar"><i style="width:36%"></i></span>
+        </div>
+        <div class="tier-row panel">
+          <span class="tier-rank">6</span>
+          <div class="tier-main"><div class="tier-name">Scrubs</div><div class="tier-desc">All remaining players — some may not get any playing time</div></div>
+          <span class="tier-bar"><i style="width:22%"></i></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHO TO ASSIGN -->
+    <section class="lsec" id="who">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Who Should You Assign To The Practice Squad?</span>
+      </div>
+      <ul class="info-list list-panel panel">
+        <li>Your <strong>least talented players</strong> — or a younger player who won't get much playing time on your varsity team and who you'd like to see get a lot of run against similar competition.</li>
+        <li>Players <strong>develop attributes</strong> while on the practice squad. They get more playing time, so that increases their development relative to riding the varsity bench. But it's against lesser talent — so playing time at this level is less developmental than playing time on the varsity team.</li>
+      </ul>
+
+      <div class="adv-callout panel" style="margin-top:16px;">
+        <span class="ac-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/><path d="M9 18h6M10 21h4"/></svg></span>
+        <div>
+          <span class="ac-eyebrow">The Takeaway</span>
+          <p>Use the practice squad as a <strong>development tool</strong>, not just a cut list. A promising young player buried on your varsity bench will often grow faster getting real minutes against practice-squad competition.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDOFF -->
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">You're all caught up</div>
+        <div class="nx">More advanced topics coming soon</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial.html#advanced-topics">All topics</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial-advanced-momentum.html">Revisit: Momentum</a>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <!-- TOAST -->
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <!-- global auth-bar + footer (injected by authBarInit) -->
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <!-- tutorial nav + progress behavior -->
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script>
+    if (window.GOB && window.GOB.markSeen) window.GOB.markSeen('practice-squad');
+  </script>
+</body>
+</html>

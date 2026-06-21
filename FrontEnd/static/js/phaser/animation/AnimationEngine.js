@@ -352,9 +352,63 @@ export class AnimationEngine {
     // Runner's imperative OOB ball-send (Path B). Gated on `turnData.bat_oob`.
     if (turnData?.bat_oob) {
       await this._runHctBatOobBallSend(turnData, sprites, ballSprite);
+    } else if (turnData?.rim_runner_bat_oob) {
+      await this._runSchemaBatOobBallSend(turnData, steps, sprites, ballSprite);
     }
 
     return true;
+  }
+
+  /**
+   * Schema Rim Runner / Triangle bat-OOB: players move via steps; overlay the
+   * shared deflection ball path using step metadata contact/oob coords.
+   */
+  async _runSchemaBatOobBallSend(turnData, steps, sprites = {}, ballSprite = null) {
+    const scene = this.scene;
+    const ball = ballSprite || scene?.ballSprite;
+    if (!scene || !ball || !Array.isArray(steps)) {
+      return;
+    }
+
+    let contactGrid = null;
+    let oobGrid = null;
+    let defId = turnData?.defender_id ?? turnData?.defenderId ?? null;
+    let approachFromGrid = null;
+
+    for (let i = steps.length - 1; i >= 0; i -= 1) {
+      const meta = steps[i]?.start?.advance_trigger?.metadata;
+      if (!meta?.contact_coords || !meta?.oob_coords) {
+        continue;
+      }
+      contactGrid = meta.contact_coords;
+      oobGrid = meta.oob_coords;
+      if (meta.to_player_id != null) {
+        defId = meta.to_player_id;
+      }
+      const fromId = meta.from_player_id;
+      if (fromId != null && steps[i]?.start?.coords?.[String(fromId)]) {
+        approachFromGrid = steps[i].start.coords[String(fromId)];
+      }
+      break;
+    }
+
+    if (!contactGrid || !oobGrid) {
+      return;
+    }
+
+    const width = scene.game?.config?.width ?? 1229;
+    const height = scene.game?.config?.height ?? 768;
+    const defSp = defId != null ? sprites[String(defId)] : null;
+    const { animateBattedBallOutOfBounds } = await import("./batOobAnimation.js");
+
+    await animateBattedBallOutOfBounds(scene, {
+      contactGrid,
+      oobGrid,
+      approachFromGrid,
+      defSprite: defSp,
+      width,
+      height,
+    });
   }
 
   /**
@@ -382,10 +436,18 @@ export class AnimationEngine {
     const width = scene.game?.config?.width ?? 1229;
     const height = scene.game?.config?.height ?? 768;
 
-    let mods;
+    const approachFromGrid = ball?.x != null && ball?.y != null
+      ? {
+          x: (ball.x / width) * 100,
+          y: 50 - (ball.y / height) * 50,
+        }
+      : null;
+
+    let gridToPixels;
+    let tweenPlayerTo;
+    let resolveNearestOutOfBoundsGrid;
     try {
-      mods = await Promise.all([
-        import("./ballAnimationSimple.js"),
+      [{ gridToPixels }, { tweenPlayerTo }, { resolveNearestOutOfBoundsGrid }] = await Promise.all([
         import("../utils/gridToPixels.js"),
         import("./ballTween.js"),
         import("./fastBreak.js"),
@@ -394,12 +456,6 @@ export class AnimationEngine {
       console.warn("[HCT BAT_OOB] helper import failed; skipping ball-send", err);
       return;
     }
-    const [
-      { animateBallToPosition },
-      { gridToPixels },
-      { getBallDuration, cancelBallTweenAndClearOwner, tweenPlayerTo },
-      { resolveNearestOutOfBoundsGrid },
-    ] = mods;
 
     const contactPx = gridToPixels(contact.x, contact.y, width, height);
 
@@ -422,18 +478,16 @@ export class AnimationEngine {
       }
     }
 
-    // Ball: detach from its owner, then passer→contact→nearest sideline.
-    cancelBallTweenAndClearOwner(scene, ball);
-    await animateBallToPosition(scene, contactPx, {
-      duration: getBallDuration(ball, contactPx.x, contactPx.y),
-      easing: "Sine.easeInOut",
-    });
-
     const oobGrid = resolveNearestOutOfBoundsGrid(contact);
-    const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
-    await animateBallToPosition(scene, oobPx, {
-      duration: getBallDuration(ball, oobPx.x, oobPx.y),
-      easing: "Quad.easeOut",
+    const { animateBattedBallOutOfBounds } = await import("./batOobAnimation.js");
+
+    await animateBattedBallOutOfBounds(scene, {
+      contactGrid: contact,
+      oobGrid,
+      approachFromGrid,
+      defSprite: defSp,
+      width,
+      height,
     });
   }
 

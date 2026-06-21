@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Momentum — Advanced Topics | Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <link rel="stylesheet" href="/css/gob-advanced.css">
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="players">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back</button>
+      <span class="spacer"></span>
+    </header>
+
+    <!-- LESSON HERO -->
+    <section class="lesson-hero" data-screen-label="Momentum — hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#advanced-topics">Advanced Topics</a>
+        <span class="sep">›</span>
+        <span class="here">Momentum</span>
+      </nav>
+      <div class="meta">
+        <span class="depth advanced">Advanced Topic</span>
+      </div>
+      <h1>MOMENTUM</h1>
+      <p class="intro">Every player runs hot or cold during a game. Momentum is the hidden state that tracks it — quietly nudging how likely a player is to make his next shot, free throw, or game-changing play.</p>
+    </section>
+
+    <!-- BASICS -->
+    <section class="lsec" id="basics">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Momentum Basics</span>
+      </div>
+
+      <div class="mscale-card panel">
+        <div class="mscale-label">
+          <span class="ml-name">Player Momentum</span>
+          <span class="ml-range">Scales from −5 to +5</span>
+        </div>
+        <div class="mtrack"><span class="mzero"></span></div>
+        <div class="mticks"><span class="cold">−5</span><span class="mid">0</span><span class="hot">+5</span></div>
+        <div class="mends"><span class="cold">Ice Cold</span><span class="hot">Red Hot</span></div>
+      </div>
+
+      <div class="mscale-card panel">
+        <div class="mscale-label">
+          <span class="ml-name">Team Momentum</span>
+          <span class="ml-range">Scales from −25 to +25</span>
+        </div>
+        <div class="mtrack"><span class="mzero"></span></div>
+        <div class="mticks"><span class="cold">−25</span><span class="mid">0</span><span class="hot">+25</span></div>
+        <div class="mends"><span class="cold">Ice Cold</span><span class="note">Sum of all 5 active players.</span><span class="hot">Red Hot</span></div>
+      </div>
+
+      <ul class="info-list list-panel panel" style="margin-top:14px;">
+        <li>All players have momentum attributes that range from <strong>−5 to +5</strong>.</li>
+        <li>Momentum shifts happen during gameplay, for the most part. There are a small number of instances where your training might create a slight increase or decrease in player momentum before tipoff, but these are very rare.</li>
+        <li>Each player's momentum is always <strong>reset to zero at the end of the game</strong>.</li>
+        <li>Only players have momentum attributes; teams do not.</li>
+        <li>The <strong>Team Momentum bar</strong> on the gameplay screen is an aggregate of the five active players' current momentum values. It scales from −25 to +25.</li>
+        <li>You can see each player's current momentum value during gameplay by <strong>hovering your cursor over the player's name</strong> in the Team Box Score section. The bar scales from −5 to +5.</li>
+      </ul>
+    </section>
+
+    <!-- SHIFTING INSTANCES -->
+    <section class="lsec" id="shifts">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Momentum Shifting Instances</span>
+        <p>These instances are not straight one-to-one — one instance does not necessarily move a player's momentum by 1. But these are the types of moments that can give a player a momentum boost or nerf, generally speaking.</p>
+      </div>
+
+      <div class="dual">
+        <div class="col-card is-pos panel">
+          <div class="col-head"><span class="col-dot"></span><span class="col-title">Positive Moments</span></div>
+          <div class="col-body">
+            <ul class="info-list">
+              <li>
+                <strong>Consecutive made shots.</strong>
+                <span class="sub">This is just relative to himself. If a player goes on a run over the course of the game where he doesn't miss any shots — even if they're not consecutive made shots for his team (his teammates can also be making shots during this run) — his momentum will increase.</span>
+              </li>
+              <li><strong>And-1 situations</strong> — when a player makes a shot on which he's fouled.</li>
+              <li>Offensive rebounds.</li>
+              <li>Made free throws.</li>
+              <li>Game-changing defensive plays like steals, blocks, and drawing a charge.</li>
+              <li>Making the final shot of a quarter.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col-card is-neg panel">
+          <div class="col-head"><span class="col-dot"></span><span class="col-title">Negative Moments</span></div>
+          <div class="col-body">
+            <ul class="info-list">
+              <li>
+                <strong>Consecutive missed shots.</strong>
+                <span class="sub">The same consecutive logic applies here — it's relative to the player himself across the course of the game.</span>
+              </li>
+              <li>Missed free throws.</li>
+              <li>Committing a turnover.</li>
+              <li>Getting a shot blocked.</li>
+              <li>Committing a charge <span style="color:var(--muted-2)">— this gets inside the player's head and makes him more reluctant to aggressively drive to the basket.</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- IMPACT -->
+    <section class="lsec" id="impact">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Momentum Impact On Gameplay</span>
+      </div>
+
+      <div class="dual">
+        <div class="col-card is-pos panel">
+          <div class="col-head"><span class="col-dot"></span><span class="col-title">Positive Momentum</span></div>
+          <div class="col-body">
+            <ul class="info-list">
+              <li>Players more likely to make shot attempts.</li>
+              <li>Players more likely to make free throw attempts.</li>
+              <li>Players more likely to make game-changing defensive plays.</li>
+              <li>Players fatigue less.</li>
+              <li>The team is <strong>less likely</strong> to commit a shot clock violation when the aggregate momentum of all active players is positive.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col-card is-neg panel">
+          <div class="col-head"><span class="col-dot"></span><span class="col-title">Negative Momentum</span></div>
+          <div class="col-body">
+            <ul class="info-list">
+              <li>Players less likely to make shot attempts.</li>
+              <li>Players less likely to make free throws.</li>
+              <li>Players less likely to make game-changing defensive plays.</li>
+              <li>The team is <strong>more likely</strong> to commit a shot clock violation when the aggregate momentum of all active players is negative.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BREAKS -->
+    <section class="lsec" id="breaks">
+      <div class="lsec-head">
+        <span class="eyebrow"><span class="tick"></span> Breaks Impact On Momentum</span>
+        <p>Breaks in gameplay have different levels of impact on player momentum. All breaks tend to push a player's momentum back toward 0 — so if a player has positive momentum it tends to decrease, and if he has negative momentum it tends to increase.</p>
+      </div>
+
+      <div class="breaks">
+        <div class="break-card panel">
+          <div class="bk-rank">Largest Impact</div>
+          <div class="bk-name">Halftime</div>
+          <div class="bk-pull">
+            <span class="bk-bars"><i class="on"></i><i class="on"></i><i class="on"></i></span>
+            <span>Strongest pull back to zero</span>
+          </div>
+        </div>
+        <div class="break-card panel">
+          <div class="bk-rank">Close Behind</div>
+          <div class="bk-name">Quarter Breaks</div>
+          <div class="bk-pull">
+            <span class="bk-bars"><i class="on"></i><i class="on"></i><i></i></span>
+            <span>Nearly as strong as halftime</span>
+          </div>
+        </div>
+        <div class="break-card panel">
+          <div class="bk-rank">Lighter Impact</div>
+          <div class="bk-name">Timeouts</div>
+          <div class="bk-pull">
+            <span class="bk-bars"><i class="on"></i><i></i><i></i></span>
+            <span>A gentler reset</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="adv-callout panel" style="margin-top:16px;">
+        <span class="ac-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>
+        <div>
+          <span class="ac-eyebrow">Coach's Tip</span>
+          <p>Use timeouts as a momentum tool — call one to <strong>cool down an opponent's player who's red hot</strong>, or to calm down any of your own players who've gone ice cold.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDOFF -->
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">Next advanced topic</div>
+        <div class="nx">Press &amp; Trap Defense</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial-advanced-press-trap.html">Continue</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial.html#advanced-topics">All topics</a>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <!-- TOAST -->
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <!-- global auth-bar + footer (injected by authBarInit) -->
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <!-- tutorial nav + progress behavior -->
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script>
+    if (window.GOB && window.GOB.markSeen) window.GOB.markSeen('momentum');
+  </script>
+</body>
+</html>

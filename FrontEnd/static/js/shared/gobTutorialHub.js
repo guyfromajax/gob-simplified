@@ -38,9 +38,9 @@
   var TOTAL = LEARNABLE.length;
 
   var ADVANCED_TOPICS = [
-    { id: 'momentum', name: 'Momentum', href: null, available: false },
-    { id: 'presses-traps', name: 'Presses & Traps', href: null, available: false },
-    { id: 'practice-squad', name: 'Practice Squad', href: null, available: false }
+    { id: 'momentum', name: 'Momentum', href: '/tutorial-advanced-momentum.html', available: true },
+    { id: 'presses-traps', name: 'Presses & Traps', href: '/tutorial-advanced-press-trap.html', available: true },
+    { id: 'practice-squad', name: 'Practice Squad', href: '/tutorial-advanced-practice-squads.html', available: true }
   ];
   var ADVANCED_TOTAL = ADVANCED_TOPICS.length;
 
@@ -114,6 +114,14 @@
     var host = document.getElementById('advanced-topics-list');
     if (!host) return;
     host.innerHTML = ADVANCED_TOPICS.map(function (t) {
+      // available topics render as live links to their sub-page; the rest stay "coming soon"
+      if (t.available && t.href) {
+        return '<a class="advanced-topic advanced-topic--live" data-advanced-topic="' + t.id + '" href="' + t.href + '">' +
+            '<span class="advanced-topic__name">' + t.name + '</span>' +
+            '<span class="seen-check" aria-label="Reviewed">✓</span>' +
+            '<span class="advanced-topic__go" aria-hidden="true">→</span>' +
+          '</a>';
+      }
       return '<div class="advanced-topic" data-advanced-topic="' + t.id + '">' +
           '<span class="advanced-topic__name">' + t.name + '</span>' +
           '<span class="coming-soon" aria-disabled="true">Coming soon</span>' +
@@ -139,6 +147,9 @@
 
   function refreshAdvancedProgress() {
     var seen = (window.GOB ? window.GOB.seen() : []);
+    document.querySelectorAll('.advanced-topic[data-advanced-topic]').forEach(function (el) {
+      el.classList.toggle('is-seen', seen.indexOf(el.getAttribute('data-advanced-topic')) !== -1);
+    });
     var n = ADVANCED_TOPICS.filter(function (t) {
       return seen.indexOf(t.id) !== -1;
     }).length;

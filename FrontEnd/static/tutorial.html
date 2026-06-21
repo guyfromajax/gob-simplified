@@ -133,6 +133,30 @@
     line-height: 1;
   }
 
+  /* live advanced topics (sub-page exists) */
+  .advanced-topic--live {
+    opacity: 1;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: background .14s, border-color .14s;
+  }
+  .advanced-topic--live:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.2);
+  }
+  .advanced-topic__go {
+    flex-shrink: 0;
+    color: var(--muted-3);
+    font-size: 18px;
+    line-height: 1;
+    transition: transform .14s, color .14s;
+  }
+  .advanced-topic--live:hover .advanced-topic__go { transform: translateX(3px); color: var(--text); }
+  .advanced-topic .seen-check { display: none; }
+  .advanced-topic.is-seen .seen-check { display: flex; }
+  .advanced-topic.is-seen .advanced-topic__go { display: none; }
+
 
   @media (max-width: 920px) {
     .cats { grid-template-columns: 1fr; }

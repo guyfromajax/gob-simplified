@@ -1759,18 +1759,16 @@ async function animateRimRunnerBatOob(
   if (defSp) {
     setRimRunnerSpriteGrid(defSp, contactGrid.x, contactGrid.y);
   }
-  const contactPx = gridToPixels(contactGrid.x, contactGrid.y, width, height);
-  cancelBallTweenAndClearOwner(scene, ballSprite);
-  await animateBallToPosition(scene, contactPx, {
-    duration: getBallDuration(ballSprite, contactPx.x, contactPx.y),
-    easing: "Sine.easeInOut",
-  });
 
   const oobGrid = resolveNearestOutOfBoundsGrid(contactGrid);
-  const oobPx = gridToPixels(oobGrid.x, oobGrid.y, width, height);
-  await animateBallToPosition(scene, oobPx, {
-    duration: getBallDuration(ballSprite, oobPx.x, oobPx.y),
-    easing: "Quad.easeOut",
+  const { animateBattedBallOutOfBounds } = await import("./batOobAnimation.js");
+  await animateBattedBallOutOfBounds(scene, {
+    contactGrid,
+    oobGrid,
+    approachFromGrid: bg,
+    defSprite: defSp,
+    width,
+    height,
   });
 
   appendToTextScroll("Batted out of bounds.");
