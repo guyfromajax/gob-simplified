@@ -67,7 +67,7 @@
 
    **Play-name subtitle (`eventSubtitle`).** Secondary headlines that map to a selected play render the play name as a small-caps subtitle to the right of the headline at 50% font-size (same treatment/placement for all callers). Passed via `meta.eventSubtitle` to `showSecondaryAnnouncement`:
    - **Fast Break!** → `getFastBreakPlayLabel(turnData.fast_break_play)` → e.g. "Fast Break!  Rim Runner".
-   - **Trap!** → `getHctTrapPlayLabel(turnData.hct_trap_play)` → e.g. "Trap!  Straight Pressure" (Standard Trap / Straight Pressure / Diamond). The key is surfaced onto every turn result in `GameManager._append_turn` from `game_state["hct_trap_play"]`, fresh on the turn that selects HCT (mirrors how `fast_break_play` feeds the FB subtitle). Both label mappers live in `announcements.js` and return `''` for unknown keys.
+   - **Trap!** → `getHctTrapPlayLabel(turnData.hct_trap_play)` → e.g. "Trap!  Straight Pressure" (Standard Trap / Straight Pressure / Standard Diamond). The key is surfaced onto every turn result in `GameManager._append_turn` from `game_state["hct_trap_play"]`, fresh on the turn that selects HCT (mirrors how `fast_break_play` feeds the FB subtitle). Both label mappers live in `announcements.js` and return `''` for unknown keys.
 
 **Announcement System Flow (2 Phases)**
 

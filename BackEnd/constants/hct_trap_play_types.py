@@ -5,7 +5,7 @@ Mirrors ``constants/fast_break_play_types.py`` exactly, but for the *defensive*
 trap play family (a sibling of zone_defense / man_defense in the playbook):
 
 - Code / persistence: snake_case keys below.
-- UI labels: "Standard Trap", "Straight Pressure", "Diamond".
+- UI labels: "Standard Trap", "Straight Pressure", "Standard Diamond".
 
 Selection mirrors Fast Breaks: weights live on the *defending* team's
 ``playbook_settings["hc_traps"]``; the chosen key is picked once at the SS&S choke
@@ -15,8 +15,8 @@ point (``TurnManager.determine_defensive_pressure_type``) and stashed in
 Per-play attempt/success counters live under ``scouting_data["defense"]
 ["hct_trap_plays"]`` (defense-side, unlike FB's offense-side counters).
 
-PR1 ships ``standard_trap`` only; ``straight_pressure`` and ``diamond`` are
-reserved keys (default weight 0) implemented in later cuts.
+All three plays are implemented. (``standard_diamond`` is the first of a planned
+Diamond family; future derivatives are out of scope.)
 """
 
 from __future__ import annotations
@@ -28,38 +28,41 @@ from typing import Any, Dict, Optional
 # Canonical keys (match playbook_settings["hc_traps"] / scouting hct_trap_plays)
 STANDARD_TRAP = "standard_trap"
 STRAIGHT_PRESSURE = "straight_pressure"
-DIAMOND = "diamond"
+STANDARD_DIAMOND = "standard_diamond"
 
 HCT_TRAP_PLAY_KEYS = (
     STANDARD_TRAP,
     STRAIGHT_PRESSURE,
-    DIAMOND,
+    STANDARD_DIAMOND,
 )
 
 # UI labels (snake_case key → display name), parallel to the FB labels.
 HCT_TRAP_PLAY_LABELS = {
     STANDARD_TRAP: "Standard Trap",
     STRAIGHT_PRESSURE: "Straight Pressure",
-    DIAMOND: "Diamond",
+    STANDARD_DIAMOND: "Standard Diamond",
 }
 
 # Name/id aliases for playbook normalization (mirrors FAST_BREAK_ID_ALIASES).
+# Legacy "diamond"/"Diamond" entries migrate onto standard_diamond.
 HCT_TRAP_ID_ALIASES = {
     STANDARD_TRAP: STANDARD_TRAP,
     "Standard Trap": STANDARD_TRAP,
     STRAIGHT_PRESSURE: STRAIGHT_PRESSURE,
     "Straight Pressure": STRAIGHT_PRESSURE,
-    DIAMOND: DIAMOND,
-    "Diamond": DIAMOND,
+    STANDARD_DIAMOND: STANDARD_DIAMOND,
+    "Standard Diamond": STANDARD_DIAMOND,
+    "diamond": STANDARD_DIAMOND,
+    "Diamond": STANDARD_DIAMOND,
 }
 
-# PR2: Standard Trap + Straight Pressure are implemented → default 50/50 so both
-# run by default. Diamond stays 0 until PR3 (its key resolves to Standard via the
-# registry fallback if ever selected). Tunable per team via playbook hc_traps.
+# PR3: all three plays implemented → user-team default splits evenly (34/33/33).
+# (CPU teams keep Standard Diamond at 0 unless their projected starting SG has
+# AG > 50 — see cpu_playbook_customization.py.) Tunable per team via hc_traps.
 DEFAULT_HCT_TRAP_WEIGHTS = {
-    STANDARD_TRAP: 50,
-    STRAIGHT_PRESSURE: 50,
-    DIAMOND: 0,
+    STANDARD_TRAP: 34,
+    STRAIGHT_PRESSURE: 33,
+    STANDARD_DIAMOND: 33,
 }
 
 

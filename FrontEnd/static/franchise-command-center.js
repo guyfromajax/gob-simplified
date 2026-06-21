@@ -5048,9 +5048,16 @@ async function renderScoutingTab() {
     renderFccScoutingProjectedLineup();
     renderFccScoutingMeasures(teamData.team_attributes || {});
     if (typeof renderPlayUsage === 'function') {
+      // Play Usage is gated on the user running this week's training with Film
+      // Study > 0 (backend sets play_usage_unlocked). Until then it's N/A with a
+      // hint. Absent flag → treat as unlocked (back-compat).
+      const playUsageUnlocked = playUsage.play_usage_unlocked !== false;
+      const playUsageEmptyMsg = playUsageUnlocked
+        ? 'No previous game data available. Opponent has not played a game yet this season.'
+        : "N/A — Run Film Study in training this week to scout this opponent's play usage.";
       renderPlayUsage(
-        playUsage.plays || [],
-        'No previous game data available. Opponent has not played a game yet this season.',
+        playUsageUnlocked ? (playUsage.plays || []) : [],
+        playUsageEmptyMsg,
         'fcc-play-usage-body'
       );
     }

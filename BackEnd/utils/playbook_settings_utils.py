@@ -55,8 +55,11 @@ HCT_TRAP_ID_ALIASES = {
     "Standard Trap": "standard_trap",
     "straight_pressure": "straight_pressure",
     "Straight Pressure": "straight_pressure",
-    "diamond": "diamond",
-    "Diamond": "diamond",
+    "standard_diamond": "standard_diamond",
+    "Standard Diamond": "standard_diamond",
+    # Legacy aliases migrate onto standard_diamond.
+    "diamond": "standard_diamond",
+    "Diamond": "standard_diamond",
 }
 DEFENSE_NAME_TO_ID = {
     **{v: k for k, v in MAN_DEFENSE_ID_TO_NAME.items()},
@@ -399,8 +402,8 @@ def build_simplified_playbook_settings(
     )
     # Playbooks saved before hc_traps existed have no map → the display surfaces
     # would render "No plays assigned" even though gameplay falls back to the
-    # 50/50 default (see _resolve_hct_trap_weights). Mirror that fallback here so
-    # the UI reflects what the team actually runs.
+    # DEFAULT_HCT_TRAP_WEIGHTS split (see _resolve_hct_trap_weights). Mirror that
+    # fallback here so the UI reflects what the team actually runs.
     if not any(_coerce_int(value) > 0 for value in hc_traps.values()):
         from BackEnd.constants.hct_trap_play_types import DEFAULT_HCT_TRAP_WEIGHTS
 

@@ -475,7 +475,9 @@ export function getHctTrapPlayLabel(playKey) {
   switch (playKey) {
     case 'standard_trap': return 'Standard Trap';
     case 'straight_pressure': return 'Straight Pressure';
-    case 'diamond': return 'Diamond';
+    case 'standard_diamond': return 'Standard Diamond';
+    // Legacy key migrates onto Standard Diamond.
+    case 'diamond': return 'Standard Diamond';
     default: return '';
   }
 }

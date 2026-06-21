@@ -10531,11 +10531,36 @@ def get_scouting_report(franchise_id: str, team_name: str):
         if isinstance(season_raw, dict):
             player_season_stats[pid] = dict(season_raw)
 
+    # Play Usage gate: the opponent's prior-game Play Usage is only revealed once
+    # the USER runs that week's training with Film Study > 0. Until then (and if
+    # Film Study == 0), Play Usage is N/A. Only Play Usage is gated — the rest of
+    # the scouting report (attributes, projected five, season stats) is unaffected.
+    current_week = int(franchise_doc.get("week", 1) or 1)
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    user_film_study = 0
+    if user_team_object_id:
+        try:
+            user_ftd = franchise_team_data_collection.find_one(
+                {"franchise_id": fid, "team_id": ObjectId(user_team_object_id)},
+                {f"training_reports.{current_week}.general.film_study": 1},
+            )
+            user_film_study = int(
+                (((user_ftd or {}).get("training_reports", {}) or {})
+                 .get(str(current_week), {}) or {})
+                .get("general", {}).get("film_study", 0) or 0
+            )
+        except Exception:
+            user_film_study = 0
+    play_usage_unlocked = user_film_study > 0
+    if not play_usage_unlocked:
+        plays_data = []
+
     return {
         "team_attributes": team_attributes,
         "plays": plays_data,
         "projected_starting_five": projected_starting_five,
         "player_season_stats": player_season_stats,
+        "play_usage_unlocked": play_usage_unlocked,
     }
 
 
@@ -11461,12 +11486,25 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         except (TypeError, ValueError):
             ftd_counts_for_highlights[_k] = 0
 
+    # Persist the `general` allocations (incl. film_study) so the FCC Scouting
+    # Report can gate the opponent's Play Usage on Film Study > 0 for this week.
+    _general_alloc = training_data.get("general") or {}
+    _film_study = int(_general_alloc.get("film_study") or 0)
+    _training_notes = list(training_report.get("training_notes", []) or [])
+    # Weeks > 1 only (week 1 has no prior game): when Film Study was run, the
+    # opponent's prior-game Play Usage is unlocked in the FCC Scouting Report.
+    if int(week) > 1 and _film_study > 0:
+        _training_notes.append({
+            "title": "Film Study",
+            "body": "Opponent's prior game play usage stats have been added to the scouting report in the command center (Half-Court Offense).",
+        })
+
     training_report_data = {
         "week": week,
         "player_logs": player_logs,
         "team_log": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
-        "training_notes": training_report.get("training_notes", []),
+        "training_notes": _training_notes,
         "plays_data": training_report.get("plays_data", {}),
         "scouting_data": training_report.get("scouting_data", {}),
         "plays_effectiveness_changes": training_report.get("plays_effectiveness_changes", {}),
@@ -11475,6 +11513,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "date": datetime.now().strftime("%Y-%m-%d"),
         "ftd_coaching_focus": ftd_counts_for_highlights,
         "team_drills": training_data.get("team_drills") or {},
+        "general": _general_alloc,
     }
     rec_ui = _training_report_recruiting_display(franchise_doc, int(week), str(team_id))
     if rec_ui is not None:

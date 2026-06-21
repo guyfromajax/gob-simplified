@@ -46,6 +46,7 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
+from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -586,6 +587,12 @@ def _roll_ab_shot(
         or game_state.get("defense_call")
         or "man"
     )
+    is_away_offense = bool(off_team.team_id == game.away_team.team_id)
+    is_three = is_three_point_shot_from_coords(
+        shot_spot,
+        is_away_offense=is_away_offense,
+    )
+    is_paint = not is_three and shot_type in ("inside", "attack")
     (
         shot_score,
         shot_score_pre_defense,
@@ -594,11 +601,11 @@ def _roll_ab_shot(
         foul_player,
     ) = shot_manager.calculate_shot_score(
         shooter, None, None, shot_defender if contested else None, shot_type,
-        defense_playcall, False, True, None, shot_spot,
+        defense_playcall, is_three, is_paint, None, shot_spot,
         apply_defense=contested,
     )
     made = shot_score >= off_team.team_attributes["shot_threshold"]
-    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player
+    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three
 
 
 def _finalize_ab_shot(
@@ -619,6 +626,7 @@ def _finalize_ab_shot(
     foul_player: Any,
     defender_end_coords: Dict[str, Dict[str, float]],
     t_shot: float,
+    is_three: bool = False,
     shot_moment_coords: Optional[Dict[str, Dict[str, float]]] = None,
     extra_seed: Optional[Dict[str, Any]] = None,
     text_prefix: str = " they go to work in the paint",
@@ -655,11 +663,11 @@ def _finalize_ab_shot(
         game_state["foul_team"] = "DEFENSE"
         game_state["shooter"] = shooter
         game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 1 if made else 2
+        game_state["free_throws"] = 1 if made else (3 if is_three else 2)
         game_state["free_throws_remaining"] = game_state["free_throws"]
         game_state["one_and_one"] = False
         fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
-        free_throws_remaining = 1 if made else 2
+        free_throws_remaining = game_state["free_throws"]
         has_and_one = made
 
     # Player Momentum (Player_Momentum_System.md): self-contained AB shot path
@@ -692,11 +700,15 @@ def _finalize_ab_shot(
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
     if made:
         shooter.record_stat("FGA")
-        apply_scoring(game, off_team, shooter, 2, ["FGM"])
+        if is_three:
+            shooter.record_stat("3PTA")
+        apply_scoring(game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
         text_outcome = "and scores, gets fouled!" if has_and_one else "and scores!"
         possession_flips = not has_and_one
     else:
         shooter.record_stat("FGA")
+        if is_three:
+            shooter.record_stat("3PTA")
         possession_flips = False
         if not d_foul:
             # D16 parity: a clean defensive stop (miss, no shooting foul) counts
@@ -801,6 +813,7 @@ def _finalize_ab_shot(
         "next_play_type": next_play_type,
         "next_turn": next_play_type,
         "shot_type": shot_type,
+        "is_three_point_shot": bool(is_three),
         "shot_score": shot_score,
         "shot_score_pre_defense": shot_score_pre_defense,
         "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
@@ -824,7 +837,7 @@ def _finalize_ab_shot(
     if extra_seed:
         turn_result.update(extra_seed)
     if made:
-        turn_result["points"] = 2
+        turn_result["points"] = 3 if is_three else 2
         turn_result["scoring_team"] = off_team.name
         if pressure_type is not None:
             turn_result["next_defensive_setup"] = pressure_type
@@ -908,7 +921,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
     shot_type = (
         "inside" if _euclid(shot_spot, basket) <= AB_INSIDE_SHOT_MAX_DIST else "outside"
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -920,6 +933,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
         made=made, shot_score=shot_score, shot_score_pre_defense=pre,
         shot_defense_score_for_sfx=sfx_score, d_foul=d_foul, foul_player=foul_player,
         defender_end_coords=defender_end_coords, t_shot=AB_SHOT_BEAT_SECONDS,
+        is_three=is_three,
         shot_moment_coords=_coords_by_player_id(off_lineup, seed_off),
         text_prefix=" they go to work in the paint",
     )
@@ -1022,7 +1036,7 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
             def_lineup, seed_def, shot_spot, is_away_offense, collapse_t,
         )
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -1067,6 +1081,7 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
         made=made, shot_score=shot_score, shot_score_pre_defense=pre,
         shot_defense_score_for_sfx=sfx_score, d_foul=d_foul, foul_player=foul_player,
         defender_end_coords=defender_end_coords, t_shot=AB_SHOT_BEAT_SECONDS,
+        is_three=is_three,
         shot_moment_coords=shot_moment_coords,
         extra_seed=extra_seed, text_prefix=" they attack the rim",
     )

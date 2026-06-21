@@ -383,9 +383,13 @@ def build_cpu_playbook_for_team(
     )
     next_settings["set_plays"] = _set_play_percentages(selected_set_ids)
     next_settings["fast_breaks"] = _random_capped_three(("covert_release", "rim_runner", "triangle"))
-    # PR2: Standard Trap + Straight Pressure are built → CPU teams split 50/50.
-    # Add "diamond" to the mix once PR3 lands.
-    next_settings["hc_traps"] = {"standard_trap": 50, "straight_pressure": 50, "diamond": 0}
+    # HCT traps: CPU teams run Standard Trap + Straight Pressure 50/50 by default;
+    # Standard Diamond is only mixed in (even 34/33/33) for teams whose projected
+    # starting SG has the agility (AG > 50) to play its high-pressure wings.
+    if _attr(position_players.get("SG"), "AG") > 50:
+        next_settings["hc_traps"] = {"standard_trap": 34, "straight_pressure": 33, "standard_diamond": 33}
+    else:
+        next_settings["hc_traps"] = {"standard_trap": 50, "straight_pressure": 50, "standard_diamond": 0}
     next_settings["zone_defense"] = _random_capped_three(("zone_23", "zone_32", "zone_131"))
     next_settings["man_defense"] = {"man_normal": 100, "man_pressure": 0, "man_loose": 0}
 

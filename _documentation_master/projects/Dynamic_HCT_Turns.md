@@ -422,17 +422,40 @@ p_dfoul = clamp(DFOUL_BASE * beaten_norm
 ```
 Roll `random() < p_dfoul` → D_FOUL (bonus → FTs, else SIDE_INBOUND); else POS_O.
 
+**On-ball primary / trapper (universal, band-based — `_select_trappers`).** When a
+trap forms, the **primary (on-ball) defender** is the in-range defender whose *own*
+position sits in the **same vertical band as the ball** (`_diamond_band` buckets:
+center 20–30 / upper >30 / lower <20); ties → closest to the BH; none in-band →
+closest to the BH. The **trapper** is the next-closest in-range defender. This
+replaces the old "defensive PG is always on-ball" rule for **all three plays**, so the
+reach-in flourish and the 60% D_FOUL land on whoever is actually defending the ball's
+band (previously the PG ate nearly every reach-in). It is routed through the
+`HCTPlay.select_trappers` seam:
+- **Standard Trap / Straight Pressure** use the geometric rule above (their trappers
+  straddle the BH at `±2`, so the band-matching man is picked).
+- **Standard Diamond** overrides with **band→role** (`_diamond_select_trappers`):
+  center → `center_bc_defender` primary; upper → `pos2` primary; lower → `pos3`
+  primary; the `center_bc_defender` is the trapper on a vertical-half trap. (A pure
+  geometric rule fails here because the `center_bc_defender` chases the BH and so is
+  always in-band + closest.)
+
 **Foul attribution (`_select_d_foul_fouler`):** the on-ball defender's blow-by is the
 *cause* of every `D_FOUL`, but the whistle spreads — sometimes a teammate commits an
 off-ball foul to compensate for the beaten defender. The credited fouler is rolled:
 
 | Roll | Fouler | `reach_in_foul` | FE announce |
 | --- | --- | --- | --- |
-| **60%** | the on-ball (BH) defender — a true reach-in | `True` | **"Reaching In!"** |
-| **30%** | another backcourt defender (PG/SG/SF): the **trapper** when one exists, else a random other backcourt defender; falls back to the on-ball defender if none | `False` | weighted off-ball foul language |
-| **10%** | a frontcourt defender (PF/C), random if more than one; falls back to the on-ball defender if none | `False` | weighted off-ball foul language |
+| **60%** | the on-ball primary defender — a true reach-in | `True` | **"Reaching In!"** |
+| **30%** | another backcourt defender: the **trapper** when one exists, else a random other backcourt defender; falls back to the on-ball defender if none | `False` | weighted off-ball foul language |
+| **10%** | a frontcourt defender, random if more than one; falls back to the on-ball defender if none | `False` | weighted off-ball foul language |
 
-Backcourt = `{PG, SG, SF}`, frontcourt = `{PF, C}` (the same split the formation uses).
+Backcourt / frontcourt membership:
+- **Standard Trap / Straight Pressure:** the static positional split — backcourt
+  `{PG,SG,SF}`, frontcourt `{PF,C}`.
+- **Standard Diamond:** a **per-step dynamic** split (`_diamond_court_split`) — a
+  defender is *frontcourt* if his current x is past the ABA boundary (`x>64` home /
+  `x<36` away), **except `pos4`** (the key safety) is always counted backcourt.
+
 `reach_in_foul` threads through the wrapper → turn dict so the FE shows "Reaching In!"
 only for the on-ball case; off-ball help fouls keep the generic
 `pickDefensiveFoulAnnouncementText` language. `O_FOUL` → the BH. All fouls:
@@ -1237,7 +1260,7 @@ Full spec in **§7**. On a Fast Break (ABA read chose FB, or broken-HCT topLane 
 
 **Goal.** Turn today's single hardcoded trap into a *family* of selectable defensive
 plays. The current behavior becomes **Standard Trap**; two more follow later
-(**Straight Pressure**, **Diamond**). Selection, playbook storage, scouting, and
+(**Straight Pressure**, **Standard Diamond**). Selection, playbook storage, scouting, and
 gameplay wiring **exactly mirror the Fast Break play system**; behavior dispatch uses
 a pluggable play interface (the formalized version of FB's per-play modules).
 
@@ -1264,7 +1287,7 @@ possession-flip handling keep working untouched.
 | `scouting["offense"]["fast_break_plays"]` A/S | `scouting["defense"]["hct_trap_plays"]` A/S |
 | `ensure_fast_break_plays()` migration | `ensure_hct_trap_plays()` migration |
 
-Canonical keys: `standard_trap`, `straight_pressure`, `diamond`.
+Canonical keys: `standard_trap`, `straight_pressure`, `standard_diamond`.
 
 **Two deliberate (and inherent) differences from FB — because a trap is a *defense*
 play:**
@@ -1316,7 +1339,7 @@ flips. A registry maps key → `HCTPlay`; `compute_dynamic_hct_turn` becomes thi
 
 API accepts/returns `hc_traps` immediately; until the frontend ships its slider
 section, teams run on the default weights (PR1: 100% Standard Trap; PR2: 50/50
-Standard / Straight Pressure; Diamond stays 0 until PR3).
+Standard / Straight Pressure; Standard Diamond stays 0 until PR3).
 
 ### 13.5 — PR boundary (refactor-first)
 
@@ -1327,7 +1350,10 @@ Standard / Straight Pressure; Diamond stays 0 until PR3).
   resolves to it → behavior provably unchanged. Verify via offline smoke (no crash,
   no behavior delta vs current).
 - **PR2:** implement `straight_pressure` as a new `HCTPlay` (spec in §13.6); add to default weights.
-- **PR3:** implement `diamond` as a new `HCTPlay`; add to default weights.
+- **PR3 (shipped):** implement `standard_diamond` as a new `HCTPlay` (spec in §13.7);
+  user-team default → 34/33/33; CPU default conditional on the projected starting SG's
+  AG. Also generalized the on-ball **primary/trapper** selection to be band-based across
+  all three plays (§5) — fixing the prior "every D_FOUL on the PG" skew.
 - **Frontend:** `HCT Traps` UI section (after backend lands).
 
 ### 13.6 — Straight Pressure (play #2) spec
@@ -1394,6 +1420,81 @@ passes and cuts to the ABA while a rover + key already exist).
 - `defense_targets(...)` → `_straight_pressure_targets` (sticky man deny/on-ball +
   rover + key/wing toggle + PF/C via `_pf_c_targets`); mutates the per-possession
   state for man→ABA role transitions. Standard inherits the base (`_defense_targets`).
+
+### 13.7 — Standard Diamond (play #3) spec
+
+Standard Diamond is a **1-4 alignment** (one true frontcourt rim protector + four
+"backcourt" defenders). It is the first of a planned Diamond family; future
+derivatives are out of scope. It diverges from Standard only in the **formation /
+movement seam** (`defense_targets`) and the **band→role primary** (`select_trappers`);
+trap detection, the D8 pressure/trap/break contest, the ABA→broken-HCT handoff, time
+terminals, stat parity, and possession flips are all inherited.
+
+**Roles → real positions (`_diamond_alias_map`).** The defensive analog of a set
+play's `target_shooter` is the **`center_bc_defender`**; `pos1..pos4` are the
+remaining positions in `[PG,SG,SF,PF,C]` order, excluding it. Default
+`center_bc_defender = PG` → **pos1=SG, pos2=SF, pos3=PF, pos4=C**. The mapping is
+dynamic so future position customization just works.
+
+**Bands (Standard Diamond, by the ball's y):** `center 20–30`, `upper > 30`,
+`lower < 20` (`_diamond_band`). (Distinct from the D22 `_ball_band` and from the
+offender/ABA half split, which stays `upper y≥26 / lower y≤25` per `_aba_half` — all
+intentional.)
+
+**Starting formation (`_diamond_start_formation`, home; flipped for away):**
+- `center_bc_defender`: `x = randint(44,50)`, `y = randint(23,27)`.
+- `pos1`: midLane, `y ±5`. · `pos2`: upper deepWing, `x & y ±3`. · `pos3`: lower
+  deepWing, `x & y ±3`. · `pos4`: key.
+- Offense starts as in every HCT play. **Step 1:** the `center_bc_defender` meets the
+  BH at his own starting x / the BH's starting y; the BH runs the standard read
+  (attack/pass/hold). **Steps 2+:** standard pressure / trap / trap-break.
+
+**Scope of the formation behavior.** Applies while the ball is **in the backcourt or
+past half but inside an Optimal Trap Area** (§2) — effectively `x ≤ 64`. Once the BH
+reaches the ABA (`x > 64`) the shared loop hands off entirely to the broken-HCT /
+Fast-Break defense.
+
+**Defender behavior (`_diamond_targets`):**
+- **`center_bc_defender`** — always tracks the BH (`_converge_xy`): on-ball in the
+  center band, the trap help-man in the upper/lower band.
+- **`pos1` (deep vertical-triangle zone in front of the rim)** — holds `x = midLane x`.
+  - center band: `{x: midLane x, y: bh_y ± 3}`.
+  - upper/lower band: **deny the closest-to-basket offender** in the ball-band's ABA
+    half (`x>64`, that half); deny destination = **2 x-spots BH-side of the offender,
+    same y** (`_diamond_deny_xy`). No such offender → station at **upper/lower bird**,
+    synced to the ball's band.
+- **`pos2` / `pos3` (mirrored upper / lower wings)** — same logic, inverted by half:
+  - center band: hold the deepWing start — `x = bh_x + (3..8 toward basket)`,
+    `y = deepWing y ± 3`.
+  - ball **in their half**: **trap** (`_converge_xy`) if within `MOMENT_RANGE`; else
+    **help-deny** the nearest-to-BH off-ball offender in their area (`x≤64`, their
+    half) via `_diamond_deny_xy`; else **move in to trap** (`_converge_xy`).
+  - ball in the **opposite half**: float to a per-step `random.choice` of
+    `{midLane, topLane, their-half midPost, their-half highPost}`.
+- **`pos4` (stay-home key safety + pass disruptor)** — anchors the key: center → key;
+  upper → `key_y+3`; lower → `key_y−3`; plus per-step `±3` jitter each axis. **Deny
+  hook:** if an off-ball offender is within **8** euclid of his anchor, he slots into
+  the **BH→offender passing lane (midpoint)**; with two in range he takes the one
+  **closest to the BH** (ties random). His pass disruption is otherwise handled by the
+  universal §14 pass-contest primitive (he is a normal in-lane interceptor).
+
+**Inherited unchanged:** the §2 ABA read + §7 HCO/FB transition, decision thresholds,
+movement rates, broken-HCT cutoff, time terminals, stat parity, schema emission,
+possession flips. **Replaced:** the Standard PF/C D22 zone coverage (Diamond owns all
+five defenders via the pos scheme).
+
+**Implementation seams (`HCTPlay` methods Standard Diamond overrides):**
+- `begin_possession(...)` → stamps the Diamond starting formation into `def_coords`
+  (stateless / reentrant — returns `self`).
+- `defense_targets(...)` → `_diamond_targets`.
+- `select_trappers(...)` → `_diamond_select_trappers` (band→role, see §5).
+- `detect_moment(...)` → **inherited** (any two defenders in range can trap).
+
+**Default weights.** User-team default rolls all three plays evenly (**34/33/33**).
+CPU teams keep Standard Diamond at **0** (Standard/Straight Pressure 50/50) **unless**
+their projected starting SG has `AG > 50`, in which case they also split 34/33/33 —
+computed alongside the other CPU playbooks in `cpu_playbook_customization.py` (see
+`Computer_Team_Playbooks_System.md`).
 
 ## §14 — Pass Contests (interceptions & bat-out-of-bounds)
 
@@ -1574,14 +1675,4 @@ off in flight) is the remaining polish.
 - A future 4th outcome — **tipped-but-live** (deflection that starts a scramble rather
   than a dead ball) — deferred.
 
-**Standard Diamond HCT Play - Defense**
-- Defense Starting Positions (all in home offense orientation)
-  - PG: x: random.randint(44,50), y: random.randint(23,27)
-  - pos1: midLane (randomize y -5 to + 5)
-  - pos2: upper deepWing (randomize x & y each -3 to + 3)
-  - pos3: lower deepWing (randomize x & y each -3 to + 3)
-  - pos4: key
-- Starting offense positions -- same as other HCT plays
-
-  step 1: defense PG meets offense bh at defense PG staring x, offense bh starting y and offense bh executes a read
-  
+> **Standard Diamond** is now fully specified and implemented — see **§13.7** above.

@@ -207,7 +207,7 @@
 - [ ] `projects/bugs.md` →
 - [ ] `projects/cloudflare_migration.md` →
 - [ ] `projects/offensive_state_hardening.md` →
-- [ ] `projects/rebounding_logic.md` →
+- [x] `projects/rebounding_logic.md` → **Deleted 2026-06-21** — superseded by `06_Gameplay_Systems/Rebound_System.md`, which now owns the implemented geo-helper, all-eligible rebound scoring, fallback, tie-breaker, and animation contracts.
 - [ ] `projects/secondary_announce/CURSOR_BRIEF_Secondary_Announce.md` →
 - [ ] `projects/secondary_announce/Secondary Announce.html` →
 - [ ] `projects/simulate_quarter_api_cleanup.md` →

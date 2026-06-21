@@ -761,12 +761,12 @@ def initialize_playbook_settings():
             "triangle": 34,
         }
 
-        # HCT traps (defensive play family). PR2: Standard Trap + Straight Pressure
-        # are built → default 50/50 (Diamond lands in PR3).
+        # HCT traps (defensive play family). All three plays are built → user-team
+        # default splits evenly across them.
         playbook_settings["hc_traps"] = {
-            "standard_trap": 50,
-            "straight_pressure": 50,
-            "diamond": 0,
+            "standard_trap": 34,
+            "straight_pressure": 33,
+            "standard_diamond": 33,
         }
         
         # Zone defense: Even distribution across supported zone IDs.
@@ -833,9 +833,9 @@ def initialize_playbook_settings():
                 "triangle": 34,
             },
             "hc_traps": {
-                "standard_trap": 50,
-                "straight_pressure": 50,
-                "diamond": 0,
+                "standard_trap": 34,
+                "straight_pressure": 33,
+                "standard_diamond": 33,
             },
             "zone_defense": {"zone_23": 100, "zone_32": 0, "zone_131": 0},
             "man_defense": {"man_normal": 100, "man_pressure": 0, "man_loose": 0},
@@ -2888,7 +2888,7 @@ def get_playbooks(
             "hc_traps": [
                 {"id": "standard_trap", "name": "Standard Trap"},
                 {"id": "straight_pressure", "name": "Straight Pressure"},
-                {"id": "diamond", "name": "Diamond"},
+                {"id": "standard_diamond", "name": "Standard Diamond"},
             ],
             "man_defense_rows": [
                 {
@@ -3019,7 +3019,7 @@ def save_playbooks(request: PlaybookSettingsRequest):
         )
         playbook_settings["hc_traps"] = normalize_string_keyed_map(
             playbook_settings.get("hc_traps", {}),
-            {"Standard Trap": "standard_trap", "Straight Pressure": "straight_pressure", "Diamond": "diamond"},
+            {"Standard Trap": "standard_trap", "Straight Pressure": "straight_pressure", "Standard Diamond": "standard_diamond", "Diamond": "standard_diamond"},
         )
         playbook_settings["zone_defense"] = normalize_string_keyed_map(
             playbook_settings.get("zone_defense", {}),

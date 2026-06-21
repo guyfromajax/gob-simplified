@@ -67,6 +67,7 @@ from BackEnd.utils.shared import (
     clamp_animation_grid_coords,
     get_away_player_coords,
 )
+from BackEnd.constants.hct_trap_play_types import STANDARD_DIAMOND
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
 from BackEnd.utils.transition_bridge import _interrupted_coord
@@ -446,17 +447,26 @@ def _steal_credit_defender(bh_defender, trapper):
     return trapper if _steal_score(trapper) > _steal_score(bh_defender) else bh_defender
 
 
-def _select_d_foul_fouler(bh_defender, def_lineup, trapper=None) -> Tuple[Any, bool]:
+def _select_d_foul_fouler(
+    bh_defender,
+    def_lineup,
+    trapper=None,
+    backcourt_pos: Tuple[str, ...] = HCT_BACKCOURT_POS,
+    frontcourt_pos: Tuple[str, ...] = HCT_FRONTCOURT_POS,
+) -> Tuple[Any, bool]:
     """§5 reach-in foul attribution. The on-ball (BH) defender's blow-by is the
     root cause of the foul, but the whistle lands on:
 
       - 60% the on-ball defender himself (a true reach-in),
-      - 30% another backcourt defender (PG/SG/SF) who rotated to help — the
-        ``trapper`` (when one exists) is the compensating fouler; otherwise a
-        random other backcourt defender; falls back to the on-ball defender when
-        none exist,
-      - 10% a frontcourt defender (PF/C) committing an off-ball help foul to
-        compensate; falls back to the on-ball defender when none exist.
+      - 30% another backcourt defender who rotated to help — the ``trapper`` (when
+        one exists) is the compensating fouler; otherwise a random other backcourt
+        defender; falls back to the on-ball defender when none exist,
+      - 10% a frontcourt defender committing an off-ball help foul to compensate;
+        falls back to the on-ball defender when none exist.
+
+    ``backcourt_pos`` / ``frontcourt_pos`` default to the static positional split
+    ({PG,SG,SF} / {PF,C}) used by Standard Trap & Straight Pressure; Standard
+    Diamond passes a per-step dynamic split (see ``_diamond_court_split``).
 
     Returns ``(fouler, is_reach_in)`` where ``is_reach_in`` is True only when the
     credited fouler is the on-ball defender — that flag drives the "Reaching In"
@@ -470,14 +480,14 @@ def _select_d_foul_fouler(bh_defender, def_lineup, trapper=None) -> Tuple[Any, b
             return trapper, False
         others = [
             def_lineup[p]
-            for p in HCT_BACKCOURT_POS
+            for p in backcourt_pos
             if def_lineup.get(p) is not None and def_lineup.get(p) is not bh_defender
         ]
         if others:
             return random.choice(others), False
         return bh_defender, True
     frontcourt = [
-        def_lineup[p] for p in HCT_FRONTCOURT_POS if def_lineup.get(p) is not None
+        def_lineup[p] for p in frontcourt_pos if def_lineup.get(p) is not None
     ]
     if frontcourt:
         return random.choice(frontcourt), False
@@ -681,18 +691,30 @@ def _detect_moment(
 
 def _select_trappers(
     in_range: List[str],
-    pg_in_range: bool,
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
 ) -> Tuple[str, str]:
-    """§5 trapper selection. Returns ``(bh_defender_pos, trapper_pos)``.
+    """§5 trapper selection (universal, band-based). Returns
+    ``(bh_defender_pos, trapper_pos)``.
 
-    Defensive PG is always a trapper when in range (the second is the closest
-    other in-range defender). Fallback when PG is out of range: the two closest
-    in-range defenders. ``in_range`` is nearest-first.
+    The **primary (on-ball) defender** is the in-range defender whose own
+    position sits in the same vertical band as the ball (band buckets per
+    ``_diamond_band`` on the *defender's* y); ties → the in-range defender
+    closest to the BH; none in-band → closest to the BH. The **trapper** is the
+    next-closest of the remaining in-range defenders. ``in_range`` is
+    nearest-first.
+
+    This replaces the old "defensive PG is always on-ball" rule across every HCT
+    play (Standard Trap / Straight Pressure / Standard Diamond), so reach-ins and
+    D_FOULs land on whoever is actually defending the ball's band rather than
+    always the PG. For Standard Diamond it naturally resolves to the band's
+    assigned defender (center → center_bc_defender; upper/lower → that wing).
     """
-    if pg_in_range and "PG" in in_range:
-        others = [p for p in in_range if p != "PG"]
-        return "PG", others[0]
-    return in_range[0], in_range[1]
+    ball_band = _diamond_band(bh_xy["y"])
+    in_band = [p for p in in_range if _diamond_band(def_coords[p]["y"]) == ball_band]
+    primary = in_band[0] if in_band else in_range[0]
+    trapper = next(p for p in in_range if p != primary)
+    return primary, trapper
 
 
 def _select_pass_receiver(
@@ -1175,6 +1197,291 @@ def _straight_pressure_targets(
     targets["PF"] = _clamp_xy(pfc["PF"])
     targets["C"] = _clamp_xy(pfc["C"])
     return targets
+
+
+# --- Standard Diamond (§13.7 — play #3) ---------------------------------------
+# A 1-4 alignment. The ``center_bc_defender`` pressures the BH up top; ``pos1``
+# anchors a deep vertical-triangle zone in front of the rim (denying ABA offenders
+# by band); ``pos2``/``pos3`` are mirrored upper/lower trap-or-help wings; ``pos4``
+# is a stay-home key safety + pass disruptor. Roles → real positions resolve via
+# ``_diamond_alias_map`` (default center_bc_defender=PG → pos1=SG/pos2=SF/pos3=PF/
+# pos4=C) so future position customization just works. The universal band-based
+# ``_select_trappers`` picks the on-ball primary; PF/C zone coverage is NOT used.
+DIAMOND_DENY_X_GAP = 2            # deny dest sits 2 x-spots BH-side of the offender
+DIAMOND_POS4_DENY_RANGE = 8.0     # pos4 mans up on an offender within this of his spot
+DIAMOND_WING_AHEAD_MIN = 3        # center-band wing x lead ahead of the BH
+DIAMOND_WING_AHEAD_MAX = 8
+DIAMOND_JITTER = 3                # ± per-step positional jitter
+DIAMOND_POS4_BAND_DY = 3          # pos4 key-anchor y shift by band
+
+
+def _diamond_band(y: float) -> str:
+    """Standard Diamond band by y: center 20–30 (inclusive), upper > 30, lower < 20."""
+    if y > 30:
+        return "upper"
+    if y < 20:
+        return "lower"
+    return "center"
+
+
+def _diamond_alias_map(center_bc_defender: str = "PG") -> Dict[str, str]:
+    """Map ``pos1..pos4`` → real defender positions, excluding the
+    ``center_bc_defender`` (the defensive analog of a set play's target_shooter).
+    Mirrors ``_alias_map``. Default center_bc_defender=PG → pos1=SG, pos2=SF,
+    pos3=PF, pos4=C."""
+    order = ["PG", "SG", "SF", "PF", "C"]
+    cbd = center_bc_defender.upper()
+    remaining = [p for p in order if p != cbd]
+    return {f"pos{i + 1}": pos for i, pos in enumerate(remaining)}
+
+
+def _diamond_deny_xy(
+    offender_xy: Dict[str, Any], is_away_offense: bool
+) -> Dict[str, int]:
+    """Deny destination: 2 x-spots toward the BH from the offender, same y."""
+    return _clamp_xy(
+        {
+            "x": int(offender_xy["x"]) - DIAMOND_DENY_X_GAP * _basket_dir(is_away_offense),
+            "y": int(offender_xy["y"]),
+        }
+    )
+
+
+def _diamond_offender_half(off_xy: Dict[str, Any]) -> str:
+    """Vertical half of an offender (matches ``_aba_half``): upper y≥26 / lower y≤25."""
+    return "upper" if off_xy["y"] >= 26 else "lower"
+
+
+def _diamond_start_formation(
+    is_away_offense: bool, center_bc_defender: str = "PG"
+) -> Dict[str, Dict[str, int]]:
+    """Standard Diamond initial alignment (home orientation, flipped for away):
+    center_bc_defender up top (x 44–50, y 23–27); pos1 at midLane (y ±5);
+    pos2/pos3 at upper/lower deepWing (x & y ±3); pos4 at the key."""
+    alias = _diamond_alias_map(center_bc_defender)
+    midlane = _spot("midLane", is_away_offense)
+    key = _spot("key", is_away_offense)
+    up_dw = _spot("deep upper wing", is_away_offense)
+    lo_dw = _spot("deep lower wing", is_away_offense)
+    cbd = center_bc_defender.upper()
+    cbd_xy = {"x": random.randint(44, 50), "y": random.randint(23, 27)}
+    out: Dict[str, Dict[str, int]] = {
+        cbd: _clamp_xy(_flip(cbd_xy) if is_away_offense else cbd_xy),
+        alias["pos1"]: _clamp_xy(
+            {"x": midlane["x"], "y": midlane["y"] + random.randint(-5, 5)}
+        ),
+        alias["pos2"]: _clamp_xy(
+            {
+                "x": up_dw["x"] + random.randint(-3, 3),
+                "y": up_dw["y"] + random.randint(-3, 3),
+            }
+        ),
+        alias["pos3"]: _clamp_xy(
+            {
+                "x": lo_dw["x"] + random.randint(-3, 3),
+                "y": lo_dw["y"] + random.randint(-3, 3),
+            }
+        ),
+        alias["pos4"]: dict(key),
+    }
+    return out
+
+
+def _diamond_wing_target(
+    wing_pos: str,
+    side: str,
+    band: str,
+    bh_xy: Dict[str, Any],
+    bh_off: str,
+    def_coords: Dict[str, Dict[str, int]],
+    off_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+) -> Dict[str, int]:
+    """§13.7 mirrored wing (pos2 upper / pos3 lower)."""
+    deep_spot = _spot(
+        "deep upper wing" if side == "upper" else "deep lower wing", is_away_offense
+    )
+    if band == "center":
+        # Hold near the deepWing start, leading the BH slightly toward the basket.
+        return _clamp_xy(
+            {
+                "x": int(bh_xy["x"])
+                + _basket_dir(is_away_offense)
+                * random.randint(DIAMOND_WING_AHEAD_MIN, DIAMOND_WING_AHEAD_MAX),
+                "y": deep_spot["y"] + random.randint(-DIAMOND_JITTER, DIAMOND_JITTER),
+            }
+        )
+    if band == side:
+        # Ball in this wing's vertical half → trap if in range; else help-deny an
+        # off-ball offender in his area (x≤64, his half) closest to the BH; else
+        # move in to execute the trap.
+        if _euclid(bh_xy, def_coords[wing_pos]) <= MOMENT_RANGE:
+            return _converge_xy(bh_xy, is_away_offense)
+        area = [
+            off_coords[p]
+            for p in POSITIONS
+            if p != bh_off
+            and not _past_primary_safe_area(off_coords[p], is_away_offense)
+            and _diamond_offender_half(off_coords[p]) == side
+        ]
+        if area:
+            return _diamond_deny_xy(min(area, key=lambda c: _euclid(bh_xy, c)), is_away_offense)
+        return _converge_xy(bh_xy, is_away_offense)
+    # Ball in the opposite half → float to a random help spot on his own side.
+    choices = [
+        "midLane",
+        "topLane",
+        "upper midPost" if side == "upper" else "lower midPost",
+        "upper highPost" if side == "upper" else "lower highPost",
+    ]
+    return _spot(random.choice(choices), is_away_offense)
+
+
+def _diamond_pos4_target(
+    band: str,
+    bh_xy: Dict[str, Any],
+    bh_off: str,
+    off_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+) -> Dict[str, int]:
+    """§13.7 pos4 — key-anchored stay-home safety + pass disruptor."""
+    key = _spot("key", is_away_offense)
+    if band == "upper":
+        anchor = {"x": key["x"], "y": key["y"] + DIAMOND_POS4_BAND_DY}
+    elif band == "lower":
+        anchor = {"x": key["x"], "y": key["y"] - DIAMOND_POS4_BAND_DY}
+    else:
+        anchor = {"x": key["x"], "y": key["y"]}
+    anchor = {
+        "x": anchor["x"] + random.randint(-DIAMOND_JITTER, DIAMOND_JITTER),
+        "y": anchor["y"] + random.randint(-DIAMOND_JITTER, DIAMOND_JITTER),
+    }
+    # Man up on the nearest-to-BH off-ball offender within range of his spot,
+    # slotting into the BH→offender passing lane (midpoint). Ties broken randomly.
+    near = [
+        off_coords[p]
+        for p in POSITIONS
+        if p != bh_off and _euclid(off_coords[p], anchor) <= DIAMOND_POS4_DENY_RANGE
+    ]
+    if near:
+        random.shuffle(near)
+        target_off = min(near, key=lambda c: _euclid(bh_xy, c))
+        return _clamp_xy(_interpolate(bh_xy, target_off, 0.5))
+    return _clamp_xy(anchor)
+
+
+def _diamond_targets(
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+    off_coords: Optional[Dict[str, Dict[str, int]]] = None,
+    center_bc_defender: str = "PG",
+) -> Dict[str, Dict[str, int]]:
+    """§13.7 Standard Diamond per-step defensive targets (pure). Behavior applies
+    while the ball is short of the ABA (x≤64); once the BH reaches the ABA the
+    shared loop hands off to the broken-HCT/Fast-Break defense."""
+    alias = _diamond_alias_map(center_bc_defender)
+    cbd = center_bc_defender.upper()
+    pos1, pos2, pos3, pos4 = alias["pos1"], alias["pos2"], alias["pos3"], alias["pos4"]
+    targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
+
+    # center_bc_defender always tracks the BH (on-ball pressure / trapper).
+    targets[cbd] = _converge_xy(bh_xy, is_away_offense)
+
+    band = _diamond_band(bh_xy["y"])
+
+    if off_coords is None:
+        # Terminal collapse beat (stopper): bring the band's wing in to finish.
+        if band == "upper":
+            targets[pos2] = _converge_xy(bh_xy, is_away_offense)
+        elif band == "lower":
+            targets[pos3] = _converge_xy(bh_xy, is_away_offense)
+        return targets
+
+    bh_off = _match_off_pos(off_coords, bh_xy)
+    midlane_x = _spot("midLane", is_away_offense)["x"]
+
+    # --- pos1: deep vertical-triangle zone in front of the rim ----------------
+    if band == "center":
+        targets[pos1] = _clamp_xy(
+            {"x": midlane_x, "y": int(bh_xy["y"]) + random.randint(-DIAMOND_JITTER, DIAMOND_JITTER)}
+        )
+    else:
+        aba_offenders = [
+            off_coords[p]
+            for p in POSITIONS
+            if p != bh_off
+            and _past_primary_safe_area(off_coords[p], is_away_offense)
+            and _diamond_offender_half(off_coords[p]) == band
+        ]
+        if aba_offenders:
+            closest_to_basket = max(
+                aba_offenders, key=lambda c: c["x"] * _basket_dir(is_away_offense)
+            )
+            targets[pos1] = _diamond_deny_xy(closest_to_basket, is_away_offense)
+        else:
+            targets[pos1] = _spot(
+                "upper bird" if band == "upper" else "lower bird", is_away_offense
+            )
+
+    # --- pos2 / pos3: mirrored upper / lower wings ----------------------------
+    targets[pos2] = _diamond_wing_target(
+        pos2, "upper", band, bh_xy, bh_off, def_coords, off_coords, is_away_offense
+    )
+    targets[pos3] = _diamond_wing_target(
+        pos3, "lower", band, bh_xy, bh_off, def_coords, off_coords, is_away_offense
+    )
+
+    # --- pos4: stay-home key safety + pass disruptor --------------------------
+    targets[pos4] = _diamond_pos4_target(band, bh_xy, bh_off, off_coords, is_away_offense)
+
+    return targets
+
+
+def _diamond_select_trappers(
+    in_range: List[str],
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    center_bc_defender: str = "PG",
+) -> Tuple[str, str]:
+    """§13.7 band→role primary/trapper for Standard Diamond. Unlike the geometric
+    default, the on-ball **primary** is the band's *assigned* defender — center →
+    ``center_bc_defender``; upper → ``pos2``; lower → ``pos3`` — because the
+    center_bc_defender chases the BH in every band (so a pure geometric rule would
+    always pick him). When the assigned man isn't in range, fall back to the
+    nearest in-range defender. The **trapper** is the ``center_bc_defender`` on a
+    vertical-half trap (he's the help man), else the next-closest in-range
+    defender."""
+    alias = _diamond_alias_map(center_bc_defender)
+    cbd = center_bc_defender.upper()
+    band = _diamond_band(bh_xy["y"])
+    assigned = cbd if band == "center" else (alias["pos2"] if band == "upper" else alias["pos3"])
+    primary = assigned if assigned in in_range else in_range[0]
+    if primary != cbd and cbd in in_range:
+        trapper = cbd
+    else:
+        trapper = next(p for p in in_range if p != primary)
+    return primary, trapper
+
+
+def _diamond_court_split(
+    def_coords: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+    center_bc_defender: str = "PG",
+) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+    """Dynamic backcourt/frontcourt split for the §5 D_FOUL spread under Standard
+    Diamond: a defender is *frontcourt* if his current x is past the ABA boundary
+    (x>64 home / x<36 away), EXCEPT ``pos4`` (the key safety) is always counted
+    backcourt (he floats forward but stays in backcourt help calculations)."""
+    pos4 = _diamond_alias_map(center_bc_defender)["pos4"]
+    backcourt: List[str] = []
+    frontcourt: List[str] = []
+    for p in POSITIONS:
+        if p != pos4 and _past_primary_safe_area(def_coords[p], is_away_offense):
+            frontcourt.append(p)
+        else:
+            backcourt.append(p)
+    return tuple(backcourt), tuple(frontcourt)
 
 
 def _position_defense(
@@ -1836,7 +2143,9 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         """Pick the contesting defender(s) per §5 and resolve the banded outcome."""
         nonlocal pending_reach_in_def_pos, pending_dfoul_trapper
         if moment == "trap":
-            bh_def_pos, trapper_pos = _select_trappers(in_range, "PG" in in_range)
+            bh_def_pos, trapper_pos = play.select_trappers(
+                in_range, bh_xy, def_coords, is_away_offense
+            )
         else:
             bh_def_pos, trapper_pos = in_range[0], None
         # Render-space reach-in: the on-ball defender lunges on this contest
@@ -1905,8 +2214,16 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
             # §5 — the on-ball defender's blow-by causes the foul, but the whistle
             # spreads: 60% on-ball (reach-in), 30% another backcourt defender
             # (trapper/help), 10% a frontcourt help foul to compensate.
+            if getattr(play, "key", "") == STANDARD_DIAMOND:
+                backcourt_pos, frontcourt_pos = _diamond_court_split(
+                    def_coords, is_away_offense,
+                    getattr(play, "center_bc_defender", "PG"),
+                )
+            else:
+                backcourt_pos, frontcourt_pos = HCT_BACKCOURT_POS, HCT_FRONTCOURT_POS
             fouler, is_reach_in = _select_d_foul_fouler(
                 credited, def_lineup, trapper=pending_dfoul_trapper,
+                backcourt_pos=backcourt_pos, frontcourt_pos=frontcourt_pos,
             )
             reach_in_foul = is_reach_in
             label = "reach-in" if is_reach_in else "off-ball help"

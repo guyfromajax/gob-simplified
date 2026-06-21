@@ -1,12 +1,3 @@
-<!--
-SEARCH TAG: [CODE-CLEANUP]
-Every outstanding code-level fix/cleanup item surfaced during the documentation sweep (and the
-ongoing code-cleanup backlog) is tagged with the literal token [CODE-CLEANUP]. To get the complete
-list across the whole repo, run:  rg "\[CODE-CLEANUP\]"
-This includes items in this file (Future Cleanup, P0, Fast Break backlog, FB test follow-up) plus
-inline notes left in individual system docs. (Sunset-mode code removal also carries its own
-"SUNSET MODE" tag inside the docs that describe those paths, and is cross-linked from here.)
--->
 
 ##End of Game / End of Quarter perfection
 6. Don't animate rebound / BIP on Final Shot FT
@@ -16,25 +7,23 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 50. Consistently sound airhorn at EOQ
 42. Quick Foul bug, wrong team fouled
 
-##Micro Movements
-9. Dunks! I need DUNKS!
-
 ##Bugs 
-2. 3 pointer on P/T Break does not register as a 3
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 37. Player Foul Out Next Step bug
 40. Batted ball out of bounds is not animating or executing properly
 
-
 ##New Features
-60. Universal distance-based rebound helper
 11. More action on Signing Day
 22. User account -- link X & Facebook?
 24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 25. Fast Break and P/T callouts in the Scouting Report of opponent
+27. Update logic on rebounds
+28. Micro Movements
+29. Write Advanced Topics tutorials
+30. Film Study impacts scouting notes
 
 ##Full Product Readiness
-100. Dynamic Trap Plays -- need to add pass disruptions and interceptions, confirm fatigue, add Diamond Trap play
+100. Dynamic Trap Plays --  add Diamond Trap play
 101. Dynamic Press Plays
 102. Team court images
 103. Player images
@@ -45,9 +34,9 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 109. More dynamic HCO animations
 110. Strategic Geek Points system
 111. Marketing Screenshot Tool Build
-112. Deeper in-game SFX: It's good, no good, three, deny, picked up his dribble
 113. Bring logic to screens
 114. Better defense stat tracking
+115. Better HCO steal/turnover logic
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report
@@ -56,8 +45,20 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 5. Add a new hire news story for user team
 6. Add a badass design appraoch to New Stories
 
+##In-Game SFX Ideas
+1. Deny, Picked Up His Dribble, No Good/Missed
 
 
+
+<!--
+SEARCH TAG: [CODE-CLEANUP]
+Every outstanding code-level fix/cleanup item surfaced during the documentation sweep (and the
+ongoing code-cleanup backlog) is tagged with the literal token [CODE-CLEANUP]. To get the complete
+list across the whole repo, run:  rg "\[CODE-CLEANUP\]"
+This includes items in this file (Future Cleanup, P0, Fast Break backlog, FB test follow-up) plus
+inline notes left in individual system docs. (Sunset-mode code removal also carries its own
+"SUNSET MODE" tag inside the docs that describe those paths, and is cross-linked from here.)
+-->
 
 ## Stale FB test suite (found + cleaned up 6-12-26, was not a product bug)
 

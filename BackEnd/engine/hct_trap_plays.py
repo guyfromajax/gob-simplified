@@ -27,6 +27,7 @@ from typing import List, Optional, Tuple
 
 from BackEnd.constants.hct_trap_play_types import (
     HCT_TRAP_PLAY_LABELS,
+    STANDARD_DIAMOND,
     STANDARD_TRAP,
     STRAIGHT_PRESSURE,
 )
@@ -86,6 +87,20 @@ class HCTPlay:
         from BackEnd.engine.dynamic_hct import _defense_targets
 
         return _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+
+    def select_trappers(
+        self,
+        in_range: List[str],
+        bh_xy,
+        def_coords: CoordMap,
+        is_away_offense: bool,
+    ) -> Tuple[str, str]:
+        """Pick ``(primary_on_ball, trapper)`` for a trap moment. Default = the
+        universal band-based geometric rule (primary = closest in-range defender in
+        the ball's vertical band). Standard Diamond overrides with band→role."""
+        from BackEnd.engine.dynamic_hct import _select_trappers
+
+        return _select_trappers(in_range, bh_xy, def_coords)
 
     # --- Entry --------------------------------------------------------------
     def run(self, game) -> Dict[str, Any]:
@@ -172,15 +187,70 @@ class StraightPressure(HCTPlay):
         )
 
 
-# Registry: canonical key → play instance. Diamond is added in PR3; until then its
-# key resolves to Standard Trap via the fallback.
+class StandardDiamond(HCTPlay):
+    """Play #3 (§13.7): a 1-4 diamond. The ``center_bc_defender`` pressures the BH
+    up top; ``pos1`` anchors a deep vertical-triangle zone in front of the rim;
+    ``pos2``/``pos3`` are mirrored upper/lower trap-or-help wings; ``pos4`` is a
+    stay-home key safety + pass disruptor. Roles map to real positions via
+    ``_diamond_alias_map`` (default center_bc_defender=PG). Stateless/reentrant:
+    formation + targets are pure functions of the current coords. Trap detection,
+    pressure/trap/break resolution, the band-based on-ball primary, and the
+    ABA→broken-HCT handoff are all shared with the rest of the family.
+    """
+
+    key = STANDARD_DIAMOND
+    center_bc_defender = "PG"
+
+    def begin_possession(
+        self,
+        bh_xy,
+        def_coords: CoordMap,
+        off_coords: Optional[CoordMap],
+        is_away_offense: bool,
+    ) -> "StandardDiamond":
+        from BackEnd.engine.dynamic_hct import _diamond_start_formation
+
+        formation = _diamond_start_formation(is_away_offense, self.center_bc_defender)
+        for pos, xy in formation.items():
+            def_coords[pos] = dict(xy)
+        return self
+
+    def defense_targets(
+        self,
+        bh_xy,
+        def_coords: CoordMap,
+        is_away_offense: bool,
+        off_coords: Optional[CoordMap] = None,
+    ) -> CoordMap:
+        from BackEnd.engine.dynamic_hct import _diamond_targets
+
+        return _diamond_targets(
+            bh_xy, def_coords, is_away_offense, off_coords, self.center_bc_defender
+        )
+
+    def select_trappers(
+        self,
+        in_range: List[str],
+        bh_xy,
+        def_coords: CoordMap,
+        is_away_offense: bool,
+    ) -> Tuple[str, str]:
+        from BackEnd.engine.dynamic_hct import _diamond_select_trappers
+
+        return _diamond_select_trappers(
+            in_range, bh_xy, def_coords, self.center_bc_defender
+        )
+
+
+# Registry: canonical key → play instance.
 HCT_TRAP_PLAYS: Dict[str, HCTPlay] = {
     STANDARD_TRAP: StandardTrap(),
     STRAIGHT_PRESSURE: StraightPressure(),
+    STANDARD_DIAMOND: StandardDiamond(),
 }
 
 
 def get_hct_trap_play(key: str | None) -> HCTPlay:
     """Resolve a play key to its implementation, falling back to Standard Trap for
-    unknown / not-yet-implemented keys (e.g. ``straight_pressure``/``diamond``)."""
+    unknown keys."""
     return HCT_TRAP_PLAYS.get(key or "", HCT_TRAP_PLAYS[STANDARD_TRAP])

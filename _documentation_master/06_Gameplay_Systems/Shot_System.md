@@ -26,6 +26,14 @@
 6. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`.
 7. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
 
+**Three-point classification**
+
+- Source of truth: `BackEnd.utils.shot_geometry.is_three_point_shot_from_coords()`.
+- `shot_manager.is_three_point_shot()` first checks `roles["shot_spot"]` against the coordinate arc. If `shot_spot` is missing, it falls back to the skeleton shoot-location name and `THREE_POINT_SPOTS`.
+- The coordinate arc uses the home-offense HCO spot model (`key`, wings, midCorners, corners) and linearly interpolates the boundary x-value by shooter y. Away-offense shots mirror x with `100 - x` before testing.
+- Fast Break shots remain 2-point by default. Only explicit outside Fast Break branches with `shot_type == "outside"` and a backend `shot_spot` can classify as 3s. This covers Triangle corner/wing/kick branches without changing Steal FB, RR rim attacks, or CR rim attacks.
+- Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same helper before `calculate_shot_score()` and carry `is_three` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
+
 **Shot Resolution Flow (13 Steps)**
 1. Extract Roles
    - shooter, passer, screener, defender, second_defender from roles dict
@@ -35,7 +43,7 @@
    - Get defense_call from `game_state["defense_playcall"]`
 
 2. Determine Shot Type
-   - is_three = `is_three_point_shot(shooter, roles)` (checks shooter spot against THREE_POINT_SPOTS)
+   - is_three = `is_three_point_shot(shooter, roles)` (coordinate arc from `roles["shot_spot"]` first; skeleton spot-name fallback via THREE_POINT_SPOTS)
    - is_paint = `is_paint_shot(shooter, roles)` (checks shooter spot against PAINT_SPOTS)
    - shot_type = `roles.get("shot_type")` or `roles.get("motion_shot_type")` (Motion uses motion_shot_type) OR skeleton analysis (Set plays)
      - Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
@@ -182,7 +190,7 @@ Shot resolution uses the following base constants:
 - defense_call: `game_state["defense_playcall"]` ("Man" or "Zone")
 
 #### Step 2: Determine Shot Type
-- **is_three**: Check shooter spot against THREE_POINT_SPOTS
+- **is_three**: Coordinate arc check from `roles["shot_spot"]` first; fallback to skeleton shoot-location name and THREE_POINT_SPOTS when no coordinate is available
 - **is_paint**: Check shooter spot against PAINT_SPOTS
 - **shot_type**: 
   - Motion: `roles.get("shot_type")` or `roles.get("motion_shot_type")` (from resolve_motion_offense_shot)
@@ -285,14 +293,15 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
 3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `40 - (random(1-5) * momentum)` (`THREE_POINT_SHOT_THRESHOLD_INCREASE = 40`; higher momentum = easier threes)
-4. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
-5. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
-6. **Location-based contest**: HCO/Final Turn → `has_contest` is role-based (`bool(defender or second_defender)`); non-HCO → geometry box around shooter (|Δx|≤8, |Δy|≤8, `CONTEST_DEFENDER_DX_MAX`/`DY_MAX`) vs all defenders. Rim box around attacking basket (±6, `RIM_BOX_HALF_SPAN`); unguarded rim shortcut (99% make); `apply_defense` only when `has_contest` (unless shortcut applies)
-7. **Motion Attack Penalty**: Applied when Motion offense attack shot is stopped short of basket (penalty = distance to basket)
-8. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
-9. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)
-10. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes
-11. **Zone shot-type threshold**: 2-3 and 3-2 zone defenses adjust `shot_threshold` by `shot_type` on HCO and Final Turn shots only (`_hco_zone_shot_threshold_delta` in `shot_manager.py`).
+4. **Three-Point Geometry**: `roles["shot_spot"]` is authoritative when present; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`.
+5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
+6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
+7. **Location-based contest**: HCO/Final Turn → `has_contest` is role-based (`bool(defender or second_defender)`); non-HCO → geometry box around shooter (|Δx|≤8, |Δy|≤8, `CONTEST_DEFENDER_DX_MAX`/`DY_MAX`) vs all defenders. Rim box around attacking basket (±6, `RIM_BOX_HALF_SPAN`); unguarded rim shortcut (99% make); `apply_defense` only when `has_contest` (unless shortcut applies)
+8. **Motion Attack Penalty**: Applied when Motion offense attack shot is stopped short of basket (penalty = distance to basket)
+9. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
+10. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)
+11. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes
+12. **Zone shot-type threshold**: 2-3 and 3-2 zone defenses adjust `shot_threshold` by `shot_type` on HCO and Final Turn shots only (`_hco_zone_shot_threshold_delta` in `shot_manager.py`).
 
 ### Status
 

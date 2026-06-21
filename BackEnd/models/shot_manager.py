@@ -6,6 +6,7 @@ from BackEnd.constants.momentum import (
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import mo_shot_roll
+from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
@@ -387,7 +388,11 @@ class ShotManager:
 
     def is_three_point_shot(self, shooter, roles):
         """
-        Determine if a shot is a three-pointer based on the shooter's spot.
+        Determine if a shot is a three-pointer.
+
+        Coordinate geometry is the source of truth when the caller provides
+        ``roles["shot_spot"]``. Skeleton spot-name detection remains as the
+        compatibility fallback for older HCO-style callers.
         
         Args:
             shooter: The player taking the shot
@@ -396,6 +401,14 @@ class ShotManager:
         Returns:
             bool: True if three-pointer, False if two-pointer
         """
+        shot_spot = roles.get("shot_spot") if isinstance(roles, dict) else None
+        if isinstance(shot_spot, dict):
+            is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+            return is_three_point_shot_from_coords(
+                shot_spot,
+                is_away_offense=is_away_offense,
+            )
+
         shooter_pos, spot = self._get_shooter_position_and_spot(shooter, roles)
         if not spot:
             return False
@@ -526,9 +539,14 @@ class ShotManager:
         
         is_fast_break = roles.get("is_fast_break", False)
         if is_fast_break:
-            # Fast Break: no steps/location; treat as 2pt paint (attack) by default
-            is_three = False
-            is_paint = True
+            # Most FB finishes are at-rim 2s. Explicit outside FB branches
+            # (Triangle corner/wing/kick) can classify from backend shot_spot.
+            shot_type_hint = roles.get("shot_type") or roles.get("motion_shot_type")
+            is_three = (
+                shot_type_hint == "outside"
+                and self.is_three_point_shot(shooter, roles)
+            )
+            is_paint = not is_three and shot_type_hint in (None, "inside", "attack")
         else:
             # Determine if shot is three-pointer based on shooter's spot
             is_three = self.is_three_point_shot(shooter, roles)

@@ -1,5 +1,6 @@
 from BackEnd.engine.dynamic_hct_shot import (
     _finalize_ab_shot,
+    _roll_ab_shot,
     resolve_hct_fast_break_shot,
 )
 from BackEnd.models.shot_manager import ShotManager
@@ -172,3 +173,85 @@ def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(m
     assert near_def.player_id in result["defense_rebounders"]
     assert actual_rebounder.player_id not in result["offense_rebounders"]
     assert near_off.coords == original_near_off_coords
+
+
+def test_hct_attack_basket_outside_shot_classifies_from_coords(monkeypatch):
+    game = build_mock_game()
+    _sync_ids_and_rosters(game)
+    game.game_state["offensive_state"] = "HCT"
+    shooter = game.offense_team.lineup["PG"]
+
+    captured = {}
+
+    def fake_calculate(
+        self,
+        shooter,
+        passer,
+        screener,
+        defender,
+        shot_type,
+        defense_call,
+        is_three,
+        is_paint=False,
+        second_defender=None,
+        shooter_location=None,
+        apply_defense=True,
+        **kwargs,
+    ):
+        captured["is_three"] = is_three
+        captured["is_paint"] = is_paint
+        return 200, 200, 0, False, None
+
+    monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
+
+    *_, is_three = _roll_ab_shot(
+        game,
+        game.offense_team,
+        game.game_state,
+        shooter,
+        None,
+        False,
+        "outside",
+        {"x": 64, "y": 25},
+    )
+
+    assert is_three is True
+    assert captured["is_three"] is True
+    assert captured["is_paint"] is False
+
+
+def test_hct_attack_basket_finalizer_records_three_point_make():
+    game = build_mock_game()
+    _sync_ids_and_rosters(game)
+    game.game_state["offensive_state"] = "HCT"
+    shooter = game.offense_team.lineup["PG"]
+    start_score = game.score[game.offense_team.name]
+
+    result = _finalize_ab_shot(
+        game,
+        shooter=shooter,
+        shooter_id=shooter.player_id,
+        shot_defender=None,
+        shot_defender_id=None,
+        contested=False,
+        shot_type="outside",
+        shot_spot={"x": 64, "y": 25},
+        made=True,
+        shot_score=200,
+        shot_score_pre_defense=200,
+        shot_defense_score_for_sfx=0,
+        d_foul=False,
+        foul_player=None,
+        defender_end_coords={},
+        t_shot=0.8,
+        is_three=True,
+    )
+
+    assert result["result_type"] == "MAKE"
+    assert result["points"] == 3
+    assert result["is_three_point_shot"] is True
+    assert shooter.get_stat("FGA") == 1
+    assert shooter.get_stat("3PTA") == 1
+    assert shooter.get_stat("FGM") == 1
+    assert shooter.get_stat("3PTM") == 1
+    assert game.score[game.offense_team.name] == start_score + 3

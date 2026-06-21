@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from BackEnd.constants import POSITION_LIST
 from BackEnd.models.shot_manager import ShotManager
 from BackEnd.utils.shared import _resolve_oreb_putback_defender
+from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 from tests.test_utils import MockPlayer
 
 
@@ -102,10 +103,10 @@ def test_hco_assignment_overrides_geometry_for_defender_presence(monkeypatch):
         "shooter": shooter,
         "passer": game.offense_team.lineup["SG"],
         "screener": game.offense_team.lineup["SF"],
-        "shot_spot": {"x": 14, "y": 32},
+        "shot_spot": {"x": 80, "y": 32},
     }
 
-    shooter.coords = {"x": 14, "y": 32}
+    shooter.coords = {"x": 80, "y": 32}
     assigned_defender.coords = {"x": 90, "y": 22}
     for pos, player in game.defense_team.lineup.items():
         if pos != "PG":
@@ -183,6 +184,82 @@ def test_fast_break_no_defender_path_does_not_crash(monkeypatch):
 
     assert result["result_type"] in {"MAKE", "MISS"}
     assert game.game_state["no_defender_shots"] == 1
+
+
+def test_three_point_geometry_matches_home_and_away_arc():
+    assert is_three_point_shot_from_coords({"x": 64, "y": 25}, is_away_offense=False)
+    assert is_three_point_shot_from_coords({"x": 36, "y": 25}, is_away_offense=True)
+    assert not is_three_point_shot_from_coords({"x": 80, "y": 25}, is_away_offense=False)
+    assert not is_three_point_shot_from_coords({"x": 20, "y": 25}, is_away_offense=True)
+
+
+def test_shot_manager_prefers_shot_spot_geometry_over_skeleton_name():
+    game = _build_stub_game()
+    shot_manager = ShotManager(game)
+    shooter = game.offense_team.lineup["PG"]
+
+    roles = {
+        "shooter": shooter,
+        "shot_spot": {"x": 64, "y": 25},
+        "steps": [
+            {
+                "pos_actions": {
+                    "PG": {"action": "shoot", "location": "basketSpot"},
+                }
+            }
+        ],
+    }
+
+    assert shot_manager.is_three_point_shot(shooter, roles) is True
+
+
+def test_fast_break_outside_branch_can_classify_as_three(monkeypatch):
+    game = _build_stub_game()
+    shot_manager = ShotManager(game)
+    shooter = game.offense_team.lineup["PG"]
+    game.game_state["offensive_state"] = "FAST_BREAK"
+    game.offense_team.team_attributes["shot_threshold"] = 100
+
+    captured = {}
+
+    def fake_calculate(
+        self,
+        shooter,
+        passer,
+        screener,
+        defender,
+        shot_type,
+        defense_call,
+        is_three,
+        is_paint=False,
+        second_defender=None,
+        shooter_location=None,
+        apply_defense=True,
+        **kwargs,
+    ):
+        captured["is_three"] = is_three
+        captured["is_paint"] = is_paint
+        return 999, 999, 0, False, None
+
+    monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
+
+    result = shot_manager.resolve_shot(
+        {
+            "shooter": shooter,
+            "passer": game.offense_team.lineup["SG"],
+            "defender": None,
+            "is_fast_break": True,
+            "shot_type": "outside",
+            "motion_playcall": "Outside",
+            "shot_spot": {"x": 64, "y": 25},
+        }
+    )
+
+    assert result["result_type"] == "MAKE"
+    assert captured["is_three"] is True
+    assert captured["is_paint"] is False
+    assert shooter.get_stat("3PTA") == 1
+    assert shooter.get_stat("3PTM") == 1
 
 
 def test_regular_fast_break_miss_uses_25_grid_rebound_geo_filter(monkeypatch):
