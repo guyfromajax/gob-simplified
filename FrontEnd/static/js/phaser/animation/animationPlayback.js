@@ -657,11 +657,21 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
         { ...(announcement.meta || {}), scene },
       );
     } else {
+      // Made 3-pointer "It's Good!" → random announcer "three" call at overlay
+      // mount (SFX_System.md "Made Three Announce"). The made-shot announcement
+      // is a backend-stamped schema step announcement rendered here; inject the
+      // "three_make" cue when the turn scored 3 and no sfx was already stamped.
+      const meta = { ...(announcement.meta || {}), scene };
+      const normText = String(announcement.text || "").trim().toLowerCase();
+      const isThreeMake = normText === "it's good!"
+        && Number(turnData?.points ?? turnData?.points_scored) === 3;
+      if (isThreeMake && !meta.sfx) meta.sfx = "three_make";
+      console.warn('[3PT-SFX] runStepAnnouncement | text=', announcement.text, '| points=', turnData?.points, '| isThreeMake=', isThreeMake, '| sfx=', meta.sfx);
       showAnnouncement(
         announcement.text,
         announcement.team || "neutral",
         playerData,
-        { ...(announcement.meta || {}), scene },
+        meta,
       );
     }
     if (
@@ -833,7 +843,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         for (const [playerId, flourish] of Object.entries(flourishMap)) {
           const sprite = sprites[playerId];
           if (!sprite || !flourish) continue;
-          runFlourish(scene, sprite, flourish, { ballSprite });
+          runFlourish(scene, sprite, flourish, { ballSprite, turnData: options.turnData });
         }
       })
       .catch((err) => console.warn("flourish dispatch failed", err));

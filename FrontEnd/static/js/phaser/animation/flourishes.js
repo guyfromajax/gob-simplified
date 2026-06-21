@@ -18,6 +18,7 @@
 
 import { animationConfig } from "./animation_config.js";
 import { playStealReachInSfx } from "../utils/gameSfx.js";
+import { isPassInterception } from "../utils/announcements.js";
 
 /**
  * Resolve a render-space move target for a sprite/container, mirroring
@@ -68,7 +69,7 @@ function resolveTargetPoint(flourish, sprite, ballSprite) {
  * Render the reach_in flourish: a quick lunge of `sprite` toward the ball, then
  * a recover (yoyo). Render-space only.
  */
-function runReachIn(scene, sprite, flourish, ballSprite) {
+function runReachIn(scene, sprite, flourish, ballSprite, turnData = null) {
   const cfg = animationConfig.flourish?.reachIn || {};
   const targetPt = resolveTargetPoint(flourish, sprite, ballSprite);
   if (!targetPt) return;
@@ -110,7 +111,11 @@ function runReachIn(scene, sprite, flourish, ballSprite) {
 
   // Steal cue: two quick clicks back-to-back, starting the instant the reach-in
   // begins. Skipped flourishes (overlap guard above) intentionally don't re-fire it.
-  playStealReachInSfx(scene);
+  // On a pass-INTERCEPTION turn the only steal-family SFX is the "INTERCEPTION!"
+  // announce voice — suppress the reach-in steal click so the two don't overlap.
+  if (!isPassInterception(turnData)) {
+    playStealReachInSfx(scene);
+  }
 
   // Snapshot the base positions so we ALWAYS restore to them on complete OR stop
   // (a killed/interrupted relative tween otherwise leaves a residual offset — the
@@ -170,7 +175,9 @@ function runReachIn(scene, sprite, flourish, ballSprite) {
  * @param {Phaser.Scene} scene
  * @param {Phaser.GameObjects.Container} sprite   The player's sprite/container.
  * @param {import("./animationStepSchema.js").Flourish} flourish
- * @param {{ ballSprite?: Phaser.GameObjects.GameObject }} [opts]
+ * @param {{ ballSprite?: Phaser.GameObjects.GameObject, turnData?: object }} [opts]
+ *   `turnData` lets a flourish suppress its SFX on certain outcomes (e.g. the
+ *   reach-in steal click is muted on a pass-interception turn).
  */
 export function runFlourish(scene, sprite, flourish, opts = {}) {
   try {
@@ -178,7 +185,7 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
     if (sprite.active === false || sprite.destroyed) return;
     switch (flourish.kind) {
       case "reach_in":
-        runReachIn(scene, sprite, flourish, opts.ballSprite);
+        runReachIn(scene, sprite, flourish, opts.ballSprite, opts.turnData);
         return;
       // pump_fake / bite / gather / rattle / shot_dip / dribble / pickup / dunk:
       // accepted-but-unrendered placeholders for now.

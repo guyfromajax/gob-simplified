@@ -167,6 +167,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - Trigger: immediately when the **INTERCEPTION!** Announce appears (a PASS interception — Rim Runner lane pass, or the HCT/HCO/FCP pass-contest primitive's INTERCEPT terminal).
 - File: **33/33/34** random each show — `braddock-interception.mp3` or `duke-interception.mp3` or `sammy-interception.mp3`
 - Resolver: `resolveInterceptionSfxFile()` (gameSfx.js). Legacy `meta.sfx` key: `"interception"`.
+- Exclusivity: on an interception turn the interception voice is the **only** steal-family SFX. The reach-in steal click (`click-steal.wav`, `playStealReachInSfx`) that an earlier beaten-pressure beat would otherwise fire is **suppressed** — `flourishes.runReachIn` skips the click when `isPassInterception(turnData)` is true, so the steal click and the interception voice never overlap.
 
 **Made Three Announce**
 
