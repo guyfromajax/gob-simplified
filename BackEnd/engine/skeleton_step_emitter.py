@@ -415,15 +415,20 @@ def _build_archetype_map(
     def_lineup: Dict[str, Any],
     actions: Dict[str, PlayerAction],
     turn_type: str = "HCO",
+    pos_actions: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, PlayerArchetype]:
-    """Per-player archetype derived from per-player action + turn type."""
+    """Per-player archetype: explicit ``pos_action["archetype"]`` override (offense only) else
+    derived from per-player action + turn type. The override lets specific beats render at a
+    distinct pace — e.g. Dynamic HCO Motion subtle movers use ``drift`` for a deliberate feel."""
+    pos_actions = pos_actions or {}
     out: Dict[str, PlayerArchetype] = {}
     for lineup in (off_lineup, def_lineup):
         for pos in _OFFENSE_POSITIONS:
             pid = _player_id_at_pos(lineup, pos)
             if not pid:
                 continue
-            out[pid] = _archetype_for_action(
+            override = (pos_actions.get(pos) or {}).get("archetype") if lineup is off_lineup else None
+            out[pid] = override or _archetype_for_action(
                 actions.get(pid, "stationary"), turn_type
             )
     return out
@@ -1189,7 +1194,10 @@ def build_skeleton_animation_steps(
         destinations, actions = _build_step_destinations_and_actions(
             skeleton_steps, i, off_lineup, def_lineup, end_coords, bh_def_pos,
         )
-        archetype = _build_archetype_map(off_lineup, def_lineup, actions, turn_type)
+        archetype = _build_archetype_map(
+            off_lineup, def_lineup, actions, turn_type,
+            pos_actions=(skeleton_steps[i].get("pos_actions") if i < len(skeleton_steps) else None),
+        )
 
         start_owner_pos, end_owner_pos = (
             ball_walks[i] if i < len(ball_walks) else (None, None)

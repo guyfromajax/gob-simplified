@@ -135,6 +135,20 @@ Then **`hct_converge`** runs (defense re-poses around the post-engagement BH; of
 
 **Debug trace:** set `LOG_FCP_STEP_COORDS = True` in `BackEnd/engine/fcp_step_trace.py` (default on). Server stdout prints `[FCP STEP TRACE]` (engine intent per segment, labeled Step N FCP) and `[FCP EMITTER TRACE]` (rendered schema steps). Emitter bail reasons log as `[FCP EMITTER TRACE] BAIL: …`. Set `False` when done playtesting.
 
+### §2.2 — FCP off-ball attack routing (locked)
+
+During **`hct_advance`** (after attack beats pressure) and on **open-floor broken-trap drives** (ABA flood until cutoff RETAIN):
+
+| Role | Behavior |
+|------|----------|
+| **Backcourt non-BH** (PG/SG/SF) | Target **x∈[46,53]**, **y = start y ± 6** at assignment; chase at **sprint** until reached |
+| **PF** | Hold while ball progress **x < 34**; then random point within **6 euclid** of **FCP deep key** (anchor **x=47**, backcourt-side of half court); at **x ≥ 50** random among **key / midWings / wings** (true random upper/lower) |
+| **C** | Hold while progress **x ≤ 34**; **34 < x ≤ 50** random **topLane / apex / midCorner / wing** on **BH vertical half**; **x > 50** **midLane** + same-half **lowPost / midPost / midBaseline / corner / midCorner / bird** |
+
+Ball progress **x** = BH **x** (home); away mirrored. BH half: **y > 25 → upper**, else lower. Destinations persist until reached, phase change, or terminal; **backtrack** re-applies the band rules. Broken-trap **RETAIN** → revert to incremental routing. Engagement/converge/hold/pass unchanged (setup hustle).
+
+**Module:** `BackEnd/engine/fcp_offball_attack.py`
+
 ### Terminals (dynamic target)
 
 | Terminal | Dynamic target |

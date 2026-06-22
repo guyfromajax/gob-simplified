@@ -146,6 +146,34 @@ def test_all_offense_present_and_coords_explicit():
     assert beat["pos_actions"]["PG"]["action"] == "handle_ball"  # BH keeps the ball
 
 
+def test_subtle_movers_use_drift_archetype():
+    off = _lineup("PG", "SG")
+    beat = build_subtle_beat(_step({"PG": "key", "SG": "upper wing"}), off,
+                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=1, random_val=0.0))
+    assert beat["pos_actions"]["PG"]["archetype"] == "drift"   # BH dribble
+    for pa in beat["pos_actions"].values():
+        if pa["action"] == "cut":
+            assert pa["archetype"] == "drift"                  # non-BH movers
+        if pa["action"] == "stationary":
+            assert "archetype" not in pa                       # holders untouched
+
+
+def test_emitter_archetype_map_respects_explicit_override():
+    from BackEnd.engine.skeleton_step_emitter import _build_archetype_map
+
+    class _P:
+        def __init__(self, pid):
+            self.player_id = pid
+
+    off = {"PG": _P("off_pg"), "SG": _P("off_sg")}
+    deff = {"PG": _P("def_pg")}
+    actions = {"off_pg": "cut", "off_sg": "cut", "def_pg": "guard_offball"}
+    pos_actions = {"PG": {"action": "cut", "archetype": "drift"}, "SG": {"action": "cut"}}
+    arch = _build_archetype_map(off, deff, actions, "HCO", pos_actions=pos_actions)
+    assert arch["off_pg"] == "drift"        # explicit override wins
+    assert arch["off_sg"] == "cruise"       # no override → HCO cut default
+
+
 def test_returns_none_when_bh_absent_from_step():
     assert build_subtle_beat(_step({"SG": "upper wing"}), _lineup("PG", "SG"),
                              "PG", is_away_offense=False, rng=FakeRng()) is None

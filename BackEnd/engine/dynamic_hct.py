@@ -2014,6 +2014,12 @@ def compute_dynamic_hct_turn(
 
     bh_xy = off_coords[bh_pos]
 
+    fcp_offball: Optional[Any] = None
+    if turn_mode == "fcp":
+        from BackEnd.engine.fcp_offball_attack import FcpOffballAttackState
+
+        fcp_offball = FcpOffballAttackState(is_away_offense)
+
     # Seed the running shot clock once (§4 Time terminals). Decremented per
     # segment so the loop is strictly bounded.
     shot_clock = float(game_state.get("shot_clock_remaining", 30) or 30)
@@ -2208,6 +2214,36 @@ def compute_dynamic_hct_turn(
     )
     shot_clock -= converge_seconds
 
+    def _fcp_move_offense(
+        bh_xy_ref: Dict[str, Any],
+        seconds: float,
+        *,
+        exclude: Optional[set] = None,
+        aba_only: bool = False,
+    ) -> None:
+        """FCP off-ball routes: incremental press-break or ABA flood."""
+        if fcp_offball is None:
+            _move_offense(off_coords, off_targets, seconds, off_lineup, bh_pos, exclude=exclude)
+            return
+        if aba_only:
+            if not fcp_offball._aba_mode:
+                fcp_offball.enter_aba_mode(off_coords, bh_pos)
+        else:
+            first = not fcp_offball._incremental_active
+            fcp_offball.refresh_incremental(
+                bh_xy_ref, off_coords, bh_pos, force=first,
+            )
+        fcp_offball.move_offense(
+            off_coords,
+            off_lineup,
+            bh_pos,
+            seconds,
+            exclude=exclude,
+            ag_grid_fn=_ag_grid_per_game_sec,
+            interrupted_fn=_interrupted_coord,
+        )
+        fcp_offball.sync_off_targets(off_targets, bh_pos)
+
     def _advance(label: str = "advance (BH dribbles forward)") -> None:
         """Neutral / beaten-pressure advance: BH dribbles forward, defense re-poses."""
         nonlocal bh_xy
@@ -2223,8 +2259,8 @@ def compute_dynamic_hct_turn(
         # D15: defenders chase at their own rate (interrupted), so a quicker BH
         # gains separation rather than the defense snapping back onto him.
         _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play)
-        # D15b: off-ball offense keep hustling toward their setup spots.
-        _move_offense(off_coords, off_targets, advance_seconds, off_lineup, bh_pos)
+        # D15b: off-ball offense — FCP press-break routes or setup hustle.
+        _fcp_move_offense(bh_xy, advance_seconds)
         _append_loop_segment(
             "hct_advance",
             advance_seconds,
@@ -2263,6 +2299,9 @@ def compute_dynamic_hct_turn(
         meet-point foul / dead ball — ``result_type`` already set), or "RETAIN"
         (the BH won the collision and is now dribble-dead → re-read)."""
         nonlocal bh_xy, dribble_alive, result_type, text_suffix, pending_dfoul_trapper
+        if turn_mode == "fcp" and fcp_offball is not None:
+            fcp_offball.enter_aba_mode(off_coords, bh_pos)
+            fcp_offball.sync_off_targets(off_targets, bh_pos)
         # Drive target keyed to the BH's current y (home orientation; y bands read
         # the same for away, only x flips via _flip).
         if bh_xy["y"] > BROKEN_HCT_DRIVE_Y_MAX:
@@ -2293,8 +2332,10 @@ def compute_dynamic_hct_turn(
                     _interrupted_coord(def_coords[trail_pos], target, def_rate, seconds)
                 )
             bh_xy = off_coords[bh_pos]
-            # Off-ball players each roll to drift toward the rim or hold.
-            _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", trail_pos)})
+            if turn_mode == "fcp" and fcp_offball is not None:
+                _fcp_move_offense(bh_xy, seconds, aba_only=True)
+            else:
+                _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", trail_pos)})
             _append_loop_segment(
                 "hct_attack",
                 seconds,
@@ -2318,8 +2359,10 @@ def compute_dynamic_hct_turn(
         off_coords[bh_pos] = meet
         def_coords[cutoff_pos] = dict(meet)
         bh_xy = off_coords[bh_pos]
-        # Off-ball players each roll to drift toward the rim or hold.
-        _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", cutoff_pos)})
+        if turn_mode == "fcp" and fcp_offball is not None:
+            _fcp_move_offense(bh_xy, seconds, aba_only=True)
+        else:
+            _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", cutoff_pos)})
         _append_loop_segment(
             "hct_attack",
             seconds,
@@ -2350,6 +2393,8 @@ def compute_dynamic_hct_turn(
             return "TERMINAL"
         # POS_O / NEUTRAL → BH beats the defender but has gathered his dribble.
         dribble_alive = False
+        if turn_mode == "fcp" and fcp_offball is not None:
+            fcp_offball.exit_aba_to_incremental(bh_xy, off_coords, bh_pos)
         return "RETAIN"
 
     def _seed_fast_break() -> None:

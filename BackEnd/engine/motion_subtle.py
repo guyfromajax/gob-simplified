@@ -26,6 +26,9 @@ _Y_MIN, _Y_MAX = 2.0, 48.0
 
 # Ball-handler radial moves (side-dribble is added dynamically when eligible).
 BH_SUBTLE_MOVES = ("in_place", "back", "in")
+# Subtle movers render slower than a normal HCO cut/dribble (cruise) for a deliberate
+# "feeling-out" pace. The emitter reads this explicit archetype off the pos_action.
+SUBTLE_ARCHETYPE = "drift"
 # Inside "flash" targets (brief: lowPost players flash to midLane / a midPost / a highPost).
 _INSIDE_FLASH_BASE = ("midLane",)
 # Probability a given non-BH player relocates during the beat (random for now).
@@ -152,7 +155,7 @@ def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng):
     bh_target, bh_move = _bh_subtle(loc_by_pos.get(bh_pos, ""), coords_by_pos[bh_pos],
                                     bh_occupied, is_away_offense, rng)
 
-    new_pos_actions = {bh_pos: {"coords": bh_target, "action": "handle_ball"}}
+    new_pos_actions = {bh_pos: {"coords": bh_target, "action": "handle_ball", "archetype": SUBTLE_ARCHETYPE}}
     movers = [bh_pos]
     for pos, xy in coords_by_pos.items():
         if pos == bh_pos:
@@ -162,7 +165,7 @@ def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng):
             occupied = {_norm(l) for q, l in loc_by_pos.items() if q != pos and l}
             target = _non_bh_target(loc_by_pos.get(pos, ""), xy, occupied, is_away_offense, rng)
             if target:
-                new_pos_actions[pos] = {"coords": target, "action": "cut"}
+                new_pos_actions[pos] = {"coords": target, "action": "cut", "archetype": SUBTLE_ARCHETYPE}
                 movers.append(pos)
                 moved = True
         if not moved:
