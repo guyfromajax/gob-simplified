@@ -1,6 +1,6 @@
 ## Stopper System (Jan 2025; **verified + updated 2026-06-13**)
 
-> **UESS render status (2026-06-13).** The backend truncation logic described here is current, but the **frontend path has migrated**: HCO / FCP / HCT stopper outcomes now ship a unified `animation_steps[]` payload and are **schema-rendered** by the UESS playback engine, *not* the legacy `playTurnAnimation()` renderer. The skeleton emission entry points are `turn_manager._emit_hco_animation_steps()` (HCO, via `build_skeleton_animation_steps`), `build_skeleton_animation_steps(..., turn_type="FCP")` (FCP), and `build_dynamic_hct_animation_steps()` (dynamic HCT). Phase 2 of the HCO UESS migration **drops the legacy `animations[]` field** from HCO turn results entirely; the `skeleton_to_animations()` + `playTurnAnimation()` path documented below is retained only as a fallback when no `animation_steps` are present. The schema emitter has dedicated stopper-step handling (`_is_fcp_stopper_action_step` / `_resolve_fcp_stopper_gate_ids` in `skeleton_step_emitter.py`).
+> **UESS render status (2026-06-13).** The backend truncation logic described here is current for **FCP** (and legacy HCT when `USE_DYNAMIC_HCT = False`). **Live HCT** uses `build_dynamic_hct_animation_steps()` — no skeleton stopper. HCO / FCP stopper outcomes ship unified `animation_steps[]` and are **schema-rendered** by the UESS playback engine.
 
 ### Overview
 
@@ -8,13 +8,13 @@ The **Stopper System** is an SS&S (Single Source & Scalable) system that interru
 
 **Key Design Principles:**
 - **SS&S Architecture**: Uses shared helper functions (`get_ball_handler_from_skeleton()`, `select_foul_player()`, `resolve_non_shooting_foul()`, `resolve_turnover_logic()`) for consistency across turn types
-- **Skeleton Reuse**: Uses existing skeleton variants (HCO: successful, mid_play_change, contested, broken; FCP/HCT: base variant) instead of creating result-specific skeletons
+- **Skeleton Reuse**: Uses existing skeleton variants (HCO: successful, mid_play_change, contested, broken; **FCP**: base variant; **legacy HCT** base variant) instead of creating result-specific skeletons
 - **Dynamic Interruption**: Determines stop step based on result type (random for fouls, strategic for turnovers/steals)
 - **Deep Copy Protection**: Always creates a deep copy of the skeleton before modification to prevent cache mutation
 
 ### When Stopper System Activates
 
-The stopper system activates in **HCO, FCP, and HCT turns** when a non-SHOT result is determined:
+The stopper system activates in **HCO and FCP** turns (and **legacy HCT** when `USE_DYNAMIC_HCT = False`) when a non-SHOT result is determined:
 
 **Possible Results:**
 - `SHOT` - Normal flow, proceeds to shot resolution (no stopper)
@@ -36,15 +36,19 @@ The stopper system activates in **HCO, FCP, and HCT turns** when a non-SHOT resu
   4. Shot Attempt (if no event occurred)
 - See `HCO_Turn_Resolution_System.md` for detailed resolution flow
 
-**FCP / HCT Turns** (result math owned by `FCP_HCT_System.md` — summarized here, do not re-spec):
-- Score-based: `offenseScore`/`defenseScore` from the PG-weighted (×3) BH/AG/IQ vs OD/AG/IQ formulas, each ×`randint(1,6)`. See `resolve_full_court_press_logic()` (~L5724) / `resolve_half_court_trap_logic()` (~L7155).
-- **Success gate** `(offenseScore + BSM) > defenseScore`, where `BSM` (Base Success Modifier) = **400** (FCP) / **200** (HCT) `+ 10×offense fight`, then chemistry adjustments via `pt_opp_modifier` / `pt_efficiency`.
-- **Dominant** success `offenseScore - defenseScore > DST`, where `DST` (Defense Safety Threshold) = **600** (FCP) / **800** (HCT) + discipline/chemistry adjustment:
+**FCP Turns** (result math owned by `FCP_HCT_System.md` — summarized here, do not re-spec):
+- Score-based: `offenseScore`/`defenseScore` from the PG-weighted (×3) BH/AG/IQ vs OD/AG/IQ formulas, each ×`randint(1,6)`. See `resolve_full_court_press_logic()` (~L5724).
+
+**HCT Turns (legacy fallback only):** When `USE_DYNAMIC_HCT = False`, HCT used the same score/stopper path as FCP with HCT BSM/DST constants — see `HCT_System.md` § Legacy Fallback. **Live HCT** (`USE_DYNAMIC_HCT = True`, default) does **not** use this math or the stopper system; outcomes emerge from the dynamic loop in `dynamic_hct.py`. HCT schema playback uses `build_dynamic_hct_animation_steps()` instead of skeleton stopper truncation.
+
+**FCP score math (reference):**
+- **Success gate** `(offenseScore + BSM) > defenseScore`, where `BSM` = **400** `+ 10×offense fight`, then chemistry adjustments via `pt_opp_modifier` / `pt_efficiency`.
+- **Dominant** success `offenseScore - defenseScore > DST`, where `DST` = **600** + discipline/chemistry adjustment:
   - Dominant → weighted choice **`D_FOUL` 30% / `HCO` 40% / `SHOT` 30%**
   - Regular success → `result_type = "HCO"` (break through)
 - **Failure** (defense wins) → weighted choice `O_FOUL` 20% / `DEAD_BALL_TURNOVER` 50% / `STEAL` 30%
 
-> Earlier versions of this doc listed the success gate as a flat `+500`/`+300` and the dominant gate as `>1000` with `D_FOUL/HCO/SHOT = 30/50/20`. Those were stale — the live values are the BSM/DST formulas above (verified 2026-06-13 against `phase_resolution.py`, matching `FCP_HCT_System.md`).
+> Earlier versions listed flat `+500`/`+300` gates — stale. HCT live path: `HCT_System.md` (not this math).
 
 ### Stopper Step Selection
 

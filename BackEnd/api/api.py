@@ -3066,6 +3066,23 @@ try:
                                     saved_ng = saved_player_data["attributes"]["NG"]
                                     player.attributes["NG"] = saved_ng
                                     player._rescale_attributes()  # Update scaled attributes based on NG
+
+                                # Restore dynamic non-malleable attributes (MO/EM/CH).
+                                # Unlike SC/SH/etc., these are NOT derived from anchor_X * NG, so
+                                # _rescale_attributes() does not reconstruct them. A freshly built
+                                # Player loads MO/EM/CH from the base roster record, so without this
+                                # in-game momentum (MO) and emotion/chemistry would be lost on every
+                                # timeout resume (which always force-reloads from DB). The save side
+                                # persists these in summarize_game_state (utils/shared.py), and the
+                                # _initialize_game_stats restore branch is skipped here because
+                                # game_stats_initialized is restored True, so we must restore them.
+                                saved_player_attrs = saved_player_data.get("attributes", {})
+                                for _attr in ("MO", "EM", "CH"):
+                                    if _attr in saved_player_attrs:
+                                        _val = saved_player_attrs[_attr]
+                                        player.attributes[_attr] = _val
+                                        # Keep the anchor in sync (mirrors _initialize_game_stats)
+                                        player.attributes[f"anchor_{_attr}"] = _val
                                 
                                 # Restore court coords (saved on timeout/quarter breaks)
                                 sx, sy = saved_player_data.get("x"), saved_player_data.get("y")

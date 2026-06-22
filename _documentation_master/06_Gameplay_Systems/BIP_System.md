@@ -114,9 +114,11 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 
 #### 2. BASELINE_INBOUND → HCT (Half Court Trap)
 
+> Full HCT gameplay bible: [`HCT_System.md`](./HCT_System.md).
+
 **Backend Setup (Dynamic HCT — bypasses the MongoDB skeleton):**
 - `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup="HCT"`
-- **Offense:** static `HCT_SETUP_POSITIONS` mapping → `HCO_STRING_SPOTS` coords (flipped for away offense). `offense_setup_positions` is built directly from those computed `o_dest` coords — **not** from a skeleton step 0 (pulling skeleton step 0 would override authored spots and cause BH hold drift; see `Dynamic_HCT_Turns.md`)
+- **Offense:** static `HCT_SETUP_POSITIONS` mapping → `HCO_STRING_SPOTS` coords (flipped for away offense). `offense_setup_positions` is built directly from those computed `o_dest` coords — **not** from a skeleton step 0 (pulling skeleton step 0 would override authored spots and cause BH hold drift; see `HCT_System.md`)
 - **Defense:** `hct_initial_defender_coords(is_away_offense)` from `BackEnd/engine/dynamic_hct.py` — PG at center court (`DEFENSIVE_PG_STEP_1_TARGET`), the other four at the **centroid of their `HCT_STANDARD_NORMAL` polygon**, so BIP-end matches dynamic HCT step 0 with no teleport
 - SF is the inbounder (uses `inbound_left` location from `HCT_SETUP_POSITIONS`)
 
@@ -151,7 +153,7 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
   - Defense per-position ranges from `FCP_DEFENSE_SETUP_RANGES` (all 5 — replaces the legacy `get_defender_coords`-derived layout for FCP)
   - **Collision resolution:** any exact (x, y) pair collision is broken by moving one random player `FCP_SETUP_COLLISION_OFFSET_GRID` spots in a random direction, re-checked ≤10 rounds
   - Generated in home orientation; flipped via `getAwayTeamCoords` for away offense
-  - Full details: `FCP_HCT_System.md` → "FCP Starting Alignment"
+  - Full details: `FCP_HCT_System.md` → "FCP Starting Alignment" (FCP-only doc; HCT → `HCT_System.md`)
 - `offense_setup_positions` is built from those `o_dest` coords — **not** from skeleton step 0. Players animate from BIP-end coords toward the first post-inbound skeleton step at archetype rate (non-gate movers freeze at the interrupted coord per UESS §9.5 — no teleport)
 - SF is the inbounder (baseline inbound spot)
 - (`get_skeleton_for_turn` step-0 sourcing remains only as the fallback for hypothetical future pressure types — neither HCT nor FCP uses it)

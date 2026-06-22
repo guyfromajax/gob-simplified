@@ -47,6 +47,22 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 - Works consistently across all game modes (franchise is live; **single / tournament are SUNSET** — see `Sunset_Modes.md`)
 - **Player Momentum (MO):** a regular timeout decays each active player's MO toward 0 by `randint(0,1)` (the smallest of the break decay ranges — 0 means a timeout may leave MO unchanged; bench → 0). **Foul-out timeouts do NOT reset MO.** See [Player_Momentum_System.md](Player_Momentum_System.md).
 
+### Player Attribute Persistence Across Resume (fixed 2026-06-22)
+
+A timeout resume **always force-reloads the game from MongoDB** (`api.py` ~line 2714, `_drop_cached_game()` even when the game is warm in `ongoing_games`). This builds fresh `Player` objects whose attributes start from the **base roster record**, so any in-game attribute value not explicitly restored from the saved game doc is lost.
+
+Two classes of attributes, restored differently in the resume loop (`api.py` `simulate_quarter_endpoint`, ~line 3064):
+
+| Attribute class | Persisted? | How it survives resume |
+|---|---|---|
+| `NG` (energy) | yes | restored directly, then `_rescale_attributes()` |
+| Malleable (`SC, SH, ID, OD, PS, BH, RB, ST, AG, FT`) | derived | recomputed as `anchor_X * NG` by `_rescale_attributes()` — never persisted individually |
+| `MO, EM, CH` (dynamic, non-malleable) | yes | **must be restored directly** — NOT derived from anchors, so `_rescale_attributes()` does not reconstruct them |
+
+**The bug (pre-2026-06-22):** `summarize_game_state()` correctly saved `MO`/`EM`/`CH` to the game doc, but the resume loop only read back `NG`. The `_initialize_game_stats` MO-restore branch (`main.py` ~line 98) was also skipped because `game_stats_initialized` is restored `True` on resume. Result: **MO (and EM/CH) reverted to base roster values on every timeout resume.**
+
+**The fix:** the resume loop now also assigns `MO`/`EM`/`CH` from `saved_player_data["attributes"]` and syncs their `anchor_*` values (mirroring `_initialize_game_stats`). See [Data_Persistence_System.md](../01_Data_Persistence/Data_Persistence_System.md) for the persistence contract.
+
 ### Timeout Turn Creation
 
 **User-Initiated Timeout:**

@@ -358,6 +358,28 @@ This system documents data persistence across all three game modes when users ar
 
 **Note:** All major persistence issues have been resolved through the Unified State Persistence refactoring (Phases 1-5.7). The fixes documented below are historical and have been integrated into the current system. For complete implementation history, see `../projects/Z-Completed/Unified_State_Persistence_Work_Plan.md` (archived).
 
+### ✅ Fixed: Player MO/EM/CH Not Restored on Timeout Resume (June 22, 2026)
+
+**Issue:** Player Momentum (`MO`) — along with `EM` and `CH` — reverted to base roster values every time a game resumed from a timeout. Other in-game attribute values (`NG`, and the malleable attrs `SC`/`SH`/etc.) persisted correctly.
+
+**Root Cause:**
+- A timeout resume **always force-reloads the game from MongoDB** (`api.py` ~line 2714: `_drop_cached_game()` runs even when the game is warm in `ongoing_games`), so fresh `Player` objects are built with attributes from the **base roster record**.
+- `summarize_game_state()` (`BackEnd/utils/shared.py`) correctly saved `EM`/`CH`/`MO`/`NG` to the game doc, but the resume restore loop in `simulate_quarter_endpoint` (`api.py` ~line 3064) read back **only `NG`**.
+- `NG` reconstructs the malleable attrs via `_rescale_attributes()` (`SC = anchor_SC * NG`, etc.), so those survived. But `MO`/`EM`/`CH` are **not** anchor-derived, so nothing reconstructed them.
+- The `_initialize_game_stats` MO-restore branch (`main.py` ~line 98) was also bypassed because `game_stats_initialized` is restored `True` on resume, causing an early return before the restore code runs.
+
+**Fix:** The resume restore loop now also assigns `MO`/`EM`/`CH` from `saved_player_data["attributes"]` and syncs their `anchor_*` values (mirroring `_initialize_game_stats`).
+
+**Persistence contract (player attributes during active gameplay):**
+
+| Attribute class | Saved to game doc | Restored on resume |
+|---|---|---|
+| `NG` (energy) | yes | direct restore + `_rescale_attributes()` |
+| Malleable (`SC, SH, ID, OD, PS, BH, RB, ST, AG, FT`) | no (derived) | recomputed as `anchor_X * NG` |
+| `MO, EM, CH` (dynamic, non-malleable) | yes | **direct restore required** (this fix) |
+
+**Files Changed:** `BackEnd/api/api.py` (`simulate_quarter_endpoint` resume restore loop). See [Timeout_System.md](../06_Gameplay_Systems/Timeout_System.md) ("Player Attribute Persistence Across Resume").
+
 ### ✅ Fixed: Franchise/Tournament Settings Source Drift (February 2026, superseded by April 2026 two-stage model)
 
 **Issue:** In franchise and tournament mode, game plan and playbook settings could appear to be "lost" when returning to the lineup screen after a timeout or when navigating during gameplay. Persistence worked before the game but not consistently during the game.

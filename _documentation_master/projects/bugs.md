@@ -10,33 +10,30 @@
 ##Bugs 
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 37. Player Foul Out Next Step bug
-40. Batted ball out of bounds is not animating or executing properly
 
 ##New Features
-11. More action on Signing Day
-22. User account -- link X & Facebook?
 24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 25. Fast Break and P/T callouts in the Scouting Report of opponent
-27. Update logic on rebounds
 28. Micro Movements
-29. Write Advanced Topics tutorials
-30. Film Study impacts scouting notes
+29. EOG/EOQ Perfection
+101. Dynamic Press Plays
+109. More dynamic HCO animations
+115. Better HCO steal/turnover logic
+103. Player images
+111. Marketing Screenshot Tool Build
 
 ##Full Product Readiness
-100. Dynamic Trap Plays --  add Diamond Trap play
-101. Dynamic Press Plays
 102. Team court images
-103. Player images
 105. More responsive front end
 106. Monetization plan
 107. Stripe
 108. Message board
-109. More dynamic HCO animations
 110. Strategic Geek Points system
-111. Marketing Screenshot Tool Build
 113. Bring logic to screens
 114. Better defense stat tracking
-115. Better HCO steal/turnover logic
+116. User account -- link X & Facebook?
+117. More action on Signing Day
+118. Lose stale load of mode select screen
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report
@@ -45,8 +42,9 @@
 5. Add a new hire news story for user team
 6. Add a badass design appraoch to New Stories
 
-##In-Game SFX Ideas
-1. Deny, Picked Up His Dribble, No Good/Missed
+##Continuous Evolution (base is built)
+1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
+2. Advanced Topics tutorials
 
 
 

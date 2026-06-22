@@ -1,0 +1,238 @@
+## Half Court Trap (HCT) System ✅ **COMPLETE** (Dynamic HCT — March 2026)
+
+> **Canonical reference (Bible):** This document is the **single source of truth** for the live **dynamic** Half Court Trap system — activation, loop logic, trap plays, outcomes, animation, stats, and file touchpoints. The original design brief and implementation tracker live in `_documentation_master/projects/Dynamic_HCT_Turns.md` (historical spec + open design notes). If something conflicts, **treat this file as authoritative** for runtime behavior unless the team explicitly updates both.
+
+**Legacy note:** HCT no longer uses MongoDB skeletons + the stopper system when `USE_DYNAMIC_HCT = True` (default). The skeleton/stopper path remains in `resolve_half_court_trap_logic()` only as a fallback when the flag is `False`.
+
+---
+
+**Base Constants**
+
+1. **Moment detection radius:** `MOMENT_RANGE = 11` euclidean grid spots (`dynamic_hct.py`) — pressure (1 defender) / trap (2+ defenders in range, with at least one ahead on x).
+2. **Attack Basket Area (ABA):** x past half court toward basket, **y ∈ [10, 40]** (`ATTACK_BASKET_Y_MIN/MAX`). Trap-break / goal resolution runs only when the BH enters this band.
+3. **10-second rule:** `HCT_TEN_SECOND_LIMIT = 10.0` game-seconds from possession start; disabled when &lt;10s remain in the quarter at possession start. Checked with shot-clock each loop iteration.
+4. **Walk-up engage point:** BH targets **(44, y ∈ [21, 29])** after BIP (flipped for away offense).
+5. **BH advance beat (beat pressure/trap):** `+random(6, 12)` x toward basket, `+random(-6, 6)` y.
+6. **Drive / cutoff pace:** `ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12`; AG-scaled via `ag_to_grid_per_game_sec`.
+7. **Off-ball drift (cutoff + FB drive):** `HCT_DRIFT_PROBABILITY = 0.5` — each off-ball player (both teams) rolls 50% to drift toward rim at `DRIFT_GRID_PER_GAME_SEC = 8`, else hold.
+8. **Pass contest lane width:** `PASS_LANE_DIST = 8` (`pass_contest.py`); safety gate base `PASS_SAFETY_BASE = 200`; intercept tiers `250` / `200` → STEAL / bat-OOB.
+9. **Trap play weights (user default):** `standard_trap` 34 / `straight_pressure` 33 / `standard_diamond` 33 (`hct_trap_play_types.DEFAULT_HCT_TRAP_WEIGHTS`). CPU teams use Standard Diamond at 0% unless projected starting SG AG &gt; 50 (see `cpu_playbook_customization.py`).
+
+---
+
+**HCT Resolution Flow (high level)**
+
+1. **Apply energy decay** — active players via `apply_energy_decay(..., omit_zeros_for_defense=True)`.
+2. **Track attempt** — `def_scouting["defense"]["HCT"]["used"] += 1`.
+3. **Resolve trap play** — `game_state["hct_trap_play"]` (stashed at BIP by `TurnManager.determine_defensive_pressure_type`) or `play_key_for_hct_trap(def_team.playbook_settings)`.
+4. **Run engine** — `get_hct_trap_play(play_key).run(game)` → `compute_dynamic_hct_turn(game, play)` returns intermediate dict (`loop_segments`, `result_type`, roles, seeds).
+5. **Branch on terminal result:**
+   - **FAST_BREAK_SHOT** → `resolve_hct_fast_break_shot` (broken-trap FB; reuses `compute_fb_shot_geometry`).
+   - **ATTACK_BASKET_SHOT / ATTACK_BASKET_DRIVE** → `resolve_hct_attack_basket_shot` / `resolve_hct_attack_basket_drive`.
+   - **HCO / DEAD BALL / STEAL / FOUL** → wrapper in `_resolve_half_court_trap_dynamic_first_cut` sets possession, `next_play_type`, stats, foul/steal side effects.
+   - **Bat-OOB pass** → `result_type = DEAD BALL` + `bat_oob = True` — offense **retains** (side inbound, no TO, no possession flip).
+6. **Emit animation** — `build_dynamic_hct_animation_steps()` → `animation_steps[]` on turn result (UESS schema playback). Post-step hook: `_runHctBatOobBallSend` / `_runSchemaBatOobBallSend` for batted-ball ball flight (`batOobAnimation.js`).
+7. **Record stats** — `_record_hct_stats` + per-play `scouting_data["defense"]["hct_trap_plays"][play_key]`.
+
+---
+
+### Overview
+
+**Half Court Trap** is defensive pressure after a made basket when `offensive_state = "HCT"`. One HCT API turn = **one full trap-break possession**: the engine runs an internal **read → detect → resolve → move** loop until a terminal outcome (HCO transition, turnover, foul, steal, shot, clock violation, or bat-OOB pass).
+
+**Architecture (three layers)**
+
+| Layer | Module | Role |
+|-------|--------|------|
+| Wrapper | `phase_resolution._resolve_half_court_trap_dynamic_first_cut` | Stats, possession flips, foul bonus routing, steal→FB chance, merges engine output into turn dict |
+| Engine | `BackEnd/engine/dynamic_hct.py` | Loop, moments, passes, ABA reads, cutoff race, pass contests |
+| Plays | `BackEnd/engine/hct_trap_plays.py` | `HCTPlay` seams: `detect_moment`, `defense_targets`, `select_trappers`, `begin_possession` |
+| Emitter | `BackEnd/engine/dynamic_hct_step_emitter.py` | Engine intermediate → `animation_steps[]` |
+| Shots | `BackEnd/engine/dynamic_hct_shot.py` | ABA shot/drive + broken-HCT FB shot resolution |
+| Pass contests | `BackEnd/engine/pass_contest.py` | Universal COMPLETE / INTERCEPT / BAT_OOB primitive |
+| Cutoff geometry | `BackEnd/engine/cutoff_resolution.py` | Shared D21 drive cutoff (HCT broken trap + Covert Release FB stops) |
+
+**Feature flag:** `USE_DYNAMIC_HCT = True` in `phase_resolution.py` (set `False` to revert to legacy skeleton + BSM/DST math).
+
+---
+
+### When HCT Activates
+
+- After **made shots** when defense applies half court trap (`TurnManager.determine_defensive_pressure_type()` → `offensive_state = "HCT"`).
+- Preceded by **BASELINE_INBOUND** with `next_defensive_setup = "HCT"` (see **BIP entry** below).
+- Play key chosen once at the SS&S choke point and stored as `game_state["hct_trap_play"]`.
+
+---
+
+### BIP → HCT Entry
+
+Documented in detail in `BIP_System.md` § "BASELINE_INBOUND → HCT". Summary:
+
+- **Offense:** `HCT_SETUP_POSITIONS` → `HCO_STRING_SPOTS` coords (`hct_inbound_pg`, `hct_inbound_sg`, etc. in `constants/__init__.py`). SF inbounder; PG is the usual BIP receiver / first-cut BH.
+- **Defense:** `hct_initial_defender_coords(is_away_offense)` — PG at center court `(50, 25)`; wings/frontcourt at `HCT_STANDARD_NORMAL` zone centroids (`shared_defense.py`).
+- **Frontend:** `runInboundSetup(..., pressureType="HCT")` animates SF→PG inbound; HCT turn uses schema step 0 walk-up from `prior_turn.final_coords` (no redundant `runSetupTween` when `fromInbound && isFCPHCT`).
+- **Clocks** start when the inbound receiver has the ball (same contract as HCO BIP).
+
+---
+
+### Trap Play Selection (`hc_traps`)
+
+Mirrors Fast Break play selection on the **defending** team's playbook:
+
+| Key | Label | Summary |
+|-----|-------|---------|
+| `standard_trap` | Standard Trap | Zone-style normal formation; universal band-based primary/trapper on trap moments |
+| `straight_pressure` | Straight Pressure | Man-to-man backcourt locks at converge; trap only when **rover** reaches BH |
+| `standard_diamond` | Standard Diamond | 1-4 diamond (`center_bc_defender` default PG); band→role trapper map; dynamic D_FOUL backcourt/frontcourt split |
+
+Registry: `HCT_TRAP_PLAYS` in `hct_trap_plays.py`. Weights: `playbook_settings["hc_traps"]`. Per-play scouting: `scouting_data["defense"]["hct_trap_plays"][key]["A"|"S"]`.
+
+---
+
+### The Possession Loop
+
+Each loop iteration (after step 0 walk-up):
+
+1. **Time terminals** — shot clock ≤ 0 → `DEAD BALL` + `turnover_type = SHOT_CLOCK`; elapsed ≥ 10s and BH not past half → `TEN_SECOND` violation.
+2. **Zone precedence** — BH in ABA → §7 goal achievement (HCO vs FB read, or in-ABA shot tree). x &gt; half court but outside ABA y-band → trap persists (keep looping).
+3. **Moment detection** — `play.detect_moment(bh_xy, def_coords)` → `none` | `pressure` | `trap` (+ in-range defender list). Defenders must be within **11** spots and on the basket-side of the BH (x gate).
+4. **BH read** — `player_read`-style score → **attack / pass / hold** (thresholds dynamic on `BH + AG`; see `Dynamic_HCT_Turns.md` §12 for full table).
+5. **Resolve branch:**
+   - **attack + none (broken HCT)** → cutoff race to y-keyed ABA spot (`topLane` / upper or lower apex); meet → D8 contest (`_resolve_moment`, steal excluded on drives); no meet → ABA arrival → HCO/FB read or shot.
+   - **attack + pressure/trap** → D8 moment at contact.
+   - **hold** → defenders converge; if a defender reaches BH → same D8 contest.
+   - **pass** → vertical-half or central pass movement; **`resolve_pass_contest`** on flight (on-ball trappers excluded from intercept pool).
+6. **Emit segment** — append to `loop_segments`; decrement shot clock by segment duration.
+7. **Advance** (non-terminal) — BH random advance; defenders move via interrupted AG rates toward `play.defense_targets()`; off-ball offense tracks actual coords.
+
+**Dribble-dead:** winning an attack cutoff collision → BH picks up dribble; loop continues **pass/hold only**.
+
+---
+
+### Moment Resolution (D8)
+
+`_resolve_moment(off_team, def_team, bh, primary_def, trapper, exclude_steal=...)` — attribute-driven regions:
+
+- Defense wins → `STEAL`, `DEAD BALL`, or `O_FOUL` (charge).
+- Offense wins → BH advances (or dribble-dead on cutoff), or `D_FOUL` (reach-in, 60/30/10 fouler spread).
+- Neutral → hold / stall (trap loop continues).
+
+Aggression multiplier on defense-wins rates; offense `fight` suppresses. **Steal excluded** on full-speed drive cutoff collisions.
+
+---
+
+### Primary / Trapper Selection (trap moments)
+
+**Universal rule (Standard Trap + Straight Pressure trap via rover):** Among in-range defenders, **primary** = closest to BH **within the ball's vertical band** (upper / center / lower); **trapper** = second in-range defender (PG on vertical-half traps when primary is not PG — see `_select_trappers`).
+
+**Standard Diamond override:** Band → role map (`center_bc_defender` → PG as trapper on vertical-half traps; upper → pos2/SF; lower → pos3/PF). D_FOUL backcourt/frontcourt split uses play-specific court split via `_diamond_court_split`.
+
+---
+
+### Pass Contests (§14 — built)
+
+On each HCT pass, `_resolve_hct_pass_contest` → `resolve_pass_contest()`:
+
+1. **Geometry gate** — in lane (perp distance ≤ 8) + D21 reachable-in-time with IQ anticipation head-start.
+2. **Passer safety gate** — `(PS·0.6 + CH·0.2 + IQ·0.2) × d6` vs `200 − pt_opp_modifier` (HCT offense modifier).
+3. **Intercept band** — defender composite vs tiers → **COMPLETE**, **INTERCEPT** (→ `STEAL` terminal), or **BAT_OOB** (→ dead ball, offense keeps).
+
+On-ball defenders within moment range of the passer are **excluded** from the intercept pool (trappers can't peel to steal their own trap outlet).
+
+**Frontend bat-OOB:** `turnData.bat_oob` + `bat_oob_contact` / `bat_oob_deflector_id`; schema steps animate players; imperative overlay flies ball passer → contact → deflected OOB (`FrontEnd/static/js/phaser/animation/batOobAnimation.js`).
+
+---
+
+### Attack Basket Area — Goal Achievement
+
+When BH enters ABA (y 10–40, past half court):
+
+- **Head-count read:** defenders vs offenders in ABA → optimal HCO vs Fast Break.
+- **IQ read** (see `Dynamic_HCT_Turns.md` §2): &gt;200 optimal; 125–200 HCO unless offense aggressive; ≤125 50/50.
+- **HCO branch:** `result_type = HCO`, `next_play_type = HCO`, possession unchanged; stamps `final_ball_handler_id` for HCO entry orchestrator (non-PG initiator supported — suppress PG override on HCT path).
+- **Fast Break branch:** broken-HCT cutoff win or numbers edge → `FAST_BREAK_SHOT` via `resolve_hct_fast_break_shot` (steal-FB geometry + full shot turn).
+- **In-ABA shot tree:** `ATTACK_BASKET_SHOT` / `ATTACK_BASKET_DRIVE` → rim collapse (D5) + shot defender at release (D6) → `resolve_shot` path; emitter appends post-shot sub-steps.
+
+---
+
+### Terminal Outcomes & Routing
+
+| `result_type` | Possession flip? | Typical `next_play_type` | Notes |
+|---------------|------------------|--------------------------|-------|
+| `HCO` | No | `HCO` | Successful trap break |
+| `DEAD BALL` | Yes* | `SIDE_INBOUND` | *No flip if `bat_oob` |
+| `STEAL` | Yes | `FAST_BREAK` or `HCO` | Steal→FB roll on **stealing** team's aggression slider |
+| `FOUL` | If O_FOUL | `FREE_THROW` or `SIDE_INBOUND` | D_FOUL bonus routing; reach-in stats |
+| `MAKE` / `MISS` | Shot rules | Rebound / BIP / FT | Via `dynamic_hct_shot` wrappers |
+| Clock violations | Yes | `SIDE_INBOUND` | `turnover_type` SHOT_CLOCK / TEN_SECOND |
+
+Announcements: `"TRAP!"` base text; `"Batted Ball Out Of Bounds!"` for bat-OOB; `"INTERCEPTION!"` for pass picks; violation strings for clock terminals.
+
+---
+
+### Stats & Scouting
+
+**Player stats:** `HCT_A`, `HCT_S` (offense); `HCT_A_D`, `HCT_S_D` (defense) — same success/failure conventions as legacy HCT (see below). Recorded via `_record_hct_stats`.
+
+**Team scouting:** `def_scouting["defense"]["HCT"]["used"]` on entry; `["success"]` on defensive stops (MISS, O_FOUL, DEAD BALL except bat-OOB, STEAL).
+
+**Per-play defense scouting:** `hct_trap_plays[play_key].A` / `.S` on attempt / offensive success events.
+
+---
+
+### Animation (UESS)
+
+- Turn carries **`animation_steps[]`** built by `build_dynamic_hct_animation_steps()`.
+- **Step 0:** `build_walk_up_step` — BH cruise to engage point; off-ball sprint to setup; defenders to formation.
+- **Steps 1..N:** one step per `loop_segment` (converge, advance, hold, pass flight, cutoff drive, etc.).
+- **Turn-stop events:** `DEAD_BALL_TURNOVER`, `STEAL`, `FOUL`, shot handoff — consumed by `animationPlayback.dispatchTurnStop`.
+- **Post-shot:** `_build_post_shot_sub_steps` appended for ABA / FB shot branches.
+- **Legacy path:** if no `animation_steps`, fall back to skeleton + stopper (deprecated for HCT when dynamic flag is on). See `Stopper_System.md`.
+
+Frontend dispatch: `AnimationEngine.runSchemaPlaybackTurn` for HCT turns with steps; HCT bat-OOB post-hook after schema settles.
+
+---
+
+### Key Files
+
+**Backend**
+- `BackEnd/engine/phase_resolution.py` — `resolve_half_court_trap_logic`, `_resolve_half_court_trap_dynamic_first_cut`, `USE_DYNAMIC_HCT`
+- `BackEnd/engine/dynamic_hct.py` — `compute_dynamic_hct_turn`, loop, moments, cutoff, pass wiring
+- `BackEnd/engine/dynamic_hct_step_emitter.py` — schema step assembly
+- `BackEnd/engine/dynamic_hct_shot.py` — ABA + broken-HCT shot resolution
+- `BackEnd/engine/hct_trap_plays.py` — `HCTPlay` + three registered plays
+- `BackEnd/constants/hct_trap_play_types.py` — keys, weights, selection
+- `BackEnd/engine/pass_contest.py` — pass contest primitive
+- `BackEnd/engine/cutoff_resolution.py` — shared drive cutoff geometry
+- `BackEnd/models/turn_manager.py` — pressure type + `hct_trap_play` stash at BIP
+- `BackEnd/utils/shared_defense.py` — HCT zone centroids, trap formation helpers
+
+**Frontend**
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` — schema playback + HCT bat-OOB hooks
+- `FrontEnd/static/js/phaser/animation/batOobAnimation.js` — bat collision + deflected OOB ball path
+- `FrontEnd/static/js/phaser/animation/animationPlayback.js` — step renderer + turn-stop dispatch
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` — BIP inbound for HCT
+
+**Tests (representative)**
+- `tests/test_fcp_hct_stopper_system.py` — includes dynamic HCT paths when flag on
+- `tests/test_dynamic_hct_shot_rebound_attemptors.py` — HCT FB miss rebound seeding
+
+---
+
+### Legacy Fallback (`USE_DYNAMIC_HCT = False`)
+
+Reverts to pre-2026 behavior documented historically in `FCP_HCT_System.md` (now **FCP-only**): single-roll **BSM/DST** score math, MongoDB **`hct_skeletons`** `"base"` / `"shot"` variants, and **stopper system** truncation for non-SHOT results. Not used in production with the default flag. Kept for regression tests and emergency rollback.
+
+**Legacy HCT success math (reference only):**
+- BSM = `200 + 10×fight` + chemistry/`pt_opp_modifier` adjustments
+- DST = `800` + discipline/chemistry
+- Success: `(offenseScore + BSM) > defenseScore`; dominant → weighted D_FOUL/HCO/SHOT; failure → O_FOUL/DEAD BALL/STEAL weights
+
+---
+
+### Related Documentation
+
+- `_documentation_master/projects/Dynamic_HCT_Turns.md` — design brief, question tracker, deep specs (pass contest §14, play specs §13)
+- `_documentation_master/06_Gameplay_Systems/BIP_System.md` — BIP→HCT setup coords
+- `_documentation_master/06_Gameplay_Systems/Stopper_System.md` — stopper truncation (FCP + legacy HCT)
+- `_documentation_master/06_Gameplay_Systems/Fast_Break_System.md` — FB executor for broken-HCT branch; shared `cutoff_resolution` with Covert Release stops

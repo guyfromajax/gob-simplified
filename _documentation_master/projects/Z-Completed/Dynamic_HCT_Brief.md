@@ -1,5 +1,7 @@
 # Dynamic HCT (Half Court Trap) Turns
 
+> **Operational bible:** `_documentation_master/06_Gameplay_Systems/HCT_System.md` is the canonical reference for the **implemented** dynamic HCT system (for agents and runtime debugging). **This file** remains the design brief, deep specs, and implementation tracker from the Dynamic HCT project.
+
 Target design for resolving an HCT possession as a **dynamic, looped turn** rather
 than a fixed skeleton. This document is the north star (full target design); the
 **Implementation Cuts + Question Tracker** (§10) records what is actually built so
@@ -1523,9 +1525,7 @@ computed alongside the other CPU playbooks in `cpu_playbook_customization.py` (s
 
 ## §14 — Pass Contests (interceptions & bat-out-of-bounds)
 
-> **Status:** design spec (not yet built). A **universal** pass-contest primitive,
-> prototyped first in the HCT pass branch (§6), then generalized to other pass paths.
-> All passes are contestable; geometry makes the overwhelming majority complete cleanly.
+> **Status:** **Built** in HCT (prototyped here first). Universal primitive in `BackEnd/engine/pass_contest.py`; wired in `dynamic_hct.py` for pass branches. Generalization to other pass paths (HCO, inbounds, Rim Runner) remains optional follow-up.
 
 ### 14.0 — Why this is "true to the sim"
 

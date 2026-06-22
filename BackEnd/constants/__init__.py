@@ -314,7 +314,7 @@ HCO_STRING_SPOTS = {
     "inbound_right": {"x": 97, "y": 25},   # Right of center baseline
     # HCT inbound-side setup spots for PG/SG (home orientation). Sit near the
     # inbounder so dynamic-HCT step 1 always advances forward from a consistent
-    # low-x starting point (see Dynamic_HCT_Turns.md, bug #2).
+    # low-x starting point (see HCT_System.md).
     "hct_inbound_pg": {"x": 10, "y": 25},
     "hct_inbound_sg": {"x": 15, "y": 35},
     # FCP inbound-side setup spots (home orientation). Pre-flipped equivalents
@@ -363,7 +363,7 @@ HCO_SETUP_HCO_BH_RADIUS = 10  # max grid units from FB BH for HCO BH placement
 # helper in `turn_manager.py`). All ranges expressed in HOME orientation
 # (x≈0..50 = backcourt for home offense). For away offense, the build
 # function flips via ``getAwayTeamCoords``.
-# See FCP_HCT_System.md → "FCP Starting Alignment".
+# See FCP_HCT_System.md → "FCP Starting Alignment" (FCP only; HCT → HCT_System.md).
 FCP_OFFENSE_SETUP_RANGES = {
     "PG": {"x": (12, 18), "y": (15, 23)},
     "SG": {"x": (12, 18), "y": (27, 35)},
@@ -387,7 +387,8 @@ FCP_SETUP_COLLISION_OFFSET_GRID = 2
 # All HCT variants use the same starting positions.
 # PG/SG sit on the inbound side near the inbounder so dynamic-HCT step 1
 # always advances forward from a consistent low-x starting point. See
-# Dynamic_HCT_Turns.md (bug #2) for why we replaced prior-turn carry-over.
+# Dynamic HCT step 1 always advances forward from a consistent
+# low-x starting point (see HCT_System.md).
 HCT_SETUP_POSITIONS = {
     "PG": "hct_inbound_pg",
     "SG": "hct_inbound_sg",
