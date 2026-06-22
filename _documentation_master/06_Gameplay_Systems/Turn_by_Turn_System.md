@@ -104,9 +104,15 @@ Every turn result from the backend contains data organized into **three distinct
 **Strategy:**
 - `offensive_playcall` / `defensive_playcall` - Play names
 - `offensive_play_type` / `defensive_play_type` - Play types
-- `offense_tempo_call` / `defense_tempo_call` - Tempo settings
-- `offense_aggression_call` / `defense_aggression_call` - Aggression settings
+- `offense_tempo_call` / `defense_tempo_call` - Tempo settings (rolled per turn)
+- `offense_aggression_call` / `defense_aggression_call` - Aggression settings (rolled per **break**, not per turn — see below)
 - `ev` - Expected value score
+
+**Aggression: rolled per break, resolved per turn.**
+- **Roll (per break):** `GameManager.roll_aggression_calls()` rolls **both** teams' `strategy_calls["aggression_roll"]` ∈ {`passive`, `normal`, `aggressive`} from each team's `aggression` slider (0–4) via `STRATEGY_CALL_DICTS["aggression"]`. It runs **coming out of every break** — game start / quarter break (`simulate_quarter`, after the timeout-resume early-return) and timeout / foul-out (`GameManager.call_timeout`) — and the roll **persists** (in `strategy_calls`, saved with the team) until the next break.
+- **Resolve (per turn):** `turn_manager.set_strategy_calls()` no longer rolls aggression; it sets the effective `aggression_call` for both teams = the user team's `aggression_override` if set, else the persisted `aggression_roll`.
+- **Override** (Playcall Center) is **universally persistent**: it drives the user team's `aggression_call` on whichever side it is (offense **or** defense), takes effect the **next turn** (immediate), and persists until the user clears it **or** a break clears it (quarter transition, timeout, foul-out).
+- Defense aggressiveness drives defensive foul/steal behavior; offense aggressiveness is consumed by the Dynamic HCO Motion read system. Tempo is unchanged (still rolled per turn).
 
 **Debug:**
 - `debug_turn_start` - Debug string for turn start

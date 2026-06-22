@@ -630,6 +630,11 @@ def simulate_quarter(
     period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
     gm.game_state["period_label"] = period_label
 
+    # ✅ Aggression: re-roll both teams' per-break aggression coming out of a quarter/game start.
+    # Only reached for genuine quarter starts (timeout/foul-out resumes early-return above and
+    # re-roll in call_timeout instead). See Turn_by_Turn_System.md / Sim_Quarter_System.md.
+    gm.roll_aggression_calls()
+
     for team in (gm.home_team, gm.away_team):
         while len(team.points_by_quarter) < q:
             team.points_by_quarter.append(0)

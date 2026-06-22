@@ -48,7 +48,7 @@ In-game tactical hub at the bottom of the court. User overrides apply only to th
 3. **Backend application**
    - **Offense**: Applied when user’s team is on offense; cleared after one use.
    - **Defense**: Applied when user’s team is on defense; persistent until user clears. API accepts full names (e.g. "2-3 Zone"); "Man Normal" is sent as `"Man"` for backend compatibility.
-   - **Aggression**: Applied in `set_strategy_calls()` when user’s team is on defense; persistent until cleared.
+   - **Aggression**: Resolved in `set_strategy_calls()` for the user’s team on **whichever side it is (offense OR defense)** — takes effect the next turn (immediate) and is persistent until cleared. The base aggression is rolled per **break** (not per turn) into `aggression_roll` by `GameManager.roll_aggression_calls()`; the user’s override replaces that roll for the user’s team only. **Cleared at every break** — quarter transition **and** timeout / foul-out (`call_timeout`) — as well as on manual clear. (Offense aggressiveness feeds the Dynamic HCO Motion read system; defense aggressiveness drives defensive foul/steal behavior.)
    - **Tempo**: Applied in `set_strategy_calls()` when user’s team is on offense; cleared after one use.
    - **Press/Trap**: Read in `determine_defensive_pressure_type()` when user’s team is applying pressure (after a made shot). `"press"` → FCP, `"trap"` → HCT, `"none"` → HCO; otherwise falls back to `strategy_settings` (hc_trap / fc_press). Note: the Q4/OT situational Quick Shot override (`_situational_quick_shot_fcp_hct_override`) forces HCO and takes precedence over the user's press/trap override.
 
@@ -67,9 +67,10 @@ In-game tactical hub at the bottom of the court. User overrides apply only to th
 team.strategy_calls = {
     "offense_call": None | str,           # Play name; cleared after one use
     "defense_call": None | str,           # "Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone"; persistent
-    "aggression_override": None | str,   # "passive", "normal", "aggressive"; persistent
-    "tempo_override": None | str,         # "slow", "normal", "fast"; cleared after one use
-    "press_trap_override": None | str,   # "press", "trap", "none"; persistent until cleared
+    "aggression_override": None | str,   # "passive", "normal", "aggressive"; persistent; cleared at every break (quarter / timeout / foul-out)
+    "tempo_override": None | str,         # "slow", "normal", "fast"; cleared after one use; also cleared at quarter / timeout / foul-out
+    "press_trap_override": None | str,   # "press", "trap", "none"; persistent; cleared at every break (quarter / timeout / foul-out)
+    "aggression_roll": None | str,        # "passive", "normal", "aggressive"; per-break base roll (set by roll_aggression_calls), NOT a user override
     "press_override": None,               # Legacy
     "trap_override": None                # Legacy
 }
@@ -113,6 +114,7 @@ Important notes:
 - **Defense ✕**: Resets to Man Normal, clears defense and aggression overrides, unhighlights defense card, deselects aggression stack buttons.
 - **`window.clearPlaycallOverrides()`**: Clears all play and stack selections, resets defense to unhighlighted Man Normal (no override). Used when overrides are consumed or reset elsewhere.
 - **Quarter transition (backend + UI reset)**: All Playcall Center overrides are cleared at quarter end (`offense_call`, `defense_call`, `tempo_override`, `aggression_override`, `press_trap_override`), and UI returns to unhighlighted baseline.
+- **Timeout / foul-out (backend reset)**: `GameManager.call_timeout()` clears `aggression_override`, `tempo_override`, and `press_trap_override` for both teams (offense/defense play overrides are left intact), and re-rolls both teams' `aggression_roll`. See `Timeout_System.md`.
 
 ---
 

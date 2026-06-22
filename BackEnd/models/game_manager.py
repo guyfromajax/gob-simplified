@@ -248,6 +248,25 @@ class GameManager:
         }
 
 
+    def roll_aggression_calls(self):
+        """Roll a fresh per-break aggression_roll for BOTH teams from their aggression slider.
+
+        Called coming out of every break — game start, quarter break, timeout, and foul-out —
+        NOT every turn. The rolled value persists in strategy_calls["aggression_roll"] until the
+        next break; set_strategy_calls() resolves the effective aggression_call each turn as
+        (user override if set, else aggression_roll). See Turn_by_Turn_System.md.
+        """
+        from BackEnd.constants import STRATEGY_CALL_DICTS
+        for team in (self.home_team, self.away_team):
+            if not isinstance(getattr(team, "strategy_calls", None), dict):
+                team.strategy_calls = {}
+            settings = getattr(team, "strategy_settings", None) or {}
+            slider = settings.get("aggression", 2)
+            choices = STRATEGY_CALL_DICTS["aggression"].get(slider, STRATEGY_CALL_DICTS["aggression"][2])
+            roll = random.choice(choices)
+            team.strategy_calls["aggression_roll"] = roll
+            logging.info(f"🎲 [AGGRESSION ROLL] {team.name}: slider={slider} → aggression_roll={roll}")
+
     def call_timeout(
         self,
         calling_team,
@@ -352,7 +371,20 @@ class GameManager:
         except Exception as e:
             logging.error(f"⚠️ TIMEOUT: Failed to rebuild lineups: {e}")
             # Don't fail the timeout if lineup rebuild fails
-        
+
+        # ✅ TIMEOUT/FOUL-OUT TACTICAL RESET: clear the user's tactical overrides (aggression,
+        # tempo, press/trap) and re-roll both teams' per-break aggression for the next possession.
+        # Mirrors the quarter-transition reset; offense/defense play overrides are intentionally
+        # left untouched here. See Timeout_System.md and Playcall_Center.md.
+        for team in (self.home_team, self.away_team):
+            calls = getattr(team, "strategy_calls", None)
+            if isinstance(calls, dict):
+                calls["aggression_override"] = None
+                calls["tempo_override"] = None
+                calls["press_trap_override"] = None
+        self.roll_aggression_calls()
+        logging.info("✅ TIMEOUT: Cleared aggression/tempo/press-trap overrides and re-rolled aggression for both teams")
+
         # ✅ TIMEOUT ENERGY RECHARGE: All players get random recharge at start of timeout
         # This happens before lineup selection screen, so user sees updated energy values
         import random

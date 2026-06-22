@@ -345,6 +345,7 @@ class TeamManager:
                 "press_override": None,
                 "trap_override": None,
                 "press_trap_override": None,  # "press", "trap", "none", or None
+                "aggression_roll": None,      # per-break aggression roll (passive/normal/aggressive); set by roll_aggression_calls()
             }
             self.strategy_calls = {**default_calls, **strategy_calls}  # Saved calls override defaults
         else:
@@ -357,6 +358,7 @@ class TeamManager:
                 "press_override": None,        # Future: FCP override
                 "trap_override": None,         # Future: HCT override
                 "press_trap_override": None,   # "press", "trap", "none", or None (playcall center)
+                "aggression_roll": None,       # per-break aggression roll (passive/normal/aggressive); set by roll_aggression_calls()
             }
         self.playbook_settings = {}
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}

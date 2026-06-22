@@ -93,6 +93,41 @@ def test_strategy_calls_are_set():
 
 
 
+_AGGRESSION_STATES = {"passive", "normal", "aggressive"}
+
+
+def test_roll_aggression_calls_sets_base_roll_for_both_teams():
+    game = build_mock_game()
+    game.roll_aggression_calls()
+    for team in (game.home_team, game.away_team):
+        assert team.strategy_calls["aggression_roll"] in _AGGRESSION_STATES
+
+
+def test_aggression_call_derives_from_break_roll_not_per_turn():
+    # set_strategy_calls() must resolve aggression_call from the persisted break roll,
+    # not re-roll it every turn.
+    game = build_mock_game()
+    game.roll_aggression_calls()
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    for team in (game.offense_team, game.defense_team):
+        assert team.strategy_calls["aggression_call"] == team.strategy_calls["aggression_roll"]
+
+
+def test_aggression_override_takes_precedence_over_break_roll():
+    game = build_mock_game()
+    # Make home the user team so its override is honored.
+    game.game_state["user_team_side"] = "home"
+    game.roll_aggression_calls()
+    game.home_team.strategy_calls["aggression_override"] = "aggressive"
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    # User (home) team uses the override; the other team falls back to its break roll.
+    assert game.home_team.strategy_calls["aggression_call"] == "aggressive"
+    other = game.away_team
+    assert other.strategy_calls["aggression_call"] == other.strategy_calls["aggression_roll"]
+
+
 def test_playcalls_are_set():
     game = build_mock_game()
     tm = TurnManager(game)

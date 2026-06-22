@@ -999,6 +999,11 @@ The system uses `is_player_eligible_for_lineup()` (`BackEnd/utils/db_utils.py`) 
 - Only affects computer team (user team lineups and strategy settings are never auto-adjusted)
 - Works consistently across all game modes (franchise is live; **single / tournament are SUNSET** — see `Sunset_Modes.md`)
 
+**Tactical reset on timeout / foul-out** (`GameManager.call_timeout()`):
+- **Clears** the user's tactical overrides for **both** teams: `aggression_override`, `tempo_override`, `press_trap_override` (offense/defense play overrides are intentionally left untouched). Mirrors the quarter-transition reset.
+- **Re-rolls** both teams' per-break aggression via `GameManager.roll_aggression_calls()` → `strategy_calls["aggression_roll"]`. Aggression is rolled per break (game start / quarter break / timeout / foul-out), not per turn; `set_strategy_calls()` resolves the effective `aggression_call` each turn as (user override if set, else `aggression_roll`). See `Turn_by_Turn_System.md` and `Playcall_Center.md`.
+- Applies to **both** user and computer teams (unlike `autoset_strategy_settings`, which is computer-only — the roll itself just draws from each team's existing `aggression` slider).
+
 ### Comparison: Timeout vs Quarter Break vs Foul Out
 
 **Similarities:**

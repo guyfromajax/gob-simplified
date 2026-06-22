@@ -2838,27 +2838,39 @@ class TurnManager:
             tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
             self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         
-        # ✅ SS&S: Check for aggression_override in user_team.strategy_calls (regardless of current offense/defense)
-        # Aggression override can be set when user is on offense (for next time they're on defense)
+        # ✅ Aggression is NOT rolled per turn. It is rolled per BREAK (game start, quarter
+        # break, timeout, foul-out) into strategy_calls["aggression_roll"] by
+        # GameManager.roll_aggression_calls(), and persists until the next break. Each turn we
+        # only RESOLVE the effective aggression_call for both teams:
+        #   - the user team's persistent aggression_override (Playcall Center) if set, else
+        #   - the team's persisted aggression_roll (fresh roll as a defensive fallback if missing).
+        # The override stays immediate (takes effect the next turn) and is universally persistent
+        # across offense/defense until the user clears it or a break clears it. See
+        # Turn_by_Turn_System.md and Playcall_Center.md.
         # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
         user_team = None
         if user_team_side == "home":
             user_team = self.game.home_team
         elif user_team_side == "away":
             user_team = self.game.away_team
-        
-        if user_team:
-            aggression_override = user_team.strategy_calls.get("aggression_override")
-            if aggression_override:
-                self.game.defense_team.strategy_calls["aggression_call"] = aggression_override
-                # ✅ PERSISTENT: Don't clear aggression_override - keep it until user manually clears
-                logging.info(f"🎮 [PLAYCALL OVERRIDE] Using aggression override: {aggression_override} (persistent until manually cleared)")
+
+        aggression_override = user_team.strategy_calls.get("aggression_override") if user_team else None
+
+        for team in (self.game.offense_team, self.game.defense_team):
+            calls = team.strategy_calls
+            base_roll = calls.get("aggression_roll")
+            if base_roll is None:
+                # Defensive fallback: no break-roll yet (e.g. a turn before any break hook ran) →
+                # roll once now so we never emit a flat "normal" by accident.
+                aggression_setting = team.strategy_settings.get("aggression", 2)
+                choices = STRATEGY_CALL_DICTS["aggression"].get(aggression_setting, STRATEGY_CALL_DICTS["aggression"][2])
+                base_roll = random.choice(choices)
+                calls["aggression_roll"] = base_roll
+            is_user_team = user_team is not None and str(team.team_id) == str(user_team.team_id)
+            if is_user_team and aggression_override:
+                calls["aggression_call"] = aggression_override
             else:
-                aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
-                self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
-        else:
-            aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
-            self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+                calls["aggression_call"] = base_roll
         
         # NOTE: rebounding and defense tempo for fast break release are now read directly 
         # from strategy_settings (numeric 0-4) in shot_manager.py - no string conversion needed
