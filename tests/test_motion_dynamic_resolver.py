@@ -165,6 +165,31 @@ def test_walk_weaves_subtle_beat_then_resumes_and_shoots(monkeypatch):
     assert out[-1]["pos_actions"]["PG"]["action"] == "shoot"
 
 
+def test_hot_read_stamps_vo_on_result():
+    from BackEnd.engine.phase_resolution import _execute_motion_decision, HOT_READ_VO_FILES
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    steps = _skeleton({"PG": "upper wing"}, {"PG": "upper wing"})["steps"]
+    decision = {"action": "HOT_READ_SHOOT", "shooter_pos": "PG", "shot_type": "outside", "via_pass": False}
+    res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "upper wing", decision,
+                                   game, off, {}, is_away_offense=False)
+    assert res["hot_read"] is True
+    assert res["hot_read_sfx"] in HOT_READ_VO_FILES
+
+
+def test_non_hot_read_shot_has_no_vo():
+    from BackEnd.engine.phase_resolution import _execute_motion_decision
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    steps = _skeleton({"PG": "basketSpot"}, {"PG": "basketSpot"})["steps"]
+    decision = {"action": "SHOOT", "shooter_pos": "PG", "shot_type": "inside"}
+    res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "basketSpot", decision,
+                                   game, off, {}, is_away_offense=False)
+    assert "hot_read" not in res
+
+
 def test_freelance_forced_enters_loop_and_shoots(monkeypatch):
     from BackEnd.engine.phase_resolution import _resolve_freelance
     game = _FakeGame(shot_clock=30)

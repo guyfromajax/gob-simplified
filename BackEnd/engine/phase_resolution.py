@@ -4278,6 +4278,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
     # GOB_DYNAMIC_HCO_MOTION env var. Recalibration (forced_shot_step_index) and any
     # error fall back to the legacy path so live games are never broken.
     if forced_shot_step_index is None and _dynamic_hco_motion_enabled():
+        logging.info("🟢 [DYNAMIC MOTION] flag ON — running dynamic resolver for this Motion shot")
         try:
             dynamic_result = _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             if dynamic_result is not None:
@@ -4480,6 +4481,12 @@ def _dynamic_hco_motion_enabled():
     return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+# Coach VO clips fired when the offense consciously breaks pattern on a hot read. One is
+# chosen at random on the BACKEND (logic + SS&S-reproducible) and stamped on the turn result;
+# the FE shows the "Hot Read!" call and plays the chosen clip (pure renderer). See SFX_System.md.
+HOT_READ_VO_FILES = ("braddock-audible.mp3", "sammy-audible.mp3", "sammy-hotread.mp3")
+
+
 def _motion_bh_at_step(step):
     """Ball-handler position + location at a skeleton step (mirrors the legacy scan)."""
     for pos, info in (step.get("pos_actions") or {}).items():
@@ -4541,6 +4548,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
         decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random)
         action = decision.get("action")
+        logging.info(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
             return _execute_motion_decision(
                 skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
@@ -4640,6 +4648,14 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
             "motion_attack_defense_bonus": drive_result.get("motion_attack_defense_bonus", 0),
             "motion_attack_driver_shoots": drive_result.get("motion_attack_driver_shoots"),
         })
+
+    # Hot read = conscious break from pattern → fire a coach VO call. Backend picks the clip
+    # (one of three, at random); the FE shows the "Hot Read!" announce and plays it.
+    if decision.get("action") == "HOT_READ_SHOOT":
+        result["hot_read"] = True
+        result["hot_read_sfx"] = random.choice(HOT_READ_VO_FILES)
+        logging.info(f"🎙️ [DYNAMIC MOTION] Hot read by {result['shooter_pos']} → VO {result['hot_read_sfx']}")
+
     return result
 
 
@@ -5744,6 +5760,11 @@ def resolve_half_court_offense_logic(game):
                 roles["motion_attack_uncontested"] = True
             if motion_shot_info.get("motion_attack_defense_bonus"):
                 roles["motion_attack_defense_bonus"] = motion_shot_info["motion_attack_defense_bonus"]
+            # Hot-read coach VO: surface to the FE (turnData.roles) so it can show the
+            # "Hot Read!" announce and play the backend-chosen clip.
+            if motion_shot_info.get("hot_read"):
+                roles["hot_read"] = True
+                roles["hot_read_sfx"] = motion_shot_info.get("hot_read_sfx")
             if motion_shot_info.get("motion_attack_driver_shoots") is not None:
                 roles["motion_attack_driver_shoots"] = motion_shot_info["motion_attack_driver_shoots"]
             

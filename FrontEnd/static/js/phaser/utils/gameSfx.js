@@ -54,6 +54,10 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "duke-great-stop.wav",
   "duke-denied.wav",
   "duke-hold-up.wav",
+  // Dynamic HCO Motion — hot-read / audible coach VO (one chosen at random by the backend).
+  "braddock-audible.mp3",
+  "sammy-audible.mp3",
+  "sammy-hotread.mp3",
 ]);
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
