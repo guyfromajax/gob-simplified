@@ -483,6 +483,19 @@ export function getHctTrapPlayLabel(playKey) {
 }
 
 /**
+ * Map a backend `fcp_press_play` key to its display label for the secondary "Press!"
+ * subtitle (mirrors `getHctTrapPlayLabel` for FCP).
+ */
+export function getFcpPressPlayLabel(playKey) {
+  switch (playKey) {
+    case 'fcp_standard_trap': return 'Standard Trap';
+    case 'fcp_straight_pressure': return 'Straight Pressure';
+    case 'fcp_standard_diamond': return 'Standard Diamond';
+    default: return '';
+  }
+}
+
+/**
  * Primary "Rebound!" headline when the rebounder secures the ball (center overlay).
  * Idempotent per turn when `turnData` is provided: sets `turnData._reboundHeadlineShown`
  * after a successful display so ballManager, ShotAnimationSystem, FT/FB paths, and
@@ -606,7 +619,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
 
     const isInboundSettingUpPressure = turnData.result_type === 'BASELINE_INBOUND';
     if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'FCP') {
-      showSecondaryAnnouncement("Press!", defenseTeam);
+      showSecondaryAnnouncement("Press!", defenseTeam, null, {
+        eventSubtitle: getFcpPressPlayLabel(turnData.fcp_press_play),
+      });
     }
     if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'HCT') {
       showSecondaryAnnouncement("Trap!", defenseTeam, null, {

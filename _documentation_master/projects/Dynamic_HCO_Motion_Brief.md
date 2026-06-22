@@ -71,25 +71,26 @@
             - Outside Score: (offender's SH) - (defender's OD) 
             - Attack Score: ((offender's SC + AG) - (defender's ID + AG)) / 2 
             - there will be 15 scores total, 3 for each matchup.
-                - if a player has a score > 25, then that Movement Option is true. 
+                - if a player has a score > 15, then that Movement Option is true. 
                     - Example: Offense PG has +28 Attack Score, -7 Inside Score, +11 Outside Score 
                      - {player string id: {"inside": false, "attack": true, "outside": false}}    
     - elif defense playcall is a zone defense:
         - Calculate Defense Shot Scores on a team level, delineated by zone areas
-            - Inside D Score = sum of ID for any D player who's zone area touches an inside spot / number of those players
-            - Outside D Score = sum of OD for any D player who's zone area touches an outside spot / number of those players
-            - Attack D Score = sum of AG for any D player who's zone area touches an attack spot / number of those players
+            - Inside D Score = average of ((ID + ST) / 2) for any D player whose zone area touches an inside spot (sum of (ID+ST)/2 across those players / number of those players)
+            - Outside D Score = average of OD for any D player whose zone area touches an outside spot (sum of OD across those players / number of those players)
+            - Attack D Score = average of ((ID + AG) / 2) for any D player whose zone area touches an attack spot (sum of (ID+AG)/2 across those players / number of those players)
         - Calculate offense Shot Scores on an individual level
             - Each players (SC+ST) / 2 = players inside score
             - Each player's SH = outside score
-            - Each player's (SC + AG) = attack score
+            - Each player's (SC + AG) / 2 = attack score
         - Calculate the 15 Mismatch Scores same as we do for man defense and set the appropriate data items to true if applicable
     - any player/shot type values that are true will be potential optimal reads for the offense as they execute their HCO turn
         
 - Step 2: run the motion skeleton, and at each step calculat the following
     - Does the ball handler choose to execute a sekelton stopping action, a hot read or freelance audible or subtle movement, or move immediately to the next step in the skeleton?
     - calculation
-        - offense_score = (bh read + offense team discipline) * random.randint(1,6)
+        - offense_score = (raw bh read + offense team discipline) * random.randint(1,6)
+            - raw bh read = (IQ*0.8 + CH*0.2) — i.e. the player_read() formula WITHOUT its internal random roll. The single outer random.randint(1,6) is the only roll (no double random), and discipline scales with it.
         - if offense_score < 110 run the nested logic here, else proceed to the progression point noted below:
             - tempo modifier: slow = -25, normal = 0, fast = 25
             - roll = random.randint(1,100) + tempo modifier
@@ -102,18 +103,25 @@
                         - sum = attack score + outside score
                         - shot_roll = random.randint(1, sum)
                         - if shot_roll <= attack_score, attack shot is chosen, else outside shot is chosen
+                - 25% chance the bh passes to a random teammate within 10 euclidian grid spots, and that receiver immediately shoots (catch-and-shoot) — choosing Inside (if at an inside location) else Attack/Outside via the same logic above, using the RECEIVER's location and attributes. This terminates the turn and enters normal shot resolution. If no teammate is within 10 grid spots, the bh shoots himself via the same logic.
+            - else proceed to the progression point
         - porgression point: calculate defense score
-            - defense_score = (bh defender defensive action + defense team fight) * random.randint(1,6)
-            - defensive action = inside defense if ball hanlder is at an inside location (let's verify the fucntion), or outside/pressure defense (let's verify the function)
+            - defense_score = (raw bh defender defensive action + defense team fight) * random.randint(1,6)
+                - The single outer random.randint(1,6) is the only roll (no double random), and fight scales with it.
+            - raw defensive action = inside defense if ball handler is at an inside location, else outside/pressure defense — each is the helper formula WITHOUT its internal random roll:
+                - raw inside defense (paint defender formula, reused from shot resolution): (ID*0.6 + ST*0.2 + IQ*0.1 + CH*0.1)
+                - raw outside/pressure defense (calculate_defender_pressure_score sans roll): (OD*0.3 + AG*0.3 + IQ*0.2 + CH*0.2) [* 0.9 if zone]
         - if offense_score > defense_score + defense team def efficiency + defense team chemistry
             - hot read is possible if one exists in this step
-            - if one exists, 50% it is executed and 50% it is not. Thresholds are adjusted for offense team aggressiveness setting
-                - aggressive: 70% executed, 30% not executed
-                - passive: 30% executed, 70% not executed
-            -if the ball handler executes:
-                - the ball handler's first read is for himself, if he is in a hot read situation, he'll attempt the shot. If he is in multiple hot read situations, choose one at random.
-                - then he'll identify teammates in a hot read situation, if multiple exist, choose the one closest to the bh. If there is a tie, choose one at random.
-            -if the ball handler does not execute, there is not subtle movement and we move immediately to the next skeleton step
+                - if hot read exists
+                    - 50% it is executed and 50% it is not. Thresholds are adjusted for offense team aggressiveness setting
+                        - aggressive: 70% executed, 30% not executed
+                        - passive: 30% executed, 70% not executed
+                    -if the ball handler executes:
+                        - the ball handler's first read is for himself, if he is in a hot read situation, he'll attempt the shot. If he is in multiple hot read situations, choose one at random.
+                        - then he'll identify teammates in a hot read situation, if multiple exist, choose the one closest to the bh. If there is a tie, choose one at random.
+                    -if the ball handler does not execute, there is not subtle movement and we move immediately to the next skeleton step
+                - if hot read does not exist, we move immediately to the next skeleton step
         - elif the defense score > offense score + offense team off efficiency + offenste team chemsitry
             - disruption moment happens
                 - 50% chance this is a subtle movement is forced 
@@ -133,8 +141,8 @@
 
 
 **Spot Classifications For Shot Type**
-- Inside Spots: lower/upper lowPost, basketSpot, midLane, basketSpot
-- Outside Spots / Attack Spots: any non-inside spot
+- Inside Spots: lower/upper lowPost, lower/upper midPost, midLane, basketSpot — plus the geometric area bounded by these (extending to the baseline along the upper lowPost → basketSpot → lower lowPost line), including grid spots within that area
+- Outside Spots / Attack Spots: any non-inside spot (named spots and grid spots outside the inside area above)
 
 **Hot Reads exist at a step if...**
 - A player with a shot type = true is placed at a spot within that shot type area
@@ -146,3 +154,5 @@
     - if offense team off eff + team chemsitry > 15, players can never move to the same location
     - if players do move to the same location, execute a visual collission effect (both sprites reach the spot and rattle off each other -- rattle each sprite 3x back and forth like we rattle rim shots, then have them land offset from the target spot by 2 euclidian grid spots, in oppositte directions)
 - shot attempt resolution: use the same shot resolutio logic, including use of tempo modifier, as is detailed above for normal HCO skeleton steps.
+    - if the ball hanlder does not choose to shoot, he will then choose to pass to a teammate within 20 euclidian grid spots of him (80%) or hold the ball in place (20%). 
+    - if no teammate is within 20 euclidian grid spots, he'll shoot, choosing Inside/Attack/Outside via the same logic as above.

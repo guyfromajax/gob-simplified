@@ -4271,7 +4271,21 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
     if len(steps) < 2:
         logging.warning(f"⚠️ [MOTION SHOT] Skeleton has insufficient steps ({len(steps)}), cannot select shot step")
         return None
-    
+
+    # ── Dynamic HCO Motion (gated, experimental) ──────────────────────────────
+    # Attribute-based per-step decision loop (brief Steps 1–2) replaces the random
+    # step + random shot-type selection below. Off by default; enable with the
+    # GOB_DYNAMIC_HCO_MOTION env var. Recalibration (forced_shot_step_index) and any
+    # error fall back to the legacy path so live games are never broken.
+    if forced_shot_step_index is None and _dynamic_hco_motion_enabled():
+        try:
+            dynamic_result = _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
+            if dynamic_result is not None:
+                return dynamic_result
+            logging.info("ℹ️ [DYNAMIC MOTION] Resolver returned None; using legacy random selection")
+        except Exception as e:
+            logging.warning(f"⚠️ [DYNAMIC MOTION] Error in dynamic resolver, falling back to legacy: {e}")
+
     # Phase 1: Select step (forced for recalibration, else random excluding step 0)
     if forced_shot_step_index is not None:
         shot_step_index = max(1, min(forced_shot_step_index, len(steps) - 1))
@@ -4450,6 +4464,268 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
         "playcall": playcall,
         "attack_penalty": attack_penalty
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dynamic HCO Motion (gated) — attribute-based shot selection.
+# See _documentation_master/projects/Dynamic_HCO_Motion_Brief.md and
+# Dynamic_HCO_Motion_Implementation_Plan.md. Phase 3: walk the skeleton making
+# per-step decisions (Step 2) and hand a shot decision off to the existing shot
+# builders / attack-drive sequence. Subtle-movement / freelance EMISSION is Phase
+# 4–5 — here those decisions simply advance to the next skeleton step.
+# ─────────────────────────────────────────────────────────────────────────────
+def _dynamic_hco_motion_enabled():
+    """Feature gate. Truthy GOB_DYNAMIC_HCO_MOTION env var enables the dynamic path."""
+    import os
+    return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _motion_bh_at_step(step):
+    """Ball-handler position + location at a skeleton step (mirrors the legacy scan)."""
+    for pos, info in (step.get("pos_actions") or {}).items():
+        if ((info or {}).get("action") or "").lower() in ("handle_ball", "receive", "pass"):
+            return pos, info.get("location", "key")
+    return None, None
+
+
+def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
+    """
+    Brief Steps 1–2: build the read map, then walk the skeleton making per-step decisions.
+
+    Accumulate-while-walking: we build an output step stream = the original skeleton steps
+    woven with any inserted subtle-movement beats. "Our place in the skeleton" is the index
+    i; the original skeleton is never mutated. A shot decision (SHOOT / KICKOUT_SHOOT /
+    HOT_READ_SHOOT) terminates and appends its shot steps to the accumulated stream; non-shot
+    decisions advance to the next skeleton step (a SUBTLE_MOVEMENT inserts a beat first, after
+    which the next step pulls players back to their defined spots). If no shot fires by the end,
+    force one at the last step. Returns the same result contract as resolve_motion_offense_shot,
+    or None to defer to the legacy path.
+    """
+    import random
+    from BackEnd.engine.motion_read_map import build_motion_read_map
+    from BackEnd.engine.motion_step_decision import (
+        decide_step_action, _choose_attack_or_outside,
+        SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT, SUBTLE_MOVEMENT, FREELANCE_FORCED,
+    )
+    from BackEnd.engine.motion_subtle import build_subtle_beat
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+
+    game_state = game.game_state
+    off_team = game.offense_team
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    steps = skeleton.get("steps", [])
+    if len(steps) < 2:
+        return None
+
+    read_map = build_motion_read_map(game, off_lineup, def_lineup)
+
+    # Ball-handler defender: man → matchup defender; zone → None (no 1:1 assignment — the zone
+    # mismatch already lives in the Step-1 read map; the zone defense_score model is a known
+    # follow-up, see brief). decide_step_action handles None (team-fight-only defense_score).
+    zone = is_zone_defense(game_state.get("defense_playcall"))
+    off_to_def = {}
+    if not zone:
+        defending_is_user = getattr(game.defense_team, "is_user_team", False)
+        matchups = get_matchups_for_defending_team(game_state, defending_is_user)
+        off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
+
+    shot_actions = {SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT}
+
+    output_steps = [steps[0]]  # always start at the skeleton's step 0
+    for i in range(1, len(steps)):
+        output_steps.append(steps[i])  # players arrive at skeleton step i
+        bh_pos, bh_location = _motion_bh_at_step(steps[i])
+        if not bh_pos or not off_lineup.get(bh_pos):
+            continue
+        bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
+        decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random)
+        action = decision.get("action")
+        if action in shot_actions:
+            return _execute_motion_decision(
+                skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
+                game, off_lineup, def_lineup, is_away_offense,
+            )
+        if action == SUBTLE_MOVEMENT:
+            beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random)
+            if beat is not None:
+                output_steps.append(beat)
+        elif action == FREELANCE_FORCED:
+            # Leave the skeleton and run the freelance progression to a shot.
+            return _resolve_freelance(
+                skeleton, output_steps, steps[i], bh_pos,
+                game, off_lineup, def_lineup, is_away_offense, random,
+            )
+        # ADVANCE / PASS_IMMEDIATE advance to the next skeleton step.
+
+    # No shot across the walk → force one at the last step, weaving with what we accumulated.
+    bh_pos, bh_location = _motion_bh_at_step(steps[-1])
+    if not bh_pos or not off_lineup.get(bh_pos):
+        return None  # malformed skeleton → defer to legacy
+    bh = off_lineup[bh_pos]
+    shot_type = "inside" if _is_inside_location(bh_location) else _choose_attack_or_outside(bh, random)
+    decision = {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": shot_type}
+    return _execute_motion_decision(
+        skeleton, output_steps, steps[-1], bh_pos, bh_location, decision,
+        game, off_lineup, def_lineup, is_away_offense,
+    )
+
+
+def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_location, decision,
+                             game, off_lineup, def_lineup, is_away_offense):
+    """
+    Map a shot Decision onto base_steps + appended shot steps, reusing the existing builders.
+
+    base_steps is the accumulated output stream (skeleton steps + any inserted subtle beats,
+    including the shot step itself). shot_step is the original skeleton step the shot fires
+    from (used as the attack-drive selected_step and for the receiver's location).
+    """
+    import random
+
+    last_timestamp = base_steps[-1].get("timestamp", 0)
+    shooter_pos = decision["shooter_pos"]
+    shot_type = decision["shot_type"]
+    via_pass = shooter_pos != bh_pos  # KICKOUT_SHOOT / teammate HOT_READ_SHOOT
+    new_steps = []
+    attack_penalty = 0.0
+    drive_result = None
+    playcall_override = None
+
+    if not via_pass:
+        # Ball handler shoots himself. Attack → full drive (existing machinery); else shoot in place.
+        if shot_type == "attack":
+            destination = random.choice(_determine_attack_drive_destination(bh_location))
+            drive_result = _create_attack_drive_shoot_steps(
+                bh_pos, bh_location, destination, last_timestamp + 300, is_away_offense,
+                selected_step=shot_step, off_lineup=off_lineup,
+                def_lineup=def_lineup, game=game,
+            )
+            new_steps.extend(drive_result["steps"])
+            shooter_pos = drive_result.get("shooter_pos") or bh_pos
+            shooter = drive_result.get("shooter") or off_lineup[bh_pos]
+            shooter_location = drive_result.get("shooter_location") or destination
+            shot_type = drive_result.get("resolved_shot_type") or "attack"
+            playcall_override = drive_result.get("playcall")
+            attack_penalty = _apply_attack_penalty(shooter_location, is_away_offense)
+        else:
+            new_steps.append(_create_shoot_step(bh_pos, bh_location, last_timestamp + 300))
+            shooter = off_lineup[bh_pos]
+            shooter_location = bh_location
+    else:
+        # Pass to a specific receiver (kick-out / teammate hot read) → catch-and-shoot.
+        receiver = off_lineup.get(shooter_pos)
+        receiver_location = ((shot_step.get("pos_actions") or {}).get(shooter_pos) or {}).get("location") or bh_location
+        new_steps.append(_create_pass_receive_step(bh_pos, shooter_pos, bh_location, receiver_location, last_timestamp + 300))
+        new_steps.append(_create_shoot_step(shooter_pos, receiver_location, last_timestamp + 600))
+        shooter = receiver
+        shooter_location = receiver_location
+        if shot_type == "attack":
+            attack_penalty = _apply_attack_penalty(shooter_location, is_away_offense)
+
+    skeleton["steps"] = list(base_steps) + new_steps
+    _playcall_map = {"inside": "Inside", "outside": "Outside", "attack": "Attack"}
+    result = {
+        "skeleton": skeleton,
+        "shooter": shooter,
+        "shooter_pos": shooter_pos,
+        "shooter_location": shooter_location,
+        "shot_type": shot_type,
+        "playcall": playcall_override or _playcall_map.get(shot_type, "Inside"),
+        "attack_penalty": attack_penalty,
+    }
+    if drive_result is not None:
+        result.update({
+            "motion_attack_uncontested": drive_result.get("motion_attack_uncontested", False),
+            "motion_attack_geometry_contest": drive_result.get("motion_attack_geometry_contest", False),
+            "motion_attack_defense_bonus": drive_result.get("motion_attack_defense_bonus", 0),
+            "motion_attack_driver_shoots": drive_result.get("motion_attack_driver_shoots"),
+        })
+    return result
+
+
+def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
+                       game, off_lineup, def_lineup, is_away_offense, rng):
+    """
+    Freelance Forced progression (brief: Freelance Behavior). The offense has left the
+    skeleton; run cycles of [movement beat → BH shoot/pass/hold] until a shot, capped at
+    FREELANCE_MAX_CYCLES (forced shot on the last cycle — option A, shoot-probability ramp).
+
+    Per cycle: emit a freelance movement beat (all five relocate/nudge), then decide —
+      - shoot via the shot-clock pressure roll, threshold tightening each cycle
+        (roll = randint(1,100)+tempo > 4*shot_clock/cycle);
+      - else 80% pass to a teammate within 20 grid (receiver becomes BH, continue) / 20% hold;
+      - no teammate within 20 → shoot.
+    Returns the resolve_motion_offense_shot result contract.
+    """
+    from BackEnd.engine.motion_freelance import (
+        build_freelance_beat, freelance_shoot_step, freelance_pass_step,
+        nearest_named_spot, dist_xy,
+        FREELANCE_MAX_CYCLES, FREELANCE_PASS_PROB, FREELANCE_PASS_RADIUS,
+    )
+    from BackEnd.engine.motion_step_decision import _choose_attack_or_outside, TEMPO_MOD
+
+    off_team = game.offense_team
+    game_state = game.game_state
+    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
+    team_chem = (getattr(off_team, "team_attributes", {}) or {}).get("team_chemistry", 7)
+    shot_clock = game_state.get("shot_clock_remaining", 30)
+    tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
+    tempo_mod = TEMPO_MOD.get(tempo, 0)
+
+    output = list(base_steps)
+    cur_bh = bh_pos
+    current_step = entry_step
+    last_ts = output[-1].get("timestamp", 0) if output else 0
+    _playcall_map = {"inside": "Inside", "outside": "Outside", "attack": "Attack"}
+
+    def _finish_shot(bh_coords):
+        nearest = nearest_named_spot(bh_coords, is_away_offense)
+        shot_type = "inside" if _is_inside_location(nearest) else _choose_attack_or_outside(off_lineup[cur_bh], rng)
+        output.append(freelance_shoot_step(cur_bh, bh_coords, last_ts + 300))
+        skeleton["steps"] = output
+        return {
+            "skeleton": skeleton,
+            "shooter": off_lineup[cur_bh],
+            "shooter_pos": cur_bh,
+            "shooter_location": nearest,
+            "shot_type": shot_type,
+            "playcall": _playcall_map.get(shot_type, "Inside"),
+            "attack_penalty": _apply_attack_penalty(nearest, is_away_offense) if shot_type == "attack" else 0.0,
+        }
+
+    for cycle in range(1, FREELANCE_MAX_CYCLES + 1):
+        beat = build_freelance_beat(current_step, off_lineup, cur_bh, off_eff, team_chem, is_away_offense, rng)
+        if beat is None:
+            break
+        output.append(beat)
+        last_ts = beat["timestamp"]
+        current_step = beat  # next cycle starts from these positions
+        bh_coords = beat["pos_actions"][cur_bh]["coords"]
+
+        roll = rng.randint(1, 100) + tempo_mod
+        forced = cycle == FREELANCE_MAX_CYCLES
+        if not forced and roll <= (4 * shot_clock) / cycle:
+            # didn't shoot → pass (to a teammate within 20) or hold
+            teammates = [
+                (p, beat["pos_actions"][p]["coords"]) for p in beat["pos_actions"]
+                if p != cur_bh and dist_xy(bh_coords, beat["pos_actions"][p]["coords"]) <= FREELANCE_PASS_RADIUS
+            ]
+            if teammates and rng.random() < FREELANCE_PASS_PROB:
+                rp, rc = rng.choice(teammates)
+                output.append(freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300))
+                last_ts += 300
+                cur_bh = rp
+                continue
+            if teammates:
+                continue  # hold → next cycle
+            # no teammate within 20 → shoot
+        return _finish_shot(bh_coords)
+
+    # Defensive: loop ended without a shot (e.g. beat was None) → force one from the BH's last spot.
+    last_coords = ((current_step.get("pos_actions") or {}).get(cur_bh) or {}).get("coords")
+    if last_coords is None:
+        return None
+    return _finish_shot(last_coords)
 
 
 def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position_to_spot, bh_pos):
@@ -5881,6 +6157,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
     def_scouting["defense"]["FCP"]["used"] += 1
 
     text = "PRESS!"
+
+    if USE_DYNAMIC_FCP:
+        return _resolve_full_court_press_dynamic_first_cut(
+            game, def_scouting, text=text
+        )
+
     offenseScore = 0
     defenseScore = 0
 
@@ -7165,6 +7447,9 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
 # emergent outcomes (DEAD BALL or HCO). Flip to False to revert to skeleton.
 USE_DYNAMIC_HCT = True
 
+# Dynamic FCP feature flag (Dynamic_FCP_Brief.md). Mirrors USE_DYNAMIC_HCT.
+USE_DYNAMIC_FCP = True
+
 
 def _assemble_hct_fb_shot_result(
     game, dyn, shot, def_scouting, text, off_lineup, def_lineup
@@ -7297,6 +7582,366 @@ def _assemble_hct_ab_shot_result(
     shot["executed_step_count"] = len(loop_segments)
     shot.setdefault("offense_team_id", off_team.team_id)
     return shot
+
+
+def _assemble_fcp_fb_shot_result(
+    game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+):
+    """Merge a resolved press-break fast-break shot with FCP loop intermediate data."""
+    off_team = game.offense_team
+    result_type = shot["result_type"]
+    ball_handler = shot.get("shooter")
+    defender = shot.get("defender")
+
+    text = text + shot.get("text_suffix", "")
+
+    _record_fcp_stats(
+        {"ball_handler": ball_handler, "shooter": ball_handler, "defender": defender},
+        {"result_type": result_type},
+        game,
+        off_lineup,
+        def_lineup,
+    )
+
+    loop_segments = dyn.get("loop_segments") or []
+    shot["text"] = text
+    shot["current_turn"] = "FCP"
+    shot["passer"] = ""
+    shot["screener"] = ""
+    shot.setdefault("foul_team", shot.get("foul_team"))
+    shot.setdefault("foul_player_id", shot.get("foul_player_id"))
+    shot.setdefault("fouled_out", shot.get("fouled_out", False))
+    shot.setdefault("foul_count", shot.get("foul_count", 0))
+    shot["victim_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["defender_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["events"] = []
+    shot["skeleton"] = {}
+    shot["roles"] = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+        "passer": "",
+        "screener": "",
+    }
+    shot["fcp_press_play"] = game.game_state.get("fcp_press_play")
+    shot["fcp_bh_pos"] = dyn["bh_pos"]
+    shot["fcp_bh_target"] = dyn["bh_target"]
+    shot["fcp_other_offense_targets"] = dyn["other_offense_targets"]
+    shot["fcp_def_initial_targets"] = dyn["def_initial_targets"]
+    shot["fcp_loop_segments"] = loop_segments
+    shot["fcp_skip_walk_up"] = bool(dyn.get("skip_walk_up"))
+
+    shot["time_elapsed"] = round(
+        sum(s["seconds"] for s in loop_segments) + float(shot.get("hct_fb_t_shooter", 0) or 0),
+        2,
+    )
+    shot["step_clock_seconds"] = [s["seconds"] for s in loop_segments]
+    shot["resolution_step_index"] = max(0, len(loop_segments) - 1)
+    shot["executed_step_count"] = len(loop_segments)
+    shot.setdefault("offense_team_id", off_team.team_id)
+    return shot
+
+
+def _assemble_fcp_ab_shot_result(
+    game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+):
+    """Merge an in-Attack-Basket press-break shot with FCP loop intermediate data."""
+    off_team = game.offense_team
+    result_type = shot["result_type"]
+    ball_handler = shot.get("shooter")
+    defender = shot.get("defender")
+
+    text = text + shot.get("text_suffix", "")
+
+    _record_fcp_stats(
+        {"ball_handler": ball_handler, "shooter": ball_handler, "defender": defender},
+        {"result_type": result_type},
+        game,
+        off_lineup,
+        def_lineup,
+    )
+
+    loop_segments = dyn.get("loop_segments") or []
+    shot["text"] = text
+    shot["current_turn"] = "FCP"
+    shot["passer"] = ""
+    shot["screener"] = ""
+    shot.setdefault("foul_team", shot.get("foul_team"))
+    shot.setdefault("foul_player_id", shot.get("foul_player_id"))
+    shot.setdefault("fouled_out", shot.get("fouled_out", False))
+    shot.setdefault("foul_count", shot.get("foul_count", 0))
+    shot["victim_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["defender_id"] = getattr(defender, "player_id", None) if defender else None
+    shot["events"] = []
+    shot["skeleton"] = {}
+    shot["roles"] = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+        "passer": "",
+        "screener": "",
+    }
+    shot["fcp_press_play"] = game.game_state.get("fcp_press_play")
+    shot["fcp_bh_pos"] = dyn["bh_pos"]
+    shot["fcp_bh_target"] = dyn["bh_target"]
+    shot["fcp_other_offense_targets"] = dyn["other_offense_targets"]
+    shot["fcp_def_initial_targets"] = dyn["def_initial_targets"]
+    shot["fcp_loop_segments"] = loop_segments
+    shot["fcp_skip_walk_up"] = bool(dyn.get("skip_walk_up"))
+
+    shot["time_elapsed"] = round(
+        sum(s["seconds"] for s in loop_segments) + float(shot.get("hct_ab_t_shot", 0) or 0),
+        2,
+    )
+    shot["step_clock_seconds"] = [s["seconds"] for s in loop_segments]
+    shot["resolution_step_index"] = max(0, len(loop_segments) - 1)
+    shot["executed_step_count"] = len(loop_segments)
+    shot.setdefault("offense_team_id", off_team.team_id)
+    return shot
+
+
+def _resolve_full_court_press_dynamic_first_cut(game, def_scouting, text):
+    """
+    Dynamic FCP entry point (PR1). Runs ``compute_dynamic_fcp_turn`` and assembles
+    the same return dict shape as the legacy skeleton path for downstream consumers.
+    """
+    from BackEnd.constants.fcp_press_play_types import play_key_for_fcp_press
+    from BackEnd.engine.fcp_press_plays import get_fcp_press_play
+
+    game_state = game.game_state
+    off_team = game.offense_team
+    def_team = game.defense_team
+    off_lineup = off_team.lineup
+    def_lineup = def_team.lineup
+
+    play_key = game_state.get("fcp_press_play") or play_key_for_fcp_press(
+        getattr(def_team, "playbook_settings", None)
+    )
+    game_state["fcp_press_play"] = play_key
+    dyn = get_fcp_press_play(play_key).run(game)
+
+    if dyn.get("bail"):
+        return {
+            "result_type": "HCO",
+            "turnover_type": "",
+            "text": text,
+            "current_turn": "FCP",
+            "next_play_type": "HCO",
+            "next_turn": "HCO",
+            "ball_handler": dyn.get("ball_handler"),
+            "defender": dyn.get("defender"),
+            "shooter": dyn.get("ball_handler"),
+            "passer": "",
+            "screener": "",
+            "offense_team_id": off_team.team_id,
+            "possession_flips": False,
+            "time_elapsed": 0.0,
+            "step_clock_seconds": [0.0],
+            "resolution_step_index": 0,
+            "executed_step_count": 0,
+            "events": [],
+            "skeleton": {},
+            "roles": {},
+            "fcp_press_play": play_key,
+            "fouled_out": False,
+            "foul_count": 0,
+        }
+
+    if dyn.get("result_type") == "FAST_BREAK_SHOT":
+        from BackEnd.engine.dynamic_hct_shot import resolve_hct_fast_break_shot
+
+        shot = resolve_hct_fast_break_shot(game, dyn)
+        if not shot.get("_hct_fb_bail"):
+            return _assemble_fcp_fb_shot_result(
+                game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+            )
+        dyn["result_type"] = "HCO"
+        dyn["fb_seed"] = {}
+
+    if dyn.get("result_type") in ("ATTACK_BASKET_SHOT", "ATTACK_BASKET_DRIVE"):
+        from BackEnd.engine.dynamic_hct_shot import (
+            resolve_hct_attack_basket_drive,
+            resolve_hct_attack_basket_shot,
+        )
+
+        resolver = (
+            resolve_hct_attack_basket_drive
+            if dyn["result_type"] == "ATTACK_BASKET_DRIVE"
+            else resolve_hct_attack_basket_shot
+        )
+        shot = resolver(game, dyn)
+        if not shot.get("_hct_ab_bail"):
+            return _assemble_fcp_ab_shot_result(
+                game, dyn, shot, def_scouting, text, off_lineup, def_lineup
+            )
+        dyn["result_type"] = "HCO"
+        dyn["ab_seed"] = {}
+
+    result_type = dyn["result_type"]
+    ball_handler = dyn["ball_handler"]
+    defender = dyn["defender"]
+    text = text + dyn.get("text_suffix", "")
+
+    turnover_type = dyn.get("turnover_type", "")
+    foul_team = dyn.get("foul_team") or None
+    foul_player = dyn.get("foul_player")
+    stealer = dyn.get("stealer") or defender
+    foul_out_info = {"fouled_out": False, "foul_count": 0}
+    bat_oob = bool(dyn.get("bat_oob"))
+
+    if result_type == "DEAD BALL" and not bat_oob:
+        if ball_handler is not None:
+            ball_handler.record_stat("TO")
+        def_scouting["defense"]["FCP"]["success"] += 1
+    elif result_type == "STEAL":
+        if ball_handler is not None:
+            ball_handler.record_stat("TO")
+        if stealer is not None:
+            stealer.record_stat("STL")
+            stealer.add_momentum(MO_STEAL_DELTA)
+            if ball_handler is not None:
+                ball_handler.add_momentum(-MO_STEAL_DELTA)
+        def_scouting["defense"]["FCP"]["success"] += 1
+        game_state["last_stealer"] = stealer
+        game_state["last_rebound"] = ""
+        steal_coords = dyn.get("steal_coords") or {}
+        if steal_coords:
+            game_state["last_stealer_coords"] = dict(steal_coords)
+    elif result_type == "FOUL":
+        if foul_player is None:
+            foul_player = select_foul_player(
+                foul_team or "DEFENSE", ball_handler, off_lineup, def_lineup
+            )
+        game_state["foul_team"] = foul_team
+        foul_player.record_stat("F")
+        foul_charged_team = off_team if foul_team == "OFFENSE" else def_team
+        foul_charged_team.team_fouls += 1
+        foul_out_info = check_and_handle_foul_out(
+            foul_player, game_state, foul_charged_team
+        )
+        if foul_team == "OFFENSE":
+            def_scouting["defense"]["FCP"]["success"] += 1
+        else:
+            if def_team.team_fouls >= 10:
+                game_state["offensive_state"] = "FREE_THROW"
+                game_state["free_throws"] = 2
+                game_state["free_throws_remaining"] = 2
+                game_state["one_and_one"] = False
+                game_state["last_ball_handler"] = ball_handler
+                game_state["shooter"] = ball_handler
+            elif def_team.team_fouls >= 5:
+                game_state["offensive_state"] = "FREE_THROW"
+                game_state["free_throws"] = 2
+                game_state["free_throws_remaining"] = 1
+                game_state["one_and_one"] = True
+                game_state["last_ball_handler"] = ball_handler
+                game_state["shooter"] = ball_handler
+            else:
+                game_state["offensive_state"] = "HCO"
+                game_state["free_throws"] = 0
+                game_state["free_throws_remaining"] = 0
+
+    possession_flips = (
+        (result_type in ("DEAD BALL", "STEAL") and not bat_oob)
+        or (result_type == "FOUL" and foul_team == "OFFENSE")
+    )
+    if result_type == "HCO":
+        next_play_type = "HCO"
+        game_state["offensive_state"] = "HCO"
+    elif result_type == "DEAD BALL":
+        next_play_type = "SIDE_INBOUND"
+        if game_state.get("offensive_state") in ("FCP", "HCT"):
+            game_state["offensive_state"] = "HCO"
+    elif result_type == "STEAL":
+        p_steal = fast_break_probability_from_slider(
+            def_team.strategy_settings.get("aggression", 2)
+        )
+        if random.random() < p_steal:
+            next_play_type = "FAST_BREAK"
+            game_state["offensive_state"] = "FAST_BREAK"
+        else:
+            next_play_type = "HCO"
+            game_state["offensive_state"] = "HCO"
+    elif result_type == "FOUL":
+        if game_state.get("offensive_state") != "FREE_THROW":
+            next_play_type = "SIDE_INBOUND"
+            if game_state.get("offensive_state") in ("FCP", "HCT"):
+                game_state["offensive_state"] = "HCO"
+        else:
+            next_play_type = "FREE_THROW"
+    else:
+        next_play_type = None
+
+    roles = {
+        "ball_handler": ball_handler,
+        "shooter": ball_handler,
+        "defender": defender,
+        "passer": "",
+        "screener": "",
+    }
+    if result_type == "FOUL" and foul_player is not None:
+        roles["foul_player"] = foul_player
+
+    _record_fcp_stats(
+        {
+            "ball_handler": ball_handler,
+            "shooter": ball_handler,
+            "defender": defender,
+        },
+        {"result_type": result_type},
+        game,
+        off_lineup,
+        def_lineup,
+    )
+
+    loop_segments = dyn.get("loop_segments") or []
+    return {
+        "result_type": result_type,
+        "turnover_type": turnover_type,
+        "text": text,
+        "current_turn": "FCP",
+        "next_play_type": next_play_type,
+        "next_turn": next_play_type,
+        "ball_handler": ball_handler,
+        "defender": defender,
+        "shooter": ball_handler,
+        "passer": "",
+        "screener": "",
+        "offense_team_id": off_team.team_id,
+        "possession_flips": possession_flips,
+        "time_elapsed": round(sum(s["seconds"] for s in loop_segments), 2),
+        "step_clock_seconds": [s["seconds"] for s in loop_segments],
+        "resolution_step_index": max(0, len(loop_segments) - 1),
+        "executed_step_count": len(loop_segments),
+        "events": [],
+        "skeleton": {},
+        "roles": roles,
+        "foul_team": foul_team,
+        "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
+        "stealer_id": getattr(stealer, "player_id", None) if (result_type == "STEAL" and stealer) else None,
+        "is_interception": bool(dyn.get("is_interception")) if result_type == "STEAL" else False,
+        "reach_in_foul": bool(dyn.get("reach_in_foul"))
+        if (result_type == "FOUL" and foul_team == "DEFENSE")
+        else False,
+        "bat_oob": bat_oob,
+        "bat_oob_contact": dict(dyn.get("bat_oob_contact") or {}) if bat_oob else None,
+        "bat_oob_deflector_id": (
+            getattr(def_lineup.get(dyn.get("bat_oob_deflector_pos")), "player_id", None)
+            if bat_oob and dyn.get("bat_oob_deflector_pos")
+            else None
+        ),
+        "victim_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
+        "defender_id": getattr(defender, "player_id", None) if defender else None,
+        "fouled_out": foul_out_info.get("fouled_out", False),
+        "foul_count": foul_out_info.get("foul_count", 0),
+        "fcp_press_play": play_key,
+        "fcp_bh_pos": dyn["bh_pos"],
+        "fcp_bh_target": dyn["bh_target"],
+        "fcp_other_offense_targets": dyn["other_offense_targets"],
+        "fcp_def_initial_targets": dyn["def_initial_targets"],
+        "fcp_loop_segments": loop_segments,
+        "fcp_skip_walk_up": bool(dyn.get("skip_walk_up")),
+    }
 
 
 def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):

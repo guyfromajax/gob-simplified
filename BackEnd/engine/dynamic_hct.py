@@ -90,6 +90,10 @@ from BackEnd.engine.pass_contest import (
 # (the period buzzer ends the possession first).
 HCT_TEN_SECOND_LIMIT = 10.0
 
+# FCP: BIP inbound baseline x (home orientation). SF at this spot is ineligible
+# as a pass target until he clears the inbound spot (Dynamic_FCP_Brief §1.1).
+FCP_INBOUND_BASELINE_X_HOME = 3
+
 # Step 1 BH target: x = 44, y random in [21, 29].
 STEP_1_BH_TARGET_X = 44
 STEP_1_BH_TARGET_Y_MIN = 21
@@ -722,6 +726,7 @@ def _select_pass_receiver(
     bh_pos: str,
     off_coords: Dict[str, Dict[str, int]],
     is_away_offense: bool,
+    exclude: Optional[set] = None,
 ) -> str:
     """§6 pass: the ball goes to one of the two teammates closest to the BH
     (chosen at random between those two).
@@ -732,8 +737,13 @@ def _select_pass_receiver(
     teammates would be a violation and the other would not, the legal teammate
     is chosen. (Detecting an actual over-and-back and processing it as a
     dead-ball turnover is a later item; see the §11 outstanding list.)
+
+    ``exclude`` drops positions from the pool (FCP: SF still at the BIP spot).
     """
-    others = [p for p in POSITIONS if p != bh_pos]
+    skip = {bh_pos} | set(exclude or ())
+    others = [p for p in POSITIONS if p not in skip]
+    if not others:
+        others = [p for p in POSITIONS if p != bh_pos]
     others.sort(key=lambda p: _euclid(off_coords[bh_pos], off_coords[p]))
     candidates = others[:2]
     if _crossed_half_court(off_coords[bh_pos]["x"], is_away_offense):
@@ -1752,17 +1762,72 @@ def _emit_dead_ball_drive(
     )
 
 
-def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
+def _fcp_ball_handler_pos(game: Any, off_lineup: Dict[str, Any]) -> str:
+    """Inbound receiver for FCP — from ``prior_turn.final_ball_handler_id``."""
+    turns = getattr(game, "turns", None) or []
+    if turns:
+        last = turns[-1]
+        if isinstance(last, dict):
+            bh_id = last.get("final_ball_handler_id")
+            if bh_id:
+                for pos, player in off_lineup.items():
+                    if player is not None and _player_id(player) == bh_id:
+                        return pos
+    return "PG"
+
+
+def _seed_lineup_coords_from_prior(
+    prior_coords: Dict[str, Dict[str, Any]],
+    lineup: Dict[str, Any],
+) -> Dict[str, Dict[str, int]]:
+    """Map lineup positions → coords from prior-turn finals, else ``player.coords``."""
+    coords: Dict[str, Dict[str, int]] = {}
+    for pos in POSITIONS:
+        player = lineup.get(pos)
+        if player is not None:
+            pid = _player_id(player)
+            if pid and pid in prior_coords:
+                coords[pos] = _clamp_xy(prior_coords[pid])
+                continue
+            raw = getattr(player, "coords", None)
+            if raw:
+                coords[pos] = _clamp_xy(raw)
+                continue
+        coords[pos] = {"x": 50, "y": 25}
+    return coords
+
+
+def _backcourt_uncleared_for_ten_second(
+    bh_xy: Dict[str, Any], is_away_offense: bool, turn_mode: str
+) -> bool:
+    """True while the BH has not cleared the backcourt clock boundary."""
+    if turn_mode == "fcp":
+        return not _past_primary_safe_area(bh_xy, is_away_offense)
+    return not _crossed_half_court(bh_xy["x"], is_away_offense)
+
+
+def _sf_at_fcp_inbound_spot(
+    off_coords: Dict[str, Dict[str, int]], is_away_offense: bool
+) -> bool:
+    sf = off_coords.get("SF") or {}
+    x = float(sf.get("x", 50))
+    if is_away_offense:
+        return x >= (100 - FCP_INBOUND_BASELINE_X_HOME)
+    return x <= FCP_INBOUND_BASELINE_X_HOME
+
+
+def compute_dynamic_hct_turn(
+    game, play: Any = None, *, turn_mode: str = "hct"
+) -> Dict[str, Any]:
     """
-    Build the dynamic HCT turn for this engine state.
+    Build the dynamic HCT (or FCP when ``turn_mode="fcp"``) turn for this engine.
 
-    ``play`` is the selected ``HCTPlay`` (Standard Trap, Straight Pressure, …) that
-    supplies the play-specific seams (``detect_moment`` / ``defense_targets``). It is
-    normally passed by ``HCTPlay.run``; when ``None`` we resolve it from
-    ``game_state["hct_trap_play"]`` via the registry (defaults to Standard Trap).
+    ``play`` is the selected ``HCTPlay`` / ``FCPPlay`` that supplies the
+    play-specific seams (``detect_moment`` / ``defense_targets``). When ``None``
+    we resolve from ``game_state["hct_trap_play"]`` or ``fcp_press_play``.
 
-    Returns a dict shaped for ``resolve_half_court_trap_logic`` to merge into
-    its existing turn result:
+    Returns a dict shaped for ``resolve_half_court_trap_logic`` / the FCP wrapper
+    to merge into its existing turn result:
         {
             "animations": [...],          # frontend animation list
             "result_type": "DEAD BALL" | "HCO",
@@ -1779,37 +1844,58 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     def_lineup = def_team.lineup
 
     is_away_offense = off_team.team_id == game.away_team.team_id
+    game_state = getattr(game, "game_state", {}) or {}
+    prior_coords = _prior_final_coords(game)
 
-    # Per spec K — first cut: BH is always PG (the BIP receiver).
-    bh_pos = "PG"
+    if play is None:
+        if turn_mode == "fcp":
+            from BackEnd.engine.fcp_press_plays import get_fcp_press_play
+
+            play = get_fcp_press_play(game_state.get("fcp_press_play"))
+        else:
+            from BackEnd.engine.hct_trap_plays import get_hct_trap_play
+
+            play = get_hct_trap_play(game_state.get("hct_trap_play"))
+
+    if turn_mode == "fcp":
+        bh_pos = _fcp_ball_handler_pos(game, off_lineup)
+    else:
+        bh_pos = "PG"
+
     ball_handler = off_lineup.get(bh_pos)
     defender = def_lineup.get(bh_pos)
     if ball_handler is None or defender is None:
-        # Defensive bail; caller will fall back to skeleton behavior if needed.
-        # Returning ``bail=True`` keeps the contract simple — the phase
-        # resolution wrapper checks this and short-circuits.
         return {
             "bail": True,
             "result_type": "HCO",
             "ball_handler": ball_handler,
             "defender": defender,
             "text_suffix": "",
+            "turn_mode": turn_mode,
         }
 
-    off_targets, def_targets = _build_step_1_targets(bh_pos, is_away_offense)
-    bh_target = off_targets[bh_pos]
-
-    # Snapshot the step-1 walk-up bring-up targets for every off-ball player NOW,
-    # keyed off the *original* BH (the walk-up always brings the ball up via the
-    # entry BH). Captured before ``bh_pos`` can be reassigned by a mid-turn pass
-    # and before ``off_targets`` is mutated by ``_park_passer``. Returning this
-    # (instead of recomputing with the final, post-pass ``bh_pos``) ensures a
-    # teammate who later becomes the BH via a pass still receives a walk-up
-    # target — otherwise he was excluded and left frozen at his pre-turn spot
-    # during the walk-up, then forced to catch up in large per-beat jumps.
-    walk_up_other_offense_targets = {
-        pos: dict(off_targets[pos]) for pos in POSITIONS if pos != bh_pos
-    }
+    if turn_mode == "fcp":
+        off_coords = _seed_lineup_coords_from_prior(prior_coords, off_lineup)
+        def_coords = _seed_lineup_coords_from_prior(prior_coords, def_lineup)
+        off_targets = {pos: dict(off_coords[pos]) for pos in POSITIONS}
+        def_targets = {pos: dict(def_coords[pos]) for pos in POSITIONS}
+        bh_target = dict(off_targets[bh_pos])
+        walk_up_other_offense_targets = {
+            pos: dict(off_targets[pos]) for pos in POSITIONS if pos != bh_pos
+        }
+    else:
+        off_targets, def_targets = _build_step_1_targets(bh_pos, is_away_offense)
+        bh_target = off_targets[bh_pos]
+        walk_up_other_offense_targets = {
+            pos: dict(off_targets[pos]) for pos in POSITIONS if pos != bh_pos
+        }
+        off_coords = _walk_up_loop_start_offense(
+            prior_coords, off_lineup, off_targets, bh_pos, bh_target
+        )
+        def_coords = {
+            pos: {"x": int(def_targets[pos]["x"]), "y": int(def_targets[pos]["y"])}
+            for pos in POSITIONS
+        }
 
     pg_def = def_lineup.get("PG")
 
@@ -1818,29 +1904,10 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
     bh_attrs = getattr(ball_handler, "attributes", None) or {}
     bh_drive_rate = ag_to_grid_per_game_sec(bh_attrs.get("AG", 50))
 
-    # --- Running per-player coords (start of the loop = walk-up end) ----------
-    # D15b: off-ball offense start the loop at their *actual* walk-up positions
-    # (they may still be hustling up from the backcourt), not snapped to setup —
-    # so reads that consult their positions (Attack-Basket count, pass targeting)
-    # use real coords. The BH is the walk-up gate, so he starts arrived.
-    prior_coords = _prior_final_coords(game)
-    off_coords: Dict[str, Dict[str, int]] = _walk_up_loop_start_offense(
-        prior_coords, off_lineup, off_targets, bh_pos, bh_target
-    )
-    def_coords: Dict[str, Dict[str, int]] = {
-        pos: {"x": int(def_targets[pos]["x"]), "y": int(def_targets[pos]["y"])}
-        for pos in POSITIONS
-    }
     bh_xy = off_coords[bh_pos]
 
     # Seed the running shot clock once (§4 Time terminals). Decremented per
     # segment so the loop is strictly bounded.
-    game_state = getattr(game, "game_state", {}) or {}
-    if play is None:
-        # Back-compat / safety: resolve the selected play from the stashed key.
-        from BackEnd.engine.hct_trap_plays import get_hct_trap_play
-
-        play = get_hct_trap_play(game_state.get("hct_trap_play"))
     shot_clock = float(game_state.get("shot_clock_remaining", 30) or 30)
     # 10-second rule is measured against ACTUAL elapsed time from possession start
     # (not an absolute shot-clock threshold), and is disabled when the quarter has
@@ -2254,12 +2321,11 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         if (
             quarter_remaining_start >= HCT_TEN_SECOND_LIMIT
             and (shot_clock_start - shot_clock) >= HCT_TEN_SECOND_LIMIT
-            and not _crossed_half_court(bh_xy["x"], is_away_offense)
+            and _backcourt_uncleared_for_ten_second(bh_xy, is_away_offense, turn_mode)
         ):
             # D9 — 10-second violation: 10 ACTUAL game-seconds elapsed since
-            # possession start without crossing half court → turnover → SIP,
-            # possession flips. Only applies while still in the backcourt, and not
-            # when <10s remained in the quarter at possession start (buzzer first).
+            # possession start without clearing the backcourt boundary (half
+            # court for HCT, x=64 for FCP) → turnover → SIP, possession flips.
             result_type = "DEAD BALL"
             turnover_type = "TEN_SECOND"
             text_suffix = " 10-second violation!"
@@ -2389,7 +2455,12 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         # decision == "pass" → §6 pass branch. The ball goes to one of the two
         # teammates closest to the BH; the receiver becomes the new ball handler
         # and the loop continues from him (enables a non-PG HCT-end BH → D7).
-        receiver_pos = _select_pass_receiver(bh_pos, off_coords, is_away_offense)
+        pass_exclude: Optional[set] = None
+        if turn_mode == "fcp" and _sf_at_fcp_inbound_spot(off_coords, is_away_offense):
+            pass_exclude = {"SF"}
+        receiver_pos = _select_pass_receiver(
+            bh_pos, off_coords, is_away_offense, exclude=pass_exclude
+        )
         passer_pos = bh_pos
         # Once he passes, the ex-BH is off-ball — freeze him so the stale x=44
         # setup pull doesn't drag him back across half court.
@@ -2524,4 +2595,7 @@ def compute_dynamic_hct_turn(game, play: Any = None) -> Dict[str, Any]:
         "fb_seed": fb_seed,
         # Set only for result_type == "ATTACK_BASKET_SHOT" (§7 in-AB shot tree).
         "ab_seed": ab_seed,
+        # FCP: emitter skips step-0 walk-up (loop starts at BIP-end coords).
+        "skip_walk_up": turn_mode == "fcp",
+        "turn_mode": turn_mode,
     }

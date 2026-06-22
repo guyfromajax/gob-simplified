@@ -629,7 +629,26 @@ def build_dynamic_hct_animation_steps(
     The engine returns a variable-length ``hct_loop_segments`` list (converge,
     advances, attack); this builds the entry walk-up plus one generic step per
     segment. Returns None if required intermediate data is missing.
+
+    FCP turns may supply ``fcp_*`` aliases (see ``build_dynamic_fcp_animation_steps``)
+    and ``fcp_skip_walk_up=True`` to omit the entry walk-up.
     """
+    # FCP alias keys (dynamic FCP wrapper stamps ``fcp_*`` on the turn result).
+    if turn_result.get("fcp_loop_segments") is not None:
+        for fcp_key, hct_key in (
+            ("fcp_bh_target", "hct_bh_target"),
+            ("fcp_other_offense_targets", "hct_other_offense_targets"),
+            ("fcp_def_initial_targets", "hct_def_initial_targets"),
+            ("fcp_loop_segments", "hct_loop_segments"),
+            ("fcp_bh_pos", "hct_bh_pos"),
+        ):
+            if turn_result.get(fcp_key) is not None:
+                turn_result[hct_key] = turn_result[fcp_key]
+
+    skip_walk_up = bool(
+        turn_result.get("fcp_skip_walk_up") or turn_result.get("hct_skip_walk_up")
+    )
+
     # --- Required intermediate data from the engine -----------------------
     bh_target = turn_result.get("hct_bh_target")
     other_offense_targets = turn_result.get("hct_other_offense_targets") or {}
@@ -680,18 +699,6 @@ def build_dynamic_hct_animation_steps(
     if not prior_final_coords or walk_up_bh_id not in prior_final_coords:
         return None
 
-    # --- Build setup_coords for the walk-up step --------------------------
-    setup_coords: Dict[str, GridCoord] = {}
-    setup_coords[walk_up_bh_id] = {"x": float(bh_target["x"]), "y": float(bh_target["y"])}
-    for pos, target in other_offense_targets.items():
-        pid = _player_id_at_pos(off_lineup, pos)
-        if pid:
-            setup_coords[pid] = {"x": float(target["x"]), "y": float(target["y"])}
-    for pos, target in def_initial_targets.items():
-        pid = _player_id_at_pos(def_lineup, pos)
-        if pid:
-            setup_coords[pid] = {"x": float(target["x"]), "y": float(target["y"])}
-
     # --- Clock state at turn start ---------------------------------------
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining_at_turn_start = float(game_state.get("time_remaining", 0) or 0)
@@ -699,27 +706,51 @@ def build_dynamic_hct_animation_steps(
         game_state.get("shot_clock_remaining", 0) or 0
     )
 
-    # --- Step 0: entry walk-up (universal primitive) ---------------------
-    walk_step = build_walk_up_step(
-        off_lineup=off_lineup,
-        def_lineup=def_lineup,
-        start_coords=prior_final_coords,
-        end_coords=setup_coords,
-        bh_id=walk_up_bh_id,
-        clock_remaining_at_start=clock_remaining_at_turn_start,
-        shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
-        next_step_index=1,
-        bh_archetype="standard",
-        other_archetype="sprint",
-        gate_player_ids=[walk_up_bh_id],
-        metadata_reason="hct_entry_walkup",
-    )
+    if skip_walk_up:
+        prev_end_coords = {
+            pid: {"x": float(c["x"]), "y": float(c["y"])}
+            for pid, c in prior_final_coords.items()
+            if isinstance(c, dict)
+        }
+        prev_clock_end = {
+            "clock_remaining": clock_remaining_at_turn_start,
+            "shot_clock_remaining": shot_clock_remaining_at_turn_start,
+        }
+        steps: List[AnimationStep] = []
+        step_clock_seconds: List[float] = []
+    else:
+        # --- Build setup_coords for the walk-up step --------------------------
+        setup_coords: Dict[str, GridCoord] = {}
+        setup_coords[walk_up_bh_id] = {"x": float(bh_target["x"]), "y": float(bh_target["y"])}
+        for pos, target in other_offense_targets.items():
+            pid = _player_id_at_pos(off_lineup, pos)
+            if pid:
+                setup_coords[pid] = {"x": float(target["x"]), "y": float(target["y"])}
+        for pos, target in def_initial_targets.items():
+            pid = _player_id_at_pos(def_lineup, pos)
+            if pid:
+                setup_coords[pid] = {"x": float(target["x"]), "y": float(target["y"])}
 
-    steps: List[AnimationStep] = [walk_step]
-    step_clock_seconds: List[float] = [round(float(walk_step["end"]["time_elapsed"]), 2)]
+        # --- Step 0: entry walk-up (universal primitive) ---------------------
+        walk_step = build_walk_up_step(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            start_coords=prior_final_coords,
+            end_coords=setup_coords,
+            bh_id=walk_up_bh_id,
+            clock_remaining_at_start=clock_remaining_at_turn_start,
+            shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
+            next_step_index=1,
+            bh_archetype="standard",
+            other_archetype="sprint",
+            gate_player_ids=[walk_up_bh_id],
+            metadata_reason="hct_entry_walkup",
+        )
 
-    prev_end_coords = walk_step["end"]["coords"]
-    prev_clock_end = walk_step["end"]["clock"]
+        steps = [walk_step]
+        step_clock_seconds = [round(float(walk_step["end"]["time_elapsed"]), 2)]
+        prev_end_coords = walk_step["end"]["coords"]
+        prev_clock_end = walk_step["end"]["clock"]
 
     # --- Steps 1..N: one generic step per loop segment ------------------
     n = len(loop_segments)

@@ -17,6 +17,7 @@ import {
   buildSecondaryStopperPlayerData,
   getFastBreakPlayLabel,
   getHctTrapPlayLabel,
+  getFcpPressPlayLabel,
   announceReboundHeadlineIfNeeded,
   isPassInterception,
 } from './announcements.js';
@@ -122,7 +123,9 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
 
     // ========== PRESSURE SYSTEMS (secondary tier) ==========
     case 'PRESSURE_FCP':
-      showSecondaryAnnouncement("Press!", defenseTeam);
+      showSecondaryAnnouncement("Press!", defenseTeam, null, {
+        eventSubtitle: getFcpPressPlayLabel(turnData?.fcp_press_play),
+      });
       break;
 
     case 'PRESSURE_HCT':

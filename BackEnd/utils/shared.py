@@ -2920,20 +2920,44 @@ def calculate_defender_pressure_score(defender, defense_call):
     Returns:
         int: Defender pressure score
     """
+    return int(defender_pressure_raw(defender, defense_call) * random.randint(1, 6))
+
+
+def defender_pressure_raw(defender, defense_call):
+    """Roll-free defender pressure score: (OD*0.3 + AG*0.3 + IQ*0.2 + CH*0.2)[* 0.9 if zone].
+
+    The randomized `calculate_defender_pressure_score` wraps this. Callers that supply
+    their own single random roll (e.g. Dynamic HCO Motion form-B scores) use this raw
+    value directly to avoid a double roll. See Dynamic_HCO_Motion_Brief.md.
+    """
     from BackEnd.utils.defense_utils import is_zone_defense
-    
+
     def_attrs = defender.attributes
     pressure = (
         def_attrs["OD"] * 0.3 +
         def_attrs["AG"] * 0.3 +
         def_attrs["IQ"] * 0.2 +
         def_attrs["CH"] * 0.2
-    ) * random.randint(1, 6)
-    
+    )
     if is_zone_defense(defense_call):
         pressure *= 0.9
+    return pressure
 
-    return int(pressure)
+
+def inside_defender_raw(defender):
+    """Roll-free paint/inside defender score: (ID*0.6 + ST*0.2 + IQ*0.1 + CH*0.1).
+
+    Mirrors the paint-defense branch of `shot_manager.calculate_shot_score` (kept in sync
+    intentionally). Used by Dynamic HCO Motion when the ball handler is at an inside location.
+    """
+    a = defender.attributes
+    return a.get("ID", 0) * 0.6 + a.get("ST", 0) * 0.2 + a.get("IQ", 0) * 0.1 + a.get("CH", 0) * 0.1
+
+
+def player_read_raw(player):
+    """Roll-free player read: (IQ*0.8 + CH*0.2). `player_read` wraps this with a random roll."""
+    attrs = getattr(player, "attributes", {}) or {}
+    return (attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)
 
 
 def player_read(player):
@@ -2950,10 +2974,7 @@ def player_read(player):
     Mirrors the shape of ``calculate_ball_handling_score`` and
     ``calculate_defender_pressure_score`` (also raw-score returns).
     """
-    attrs = getattr(player, "attributes", {}) or {}
-    return int(
-        ((attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)) * random.randint(1, 6)
-    )
+    return int(player_read_raw(player) * random.randint(1, 6))
 
 
 def get_away_player_coords(playerCoords):

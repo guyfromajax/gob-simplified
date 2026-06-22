@@ -1403,28 +1403,28 @@ class TurnManager:
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
-            # Parallel-build: stamp unified animation_steps alongside legacy
-            # animations[]. FCP carries a skeleton in the same shape HCO uses,
-            # so the shared skeleton emitter works. Defensive: failure must
-            # not block the existing payload.
-            if isinstance(result, dict):
+            # Dynamic FCP returns skeleton:{} — use the FCP-specific emitter when
+            # intermediate loop data is present; fall back to legacy skeleton emitter.
+            if isinstance(result, dict) and "animation_steps" not in result:
                 try:
-                    from BackEnd.engine.skeleton_step_emitter import (
-                        build_skeleton_animation_steps,
-                    )
-                    anim_steps = build_skeleton_animation_steps(
-                        result, self.game, turn_type="FCP"
-                    )
+                    if result.get("fcp_loop_segments"):
+                        from BackEnd.engine.dynamic_fcp_step_emitter import (
+                            build_dynamic_fcp_animation_steps,
+                        )
+
+                        anim_steps = build_dynamic_fcp_animation_steps(
+                            result, self.game
+                        )
+                    else:
+                        from BackEnd.engine.skeleton_step_emitter import (
+                            build_skeleton_animation_steps,
+                        )
+
+                        anim_steps = build_skeleton_animation_steps(
+                            result, self.game, turn_type="FCP"
+                        )
                     if anim_steps is not None:
                         result["animation_steps"] = anim_steps
-                        # Align result["time_elapsed"] with the schema's
-                        # total game-clock burn for MAKE/MISS/BLOCK on FCP
-                        # turns. Mirrors the HCO realignment in
-                        # `resolve_half_court_offense` — without this, the
-                        # legacy step_clock_seconds-based time_elapsed
-                        # excludes the [ball_flight] + [bounce] sub-step
-                        # durations, causing FCP shot turns to under-burn
-                        # the game clock by ~1-1.5 game-sec each.
                         fcp_result_type = (result.get("result_type") or "").upper()
                         if fcp_result_type in ("MAKE", "MISS", "BLOCK") and anim_steps:
                             first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
@@ -1436,7 +1436,7 @@ class TurnManager:
                                 result["time_elapsed"] = int(round(schema_game_burn))
                 except Exception as e:
                     logging.warning(
-                        "build_skeleton_animation_steps (FCP) failed: %s", e
+                        "build_dynamic_fcp_animation_steps (FCP) failed: %s", e
                     )
         elif state == "HCT":
             self.logger.log("hct:start")
@@ -5210,25 +5210,30 @@ class TurnManager:
     def determine_defensive_pressure_type(self):
         """
         Determine the defensive setup ('FCP', 'HCT', or 'HCO') for the next
-        possession AND, when it is HCT, pick which trap play runs.
+        possession AND, when it is FCP or HCT, pick which press/trap play runs.
 
-        SS&S choke point: rather than duplicating the trap-play pick at the ~6
+        SS&S choke point: rather than duplicating the play pick at the ~6
         callers that set ``offensive_state`` from this return value, we select it
-        ONCE here and sync it into ``game_state["hct_trap_play"]`` so every
-        downstream reader (``compute_dynamic_hct_turn``) uses the same value.
+        ONCE here and sync into ``game_state["fcp_press_play"]`` /
+        ``game_state["hct_trap_play"]`` so downstream engines use the same value.
         Mirrors the Fast Break select-once → stash → consume-with-fallback shape.
         """
         pressure_type = self._select_defensive_pressure_type()
 
-        if pressure_type == "HCT":
+        # After a made shot possession flips: the team that just scored
+        # (currently offense_team) becomes the defense.
+        press_trap_team = self.game.offense_team
+        playbook_settings = getattr(press_trap_team, "playbook_settings", None)
+
+        if pressure_type == "FCP":
+            from BackEnd.constants.fcp_press_play_types import play_key_for_fcp_press
+
+            self.game.game_state["fcp_press_play"] = play_key_for_fcp_press(
+                playbook_settings
+            )
+        elif pressure_type == "HCT":
             from BackEnd.constants.hct_trap_play_types import play_key_for_hct_trap
 
-            # After a made shot possession flips: the team that just scored
-            # (currently offense_team) becomes the defense and runs the trap, so
-            # the trap-play weights come from THAT team's playbook (mirrors how
-            # this fn already reads offense_team for the pressure decision).
-            trap_team = self.game.offense_team
-            playbook_settings = getattr(trap_team, "playbook_settings", None)
             self.game.game_state["hct_trap_play"] = play_key_for_hct_trap(
                 playbook_settings
             )

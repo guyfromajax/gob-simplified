@@ -1,0 +1,228 @@
+"""Phase 3 tests — Dynamic HCO Motion resolver integration (walk + shot handoff)."""
+import BackEnd.engine.phase_resolution as PR
+from BackEnd.engine.phase_resolution import (
+    _dynamic_hco_motion_enabled,
+    _resolve_motion_offense_shot_dynamic,
+    _execute_motion_decision,
+)
+
+_ATTR_KEYS = ["SC", "ST", "AG", "SH", "ID", "OD", "IQ", "CH"]
+
+
+class _FakePlayer:
+    def __init__(self, pid, **overrides):
+        self.player_id = pid
+        self.attributes = {k: 50 for k in _ATTR_KEYS}
+        self.attributes.update(overrides)
+
+
+class _FakeTeam:
+    def __init__(self, team_id, is_user_team=False):
+        self.team_id = team_id
+        self.is_user_team = is_user_team
+        self.team_attributes = {
+            "discipline": 0, "fight": 0, "offensive_efficiency": 0,
+            "defensive_efficiency": 0, "team_chemistry": 7,
+        }
+        self.strategy_calls = {"aggression_call": "normal", "tempo_call": "normal"}
+
+
+class _FakeGame:
+    def __init__(self, defense_playcall="Man", shot_clock=30):
+        self.home_team = _FakeTeam("HOME")
+        self.away_team = _FakeTeam("AWAY")
+        self.offense_team = self.home_team
+        self.defense_team = self.away_team
+        self.game_state = {"defense_playcall": defense_playcall, "shot_clock_remaining": shot_clock}
+
+
+def _step(locations, ts=0):
+    return {"timestamp": ts,
+            "pos_actions": {p: {"location": loc, "action": "handle_ball"} for p, loc in locations.items()},
+            "events": []}
+
+
+def _skeleton(*step_locs):
+    return {"steps": [_step(loc, ts=i * 1000) for i, loc in enumerate(step_locs)]}
+
+
+def _lineup(**by_pos):
+    return by_pos
+
+
+# ---------------------------------------------------------------- gate
+
+def test_gate_off_by_default(monkeypatch):
+    monkeypatch.delenv("GOB_DYNAMIC_HCO_MOTION", raising=False)
+    assert _dynamic_hco_motion_enabled() is False
+
+
+def test_gate_on_when_env_truthy(monkeypatch):
+    for v in ("1", "true", "on", "YES"):
+        monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", v)
+        assert _dynamic_hco_motion_enabled() is True
+
+
+# ---------------------------------------------------------------- handoff
+
+def test_execute_inside_shot_appends_shoot_step():
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    steps = _skeleton({"PG": "key"}, {"PG": "basketSpot"}, {"PG": "midLane"})["steps"]
+    decision = {"action": "SHOOT", "shooter_pos": "PG", "shot_type": "inside"}
+    res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "basketSpot", decision,
+                                   game, off, {"PG": _FakePlayer("d")}, is_away_offense=False)
+    assert res["shooter_pos"] == "PG" and res["shot_type"] == "inside" and res["playcall"] == "Inside"
+    last = res["skeleton"]["steps"][-1]
+    assert last["pos_actions"]["PG"]["action"] == "shoot"
+    assert len(res["skeleton"]["steps"]) == 3  # base [0,1] + shoot
+
+
+def test_execute_kickout_appends_pass_then_shoot():
+    game = _FakeGame()
+    bh, sg = _FakePlayer("bh"), _FakePlayer("sg")
+    off = _lineup(PG=bh, SG=sg)
+    steps = _skeleton({"PG": "key", "SG": "upper wing"}, {"PG": "key", "SG": "upper wing"})["steps"]
+    decision = {"action": "KICKOUT_SHOOT", "shooter_pos": "SG", "shot_type": "outside"}
+    res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "key", decision,
+                                   game, off, {}, is_away_offense=False)
+    assert res["shooter_pos"] == "SG" and res["shooter"] is sg
+    actions = [list(s["pos_actions"].values())[0]["action"] for s in res["skeleton"]["steps"][-2:]]
+    # second-to-last has pass/receive; last is shoot
+    assert res["skeleton"]["steps"][-1]["pos_actions"]["SG"]["action"] == "shoot"
+    assert "pass" in [a for s in res["skeleton"]["steps"] for a in
+                      (v.get("action") for v in s["pos_actions"].values())]
+
+
+def test_execute_attack_reuses_drive_sequence(monkeypatch):
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    steps = _skeleton({"PG": "upper wing"}, {"PG": "upper wing"})["steps"]
+    canned = {
+        "steps": [_step({"PG": "midLane"})],
+        "shooter": bh, "shooter_pos": "PG", "shooter_location": "midLane",
+        "resolved_shot_type": "attack", "playcall": "Attack",
+        "motion_attack_uncontested": True, "motion_attack_geometry_contest": True,
+        "motion_attack_defense_bonus": 100, "motion_attack_driver_shoots": True,
+    }
+    monkeypatch.setattr(PR, "_create_attack_drive_shoot_steps", lambda *a, **k: canned)
+    decision = {"action": "HOT_READ_SHOOT", "shooter_pos": "PG", "shot_type": "attack", "via_pass": False}
+    res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "upper wing", decision,
+                                   game, off, {}, is_away_offense=False)
+    assert res["shot_type"] == "attack" and res["playcall"] == "Attack"
+    assert res["motion_attack_uncontested"] is True and res["motion_attack_defense_bonus"] == 100
+
+
+# ---------------------------------------------------------------- walk
+
+def test_walk_picks_first_shot_decision(monkeypatch):
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    game.offense_team.lineup = off
+    skel = _skeleton({"PG": "key"}, {"PG": "key"}, {"PG": "basketSpot"}, {"PG": "key"})
+
+    calls = {"n": 0}
+
+    def fake_decide(*a, **k):
+        calls["n"] += 1
+        # ADVANCE on step 1, SHOOT on step 2, never reached after
+        return {"action": "SHOOT", "shooter_pos": "PG", "shot_type": "inside"} if calls["n"] == 2 else {"action": "ADVANCE"}
+
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action", fake_decide)
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+    res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
+    assert res is not None and res["shooter_pos"] == "PG"
+    # shot fired at step index 2 → truncated [0,1,2] (3) + shoot (1) = 4
+    assert len(res["skeleton"]["steps"]) == 4
+    assert res["skeleton"]["steps"][-1]["pos_actions"]["PG"]["action"] == "shoot"
+
+
+def test_walk_weaves_subtle_beat_then_resumes_and_shoots(monkeypatch):
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    skel = _skeleton({"PG": "key"}, {"PG": "key"}, {"PG": "basketSpot"})
+
+    calls = {"n": 0}
+
+    def fake_decide(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {"action": "SUBTLE_MOVEMENT"}            # step 1 → insert a beat, continue
+        return {"action": "SHOOT", "shooter_pos": "PG", "shot_type": "inside"}  # step 2 → shoot
+
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action", fake_decide)
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+    res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
+    out = res["skeleton"]["steps"]
+    # [step0, step1, subtle_beat, step2, shoot]
+    assert len(out) == 5
+    assert "_subtle_movement" in out[2]                    # beat inserted after step 1
+    assert out[3]["pos_actions"]["PG"]["location"] == "basketSpot"  # skeleton resumed at step 2
+    assert out[-1]["pos_actions"]["PG"]["action"] == "shoot"
+
+
+def test_freelance_forced_enters_loop_and_shoots(monkeypatch):
+    from BackEnd.engine.phase_resolution import _resolve_freelance
+    game = _FakeGame(shot_clock=30)
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh, SG=_FakePlayer("sg"))
+    skel = _skeleton({"PG": "key", "SG": "upper wing"}, {"PG": "key", "SG": "upper wing"})
+    base = skel["steps"][:2]
+
+    # rng that never triggers an early shot (forces the cap path) but holds (no pass) each cycle.
+    class _Rng:
+        def random(self): return 0.99           # >FREELANCE_PASS_PROB → hold; also non-BH gate → hold
+        def randint(self, a, b): return 1        # low → never beats threshold until forced cap
+        def choice(self, seq): return list(seq)[0]
+
+    res = _resolve_freelance(skel, base, skel["steps"][1], "PG", game, off, {}, False, _Rng())
+    assert res is not None
+    out = res["skeleton"]["steps"]
+    assert out[-1]["pos_actions"]["PG"]["action"] == "shoot"     # terminated in a shot
+    # exactly FREELANCE_MAX_CYCLES movement beats (held every cycle) + the forced shoot
+    from BackEnd.engine.motion_freelance import FREELANCE_MAX_CYCLES
+    beats = [s for s in out if "_freelance" in s]
+    assert len(beats) == FREELANCE_MAX_CYCLES
+
+
+def test_freelance_pass_transfers_ball_to_receiver():
+    from BackEnd.engine.phase_resolution import _resolve_freelance
+    game = _FakeGame(shot_clock=30)
+    off = _lineup(PG=_FakePlayer("pg"), SG=_FakePlayer("sg"))
+    # SG starts near the BH so it stays within the 20-grid pass radius after nudges.
+    skel = _skeleton({"PG": "key", "SG": "upper midWing"}, {"PG": "key", "SG": "upper midWing"})
+
+    # Cycle 1: roll low → don't shoot → pass (random<0.80) to SG. Cycle 2: roll high → SG shoots.
+    class _Rng:
+        def __init__(self): self.cycle_rolls = [1, 200]; self.i = 0
+        def random(self): return 0.1            # <0.5 subtle nudge; <0.80 pass
+        def randint(self, a, b):
+            if (a, b) == (1, 100):
+                v = self.cycle_rolls[min(self.i, len(self.cycle_rolls) - 1)]; self.i += 1; return v
+            return 2                            # nudge magnitude
+        def choice(self, seq): return list(seq)[0]
+
+    res = _resolve_freelance(skel, skel["steps"][:2], skel["steps"][1], "PG", game, off, {}, False, _Rng())
+    out = res["skeleton"]["steps"]
+    assert any(any(v.get("action") == "pass" for v in s["pos_actions"].values()) for s in out)
+    assert res["shooter_pos"] == "SG"           # possession transferred to the pass receiver
+
+
+def test_walk_no_shot_forces_terminal_shot(monkeypatch):
+    game = _FakeGame()
+    bh = _FakePlayer("bh")
+    off = _lineup(PG=bh)
+    skel = _skeleton({"PG": "key"}, {"PG": "key"}, {"PG": "basketSpot"})
+
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action",
+                        lambda *a, **k: {"action": "ADVANCE"})
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+    res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
+    assert res is not None and res["shooter_pos"] == "PG"
+    # forced at last step (index 2, basketSpot → inside)
+    assert res["shot_type"] == "inside"
+    assert res["skeleton"]["steps"][-1]["pos_actions"]["PG"]["action"] == "shoot"
