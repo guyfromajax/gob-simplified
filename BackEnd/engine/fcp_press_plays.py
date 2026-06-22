@@ -97,7 +97,7 @@ class StraightPressureFCP(FCPPlay):
 
         inst = StraightPressureFCP()
         inst.state = _straight_pressure_begin(
-            bh_xy, def_coords, off_coords, is_away_offense
+            bh_xy, def_coords, off_coords, is_away_offense, fcp=True
         )
         return inst
 
@@ -108,6 +108,8 @@ class StraightPressureFCP(FCPPlay):
 
         kind, in_range = _detect_moment(bh_xy, def_coords, is_away_offense)
         if kind == "trap":
+            if (self.state or {}).get("fcp_man_glue"):
+                return "pressure", in_range
             rover = (self.state or {}).get("rover")
             if rover is not None and rover in in_range:
                 return "trap", in_range
@@ -128,7 +130,7 @@ class StraightPressureFCP(FCPPlay):
 
         if self.state is None:
             self.state = _straight_pressure_begin(
-                bh_xy, def_coords, off_coords, is_away_offense
+                bh_xy, def_coords, off_coords, is_away_offense, fcp=True
             )
         return _straight_pressure_targets(
             self.state, bh_xy, def_coords, is_away_offense, off_coords

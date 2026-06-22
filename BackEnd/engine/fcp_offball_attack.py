@@ -75,8 +75,10 @@ C_PHASE3_HALF_SPOTS = (
 
 
 def _clamp_xy(xy: Dict[str, Any]) -> Dict[str, int]:
-    c = clamp_animation_grid_coords(float(xy["x"]), float(xy["y"]))
-    return {"x": int(c["x"]), "y": int(c["y"])}
+    clamped = clamp_animation_grid_coords(
+        {"x": float(xy["x"]), "y": float(xy["y"])},
+    ) or xy
+    return {"x": int(round(clamped["x"])), "y": int(round(clamped["y"]))}
 
 
 def _flip(xy: Dict[str, Any]) -> Dict[str, int]:

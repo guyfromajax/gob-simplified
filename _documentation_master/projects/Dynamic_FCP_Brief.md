@@ -149,6 +149,8 @@ Ball progress **x** = BH **x** (home); away mirrored. BH half: **y > 25 → uppe
 
 **Module:** `BackEnd/engine/fcp_offball_attack.py`
 
+**FCP Straight Pressure defense:** def **SG/SF stay man-glued** (deny on assignment) — no rover/key converge on the BH; trap moments downgraded to single-defender pressure. Only **def PG** closes on the ball at converge. HCT Straight Pressure unchanged.
+
 ### Terminals (dynamic target)
 
 | Terminal | Dynamic target |

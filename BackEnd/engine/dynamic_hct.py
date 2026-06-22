@@ -1143,12 +1143,17 @@ def _straight_pressure_begin(
     def_coords: Dict[str, Dict[str, int]],
     off_coords: Optional[Dict[str, Dict[str, int]]],
     is_away_offense: bool,
+    *,
+    fcp: bool = False,
 ) -> Dict[str, Any]:
     """Lock the initial man assignments + roles at the converge (§13.6).
 
     def PG → the BH. The two off-ball defenders (SG/SF) cover, by nearest-matchup,
     the two non-BH backcourt offenders closest to the BH (higher-y / lower-y). With
     one such offender the spare defender roves; with none, one roves and one keys.
+
+    ``fcp=True`` (FCP Straight Pressure): SG/SF stay glued to man assignments —
+    no rover/key converge on the BH.
     """
     state: Dict[str, Any] = {
         "assignment": {},     # def_pos -> off_pos (man defenders, incl. PG→BH)
@@ -1156,12 +1161,14 @@ def _straight_pressure_begin(
         "key": None,          # def_pos or None
         "wings": {},          # def_pos -> "upper" | "lower"
         "entered_aba": set(),  # off positions that have visited the ABA
+        "fcp_man_glue": bool(fcp),
     }
     offball = list(STRAIGHT_PRESSURE_OFFBALL_DEFENDERS)
     if off_coords is None:
         state["assignment"]["PG"] = "PG"
-        state["rover"] = offball[0]
-        state["key"] = offball[1]
+        if not fcp:
+            state["rover"] = offball[0]
+            state["key"] = offball[1]
         return state
 
     bh_off = _match_off_pos(off_coords, bh_xy)
@@ -1173,6 +1180,12 @@ def _straight_pressure_begin(
         if p != bh_off and _is_backcourt_offender(off_coords[p], is_away_offense)
     ]
     candidates.sort(key=lambda p: _euclid(off_coords[p], bh_xy))
+
+    if fcp:
+        _straight_pressure_assign_offball_fcp(
+            state, offball, bh_off, bh_xy, def_coords, off_coords, candidates
+        )
+        return state
 
     if len(candidates) >= 2:
         two = sorted(candidates[:2], key=lambda p: off_coords[p]["y"])
@@ -1192,6 +1205,56 @@ def _straight_pressure_begin(
         state["rover"] = rover
         state["key"] = other
     return state
+
+
+def _straight_pressure_assign_offball_fcp(
+    state: Dict[str, Any],
+    offball: List[str],
+    bh_off: str,
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    off_coords: Dict[str, Dict[str, int]],
+    candidates: List[str],
+) -> None:
+    """Assign def SG/SF to men only — no rover/key (FCP Straight Pressure)."""
+    if len(candidates) >= 2:
+        two = sorted(candidates[:2], key=lambda p: off_coords[p]["y"])
+        state["assignment"].update(
+            _nearest_matchup_two(offball, two, def_coords, off_coords)
+        )
+        return
+    if len(candidates) == 1:
+        man = candidates[0]
+        order = sorted(offball, key=lambda d: _euclid(def_coords[d], off_coords[man]))
+        state["assignment"][order[0]] = man
+        others = [p for p in POSITIONS if p != bh_off and p != man]
+        if len(order) > 1 and others:
+            second_man = min(others, key=lambda p: _euclid(off_coords[p], bh_xy))
+            state["assignment"][order[1]] = second_man
+        return
+    others = [p for p in POSITIONS if p != bh_off]
+    if not others:
+        return
+    picked = sorted(others, key=lambda p: _euclid(off_coords[p], bh_xy))[: len(offball)]
+    for d, m in zip(offball, picked):
+        state["assignment"][d] = m
+
+
+def _straight_pressure_reassign_man_fcp(
+    state: Dict[str, Any],
+    def_pos: str,
+    bh_off: str,
+    off_coords: Dict[str, Dict[str, int]],
+    def_coords: Dict[str, Dict[str, int]],
+) -> None:
+    """When a man's ABA release frees a defender, re-pick an unguarded offender."""
+    guarded = set(state["assignment"].values())
+    pool = [p for p in POSITIONS if p != bh_off and p not in guarded]
+    if not pool:
+        return
+    state["assignment"][def_pos] = min(
+        pool, key=lambda p: _euclid(def_coords[def_pos], off_coords[p])
+    )
 
 
 def _straight_pressure_assign_role(
@@ -1271,11 +1334,17 @@ def _straight_pressure_targets(
     ]
     for d in released:
         del state["assignment"][d]
-        _straight_pressure_assign_role(state, d, def_coords, is_away_offense)
+        if state.get("fcp_man_glue"):
+            _straight_pressure_reassign_man_fcp(
+                state, d, bh_off, off_coords, def_coords
+            )
+        else:
+            _straight_pressure_assign_role(state, d, def_coords, is_away_offense)
 
     # 2) The key defender mans up on an offender returning to the backcourt from
-    #    the ABA (takes precedence over the key/wing toggle).
-    if state["key"] is not None:
+    #    the ABA (takes precedence over the key/wing toggle). FCP man-glue skips
+    #    the key role entirely — freed defenders re-pick in step 1 above.
+    if state["key"] is not None and not state.get("fcp_man_glue"):
         guarded = set(state["assignment"].values())
         returners = [
             p
@@ -1300,16 +1369,17 @@ def _straight_pressure_targets(
             targets[d] = _clamp_xy(
                 _interpolate(bh_xy, off_coords[m], STRAIGHT_PRESSURE_DENY_FRACTION)
             )  # deny ball-side
-    if state["rover"] is not None:
-        targets[state["rover"]] = _converge_xy(bh_xy, is_away_offense)
-    if state["key"] is not None:
-        targets[state["key"]] = _clamp_xy(
-            _straight_pressure_key_spot(bh_xy, is_away_offense)
-        )
-    for d, side in state["wings"].items():
-        targets[d] = _clamp_xy(
-            _spot("upper wing" if side == "upper" else "lower wing", is_away_offense)
-        )
+    if not state.get("fcp_man_glue"):
+        if state["rover"] is not None:
+            targets[state["rover"]] = _converge_xy(bh_xy, is_away_offense)
+        if state["key"] is not None:
+            targets[state["key"]] = _clamp_xy(
+                _straight_pressure_key_spot(bh_xy, is_away_offense)
+            )
+        for d, side in state["wings"].items():
+            targets[d] = _clamp_xy(
+                _spot("upper wing" if side == "upper" else "lower wing", is_away_offense)
+            )
 
     # PF/C — identical D22 ball-reactive coverage as Standard Trap.
     pfc = _pf_c_targets(bh_xy, off_coords, is_away_offense)
