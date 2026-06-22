@@ -6620,7 +6620,14 @@
         overlay.classList.remove('hidden');
 
         // [3PT-SFX] TEMP DEBUG — remove once the made-3 cue is confirmed.
-        console.warn('[3PT-SFX] overlay mount | eventText=', data && data.eventText, '| sfx=', data && data.sfx);
+        var dbgSfx = data && data.sfx;
+        var dbgSfxList = Array.isArray(dbgSfx) ? dbgSfx : (dbgSfx ? [dbgSfx] : []);
+        var dbgHasThreeSfx = dbgSfxList.some(function(file) {
+          return /(?:braddock|duke|sammy)-three\.mp3$/i.test(String(file || ''));
+        });
+        if (dbgHasThreeSfx) {
+          console.warn('[3PT-SFX] overlay mount payload', data);
+        }
 
         // SFX dispatch at mount — see secondary overlay's matching block for rationale.
         if (data && data.sfx && typeof window.playGameSfx === 'function') {

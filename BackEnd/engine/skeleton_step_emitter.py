@@ -18,6 +18,7 @@ Coexists with the legacy ``animations[]`` payload until per-turn-type
 cutover.
 """
 
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
@@ -1842,6 +1843,20 @@ def _build_make_hold_sub_step(
         # 3-point condition); FE resolves the "three_make" key to a random file
         # and plays it. Keeps the made-3 audio decision off the pure-renderer FE.
         if int(turn_result.get("points") or 0) == 3:
+            logging.warning(
+                "[3PT-SFX-STAMP] stamping three_make: result_type=%s points=%s "
+                "is_three_point_shot=%s shot_type=%s current_turn=%s fast_break=%s "
+                "fast_break_play=%s shooter_id=%s text=%s",
+                turn_result.get("result_type"),
+                turn_result.get("points"),
+                turn_result.get("is_three_point_shot"),
+                turn_result.get("shot_type"),
+                turn_result.get("current_turn"),
+                turn_result.get("fast_break"),
+                turn_result.get("fast_break_play"),
+                turn_result.get("shooter_id"),
+                turn_result.get("text"),
+            )
             announcement["meta"] = {"sfx": "three_make"}
 
     trigger: AdvanceTrigger = {
