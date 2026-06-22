@@ -279,6 +279,7 @@ function fireMomentumCallout(scene, playerId, teamSide, sign, mo) {
 function fireHotReadCallout(scene, turnData) {
   const roles = turnData?.roles;
   if (!roles?.hot_read) return;
+  console.warn('🔥 [HOT READ FE] firing "Hot Read!" ribbon + VO:', roles.hot_read_sfx);
   const shooterId =
     turnData.shooter_id || turnData.shooter?.player_id || roles.shooter?.player_id || roles.shooter || null;
   const sprite = shooterId ? scene.playerSprites?.[shooterId] : null;

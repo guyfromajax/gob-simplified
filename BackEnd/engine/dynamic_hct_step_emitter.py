@@ -648,6 +648,10 @@ def build_dynamic_hct_animation_steps(
     skip_walk_up = bool(
         turn_result.get("fcp_skip_walk_up") or turn_result.get("hct_skip_walk_up")
     )
+    is_fcp = bool(
+        turn_result.get("fcp_skip_walk_up")
+        or turn_result.get("fcp_loop_segments") is not None
+    )
 
     # --- Required intermediate data from the engine -----------------------
     bh_target = turn_result.get("hct_bh_target")
@@ -657,6 +661,14 @@ def build_dynamic_hct_animation_steps(
     bh_pos = turn_result.get("hct_bh_pos") or "PG"
 
     if not bh_target or not loop_segments:
+        if is_fcp:
+            from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
+
+            log_fcp_emitter_bail(
+                "missing bh_target or loop_segments",
+                bh_target=bool(bh_target),
+                loop_segment_count=len(loop_segments),
+            )
         return None
 
     off_team = getattr(game, "offense_team", None)
@@ -683,6 +695,15 @@ def build_dynamic_hct_animation_steps(
     bh_id = _player_id_at_pos(off_lineup, bh_pos)
     pg_def_id = _player_id_at_pos(def_lineup, "PG")
     if not bh_id or not pg_def_id:
+        if is_fcp:
+            from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
+
+            log_fcp_emitter_bail(
+                "missing bh_id or pg_def_id",
+                bh_id=bh_id,
+                pg_def_id=pg_def_id,
+                bh_pos=bh_pos,
+            )
         return None
 
     # --- Prior turn state (BIP-end coords + ball handler) -----------------
@@ -697,9 +718,18 @@ def build_dynamic_hct_animation_steps(
     walk_up_bh_id = prior_final_bh_id or bh_id
 
     if not prior_final_coords or walk_up_bh_id not in prior_final_coords:
+        if is_fcp:
+            from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
+
+            log_fcp_emitter_bail(
+                "missing prior_turn.final_coords or BH not in map",
+                prior_coord_count=len(prior_final_coords),
+                walk_up_bh_id=walk_up_bh_id,
+                bh_in_map=walk_up_bh_id in prior_final_coords if walk_up_bh_id else False,
+            )
         return None
 
-    # --- Clock state at turn start ---------------------------------------
+    setup_coords: Dict[str, GridCoord] = {}
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining_at_turn_start = float(game_state.get("time_remaining", 0) or 0)
     shot_clock_remaining_at_turn_start = float(
@@ -720,7 +750,6 @@ def build_dynamic_hct_animation_steps(
         step_clock_seconds: List[float] = []
     else:
         # --- Build setup_coords for the walk-up step --------------------------
-        setup_coords: Dict[str, GridCoord] = {}
         setup_coords[walk_up_bh_id] = {"x": float(bh_target["x"]), "y": float(bh_target["y"])}
         for pos, target in other_offense_targets.items():
             pid = _player_id_at_pos(off_lineup, pos)
@@ -999,8 +1028,20 @@ def build_dynamic_hct_animation_steps(
     turn_result["resolution_step_index"] = len(steps) - 1
     turn_result["executed_step_count"] = len(steps)
 
-    _log_hct_step_trace(
-        steps, loop_segments, prior_final_coords, setup_coords, off_lineup, def_lineup
-    )
+    if is_fcp:
+        from BackEnd.engine.fcp_step_trace import log_emitter_step_trace
+
+        log_emitter_step_trace(
+            steps,
+            loop_segments,
+            prior_final_coords,
+            off_lineup,
+            def_lineup,
+            skip_walk_up=skip_walk_up,
+        )
+    else:
+        _log_hct_step_trace(
+            steps, loop_segments, prior_final_coords, setup_coords, off_lineup, def_lineup
+        )
 
     return steps

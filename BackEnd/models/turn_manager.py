@@ -1446,6 +1446,14 @@ class TurnManager:
                             if cs_start is not None and cs_end is not None:
                                 schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
                                 result["time_elapsed"] = int(round(schema_game_burn))
+                    elif result.get("fcp_loop_segments"):
+                        from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
+
+                        log_fcp_emitter_bail(
+                            "build_dynamic_fcp_animation_steps returned None",
+                            segment_count=len(result.get("fcp_loop_segments") or []),
+                            result_type=result.get("result_type"),
+                        )
                 except Exception as e:
                     logging.warning(
                         "build_dynamic_fcp_animation_steps (FCP) failed: %s", e

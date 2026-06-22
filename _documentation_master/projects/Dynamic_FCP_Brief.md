@@ -133,6 +133,8 @@ Then **`hct_converge`** runs (defense re-poses around the post-engagement BH; of
 
 **Engine:** `_fcp_engagement_ends` / `_apply_fcp_engagement` in `dynamic_hct.py` (`turn_mode="fcp"` only). **Emitter:** generic loop step via `reason="fcp_engagement"`.
 
+**Debug trace:** set `LOG_FCP_STEP_COORDS = True` in `BackEnd/engine/fcp_step_trace.py` (default on). Server stdout prints `[FCP STEP TRACE]` (engine intent per segment, labeled Step N FCP) and `[FCP EMITTER TRACE]` (rendered schema steps). Emitter bail reasons log as `[FCP EMITTER TRACE] BAIL: …`. Set `False` when done playtesting.
+
 ### Terminals (dynamic target)
 
 | Terminal | Dynamic target |

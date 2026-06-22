@@ -4278,7 +4278,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
     # GOB_DYNAMIC_HCO_MOTION env var. Recalibration (forced_shot_step_index) and any
     # error fall back to the legacy path so live games are never broken.
     if forced_shot_step_index is None and _dynamic_hco_motion_enabled():
-        logging.info("🟢 [DYNAMIC MOTION] flag ON — running dynamic resolver for this Motion shot")
+        logging.warning("🟢 [DYNAMIC MOTION] flag ON — running dynamic resolver for this Motion shot")
         try:
             dynamic_result = _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             if dynamic_result is not None:
@@ -4548,7 +4548,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
         decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random)
         action = decision.get("action")
-        logging.info(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
+        logging.warning(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
             return _execute_motion_decision(
                 skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
@@ -4654,7 +4654,10 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
     if decision.get("action") == "HOT_READ_SHOOT":
         result["hot_read"] = True
         result["hot_read_sfx"] = random.choice(HOT_READ_VO_FILES)
-        logging.info(f"🎙️ [DYNAMIC MOTION] Hot read by {result['shooter_pos']} → VO {result['hot_read_sfx']}")
+        logging.warning(
+            f"🔥🔥🔥 [HOT READ EXECUTED] shooter={result['shooter_pos']} "
+            f"shot_type={result['shot_type']} vo={result['hot_read_sfx']}"
+        )
 
     return result
 

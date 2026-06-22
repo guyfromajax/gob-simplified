@@ -2026,6 +2026,61 @@ def compute_dynamic_hct_turn(
     )
 
     loop_segments: List[Dict[str, Any]] = []
+
+    fcp_tracer: Optional[Any] = None
+    if turn_mode == "fcp":
+        from BackEnd.engine.fcp_step_trace import FcpStepTracer, LOG_FCP_STEP_COORDS
+
+        if LOG_FCP_STEP_COORDS:
+            fcp_tracer = FcpStepTracer(off_lineup, def_lineup, bh_pos)
+            fcp_tracer.log_turn_start(
+                off_coords,
+                def_coords,
+                off_agg=_team_aggression_call(off_team),
+                def_agg=_team_aggression_call(def_team),
+            )
+
+    def _snap_loop_coords() -> Tuple[
+        Optional[Dict[str, Dict[str, int]]], Optional[Dict[str, Dict[str, int]]]
+    ]:
+        if fcp_tracer is None:
+            return None, None
+        from BackEnd.engine.fcp_step_trace import FcpStepTracer
+
+        return FcpStepTracer.snap_coords(off_coords, def_coords)
+
+    def _append_loop_segment(
+        reason: str,
+        seconds: float,
+        gate: Tuple[str, str],
+        ball_owner: str,
+        label: str,
+        snap_off: Optional[Dict[str, Dict[str, int]]] = None,
+        snap_def: Optional[Dict[str, Dict[str, int]]] = None,
+        dest_off: Optional[Dict[str, Dict[str, int]]] = None,
+        dest_def: Optional[Dict[str, Dict[str, int]]] = None,
+        note: str = "",
+    ) -> Dict[str, Any]:
+        seg = _segment(
+            reason, off_coords, def_coords, seconds, gate, ball_owner, label,
+        )
+        if fcp_tracer is not None and snap_off is not None and snap_def is not None:
+            fcp_tracer.log_engine_step(
+                label,
+                reason,
+                snap_off,
+                snap_def,
+                {p: dict(off_coords[p]) for p in POSITIONS},
+                {p: dict(def_coords[p]) for p in POSITIONS},
+                dest_off=dest_off,
+                dest_def=dest_def,
+                gate=gate,
+                seconds=seconds,
+                note=note,
+            )
+        loop_segments.append(seg)
+        return seg
+
     result_type = "HCO"
     text_suffix = ""
     # Violation subtype for a DEAD BALL terminal (D9 announce / classification):
@@ -2085,6 +2140,25 @@ def compute_dynamic_hct_turn(
 
     # --- FCP engagement: aggression-driven BH ↔ def PG meet (§FCP) ------------
     if turn_mode == "fcp":
+        eng_snap_off, eng_snap_def = _snap_loop_coords()
+        off_agg = _team_aggression_call(off_team)
+        def_agg = _team_aggression_call(def_team)
+        bh_dest, dpg_dest, _, _ = _fcp_engagement_ends(
+            eng_snap_off[bh_pos] if eng_snap_off else off_coords[bh_pos],
+            eng_snap_def["PG"] if eng_snap_def else def_coords["PG"],
+            off_agg,
+            def_agg,
+        )
+        dest_off = (
+            {p: dict(eng_snap_off[p]) for p in POSITIONS} if eng_snap_off else None
+        )
+        dest_def = (
+            {p: dict(eng_snap_def[p]) for p in POSITIONS} if eng_snap_def else None
+        )
+        if dest_off is not None:
+            dest_off[bh_pos] = bh_dest
+        if dest_def is not None:
+            dest_def["PG"] = dpg_dest
         eng_seconds, eng_gate, eng_label = _apply_fcp_engagement(
             off_coords,
             def_coords,
@@ -2096,16 +2170,17 @@ def compute_dynamic_hct_turn(
         )
         bh_xy = off_coords[bh_pos]
         _move_offense(off_coords, off_targets, eng_seconds, off_lineup, bh_pos)
-        loop_segments.append(
-            _segment(
-                "fcp_engagement",
-                off_coords,
-                def_coords,
-                eng_seconds,
-                eng_gate,
-                bh_pos,
-                label=eng_label,
-            )
+        _append_loop_segment(
+            "fcp_engagement",
+            eng_seconds,
+            eng_gate,
+            bh_pos,
+            eng_label,
+            snap_off=eng_snap_off,
+            snap_def=eng_snap_def,
+            dest_off=dest_off,
+            dest_def=dest_def,
+            note=f"off={off_agg} def={def_agg}",
         )
         shot_clock -= eng_seconds
 
@@ -2113,6 +2188,7 @@ def compute_dynamic_hct_turn(
     # Initialize per-possession play state (man assignments / roles for plays that
     # track them, e.g. Straight Pressure; Standard Trap returns ``self`` unchanged).
     play = play.begin_possession(bh_xy, def_coords, off_coords, is_away_offense)
+    conv_snap_off, conv_snap_def = _snap_loop_coords()
     pg_initial = dict(def_coords["PG"])
     _position_defense(bh_xy, def_coords, is_away_offense, off_coords, play=play)
     converge_seconds = max(
@@ -2121,17 +2197,21 @@ def compute_dynamic_hct_turn(
     )
     # D15b: off-ball offense keep hustling toward setup during the converge beat.
     _move_offense(off_coords, off_targets, converge_seconds, off_lineup, bh_pos)
-    loop_segments.append(
-        _segment(
-            "hct_converge", off_coords, def_coords, converge_seconds, ("def", "PG"), bh_pos,
-            label="converge (defense closes on the BH)",
-        )
+    _append_loop_segment(
+        "hct_converge",
+        converge_seconds,
+        ("def", "PG"),
+        bh_pos,
+        "converge (defense closes on the BH)",
+        snap_off=conv_snap_off,
+        snap_def=conv_snap_def,
     )
     shot_clock -= converge_seconds
 
     def _advance(label: str = "advance (BH dribbles forward)") -> None:
         """Neutral / beaten-pressure advance: BH dribbles forward, defense re-poses."""
         nonlocal bh_xy
+        adv_snap_off, adv_snap_def = _snap_loop_coords()
         adv_x = bh_xy["x"] + _basket_dir(is_away_offense) * random.randint(
             ADVANCE_X_MIN, ADVANCE_X_MAX
         )
@@ -2145,11 +2225,14 @@ def compute_dynamic_hct_turn(
         _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play)
         # D15b: off-ball offense keep hustling toward their setup spots.
         _move_offense(off_coords, off_targets, advance_seconds, off_lineup, bh_pos)
-        loop_segments.append(
-            _segment(
-                "hct_advance", off_coords, def_coords, advance_seconds, ("off", bh_pos), bh_pos,
-                label=label,
-            )
+        _append_loop_segment(
+            "hct_advance",
+            advance_seconds,
+            ("off", bh_pos),
+            bh_pos,
+            label,
+            snap_off=adv_snap_off,
+            snap_def=adv_snap_def,
         )
 
     def _apply_off_ball_drift(seconds: float, exclude: set) -> None:
@@ -2203,6 +2286,7 @@ def compute_dynamic_hct_turn(
             trail_def = def_lineup.get(trail_pos)
             def_rate = _ag_grid_per_game_sec(trail_def, "standard")
             seconds = max(0.3, _euclid(bh_xy, target) / bh_drive_rate)
+            atk_snap_off, atk_snap_def = _snap_loop_coords()
             off_coords[bh_pos] = target
             if def_rate > 0:
                 def_coords[trail_pos] = _clamp_xy(
@@ -2211,11 +2295,14 @@ def compute_dynamic_hct_turn(
             bh_xy = off_coords[bh_pos]
             # Off-ball players each roll to drift toward the rim or hold.
             _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", trail_pos)})
-            loop_segments.append(
-                _segment(
-                    "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
-                    label="attack (broken-HCT cutoff drive — clean to ABA spot)",
-                )
+            _append_loop_segment(
+                "hct_attack",
+                seconds,
+                ("off", bh_pos),
+                bh_pos,
+                "attack (broken-HCT cutoff drive — clean to ABA spot)",
+                snap_off=atk_snap_off,
+                snap_def=atk_snap_def,
             )
             nonlocal_shot_clock_dec(seconds)
             # D23: a clean broken-HCT arrival runs the same §2 3-tier ABA read
@@ -2227,16 +2314,20 @@ def compute_dynamic_hct_turn(
 
         # Angle → the BH and the cutoff defender collide at the meet point.
         seconds = max(0.3, _euclid(bh_xy, meet) / bh_drive_rate)
+        col_snap_off, col_snap_def = _snap_loop_coords()
         off_coords[bh_pos] = meet
         def_coords[cutoff_pos] = dict(meet)
         bh_xy = off_coords[bh_pos]
         # Off-ball players each roll to drift toward the rim or hold.
         _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", cutoff_pos)})
-        loop_segments.append(
-            _segment(
-                "hct_attack", off_coords, def_coords, seconds, ("off", bh_pos), bh_pos,
-                label="attack (broken-HCT cutoff drive — meet-point collision)",
-            )
+        _append_loop_segment(
+            "hct_attack",
+            seconds,
+            ("off", bh_pos),
+            bh_pos,
+            "attack (broken-HCT cutoff drive — meet-point collision)",
+            snap_off=col_snap_off,
+            snap_def=col_snap_def,
         )
         nonlocal_shot_clock_dec(seconds)
 
@@ -2352,10 +2443,17 @@ def compute_dynamic_hct_turn(
     def _emit_stopper(reason: str, label: str = "") -> float:
         """D8 — terminal whistle/steal beat: the defense collapses onto the BH
         for a short hold. Mutates ``def_coords`` and appends the segment."""
+        stop_snap_off, stop_snap_def = _snap_loop_coords()
         _position_defense(bh_xy, def_coords, is_away_offense, play=play)
         secs = 0.5
-        loop_segments.append(
-            _segment(reason, off_coords, def_coords, secs, ("def", "PG"), bh_pos, label=label)
+        _append_loop_segment(
+            reason,
+            secs,
+            ("def", "PG"),
+            bh_pos,
+            label or reason,
+            snap_off=stop_snap_off,
+            snap_def=stop_snap_def,
         )
         return secs
 
@@ -2414,10 +2512,22 @@ def compute_dynamic_hct_turn(
             )
             return True
         if outcome == "DEAD BALL":
+            db_snap_off, db_snap_def = _snap_loop_coords()
             seg, sec = _emit_dead_ball_drive(
                 bh_xy, score_ratio, is_away_offense, bh_drive_rate,
                 off_coords, def_coords, bh_pos, play=play,
             )
+            if fcp_tracer is not None and db_snap_off is not None and db_snap_def is not None:
+                fcp_tracer.log_engine_step(
+                    seg.get("step_label") or "dead ball drive",
+                    seg.get("reason") or "hct_dead_ball",
+                    db_snap_off,
+                    db_snap_def,
+                    seg.get("off_end") or {p: dict(off_coords[p]) for p in POSITIONS},
+                    seg.get("def_end") or {p: dict(def_coords[p]) for p in POSITIONS},
+                    gate=(seg.get("gate") or ["off", bh_pos]),
+                    seconds=sec,
+                )
             loop_segments.append(seg)
             nonlocal_shot_clock_dec(sec)
             result_type = "DEAD BALL"
@@ -2525,16 +2635,20 @@ def compute_dynamic_hct_turn(
         if decision == "hold":
             # §5 hold resolution: BH holds the ball for random(1,2)s while the
             # defense keeps closing. Outcome depends on what reaches the BH.
+            hold_snap_off, hold_snap_def = _snap_loop_coords()
             hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
             # D15: defense keeps closing during the hold at its own rate.
             _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
             # D15b: off-ball offense keep hustling toward their setup spots.
             _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
-            loop_segments.append(
-                _segment(
-                    "hct_hold", off_coords, def_coords, hold_seconds, ("off", bh_pos), bh_pos,
-                    label="hold (BH holds the ball 1-2s while the defense closes)",
-                )
+            _append_loop_segment(
+                "hct_hold",
+                hold_seconds,
+                ("off", bh_pos),
+                bh_pos,
+                "hold (BH holds the ball 1-2s while the defense closes)",
+                snap_off=hold_snap_off,
+                snap_def=hold_snap_def,
             )
             shot_clock -= hold_seconds
 
@@ -2664,6 +2778,7 @@ def compute_dynamic_hct_turn(
         pass_seconds = max(
             0.3, _euclid(off_coords[passer_pos], off_coords[receiver_pos]) / PASS_GRID_PER_GAME_SEC
         )
+        pass_snap_off, pass_snap_def = _snap_loop_coords()
         _move_defense(
             off_coords[receiver_pos], def_coords, is_away_offense, pass_seconds,
             def_lineup, off_coords, play=play,
@@ -2672,12 +2787,22 @@ def compute_dynamic_hct_turn(
             off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
             exclude={receiver_pos},
         )
-        loop_segments.append(
-            _pass_segment(
-                passer_pos, receiver_pos, off_coords, def_coords, pass_seconds,
-                label=f"pass (backcourt outlet {passer_pos}\u2192{receiver_pos})",
-            )
+        pass_seg = _pass_segment(
+            passer_pos, receiver_pos, off_coords, def_coords, pass_seconds,
+            label=f"pass (backcourt outlet {passer_pos}\u2192{receiver_pos})",
         )
+        if fcp_tracer is not None and pass_snap_off is not None and pass_snap_def is not None:
+            fcp_tracer.log_engine_step(
+                pass_seg.get("step_label") or "pass",
+                pass_seg.get("reason") or "hct_pass",
+                pass_snap_off,
+                pass_snap_def,
+                {p: dict(off_coords[p]) for p in POSITIONS},
+                {p: dict(def_coords[p]) for p in POSITIONS},
+                gate=(pass_seg.get("gate") or ["off", receiver_pos]),
+                seconds=pass_seconds,
+            )
+        loop_segments.append(pass_seg)
         shot_clock -= pass_seconds
 
         # The receiver becomes the BH with a live dribble (D21); the loop re-reads
