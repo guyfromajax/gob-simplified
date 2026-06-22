@@ -165,6 +165,26 @@ def test_walk_weaves_subtle_beat_then_resumes_and_shoots(monkeypatch):
     assert out[-1]["pos_actions"]["PG"]["action"] == "shoot"
 
 
+def test_bh_at_step_prefers_receiver_over_passer():
+    # A pass step holds both pass (passer) and receive (receiver). The ball handler going forward
+    # is the RECEIVER — picking the passer would double a subsequent dish (the reported bug).
+    from BackEnd.engine.phase_resolution import _motion_bh_at_step
+    step = {"pos_actions": {
+        "PG": {"location": "key", "action": "pass"},
+        "SG": {"location": "upper wing", "action": "receive"},
+        "SF": {"location": "lower wing", "action": "stationary"},
+    }}
+    pos, loc = _motion_bh_at_step(step)
+    assert pos == "SG" and loc == "upper wing"
+
+
+def test_bh_at_step_handle_ball_when_no_pass():
+    from BackEnd.engine.phase_resolution import _motion_bh_at_step
+    step = {"pos_actions": {"PG": {"location": "key", "action": "handle_ball"},
+                            "SG": {"location": "wing", "action": "stationary"}}}
+    assert _motion_bh_at_step(step) == ("PG", "key")
+
+
 def test_hot_read_stamps_vo_on_result():
     from BackEnd.engine.phase_resolution import _execute_motion_decision, HOT_READ_VO_FILES
     game = _FakeGame()

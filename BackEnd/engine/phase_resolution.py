@@ -4488,10 +4488,21 @@ HOT_READ_VO_FILES = ("braddock-audible.mp3", "sammy-audible.mp3", "sammy-hotread
 
 
 def _motion_bh_at_step(step):
-    """Ball-handler position + location at a skeleton step (mirrors the legacy scan)."""
-    for pos, info in (step.get("pos_actions") or {}).items():
-        if ((info or {}).get("action") or "").lower() in ("handle_ball", "receive", "pass"):
-            return pos, info.get("location", "key")
+    """
+    Ball-handler position + location at a skeleton step = whoever HOLDS the ball at step END.
+
+    On a pass/receive step the ball ends with the receiver (it just arrived), so prefer
+    ``receive`` > ``handle_ball`` > ``pass``. Picking the passer — who is giving the ball up —
+    would make an appended dish (e.g. a teammate hot read) pass a SECOND time from the same
+    player, producing the doubled pass animation. The dynamic walk evaluates every step, so it
+    lands on pass steps and must resolve the actual holder (the legacy resolver only sampled one
+    random step, so it rarely hit this).
+    """
+    pos_actions = step.get("pos_actions") or {}
+    for wanted in ("receive", "handle_ball", "pass"):
+        for pos, info in pos_actions.items():
+            if ((info or {}).get("action") or "").lower() == wanted:
+                return pos, info.get("location", "key")
     return None, None
 
 
@@ -5802,6 +5813,13 @@ def resolve_half_court_offense_logic(game):
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
+
+    # Hot-read VO → stamp TOP-LEVEL on the turn payload so the FE receives it (the motion shot
+    # path returns shot_result directly and does not serialize `roles` to the FE). FE reads
+    # turnData.hot_read / turnData.hot_read_sfx → "Hot Read!" ribbon + backend-chosen clip.
+    if roles.get("hot_read"):
+        shot_result["hot_read"] = True
+        shot_result["hot_read_sfx"] = roles.get("hot_read_sfx")
 
     # Player Momentum: a SET PLAY whose EXECUTED skeleton is the "successful"
     # variant routes the ball to the target_shooter by design, so a make here is
