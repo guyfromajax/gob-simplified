@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from BackEnd.engine.dynamic_fcp import compute_dynamic_fcp_turn
+from BackEnd.engine.dynamic_hct import _fcp_engagement_ends
 from BackEnd.engine.fcp_press_plays import StraightPressureFCP
 
 
@@ -104,8 +105,9 @@ def test_fcp_engine_skips_walk_up_and_produces_segments():
         "FAST_BREAK_SHOT",
     )
     segments = dyn.get("loop_segments") or []
-    assert len(segments) >= 1
-    assert segments[0].get("kind") == "hct_converge"
+    assert len(segments) >= 2
+    assert segments[0].get("reason") == "fcp_engagement"
+    assert segments[1].get("reason") == "hct_converge"
 
 
 def test_fcp_bh_from_final_ball_handler_not_hardcoded_pg():
@@ -122,3 +124,39 @@ def test_sf_at_inbound_spot_excluded_from_pass_pool():
 
     assert _sf_at_fcp_inbound_spot({"SF": {"x": 3, "y": 25}}, False) is True
     assert _sf_at_fcp_inbound_spot({"SF": {"x": 12, "y": 25}}, False) is False
+
+
+def test_fcp_engagement_offense_aggressive_closes_on_def_pg():
+    bh_end, dpg_end, gate, _ = _fcp_engagement_ends(
+        {"x": 15, "y": 20},
+        {"x": 22, "y": 25},
+        "aggressive",
+        "normal",
+    )
+    assert bh_end == {"x": 20, "y": 25}
+    assert dpg_end == {"x": 22, "y": 25}
+    assert gate == ("off", "PG")
+
+
+def test_fcp_engagement_defense_aggressive_closes_on_bh():
+    bh_end, dpg_end, gate, _ = _fcp_engagement_ends(
+        {"x": 15, "y": 20},
+        {"x": 22, "y": 25},
+        "normal",
+        "aggressive",
+    )
+    assert bh_end == {"x": 15, "y": 20}
+    assert dpg_end == {"x": 17, "y": 20}
+    assert gate == ("def", "PG")
+
+
+def test_fcp_engagement_equal_aggression_meets_at_midpoint_bh_y():
+    bh_end, dpg_end, gate, _ = _fcp_engagement_ends(
+        {"x": 15, "y": 20},
+        {"x": 23, "y": 27},
+        "normal",
+        "normal",
+    )
+    assert bh_end == {"x": 19, "y": 20}
+    assert dpg_end == bh_end
+    assert gate == ("off", "PG")

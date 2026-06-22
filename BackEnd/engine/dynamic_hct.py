@@ -103,6 +103,10 @@ STEP_1_BH_TARGET_Y_MAX = 29
 # in home-defending orientation), same y as BH.
 STEP_2_DEFENDER_X_OFFSET = 2
 
+# FCP engagement: the closing party lands this many grid spots from the anchor
+# (the other player's setup spot) on the approach side.
+FCP_ENGAGEMENT_X_SPACING = 2
+
 # Step 3 HCO transition target: BH dribbles to deep key spot.
 DEEP_KEY_SPOT = HCO_STRING_SPOTS["deep key"]  # (57, 25)
 
@@ -247,11 +251,115 @@ def _clampf(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-def _aggression_call(def_team) -> str:
-    """Resolved per-turn defensive aggression call ∈ {passive, normal, aggressive}."""
-    calls = getattr(def_team, "strategy_calls", {}) or {}
+def _team_aggression_call(team) -> str:
+    """Resolved per-turn aggression call ∈ {passive, normal, aggressive}."""
+    calls = getattr(team, "strategy_calls", {}) or {}
     call = calls.get("aggression_call", "normal")
     return call if call in HCT_D8_AGG_MULT else "normal"
+
+
+def _aggression_call(def_team) -> str:
+    """Resolved per-turn defensive aggression call ∈ {passive, normal, aggressive}."""
+    return _team_aggression_call(def_team)
+
+
+def _fcp_approach_x(from_x: int, anchor_x: int, spacing: int = FCP_ENGAGEMENT_X_SPACING) -> int:
+    """Target x ``spacing`` grid spots from ``anchor_x`` on the approach side of ``from_x``."""
+    if from_x < anchor_x:
+        return anchor_x - spacing
+    if from_x > anchor_x:
+        return anchor_x + spacing
+    return from_x
+
+
+def _fcp_engagement_ends(
+    bh_xy: Dict[str, Any],
+    def_pg_xy: Dict[str, Any],
+    off_agg: str,
+    def_agg: str,
+) -> Tuple[Dict[str, int], Dict[str, int], Tuple[str, str], str]:
+    """FCP aggression engagement targets from BIP setup spots (pure).
+
+    Returns ``(bh_end, def_pg_end, gate, label)``. Each side holds when it is
+    not the closing party. Equal aggression → both meet at the x midpoint at the
+    BH's setup y.
+    """
+    bh = {"x": int(bh_xy["x"]), "y": int(bh_xy["y"])}
+    dpg = {"x": int(def_pg_xy["x"]), "y": int(def_pg_xy["y"])}
+
+    if off_agg == "aggressive" and def_agg != "aggressive":
+        bh["x"] = _fcp_approach_x(bh["x"], dpg["x"])
+        bh["y"] = dpg["y"]
+        return _clamp_xy(bh), dpg, ("off", "PG"), "fcp engagement (offense closes on press)"
+
+    if off_agg == "normal" and def_agg == "passive":
+        bh["x"] = _fcp_approach_x(bh["x"], dpg["x"])
+        bh["y"] = dpg["y"]
+        return _clamp_xy(bh), dpg, ("off", "PG"), "fcp engagement (offense closes on press)"
+
+    if def_agg == "aggressive" and off_agg != "aggressive":
+        dpg["x"] = _fcp_approach_x(dpg["x"], bh["x"])
+        dpg["y"] = bh["y"]
+        return bh, _clamp_xy(dpg), ("def", "PG"), "fcp engagement (defense closes on ball)"
+
+    if def_agg == "normal" and off_agg == "passive":
+        dpg["x"] = _fcp_approach_x(dpg["x"], bh["x"])
+        dpg["y"] = bh["y"]
+        return bh, _clamp_xy(dpg), ("def", "PG"), "fcp engagement (defense closes on ball)"
+
+    meet = _clamp_xy(
+        {"x": int(round((bh["x"] + dpg["x"]) / 2)), "y": bh["y"]}
+    )
+    return meet, meet, ("off", "PG"), "fcp engagement (meet at midpoint)"
+
+
+def _apply_fcp_engagement(
+    off_coords: Dict[str, Dict[str, int]],
+    def_coords: Dict[str, Dict[str, int]],
+    bh_pos: str,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    off_team: Any,
+    def_team: Any,
+) -> Tuple[float, Tuple[str, str], str]:
+    """Mutate BH + def PG for the FCP aggression engagement beat; return timing."""
+    off_agg = _team_aggression_call(off_team)
+    def_agg = _team_aggression_call(def_team)
+    bh_start = dict(off_coords[bh_pos])
+    def_pg_start = dict(def_coords["PG"])
+    bh_end, def_pg_end, gate, label = _fcp_engagement_ends(
+        bh_start, def_pg_start, off_agg, def_agg,
+    )
+
+    bh_player = off_lineup.get(bh_pos)
+    pg_def = def_lineup.get("PG")
+    seconds_list: List[float] = []
+    if bh_end["x"] != bh_start["x"] or bh_end["y"] != bh_start["y"]:
+        seconds_list.append(
+            calc_ag_segment_seconds(bh_start, bh_end, bh_player, archetype="standard")
+        )
+    if def_pg_end["x"] != def_pg_start["x"] or def_pg_end["y"] != def_pg_start["y"]:
+        seconds_list.append(
+            calc_ag_segment_seconds(def_pg_start, def_pg_end, pg_def, archetype="standard")
+        )
+    seconds = max(0.4, max(seconds_list) if seconds_list else 0.4)
+
+    if bh_end["x"] != bh_start["x"] or bh_end["y"] != bh_start["y"]:
+        bh_rate = _ag_grid_per_game_sec(bh_player, "standard")
+        off_coords[bh_pos] = _clamp_xy(
+            _interrupted_coord(bh_start, bh_end, bh_rate, seconds)
+        )
+    if def_pg_end["x"] != def_pg_start["x"] or def_pg_end["y"] != def_pg_start["y"]:
+        pg_rate = _ag_grid_per_game_sec(pg_def, "standard")
+        def_coords["PG"] = _clamp_xy(
+            _interrupted_coord(def_pg_start, def_pg_end, pg_rate, seconds)
+        )
+
+    # Gate side uses the ball-handler position key, not a hardcoded "PG".
+    gate_side, gate_pos = gate
+    if gate_side == "off":
+        gate = (gate_side, bh_pos)
+    return seconds, gate, label
 
 
 def _flip(coords: Dict[str, Any]) -> Dict[str, Any]:
@@ -1974,6 +2082,32 @@ def compute_dynamic_hct_turn(
     # broken-HCT cutoff win → reads collapse to pass/hold, no drive. Resets to
     # True whenever a pass transfers the ball to a new BH (and at turn end).
     dribble_alive = True
+
+    # --- FCP engagement: aggression-driven BH ↔ def PG meet (§FCP) ------------
+    if turn_mode == "fcp":
+        eng_seconds, eng_gate, eng_label = _apply_fcp_engagement(
+            off_coords,
+            def_coords,
+            bh_pos,
+            off_lineup,
+            def_lineup,
+            off_team,
+            def_team,
+        )
+        bh_xy = off_coords[bh_pos]
+        _move_offense(off_coords, off_targets, eng_seconds, off_lineup, bh_pos)
+        loop_segments.append(
+            _segment(
+                "fcp_engagement",
+                off_coords,
+                def_coords,
+                eng_seconds,
+                eng_gate,
+                bh_pos,
+                label=eng_label,
+            )
+        )
+        shot_clock -= eng_seconds
 
     # --- Initial converge: position the defense around the BH (§6) -----------
     # Initialize per-possession play state (man assignments / roles for plays that

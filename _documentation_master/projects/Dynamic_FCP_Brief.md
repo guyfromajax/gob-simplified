@@ -54,6 +54,7 @@ The shared primitives already extracted for HCT — **`pass_contest.py`**, **`cu
 | **Success line** | Press break / goal zone = **x=64** (home-on-offense), not half court (x=50). At this moment, run the **same HCO vs Fast Break read** as HCT §7 (3-tier goal achievement + broken-press FB branch). |
 | **10-second rule** | **10 game-seconds** from possession start; violation if BH has not reached **x=64** before limit (mirror HCT timing model, success boundary adjusted). |
 | **Walk-up** | **None.** |
+| **Engagement** | After BIP, before converge: BH ↔ def PG meet per **aggression calls** (see §2.1). |
 | **SF inbounder** | Valid pass target once he is **no longer at the BIP inbound spot / OOB**. |
 | **BSM/DST** | **Retired** for dynamic FCP — outcomes emerge from the spatial loop (see glossary below). Legacy skeleton path keeps old math when `USE_DYNAMIC_FCP=False`. |
 | **Moment range** | **`MOMENT_RANGE = 11`** grid spots (same as HCT) for PR1. |
@@ -115,6 +116,22 @@ x < 64 (home)                   x ≥ 64 — same boundary as HCT ABA entry
 Half court (x=50) is **not** the FCP success terminal. The 10-second clock runs until **x=64** is reached.
 
 HCT effectively starts at **engage ~x=44** with defenders already at half court. FCP starts with offense **scattered in backcourt** (PG/SG x=12–18, PF/C already near midcourt per setup ranges) and defense **between ball and frontcourt** (PG x=20–25, wings x=26–31, PF x=50–55, C x=71–76).
+
+### §2.1 — FCP engagement step (locked)
+
+Parallel to HCT step-1 BH bring-up to x=44: the first FCP loop segment after BIP is **`fcp_engagement`**, before the **`hct_converge`** beat. Both teams' per-turn **`aggression_call`** (`strategy_calls`, same source as HCT D8) decides who closes on whom from their **BIP setup spots**:
+
+| Condition | Mover | Target |
+|-----------|-------|--------|
+| Offense **aggressive** & defense ≠ aggressive | **Offense BH** | Def PG setup spot, within **2 x** (approach side), def PG **y** |
+| Offense **normal** & defense **passive** | **Offense BH** | Same |
+| Defense **aggressive** & offense ≠ aggressive | **Def PG** | BH setup spot, within **2 x**, BH **y** |
+| Defense **normal** & offense **passive** | **Def PG** | Same |
+| **Else** (equal aggression) | **Both** | **x** = midpoint of setup x coords; **y** = BH setup **y** |
+
+Then **`hct_converge`** runs (defense re-poses around the post-engagement BH; off-ball offense keeps sprinting to setup). No walk-up step.
+
+**Engine:** `_fcp_engagement_ends` / `_apply_fcp_engagement` in `dynamic_hct.py` (`turn_mode="fcp"` only). **Emitter:** generic loop step via `reason="fcp_engagement"`.
 
 ### Terminals (dynamic target)
 

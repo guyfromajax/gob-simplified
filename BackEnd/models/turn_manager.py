@@ -702,9 +702,9 @@ class TurnManager:
     ):
         """Build randomized BIP-end positions for an FCP turn (offense + defense).
 
-        Offense ranges per ``FCP_OFFENSE_SETUP_RANGES`` (PG/SG/PF/C). SF uses
-        the same chemistry-aware dynamic-y logic as HCO BIP (sf_x = inbound
-        baseline x; sf_y range biased by team chemistry + current PG y).
+        Offense: SF uses chemistry-aware inbound y (HCO BIP logic). PG x from
+        ``FCP_OFFENSE_SETUP_RANGES``; PG y = SF y + randint(-6, 6). SG/PF/C
+        from ``FCP_OFFENSE_SETUP_RANGES``.
 
         Defense ranges per ``FCP_DEFENSE_SETUP_RANGES`` (all 5 positions —
         replaces the legacy `get_defender_coords`-derived layout for FCP only).
@@ -739,7 +739,18 @@ class TurnManager:
         sf_y = random.randint(*sf_y_range)
 
         o_dest_home = {"SF": {"x": float(sf_x), "y": float(sf_y)}}
-        for pos, ranges in FCP_OFFENSE_SETUP_RANGES.items():
+        pg_ranges = FCP_OFFENSE_SETUP_RANGES["PG"]
+        o_dest_home["PG"] = {
+            "x": float(random.randint(*pg_ranges["x"])),
+            "y": float(max(1, min(49, sf_y + random.randint(-6, 6)))),
+        }
+        sg_ranges = FCP_OFFENSE_SETUP_RANGES["SG"]
+        o_dest_home["SG"] = {
+            "x": float(random.randint(*sg_ranges["x"])),
+            "y": float(random.randint(*sg_ranges["y"])),
+        }
+        for pos in ("PF", "C"):
+            ranges = FCP_OFFENSE_SETUP_RANGES[pos]
             o_dest_home[pos] = {
                 "x": float(random.randint(*ranges["x"])),
                 "y": float(random.randint(*ranges["y"])),
@@ -1106,6 +1117,7 @@ class TurnManager:
                         pg_id=pg_id,
                         ball_start_coord=ball_start_coord,
                         is_fast_break_after_make=False,
+                        fcp_setup=next_defensive_setup == "FCP",
                         clock_remaining_at_start=clock_r,
                         shot_clock_remaining_at_start=shot_r,
                     )

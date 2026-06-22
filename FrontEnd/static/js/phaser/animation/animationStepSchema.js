@@ -38,7 +38,7 @@
 /**
  * @typedef {(
  *   "fixed_duration" | "ball_reaches_player" | "player_reaches_position"
- *   | "shot_resolved" | "stopper_action"
+ *   | "offense_players_reach_position" | "shot_resolved" | "stopper_action"
  * )} TriggerCondition
  *   Step-end gate. `stopper_action` collapses foul / steal / dead-ball
  *   turnover — backend resolves which on fire.

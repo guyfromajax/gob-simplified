@@ -365,8 +365,8 @@ HCO_SETUP_HCO_BH_RADIUS = 10  # max grid units from FB BH for HCO BH placement
 # function flips via ``getAwayTeamCoords``.
 # See FCP_HCT_System.md → "FCP Starting Alignment" (FCP only; HCT → HCT_System.md).
 FCP_OFFENSE_SETUP_RANGES = {
-    "PG": {"x": (12, 18), "y": (15, 23)},
-    "SG": {"x": (12, 18), "y": (27, 35)},
+    "PG": {"x": (12, 18)},  # y: SF y + randint(-6, 6) in turn_manager
+    "SG": {"x": (25, 32), "y": (20, 30)},
     "PF": {"x": (45, 55), "y": (20, 30)},
     "C":  {"x": (60, 70), "y": (20, 30)},
 }

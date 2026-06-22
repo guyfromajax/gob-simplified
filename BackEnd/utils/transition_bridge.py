@@ -179,6 +179,46 @@ def build_kickout_non_core_targets(
     return targets
 
 
+def _offense_player_ids(off_lineup: Dict[str, Any]) -> List[str]:
+    ids: List[str] = []
+    for player in (off_lineup or {}).values():
+        if player is None:
+            continue
+        pid = getattr(player, "player_id", None)
+        if pid is not None:
+            ids.append(str(pid))
+    return ids
+
+
+def _offense_arrival_times(
+    *,
+    start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    bh_id: str,
+    bh_archetype: PlayerArchetype,
+    other_archetype: PlayerArchetype,
+) -> Dict[str, float]:
+    """Per-offense-player natural travel time to ``end_coords`` target (0 if already there)."""
+    arrival: Dict[str, float] = {}
+    for pid in _offense_player_ids(off_lineup):
+        sc = start_coords.get(pid)
+        ec = end_coords.get(pid)
+        if not sc or not ec:
+            arrival[pid] = 0.0
+            continue
+        dist = _euclid(sc, ec)
+        if dist < 1e-6:
+            arrival[pid] = 0.0
+            continue
+        arch = bh_archetype if pid == bh_id else other_archetype
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        arrival[pid] = dist / rate if rate > 0 else 0.0
+    return arrival
+
+
 def build_walk_up_step(
     *,
     off_lineup: Dict[str, Any],
@@ -192,6 +232,7 @@ def build_walk_up_step(
     bh_archetype: PlayerArchetype = "standard",
     other_archetype: PlayerArchetype = "standard",
     gate_player_ids: Optional[List[str]] = None,
+    gate_offense_required_count: Optional[int] = None,
     metadata_reason: str = "walk_up",
     min_t_game_sec: float = 0.05,
 ) -> AnimationStep:
@@ -205,10 +246,18 @@ def build_walk_up_step(
     avoids snap teleports. If they'd arrive before T, they reach target and
     idle there until T elapses.
 
+    When ``gate_offense_required_count`` is set (FCP BIP setup only today),
+    T = the arrival time of the Nth-fastest offensive player among the five
+    on-court (e.g. 4 → advance once four offense players reach destination).
+
     When ``gate_player_ids`` is ``None`` (default), gates on the slowest of
     ALL players — preserves legacy behavior for callers that want everyone
     to settle before advancing.
     """
+    if gate_player_ids and gate_offense_required_count is not None:
+        raise ValueError(
+            "build_walk_up_step: gate_player_ids and gate_offense_required_count are mutually exclusive"
+        )
     # Per-player natural travel time (dist / archetype rate).
     natural_t: Dict[str, float] = {}
     rates: Dict[str, float] = {}
@@ -232,15 +281,35 @@ def build_walk_up_step(
     # metadata names the actual gate, not whichever player happens to have
     # the longest start→end distance (which can be a non-gate defender when
     # gate_player_ids restricts the timing to a small subset).
-    if gate_player_ids:
+    gate_slowest_id: Optional[str] = None
+    slowest_t = 0.0
+    use_offense_n_of_m = gate_offense_required_count is not None
+    if use_offense_n_of_m:
+        offense_arrivals = _offense_arrival_times(
+            start_coords=start_coords,
+            end_coords=end_coords,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            bh_id=bh_id,
+            bh_archetype=bh_archetype,
+            other_archetype=other_archetype,
+        )
+        required = max(1, int(gate_offense_required_count or 1))
+        sorted_arrivals = sorted(offense_arrivals.items(), key=lambda item: item[1])
+        if sorted_arrivals:
+            idx = min(required, len(sorted_arrivals)) - 1
+            gate_slowest_id, slowest_t = sorted_arrivals[idx]
+        else:
+            gate_slowest_id, slowest_t = None, 0.0
+    elif gate_player_ids:
         gate_set = {str(g) for g in gate_player_ids if g}
         gate_items = [(pid, ti) for pid, ti in natural_t.items() if pid in gate_set]
+        if gate_items:
+            gate_slowest_id, slowest_t = max(gate_items, key=lambda item: item[1])
     else:
         gate_items = list(natural_t.items())
-    if gate_items:
-        gate_slowest_id, slowest_t = max(gate_items, key=lambda item: item[1])
-    else:
-        gate_slowest_id, slowest_t = None, 0.0
+        if gate_items:
+            gate_slowest_id, slowest_t = max(gate_items, key=lambda item: item[1])
     t = max(float(min_t_game_sec), slowest_t)
 
     actions: Dict[str, PlayerAction] = {}
@@ -269,10 +338,21 @@ def build_walk_up_step(
 
     # Prefer the gate player that drove slowest_t. Fall back to overall
     # slowest-mover only when no gate player moved (e.g. all gate members
-    # were stationary, which would have produced T = 1.5 floor above).
+    # were stationary, which would have produced T = min_t floor above).
     gate_id = gate_slowest_id or _slowest_mover_id(start_coords, final_end_coords)
     gate_target = final_end_coords.get(gate_id) if gate_id else None
-    if gate_id and gate_target:
+    if use_offense_n_of_m and gate_offense_required_count:
+        advance_trigger: AdvanceTrigger = {
+            "condition": "offense_players_reach_position",
+            "T_game_seconds": float(t),
+            "metadata": {
+                "required_count": int(gate_offense_required_count),
+                "total_offense_count": len(_offense_player_ids(off_lineup)),
+                "gate_player_id": str(gate_id) if gate_id else None,
+                "reason": metadata_reason,
+            },
+        }
+    elif gate_id and gate_target:
         advance_trigger: AdvanceTrigger = {
             "condition": "player_reaches_position",
             "T_game_seconds": float(t),
@@ -934,54 +1014,91 @@ def _build_inbound_passer_hold_step(
     next_step_index: int,
     hold_t_game_sec: float = _INBOUND_PASSER_HOLD_GAME_SECONDS,
     metadata_reason: str = "inbound_passer_hold",
+    setup_coords: Optional[Dict[str, GridCoord]] = None,
+    off_lineup: Optional[Dict[str, Any]] = None,
+    def_lineup: Optional[Dict[str, Any]] = None,
+    moving_archetype: PlayerArchetype = "standard",
 ) -> AnimationStep:
     """1-game-sec beat where the inbound passer holds the ball at the
-    inbound spot before throwing the pass. All 10 players stationary at
-    their step-1 (or step-2 for BIP-after-make) end positions; SF carries
-    the ball.
+    inbound spot before throwing the pass. SF carries the ball.
+
+    Default (SIP / HCT / HCO BIP): all 10 players stationary at their
+    prior-step end positions.
+
+    FCP BIP: pass ``setup_coords`` + lineups so SF holds while the other
+    nine continue toward FCP setup destinations at ``moving_archetype``.
 
     Clock fields here decrement by the hold T (defaults to 1 game-sec).
     Callers may override the end clock to pin one or both clocks (BIP pins
     shot clock; SIP pins both clocks).
     """
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
-    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
-    destinations: Dict[str, Optional[GridCoord]] = {pid: None for pid in start_coords}
-    actions[sf_id] = "handle_ball"
+    t = float(hold_t_game_sec)
+    sf_key = str(sf_id)
+    actions: Dict[str, PlayerAction] = {}
+    archetype: Dict[str, PlayerArchetype] = {}
+    destinations: Dict[str, Optional[GridCoord]] = {}
+    end_coords: Dict[str, GridCoord] = {}
+    fcp_moving_hold = bool(setup_coords and off_lineup and def_lineup)
 
-    end_coords: Dict[str, GridCoord] = {pid: dict(c) for pid, c in start_coords.items()}
+    for pid, sc in start_coords.items():
+        if fcp_moving_hold and str(pid) != sf_key:
+            target = setup_coords.get(pid) if setup_coords else None
+            if (
+                isinstance(target, dict)
+                and "x" in target
+                and "y" in target
+                and _euclid(sc, target) > 1e-6
+            ):
+                actions[pid] = (
+                    "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+                )
+                archetype[pid] = moving_archetype
+                destinations[pid] = dict(target)
+                player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+                rate = _ag_grid_per_game_sec(player, moving_archetype)
+                end_coords[pid] = (
+                    _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
+                )
+                continue
+        actions[pid] = "handle_ball" if str(pid) == sf_key else "stationary"
+        archetype[pid] = "stationary"
+        destinations[pid] = None
+        end_coords[pid] = dict(sc)
 
     trigger: AdvanceTrigger = {
         "condition": "fixed_duration",
-        "T_game_seconds": float(hold_t_game_sec),
+        "T_game_seconds": t,
         "metadata": {"reason": metadata_reason},
     }
 
-    sf_coord = start_coords.get(sf_id) or {"x": 50.0, "y": 25.0}
-    return {
-        "start": {
-            "coords": {pid: dict(c) for pid, c in start_coords.items()},
-            "destination": destinations,
-            "action": actions,
-            "archetype": archetype,
-            "ball": {"owner_player_id": str(sf_id)},
-            "clock": {
-                "clock_remaining": float(clock_remaining_at_start),
-                "shot_clock_remaining": float(shot_clock_remaining_at_start),
-            },
-            "advance_trigger": trigger,
-        },
-        "end": {
-            "coords": end_coords,
-            "ball": {"owner_player_id": str(sf_id)},
-            "time_elapsed": float(hold_t_game_sec),
-            "clock": {
-                "clock_remaining": float(clock_remaining_at_start) - hold_t_game_sec,
-                "shot_clock_remaining": float(shot_clock_remaining_at_start) - hold_t_game_sec,
-            },
-            "next": {"kind": "next_step", "index": next_step_index},
-        },
+    clock_start: ClockState = {
+        "clock_remaining": float(clock_remaining_at_start),
+        "shot_clock_remaining": float(shot_clock_remaining_at_start),
     }
+    clock_end: ClockState = {
+        "clock_remaining": float(clock_remaining_at_start) - t,
+        "shot_clock_remaining": float(shot_clock_remaining_at_start) - t,
+    }
+
+    start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": {"owner_player_id": sf_key},
+        "clock": clock_start,
+        "advance_trigger": trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": {"owner_player_id": sf_key},
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": {"kind": "next_step", "index": next_step_index},
+    }
+    if fcp_moving_hold and off_lineup and def_lineup:
+        stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
 
 
 def build_bip_animation_steps(
@@ -994,6 +1111,7 @@ def build_bip_animation_steps(
     pg_id: str,
     ball_start_coord: GridCoord,
     is_fast_break_after_make: bool = False,
+    fcp_setup: bool = False,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
 ) -> List[AnimationStep]:
@@ -1009,10 +1127,11 @@ def build_bip_animation_steps(
     - **Step 2 — SF to inbound spot**: SF walks rim → ``setup_coords[sf_id]``
       (the dynamically-chosen inbound baseline spot) carrying the ball.
       Other 9 continue toward their setup positions if not yet there.
-      Gate = slower of [SF reaches inbound, PG reaches receive].
+      Gate = slower of [SF reaches inbound, PG reaches receive] for normal
+      BIP/HCT; **FCP only** = 4 of 5 offensive players reach FCP setup coords.
     - **Step 3 — Passer hold**: 1-game-sec beat where SF holds the ball at
-      the inbound spot before the pass. All 10 stationary at step-2 end
-      coords.
+      the inbound spot before the pass. All 10 stationary for normal BIP;
+      **FCP only** SF holds while the other nine continue toward setup.
     - **Step 4 — Inbound pass**: SF passes to PG. Other 8 may continue
       toward setup positions during the pass (``continuing_targets``).
 
@@ -1095,9 +1214,9 @@ def build_bip_animation_steps(
         next_step_index=2,
         bh_archetype="standard",
         other_archetype=other_arch,
-        # Gate on SF + PG so PG is at receive spot for the upcoming pass.
-        gate_player_ids=[str(sf_id), str(pg_id)],
-        metadata_reason="bip_sf_to_inbound",
+        gate_player_ids=None if fcp_setup else [str(sf_id), str(pg_id)],
+        gate_offense_required_count=4 if fcp_setup else None,
+        metadata_reason="bip_fcp_setup" if fcp_setup else "bip_sf_to_inbound",
     )
 
     # ===== Step 3: Passer hold (1 game-sec). =====
@@ -1107,7 +1226,11 @@ def build_bip_animation_steps(
         clock_remaining_at_start=step2["end"]["clock"]["clock_remaining"],
         shot_clock_remaining_at_start=step2["end"]["clock"]["shot_clock_remaining"],
         next_step_index=3,
-        metadata_reason="bip_passer_hold",
+        metadata_reason="bip_fcp_passer_hold" if fcp_setup else "bip_passer_hold",
+        setup_coords=setup_coords if fcp_setup else None,
+        off_lineup=off_lineup if fcp_setup else None,
+        def_lineup=def_lineup if fcp_setup else None,
+        moving_archetype=other_arch,
     )
 
     # ===== Step 4: Inbound pass SF → PG. =====
