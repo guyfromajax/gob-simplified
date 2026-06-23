@@ -27,7 +27,7 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 ## Dynamic HCO Motion — Hot Read VO
 
 - **Trigger:** a hot read is executed in an HCO Motion possession (`_execute_motion_decision`, `phase_resolution.py`).
-- **File:** one of `braddock-audible.mp3` / `sammy-audible.mp3` / `sammy-hotread.mp3`, chosen **at random on the backend** (SS&S-reproducible; FE picks nothing).
+- **File:** one of `braddock-greatread.wav` / `sammy-niceread.mp3`, chosen **at random on the backend** (SS&S-reproducible; FE picks nothing).
 - **Timing:** plays at the **start of the hot-read initiation step** (the dish / drive / shot break) via `sfx_on_step_start` — fires before any tween, so it lands as the break begins and does **not** collide with the shot/pass launch sound.
 - **Path:** resolver flags the initiation skeleton step with `_hot_read_sfx` → `skeleton_step_emitter` stamps `step.start.sfx_on_step_start` → FE `playAnimationStep` plays it. **No ribbon / announcement** (an earlier version used a "Hot Read!" secondary announce; removed because the ribbon's wall-time lifetime bled into the following turn).
 

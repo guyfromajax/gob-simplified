@@ -1,8 +1,10 @@
-## Full Court Press (FCP) System ✅ **COMPLETE** (January 2025; re-verified June 2026)
+## Full Court Press (FCP) System
 
-> **Half Court Trap (HCT)** is documented separately in [`HCT_System.md`](./HCT_System.md). The live HCT path is **dynamic** (engine loop + UESS schema steps), not the skeleton/stopper system described below for FCP. This file covers **FCP only** plus shared BIP/inbound conventions that apply to both pressure types.
+> **Doc status (June 2026):** This file is **mid-overhaul**. The **legacy** skeleton + BSM/DST resolution flow (sections through *Overview*) still describes the old path when `USE_DYNAMIC_FCP=False`. The **dynamic** spatial loop (`USE_DYNAMIC_FCP=True`, default) is documented in [**Dynamic FCP Engine — BH Read Logic**](#dynamic-fcp-engine--bh-read-logic-current) below and in [`Dynamic_FCP_Brief.md`](../projects/Dynamic_FCP_Brief.md). A full rewrite of this document is planned once FCP migration is complete.
 
-**Base Constants**
+> **Half Court Trap (HCT)** is documented separately in [`HCT_System.md`](./HCT_System.md). The live HCT path is **dynamic** (engine loop + UESS schema steps), not the skeleton/stopper system described below for legacy FCP. This file covers **FCP only** plus shared BIP/inbound conventions that apply to both pressure types.
+
+**Legacy path only** — superseded by the dynamic engine when `USE_DYNAMIC_FCP=True`:
 
 1. FCP Success Threshold: `offenseScore + BSM > defenseScore`
 2. Dominant Success Threshold: `offenseScore - defenseScore > DST` — DST = **600 (FCP)** plus discipline-based chemistry adjustment (see step 5).
@@ -101,6 +103,82 @@ For **Half Court Trap**, see [`HCT_System.md`](./HCT_System.md) — dynamic engi
 
 ---
 
+### Dynamic FCP Engine — BH Read Logic (current)
+
+**Status:** Implemented (June 2026). Applies when `USE_DYNAMIC_FCP=True` (default in `BackEnd/engine/phase_resolution.py`).
+
+**Entry points:** `compute_dynamic_fcp_turn()` → shared §4 loop in `compute_dynamic_hct_turn(..., turn_mode="fcp")` (`BackEnd/engine/dynamic_hct.py`). FCP does **not** fork read math into a separate module; it passes `fcp=True` into `_read_decision()`.
+
+#### Read score
+
+Each loop iteration rolls a fresh read for the ball handler:
+
+```python
+int(((IQ * 0.8) + (CH * 0.2)) * random.randint(1, 6))
+```
+
+(`_player_read()` in `dynamic_hct.py`.)
+
+#### Attack / pass thresholds (shared with HCT)
+
+| Context | High tier (attack gate) | Mid tier (pass gate) | Below mid |
+|---------|-------------------------|----------------------|-----------|
+| **Normal** — defender in range (`moment` ≠ `"none"`) | read ≥ **200** | read **> 120** | low-tier roll |
+| **Broken** — no ahead defender in range (`moment == "none"`) | read ≥ **175** | read **> 110** | low-tier roll |
+
+Moment detection uses `MOMENT_RANGE = 11` (same as HCT).
+
+#### FCP-specific strong-handler gate
+
+Press breaks favor **passing** unless the ball handler is an elite dribbler. FCP raises the bar for who counts as a “strong handler” who may **attack** on a high read:
+
+| Constant | HCT | FCP |
+|----------|-----|-----|
+| Strong-handler sum | `BH + AG > 80` | `BH + AG > 140` |
+
+**Strong handler** (above the active sum): high read → **attack**, mid read → **pass**.  
+**Weak handler** (at or below the sum): mapping is **inverted** — high read → **pass**, mid read → **attack**.
+
+Example: BH+AG = 120 is “strong” in HCT (attacks on read ≥ 200) but still “weak” in FCP (passes on read ≥ 200).
+
+#### FCP-specific low-tier mix
+
+When read ≤ the pass threshold, the BH does not hold automatically — a weighted roll picks the action:
+
+| Mode | Hold | Pass | Attack |
+|------|------|------|--------|
+| HCT | 50% | 25% | 25% |
+| **FCP** | **50%** | **35%** | **15%** |
+
+Constants: `FCP_READ_STRONG_HANDLER_SUM`, `FCP_READ_LOW_TIER_CHOICES` in `dynamic_hct.py`.
+
+#### Post-read overrides (shared)
+
+- **D21 — no live dribble:** any `attack` result collapses to `pass`.
+- **Broken + attack:** runs the open-floor cutoff race (`_do_broken_hct_cutoff`) instead of a normal on-ball contest.
+- **Straight Pressure FCP:** trap moments downgrade to single-defender `"pressure"` (man-glue); read thresholds unchanged.
+
+#### Goal achievement at x = 64 (shared with HCT §7)
+
+When the BH enters the Attack Basket Area (trap-break zone), a **separate** 3-tier read runs before the normal loop read — unchanged from HCT:
+
+| Read | Result |
+|------|--------|
+| > 200 | Optimal: HCO if more defenders than offenders in ABA, else Fast Break |
+| 125–200 | HCO, unless offense aggression is `"aggressive"` → Fast Break |
+| ≤ 125 | 50/50 HCO vs Fast Break |
+
+#### Tests
+
+- `tests/test_fcp_read_decision.py` — FCP strong-handler sum (140) and low-tier weights.
+
+#### Related docs
+
+- [`Dynamic_FCP_Brief.md`](../projects/Dynamic_FCP_Brief.md) — full dynamic FCP spec (engagement, off-ball routing, play architecture).
+- [`HCT_System.md`](./HCT_System.md) — shared loop primitives; HCT keeps `READ_STRONG_HANDLER_SUM = 80`.
+
+---
+
 ### FCP Starting Alignment (BIP-end positions)
 
 Set during BASELINE_INBOUND when `next_defensive_setup="FCP"` (`TurnManager._build_fcp_setup_positions`). HOME orientation; away offense flips x via `getAwayTeamCoords`.
@@ -178,7 +256,10 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 ### Key Files
 
 **Backend**
-- `BackEnd/engine/phase_resolution.py` — `resolve_full_court_press_logic()`, FCP skeleton getters, stopper integration
+- `BackEnd/engine/dynamic_fcp.py` — `compute_dynamic_fcp_turn()` wrapper
+- `BackEnd/engine/dynamic_hct.py` — shared §4 loop (`turn_mode="fcp"`), FCP read constants, engagement, off-ball attack routing
+- `BackEnd/engine/fcp_press_plays.py` — FCP play registry (`StraightPressureFCP`, etc.)
+- `BackEnd/engine/phase_resolution.py` — `resolve_full_court_press_logic()`, `USE_DYNAMIC_FCP`, legacy skeleton getters, stopper integration
 - `BackEnd/models/turn_manager.py` — `_build_fcp_setup_positions()`, pressure type
 - `BackEnd/engine/skeleton_step_emitter.py` — FCP schema steps + stopper step handling
 - `BackEnd/models/animator.py` — legacy skeleton → animations
@@ -188,6 +269,7 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` — BIP + FCP setup
 
 **Related**
+- [`Dynamic_FCP_Brief.md`](../projects/Dynamic_FCP_Brief.md) — dynamic FCP overhaul (in progress)
 - [`HCT_System.md`](./HCT_System.md) — Half Court Trap (dynamic; separate system)
 - [`Stopper_System.md`](./Stopper_System.md) — truncation architecture (FCP + legacy HCT fallback)
 - [`BIP_System.md`](./BIP_System.md) — baseline inbound → FCP setup

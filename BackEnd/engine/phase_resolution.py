@@ -4484,7 +4484,7 @@ def _dynamic_hco_motion_enabled():
 # Coach VO clips fired when the offense consciously breaks pattern on a hot read. One is
 # chosen at random on the BACKEND (logic + SS&S-reproducible) and stamped on the turn result;
 # the FE shows the "Hot Read!" call and plays the chosen clip (pure renderer). See SFX_System.md.
-HOT_READ_VO_FILES = ("braddock-audible.mp3", "sammy-audible.mp3", "sammy-hotread.mp3")
+HOT_READ_VO_FILES = ("braddock-greatread.wav", "sammy-niceread.mp3")
 
 
 def _motion_bh_at_step(step):

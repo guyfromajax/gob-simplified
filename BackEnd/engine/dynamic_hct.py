@@ -184,6 +184,12 @@ READ_STRONG_HANDLER_SUM = 80
 # pool (50% hold, 25% attack, 25% pass).
 READ_LOW_TIER_CHOICES = ("hold", "hold", "attack", "pass")
 
+# FCP §4: press breaks favor passing unless the BH is an elite dribbler; only
+# BH+AG above this sum may attack on a strong read (HCT keeps 80).
+FCP_READ_STRONG_HANDLER_SUM = 140
+# FCP low tier: 50% hold, 35% pass, 15% attack.
+FCP_READ_LOW_TIER_CHOICES = ("hold",) * 10 + ("pass",) * 7 + ("attack",) * 3
+
 # §4 neutral-advance: BH moves +rand(ADV_X) toward basket, +rand(ADV_Y) in y.
 ADVANCE_X_MIN, ADVANCE_X_MAX = 6, 12
 ADVANCE_Y_MIN, ADVANCE_Y_MAX = -6, 6
@@ -511,35 +517,42 @@ def _player_read(player) -> int:
     return int(((attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)) * random.randint(1, 6))
 
 
-def _read_decision(player, broken: bool = False, dribble_alive: bool = True) -> str:
+def _read_decision(
+    player, broken: bool = False, dribble_alive: bool = True, *, fcp: bool = False
+) -> str:
     """Map a read score to attack / pass / hold (§4).
 
     The mapping is **dynamic on the ball-handler's ``BH + AG``**:
-      - **Strong handler** (``BH + AG > READ_STRONG_HANDLER_SUM``): a high read
+      - **Strong handler** (``BH + AG > strong_handler_sum``): a high read
         (``>= attack_t``) drives; a mid read (``> pass_t``) passes.
-      - **Weak handler** (``BH + AG <= READ_STRONG_HANDLER_SUM``): INVERTED — a
+      - **Weak handler** (``BH + AG <= strong_handler_sum``): INVERTED — a
         high read (``>= attack_t``) kicks it out (pass); a mid read (``> pass_t``)
         forces a drive (attack).
 
+    ``fcp=True`` uses ``FCP_READ_STRONG_HANDLER_SUM`` (140) and
+    ``FCP_READ_LOW_TIER_CHOICES`` (50% hold / 35% pass / 15% attack).
+
     ``broken=True`` applies the §5 reduced (open-floor) thresholds for BOTH
     branches. The low tier (read below ``pass_t``) is no longer a hard hold — it
-    rolls ``READ_LOW_TIER_CHOICES`` (50% hold, 25% attack, 25% pass).
+    rolls the active low-tier pool.
     ``dribble_alive=False`` (D21): the BH has picked up his dribble, so any
     ``attack`` result collapses to ``pass`` (no drive without a live dribble).
     """
     score = _player_read(player)
     attack_t = BROKEN_READ_ATTACK_THRESHOLD if broken else READ_ATTACK_THRESHOLD
     pass_t = BROKEN_READ_PASS_THRESHOLD if broken else READ_PASS_THRESHOLD
+    strong_handler_sum = FCP_READ_STRONG_HANDLER_SUM if fcp else READ_STRONG_HANDLER_SUM
+    low_tier_choices = FCP_READ_LOW_TIER_CHOICES if fcp else READ_LOW_TIER_CHOICES
 
     attrs = getattr(player, "attributes", {}) or {}
-    strong_handler = (attrs.get("BH", 0) + attrs.get("AG", 0)) > READ_STRONG_HANDLER_SUM
+    strong_handler = (attrs.get("BH", 0) + attrs.get("AG", 0)) > strong_handler_sum
 
     if score >= attack_t:
         decision = "attack" if strong_handler else "pass"
     elif score > pass_t:
         decision = "pass" if strong_handler else "attack"
     else:
-        decision = random.choice(READ_LOW_TIER_CHOICES)
+        decision = random.choice(low_tier_choices)
 
     # D21: no live dribble → a drive is impossible; kick it out instead.
     if decision == "attack" and not dribble_alive:
@@ -2716,7 +2729,10 @@ def compute_dynamic_hct_turn(
         #    classifies the moment (Straight Pressure caps it at "pressure").
         moment, in_range = play.detect_moment(bh_xy, def_coords, is_away_offense)
         decision = _read_decision(
-            ball_handler, broken=(moment == "none"), dribble_alive=dribble_alive
+            ball_handler,
+            broken=(moment == "none"),
+            dribble_alive=dribble_alive,
+            fcp=(turn_mode == "fcp"),
         )
 
         if decision == "attack":

@@ -1852,10 +1852,15 @@ def _build_make_hold_sub_step(
         # 3-point condition); FE resolves the "three_make" key to a random file
         # and plays it. Keeps the made-3 audio decision off the pure-renderer FE.
         if int(turn_result.get("points") or 0) == 3:
+            schema_shooter_coord = prev_end_coords.get(str(shooter_id))
+            shooter_model = turn_result.get("shooter")
+            shooter_model_coord = getattr(shooter_model, "coords", None)
             logging.warning(
                 "[3PT-SFX-STAMP] stamping three_make: result_type=%s points=%s "
                 "is_three_point_shot=%s shot_type=%s current_turn=%s fast_break=%s "
-                "fast_break_play=%s shooter_id=%s text=%s",
+                "fast_break_play=%s shooter_id=%s schema_shooter_coord=%s "
+                "shooter_model_coord=%s ball_coord=%s hct_ab_shooter_target=%s "
+                "hct_fb_bh_target=%s bh_target=%s text=%s",
                 turn_result.get("result_type"),
                 turn_result.get("points"),
                 turn_result.get("is_three_point_shot"),
@@ -1864,6 +1869,12 @@ def _build_make_hold_sub_step(
                 turn_result.get("fast_break"),
                 turn_result.get("fast_break_play"),
                 turn_result.get("shooter_id"),
+                schema_shooter_coord,
+                shooter_model_coord,
+                ball_coord,
+                turn_result.get("hct_ab_shooter_target"),
+                turn_result.get("hct_fb_bh_target"),
+                turn_result.get("bh_target"),
                 turn_result.get("text"),
             )
             announcement["meta"] = {"sfx": "three_make"}

@@ -723,6 +723,57 @@ class ShotManager:
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
+        if game_state.get("offensive_state") == "HCO" and (
+            shot_type == "outside"
+            or roles.get("motion_playcall")
+            or roles.get("motion_shot_type")
+            or roles.get("motion_attack_geometry_contest")
+            or isinstance(roles.get("shot_spot"), dict)
+        ):
+            is_away_offense_for_log = off_team.team_id == self.game.away_team.team_id
+            coord_three_for_log = is_three_point_shot_from_coords(
+                {"x": sx, "y": sy},
+                is_away_offense=is_away_offense_for_log,
+            )
+            roles_shot_spot = roles.get("shot_spot")
+            role_spot_three_for_log = (
+                is_three_point_shot_from_coords(
+                    roles_shot_spot,
+                    is_away_offense=is_away_offense_for_log,
+                )
+                if isinstance(roles_shot_spot, dict)
+                else None
+            )
+            logging.warning(
+                "[3PT-READ] HCO shot classification: result_pending shot_type=%s "
+                "resolved_is_three=%s coord_is_three=%s role_spot_is_three=%s "
+                "spot_name_is_three=%s shooter_id=%s shooter_pos=%s "
+                "skeleton_spot=%s roles_shot_spot=%s resolved_xy=(%.2f,%.2f) "
+                "shooter_model_coord=%s is_away_offense=%s motion_playcall=%s "
+                "motion_shot_type=%s motion_geometry=%s motion_uncontested=%s "
+                "forced_shot=%s shot_step_index=%s playcall=%s variant=%s",
+                shot_type,
+                is_three,
+                coord_three_for_log,
+                role_spot_three_for_log,
+                shooter_location in THREE_POINT_SPOTS if shooter_location else None,
+                getattr(shooter, "player_id", None),
+                shooter_pos,
+                shooter_location_str,
+                roles_shot_spot,
+                sx,
+                sy,
+                getattr(shooter, "coords", None),
+                is_away_offense_for_log,
+                roles.get("motion_playcall"),
+                roles.get("motion_shot_type"),
+                roles.get("motion_attack_geometry_contest"),
+                roles.get("motion_attack_uncontested"),
+                forced_shot,
+                shot_step_index,
+                playcall,
+                variant,
+            )
         charge_result = None
         defense_applied_defenders = []
 
