@@ -1,4 +1,5 @@
 """Phase 3 tests — Dynamic HCO Motion resolver integration (walk + shot handoff)."""
+import random
 import BackEnd.engine.phase_resolution as PR
 from BackEnd.engine.phase_resolution import (
     _dynamic_hco_motion_enabled,
@@ -25,6 +26,9 @@ class _FakeTeam:
             "defensive_efficiency": 0, "team_chemistry": 7,
         }
         self.strategy_calls = {"aggression_call": "normal", "tempo_call": "normal"}
+        # 4/4 → turn-level gate always passes (roll 0-4 <= 4) → both teams engaged (Condition 1),
+        # preserving the pre-gate resolver behavior these tests assert.
+        self.strategy_settings = {"alterations": 4, "aggression": 4}
 
 
 class _FakeGame:
@@ -61,6 +65,18 @@ def test_gate_on_when_env_truthy(monkeypatch):
     for v in ("1", "true", "on", "YES"):
         monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", v)
         assert _dynamic_hco_motion_enabled() is True
+
+
+def test_turn_gate_both_off_defers_to_static(monkeypatch):
+    # alterations 0 + aggression 0, and every randint(0,4) returns its max (4) → 4 <= 0 is False
+    # for both rolls → neither team engaged → resolver defers to the static skeleton (None).
+    game = _FakeGame()
+    game.offense_team.strategy_settings = {"alterations": 0}
+    game.defense_team.strategy_settings = {"aggression": 0}
+    monkeypatch.setattr(random, "randint", lambda a, b: b)
+    off = _lineup(PG=_FakePlayer("pg"))
+    skel = _skeleton({"PG": "key"}, {"PG": "upper wing"})
+    assert _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")}) is None
 
 
 # ---------------------------------------------------------------- handoff

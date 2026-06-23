@@ -209,7 +209,7 @@ Removed: `NON_BH_MOVE_PROB` (the old flat 50% teammate coin flip) — teammates 
 
 ## Updated Subtle Movement Logic (IMPLEMENTED)
 
-Triggered once the BH commits to a subtle movement (the BH-level decision in `decide_step_action` is unchanged). `read = (player_read_raw + team_eff) * randint(1,6)`; clears at `> MOTION_READ_THRESHOLD` (110). `player_read_raw = IQ*0.8 + CH*0.2`.
+Triggered once the BH commits to a subtle movement (how he gets there is the **Turn-Level Read Gating & Condition Matrix** below). `read = (player_read_raw + team_eff) * randint(1,6)`; clears at `> MOTION_READ_THRESHOLD` (110). `player_read_raw = IQ*0.8 + CH*0.2`.
 
 **Offense** — `build_subtle_beat` (`motion_subtle.py`):
 - BH always moves (he chose it). Each non-BH teammate makes his own read with the offense team's `offensive_efficiency`; clears the threshold AND has an applicable move → he relocates, else holds. (Replaces the old flat 50% coin flip — smart teams move together, weak readers are hit-and-miss.)
@@ -224,3 +224,31 @@ Triggered once the BH commits to a subtle movement (the BH-level decision in `de
 **Stopping actions (G3):** the subtle beat carries an `events` list and the resolver can terminate the walk on a subtle step (the forced shot is the first such case) — structurally ready for fouls/turnovers/quick-shots later.
 
 **Verified — does a frozen defender organically create offense opportunity?** Yes, strongest on attack shots: contest is geometric (`uncontested = len(_guardians_within_radius(shooter_coords, defender_end_coords)) == 0`, `attack_drive_clearance.py`), so a held defender drops out of the contest radius → uncontested → higher shoot-prob/score; pass openness is distance-based the same way. Caveat: plain named-spot inside/outside shots may score contest from the assigned defender's attributes rather than exact distance, so the spacing payoff there is weaker until those are routed through the geometry contest too.
+
+---
+
+## Turn-Level Read Gating & Condition Matrix (IMPLEMENTED)
+
+**Rolled once per HCO turn** in the dynamic resolver (`_resolve_motion_offense_shot_dynamic`), both on a 0–4 scale via `strategy_settings` (defaults 2):
+- **Offense:** `random.randint(0,4) <= alterations` → offense executes **reads** this turn (Dynamic HCO). Else it runs the skeleton.
+- **Defense:** `random.randint(0,4) <= aggression` → defense executes **pressure** this turn. Else it has no read impact.
+- (Currently gates **Motion** plays only; the roll moves to turn setup when Set Play reads land. Sits under the `GOB_DYNAMIC_HCO_MOTION` master flag.)
+
+The two booleans select the per-step branch in `decide_step_action` (a universal shot-clock **desperation** pre-check still runs first in all engaged cases):
+
+| Offense reads | Defense pressure | Per-step behavior |
+|---|---|---|
+| ✅ | ✅ | **Read battle** — `offense read score` vs `defense_score`. Offense wins → hot read or (fallback) subtle; defense wins → disruption (subtle/FF/none); neutral → subtle/pass. |
+| ✅ | ❌ | **Offense unopposed** → hot read if available + executed, **else subtle** (never a plain advance). |
+| ❌ | ✅ | **Ball-handling battle** — `ball_handling_score` vs `defense_score`. Defense wins → disruption; offense wins **or** neutral → advance. (d-foul check on an offense win is deferred.) |
+| ❌ | ❌ | **Static skeleton** — resolver returns `None`, defers to the legacy path. |
+
+**Scores (form B, single d6):**
+- Offense read: `(player_read_raw + discipline) * d6`
+- Ball-handling: `(ball_handling_raw + offensive_efficiency) * d6`, where `ball_handling_raw = BH*0.6 + IQ*0.2 + CH*0.2` — symmetric to `defender_pressure_raw = OD*0.3 + AG*0.3 + IQ*0.2 + CH*0.2` (both weight to 1.0, both add a team modifier × the same d6).
+- Defense: `(defender_pressure_raw | inside_defender_raw + fight) * d6`
+- Win margins: offense wins if `> defense_score + def_eff + def_chem`; defense wins if `> offense_score + off_eff + off_chem`; else neutral.
+
+**Key behavior change:** a successful offense (wins the read in Condition 1, or is unopposed in Condition 2) that doesn't fire a hot read now **falls back to a subtle movement** instead of advancing — `_hot_read_branch`'s old `advance` fallback is now `subtle` (keeps the aggression-weighted execute roll: 50% / 70% / 30%).
+
+**Tunables:** `alterations` (offense, per-team, 0–4) and `aggression` (defense, per-team, 0–4) — both in `strategy_settings`, default 2. `roll <= setting`, so 2 → ~60% engaged, 4 → always, 0 → 20%.

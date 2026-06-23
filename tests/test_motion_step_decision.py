@@ -101,18 +101,65 @@ def test_hot_read_self_executes():
     assert dec["shooter_pos"] == "PG" and dec["shot_type"] == "attack" and dec["via_pass"] is False
 
 
-def test_hot_read_not_executed_advances():
+def test_hot_read_not_executed_falls_back_to_subtle():
+    # Offense wins the read but passes up the hot read → subtle (no longer a plain advance).
     game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(
         read_map={"bh": {"inside": False, "attack": True, "outside": False}})
     dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
                              rng=FakeRng(randints=[3, 3], random_val=0.9))  # >=0.5 → not executed
-    assert dec["action"] == D.ADVANCE
+    assert dec["action"] == D.SUBTLE_MOVEMENT
 
 
-def test_offense_wins_but_no_hot_read_advances():
+def test_offense_wins_no_hot_read_falls_back_to_subtle():
+    # Offense wins the read but there's no opening to seize → subtle (probe).
     game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(read_map={})
     dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
                              rng=FakeRng(randints=[3, 3], random_val=0.0))
+    assert dec["action"] == D.SUBTLE_MOVEMENT
+
+
+# ---------------------------------------------------------------- turn-level condition matrix
+
+def test_condition2_unopposed_executes_hot_read_when_available():
+    # offense reading, defense NOT pressuring → hot read if available + executed.
+    game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(
+        read_map={"bh": {"inside": False, "attack": True, "outside": False}})
+    dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
+                             rng=FakeRng(randints=[3], random_val=0.0),
+                             offense_reads=True, defense_pressure=False)
+    assert dec["action"] == D.HOT_READ_SHOOT
+
+
+def test_condition2_unopposed_falls_back_to_subtle():
+    # offense reading, defense NOT pressuring, no read available → subtle (never advance).
+    game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(read_map={})
+    dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
+                             rng=FakeRng(randints=[3], random_val=0.0),
+                             offense_reads=True, defense_pressure=False)
+    assert dec["action"] == D.SUBTLE_MOVEMENT
+
+
+def test_condition3_defense_pressures_unreading_offense_loses_to_disruption():
+    # offense NOT reading, defense pressuring. Strong defender beats weak ball handler → disruption.
+    off = _FakeTeam(); deff = _FakeTeam()
+    game = _FakeGame(off, deff)
+    bh = _FakePlayer("bh", BH=0, IQ=50, CH=50)                     # read 50 (skips desperation); ball_handling 20
+    defender = _FakePlayer("def", OD=100, AG=100, IQ=100, CH=100)  # pressure raw 100
+    dec = decide_step_action(game, _step({"PG": "key"}), "PG", defender, {"PG": bh}, {},
+                             rng=FakeRng(randints=[3, 3, 3], random_val=0.0),
+                             offense_reads=False, defense_pressure=True)
+    assert dec["action"] == D.SUBTLE_MOVEMENT  # disruption → subtle (random_val 0.0)
+
+
+def test_condition3_unreading_offense_beats_pressure_advances():
+    # offense NOT reading, defense pressuring. Weak defender → offense wins/neutral → advance.
+    off = _FakeTeam(); deff = _FakeTeam()
+    game = _FakeGame(off, deff)
+    bh = _FakePlayer("bh", BH=80, IQ=80, CH=80)                    # strong ball handler
+    defender = _FakePlayer("def", OD=0, AG=0, IQ=0, CH=0, ID=0, ST=0)  # no pressure
+    dec = decide_step_action(game, _step({"PG": "key"}), "PG", defender, {"PG": bh}, {},
+                             rng=FakeRng(randints=[3, 3, 3], random_val=0.0),
+                             offense_reads=False, defense_pressure=True)
     assert dec["action"] == D.ADVANCE
 
 

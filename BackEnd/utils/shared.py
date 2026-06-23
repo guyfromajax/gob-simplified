@@ -2970,6 +2970,14 @@ def player_read_raw(player):
     return (attrs.get("IQ", 0) * 0.8) + (attrs.get("CH", 0) * 0.2)
 
 
+def ball_handling_raw(player):
+    """Roll-free ball-handling score: (BH*0.6 + IQ*0.2 + CH*0.2). Weights sum to 1.0, mirroring
+    `defender_pressure_raw` so the Dynamic HCO "offense not reading vs defense pressuring" battle
+    (ball_handling vs defense_score) is symmetric. Caller adds the team modifier + single d6."""
+    attrs = getattr(player, "attributes", {}) or {}
+    return (attrs.get("BH", 0) * 0.6) + (attrs.get("IQ", 0) * 0.2) + (attrs.get("CH", 0) * 0.2)
+
+
 def player_read(player):
     """
     Player decision-read score for situational reads (pass vs. drive, did the

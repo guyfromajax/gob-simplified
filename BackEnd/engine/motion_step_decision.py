@@ -13,7 +13,9 @@ so there is no double random.
 """
 import random as _random
 from BackEnd.constants import HCO_STRING_SPOTS
-from BackEnd.utils.shared import player_read_raw, defender_pressure_raw, inside_defender_raw
+from BackEnd.utils.shared import (
+    player_read_raw, defender_pressure_raw, inside_defender_raw, ball_handling_raw,
+)
 from BackEnd.engine.motion_read_map import is_inside_location
 
 # --- action vocabulary (Decision["action"]) ---
@@ -138,7 +140,11 @@ def _forced_action(bh, bh_pos, bh_location, bh_at_inside, off_lineup, locations,
 
 
 def _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng):
-    """Offense won the read: execute a hot read (self first, else closest teammate) or advance."""
+    """Offense is successful (won the read, or reading while unpressured): take a hot read
+    (self first, else closest teammate) when one is available AND the aggression-weighted
+    execute roll hits; otherwise fall back to a SUBTLE MOVEMENT (brief: "if the offense is
+    successful, hot read if available, otherwise fall back to Subtle Movement"). A successful
+    offense never just advances — it either strikes or keeps probing."""
     bh_types = _hot_read_types(bh, bh_location, read_map) if bh else []
     teammate_reads = []
     for pos, loc in locations.items():
@@ -152,11 +158,11 @@ def _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, o
             teammate_reads.append((pos, t))
 
     if not bh_types and not teammate_reads:
-        return {"action": ADVANCE}
+        return {"action": SUBTLE_MOVEMENT}  # no opening to seize → probe
 
     execute_pct = 0.50 + _aggr_delta(off_aggr, 0.20, -0.20)  # aggressive 70% / passive 30%
     if rng.random() >= execute_pct:
-        return {"action": ADVANCE}
+        return {"action": SUBTLE_MOVEMENT}  # saw a read but passed it up → probe
 
     if bh_types:  # ball handler reads for himself first
         return {"action": HOT_READ_SHOOT, "shooter_pos": bh_pos,
@@ -197,19 +203,32 @@ def _neutral_branch(off_aggr, def_aggr, rng):
 # --------------------------------------------------------------------------- #
 # entry point
 # --------------------------------------------------------------------------- #
-def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rng=_random):
+def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rng=_random,
+                       offense_reads=True, defense_pressure=True):
     """
-    Decide the ball handler's action for one motion skeleton step (brief Step 2).
+    Decide the ball handler's action for one motion skeleton step (brief Step 2 + Turn-Level
+    Read Gating). The two booleans are rolled once per turn by the resolver and select which of
+    the four condition-matrix branches applies:
+
+      offense_reads=T, defense_pressure=T  → read battle (offense read vs defense): offense wins
+          → hot read or (fallback) subtle; defense wins → disruption; neutral → subtle/pass.
+      offense_reads=T, defense_pressure=F  → offense unopposed/"successful" → hot read or subtle.
+      offense_reads=F, defense_pressure=T  → ball-handling battle (ball_handling vs defense):
+          defense wins → disruption; otherwise (offense wins / neutral) → advance.
+      (offense_reads=F, defense_pressure=F → the resolver defers to the static skeleton; this
+          function isn't called.)
 
     Args:
         game: GameManager (offense_team/defense_team team_attributes + aggression_call; game_state).
         step: the skeleton step dict (pos_actions give each player's location this step).
         bh_pos: ball-handler position key (e.g. "PG").
-        bh_defender: the ball handler's defender Player (man matchup, or nearest zone defender —
-            resolved by the caller in Phase 3). May be None (treated as no defensive pressure).
+        bh_defender: the ball handler's defender Player (man matchup, or nearest zone defender).
+            May be None (treated as no defensive pressure).
         off_lineup: {pos: Player} for the offense.
         read_map: Phase-1 {player_id: {inside,attack,outside}} flags.
         rng: random source (injectable for tests).
+        offense_reads: turn-level — offense is executing reads this turn.
+        defense_pressure: turn-level — defense is executing pressure this turn.
 
     Returns:
         Decision dict: {"action": <one of the action constants>, ...payload}.
@@ -236,17 +255,23 @@ def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rn
     defense_playcall = game_state.get("defense_playcall")
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
 
-    # offense_score (form B)
+    # offense_score (form B) — read-based
     offense_score = (player_read_raw(bh) + discipline) * rng.randint(1, 6)
 
-    # shot-clock desperation pre-check (only when offense isn't reading well)
+    # shot-clock desperation pre-check (universal shot-clock safety; only bites when the offense
+    # isn't reading well and the clock is low).
     if offense_score < DESPERATION_OFFENSE_CEILING:
         roll = rng.randint(1, 100) + TEMPO_MOD.get(tempo, 0)
         if roll > 4 * shot_clock:
             return _forced_action(bh, bh_pos, bh_location, bh_at_inside, off_lineup, locations, rng)
-        # else fall through to the progression point
+        # else fall through to the condition matrix
 
-    # progression point: defense_score (form B)
+    # Condition 2 — offense reading, defense not pressuring: the offense is unopposed/"successful"
+    # → hot read if available+executed, else subtle (no defense_score battle).
+    if offense_reads and not defense_pressure:
+        return _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng)
+
+    # Defense IS pressuring (Condition 1 or 3) → defense_score (form B).
     if bh_defender is None:
         raw_def = 0.0
     elif bh_at_inside:
@@ -255,8 +280,18 @@ def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rn
         raw_def = defender_pressure_raw(bh_defender, defense_playcall)
     defense_score = (raw_def + fight) * rng.randint(1, 6)
 
-    if offense_score > defense_score + def_eff + def_chem:
-        return _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng)
-    if defense_score > offense_score + off_eff + off_chem:
+    if offense_reads:
+        # Condition 1 — read battle: offense read score vs defense.
+        if offense_score > defense_score + def_eff + def_chem:
+            return _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng)
+        if defense_score > offense_score + off_eff + off_chem:
+            return _disruption_branch(def_aggr, rng)
+        return _neutral_branch(off_aggr, def_aggr, rng)
+
+    # Condition 3 — offense NOT reading, defense pressuring → ball-handling battle (symmetric to
+    # defense_score). Defense wins → disruption; offense wins or neutral → advance (the d-foul
+    # check on an offense win is deferred per brief).
+    ball_handling_score = (ball_handling_raw(bh) + off_eff) * rng.randint(1, 6)
+    if defense_score > ball_handling_score + off_eff + off_chem:
         return _disruption_branch(def_aggr, rng)
-    return _neutral_branch(off_aggr, def_aggr, rng)
+    return {"action": ADVANCE}

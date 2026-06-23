@@ -4612,6 +4612,22 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
     shot_clock_est = float(game_state.get("shot_clock_remaining", 30) or 30)
 
+    # Turn-level read gating (brief: rolled ONCE per HCO turn). roll <= setting (both 0-4):
+    #  - offense executes reads (Dynamic HCO) if its alterations roll clears;
+    #  - defense executes pressure if its aggression roll clears.
+    # Both off → defer to the static skeleton (legacy path). The 2x2 is resolved per step inside
+    # decide_step_action. (For now this only gates Motion plays; Set Play reads are a follow-up.)
+    alterations = (getattr(off_team, "strategy_settings", {}) or {}).get("alterations", 2)
+    aggression = (getattr(def_team, "strategy_settings", {}) or {}).get("aggression", 2)
+    offense_reads = random.randint(0, 4) <= alterations
+    defense_pressure = random.randint(0, 4) <= aggression
+    logging.warning(
+        f"🎲 [DYNAMIC MOTION] turn gate: offense_reads={offense_reads} "
+        f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
+    )
+    if not offense_reads and not defense_pressure:
+        return None  # neither engaged → run the static skeleton (defer to legacy)
+
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
@@ -4620,7 +4636,8 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         if not bh_pos or not off_lineup.get(bh_pos):
             continue
         bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
-        decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random)
+        decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
+                                      offense_reads=offense_reads, defense_pressure=defense_pressure)
         action = decision.get("action")
         logging.warning(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
