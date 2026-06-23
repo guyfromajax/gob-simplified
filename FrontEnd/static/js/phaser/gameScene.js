@@ -271,34 +271,6 @@ function fireMomentumCallout(scene, playerId, teamSide, sign, mo) {
   });
 }
 
-/**
- * Dynamic HCO Motion hot read: show the "Hot Read!" secondary ribbon + play the coach VO clip
- * the BACKEND chose (turnData.hot_read_sfx). Pure renderer — no selection logic here.
- * Fires once at the start of the HCO motion turn's animation.
- */
-function fireHotReadCallout(scene, turnData) {
-  // hot_read / hot_read_sfx are stamped top-level on the turn payload by the backend.
-  if (!turnData?.hot_read) return;
-  const hotReadSfx = turnData.hot_read_sfx || null;
-  console.warn('🔥 [HOT READ FE] firing "Hot Read!" ribbon + VO:', hotReadSfx);
-  const shooterId =
-    turnData.shooter_id || turnData.shooter?.player_id || turnData.roles?.shooter?.player_id || null;
-  const sprite = shooterId ? scene.playerSprites?.[shooterId] : null;
-  const teamSide = sprite?.team === 'away' ? 'away' : 'home';
-  const playerData = (sprite && shooterId)
-    ? {
-        playerId: shooterId,
-        photo: sprite.photo || null,
-        teamName: sprite.team_id,
-        secondaryColor: getSecondaryColorForTeam(scene, sprite.team_id),
-      }
-    : (shooterId ? { playerId: shooterId } : null);
-  showSecondaryAnnouncement('Hot Read!', teamSide, playerData, {
-    sfx: hotReadSfx,
-    scene,
-  });
-}
-
 /** Solid left-pointing chevron (offense advantage); currentColor fill */
 function pcsEvSvgChevronLeftSolid() {
   return '<svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path fill="currentColor" d="M8.6 1.2L8.6 10.8L1.2 6z"/></svg>';
@@ -3849,8 +3821,6 @@ export function createGameScene(Phaser) {
                 turn_text: turn.text?.substring(0, 50)
               });
             }
-            // Hot Read! VO + ribbon at the start of the HCO motion turn (backend-flagged).
-            fireHotReadCallout(this, turn);
             await animateGameTurns({
               scene: this,
               simData: {

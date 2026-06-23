@@ -1463,6 +1463,15 @@ def build_skeleton_animation_steps(
                 # Backend resolves the tier from attributes; FE just plays.
                 step["start"]["sfx_on_ball_release"] = pass_release_sfx(passer_player)
                 step["start"]["sfx_on_ball_arrival"] = pass_arrival_sfx(receiver_player)
+        # Dynamic HCO Motion hot-read VO: the resolver flags the initiation skeleton step with
+        # ``_hot_read_sfx``. Fire it at step-processing start (not ball motion) so it doesn't
+        # collide with the shot/pass launch sound. See SFX_System.md.
+        if i < len(skeleton_steps):
+            hot_read_clip = (skeleton_steps[i] or {}).get("_hot_read_sfx")
+            if hot_read_clip:
+                step.setdefault("start", {})["sfx_on_step_start"] = {
+                    "file": hot_read_clip, "event": "hot_read", "volume": 0.7,
+                }
         stamp_tween_durations(
             step["start"], final_end_coords, t, off_lineup, def_lineup,
         )

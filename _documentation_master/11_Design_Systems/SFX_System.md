@@ -14,7 +14,8 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 
 - **Preload:** gameplay SFX preloaded in `bootGame.js` before `GameScene`.
 - **Playback:** all gameplay and court-stinger audio through `playGameSfx()` — small per-file pools, scene-retained until `ended` / `error`. **Exception:** the quarter-break / clock-zero airhorn (`airhorn-lowervol.wav`) plays via raw `new Audio()` in `bootGame.js` and `AnimationEngine.js`.
-- **Schema path:** backend stamps `sfx_on_ball_release`, `sfx_on_ball_arrival`, `timed_sfx`, and step `meta.sfx`; FE plays at ball detach/arrival and announce mount (no parallel legacy `Audio()` paths for those events).
+- **Schema path:** backend stamps `sfx_on_step_start`, `sfx_on_ball_release`, `sfx_on_ball_arrival`, `timed_sfx`, and step `meta.sfx`; FE plays at step-processing start, ball detach/arrival, and announce mount (no parallel legacy `Audio()` paths for those events).
+- **Step-start cue (`sfx_on_step_start`):** a per-step SFX fired at the **start** of `playAnimationStep` in `animationPlayback.js`, BEFORE any tween/ball motion and independent of the ball. Distinct from `sfx_on_ball_release` (occupied by the shot/pass launch sound), so a cue can fire *as a step begins* without colliding. Schema: `BackEnd/utils/animation_step_schema.py`.
 - **Announcements:** `meta.sfx` on announce payloads → `court.html` overlay mount → `playGameSfx` (see Court Event SFX below).
 - **Debug:** `window.DEBUG_GAME_SFX = true` or `?debug_sfx=1`.
 - **Passes 1–2 shipped:** central manager + shot timing markers (`onShotRelease`, `onShotArrive`) on shared shot helpers. Phases 3–7 in the old implementation plan remain aspirational (marker inventory, broader migration).
@@ -22,6 +23,13 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 ---
 
 ## Bindings and variant rules
+
+## Dynamic HCO Motion — Hot Read VO
+
+- **Trigger:** a hot read is executed in an HCO Motion possession (`_execute_motion_decision`, `phase_resolution.py`).
+- **File:** one of `braddock-audible.mp3` / `sammy-audible.mp3` / `sammy-hotread.mp3`, chosen **at random on the backend** (SS&S-reproducible; FE picks nothing).
+- **Timing:** plays at the **start of the hot-read initiation step** (the dish / drive / shot break) via `sfx_on_step_start` — fires before any tween, so it lands as the break begins and does **not** collide with the shot/pass launch sound.
+- **Path:** resolver flags the initiation skeleton step with `_hot_read_sfx` → `skeleton_step_emitter` stamps `step.start.sfx_on_step_start` → FE `playAnimationStep` plays it. **No ribbon / announcement** (an earlier version used a "Hot Read!" secondary announce; removed because the ribbon's wall-time lifetime bled into the following turn).
 
 ## Backend Terms
 

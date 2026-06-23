@@ -4660,14 +4660,16 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
             "motion_attack_driver_shoots": drive_result.get("motion_attack_driver_shoots"),
         })
 
-    # Hot read = conscious break from pattern → fire a coach VO call. Backend picks the clip
-    # (one of three, at random); the FE shows the "Hot Read!" announce and plays it.
-    if decision.get("action") == "HOT_READ_SHOOT":
-        result["hot_read"] = True
-        result["hot_read_sfx"] = random.choice(HOT_READ_VO_FILES)
+    # Hot read = conscious break from pattern → fire a coach VO. Backend picks the clip and
+    # flags it on the INITIATION step (first appended step: the dish/drive/shot break). The
+    # emitter carries it to step.start.sfx_on_step_start; the FE plays it at step-processing
+    # start (before tweens) — no ribbon, no shot/pass-sound collision. See SFX_System.md.
+    if decision.get("action") == "HOT_READ_SHOOT" and new_steps:
+        clip = random.choice(HOT_READ_VO_FILES)
+        new_steps[0]["_hot_read_sfx"] = clip
         logging.warning(
             f"🔥🔥🔥 [HOT READ EXECUTED] shooter={result['shooter_pos']} "
-            f"shot_type={result['shot_type']} vo={result['hot_read_sfx']}"
+            f"shot_type={result['shot_type']} vo={clip}"
         )
 
     return result
@@ -5774,11 +5776,6 @@ def resolve_half_court_offense_logic(game):
                 roles["motion_attack_uncontested"] = True
             if motion_shot_info.get("motion_attack_defense_bonus"):
                 roles["motion_attack_defense_bonus"] = motion_shot_info["motion_attack_defense_bonus"]
-            # Hot-read coach VO: surface to the FE (turnData.roles) so it can show the
-            # "Hot Read!" announce and play the backend-chosen clip.
-            if motion_shot_info.get("hot_read"):
-                roles["hot_read"] = True
-                roles["hot_read_sfx"] = motion_shot_info.get("hot_read_sfx")
             if motion_shot_info.get("motion_attack_driver_shoots") is not None:
                 roles["motion_attack_driver_shoots"] = motion_shot_info["motion_attack_driver_shoots"]
             
@@ -5813,13 +5810,6 @@ def resolve_half_court_offense_logic(game):
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
-
-    # Hot-read VO → stamp TOP-LEVEL on the turn payload so the FE receives it (the motion shot
-    # path returns shot_result directly and does not serialize `roles` to the FE). FE reads
-    # turnData.hot_read / turnData.hot_read_sfx → "Hot Read!" ribbon + backend-chosen clip.
-    if roles.get("hot_read"):
-        shot_result["hot_read"] = True
-        shot_result["hot_read_sfx"] = roles.get("hot_read_sfx")
 
     # Player Momentum: a SET PLAY whose EXECUTED skeleton is the "successful"
     # variant routes the ball to the target_shooter by design, so a make here is

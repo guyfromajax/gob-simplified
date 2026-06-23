@@ -185,7 +185,7 @@ def test_bh_at_step_handle_ball_when_no_pass():
     assert _motion_bh_at_step(step) == ("PG", "key")
 
 
-def test_hot_read_stamps_vo_on_result():
+def test_hot_read_stamps_vo_on_initiation_step():
     from BackEnd.engine.phase_resolution import _execute_motion_decision, HOT_READ_VO_FILES
     game = _FakeGame()
     bh = _FakePlayer("bh")
@@ -194,8 +194,10 @@ def test_hot_read_stamps_vo_on_result():
     decision = {"action": "HOT_READ_SHOOT", "shooter_pos": "PG", "shot_type": "outside", "via_pass": False}
     res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "upper wing", decision,
                                    game, off, {}, is_away_offense=False)
-    assert res["hot_read"] is True
-    assert res["hot_read_sfx"] in HOT_READ_VO_FILES
+    out = res["skeleton"]["steps"]
+    appended = out[2:]  # everything after base_steps[:2] is the appended hot-read shot break
+    assert appended and appended[0].get("_hot_read_sfx") in HOT_READ_VO_FILES
+    assert "hot_read" not in res  # no top-level turn flag anymore (SFX rides the step)
 
 
 def test_non_hot_read_shot_has_no_vo():
@@ -208,6 +210,7 @@ def test_non_hot_read_shot_has_no_vo():
     res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "basketSpot", decision,
                                    game, off, {}, is_away_offense=False)
     assert "hot_read" not in res
+    assert all("_hot_read_sfx" not in s for s in res["skeleton"]["steps"])
 
 
 def test_freelance_forced_enters_loop_and_shoots(monkeypatch):

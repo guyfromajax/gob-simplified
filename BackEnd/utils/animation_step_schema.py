@@ -269,6 +269,13 @@ class StepStart(TypedDict, total=False):
     cutting). Backend pre-resolves the meet-point; FE consumes it
     without recomputing."""
 
+    sfx_on_step_start: StepSfx
+    """Optional. SFX cue fired at the START of step processing in the FE
+    (``playAnimationStep``), BEFORE any tween / ball motion and independent
+    of the ball. Distinct from ``sfx_on_ball_release`` (which is occupied by
+    the shot/pass launch sound). Used by Dynamic HCO Motion to fire the
+    hot-read coach VO as the break begins. See SFX_System.md."""
+
     sfx_on_ball_release: StepSfx
     """Optional. SFX cue fired at the moment the ball detaches from its
     start-owner (= start of the ball tween in the FE). Used for pass

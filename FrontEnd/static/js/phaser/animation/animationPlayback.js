@@ -722,6 +722,19 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   const width = scene.game?.config?.width;
   const height = scene.game?.config?.height;
 
+  // step.start.sfx_on_step_start: play at step-processing start, before any tween / ball motion.
+  // Distinct from sfx_on_ball_release (occupied by the shot/pass launch sound). Used by Dynamic
+  // HCO Motion to fire the hot-read coach VO as the break begins (SFX_System.md).
+  const stepStartSfx = step.start?.sfx_on_step_start;
+  if (stepStartSfx?.file) {
+    playGameSfx(
+      scene,
+      stepStartSfx.file,
+      typeof stepStartSfx.volume === "number" ? stepStartSfx.volume : 0.7,
+      { event: stepStartSfx.event || "step_start" },
+    );
+  }
+
   // step.start.announcement: play before tweens fire.
   if (step.start?.announcement) {
     await runStepAnnouncement(scene, step.start.announcement, sprites, step, options.turnData);
