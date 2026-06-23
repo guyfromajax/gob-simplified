@@ -167,6 +167,20 @@ During **`hct_advance`** beats (after attack wins pressure), non-BH offenders ro
 
 Constants: `FCP_TIER1_MAX = 34`, `FCP_TIER2_MAX = 50`, `FCP_TIER3_MAX = 64`. Broken-trap drives flood all non-BH to ABA spots until cutoff **RETAIN** reverts to incremental tiers.
 
+#### FCP Straight Pressure — PF/C zone & man release (current)
+
+**Def PF/C** use a compressing front-court zone (not HCT `_pf_c_targets`):
+
+| BH x (home) | Zone x | Zone y |
+|-------------|--------|--------|
+| < 36 | [50, 64] | 1–50 |
+| 36–50 | [ball_x, min(ball_x+14, 64)] | 10–40 |
+| 50–64 | [50, 64] | 10–40 |
+
+Anchor ladder: midcourt → key → midLane → basketSpot by progress. Help/denial counts offenders inside the zone.
+
+**Def SG/SF release:** when **BH x ≥ 64** (not when their man enters ABA). PG stays on ball. Module: `fcp_pf_c_zone.py`.
+
 #### Post-read overrides (shared)
 
 - **D21 — no live dribble:** any `attack` result collapses to `pass`.
@@ -187,6 +201,7 @@ When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, 
 
 - `tests/test_fcp_read_decision.py` — FCP strong-handler sum (140) and low-tier weights.
 - `tests/test_fcp_offball_attack.py` — tier boundaries at 34 / 50 / 51 and backcourt release lane.
+- `tests/test_fcp_pf_c_zone.py` — zone geometry, anchor ladder, BH x≥64 man release.
 
 #### Related docs
 
@@ -273,7 +288,9 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 
 **Backend**
 - `BackEnd/engine/dynamic_fcp.py` — `compute_dynamic_fcp_turn()` wrapper
-- `BackEnd/engine/dynamic_hct.py` — shared §4 loop (`turn_mode="fcp"`), FCP read constants, engagement, off-ball attack routing
+- `BackEnd/engine/fcp_pf_c_zone.py` — FCP Straight Pressure PF/C zone + anchor ladder
+- `BackEnd/engine/fcp_offball_attack.py` — off-ball attack routing on advance beats
+- `BackEnd/engine/dynamic_hct.py` — shared §4 loop, FCP read constants, engagement, Straight Pressure wiring
 - `BackEnd/engine/fcp_press_plays.py` — FCP play registry (`StraightPressureFCP`, etc.)
 - `BackEnd/engine/phase_resolution.py` — `resolve_full_court_press_logic()`, `USE_DYNAMIC_FCP`, legacy skeleton getters, stopper integration
 - `BackEnd/models/turn_manager.py` — `_build_fcp_setup_positions()`, pressure type

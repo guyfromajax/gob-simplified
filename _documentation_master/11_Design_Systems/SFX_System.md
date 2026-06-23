@@ -180,7 +180,8 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 **Made Three Announce**
 
-- Trigger: immediately when the **It's Good!** Announce appears for a made 3-pointer (`turnData.points === 3` in `handleShotMakeAnnouncement`, gameAnnouncements.js). 2-pt makes carry no court SFX here; FT makes and 3-pt and-1s are not covered.
+- Trigger: immediately when the backend schema emitter builds the **It's Good!** Announce for a made 3-pointer and `turn_result["is_three_point_shot"] is True`. The frontend does **not** infer this from `points`; it only renders the backend-stamped `meta.sfx`.
+- 2-pt makes carry no court SFX here. FT makes and 3-pt and-1s are not covered.
 - File: **33/33/34** random each show — `braddock-three.mp3` or `duke-three.mp3` or `sammy-three.mp3`
 - Resolver: `resolveThreePointerSfxFile()` (gameSfx.js). `meta.sfx` key: `"three_make"` (passed on the "It's Good!" announce payload).
 

@@ -28,11 +28,21 @@
 
 **Three-point classification**
 
-- Source of truth: `BackEnd.utils.shot_geometry.is_three_point_shot_from_coords()`.
-- `shot_manager.is_three_point_shot()` first checks `roles["shot_spot"]` against the coordinate arc. If `shot_spot` is missing, it falls back to the skeleton shoot-location name and `THREE_POINT_SPOTS`.
-- The coordinate arc uses the home-offense HCO spot model (`key`, wings, midCorners, corners) and linearly interpolates the boundary x-value by shooter y. Away-offense shots mirror x with `100 - x` before testing.
+- Geometry primitive: `BackEnd.utils.shot_geometry.is_three_point_shot_from_coords()`.
+- Canonical classification wrapper: `BackEnd.utils.shot_geometry.classify_shot_value()`.
+- Backend classification is the source of truth. The frontend/UESS renderer does not infer whether a shot is worth 1, 2, or 3.
+- `classify_shot_value()` returns a self-describing payload including `points`, `shot_value`, `is_three_point_shot`, `classification_coord`, `normalized_coord`, `boundary_x`, `classification_source`, and `allow_three`.
+- `ShotManager.resolve_shot()` builds this payload before shot math and stamps shot results with `is_three_point_shot`, `shot_value`, `shot_spot`, `shot_classification_coord`, `shot_classification`, and `shot_classification_source`.
+- Coordinate priority for field goals:
+  1. Explicit backend `roles["shot_spot"]` coords.
+  2. Shooter model `coords`.
+  3. Legacy skeleton shoot-location name and `THREE_POINT_SPOTS` fallback only if usable coords are missing.
+- The coordinate arc uses the home-offense HCO spot model (`key`, wings, midCorners, corners) and linearly interpolates the boundary x-value by shooter y. Away-offense shots mirror x with `100 - x` before testing. The helper expects display-oriented coords.
 - Fast Break shots remain 2-point by default. Only explicit outside Fast Break branches with `shot_type == "outside"` and a backend `shot_spot` can classify as 3s. This covers Triangle corner/wing/kick branches without changing Steal FB, RR rim attacks, or CR rim attacks.
-- Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same helper before `calculate_shot_score()` and carry `is_three` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
+- Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same classification wrapper before `calculate_shot_score()` and carry `is_three_point_shot` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
+- OREB putbacks are forced 2-point field goals and stamp a forced-two classification payload.
+- Free throws are forced 1-point attempts. They do not use field-goal 2/3 geometry.
+- Made-three SFX is stamped by the backend schema emitter only when `turn_result["is_three_point_shot"] is True`, not by raw `points == 3` and not by frontend inference.
 
 **Shot Resolution Flow (13 Steps)**
 1. Extract Roles
@@ -43,7 +53,8 @@
    - Get defense_call from `game_state["defense_playcall"]`
 
 2. Determine Shot Type
-   - is_three = `is_three_point_shot(shooter, roles)` (coordinate arc from `roles["shot_spot"]` first; skeleton spot-name fallback via THREE_POINT_SPOTS)
+   - `shot_classification = classify_shot_value(...)` via `ShotManager._build_shot_classification()`
+   - `is_three = shot_classification["is_three_point_shot"]`
    - is_paint = `is_paint_shot(shooter, roles)` (checks shooter spot against PAINT_SPOTS)
    - shot_type = `roles.get("shot_type")` or `roles.get("motion_shot_type")` (Motion uses motion_shot_type) OR skeleton analysis (Set plays)
      - Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
@@ -153,6 +164,7 @@
     - result["result_type"] = "MAKE" if made else "MISS"
     - If made: Calculate points (3 if is_three, else 2), record FGM, 3PTM, PIP if applicable
     - If miss: Determine rebound (geography-based system)
+    - Stamp classification metadata: `is_three_point_shot`, `shot_value`, `shot_spot`, `shot_classification_coord`, `shot_classification`, `shot_classification_source`
 
 13. Player Positioning (for all shots)
     - Determine offense get-back players (based on rebounding strategy setting; HCO only — HCT / FCP / Fast Break skip get-back). The shooter is never eligible to be a get-back player; backend selection excludes them by both shooter position and shooter `player_id`.
@@ -190,7 +202,8 @@ Shot resolution uses the following base constants:
 - defense_call: `game_state["defense_playcall"]` ("Man" or "Zone")
 
 #### Step 2: Determine Shot Type
-- **is_three**: Coordinate arc check from `roles["shot_spot"]` first; fallback to skeleton shoot-location name and THREE_POINT_SPOTS when no coordinate is available
+- **shot_classification**: `classify_shot_value()` payload built from backend shot coords. `roles["shot_spot"]` is preferred; shooter coords are fallback; skeleton spot names are compatibility fallback only when usable coords are missing.
+- **is_three**: `shot_classification["is_three_point_shot"]`
 - **is_paint**: Check shooter spot against PAINT_SPOTS
 - **shot_type**: 
   - Motion: `roles.get("shot_type")` or `roles.get("motion_shot_type")` (from resolve_motion_offense_shot)
@@ -279,6 +292,9 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 #### Step 12: Final Result
 - If made: Record FGM, 3PTM, PIP, AST, SCR_S, set up AND-1 if d_foul
 - If miss: Record DEF_S, determine rebound (geography-based), check block
+- All normal `ShotManager.resolve_shot()` field-goal results carry `is_three_point_shot`, `shot_value`, `shot_spot`, `shot_classification_coord`, `shot_classification`, and `shot_classification_source`.
+- Dynamic HCT shot results carry the same classification payload from their procedural `shot_spot`.
+- OREB putback attempts carry a forced-two classification payload.
 
 #### Step 13: Player Positioning
 - Get-back players (offense): Based on rebounding strategy (0-4 scale)
@@ -293,7 +309,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
 3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `40 - (random(1-5) * momentum)` (`THREE_POINT_SHOT_THRESHOLD_INCREASE = 40`; higher momentum = easier threes)
-4. **Three-Point Geometry**: `roles["shot_spot"]` is authoritative when present; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`.
+4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
 7. **Location-based contest**: HCO/Final Turn → `has_contest` is role-based (`bool(defender or second_defender)`); non-HCO → geometry box around shooter (|Δx|≤8, |Δy|≤8, `CONTEST_DEFENDER_DX_MAX`/`DY_MAX`) vs all defenders. Rim box around attacking basket (±6, `RIM_BOX_HALF_SPAN`); unguarded rim shortcut (99% make); `apply_defense` only when `has_contest` (unless shortcut applies)
@@ -305,8 +321,9 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 
 ### Status
 
-✅ **Shot Resolution**: Implementation complete (January 2025)
-- Unified shot resolution for HCO, Fast Break, Putback, and Free Throw
+✅ **Shot Resolution**: Implementation active
+- Unified shot resolution for HCO and Fast Break field-goal paths through `ShotManager.resolve_shot()`
+- Shared backend classification wrapper for field-goal 2/3 decisions and forced-value paths
 - Shot type-based attribute weights (inside/attack/outside)
 - Shot type-specific foul thresholds
 - Momentum-based three-point modifier
@@ -316,7 +333,10 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 
 ### Key Files
 
-- `BackEnd/models/shot_manager.py`: `resolve_shot()`, `_hco_zone_shot_threshold_delta()`, `calculate_shot_score()`, `check_defensive_foul_on_shot()`, `resolve_fast_break_shot()`
+- `BackEnd/models/shot_manager.py`: `resolve_shot()`, `_build_shot_classification()`, `_stamp_shot_classification()`, `_hco_zone_shot_threshold_delta()`, `calculate_shot_score()`, `check_defensive_foul_on_shot()`, `resolve_fast_break_shot()`
+- `BackEnd/utils/shot_geometry.py`: `is_three_point_shot_from_coords()`, `classify_shot_value()`
 - `BackEnd/constants/__init__.py`: PLAYCALL_ATTRIBUTE_WEIGHTS, THREE_POINT_SPOTS, PAINT_SPOTS
-- `BackEnd/utils/shared.py`: `calculate_gravity_score()`, `calculate_screen_score()`, `calculate_bounce_spot()`, `determine_rebounder()`
+- `BackEnd/utils/shared.py`: `calculate_gravity_score()`, `calculate_screen_score()`, `calculate_bounce_spot()`, `determine_rebounder()`, OREB putback forced-two classification
+- `BackEnd/engine/dynamic_hct_shot.py`: Dynamic HCT procedural shot classification payloads
+- `BackEnd/engine/skeleton_step_emitter.py`: made-three SFX gate from `is_three_point_shot`
 - `BackEnd/engine/phase_resolution.py`: `_apply_attack_penalty()`, `resolve_motion_offense_shot()`, `apply_balancing_system()`

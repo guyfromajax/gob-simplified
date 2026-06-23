@@ -158,7 +158,24 @@ BH vertical half: **y > 25 → upper**, else lower. Destinations persist until r
 
 **Module:** `BackEnd/engine/fcp_offball_attack.py`
 
-**FCP Straight Pressure defense:** def **SG/SF stay man-glued** (deny on assignment) — no rover/key converge on the BH; trap moments downgraded to single-defender pressure. Only **def PG** closes on the ball at converge. HCT Straight Pressure unchanged.
+**FCP Straight Pressure defense:** def **SG/SF stay man-glued** (deny on assignment) — no rover/key converge on the BH; trap moments downgraded to single-defender pressure. Only **def PG** closes on the ball at converge. **Man release** when **BH x ≥ 64** (not offender ABA y-band). HCT Straight Pressure unchanged.
+
+### §2.3 — FCP PF/C compressed zone (locked)
+
+FCP Straight Pressure replaces HCT `_pf_c_targets` with a dynamic front-court zone (`fcp_pf_c_zone.py`):
+
+| BH progress x (home) | Zone x-range | Zone y-band | Mode |
+|----------------------|--------------|-------------|------|
+| **< 36** | **[50, 64]** static | **1–50** | Pre-compression |
+| **36–50** | **[ball_x, min(ball_x + 14, 64)]** | **10–40** | Sliding 14-wide window |
+| **50–64** | **[50, 64]** fixed | **10–40** | Compression stopped |
+| **≥ 64** | Press broken | — | §7 / ladder exit |
+
+**Retreat:** BH drops below **x=36** → static **[50, 64]**, y **1–50**.
+
+**Anchor ladder (PF/C):** midcourt (50,25) → key (64,25) → midLane (80,25) → basketSpot (87,25), toggled by progress band. Same D22 split — C upper / PF lower by ball y-band; help/denial uses offenders **inside the dynamic zone**.
+
+**Module:** `BackEnd/engine/fcp_pf_c_zone.py`
 
 ### Terminals (dynamic target)
 

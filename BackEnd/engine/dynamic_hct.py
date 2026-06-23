@@ -1322,6 +1322,8 @@ def _straight_pressure_targets(
     sits at the key/wing toggle or mans up on a returning offender; wing defenders
     sit on their wing. PF/C inherit the Standard D22 zone coverage.
     """
+    from BackEnd.engine.fcp_pf_c_zone import fcp_bh_past_press_break, fcp_pf_c_targets
+
     targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
 
     if off_coords is None:
@@ -1339,18 +1341,26 @@ def _straight_pressure_targets(
         if _in_attack_basket_area(off_coords[p], is_away_offense):
             state["entered_aba"].add(p)
 
-    # 1) Release any man defender whose man entered the ABA → fill the next role.
-    released = [
-        d
-        for d, m in state["assignment"].items()
-        if _in_attack_basket_area(off_coords[m], is_away_offense)
-    ]
+    # 1) Release man defenders when their man enters the ABA (HCT) or when the
+    #    BH crosses x≥64 (FCP Straight Pressure — BH-only release, not ABA y-band).
+    if state.get("fcp_man_glue") and fcp_bh_past_press_break(bh_xy, is_away_offense):
+        released = [
+            d for d, m in state["assignment"].items() if m != bh_off
+        ]
+    else:
+        released = [
+            d
+            for d, m in state["assignment"].items()
+            if _in_attack_basket_area(off_coords[m], is_away_offense)
+        ]
     for d in released:
         del state["assignment"][d]
         if state.get("fcp_man_glue"):
-            _straight_pressure_reassign_man_fcp(
-                state, d, bh_off, off_coords, def_coords
-            )
+            # Press broken — off-ball men stay released to help; do not re-glue.
+            if not fcp_bh_past_press_break(bh_xy, is_away_offense):
+                _straight_pressure_reassign_man_fcp(
+                    state, d, bh_off, off_coords, def_coords
+                )
         else:
             _straight_pressure_assign_role(state, d, def_coords, is_away_offense)
 
@@ -1394,8 +1404,26 @@ def _straight_pressure_targets(
                 _spot("upper wing" if side == "upper" else "lower wing", is_away_offense)
             )
 
-    # PF/C — identical D22 ball-reactive coverage as Standard Trap.
-    pfc = _pf_c_targets(bh_xy, off_coords, is_away_offense)
+    # PF/C — D22 ball-reactive coverage; FCP Straight Pressure uses the dynamic
+    # front-court zone + anchor ladder instead of the HCT table.
+    if state.get("fcp_man_glue") and off_coords is not None:
+        pfc = fcp_pf_c_targets(
+            bh_xy,
+            off_coords,
+            is_away_offense,
+            spot_fn=lambda name: _spot(name, is_away_offense),
+            ball_band_fn=_ball_band,
+            converge_fn=_converge_xy,
+            clamp_fn=_clamp_xy,
+            interpolate_fn=_interpolate,
+            euclid_fn=_euclid,
+            in_aba_fn=_in_attack_basket_area,
+            aba_half_fn=_aba_half,
+            rim_coords=AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS,
+            flip_fn=_flip,
+        )
+    else:
+        pfc = _pf_c_targets(bh_xy, off_coords, is_away_offense)
     targets["PF"] = _clamp_xy(pfc["PF"])
     targets["C"] = _clamp_xy(pfc["C"])
     return targets
