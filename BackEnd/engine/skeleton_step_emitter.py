@@ -1851,7 +1851,7 @@ def _build_make_hold_sub_step(
         # (SFX_System.md "Made Three Announce"). Backend decides WHEN (the
         # 3-point condition); FE resolves the "three_make" key to a random file
         # and plays it. Keeps the made-3 audio decision off the pure-renderer FE.
-        if int(turn_result.get("points") or 0) == 3:
+        if turn_result.get("is_three_point_shot") is True:
             schema_shooter_coord = prev_end_coords.get(str(shooter_id))
             shooter_model = turn_result.get("shooter")
             shooter_model_coord = getattr(shooter_model, "coords", None)

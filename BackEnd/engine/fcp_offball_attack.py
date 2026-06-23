@@ -2,8 +2,8 @@
 FCP off-ball offense movement during BH attack / advance beats.
 
 Incremental press-break (``hct_advance`` after attack wins): backcourt non-BH
-release toward x∈[46,53]; PF/C phase targets keyed to ball progress x. Broken
-open-floor drives use ABA spot targets until a cutoff RETAIN reverts here.
+release toward x∈[46,53]; PF/C phased by four ball-progress tiers (34 / 50 / 64).
+Broken open-floor drives use ABA spot targets until a cutoff RETAIN reverts here.
 
 Home-on-offense coords; away uses ``get_away_player_coords`` flip at boundaries.
 """
@@ -26,10 +26,15 @@ FCP_BACKCOURT_X_MIN = 46
 FCP_BACKCOURT_X_MAX = 53
 FCP_BACKCOURT_Y_JITTER = 6
 
-# Ball-progress thresholds (see ``_ball_progress_x``).
-FCP_PROGRESS_HOLD_PF = 34  # PF stationary while progress < this
-FCP_PROGRESS_HOLD_C = 34  # C stationary while progress <= this
-FCP_PROGRESS_FRONT = 50  # PF wing band / C front band above this
+# Ball-progress tiers keyed to BH x (home orientation — see ``_ball_progress_x``).
+# Clean half-open partition — no overlap:
+#   T1  x ≤ 34          hold (PF/C)
+#   T2  34 < x ≤ 50     PF deep key / C mid spots
+#   T3  50 < x ≤ 64     PF wing / C front spots
+#   T4  x > 64          same PF/C routing as T3 until goal-achievement terminal
+FCP_TIER1_MAX = 34
+FCP_TIER2_MAX = 50
+FCP_TIER3_MAX = 64
 
 # Deep key anchor for PF mid-band: backcourt-side of half court (x < 50 home).
 FCP_DEEP_KEY_ANCHOR = {"x": 47, "y": 25}
@@ -224,10 +229,10 @@ class FcpOffballAttackState:
         *,
         force: bool,
     ) -> None:
-        if progress < FCP_PROGRESS_HOLD_PF:
+        if progress <= FCP_TIER1_MAX:
             phase = "hold"
             self._dest[pos] = dict(off_coords[pos])
-        elif progress < FCP_PROGRESS_FRONT:
+        elif progress <= FCP_TIER2_MAX:
             phase = "deep"
             if self._should_assign_phase(pos, phase, off_coords, force=force):
                 self._dest[pos] = _random_near_deep_key(self.is_away_offense)
@@ -247,10 +252,10 @@ class FcpOffballAttackState:
         *,
         force: bool,
     ) -> None:
-        if progress <= FCP_PROGRESS_HOLD_C:
+        if progress <= FCP_TIER1_MAX:
             phase = "hold"
             self._dest[pos] = dict(off_coords[pos])
-        elif progress <= FCP_PROGRESS_FRONT:
+        elif progress <= FCP_TIER2_MAX:
             phase = "mid"
             if self._should_assign_phase(pos, phase, off_coords, force=force):
                 pool = _filter_half_spots(C_PHASE2_SPOTS, half)
@@ -306,7 +311,7 @@ def _random_near_deep_key(is_away_offense: bool) -> Dict[str, int]:
             continue
         pt = _clamp_xy({"x": anchor["x"] + dx, "y": anchor["y"] + dy})
         prog = _ball_progress_x(pt, is_away_offense)
-        if FCP_PROGRESS_HOLD_PF <= prog < FCP_PROGRESS_FRONT:
+        if FCP_TIER1_MAX < prog <= FCP_TIER2_MAX:
             return pt
     return _clamp_xy(anchor)
 

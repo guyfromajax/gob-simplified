@@ -46,7 +46,7 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
-from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
+from BackEnd.utils.shot_geometry import classify_shot_value
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -588,10 +588,12 @@ def _roll_ab_shot(
         or "man"
     )
     is_away_offense = bool(off_team.team_id == game.away_team.team_id)
-    is_three = is_three_point_shot_from_coords(
+    shot_classification = classify_shot_value(
         shot_spot,
         is_away_offense=is_away_offense,
+        classification_source="dynamic_hct_shot_spot",
     )
+    is_three = bool(shot_classification["is_three_point_shot"])
     is_paint = not is_three and shot_type in ("inside", "attack")
     (
         shot_score,
@@ -605,7 +607,7 @@ def _roll_ab_shot(
         apply_defense=contested,
     )
     made = shot_score >= off_team.team_attributes["shot_threshold"]
-    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three
+    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three, shot_classification
 
 
 def _finalize_ab_shot(
@@ -627,6 +629,7 @@ def _finalize_ab_shot(
     defender_end_coords: Dict[str, Dict[str, float]],
     t_shot: float,
     is_three: bool = False,
+    shot_classification: Optional[Dict[str, Any]] = None,
     shot_moment_coords: Optional[Dict[str, Dict[str, float]]] = None,
     extra_seed: Optional[Dict[str, Any]] = None,
     text_prefix: str = " they go to work in the paint",
@@ -650,6 +653,13 @@ def _finalize_ab_shot(
     off_team = game.offense_team
     def_team = game.defense_team
     is_away_offense = bool(off_team.team_id == game.away_team.team_id)
+    if shot_classification is None:
+        shot_classification = classify_shot_value(
+            shot_spot,
+            is_away_offense=is_away_offense,
+            classification_source="dynamic_hct_shot_spot",
+        )
+    is_three = bool(shot_classification.get("is_three_point_shot"))
     rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
 
     has_and_one = False
@@ -814,6 +824,11 @@ def _finalize_ab_shot(
         "next_turn": next_play_type,
         "shot_type": shot_type,
         "is_three_point_shot": bool(is_three),
+        "shot_value": int(shot_classification.get("shot_value") or 2),
+        "shot_spot": dict(shot_classification["classification_coord"]) if isinstance(shot_classification.get("classification_coord"), dict) else {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+        "shot_classification_coord": dict(shot_classification["classification_coord"]) if isinstance(shot_classification.get("classification_coord"), dict) else {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+        "shot_classification": dict(shot_classification),
+        "shot_classification_source": shot_classification.get("classification_source"),
         "shot_score": shot_score,
         "shot_score_pre_defense": shot_score_pre_defense,
         "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
@@ -921,7 +936,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
     shot_type = (
         "inside" if _euclid(shot_spot, basket) <= AB_INSIDE_SHOT_MAX_DIST else "outside"
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -933,7 +948,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
         made=made, shot_score=shot_score, shot_score_pre_defense=pre,
         shot_defense_score_for_sfx=sfx_score, d_foul=d_foul, foul_player=foul_player,
         defender_end_coords=defender_end_coords, t_shot=AB_SHOT_BEAT_SECONDS,
-        is_three=is_three,
+        is_three=is_three, shot_classification=shot_classification,
         shot_moment_coords=_coords_by_player_id(off_lineup, seed_off),
         text_prefix=" they go to work in the paint",
     )
@@ -1036,7 +1051,7 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
             def_lineup, seed_def, shot_spot, is_away_offense, collapse_t,
         )
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -1081,7 +1096,7 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
         made=made, shot_score=shot_score, shot_score_pre_defense=pre,
         shot_defense_score_for_sfx=sfx_score, d_foul=d_foul, foul_player=foul_player,
         defender_end_coords=defender_end_coords, t_shot=AB_SHOT_BEAT_SECONDS,
-        is_three=is_three,
+        is_three=is_three, shot_classification=shot_classification,
         shot_moment_coords=shot_moment_coords,
         extra_seed=extra_seed, text_prefix=" they attack the rim",
     )

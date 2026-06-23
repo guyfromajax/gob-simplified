@@ -1129,6 +1129,16 @@ def resolve_offensive_rebound(game, rebounder):
                 "shot_variant": _putback_variant,
             },
         }
+        from BackEnd.utils.shot_geometry import classify_shot_value
+        putback_classification = classify_shot_value(
+            None,
+            is_away_offense=off_team.team_id == game.away_team.team_id,
+            forced_points=2,
+        )
+        event["is_three_point_shot"] = False
+        event["shot_value"] = 2
+        event["shot_classification"] = putback_classification
+        event["shot_classification_source"] = putback_classification["classification_source"]
         if _putback_variant_extras:
             event.update(_putback_variant_extras)
 

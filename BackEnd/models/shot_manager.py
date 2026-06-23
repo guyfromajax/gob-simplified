@@ -6,7 +6,7 @@ from BackEnd.constants.momentum import (
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import mo_shot_roll
-from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
+from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
@@ -416,6 +416,55 @@ class ShotManager:
         # Check if spot is a three-point spot (case insensitive)
         return spot in THREE_POINT_SPOTS
 
+    def _build_shot_classification(self, shooter, roles, *, allow_three=True):
+        """Build the canonical backend shot-value payload for field goals."""
+        is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+        shot_spot = roles.get("shot_spot") if isinstance(roles, dict) else None
+        if isinstance(shot_spot, dict):
+            return classify_shot_value(
+                shot_spot,
+                is_away_offense=is_away_offense,
+                allow_three=allow_three,
+                classification_source="shot_spot",
+            )
+
+        shooter_coords = getattr(shooter, "coords", None)
+        if isinstance(shooter_coords, dict) and shooter_coords.get("x") is not None and shooter_coords.get("y") is not None:
+            return classify_shot_value(
+                shooter_coords,
+                is_away_offense=is_away_offense,
+                allow_three=allow_three,
+                classification_source="shooter_coords",
+            )
+
+        _shooter_pos, spot = self._get_shooter_position_and_spot(shooter, roles)
+        is_three = bool(allow_three and spot and spot in THREE_POINT_SPOTS)
+        points = 3 if is_three else 2
+        return {
+            "points": points,
+            "shot_value": points,
+            "is_three_point_shot": is_three,
+            "classification_coord": None,
+            "normalized_coord": None,
+            "boundary_x": None,
+            "classification_source": "legacy_spot_fallback" if spot else "missing_coords",
+            "allow_three": bool(allow_three),
+        }
+
+    def _stamp_shot_classification(self, result, classification):
+        """Attach canonical shot classification fields to a turn result."""
+        if not isinstance(result, dict) or not isinstance(classification, dict):
+            return result
+        result["is_three_point_shot"] = bool(classification.get("is_three_point_shot"))
+        result["shot_value"] = int(classification.get("shot_value") or classification.get("points") or 2)
+        classification_coord = classification.get("classification_coord")
+        if isinstance(classification_coord, dict):
+            result["shot_spot"] = dict(classification_coord)
+            result["shot_classification_coord"] = dict(classification_coord)
+        result["shot_classification"] = dict(classification)
+        result["shot_classification_source"] = classification.get("classification_source")
+        return result
+
     def is_paint_shot(self, shooter, roles):
         """
         Determine if a shot is from the paint (PIP) based on the shooter's spot.
@@ -542,14 +591,16 @@ class ShotManager:
             # Most FB finishes are at-rim 2s. Explicit outside FB branches
             # (Triangle corner/wing/kick) can classify from backend shot_spot.
             shot_type_hint = roles.get("shot_type") or roles.get("motion_shot_type")
-            is_three = (
-                shot_type_hint == "outside"
-                and self.is_three_point_shot(shooter, roles)
+            shot_classification = self._build_shot_classification(
+                shooter,
+                roles,
+                allow_three=(shot_type_hint == "outside"),
             )
+            is_three = bool(shot_classification["is_three_point_shot"])
             is_paint = not is_three and shot_type_hint in (None, "inside", "attack")
         else:
-            # Determine if shot is three-pointer based on shooter's spot
-            is_three = self.is_three_point_shot(shooter, roles)
+            shot_classification = self._build_shot_classification(shooter, roles)
+            is_three = bool(shot_classification["is_three_point_shot"])
             # Determine if shot is from the paint (PIP)
             is_paint = self.is_paint_shot(shooter, roles)
 
@@ -946,6 +997,7 @@ class ShotManager:
                                 "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
                             },
                         }
+                        self._stamp_shot_classification(result, shot_classification)
                         if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
                             result["fouled_out"] = True
                             result["foul_out_player"] = {
@@ -2113,6 +2165,10 @@ class ShotManager:
             "time_elapsed": time_elapsed,
             "events": events,
             "shot_type": shot_type,
+            "is_three_point_shot": bool(shot_classification.get("is_three_point_shot")),
+            "shot_value": int(shot_classification.get("shot_value") or 2),
+            "shot_classification": dict(shot_classification),
+            "shot_classification_source": shot_classification.get("classification_source"),
             "shot_score": shot_score,
             "shot_score_pre_defense": shot_score_pre_defense,
             "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
@@ -2126,6 +2182,7 @@ class ShotManager:
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
         })
+        self._stamp_shot_classification(result, shot_classification)
         if shot_variant_extras:
             result.update(shot_variant_extras)
         if timing_contract is not None:

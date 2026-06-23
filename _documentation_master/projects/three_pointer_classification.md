@@ -52,6 +52,18 @@ Keep `BackEnd.utils.shot_geometry.is_three_point_shot_from_coords()` as the geom
 
 Free throws should be represented as a forced-one path, not a forced-two path.
 
+Implementation status:
+
+- `BackEnd/utils/shot_geometry.py` now exposes `classify_shot_value(...)`.
+- `ShotManager.resolve_shot()` now builds a `shot_classification` payload before shot math and stamps the final turn result with:
+  - `is_three_point_shot`
+  - `shot_value`
+  - `shot_spot`
+  - `shot_classification_coord`
+  - `shot_classification`
+  - `shot_classification_source`
+- Fast Break field-goal attempts preserve the existing outside-shot gate by passing `allow_three=False` unless the branch is explicitly stamped as outside.
+
 ### Phase 3: Standardize canonical shot-coordinate priority
 
 Every field-goal shot path should resolve one canonical shot coordinate before scoring:
@@ -86,6 +98,12 @@ Use this classification result for:
 - Made-three SFX.
 - Animation and announcement payload metadata.
 
+Implementation status:
+
+- `ShotManager.resolve_shot()` now stamps the canonical classification payload on normal shot results and the block-reconciliation shooting-foul early return.
+- Dynamic HCT attack-basket shot paths now build a `shot_classification` payload from the procedural `shot_spot` and stamp it on the turn result.
+- OREB putback attempts now stamp a forced-two classification payload.
+
 ### Phase 5: Preserve explicit forced-value contracts
 
 Some paths should not use 3-point geometry:
@@ -108,6 +126,10 @@ turn_result.get("is_three_point_shot") is True
 not from raw `points == 3`.
 
 This keeps UESS intact: backend classifies, frontend renders.
+
+Implementation status:
+
+- `skeleton_step_emitter.py` now stamps `meta.sfx = "three_make"` only when `turn_result["is_three_point_shot"] is True`.
 
 ### Phase 7: Add regression tests
 

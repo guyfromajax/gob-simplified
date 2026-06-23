@@ -152,15 +152,30 @@ When read ≤ the pass threshold, the BH does not hold automatically — a weigh
 
 Constants: `FCP_READ_STRONG_HANDLER_SUM`, `FCP_READ_LOW_TIER_CHOICES` in `dynamic_hct.py`.
 
+#### Off-ball attack routing (current)
+
+During **`hct_advance`** beats (after attack wins pressure), non-BH offenders route via `fcp_offball_attack.py`. Engagement / converge / hold / pass still use BIP setup hustle.
+
+**Ball-progress tiers** (BH **x**, home orientation; away mirrored). Half-open partition — PF and C share the same boundary operators:
+
+| Tier | BH progress x (home) | PG / SG / SF | PF | C |
+|------|----------------------|--------------|----|---|
+| **T1** | **x ≤ 34** | Release **x∈[46,53]**, **y ± 6** | Hold | Hold |
+| **T2** | **34 < x ≤ 50** | Release (same) | Deep key (6 eu of x=47) | BH-half mid spots |
+| **T3** | **50 < x ≤ 64** | Release (same) | key / midWings / wings | midLane + front half spots |
+| **T4** | **x > 64** | Release until terminal | Same as T3 | Same as T3 |
+
+Constants: `FCP_TIER1_MAX = 34`, `FCP_TIER2_MAX = 50`, `FCP_TIER3_MAX = 64`. Broken-trap drives flood all non-BH to ABA spots until cutoff **RETAIN** reverts to incremental tiers.
+
 #### Post-read overrides (shared)
 
 - **D21 — no live dribble:** any `attack` result collapses to `pass`.
 - **Broken + attack:** runs the open-floor cutoff race (`_do_broken_hct_cutoff`) instead of a normal on-ball contest.
 - **Straight Pressure FCP:** trap moments downgrade to single-defender `"pressure"` (man-glue); read thresholds unchanged.
 
-#### Goal achievement at x = 64 (shared with HCT §7)
+#### Goal achievement at x > 64 (shared with HCT §7)
 
-When the BH enters the Attack Basket Area (trap-break zone), a **separate** 3-tier read runs before the normal loop read — unchanged from HCT:
+When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, y 10–40), a **separate** 3-tier read runs before the normal loop read — unchanged from HCT:
 
 | Read | Result |
 |------|--------|
@@ -171,6 +186,7 @@ When the BH enters the Attack Basket Area (trap-break zone), a **separate** 3-ti
 #### Tests
 
 - `tests/test_fcp_read_decision.py` — FCP strong-handler sum (140) and low-tier weights.
+- `tests/test_fcp_offball_attack.py` — tier boundaries at 34 / 50 / 51 and backcourt release lane.
 
 #### Related docs
 

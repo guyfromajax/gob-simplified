@@ -109,11 +109,13 @@ The shared primitives already extracted for HCT — **`pass_contest.py`**, **`cu
 
 ```
 BACKCOURT / PRESS ZONE          SUCCESS / GOAL ZONE
-x < 64 (home)                   x ≥ 64 — same boundary as HCT ABA entry
+x ≤ 64 (home)                   x > 64 — same boundary as HCT ABA entry
 (BIP receive ~x=12–18)          §7 HCO / Fast Break read (inherited from HCT)
 ```
 
-Half court (x=50) is **not** the FCP success terminal. The 10-second clock runs until **x=64** is reached.
+Off-ball PF/C tiers within the press zone: **T1 x≤34 | T2 34<x≤50 | T3 50<x≤64** (see §2.2). **T4** begins at **x > 64**.
+
+Half court (x=50) is **not** the FCP success terminal. The 10-second clock runs until the BH is **past x=64**.
 
 HCT effectively starts at **engage ~x=44** with defenders already at half court. FCP starts with offense **scattered in backcourt** (PG/SG x=12–18, PF/C already near midcourt per setup ranges) and defense **between ball and frontcourt** (PG x=20–25, wings x=26–31, PF x=50–55, C x=71–76).
 
@@ -139,13 +141,20 @@ Then **`hct_converge`** runs (defense re-poses around the post-engagement BH; of
 
 During **`hct_advance`** (after attack beats pressure) and on **open-floor broken-trap drives** (ABA flood until cutoff RETAIN):
 
-| Role | Behavior |
-|------|----------|
-| **Backcourt non-BH** (PG/SG/SF) | Target **x∈[46,53]**, **y = start y ± 6** at assignment; chase at **sprint** until reached |
-| **PF** | Hold while ball progress **x < 34**; then random point within **6 euclid** of **FCP deep key** (anchor **x=47**, backcourt-side of half court); at **x ≥ 50** random among **key / midWings / wings** (true random upper/lower) |
-| **C** | Hold while progress **x ≤ 34**; **34 < x ≤ 50** random **topLane / apex / midCorner / wing** on **BH vertical half**; **x > 50** **midLane** + same-half **lowPost / midPost / midBaseline / corner / midCorner / bird** |
+**Ball-progress tiers** (BH **x**, home orientation; away mirrored via `_ball_progress_x`). Half-open partition — no overlap:
 
-Ball progress **x** = BH **x** (home); away mirrored. BH half: **y > 25 → upper**, else lower. Destinations persist until reached, phase change, or terminal; **backtrack** re-applies the band rules. Broken-trap **RETAIN** → revert to incremental routing. Engagement/converge/hold/pass unchanged (setup hustle).
+| Tier | BH progress x (home) | PF | C |
+|------|----------------------|----|---|
+| **T1** | **x ≤ 34** | Hold at current spot | Hold at current spot |
+| **T2** | **34 < x ≤ 50** | Random point within **6 euclid** of **FCP deep key** (anchor **x=47**, backcourt-side of half court) | Random **topLane / apex / midCorner / wing** on **BH vertical half** |
+| **T3** | **50 < x ≤ 64** | Random among **key / midWings / wings** (true random upper/lower) | **midLane** + same-half **lowPost / midPost / midBaseline / corner / midCorner / bird** |
+| **T4** | **x > 64** | Same as T3 until terminal | Same as T3 until terminal |
+
+**Backcourt non-BH** (PG/SG/SF): **not tiered** — always target **x∈[46,53]**, **y = start y ± 6** at assignment; chase at **sprint** until reached.
+
+Constants: `FCP_TIER1_MAX = 34`, `FCP_TIER2_MAX = 50`, `FCP_TIER3_MAX = 64` in `fcp_offball_attack.py`. PF and C share the same boundary operators at 34 and 50.
+
+BH vertical half: **y > 25 → upper**, else lower. Destinations persist until reached, phase change, or terminal; **backtrack** re-applies the band rules. Broken-trap **RETAIN** → revert to incremental routing. Engagement/converge/hold/pass unchanged (setup hustle).
 
 **Module:** `BackEnd/engine/fcp_offball_attack.py`
 
@@ -155,7 +164,7 @@ Ball progress **x** = BH **x** (home); away mirrored. BH half: **y > 25 → uppe
 
 | Terminal | Dynamic target |
 |----------|----------------|
-| **HCO / FAST_BREAK_SHOT** | BH reaches **x=64** → HCT §7 goal-achievement read (HCO settle vs broken-press FB shot) |
+| **HCO / FAST_BREAK_SHOT** | BH past **x=64** (ABA y-band) → HCT §7 goal-achievement read (HCO settle vs broken-press FB shot) |
 | **STEAL** | Emergent from pass contest / on-ball moment resolution; steal→FB aftermath mirrors HCT wrapper |
 | **DEAD BALL** | Emergent + **10-second** / shot-clock violations → SIDE_INBOUND |
 | **FOUL** (O/D) | Emergent from moment resolution (mirror HCT D8) |
