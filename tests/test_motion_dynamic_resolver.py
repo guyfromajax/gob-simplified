@@ -201,8 +201,11 @@ def test_bh_at_step_handle_ball_when_no_pass():
     assert _motion_bh_at_step(step) == ("PG", "key")
 
 
-def test_hot_read_stamps_vo_on_initiation_step():
+def test_hot_read_stamps_vo_on_initiation_step(monkeypatch):
+    # The VO is currently disabled (HOT_READ_VO_ENABLED=False); flip it on to verify the
+    # stamping pipeline is intact for when it's re-enabled.
     from BackEnd.engine.phase_resolution import _execute_motion_decision, HOT_READ_VO_FILES
+    monkeypatch.setattr(PR, "HOT_READ_VO_ENABLED", True)
     game = _FakeGame()
     bh = _FakePlayer("bh")
     off = _lineup(PG=bh)
@@ -214,6 +217,19 @@ def test_hot_read_stamps_vo_on_initiation_step():
     appended = out[2:]  # everything after base_steps[:2] is the appended hot-read shot break
     assert appended and appended[0].get("_hot_read_sfx") in HOT_READ_VO_FILES
     assert "hot_read" not in res  # no top-level turn flag anymore (SFX rides the step)
+
+
+def test_hot_read_vo_disabled_by_default():
+    # With HOT_READ_VO_ENABLED False (default), no clip is stamped on the hot-read step.
+    from BackEnd.engine.phase_resolution import _execute_motion_decision
+    assert PR.HOT_READ_VO_ENABLED is False
+    game = _FakeGame()
+    off = _lineup(PG=_FakePlayer("bh"))
+    steps = _skeleton({"PG": "upper wing"}, {"PG": "upper wing"})["steps"]
+    decision = {"action": "HOT_READ_SHOOT", "shooter_pos": "PG", "shot_type": "outside", "via_pass": False}
+    res = _execute_motion_decision({"steps": steps}, steps[:2], steps[1], "PG", "upper wing", decision,
+                                   game, off, {}, is_away_offense=False)
+    assert all("_hot_read_sfx" not in s for s in res["skeleton"]["steps"])
 
 
 def test_non_hot_read_shot_has_no_vo():

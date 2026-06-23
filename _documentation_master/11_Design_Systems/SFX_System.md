@@ -26,6 +26,7 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 
 ## Dynamic HCO Motion — Hot Read VO
 
+- **Status:** ⛔ **temporarily disabled** (`HOT_READ_VO_ENABLED = False` in `phase_resolution.py`, 2026-06-23) — cluttered more than it helped. The full pipeline below is left intact; flip the flag back to `True` to re-enable.
 - **Trigger:** a hot read is executed in an HCO Motion possession (`_execute_motion_decision`, `phase_resolution.py`).
 - **File:** one of `braddock-greatread.wav` / `sammy-niceread.mp3`, chosen **at random on the backend** (SS&S-reproducible; FE picks nothing).
 - **Timing:** plays at the **start of the hot-read initiation step** (the dish / drive / shot break) via `sfx_on_step_start` — fires before any tween, so it lands as the break begins and does **not** collide with the shot/pass launch sound.

@@ -4501,6 +4501,10 @@ def _dynamic_hco_motion_enabled():
 # chosen at random on the BACKEND (logic + SS&S-reproducible) and stamped on the turn result;
 # the FE shows the "Hot Read!" call and plays the chosen clip (pure renderer). See SFX_System.md.
 HOT_READ_VO_FILES = ("braddock-greatread.wav", "sammy-niceread.mp3")
+# TEMPORARILY DISABLED (2026-06-23): the nice-read/great-read hot-read VO clutters more than it
+# helps. Flip back to True to re-enable — the full pipeline (clip stamp → emitter
+# sfx_on_step_start → FE playback) is left intact, this flag just gates the stamping.
+HOT_READ_VO_ENABLED = False
 
 
 def _motion_bh_at_step(step):
@@ -4772,7 +4776,7 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
     # flags it on the INITIATION step (first appended step: the dish/drive/shot break). The
     # emitter carries it to step.start.sfx_on_step_start; the FE plays it at step-processing
     # start (before tweens) — no ribbon, no shot/pass-sound collision. See SFX_System.md.
-    if decision.get("action") == "HOT_READ_SHOOT" and new_steps:
+    if HOT_READ_VO_ENABLED and decision.get("action") == "HOT_READ_SHOOT" and new_steps:
         clip = random.choice(HOT_READ_VO_FILES)
         new_steps[0]["_hot_read_sfx"] = clip
         logging.warning(
