@@ -4176,17 +4176,33 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         return
     from BackEnd.constants import HCO_STRING_SPOTS
     from BackEnd.utils.shared import get_away_player_coords
-    location = (pa.get("location") or pa.get("spot") or "key").strip()
-    # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
-    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
-    if coords == {"x": 50, "y": 25} and location.lower() != "key":
-        for k, v in HCO_STRING_SPOTS.items():
-            if k.lower() == location.lower():
-                coords = v
-                break
-    is_away_offense = game.offense_team.team_id == game.away_team.team_id
-    if is_away_offense:
-        coords = get_away_player_coords(coords)
+
+    explicit_coords = pa.get("coords")
+    if (
+        isinstance(explicit_coords, dict)
+        and explicit_coords.get("x") is not None
+        and explicit_coords.get("y") is not None
+    ):
+        # Dynamic HCO coord-based shoot step (e.g. Freelance, or an attack-drive step that
+        # carries an explicit final coord). These coords are already DISPLAY-oriented — they
+        # are produced by _spot_display_coords / _basket_display_coords, the same frame the
+        # named path lands in after its away mirror, and exactly what
+        # is_three_point_shot_from_coords expects. Use them VERBATIM (no re-mirror) and prefer
+        # them over the named-spot lookup so the exact procedural shot position drives 2PT/3PT
+        # classification rather than a defaulted "key".
+        coords = {"x": float(explicit_coords["x"]), "y": float(explicit_coords["y"])}
+    else:
+        # Legacy named-spot fallback: HCO_STRING_SPOTS is home-oriented → mirror for away.
+        location = (pa.get("location") or pa.get("spot") or "key").strip()
+        # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
+        coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+        if coords == {"x": 50, "y": 25} and location.lower() != "key":
+            for k, v in HCO_STRING_SPOTS.items():
+                if k.lower() == location.lower():
+                    coords = v
+                    break
+        if game.offense_team.team_id == game.away_team.team_id:
+            coords = get_away_player_coords(coords)
     shooter.coords = coords
     roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
 

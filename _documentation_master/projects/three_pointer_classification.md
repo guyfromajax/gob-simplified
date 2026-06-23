@@ -1,8 +1,8 @@
-# Three-Pointer Classification Assessment
+# Three-Pointer Classification Work Plan
 
 ## Purpose
 
-Assess how the current code classifies made and missed shot attempts as 2-point or 3-point attempts across HCO, Dynamic HCT, FCP, Fast Break, OREB, Free Throw, and Final Shot paths.
+Define the work plan for hardening how the backend classifies made and missed shot attempts as 1-point, 2-point, or 3-point attempts across HCO, Dynamic HCT, FCP, Fast Break, OREB, Free Throw, and Final Shot paths.
 
 This document was created after observed mismatches:
 
@@ -10,6 +10,138 @@ This document was created after observed mismatches:
 - A visually apparent 3-point step-back shot registered as a 2-pointer and did not trigger made-three SFX.
 
 The frontend is a UESS renderer only. It should not decide whether a shot is worth 2 or 3. Classification must be backend-owned and carried through scoring, stats, payload fields, and backend-stamped announcement/SFX metadata.
+
+This replaces the older `universal_3point_helper.md` project brief. The still-valid pieces from that brief are preserved here:
+
+- Coordinate-based classification should replace skeleton-name-based classification.
+- One home/right-attacking 3-point geometry model should be normalized for away offense by mirroring x.
+- `roles["shot_spot"]` should be the preferred classification input when it contains explicit coords.
+- Shooter model coords are an acceptable fallback.
+- Skeleton location-name classification should be a last-resort legacy fallback only.
+
+## Implementation Work Plan
+
+### Phase 1: Fix Dynamic HCO coordinate handoff
+
+Immediate bug target:
+
+- Dynamic HCO can create procedural shot coordinates that differ from named skeleton spots.
+- `set_shooter_coords_from_skeleton_last_step()` must support explicit coord-based shoot steps and prefer those coords over named `location` / `spot` lookups.
+- Before `ShotManager.resolve_shot(roles)` runs, the canonical final shot coordinate must be written into:
+  - `shooter.coords`
+  - `roles["shot_spot"]`
+
+This phase should confirm the coordinate frame used by Dynamic HCO/UESS shoot-step coords. Do not blindly mirror explicit coords unless the pipeline confirms they are stored in home-oriented space.
+
+### Phase 2: Create a richer backend classification wrapper
+
+Keep `BackEnd.utils.shot_geometry.is_three_point_shot_from_coords()` as the geometry primitive, but wrap it with a single shot-value classifier that returns a self-describing payload:
+
+```python
+{
+    "points": 3 or 2,
+    "is_three_point_shot": True/False,
+    "shot_value": 3 or 2,
+    "classification_coord": {"x": ..., "y": ...},
+    "normalized_coord": {"x": ..., "y": ...},
+    "boundary_x": ...,
+    "classification_source": "coords" | "forced_two" | "forced_one" | "legacy_spot_fallback",
+    "allow_three": True/False,
+}
+```
+
+Free throws should be represented as a forced-one path, not a forced-two path.
+
+### Phase 3: Standardize canonical shot-coordinate priority
+
+Every field-goal shot path should resolve one canonical shot coordinate before scoring:
+
+1. Explicit procedural `roles["shot_spot"]` coords.
+2. Dynamic HCO motion final shot coord.
+3. Terminal UESS shoot-step end coord.
+4. Shooter model `coords`.
+5. Legacy skeleton spot name as last-resort fallback only.
+
+The classifier should not infer from frontend state.
+
+### Phase 4: Classify once and carry the result everywhere
+
+After classification, shot results should consistently carry:
+
+- `shot_spot`
+- `shot_classification_coord`
+- `shot_classification`
+- `is_three_point_shot`
+- `shot_value`
+- `points` when the shot is made
+- `shot_type`
+- `classification_source`
+
+Use this classification result for:
+
+- Score changes.
+- `3PTA` / `3PTM`.
+- Shooting foul FT count.
+- Shot text.
+- Made-three SFX.
+- Animation and announcement payload metadata.
+
+### Phase 5: Preserve explicit forced-value contracts
+
+Some paths should not use 3-point geometry:
+
+- Free throws: forced 1.
+- OREB putbacks: forced 2.
+- Steal Fast Break rim finishes: forced 2.
+- Rim Runner / Covert Release rim finishes: forced 2 unless explicitly designed as outside attempts.
+
+These paths should still stamp classification metadata so downstream systems can see why geometry was bypassed.
+
+### Phase 6: Move made-three SFX to the classification flag
+
+Made-three SFX should be stamped from:
+
+```python
+turn_result.get("is_three_point_shot") is True
+```
+
+not from raw `points == 3`.
+
+This keeps UESS intact: backend classifies, frontend renders.
+
+### Phase 7: Add regression tests
+
+Required test coverage:
+
+- Arc boundary:
+  - Lower corner straight-line segment.
+  - Upper corner straight-line segment.
+  - Interpolated wing/midwing/key sections.
+  - One point just inside and just outside each segment.
+- Home/away parity:
+  - `x_away = 100 - x_home`.
+- HCO:
+  - Coordinate-based step-back from inside the arc can classify as 3.
+  - Coordinate-based step-in from outside the arc can classify as 2.
+  - Named spot fallback still works when explicit coords are missing.
+- Dynamic HCT:
+  - Procedural `shot_spot` drives points and `is_three_point_shot`.
+- Fast Break:
+  - Triangle outside branches classify by coordinate.
+  - Rim/post branches force 2.
+- OREB:
+  - Putbacks force 2.
+- Free Throw:
+  - Free throws force 1.
+- SFX:
+  - Made 3 stamps `meta.sfx = "three_make"`.
+  - Made 2 never stamps `three_make`.
+
+### Phase 8: Canonical documentation update
+
+After implementation, move the final rules into `_documentation_master/06_Gameplay_Systems/Shot_System.md`.
+
+This project doc can then be archived or deleted.
 
 ## Current 3-Point Arc Model
 
@@ -549,4 +681,3 @@ The correct fix is backend-only:
 3. Stamp `is_three_point_shot`, `shot_value`, `shot_spot`, and classification metadata onto every shot result.
 4. Make made-three SFX read `is_three_point_shot`, not raw `points`.
 5. Remove or demote skeleton spot-name fallback once Dynamic HCO Motion is fully coordinate-safe.
-
