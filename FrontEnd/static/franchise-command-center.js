@@ -76,6 +76,9 @@ const GAMEPLAN_LABELS = {
   fc_press: 'Full-Court Press',
   rebounding: 'Rebounding'
 };
+// Row-major pairs for the 2-column FCC grid — must match game-plan.html columns:
+// Left: offense, inside, attack, outside, tempo, alterations
+// Right: defense, aggression, hc_trap, fc_press, fast_breaks, rebounding
 const GAMEPLAN_DISPLAY_ORDER = [
   'offense',
   'defense',
@@ -84,10 +87,10 @@ const GAMEPLAN_DISPLAY_ORDER = [
   'attack',
   'hc_trap',
   'outside',
-  'tempo',
-  'alterations',
   'fc_press',
+  'tempo',
   'fast_breaks',
+  'alterations',
   'rebounding'
 ];
 

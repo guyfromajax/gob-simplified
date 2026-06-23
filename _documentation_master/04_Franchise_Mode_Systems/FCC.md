@@ -380,17 +380,22 @@ Important implementation note:
 
 The `Game Plan` tab renders the current strategic settings summary.
 
-It displays human-readable interpretations of strategy sliders for:
+It displays human-readable interpretations of strategy sliders in the same two-column order as `game-plan.html` (left column, then right column, row by row):
+
+**Left column**
 
 - Offense
-- Defense
 - Inside
-- Aggression
 - Attack
-- Half-Court Trap
 - Outside
 - Offense Tempo
 - Play Alteration
+
+**Right column**
+
+- Defense
+- Aggression
+- Half-Court Trap
 - Full-Court Press
 - Fast Breaks
 - Rebounding

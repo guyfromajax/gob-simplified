@@ -83,6 +83,8 @@ All sliders are `input[type=range]` with `min=0`, `max=4`, `step=1` (five discre
 
 ### Read-only summary value maps (FCC Game Plan tab)
 
+The FCC summary uses a two-column grid (`GAMEPLAN_DISPLAY_ORDER` in `franchise-command-center.js`): each row pairs one left-column slider with one right-column slider, matching `game-plan.html` (offense ↔ defense, inside ↔ aggression, …, alterations ↔ rebounding).
+
 | Key | 0 | 1 | 2 | 3 | 4 |
 |-----|---|---|---|---|---|
 | `tempo` | Slow | Slow / Normal | Normal | Normal / Fast | Fast |
