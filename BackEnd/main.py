@@ -409,7 +409,7 @@ def simulate_quarter(
             from BackEnd.utils.db_utils import autoset_strategy_settings
             computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
             # Autoset strategy settings for computer team
-            autoset_strategy_settings(computer_team)
+            autoset_strategy_settings(computer_team, gm.game_state)
             logging.info(f"✅ QUARTER BREAK: Rebuilt computer team ({computer_team.name}) lineup for Q{gm.quarter} with energy/foul filtering and autoset strategy settings")
         except Exception as e:
             logging.error(f"⚠️ QUARTER BREAK: Failed to rebuild computer team lineup: {e}")

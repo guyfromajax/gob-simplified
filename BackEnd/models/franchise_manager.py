@@ -600,6 +600,7 @@ class FranchiseManager:
                 "outside": 2,
                 "fast_breaks": 2,
                 "tempo": 2,
+                "alterations": 2,
                 "defense": 2,
                 "aggression": 2,
                 "hc_trap": 2,

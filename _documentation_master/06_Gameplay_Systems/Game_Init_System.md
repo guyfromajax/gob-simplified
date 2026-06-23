@@ -329,13 +329,23 @@ When simulation starts a **new** in-process game for franchise mode (no existing
   - elif cum D Ability > 500: defense = random.randint(1,4)
   - else: defense = random.randint(2,4)
 
-5. Leave as is with current logic for now for
-  -offense
-  -rebounding
+5. Tempo and Play Alteration (CPU only)
+  - **Game init and Q1–Q3:** `tempo` and `alterations` each get an independent weighted roll centered on **2** (`init_tempo_random()` — weights `[10,20,50,20,10]` on 0–4).
+  - **Q4+ (including OT):** `alterations` keeps the same weighted roll. `tempo` uses score/time logic from the **computer team's** perspective:
+    - **Score difference** = winning team's score − losing team's score (ties = 0).
+    - **If computer team winning:** if score difference > `time_remaining / 30` → `tempo = 0`; else weighted roll centered on 2.
+    - **If computer team losing and `time_remaining > 90`:** if score difference > `time_remaining / 30` → `tempo = 4`; else weighted roll centered on 2.
+    - **If computer team losing and `time_remaining ≤ 90`:** if score difference > `time_remaining / 4` → `tempo = 0`; elif score difference > `time_remaining / 30` → `tempo = 4`; else weighted roll centered on 2.
+    - **If tied:** weighted roll centered on 2.
+
+6. Leave as is with current logic for now for
+  - offense
+  - rebounding
+  - play_calling (legacy weighted rolls — see implementation notes)
 
 ### Implementation notes (finalized 2026-06-16)
 
-**Scope:** computer teams only (user game plan is never auto-set). Applied at **game init** and at every **quarter break / timeout / foul-out**. `offense`, `rebounding`, `play_calling`, and `tempo` keep their legacy rolls.
+**Scope:** computer teams only (user game plan is never auto-set). Applied at **game init** and at every **quarter break / timeout / foul-out**. `offense`, `rebounding`, and `play_calling` keep their legacy rolls. **`tempo`** uses the weighted center-2 roll for game init and Q1–Q3, then Q4+ score/time logic when `game_state` is available (timeouts, quarter breaks, foul-outs). **`alterations`** always uses the same weighted center-2 roll as tempo at init/Q1–Q3.
 
 **Active five (point 1):** at game init the lineup isn't built yet, so the five come from the **projected starting five** (greedy best (player, open position) by rating — same selection as the FCC Scouting Report). At in-game events the lineup is already rebuilt first, so the actual five active players are used (no ordering change needed).
 
@@ -348,4 +358,4 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 
 **Point 3 correction:** in the strong-endurance branch, if `cum Intelligence ≤ 300`, **aggression** also falls back to its standard roll (it was accidentally omitted from the original else).
 
-**Code:** `TeamManager._compute_strategic_strategy_settings()` / `_resolve_strategy_active_five()` (`BackEnd/models/team_manager.py`); applied at construction (computer teams) and via `autoset_strategy_settings()` (`BackEnd/utils/db_utils.py`).
+**Code:** `TeamManager._compute_strategic_strategy_settings(game_state=None)`, `_compute_cpu_tempo()`, and `_resolve_strategy_active_five()` (`BackEnd/models/team_manager.py`); applied at construction (computer teams) and via `autoset_strategy_settings(team, game_state=None)` (`BackEnd/utils/db_utils.py`). Quarter-break and timeout autoset pass live `game_state` so Q4+ tempo reflects current score and clock.

@@ -200,11 +200,13 @@ const strategySliders = {
   'inside': 'slider-inside',
   'attack': 'slider-attack',
   'outside': 'slider-outside',
-  'fast_breaks': 'slider-fast_breaks',
+  'tempo': 'slider-tempo',
+  'alterations': 'slider-alterations',
   'defense': 'slider-defense',
   'aggression': 'slider-aggression',
   'hc_trap': 'slider-hc-trap',
   'fc_press': 'slider-fc-press',
+  'fast_breaks': 'slider-fast_breaks',
   'rebounding': 'slider-rebounding'
 };
 

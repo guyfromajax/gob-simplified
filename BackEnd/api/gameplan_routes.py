@@ -373,8 +373,9 @@ def get_default_settings():
             "aggression": 2,
             "hc_trap": 2,  # Half court trap (matches frontend key)
             "fc_press": 2, # Full court press (matches frontend key)
-            "rebounding": 2
-            # Note: tempo is initialized randomly per game, not stored in game plan settings
+            "rebounding": 2,
+            "tempo": 2,  # Offense tempo slider (Game Plan); feeds STRATEGY_CALL_DICTS["tempo"]
+            "alterations": 2,  # Play alteration slider (Game Plan); gameplay wiring TBD
         }
     }
 

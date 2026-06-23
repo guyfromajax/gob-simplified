@@ -411,14 +411,53 @@ class TeamManager:
     @staticmethod
     def init_tempo_random():
         """
-        Initialize tempo randomly per game with specified distribution:
-        - 10% chance for 0
-        - 20% chance for 1
-        - 50% chance for 2
-        - 20% chance for 3
-        - 10% chance for 4
+        Weighted roll centered on 2 (10/20/50/20/10 on 0–4).
+        Used for CPU tempo (Q1–Q3 / init), CPU alterations, and GameManager
+        fallback when tempo is missing from a team snapshot.
         """
         return random.choices([0, 1, 2, 3, 4], weights=[10, 20, 50, 20, 10], k=1)[0]
+
+    def _compute_cpu_tempo(self, game_state=None):
+        """CPU tempo slider (0–4). Game init and Q1–Q3: weighted roll centered on 2.
+        Q4+ (including OT): score/time situational logic from the computer team's
+        perspective (Game_Init_System.md § Computer Team Strategy Logic, point 5).
+        """
+        if not game_state:
+            return TeamManager.init_tempo_random()
+
+        quarter = int(game_state.get("quarter") or 1)
+        if quarter < 4:
+            return TeamManager.init_tempo_random()
+
+        time_remaining = float(game_state.get("time_remaining") or 0)
+        score_map = game_state.get("score") or {}
+        my_score = int(score_map.get(self.name, 0) or 0)
+        opp_score = None
+        for team_name, score_val in score_map.items():
+            if team_name != self.name:
+                opp_score = int(score_val or 0)
+                break
+        if opp_score is None:
+            return TeamManager.init_tempo_random()
+
+        if my_score > opp_score:
+            score_diff = my_score - opp_score
+            if score_diff > time_remaining / 30:
+                return 0
+            return TeamManager.init_tempo_random()
+        if my_score < opp_score:
+            score_diff = opp_score - my_score
+            if time_remaining > 90:
+                if score_diff > time_remaining / 30:
+                    return 4
+                return TeamManager.init_tempo_random()
+            if score_diff > time_remaining / 4:
+                return 0
+            if score_diff > time_remaining / 30:
+                return 4
+            return TeamManager.init_tempo_random()
+
+        return TeamManager.init_tempo_random()
     
     def _init_strategy_settings(self):
         """
@@ -480,8 +519,8 @@ class TeamManager:
             "hc_trap": trap_press_choice,
             "fc_press": trap_press_choice,
             "rebounding": random.choices([0, 1, 2, 3, 4], weights=[5, 10, 15, 30, 40], k=1)[0],
-            # tempo is initialized per game, not per team
-            "tempo": TeamManager.init_tempo_random()
+            "tempo": TeamManager.init_tempo_random(),
+            "alterations": TeamManager.init_tempo_random(),
         }
 
     # --- Strategic (player-based) CPU strategy settings -----------------------
@@ -558,24 +597,29 @@ class TeamManager:
             assigned.add(str(getattr(bp, "player_id", "") or ""))
         return chosen
 
-    def _compute_strategic_strategy_settings(self):
+    def _compute_strategic_strategy_settings(self, game_state=None):
         """Compute CPU strategy settings from the five active players.
         Falls back to the legacy random init if five players can't be resolved.
         """
         five = self._resolve_strategy_active_five()
         if len(five) < 5:
-            return self._init_strategy_settings()
+            settings = self._init_strategy_settings()
+            settings["tempo"] = self._compute_cpu_tempo(game_state)
+            settings["alterations"] = TeamManager.init_tempo_random()
+            return settings
 
         def cum(key):
             return sum(self._strategy_attr(p, key) for p in five)
 
         settings = {}
 
-        # Point 5: legacy logic for offense / rebounding / play_calling / tempo.
+        # Point 5: legacy rolls for offense / rebounding / play_calling; tempo and
+        # alterations use weighted center-2 rolls (tempo is situational in Q4+).
         settings["offense"] = self._strategy_roll_balanced()
         settings["rebounding"] = self._strategy_roll_rebounding()
         settings["play_calling"] = self._strategy_roll_balanced()
-        settings["tempo"] = TeamManager.init_tempo_random()
+        settings["tempo"] = self._compute_cpu_tempo(game_state)
+        settings["alterations"] = TeamManager.init_tempo_random()
 
         # Point 2: offense-type tendencies (inside / attack / outside).
         scores = {

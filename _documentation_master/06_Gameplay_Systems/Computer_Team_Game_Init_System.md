@@ -32,8 +32,10 @@ This controls:
 - defense / aggression
 - pressure usage (`hc_trap`, `fc_press` — weighted heavily toward 0–1)
 - rebounding preference (weighted toward 3–4)
+- **`tempo`** — weighted roll centered on 2 at game init and Q1–Q3; Q4+ situational score/time logic when autoset receives `game_state` (see `Game_Init_System.md` § Computer Team Strategy Logic, point 5)
+- **`alterations`** — same weighted center-2 roll as tempo at every CPU refresh (game init, quarter break, timeout, foul-out)
 
-Note: **tempo is not initialized here** — it's rolled per game via `init_tempo_random()`.
+Note: **`init_tempo_random()`** implements the shared weighted center-2 distribution (10/20/50/20/10 on 0–4). `GameManager` still backfills missing `tempo` on both teams at construct time when absent from the snapshot.
 
 This part of init did not change materially during the play identity migration.
 

@@ -67,6 +67,8 @@ const GAMEPLAN_LABELS = {
   inside: 'Inside',
   attack: 'Attack',
   outside: 'Outside',
+  tempo: 'Offense Tempo',
+  alterations: 'Play Alteration',
   fast_breaks: 'Fast Breaks',
   defense: 'Defense',
   aggression: 'Aggression',
@@ -82,6 +84,8 @@ const GAMEPLAN_DISPLAY_ORDER = [
   'attack',
   'hc_trap',
   'outside',
+  'tempo',
+  'alterations',
   'fc_press',
   'fast_breaks',
   'rebounding'
@@ -4256,6 +4260,22 @@ function mapGamePlanValue(key, rawValue) {
         2: '50% Half Court Sets / 50% Fast Breaks',
         3: '75% Fast Breaks / 25% Half Court Sets',
         4: '100% Fast Breaks'
+      }[value];
+    case 'tempo':
+      return {
+        0: 'Slow',
+        1: 'Slow / Normal',
+        2: 'Normal',
+        3: 'Normal / Fast',
+        4: 'Fast'
+      }[value];
+    case 'alterations':
+      return {
+        0: 'Least',
+        1: 'Less',
+        2: 'Normal',
+        3: 'More',
+        4: 'Most'
       }[value];
     case 'aggression':
       return {

@@ -389,6 +389,8 @@ It displays human-readable interpretations of strategy sliders for:
 - Attack
 - Half-Court Trap
 - Outside
+- Offense Tempo
+- Play Alteration
 - Full-Court Press
 - Fast Breaks
 - Rebounding

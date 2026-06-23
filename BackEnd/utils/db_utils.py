@@ -469,18 +469,18 @@ def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dic
     return team.lineup
 
 
-def autoset_strategy_settings(team: TeamManager):
+def autoset_strategy_settings(team: TeamManager, game_state=None):
     """
-    Automatically set strategy settings for a computer team using the same
-    weighted randomization logic as initial strategy settings.
-    
-    This function regenerates strategy settings using _init_strategy_settings()
-    to allow computer teams to adjust their strategy during timeouts, quarter
-    breaks, and foul out instances.
-    
+    Automatically set strategy settings for a computer team from its active five
+    (Game_Init_System.md § Computer Team Strategy Logic).
+
+    Regenerates settings during timeouts, quarter breaks, and foul-outs.
+    When ``game_state`` is supplied, Q4+ CPU tempo uses score/time logic.
+
     Args:
         team: TeamManager instance (must be a computer team, not user team)
-    
+        game_state: Optional live game state (quarter, time_remaining, score)
+
     Returns:
         dict: New strategy settings
     """
@@ -497,7 +497,7 @@ def autoset_strategy_settings(team: TeamManager):
     # Regenerate strategy settings from the team's current five active players
     # (Game_Init_System.md § Computer Team Strategy Logic). Falls back to the
     # legacy random init internally if five players can't be resolved.
-    new_strategy_settings = team._compute_strategic_strategy_settings()
+    new_strategy_settings = team._compute_strategic_strategy_settings(game_state)
     team.strategy_settings = new_strategy_settings
     
     new_inside = new_strategy_settings.get('inside', 'MISSING')

@@ -991,7 +991,7 @@ The system uses `is_player_eligible_for_lineup()` (`BackEnd/utils/db_utils.py`) 
 
 **Implementation Details:**
 - **Lineup Function:** `build_lineup_from_mongo(team, game_state=None)` (`BackEnd/utils/db_utils.py`)
-- **Strategy Function:** `autoset_strategy_settings(team)` (`BackEnd/utils/db_utils.py`)
+- **Strategy Function:** `autoset_strategy_settings(team, game_state=None)` (`BackEnd/utils/db_utils.py`) — passes live `game_state` so Q4+ CPU tempo reflects score and clock.
   - Regenerates strategy settings using `TeamManager._init_strategy_settings()` method
   - Uses same weighted randomization logic as initial strategy settings
   - Only applies to computer teams (user team strategy settings are never auto-adjusted)

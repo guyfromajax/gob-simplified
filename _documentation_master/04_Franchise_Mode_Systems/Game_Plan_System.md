@@ -1,10 +1,10 @@
 # Game Plan System (**verified 2026-06-23**)
 
-> Verified vs code: `FrontEnd/static/game-plan.js`, `FrontEnd/static/game-plan.html`, `BackEnd/api/gameplan_routes.py` (`get_default_settings`, `validate_settings`, `GET/PUT /api/gameplan`), `BackEnd/utils/team_settings_manager.py` (`save_team_settings`). Persistence policy matches `../01_Data_Persistence/Settings_Persistence_Guide.md` (April 2026 two-stage model).
+> Verified vs code: `FrontEnd/static/game-plan.js`, `FrontEnd/static/game-plan.html`, `FrontEnd/static/franchise-command-center.js` (`mapGamePlanValue`), `BackEnd/api/gameplan_routes.py` (`get_default_settings`, `validate_settings`, `GET/PUT /api/gameplan`), `BackEnd/utils/team_settings_manager.py` (`save_team_settings`), `BackEnd/models/franchise_manager.py`. Persistence policy matches `../01_Data_Persistence/Settings_Persistence_Guide.md` (April 2026 two-stage model).
 
 ## Overview
 
-The Game Plan screen (`game-plan.html`) lets the **user team** configure ten strategic sliders (`strategy_settings`) that influence sim behavior. Settings are database-backed, mode-scoped, and never stored in `localStorage` or URL params.
+The Game Plan screen (`game-plan.html`) lets the **user team** configure twelve strategic sliders (`strategy_settings`) that influence sim behavior. Settings are database-backed, mode-scoped, and never stored in `localStorage` or URL params.
 
 **Active product mode:** Franchise. Single Game and Tournament paths still exist in code but are sunset — see `Sunset_Modes.md`.
 
@@ -55,9 +55,11 @@ When `game_id` and `resume_from_timeout=true` are present, franchise/tournament 
 
 ---
 
-## Page UI — Ten Sliders
+## Page UI — Twelve Sliders
 
-All sliders are `input[type=range]` with `min=0`, `max=4`, `step=1` (five discrete positions). Endpoint labels appear under each slider in HTML; intermediate values (1 and 3) use blended semantics (see FCC `mapGamePlanValue()` for full text).
+All sliders are `input[type=range]` with `min=0`, `max=4`, `step=1` (five discrete positions). Endpoint labels appear under each slider in HTML; intermediate values (1 and 3) use blended semantics in read-only summaries (FCC `mapGamePlanValue()`).
+
+### Left column (offense)
 
 | UI label | `strategy_settings` key | Endpoint semantics (0 / 2 / 4) |
 |----------|---------------------------|--------------------------------|
@@ -65,12 +67,28 @@ All sliders are `input[type=range]` with `min=0`, `max=4`, `step=1` (five discre
 | Inside Offense | `inside` | Never / Normal / Most |
 | Attack Offense | `attack` | Never / Normal / Most |
 | Outside Offense | `outside` | Never / Normal / Most |
-| Fast Break | `fast_breaks` | 100% Half-Court Sets / 50-50 / 100% Fast Breaks |
+| Offense Tempo | `tempo` | Slow / Normal / Fast |
+| Play Alteration | `alterations` | Least / Normal / Most |
+
+### Right column (defense / general)
+
+| UI label | `strategy_settings` key | Endpoint semantics (0 / 2 / 4) |
+|----------|---------------------------|--------------------------------|
 | Defense | `defense` | 100% Man / 50-50 / 100% Zone |
 | Aggression | `aggression` | Passive / Normal / Aggressive |
 | Half-Court Trap | `hc_trap` | Never / Normal / Most |
 | Full-Court Press | `fc_press` | Never / Normal / Most |
+| Fast Break | `fast_breaks` | 100% Half-Court Sets / 50-50 / 100% Fast Breaks |
 | Offensive Rebounding | `rebounding` | 100% Crash the Boards / 50-50 / 100% Get Back on D |
+
+### Read-only summary value maps (FCC Game Plan tab)
+
+| Key | 0 | 1 | 2 | 3 | 4 |
+|-----|---|---|---|---|---|
+| `tempo` | Slow | Slow / Normal | Normal | Normal / Fast | Fast |
+| `alterations` | Least | Less | Normal | More | Most |
+
+Other keys use existing `mapGamePlanValue()` cases (offense, defense, fast_breaks, aggression, rebounding, or `GENERIC_GAMEPLAN_SCALE` for inside/attack/outside/hc_trap/fc_press).
 
 Frontend mapping: `strategySliders` in `game-plan.js` (keys → slider element IDs).
 
@@ -145,19 +163,24 @@ strategy_settings = {
   "inside": 0-4,
   "attack": 0-4,
   "outside": 0-4,
-  "fast_breaks": 0-4,
+  "tempo": 0-4,
+  "alterations": 0-4,
   "defense": 0-4,
   "aggression": 0-4,
   "hc_trap": 0-4,
   "fc_press": 0-4,
+  "fast_breaks": 0-4,
   "rebounding": 0-4
 }
 ```
 
 **Not on this screen:**
 
-- **`tempo`** — per-game sim setting (randomized at game init via `TeamManager.init_tempo_random()` / `GameManager`). FTD season init currently seeds `tempo: 2` in `franchise_manager.py`, but the Game Plan UI does not expose or save it; a save replaces the stored blob with the ten UI keys only. Gameplay re-injects `tempo` on `GameManager` when missing. Backlog: add tempo to Game Plan UI (`projects/bugs.md` #113).
 - **`playbook_settings`** — configured on Playbooks / Playbook Report, not here.
+
+**`tempo` behavior:** Saved via Game Plan as a 0–4 team setting. At game start, if `tempo` is already present on the team snapshot, it is used as-is; `GameManager` only calls `TeamManager.init_tempo_random()` when `tempo` is missing. Each offensive possession rolls `strategy_calls.tempo_call` (`slow` / `normal` / `fast`) from `STRATEGY_CALL_DICTS["tempo"][tempo]` — see `BackEnd/constants/__init__.py`. **CPU teams** refresh `tempo` at quarter break / timeout / foul-out: weighted center-2 roll for Q1–Q3; Q4+ uses score/time situational logic when autoset receives live `game_state` (see `Game_Init_System.md` § point 5).
+
+**`alterations` behavior:** Saved via Game Plan as a 0–4 team setting (default **2**). CPU teams refresh `alterations` at game init and every quarter break / timeout / foul-out via the same weighted center-2 roll as CPU tempo (`init_tempo_random()`). User-set values persist on the user team; gameplay consumption of alterations is not wired yet.
 
 **Legacy note:** Old `playcall_settings` (Base/Freelance/Inside/Attack/Outside/Set) is **not** used by current API or UI. GET/PUT responses no longer include it.
 
@@ -214,6 +237,8 @@ Full persistence flows, pitfalls, and timeout behavior: `../01_Data_Persistence/
     "inside": 2,
     "attack": 2,
     "outside": 2,
+    "tempo": 2,
+    "alterations": 2,
     "fast_breaks": 2,
     "defense": 2,
     "aggression": 2,
@@ -249,13 +274,13 @@ Full persistence flows, pitfalls, and timeout behavior: `../01_Data_Persistence/
 
 ### User team (franchise)
 
-- Season init creates FTD rows for **all 128 teams** with default `strategy_settings` (all **2**, plus `tempo: 2` at init).
+- Season init creates FTD rows for **all 128 teams** with default `strategy_settings` (all keys **2**, including `tempo` and `alterations`).
 - Only the **user team** is edited through the Game Plan screen / API master-save path (authoritative `user_team_object_id` from franchise doc).
 
 ### CPU / opponent teams
 
 - Do not use the Game Plan UI.
-- At game time, computer teams derive settings via `TeamManager` (`_compute_strategic_strategy_settings()` or weighted random defaults) when not the user team. See `Computer_Team_Game_Init_System.md`.
+- At game time, computer teams derive settings via `TeamManager` (`_compute_strategic_strategy_settings(game_state)` or weighted random defaults) when not the user team. CPU `tempo` is situational in Q4+ when autoset receives live score/clock. See `Computer_Team_Game_Init_System.md` and `Game_Init_System.md` § Computer Team Strategy Logic.
 
 ---
 
@@ -264,6 +289,8 @@ Full persistence flows, pitfalls, and timeout behavior: `../01_Data_Persistence/
 | Setting | Primary runtime use |
 |---------|---------------------|
 | `offense`, `inside`, `attack`, `outside` | Motion vs set-play choice and set-play focus (`turn_manager.py` / Sim Playcalling) |
+| `tempo` | Offensive possession tempo roll → `tempo_call` → clock time / pacing (`STRATEGY_CALL_DICTS`, `get_time_elapsed`) |
+| `alterations` | CPU: refreshed at breaks via weighted center-2 roll; user: persisted from Game Plan. **Gameplay consumption not wired yet.** |
 | `defense` | Man vs zone tendency; specific scheme from `playbook_settings` when zone/man chosen |
 | `fast_breaks` | Fast-break opportunity rate (`Fast_Break_System.md`) |
 | `fc_press`, `hc_trap` | Press / half-court trap frequency (`FCP_System.md`, HCT systems) |
@@ -274,22 +301,20 @@ Playbook **which play** is chosen still comes from `playbook_settings` percentag
 
 ---
 
+## FTD backfill — `alterations`
+
+Existing FTD documents need `strategy_settings.alterations: 2`. Script:
+
+```bash
+python scripts/backfill_ftd_strategy_alterations.py --dry-run
+python scripts/backfill_ftd_strategy_alterations.py --db gob-staging
+python scripts/backfill_ftd_strategy_alterations.py --db gob
+```
+
+New franchise season init includes `alterations: 2` via `franchise_manager.py` and `get_default_settings()`.
+
+---
+
 ## Migration note
 
 This document supersedes `docs/GMO_&_GP_Supporting_Systems/game_plan_screen.md` as the canonical Game Plan reference in `_documentation_master`.
-
-**Update To Game Plan Screen**
-Step 1: add a new field to every FTD strategy_settings titled "alterations". We'll also need to write and run a script to add this new field to all FTD documents in the gob and gob-staging databases. Set all defaults to 2. 
-
-Step 2: Update the gameplan.html screen
-1. Move the Fast Breaks slider to the right column, sitting below the Full-Court Press slider and above the Offensive Rebounding Slider
-2. In the left column, place a slider under the Outside Offense slider, place a new slider with teh following info
-    - Title: "Offense Tempo"
-    - Slider copy: left toggle: "Slow", middle toggle: "Normal", right toggle: "Fast"
-    - Wiring: wire it to set the user team's "tempo" in the strategy_settings of the team's FTD document
-3. Place a slider below the "Offense Tempo" slider with following info:
-    - Title: "Play Alteration"
-    - Slider copy: left toggle: "Least", middle toggle: "Normal", right toggle: "Most"
-    - Wiring: wire it to set the team's "alteration" in the strategy_settings field
-
-Step 3: update the Game_Plan_System.md doc with this new and current info.
