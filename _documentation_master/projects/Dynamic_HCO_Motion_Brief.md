@@ -142,7 +142,10 @@
 
 **Spot Classifications For Shot Type**
 - Inside Spots: lower/upper lowPost, lower/upper midPost, midLane, basketSpot — plus the geometric area bounded by these (extending to the baseline along the upper lowPost → basketSpot → lower lowPost line), including grid spots within that area
-- Outside Spots / Attack Spots: any non-inside spot (named spots and grid spots outside the inside area above)
+- Outside Spots normal tempo: game seconds elapsed = random.randint(3,5)
+    - offense fast tempo: game seconds elapsed = random.randint(2,4)
+- advence trigger for subtle movement steps will be the floor being reached, no player's movements
+- each non bh offender/ Attack Spots: any non-inside spot (named spots and grid spots outside the inside area above)
 
 **Hot Reads exist at a step if...**
 - A player with a shot type = true is placed at a spot within that shot type area
@@ -156,3 +159,68 @@
 - shot attempt resolution: use the same shot resolutio logic, including use of tempo modifier, as is detailed above for normal HCO skeleton steps.
     - if the ball hanlder does not choose to shoot, he will then choose to pass to a teammate within 20 euclidian grid spots of him (80%) or hold the ball in place (20%). 
     - if no teammate is within 20 euclidian grid spots, he'll shoot, choosing Inside/Attack/Outside via the same logic as above.
+
+---
+
+## Tunable Constants
+
+Live values in `BackEnd/engine/motion_step_decision.py`. `aggr(±x)` = add `+x` if the team's aggression call is aggressive, `-x` if passive, `0` if normal. All probabilities are per-step.
+
+**Read routing — decides which branch fires (line refs in `decide_step_action`)**
+
+| Constant | Where | Value | What it does |
+|---|---|---|---|
+| `DESPERATION_OFFENSE_CEILING` | L29 | `110` | Offense_score below this enables the shot-clock desperation pre-check; at/above it, skip straight to the read. |
+| Desperation shot-clock multiplier | L235 | `tempo based - see below` | Forces a shot when `d100 + tempo > 4 × shot_clock_remaining` (lower = forces earlier). |
+    - offense slow tempo | `3×` |
+    - offense normal tempo | `4×` |
+    - offense fast tempo | `5×` |
+| `TEMPO_MOD` | L31 | `slow −25 / normal 0 / fast +25` | Added to the desperation roll so faster tempo forces shots sooner. |
+| Offense-wins margin | L248 | `def_eff + def_chem` | Offense wins the read (hot-read branch) only if `offense_score` beats `defense_score` by more than this. |
+| Defense-wins margin | L250 | `off_eff + off_chem` | Defense wins the read (disruption branch) only if `defense_score` beats `offense_score` by more than this; otherwise neutral. |
+
+**Branch probabilities — the direct subtle-movement dials**
+
+| Constant | Where | Value | What it does |
+|---|---|---|---|
+| Desperation BH-shoot share | L110 | `0.75` | On a forced possession, chance the ball handler shoots himself vs kicking out to a teammate (`0.25`). |
+| Hot-read execute % | L147 | `0.50 + aggr(±0.20)` | When offense wins the read, chance it actually executes the hot read vs advancing to the next skeleton step. |
+| Disruption Freelance-Forced % | L167 | `0.20 + aggr(±0.10)` | When defense wins the read, chance the possession breaks into forced freelance. |
+| Disruption none % | L168 | `0.30 + aggr(∓0.10)` | When defense wins the read, chance nothing happens and play advances to the next step. |
+| **Disruption subtle %** | L170 | remainder ≈ `0.50` | When defense wins the read, chance the ball handler does a subtle movement (whatever's left after FF + none). |
+| Neutral pass-immediate % | L180 | `0.50 + off_aggr(±0.20) + def_aggr(∓0.20)`, clamped `[0.10, 0.90]` | When neither side wins the read, chance the ball handler passes immediately vs doing a subtle movement. |
+| **Neutral subtle %** | L184 | remainder of pass % | When neither side wins the read, chance the ball handler does a subtle movement. |
+| `KICKOUT_MAX_DIST` | L30 | `10` | Max euclidean grid distance for a desperation kick-out target. |
+
+The two bolded rows are the actual "do a subtle movement" probabilities; the `±0.20` / `±0.10` aggression deltas and the `[0.10, 0.90]` clamp are also dials. Update this table whenever the code values change.
+
+**Subtle-step execution dials (Updated Subtle Movement Logic — IMPLEMENTED)**
+
+Once the BH commits to a subtle movement, these govern who moves, how long the step takes, and the shot-clock backstop. Constants in `motion_step_decision.py`.
+
+| Constant | Value | What it does |
+|---|---|---|
+| `MOTION_READ_THRESHOLD` | `110` | Single shared read threshold: a `(player_read_raw + team_eff) * d6` read clears when `> 110`. Used by the per-teammate offense read, the per-defender read, and the desperation ceiling. |
+| `SUBTLE_STEP_ELAPSED_BY_TEMPO` | `slow (4,5) / normal (3,5) / fast (2,4)` | Game-seconds elapsed floor for a subtle step by offense tempo (the emitter honors it; the slowest mover's natural travel can exceed it). Replaces the old `~0.5s` floor for subtle beats. |
+| `SUBTLE_FORCED_SHOT_PENALTY` | `50` | Subtracted from `shot_score` when the BH is forced to shoot because the subtle step ran the shot clock to expiry. |
+
+Removed: `NON_BH_MOVE_PROB` (the old flat 50% teammate coin flip) — teammates now gate on the offense read.
+
+
+## Updated Subtle Movement Logic (IMPLEMENTED)
+
+Triggered once the BH commits to a subtle movement (the BH-level decision in `decide_step_action` is unchanged). `read = (player_read_raw + team_eff) * randint(1,6)`; clears at `> MOTION_READ_THRESHOLD` (110). `player_read_raw = IQ*0.8 + CH*0.2`.
+
+**Offense** — `build_subtle_beat` (`motion_subtle.py`):
+- BH always moves (he chose it). Each non-BH teammate makes his own read with the offense team's `offensive_efficiency`; clears the threshold AND has an applicable move → he relocates, else holds. (Replaces the old flat 50% coin flip — smart teams move together, weak readers are hit-and-miss.)
+- Step elapsed = a tempo floor (`SUBTLE_STEP_ELAPSED_BY_TEMPO`) the emitter honors, so the deliberate pace costs real game/shot clock.
+
+**Defense** — read rolled in the resolver (`_roll_subtle_defender_reads`), applied geometrically in the animator (`_subtle_defender_should_freeze`, man + zone loops):
+- Each defender (incl. the BH defender) reads with the defense team's `defensive_efficiency`. Clears → he tracks his man's new spot; fails → he **freezes** at his prior coords (disengaging auto-tracking — this is what opens the space). If his guarded man didn't move, he holds regardless of the read.
+- Anchor (who he's guarding): man = matchup; zone = the per-step assignment `game.zone_defender_assignments_by_step` (`defender_to_offensive_player`, which always assigns one offender — falls back to the BH). On the next skeleton step the zone defender reverts to zone positioning automatically (stateless, recomputed per step).
+
+**Shot-clock backstop** — if finishing a subtle beat would leave `< 1s`, the BH (still holding) is forced to shoot at the 1-second mark: Inside if at an inside location, else Outside (no time for an attack drive), with a `SUBTLE_FORCED_SHOT_PENALTY` (−50) to `shot_score`. The resolver tracks a running shot-clock estimate (subtle floors exact + per-skeleton-step travel estimate); the emitter remains the authoritative timer.
+
+**Stopping actions (G3):** the subtle beat carries an `events` list and the resolver can terminate the walk on a subtle step (the forced shot is the first such case) — structurally ready for fouls/turnovers/quick-shots later.
+
+**Verified — does a frozen defender organically create offense opportunity?** Yes, strongest on attack shots: contest is geometric (`uncontested = len(_guardians_within_radius(shooter_coords, defender_end_coords)) == 0`, `attack_drive_clearance.py`), so a held defender drops out of the contest radius → uncontested → higher shoot-prob/score; pass openness is distance-based the same way. Caveat: plain named-spot inside/outside shots may score contest from the assigned defender's attributes rather than exact distance, so the spacing payoff there is weaker until those are routed through the geometry contest too.

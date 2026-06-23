@@ -1331,10 +1331,20 @@ def build_skeleton_animation_steps(
         # Shot steps should release as soon as the shooter reaches the shot
         # spot. Applying the generic HCO floor here creates visible dead-air
         # between the shooter settling and the [ball_flight] sub-step.
+        # A source step may carry an explicit elapsed FLOOR (Dynamic HCO subtle beats set a
+        # tempo-based floor so the deliberate "feeling-out" pace consumes real game/shot clock;
+        # a shot-clock-expiry forced shot sets it to the time down to 1s). Honor it over the
+        # generic HCO floor; the slowest mover's natural travel can still exceed it.
+        step_floor = (
+            skeleton_steps[i].get("_step_t_floor_game_seconds")
+            if i < len(skeleton_steps) else None
+        )
         if gate_kind == "shooter" and not is_pass_step:
             t = max(0.05, natural_t)
         elif gate_kind == "attack_drive_driver" and not is_pass_step:
             t = max(0.05, natural_t)
+        elif step_floor is not None:
+            t = max(float(step_floor), natural_t, ball_pass_t)
         else:
             t = max(HCO_STEP_T_FLOOR_GAME_SECONDS, natural_t, ball_pass_t)
 

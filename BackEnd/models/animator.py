@@ -51,6 +51,21 @@ def _attack_drive_defender_override(skeleton_step, def_pos):
     return overrides.get(def_pos)
 
 
+def _subtle_defender_should_freeze(skeleton_step, def_pos, anchor_off_pos):
+    """Dynamic HCO subtle beat: should this defender FREEZE (hold prior coords) instead of
+    tracking his man? Returns False for non-subtle steps. On a subtle beat he freezes when
+    his guarded man did NOT move, OR when he failed his per-defender read (brief: Updated
+    Subtle Movement Logic — Defense Behavior). The read outcome is rolled in the resolver and
+    rides on the beat (``_subtle_movement.defender_reads``); the man-moved check is geometric
+    here. Works for man (anchor = matchup) and zone (anchor = assigned zone offender)."""
+    sm = skeleton_step.get("_subtle_movement") if skeleton_step else None
+    if not sm:
+        return False
+    anchor_moved = anchor_off_pos in (sm.get("movers") or [])
+    read_follows = (sm.get("defender_reads") or {}).get(def_pos, True)
+    return (not anchor_moved) or (not read_follows)
+
+
 class Animator:
     def __init__(self, game):
         self.game = game
@@ -1933,9 +1948,24 @@ class Animator:
                 
                 if step_index == 0:
                     def_start = def_coords
-                
+
+                # Dynamic HCO subtle beat (zone): treat the defender's already-assigned zone
+                # offender as "his man" for this step and apply the same read/freeze as man D.
+                # Anchor = this step's zone assignment (defender_pos → offender player_id).
+                skeleton_step_obj = skeleton_steps[step_index] if step_index < len(skeleton_steps) else None
+                if skeleton_step_obj and skeleton_step_obj.get("_subtle_movement") and def_movement:
+                    assigns = getattr(self.game, "zone_defender_assignments_by_step", {}).get(step_index, {})
+                    anchor_id = assigns.get(def_pos)
+                    anchor_off_pos = None
+                    for _opos, _opl in (self.game.offense_team.lineup or {}).items():
+                        if _opl is not None and getattr(_opl, "player_id", None) == anchor_id:
+                            anchor_off_pos = _opos
+                            break
+                    if _subtle_defender_should_freeze(skeleton_step_obj, def_pos, anchor_off_pos):
+                        def_coords = dict(def_movement[-1]["coords"])
+
                 def_end = def_coords
-                
+
                 # Determine action (guard_ball if ball handler in zone, otherwise guard_offball)
                 zone_coords = zone_boundaries.get(def_pos, [])
                 action = "guard_offball"
@@ -2171,7 +2201,15 @@ class Animator:
                             ball_spot=bh_spot  # Pass ball handler's spot for non-BH defender logic
                         )
                     # For BH defenders, get_defender_coords already returns correct orientation
-                    
+
+                    # Dynamic HCO subtle beat: a defender who didn't make the read (or whose man
+                    # held) freezes at his prior coords instead of tracking — this is what opens
+                    # the space the offense is testing for.
+                    if def_movement and _subtle_defender_should_freeze(
+                        skeleton_step, def_pos, off_pos_to_guard
+                    ):
+                        def_coords = dict(def_movement[-1]["coords"])
+
                     def_end = def_coords
                     def_movement.append({
                         "timestamp": timestamp,

@@ -4522,6 +4522,45 @@ def _motion_bh_at_step(step):
     return None, None
 
 
+def _estimate_step_game_seconds(prev_step, step, off_lineup, is_away_offense):
+    """Approximate the game-seconds a skeleton step consumes = the slowest offensive mover's
+    grid travel at HCO cruise pace, floored at HCO_STEP_T_FLOOR. Used only by the dynamic
+    resolver to track a running shot-clock estimate for the subtle forced-shot backstop (the
+    emitter remains the authoritative timer); subtle beats use their explicit tempo floor."""
+    import math as _math
+    from BackEnd.engine.motion_subtle import _coords_for
+    from BackEnd.constants import CRUISE_GRID_PER_GAME_SEC, HCO_STEP_T_FLOOR_GAME_SECONDS
+    prev_pa = prev_step.get("pos_actions") or {}
+    cur_pa = step.get("pos_actions") or {}
+    max_t = 0.0
+    for pos in off_lineup:
+        if not off_lineup.get(pos):
+            continue
+        p, c = prev_pa.get(pos), cur_pa.get(pos)
+        if not p or not c:
+            continue
+        pc, cc = _coords_for(p, is_away_offense), _coords_for(c, is_away_offense)
+        t = _math.hypot(cc["x"] - pc["x"], cc["y"] - pc["y"]) / float(CRUISE_GRID_PER_GAME_SEC)
+        max_t = max(max_t, t)
+    return max(float(HCO_STEP_T_FLOOR_GAME_SECONDS), max_t)
+
+
+def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
+    """Per-defender subtle read (incl. the BH defender): ``(player_read_raw + def_eff) * d6``.
+    Returns {def_pos: follows_bool} — True = the defender made the read to move with his man;
+    False = he freezes (the animator applies this against the beat, creating space). The
+    geometric "did my man actually move?" gate is applied in the animator, not here."""
+    from BackEnd.utils.shared import player_read_raw
+    from BackEnd.engine.motion_step_decision import MOTION_READ_THRESHOLD
+    reads = {}
+    for def_pos, defender in (def_lineup or {}).items():
+        if not defender:
+            continue
+        score = (player_read_raw(defender) + def_eff) * rng.randint(1, 6)
+        reads[def_pos] = bool(score > MOTION_READ_THRESHOLD)
+    return reads
+
+
 def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
     """
     Brief Steps 1–2: build the read map, then walk the skeleton making per-step decisions.
@@ -4540,6 +4579,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     from BackEnd.engine.motion_step_decision import (
         decide_step_action, _choose_attack_or_outside,
         SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT, SUBTLE_MOVEMENT, FREELANCE_FORCED,
+        SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY,
     )
     from BackEnd.engine.motion_subtle import build_subtle_beat
     from BackEnd.utils.defense_utils import is_zone_defense
@@ -4566,8 +4606,15 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
 
     shot_actions = {SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT}
 
+    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
+    def_team = game.defense_team
+    def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
+    tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
+    shot_clock_est = float(game_state.get("shot_clock_remaining", 30) or 30)
+
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
+        shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
         output_steps.append(steps[i])  # players arrive at skeleton step i
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
@@ -4582,9 +4629,35 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                 game, off_lineup, def_lineup, is_away_offense,
             )
         if action == SUBTLE_MOVEMENT:
-            beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random)
-            if beat is not None:
+            beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random, off_eff)
+            if beat is None:
+                continue
+            # Per-defender reads (man + zone, applied in the animator) ride on the beat.
+            beat["_subtle_movement"]["defender_reads"] = _roll_subtle_defender_reads(
+                def_lineup, def_eff, random
+            )
+            lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
+            elapsed = float(random.randint(lo, hi))
+            # Shot-clock expiry backstop: if finishing this beat would leave < 1s, the BH (still
+            # holding) is forced to shoot at the 1-second mark with a hard shot_score penalty.
+            # Inside if he's at an inside location, else Outside (no time for an attack drive).
+            if shot_clock_est - elapsed < 1.0:
+                beat["_step_t_floor_game_seconds"] = max(0.0, shot_clock_est - 1.0)
                 output_steps.append(beat)
+                shot_type = "inside" if _is_inside_location(bh_location) else "outside"
+                forced = {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": shot_type}
+                logging.warning(
+                    f"⏱️ [SUBTLE FORCED SHOT] shot clock expiring → {bh_pos} forced {shot_type} "
+                    f"shot (-{SUBTLE_FORCED_SHOT_PENALTY})"
+                )
+                return _execute_motion_decision(
+                    skeleton, output_steps, steps[i], bh_pos, bh_location, forced,
+                    game, off_lineup, def_lineup, is_away_offense,
+                    forced_shot_penalty=SUBTLE_FORCED_SHOT_PENALTY,
+                )
+            beat["_step_t_floor_game_seconds"] = elapsed
+            shot_clock_est -= elapsed
+            output_steps.append(beat)
         elif action == FREELANCE_FORCED:
             # Leave the skeleton and run the freelance progression to a shot.
             return _resolve_freelance(
@@ -4607,7 +4680,8 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
 
 
 def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_location, decision,
-                             game, off_lineup, def_lineup, is_away_offense):
+                             game, off_lineup, def_lineup, is_away_offense,
+                             forced_shot_penalty=0.0):
     """
     Map a shot Decision onto base_steps + appended shot steps, reusing the existing builders.
 
@@ -4667,6 +4741,7 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
         "shot_type": shot_type,
         "playcall": playcall_override or _playcall_map.get(shot_type, "Inside"),
         "attack_penalty": attack_penalty,
+        "forced_shot_penalty": float(forced_shot_penalty or 0.0),
     }
     if drive_result is not None:
         result.update({
@@ -5785,7 +5860,11 @@ def resolve_half_court_offense_logic(game):
             roles["shooter_location"] = motion_shot_info["shooter_location"]
             roles["motion_shot_type"] = motion_shot_info["shot_type"]
             roles["motion_playcall"] = motion_shot_info["playcall"]
-            roles["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
+            # attack_penalty (attack drives) + forced_shot_penalty (subtle shot-clock-expiry
+            # forced shot) both subtract from shot_score via shot_manager's motion penalty path.
+            roles["motion_attack_penalty"] = (
+                motion_shot_info["attack_penalty"] + motion_shot_info.get("forced_shot_penalty", 0)
+            )
             if motion_shot_info.get("motion_attack_geometry_contest"):
                 roles["motion_attack_geometry_contest"] = True
             if motion_shot_info.get("motion_attack_uncontested"):

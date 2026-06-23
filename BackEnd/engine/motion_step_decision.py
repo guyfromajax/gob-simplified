@@ -26,9 +26,19 @@ FREELANCE_FORCED = "FREELANCE_FORCED"
 PASS_IMMEDIATE = "PASS_IMMEDIATE"
 
 # --- tunables (brief) ---
-DESPERATION_OFFENSE_CEILING = 110    # offense_score below this triggers the shot-clock pre-check
+# Single shared read threshold (brief: "one constant"): a `(read_raw + team_eff) * d6` read
+# clears it when > MOTION_READ_THRESHOLD. Used by the desperation ceiling, the per-teammate
+# offense subtle read (motion_subtle), and the per-defender subtle read.
+MOTION_READ_THRESHOLD = 110
+DESPERATION_OFFENSE_CEILING = MOTION_READ_THRESHOLD  # offense_score below this triggers the shot-clock pre-check
 KICKOUT_MAX_DIST = 10                # euclidean grid spots for the 25% desperation kick-out
 TEMPO_MOD = {"slow": -25, "normal": 0, "fast": 25}
+# Subtle-movement step elapsed (game seconds) by offense tempo — a FLOOR the emitter honors
+# (brief: Updated Subtle Movement Logic). The slowest mover's natural travel can exceed it.
+SUBTLE_STEP_ELAPSED_BY_TEMPO = {"slow": (4, 5), "normal": (3, 5), "fast": (2, 4)}
+# Hard penalty applied to shot_score when the BH is forced to shoot because a subtle step
+# ran the shot clock to expiry (brief: force a shot with 1s left, -50 to shot score).
+SUBTLE_FORCED_SHOT_PENALTY = 50
 
 
 # --------------------------------------------------------------------------- #

@@ -134,7 +134,7 @@ Press breaks favor **passing** unless the ball handler is an elite dribbler. FCP
 
 | Constant | HCT | FCP |
 |----------|-----|-----|
-| Strong-handler sum | `BH + AG > 80` | `BH + AG > 140` |
+| Strong-handler sum | `BH + AG > 80` | `BH + AG > 130` |
 
 **Strong handler** (above the active sum): high read → **attack**, mid read → **pass**.  
 **Weak handler** (at or below the sum): mapping is **inverted** — high read → **pass**, mid read → **attack**.
@@ -199,7 +199,7 @@ When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, 
 
 #### Tests
 
-- `tests/test_fcp_read_decision.py` — FCP strong-handler sum (140) and low-tier weights.
+- `tests/test_fcp_read_decision.py` — FCP strong-handler sum (130) and low-tier weights.
 - `tests/test_fcp_offball_attack.py` — tier boundaries at 34 / 50 / 51 and backcourt release lane.
 - `tests/test_fcp_pf_c_zone.py` — zone geometry, anchor ladder, BH x≥64 man release.
 

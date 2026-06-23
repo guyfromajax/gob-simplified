@@ -5,8 +5,9 @@ from BackEnd.engine.attack_drive_clearance import _spot_display_coords, _basket_
 
 
 class _FakePlayer:
-    def __init__(self, pid):
+    def __init__(self, pid, attributes=None):
         self.player_id = pid
+        self.attributes = attributes or {}
 
 
 class FakeRng:
@@ -107,9 +108,9 @@ def test_bh_side_dribble_unavailable_inside():
 # ---------------------------------------------------------------- non-BH moves (4b)
 
 def test_non_bh_inside_player_flashes_to_inside_target():
-    # C at basketSpot (inside); random_val 0 → moves; choice 0 → flash; first free target = midLane.
+    # C at basketSpot (inside); off_eff 100 → read clears so C moves; choice 0 → flash → midLane.
     beat = build_subtle_beat(_step({"PG": "key", "C": "basketSpot"}), _lineup("PG", "C"),
-                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0, random_val=0.0))
+                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0), off_eff=100)
     c = beat["pos_actions"]["C"]
     assert c["action"] == "cut"
     mx, my = _disp("midLane")
@@ -118,9 +119,9 @@ def test_non_bh_inside_player_flashes_to_inside_target():
 
 
 def test_non_bh_outside_player_slides_to_open_neighbor():
-    # SG at upper wing (perimeter); choice 0 → slide; first neighbor = upper midWing.
+    # SG at upper wing (perimeter); off_eff 100 → read clears; choice 0 → slide → upper midWing.
     beat = build_subtle_beat(_step({"PG": "key", "SG": "upper wing"}), _lineup("PG", "SG"),
-                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0, random_val=0.0))
+                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0), off_eff=100)
     sg = beat["pos_actions"]["SG"]
     assert sg["action"] == "cut"
     wx, wy = _disp("upper midWing")
@@ -133,6 +134,34 @@ def test_non_bh_holds_when_gate_high():
     sg = beat["pos_actions"]["SG"]
     wx, wy = _disp("upper wing")
     assert sg["action"] == "stationary" and sg["coords"]["x"] == wx and sg["coords"]["y"] == wy
+
+
+# ---------------------------------------------------------------- per-teammate read gate
+
+def test_non_bh_read_smart_player_moves():
+    # High-read SG: (IQ*0.8+CH*0.2=90 + off_eff 0) * d6(3) = 270 > 110 → moves.
+    off = {"PG": _FakePlayer("pg"), "SG": _FakePlayer("sg", {"IQ": 90, "CH": 90})}
+    beat = build_subtle_beat(_step({"PG": "key", "SG": "upper wing"}), off,
+                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0, randint_val=3))
+    assert beat["pos_actions"]["SG"]["action"] == "cut"
+    assert "SG" in beat["_subtle_movement"]["movers"]
+
+
+def test_non_bh_read_dumb_player_holds():
+    # Low-read SG: (read 8 + off_eff 0) * d6(3) = 24 < 110 → holds despite being eligible to move.
+    off = {"PG": _FakePlayer("pg"), "SG": _FakePlayer("sg", {"IQ": 10, "CH": 0})}
+    beat = build_subtle_beat(_step({"PG": "key", "SG": "upper wing"}), off,
+                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0, randint_val=3))
+    assert beat["pos_actions"]["SG"]["action"] == "stationary"
+    assert "SG" not in beat["_subtle_movement"]["movers"]
+
+
+def test_off_eff_lifts_weak_readers_over_threshold():
+    # Same weak reader, but a strong team off_eff pushes the read over the line: (8+40)*3=144 > 110.
+    off = {"PG": _FakePlayer("pg"), "SG": _FakePlayer("sg", {"IQ": 10, "CH": 0})}
+    beat = build_subtle_beat(_step({"PG": "key", "SG": "upper wing"}), off,
+                             "PG", is_away_offense=False, rng=FakeRng(choice_idx=0, randint_val=3), off_eff=40)
+    assert beat["pos_actions"]["SG"]["action"] == "cut"
 
 
 # ---------------------------------------------------------------- shape / UESS

@@ -225,7 +225,7 @@ _documentation_master/06_Gameplay_Systems/FCP_System.md  # post-ship operational
 | Pass contest lanes | `pass_contest.py` | Same API; may tune `PASS_LANE_DIST`, safety base |
 | Drive cutoff race | `cutoff_resolution.py` | Relevant if press break includes drive-to-rim / transition shot |
 | Moment radius | `MOMENT_RANGE = 11` | **Locked: same 11** for PR1 |
-| BH read thresholds | `player_read` + dynamic BH/AG gates | Same table or FCP-specific? |
+| BH read thresholds | `player_read` + dynamic BH/AG gates | **FCP-specific:** strong-handler sum **130** (HCT 80); low-tier 50/35/15 hold/pass/attack |
 | Defender motion | `_move_defense`, AG rates, PF/C sprint | Same; targets come from `FCPPlay.defense_targets` |
 | Pass receiver selection | `_select_pass_receiver` + backcourt guard | **Extend** for full-court outlet logic (PF/C already upcourt) |
 | Step emitter pattern | `dynamic_hct_step_emitter.py` | New module; same segment/tween contract |

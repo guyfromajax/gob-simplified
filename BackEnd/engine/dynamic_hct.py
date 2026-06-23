@@ -186,7 +186,7 @@ READ_LOW_TIER_CHOICES = ("hold", "hold", "attack", "pass")
 
 # FCP §4: press breaks favor passing unless the BH is an elite dribbler; only
 # BH+AG above this sum may attack on a strong read (HCT keeps 80).
-FCP_READ_STRONG_HANDLER_SUM = 140
+FCP_READ_STRONG_HANDLER_SUM = 130
 # FCP low tier: 50% hold, 35% pass, 15% attack.
 FCP_READ_LOW_TIER_CHOICES = ("hold",) * 10 + ("pass",) * 7 + ("attack",) * 3
 
@@ -529,7 +529,7 @@ def _read_decision(
         high read (``>= attack_t``) kicks it out (pass); a mid read (``> pass_t``)
         forces a drive (attack).
 
-    ``fcp=True`` uses ``FCP_READ_STRONG_HANDLER_SUM`` (140) and
+    ``fcp=True`` uses ``FCP_READ_STRONG_HANDLER_SUM`` (130) and
     ``FCP_READ_LOW_TIER_CHOICES`` (50% hold / 35% pass / 15% attack).
 
     ``broken=True`` applies the §5 reduced (open-floor) thresholds for BOTH

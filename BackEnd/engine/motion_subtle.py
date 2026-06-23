@@ -12,8 +12,9 @@ The beat is a normal coord-based skeleton step → the existing UESS emitter sta
 every required field. The ball stays with the BH via his ``handle_ball`` action
 (skeleton_step_emitter._walk_ball_owners). Coords are display-space.
 
-Scope: positional micro-moves only. Selection (which moves, which non-BH players)
-is random for now (per brief decision). DEFERRED — the two ball-transfer non-BH
+Scope: positional micro-moves only. Which non-BH players relocate is gated by a per-teammate
+attribute read (see ``build_subtle_beat``); the specific move category is still chosen at
+random within what's applicable to each player's location. DEFERRED — the two ball-transfer non-BH
 variants ("flash to receive a quick pass and shoot" and "cut to the basket and
 receive a pass from the BH"): those transfer possession / can terminate in a shot,
 so they belong with the hot-read/decision machinery, not the positional beat.
@@ -31,8 +32,6 @@ BH_SUBTLE_MOVES = ("in_place", "back", "in")
 SUBTLE_ARCHETYPE = "drift"
 # Inside "flash" targets (brief: lowPost players flash to midLane / a midPost / a highPost).
 _INSIDE_FLASH_BASE = ("midLane",)
-# Probability a given non-BH player relocates during the beat (random for now).
-NON_BH_MOVE_PROB = 0.5
 
 
 def _norm(loc):
@@ -131,12 +130,20 @@ def _non_bh_target(loc, xy, occupied, is_away_offense, rng):
     return _radial_nudge(xy, basket, toward=False, amt=rng.randint(2, 5))
 
 
-def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng):
+def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng, off_eff=0):
     """
     Build a coord-based subtle-movement beat (BH nudges off pattern; some non-BH relocate;
     the rest hold), or None if the step can't support one. Carries explicit display coords
     for all five offensive players; the BH keeps the ball via its ``handle_ball`` action.
+
+    Each non-BH teammate makes his own read — ``(player_read_raw + off_eff) * d6`` — and only
+    relocates (when a move is applicable) if it clears ``MOTION_READ_THRESHOLD`` (brief: Updated
+    Subtle Movement Logic; replaces the old flat 50% coin flip). The BH always moves (he chose
+    the subtle movement). ``off_eff`` = offense team offensive_efficiency.
     """
+    from BackEnd.utils.shared import player_read_raw
+    from BackEnd.engine.motion_step_decision import MOTION_READ_THRESHOLD
+
     pos_actions = step.get("pos_actions") or {}
     coords_by_pos, loc_by_pos = {}, {}
     for pos in off_lineup:
@@ -161,7 +168,10 @@ def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng):
         if pos == bh_pos:
             continue
         moved = False
-        if rng.random() < NON_BH_MOVE_PROB:
+        # Per-teammate read: smart players almost always make the (correct) read to move;
+        # the d6 makes weaker readers hit-and-miss (brief G2).
+        read = (player_read_raw(off_lineup.get(pos)) + off_eff) * rng.randint(1, 6)
+        if read > MOTION_READ_THRESHOLD:
             occupied = {_norm(l) for q, l in loc_by_pos.items() if q != pos and l}
             target = _non_bh_target(loc_by_pos.get(pos, ""), xy, occupied, is_away_offense, rng)
             if target:
