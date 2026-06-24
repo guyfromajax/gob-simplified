@@ -796,7 +796,9 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
             "is_final": {"$ne": True},
             "$or": [
                 {"home_team_id": home_id, "away_team_id": away_id},
+                {"home_team_id": away_id, "away_team_id": home_id},
                 {"team1_id": away_id, "team2_id": home_id},
+                {"team1_id": home_id, "team2_id": away_id},
             ],
         },
         sort=[("_id", -1)],
@@ -827,7 +829,6 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         or home_score != 0
         or away_score != 0
         or bool(game_doc.get("opening_tip_winner"))
-        or bool(game_doc.get("turns"))
     )
     if not has_started:
         return None

@@ -269,6 +269,7 @@ Initial implementation added:
 - Mode Select resume card inside the existing active franchise card.
 - Mode Select active-game routing to `court.html` instead of direct FCC entry.
 - Court resume modal using the existing pre-game modal visual language.
+- Direct `court.html` refresh detection for active games with `game_id`.
 - `GameScene` active-resume path that reads `/api/game/{game_id}?source=db` instead of calling `/api/simulate-quarter`.
 
 Current limitation:

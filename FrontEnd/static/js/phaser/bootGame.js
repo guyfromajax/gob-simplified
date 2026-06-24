@@ -2672,7 +2672,23 @@ async function initGame() {
   // 3. If it's truly a timeout resume, the helper should have set it to 'true'
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
-  const activeResume = urlParams.get('active_resume') === 'true';
+  let activeResume = urlParams.get('active_resume') === 'true';
+  let resumeState = null;
+  if (gameId && !resumeFromTimeout) {
+    try {
+      const resumeStateResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
+        headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+      });
+      if (resumeStateResponse.ok) {
+        resumeState = await resumeStateResponse.json();
+        if (resumeState && resumeState.status === 'active_mid_quarter') {
+          activeResume = true;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ [COURT RESUME] Could not check resume-state:', error);
+    }
+  }
   
   // ✅ CRITICAL FIX: Explicitly control pre-game container visibility
   // Rule: Show pre-game container UNLESS we're resuming from timeout or foul out
@@ -2692,39 +2708,57 @@ async function initGame() {
   }
   if (resumeGameContainer) {
     if (activeResume && gameId) {
-      const period = urlParams.get('period') || (quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`);
-      const clock = urlParams.get('clock') || '';
+      const resumeQuarter = Number(resumeState && resumeState.quarter) || quarter;
+      const period = urlParams.get('period') || (resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`);
+      const clock = (resumeState && resumeState.clock) || urlParams.get('clock') || '';
+      const cached = !!(resumeState && resumeState.has_cached_game);
       if (resumeGameSubtitle) {
-        resumeGameSubtitle.textContent = `Checking saved ${period}${clock ? ' · ' + clock : ''} state...`;
+        resumeGameSubtitle.textContent = cached
+          ? `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`
+          : `Checking saved ${period}${clock ? ' · ' + clock : ''} state...`;
       }
       resumeGameContainer.classList.remove('hidden');
-      fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
-        headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
-      })
-        .then((res) => res.ok ? res.json() : null)
-        .then((state) => {
-          const cached = !!(state && state.has_cached_game);
-          if (resumeGameSubtitle) {
-            if (cached) {
-              resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`;
-            } else {
-              resumeGameSubtitle.textContent = 'A saved checkpoint exists, but this server session needs cold rehydration before gameplay can resume.';
-            }
-          }
-          if (resumeGameButton && !cached) {
-            resumeGameButton.disabled = true;
-            resumeGameButton.textContent = 'Resume Unavailable';
-          }
+      if (!resumeState) {
+        fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
+          headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
         })
-        .catch(() => {
-          if (resumeGameSubtitle) {
-            resumeGameSubtitle.textContent = 'Could not verify the active game state. Return to Mode Select and try again.';
+          .then((res) => res.ok ? res.json() : null)
+          .then((state) => {
+            const cached = !!(state && state.has_cached_game);
+            if (resumeGameSubtitle) {
+              if (cached) {
+                resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`;
+              } else {
+                resumeGameSubtitle.textContent = 'A saved checkpoint exists, but this server session needs cold rehydration before gameplay can resume.';
+              }
+            }
+            if (resumeGameButton) {
+              resumeGameButton.disabled = !cached;
+              resumeGameButton.textContent = cached ? 'Resume Game' : 'Resume Unavailable';
+            }
+          })
+          .catch(() => {
+            if (resumeGameSubtitle) {
+              resumeGameSubtitle.textContent = 'Could not verify the active game state. Return to Mode Select and try again.';
+            }
+            if (resumeGameButton) {
+              resumeGameButton.disabled = true;
+              resumeGameButton.textContent = 'Resume Unavailable';
+            }
+          });
+      } else {
+        if (resumeGameSubtitle) {
+          if (cached) {
+            resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`;
+          } else {
+            resumeGameSubtitle.textContent = 'A saved checkpoint exists, but this server session needs cold rehydration before gameplay can resume.';
           }
-          if (resumeGameButton) {
-            resumeGameButton.disabled = true;
-            resumeGameButton.textContent = 'Resume Unavailable';
-          }
-        });
+        }
+        if (resumeGameButton) {
+          resumeGameButton.disabled = !cached;
+          resumeGameButton.textContent = cached ? 'Resume Game' : 'Resume Unavailable';
+        }
+      }
     } else {
       resumeGameContainer.classList.add('hidden');
     }

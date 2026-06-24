@@ -2312,7 +2312,6 @@ try:
             or home_score != 0
             or away_score != 0
             or bool(saved.get("opening_tip_winner"))
-            or bool(saved.get("turns"))
         )
         if is_final:
             status = "final"
