@@ -37,7 +37,7 @@ KICKOUT_MAX_DIST = 10                # euclidean grid spots for the 25% desperat
 TEMPO_MOD = {"slow": -25, "normal": 0, "fast": 25}
 # Subtle-movement step elapsed (game seconds) by offense tempo — a FLOOR the emitter honors
 # (brief: Updated Subtle Movement Logic). The slowest mover's natural travel can exceed it.
-SUBTLE_STEP_ELAPSED_BY_TEMPO = {"slow": (4, 5), "normal": (3, 5), "fast": (2, 4)}
+SUBTLE_STEP_ELAPSED_BY_TEMPO = {"slow": (3, 4), "normal": (2, 4), "fast": (2, 3)}
 # Hard penalty applied to shot_score when the BH is forced to shoot because a subtle step
 # ran the shot clock to expiry (brief: force a shot with 1s left, -50 to shot score).
 SUBTLE_FORCED_SHOT_PENALTY = 50

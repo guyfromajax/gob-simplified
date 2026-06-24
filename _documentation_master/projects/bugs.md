@@ -1,12 +1,11 @@
 
 ##End of Game / End of Quarter perfection
 6. Don't animate rebound / BIP on Final Shot FT
-18. Final Turn perfection (Run clock to 0:00 for Final Shot), airhorn on ending
 48. Double block announce on Final Shot
 49. No OREB putback attempts on missed final shot
-50. Consistently sound airhorn at EOQ
 42. Quick Foul bug, wrong team fouled
 43. Add a run out the clock animation
+44. Full court shots
 
 ##Bugs 
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
@@ -15,19 +14,17 @@
 39. Fix naming conventions for aggression/aggressiveness
 40. Audibles 3-ponit on a 2-point shot. Triangel Fast Break, shooter tarted at 3 point spot then did an attack shot driving to the basket.
 41. OREB kickout steps don't seem to be adhering to a speed archetype
+42. over and back fouls registering as 10 second vilations
+43. Fix final shot steup sppot coords
+44. Fix fianl shot UESs setup
 
 ##New Features
 24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
-25. Fast Break and P/T callouts in the Scouting Report of opponent
 28. Micro Movements
-29. EOG/EOQ Perfection
-101. Dynamic FCP Turns
-109. More dynamic HCO animations
+109. More dynamic HCO animations for Set Plays
 115. Better HCO steal/turnover logic
 103. Player images
 111. Marketing Screenshot Tool Build
-112. Add in-game points score callouts
-113. Tempo system and add to game plan screen
 
 ##Full Product Readiness
 102. Team court images
@@ -48,10 +45,12 @@
 3. Recruiting Round Up Results
 5. Add a new hire news story for user team
 6. Add a badass design appraoch to New Stories
+25. Fast Break and P/T callouts in the Scouting Report of opponent
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
 2. Advanced Topics tutorials
+3. Dynamic FCP Turns
 
 
 

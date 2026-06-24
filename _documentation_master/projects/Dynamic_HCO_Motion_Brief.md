@@ -142,8 +142,7 @@
 
 **Spot Classifications For Shot Type**
 - Inside Spots: lower/upper lowPost, lower/upper midPost, midLane, basketSpot — plus the geometric area bounded by these (extending to the baseline along the upper lowPost → basketSpot → lower lowPost line), including grid spots within that area
-- Outside Spots normal tempo: game seconds elapsed = random.randint(3,5)
-    - offense fast tempo: game seconds elapsed = random.randint(2,4)
+- Subtle-step elapsed by tempo (see `SUBTLE_STEP_ELAPSED_BY_TEMPO` / Tunable Constants for the live values): slow `randint(3,4)` / normal `randint(2,4)` / fast `randint(2,3)`
 - advence trigger for subtle movement steps will be the floor being reached, no player's movements
 - each non bh offender/ Attack Spots: any non-inside spot (named spots and grid spots outside the inside area above)
 
@@ -201,7 +200,7 @@ Once the BH commits to a subtle movement, these govern who moves, how long the s
 | Constant | Value | What it does |
 |---|---|---|
 | `MOTION_READ_THRESHOLD` | `110` | Single shared read threshold: a `(player_read_raw + team_eff) * d6` read clears when `> 110`. Used by the per-teammate offense read, the per-defender read, and the desperation ceiling. |
-| `SUBTLE_STEP_ELAPSED_BY_TEMPO` | `slow (4,5) / normal (3,5) / fast (2,4)` | Game-seconds elapsed floor for a subtle step by offense tempo (the emitter honors it; the slowest mover's natural travel can exceed it). Replaces the old `~0.5s` floor for subtle beats. |
+| `SUBTLE_STEP_ELAPSED_BY_TEMPO` | `slow (3,4) / normal (2,4) / fast (2,3)` | Game-seconds elapsed floor for a subtle step by offense tempo (the emitter honors it; the slowest mover's natural travel can exceed it). Replaces the old `~0.5s` floor for subtle beats. |
 | `SUBTLE_FORCED_SHOT_PENALTY` | `50` | Subtracted from `shot_score` when the BH is forced to shoot because the subtle step ran the shot clock to expiry. |
 
 Removed: `NON_BH_MOVE_PROB` (the old flat 50% teammate coin flip) — teammates now gate on the offense read.
