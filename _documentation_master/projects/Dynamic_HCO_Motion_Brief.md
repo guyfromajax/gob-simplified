@@ -320,4 +320,13 @@ Replaces HCO's up-front percentile tables (`STANDARD_D_FOUL`/`STEAL_ATTEMPT`/`DE
 
 **Sunset:** `resolve_hco_outcome` skips the up-front tables for motion turns when the flag is on (`skip_upfront_events`); set plays + flag-off keep them.
 
+**Steal / reach-in micro-movement (the "pressure moment" visual):** HCO uses a single on-ball
+defender, so it does NOT get FCP/HCT's multi-defender *converge* — it gets the **`reach_in`
+flourish** (one defender lunges at the ball + `click-steal.wav`). On a defender-reach outcome
+(`STEAL` / `DEAD_BALL_TURNOVER` / `D_FOUL`), the HCO non-shot block tags the stopper step with
+`reach_in_def_id` (the on-ball defender); `skeleton_step_emitter` stamps
+`step.start.flourish[id] = {kind:"reach_in", target:"ball"}` (mirrors the HCT emitter); the FE
+(`flourishes.js`) renders the lunge + plays the SFX. Pure render-space — never mutates gameplay
+coords (UESS-safe). `O_FOUL` (offensive/charge) is excluded.
+
 **v1 scope / deferred:** man defense only (zone has no clean 1:1 defender); the moment walk runs **before** shot resolution, so a moment pre-empts the would-be shot — true per-step interleaving with `should_shoot` is a later refinement (needs the late shot resolver, which must run after the shot-clock truncation). Pass interceptions (HCT `pass_contest`) and set-play moments also deferred. All behind `GOB_DYNAMIC_HCO_MOTION`. Tune frequency via `HCT_D8_GLOBAL_SCALAR` / `HCT_D8_DEF_WIN_BASE`.

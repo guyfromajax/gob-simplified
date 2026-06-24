@@ -1482,6 +1482,15 @@ def build_skeleton_animation_steps(
                 step.setdefault("start", {})["sfx_on_step_start"] = {
                     "file": hot_read_clip, "event": "hot_read", "volume": 0.7,
                 }
+            # Dynamic HCO steal / reach-in: the resolver tags the stopper step with the on-ball
+            # defender (``reach_in_def_id``). Stamp a render-space ``reach_in`` flourish so the FE
+            # lunges that defender at the ball + plays the steal cue (click-steal.wav). Mirrors
+            # the HCT emitter; render-only, never mutates gameplay coords (UESS-safe).
+            reach_in_id = (skeleton_steps[i] or {}).get("reach_in_def_id")
+            if reach_in_id:
+                step.setdefault("start", {}).setdefault("flourish", {})[reach_in_id] = {
+                    "kind": "reach_in", "target": "ball",
+                }
         stamp_tween_durations(
             step["start"], final_end_coords, t, off_lineup, def_lineup,
         )

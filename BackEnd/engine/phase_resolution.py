@@ -5790,7 +5790,18 @@ def resolve_half_court_offense_logic(game):
         else:
             # Use the defender that was already set by override logic
             defender = roles["defender"]
-        
+
+        # Dynamic HCO steal / reach-in micro-movement: for a defender-reach outcome (steal,
+        # dead-ball forced by pressure, or reach-in D_FOUL), tag the stopper step (the last,
+        # event-bearing step) with the on-ball defender's id. The schema emitter turns this into
+        # a render-space ``reach_in`` flourish (defender lunges at the ball + click-steal SFX) —
+        # FE-render only, never mutates gameplay coords (UESS-safe). O_FOUL (offensive) is excluded.
+        if (result in ("STEAL", "DEAD_BALL_TURNOVER", "D_FOUL")
+                and defender is not None and (skeleton or {}).get("steps")):
+            _rid = getattr(defender, "player_id", None)
+            if _rid:
+                skeleton["steps"][-1]["reach_in_def_id"] = _rid
+
         # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
             foul_team_type = "OFFENSE" if event_type == "O_FOUL" else "DEFENSE"
