@@ -13,12 +13,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/mode-select.css">
 </head>
-<body class="mode-select-page">
+<body class="mode-select-page mode-select-loading">
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
   <!-- Auth bar (logo | Alpha badge | YT, X, account) is injected by authBarInit when not present -->
+
+  <div id="mode-select-loading" class="mode-select-loading-panel" role="status" aria-live="polite">
+    <div class="mode-select-loading-card">
+      <div class="mode-select-loading-mark" aria-hidden="true">
+        <img src="/images/buttons/whiteball.svg" alt="">
+      </div>
+      <div class="mode-select-loading-title">Loading Coach Home Base</div>
+      <div class="mode-select-loading-copy">Checking your session…</div>
+    </div>
+  </div>
 
   <!-- Alpha Disclaimer (shown when IS_ALPHA=true). Copy source: Website_Copy/alpha-box-copy.md -->
   <div id="alpha-disclaimer" class="alpha-disclaimer" hidden>

@@ -836,9 +836,9 @@ def build_kickout_step(
 
     Two sub-steps mirror the legacy OREB Kickout shape:
 
-    - **Sub-step A (Outlet positioning)**: BH sprints to a perimeter
-      passer outlet; receiver sprints to a perimeter receive outlet
-      (constrained to same vertical half). Other 8 sprint toward their
+    - **Sub-step A (Outlet positioning)**: BH cruises to a perimeter
+      passer outlet; receiver cruises to a perimeter receive outlet
+      (constrained to same vertical half). Other 8 cruise toward their
       ``setup_coords`` (= HCO step 0 setup positions); interrupted at T.
       Gate: slower of BH/receiver arrival.
     - **Sub-step B (Pass)**: BH stationary at passer outlet; receiver
@@ -890,7 +890,7 @@ def build_kickout_step(
         passer_id=bh_id,
         receiver_id=receiver_id,
         continuing_targets=other_targets,
-        continuing_archetype="sprint",
+        continuing_archetype="cruise",
         clock_remaining_at_start=a_clock["clock_remaining"],
         shot_clock_remaining_at_start=a_clock["shot_clock_remaining"],
         next_step_index=next_step_index + 2,
@@ -916,12 +916,12 @@ def _build_kickout_positioning_substep(
     next_step_index: int,
     metadata_reason: str,
 ) -> AnimationStep:
-    """Sub-step A: BH and receiver both sprint to their outlet spots;
-    other 8 sprint toward HCO setup positions. Gate = slower of BH/receiver."""
+    """Sub-step A: BH and receiver both cruise to their outlet spots;
+    other 8 cruise toward HCO setup positions. Gate = slower of BH/receiver."""
     bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
     rx_player = _player_lookup_by_id(off_lineup, def_lineup, receiver_id)
-    bh_rate = _ag_grid_per_game_sec(bh_player, "sprint")
-    rx_rate = _ag_grid_per_game_sec(rx_player, "sprint")
+    bh_rate = _ag_grid_per_game_sec(bh_player, "cruise")
+    rx_rate = _ag_grid_per_game_sec(rx_player, "cruise")
 
     bh_start = start_coords[bh_id]
     rx_start = start_coords[receiver_id]
@@ -936,27 +936,27 @@ def _build_kickout_positioning_substep(
     }
     end_coords: Dict[str, GridCoord] = {pid: dict(coord) for pid, coord in start_coords.items()}
 
-    # BH: sprint to passer outlet, holding ball.
+    # BH: cruise to passer outlet, holding ball.
     actions[bh_id] = "handle_ball"
-    archetype[bh_id] = "sprint"
+    archetype[bh_id] = "cruise"
     destinations[bh_id] = dict(bh_outlet)
     end_coords[bh_id] = dict(bh_outlet)
 
-    # Receiver: sprint to receive outlet.
+    # Receiver: cruise to receive outlet.
     actions[receiver_id] = "cut"
-    archetype[receiver_id] = "sprint"
+    archetype[receiver_id] = "cruise"
     destinations[receiver_id] = dict(receiver_outlet)
     end_coords[receiver_id] = dict(receiver_outlet)
 
-    # Other 8: sprint toward HCO setup; interrupted at T.
+    # Other 8: cruise toward HCO setup; interrupted at T.
     for pid, target in other_targets.items():
         if pid not in start_coords:
             continue
         actions[pid] = "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-        archetype[pid] = "sprint"
+        archetype[pid] = "cruise"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "sprint")
+        rate = _ag_grid_per_game_sec(player, "cruise")
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}

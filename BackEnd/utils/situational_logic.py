@@ -49,6 +49,54 @@ def get_score_delta(game):
     return off_score - def_score
 
 
+def _player_team_name(game, player):
+    if player is None:
+        return None
+    pid = getattr(player, "player_id", None)
+    if pid is None:
+        return None
+    for team in (getattr(game, "home_team", None), getattr(game, "away_team", None)):
+        if team is None:
+            continue
+        for p in (getattr(team, "lineup", {}) or {}).values():
+            if p and getattr(p, "player_id", None) == pid:
+                return team.name
+    return None
+
+
+def log_force_foul_debug(game, path, *, time_remaining=None, fouler=None, victim=None, note=None):
+    """
+    Backend diagnostic for situational force-foul leading/trailing investigations.
+    Emits to the Python server log (terminal), not the browser console.
+    """
+    score = game.score or {}
+    off = game.offense_team
+    def_ = game.defense_team
+    off_score = int(score.get(off.name, 0))
+    def_score = int(score.get(def_.name, 0))
+    gs = getattr(game, "game_state", None) or {}
+    tr = time_remaining if time_remaining is not None else gs.get("time_remaining")
+    payload = {
+        "path": path,
+        "quarter": getattr(game, "quarter", None),
+        "time_remaining": tr,
+        "offense_team": off.name,
+        "defense_team": def_.name,
+        "offense_score": off_score,
+        "defense_score": def_score,
+        "score_delta": off_score - def_score,
+        "slow_it_down": is_slow_it_down(game, tr) if tr is not None else None,
+        "should_force_foul": should_force_foul(game, tr) if tr is not None else None,
+        "fouler_id": getattr(fouler, "player_id", None) if fouler else None,
+        "fouler_team": _player_team_name(game, fouler),
+        "victim_id": getattr(victim, "player_id", None) if victim else None,
+        "victim_team": _player_team_name(game, victim),
+    }
+    if note:
+        payload["note"] = note
+    logging.info("[FORCE_FOUL_DEBUG] %s", payload)
+
+
 def is_slow_it_down(game, time_remaining_seconds):
     """
     True when offense is ahead by at least this band's Slow It Down minimum (Q4/OT).

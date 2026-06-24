@@ -1297,6 +1297,12 @@ class TurnManager:
                 elif slow and force_foul:
                     # Phase 6 edge case: Slow It Down + Force Foul — execute Force Foul (existing logic).
                     # No special Final Turn alignment for this possession; victim = current ball handler / PG.
+                    sl.log_force_foul_debug(
+                        self.game,
+                        "FINAL_TURN_TRIGGER",
+                        time_remaining=time_remaining_sec,
+                        note="slow+force_foul → _execute_final_turn_force_foul",
+                    )
                     result = self._execute_final_turn_force_foul()
                 elif quick:
                     # Normal Quick Shot turn — fall through to state routing (don't set result)
@@ -1328,6 +1334,14 @@ class TurnManager:
                 d_dest = pending_foul.get("defender_coords_by_pos")
                 foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
                 if foul_player:
+                    sl.log_force_foul_debug(
+                        self.game,
+                        "INBOUND_PENDING_EXECUTE",
+                        time_remaining=game_state.get("time_remaining"),
+                        fouler=foul_player,
+                        victim=victim,
+                        note="situational_force_foul_pending popped",
+                    )
                     roles = {
                         "ball_handler": victim,
                         "defender": foul_player,
@@ -3425,6 +3439,14 @@ class TurnManager:
         foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
         if not foul_player:
             return None
+        sl.log_force_foul_debug(
+            self.game,
+            "FINAL_TURN_EXECUTE",
+            time_remaining=self.game.game_state.get("time_remaining"),
+            fouler=foul_player,
+            victim=victim,
+            note="offense has possession (PG victim)",
+        )
         self.game.game_state["foul_team"] = "DEFENSE"
         roles = {
             "ball_handler": victim,

@@ -135,8 +135,8 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   // Update playcall display before animating the turn
   updatePlaycallDisplay(turn, homeTeamId);
   
-  // Update strategy bars at start of turn
-  updateStrategyBars(turn, homeTeamId);
+  // Scoreboard strategy stacks (tempo / aggr / alt) — reveal on first turn with call fields
+  updateStrategyBars(turn, homeTeamId, scene?.simData);
   
   // Update Playcall Center panels
   updatePlaycallCenter(turn, homeTeamId);

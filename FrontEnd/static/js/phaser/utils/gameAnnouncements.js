@@ -517,7 +517,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
         "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
         "BAD_PASS": "BAD PASS!",
         "SHOT_CLOCK": "Shot Clock Violation!",
-        "TEN_SECOND": "10-Second Violation!"
+        "TEN_SECOND": "10-Second Violation!",
+        "OVER_BACK": "Over & Back!"
       };
       turnoverText = typeMap[turnoverType] || "TURNOVER!";
     }
@@ -529,7 +530,8 @@ function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
       "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
       "BAD_PASS": "BAD PASS!",
       "SHOT_CLOCK": "Shot Clock Violation!",
-      "TEN_SECOND": "10-Second Violation!"
+      "TEN_SECOND": "10-Second Violation!",
+      "OVER_BACK": "Over & Back!"
     };
     turnoverText = typeMap[turnoverType] || "TURNOVER!";
   }

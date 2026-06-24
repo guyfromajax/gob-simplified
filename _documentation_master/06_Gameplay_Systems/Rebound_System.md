@@ -111,6 +111,17 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
 - Each OREB is a separate turn, and each rebounder must have their stat properly recorded
 - Stat deltas are computed by comparing current stats to `pre_stats` snapshot, so the stat must be on the same object instance used for delta computation
 
+### OREB Kickout Animation
+
+`OREB_KICKOUT` is schema-owned. The OREB turn itself only animates the rebound capture: the rebounder/captor moves to the bounce spot at `sprint`, eligible failed rebound attemptors collapse near the bounce spot, and everyone else holds.
+
+The visible kickout setup/pass is prepended to the following HCO turn by `build_kickout_step` in `BackEnd/utils/transition_bridge.py`:
+
+- **Sub-step A — outlet positioning:** current BH / OREB rebounder, the next HCO initiator/receiver, and the other eight players all move at the `cruise` archetype. The step advances when the slower of the BH or receiver reaches his outlet spot; non-gate players are interrupted at the point they can naturally reach.
+- **Sub-step B — kickout pass:** passer and receiver are stationary for the pass; the other eight players continue toward setup spots at `cruise`. The step advances when the ball reaches the receiver.
+
+Frontend kickout spot selection and legacy fallback pass behavior have been removed; the frontend renders backend `animation_steps` only.
+
 **Rebound Resolution Flow** (`calculate_bounce_spot`, `determine_rebounder`, `select_rebounder_by_score`, `calculate_rebound_score` — all in `BackEnd/utils/shared.py`)
 
 1. **Calculate the missed-shot bounce spot** (`calculate_bounce_spot`). Variance widens with shot distance (distance from shooter spot to basket), x is always outward from the basket into the paint:

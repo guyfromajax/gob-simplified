@@ -14,6 +14,66 @@ body.mode-select-page input[type="reset"] {
   font-family: 'Bebas Neue', sans-serif;
 }
 
+body.mode-select-page.mode-select-loading .mode-wrapper {
+  display: none;
+}
+
+body.mode-select-page:not(.mode-select-loading) .mode-select-loading-panel {
+  display: none;
+}
+
+body.mode-select-page .mode-select-loading-panel {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  min-height: calc(100vh - 180px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.mode-select-page .mode-select-loading-card {
+  width: min(420px, 100%);
+  padding: 34px 28px 30px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 30%),
+    rgba(22, 26, 36, 0.97);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+
+body.mode-select-page .mode-select-loading-mark {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(247, 148, 32, 0.12);
+  border: 1px solid rgba(247, 148, 32, 0.3);
+}
+
+body.mode-select-page .mode-select-loading-mark img {
+  width: 30px;
+  height: 30px;
+  opacity: 0.9;
+}
+
+body.mode-select-page .mode-select-loading-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  line-height: 1;
+}
+
+body.mode-select-page .mode-select-loading-copy {
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 body.mode-select-page .mode-wrapper {
   width: min(1100px, 100%);
   margin: 0 auto;

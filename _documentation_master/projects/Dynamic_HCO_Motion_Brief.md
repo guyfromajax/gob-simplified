@@ -303,3 +303,21 @@ One shared decision, `should_shoot` (`motion_step_decision.py`), evaluated at th
 
 ### Still open
 - (none — spec settled; ready to implement against a unified `should_shoot` + the three call sites.)
+
+---
+
+## Per-step Foul / Steal / Turnover Moment (IMPLEMENTED — migrated from HCT)
+
+Replaces HCO's up-front percentile tables (`STANDARD_D_FOUL`/`STEAL_ATTEMPT`/`DEAD_BALL_TURNOVER`) with HCT's **attribute-driven per-step moment**, reusing HCT's contest + `HCT_D8_*` levels.
+
+**Shared engine:** `_resolve_moment` (`dynamic_hct.py`) now takes optional `def_mod`/`off_mod` (default → HCT's `pt_efficiency`/`pt_opp_modifier`; HCO injects `def_eff`/`off_eff`). `_resolve_hco_moment` is the thin HCO entry. So HCO and HCT share one contest with the same levels — tune `HCT_D8_*`.
+
+**Where it runs:** `_resolve_hco_moment_walk` (`phase_resolution.py`), called right after `resolve_hco_outcome` in `resolve_half_court_offense_logic`:
+- Rolls the defense's per-turn pressure engagement (`aggression` 0–4, `roll <= setting`); no pressure → no moment.
+- Walks the skeleton steps; per step fires `_resolve_hco_moment` for the BH vs his **man** defender; the **first** hard outcome wins.
+- HCT→HCO mapping: `STEAL`→`STEAL`, `DEAD BALL`→`DEAD_BALL_TURNOVER`, `O_FOUL`→`O_FOUL` (charge), `D_FOUL`→`D_FOUL` (reach-in). `POS_O`/`NEUTRAL` → None (shot resolution proceeds).
+- On a hard outcome it sets `result`, and the **existing** non-shot resolution + `apply_stopper_system_to_skeleton` + emitter render/route it (no new emission path — same `o_foul`/`d_foul`/`dead_ball_turnover`/`steal` machinery FCP uses).
+
+**Sunset:** `resolve_hco_outcome` skips the up-front tables for motion turns when the flag is on (`skip_upfront_events`); set plays + flag-off keep them.
+
+**v1 scope / deferred:** man defense only (zone has no clean 1:1 defender); the moment walk runs **before** shot resolution, so a moment pre-empts the would-be shot — true per-step interleaving with `should_shoot` is a later refinement (needs the late shot resolver, which must run after the shot-clock truncation). Pass interceptions (HCT `pass_contest`) and set-play moments also deferred. All behind `GOB_DYNAMIC_HCO_MOTION`. Tune frequency via `HCT_D8_GLOBAL_SCALAR` / `HCT_D8_DEF_WIN_BASE`.

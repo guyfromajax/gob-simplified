@@ -2072,6 +2072,17 @@ class ShotManager:
                                 and sl.is_slow_it_down(self.game, time_remaining_sec)
                                 and sl.should_force_foul(self.game, time_remaining_sec)
                             )
+                            if sl.is_situational_active(getattr(self.game, "quarter", None)):
+                                sl.log_force_foul_debug(
+                                    self.game,
+                                    "DREB_TRIGGER",
+                                    time_remaining=time_remaining_sec,
+                                    note=(
+                                        "triggered"
+                                        if force_foul_after_dreb
+                                        else "not_triggered (pre-possession-flip; offense=shooting team)"
+                                    ),
+                                )
                             if force_foul_after_dreb:
                                 result["force_foul_after_dreb"] = True
                                 next_play_type = "HCO"

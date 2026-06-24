@@ -627,6 +627,8 @@ def _resolve_moment(
     bh_defender,
     trapper=None,
     exclude_steal: bool = False,
+    def_mod=None,
+    off_mod=None,
 ) -> Tuple[str, float, Any]:
     """§5 Pressure / Trap banded outcome (D8 attribute-driven).
 
@@ -646,8 +648,11 @@ def _resolve_moment(
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
 
-    pt_eff = float(def_attrs.get("pt_efficiency", 0) or 0)
-    pt_opp = float(off_attrs.get("pt_opp_modifier", 0) or 0)
+    # Team modifiers: HCT uses pt_efficiency (def) / pt_opp_modifier (off). Callers in other
+    # turn types (HCO) inject their own symmetric modifiers via def_mod/off_mod (e.g. def_eff /
+    # off_eff) so the same attribute contest + HCT_D8_* levels apply with the right team ratings.
+    pt_eff = float(def_attrs.get("pt_efficiency", 0) or 0) if def_mod is None else float(def_mod or 0)
+    pt_opp = float(off_attrs.get("pt_opp_modifier", 0) or 0) if off_mod is None else float(off_mod or 0)
     off_chem = int((off_attrs.get("team_chemistry", 0) or 0) / 4)
     def_chem = int((def_attrs.get("team_chemistry", 0) or 0) / 4)
     discipline = float(def_attrs.get("discipline", 0) or 0)
@@ -739,6 +744,11 @@ def _basket_dir(is_away_offense: bool) -> int:
 
 def _crossed_half_court(x: float, is_away_offense: bool) -> bool:
     return x <= 50 if is_away_offense else x >= 50
+
+
+def _in_backcourt(x: float, is_away_offense: bool) -> bool:
+    """True when ``x`` is behind the half-court line for this offense."""
+    return not _crossed_half_court(x, is_away_offense)
 
 
 def _past_primary_safe_area(xy: Dict[str, Any], is_away_offense: bool) -> bool:
@@ -852,12 +862,7 @@ def _select_pass_receiver(
     """§6 pass: the ball goes to one of the two teammates closest to the BH
     (chosen at random between those two).
 
-    Over-and-back guard: once the BH has crossed half-court he may not pass to a
-    teammate still in the backcourt (x<50 home / x>50 away) without an
-    over-and-back violation. For now we *prevent* it — if one of the two closest
-    teammates would be a violation and the other would not, the legal teammate
-    is chosen. (Detecting an actual over-and-back and processing it as a
-    dead-ball turnover is a later item; see the §11 outstanding list.)
+    Over-and-back is detected after the pass completes (see the main loop).
 
     ``exclude`` drops positions from the pool (FCP: SF still at the BIP spot).
     """
@@ -867,14 +872,6 @@ def _select_pass_receiver(
         others = [p for p in POSITIONS if p != bh_pos]
     others.sort(key=lambda p: _euclid(off_coords[bh_pos], off_coords[p]))
     candidates = others[:2]
-    if _crossed_half_court(off_coords[bh_pos]["x"], is_away_offense):
-        legal = [
-            p
-            for p in candidates
-            if _crossed_half_court(off_coords[p]["x"], is_away_offense)
-        ]
-        if legal:
-            candidates = legal
     return random.choice(candidates)
 
 
@@ -2016,15 +2013,6 @@ def _seed_lineup_coords_from_prior(
     return coords
 
 
-def _backcourt_uncleared_for_ten_second(
-    bh_xy: Dict[str, Any], is_away_offense: bool, turn_mode: str
-) -> bool:
-    """True while the BH has not cleared the backcourt clock boundary."""
-    if turn_mode == "fcp":
-        return not _past_primary_safe_area(bh_xy, is_away_offense)
-    return not _crossed_half_court(bh_xy["x"], is_away_offense)
-
-
 def _sf_at_fcp_inbound_spot(
     off_coords: Dict[str, Dict[str, int]], is_away_offense: bool
 ) -> bool:
@@ -2201,10 +2189,15 @@ def compute_dynamic_hct_turn(
     result_type = "HCO"
     text_suffix = ""
     # Violation subtype for a DEAD BALL terminal (D9 announce / classification):
-    # "SHOT_CLOCK" (clock hit 0) or "TEN_SECOND" (didn't cross half court in
-    # time). Empty for a defense-forced dead ball (FE renders a generic
+    # "SHOT_CLOCK" (clock hit 0), "TEN_SECOND" (10s elapsed without reaching
+    # x=50), or "OVER_BACK" (pass back behind half after frontcourt was
+    # established). Empty for a defense-forced dead ball (FE renders a generic
     # travel/double-dribble) and for non-turnover outcomes.
     turnover_type = ""
+    # True once the ball crosses half court (x≥50 home / x≤50 away) this turn;
+    # clears when the turn ends. Drives the 10-second rule (no longer applies
+    # after establishment) and over-and-back detection on backcourt passes.
+    frontcourt_established = False
     # D8 — set for the emergent foul/steal terminals. ``foul_team`` is
     # "OFFENSE" (charge) or "DEFENSE" (reach); ``foul_player`` / ``stealer``
     # carry the credited Player so the wrapper can record stats + route.
@@ -2711,6 +2704,10 @@ def compute_dynamic_hct_turn(
 
     # --- §4 loop ------------------------------------------------------------
     for _ in range(MAX_LOOP_ITERATIONS):
+        frontcourt_established = frontcourt_established or _crossed_half_court(
+            bh_xy["x"], is_away_offense
+        )
+
         # 1) Time terminals (checked at the top of each iteration).
         if shot_clock <= 0:
             # D9 — shot-clock violation: turnover → SIP, possession flips.
@@ -2721,11 +2718,11 @@ def compute_dynamic_hct_turn(
         if (
             quarter_remaining_start >= HCT_TEN_SECOND_LIMIT
             and (shot_clock_start - shot_clock) >= HCT_TEN_SECOND_LIMIT
-            and _backcourt_uncleared_for_ten_second(bh_xy, is_away_offense, turn_mode)
+            and not frontcourt_established
         ):
             # D9 — 10-second violation: 10 ACTUAL game-seconds elapsed since
-            # possession start without clearing the backcourt boundary (half
-            # court for HCT, x=64 for FCP) → turnover → SIP, possession flips.
+            # possession start without the ball reaching half court (x=50) →
+            # turnover → SIP, possession flips.
             result_type = "DEAD BALL"
             turnover_type = "TEN_SECOND"
             text_suffix = " 10-second violation!"
@@ -2963,6 +2960,14 @@ def compute_dynamic_hct_turn(
             )
         loop_segments.append(pass_seg)
         shot_clock -= pass_seconds
+
+        if frontcourt_established and _in_backcourt(
+            off_coords[receiver_pos]["x"], is_away_offense
+        ):
+            result_type = "DEAD BALL"
+            turnover_type = "OVER_BACK"
+            text_suffix = " over & back!"
+            break
 
         # The receiver becomes the BH with a live dribble (D21); the loop re-reads
         # & reacts at the top next iteration — NO forced reception hold. His §5

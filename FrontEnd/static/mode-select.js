@@ -97,6 +97,19 @@ function getAuthHeaders() {
   }
 }
 
+function redirectToLogin() {
+  try {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+  } catch (e) {}
+  const redirectParam = encodeURIComponent('/mode-select.html');
+  window.location.replace('/login.html?redirect=' + redirectParam);
+}
+
+function revealModeSelect() {
+  if (document.body) document.body.classList.remove('mode-select-loading');
+}
+
 function safeJsonFetch(url, options) {
   return fetch(url, options)
     .then(function (response) {
@@ -867,6 +880,51 @@ if (newFranchiseModalConfirm) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
+  const authLoggedOut = document.getElementById('auth-logged-out');
+  const authLoggedIn = document.getElementById('auth-logged-in');
+  const authUserEmail = document.getElementById('auth-user-email');
+  const logoutBtn = document.getElementById('logout-btn');
+  const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  const authUser = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_user') : null;
+  let currentUsername = '';
+
+  if (!authToken || !authUser) {
+    redirectToLogin();
+    return;
+  }
+
+  try {
+    const user = JSON.parse(authUser);
+    currentUsername = user.username || user.email || '';
+    if (authLoggedOut) authLoggedOut.style.display = 'none';
+    if (authLoggedIn) authLoggedIn.style.display = 'flex';
+    if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+
+    const meRes = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: getAuthHeaders() });
+    if (!meRes.ok) {
+      if (meRes.status === 401 || meRes.status === 403) {
+        redirectToLogin();
+        return;
+      }
+      throw new Error('/api/auth/me failed with status ' + meRes.status);
+    }
+
+    const meData = await meRes.json();
+    if (meData.username && meData.username.trim()) {
+      currentUsername = meData.username;
+      if (authUserEmail) authUserEmail.textContent = meData.username;
+      const stored = JSON.parse(authUser);
+      stored.username = meData.username;
+      localStorage.setItem('auth_user', JSON.stringify(stored));
+    }
+  } catch (e) {
+    console.error('[AUTH] Mode select auth validation failed:', e);
+    redirectToLogin();
+    return;
+  }
+
+  wireAlphaBanner();
+
   try {
     const lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
     lobbyMusic.loop = true;
@@ -888,49 +946,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   } catch (error) {
     console.error('[ALPHA] Failed to load app config:', error);
-  }
-
-  const authLoggedOut = document.getElementById('auth-logged-out');
-  const authLoggedIn = document.getElementById('auth-logged-in');
-  const authUserEmail = document.getElementById('auth-user-email');
-  const logoutBtn = document.getElementById('logout-btn');
-  const authToken = localStorage.getItem('auth_token');
-  const authUser = localStorage.getItem('auth_user');
-  let currentUsername = '';
-
-  wireAlphaBanner();
-
-  if (authToken && authUser) {
-    try {
-      const user = JSON.parse(authUser);
-      currentUsername = user.username || user.email || '';
-      if (authLoggedOut) authLoggedOut.style.display = 'none';
-      if (authLoggedIn) authLoggedIn.style.display = 'flex';
-      if (authUserEmail) authUserEmail.textContent = user.username || user.email;
-
-      const meRes = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: getAuthHeaders() });
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        if (meData.username && meData.username.trim()) {
-          currentUsername = meData.username;
-          if (authUserEmail) authUserEmail.textContent = meData.username;
-          const stored = JSON.parse(authUser);
-          stored.username = meData.username;
-          localStorage.setItem('auth_user', JSON.stringify(stored));
-        }
-      } else if (meRes.status === 401) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        if (authLoggedOut) authLoggedOut.style.display = 'flex';
-        if (authLoggedIn) authLoggedIn.style.display = 'none';
-      }
-    } catch (e) {
-      console.error('[AUTH] Failed to parse user:', e);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-      if (authLoggedOut) authLoggedOut.style.display = 'flex';
-      if (authLoggedIn) authLoggedIn.style.display = 'none';
-    }
   }
 
   setLeaderboardView('geek_points');
@@ -963,6 +978,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   if (!currentFranchise) {
     renderFranchiseEmptyState();
+    revealModeSelect();
     return;
   }
 
@@ -974,4 +990,5 @@ document.addEventListener('DOMContentLoaded', async function () {
   const teamName = safeText(currentFranchise.user_team_id, '');
   const teamDoc = teamsByName[teamName] || null;
   renderFranchiseActiveState(currentFranchise, teamDoc, commandCenterData);
+  revealModeSelect();
 });

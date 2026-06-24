@@ -433,6 +433,113 @@
     }
     */
 
+    /* ===== Scoreboard strategy stacks (tempo / aggr / alt) ===== */
+    .sb-strat {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      justify-content: center;
+      height: 100%;
+      font-family: 'Bebas Neue', sans-serif;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+    .sb-strat.is-visible {
+      visibility: visible;
+      opacity: 1;
+    }
+    .sb-strat.away {
+      grid-column: 13;
+      align-items: flex-end;
+      padding-right: 120px;
+    }
+    .sb-strat.home {
+      grid-column: 15;
+      align-items: flex-start;
+      padding-left: 120px;
+    }
+
+    .sb-strat .srow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sb-strat.home .srow {
+      flex-direction: row-reverse;
+    }
+
+    .sb-strat .lab {
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      color: rgba(255, 255, 255, 0.42);
+      width: 40px;
+      text-align: right;
+    }
+    .sb-strat.home .lab {
+      text-align: left;
+    }
+
+    .sb-strat .rail {
+      position: relative;
+      width: 137px;
+      height: 15px;
+    }
+
+    .sb-strat .track {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.13);
+      border-radius: 2px;
+    }
+    .sb-strat .tick {
+      position: absolute;
+      top: 50%;
+      width: 2px;
+      height: 7px;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.20);
+      border-radius: 1px;
+    }
+
+    .sb-strat .marker {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 16px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+      clip-path: polygon(0 0, 62% 0, 100% 50%, 62% 100%, 0 100%);
+      transition: left 0.5s cubic-bezier(0.6, 0, 0.2, 1), background 0.4s, box-shadow 0.4s;
+      z-index: 3;
+    }
+    .sb-strat.home .marker {
+      transform: translate(-50%, -50%) scaleX(-1);
+    }
+
+    .sb-strat .val {
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      min-width: 62px;
+      transition: color 0.4s;
+    }
+    .sb-strat.home .val {
+      text-align: right;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sb-strat .marker {
+        transition: none;
+      }
+      .sb-strat {
+        transition: none;
+      }
+    }
+
     /* Active Player Display - Grid columns 8 and 20 */
     .active-player-display {
       display: flex;
@@ -3969,7 +4076,8 @@
       <div id="away-tol">TOL: 5</div>
       <div id="away-fouls">F: 0</div>
     </div>
-    
+
+    <div class="sb-strat away" id="sb-strat-away" aria-hidden="true"></div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Defensive Playcall with Focus Dots - Grid column 8 -->
@@ -4069,6 +4177,8 @@
     </div>
     -->
     
+    <div class="sb-strat home" id="sb-strat-home" aria-hidden="true"></div>
+
     <!-- Home TOL/F - Grid column 22 -->
     <div class="tol-fouls home">
       <div id="home-tol">TOL: 5</div>

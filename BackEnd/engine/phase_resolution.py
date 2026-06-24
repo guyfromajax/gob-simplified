@@ -3269,12 +3269,20 @@ def resolve_hco_outcome(game, skeleton):
     
     # Randomize the order
     random.shuffle(check_functions)
-    
+
     logging.debug(f"🔍 [HCO RESOLUTION] Randomized check order: {[name for name, _ in check_functions]}")
     logging.debug("")  # Blank line after randomized order
-    
+
+    # Dynamic HCO migration: motion turns resolve foul/steal/turnover PER STEP (the attribute-
+    # driven moment walk in resolve_half_court_offense_logic), so skip these up-front percentile
+    # tables for motion when the flag is on. Set plays + the flag-off path keep the up-front
+    # tables. See Dynamic_HCO_Motion_Brief.md / HCT_System.md.
+    skip_upfront_events = (
+        game_state.get("offense_play_type", "") == "motion" and _dynamic_hco_motion_enabled()
+    )
+
     # Execute checks in randomized order
-    for check_name, check_func in check_functions:
+    for check_name, check_func in ([] if skip_upfront_events else check_functions):
         result = check_func()
         if result is not None:
             # Event occurred, return immediately with execution_score
@@ -4632,6 +4640,69 @@ def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
     return reads
 
 
+def _resolve_hco_moment(game, ball_handler, bh_defender):
+    """HCO per-step foul/steal/turnover moment — reuses the HCT attribute contest
+    (`_resolve_moment`, same HCT_D8_* levels) but feeds HCO's team modifiers (offensive /
+    defensive efficiency) in place of the HCT pressure ratings. Returns the raw HCT outcome
+    tuple ``(outcome, score_ratio, credited_player)`` — outcome ∈ {STEAL, DEAD BALL, O_FOUL,
+    D_FOUL, POS_O, NEUTRAL}; the caller maps the hard outcomes to HCO result types and truncates
+    the walk. All logic + RNG stays backend-side (SS&S); the FE only renders the stamped event."""
+    from BackEnd.engine.dynamic_hct import _resolve_moment
+    off_team = game.offense_team
+    def_team = game.defense_team
+    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
+    def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
+    return _resolve_moment(off_team, def_team, ball_handler, bh_defender,
+                           def_mod=def_eff, off_mod=off_eff)
+
+
+def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup):
+    """Dynamic HCO per-step foul / steal / turnover moment — the HCT step-by-step moment migrated
+    to HCO. Rolls the defense's per-turn pressure engagement (aggression, 0–4: roll <= setting),
+    then walks the skeleton steps firing the attribute-driven moment (`_resolve_hco_moment`) for
+    the ball handler vs his MAN defender. Returns the HCO ``result_type`` of the FIRST hard
+    outcome (``O_FOUL`` / ``D_FOUL`` / ``STEAL`` / ``DEAD_BALL_TURNOVER``) or None (no moment →
+    normal shot resolution). The caller sets ``result`` to this so the existing non-shot
+    resolution + stopper system render and route it (no new emission path needed).
+
+    v1 scope: man defense only (zone deferred — no clean 1:1 defender); the walk runs BEFORE shot
+    resolution, so a moment pre-empts the would-be shot (true per-step interleaving with the shoot
+    decision is a later refinement). All logic + RNG backend-side (SS&S); FE only renders."""
+    import random
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+
+    game_state = game.game_state
+    if is_zone_defense(game_state.get("defense_playcall")):
+        return None  # man-only for v1
+    steps = (skeleton or {}).get("steps") or []
+    if len(steps) < 2:
+        return None
+    # Per-turn defense pressure engagement (aggression 0-4). No pressure → no moment this turn.
+    aggression = (getattr(game.defense_team, "strategy_settings", {}) or {}).get("aggression", 2)
+    if random.randint(0, 4) > aggression:
+        return None
+
+    defending_is_user = getattr(game.defense_team, "is_user_team", False)
+    matchups = get_matchups_for_defending_team(game_state, defending_is_user)
+    off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
+    rt_map = {"STEAL": "STEAL", "DEAD BALL": "DEAD_BALL_TURNOVER",
+              "O_FOUL": "O_FOUL", "D_FOUL": "D_FOUL"}
+    for i in range(1, len(steps)):
+        bh_pos, _loc = _motion_bh_at_step(steps[i])
+        if not bh_pos or not off_lineup.get(bh_pos):
+            continue
+        bh_defender = def_lineup.get(off_to_def.get(bh_pos, bh_pos))
+        if bh_defender is None:
+            continue
+        outcome, _ratio, _credited = _resolve_hco_moment(game, off_lineup[bh_pos], bh_defender)
+        result_type = rt_map.get(outcome)
+        if result_type:
+            logging.warning(f"⚔️ [HCO MOMENT] {result_type} at step {i} ({bh_pos})")
+            return result_type
+    return None
+
+
 def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
     """
     Brief Steps 1–2: build the read map, then walk the skeleton making per-step decisions.
@@ -5158,7 +5229,16 @@ def resolve_half_court_offense_logic(game):
     
     # ✅ NEW RESOLUTION SYSTEM: Use new sequential resolution system
     result, variant_result, execution_score = resolve_hco_outcome(game, skeleton)
-    
+
+    # Dynamic HCO migration: per-step foul/steal/turnover MOMENT (from HCT). When the up-front
+    # tables are skipped for motion (resolve_hco_outcome → SHOT) and the flag is on, walk the
+    # steps with the attribute-driven moment; a hard outcome overrides `result` and routes through
+    # the EXISTING non-shot resolution + stopper system below. (v1: man defense, pre-shot.)
+    if is_motion_play and result == "SHOT" and _dynamic_hco_motion_enabled():
+        _moment_result = _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup)
+        if _moment_result:
+            result = _moment_result
+
     # ✅ REMOVED: Old generate_logic() call and lean_score storage
     # Store variant_result for skeleton selection (replaces lean_score)
     if variant_result:
@@ -8273,10 +8353,10 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     text = text + dyn.get("text_suffix", "")
 
     # D9 — §8 violation subtype for a DEAD BALL terminal ("SHOT_CLOCK" /
-    # "TEN_SECOND"); empty for a defense-forced dead ball. Drives the FE
-    # turnover announcement (gameAnnouncements/announcements typeMap) and
-    # carries through turnoverAdapter. SHOT_CLOCK/TEN_SECOND are clock-style
-    # violations → no steal, SIDE_INBOUND, possession flips.
+    # "TEN_SECOND", "OVER_BACK"); empty for a defense-forced dead ball. Drives
+    # the FE turnover announcement (gameAnnouncements/announcements typeMap) and
+    # carries through turnoverAdapter. Clock/backcourt violations → no steal,
+    # SIDE_INBOUND, possession flips.
     turnover_type = dyn.get("turnover_type", "")
 
     # D8 — emergent foul/steal attribution (literal: the engine names the

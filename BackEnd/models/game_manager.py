@@ -1146,6 +1146,14 @@ class GameManager:
             "defender_coords_by_pos": d_dest,
             "foul_player_id": getattr(foul_player, "player_id", None),
         }
+        sl.log_force_foul_debug(
+            self,
+            "INBOUND_PENDING_SET",
+            time_remaining=time_remaining,
+            fouler=foul_player,
+            victim=receiver,
+            note=f"inbound_type={inbound_type} pending_stored=True",
+        )
 
     def simulate_macro_turn(self): #run_simulation
         import time as _time
@@ -1469,6 +1477,14 @@ class GameManager:
             d_dest = defender_coords_by_pos_from_lineup(def_lineup)
             foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
             if victim and foul_player:
+                sl.log_force_foul_debug(
+                    self,
+                    "DREB_EXECUTE",
+                    time_remaining=self.game_state.get("time_remaining"),
+                    fouler=foul_player,
+                    victim=victim,
+                    note="post-possession-flip; offense=rebounder team",
+                )
                 self.game_state["foul_team"] = "DEFENSE"
                 roles = {
                     "ball_handler": victim,

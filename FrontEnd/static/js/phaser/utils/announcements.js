@@ -807,7 +807,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
           "ILLEGAL_DRIBBLE": "ILLEGAL DRIBBLE!",
           "SHOT_CLOCK": "SHOT CLOCK VIOLATION!",
           "BACKCOURT": "BACKCOURT VIOLATION!",
-          "TEN_SECOND": "10-Second Violation!"
+          "TEN_SECOND": "10-Second Violation!",
+          "OVER_BACK": "Over & Back!"
         };
         turnoverText = typeMap[turnData.turnover_type] || "TURNOVER!";
       } else {
