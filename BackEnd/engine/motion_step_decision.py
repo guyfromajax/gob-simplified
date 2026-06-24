@@ -101,19 +101,6 @@ def _shot_type_for_location(player, location, rng):
     return _choose_attack_or_outside(player, rng)
 
 
-def _hot_read_types(player, location, read_map):
-    """Shot types this player can hot-read FROM this spot (flag true AND positioned in that area)."""
-    flags = read_map.get(getattr(player, "player_id", None), {}) or {}
-    if is_inside_location(location):
-        return ["inside"] if flags.get("inside") else []
-    types = []
-    if flags.get("attack"):
-        types.append("attack")
-    if flags.get("outside"):
-        types.append("outside")
-    return types
-
-
 # --------------------------------------------------------------------------- #
 # branches
 # --------------------------------------------------------------------------- #
@@ -139,45 +126,6 @@ def _forced_action(bh, bh_pos, bh_location, bh_at_inside, off_lineup, locations,
     return {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": shot_type}
 
 
-def _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng):
-    """Offense is successful (won the read, or reading while unpressured): take a hot read
-    (self first, else closest teammate) when one is available AND the aggression-weighted
-    execute roll hits; otherwise fall back to a SUBTLE MOVEMENT (brief: "if the offense is
-    successful, hot read if available, otherwise fall back to Subtle Movement"). A successful
-    offense never just advances — it either strikes or keeps probing."""
-    bh_types = _hot_read_types(bh, bh_location, read_map) if bh else []
-    teammate_reads = []
-    for pos, loc in locations.items():
-        if pos == bh_pos:
-            continue
-        p = off_lineup.get(pos)
-        if not p:
-            continue
-        t = _hot_read_types(p, loc, read_map)
-        if t:
-            teammate_reads.append((pos, t))
-
-    if not bh_types and not teammate_reads:
-        return {"action": SUBTLE_MOVEMENT}  # no opening to seize → probe
-
-    execute_pct = 0.50 + _aggr_delta(off_aggr, 0.20, -0.20)  # aggressive 70% / passive 30%
-    if rng.random() >= execute_pct:
-        return {"action": SUBTLE_MOVEMENT}  # saw a read but passed it up → probe
-
-    if bh_types:  # ball handler reads for himself first
-        return {"action": HOT_READ_SHOOT, "shooter_pos": bh_pos,
-                "shot_type": rng.choice(bh_types), "via_pass": False}
-
-    # else closest teammate (tie → random)
-    dists = [(pos, _dist(bh_location, locations.get(pos, "key"))) for pos, _t in teammate_reads]
-    min_d = min(d for _, d in dists)
-    closest = [pos for pos, d in dists if abs(d - min_d) < 1e-9]
-    chosen_pos = rng.choice(closest)
-    types = dict(teammate_reads)[chosen_pos]
-    return {"action": HOT_READ_SHOOT, "shooter_pos": chosen_pos,
-            "shot_type": rng.choice(types), "via_pass": True}
-
-
 def _disruption_branch(def_aggr, rng):
     """Defense won the read: 50% subtle / 20% Freelance Forced / 30% none (def-aggr adjusts FF/none)."""
     ff = 0.20 + _aggr_delta(def_aggr, 0.10, -0.10)
@@ -198,6 +146,106 @@ def _neutral_branch(off_aggr, def_aggr, rng):
     if rng.random() < pass_pct:
         return {"action": PASS_IMMEDIATE}
     return {"action": SUBTLE_MOVEMENT}
+
+
+# --------------------------------------------------------------------------- #
+# Universal Shoot Decision (brief: Proposed: Universal Shoot Decision)
+#
+# One shared decision evaluated at every BH step, after every subtle beat, and at every
+# reception. Two steps: (1) is the look optimal? (shot-type mismatch + openness vs a clock/
+# tempo-scaled bar) then (2) does the shooter make the right call? (read tier). Shares the
+# read map's raw mismatch scores with the (now label-only) hot read — one computation.
+# --------------------------------------------------------------------------- #
+SHOOT_THRESHOLD_BASE = 30          # "optimal look" bar at a full clock, normal tempo (mismatch-score scale)
+SHOT_CLOCK_START = 30              # clock used to scale clock_relief
+SHOOT_TEMPO_ADJ = {"slow": -8, "normal": 0, "fast": 8}  # fast lowers the bar (shoot sooner)
+SHOOT_READ_RIGHT = 200             # read tier: optimal decision (shoot/dish if optimal, else progress)
+SHOOT_READ_SAFE = 125              # read tier: safe decision (progress)
+
+
+def _weighted_attack_or_outside(player, off_team, rng):
+    """Weighted attack-vs-outside pick biased by team emphasis (`strategy_settings` attack/outside,
+    0–4, +10 each). A stronger skill / higher emphasis is chosen MORE often, not always."""
+    a = getattr(player, "attributes", {}) or {}
+    s = getattr(off_team, "strategy_settings", {}) or {}
+    attack_score = (a.get("AG", 0) + a.get("SC", 0)) / 2 + s.get("attack", 2) * 10
+    outside_score = a.get("SH", 0) + s.get("outside", 2) * 10
+    total = attack_score + outside_score
+    if total <= 0:
+        return "outside"
+    return "attack" if rng.randint(1, int(round(total))) <= attack_score else "outside"
+
+
+def _shoot_threshold(shot_clock, tempo_call):
+    """The optimal-shot bar, lowered as the clock drains and for faster tempo."""
+    clock = max(0.0, min(float(shot_clock or 0), SHOT_CLOCK_START))
+    clock_relief = SHOOT_THRESHOLD_BASE * (1.0 - clock / SHOT_CLOCK_START)
+    return SHOOT_THRESHOLD_BASE - clock_relief - SHOOT_TEMPO_ADJ.get(tempo_call, 0)
+
+
+def _shoot_read_tier(shooter, off_team, rng):
+    """Decision-quality tier (form B): right (>200) / safe (>125) / non-strategic (else)."""
+    read = (player_read_raw(shooter) + _team_attr(off_team, "discipline", 0)) * rng.randint(1, 6)
+    if read > SHOOT_READ_RIGHT:
+        return "right"
+    if read > SHOOT_READ_SAFE:
+        return "safe"
+    return "random"
+
+
+def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_call, openness, rng):
+    """(shot_type, quality, optimal, is_mismatch) for one candidate shooter at his location."""
+    from BackEnd.engine.motion_read_map import READ_THRESHOLD
+    scores = read_scores.get(getattr(player, "player_id", None), {}) or {}
+    if is_inside_location(location):
+        shot_type = "inside"
+    else:
+        shot_type = _weighted_attack_or_outside(player, off_team, rng)
+    raw = float(scores.get(shot_type, 0.0))
+    quality = raw + openness
+    return shot_type, quality, quality >= _shoot_threshold(shot_clock, tempo_call), raw > READ_THRESHOLD
+
+
+def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
+                 shot_clock, tempo_call, rng, openness=0.0, allow_dish=True):
+    """Universal shoot decision. Returns a SHOOT Decision
+    ``{action, shooter_pos, shot_type, via_pass, hot_read}`` or ``None`` (progress).
+
+    Step 1 evaluates the shooter's look (and, when ``allow_dish``, teammates — the "best shot
+    available" = the collapsed hot read as a *dish*); Step 2 applies the shooter's read tier:
+    right → take it if optimal (self or dish) else progress; safe → progress; random → 50/50.
+    ``openness`` (>=0) lifts the shooter's quality (e.g. a frozen defender post-subtle). The
+    ``hot_read`` flag tags a shot that came off a genuine mismatch (label only). Receptions pass
+    ``allow_dish=False`` (no re-dish)."""
+    shooter = off_lineup.get(shooter_pos)
+    if shooter is None:
+        return None
+    s_type, s_quality, s_optimal, s_mismatch = _evaluate_shot(
+        shooter, locations.get(shooter_pos, "key"), read_scores, off_team, shot_clock, tempo_call, openness, rng)
+    best = {"pos": shooter_pos, "type": s_type, "quality": s_quality,
+            "optimal": s_optimal, "mismatch": s_mismatch, "via_pass": False}
+    if allow_dish:
+        for pos, p in off_lineup.items():
+            if pos == shooter_pos or not p or locations.get(pos) is None:
+                continue
+            t, q, opt, mm = _evaluate_shot(p, locations[pos], read_scores, off_team,
+                                           shot_clock, tempo_call, 0.0, rng)
+            if opt and q > best["quality"]:
+                best = {"pos": pos, "type": t, "quality": q, "optimal": opt, "mismatch": mm, "via_pass": True}
+
+    tier = _shoot_read_tier(shooter, off_team, rng)
+    if tier == "safe":
+        return None  # pass the look up → progress
+    if tier == "right":
+        if best["optimal"]:
+            return {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
+                    "via_pass": best["via_pass"], "hot_read": best["mismatch"]}
+        return None  # nothing optimal → progress
+    # non-strategic: 50/50 shoot (self, forced/contested) vs progress
+    if rng.random() < 0.5:
+        return {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
+                "via_pass": False, "hot_read": False}
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -266,10 +314,14 @@ def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rn
             return _forced_action(bh, bh_pos, bh_location, bh_at_inside, off_lineup, locations, rng)
         # else fall through to the condition matrix
 
-    # Condition 2 — offense reading, defense not pressuring: the offense is unopposed/"successful"
-    # → hot read if available+executed, else subtle (no defense_score battle).
+    # NOTE: shots (incl. the old hot read, now a label) are handled BEFORE this by
+    # ``should_shoot`` in the resolver. This function is the MOVEMENT decision for when the BH
+    # progresses (doesn't shoot): subtle / advance / disruption / pass.
+
+    # Condition 2 — offense reading, defense not pressuring: the offense is unopposed → it keeps
+    # probing off-pattern (subtle), since it didn't take a shot.
     if offense_reads and not defense_pressure:
-        return _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng)
+        return {"action": SUBTLE_MOVEMENT}
 
     # Defense IS pressuring (Condition 1 or 3) → defense_score (form B).
     if bh_defender is None:
@@ -281,9 +333,11 @@ def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rn
     defense_score = (raw_def + fight) * rng.randint(1, 6)
 
     if offense_reads:
-        # Condition 1 — read battle: offense read score vs defense.
+        # Condition 1 — read battle: offense read score vs defense. Offense wins → it keeps the
+        # initiative with a subtle probe (the shot was already offered by should_shoot); defense
+        # wins → disruption; neutral → subtle/pass.
         if offense_score > defense_score + def_eff + def_chem:
-            return _hot_read_branch(bh, bh_pos, bh_location, off_lineup, locations, read_map, off_aggr, rng)
+            return {"action": SUBTLE_MOVEMENT}
         if defense_score > offense_score + off_eff + off_chem:
             return _disruption_branch(def_aggr, rng)
         return _neutral_branch(off_aggr, def_aggr, rng)

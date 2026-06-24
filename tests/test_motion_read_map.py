@@ -3,11 +3,20 @@ from BackEnd.engine.motion_read_map import (
     build_motion_read_map,
     _man_read_map,
     _zone_read_map,
+    read_flag,
     READ_THRESHOLD,
     ZONE_AREA_COVERAGE,
 )
 
 POSITIONS = ["PG", "SG", "SF", "PF", "C"]
+
+
+def _flags(scores):
+    """Derive the boolean edge flags from a player's raw mismatch scores (read map now stores
+    raw floats; these tests assert the edge outcomes)."""
+    return {t: read_flag(scores, t) for t in ("inside", "attack", "outside")}
+
+
 _ATTR_KEYS = ["SC", "ST", "AG", "SH", "ID", "OD", "IQ", "CH"]
 
 
@@ -42,15 +51,15 @@ def test_man_attack_edge_flags_only_attack():
     off["PG"] = _FakePlayer("off_PG", AG=90)
     deff = _uniform_lineup("def")
     flags = _man_read_map(off, deff, game_state={}, defending_is_user=False)
-    assert flags["off_PG"] == {"inside": False, "attack": True, "outside": False}
+    assert _flags(flags["off_PG"]) == {"inside": False, "attack": True, "outside": False}
     for pos in ["SG", "SF", "PF", "C"]:
-        assert flags[f"off_{pos}"] == {"inside": False, "attack": False, "outside": False}
+        assert _flags(flags[f"off_{pos}"]) == {"inside": False, "attack": False, "outside": False}
 
 
 def test_man_even_matchup_all_false():
     off, deff = _uniform_lineup("off"), _uniform_lineup("def")
     flags = _man_read_map(off, deff, game_state={}, defending_is_user=False)
-    assert all(f == {"inside": False, "attack": False, "outside": False} for f in flags.values())
+    assert all(_flags(f) == {"inside": False, "attack": False, "outside": False} for f in flags.values())
 
 
 def test_man_outside_edge_flags_only_outside():
@@ -58,7 +67,7 @@ def test_man_outside_edge_flags_only_outside():
     off["SG"] = _FakePlayer("off_SG", SH=90)  # SH - OD = 40 > 15
     deff = _uniform_lineup("def")
     flags = _man_read_map(off, deff, game_state={}, defending_is_user=False)
-    assert flags["off_SG"] == {"inside": False, "attack": False, "outside": True}
+    assert _flags(flags["off_SG"]) == {"inside": False, "attack": False, "outside": True}
 
 
 def test_man_missing_defender_yields_all_false():
@@ -67,7 +76,7 @@ def test_man_missing_defender_yields_all_false():
     deff = _uniform_lineup("def")
     deff["PG"] = None  # no matched defender
     flags = _man_read_map(off, deff, game_state={}, defending_is_user=False)
-    assert flags["off_PG"] == {"inside": False, "attack": False, "outside": False}
+    assert _flags(flags["off_PG"]) == {"inside": False, "attack": False, "outside": False}
 
 
 # ----- zone -----
@@ -77,16 +86,16 @@ def test_zone_attack_edge_flags_only_attack():
     off["PG"] = _FakePlayer("off_PG", AG=90)  # attack D ~ 50 (uniform) → (50+90)/2 - 50 = 20 > 15
     deff = _uniform_lineup("def")
     flags = _zone_read_map(off, deff, variant="23")
-    assert flags["off_PG"] == {"inside": False, "attack": True, "outside": False}
+    assert _flags(flags["off_PG"]) == {"inside": False, "attack": True, "outside": False}
     for pos in ["SG", "SF", "PF", "C"]:
-        assert flags[f"off_{pos}"] == {"inside": False, "attack": False, "outside": False}
+        assert _flags(flags[f"off_{pos}"]) == {"inside": False, "attack": False, "outside": False}
 
 
 def test_zone_uniform_all_false_every_variant():
     for variant in ZONE_AREA_COVERAGE:
         off, deff = _uniform_lineup("off"), _uniform_lineup("def")
         flags = _zone_read_map(off, deff, variant=variant)
-        assert all(f == {"inside": False, "attack": False, "outside": False} for f in flags.values()), variant
+        assert all(_flags(f) == {"inside": False, "attack": False, "outside": False} for f in flags.values()), variant
 
 
 def test_zone_23_center_excluded_from_outside_dscore():
@@ -98,7 +107,7 @@ def test_zone_23_center_excluded_from_outside_dscore():
     deff["C"] = _FakePlayer("def_C", OD=100)  # would tank outside reads IF counted
     flags = _zone_read_map(off, deff, variant="23")
     # outside_d averages OD over PG/SG/SF/PF (all 50), C excluded → outside_d = 50 → 70-50 = 20 > 15
-    assert flags["off_SG"]["outside"] is True
+    assert read_flag(flags["off_SG"], "outside") is True
 
 
 # ----- routing -----

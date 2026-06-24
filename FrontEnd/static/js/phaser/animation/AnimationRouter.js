@@ -18,6 +18,7 @@ import { DebugFlags, animationDebugLog } from '../utils/debugFlags.js';
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
 import { ENABLE_TIMEOUT_BUTTON } from '../utils/timeoutButtonManager.js';
 import { waitMsRespectingPause, waitWhileUserPaused } from './playbackPause.js';
+import { playEndOfQuarterAirhorn } from '../utils/quarterEndAirhorn.js';
 
 export class AnimationRouter {
   constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null, updateDebugScore = null) {
@@ -594,6 +595,14 @@ export class AnimationRouter {
 
       // Tween: run when game clock runs (same condition). Two-phase when shot stops early: both in sync, then shot paused.
       const shouldRunClockTween = durationMs > 0 && gameSecondsToCount > 0 && this.scene?.gameClock && this.scene?.shotClock;
+      const isEndOfQuarterClockTurn =
+        Number.isFinite(clockEnd) && clockEnd === 0
+        && Number.isFinite(clockStart) && clockStart > 0;
+      let endOfQuarterAirhornFiredThisTurn = false;
+      const maybePlayEndOfQuarterAirhorn = () => {
+        if (endOfQuarterAirhornFiredThisTurn || !isEndOfQuarterClockTurn) return;
+        endOfQuarterAirhornFiredThisTurn = playEndOfQuarterAirhorn(this.scene, turnData);
+      };
       if (shouldRunClockTween) {
         const gameClock = this.scene.gameClock;
         const shotClock = this.scene.shotClock;
@@ -640,11 +649,17 @@ export class AnimationRouter {
             }
             gameClock.syncWithBackend(Math.max(endGame, Math.min(startGame, gameSeconds)));
             shotClock.syncWithBackend(Math.max(0, Math.min(30, shotSeconds)));
+            if (endGame === 0 && gameSeconds <= 0) {
+              maybePlayEndOfQuarterAirhorn();
+            }
           },
           onComplete: () => {
+            maybePlayEndOfQuarterAirhorn();
             this._resolveClockInterpolationTracking();
           },
         });
+      } else if (isEndOfQuarterClockTurn) {
+        maybePlayEndOfQuarterAirhorn();
       }
 
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start

@@ -67,16 +67,57 @@ def test_gate_on_when_env_truthy(monkeypatch):
         assert _dynamic_hco_motion_enabled() is True
 
 
-def test_turn_gate_both_off_defers_to_static(monkeypatch):
-    # alterations 0 + aggression 0, and every randint(0,4) returns its max (4) → 4 <= 0 is False
-    # for both rolls → neither team engaged → resolver defers to the static skeleton (None).
+def test_turn_gate_both_off_still_resolves(monkeypatch):
+    # alterations 0 + aggression 0 → neither team engaged (no subtle/disruption movement), but
+    # the shoot decision is UNIVERSAL: the resolver still walks (should_shoot per step + an
+    # end-of-walk forced shot) and returns a result rather than deferring to legacy.
     game = _FakeGame()
     game.offense_team.strategy_settings = {"alterations": 0}
     game.defense_team.strategy_settings = {"aggression": 0}
-    monkeypatch.setattr(random, "randint", lambda a, b: b)
+    monkeypatch.setattr(random, "randint", lambda a, b: b)  # max rolls → 4 <= 0 is False → both off
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
     off = _lineup(PG=_FakePlayer("pg"))
     skel = _skeleton({"PG": "key"}, {"PG": "upper wing"})
-    assert _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")}) is None
+    res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
+    assert res is not None and "skeleton" in res  # walks + end-of-walk forced shot, no defer
+
+
+def test_should_shoot_fires_per_step(monkeypatch):
+    # The universal per-step shoot decision terminates the walk with the chosen shot.
+    game = _FakeGame()
+    off = _lineup(PG=_FakePlayer("pg"))
+    skel = _skeleton({"PG": "key"}, {"PG": "upper wing"})
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot",
+                        lambda *a, **k: {"shooter_pos": "PG", "shot_type": "outside",
+                                         "via_pass": False, "hot_read": False})
+    res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
+    assert res is not None and res["shooter_pos"] == "PG" and res["shot_type"] == "outside"
+    assert res["skeleton"]["steps"][-1]["pos_actions"]["PG"]["action"] == "shoot"
+
+
+def test_post_subtle_shoot_fires_after_beat(monkeypatch):
+    # should_shoot returns None at the per-step check (→ movement = subtle beat), then fires on
+    # the post-subtle check → the shot lands AFTER the inserted beat.
+    game = _FakeGame()
+    off = _lineup(PG=_FakePlayer("pg"))
+    skel = _skeleton({"PG": "key"}, {"PG": "key"}, {"PG": "basketSpot"})
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action",
+                        lambda *a, **k: {"action": "SUBTLE_MOVEMENT"})
+    calls = {"n": 0}
+
+    def fake_shoot(*a, **k):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else {"shooter_pos": "PG", "shot_type": "inside",
+                                             "via_pass": False, "hot_read": False}
+
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", fake_shoot)
+    res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
+    assert res is not None and res["shooter_pos"] == "PG"
+    out = res["skeleton"]["steps"]
+    assert any("_subtle_movement" in s for s in out)            # a beat was inserted
+    assert out[-1]["pos_actions"]["PG"]["action"] == "shoot"     # then the post-subtle shot
 
 
 # ---------------------------------------------------------------- handoff
@@ -148,6 +189,7 @@ def test_walk_picks_first_shot_decision(monkeypatch):
         return {"action": "SHOOT", "shooter_pos": "PG", "shot_type": "inside"} if calls["n"] == 2 else {"action": "ADVANCE"}
 
     monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action", fake_decide)
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
     monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
     res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
     assert res is not None and res["shooter_pos"] == "PG"
@@ -171,6 +213,7 @@ def test_walk_weaves_subtle_beat_then_resumes_and_shoots(monkeypatch):
         return {"action": "SHOOT", "shooter_pos": "PG", "shot_type": "inside"}  # step 2 → shoot
 
     monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action", fake_decide)
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
     monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
     res = _resolve_motion_offense_shot_dynamic(skel, game, off, {"PG": _FakePlayer("d")})
     out = res["skeleton"]["steps"]

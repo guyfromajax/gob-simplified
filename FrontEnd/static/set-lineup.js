@@ -2375,7 +2375,7 @@ async function init() {
         myTeamSide: myTeamSide,
         clock: currentUrlParams.get('clock')
       });
-      // Pass through quarter_break_from so court knows whether to play airhorn (play_quarter only)
+      // Pass through quarter_break_from for quarter-break navigation context
       const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
 

@@ -351,8 +351,8 @@ These appear on snapshot objects for grep-friendly tracing (not exhaustive of ev
 | `fb_turnover_post_stopper` / `fb_non_shooting_foul_post_stopper` | Standard fast break non-shot (dynamic suffix on FB path). |
 | `fb_rr_turnover_post_stopper` / `fb_rr_bat_oob_post_stopper` | Rim Runner steal tier and batted ball OOB. |
 | `hco_situational_force_foul_inbound` | Situational “quick foul” after inbound (`situational_force_foul_pending`). Victim `coords` set from pending payload before snapshot. |
-| `hco_force_foul_final_turn` | Final-turn force foul (`_execute_final_turn_force_foul`); victim at key default. |
-| `hco_force_foul_after_dreb` | Force foul injected after DREB branch; rebounder `coords` set to half-court placeholder used for defender pick. |
+| `hco_force_foul_final_turn` | Final-turn force foul (`_execute_final_turn_force_foul`); victim/defender picks use live `Player.coords`. |
+| `hco_force_foul_after_dreb` | Force foul injected after DREB branch; rebounder/defender picks use synced `Player.coords` (fallback: `defense_rebounder_coords` / bounce). |
 | `opening_tip` | Opening tip animation finals. |
 | `free_throw_attempt` | FT snapshot helper. |
 | Inbound / OREB | See `build_inbound_destinations_snapshot` and OREB builder `source` arguments at call sites. |

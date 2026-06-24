@@ -341,7 +341,9 @@ export async function finalizeTurnAfterAnimation({
       turn.animation_steps.length > 0
     );
     const isBlockingFoul = turn.foul_team === 'DEFENSE' && turn.text?.toLowerCase().includes('blocking foul');
-    if (isSchemaDrebOtb) {
+    if (turn._quickFoulAnnounceDone) {
+      // Quick Foul: announce already fired after reach-in (BIP/SIP, DREB, or Final Turn path).
+    } else if (isSchemaDrebOtb) {
       // Backend schema step announces OTB after the rebounder reaches/attaches the ball.
     } else if (isBlockingFoul) {
       announceGameEvent('BLOCKING_FOUL', turn, scene, { foulerId: turn.foul_player_id || turn.defenderId });

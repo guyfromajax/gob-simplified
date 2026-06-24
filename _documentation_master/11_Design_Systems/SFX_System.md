@@ -13,7 +13,7 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 ## Runtime (implemented)
 
 - **Preload:** gameplay SFX preloaded in `bootGame.js` before `GameScene`.
-- **Playback:** all gameplay and court-stinger audio through `playGameSfx()` — small per-file pools, scene-retained until `ended` / `error`. **Exception:** the quarter-break / clock-zero airhorn (`airhorn-lowervol.wav`) plays via raw `new Audio()` in `bootGame.js` and `AnimationEngine.js`.
+- **Playback:** all gameplay and court-stinger audio through `playGameSfx()` — small per-file pools, scene-retained until `ended` / `error`. **Exception:** timeout and end-of-quarter airhorns (`airhorn-lowervol.wav`) play via raw `new Audio()` in `timeoutButtonManager.js` and `quarterEndAirhorn.js` (see below).
 - **Schema path:** backend stamps `sfx_on_step_start`, `sfx_on_ball_release`, `sfx_on_ball_arrival`, `timed_sfx`, and step `meta.sfx`; FE plays at step-processing start, ball detach/arrival, and announce mount (no parallel legacy `Audio()` paths for those events).
 - **Step-start cue (`sfx_on_step_start`):** a per-step SFX fired at the **start** of `playAnimationStep` in `animationPlayback.js`, BEFORE any tween/ball motion and independent of the ball. Distinct from `sfx_on_ball_release` (occupied by the shot/pass launch sound), so a cue can fire *as a step begins* without colliding. Schema: `BackEnd/utils/animation_step_schema.py`.
 - **Announcements:** `meta.sfx` on announce payloads → `court.html` overlay mount → `playGameSfx` (see Court Event SFX below).
@@ -108,7 +108,13 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 **Timeout airhorn**
 
 - Trigger: timeout popup appears (user-called) or computer timeout navigates to lineup.
-- File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()` in `timeoutButtonManager.js` (same exception class as the quarter-break/clock-zero airhorn noted in Runtime).
+- File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()` in `timeoutButtonManager.js`.
+
+**End of quarter airhorn**
+
+- Trigger: game clock reaches **0:00** on the turn that ends the quarter (`clock_end === 0`, `clock_start > 0`). Fires **immediately** when the clock tween hits zero (or at turn start if there is no clock tween for that turn).
+- File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js`, called from `AnimationRouter.js` clock interpolation (`onUpdate` / `onComplete`). Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`.
+- Scope: live turn-by-turn court playback (Q1–Q4). Not tied to the quarter-break locker-room screen or the "Quarter X Complete!" popup.
 
 **Defense Matchup Modal**
 

@@ -658,6 +658,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     }
     
     if (turnData.result_type === 'FOUL') {
+      if (turnData._quickFoulAnnounceDone) {
+        return;
+      }
       // FOUL turns should always announce foul type, including bonus fouls that lead to free throws.
       // True shooting fouls are emitted as shot result turns (MAKE/MISS) and are announced there.
       const isBonusFoul = isBonusFreeThrowFoulTurn(turnData);

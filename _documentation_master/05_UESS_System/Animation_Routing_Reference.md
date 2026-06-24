@@ -280,7 +280,7 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 - Updates active player display (shooter)
 - Routes to `FreeThrowAnimationSystem` (if available) or falls back to `runFreeThrowSequence()`
 - Appends text scroll with free throw result
-- On `quarter_ends_after` (e.g. Final Turn shooting foul → FTs): shows 0:00, plays the final-hold airhorn, holds `holdFinalShotMs` (default 3000ms) — no BIP
+- On `quarter_ends_after` (e.g. Final Turn shooting foul → FTs): shows 0:00, holds `holdFinalShotMs` (default 3000ms) — no BIP. EOQ airhorn fires from `AnimationRouter` when the game clock tween hits 0:00 (see `SFX_System.md`).
 - **Note:** `onUpdate` is called inside `runFreeThrowSequence` (no double counting)
 
 **Key Features:**

@@ -543,13 +543,80 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
     return foul_player
 
 
+def grid_coords_from_player(player, fallback=None):
+    """Return ``{x, y}`` grid coords from a player's current ``coords`` attribute."""
+    coords = getattr(player, "coords", None) or {}
+    if isinstance(coords, dict) and coords.get("x") is not None and coords.get("y") is not None:
+        try:
+            return {"x": float(coords["x"]), "y": float(coords["y"])}
+        except (TypeError, ValueError):
+            pass
+    if isinstance(fallback, dict) and fallback.get("x") is not None and fallback.get("y") is not None:
+        try:
+            return {"x": float(fallback["x"]), "y": float(fallback["y"])}
+        except (TypeError, ValueError):
+            pass
+    return {"x": 50.0, "y": 25.0}
+
+
+def defender_coords_by_pos_from_lineup(def_lineup):
+    """Build position -> grid coords from each defender's live ``Player.coords``."""
+    coords_by_pos = {}
+    for pos, defender in (def_lineup or {}).items():
+        if defender is None:
+            continue
+        coords_by_pos[pos] = grid_coords_from_player(defender)
+    return coords_by_pos or None
+
+
+def pick_force_foul_defender_spot(
+    victim_coords,
+    foul_player,
+    def_lineup,
+    defender_coords_by_pos=None,
+    max_radius=2.0,
+):
+    """
+    Grid spot for a force-foul defender: within ``max_radius`` Euclidean units of
+    the victim, biased toward the fouler's current/planned position.
+    """
+    import math
+
+    vx = float(victim_coords.get("x", 50))
+    vy = float(victim_coords.get("y", 25))
+    fouler_pos = None
+    for pos, player in (def_lineup or {}).items():
+        if player is foul_player:
+            fouler_pos = pos
+            break
+    d_coords = None
+    if fouler_pos and defender_coords_by_pos and fouler_pos in defender_coords_by_pos:
+        d_coords = defender_coords_by_pos[fouler_pos]
+    elif foul_player is not None:
+        d_coords = grid_coords_from_player(foul_player)
+    else:
+        d_coords = {"x": vx + 2, "y": vy}
+    dx = float(d_coords.get("x", vx + 2)) - vx
+    dy = float(d_coords.get("y", vy)) - vy
+    dist = math.hypot(dx, dy)
+    if dist < 0.01:
+        dx, dy, dist = 1.0, 0.0, 1.0
+    if dist <= max_radius:
+        r = max(0.5, dist * 0.85)
+    else:
+        r = min(max_radius * 0.875, max(0.5, max_radius - 0.01))
+    x = max(0.0, min(100.0, vx + (dx / dist) * r))
+    y = max(0.0, min(50.0, vy + (dy / dist) * r))
+    return {"x": round(x, 2), "y": round(y, 2)}
+
+
 def select_defender_closest_to_victim(victim_coords, def_lineup, defender_coords_by_pos=None):
     """
     For intentional foul (situational Force Foul): select the defender closest to the victim
     by Euclidean distance in court coordinates.
 
     Args:
-        victim_coords: dict with "x" and "y" (e.g. from HCO_STRING_SPOTS or inbound oDestinations)
+        victim_coords: dict with "x" and "y" (player coords, inbound oDestinations, etc.)
         def_lineup: dict position -> Player
         defender_coords_by_pos: optional dict position -> {"x", "y"}. If None, use position-based
             default spots (key) for all defenders as fallback.
@@ -4581,7 +4648,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     import random
     from BackEnd.engine.motion_read_map import build_motion_read_map
     from BackEnd.engine.motion_step_decision import (
-        decide_step_action, _choose_attack_or_outside,
+        decide_step_action, should_shoot, _choose_attack_or_outside, _step_locations,
         SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT, SUBTLE_MOVEMENT, FREELANCE_FORCED,
         SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY,
     )
@@ -4617,10 +4684,11 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     shot_clock_est = float(game_state.get("shot_clock_remaining", 30) or 30)
 
     # Turn-level read gating (brief: rolled ONCE per HCO turn). roll <= setting (both 0-4):
-    #  - offense executes reads (Dynamic HCO) if its alterations roll clears;
+    #  - offense executes reads (subtle MOVEMENT) if its alterations roll clears;
     #  - defense executes pressure if its aggression roll clears.
-    # Both off → defer to the static skeleton (legacy path). The 2x2 is resolved per step inside
-    # decide_step_action. (For now this only gates Motion plays; Set Play reads are a follow-up.)
+    # NOTE: the shoot decision (should_shoot) is UNIVERSAL — it runs every step regardless of
+    # these rolls (brief: decoupled from alterations). The rolls only gate the MOVEMENT matrix
+    # (subtle / disruption). (For now this only gates Motion plays; Set Play reads are a follow-up.)
     alterations = (getattr(off_team, "strategy_settings", {}) or {}).get("alterations", 2)
     aggression = (getattr(def_team, "strategy_settings", {}) or {}).get("aggression", 2)
     offense_reads = random.randint(0, 4) <= alterations
@@ -4629,8 +4697,6 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         f"🎲 [DYNAMIC MOTION] turn gate: offense_reads={offense_reads} "
         f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
     )
-    if not offense_reads and not defense_pressure:
-        return None  # neither engaged → run the static skeleton (defer to legacy)
 
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
@@ -4638,6 +4704,27 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         output_steps.append(steps[i])  # players arrive at skeleton step i
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
+            continue
+
+        # 1. Universal shoot decision — runs BEFORE the movement matrix, every step, all
+        # conditions. shoot/dish → execute (terminate); else fall through to movement.
+        locations = _step_locations(steps[i])
+        shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
+                             shot_clock_est, tempo, random, openness=0.0, allow_dish=True)
+        if shoot:
+            logging.warning(
+                f"🎯 [DYNAMIC MOTION] step {i}: SHOOT {shoot['shooter_pos']} "
+                f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
+            )
+            return _execute_motion_decision(
+                skeleton, output_steps, steps[i], bh_pos, bh_location,
+                {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]},
+                game, off_lineup, def_lineup, is_away_offense,
+            )
+
+        # 2. Movement matrix — only when the offense alters and/or the defense pressures.
+        # Neither engaged → static skeleton: just progress to the next step.
+        if not offense_reads and not defense_pressure:
             continue
         bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
         decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
@@ -4679,6 +4766,26 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             beat["_step_t_floor_game_seconds"] = elapsed
             shot_clock_est -= elapsed
             output_steps.append(beat)
+
+            # Post-subtle shoot decision (brief: subtle movement can lead to a shot). The BH is
+            # now off-pattern; if his man defender FROZE (failed his read) he's open → openness
+            # bonus. A yes terminates with a shot; a no resumes the skeleton next iteration.
+            bh_def_pos = off_to_def.get(bh_pos) if not zone else None
+            froze = (bh_def_pos is not None
+                     and beat["_subtle_movement"].get("defender_reads", {}).get(bh_def_pos) is False)
+            post_shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
+                                      shot_clock_est, tempo, random,
+                                      openness=(20.0 if froze else 0.0), allow_dish=True)
+            if post_shoot:
+                logging.warning(
+                    f"🎯 [DYNAMIC MOTION] post-subtle SHOOT {post_shoot['shooter_pos']} "
+                    f"{post_shoot['shot_type']} (froze={froze})"
+                )
+                return _execute_motion_decision(
+                    skeleton, output_steps, steps[i], bh_pos, bh_location,
+                    {"action": SHOOT, "shooter_pos": post_shoot["shooter_pos"], "shot_type": post_shoot["shot_type"]},
+                    game, off_lineup, def_lineup, is_away_offense,
+                )
         elif action == FREELANCE_FORCED:
             # Leave the skeleton and run the freelance progression to a shot.
             return _resolve_freelance(

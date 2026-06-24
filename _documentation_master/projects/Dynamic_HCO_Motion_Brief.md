@@ -234,14 +234,14 @@ Triggered once the BH commits to a subtle movement (how he gets there is the **T
 - **Defense:** `random.randint(0,4) <= aggression` → defense executes **pressure** this turn. Else it has no read impact.
 - (Currently gates **Motion** plays only; the roll moves to turn setup when Set Play reads land. Sits under the `GOB_DYNAMIC_HCO_MOTION` master flag.)
 
-The two booleans select the per-step branch in `decide_step_action` (a universal shot-clock **desperation** pre-check still runs first in all engaged cases):
+**The universal `should_shoot` decision runs FIRST each step (see below) — a shot/dish terminates the step.** Only if the BH *progresses* do the two booleans select the per-step **movement** branch in `decide_step_action` (a shot-clock **desperation** pre-check still runs first in engaged cases):
 
-| Offense reads | Defense pressure | Per-step behavior |
+| Offense reads | Defense pressure | Per-step MOVEMENT (after no-shot) |
 |---|---|---|
-| ✅ | ✅ | **Read battle** — `offense read score` vs `defense_score`. Offense wins → hot read or (fallback) subtle; defense wins → disruption (subtle/FF/none); neutral → subtle/pass. |
-| ✅ | ❌ | **Offense unopposed** → hot read if available + executed, **else subtle** (never a plain advance). |
-| ❌ | ✅ | **Ball-handling battle** — `ball_handling_score` vs `defense_score`. Defense wins → disruption; offense wins **or** neutral → advance. (d-foul check on an offense win is deferred.) |
-| ❌ | ❌ | **Static skeleton** — resolver returns `None`, defers to the legacy path. |
+| ✅ | ✅ | **Read battle** — `offense read score` vs `defense_score`. Offense wins → subtle probe; defense wins → disruption (subtle/FF/none); neutral → subtle/pass. |
+| ✅ | ❌ | **Offense unopposed** → subtle probe (never a plain advance). |
+| ❌ | ✅ | **Ball-handling battle** — `ball_handling_score` vs `defense_score`. Defense wins → disruption; offense wins **or** neutral → advance. (d-foul deferred.) |
+| ❌ | ❌ | **Static skeleton** — advance to the next step. (No longer defers to legacy: `should_shoot` still runs every step.) |
 
 **Scores (form B, single d6):**
 - Offense read: `(player_read_raw + discipline) * d6`
@@ -249,6 +249,58 @@ The two booleans select the per-step branch in `decide_step_action` (a universal
 - Defense: `(defender_pressure_raw | inside_defender_raw + fight) * d6`
 - Win margins: offense wins if `> defense_score + def_eff + def_chem`; defense wins if `> offense_score + off_eff + off_chem`; else neutral.
 
-**Key behavior change:** a successful offense (wins the read in Condition 1, or is unopposed in Condition 2) that doesn't fire a hot read now **falls back to a subtle movement** instead of advancing — `_hot_read_branch`'s old `advance` fallback is now `subtle` (keeps the aggression-weighted execute roll: 50% / 70% / 30%).
+**Shots are no longer in this matrix.** The old hot-read branch was removed from `decide_step_action`; all shooting (incl. the hot read, now a *label*) is the universal `should_shoot` decision that runs **before** this matrix every step. So this matrix is purely *how the BH moves when he doesn't shoot*.
 
 **Tunables:** `alterations` (offense, per-team, 0–4) and `aggression` (defense, per-team, 0–4) — both in `strategy_settings`, default 2. `roll <= setting`, so 2 → ~60% engaged, 4 → always, 0 → 20%.
+
+---
+
+## Universal Shoot Decision (IMPLEMENTED — tune the constants)
+
+One shared decision, `should_shoot` (`motion_step_decision.py`), evaluated at three call sites. Two steps: **(1) is the look optimal?** then **(2) does the shooter make the right call?**. Constants to tune: `SHOOT_THRESHOLD_BASE` (30), `SHOOT_TEMPO_ADJ` (±8), `SHOOT_READ_RIGHT/SAFE` (200/125).
+
+**What's live:**
+- **Per-step BH** (`_resolve_motion_offense_shot_dynamic` walk): runs every step before the movement matrix, universal (decoupled from `alterations`). A shoot/dish terminates the walk.
+- **On-skeleton reception:** covered automatically — the walk evaluates whoever *holds the ball at step end* (`_motion_bh_at_step` prefers `receive`), so a receiver at a skeleton pass step gets the same shoot check (catch-and-shoot, else resume).
+- **Post-subtle:** after a subtle beat, re-runs `should_shoot` from the BH's spot with a freeze openness bonus (if his man defender failed his subtle read).
+- "Hot read" is now a **label** (`hot_read` flag on the decision when the shot came off a genuine mismatch), not a separate path — shares the read map's raw scores with the shoot check (one computation).
+
+**Deferred refinements:** coord-exact shoot from the *subtle* position (currently the BH moves back to his named spot to shoot — a small move, not a teleport); reception `allow_dish=False` (a skeleton receiver can currently re-dish); off-skeleton-reception → freelance (moot while all dishes shoot); the timeout/quarter-break read-map cache.
+
+`should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team, shot_clock, tempo_call, rng, openness, allow_dish) → SHOOT decision | None`
+
+### Step 1 — Optimal shot?  (`shot_quality >= scaled_threshold`)
+- **`shot_quality`** = the **hot-read offender-vs-defender shot-type score** (Step-1 formulas: Inside `((SC+ST)-(ID+ST))/2`, Outside `SH-OD`, Attack `((SC+AG)-(ID+AG))/2`), **location-relative**:
+  - inside spot → Inside score;
+  - non-inside spot → **attack OR outside** (a perimeter spot supports both), chosen by a **weighted roll biased by team emphasis** (extends `_choose_attack_or_outside`):
+    - `attack_score  = (AG+SC)/2 + attack_setting  * 10`
+    - `outside_score =  SH       + outside_setting * 10`  (`attack`/`outside` `strategy_settings`, 0–4, default 2)
+    - roll in `[1, attack_score + outside_score]` → **attack** if `<= attack_score`, else **outside**; read *that* type's quality. (Weighted, not argmax — a stronger skill / higher team emphasis is chosen *more often*, not always.)
+  - then **modified by openness** (defender proximity / contest — a frozen or distant defender boosts the look; dominant term at receptions and after a defender freeze).
+- **`scaled_threshold = BASE − clock_relief − TEMPO_MOD[tempo_call]`**
+  - `BASE` (≈150, tunable) = the "elite look" bar at a full clock, normal tempo.
+  - `clock_relief` grows as the clock drains → lower bar late: e.g. `(SHOT_CLOCK_START − shot_clock) × k` (tunable `k`).
+  - `TEMPO_MOD` reuses `{slow −25, normal 0, fast +25}`: **fast lowers the bar** (shoot sooner), slow raises it.
+- `optimal = shot_quality >= scaled_threshold`
+
+### Step 2 — Read tier  (shooter's decision quality)
+`read = (player_read_raw(shooter) + discipline) * d6`  (form B; `discipline` = shot-selection discipline)
+- **`> 200` → right decision:** optimal → **shoot** (or **dish** to a better-positioned teammate); not optimal → **progress**.
+- **`> 125` → safe decision:** **progress** (pass up the look).
+- **`<= 125` → non-strategic:** 50/50 **shoot vs progress** (the shoot is a forced/contested attempt — no bonus).
+
+### Outcome routing (by site)
+| Site | shoot / dish | progress |
+|---|---|---|
+| **BH step** | shoot, or catch-and-shoot **dish** (the collapsed hot read) | fall through to the movement matrix (subtle / advance / disruption) |
+| **After subtle beat** | shoot from the BH's subtle coords | resume the skeleton (next step) |
+| **Reception — on-skeleton** | catch-and-shoot | resume the skeleton (its defined flow) |
+| **Reception — off-skeleton** (hot-read / subtle dish) | catch-and-shoot | **enter freelance** (`_resolve_freelance`, already built) |
+
+### Resolved
+1. **The shoot decision is UNIVERSAL — decoupled from the `alterations` gate.** `alterations` gates only off-pattern *movement* (subtle moves); the BH reads to **shoot-or-progress every step in all four conditions**. ⚠️ Implementation consequence: the resolver's current "both-off → defer to static skeleton" must change when `should_shoot` lands so the shoot decision still runs when neither team alters/pressures.
+2. **All dishes catch-and-shoot** (matches existing kick-out / hot-read dishes). So the reception shoot-decision applies to **skeleton passes only**; the off-skeleton-reception → freelance path is deferred (it can't arise while dishes always shoot).
+3. **Layering:** the shoot decision runs **before** the movement matrix each step (shoot/dish → else progress → matrix).
+
+### Still open
+- (none — spec settled; ready to implement against a unified `should_shoot` + the three call sites.)

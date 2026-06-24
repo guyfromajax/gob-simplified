@@ -298,12 +298,16 @@ export class AnimationEngine {
     if (this.scene) {
       this.scene.__uessTracePlayback = true;
     }
+    const isFinalTurnShot = this._isFinalTurnSchemaShot(turnData);
+    let stepsToPlay = steps;
+
     console.warn("[UESS PLAYBACK] schema:enter", {
       turnIndex: turnData?.index ?? this.scene?.currentTurn ?? null,
       resultType: turnData?.result_type ?? null,
       currentTurn: turnData?.current_turn ?? null,
       nextPlayType: turnData?.next_play_type ?? null,
       steps: steps.length,
+      finalTurnShot: isFinalTurnShot,
       spriteCount: Object.keys(sprites || {}).length,
       hasBallSprite: Boolean(ballSprite),
       ballVisible: ballSprite?.visible ?? null,
@@ -311,9 +315,24 @@ export class AnimationEngine {
       skipToEnd: this.scene?.skipToEnd ?? null,
     });
 
+    if (isFinalTurnShot) {
+      const { runFinalTurnAlignment } = await import('./turnAnimation.js');
+      await runFinalTurnAlignment({
+        scene: this.scene,
+        playerSprites: sprites,
+        ballSprite,
+        turnData,
+      });
+      await this._runFinalTurnStep0EntryPassIfNeeded(turnData, sprites, ballSprite);
+      await this._holdFinalTurnBallUntilShotWindow(turnData);
+      if (steps.length > 1) {
+        stepsToPlay = steps.slice(1);
+      }
+    }
+
     const turnStop = await playTurn(
       this.scene,
-      steps,
+      stepsToPlay,
       sprites,
       ballSprite,
       { turnData },
@@ -353,7 +372,11 @@ export class AnimationEngine {
     if (turnData?.bat_oob) {
       await this._runHctBatOobBallSend(turnData, sprites, ballSprite);
     } else if (turnData?.rim_runner_bat_oob) {
-      await this._runSchemaBatOobBallSend(turnData, steps, sprites, ballSprite);
+      await this._runSchemaBatOobBallSend(turnData, stepsToPlay, sprites, ballSprite);
+    }
+
+    if (isFinalTurnShot && turnData?.quarter_ends_after) {
+      await this._finishFinalTurnQuarterEnd(turnData, context);
     }
 
     return true;
@@ -535,7 +558,6 @@ export class AnimationEngine {
 
     if (turnData?.quarter_ends_after) {
       if (context.onUpdate) context.onUpdate({ clock: "0:00" });
-      this._playFinalHoldAirhorn();
       const animationConfig = (await import("./animation_config.js")).default;
       const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
       await new Promise((resolve) => setTimeout(resolve, holdMs));
@@ -1055,7 +1077,6 @@ export class AnimationEngine {
     // Final play of quarter (e.g. Final Turn shooting foul → FTs): show 0:00, hold then quarter end (no BIP)
     if (turnData.quarter_ends_after) {
       if (context.onUpdate) context.onUpdate({ clock: '0:00' });
-      this._playFinalHoldAirhorn();
       const animationConfig = (await import('./animation_config.js')).default;
       const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
       await new Promise(resolve => setTimeout(resolve, holdMs));
@@ -1645,22 +1666,6 @@ export class AnimationEngine {
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }
 
-  /**
-   * Play airhorn-lowervol.wav when the clock hits 0:00 (e.g. final play of quarter hold).
-   */
-  _playFinalHoldAirhorn() {
-    if (typeof window === 'undefined') return;
-    try {
-      const staticPath = (window.API_CONFIG && typeof window.API_CONFIG.getStaticPath === 'function')
-        ? window.API_CONFIG.getStaticPath()
-        : '/static';
-      const airhorn = new Audio(`${staticPath}/sounds/airhorn-lowervol.wav`);
-      airhorn.volume = 0.7;
-      airhorn.currentTime = 0;
-      airhorn.play().catch(() => {});
-    } catch (e) {}
-  }
-
   _parseClockTextToSeconds(clockText) {
     if (typeof clockText !== 'string') return null;
     const parts = clockText.trim().split(':');
@@ -1671,14 +1676,74 @@ export class AnimationEngine {
     return Math.max(0, Math.floor(minutes * 60 + seconds));
   }
 
-  async _holdFinalTurnBallUntilLatePassWindow(turnData) {
-    if (this.scene?.skipToEnd) return;
+  _isFinalTurnSchemaShot(turnData) {
+    if (turnData?.final_turn !== true) return false;
+    const resultType = String(turnData?.result_type || '').toUpperCase();
+    return resultType === 'MAKE' || resultType === 'MISS' || resultType === 'BLOCK';
+  }
+
+  async _getFinalTurnShotWindowTargetSec(turnData) {
     const animationConfig = (await import('./animation_config.js')).default;
-    const minTarget = Number(animationConfig?.finalTurn?.latePassTargetSecMin ?? 5.7);
-    const maxTarget = Number(animationConfig?.finalTurn?.latePassTargetSecMax ?? 6.3);
-    const targetMin = Math.min(minTarget, maxTarget);
-    const targetMax = Math.max(minTarget, maxTarget);
-    const targetRemainingSec = targetMin + Math.random() * (targetMax - targetMin);
+    const playcall = String(
+      turnData?.offensive_playcall
+      ?? turnData?.current_playcall
+      ?? turnData?.offensive_play_focus
+      ?? ''
+    ).trim().toLowerCase();
+    if (playcall === 'attack') {
+      return Number(animationConfig?.finalTurn?.latePassTargetSecAttack ?? 4);
+    }
+    return Number(animationConfig?.finalTurn?.latePassTargetSecOutside ?? 3);
+  }
+
+  _resolveFinalTurnStep0OwnerId(turnData) {
+    for (const anim of turnData?.animations || []) {
+      if (anim?.hasBallAtStep?.[0] && anim.playerId != null) {
+        return String(anim.playerId);
+      }
+    }
+    const step0Ball = turnData?.animation_steps?.[0]?.start?.ball;
+    if (step0Ball?.owner_player_id != null && step0Ball.owner_player_id !== '') {
+      return String(step0Ball.owner_player_id);
+    }
+    const bhId = turnData?.ball_handler_id ?? turnData?.roles?.ball_handler_id;
+    return bhId != null ? String(bhId) : null;
+  }
+
+  async _runFinalTurnStep0EntryPassIfNeeded(turnData, sprites, ballSprite) {
+    if (!ballSprite || !this._isFinalTurnSchemaShot(turnData)) return;
+    const step0OwnerId = this._resolveFinalTurnStep0OwnerId(turnData);
+    const {
+      getCurrentOwner,
+      getPendingOwner,
+    } = await import('./BallControllerAdapter.js');
+    const liveOwnerId = getCurrentOwner(this.scene) ?? getPendingOwner(this.scene) ?? null;
+    if (!step0OwnerId || !liveOwnerId || String(liveOwnerId) === String(step0OwnerId)) {
+      return;
+    }
+    if (!this.shotSystem) {
+      if (!this.ballController) return;
+      this.shotSystem = new ShotAnimationSystem(
+        this.scene,
+        this.ballController,
+        this.stateMachine,
+        sprites,
+        gameStore,
+      );
+    } else {
+      this.shotSystem.playerSprites = sprites;
+    }
+    await this.shotSystem.runStep0EntryPassIfNeeded(
+      ballSprite,
+      { value: null },
+      liveOwnerId,
+      step0OwnerId,
+    );
+  }
+
+  async _holdFinalTurnBallUntilShotWindow(turnData) {
+    if (this.scene?.skipToEnd) return;
+    const targetRemainingSec = await this._getFinalTurnShotWindowTargetSec(turnData);
 
     const contractStart = Number(turnData?.clock_start ?? turnData?.clockStart);
     const contractEnd = Number(turnData?.clock_end ?? turnData?.clockEnd);
@@ -1693,7 +1758,6 @@ export class AnimationEngine {
       ? liveClockSec
       : (Number.isFinite(contractStart) ? contractStart : fallbackClockFromText);
 
-    // Edge case requested: if already under the late-pass threshold, pass immediately.
     if (!Number.isFinite(currentRemainingSec) || currentRemainingSec <= targetRemainingSec) {
       return;
     }
@@ -1706,6 +1770,25 @@ export class AnimationEngine {
     if (waitMs <= 0) return;
 
     await new Promise(resolve => setTimeout(resolve, waitMs));
+  }
+
+  async _finishFinalTurnQuarterEnd(turnData, context) {
+    if (context.onUpdate) {
+      context.onUpdate({
+        home_score: turnData.home_score,
+        away_score: turnData.away_score,
+        clock: '0:00',
+        time_remaining: 0,
+        shot_clock_remaining: 0,
+      });
+    }
+    const animationConfig = (await import('./animation_config.js')).default;
+    const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
+    if (turnData.result_type === 'MAKE') {
+      const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+      announceGameEvent('SHOT_MAKE', turnData, this.scene, context);
+    }
+    await new Promise(resolve => setTimeout(resolve, holdMs));
   }
 
   /**
@@ -1733,7 +1816,7 @@ export class AnimationEngine {
       ballSprite: context.ballSprite,
       turnData
     });
-    await this._holdFinalTurnBallUntilLatePassWindow(turnData);
+    await this._holdFinalTurnBallUntilShotWindow(turnData);
     if (this.shotSystem) {
       await this.shotSystem.processShot(turnData);
     } else {
@@ -1754,23 +1837,7 @@ export class AnimationEngine {
     }
     // Final play of quarter: hold ball at rim (make) or bounce (miss), announce "It's Good" on make, then quarter end (no BIP/rebound)
     if (turnData.quarter_ends_after) {
-      if (context.onUpdate) {
-        context.onUpdate({
-          home_score: turnData.home_score,
-          away_score: turnData.away_score,
-          clock: '0:00',
-          time_remaining: 0,
-          shot_clock_remaining: 0
-        });
-      }
-      this._playFinalHoldAirhorn();
-      const animationConfig = (await import('./animation_config.js')).default;
-      const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
-      if (turnData.result_type === 'MAKE') {
-        const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
-        announceGameEvent('SHOT_MAKE', turnData, this.scene, context);
-      }
-      await new Promise(resolve => setTimeout(resolve, holdMs));
+      await this._finishFinalTurnQuarterEnd(turnData, context);
     }
   }
 
@@ -2081,20 +2148,30 @@ export class AnimationEngine {
   }
 
   async handleDefault(turnData, context) {
-    // ✅ Force Foul: animation (defender move) was already done during BIP/SIP turn
+    // ✅ Force Foul: animation (reach-in + announce) was already done during BIP/SIP turn
     if (turnData.result_type === 'FOUL' && turnData._quickFoulAnimatedDuringInbound) {
       return;
     }
 
-    // ✅ Force Foul after DREB: animate defender→victim (rebounder), then finalize ("Quick Foul")
-    if (turnData.result_type === 'FOUL' && turnData.force_foul_after_dreb) {
-      const victimId = turnData.victim_id;
+    // ✅ Quick Foul after DREB or Final Turn: sprint → reach_in → announce (clock runs via turn contract)
+    if (
+      turnData.result_type === 'FOUL'
+      && turnData.quick_foul
+      && (turnData.force_foul_after_dreb || turnData.force_foul_final_turn)
+    ) {
+      const victimId = turnData.victim_id ?? turnData.ball_handler ?? turnData.shooter;
       const foulPlayerId = turnData.foul_player_id;
       const victimSprite = context.playerSprites?.[victimId];
       const defenderSprite = context.playerSprites?.[foulPlayerId];
       if (victimSprite && defenderSprite) {
-        const { animateQuickFoulDefenderToReceiver } = await import('./turnAnimation.js');
-        await animateQuickFoulDefenderToReceiver(this.scene, defenderSprite, victimSprite);
+        const { runQuickFoulSprintSequence } = await import('./quickFoulAnimation.js');
+        await runQuickFoulSprintSequence(this.scene, {
+          defenderSprite,
+          victimSprite,
+          ballSprite: context.ballSprite,
+          turnData,
+          clockBudgetMs: this.scene._clockInterpolationDurationMs,
+        });
       }
       return;
     }

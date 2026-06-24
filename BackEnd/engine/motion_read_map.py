@@ -77,35 +77,40 @@ def _attr(player, key):
         return 0.0
 
 
-def _empty_flags():
-    return {"inside": False, "attack": False, "outside": False}
+def _empty_scores():
+    # No-defender edge case (missing matchup): neutral 0.0 → below READ_THRESHOLD (no edge).
+    return {"inside": 0.0, "attack": 0.0, "outside": 0.0}
+
+
+def read_flag(scores, shot_type):
+    """Derive the hot-read boolean from a raw mismatch score: an edge exists when the raw
+    shot-type score clears READ_THRESHOLD. Lets callers that want booleans stay decoupled from
+    the storage format (the map now stores raw floats so should_shoot can scale a threshold)."""
+    return float((scores or {}).get(shot_type, 0.0)) > READ_THRESHOLD
 
 
 def _man_read_map(off_lineup, def_lineup, game_state, defending_is_user):
-    """1:1 matchup mismatch scores. Returns {player_id: {inside,attack,outside}}."""
+    """1:1 matchup mismatch scores. Returns {player_id: {inside,attack,outside}} as RAW floats."""
     matchups = get_matchups_for_defending_team(game_state, defending_is_user)  # {def_pos: off_pos}
     off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
     out = {}
     for off_pos, off_player in off_lineup.items():
         if not off_player:
             continue
-        flags = _empty_flags()
+        scores = _empty_scores()
         defender = def_lineup.get(off_to_def.get(off_pos, off_pos))
         if defender:
-            inside = ((_attr(off_player, "SC") + _attr(off_player, "ST"))
-                      - (_attr(defender, "ID") + _attr(defender, "ST"))) / 2
-            outside = _attr(off_player, "SH") - _attr(defender, "OD")
-            attack = ((_attr(off_player, "SC") + _attr(off_player, "AG"))
-                      - (_attr(defender, "ID") + _attr(defender, "AG"))) / 2
-            flags["inside"] = inside > READ_THRESHOLD
-            flags["outside"] = outside > READ_THRESHOLD
-            flags["attack"] = attack > READ_THRESHOLD
-        out[off_player.player_id] = flags
+            scores["inside"] = ((_attr(off_player, "SC") + _attr(off_player, "ST"))
+                                - (_attr(defender, "ID") + _attr(defender, "ST"))) / 2
+            scores["outside"] = _attr(off_player, "SH") - _attr(defender, "OD")
+            scores["attack"] = ((_attr(off_player, "SC") + _attr(off_player, "AG"))
+                                 - (_attr(defender, "ID") + _attr(defender, "AG"))) / 2
+        out[off_player.player_id] = scores
     return out
 
 
 def _zone_read_map(off_lineup, def_lineup, variant):
-    """Team-level zone-area D-scores vs individual offense scores."""
+    """Team-level zone-area D-scores vs individual offense scores (RAW floats)."""
     coverage = ZONE_AREA_COVERAGE.get(variant, {})
 
     inside_d_parts, outside_d_parts, attack_d_parts = [], [], []
@@ -127,21 +132,21 @@ def _zone_read_map(off_lineup, def_lineup, variant):
     for off_pos, off_player in off_lineup.items():
         if not off_player:
             continue
-        inside = (_attr(off_player, "SC") + _attr(off_player, "ST")) / 2 - inside_d
-        outside = _attr(off_player, "SH") - outside_d
-        attack = (_attr(off_player, "SC") + _attr(off_player, "AG")) / 2 - attack_d
         out[off_player.player_id] = {
-            "inside": inside > READ_THRESHOLD,
-            "outside": outside > READ_THRESHOLD,
-            "attack": attack > READ_THRESHOLD,
+            "inside": (_attr(off_player, "SC") + _attr(off_player, "ST")) / 2 - inside_d,
+            "outside": _attr(off_player, "SH") - outside_d,
+            "attack": (_attr(off_player, "SC") + _attr(off_player, "AG")) / 2 - attack_d,
         }
     return out
 
 
 def build_motion_read_map(game, off_lineup, def_lineup):
     """
-    Brief Steps 0 & 1. Returns {player_id: {"inside":bool, "attack":bool, "outside":bool}}
-    for the five offensive players — the potential optimal reads for this HCO turn.
+    Brief Steps 0 & 1. Returns {player_id: {"inside":float, "attack":float, "outside":float}}
+    — RAW per-shot-type mismatch scores for the five offensive players. A hot-read edge exists
+    where a score clears READ_THRESHOLD (use ``read_flag``); ``should_shoot`` scales its own
+    clock/tempo threshold against the same raw scores, so hot reads and the shoot decision share
+    one computation.
 
     Ephemeral: the caller attaches the result to the turn context; it is not persisted
     to the team document (it depends on both the 5-man lineup and the current defensive

@@ -76,7 +76,7 @@ def test_neutral_branch_pass_vs_subtle():
     assert subtle_dec["action"] == D.SUBTLE_MOVEMENT
 
 
-# ---------------------------------------------------------------- offense wins → hot read
+# ---------------------------------------------------------------- offense wins read → subtle probe
 
 def _offense_wins_setup(read_map, bh_loc="key", teammates=None):
     off = _FakeTeam()
@@ -92,19 +92,10 @@ def _offense_wins_setup(read_map, bh_loc="key", teammates=None):
     return game, _step(locs), "PG", defender, lineup, read_map
 
 
-def test_hot_read_self_executes():
-    game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(
-        read_map={"bh": {"inside": False, "attack": True, "outside": False}}, bh_loc="key")
-    dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
-                             rng=FakeRng(randints=[3, 3], random_val=0.0))  # execute (<0.5)
-    assert dec["action"] == D.HOT_READ_SHOOT
-    assert dec["shooter_pos"] == "PG" and dec["shot_type"] == "attack" and dec["via_pass"] is False
-
-
 def test_hot_read_not_executed_falls_back_to_subtle():
     # Offense wins the read but passes up the hot read → subtle (no longer a plain advance).
     game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(
-        read_map={"bh": {"inside": False, "attack": True, "outside": False}})
+        read_map={"bh": {"inside": 0.0, "attack": 20.0, "outside": 0.0}})
     dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
                              rng=FakeRng(randints=[3, 3], random_val=0.9))  # >=0.5 → not executed
     assert dec["action"] == D.SUBTLE_MOVEMENT
@@ -119,16 +110,6 @@ def test_offense_wins_no_hot_read_falls_back_to_subtle():
 
 
 # ---------------------------------------------------------------- turn-level condition matrix
-
-def test_condition2_unopposed_executes_hot_read_when_available():
-    # offense reading, defense NOT pressuring → hot read if available + executed.
-    game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(
-        read_map={"bh": {"inside": False, "attack": True, "outside": False}})
-    dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
-                             rng=FakeRng(randints=[3], random_val=0.0),
-                             offense_reads=True, defense_pressure=False)
-    assert dec["action"] == D.HOT_READ_SHOOT
-
 
 def test_condition2_unopposed_falls_back_to_subtle():
     # offense reading, defense NOT pressuring, no read available → subtle (never advance).
@@ -163,15 +144,9 @@ def test_condition3_unreading_offense_beats_pressure_advances():
     assert dec["action"] == D.ADVANCE
 
 
-def test_hot_read_teammate_when_bh_has_none():
-    # BH no read; teammate SG at wing has an outside read → pass-and-shoot.
-    game, step, bh_pos, defender, lineup, rm = _offense_wins_setup(
-        read_map={"sg": {"inside": False, "attack": False, "outside": True}},
-        teammates={"SG": ("sg", "upper wing")})
-    dec = decide_step_action(game, step, bh_pos, defender, lineup, rm,
-                             rng=FakeRng(randints=[3, 3], random_val=0.0))
-    assert dec["action"] == D.HOT_READ_SHOOT
-    assert dec["shooter_pos"] == "SG" and dec["shot_type"] == "outside" and dec["via_pass"] is True
+# NOTE: hot-read SHOTS (self + teammate dish) moved out of decide_step_action into the
+# universal should_shoot decision — see test_motion_should_shoot.py. decide_step_action is now
+# movement-only (offense wins the read → subtle probe, not a shot).
 
 
 # ---------------------------------------------------------------- defense wins → disruption

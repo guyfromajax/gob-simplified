@@ -10,6 +10,10 @@ import {
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { playGameplayTrack } from "../../musicController.js";
 import { runPass, tweenPlayerTo } from "./ballTween.js";
+import {
+  commitQuickFoulReachInAndAnnounce,
+  resolveQuickFoulInboundPair,
+} from "./quickFoulAnimation.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext } from "./outletUtils.js";
@@ -1090,9 +1094,12 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
     // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
     
     if (!scene.stateMachine?.is(States.FastBreak)) {
-      // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
-      const nextTurn = context?.nextTurn;
-      const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+      const quickFoulPair = resolveQuickFoulInboundPair(
+        turnData,
+        context?.nextTurn,
+        playerSprites,
+        passInfo,
+      );
       const passPromise = passInfo
         ? handlePassAnimation({ scene, passInfo, playerSprites, enablePassSfx: true })
         : pgSprite
@@ -1104,17 +1111,27 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
             })
           : Promise.resolve();
 
-      let defenderPromise = Promise.resolve();
-      if (isQuickFoulNext) {
-        const receiverId = passInfo?.receiverId ?? pgId;
-        const receiverSprite = playerSprites[receiverId];
-        const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
-        if (receiverSprite && defenderSprite) {
-          defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
-          nextTurn._quickFoulAnimatedDuringInbound = true;
+      await passPromise;
+
+      if (quickFoulPair) {
+        const announceTurn = quickFoulPair.foulTurnData ?? {
+          quick_foul: true,
+          foul_player_id: quickFoulPair.foulerId,
+          foul_team: 'DEFENSE',
+          result_type: 'FOUL',
+        };
+        await commitQuickFoulReachInAndAnnounce(scene, {
+          defenderSprite: quickFoulPair.defenderSprite,
+          victimSprite: quickFoulPair.victimSprite,
+          ballSprite,
+          turnDataForAnnounce: announceTurn,
+          markTurnDone: turnData,
+        });
+        if (quickFoulPair.foulTurnData) {
+          quickFoulPair.foulTurnData._quickFoulAnimatedDuringInbound = true;
+          quickFoulPair.foulTurnData._quickFoulAnnounceDone = true;
         }
       }
-      await Promise.all([passPromise, defenderPromise]);
       sideInboundPassDelivered = true;
     }
 
@@ -2463,21 +2480,6 @@ async function runDefensiveReboundSetup({
   }
 }
 
-/**
- * Animate the fouling defender moving to within 1-2 x spots and ±1 y spots of the receiver (Quick Foul after BIP/SIP).
- * Used in the same turn as the inbound pass so ball and defender move together.
- */
-function animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite) {
-  if (!scene?.tweens || !defenderSprite || !receiverSprite) return Promise.resolve();
-  const w = scene.game.config?.width ?? 1229;
-  const h = scene.game.config?.height ?? 768;
-  const spotW = w / 100;
-  const spotH = h / 50;
-  const offsetX = spotW * (Math.random() < 0.5 ? 1 : 2);
-  const offsetY = spotH * (Math.random() * 2 - 1); // -1 to 1
-  const target = { x: receiverSprite.x + offsetX, y: receiverSprite.y + offsetY };
-  return tweenPlayerTo(scene, defenderSprite, target, { duration: 400, easing: 'Linear' });
-}
 
 // Setup baseline inbound play after a made basket
 async function runInboundSetup({
@@ -3012,10 +3014,12 @@ async function runInboundSetup({
     }
   }
   
-  // Allow inbound pass regardless of current state (including FastBreak)
-  // ✅ Force Foul: when next turn is Quick Foul, animate defender to receiver in same step as the pass
-  const nextTurn = context?.nextTurn;
-  const isQuickFoulNext = nextTurn?.quick_foul && nextTurn?.result_type === 'FOUL';
+  const quickFoulPair = resolveQuickFoulInboundPair(
+    turnData,
+    context?.nextTurn,
+    playerSprites,
+    passInfo,
+  );
   const baselineInboundPassStartMs = Date.now();
   const passPromise = passInfo
     ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
@@ -3028,17 +3032,27 @@ async function runInboundSetup({
         sfxContext: buildGameplayPassSfxContext(scene, sfId, pgId),
       });
 
-  let defenderPromise = Promise.resolve();
-  if (isQuickFoulNext) {
-    const receiverId = passInfo?.receiverId ?? pgId;
-    const receiverSprite = playerSprites[receiverId];
-    const defenderSprite = nextTurn.foul_player_id ? playerSprites[nextTurn.foul_player_id] : null;
-    if (receiverSprite && defenderSprite) {
-      defenderPromise = animateQuickFoulDefenderToReceiver(scene, defenderSprite, receiverSprite);
-      nextTurn._quickFoulAnimatedDuringInbound = true;
+  await passPromise;
+
+  if (quickFoulPair) {
+    const announceTurn = quickFoulPair.foulTurnData ?? {
+      quick_foul: true,
+      foul_player_id: quickFoulPair.foulerId,
+      foul_team: 'DEFENSE',
+      result_type: 'FOUL',
+    };
+    await commitQuickFoulReachInAndAnnounce(scene, {
+      defenderSprite: quickFoulPair.defenderSprite,
+      victimSprite: quickFoulPair.victimSprite,
+      ballSprite,
+      turnDataForAnnounce: announceTurn,
+      markTurnDone: turnData,
+    });
+    if (quickFoulPair.foulTurnData) {
+      quickFoulPair.foulTurnData._quickFoulAnimatedDuringInbound = true;
+      quickFoulPair.foulTurnData._quickFoulAnnounceDone = true;
     }
   }
-  await Promise.all([passPromise, defenderPromise]);
   validateInboundUnitCompletionContract({
     scene,
     turnData,
@@ -5721,7 +5735,8 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration, animateQuickFoulDefenderToReceiver };
+export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration };
+export { animateQuickFoulDefenderToReceiver } from './quickFoulAnimation.js';
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY, opts = {}) {
   return getPlayerMovementDurationMs(sprite, targetX, targetY, {

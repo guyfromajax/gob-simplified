@@ -166,6 +166,112 @@ function runReachIn(scene, sprite, flourish, ballSprite, turnData = null) {
   } else {
     restore();
   }
+  return tween;
+}
+
+/**
+ * Awaitable reach-in flourish (for Quick Foul commit timing).
+ */
+export function awaitReachInFlourish(scene, sprite, ballSprite, turnData = null, flourish = {}) {
+  return new Promise((resolve) => {
+    if (!scene?.tweens || !sprite) {
+      resolve();
+      return;
+    }
+    const cfg = animationConfig.flourish?.reachIn || {};
+    const targetPt = resolveTargetPoint({ target: 'ball', ...flourish }, sprite, ballSprite);
+    if (!targetPt) {
+      resolve();
+      return;
+    }
+    const dxBall = targetPt.x - sprite.x;
+    const dyBall = targetPt.y - sprite.y;
+    const len = Math.hypot(dxBall, dyBall);
+    if (!Number.isFinite(len) || len < 1e-3) {
+      resolve();
+      return;
+    }
+    const ux = dxBall / len;
+    const uy = dyBall / len;
+    let ampPx = Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 11;
+    if (Number.isFinite(flourish?.amplitude_grid)) {
+      const width = scene.game?.config?.width;
+      const height = scene.game?.config?.height;
+      if (Number.isFinite(width) && Number.isFinite(height)) {
+        const pxPerGrid = (width / 100 + height / 50) / 2;
+        ampPx = flourish.amplitude_grid * pxPerGrid;
+      }
+    }
+    const dx = ux * ampPx;
+    const dy = uy * ampPx;
+    const totalMs = Number.isFinite(flourish?.duration_ms)
+      ? flourish.duration_ms
+      : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 450);
+    const ease = flourish?.ease || cfg.ease || 'Back.easeOut';
+    const halfMs = Math.max(1, totalMs / 2);
+
+    if (sprite.__reachInTween && sprite.__reachInTween.isPlaying?.()) {
+      resolve();
+      return;
+    }
+
+    const resolved = resolveRenderTarget(sprite);
+    if (!resolved) {
+      resolve();
+      return;
+    }
+
+    if (!isPassInterception(turnData)) {
+      playStealReachInSfx(scene);
+    }
+
+    let restore;
+    let tweenProps;
+    if (resolved.mode === 'origin') {
+      const baseOX = Number(sprite.displayOriginX);
+      const baseOY = Number(sprite.displayOriginY);
+      tweenProps = { displayOriginX: baseOX - dx, displayOriginY: baseOY - dy };
+      restore = () => {
+        sprite.displayOriginX = baseOX;
+        sprite.displayOriginY = baseOY;
+        sprite.__reachInTween = null;
+      };
+    } else {
+      const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
+      tweenProps = { x: `+=${dx}`, y: `+=${dy}` };
+      restore = () => {
+        for (const b of bases) {
+          b.c.x = b.x;
+          b.c.y = b.y;
+        }
+        sprite.__reachInTween = null;
+      };
+    }
+
+    const tween = scene.tweens.add({
+      targets: resolved.targets,
+      ...tweenProps,
+      duration: halfMs,
+      ease,
+      yoyo: true,
+      repeat: 0,
+      onComplete: () => {
+        restore();
+        resolve();
+      },
+      onStop: () => {
+        restore();
+        resolve();
+      },
+    });
+    if (tween) {
+      tween.__uessBoundaryIgnore = true;
+      sprite.__reachInTween = tween;
+    } else {
+      restore();
+      resolve();
+    }
+  });
 }
 
 /**

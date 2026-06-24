@@ -1099,8 +1099,13 @@ class GameManager:
         """
         Situational Logic (Q4/OT): If Slow It Down + Force Foul, set pending so the next
         API turn returns a defensive foul on the inbound pass receiver (after frontend animates the pass).
+        Also stamps the inbound payload so the frontend can position the fouler near the receiver during setup.
         """
         from BackEnd.utils import situational_logic as sl
+        from BackEnd.engine.phase_resolution import (
+            pick_force_foul_defender_spot,
+            select_defender_closest_to_victim,
+        )
         time_remaining = self.game_state.get("time_remaining")
         if not (
             sl.is_situational_active(self.quarter)
@@ -1110,12 +1115,36 @@ class GameManager:
             return
         receiver_pos = inbound_payload.get("receiver_pos", "SG")
         off_lineup = self.offense_team.lineup
+        def_lineup = self.defense_team.lineup
         if receiver_pos not in off_lineup or not off_lineup[receiver_pos]:
             return
+        victim_coords = inbound_payload.get("oDestinations", {}).get(
+            receiver_pos, {"x": 50, "y": 25}
+        )
+        d_dest = dict(inbound_payload.get("dDestinations") or {})
+        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
+        if not foul_player:
+            return
+        fouler_pos = None
+        for pos, player in (def_lineup or {}).items():
+            if player is foul_player:
+                fouler_pos = pos
+                break
+        if fouler_pos:
+            d_dest[fouler_pos] = pick_force_foul_defender_spot(
+                victim_coords, foul_player, def_lineup, d_dest
+            )
+            inbound_payload["dDestinations"] = d_dest
+        receiver = off_lineup[receiver_pos]
+        inbound_payload["force_foul_pending"] = True
+        inbound_payload["force_foul_fouler_id"] = getattr(foul_player, "player_id", None)
+        inbound_payload["force_foul_receiver_id"] = getattr(receiver, "player_id", None)
+        inbound_payload["force_foul_receiver_pos"] = receiver_pos
         self.game_state["situational_force_foul_pending"] = {
-            "victim_id": getattr(off_lineup[receiver_pos], "player_id", None),
-            "victim_coords": inbound_payload.get("oDestinations", {}).get(receiver_pos, {"x": 50, "y": 25}),
-            "defender_coords_by_pos": inbound_payload.get("dDestinations", {}),
+            "victim_id": getattr(receiver, "player_id", None),
+            "victim_coords": victim_coords,
+            "defender_coords_by_pos": d_dest,
+            "foul_player_id": getattr(foul_player, "player_id", None),
         }
 
     def simulate_macro_turn(self): #run_simulation
@@ -1418,13 +1447,27 @@ class GameManager:
         if result.get("force_foul_after_dreb"):
             from BackEnd.utils import situational_logic as sl
             from BackEnd.engine.phase_resolution import (
+                defender_coords_by_pos_from_lineup,
+                grid_coords_from_player,
                 resolve_non_shooting_foul,
                 select_defender_closest_to_victim,
             )
             victim = self.game_state.get("last_rebounder")
             def_lineup = self.defense_team.lineup  # After DREB flip, rebounder's team is offense; fouling team is defense
-            victim_coords = {"x": 50, "y": 25}  # Rebounder at half-court; defender positions use HCO fallback
-            foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, None)
+            rebounder_id = getattr(victim, "player_id", None)
+            rebounder_coords_fallback = None
+            if rebounder_id is not None:
+                dreb_coords = (result.get("defense_rebounder_coords") or {}).get(str(rebounder_id))
+                if isinstance(dreb_coords, dict):
+                    rebounder_coords_fallback = dreb_coords
+            if rebounder_coords_fallback is None and result.get("ball_bounce_x") is not None:
+                rebounder_coords_fallback = {
+                    "x": result.get("ball_bounce_x"),
+                    "y": result.get("ball_bounce_y", 25),
+                }
+            victim_coords = grid_coords_from_player(victim, rebounder_coords_fallback)
+            d_dest = defender_coords_by_pos_from_lineup(def_lineup)
+            foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
             if victim and foul_player:
                 self.game_state["foul_team"] = "DEFENSE"
                 roles = {

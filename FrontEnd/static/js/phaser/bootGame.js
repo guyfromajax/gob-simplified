@@ -2376,7 +2376,7 @@ async function handleSimQuarter() {
         lineup: {}, // Lineup will be set on lineup screen
         myTeamSide: userTeamSide || 'home'
       });
-      params.set('quarter_break_from', 'sim_quarter'); // No airhorn on Sim Quarter break
+      params.set('quarter_break_from', 'sim_quarter');
       console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
       window.location.href = `/set-lineup.html?${params.toString()}`;
     } else {
@@ -2394,7 +2394,7 @@ async function handleSimQuarter() {
       params.set('quarter', quarterAfterSim);
       params.set('period', periodLabel);
       params.set('game_id', gameId);
-      params.set('quarter_break_from', 'sim_quarter'); // No airhorn on Sim Quarter break (fallback path)
+      params.set('quarter_break_from', 'sim_quarter'); (fallback path)
       console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
       window.location.href = `/set-lineup.html?${params.toString()}`;
     }
@@ -2683,16 +2683,6 @@ async function initGame() {
       preGameContainer.classList.add('hidden');
     } else {
       preGameContainer.classList.remove('hidden');
-      // Quarter break: play airhorn only when user reached this break via "Play Quarter" (not Sim Quarter / Sim Full Game)
-      const quarterBreakFrom = urlParams.get('quarter_break_from');
-      if (quarter > 1 && quarterBreakFrom === 'play_quarter') {
-        try {
-          const staticPath = (typeof window.API_CONFIG !== 'undefined' && window.API_CONFIG.getStaticPath) ? window.API_CONFIG.getStaticPath() : '';
-          const airhorn = new Audio(`${staticPath}/sounds/airhorn-lowervol.wav`);
-          airhorn.volume = 0.7;
-          airhorn.play().catch(() => {});
-        } catch (e) {}
-      }
     }
   }
 

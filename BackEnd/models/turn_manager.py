@@ -3407,6 +3407,8 @@ class TurnManager:
         """Edge case: Slow It Down + Force Foul at Final Turn time. Victim = PG (ball handler)."""
         from BackEnd.utils import situational_logic as sl
         from BackEnd.engine.phase_resolution import (
+            defender_coords_by_pos_from_lineup,
+            grid_coords_from_player,
             resolve_non_shooting_foul,
             select_defender_closest_to_victim,
         )
@@ -3415,8 +3417,9 @@ class TurnManager:
         victim = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
         if not victim or not def_lineup:
             return None
-        victim_coords = {"x": 50, "y": 25}
-        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, None)
+        victim_coords = grid_coords_from_player(victim)
+        d_dest = defender_coords_by_pos_from_lineup(def_lineup)
+        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
         if not foul_player:
             return None
         self.game.game_state["foul_team"] = "DEFENSE"
@@ -3434,7 +3437,9 @@ class TurnManager:
         result["offense_team_id"] = self.game.offense_team.team_id
         result["current_turn"] = "HCO"
         result["quick_foul"] = True
-        victim.coords = {"x": 50.0, "y": 25.0}
+        result["force_foul_final_turn"] = True
+        result["victim_id"] = getattr(victim, "player_id", None)
+        victim.coords = dict(victim_coords)
         attach_position_snapshots(
             result,
             [
