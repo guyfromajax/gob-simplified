@@ -251,10 +251,15 @@
     /* Away Score */
     #away-score {
       grid-column: 4;
-      font-size: 80px;
-      line-height: 1;
+      font-size: 88px;
+      line-height: 0.92;
       text-align: center;
-      font-weight: bold;
+      font-weight: 800;
+      color: #fff;
+      text-decoration: underline;
+      text-decoration-color: var(--away-vibrant-color);
+      text-decoration-thickness: 3px;
+      text-underline-offset: 5px;
     }
 
     /* Away TOL/F */
@@ -427,11 +432,11 @@
     }
     */
 
-    /* ===== Scoreboard strategy stacks (tempo / aggr / alt) ===== */
+    /* ===== Scoreboard strategy stacks (tempo / aggr / alt) — read-only gauges ===== */
     .sb-strat {
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: 7px;
       justify-content: center;
       height: 100%;
       width: var(--strat-col);
@@ -465,9 +470,9 @@
     }
 
     .sb-strat .lab {
-      font-size: 12px;
+      font-size: 10px;
       letter-spacing: 0.1em;
-      color: rgba(255, 255, 255, 0.42);
+      color: rgba(255, 255, 255, 0.45);
       width: 30px;
       text-align: right;
     }
@@ -478,7 +483,7 @@
     .sb-strat .rail {
       position: relative;
       width: 96px;
-      height: 15px;
+      height: 11px;
     }
 
     .sb-strat .track {
@@ -505,23 +510,29 @@
       position: absolute;
       top: 50%;
       left: 0;
-      width: 16px;
-      height: 18px;
+      width: 5px;
+      height: 7px;
       transform: translate(-50%, -50%);
-      clip-path: polygon(0 0, 62% 0, 100% 50%, 62% 100%, 0 100%);
-      transition: left 0.5s cubic-bezier(0.6, 0, 0.2, 1), background 0.4s, box-shadow 0.4s;
+      clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+      background: #8A94A6 !important;
+      box-shadow: none !important;
+      border-radius: 0;
+      cursor: default;
+      pointer-events: none;
+      transition: left 0.5s cubic-bezier(0.6, 0, 0.2, 1);
       z-index: 3;
     }
     .sb-strat.home .marker {
-      transform: translate(-50%, -50%) scaleX(-1);
+      transform: translate(-50%, -50%);
     }
 
     .sb-strat .val {
-      font-size: 13px;
+      font-size: 11px;
       letter-spacing: 0.05em;
       width: 50px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.82) !important;
       text-align: right;
-      transition: color 0.4s;
     }
     .sb-strat.home .val {
       text-align: left;
@@ -675,10 +686,15 @@
     /* Home Score */
     #home-score {
       grid-column: 16;
-      font-size: 80px;
-      line-height: 1;
+      font-size: 88px;
+      line-height: 0.92;
       text-align: center;
-      font-weight: bold;
+      font-weight: 800;
+      color: #fff;
+      text-decoration: underline;
+      text-decoration-color: var(--home-vibrant-color);
+      text-decoration-thickness: 3px;
+      text-underline-offset: 5px;
     }
 
     /* Home Logo stack */
@@ -3788,6 +3804,7 @@
 /* Edge columns 0px: logos flush to viewport; global --side-padding unchanged elsewhere */
 #scoreboard {
   --sb-clock-font-size: 54px !important;
+  --sb-score-font-size: 80px !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
   align-items: stretch !important;
@@ -3843,21 +3860,30 @@
   margin-top: 2px !important;
   padding-bottom: 2px !important;
 }
-#scoreboard #away-score,
-#scoreboard #home-score {
-  font-size: var(--sb-clock-font-size) !important;
-  line-height: 0.92 !important;
-}
 #scoreboard #away-logo-container {
   grid-column: 2 !important;
+}
+#scoreboard #away-score,
+#scoreboard #home-score {
+  font-size: var(--sb-score-font-size) !important;
+  line-height: 0.92 !important;
+  font-weight: 800 !important;
 }
 #scoreboard #away-score {
   grid-column: 4 !important;
   margin-left: 16px !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--away-vibrant-color) !important;
+  text-decoration-thickness: 3px !important;
+  text-underline-offset: 5px !important;
 }
 #scoreboard #home-score {
   grid-column: 16 !important;
   margin-right: 16px !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--home-vibrant-color) !important;
+  text-decoration-thickness: 3px !important;
+  text-underline-offset: 5px !important;
 }
 #scoreboard .tol-fouls.away {
   grid-column: 6 !important;
@@ -3873,6 +3899,19 @@
 }
 #scoreboard .sb-strat.home {
   grid-column: 12 !important;
+}
+
+/* Scoreboard gauges: neutral readout (overrides JS inline hue on .val / .marker) */
+#scoreboard .sb-strat .val {
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-weight: 600 !important;
+}
+#scoreboard .sb-strat .lab {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+#scoreboard .sb-strat .marker {
+  background: #8A94A6 !important;
+  box-shadow: none !important;
 }
 
 #away-logo-container,

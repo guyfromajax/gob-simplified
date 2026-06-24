@@ -241,14 +241,9 @@ body::after {
   text-decoration: underline;
 }
 
-/* OTP input special styling */
-#otp-code {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', monospace;
-  font-size: 18px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  text-align: center;
-}
+/* Alpha access-code input — matches the standard field styling (.form-group
+   input) so the section reads consistently with email/password: stacked label,
+   full-width input, hint below. No special code-box treatment. */
 
 /* Error message — semantic red on dark */
 .error-message {
