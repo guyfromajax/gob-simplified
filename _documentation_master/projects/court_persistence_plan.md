@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Clean up `court.html` refresh / close / re-entry behavior so an active game does not restart from a quarter-start UI state with existing score and stats.
+Clean up `court.html` refresh / close / re-entry behavior so an active game resumes from the latest stable stoppage anchor instead of an arbitrary mid-turn or mid-animation state.
 
 Target user experience:
 
-- If the user refreshes or closes/reopens `court.html` mid-game, they return to the latest safe game state.
+- If the user refreshes or closes/reopens `court.html` mid-game, they return to the latest stable stoppage anchor.
 - The page should not show `Play Game` / `Sim Full Game` when the saved game is already active mid-quarter.
 - If the user logs back in later and enters the same franchise, the app should route them back to the active game instead of letting them bypass it into the FCC.
-- If exact current animation state cannot be restored, resume from the latest completed backend turn/checkpoint.
+- Resume anchors are saved after the user returns from the set-lineup screen at quarter breaks, timeouts, and player foul-outs.
 - Quarter breaks and timeout/foul-out resumes keep their existing distinct behavior.
 
 ## Current Failure Mode
@@ -31,7 +31,15 @@ Likely cause:
 
 ## Scope
 
-This plan intentionally targets **latest completed turn/checkpoint resume**, not mid-animation resume.
+This plan intentionally targets **latest stable stoppage resume**, not mid-animation or arbitrary completed-turn resume.
+
+Stable stoppage anchors:
+
+- Quarter break after the user returns from set-lineup for the next quarter.
+- Timeout after the user returns from set-lineup.
+- Player foul-out after the user returns from set-lineup.
+
+The anchor is captured after lineup return because that is the first point where lineups, strategy settings, possession, clock, score, and the next restart turn are all coherent.
 
 Out of scope for this phase:
 
@@ -58,13 +66,13 @@ Suggested response shape:
 ```json
 {
   "game_id": "...",
-  "status": "active_mid_quarter",
+  "status": "stoppage_anchor",
   "quarter": 2,
   "clock": "4:23",
   "time_remaining": 263,
   "shot_clock_remaining": 18,
   "offensive_state": "HCO",
-  "next_play_type": "HCO",
+  "next_play_type": "SIDE_INBOUND",
   "resume_from_timeout": false,
   "is_final": false,
   "has_cached_game": true,
@@ -75,7 +83,8 @@ Suggested response shape:
 Status values:
 
 - `pregame`: game exists but gameplay has not started.
-- `active_mid_quarter`: game is in progress and should auto-resume, not show quarter-start buttons.
+- `active_mid_quarter`: game is in progress, but should resume from the latest saved stoppage anchor rather than the current arbitrary live state.
+- `stoppage_anchor`: a saved lineup-return anchor exists and should be used for resume.
 - `timeout_resume`: timeout/foul-out state exists; existing timeout resume flow should run.
 - `quarter_break`: quarter completed; show quarter-start buttons.
 - `final`: game completed; route to completion / box score behavior.
@@ -89,18 +98,18 @@ Classification rules:
 - Treat `timeout_next_play_type` / `timeout_offense_team_id` / pending FT timeout fields as timeout resume state.
 - Treat `time_remaining <= 0` and non-final as quarter break.
 - Treat `quarter == 0` or no meaningful gameplay state as pregame.
-- Treat `time_remaining > 0` and game not final as active mid-quarter.
+- Treat `time_remaining > 0` and game not final as active mid-quarter only for live-state classification; user-facing resume should still resolve to the latest saved stoppage anchor.
 
 ### Frontend
 
 On `court.html` load:
 
 1. If URL has `game_id`, call `/api/game/{game_id}/resume-state` before revealing the pre-game button container.
-2. If status is `active_mid_quarter`:
+2. If status is `stoppage_anchor` or an active game with an available anchor:
    - Hide `Play Game`, `Sim Full Game`, and other quarter-start controls.
-   - Show a blocking “Restoring game...” overlay.
-   - Start `GameScene` in resume mode.
-   - Do not call the opening-tip / quarter-start branch.
+   - Show a blocking `Game In Progress` resume modal.
+   - Resume from the saved anchor and let the normal restart-turn path create the next BIP/SIP/FT/tip state.
+   - Do not hydrate a random mid-possession snapshot.
 3. If status is `timeout_resume`:
    - Preserve existing `resume_from_timeout=true` behavior.
 4. If status is `quarter_break`:
@@ -141,8 +150,8 @@ When `court.html` detects an active incomplete game, present clear context befor
 
 Show the resume modal when `/api/game/{game_id}/resume-state` returns:
 
-- `active_mid_quarter`
-- or another resumable live-game state that is not a timeout/foul-out lineup flow and not a quarter break.
+- `stoppage_anchor`
+- or an active incomplete game that has a saved stoppage anchor.
 
 Do not show the resume modal for:
 
@@ -156,7 +165,7 @@ Do not show the resume modal for:
 Suggested copy:
 
 - Title: `Game In Progress`
-- Body: `{Away Team} vs {Home Team}, Q{quarter}, {clock} remaining`
+- Body: `{Away Team} vs {Home Team}, resume from the last stoppage`
 - Score line: `{Away Team} {away_score} - {Home Team} {home_score}`
 - Primary button: `Resume Game`
 
@@ -171,7 +180,7 @@ No destructive or alternate action should be added in this phase. Abandon/forfei
 1. `court.html` starts in a neutral loading state.
 2. Pre-game controls stay hidden while resume-state resolves.
 3. If the game is active, render the resume modal.
-4. Pressing `Resume Game` hydrates the court from the latest completed checkpoint and continues from there.
+4. Pressing `Resume Game` hydrates the court from the saved stoppage anchor and continues from the restart turn.
 5. If the user refreshes again before pressing `Resume Game`, the same modal can appear again.
 
 ### Visual Design
@@ -192,11 +201,11 @@ Implementation should reuse or extend the existing `.pre-game-container`, `.pre-
 
 Do not invent a new modal design system. This is a gameplay modal and should visually match other mid-game court overlays.
 
-## Option B-Lite: More Reliable Backend Checkpoints
+## Option B-Lite: Stoppage Anchor Persistence
 
 ### Goal
 
-Make DB fallback good enough that a refresh can resume from the latest completed backend turn, even if the server cache is gone.
+Make DB fallback good enough that a refresh can resume from the latest lineup-return stoppage anchor, even if the server cache is gone.
 
 ### Backend
 
@@ -206,26 +215,27 @@ Current turn-by-turn save behavior:
 
 Proposed change:
 
-- Persist an active-game checkpoint after every completed user-played turn.
-- Continue using `summarize_game_state(gm, exclude_animations=True)` to avoid storing animation payloads.
-- Save only after turn simulation has completed and game state has advanced.
-- Keep existing special saves for timeout, foul-out, pending computer timeout, and quarter complete.
+- Do not use arbitrary per-turn checkpoints as the user-facing resume target.
+- Persist a dedicated `resume_anchor` after lineup return for quarter breaks, timeouts, and player foul-outs.
+- The anchor should be based on `summarize_game_state(gm, exclude_animations=True)` so the DB record remains compact.
+- The anchor should preserve the restart context needed to recreate the next turn: quarter-start BIP/tip, timeout SIP/BIP, or FT.
+- Existing timeout/foul-out save state remains useful, but the user-facing resume target should be the post-lineup-return anchor.
 
 Potential implementation choices:
 
-1. **Simple version:** save after every `/api/simulate-turn`.
-2. **Scoped version:** save after every `/api/simulate-turn` only for user-facing game modes (`single`, `franchise`, `tournament`, `tutorial`) and skip CPU-only bulk sims.
-3. **Dirty-check version:** save only if clock, score, possession state, lineups, stats, or pending state changed.
+1. **Anchor field on game doc:** add `resume_anchor` as a nested snapshot inside the existing game document.
+2. **Anchor metadata only:** mark the existing game document as a resume anchor when the save happens after lineup return.
+3. **Separate collection:** store anchors in a small `game_resume_anchors` collection keyed by `game_id`.
 
 Recommended first implementation:
 
-- Use the simple version for user-played turn-by-turn games.
-- Measure DB write time using existing performance logging.
-- If write cost is too high, move to dirty-check or save-every-N-plus-beforeunload strategy.
+- Use an anchor field on the existing game document.
+- Save/update it only after lineup return.
+- Have `/api/game/{game_id}/resume-state` classify active games from this anchor rather than from arbitrary latest game state.
 
 ### Checkpoint Contents
 
-Checkpoint must preserve:
+Anchor snapshot must preserve:
 
 - `quarter`
 - `clock`
@@ -242,7 +252,8 @@ Checkpoint must preserve:
 - timeouts
 - lineups
 - playbook and strategy settings in the game document
-- pending OREB / DREB / inbound / FT state when applicable
+- timeout/foul-out next-play state when applicable
+- quarter-start possession state when applicable
 
 `summarize_game_state()` already captures much of this, but implementation should audit the fields above before relying on it for refresh resume.
 
@@ -254,40 +265,40 @@ Preferred runtime flow after this work:
 2. Frontend shows load overlay immediately.
 3. Frontend calls `/api/game/{game_id}/resume-state`.
 4. Backend classifies game status from cache or DB.
-5. If active mid-quarter:
+5. If active mid-quarter and a stoppage anchor exists:
    - Frontend shows the `Game In Progress` resume modal.
-   - On `Resume Game`, frontend initializes scene with saved teams/rosters/current scoreboard state.
-   - Frontend calls a resume-safe backend path rather than `/api/simulate-quarter` as a new quarter start.
+   - On `Resume Game`, frontend resumes from the saved anchor.
+   - Frontend calls the existing quarter/timeout restart path with anchor-backed parameters instead of arbitrary live-state hydration.
+6. If active mid-quarter and no stoppage anchor exists:
+   - Treat as a pre-anchor game and fall back to the safest existing behavior.
+   - This should be rare after the feature is deployed because the first anchor is created after the first lineup return.
 
 ## Implementation Status
 
-Initial implementation added:
+Current implementation adds:
 
 - `GET /api/game/{game_id}/resume-state` for lightweight active-game classification.
-- Per-turn DB checkpoint saves in `/api/simulate-turn`.
+- `resume_anchor` metadata on the game document, written after `/api/simulate-quarter` runs from a lineup-return entry.
+- Quarter-complete DB saves in `/api/simulate-turn`; arbitrary per-turn saves are not used as the resume target.
 - FCC command-center payload field `active_game_resume` for the user's current scheduled active game.
 - Mode Select resume card inside the existing active franchise card.
 - Mode Select active-game routing to `court.html` instead of direct FCC entry.
 - Court resume modal using the existing pre-game modal visual language.
 - Direct `court.html` refresh detection for active games with `game_id`.
-- `GameScene` active-resume path that reads `/api/game/{game_id}?source=db` instead of calling `/api/simulate-quarter`.
+- `GameScene` resumes through the normal `/api/simulate-quarter` restart path; it does not hydrate arbitrary DB snapshots directly.
 
 Current limitation:
 
-- Active-session resume is wired when the backend still has the live `GameManager` in `ongoing_games`.
-- Cold rehydrate from DB checkpoint into a new `GameManager` is still required before the “close browser, return tomorrow” path can continue gameplay from the saved checkpoint.
-- Until cold rehydrate is implemented, the court resume modal disables `Resume Game` when `/api/game/{game_id}/resume-state` reports `has_cached_game=false`.
+- The first usable anchor is created only after the first lineup-return `/api/simulate-quarter` call.
+- If a game predates this feature and has no `resume_anchor`, the system cannot create a clean stoppage resume point retroactively.
 
 Next implementation step:
 
-- Extract the DB restore/hydration logic currently embedded in `/api/simulate-quarter` into a reusable helper.
-- Use that helper from `/api/simulate-turn` when `ongoing_games` misses but a valid active DB checkpoint exists.
-- After hydration, `/api/simulate-turn` should continue from the restored checkpoint without calling the opening-tip or quarter-start path.
-   - First resumed action is the next completed backend turn after the checkpoint.
-6. If quarter break:
-   - Frontend shows quarter-start buttons.
-7. If timeout/foul-out:
-   - Existing timeout resume path runs.
+- Prototype-test the three anchor cases:
+  - quarter break return
+  - timeout return
+  - player foul-out return
+- Confirm refresh and next-day re-entry both land on the last stoppage and generate the correct restart turn.
 
 ## Open Design Questions
 

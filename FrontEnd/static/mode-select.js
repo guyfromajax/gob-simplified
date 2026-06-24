@@ -751,8 +751,10 @@ function buildActiveGameCourtUrl(resume) {
   params.set('my_team', resume.user_team_side || 'home');
   params.set('quarter', String(Number(resume.quarter) || 1));
   params.set('period', formatResumePeriod(resume));
+  params.set('resume_from_timeout', resume.resume_from_timeout ? 'true' : 'false');
   if (resume.week) params.set('week', String(resume.week));
   if (resume.clock) params.set('clock', resume.clock);
+  if (resume.timeout_trace_id) params.set('timeout_trace_id', resume.timeout_trace_id);
   return './court.html?' + params.toString();
 }
 
@@ -788,7 +790,7 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
       franchiseResumeMatchup.textContent = (currentActiveGameResume.away_team_name || 'Away') + ' at ' + (currentActiveGameResume.home_team_name || 'Home');
     }
     if (franchiseResumeDetail) {
-      franchiseResumeDetail.textContent = formatResumePeriod(currentActiveGameResume) + ' · ' + (currentActiveGameResume.clock || 'Latest saved state');
+      franchiseResumeDetail.textContent = formatResumePeriod(currentActiveGameResume) + ' · ' + (currentActiveGameResume.clock || 'Last stoppage');
     }
     if (franchiseResumeScore) {
       franchiseResumeScore.textContent = String(currentActiveGameResume.away_score ?? 0) + ' - ' + String(currentActiveGameResume.home_score ?? 0);

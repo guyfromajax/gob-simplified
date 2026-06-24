@@ -806,12 +806,15 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     if not game_doc:
         return None
 
+    resume_anchor = game_doc.get("resume_anchor") if isinstance(game_doc.get("resume_anchor"), dict) else {}
+    source_doc = game_doc
+
     try:
-        quarter = int(game_doc.get("quarter", 1) or 1)
+        quarter = int((resume_anchor.get("quarter") if resume_anchor else source_doc.get("quarter", 1)) or 1)
     except (TypeError, ValueError):
         quarter = 1
     try:
-        time_remaining = int(float(game_doc.get("time_remaining", 480) or 480))
+        time_remaining = int(float((resume_anchor.get("time_remaining") if resume_anchor else source_doc.get("time_remaining", 480)) or 480))
     except (TypeError, ValueError):
         time_remaining = 480
 
@@ -851,7 +854,7 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "franchise_id": franchise_id,
         "week": int(next_game.get("week", franchise_doc.get("week", 1)) or 1),
         "quarter": quarter,
-        "clock": game_doc.get("clock") or _clock_from_time_remaining(time_remaining),
+        "clock": (resume_anchor.get("clock") if resume_anchor else None) or game_doc.get("clock") or _clock_from_time_remaining(time_remaining),
         "time_remaining": time_remaining,
         "home_team_id": home_id,
         "away_team_id": away_id,
@@ -860,6 +863,10 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "home_score": home_score,
         "away_score": away_score,
         "user_team_side": "home" if str(user_team_id_str) == home_id else "away",
+        "status": "stoppage_anchor" if resume_anchor else "active_mid_quarter",
+        "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or game_doc.get("timeout_next_play_type")),
+        "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type"),
+        "timeout_trace_id": resume_anchor.get("timeout_trace_id") or game_doc.get("timeout_trace_id"),
     }
 
 

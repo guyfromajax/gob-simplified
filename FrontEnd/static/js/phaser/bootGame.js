@@ -389,6 +389,41 @@ let isSimulating = false;
 // ✅ SS&S: Import shared status display utility
 import { showStatus, hideStatus } from './utils/statusDisplay.js';
 
+function applyResumeStateToUrl(resumeState) {
+  if (!resumeState || typeof window === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  const resumeQuarter = Number(resumeState.quarter) || quarter || 1;
+  quarter = resumeQuarter;
+  periodLabel = resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`;
+  params.set('quarter', String(resumeQuarter));
+  params.set('period', periodLabel);
+  params.set('resume_from_timeout', resumeState.resume_from_timeout ? 'true' : 'false');
+  params.delete('active_resume');
+  if (resumeState.clock) params.set('clock', resumeState.clock);
+  if (resumeState.timeout_trace_id) params.set('timeout_trace_id', resumeState.timeout_trace_id);
+  const applyLineup = (side, lineup) => {
+    if (!lineup || typeof lineup !== 'object') return;
+    ['PG', 'SG', 'SF', 'PF', 'C'].forEach((pos) => {
+      const pid = lineup[pos];
+      if (pid) params.set(`${side}_${pos.toLowerCase()}`, String(pid));
+    });
+  };
+  applyLineup('home', resumeState.home_lineup);
+  applyLineup('away', resumeState.away_lineup);
+  if (typeof history !== 'undefined' && history.replaceState) {
+    history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+  }
+
+  Object.keys(homeLineup).forEach((key) => delete homeLineup[key]);
+  Object.keys(awayLineup).forEach((key) => delete awayLineup[key]);
+  ['PG', 'SG', 'SF', 'PF', 'C'].forEach((pos) => {
+    const homePid = resumeState.home_lineup && resumeState.home_lineup[pos];
+    const awayPid = resumeState.away_lineup && resumeState.away_lineup[pos];
+    if (homePid) homeLineup[pos] = String(homePid);
+    if (awayPid) awayLineup[pos] = String(awayPid);
+  });
+}
+
 /**
  * Show scrolling text popup with shot results during Sim Quarter
  * @param {Object} lastSummary - Game summary from backend with turns array
@@ -2681,7 +2716,7 @@ async function initGame() {
       });
       if (resumeStateResponse.ok) {
         resumeState = await resumeStateResponse.json();
-        activeResume = !!(resumeState && resumeState.status === 'active_mid_quarter');
+        activeResume = !!(resumeState && resumeState.status === 'stoppage_anchor');
       }
     } catch (error) {
       console.warn('⚠️ [COURT RESUME] Could not check resume-state:', error);
@@ -2709,11 +2744,8 @@ async function initGame() {
       const resumeQuarter = Number(resumeState && resumeState.quarter) || quarter;
       const period = urlParams.get('period') || (resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`);
       const clock = (resumeState && resumeState.clock) || urlParams.get('clock') || '';
-      const cached = !!(resumeState && resumeState.has_cached_game);
       if (resumeGameSubtitle) {
-        resumeGameSubtitle.textContent = cached
-          ? `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`
-          : `Checking saved ${period}${clock ? ' · ' + clock : ''} state...`;
+        resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the last stoppage.`;
       }
       resumeGameContainer.classList.remove('hidden');
       if (!resumeState) {
@@ -2722,18 +2754,14 @@ async function initGame() {
         })
           .then((res) => res.ok ? res.json() : null)
           .then((state) => {
-            const cached = !!(state && state.has_cached_game);
             if (resumeGameSubtitle) {
-              if (cached) {
-                resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`;
-              } else {
-                resumeGameSubtitle.textContent = 'A saved checkpoint exists, but this server session needs cold rehydration before gameplay can resume.';
-              }
+              resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the last stoppage.`;
             }
             if (resumeGameButton) {
-              resumeGameButton.disabled = !cached;
-              resumeGameButton.textContent = cached ? 'Resume Game' : 'Resume Unavailable';
+              resumeGameButton.disabled = !(state && state.status === 'stoppage_anchor');
+              resumeGameButton.textContent = state && state.status === 'stoppage_anchor' ? 'Resume Game' : 'Resume Unavailable';
             }
+            resumeState = state;
           })
           .catch(() => {
             if (resumeGameSubtitle) {
@@ -2746,15 +2774,11 @@ async function initGame() {
           });
       } else {
         if (resumeGameSubtitle) {
-          if (cached) {
-            resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`;
-          } else {
-            resumeGameSubtitle.textContent = 'A saved checkpoint exists, but this server session needs cold rehydration before gameplay can resume.';
-          }
+          resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the last stoppage.`;
         }
         if (resumeGameButton) {
-          resumeGameButton.disabled = !cached;
-          resumeGameButton.textContent = cached ? 'Resume Game' : 'Resume Unavailable';
+          resumeGameButton.disabled = false;
+          resumeGameButton.textContent = 'Resume Game';
         }
       }
     } else {
@@ -2764,9 +2788,10 @@ async function initGame() {
   if (resumeGameButton) {
     resumeGameButton.addEventListener('click', async () => {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
+      applyResumeStateToUrl(resumeState);
       if (resumeGameContainer) resumeGameContainer.remove();
       try {
-        await handleButtonClick(true, { resumeActive: true });
+        await handleButtonClick(true, { resumeActive: false });
       } catch (error) {
         console.error('🚨 RESUME CLICKED: handleButtonClick failed:', error);
       }

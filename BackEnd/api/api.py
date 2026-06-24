@@ -2247,6 +2247,110 @@ try:
                     # logging.warning(f"⚠️ [PERF] Slow endpoint: /api/game/{game_id} - {total_time:.2f}ms")
                     pass
     
+    def _extract_saved_lineups(saved_doc: dict) -> tuple[dict, dict]:
+        home_lineup = {}
+        away_lineup = {}
+        if not isinstance(saved_doc, dict):
+            return home_lineup, away_lineup
+        for player in saved_doc.get("players") or []:
+            if not isinstance(player, dict):
+                continue
+            pos = player.get("pos")
+            pid = player.get("playerId") or player.get("player_id")
+            side = player.get("team")
+            if pos in POSITION_LIST and pid:
+                if side == "home":
+                    home_lineup[pos] = str(pid)
+                elif side == "away":
+                    away_lineup[pos] = str(pid)
+        return home_lineup, away_lineup
+
+    def _build_resume_anchor(db_summary: dict, body) -> dict:
+        home_lineup, away_lineup = _extract_saved_lineups(db_summary)
+        return {
+            "version": 1,
+            "saved_at": datetime.utcnow().isoformat() + "Z",
+            "game_id": str(db_summary.get("game_id") or body.game_id or ""),
+            "quarter": int(db_summary.get("quarter") or body.quarter or 1),
+            "clock": db_summary.get("clock"),
+            "time_remaining": db_summary.get("time_remaining"),
+            "shot_clock_remaining": db_summary.get("shot_clock_remaining"),
+            "resume_from_timeout": bool(body.resume_from_timeout),
+            "timeout_next_play_type": db_summary.get("timeout_next_play_type"),
+            "timeout_trace_id": db_summary.get("timeout_trace_id"),
+            "home_lineup": home_lineup,
+            "away_lineup": away_lineup,
+        }
+
+    def _resume_payload_from_saved_doc(
+        *,
+        game_id: str,
+        normalized_game_id: str,
+        saved: dict,
+        has_cached_game: bool,
+        force_status: str | None = None,
+    ) -> dict:
+        try:
+            quarter = int(saved.get("quarter", 1) or 1)
+        except (TypeError, ValueError):
+            quarter = 1
+        try:
+            time_remaining = int(float(saved.get("time_remaining", 480) or 480))
+        except (TypeError, ValueError):
+            time_remaining = 480
+        home_team = saved.get("home_team") if isinstance(saved.get("home_team"), dict) else {}
+        away_team = saved.get("away_team") if isinstance(saved.get("away_team"), dict) else {}
+        home_team_id = str(saved.get("home_team_id") or "")
+        away_team_id = str(saved.get("away_team_id") or "")
+        teams_obj = saved.get("teams") if isinstance(saved.get("teams"), dict) else {}
+        home_row = teams_obj.get(home_team_id, {}) if home_team_id and isinstance(teams_obj.get(home_team_id), dict) else {}
+        away_row = teams_obj.get(away_team_id, {}) if away_team_id and isinstance(teams_obj.get(away_team_id), dict) else {}
+        home_score = int((home_row or home_team).get("score", saved.get("home_score", 0)) or 0)
+        away_score = int((away_row or away_team).get("score", saved.get("away_score", 0)) or 0)
+        is_final = bool(saved.get("is_final"))
+        has_started = (
+            quarter > 1
+            or time_remaining < 480
+            or home_score != 0
+            or away_score != 0
+            or bool(saved.get("opening_tip_winner"))
+        )
+        if force_status:
+            status = force_status
+        elif is_final:
+            status = "final"
+        elif saved.get("timeout_next_play_type"):
+            status = "timeout_resume"
+        elif time_remaining <= 0:
+            status = "quarter_break"
+        elif has_started:
+            status = "active_mid_quarter"
+        else:
+            status = "pregame"
+
+        home_lineup, away_lineup = _extract_saved_lineups(saved)
+        resume_anchor = saved.get("resume_anchor") if isinstance(saved.get("resume_anchor"), dict) else {}
+
+        return {
+            "game_id": str(normalized_game_id or game_id),
+            "status": status,
+            "has_cached_game": has_cached_game,
+            "quarter": quarter,
+            "clock": saved.get("clock") or f"{time_remaining // 60}:{time_remaining % 60:02d}",
+            "time_remaining": time_remaining,
+            "home_team_id": home_team_id,
+            "away_team_id": away_team_id,
+            "home_team_name": home_row.get("name") or home_team.get("name"),
+            "away_team_name": away_row.get("name") or away_team.get("name"),
+            "home_score": home_score,
+            "away_score": away_score,
+            "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or saved.get("timeout_next_play_type")),
+            "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or saved.get("timeout_next_play_type"),
+            "timeout_trace_id": resume_anchor.get("timeout_trace_id") or saved.get("timeout_trace_id"),
+            "home_lineup": home_lineup,
+            "away_lineup": away_lineup,
+        }
+
     @app.get("/api/game/{game_id}/resume-state")
     def get_game_resume_state(
         game_id: str,
@@ -2263,6 +2367,15 @@ try:
             saved, _ = find_game_doc(games_collection, normalized_game_id)
             if not saved and game_id != normalized_game_id:
                 saved, _ = find_game_doc(games_collection, game_id)
+
+        if saved and isinstance(saved.get("resume_anchor"), dict) and not saved.get("is_final"):
+            return _resume_payload_from_saved_doc(
+                game_id=game_id,
+                normalized_game_id=normalized_game_id,
+                saved=saved,
+                has_cached_game=cached is not None,
+                force_status="stoppage_anchor",
+            )
 
         if cached is not None:
             home_score = cached.score.get(cached.home_team.name, 0)
@@ -2304,54 +2417,12 @@ try:
         if not saved:
             raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
 
-        try:
-            quarter = int(saved.get("quarter", 1) or 1)
-        except (TypeError, ValueError):
-            quarter = 1
-        try:
-            time_remaining = int(float(saved.get("time_remaining", 480) or 480))
-        except (TypeError, ValueError):
-            time_remaining = 480
-        home_team = saved.get("home_team") if isinstance(saved.get("home_team"), dict) else {}
-        away_team = saved.get("away_team") if isinstance(saved.get("away_team"), dict) else {}
-        home_team_id = str(saved.get("home_team_id") or "")
-        away_team_id = str(saved.get("away_team_id") or "")
-        teams_obj = saved.get("teams") if isinstance(saved.get("teams"), dict) else {}
-        home_row = teams_obj.get(home_team_id, {}) if home_team_id and isinstance(teams_obj.get(home_team_id), dict) else {}
-        away_row = teams_obj.get(away_team_id, {}) if away_team_id and isinstance(teams_obj.get(away_team_id), dict) else {}
-        home_score = int((home_row or home_team).get("score", saved.get("home_score", 0)) or 0)
-        away_score = int((away_row or away_team).get("score", saved.get("away_score", 0)) or 0)
-        is_final = bool(saved.get("is_final"))
-        has_started = (
-            quarter > 1
-            or time_remaining < 480
-            or home_score != 0
-            or away_score != 0
-            or bool(saved.get("opening_tip_winner"))
+        return _resume_payload_from_saved_doc(
+            game_id=game_id,
+            normalized_game_id=normalized_game_id,
+            saved=saved,
+            has_cached_game=False,
         )
-        if is_final:
-            status = "final"
-        elif saved.get("timeout_next_play_type"):
-            status = "timeout_resume"
-        elif time_remaining <= 0:
-            status = "quarter_break"
-        elif has_started:
-            status = "active_mid_quarter"
-        else:
-            status = "pregame"
-
-        return {
-            "game_id": str(normalized_game_id),
-            "status": status,
-            "has_cached_game": False,
-            "quarter": quarter,
-            "clock": saved.get("clock") or f"{time_remaining // 60}:{time_remaining % 60:02d}",
-            "time_remaining": time_remaining,
-            "home_team_name": home_row.get("name") or home_team.get("name"),
-            "away_team_name": away_row.get("name") or away_team.get("name"),
-            "home_score": home_score,
-            "away_score": away_score,
-        }
 
     @app.get("/api/game/{game_id}/ft-lock")
     def get_game_ft_lock(game_id: str):
@@ -4286,6 +4357,14 @@ try:
             
             # Ensure _id is set in db_summary for upsert to work correctly
             db_summary["_id"] = game_id_oid
+
+            # Court persistence: the user-facing resume target is the latest
+            # clean lineup-return stoppage anchor, not an arbitrary mid-turn
+            # checkpoint. This API is called immediately after Set Lineup hands
+            # control back to the court, after lineups/settings are applied and
+            # the restart turn has been generated.
+            if not body.full_sim and not is_final:
+                db_summary["resume_anchor"] = _build_resume_anchor(db_summary, body)
             
             # ✅ DEBUG: Log detailed save information for Q4 to diagnose finalize_game() issue
             quarter_saving = db_summary.get('quarter', 'N/A')
@@ -4294,7 +4373,10 @@ try:
             if quarter_saving == 4 or is_final_saving:
                 logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
             
-            games_collection.update_one({"_id": game_id_oid}, {"$set": db_summary}, upsert=True)
+            save_update = {"$set": db_summary}
+            if is_final:
+                save_update["$unset"] = {"resume_anchor": ""}
+            games_collection.update_one({"_id": game_id_oid}, save_update, upsert=True)
 
             # Stash the user's coaching archetype for this period (franchise only).
             # Diagnosis via DB breadcrumbs (Railway drops logs). `archetype_hook`
@@ -5062,15 +5144,18 @@ try:
                 except Exception as e:
                     logging.error(f"⚠️ QUARTER BREAK: Player momentum reset failed: {e}")
 
-            # Court persistence: save every completed user-played turn so refresh/close recovery
-            # lands on the latest backend checkpoint instead of a stale 25-turn interval.
+            # Court persistence: do not persist every mid-possession turn as the
+            # user-facing resume target. Resume now uses the latest
+            # lineup-return stoppage anchor written by /api/simulate-quarter.
+            # Quarter completion still persists so the lineup screen sees the
+            # post-break score/stats/energy state.
             db_save_time = 0
-            if game_id:
+            if game_id and quarter_complete:
                 db_save_start = time.time()
                 try:
                     db_summary = summarize_game_state(gm, exclude_animations=True)
                     games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-                    logging.info(f"💾 Saved game state checkpoint at turn {len(gm.turns)}, quarter={gm.quarter}")
+                    logging.info(f"💾 Saved quarter-break state at turn {len(gm.turns)}, quarter={gm.quarter}")
                 except Exception as e:
                     logging.error(f"Failed to save game state: {e}")
                 finally:

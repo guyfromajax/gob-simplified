@@ -1153,36 +1153,27 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
-      let res;
-      if (this.resumeActive && this.gameId) {
-        const resumeUrl = API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(this.gameId)}?source=db`);
-        res = await fetch(resumeUrl, {
-          method: 'GET',
-          headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
-        });
-      } else {
-        let url = API_CONFIG.buildUrl('/api/simulate-quarter');
-        if (isDebugPlaycall()) {
-          url += (url.includes('?') ? '&' : '?') + 'debug_pc=1';
-          const po = payload.playbook_settings && payload.playbook_settings.pc_order;
-          const _row = {
-            url,
-            gameId: this.gameId,
-            quarter: this.quarter,
-            user_team_side: payload.user_team_side,
-            has_playbook_settings: !!payload.playbook_settings,
-            pc_offense_len: po && Array.isArray(po.offense) ? po.offense.length : null,
-            pc_defense_len: po && Array.isArray(po.defense) ? po.defense.length : null,
-          };
-          console.info('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
-          console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
-        }
-        res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+      let url = API_CONFIG.buildUrl('/api/simulate-quarter');
+      if (isDebugPlaycall()) {
+        url += (url.includes('?') ? '&' : '?') + 'debug_pc=1';
+        const po = payload.playbook_settings && payload.playbook_settings.pc_order;
+        const _row = {
+          url,
+          gameId: this.gameId,
+          quarter: this.quarter,
+          user_team_side: payload.user_team_side,
+          has_playbook_settings: !!payload.playbook_settings,
+          pc_offense_len: po && Array.isArray(po.offense) ? po.offense.length : null,
+          pc_defense_len: po && Array.isArray(po.defense) ? po.defense.length : null,
+        };
+        console.info('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
+        console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
       }
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
       if (DEBUG_FLOW) {
         console.log('[gameScene] response status', res.status);
       }
@@ -1210,10 +1201,6 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
-      if (this.resumeActive) {
-        simData.turns = [];
-        simData.game_id = simData.game_id || this.gameId;
-      }
       // ✅ TIMEOUT: Store simData in scene for timeout button manager access
       this.simData = simData;
       const _tsm0 = simData.team_scoreboard_meta;
