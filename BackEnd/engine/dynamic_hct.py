@@ -628,6 +628,7 @@ def _resolve_moment(
     exclude_steal: bool = False,
     def_mod=None,
     off_mod=None,
+    event_scalar: float = 1.0,
 ) -> Tuple[str, float, Any]:
     """§5 Pressure / Trap banded outcome (D8 attribute-driven).
 
@@ -678,7 +679,7 @@ def _resolve_moment(
         # OFFENSE fight resists ALL D-wins events (same scale as discipline on D_FOUL).
         p_event = _clampf(
             HCT_D8_DEF_WIN_BASE * m_norm * agg
-            * (1.0 - HCT_D8_W_FIGHT * fight_off) * HCT_D8_GLOBAL_SCALAR,
+            * (1.0 - HCT_D8_W_FIGHT * fight_off) * HCT_D8_GLOBAL_SCALAR * event_scalar,
             0.0, HCT_D8_P_EVENT_MAX,
         )
         if random.random() >= p_event:
@@ -726,7 +727,7 @@ def _resolve_moment(
             HCT_D8_DFOUL_BASE * beaten_norm
             * (1.0 - HCT_D8_W_DISC_REACH * discipline)
             * (1.0 + HCT_D8_W_AG_BEATEN * ag_gap / ref)
-            * agg * HCT_D8_GLOBAL_SCALAR,
+            * agg * HCT_D8_GLOBAL_SCALAR * event_scalar,
             0.0, HCT_D8_P_DFOUL_MAX,
         )
         if random.random() < p_dfoul:
