@@ -23,6 +23,10 @@ const franchiseCardPrestige = document.getElementById('franchise-card-prestige')
 const franchiseCardNext = document.getElementById('franchise-card-next');
 const franchiseCardCareerSummary = document.getElementById('franchise-card-career-summary');
 const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
+const franchiseResumeCard = document.getElementById('franchise-resume-card');
+const franchiseResumeMatchup = document.getElementById('franchise-resume-matchup');
+const franchiseResumeDetail = document.getElementById('franchise-resume-detail');
+const franchiseResumeScore = document.getElementById('franchise-resume-score');
 const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
@@ -43,6 +47,7 @@ const A1_CONFERENCE_TEAMS = [
 ];
 
 let currentFranchise = null;
+let currentActiveGameResume = null;
 let currentLeaderboardData = null;
 let currentLeaderboardView = 'geek_points';
 
@@ -720,9 +725,35 @@ function wireAlphaBanner() {
 }
 
 function renderFranchiseEmptyState() {
+  currentActiveGameResume = null;
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
   if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'none';
+}
+
+function formatResumePeriod(resume) {
+  const q = Number(resume && resume.quarter) || 1;
+  return q <= 4 ? 'Q' + q : 'OT' + (q - 4);
+}
+
+function buildActiveGameCourtUrl(resume) {
+  if (!currentFranchise || !currentFranchise.franchise_id || !resume || !resume.game_id) return null;
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  params.set('active_resume', 'true');
+  params.set('franchise_id', currentFranchise.franchise_id);
+  params.set('game_id', resume.game_id);
+  params.set('home', resume.home_team_name || 'Home');
+  params.set('away', resume.away_team_name || 'Away');
+  params.set('home_id', resume.home_team_id || resume.home_team_name || 'Home');
+  params.set('away_id', resume.away_team_id || resume.away_team_name || 'Away');
+  params.set('team_id', currentFranchise.user_team_id || '');
+  params.set('my_team', resume.user_team_side || 'home');
+  params.set('quarter', String(Number(resume.quarter) || 1));
+  params.set('period', formatResumePeriod(resume));
+  if (resume.week) params.set('week', String(resume.week));
+  if (resume.clock) params.set('clock', resume.clock);
+  return './court.html?' + params.toString();
 }
 
 function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
@@ -750,6 +781,23 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
   renderCareerSummary(commandCenterData);
+  currentActiveGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
+  if (currentActiveGameResume && franchiseResumeCard) {
+    franchiseResumeCard.hidden = false;
+    if (franchiseResumeMatchup) {
+      franchiseResumeMatchup.textContent = (currentActiveGameResume.away_team_name || 'Away') + ' at ' + (currentActiveGameResume.home_team_name || 'Home');
+    }
+    if (franchiseResumeDetail) {
+      franchiseResumeDetail.textContent = formatResumePeriod(currentActiveGameResume) + ' · ' + (currentActiveGameResume.clock || 'Latest saved state');
+    }
+    if (franchiseResumeScore) {
+      franchiseResumeScore.textContent = String(currentActiveGameResume.away_score ?? 0) + ' - ' + String(currentActiveGameResume.home_score ?? 0);
+    }
+    if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Resume Game →';
+  } else {
+    if (franchiseResumeCard) franchiseResumeCard.hidden = true;
+    if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Enter Franchise →';
+  }
 
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
   franchisePlayNowBtn.style.display = 'block';
@@ -758,6 +806,11 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
 
 function goToFranchiseCommandCenter() {
   if (currentFranchise && currentFranchise.franchise_id) {
+    const resumeUrl = buildActiveGameCourtUrl(currentActiveGameResume);
+    if (resumeUrl) {
+      window.location.href = resumeUrl;
+      return;
+    }
     window.location.href = './franchise-command-center.html?franchise_id=' + encodeURIComponent(currentFranchise.franchise_id);
   } else {
     window.location.href = './franchise-select-team.html';

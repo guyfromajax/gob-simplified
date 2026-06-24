@@ -848,6 +848,7 @@ export function createGameScene(Phaser) {
           this.playbookSettings = window.__courtPlaybookApiData;
         }
         this.userTeamSide = data.userTeamSide;
+        this.resumeActive = !!data.resumeActive;
         // ✅ SS&S: Store team_id (ObjectId) for navigation anchor preservation
         this.teamId = data.teamId;
         
@@ -958,14 +959,15 @@ export function createGameScene(Phaser) {
       // We'll show the popup after simData is fetched but before animation starts
       const urlParams = new URLSearchParams(window.location.search);
       const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      const activeResume = urlParams.get('active_resume') === 'true' || this.resumeActive;
       const timeoutTraceId = urlParams.get('timeout_trace_id');
       // Defense Matchups popup trigger:
       // - Q1 start (non-timeout)
       // - Any quarter > 1 entry (quarter breaks)
       // - Any timeout/foul-out resume (resume_from_timeout=true)
       // Keep timeout/navigation contracts unchanged; this only controls popup visibility.
-      const isQ1Start = this.quarter === 1 && !resumeFromTimeout;
-      const isQuarterBreakEntry = this.quarter > 1;
+      const isQ1Start = this.quarter === 1 && !resumeFromTimeout && !activeResume;
+      const isQuarterBreakEntry = this.quarter > 1 && !activeResume;
       const isTimeoutOrFoulOutResume = resumeFromTimeout;
       this.shouldShowMatchupsPopup = (isQ1Start || isQuarterBreakEntry || isTimeoutOrFoulOutResume) && this.gameId;
 
@@ -1151,27 +1153,36 @@ export function createGameScene(Phaser) {
       
       // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
       // No need to pass start_with_inbound for standard Q4 logic
-      let url = API_CONFIG.buildUrl('/api/simulate-quarter');
-      if (isDebugPlaycall()) {
-        url += (url.includes('?') ? '&' : '?') + 'debug_pc=1';
-        const po = payload.playbook_settings && payload.playbook_settings.pc_order;
-        const _row = {
-          url,
-          gameId: this.gameId,
-          quarter: this.quarter,
-          user_team_side: payload.user_team_side,
-          has_playbook_settings: !!payload.playbook_settings,
-          pc_offense_len: po && Array.isArray(po.offense) ? po.offense.length : null,
-          pc_defense_len: po && Array.isArray(po.defense) ? po.defense.length : null,
-        };
-        console.info('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
-        console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
+      let res;
+      if (this.resumeActive && this.gameId) {
+        const resumeUrl = API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(this.gameId)}?source=db`);
+        res = await fetch(resumeUrl, {
+          method: 'GET',
+          headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+        });
+      } else {
+        let url = API_CONFIG.buildUrl('/api/simulate-quarter');
+        if (isDebugPlaycall()) {
+          url += (url.includes('?') ? '&' : '?') + 'debug_pc=1';
+          const po = payload.playbook_settings && payload.playbook_settings.pc_order;
+          const _row = {
+            url,
+            gameId: this.gameId,
+            quarter: this.quarter,
+            user_team_side: payload.user_team_side,
+            has_playbook_settings: !!payload.playbook_settings,
+            pc_offense_len: po && Array.isArray(po.offense) ? po.offense.length : null,
+            pc_defense_len: po && Array.isArray(po.defense) ? po.defense.length : null,
+          };
+          console.info('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
+          console.warn('[DEBUG_PC] gameScene POST /api/simulate-quarter', _row);
+        }
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
       }
-      const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-      });
       if (DEBUG_FLOW) {
         console.log('[gameScene] response status', res.status);
       }
@@ -1199,6 +1210,10 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
+      if (this.resumeActive) {
+        simData.turns = [];
+        simData.game_id = simData.game_id || this.gameId;
+      }
       // ✅ TIMEOUT: Store simData in scene for timeout button manager access
       this.simData = simData;
       const _tsm0 = simData.team_scoreboard_meta;

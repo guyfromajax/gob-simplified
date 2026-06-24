@@ -771,6 +771,97 @@ def _find_user_next_game(franchise_doc: dict[str, Any], user_team_id_str: str) -
     return None
 
 
+def _clock_from_time_remaining(seconds: Any) -> str:
+    try:
+        total = max(0, int(float(seconds)))
+    except (TypeError, ValueError):
+        total = 480
+    return f"{total // 60}:{total % 60:02d}"
+
+
+def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
+    next_game = _find_user_next_game(franchise_doc, user_team_id_str)
+    if not next_game:
+        return None
+
+    franchise_id = str(franchise_doc.get("_id") or "")
+    away_id = str(next_game.get("away_team_id") or "")
+    home_id = str(next_game.get("home_team_id") or "")
+    if not franchise_id or not away_id or not home_id:
+        return None
+
+    game_doc = db.games.find_one(
+        {
+            "franchise_id": franchise_id,
+            "is_final": {"$ne": True},
+            "$or": [
+                {"home_team_id": home_id, "away_team_id": away_id},
+                {"team1_id": away_id, "team2_id": home_id},
+            ],
+        },
+        sort=[("_id", -1)],
+    )
+    if not game_doc:
+        return None
+
+    try:
+        quarter = int(game_doc.get("quarter", 1) or 1)
+    except (TypeError, ValueError):
+        quarter = 1
+    try:
+        time_remaining = int(float(game_doc.get("time_remaining", 480) or 480))
+    except (TypeError, ValueError):
+        time_remaining = 480
+
+    home_team = game_doc.get("home_team") if isinstance(game_doc.get("home_team"), dict) else {}
+    away_team = game_doc.get("away_team") if isinstance(game_doc.get("away_team"), dict) else {}
+    teams_obj = game_doc.get("teams") if isinstance(game_doc.get("teams"), dict) else {}
+    home_row = teams_obj.get(home_id, {}) if isinstance(teams_obj.get(home_id), dict) else {}
+    away_row = teams_obj.get(away_id, {}) if isinstance(teams_obj.get(away_id), dict) else {}
+
+    home_score = int((home_row or home_team).get("score", game_doc.get("home_score", 0)) or 0)
+    away_score = int((away_row or away_team).get("score", game_doc.get("away_score", 0)) or 0)
+    has_started = (
+        quarter > 1
+        or time_remaining < 480
+        or home_score != 0
+        or away_score != 0
+        or bool(game_doc.get("opening_tip_winner"))
+        or bool(game_doc.get("turns"))
+    )
+    if not has_started:
+        return None
+
+    team_object_ids = []
+    for raw_id in (home_id, away_id):
+        try:
+            team_object_ids.append(ObjectId(raw_id))
+        except Exception:
+            pass
+    team_docs = {
+        str(team["_id"]): team.get("name", str(team["_id"]))
+        for team in db.teams.find({"_id": {"$in": team_object_ids}}, {"name": 1})
+    } if team_object_ids else {}
+    home_name = home_row.get("name") or home_team.get("name") or team_docs.get(home_id, home_id)
+    away_name = away_row.get("name") or away_team.get("name") or team_docs.get(away_id, away_id)
+
+    return {
+        "game_id": str(game_doc.get("_id")),
+        "franchise_id": franchise_id,
+        "week": int(next_game.get("week", franchise_doc.get("week", 1)) or 1),
+        "quarter": quarter,
+        "clock": game_doc.get("clock") or _clock_from_time_remaining(time_remaining),
+        "time_remaining": time_remaining,
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "home_team_name": home_name,
+        "away_team_name": away_name,
+        "home_score": home_score,
+        "away_score": away_score,
+        "user_team_side": "home" if str(user_team_id_str) == home_id else "away",
+    }
+
+
 def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
     results = franchise_doc.get("results", {}) or {}
     current_week = int(franchise_doc.get("week", 1) or 1)
@@ -5853,6 +5944,13 @@ def command_center_data(
         response["cut_count"] = int(cut_state.get("cut_count", 0) or 0)
         response["cut_required"] = bool(cut_state.get("cut_required", False))
         response["week_35_recruiting_ran"] = bool(franchise_doc.get("week_35_recruiting_ran", False)) if franchise_doc else False
+        response["active_game_resume"] = None
+        if franchise_doc and team_id:
+            try:
+                response["active_game_resume"] = _find_active_user_game_resume(franchise_doc, str(team_id))
+            except Exception as e:
+                logger.debug("active game resume lookup failed: %s", e)
+                response["active_game_resume"] = None
         recruiting_results = franchise_doc.get("recruiting_results", {}) if franchise_doc else {}
         current_results_week = week if week is not None and str(week) in (recruiting_results or {}) else None
         response["current_recruiting_results_week"] = current_results_week

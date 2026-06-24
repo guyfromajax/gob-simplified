@@ -1860,8 +1860,8 @@ async function fetchTeamRoster(teamName) {
   return res.json();
 }
 
-async function startGame({ homeRoster, awayRoster, animate = true }) {
-  DEBUG && console.log('[bootGame] startGame', { quarter, animate });
+async function startGame({ homeRoster, awayRoster, animate = true, resumeActive = false }) {
+  DEBUG && console.log('[bootGame] startGame', { quarter, animate, resumeActive });
 
   const live = readLiveSearchParams();
   const liveGid = live.get('game_id');
@@ -1936,6 +1936,7 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     userTeamSide,
     mode,
     teamId, // ✅ SS&S: Pass team_id (ObjectId) for navigation anchor preservation
+    resumeActive,
   };
 
   if (game.scene.isActive('GameScene')) {
@@ -2000,7 +2001,7 @@ async function showPopup(score) {
   });
 }
 
-async function handleButtonClick(animate) {
+async function handleButtonClick(animate, options = {}) {
   // ✅ PHASE 2: Validate game_id before starting game
   try {
     await validateGameIdIfPresent();
@@ -2059,7 +2060,7 @@ async function handleButtonClick(animate) {
       fetchTeamRoster(homeTeam),
       fetchTeamRoster(awayTeam),
     ]);
-    const finalScore = await startGame({ homeRoster, awayRoster, animate });
+    const finalScore = await startGame({ homeRoster, awayRoster, animate, resumeActive: !!options.resumeActive });
     console.log('Game completed, final score:', finalScore);
     showPopup(finalScore);
   } catch (err) {
@@ -2671,6 +2672,7 @@ async function initGame() {
   // 3. If it's truly a timeout resume, the helper should have set it to 'true'
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
+  const activeResume = urlParams.get('active_resume') === 'true';
   
   // ✅ CRITICAL FIX: Explicitly control pre-game container visibility
   // Rule: Show pre-game container UNLESS we're resuming from timeout or foul out
@@ -2678,12 +2680,65 @@ async function initGame() {
   // Timeouts and foul outs (resume_from_timeout=true) should hide popup
   // This ensures the container is always in the correct state
   const preGameContainer = document.querySelector('.pre-game-container');
+  const resumeGameContainer = document.getElementById('resume-game-container');
+  const resumeGameButton = document.getElementById('resume-game-button');
+  const resumeGameSubtitle = document.getElementById('resume-game-subtitle');
   if (preGameContainer) {
-    if (resumeFromTimeout) {
+    if (resumeFromTimeout || activeResume) {
       preGameContainer.classList.add('hidden');
     } else {
       preGameContainer.classList.remove('hidden');
     }
+  }
+  if (resumeGameContainer) {
+    if (activeResume && gameId) {
+      const period = urlParams.get('period') || (quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`);
+      const clock = urlParams.get('clock') || '';
+      if (resumeGameSubtitle) {
+        resumeGameSubtitle.textContent = `Checking saved ${period}${clock ? ' · ' + clock : ''} state...`;
+      }
+      resumeGameContainer.classList.remove('hidden');
+      fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
+        headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+      })
+        .then((res) => res.ok ? res.json() : null)
+        .then((state) => {
+          const cached = !!(state && state.has_cached_game);
+          if (resumeGameSubtitle) {
+            if (cached) {
+              resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the latest saved game state.`;
+            } else {
+              resumeGameSubtitle.textContent = 'A saved checkpoint exists, but this server session needs cold rehydration before gameplay can resume.';
+            }
+          }
+          if (resumeGameButton && !cached) {
+            resumeGameButton.disabled = true;
+            resumeGameButton.textContent = 'Resume Unavailable';
+          }
+        })
+        .catch(() => {
+          if (resumeGameSubtitle) {
+            resumeGameSubtitle.textContent = 'Could not verify the active game state. Return to Mode Select and try again.';
+          }
+          if (resumeGameButton) {
+            resumeGameButton.disabled = true;
+            resumeGameButton.textContent = 'Resume Unavailable';
+          }
+        });
+    } else {
+      resumeGameContainer.classList.add('hidden');
+    }
+  }
+  if (resumeGameButton) {
+    resumeGameButton.addEventListener('click', async () => {
+      if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
+      if (resumeGameContainer) resumeGameContainer.remove();
+      try {
+        await handleButtonClick(true, { resumeActive: true });
+      } catch (error) {
+        console.error('🚨 RESUME CLICKED: handleButtonClick failed:', error);
+      }
+    });
   }
 
   if (playBtn) {
