@@ -1771,7 +1771,7 @@
     #pcc-stacks-zone.pcc-strategy {
       display: flex;
       flex-direction: column;
-      padding: 14px 18px 24px;
+      padding: 10px 18px 14px;
       min-width: 0;
       min-height: 0;
       border: none;
@@ -1849,7 +1849,8 @@
     .pcc-notch.pcc-stack-btn::after {
       content: attr(data-label);
       position: absolute;
-      top: 24px;
+      top: auto;
+      bottom: calc(100% + 7px);
       left: 50%;
       transform: translateX(-50%);
       font-family: 'Bebas Neue', sans-serif;
