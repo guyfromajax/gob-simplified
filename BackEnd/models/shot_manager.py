@@ -2483,14 +2483,14 @@ class ShotManager:
 
         # Base thresholds by shot_type
         if shot_type == "inside":
-            base_hard = 50
-            base_soft = 110
+            base_hard = 35
+            base_soft = 105
         elif shot_type == "attack":
-            base_hard = 85  # ✅ Updated from 70
-            base_soft = 145  # ✅ Updated from 130
+            base_hard = 80
+            base_soft = 140
         else:  # outside
-            base_hard = 30
-            base_soft = 90
+            base_hard = 20
+            base_soft = 80
 
         # Calculate thresholds with discipline adjustment
         # Higher discipline = less likely to foul (subtract from threshold, making it harder to foul)

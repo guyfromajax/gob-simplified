@@ -1,13 +1,13 @@
 
 **Base Constants**
 1. HARD_SHOOTING_FOUL_THRESHOLD (varies by shot_type):
-   - Inside: 50 (hard shooting foul threshold)
-   - Attack: 70 (hard shooting foul threshold)
-   - Outside: 30 (hard shooting foul threshold)
+   - Inside: 35 (hard shooting foul threshold)
+   - Attack: 80 (hard shooting foul threshold)
+   - Outside: 20 (hard shooting foul threshold)
 2. SOFT_SHOOTING_FOUL_THRESHOLD (varies by shot_type):
-   - Inside: 110 (soft shooting foul threshold)
-   - Attack: 130 (soft shooting foul threshold)
-   - Outside: 90 (soft shooting foul threshold)
+   - Inside: 105 (soft shooting foul threshold)
+   - Attack: 140 (soft shooting foul threshold)
+   - Outside: 80 (soft shooting foul threshold)
 3. SOFT_PROB = 0.16 (probability for soft foul bands)
 4. THREE_POINTER_FOUL_MISS_CHANCE = 0.4 (40% chance foul forces miss on 3-pointers)
 5. TWO_POINTER_FOUL_MISS_CHANCE = 0.2 (20% chance foul forces miss on 2-pointers)
@@ -113,10 +113,10 @@
       - Mid-range: `(OD * 0.3 + ID * 0.3 + AG * 0.1 + ST * 0.1 + IQ * 0.1 + CH * 0.1) * random(1-6)`
    
    d. Check Defensive Foul (thresholds vary by shot_type) — **not run when `apply_defense` is False**
-      - Inside shots: hard_threshold = 50 + defense_team.fight, soft_threshold = 110 + defense_team.fight
-      - Attack shots: hard_threshold = 70 + defense_team.fight, soft_threshold = 130 + defense_team.fight
-      - Outside shots: hard_threshold = 30 + defense_team.fight, soft_threshold = 90 + defense_team.fight
-      - if defense_score < hard_threshold: d_foul = True
+      - Inside shots: hard_threshold = 35 - defense_team.discipline, soft_threshold = 105 - defense_team.discipline
+      - Attack shots: hard_threshold = 80 - defense_team.discipline, soft_threshold = 140 - defense_team.discipline
+      - Outside shots: hard_threshold = 20 - defense_team.discipline, soft_threshold = 80 - defense_team.discipline
+      - if defense_score < hard_threshold: d_foul = random() < HARD_PROB (0.70)
       - elif defense_score < soft_threshold: d_foul = random() < SOFT_PROB (0.16)
       - else: d_foul = False
    
@@ -187,9 +187,9 @@
 Shot resolution uses the following base constants:
 
 - **Foul Thresholds (vary by shot_type)**:
-  - Inside: HARD=50, SOFT=110
-  - Attack: HARD=70, SOFT=130
-  - Outside: HARD=30, SOFT=90
+  - Inside: HARD=35, SOFT=105
+  - Attack: HARD=80, SOFT=140
+  - Outside: HARD=20, SOFT=80
 - **SOFT_PROB**: 0.16
 - **THREE_POINTER_FOUL_MISS_CHANCE**: 0.4
 - **TWO_POINTER_FOUL_MISS_CHANCE**: 0.2

@@ -31,6 +31,8 @@
       --team-rgb: 255, 98, 0;
       /* Taller bar: center cluster (clock + Q/shot) must fit inside; overflow hidden clips bleed onto court */
       --scoreboard-height: 120px;
+      --clock-col: 190px;
+      --strat-col: 200px;
       --player-stats-width: 280px;
       --pbp-height: 120px;
       --court-bottom-trim: 80px;
@@ -130,28 +132,20 @@
       background: #000;
       color: #fff;
       display: grid;
-      grid-template-columns: 
+      grid-template-columns:
         var(--side-padding)
         auto
         var(--scoreboard-gap)
         70px
         var(--scoreboard-gap)
         max-content
-        var(--scoreboard-gap)
-        auto
-        10px
-        25px
-        10px
-        25px
-        1fr
-        auto
-        1fr
-        25px
-        10px
-        25px
-        10px
-        auto
-        var(--scoreboard-gap)
+        minmax(0, 1fr)
+        var(--strat-col)
+        minmax(0, 1fr)
+        var(--clock-col)
+        minmax(0, 1fr)
+        var(--strat-col)
+        minmax(0, 1fr)
         max-content
         var(--scoreboard-gap)
         70px
@@ -440,6 +434,9 @@
       gap: 9px;
       justify-content: center;
       height: 100%;
+      width: var(--strat-col);
+      max-width: var(--strat-col);
+      overflow: hidden;
       font-family: 'Bebas Neue', sans-serif;
       visibility: hidden;
       opacity: 0;
@@ -450,20 +447,18 @@
       opacity: 1;
     }
     .sb-strat.away {
-      grid-column: 13;
-      align-items: flex-end;
-      padding-right: 120px;
+      grid-column: 8;
+      align-items: center;
     }
     .sb-strat.home {
-      grid-column: 15;
-      align-items: flex-start;
-      padding-left: 120px;
+      grid-column: 12;
+      align-items: center;
     }
 
     .sb-strat .srow {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .sb-strat.home .srow {
       flex-direction: row-reverse;
@@ -473,7 +468,7 @@
       font-size: 12px;
       letter-spacing: 0.1em;
       color: rgba(255, 255, 255, 0.42);
-      width: 40px;
+      width: 30px;
       text-align: right;
     }
     .sb-strat.home .lab {
@@ -482,7 +477,7 @@
 
     .sb-strat .rail {
       position: relative;
-      width: 137px;
+      width: 96px;
       height: 15px;
     }
 
@@ -524,11 +519,12 @@
     .sb-strat .val {
       font-size: 13px;
       letter-spacing: 0.05em;
-      min-width: 62px;
+      width: 50px;
+      text-align: right;
       transition: color 0.4s;
     }
     .sb-strat.home .val {
-      text-align: right;
+      text-align: left;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -540,7 +536,7 @@
       }
     }
 
-    /* Active Player Display - Grid columns 8 and 20 */
+    /* Active Player Display — absolute overlay (out of grid flow) */
     .active-player-display {
       display: flex;
       align-items: center;
@@ -548,6 +544,10 @@
       padding: 4px 8px;
       opacity: 0;
       transition: opacity 0.3s ease;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 30;
     }
 
     .active-player-display.visible {
@@ -556,14 +556,16 @@
 
     /* Away side: [Image] 🏀/D AUDIBLE! → (reading left to right from center) */
     .active-player-display.away-side {
-      grid-column: 8;
+      right: calc(50% + 305px);
+      left: auto;
       flex-direction: row;
       justify-content: flex-end; /* Push content toward center */
     }
 
     /* Home side: AUDIBLE! 🏀/D [Image] ← (reading right to left from center) */
     .active-player-display.home-side {
-      grid-column: 20;
+      left: calc(50% + 305px);
+      right: auto;
       flex-direction: row-reverse;
       justify-content: flex-start; /* Push content toward center */
     }
@@ -651,7 +653,7 @@
 
     /* Home TOL/F */
     .tol-fouls.home {
-      grid-column: 22;
+      grid-column: 14;
       display: flex;
       flex-direction: column;
       gap: 1px;
@@ -672,7 +674,7 @@
 
     /* Home Score */
     #home-score {
-      grid-column: 24;
+      grid-column: 16;
       font-size: 80px;
       line-height: 1;
       text-align: center;
@@ -681,7 +683,7 @@
 
     /* Home Logo stack */
     #home-logo-container {
-      grid-column: 26;
+      grid-column: 18;
       height: var(--scoreboard-height);
       width: 200px;
       max-width: 200px;
@@ -3776,7 +3778,9 @@
 #scoreboard .tol-fouls.away,
 #scoreboard .tol-fouls.home,
 #scoreboard #home-score,
-#scoreboard #home-logo-container {
+#scoreboard #home-logo-container,
+#scoreboard .sb-strat.away,
+#scoreboard .sb-strat.home {
   grid-row: 1 !important;
 }
 
@@ -3795,21 +3799,13 @@
     70px
     var(--scoreboard-gap)
     max-content
-    var(--scoreboard-gap)
-    auto
-    10px
-    25px
-    10px
-    25px
-    1fr
-    auto
-    1fr
-    25px
-    10px
-    25px
-    10px
-    auto
-    var(--scoreboard-gap)
+    minmax(0, 1fr)
+    var(--strat-col)
+    minmax(0, 1fr)
+    var(--clock-col)
+    minmax(0, 1fr)
+    var(--strat-col)
+    minmax(0, 1fr)
     max-content
     var(--scoreboard-gap)
     70px
@@ -3860,17 +3856,23 @@
   margin-left: 16px !important;
 }
 #scoreboard #home-score {
-  grid-column: 24 !important;
+  grid-column: 16 !important;
   margin-right: 16px !important;
 }
 #scoreboard .tol-fouls.away {
   grid-column: 6 !important;
 }
 #scoreboard .tol-fouls.home {
-  grid-column: 22 !important;
+  grid-column: 14 !important;
 }
 #scoreboard #home-logo-container {
-  grid-column: 26 !important;
+  grid-column: 18 !important;
+}
+#scoreboard .sb-strat.away {
+  grid-column: 8 !important;
+}
+#scoreboard .sb-strat.home {
+  grid-column: 12 !important;
 }
 
 #away-logo-container,
