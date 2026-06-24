@@ -5666,6 +5666,35 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
  * Coordinates are final display-oriented backend values. If the live owner differs from the
  * step-0 handler, preserve the live owner so ShotAnimationSystem can animate the entry pass.
  */
+/**
+ * After runFinalTurnAlignment (and optional step-0 entry pass), patch schema step 1
+ * start.coords from live sprites so playTurn's entry snap matches alignment positions.
+ * Step 0 is rendered outside schema playback; its gated end.coords can still reflect
+ * prior-possession / interrupted coords for non-gate movers.
+ */
+export function patchFinalTurnSchemaEntryStepFromAlignment({ scene, stepsToPlay, sprites }) {
+  if (!scene || !Array.isArray(stepsToPlay) || stepsToPlay.length === 0 || !sprites) {
+    return;
+  }
+  const entryStep = stepsToPlay[0];
+  if (!entryStep?.start) {
+    return;
+  }
+
+  const width = scene.game?.config?.width;
+  const height = scene.game?.config?.height;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return;
+  }
+
+  const patchedCoords = { ...(entryStep.start.coords || {}) };
+  for (const [playerId, sprite] of Object.entries(sprites)) {
+    if (!sprite) continue;
+    patchedCoords[playerId] = pixelsToGrid(sprite.x, sprite.y, width, height);
+  }
+  entryStep.start.coords = patchedCoords;
+}
+
 export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
   if (scene?.skipToEnd || !turnData) return;
   const oDestinations = turnData.oDestinations || turnData.o_destinations || {};

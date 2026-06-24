@@ -328,6 +328,12 @@ export class AnimationEngine {
       if (steps.length > 1) {
         stepsToPlay = steps.slice(1);
       }
+      const { patchFinalTurnSchemaEntryStepFromAlignment } = await import('./turnAnimation.js');
+      patchFinalTurnSchemaEntryStepFromAlignment({
+        scene: this.scene,
+        stepsToPlay,
+        sprites,
+      });
     }
 
     const turnStop = await playTurn(

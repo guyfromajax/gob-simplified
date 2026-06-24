@@ -63,6 +63,16 @@ def test_final_turn_alignment_payloads_are_display_oriented():
     _assert_mirror(home_defense, away_defense)
 
 
+def test_final_turn_defense_pg_uses_top_lane_not_key():
+    from BackEnd.constants import HCO_STRING_SPOTS
+
+    manager = _alignment_manager(away_offense=False)
+    random.seed(42)
+    d_dest, _zone = manager._build_final_turn_defense_alignment()
+    assert d_dest["PG"] == HCO_STRING_SPOTS["topLane"]
+    assert d_dest["PG"] != HCO_STRING_SPOTS["key"]
+
+
 @pytest.mark.parametrize(
     ("shot_variant", "result_type"),
     [

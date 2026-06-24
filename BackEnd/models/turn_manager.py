@@ -3372,7 +3372,8 @@ class TurnManager:
 
     def _build_final_turn_defense_alignment(self):
         """Final Turn defense: 50/50 2-3 or 3-2 zone, ball-at-key positions. Returns (dDestinations, zone_playcall).
-        Destinations are emitted in final display orientation for the current offense."""
+        Destinations are emitted in final display orientation for the current offense.
+        PG anchors at topLane (not key) so the point defender sits above the lane."""
         from BackEnd.constants import HCO_STRING_SPOTS
         from BackEnd.utils.shared import get_away_player_coords
         from BackEnd.utils.shared_defense import ZONE_23_NORMAL, ZONE_32_NORMAL
@@ -3384,6 +3385,8 @@ class TurnManager:
         d_destinations = {}
         for pos, spots in zone_map.items():
             spot = spots[0] if spots else "key"
+            if pos == "PG" and spot == "key":
+                spot = "topLane"
             coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
             d_destinations[pos] = (
                 get_away_player_coords(coords) if is_away_offense else dict(coords)
