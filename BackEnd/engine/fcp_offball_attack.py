@@ -122,6 +122,22 @@ class FcpOffballAttackState:
         self._phase: Dict[str, str] = {}
         self._aba_mode = False
         self._incremental_active = False
+        self._sf_inbound_release_dest: Optional[Dict[str, int]] = None
+
+    def set_sf_inbound_release(self, dest: Dict[str, int]) -> None:
+        """Hold SF on the x=34 staging target until he arrives; then normal release."""
+        self._sf_inbound_release_dest = dict(dest)
+
+    def _sf_inbound_release_complete(
+        self, off_coords: Dict[str, Dict[str, int]]
+    ) -> bool:
+        if self._sf_inbound_release_dest is None:
+            return True
+        return _at_destination(
+            off_coords.get("SF") or {},
+            self._sf_inbound_release_dest,
+            tol=1.5,
+        )
 
     def sync_off_targets(
         self,
@@ -131,6 +147,13 @@ class FcpOffballAttackState:
         """Mirror active destinations into ``off_targets`` for the emitter."""
         for pos in POSITIONS:
             if pos == bh_pos:
+                continue
+            if (
+                pos == "SF"
+                and self._sf_inbound_release_dest is not None
+                and pos not in self._dest
+            ):
+                off_targets[pos] = dict(self._sf_inbound_release_dest)
                 continue
             if pos in self._dest:
                 off_targets[pos] = dict(self._dest[pos])
@@ -192,6 +215,13 @@ class FcpOffballAttackState:
         *,
         force: bool,
     ) -> None:
+        if pos == "SF" and self._sf_inbound_release_dest is not None:
+            if not self._sf_inbound_release_complete(off_coords):
+                self._dest["SF"] = dict(self._sf_inbound_release_dest)
+                self._phase["SF"] = "inbound_release"
+                return
+            self._sf_inbound_release_dest = None
+
         phase = "release"
         if not force and self._phase.get(pos) == phase and pos in self._dest:
             return

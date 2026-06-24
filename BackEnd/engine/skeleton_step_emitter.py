@@ -2011,6 +2011,15 @@ def _variant_flight_end(
     or missing variant (legacy emitters that haven't rolled a variant).
     """
     result_upper = (result_type or "").upper()
+    # Shooting foul during a block attempt: visually use the contact point,
+    # but keep the rules result as MISS → FREE_THROW, not BLOCK. This avoids
+    # block SFX/announcement/stat side effects while preventing the ball from
+    # flying through to the rim.
+    if turn_result.get("foul_block_contact"):
+        bx = turn_result.get("foul_block_contact_x")
+        by = turn_result.get("foul_block_contact_y")
+        if bx is not None and by is not None:
+            return {"x": float(bx), "y": float(by)}
     # BLOCK: ball is rejected at the block point — never reaches the rim.
     # Terminate ball flight directly at the block spot (= ball_bounce_x/y,
     # stamped by shot_manager). The [bounce] step is suppressed for BLOCK
@@ -2166,7 +2175,8 @@ def _build_post_shot_sub_steps(
         return ns
 
     is_make = result_type == "MAKE"
-    shot_variant = turn_result.get("shot_variant")
+    is_foul_block_contact = bool(turn_result.get("foul_block_contact"))
+    shot_variant = None if is_foul_block_contact else turn_result.get("shot_variant")
     variant_upper = (shot_variant or "").upper()
     is_rattle = variant_upper in _RATTLE_VARIANTS
     is_airball = variant_upper == "AIRBALL"
@@ -2203,19 +2213,28 @@ def _build_post_shot_sub_steps(
     by = turn_result.get("ball_bounce_y")
     has_bounce_coords = (bx is not None) and (by is not None)
     is_block = result_type == "BLOCK"
-    needs_bounce = (not is_make) and (not is_airball) and (not is_block) and has_bounce_coords
+    needs_bounce = (
+        (not is_make)
+        and (not is_airball)
+        and (not is_block)
+        and (not is_foul_block_contact)
+        and has_bounce_coords
+    )
 
     # SFX cues for the [ball_flight] step. Launch cue fires at detach
     # (= step start). Arrival cue fires at the ball's tween onComplete.
     # RATTLE variants leave the arrival cue empty — per-hop SFX fires from
     # the hop sub-steps below.
     launch_sfx = shot_launch_sfx(turn_result.get("shot_score_pre_defense"), result_type)
-    arrival_sfx = shot_result_sfx(
+    arrival_sfx = None if is_foul_block_contact else shot_result_sfx(
         shot_variant,
         result_type,
         bank_miss_sfx_file=turn_result.get("shot_variant_bank_miss_sfx_file"),
     )
-    timed_sfx = shot_followup_timed_sfx(shot_variant, result_type)
+    timed_sfx = None if is_foul_block_contact else shot_followup_timed_sfx(
+        shot_variant,
+        result_type,
+    )
 
     flight_idx = len(steps)
     # Flight's next pointer is filled in after we know how many variant

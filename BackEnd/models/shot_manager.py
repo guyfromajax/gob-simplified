@@ -250,6 +250,9 @@ class ShotManager:
 
     def _compute_miss_bounce_spot(self, roles, shooter, off_team):
         """Grid coord where a missed shot's ball rests for schema ``[bounce]``."""
+        foul_block_spot_used = getattr(self, "_foul_block_spot", None)
+        if foul_block_spot_used:
+            return foul_block_spot_used
         block_spot_used = getattr(self, "_block_spot", None)
         if block_spot_used:
             return block_spot_used
@@ -1026,12 +1029,6 @@ class ShotManager:
                             )
                         return result
                     elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
-                        # Block: set flags and fall through to miss path (FGA/3PTA recorded in normal path)
-                        defender.record_stat("BLK")
-                        # Momentum: blocker +, blocked shooter − (the shooter also
-                        # gets a False on his Shot_Result_List via the miss path).
-                        defender.add_momentum(MO_BLOCK_DELTA)
-                        shooter.add_momentum(-MO_BLOCK_DELTA)
                         is_away_offense = off_team.team_id == self.game.away_team.team_id
                         # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
                         shot_spot = roles.get("shot_spot")
@@ -1042,8 +1039,24 @@ class ShotManager:
                             shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25})
                             sx = shooter_coords.get("x", 50)
                             sy = shooter_coords.get("y", 25)
-                        self._block_spot = calculate_block_spot(sx, sy, is_away_offense)
-                        self._block_defender = defender
+                        block_contact_spot = calculate_block_spot(sx, sy, is_away_offense)
+                        if d_foul:
+                            # Shooting foul wins the rules outcome. Preserve a
+                            # blocked-shot-looking ball path, but do not create
+                            # a true BLOCK result, block SFX/announcement, BLK
+                            # stat, or block momentum.
+                            self._foul_block_spot = block_contact_spot
+                        else:
+                            # Block: set flags and fall through to miss path
+                            # (FGA/3PTA recorded in normal path).
+                            defender.record_stat("BLK")
+                            # Momentum: blocker +, blocked shooter − (the
+                            # shooter also gets a False on his Shot_Result_List
+                            # via the miss path).
+                            defender.add_momentum(MO_BLOCK_DELTA)
+                            shooter.add_momentum(-MO_BLOCK_DELTA)
+                            self._block_spot = block_contact_spot
+                            self._block_defender = defender
 
             # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
             # Fast Break: only allow charge/block when there is a shot defender defending the attempt (defender_count >= 1)
@@ -1710,6 +1723,9 @@ class ShotManager:
                         "shooter": shooter,
                     }
                     logging.info(f"✅ FOUL OUT: Stored shooting foul context (miss + d_foul) - shooter={get_name_safe(shooter)}")
+                self._ensure_schema_miss_bounce_for_free_throw(
+                    result, roles, shooter, off_team,
+                )
             elif charge_result == "BLOCKING_FOUL":
                 # Blocking foul on missed shot - add blocking foul text
                 text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}. {get_name_safe(defender)} commits a blocking foul!"
@@ -2207,6 +2223,13 @@ class ShotManager:
                 del self._block_spot
             if hasattr(self, "_block_defender"):
                 del self._block_defender
+        if (not made) and getattr(self, "_foul_block_spot", None):
+            result["foul_block_contact"] = True
+            result["foul_block_contact_x"] = self._foul_block_spot["x"]
+            result["foul_block_contact_y"] = self._foul_block_spot["y"]
+            del self._foul_block_spot
+        elif getattr(self, "_foul_block_spot", None):
+            del self._foul_block_spot
         # Add blocking foul next_play_type if applicable
         if blocking_foul_next_play_type:
             result["next_play_type"] = blocking_foul_next_play_type

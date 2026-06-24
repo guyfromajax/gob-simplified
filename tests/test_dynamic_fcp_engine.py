@@ -120,10 +120,10 @@ def test_fcp_bh_from_final_ball_handler_not_hardcoded_pg():
 
 
 def test_sf_at_inbound_spot_excluded_from_pass_pool():
-    from BackEnd.engine.dynamic_hct import _sf_at_fcp_inbound_spot
+    from BackEnd.engine.fcp_inbound_release import sf_at_fcp_inbound_baseline
 
-    assert _sf_at_fcp_inbound_spot({"SF": {"x": 3, "y": 25}}, False) is True
-    assert _sf_at_fcp_inbound_spot({"SF": {"x": 12, "y": 25}}, False) is False
+    assert sf_at_fcp_inbound_baseline({"SF": {"x": 3, "y": 25}}, False) is True
+    assert sf_at_fcp_inbound_baseline({"SF": {"x": 12, "y": 25}}, False) is False
 
 
 def test_fcp_engagement_offense_aggressive_closes_on_def_pg():

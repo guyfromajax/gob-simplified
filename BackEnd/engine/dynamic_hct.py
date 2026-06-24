@@ -90,9 +90,8 @@ from BackEnd.engine.pass_contest import (
 # (the period buzzer ends the possession first).
 HCT_TEN_SECOND_LIMIT = 10.0
 
-# FCP: BIP inbound baseline x (home orientation). SF at this spot is ineligible
-# as a pass target until he clears the inbound spot (Dynamic_FCP_Brief §1.1).
-FCP_INBOUND_BASELINE_X_HOME = 3
+# FCP inbound SF helpers live in ``fcp_inbound_release`` (baseline spot, release
+# sprint, pass-clear x threshold).
 
 # Step 1 BH target: x = 44, y random in [21, 29].
 STEP_1_BH_TARGET_X = 44
@@ -2013,16 +2012,6 @@ def _seed_lineup_coords_from_prior(
     return coords
 
 
-def _sf_at_fcp_inbound_spot(
-    off_coords: Dict[str, Dict[str, int]], is_away_offense: bool
-) -> bool:
-    sf = off_coords.get("SF") or {}
-    x = float(sf.get("x", 50))
-    if is_away_offense:
-        return x >= (100 - FCP_INBOUND_BASELINE_X_HOME)
-    return x <= FCP_INBOUND_BASELINE_X_HOME
-
-
 def compute_dynamic_hct_turn(
     game, play: Any = None, *, turn_mode: str = "hct"
 ) -> Dict[str, Any]:
@@ -2114,10 +2103,24 @@ def compute_dynamic_hct_turn(
     bh_xy = off_coords[bh_pos]
 
     fcp_offball: Optional[Any] = None
+    fcp_sf_pass_clear_x = 0
     if turn_mode == "fcp":
+        from BackEnd.engine.fcp_inbound_release import (
+            compute_sf_inbound_release_target,
+            sample_fcp_sf_pass_clear_x,
+            sf_at_fcp_inbound_baseline,
+        )
         from BackEnd.engine.fcp_offball_attack import FcpOffballAttackState
 
         fcp_offball = FcpOffballAttackState(is_away_offense)
+        fcp_sf_pass_clear_x = sample_fcp_sf_pass_clear_x()
+        if bh_pos != "SF" and sf_at_fcp_inbound_baseline(off_coords, is_away_offense):
+            sf_release_dest = compute_sf_inbound_release_target(
+                off_coords, bh_pos, is_away_offense,
+            )
+            off_targets["SF"] = dict(sf_release_dest)
+            walk_up_other_offense_targets["SF"] = dict(sf_release_dest)
+            fcp_offball.set_sf_inbound_release(sf_release_dest)
 
     # Seed the running shot clock once (§4 Time terminals). Decremented per
     # segment so the loop is strictly bounded.
@@ -2860,8 +2863,12 @@ def compute_dynamic_hct_turn(
         # teammates closest to the BH; the receiver becomes the new ball handler
         # and the loop continues from him (enables a non-PG HCT-end BH → D7).
         pass_exclude: Optional[set] = None
-        if turn_mode == "fcp" and _sf_at_fcp_inbound_spot(off_coords, is_away_offense):
-            pass_exclude = {"SF"}
+        if turn_mode == "fcp":
+            from BackEnd.engine.fcp_inbound_release import sf_cleared_for_fcp_pass
+
+            sf_xy = off_coords.get("SF") or {}
+            if not sf_cleared_for_fcp_pass(sf_xy, is_away_offense, fcp_sf_pass_clear_x):
+                pass_exclude = {"SF"}
         receiver_pos = _select_pass_receiver(
             bh_pos, off_coords, is_away_offense, exclude=pass_exclude
         )

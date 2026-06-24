@@ -152,9 +152,23 @@ When read ≤ the pass threshold, the BH does not hold automatically — a weigh
 
 Constants: `FCP_READ_STRONG_HANDLER_SUM`, `FCP_READ_LOW_TIER_CHOICES` in `dynamic_hct.py`.
 
+#### SF inbound release (current)
+
+After BIP, SF sprints off the baseline **starting on the first FCP segment** (engagement / converge / hold — not waiting for a BH advance beat).
+
+| Rule | Detail |
+|------|--------|
+| **Movement target** | **x = 34** (home; mirrored away) on an **open vertical tier** |
+| **Tier anchors (home y)** | upper **35**, center **25**, lower **15** |
+| **Tier occupancy** | PG + SG (excluding BH) each claim upper (y>30), center (20–30), or lower (y<20); SF picks **randomly among open tiers** (always ≥1 with 3 tiers / 2 players) |
+| **Pass eligibility** | SF excluded from press-break pass targets until **offense-progress x ≥ clear_x**, where `clear_x = randint(14, 20)` per possession (halfway from baseline ~3 → staging 34). Away: `x ≤ 100 − clear_x`. |
+| **After staging** | On **`hct_advance`**, SF joins PG/SG on the normal backcourt release lane **x∈[46,53]** |
+
+Module: `fcp_inbound_release.py` (target + pass gate); wired in `compute_dynamic_hct_turn` via `off_targets["SF"]` + `FcpOffballAttackState.set_sf_inbound_release`.
+
 #### Off-ball attack routing (current)
 
-During **`hct_advance`** beats (after attack wins pressure), non-BH offenders route via `fcp_offball_attack.py`. Engagement / converge / hold / pass still use BIP setup hustle.
+During **`hct_advance`** beats (after attack wins pressure), non-BH offenders route via `fcp_offball_attack.py`. Engagement / converge / hold / pass use **`off_targets`** (SF release included from turn init).
 
 **Ball-progress tiers** (BH **x**, home orientation; away mirrored). Half-open partition — PF and C share the same boundary operators:
 
@@ -200,6 +214,7 @@ When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, 
 #### Tests
 
 - `tests/test_fcp_read_decision.py` — FCP strong-handler sum (130) and low-tier weights.
+- `tests/test_fcp_inbound_release.py` — SF x=34 tier pick, pass-clear x (14–20), off-ball handoff.
 - `tests/test_fcp_offball_attack.py` — tier boundaries at 34 / 50 / 51 and backcourt release lane.
 - `tests/test_fcp_pf_c_zone.py` — zone geometry, anchor ladder, BH x≥64 man release.
 

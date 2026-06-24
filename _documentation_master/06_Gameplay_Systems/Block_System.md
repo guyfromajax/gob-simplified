@@ -72,6 +72,12 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
   - Animate the ball to the **block spot** (not the rim), then run the same miss path (bounce, rebound). The block spot is used as the reference for both the ball flight target and the bounce/rebound so the ball does not snap to the opposite side of the court.
   - **Frontend:** In `ShotAnimationSystem`, (1) ball flight uses `ball_bounce_x`/`ball_bounce_y` as the target when `result_type === 'BLOCK'`; (2) in the miss path, `rimCoords` for BLOCK is also set from the block spot (not `getRimCoordinates`) so the bounce and rebound logic use the block spot as the reference; (3) shot **variant** animations (rattle/backboard) are skipped for BLOCK.
 - When outcome is shooting foul or “else” to standard shot, keep current shot (and optional foul) animation behavior.
+- If the standard shooting-foul roll has already produced a defensive shooting foul and block reconciliation also reaches the block threshold, the **shooting foul owns the rules outcome**:
+  - Backend keeps `result_type: "MISS"` / `next_play_type: "FREE_THROW"` rather than `result_type: "BLOCK"`.
+  - Backend may stamp `foul_block_contact: true` plus `foul_block_contact_x/y` for animation-only contact.
+  - The schema emitter sends the ball to that contact point and suppresses rim/clank arrival SFX and the bounce sub-step.
+  - No `BLK` stat is credited, no blocker momentum is applied, no `blocker_id` is stamped, and no "BLOCK!" announcement or block SFX fires.
+  - The defender still receives the shooting foul, and the shooter receives the appropriate free throws.
 
 **Result_type BLOCK (dedicated, both backend and frontend):**
 
@@ -108,6 +114,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 - **Block:** Defender credited with a block (BLK); shooter’s FGA (and 3PTA if applicable) recorded; shot is a miss; no points. **Possession:** Possession flips **only on DREB** (same as any miss). OREB does not flip possession; defense +1 / offense −1 momentum still applies when the block occurs.
 - **Shooting foul (from block reconciliation):** Use existing shooting-foul stat and free-throw flow (defender foul, shooter FTs, optional and-one bucket from shooter_finish_score).
+- **Shooting foul with block-like contact:** If a normal defensive shooting foul is already active when block reconciliation reaches the block threshold, treat it as a shooting foul with animation-only contact. Do not credit BLK or block momentum.
 
 ---
 
