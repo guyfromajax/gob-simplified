@@ -70,3 +70,33 @@ def test_moment_walk_neutral_returns_none(monkeypatch):
     monkeypatch.setattr(random, "randint", lambda a, b: a)
     monkeypatch.setattr(PR, "_resolve_hco_moment", lambda *a, **k: ("NEUTRAL", 1.0, None))
     assert PR._resolve_hco_moment_walk(_skel(), _Game(aggression=4), OFF, DEF) is None
+
+
+# --------------------------------------------------- option B: per-step reach-in tagging
+
+def test_moment_walk_option_b_tags_every_non_terminal_contest(monkeypatch):
+    # NEUTRAL/POS_O on each contested step → no hard outcome, but every step records the on-ball
+    # defender so the FE renders the (failed) steal-attempt reach-in. _skel(3) → steps 1,2 walked.
+    monkeypatch.setattr(random, "randint", lambda a, b: a)
+    monkeypatch.setattr(PR, "_resolve_hco_moment", lambda *a, **k: ("POS_O", 1.0, None))
+    tags = []
+    assert PR._resolve_hco_moment_walk(_skel(3), _Game(aggression=4), OFF, DEF, reach_in_tags=tags) is None
+    assert tags == [(1, "d_pg"), (2, "d_pg")]
+
+
+def test_moment_walk_option_b_no_tags_after_terminal(monkeypatch):
+    # A terminal outcome on the first contested step → walk returns immediately; the terminal
+    # reach-in comes from the stopper step, so no non-terminal tags are collected.
+    monkeypatch.setattr(random, "randint", lambda a, b: a)
+    monkeypatch.setattr(PR, "_resolve_hco_moment", lambda *a, **k: ("STEAL", 0.5, _P("d_pg")))
+    tags = []
+    assert PR._resolve_hco_moment_walk(_skel(3), _Game(aggression=4), OFF, DEF, reach_in_tags=tags) == "STEAL"
+    assert tags == []
+
+
+def test_moment_walk_option_b_inert_when_not_engaged(monkeypatch):
+    # Not engaged (aggression 0, max roll) → no contests, no tags.
+    monkeypatch.setattr(random, "randint", lambda a, b: b)
+    tags = []
+    assert PR._resolve_hco_moment_walk(_skel(3), _Game(aggression=0), OFF, DEF, reach_in_tags=tags) is None
+    assert tags == []

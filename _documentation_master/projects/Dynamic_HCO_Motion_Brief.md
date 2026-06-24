@@ -322,11 +322,22 @@ Replaces HCO's up-front percentile tables (`STANDARD_D_FOUL`/`STEAL_ATTEMPT`/`DE
 
 **Steal / reach-in micro-movement (the "pressure moment" visual):** HCO uses a single on-ball
 defender, so it does NOT get FCP/HCT's multi-defender *converge* — it gets the **`reach_in`
-flourish** (one defender lunges at the ball + `click-steal.wav`). On a defender-reach outcome
-(`STEAL` / `DEAD_BALL_TURNOVER` / `D_FOUL`), the HCO non-shot block tags the stopper step with
-`reach_in_def_id` (the on-ball defender); `skeleton_step_emitter` stamps
-`step.start.flourish[id] = {kind:"reach_in", target:"ball"}` (mirrors the HCT emitter); the FE
-(`flourishes.js`) renders the lunge + plays the SFX. Pure render-space — never mutates gameplay
-coords (UESS-safe). `O_FOUL` (offensive/charge) is excluded.
+flourish** (one defender lunges at the ball + `click-steal.wav`). `skeleton_step_emitter` stamps
+`step.start.flourish[id] = {kind:"reach_in", target:"ball"}` from a `reach_in_def_id` tag on the
+step (mirrors the HCT emitter); the FE (`flourishes.js`) renders the lunge + plays the SFX. Pure
+render-space — never mutates gameplay coords (UESS-safe).
+
+**Option B — reach-in on every contested step of an engaged turn** (chosen over A = defender-wins-only,
+so the coach *sees* that an aggressive defense is constantly poking — successes and whiffs alike):
+- **Terminal outcome** (`STEAL` / `DEAD_BALL_TURNOVER` / `D_FOUL`): the non-shot block tags the
+  **stopper step** with the on-ball defender. (`O_FOUL`, an offensive charge, is excluded.)
+- **Non-terminal contest** (`NEUTRAL` near-miss / `POS_O` blow-by): `_resolve_hco_moment_walk`
+  collects `(step_index, defender_id)` per contested step into a `reach_in_tags` out-param; the
+  caller applies them to `final_skeleton` **after the deepcopy** (the walk never mutates the cached
+  skeleton). The continues-to-shot path carries the tags because the dynamic resolver appends the
+  base step dicts verbatim (`output_steps.append(steps[i])`), and custom step keys survive to the
+  emitter.
+- Gated by the same per-turn aggression engagement roll as the moment itself — non-engaged turns
+  show no reach-ins at all, so reach-in *presence* reads as defensive aggression.
 
 **v1 scope / deferred:** man defense only (zone has no clean 1:1 defender); the moment walk runs **before** shot resolution, so a moment pre-empts the would-be shot — true per-step interleaving with `should_shoot` is a later refinement (needs the late shot resolver, which must run after the shot-clock truncation). Pass interceptions (HCT `pass_contest`) and set-play moments also deferred. All behind `GOB_DYNAMIC_HCO_MOTION`. Tune frequency via `HCT_D8_GLOBAL_SCALAR` / `HCT_D8_DEF_WIN_BASE`.

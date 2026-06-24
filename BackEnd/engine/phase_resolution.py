@@ -4663,7 +4663,7 @@ def _resolve_hco_moment(game, ball_handler, bh_defender):
                            def_mod=def_eff, off_mod=off_eff, event_scalar=HCO_MOMENT_SCALAR)
 
 
-def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup):
+def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_tags=None):
     """Dynamic HCO per-step foul / steal / turnover moment — the HCT step-by-step moment migrated
     to HCO. Rolls the defense's per-turn pressure engagement (aggression, 0–4: roll <= setting),
     then walks the skeleton steps firing the attribute-driven moment (`_resolve_hco_moment`) for
@@ -4671,6 +4671,13 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup):
     outcome (``O_FOUL`` / ``D_FOUL`` / ``STEAL`` / ``DEAD_BALL_TURNOVER``) or None (no moment →
     normal shot resolution). The caller sets ``result`` to this so the existing non-shot
     resolution + stopper system render and route it (no new emission path needed).
+
+    Reach-in micro-movement (option B — every contested step of an engaged turn): when
+    ``reach_in_tags`` (a list) is passed, each NON-terminal contest (NEUTRAL near-miss / POS_O
+    blow-by) appends ``(step_index, on_ball_defender_id)`` so the caller stamps a render-space
+    ``reach_in`` flourish there — the defender's failed steal attempt. Terminal outcomes get
+    their reach-in via the stopper step instead. The walk only READS the skeleton (never mutates
+    it — tags are applied by the caller post-deepcopy), so the cached skeleton is untouched.
 
     v1 scope: man defense only (zone deferred — no clean 1:1 defender); the walk runs BEFORE shot
     resolution, so a moment pre-empts the would-be shot (true per-step interleaving with the shoot
@@ -4707,6 +4714,12 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup):
         if result_type:
             logging.warning(f"⚔️ [HCO MOMENT] {result_type} at step {i} ({bh_pos})")
             return result_type
+        # Option B: no hard outcome (NEUTRAL near-miss / POS_O blow-by), but the on-ball defender
+        # still lunged — record him so the caller stamps a render-space reach_in flourish here.
+        if reach_in_tags is not None:
+            _rid = getattr(bh_defender, "player_id", None)
+            if _rid:
+                reach_in_tags.append((i, _rid))
     return None
 
 
@@ -5241,8 +5254,11 @@ def resolve_half_court_offense_logic(game):
     # tables are skipped for motion (resolve_hco_outcome → SHOT) and the flag is on, walk the
     # steps with the attribute-driven moment; a hard outcome overrides `result` and routes through
     # the EXISTING non-shot resolution + stopper system below. (v1: man defense, pre-shot.)
+    _hco_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
     if is_motion_play and result == "SHOT" and _dynamic_hco_motion_enabled():
-        _moment_result = _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup)
+        _moment_result = _resolve_hco_moment_walk(
+            skeleton, game, off_lineup, def_lineup, reach_in_tags=_hco_reach_in_tags,
+        )
         if _moment_result:
             result = _moment_result
 
@@ -5275,6 +5291,16 @@ def resolve_half_court_offense_logic(game):
     if is_motion_play:
         # Motion plays use base_loop skeleton (already retrieved)
         final_skeleton = skeleton
+        # Dynamic HCO option B: stamp the (failed) steal-attempt reach-in on every non-terminal
+        # contested step of an engaged moment-walk turn (terminal outcomes get theirs via the
+        # stopper step). Applied here, post-deepcopy, so the cached skeleton is never mutated;
+        # step indices align with the walked skeleton. The emitter turns reach_in_def_id into a
+        # render-space reach_in flourish (FE lunge + click-steal SFX) — UESS-safe, no coord change.
+        if _hco_reach_in_tags and final_skeleton and final_skeleton.get("steps"):
+            _fsteps = final_skeleton["steps"]
+            for _idx, _rid in _hco_reach_in_tags:
+                if 0 <= _idx < len(_fsteps):
+                    _fsteps[_idx]["reach_in_def_id"] = _rid
     else:
         # Set Plays: Get skeleton with correct variant based on resolution result
         if variant_result:
