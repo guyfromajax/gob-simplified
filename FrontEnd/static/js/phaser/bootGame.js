@@ -2394,7 +2394,7 @@ async function handleSimQuarter() {
       params.set('quarter', quarterAfterSim);
       params.set('period', periodLabel);
       params.set('game_id', gameId);
-      params.set('quarter_break_from', 'sim_quarter'); (fallback path)
+      params.set('quarter_break_from', 'sim_quarter'); // fallback path
       console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
       window.location.href = `/set-lineup.html?${params.toString()}`;
     }
