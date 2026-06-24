@@ -2013,8 +2013,8 @@
       display: inline-flex;
       flex-direction: row;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+      justify-content: center;
+      gap: 11px;
       transition: background 0.14s, border-color 0.14s;
       box-shadow: none;
     }
@@ -2031,7 +2031,7 @@
     .pcc-timeout-pills {
       display: flex;
       gap: 3px;
-      justify-content: flex-end;
+      justify-content: center;
       flex: 0 0 auto;
       width: auto;
       margin: 0;
@@ -2067,13 +2067,15 @@
     }
 
     #playcall-center .pcc-game #timeout-btn.pcc-timeout.timeout-btn-highlighted {
-      background: rgba(247, 148, 32, 0.12);
-      border-color: var(--orange);
-      color: #fff;
-      box-shadow: 0 0 16px var(--orange-glow);
+      background: rgba(53, 199, 90, 0.18);
+      border-color: #35C75A;
+      box-shadow: 0 0 14px -3px rgba(53, 199, 90, 0.6);
       transform: none;
       font-weight: inherit;
-      animation: none;
+    }
+
+    #playcall-center .pcc-game #timeout-btn.pcc-timeout.timeout-btn-highlighted .to-pip:not(.used) {
+      background: #35C75A;
     }
 
     /* Offense slot carousel */

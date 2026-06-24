@@ -3,7 +3,6 @@
 6. Don't animate rebound / BIP on Final Shot FT
 48. Double block announce on Final Shot
 49. No OREB putback attempts on missed final shot
-42. Quick Foul bug, wrong team fouled
 43. Add a run out the clock animation
 44. Full court shots
 
@@ -11,20 +10,14 @@
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 37. Player Foul Out Next Step bug
 38 Fast Break, aninate defender back on pass
-39. Fix naming conventions for aggression/aggressiveness
-40. Audibles 3-ponit on a 2-point shot. Triangel Fast Break, shooter tarted at 3 point spot then did an attack shot driving to the basket.
-41. OREB kickout steps don't seem to be adhering to a speed archetype
-42. over and back fouls registering as 10 second vilations
-43. Fix final shot steup sppot coords
-44. Fix fianl shot UESs setup
 
 ##New Features
 24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 28. Micro Movements
 109. More dynamic HCO animations for Set Plays
-115. Better HCO steal/turnover logic
 103. Player images
 111. Marketing Screenshot Tool Build
+112. Nail court.html refresh behavior
 
 ##Full Product Readiness
 102. Team court images
@@ -37,7 +30,6 @@
 114. Better defense stat tracking
 116. User account -- link X & Facebook?
 117. More action on Signing Day
-118. Lose stale load of mode select screen
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report
