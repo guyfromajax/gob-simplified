@@ -4673,14 +4673,19 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup):
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
     game_state = game.game_state
-    if is_zone_defense(game_state.get("defense_playcall")):
+    _zone = is_zone_defense(game_state.get("defense_playcall"))
+    logging.warning(f"⚔️ [HCO MOMENT WALK] entered playcall={game_state.get('defense_playcall')!r} zone={_zone}")
+    if _zone:
         return None  # man-only for v1
     steps = (skeleton or {}).get("steps") or []
     if len(steps) < 2:
+        logging.warning(f"⚔️ [HCO MOMENT WALK] skeleton has {len(steps)} steps (<2) → no moment")
         return None
     # Per-turn defense pressure engagement (aggression 0-4). No pressure → no moment this turn.
     aggression = (getattr(game.defense_team, "strategy_settings", {}) or {}).get("aggression", 2)
-    if random.randint(0, 4) > aggression:
+    _roll = random.randint(0, 4)
+    logging.warning(f"⚔️ [HCO MOMENT WALK] aggression={aggression} roll={_roll} pressuring={_roll <= aggression}")
+    if _roll > aggression:
         return None
 
     defending_is_user = getattr(game.defense_team, "is_user_team", False)
@@ -4688,18 +4693,23 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup):
     off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
     rt_map = {"STEAL": "STEAL", "DEAD BALL": "DEAD_BALL_TURNOVER",
               "O_FOUL": "O_FOUL", "D_FOUL": "D_FOUL"}
+    _fired = 0
     for i in range(1, len(steps)):
         bh_pos, _loc = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
             continue
         bh_defender = def_lineup.get(off_to_def.get(bh_pos, bh_pos))
         if bh_defender is None:
+            logging.warning(f"⚔️ [HCO MOMENT WALK] step {i} bh={bh_pos} → no man defender (off_to_def={off_to_def.get(bh_pos)})")
             continue
+        _fired += 1
         outcome, _ratio, _credited = _resolve_hco_moment(game, off_lineup[bh_pos], bh_defender)
         result_type = rt_map.get(outcome)
+        logging.warning(f"⚔️ [HCO MOMENT WALK] step {i} bh={bh_pos} vs {getattr(bh_defender,'player_id','?')} → {outcome}")
         if result_type:
             logging.warning(f"⚔️ [HCO MOMENT] {result_type} at step {i} ({bh_pos})")
             return result_type
+    logging.warning(f"⚔️ [HCO MOMENT WALK] no hard outcome across {_fired} contested steps")
     return None
 
 
