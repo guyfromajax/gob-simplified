@@ -1571,24 +1571,40 @@
       height: 132px;
       max-height: 100%;
       display: grid;
-      grid-template-columns: 38% 1px 32% 1px minmax(0, 1fr);
+      grid-template-columns: 37% 35% minmax(0, 1fr);
       align-items: stretch;
       box-sizing: border-box;
     }
 
-    /* 4. Inner zone dividers */
-    .pcc-divider {
-      background: rgba(255, 255, 255, 0.08);
-      width: 1px;
+    .pcc-cockpit > .pcc-zone + .pcc-zone {
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .pcc-ztitle {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      color: rgba(255, 255, 255, 0.30);
+      margin-bottom: 11px;
+      flex-shrink: 0;
+    }
+
+    .pcc-zone-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      gap: 10px;
+      justify-content: space-between;
     }
 
     /* ── ZONE 1 overrides ── */
     .pcc-overrides {
       display: flex;
       flex-direction: column;
-      padding: 4px 12px;
-      gap: 4px;
+      padding: 14px 18px;
       min-width: 0;
+      min-height: 0;
     }
 
     /* 5. OFF/DEF rows — recessed slot */
@@ -1616,9 +1632,11 @@
 
     .pcc-row-label {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 14px;
-      letter-spacing: 0.14em;
+      font-size: 13px;
+      letter-spacing: 0.18em;
       color: rgba(255, 255, 255, 0.42);
+      width: 96px;
+      flex: 0 0 96px;
       flex-shrink: 0;
     }
 
@@ -1753,10 +1771,9 @@
     #pcc-stacks-zone.pcc-strategy {
       display: flex;
       flex-direction: column;
-      padding: 2px 12px 4px;
-      gap: 6px;
-      justify-content: space-between;
+      padding: 14px 18px 24px;
       min-width: 0;
+      min-height: 0;
       border: none;
     }
 
@@ -1783,15 +1800,6 @@
       color: rgba(255, 255, 255, 0.42);
       text-align: left;
       margin: 0;
-    }
-
-    /* "AGGRESSION" at 13px: tighter tracking so it stays one line in the label column */
-    .pcc-dial-row.pcc-stack.aggression .pcc-dial-label.pcc-stack-label {
-      letter-spacing: 0.10em;
-    }
-
-    .pcc-dial-row.pcc-stack.press-trap .pcc-dial-label.pcc-stack-label {
-      letter-spacing: 0.11em;
     }
 
     .pcc-dial-row:has(.pcc-stack-btn.selected) .pcc-dial-label {
@@ -1896,22 +1904,15 @@
     /* ── ZONE 3 game controls ── */
     .pcc-game {
       display: flex;
-      align-items: center;
-      padding: 6px 12px;
-      gap: 12px;
-      justify-content: flex-end;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 14px 18px;
       min-width: 0;
+      min-height: 0;
     }
 
     .pcc-speed {
-      display: flex;
-      flex-direction: column;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 5px;
-      overflow: hidden;
-      opacity: 0.35;
-      pointer-events: none;
+      display: none;
     }
 
     .pcc-speed-btn {
@@ -1945,18 +1946,18 @@
       font-size: 11px;
     }
 
-    /* 10. Pause — darker treatment vs lifted steel surface */
+    /* 10. Pause / Resume — primary action, filled orange */
     #playcall-center .pcc-game #pause-btn.pcc-pause {
       position: static;
       transform: none;
-      width: 120px;
-      height: 64px;
-      min-width: 120px;
-      padding: 0 12px;
-      background: linear-gradient(180deg, #14171e 0%, #0c0e13 100%);
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      border-radius: 6px;
-      color: #fff;
+      width: 100%;
+      flex: 1;
+      min-height: 48px;
+      padding: 0 14px;
+      background: var(--orange);
+      border: 1px solid var(--orange);
+      border-radius: 9px;
+      color: #15181f;
       font-family: 'Bebas Neue', sans-serif;
       font-size: 20px;
       letter-spacing: 0.06em;
@@ -1965,70 +1966,80 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: filter 0.14s, transform 0.14s, background 0.18s, border-color 0.18s;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 16px -6px rgba(0, 0, 0, 0.8);
+      transition: filter 0.14s, transform 0.14s;
+      box-shadow: none;
     }
 
     #playcall-center .pcc-game #pause-btn.pcc-pause:hover {
-      filter: brightness(1.18);
-      border-color: rgba(255, 255, 255, 0.42);
+      filter: brightness(1.12);
     }
 
     #playcall-center .pcc-game #pause-btn.pcc-pause.paused {
-      background: linear-gradient(180deg, #1c2028 0%, #14171e 100%);
-      border-color: rgba(255, 255, 255, 0.42);
+      background: var(--orange);
+      border-color: var(--orange);
+      color: #15181f;
     }
 
     .pcc-pause-icon {
       font-size: 14px;
-      color: rgba(255, 255, 255, 0.85);
+      line-height: 1;
+      color: inherit;
     }
 
-    .pcc-timeout-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      align-items: stretch;
+    .pcc-pause-icon::before {
+      content: '❚❚';
     }
 
-    /* 11. Timeout */
+    #pause-btn.paused .pcc-pause-icon::before {
+      content: '▶';
+    }
+
+    /* 11. Timeout — secondary outline; pips integrated inside button */
     #playcall-center .pcc-game #timeout-btn.pcc-timeout {
       position: static;
       margin: 0;
-      width: 120px;
-      height: auto;
-      min-height: 38px;
-      padding: 6px 8px;
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      border-radius: 5px;
+      width: 100%;
+      flex: 1;
+      min-height: 48px;
+      padding: 0 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 9px;
       color: #fff;
       font-family: 'Bebas Neue', sans-serif;
       font-size: 15px;
       letter-spacing: 0.08em;
       cursor: pointer;
       display: inline-flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
-      justify-content: center;
-      gap: 4px;
+      justify-content: space-between;
+      gap: 10px;
       transition: background 0.14s, border-color 0.14s;
+      box-shadow: none;
     }
 
     #playcall-center .pcc-game #timeout-btn.pcc-timeout:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.42);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.24);
+    }
+
+    .pcc-timeout-label {
+      flex-shrink: 0;
     }
 
     .pcc-timeout-pills {
       display: flex;
       gap: 3px;
-      justify-content: center;
-      width: 100%;
+      justify-content: flex-end;
+      flex: 0 0 auto;
+      width: auto;
+      margin: 0;
     }
 
     .pcc-pill.to-pip {
-      flex: 1;
+      flex: 0 0 8px;
+      width: 8px;
       height: 5px;
       border-radius: 1px;
       background: var(--orange);
@@ -2038,6 +2049,31 @@
     /* 12. Used timeout pill */
     .pcc-pill.to-pip.used {
       background: rgba(255, 255, 255, 0.18);
+    }
+
+    #playcall-center .pcc-timeout-pills.timeout-pips {
+      margin-left: 0;
+    }
+
+    #playcall-center .pcc-timeout-pills.timeout-pips .to-pip {
+      width: 8px;
+      height: 5px;
+      border-radius: 1px;
+      background: var(--orange);
+    }
+
+    #playcall-center .pcc-timeout-pips.timeout-pips .to-pip.used {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    #playcall-center .pcc-game #timeout-btn.pcc-timeout.timeout-btn-highlighted {
+      background: rgba(247, 148, 32, 0.12);
+      border-color: var(--orange);
+      color: #fff;
+      box-shadow: 0 0 16px var(--orange-glow);
+      transform: none;
+      font-weight: inherit;
+      animation: none;
     }
 
     /* Offense slot carousel */
@@ -4563,7 +4599,9 @@
 
     <div class="pcc-cockpit">
       <!-- ZONE 1: Overrides -->
-      <div class="pcc-overrides">
+      <div class="pcc-overrides pcc-zone">
+        <div class="pcc-ztitle">PLAYCALLS</div>
+        <div class="pcc-zone-body">
         <div class="pcc-row" id="row-offense">
           <div class="pcc-row-label">OFF</div>
           <div class="pcc-offense-call">
@@ -4588,12 +4626,13 @@
           </div>
           <button type="button" class="pcc-clear" id="clear-defense-card-x" aria-label="Clear defense override">✕</button>
         </div>
+        </div>
       </div>
 
-      <div class="pcc-divider" aria-hidden="true"></div>
-
       <!-- ZONE 2: Strategy dials (keep #pcc-stacks-zone + .pcc-stack.* for playcallCenter.js selectors) -->
-      <div id="pcc-stacks-zone" class="pcc-strategy">
+      <div id="pcc-stacks-zone" class="pcc-strategy pcc-zone">
+        <div class="pcc-ztitle">TACTICS</div>
+        <div class="pcc-zone-body">
         <div class="pcc-dial-row pcc-stack tempo">
           <div class="pcc-dial-label pcc-stack-label">TEMPO</div>
           <div class="pcc-dial">
@@ -4630,29 +4669,31 @@
           </div>
           <button type="button" class="pcc-clear-strategy pcc-stack-x" id="clear-press-trap-x" aria-label="Clear press/trap">✕</button>
         </div>
+        </div>
       </div>
 
-      <div class="pcc-divider" aria-hidden="true"></div>
-
       <!-- ZONE 3: Game controls -->
-      <div class="pcc-game">
-        <div class="pcc-speed" aria-hidden="false">
+      <div class="pcc-game pcc-zone">
+        <div class="pcc-ztitle">CONTROLS</div>
+        <div class="pcc-zone-body">
+        <div class="pcc-speed" aria-hidden="true">
           <button type="button" class="pcc-speed-btn" disabled tabindex="-1" title="Coming in a future update"><span class="pcc-speed-glyph">▶▶▶</span></button>
           <button type="button" class="pcc-speed-btn" disabled tabindex="-1" title="Coming in a future update"><span class="pcc-speed-glyph">▶▶</span></button>
           <button type="button" class="pcc-speed-btn on" id="game-speed-btn" disabled title="Coming in a future update"><span class="pcc-speed-glyph">▶</span></button>
         </div>
         <button type="button" id="pause-btn" class="pcc-pause">
-          <span class="pcc-pause-icon">▮▮</span>
+          <span class="pcc-pause-icon" aria-hidden="true"></span>
           <span class="pcc-pause-text">PAUSE</span>
         </button>
-        <div class="pcc-timeout-wrap">
-          <button type="button" id="timeout-btn" class="pcc-timeout">TIMEOUT</button>
+        <button type="button" id="timeout-btn" class="pcc-timeout">
+          <span class="pcc-timeout-label">TIMEOUT</span>
           <div class="pcc-timeout-pills timeout-pips" id="timeout-pips" aria-hidden="true">
             <span class="pcc-pill to-pip"></span>
             <span class="pcc-pill to-pip"></span>
             <span class="pcc-pill to-pip"></span>
             <span class="pcc-pill to-pip"></span>
           </div>
+        </button>
         </div>
       </div>
     </div>
