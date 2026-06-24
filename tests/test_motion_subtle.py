@@ -175,14 +175,14 @@ def test_all_offense_present_and_coords_explicit():
     assert beat["pos_actions"]["PG"]["action"] == "handle_ball"  # BH keeps the ball
 
 
-def test_subtle_movers_use_drift_archetype():
+def test_subtle_movers_use_cruise_archetype():
     off = _lineup("PG", "SG")
     beat = build_subtle_beat(_step({"PG": "key", "SG": "upper wing"}), off,
                              "PG", is_away_offense=False, rng=FakeRng(choice_idx=1, random_val=0.0))
-    assert beat["pos_actions"]["PG"]["archetype"] == "drift"   # BH dribble
+    assert beat["pos_actions"]["PG"]["archetype"] == "cruise"   # BH dribble (standard HCO pace)
     for pa in beat["pos_actions"].values():
         if pa["action"] == "cut":
-            assert pa["archetype"] == "drift"                  # non-BH movers
+            assert pa["archetype"] == "cruise"                 # non-BH movers
         if pa["action"] == "stationary":
             assert "archetype" not in pa                       # holders untouched
 

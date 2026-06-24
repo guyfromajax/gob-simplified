@@ -27,9 +27,9 @@ _Y_MIN, _Y_MAX = 2.0, 48.0
 
 # Ball-handler radial moves (side-dribble is added dynamically when eligible).
 BH_SUBTLE_MOVES = ("in_place", "back", "in")
-# Subtle movers render slower than a normal HCO cut/dribble (cruise) for a deliberate
-# "feeling-out" pace. The emitter reads this explicit archetype off the pos_action.
-SUBTLE_ARCHETYPE = "drift"
+# Subtle movers render at the standard HCO skeleton pace (cruise). The emitter reads this
+# explicit archetype off the pos_action.
+SUBTLE_ARCHETYPE = "cruise"
 # Inside "flash" targets (brief: lowPost players flash to midLane / a midPost / a highPost).
 _INSIDE_FLASH_BASE = ("midLane",)
 

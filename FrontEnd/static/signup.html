@@ -20,19 +20,11 @@
   <!-- End Google Tag Manager (noscript) -->
   <!-- Alpha Badge (shown when IS_ALPHA=true) -->
   <img id="alpha-badge" class="alpha-badge" src="/images/alpha_badge_gold.png" alt="Alpha">
-  
+
+  <img class="auth-logo" src="/images/geekedout_logo.png" alt="Geeked Out Basketball">
   <div class="auth-container">
     <h1 class="auth-title">CREATE ACCOUNT</h1>
-    
-    <!-- Alpha Disclaimer (shown when IS_ALPHA=true) -->
-    <div id="alpha-disclaimer" class="alpha-disclaimer">
-      <div class="alpha-disclaimer-title">ALPHA ACCESS</div>
-      <p class="alpha-disclaimer-text">
-        You need an <strong>alpha access code</strong> to sign up.
-        Data may be wiped without notice during alpha testing.
-      </p>
-    </div>
-    
+
     <form id="signup-form" class="auth-form">
       <div class="form-group">
         <label for="email">Email</label>
@@ -53,9 +45,8 @@
       <!-- OTP field (shown when IS_ALPHA=true) -->
       <div id="otp-group" class="form-group" style="display: none;">
         <label for="otp-code">Alpha Access Code</label>
-        <input type="text" id="otp-code" name="otp_code" placeholder="Enter your access code">
-        <div class="form-hint">Required for alpha signup</div>
-        <a href="#" id="request-access-link" class="request-access-link">Request Access Code</a>
+        <input type="text" id="otp-code" name="otp_code" placeholder="Enter your code">
+        <div class="form-hint">Don't have one? <a href="#" id="request-access-link">Request access</a></div>
       </div>
       
       <div id="error-message" class="error-message"></div>
@@ -65,7 +56,9 @@
         <span id="button-loading" style="display: none;">Creating account...</span>
       </button>
     </form>
-    
+
+    <p id="alpha-warnline" class="auth-warnline" style="display: none;">Alpha build — your data may be wiped during testing.</p>
+
     <div class="auth-footer">
       Already have an account? <a href="/login.html">Log in</a>
     </div>
@@ -88,9 +81,9 @@
         const config = await API_CONFIG.loadAppConfig();
         
         if (config.isAlpha) {
-          // Show alpha badge and disclaimer
+          // Show alpha badge and the quiet data-wipe caveat line
           document.getElementById('alpha-badge').classList.add('visible');
-          document.getElementById('alpha-disclaimer').classList.add('visible');
+          document.getElementById('alpha-warnline').style.display = 'block';
           // Show OTP field
           document.getElementById('otp-group').style.display = 'block';
           document.getElementById('otp-code').required = true;
