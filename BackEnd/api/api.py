@@ -2271,7 +2271,23 @@ try:
             time_remaining = int(cached.game_state.get("time_remaining", 480) or 480)
             clock = cached.game_state.get("clock") or f"{time_remaining // 60}:{time_remaining % 60:02d}"
             is_final = bool(quarter >= 4 and time_remaining <= 0 and home_score != away_score)
-            status = "final" if is_final else ("quarter_break" if time_remaining <= 0 else "active_mid_quarter")
+            has_started = (
+                quarter > 1
+                or time_remaining < 480
+                or home_score != 0
+                or away_score != 0
+                or bool(cached.game_state.get("opening_tip_winner"))
+            )
+            if is_final:
+                status = "final"
+            elif cached.game_state.get("timeout_next_play_type"):
+                status = "timeout_resume"
+            elif time_remaining <= 0:
+                status = "quarter_break"
+            elif has_started:
+                status = "active_mid_quarter"
+            else:
+                status = "pregame"
             return {
                 "game_id": str(normalized_game_id),
                 "status": status,

@@ -2681,9 +2681,7 @@ async function initGame() {
       });
       if (resumeStateResponse.ok) {
         resumeState = await resumeStateResponse.json();
-        if (resumeState && resumeState.status === 'active_mid_quarter') {
-          activeResume = true;
-        }
+        activeResume = !!(resumeState && resumeState.status === 'active_mid_quarter');
       }
     } catch (error) {
       console.warn('⚠️ [COURT RESUME] Could not check resume-state:', error);
