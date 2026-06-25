@@ -2798,7 +2798,16 @@ async function initGame() {
   if (resumeGameButton) {
     resumeGameButton.addEventListener('click', async () => {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
-      applyResumeStateToUrl(resumeState);
+      if (resumeState) {
+        applyResumeStateToUrl(resumeState);
+      } else if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('active_resume');
+        params.set('resume_from_anchor', 'true');
+        if (typeof history !== 'undefined' && history.replaceState) {
+          history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+        }
+      }
       if (resumeGameContainer) resumeGameContainer.remove();
       try {
         await handleButtonClick(true, { resumeActive: false });
@@ -2821,9 +2830,10 @@ async function initGame() {
     console.error('Play Quarter button not found!');
   }
   
-  // ✅ FIX: Only auto-start when resuming from timeout (not quarter breaks)
+  // ✅ FIX: Only auto-start direct timeout resumes. Cold browser returns use the
+  // explicit active-resume modal and must wait for the user's Resume click.
   // Quarter breaks now show pre-game buttons for user to choose Play/Sim Quarter/Sim Full Game
-  if (resumeFromTimeout && gameId && homeTeam && awayTeam) {
+  if (resumeFromTimeout && !activeResume && gameId && homeTeam && awayTeam) {
     console.log(`⏸️ AUTO-START: Timeout resume - auto-starting game`);
     // Auto-start the game (same as clicking "Play Quarter" button)
     handleButtonClick(true);
