@@ -90,6 +90,31 @@ Two-stage: **(1) is this an optimal look?** — shot-type mismatch score from th
 
 ---
 
+### 4. Passing lanes & hot-read openness (SPEC — building)
+
+A defender sitting in a passing lane can disrupt an HCO **hot-read dish or kickout** (skeleton motion/reversal passes are NOT contested). Reuses the shared HCT pass model `resolve_pass_contest` (spatial lane gate → skill/anticipation → `complete` / `BAT_OOB` / `INTERCEPT`). **Hybrid** design:
+
+- **Decision gate ("truly open"):** when `should_shoot` evaluates a teammate as a hot-read **dish** target, that teammate is only "open" if the BH→teammate lane is clear — no eligible defender within the perpendicular lane distance. A covered lane removes him from the dish candidates (the offense won't force it).
+- **Contest (interception):** when a dish/kickout **is** thrown, run `resolve_pass_contest`; `INTERCEPT`/`BAT_OOB` converts the would-be shot into a turnover, routed through the existing non-shot resolution + stopper system (same path as the per-step Moment). `complete` → the shot resolves as today.
+
+**Defender coords at decision time** (the skeleton carries no defender positions) are reconstructed from the offensive coords — the same math the animator renders with, so the contest matches the picture: **man** → `get_defender_coords(off_coords, is_away_offense, aggression_call, spot, …)` per matchup; **zone** → `assign_all_zone_defenders(zone_boundaries, offensive_players, bh_coords, ball_spot, aggression, is_away_offense)`.
+
+**Lane distance** (perpendicular, passed as a param to `resolve_pass_contest` so HCT's `8.0` is untouched):
+
+| Turn / defense | Lane dist | Source |
+|---|---|---|
+| HCO, defense passive | `6.0` | `HCO_PASS_LANE_DIST_BY_AGGRESSION` |
+| HCO, defense normal | `randint(5,6)` **once per game** | rolled + cached in `game_state` |
+| HCO, defense aggressive | `5.0` | `HCO_PASS_LANE_DIST_BY_AGGRESSION` |
+| HCT | `8.0` | `PASS_LANE_DIST` (unchanged) |
+| FCP | `8.0` | `FCP_PASS_LANE_DIST` (new — see Roadmap) |
+
+Tighter HCO lanes (5–6 vs 8) reflect closer spacing + faster half-court passes. The normal-tempo roll is taken once and cached for the whole game (no per-pass roll).
+
+**Build stages:** (1) decision gate — reconstruct def coords, exclude covered-lane dish targets in `should_shoot`; (2) interception contest on thrown dish/kickout → turnover routing; (3) FCP @ 8 (needs a pass-beat audit — FCP's inbound/press-break/advance passes have no contest today).
+
+---
+
 ### Tunable Constants
 
 Per agents.md best-practice #3, every knob is a named constant. To retune frequency/feel, change these and re-run — no logic edits.
@@ -100,6 +125,9 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | `HCO_MOMENT_SCALAR` | phase_resolution.py | `0.5` | **HCO man-defense** dial; multiplies the whole per-moment event probability. ↑ = more steals/fouls/TOs vs man. HCT/FCP unaffected. |
 | `HCO_ZONE_MOMENT_SCALAR` | phase_resolution.py | `0.5` | **HCO zone-defense** dial (defaults equal to man). Tune zone independently — zones strip less, deflect/help more. |
 | `MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION` | phase_resolution.py | `{0:5, 1:20, 2:35, 3:50, 4:75}` | Per-turn % of possessions the defense attempts **any** moment, by aggression (man + zone). The frequency knob *before* conversion. ↓ = fewer possessions with a steal/foul/TO at every aggression level. |
+| `HCO_PASS_LANE_DIST_BY_AGGRESSION` | phase_resolution.py | `{passive:6.0, aggressive:5.0}` (normal = `randint(5,6)`/game) | Perpendicular lane distance for HCO hot-read/kickout pass disruption. ↑ = defenders contest from farther = more interceptions. Tighter than HCT/FCP (8.0). |
+| `PASS_LANE_DIST` | pass_contest.py | `8.0` | HCT lane distance (and the param default). Shared pure model. |
+| `FCP_PASS_LANE_DIST` | *(planned)* | `8.0` | FCP lane distance once FCP pass contests are wired (Roadmap). |
 | `HCT_D8_GLOBAL_SCALAR` | dynamic_hct.py | `1.0` | Global per-moment frequency (affects HCT/FCP/HCO). |
 | `HCT_D8_DEF_WIN_BASE` | dynamic_hct.py | `0.45` | Base P(any event) when defense fully wins the contest. |
 | `HCT_D8_P_EVENT_MAX` | dynamic_hct.py | `0.60` | Cap on per-moment event probability. |
@@ -146,6 +174,8 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 |---|---|
 | **Zone-defense moments** | ✅ Shipped (June 2026). On-ball defender resolved by zone polygon (`_zone_bh_defender`); `HCO_ZONE_MOMENT_SCALAR` dial; contest uses the **same D8 weights** as man for v1 (reweighting toward deflections/help is a future tuning pass). |
 | **Zone contest reweighting** | Deferred — v1 reuses man's D8 steal/dead-ball/charge weights. Zones realistically strip less and force more deflections/help; revisit `HCT_D8_*` weights (or a zone-specific set) + `HCO_ZONE_MOMENT_SCALAR` after live observation. |
+| **Passing lanes & hot-read openness** | 🔨 Building (see §4). ✅ Decision gate ("truly open") shipped for **man + zone** (`_hco_blocked_dish_targets` + `defenders_in_lane`); ⏳ interception contest on thrown dishes/kickouts is the next stage. Hot-read/kickout dishes only. |
+| **FCP pass contests @ 8** | 🔨 Planned (§4 stage 3). FCP has **no** pass-disruption today — needs a pass-beat audit (inbound / press-break / advance) before wiring `resolve_pass_contest` with `FCP_PASS_LANE_DIST = 8.0`. (NB: interceptions seen on "FCP" today are the post-steal **rim-runner fast break** mechanic, labeled `FAST_BREAK`, not FCP.) |
 | **Set-play moments** | Deferred — motion only for now. |
 | **True per-step shoot↔moment interleaving** | The moment walk currently runs fully **before** the shot resolver, so a moment pre-empts the would-be shot. True interleaving needs the late shot resolver (after shot-clock truncation). |
 | **Pass interceptions** | HCT's `pass_contest` not yet ported to HCO. |

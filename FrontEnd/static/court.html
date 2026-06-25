@@ -33,6 +33,10 @@
       --scoreboard-height: 120px;
       --clock-col: 190px;
       --strat-col: 200px;
+      /* muted strategy tier hues (low saturation on purpose — not the old carnival) */
+      --tier-yellow: #C9A24E;  /* slow / passive / fewer */
+      --tier-green:  #5FA86B;  /* normal */
+      --tier-blue:   #5E86C4;  /* fast / aggressive / more */
       --player-stats-width: 280px;
       --pbp-height: 120px;
       --court-bottom-trim: 80px;
@@ -486,6 +490,7 @@
       height: 11px;
     }
 
+    /* track spans exactly end-to-end now — outer points are pinned to 0% / 100% */
     .sb-strat .track {
       position: absolute;
       top: 50%;
@@ -506,41 +511,101 @@
       border-radius: 1px;
     }
 
+    /* transient segment that lights the path the marker just travelled */
+    .sb-strat .sweep {
+      position: absolute;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      border-radius: 2px;
+      background: var(--mk-color, #8A94A6);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
     .sb-strat .marker {
       position: absolute;
       top: 50%;
       left: 0;
-      width: 5px;
-      height: 7px;
+      width: 7px;
+      height: 9px;
       transform: translate(-50%, -50%);
       clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-      background: #8A94A6 !important;
-      box-shadow: none !important;
+      background: var(--mk-color, #8A94A6);
       border-radius: 0;
       cursor: default;
       pointer-events: none;
-      transition: left 0.5s cubic-bezier(0.6, 0, 0.2, 1);
       z-index: 3;
+      transition: left 0.5s cubic-bezier(0.6, 0, 0.2, 1),
+                  background 0.4s ease, width 0.2s ease, height 0.2s ease;
     }
     .sb-strat.home .marker {
       transform: translate(-50%, -50%);
     }
+
+    /* one-shot expanding ring on change */
+    .sb-strat .marker::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      box-shadow: 0 0 0 0 var(--mk-color, #8A94A6);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* fire the transients only when the JS adds .moved */
+    .sb-strat .marker.moved        { animation: stratFlare 0.62s cubic-bezier(0.34, 1.4, 0.5, 1); }
+    .sb-strat .marker.moved::after { animation: stratRing  0.62s ease-out; }
+    .sb-strat .sweep.moved         { animation: stratSweep 0.60s ease-out; }
+    .sb-strat .val.moved           { animation: stratWord  0.70s ease-out; }
 
     .sb-strat .val {
       font-size: 11px;
       letter-spacing: 0.05em;
       width: 50px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.82) !important;
+      color: rgba(255, 255, 255, 0.82);
       text-align: right;
+      transition: color 0.3s ease;
     }
     .sb-strat.home .val {
       text-align: left;
     }
 
+    @keyframes stratFlare {
+      0%   { transform: translate(-50%, -50%) scale(1); }
+      32%  { transform: translate(-50%, -50%) scale(2.05); filter: brightness(1.6); }
+      100% { transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+    }
+    @keyframes stratRing {
+      0%   { opacity: 0.9; box-shadow: 0 0 0 0 var(--mk-color, #8A94A6);
+             transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; box-shadow: 0 0 0 7px transparent;
+             transform: translate(-50%, -50%) scale(2.4); }
+    }
+    @keyframes stratSweep {
+      0% { opacity: 0; } 25% { opacity: 0.55; } 100% { opacity: 0; }
+    }
+    @keyframes stratWord {
+      0%   { color: rgba(255, 255, 255, 0.82); }
+      18%  { color: #fff; text-shadow: 0 0 8px var(--mk-color, rgba(255,255,255,0.6)); }
+      100% { color: rgba(255, 255, 255, 0.82); text-shadow: none; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .sb-strat .marker {
-        transition: none;
+      .sb-strat .marker,
+      .sb-strat .marker.moved,
+      .sb-strat .marker.moved::after,
+      .sb-strat .val.moved,
+      .sb-strat .sweep {
+        animation: none !important;
+        transition: none !important;
       }
       .sb-strat {
         transition: none;
@@ -3940,17 +4005,8 @@
   grid-column: 12 !important;
 }
 
-/* Scoreboard gauges: neutral readout (overrides JS inline hue on .val / .marker) */
-#scoreboard .sb-strat .val {
-  color: rgba(255, 255, 255, 0.82) !important;
-  font-weight: 600 !important;
-}
 #scoreboard .sb-strat .lab {
   color: rgba(255, 255, 255, 0.45) !important;
-}
-#scoreboard .sb-strat .marker {
-  background: #8A94A6 !important;
-  box-shadow: none !important;
 }
 
 #away-logo-container,

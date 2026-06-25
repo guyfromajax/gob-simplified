@@ -4652,6 +4652,107 @@ HCO_ZONE_MOMENT_SCALAR = 0.5   # zone-defense dial (defaults equal to man; tune 
 # subtle-movement/defense-pressure gates (those keep the flat randint(0,4) <= slider form).
 MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION = {0: 5, 1: 20, 2: 35, 3: 50, 4: 75}
 
+# HCO passing-lane perpendicular distance by defense aggression_call (Dynamic_HCO_Motion_System §4).
+# Tighter than HCT/FCP (8.0) — closer half-court spacing + faster passes. Normal tempo is rolled
+# once per game (randint 5-6) and cached in game_state (stable all game; no per-pass roll).
+HCO_PASS_LANE_DIST_BY_AGGRESSION = {"passive": 6.0, "aggressive": 5.0}
+
+
+def _hco_pass_lane_dist(game):
+    """HCO hot-read/kickout passing-lane distance: passive→6, aggressive→5, normal→randint(5,6)
+    rolled ONCE per game and cached in game_state['_hco_pass_lane_dist_normal']."""
+    import random
+    game_state = game.game_state
+    def_call = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
+    fixed = HCO_PASS_LANE_DIST_BY_AGGRESSION.get(def_call)
+    if fixed is not None:
+        return fixed
+    cached = game_state.get("_hco_pass_lane_dist_normal")
+    if cached is None:
+        cached = float(random.randint(5, 6))
+        game_state["_hco_pass_lane_dist_normal"] = cached
+    return cached
+
+
+def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
+                              is_away_offense, def_aggr, lane_dist, zone=False, defense_playcall=None):
+    """Hot-read "truly open" gate (§4): positions whose BH→teammate passing lane is covered by a
+    help defender — excluded as dish candidates so the offense won't dish into a covered lane.
+
+    Reconstructs defender coords from the offensive coords (same math the animator renders):
+      • MAN  → get_defender_coords per matchup (returns SAME orientation as input → display).
+      • ZONE → assign_all_zone_defenders by zone polygon (always returns HOME orientation), so the
+               lane endpoints are flipped to home to match.
+    Each non-BH lane is tested with defenders_in_lane; its t-band excludes the BH's and receiver's
+    own covering defenders, so only a true lane-sitting help defender blocks."""
+    from BackEnd.engine.attack_drive_clearance import _spot_display_coords
+    from BackEnd.engine.pass_contest import defenders_in_lane
+
+    pos_actions = step.get("pos_actions") or {}
+
+    def _coord(pos):
+        info = pos_actions.get(pos) or {}
+        if info.get("coords"):
+            return {"x": float(info["coords"]["x"]), "y": float(info["coords"]["y"])}
+        return _spot_display_coords(info.get("location") or "key", is_away_offense)
+
+    def _loc(pos):
+        return (pos_actions.get(pos) or {}).get("location") or "key"
+
+    if bh_pos not in pos_actions:
+        return set()
+    bh_xy = _coord(bh_pos)
+    bh_location = _loc(bh_pos)
+
+    if zone:
+        # Zone def coords come back in HOME orientation → flip the lane endpoints to match.
+        from BackEnd.utils.shared_defense import assign_all_zone_defenders
+        from BackEnd.utils.shared import get_away_player_coords
+        from BackEnd.engine.attack_drive_clearance import _zone_boundaries_for_spot
+        offensive_players = [
+            {"player_id": getattr(off_lineup[p], "player_id", None), "coords": _coord(p),
+             "is_ball_handler": p == bh_pos, "spot": _loc(p)}
+            for p in off_lineup if p in pos_actions and off_lineup.get(p)
+        ]
+        zb = _zone_boundaries_for_spot(defense_playcall, bh_location, is_away_offense)
+        def_coords, _guard = assign_all_zone_defenders(
+            zb, offensive_players, bh_xy, bh_location, def_aggr, is_away_offense)
+        def_coords = def_coords or {}
+
+        def _pt(xy):
+            return get_away_player_coords(xy) if is_away_offense else xy
+
+        def _exclude(_recv_pos):
+            return set()  # t-band excludes the on-ball/receiver zone defenders
+    else:
+        from BackEnd.utils.shared_defense import get_defender_coords
+        def_coords = {}
+        for off_pos in off_lineup:
+            if off_pos not in pos_actions:
+                continue
+            dpos = off_to_def.get(off_pos, off_pos)
+            if not def_lineup.get(dpos):
+                continue
+            def_coords[dpos] = get_defender_coords(
+                _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
+                ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
+            )
+
+        def _pt(xy):
+            return xy
+
+        def _exclude(recv_pos):
+            return {off_to_def.get(bh_pos, bh_pos), off_to_def.get(recv_pos, recv_pos)}
+
+    blocked = set()
+    for recv_pos in off_lineup:
+        if recv_pos == bh_pos or not off_lineup.get(recv_pos) or recv_pos not in pos_actions:
+            continue
+        if defenders_in_lane(_pt(bh_xy), _pt(_coord(recv_pos)), def_coords, lane_dist,
+                             exclude=_exclude(recv_pos)):
+            blocked.add(recv_pos)
+    return blocked
+
 
 def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
     """HCO per-step foul/steal/turnover moment — reuses the HCT attribute contest
@@ -4826,6 +4927,9 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
     shot_clock_est = float(game_state.get("shot_clock_remaining", 30) or 30)
+    # §4 hot-read "truly open" gate (man only for now): per-game lane distance + defense aggression.
+    _hco_lane_dist = _hco_pass_lane_dist(game)
+    _def_aggr_call = (getattr(def_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
 
     # Turn-level read gating (brief: rolled ONCE per HCO turn). roll <= setting (both 0-4):
     #  - offense executes reads (subtle MOVEMENT) if its alterations roll clears;
@@ -4853,8 +4957,14 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         # 1. Universal shoot decision — runs BEFORE the movement matrix, every step, all
         # conditions. shoot/dish → execute (terminate); else fall through to movement.
         locations = _step_locations(steps[i])
+        # §4 hot-read "truly open" gate: drop dish targets whose passing lane is covered (man + zone).
+        blocked_dish = _hco_blocked_dish_targets(
+            steps[i], bh_pos, off_lineup, def_lineup, off_to_def,
+            is_away_offense, _def_aggr_call, _hco_lane_dist,
+            zone=zone, defense_playcall=game_state.get("defense_playcall"))
         shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
-                             shot_clock_est, tempo, random, openness=0.0, allow_dish=True)
+                             shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
+                             blocked_dish_targets=blocked_dish)
         if shoot:
             logging.warning(
                 f"🎯 [DYNAMIC MOTION] step {i}: SHOOT {shoot['shooter_pos']} "
@@ -4919,7 +5029,8 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                      and beat["_subtle_movement"].get("defender_reads", {}).get(bh_def_pos) is False)
             post_shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
                                       shot_clock_est, tempo, random,
-                                      openness=(20.0 if froze else 0.0), allow_dish=True)
+                                      openness=(20.0 if froze else 0.0), allow_dish=True,
+                                      blocked_dish_targets=blocked_dish)
             if post_shoot:
                 logging.warning(
                     f"🎯 [DYNAMIC MOTION] post-subtle SHOOT {post_shoot['shooter_pos']} "

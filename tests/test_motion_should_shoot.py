@@ -120,3 +120,22 @@ def test_reception_mode_never_dishes():
                        scores, _Team(), shot_clock=30, tempo_call="normal", rng=Rng([3]),
                        allow_dish=False)
     assert dec is None
+
+
+# ---------------------------------------------------------------- blocked dish targets (§4 gate)
+
+def test_blocked_dish_target_is_excluded_from_hot_read():
+    # PG (BH) has no look; SG has an optimal inside mismatch. High-read PG → 'right' tier.
+    pg = _P("pg", IQ=90, CH=90)
+    sg = _P("sg")
+    off = {"PG": pg, "SG": sg}
+    locations = {"PG": "basketSpot", "SG": "basketSpot"}  # inside → no _weighted rng draw
+    reads = {"sg": {"inside": 100}, "pg": {"inside": 0}}    # SG optimal+mismatch; PG nothing
+    team = _Team()
+    # Lane clear → dishes to SG.
+    d = should_shoot("PG", off, locations, reads, team, 30, "normal", Rng([6]), allow_dish=True)
+    assert d and d["shooter_pos"] == "SG" and d["via_pass"] is True
+    # SG's lane covered → excluded → PG not optimal → progress (None).
+    d2 = should_shoot("PG", off, locations, reads, team, 30, "normal", Rng([6]),
+                      allow_dish=True, blocked_dish_targets={"SG"})
+    assert d2 is None

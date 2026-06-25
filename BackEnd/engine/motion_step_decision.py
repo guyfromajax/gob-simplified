@@ -207,7 +207,8 @@ def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_ca
 
 
 def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
-                 shot_clock, tempo_call, rng, openness=0.0, allow_dish=True):
+                 shot_clock, tempo_call, rng, openness=0.0, allow_dish=True,
+                 blocked_dish_targets=None):
     """Universal shoot decision. Returns a SHOOT Decision
     ``{action, shooter_pos, shot_type, via_pass, hot_read}`` or ``None`` (progress).
 
@@ -216,10 +217,15 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     right → take it if optimal (self or dish) else progress; safe → progress; random → 50/50.
     ``openness`` (>=0) lifts the shooter's quality (e.g. a frozen defender post-subtle). The
     ``hot_read`` flag tags a shot that came off a genuine mismatch (label only). Receptions pass
-    ``allow_dish=False`` (no re-dish)."""
+    ``allow_dish=False`` (no re-dish).
+
+    ``blocked_dish_targets`` (a set of positions) are teammates whose passing lane is covered —
+    the hot-read "truly open" gate (see Dynamic_HCO_Motion_System.md §4). They're excluded as
+    dish candidates: the offense won't dish into a covered lane."""
     shooter = off_lineup.get(shooter_pos)
     if shooter is None:
         return None
+    blocked_dish_targets = blocked_dish_targets or set()
     s_type, s_quality, s_optimal, s_mismatch = _evaluate_shot(
         shooter, locations.get(shooter_pos, "key"), read_scores, off_team, shot_clock, tempo_call, openness, rng)
     best = {"pos": shooter_pos, "type": s_type, "quality": s_quality,
@@ -228,6 +234,8 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
         for pos, p in off_lineup.items():
             if pos == shooter_pos or not p or locations.get(pos) is None:
                 continue
+            if pos in blocked_dish_targets:
+                continue  # covered passing lane → not "truly open" → not a dish candidate
             t, q, opt, mm = _evaluate_shot(p, locations[pos], read_scores, off_team,
                                            shot_clock, tempo_call, 0.0, rng)
             if opt and q > best["quality"]:

@@ -91,6 +91,26 @@ def _project_onto_segment(
     return t, proj, perp
 
 
+def defenders_in_lane(passer_xy, receiver_xy, def_coords, lane_dist,
+                      exclude=None, t_min=0.1, t_max=0.9):
+    """Defender ids sitting in the passer→receiver passing lane: perpendicular distance to the
+    segment <= ``lane_dist`` AND projection in the middle band (``t_min``..``t_max``). The band
+    excludes endpoint defenders — the passer's on-ball man (t≈0) and the receiver's man (t≈1) —
+    so only a true lane-sitting help defender counts. ``exclude``: ids to skip outright.
+
+    Pure geometry; used for the HCO hot-read "truly open" decision gate (and reusable for any
+    lane-clearance check). ``def_coords`` maps id → {x, y}."""
+    exclude = exclude or set()
+    out = set()
+    for did, xy in (def_coords or {}).items():
+        if did in exclude or not xy:
+            continue
+        t, _proj, perp = _project_onto_segment(xy, passer_xy, receiver_xy)
+        if t_min <= t <= t_max and perp <= lane_dist:
+            out.add(did)
+    return out
+
+
 def _iq_headstart(iq: float) -> float:
     return max(0.0, min(1.0, float(iq) / 100.0)) * PASS_IQ_ANTICIPATION_MAX_SEC
 

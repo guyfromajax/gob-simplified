@@ -3,26 +3,30 @@
  * Markup + CSS in court.html; updated each turn from turn payload + simData.teams.
  */
 
-const SB_TIER = { yellow: '#F2C744', green: '#46C06A', blue: '#4A90D9' };
+const SB_TIER = {
+  yellow: 'var(--tier-yellow)',
+  green: 'var(--tier-green)',
+  blue: 'var(--tier-blue)',
+};
 
 const SB_TEMPO = {
-  slow: { pct: 10, hue: 'yellow', word: 'SLOW' },
+  slow: { pct: 0, hue: 'yellow', word: 'SLOW' },
   normal: { pct: 50, hue: 'green', word: 'NORMAL' },
-  fast: { pct: 90, hue: 'blue', word: 'FAST' },
+  fast: { pct: 100, hue: 'blue', word: 'FAST' },
 };
 
 const SB_AGGR = {
-  passive: { pct: 10, hue: 'yellow', word: 'PASSIVE' },
+  passive: { pct: 0, hue: 'yellow', word: 'PASSIVE' },
   normal: { pct: 50, hue: 'green', word: 'NORMAL' },
-  aggressive: { pct: 90, hue: 'blue', word: 'AGGR' },
+  aggressive: { pct: 100, hue: 'blue', word: 'AGGR' },
 };
 
 const SB_ALT = {
-  0: { pct: 10, hue: 'yellow', word: 'LEAST' },
-  1: { pct: 30, hue: 'yellow', word: 'LESS' },
+  0: { pct: 0, hue: 'yellow', word: 'LEAST' },
+  1: { pct: 25, hue: 'yellow', word: 'LESS' },
   2: { pct: 50, hue: 'green', word: 'NORMAL' },
-  3: { pct: 70, hue: 'green', word: 'MORE' },
-  4: { pct: 90, hue: 'blue', word: 'MOST' },
+  3: { pct: 75, hue: 'blue', word: 'MORE' },
+  4: { pct: 100, hue: 'blue', word: 'MOST' },
 };
 
 const SB_ROWS = [
@@ -31,7 +35,7 @@ const SB_ROWS = [
   { key: 'alt', lab: 'ALT', map: SB_ALT },
 ];
 
-const SB_STOPS = [10, 30, 50, 70, 90];
+const SB_STOPS = [0, 25, 50, 75, 100];
 
 let stacksBuilt = false;
 let stacksRevealed = false;
@@ -46,6 +50,39 @@ function normalizeAlterations(raw) {
   const n = Number(raw);
   if (!Number.isFinite(n)) return 2;
   return Math.max(0, Math.min(4, Math.round(n)));
+}
+
+function applyStratMotion(rail, newLeftPct, word, tierColor) {
+  const srow = rail.closest('.srow');
+  const marker = rail.querySelector('.marker');
+  const val = srow && srow.querySelector('.val');
+  let sweep = rail.querySelector('.sweep');
+  if (!sweep) {
+    sweep = document.createElement('div');
+    sweep.className = 'sweep';
+    rail.insertBefore(sweep, marker);
+  }
+
+  const prevPct = parseFloat(marker.style.left);
+  const changed = !Number.isFinite(prevPct) || Math.abs(newLeftPct - prevPct) > 0.01;
+
+  if (srow) srow.style.setProperty('--mk-color', tierColor);
+
+  marker.style.left = `${newLeftPct}%`;
+  if (val && word != null) val.textContent = word;
+
+  if (changed && Number.isFinite(prevPct)) {
+    const a = Math.min(prevPct, newLeftPct);
+    const b = Math.max(prevPct, newLeftPct);
+    sweep.style.left = `${a}%`;
+    sweep.style.width = `${Math.max(2, b - a)}%`;
+    [marker, val, sweep].forEach((el) => {
+      if (!el) return;
+      el.classList.remove('moved');
+      void el.offsetWidth;
+      el.classList.add('moved');
+    });
+  }
 }
 
 function buildStrategyStack(side) {
@@ -119,16 +156,11 @@ function updateStrategyStack(side, values) {
     if (!def) return;
     const row = el.querySelector(`[data-row="${r.key}"]`);
     if (!row) return;
-    const marker = row.querySelector('.marker');
-    const val = row.querySelector('.val');
-    if (!marker || !val) return;
-    const color = SB_TIER[def.hue];
+    const rail = row.querySelector('.rail');
+    if (!rail) return;
+    const tierColor = SB_TIER[def.hue];
     const leftPct = side === 'home' ? 100 - def.pct : def.pct;
-    marker.style.left = `${leftPct}%`;
-    marker.style.background = color;
-    marker.style.boxShadow = `0 0 10px ${color}cc`;
-    val.textContent = def.word;
-    val.style.color = color;
+    applyStratMotion(rail, leftPct, def.word, tierColor);
   });
 }
 
