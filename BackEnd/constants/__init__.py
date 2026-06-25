@@ -68,6 +68,40 @@ PAINT_SPOTS = {
     "basketspot",
 }
 
+# Inside paint area — canonical spot names and bounding rectangle (home orientation,
+# basket at x=91). Use is_inside_paint_grid() for arbitrary grid coords; away offense
+# mirrors x before the rect check.
+INSIDE_PAINT_SPOT_NAMES = (
+    "basketSpot",
+    "lower lowPost",
+    "lower midPost",
+    "midLane",
+    "upper midPost",
+    "upper lowPost",
+)
+
+INSIDE_PAINT_RECT_HOME = {
+    "x_min": 80,
+    "x_max": 87,
+    "y_min": 19,
+    "y_max": 32,
+}
+
+# FLSS (Forced Last Second Shot) x-band thresholds — home orientation; mirror for away.
+FLSS_DEEP_KEY_X_HOME = 57
+FLSS_NORMAL_SHOT_MIN_X_HOME = 64
+FLSS_HEAVE_MAX_X_HOME = 50
+
+
+def is_inside_paint_grid(x, y, *, home_basket: bool = True) -> bool:
+    """True when display grid (x, y) lies inside INSIDE_PAINT_RECT_HOME (mirrored for away)."""
+    rect = INSIDE_PAINT_RECT_HOME
+    gx = float(x)
+    if not home_basket:
+        gx = 100.0 - gx
+    gy = float(y)
+    return rect["x_min"] <= gx <= rect["x_max"] and rect["y_min"] <= gy <= rect["y_max"]
+
 BLOCK_PROBABILITY = {
     "Inside": 0.2,
     "Attack": 0.1,

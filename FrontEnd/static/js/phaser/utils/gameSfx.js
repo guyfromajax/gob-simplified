@@ -57,6 +57,9 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   // Dynamic HCO Motion — hot-read coach VO (one chosen at random by the backend).
   "braddock-greatread.wav",
   "sammy-niceread.mp3",
+  "braddock-finalshot.mp3",
+  "sammy-launch.mp3",
+  "duke-heave.mp3",
 ]);
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
@@ -495,6 +498,19 @@ export function playHcoReceiveSfx(scene, sfxContext) {
 function pickRandomCourtEventFile(files) {
   if (!files?.length) return null;
   return files[Math.floor(Math.random() * files.length)];
+}
+
+/** FLSS coach VO — fires at ball detach when flss_vo is set on the turn. */
+export function playFlssVoSfx(scene, turnData) {
+  if (!turnData?.flss_vo) return;
+  const pool = ["braddock-finalshot.mp3", "sammy-launch.mp3"];
+  if (turnData.flss_heave_sfx) {
+    pool.push("duke-heave.mp3");
+  }
+  const file = pickRandomCourtEventFile(pool);
+  if (file) {
+    playGameSfx(scene, file, DEFAULT_VOLUME, { event: "flss_vo" });
+  }
 }
 
 const ONCE_PER_TURN_SECONDARY_HEADLINES = new Set(["Press!", "Trap!", "Fast Break!"]);

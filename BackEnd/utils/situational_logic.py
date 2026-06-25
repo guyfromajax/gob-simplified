@@ -217,3 +217,38 @@ def get_inbound_receiver_pos(inbound_type):
     if inbound_type == "SIDE_INBOUND":
         return SITUATIONAL_SIP_RECEIVER_POS
     return "SG"
+
+
+def should_run_out_clock(game, time_remaining_seconds):
+    """
+    EOQ Run Out The Clock (Q4/OT only): winning team or blowout loss (>18),
+    time <= 30s, and defense is not in force-foul mode.
+    """
+    if not is_situational_active(game.quarter):
+        return False
+    if time_remaining_seconds is None or int(time_remaining_seconds) > 30:
+        return False
+    if should_force_foul(game, time_remaining_seconds):
+        return False
+    delta = get_score_delta(game)
+    return delta >= 1 or delta < -18
+
+
+def would_take_final_shot(game, time_remaining_seconds):
+    """
+    True when this possession should attempt a Final Shot (not run-out, force foul, or quick shot).
+    Uses final_shot_possession_active set when Final Turn shot is triggered for the period.
+    """
+    gs = getattr(game, "game_state", None) or {}
+    if gs.get("final_shot_possession_active") or gs.get("final_turn_shot_this_turn"):
+        return True
+    quarter = getattr(game, "quarter", None)
+    if quarter is None or quarter < 4:
+        return False
+    if should_run_out_clock(game, time_remaining_seconds):
+        return False
+    if is_slow_it_down(game, time_remaining_seconds) and should_force_foul(game, time_remaining_seconds):
+        return False
+    if is_quick_shot(game, time_remaining_seconds):
+        return False
+    return True

@@ -1923,6 +1923,9 @@ class GameManager:
         if result_type == "FINAL_HOLD":
             return None
 
+        if result_type == "RUN_OUT_CLOCK":
+            return None
+
         # OPENING_TIP → HCO (always)
         if current == "OPENING_TIP":
             return "HCO"

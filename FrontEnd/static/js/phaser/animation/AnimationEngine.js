@@ -266,7 +266,8 @@ export class AnimationEngine {
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
     // ✅ TIMEOUT: Add handler for TIMEOUT turns
     this.animationHandlers.set('TIMEOUT', this.handleTimeout.bind(this));
-    // ✅ Phase 4: Final Turn — FINAL_HOLD (clock out, quarter end) and Final Turn shot (alignment then shot)
+    // ✅ Phase 4: Final Turn — RUN_OUT_CLOCK / FINAL_HOLD / Final Turn shot
+    this.animationHandlers.set('RUN_OUT_CLOCK', this.handleRunOutClock.bind(this));
     this.animationHandlers.set('FINAL_HOLD', this.handleFinalHold.bind(this));
     this.animationHandlers.set('FINAL_TURN_SHOT', this.handleFinalTurnShot.bind(this));
   }
@@ -382,6 +383,8 @@ export class AnimationEngine {
     }
 
     if (isFinalTurnShot && turnData?.quarter_ends_after) {
+      await this._finishFinalTurnQuarterEnd(turnData, context);
+    } else if (turnData?.flss && turnData?.quarter_ends_after) {
       await this._finishFinalTurnQuarterEnd(turnData, context);
     }
 
@@ -933,7 +936,10 @@ export class AnimationEngine {
       return this.animationHandlers.get('FAST_BREAK');
     }
 
-    // ✅ Phase 4: Final Turn — route FINAL_HOLD and Final Turn shot to dedicated handlers
+    // ✅ Phase 4: Final Turn — route RUN_OUT_CLOCK, FINAL_HOLD, and Final Turn shot
+    if (turnData.result_type === 'RUN_OUT_CLOCK') {
+      return this.animationHandlers.get('RUN_OUT_CLOCK');
+    }
     if (turnData.result_type === 'FINAL_HOLD') {
       return this.animationHandlers.get('FINAL_HOLD');
     }
@@ -1808,6 +1814,19 @@ export class AnimationEngine {
     const animationConfig = (await import('./animation_config.js')).default;
     const holdMs = animationConfig?.finalTurn?.holdClockOutMs ?? 1800;
     await new Promise(resolve => setTimeout(resolve, holdMs));
+  }
+
+  /**
+   * Q4/OT Run Out The Clock — drift all players to spots, drain clock, airhorn, hold.
+   */
+  async handleRunOutClock(turnData, context) {
+    const { runOutClockSequence } = await import('./runOutClock.js');
+    await runOutClockSequence({
+      scene: this.scene,
+      playerSprites: context.playerSprites,
+      turnData,
+      onUpdate: context.onUpdate,
+    });
   }
 
   /**

@@ -889,9 +889,12 @@ class ShotManager:
                 shooter_location_str,
                 apply_defense=has_contest,
             )
-            if forced_shot:
+            if forced_shot and not roles.get("flss"):
                 # Forced shots keep standard defender/defense scoring, then apply hard penalty.
                 shot_score -= 100
+            flss_penalty = roles.get("flss_penalty")
+            if flss_penalty:
+                shot_score -= float(flss_penalty)
             
             # ✅ MOTION OFFENSE: Apply attack penalty if applicable
             motion_attack_penalty = roles.get("motion_attack_penalty", 0) or game_state.get("motion_attack_penalty", 0)
@@ -2250,6 +2253,12 @@ class ShotManager:
             }
             result["foul_count"] = blocking_foul_out_info["foul_count"]
 
+        if roles.get("flss"):
+            result["flss"] = True
+            for _flss_key in ("flss_zone", "flss_vo", "flss_heave_sfx"):
+                if roles.get(_flss_key) is not None:
+                    result[_flss_key] = roles.get(_flss_key)
+
         if made:
             result["points"] = points
             result["scoring_team"] = off_team.name
@@ -2304,6 +2313,11 @@ class ShotManager:
         # in which overlay map" — see canonicalize_post_shot_overlays docstring.
         from BackEnd.utils.shared import canonicalize_post_shot_overlays
         canonicalize_post_shot_overlays(result)
+        if result.get("quarter_ends_after"):
+            from BackEnd.engine.eoq_perfection import log_block_bounce_debug, strip_terminal_rebound_fields
+
+            strip_terminal_rebound_fields(result)
+            log_block_bounce_debug(result, context="resolve_shot_terminal")
         return result
 
 

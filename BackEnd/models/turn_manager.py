@@ -147,6 +147,9 @@ class TurnManager:
             # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
             fixed_ms = 1800  # holdClockOutMs
 
+        elif result_type == "RUN_OUT_CLOCK":
+            fixed_ms = 4000  # drift movement + clock drain (wall-clock; game time in time_elapsed)
+
         elif result_type in ("OREB_KICKOUT", "PUTBACK_MAKE", "PUTBACK_MISS"):
             # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
             if result_type == "PUTBACK_MAKE":
@@ -1271,6 +1274,7 @@ class TurnManager:
         if game_state.get("_last_final_turn_quarter") != quarter:
             game_state["_last_final_turn_quarter"] = quarter
             game_state["final_turn_triggered_this_period"] = False
+            game_state.pop("final_shot_possession_active", None)
 
         # ✅ Final Turn (Phase 6): first possession with time_remaining <= 30s triggers Final Turn (all quarters + OT).
         # OREB and Fast Break: excluded by design — state must be HCO, HCT, or FCP. The *next* turn after OREB/FB
@@ -1291,8 +1295,12 @@ class TurnManager:
                 slow = sl.is_slow_it_down(self.game, time_remaining_sec)
                 quick = sl.is_quick_shot(self.game, time_remaining_sec)
                 force_foul = sl.should_force_foul(self.game, time_remaining_sec)
-                if slow and not force_foul:
-                    # FINAL_HOLD: hold until 0, no shot, no fouls/turnovers
+                if sl.should_run_out_clock(self.game, time_remaining_sec):
+                    from BackEnd.engine.eoq_perfection import build_run_out_clock_result
+
+                    result = build_run_out_clock_result(self.game, time_remaining_sec)
+                elif slow and not force_foul:
+                    # Legacy path — superseded by run-out when should_run_out_clock; kept as fallback.
                     result = self._build_final_hold_result(time_remaining_sec)
                 elif slow and force_foul:
                     # Phase 6 edge case: Slow It Down + Force Foul — execute Force Foul (existing logic).
@@ -1310,9 +1318,11 @@ class TurnManager:
                 else:
                     # Normal final shot (trailing/tied): use Final Turn play execution (Phase 2)
                     game_state["final_turn_shot_this_turn"] = True
+                    game_state["final_shot_possession_active"] = True
             else:
                 # Qs 1–3: Final Turn shot (same play execution as Q4 "normal" final shot)
                 game_state["final_turn_shot_this_turn"] = True
+                game_state["final_shot_possession_active"] = True
 
         # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
         from BackEnd.engine.phase_resolution import (
@@ -1385,12 +1395,21 @@ class TurnManager:
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
         elif state in clock_enforced_states and game_clock_remaining <= 0:
-            # At exact 0 game clock, do not run a normal possession.
-            # This should terminally hand control back to API quarter-end handling.
-            result = self._build_final_hold_result(0)
-            result["text"] = "Clock expires before a shot."
-            result["forced_shot"] = False
-            low_clock_branch = "GAME_CLOCK_LE_0_FINAL_HOLD"
+            if sl.should_run_out_clock(self.game, game_clock_remaining):
+                from BackEnd.engine.eoq_perfection import build_run_out_clock_result
+
+                result = build_run_out_clock_result(self.game, max(game_clock_remaining, 0))
+                low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
+            elif sl.would_take_final_shot(self.game, game_clock_remaining):
+                from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
+
+                result = resolve_flss_shot_logic(self.game, state)
+                low_clock_branch = "GAME_CLOCK_LE_0_FLSS"
+            else:
+                result = self._build_final_hold_result(0)
+                result["text"] = "Clock expires before a shot."
+                result["forced_shot"] = False
+                low_clock_branch = "GAME_CLOCK_LE_0_FINAL_HOLD"
         elif state in clock_enforced_states and shot_clock_remaining <= 0:
             # At exact 0 shot clock: temporary 50/50 behavior.
             # 1) Forced shot path
@@ -1402,11 +1421,13 @@ class TurnManager:
                 result = self._build_shot_clock_violation_result(state)
                 low_clock_branch = "SHOT_CLOCK_LE_0_VIOLATION"
         elif state in clock_enforced_states and game_clock_remaining <= 1:
-            # Game clock precedence: force final-turn shot execution at 1 or 0 seconds.
-            result = self.resolve_final_turn_shot()
-            result["forced_shot"] = True
-            result["forced_shot_reason"] = "GAME_CLOCK"
-            low_clock_branch = "GAME_CLOCK_LE_1_FORCED_SHOT"
+            if sl.would_take_final_shot(self.game, game_clock_remaining):
+                from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
+
+                result = resolve_flss_shot_logic(self.game, state)
+                result["forced_shot"] = True
+                result["forced_shot_reason"] = "FLSS"
+                low_clock_branch = "GAME_CLOCK_LE_1_FLSS"
         elif state in clock_enforced_states and shot_clock_remaining <= 1:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
@@ -1616,6 +1637,17 @@ class TurnManager:
         # ✅ SS&S: Copy next_play_type to next_turn for explicit naming
         if "next_play_type" in result and result["next_play_type"]:
             result["next_turn"] = result["next_play_type"]
+
+        if isinstance(result, dict) and result.get("flss") and result.get("skeleton"):
+            if not (
+                isinstance(result.get("animation_steps"), list)
+                and result.get("animation_steps")
+            ):
+                self._emit_hco_animation_steps(result)
+            result["time_elapsed"] = 1
+            result["quarter_ends_after"] = True
+            result["next_play_type"] = None
+            result.pop("next_turn", None)
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
@@ -3299,10 +3331,10 @@ class TurnManager:
             if anim_steps is None:
                 return
             result["animation_steps"] = anim_steps
-            # Skip the schema-burn time_elapsed override for Final Shot —
+            # Skip the schema-burn time_elapsed override for Final Shot / FLSS —
             # those turns deliberately burn the entire remaining quarter
-            # clock (``time_remaining``) regardless of natural step T.
-            if result.get("final_turn") is True:
+            # clock (``time_remaining``) or a fixed 1s terminal tick.
+            if result.get("final_turn") is True or result.get("flss") is True:
                 return
             # Align result["time_elapsed"] with the schema's total
             # game-clock burn for MAKE/MISS/BLOCK. The legacy

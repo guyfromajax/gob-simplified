@@ -344,6 +344,11 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
         { event: releaseSfx.event || "ball_release" },
       );
     }
+    if (options.turnData?.flss_vo) {
+      import("../utils/gameSfx.js").then(({ playFlssVoSfx }) => {
+        playFlssVoSfx(scene, options.turnData);
+      });
+    }
   }
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
@@ -670,6 +675,12 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
       && String(announcement.text || "").trim().toLowerCase() === "airball!"
     ) {
       turnData._airballAnnounced = true;
+    }
+    if (
+      turnData
+      && String(announcement.text || "").trim().toLowerCase() === "block!"
+    ) {
+      turnData._blockAnnounced = true;
     }
   } catch (err) {
     console.warn("runStepAnnouncement: showAnnouncement failed", err);

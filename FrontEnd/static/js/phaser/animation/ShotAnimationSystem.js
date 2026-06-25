@@ -1271,8 +1271,9 @@ export class ShotAnimationSystem {
     // This happens when rebounder secures the ball (in handleEmbeddedRebound)
 
     // ✅ PRIORITY 2 FIX: Add validation to ensure rebound_type is set
-    // Check if this shot turn includes rebound data
-    if (turnData.rebounderId && turnData.rebound_type) {
+    // Terminal quarter-end shots: hold at bounce/rim — no embedded rebound animation.
+    const isTerminalQuarterEnd = turnData?.quarter_ends_after === true;
+    if (turnData.rebounderId && turnData.rebound_type && !isTerminalQuarterEnd) {
       // Handle the rebound within the shot turn
       await this.handleEmbeddedRebound(turnData);
     } else {
