@@ -1317,12 +1317,44 @@ class TurnManager:
                     pass
                 else:
                     # Normal final shot (trailing/tied): use Final Turn play execution (Phase 2)
+                    from BackEnd.engine.eoq_debug_log import log_eoq_step
+
+                    log_eoq_step(
+                        self.game,
+                        "FINAL_SHOT",
+                        "turn_trigger",
+                        "START",
+                        extra={"quarter_gte_4": True, "time_remaining_sec": time_remaining_sec},
+                    )
                     game_state["final_turn_shot_this_turn"] = True
                     game_state["final_shot_possession_active"] = True
+                    log_eoq_step(
+                        self.game,
+                        "FINAL_SHOT",
+                        "turn_trigger",
+                        "END",
+                        extra={"flags_set": True},
+                    )
             else:
                 # Qs 1–3: Final Turn shot (same play execution as Q4 "normal" final shot)
+                from BackEnd.engine.eoq_debug_log import log_eoq_step
+
+                log_eoq_step(
+                    self.game,
+                    "FINAL_SHOT",
+                    "turn_trigger",
+                    "START",
+                    extra={"quarter_gte_4": False, "time_remaining_sec": time_remaining_sec},
+                )
                 game_state["final_turn_shot_this_turn"] = True
                 game_state["final_shot_possession_active"] = True
+                log_eoq_step(
+                    self.game,
+                    "FINAL_SHOT",
+                    "turn_trigger",
+                    "END",
+                    extra={"flags_set": True},
+                )
 
         # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
         from BackEnd.engine.phase_resolution import (
@@ -1401,9 +1433,28 @@ class TurnManager:
                 result = build_run_out_clock_result(self.game, max(game_clock_remaining, 0))
                 low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
             elif sl.would_take_final_shot(self.game, game_clock_remaining):
+                from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
                 from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
 
+                log_eoq_routing_decision(
+                    self.game,
+                    branch="GAME_CLOCK_LE_0_FLSS",
+                    game_clock_remaining=game_clock_remaining,
+                    would_final_shot=True,
+                )
+                log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state})
                 result = resolve_flss_shot_logic(self.game, state)
+                log_eoq_step(
+                    self.game,
+                    "FLSS",
+                    "resolve_flss",
+                    "END",
+                    extra={
+                        "result_type": result.get("result_type"),
+                        "flss_zone": result.get("flss_zone"),
+                        "shooter_id": result.get("shooter_id"),
+                    },
+                )
                 low_clock_branch = "GAME_CLOCK_LE_0_FLSS"
             else:
                 result = self._build_final_hold_result(0)
@@ -1422,11 +1473,30 @@ class TurnManager:
                 low_clock_branch = "SHOT_CLOCK_LE_0_VIOLATION"
         elif state in clock_enforced_states and game_clock_remaining <= 1:
             if sl.would_take_final_shot(self.game, game_clock_remaining):
+                from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
                 from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
 
+                log_eoq_routing_decision(
+                    self.game,
+                    branch="GAME_CLOCK_LE_1_FLSS",
+                    game_clock_remaining=game_clock_remaining,
+                    would_final_shot=True,
+                )
+                log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state})
                 result = resolve_flss_shot_logic(self.game, state)
                 result["forced_shot"] = True
                 result["forced_shot_reason"] = "FLSS"
+                log_eoq_step(
+                    self.game,
+                    "FLSS",
+                    "resolve_flss",
+                    "END",
+                    extra={
+                        "result_type": result.get("result_type"),
+                        "flss_zone": result.get("flss_zone"),
+                        "shooter_id": result.get("shooter_id"),
+                    },
+                )
                 low_clock_branch = "GAME_CLOCK_LE_1_FLSS"
         elif state in clock_enforced_states and shot_clock_remaining <= 1:
             # Force shot-clock attempt at 1 or 0 seconds.
@@ -1585,7 +1655,21 @@ class TurnManager:
                 
                 # Final Turn shot uses dedicated resolver (Phase 2 will add alignment + shot); for now stub to normal HCO
                 if game_state.pop("final_turn_shot_this_turn", False):
+                    from BackEnd.engine.eoq_debug_log import log_eoq_step
+
+                    log_eoq_step(self.game, "FINAL_SHOT", "resolve_final_turn_shot", "START")
                     result = self.resolve_final_turn_shot()
+                    log_eoq_step(
+                        self.game,
+                        "FINAL_SHOT",
+                        "resolve_final_turn_shot",
+                        "END",
+                        extra={
+                            "result_type": result.get("result_type") if isinstance(result, dict) else None,
+                            "shooter_id": result.get("shooter_id") if isinstance(result, dict) else None,
+                            "time_elapsed": result.get("time_elapsed") if isinstance(result, dict) else None,
+                        },
+                    )
                 else:
                     result = self.resolve_half_court_offense()
                 # Add playcalls to result for frontend display
@@ -1639,6 +1723,9 @@ class TurnManager:
             result["next_turn"] = result["next_play_type"]
 
         if isinstance(result, dict) and result.get("flss") and result.get("skeleton"):
+            from BackEnd.engine.eoq_debug_log import log_eoq_step
+
+            log_eoq_step(self.game, "FLSS", "post_process_emit_steps", "START")
             if not (
                 isinstance(result.get("animation_steps"), list)
                 and result.get("animation_steps")
@@ -1648,6 +1735,17 @@ class TurnManager:
             result["quarter_ends_after"] = True
             result["next_play_type"] = None
             result.pop("next_turn", None)
+            log_eoq_step(
+                self.game,
+                "FLSS",
+                "post_process_emit_steps",
+                "END",
+                extra={
+                    "animation_step_count": len(result.get("animation_steps") or []),
+                    "result_type": result.get("result_type"),
+                    "shooter_id": result.get("shooter_id"),
+                },
+            )
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
@@ -3367,14 +3465,54 @@ class TurnManager:
 
     def resolve_final_turn_shot(self):
         """Final Turn shot (≤30s): alignment (Phase 2) + shot execution (Phase 3)."""
+        from BackEnd.engine.eoq_debug_log import log_eoq_step
         from BackEnd.engine.phase_resolution import resolve_final_turn_shot_logic
+
+        log_eoq_step(self.game, "FINAL_SHOT", "alignment_build", "START")
         o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
         d_dest, zone_playcall = self._build_final_turn_defense_alignment()
+        log_eoq_step(
+            self.game,
+            "FINAL_SHOT",
+            "alignment_build",
+            "END",
+            extra={
+                "bh_pos": bh_pos,
+                "zone_playcall": zone_playcall,
+                "oDestinations": o_dest,
+                "dDestinations": d_dest,
+                "position_to_spot": position_to_spot,
+            },
+        )
         self.game.game_state["defense_playcall"] = zone_playcall
+        log_eoq_step(self.game, "FINAL_SHOT", "resolve_final_turn_shot_logic", "START", extra={"bh_pos": bh_pos})
         result = resolve_final_turn_shot_logic(
             self.game, o_dest, d_dest, position_to_spot, bh_pos
         )
+        log_eoq_step(
+            self.game,
+            "FINAL_SHOT",
+            "resolve_final_turn_shot_logic",
+            "END",
+            extra={
+                "result_type": result.get("result_type"),
+                "shooter_id": result.get("shooter_id"),
+                "shot_type": result.get("shot_type"),
+                "skeleton_steps": len((result.get("skeleton") or {}).get("steps") or []),
+            },
+        )
+        log_eoq_step(self.game, "FINAL_SHOT", "emit_animation_steps", "START")
         self._emit_hco_animation_steps(result)
+        log_eoq_step(
+            self.game,
+            "FINAL_SHOT",
+            "emit_animation_steps",
+            "END",
+            extra={
+                "animation_step_count": len(result.get("animation_steps") or []),
+                "time_elapsed": result.get("time_elapsed"),
+            },
+        )
         return result
 
     def _build_final_turn_offense_alignment(self):

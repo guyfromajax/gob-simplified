@@ -5408,8 +5408,10 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     """
     import random
     from BackEnd.constants import ACTIONS
+    from BackEnd.engine.eoq_debug_log import log_eoq_step
     from BackEnd.utils import situational_logic as sl
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    log_eoq_step(game, "FINAL_SHOT", "pick_shooter", "START", extra={"bh_pos": bh_pos})
     # Shot type: 50% outside, 50% attack, except in Q4/OT when trailing by exactly 3:
     # Final Shot must be an outside three-point attempt (no drive/attack branch).
     delta = sl.get_score_delta(game)
@@ -5450,6 +5452,15 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 break
     shot_wing = random.choice(["upper wing", "lower wing"])
     bh_is_shooter = bh_pos == shooter_pos
+    log_eoq_step(
+        game,
+        "FINAL_SHOT",
+        "pick_shooter",
+        "END",
+        shooter=shooter,
+        shooter_pos=shooter_pos,
+        extra={"shot_type": shot_type, "shot_wing": shot_wing, "bh_is_shooter": bh_is_shooter},
+    )
     # Opposite vertical half spots for the other 3 or 4 players (doc: midWing, wing, midCorner, corner, deep wing, deep baseline)
     if shot_wing == "upper wing":
         opposite_half_spots = [
@@ -5507,12 +5518,22 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
                 step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
         skeleton = {"steps": [step0, step1, step2]}
+    log_eoq_step(
+        game,
+        "FINAL_SHOT",
+        "skeleton_built",
+        "END",
+        shooter=shooter,
+        shooter_pos=shooter_pos,
+        extra={"skeleton_step_count": len(skeleton.get("steps") or []), "shot_type": shot_type},
+    )
     roles = game.turn_manager.assign_roles(
         off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3-zone"), skeleton=skeleton
     )
     # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
     game_state["final_turn"] = True
     try:
+        log_eoq_step(game, "FINAL_SHOT", "resolve_shot", "START", shooter=shooter, shooter_pos=shooter_pos)
         # SS&S / UESS: same pre-resolve shot coord sync as HCO/FCP/HCT — stamps
         # roles["shot_spot"] from the skeleton shoot step (with away flip) so
         # block reconciliation and ball_bounce_x/y match the schema animation.
@@ -5522,6 +5543,19 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         )
         shot_result = game.shot_manager.resolve_shot(roles)
         attach_position_snapshots(shot_result, [final_snap])
+        log_eoq_step(
+            game,
+            "FINAL_SHOT",
+            "resolve_shot",
+            "END",
+            shooter=shooter,
+            shooter_pos=shooter_pos,
+            extra={
+                "result_type": shot_result.get("result_type"),
+                "quarter_ends_after": shot_result.get("quarter_ends_after"),
+                "shot_spot": roles.get("shot_spot"),
+            },
+        )
     finally:
         game_state.pop("final_turn", None)
     # Use time_elapsed = time_remaining for the turn so clock goes to 0 and quarter/game end triggers

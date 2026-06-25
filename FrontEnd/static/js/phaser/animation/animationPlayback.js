@@ -17,6 +17,7 @@
  */
 
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { logEoqStep, isEoqTraceEnabled } from "../utils/eoqDebugLog.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { attachBallToPlayer } from "./ballManager.js";
 // IMPORTANT: import `detachBall` from BallControllerAdapter — not from
@@ -1098,11 +1099,38 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       stepId: step.id ?? null,
     });
 
+    const eoqFlow = options.turnData?.flss
+      ? "FLSS"
+      : (options.turnData?.final_turn ? "FINAL_SHOT" : null);
+    if (eoqFlow && isEoqTraceEnabled(scene)) {
+      logEoqStep(
+        scene,
+        eoqFlow,
+        `schema_step_${currentIndex}`,
+        "START",
+        options.turnData,
+        { playerSprites: sprites },
+        { step_id: step.id ?? null, step_index: currentIndex },
+      );
+    }
+
     const next = await playAnimationStep(scene, step, sprites, ballSprite, {
       ...options,
       steps,
       currentIndex,
     });
+
+    if (eoqFlow && isEoqTraceEnabled(scene)) {
+      logEoqStep(
+        scene,
+        eoqFlow,
+        `schema_step_${currentIndex}`,
+        "END",
+        options.turnData,
+        { playerSprites: sprites },
+        { step_id: step.id ?? null, step_index: currentIndex },
+      );
+    }
     tracePlayback(scene, "turn:next", {
       turnIndex: options.turnData?.index ?? null,
       currentIndex,

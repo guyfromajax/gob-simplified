@@ -214,10 +214,13 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     could not complete before the game clock expired.
     """
     from BackEnd.constants import POSITION_LIST
+    from BackEnd.engine.eoq_debug_log import log_eoq_step
     from BackEnd.utils.position_snapshot_ledger import (
         attach_position_snapshots,
         build_skeleton_pre_resolve_shot_snapshot,
     )
+
+    log_eoq_step(game, "FLSS", "identify_ball_handler", "START", extra={"current_state": current_state})
 
     game_state = game.game_state
     off_team = game.offense_team
@@ -230,6 +233,7 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     if not ball_handler:
         ball_handler = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
     if not ball_handler:
+        log_eoq_step(game, "FLSS", "identify_ball_handler", "END", extra={"error": "no_ball_handler"})
         return {
             "result_type": "MISS",
             "current_turn": current_state,
@@ -251,7 +255,32 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     flss_vo = zone != "normal"
     heave_sfx = flss_heave_sfx_eligible(sx, is_home_offense=is_home_off)
 
+    log_eoq_step(
+        game,
+        "FLSS",
+        "identify_ball_handler",
+        "END",
+        shooter=shooter,
+        shooter_pos=shooter_pos,
+        extra={
+            "shooter_coords": {"x": sx, "y": sy},
+            "flss_zone": zone,
+            "flss_vo": flss_vo,
+            "flss_heave_sfx": heave_sfx,
+            "is_home_offense": is_home_off,
+        },
+    )
+
     spot_label = game.turn_manager._coords_to_nearest_spot({"x": sx, "y": sy})
+    log_eoq_step(
+        game,
+        "FLSS",
+        "build_skeleton",
+        "START",
+        shooter=shooter,
+        shooter_pos=shooter_pos,
+        extra={"spot_label": spot_label},
+    )
     step0 = {"timestamp": 0, "pos_actions": {}}
     step1 = {"timestamp": 300, "pos_actions": {}}
     for pos in POSITION_LIST:
@@ -272,6 +301,7 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
                 defender.coords = dict(d_coords)
 
     if zone == "heave":
+        log_eoq_step(game, "FLSS", "heave_resolve", "START", shooter=shooter, shooter_pos=shooter_pos)
         made, points = _resolve_flss_heave(shooter, sx, is_home_offense=is_home_off)
         result_type = "MAKE" if made else "MISS"
         result: Dict[str, Any] = {
@@ -309,9 +339,20 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             result["ball_bounce_y"] = sy
             result["text"] = f"{get_name_safe(shooter)} misses the desperation heave."
         strip_terminal_rebound_fields(result)
+        log_eoq_step(
+            game,
+            "FLSS",
+            "heave_resolve",
+            "END",
+            shooter=shooter,
+            shooter_pos=shooter_pos,
+            extra={"result_type": result_type, "points": points, "made": made},
+        )
         return result
 
     # normal / penalty — standard shot pipeline
+    log_eoq_step(game, "FLSS", "build_skeleton", "END", extra={"zone": zone})
+    log_eoq_step(game, "FLSS", "pipeline_resolve_shot", "START", shooter=shooter, shooter_pos=shooter_pos)
     if zone == "normal":
         inside = is_inside_paint_grid(sx, sy, home_basket=home_basket)
         shot_type = "inside" if inside else "outside"
@@ -371,6 +412,19 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     result["forced_shot"] = True
     result["forced_shot_reason"] = "FLSS"
     result["current_turn"] = current_state
+    log_eoq_step(
+        game,
+        "FLSS",
+        "pipeline_resolve_shot",
+        "END",
+        shooter=shooter,
+        shooter_pos=shooter_pos,
+        extra={
+            "result_type": result.get("result_type"),
+            "flss_penalty": roles.get("flss_penalty"),
+            "defender_id": getattr(defender, "player_id", None) if defender else None,
+        },
+    )
     return result
 
 

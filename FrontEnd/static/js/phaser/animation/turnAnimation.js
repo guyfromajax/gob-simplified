@@ -5697,6 +5697,10 @@ export function patchFinalTurnSchemaEntryStepFromAlignment({ scene, stepsToPlay,
 
 export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, turnData }) {
   if (scene?.skipToEnd || !turnData) return;
+  const { logEoqStep, isEoqTraceEnabled } = await import('../utils/eoqDebugLog.js');
+  if (isEoqTraceEnabled(scene)) {
+    logEoqStep(scene, 'FINAL_SHOT', 'alignment_tween', 'START', turnData, { playerSprites });
+  }
   const oDestinations = turnData.oDestinations || turnData.o_destinations || {};
   const dDestinations = turnData.dDestinations || turnData.d_destinations || {};
   const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
@@ -5761,6 +5765,12 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
     String(liveOwnerId) !== String(ballHandlerSprite.playerId);
   if (ballSprite && ballHandlerSprite && !preserveLiveOwner) {
     attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
+  }
+  if (isEoqTraceEnabled(scene)) {
+    logEoqStep(scene, 'FINAL_SHOT', 'alignment_tween', 'END', turnData, { playerSprites }, {
+      ball_handler_id: ballHandlerId ?? null,
+      preserve_live_owner: preserveLiveOwner,
+    });
   }
 }
 
