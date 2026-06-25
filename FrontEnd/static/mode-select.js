@@ -785,6 +785,16 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
   renderCareerSummary(commandCenterData);
   currentActiveGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
+  console.warn('[MODE-RESUME-CLIENT] render franchise card', {
+    has_command_center_data: !!commandCenterData,
+    has_active_game_resume: !!currentActiveGameResume,
+    game_id: currentActiveGameResume && currentActiveGameResume.game_id,
+    status: currentActiveGameResume && currentActiveGameResume.status,
+    quarter: currentActiveGameResume && currentActiveGameResume.quarter,
+    clock: currentActiveGameResume && currentActiveGameResume.clock,
+    away_score: currentActiveGameResume && currentActiveGameResume.away_score,
+    home_score: currentActiveGameResume && currentActiveGameResume.home_score,
+  });
   if (currentActiveGameResume && franchiseResumeCard) {
     franchiseResumeCard.hidden = false;
     if (franchiseResumeMatchup) {
@@ -811,11 +821,23 @@ function goToFranchiseCommandCenter() {
   if (currentFranchise && currentFranchise.franchise_id) {
     const resumeUrl = buildActiveGameCourtUrl(currentActiveGameResume);
     if (resumeUrl) {
+      console.warn('[MODE-RESUME-CLIENT] route resume', {
+        franchise_id: currentFranchise.franchise_id,
+        game_id: currentActiveGameResume && currentActiveGameResume.game_id,
+        url: resumeUrl,
+      });
       window.location.href = resumeUrl;
       return;
     }
+    console.warn('[MODE-RESUME-CLIENT] route fcc', {
+      franchise_id: currentFranchise.franchise_id,
+      has_active_game_resume: !!currentActiveGameResume,
+    });
     window.location.href = './franchise-command-center.html?franchise_id=' + encodeURIComponent(currentFranchise.franchise_id);
   } else {
+    console.warn('[MODE-RESUME-CLIENT] route franchise select', {
+      has_current_franchise: !!currentFranchise,
+    });
     window.location.href = './franchise-select-team.html';
   }
 }
@@ -1042,6 +1064,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     API_CONFIG.buildUrl('/franchise/command-center/data?franchise_id=' + encodeURIComponent(currentFranchise.franchise_id)),
     { headers: headers }
   );
+  console.warn('[MODE-RESUME-CLIENT] command center data loaded', {
+    franchise_id: currentFranchise.franchise_id,
+    has_data: !!commandCenterData,
+    has_active_game_resume: !!(commandCenterData && commandCenterData.active_game_resume),
+    active_game_resume: commandCenterData && commandCenterData.active_game_resume,
+  });
 
   const teamName = safeText(currentFranchise.user_team_id, '');
   const teamDoc = teamsByName[teamName] || null;

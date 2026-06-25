@@ -782,15 +782,35 @@ def _clock_from_time_remaining(seconds: Any) -> str:
 def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
     next_game = _find_user_next_game(franchise_doc, user_team_id_str)
     if not next_game:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] no_next_game franchise_id=%s user_team_id=%s week=%s",
+            str(franchise_doc.get("_id") or ""),
+            user_team_id_str,
+            franchise_doc.get("week"),
+        )
         return None
 
     franchise_id = str(franchise_doc.get("_id") or "")
     away_id = str(next_game.get("away_team_id") or "")
     home_id = str(next_game.get("home_team_id") or "")
     if not franchise_id or not away_id or not home_id:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] incomplete_next_game franchise_id=%s user_team_id=%s next_game=%s",
+            franchise_id,
+            user_team_id_str,
+            next_game,
+        )
         return None
 
     expected_pair = {away_id, home_id}
+    logger.warning(
+        "🧭 [MODE-RESUME-LOOKUP] start franchise_id=%s week=%s user_team_id=%s expected_away=%s expected_home=%s",
+        franchise_id,
+        next_game.get("week"),
+        user_team_id_str,
+        away_id,
+        home_id,
+    )
 
     def _anchor_snapshot(doc: dict[str, Any]) -> dict[str, Any]:
         anchor = doc.get("resume_anchor") if isinstance(doc.get("resume_anchor"), dict) else {}
@@ -822,10 +842,29 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         sort=[("_id", -1)],
         limit=12,
     )
+    anchor_candidate_count = 0
+    rejected_candidates: list[dict[str, Any]] = []
     for candidate in anchor_cursor:
+        anchor_candidate_count += 1
         if _matches_current_user_game(candidate):
             game_doc = candidate
             break
+        if len(rejected_candidates) < 5:
+            rejected_candidates.append(
+                {
+                    "game_id": str(candidate.get("_id")),
+                    "pair": sorted(_candidate_pair(candidate)),
+                    "has_snapshot": bool(_anchor_snapshot(candidate)),
+                }
+            )
+
+    logger.warning(
+        "🧭 [MODE-RESUME-LOOKUP] anchored_scan franchise_id=%s candidates=%s matched_game_id=%s rejected_sample=%s",
+        franchise_id,
+        anchor_candidate_count,
+        str(game_doc.get("_id")) if game_doc else None,
+        rejected_candidates,
+    )
 
     if not game_doc:
         game_doc = db.games.find_one(
@@ -841,7 +880,17 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
             },
             sort=[("_id", -1)],
         )
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] fallback_exact_query franchise_id=%s matched_game_id=%s",
+            franchise_id,
+            str(game_doc.get("_id")) if game_doc else None,
+        )
     if not game_doc:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] no_match franchise_id=%s expected_pair=%s",
+            franchise_id,
+            sorted(expected_pair),
+        )
         return None
 
     resume_anchor = game_doc.get("resume_anchor") if isinstance(game_doc.get("resume_anchor"), dict) else {}
@@ -874,6 +923,15 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         or bool(source_doc.get("opening_tip_winner") or game_doc.get("opening_tip_winner"))
     )
     if not has_started:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] matched_but_not_started game_id=%s quarter=%s time_remaining=%s home_score=%s away_score=%s has_anchor=%s",
+            str(game_doc.get("_id")),
+            quarter,
+            time_remaining,
+            home_score,
+            away_score,
+            bool(resume_anchor),
+        )
         return None
 
     team_object_ids = []
@@ -889,7 +947,7 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     home_name = home_row.get("name") or home_team.get("name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
     away_name = away_row.get("name") or away_team.get("name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
 
-    return {
+    payload = {
         "game_id": str(game_doc.get("_id")),
         "franchise_id": franchise_id,
         "week": int(next_game.get("week", franchise_doc.get("week", 1)) or 1),
@@ -908,6 +966,19 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type"),
         "timeout_trace_id": resume_anchor.get("timeout_trace_id") or source_doc.get("timeout_trace_id") or game_doc.get("timeout_trace_id"),
     }
+    logger.warning(
+        "🧭 [MODE-RESUME-RETURN] game_id=%s status=%s quarter=%s clock=%s time_remaining=%s away_score=%s home_score=%s resume_from_timeout=%s next_play=%s",
+        payload.get("game_id"),
+        payload.get("status"),
+        payload.get("quarter"),
+        payload.get("clock"),
+        payload.get("time_remaining"),
+        payload.get("away_score"),
+        payload.get("home_score"),
+        payload.get("resume_from_timeout"),
+        payload.get("timeout_next_play_type"),
+    )
+    return payload
 
 
 def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
