@@ -48,7 +48,7 @@ Two decoupled per-turn rolls in `_resolve_motion_offense_shot_dynamic`:
 | `offense_reads` | `randint(0,4) <= alterations` | offense executes reads (subtle movement / hot reads) this turn |
 | `defense_pressure` | `randint(0,4) <= aggression` | defense applies step pressure (feeds the freeze reaction) |
 
-`alterations` and `aggression` are integer `strategy_settings` sliders (0–4). Neither true → the turn walks straight to a shot with no reads/pressure. **The per-step Moment uses its OWN identical engagement roll** (`randint(0,4) <= aggression`) inside `_resolve_hco_moment_walk` — so aggression gates both the contest frequency and the pressure reaction.
+`alterations` and `aggression` are integer `strategy_settings` sliders (0–4). Neither true → the turn walks straight to a shot with no reads/pressure. **The per-step Moment has its OWN, separate engagement roll** inside `_resolve_hco_moment_walk` — a percentage curve (`MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION`, see §2), *not* this flat `randint(0,4) <= aggression`. So aggression gates the freeze-reaction pressure (here) and the moment frequency (there) independently.
 
 ---
 
@@ -56,7 +56,7 @@ Two decoupled per-turn rolls in `_resolve_motion_offense_shot_dynamic`:
 
 `_resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_tags)` — runs **before** shot resolution:
 
-1. **Engagement:** `randint(0,4) <= aggression`, else None (no moment this turn). Same gate for man and zone.
+1. **Engagement:** per-turn, by defense aggression → % of possessions with any contest (`MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION` = `{0:5, 1:20, 2:35, 3:50, 4:75}`), else None (no moment this turn). Same gate for man and zone.
 2. **Walk steps 1..n:** for each, resolve the on-ball defender — **man:** the ball-handler's matchup defender (`off_to_def[bh_pos]`); **zone:** the defender whose zone polygon covers the BH's spot (`_zone_bh_defender` → `_zone_boundaries_for_spot` + `_defender_for_zone_point`, nearest-zone centroid fallback, then position-on-position). Fire `_resolve_hco_moment` → `_resolve_moment` (shared HCT D8 contest in dynamic_hct.py), scaled by `HCO_MOMENT_SCALAR` (man) or `HCO_ZONE_MOMENT_SCALAR` (zone).
 3. **First hard outcome wins:** `STEAL` / `DEAD_BALL_TURNOVER` / `O_FOUL` / `D_FOUL` → returned; the caller sets `result`, and the **existing** non-shot resolution + `apply_stopper_system_to_skeleton` route/render it (no new emission path). `NEUTRAL` (defender won, no event) / `POS_O` (offense beat defender) → continue.
 4. **Credited defender stash:** on a hard outcome the walk stashes the contesting defender's id in `game_state["_hco_moment_defender_id"]`; the non-shot block consumes it so the steal credit (`stealer_id`) + terminal reach-in land on the **actual** defender (critical for zone, where the position-on-position fallback would pick the wrong one). Man path: the stash equals the matchup defender, so behavior is unchanged.
@@ -99,6 +99,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 |---|---|---|---|
 | `HCO_MOMENT_SCALAR` | phase_resolution.py | `0.5` | **HCO man-defense** dial; multiplies the whole per-moment event probability. ↑ = more steals/fouls/TOs vs man. HCT/FCP unaffected. |
 | `HCO_ZONE_MOMENT_SCALAR` | phase_resolution.py | `0.5` | **HCO zone-defense** dial (defaults equal to man). Tune zone independently — zones strip less, deflect/help more. |
+| `MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION` | phase_resolution.py | `{0:5, 1:20, 2:35, 3:50, 4:75}` | Per-turn % of possessions the defense attempts **any** moment, by aggression (man + zone). The frequency knob *before* conversion. ↓ = fewer possessions with a steal/foul/TO at every aggression level. |
 | `HCT_D8_GLOBAL_SCALAR` | dynamic_hct.py | `1.0` | Global per-moment frequency (affects HCT/FCP/HCO). |
 | `HCT_D8_DEF_WIN_BASE` | dynamic_hct.py | `0.45` | Base P(any event) when defense fully wins the contest. |
 | `HCT_D8_P_EVENT_MAX` | dynamic_hct.py | `0.60` | Cap on per-moment event probability. |
@@ -107,7 +108,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | `HCT_D8_S_SENS` / `HCT_D8_DB_SENS` / `HCT_D8_O_SENS_IQ` | dynamic_hct.py | `1.2` / `1.0` / `0.8` | Steal / dead-ball / charge sensitivity to attribute gaps. |
 | `HCT_D8_W_PTEFF` / `W_PTOPP` / `W_FIGHT` / `W_DISC_REACH` | dynamic_hct.py | `0.04` each | Team-modifier weights (pt_efficiency, pt_opp, fight, discipline). |
 
-> Engagement frequency is **not** a constant — it's `randint(0,4) <= aggression` (passive 0 → 20% of turns engage … aggressive 4 → 100%).
+> **Two-factor steal rate:** effective rate ≈ *engagement %* (`MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION`) × *conversion* (`HCO_*_MOMENT_SCALAR` × D8 × `HCT_D8_AGG_MULT`). Aggression raises both. To thin steals globally, lower the engagement %; to thin them on one defense type, lower that type's scalar.
 
 #### Subtle movement
 | Constant | File | Default | Effect |

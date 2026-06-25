@@ -4646,6 +4646,12 @@ def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
 HCO_MOMENT_SCALAR = 0.5        # man-defense per-moment event-frequency dial (HCO-only)
 HCO_ZONE_MOMENT_SCALAR = 0.5   # zone-defense dial (defaults equal to man; tune zone independently)
 
+# Per-turn moment ENGAGEMENT by defense aggression (0-4) → % of possessions the defense attempts
+# any steal/foul/TO contest. HCO man + zone only (HCT/FCP contest every step). Lower = fewer
+# possessions with any moment. Distinct from conversion (HCO_*_MOMENT_SCALAR) and from the
+# subtle-movement/defense-pressure gates (those keep the flat randint(0,4) <= slider form).
+MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION = {0: 5, 1: 20, 2: 35, 3: 50, 4: 75}
+
 
 def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
     """HCO per-step foul/steal/turnover moment — reuses the HCT attribute contest
@@ -4695,8 +4701,8 @@ def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup
 
 def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_tags=None):
     """Dynamic HCO per-step foul / steal / turnover moment — the HCT step-by-step moment migrated
-    to HCO. Rolls the defense's per-turn pressure engagement (aggression, 0–4: roll <= setting),
-    then walks the skeleton steps firing the attribute-driven moment (`_resolve_hco_moment`) for
+    to HCO. Rolls the defense's per-turn moment engagement (aggression 0-4 → % via
+    MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION), then walks the skeleton steps firing the attribute-driven moment (`_resolve_hco_moment`) for
     the ball handler vs his MAN defender. Returns the HCO ``result_type`` of the FIRST hard
     outcome (``O_FOUL`` / ``D_FOUL`` / ``STEAL`` / ``DEAD_BALL_TURNOVER``) or None (no moment →
     normal shot resolution). The caller sets ``result`` to this so the existing non-shot
@@ -4723,9 +4729,11 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     steps = (skeleton or {}).get("steps") or []
     if len(steps) < 2:
         return None
-    # Per-turn defense pressure engagement (aggression 0-4). No pressure → no moment this turn.
+    # Per-turn moment engagement: aggression (0-4) → % of possessions with any contest
+    # (MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION). No engagement → no moment this turn.
     aggression = (getattr(game.defense_team, "strategy_settings", {}) or {}).get("aggression", 2)
-    if random.randint(0, 4) > aggression:
+    engage_pct = MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION.get(int(aggression), 35)
+    if random.randint(1, 100) > engage_pct:
         return None
 
     defense_playcall = game_state.get("defense_playcall")
