@@ -1,4 +1,4 @@
-
+> 📄 **Authoritative system doc:** [06_Gameplay_Systems/Dynamic_HCO_Motion_System.md](../06_Gameplay_Systems/Dynamic_HCO_Motion_System.md) — full architecture, **Tunable Constants**, key files. This brief is build-phase scratch (rationale, phase log).
 
 **Base Behavior**
 - Offense team executes the called Motion play per the defined skeleton
@@ -340,4 +340,4 @@ so the coach *sees* that an aggressive defense is constantly poking — successe
 - Gated by the same per-turn aggression engagement roll as the moment itself — non-engaged turns
   show no reach-ins at all, so reach-in *presence* reads as defensive aggression.
 
-**v1 scope / deferred:** man defense only (zone has no clean 1:1 defender); the moment walk runs **before** shot resolution, so a moment pre-empts the would-be shot — true per-step interleaving with `should_shoot` is a later refinement (needs the late shot resolver, which must run after the shot-clock truncation). Pass interceptions (HCT `pass_contest`) and set-play moments also deferred. All behind `GOB_DYNAMIC_HCO_MOTION`. Tune frequency via `HCT_D8_GLOBAL_SCALAR` / `HCT_D8_DEF_WIN_BASE`.
+**scope / deferred:** man **+ zone** defense (zone resolves the on-ball defender by zone polygon, `_zone_bh_defender`; dial `HCO_ZONE_MOMENT_SCALAR`, same D8 weights as man for v1). The moment walk runs **before** shot resolution, so a moment pre-empts the would-be shot — true per-step interleaving with `should_shoot` is a later refinement (needs the late shot resolver, which must run after the shot-clock truncation). Pass interceptions (HCT `pass_contest`), set-play moments, and zone contest-weight reweighting deferred. All behind `GOB_DYNAMIC_HCO_MOTION`. Tune frequency via `HCO_MOMENT_SCALAR` / `HCO_ZONE_MOMENT_SCALAR` (and the shared `HCT_D8_*`). See the [authoritative system doc](../06_Gameplay_Systems/Dynamic_HCO_Motion_System.md).

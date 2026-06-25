@@ -34,9 +34,21 @@ OFF = {"PG": _P("o_pg")}
 DEF = {"PG": _P("d_pg")}
 
 
-def test_moment_walk_zone_returns_none():
-    # v1 is man-only — zone defers (no clean 1:1 defender).
-    assert PR._resolve_hco_moment_walk(_skel(), _Game(defense_playcall="2-3 Zone"), OFF, DEF) is None
+def test_moment_walk_zone_fires_and_stashes_credited(monkeypatch):
+    # Zone is now supported: the on-ball defender is resolved by zone (not a man matchup), the
+    # moment fires, and the credited defender is stashed for the non-shot block.
+    monkeypatch.setattr(random, "randint", lambda a, b: a)  # engaged
+    monkeypatch.setattr(PR, "_zone_bh_defender", lambda *a, **k: _P("d_sf"))
+    monkeypatch.setattr(PR, "_resolve_hco_moment", lambda *a, **k: ("STEAL", 0.5, _P("d_sf")))
+    g = _Game(defense_playcall="2-3 Zone", aggression=4)
+    assert PR._resolve_hco_moment_walk(_skel(), g, OFF, DEF) == "STEAL"
+    assert g.game_state["_hco_moment_defender_id"] == "d_sf"
+
+
+def test_moment_walk_zone_not_engaged_returns_none(monkeypatch):
+    # Same per-turn aggression engagement gate applies to zone.
+    monkeypatch.setattr(random, "randint", lambda a, b: b)  # 4 > 0 → not engaged
+    assert PR._resolve_hco_moment_walk(_skel(), _Game(defense_playcall="2-3 Zone", aggression=0), OFF, DEF) is None
 
 
 def test_moment_walk_no_pressure_returns_none(monkeypatch):
@@ -100,3 +112,35 @@ def test_moment_walk_option_b_inert_when_not_engaged(monkeypatch):
     tags = []
     assert PR._resolve_hco_moment_walk(_skel(3), _Game(aggression=0), OFF, DEF, reach_in_tags=tags) is None
     assert tags == []
+
+
+# --------------------------------------------------- zone on-ball defender resolution
+
+def test_zone_bh_defender_uses_polygon_match(monkeypatch):
+    # Primary path: the defender whose zone polygon contains the BH's spot.
+    import BackEnd.engine.attack_drive_clearance as ADC
+    monkeypatch.setattr(ADC, "_zone_boundaries_for_spot", lambda *a, **k: {"SF": [(0, 0)]})
+    monkeypatch.setattr(ADC, "_spot_display_coords", lambda *a, **k: {"x": 50, "y": 25})
+    monkeypatch.setattr(ADC, "_defender_for_zone_point", lambda *a, **k: "SF")
+    deff = {"SF": _P("d_sf"), "PG": _P("d_pg")}
+    assert PR._zone_bh_defender("2-3 Zone", "key", False, deff, "PG").player_id == "d_sf"
+
+
+def test_zone_bh_defender_falls_back_to_position_match(monkeypatch):
+    # No polygon contains the point and no polygons to centroid → position-on-position fallback.
+    import BackEnd.engine.attack_drive_clearance as ADC
+    monkeypatch.setattr(ADC, "_zone_boundaries_for_spot", lambda *a, **k: {})
+    monkeypatch.setattr(ADC, "_spot_display_coords", lambda *a, **k: {"x": 50, "y": 25})
+    monkeypatch.setattr(ADC, "_defender_for_zone_point", lambda *a, **k: None)
+    deff = {"PG": _P("d_pg")}
+    assert PR._zone_bh_defender("2-3 Zone", "key", False, deff, "PG").player_id == "d_pg"
+
+
+def test_zone_bh_defender_nearest_zone_fallback(monkeypatch):
+    # Point in no polygon, but polygons exist → nearest-centroid (here only SF has one).
+    import BackEnd.engine.attack_drive_clearance as ADC
+    monkeypatch.setattr(ADC, "_zone_boundaries_for_spot", lambda *a, **k: {"SF": [(48, 24), (52, 26)]})
+    monkeypatch.setattr(ADC, "_spot_display_coords", lambda *a, **k: {"x": 50, "y": 25})
+    monkeypatch.setattr(ADC, "_defender_for_zone_point", lambda *a, **k: None)
+    deff = {"SF": _P("d_sf"), "PG": _P("d_pg")}
+    assert PR._zone_bh_defender("2-3 Zone", "key", False, deff, "PG").player_id == "d_sf"

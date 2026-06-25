@@ -4643,24 +4643,54 @@ def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
 # HCO-specific moment frequency dial: scales the HCT contest's p_event + p_dfoul for HCO ONLY
 # (HCT/FCP keep event_scalar=1.0). Lower = fewer HCO fouls/steals/turnovers. The HCT contest is
 # calibrated for traps (2 defenders); HCO is a single on-ball defender, so we scale it back.
-HCO_MOMENT_SCALAR = 0.5
+HCO_MOMENT_SCALAR = 0.5        # man-defense per-moment event-frequency dial (HCO-only)
+HCO_ZONE_MOMENT_SCALAR = 0.5   # zone-defense dial (defaults equal to man; tune zone independently)
 
 
-def _resolve_hco_moment(game, ball_handler, bh_defender):
+def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
     """HCO per-step foul/steal/turnover moment — reuses the HCT attribute contest
     (`_resolve_moment`, same HCT_D8_* levels) but feeds HCO's team modifiers (offensive /
     defensive efficiency) in place of the HCT pressure ratings, and scales event frequency by
-    HCO_MOMENT_SCALAR (HCO-only dial). Returns the raw HCT outcome tuple
-    ``(outcome, score_ratio, credited_player)`` — outcome ∈ {STEAL, DEAD BALL, O_FOUL, D_FOUL,
-    POS_O, NEUTRAL}; the caller maps hard outcomes to HCO result types and truncates the walk.
-    All logic + RNG stays backend-side (SS&S); the FE only renders the stamped event."""
+    ``event_scalar`` (defaults to HCO_MOMENT_SCALAR; the walk passes HCO_ZONE_MOMENT_SCALAR for
+    zone). Returns the raw HCT outcome tuple ``(outcome, score_ratio, credited_player)`` — outcome
+    ∈ {STEAL, DEAD BALL, O_FOUL, D_FOUL, POS_O, NEUTRAL}; the caller maps hard outcomes to HCO
+    result types and truncates the walk. All logic + RNG stays backend-side (SS&S); FE only renders."""
     from BackEnd.engine.dynamic_hct import _resolve_moment
     off_team = game.offense_team
     def_team = game.defense_team
     off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
     def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
+    if event_scalar is None:
+        event_scalar = HCO_MOMENT_SCALAR
     return _resolve_moment(off_team, def_team, ball_handler, bh_defender,
-                           def_mod=def_eff, off_mod=off_eff, event_scalar=HCO_MOMENT_SCALAR)
+                           def_mod=def_eff, off_mod=off_eff, event_scalar=event_scalar)
+
+
+def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup, bh_pos):
+    """On-ball ZONE defender at a step: the defender whose zone polygon contains the ball-handler's
+    spot (mirrors attack_drive's ``bh_zone_def``). Falls back to the nearest zone (by polygon
+    centroid, compared in the polygons' home space) and finally to the position-on-position
+    defender. Used by the per-step moment when the defense is in a zone (no 1:1 man matchup)."""
+    from BackEnd.engine.attack_drive_clearance import (
+        _zone_boundaries_for_spot, _defender_for_zone_point, _closest_defender_to_point,
+        _spot_display_coords,
+    )
+    loc = bh_location or "key"
+    zb = _zone_boundaries_for_spot(defense_playcall, loc, is_away_offense)
+    bh_coord = _spot_display_coords(loc, is_away_offense)
+    dpos = _defender_for_zone_point(zb, bh_coord, is_away_offense)
+    if dpos is None and zb:
+        # Nearest-zone fallback: polygons live in home space, so flip the point to match.
+        from BackEnd.utils.shared import get_away_player_coords
+        pt = get_away_player_coords(bh_coord) if is_away_offense else bh_coord
+        centroids = {}
+        for p, poly in zb.items():
+            if poly:
+                xs = [c[0] for c in poly]
+                ys = [c[1] for c in poly]
+                centroids[p] = {"x": sum(xs) / len(xs), "y": sum(ys) / len(ys)}
+        dpos = _closest_defender_to_point(centroids, pt)
+    return def_lineup.get(dpos) if dpos else def_lineup.get(bh_pos)
 
 
 def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_tags=None):
@@ -4679,16 +4709,17 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     their reach-in via the stopper step instead. The walk only READS the skeleton (never mutates
     it — tags are applied by the caller post-deepcopy), so the cached skeleton is untouched.
 
-    v1 scope: man defense only (zone deferred — no clean 1:1 defender); the walk runs BEFORE shot
-    resolution, so a moment pre-empts the would-be shot (true per-step interleaving with the shoot
-    decision is a later refinement). All logic + RNG backend-side (SS&S); FE only renders."""
+    Defense: MAN → ball-handler's matchup defender; ZONE → the defender whose zone polygon covers
+    the BH's spot (`_zone_bh_defender`), scaled by HCO_ZONE_MOMENT_SCALAR. On a hard outcome the
+    credited defender is stashed in ``game_state["_hco_moment_defender_id"]`` so the non-shot block
+    credits / lunges the ACTUAL contesting defender (man position-match ≠ zone defender). The walk
+    runs BEFORE shot resolution, so a moment pre-empts the would-be shot (true per-step interleaving
+    is a later refinement). All logic + RNG backend-side (SS&S); FE only renders."""
     import random
     from BackEnd.utils.defense_utils import is_zone_defense
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
     game_state = game.game_state
-    if is_zone_defense(game_state.get("defense_playcall")):
-        return None  # man-only for v1
     steps = (skeleton or {}).get("steps") or []
     if len(steps) < 2:
         return None
@@ -4697,22 +4728,36 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     if random.randint(0, 4) > aggression:
         return None
 
-    defending_is_user = getattr(game.defense_team, "is_user_team", False)
-    matchups = get_matchups_for_defending_team(game_state, defending_is_user)
-    off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
+    defense_playcall = game_state.get("defense_playcall")
+    zone = is_zone_defense(defense_playcall)
+    is_away_offense = getattr(game.offense_team, "team_id", None) == getattr(
+        getattr(game, "away_team", None), "team_id", None)
+    event_scalar = HCO_ZONE_MOMENT_SCALAR if zone else HCO_MOMENT_SCALAR
+    off_to_def = {}
+    if not zone:
+        defending_is_user = getattr(game.defense_team, "is_user_team", False)
+        matchups = get_matchups_for_defending_team(game_state, defending_is_user)
+        off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
     rt_map = {"STEAL": "STEAL", "DEAD BALL": "DEAD_BALL_TURNOVER",
               "O_FOUL": "O_FOUL", "D_FOUL": "D_FOUL"}
     for i in range(1, len(steps)):
-        bh_pos, _loc = _motion_bh_at_step(steps[i])
+        bh_pos, bh_loc = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
             continue
-        bh_defender = def_lineup.get(off_to_def.get(bh_pos, bh_pos))
+        if zone:
+            bh_defender = _zone_bh_defender(defense_playcall, bh_loc, is_away_offense, def_lineup, bh_pos)
+        else:
+            bh_defender = def_lineup.get(off_to_def.get(bh_pos, bh_pos))
         if bh_defender is None:
             continue
-        outcome, _ratio, _credited = _resolve_hco_moment(game, off_lineup[bh_pos], bh_defender)
+        outcome, _ratio, _credited = _resolve_hco_moment(
+            game, off_lineup[bh_pos], bh_defender, event_scalar=event_scalar)
         result_type = rt_map.get(outcome)
         if result_type:
-            logging.warning(f"⚔️ [HCO MOMENT] {result_type} at step {i} ({bh_pos})")
+            logging.warning(
+                f"⚔️ [HCO MOMENT] {result_type} at step {i} ({bh_pos}, {'zone' if zone else 'man'})")
+            # Stash the contesting defender so the non-shot block credits / lunges the actual one.
+            game_state["_hco_moment_defender_id"] = getattr(_credited or bh_defender, "player_id", None)
             return result_type
         # Option B: no hard outcome (NEUTRAL near-miss / POS_O blow-by), but the on-ball defender
         # still lunged — record him so the caller stamps a render-space reach_in flourish here.
@@ -5805,6 +5850,16 @@ def resolve_half_court_offense_logic(game):
         
         ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
         
+        # Dynamic HCO: the per-step moment stashed the ACTUAL contesting defender (the man matchup
+        # OR the resolved zone defender). Prefer it so the steal credit + reach-in lunge land on the
+        # right player — for a zone, the position-on-position fallback below would pick the wrong one.
+        _moment_def_id = game_state.pop("_hco_moment_defender_id", None)
+        if _moment_def_id and not roles.get("defender"):
+            for _dp in def_lineup.values():
+                if getattr(_dp, "player_id", None) == _moment_def_id:
+                    roles["defender"] = _dp
+                    break
+
         # ✅ FIX: Only set defender if not already set by override logic
         # The defender override logic (for steals/turnovers/fouls) should have already set
         # the correct defender based on ball handler position and zone/man defense
