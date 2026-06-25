@@ -4674,20 +4674,13 @@ def _hco_pass_lane_dist(game):
     return cached
 
 
-def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
-                              is_away_offense, def_aggr, lane_dist, zone=False, defense_playcall=None):
-    """Hot-read "truly open" gate (§4): positions whose BH→teammate passing lane is covered by a
-    help defender — excluded as dish candidates so the offense won't dish into a covered lane.
-
-    Reconstructs defender coords from the offensive coords (same math the animator renders):
-      • MAN  → get_defender_coords per matchup (returns SAME orientation as input → display).
-      • ZONE → assign_all_zone_defenders by zone polygon (always returns HOME orientation), so the
-               lane endpoints are flipped to home to match.
-    Each non-BH lane is tested with defenders_in_lane; its t-band excludes the BH's and receiver's
-    own covering defenders, so only a true lane-sitting help defender blocks."""
+def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
+                     is_away_offense, def_aggr, zone, defense_playcall):
+    """Reconstruct on-court defender coords for a step (def_pos → {x,y}) the same way the animator
+    renders them, plus readers + a point transform for lane geometry. MAN → get_defender_coords
+    (returns input orientation → display); ZONE → assign_all_zone_defenders (always HOME), so the
+    transform flips offensive points to home to match. Returns (def_xy, _coord, _loc, _pt)."""
     from BackEnd.engine.attack_drive_clearance import _spot_display_coords
-    from BackEnd.engine.pass_contest import defenders_in_lane
-
     pos_actions = step.get("pos_actions") or {}
 
     def _coord(pos):
@@ -4699,13 +4692,10 @@ def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
     def _loc(pos):
         return (pos_actions.get(pos) or {}).get("location") or "key"
 
-    if bh_pos not in pos_actions:
-        return set()
     bh_xy = _coord(bh_pos)
     bh_location = _loc(bh_pos)
 
     if zone:
-        # Zone def coords come back in HOME orientation → flip the lane endpoints to match.
         from BackEnd.utils.shared_defense import assign_all_zone_defenders
         from BackEnd.utils.shared import get_away_player_coords
         from BackEnd.engine.attack_drive_clearance import _zone_boundaries_for_spot
@@ -4715,25 +4705,22 @@ def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
             for p in off_lineup if p in pos_actions and off_lineup.get(p)
         ]
         zb = _zone_boundaries_for_spot(defense_playcall, bh_location, is_away_offense)
-        def_coords, _guard = assign_all_zone_defenders(
+        def_xy, _guard = assign_all_zone_defenders(
             zb, offensive_players, bh_xy, bh_location, def_aggr, is_away_offense)
-        def_coords = def_coords or {}
+        def_xy = def_xy or {}
 
         def _pt(xy):
             return get_away_player_coords(xy) if is_away_offense else xy
-
-        def _exclude(_recv_pos):
-            return set()  # t-band excludes the on-ball/receiver zone defenders
     else:
         from BackEnd.utils.shared_defense import get_defender_coords
-        def_coords = {}
+        def_xy = {}
         for off_pos in off_lineup:
             if off_pos not in pos_actions:
                 continue
             dpos = off_to_def.get(off_pos, off_pos)
             if not def_lineup.get(dpos):
                 continue
-            def_coords[dpos] = get_defender_coords(
+            def_xy[dpos] = get_defender_coords(
                 _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
                 ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
             )
@@ -4741,17 +4728,107 @@ def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
         def _pt(xy):
             return xy
 
-        def _exclude(recv_pos):
-            return {off_to_def.get(bh_pos, bh_pos), off_to_def.get(recv_pos, recv_pos)}
+    return def_xy, _coord, _loc, _pt
+
+
+def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
+                              is_away_offense, def_aggr, lane_dist, zone=False, defense_playcall=None):
+    """Hot-read "truly open" gate (§4): positions whose BH→teammate passing lane is covered by a
+    help defender — excluded as dish candidates so the offense won't dish into a covered lane.
+    Each non-BH lane is tested with defenders_in_lane; the t-band (0.1–0.9) excludes the BH's and
+    receiver's own covering defenders, so only a true lane-sitting help defender blocks."""
+    from BackEnd.engine.pass_contest import defenders_in_lane
+
+    pos_actions = step.get("pos_actions") or {}
+    if bh_pos not in pos_actions:
+        return set()
+    def_xy, _coord, _loc, _pt = _hco_step_def_xy(
+        step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone, defense_playcall)
+    bh_pt = _pt(_coord(bh_pos))
 
     blocked = set()
     for recv_pos in off_lineup:
         if recv_pos == bh_pos or not off_lineup.get(recv_pos) or recv_pos not in pos_actions:
             continue
-        if defenders_in_lane(_pt(bh_xy), _pt(_coord(recv_pos)), def_coords, lane_dist,
-                             exclude=_exclude(recv_pos)):
+        exclude = set() if zone else {off_to_def.get(bh_pos, bh_pos), off_to_def.get(recv_pos, recv_pos)}
+        if defenders_in_lane(bh_pt, _pt(_coord(recv_pos)), def_xy, lane_dist, exclude=exclude):
             blocked.add(recv_pos)
     return blocked
+
+
+def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, off_to_def,
+                              is_away_offense, def_aggr, lane_dist, zone, defense_playcall, off_team, rng):
+    """Stage 2 (§4): resolve a THROWN hot-read dish / kickout through the passing lane. Reuses the
+    shared HCT pass model (resolve_pass_contest) with the tighter HCO ``lane_dist``. Eligible
+    interceptors = lane-sitting help defenders + the receiver's own man (t-band 0.1..1.0; the
+    passer's on-ball man at t≈0 is excluded). Since the decision gate already cleared the 0.1–0.9
+    band, the contest mostly catches the receiver's man gambling on the catch + marginal/temporal
+    cases. Returns {outcome, deflector, contact_point} — COMPLETE / INTERCEPT / BAT_OOB."""
+    from BackEnd.engine.pass_contest import (
+        defenders_in_lane, resolve_pass_contest, resolve_offense_pass_modifier, COMPLETE,
+    )
+    from BackEnd.engine.dynamic_hct import PASS_GRID_PER_GAME_SEC
+    from BackEnd.utils.shared import ag_to_grid_per_game_sec
+
+    def_xy, _coord, _loc, _pt = _hco_step_def_xy(
+        step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone, defense_playcall)
+    passer_xy = _pt(_coord(bh_pos))
+    receiver_xy = _pt(_coord(recv_pos))
+    # Eligible interceptors: in-lane (perp <= lane_dist) with projection past the passer (t > 0.1),
+    # including the receiver end (<= 1.0). The passer's on-ball man (t≈0) is dropped.
+    eligible = defenders_in_lane(passer_xy, receiver_xy, def_xy, lane_dist, t_min=0.1, t_max=1.0)
+    if not eligible:
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+
+    defenders = []
+    for dpos in eligible:
+        d = def_lineup.get(dpos)
+        if d is None:
+            continue
+        da = getattr(d, "attributes", None) or {}
+        defenders.append({
+            "id": dpos, "xy": def_xy[dpos], "rate": ag_to_grid_per_game_sec(da.get("AG", 50)),
+            "OD": da.get("OD", 50), "CH": da.get("CH", 50), "IQ": da.get("IQ", 50),
+        })
+    passer = off_lineup.get(bh_pos)
+    pa = getattr(passer, "attributes", None) or {}
+    passer_desc = {"xy": passer_xy, "PS": pa.get("PS", 50), "CH": pa.get("CH", 50), "IQ": pa.get("IQ", 50)}
+    offense_modifier = resolve_offense_pass_modifier("HCO", getattr(off_team, "team_attributes", None))
+    return resolve_pass_contest(
+        passer_desc, receiver_xy, PASS_GRID_PER_GAME_SEC, defenders,
+        offense_modifier=offense_modifier, lane_dist=lane_dist, rng=rng)
+
+
+def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, def_lineup, game_state):
+    """§4 Stage 2: convert an intercepted HCO dish/kickout into a STEAL turnover. ``is_interception``
+    drives the FE's INTERCEPTION! headline + SFX. Reuses resolve_turnover_logic + the shared stopper
+    system (same tools as the per-step Moment / FCP / rim-runner) so the turnover contract matches."""
+    interceptor = def_lineup.get(motion_shot_info.get("interceptor_pos"))
+    ball_handler = roles.get("ball_handler")
+    skel = apply_stopper_system_to_skeleton(motion_shot_info.get("skeleton") or {}, "STEAL", game_state)
+    to_roles = dict(roles)
+    to_roles["ball_handler"] = ball_handler
+    to_roles["defender"] = interceptor
+    if isinstance(skel, dict) and skel.get("steps"):
+        to_roles["steps"] = skel["steps"]
+    turn_result = resolve_turnover_logic(to_roles, game, turnover_type="STEAL", from_resolution_system=True)
+    turn_result["is_interception"] = True
+    turn_result["current_turn"] = "HCO"
+    turn_result["skeleton"] = skel or {}
+    steps = (skel or {}).get("steps") or []
+    if steps:
+        timing = calc_skeleton_step_timing_contract(
+            steps, resolution_step_index=max(0, len(steps) - 1),
+            include_hco_step1_bringup=True, phase_type="HCO", off_lineup=game.offense_team.lineup,
+        )
+        turn_result["time_elapsed"] = timing["time_elapsed"]
+        turn_result["step_clock_seconds"] = timing["step_clock_seconds"]
+        turn_result["resolution_step_index"] = timing["resolution_step_index"]
+        turn_result["executed_step_count"] = timing["executed_step_count"]
+    logging.warning(
+        f"🪡 [HCO INTERCEPTION] {getattr(ball_handler, 'player_id', None)} dish picked off by "
+        f"{getattr(interceptor, 'player_id', None)} → STEAL")
+    return turn_result
 
 
 def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
@@ -4946,6 +5023,27 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
     )
 
+    def _apply_dish_contest(decision, result, step, passer_pos):
+        """§4 Stage 2: if the executed decision threw a pass (dish/kickout), contest it. On an
+        INTERCEPT/BAT_OOB flag the result so the caller converts it to a STEAL turnover. Self-shots
+        (shooter == passer) are a no-op."""
+        if not isinstance(result, dict):
+            return result
+        recv = decision.get("shooter_pos")
+        if not recv or recv == passer_pos:
+            return result
+        contest = _hco_resolve_dish_contest(
+            step, passer_pos, recv, off_lineup, def_lineup, off_to_def, is_away_offense,
+            _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random)
+        if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
+            result["pass_intercepted"] = True
+            result["interceptor_pos"] = contest.get("deflector")
+            result["pass_bat_oob"] = contest["outcome"] == "BAT_OOB"
+            logging.warning(
+                f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
+                f"by {contest.get('deflector')}")
+        return result
+
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
@@ -4970,11 +5068,11 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                 f"🎯 [DYNAMIC MOTION] step {i}: SHOOT {shoot['shooter_pos']} "
                 f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
             )
-            return _execute_motion_decision(
-                skeleton, output_steps, steps[i], bh_pos, bh_location,
-                {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]},
+            _dec = {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]}
+            return _apply_dish_contest(_dec, _execute_motion_decision(
+                skeleton, output_steps, steps[i], bh_pos, bh_location, _dec,
                 game, off_lineup, def_lineup, is_away_offense,
-            )
+            ), steps[i], bh_pos)
 
         # 2. Movement matrix — only when the offense alters and/or the defense pressures.
         # Neither engaged → static skeleton: just progress to the next step.
@@ -4986,10 +5084,10 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         action = decision.get("action")
         logging.warning(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
-            return _execute_motion_decision(
+            return _apply_dish_contest(decision, _execute_motion_decision(
                 skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
                 game, off_lineup, def_lineup, is_away_offense,
-            )
+            ), steps[i], bh_pos)
         if action == SUBTLE_MOVEMENT:
             beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random, off_eff)
             if beat is None:
@@ -5036,11 +5134,11 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                     f"🎯 [DYNAMIC MOTION] post-subtle SHOOT {post_shoot['shooter_pos']} "
                     f"{post_shoot['shot_type']} (froze={froze})"
                 )
-                return _execute_motion_decision(
-                    skeleton, output_steps, steps[i], bh_pos, bh_location,
-                    {"action": SHOOT, "shooter_pos": post_shoot["shooter_pos"], "shot_type": post_shoot["shot_type"]},
+                _pdec = {"action": SHOOT, "shooter_pos": post_shoot["shooter_pos"], "shot_type": post_shoot["shot_type"]}
+                return _apply_dish_contest(_pdec, _execute_motion_decision(
+                    skeleton, output_steps, steps[i], bh_pos, bh_location, _pdec,
                     game, off_lineup, def_lineup, is_away_offense,
-                )
+                ), steps[i], bh_pos)
         elif action == FREELANCE_FORCED:
             # Leave the skeleton and run the freelance progression to a shot.
             return _resolve_freelance(
@@ -6270,6 +6368,11 @@ def resolve_half_court_offense_logic(game):
         motion_shot_info = game_state.pop("_motion_shot_recalibrated", None)
         if not motion_shot_info:
             motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
+
+        # §4 Stage 2: a dish/kickout picked off in the lane → STEAL (interception), not a shot.
+        if motion_shot_info and motion_shot_info.get("pass_intercepted"):
+            return _finalize_hco_pass_interception(
+                motion_shot_info, game, roles, off_lineup, def_lineup, game_state)
 
         if motion_shot_info:
             # Update skeleton with Motion shot modifications

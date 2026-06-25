@@ -123,3 +123,46 @@ def test_zone_clear_when_no_zone_defender_in_lane(monkeypatch):
     blocked = PR._hco_blocked_dish_targets(
         _step(), "PG", _OFF, _DEF, {}, False, "normal", 6.0, zone=True, defense_playcall="2-3 Zone")
     assert blocked == set()
+
+
+# ---------------------------------------------------------------- _hco_resolve_dish_contest (Stage 2)
+
+class _PA:  # player with attributes
+    def __init__(self, pid, **attrs):
+        self.player_id = pid
+        self.attributes = {"PS": 50, "CH": 50, "IQ": 50, "OD": 50, "AG": 50}
+        self.attributes.update(attrs)
+
+
+class _OffTeam:
+    team_attributes = {"offensive_efficiency": 0}
+
+
+class _Rng6:
+    def randint(self, a, b):
+        return min(6, b)
+
+
+def test_dish_contest_strong_passer_completes(monkeypatch):
+    # All defenders sit on their men; an elite passer clears the safety gate → COMPLETE.
+    monkeypatch.setattr("BackEnd.utils.shared_defense.get_defender_coords",
+                        lambda oc, *a, **k: {"x": oc["x"], "y": oc["y"]})
+    off = {"PG": _PA("o_pg", PS=99, CH=99, IQ=99), "SG": _PA("o_sg"), "SF": _PA("o_sf")}
+    deff = {"PG": _PA("d_pg"), "SG": _PA("d_sg"), "SF": _PA("d_sf")}
+    out = PR._hco_resolve_dish_contest(_step(), "PG", "SG", off, deff, _O2D, False, "normal", 6.0,
+                                       False, None, _OffTeam(), _Rng6())
+    assert out["outcome"] == "COMPLETE"
+
+
+def test_dish_contest_weak_passer_lane_defender_intercepts(monkeypatch):
+    # A high-OD defender planted mid-lane + a turnover-prone passer → INTERCEPT.
+    def fake_gdc(oc, *a, **k):
+        if abs(oc["x"] - 30) < 1 and abs(oc["y"] - 5) < 1:
+            return {"x": 40, "y": 25}   # SF's man jumps into the PG→SG lane (t≈0.67)
+        return {"x": oc["x"], "y": oc["y"]}
+    monkeypatch.setattr("BackEnd.utils.shared_defense.get_defender_coords", fake_gdc)
+    off = {"PG": _PA("o_pg", PS=3, CH=3, IQ=3), "SG": _PA("o_sg"), "SF": _PA("o_sf")}
+    deff = {"PG": _PA("d_pg"), "SG": _PA("d_sg"), "SF": _PA("d_sf", OD=99, CH=99, IQ=99, AG=99)}
+    out = PR._hco_resolve_dish_contest(_step(), "PG", "SG", off, deff, _O2D, False, "normal", 6.0,
+                                       False, None, _OffTeam(), _Rng6())
+    assert out["outcome"] in ("INTERCEPT", "BAT_OOB")

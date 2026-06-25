@@ -183,11 +183,14 @@ def find_pass_contester(
     receiver_xy: Dict[str, Any],
     ball_speed: float,
     defenders: Iterable[Dict[str, Any]],
+    lane_dist: float = PASS_LANE_DIST,
 ) -> Optional[Dict[str, Any]]:
     """Stage 1 (pure geometry). Return the eligible defender whose contact is earliest
     along the flight, as ``{"defender", "contact_point", "s"}``, or ``None``.
 
     Each defender descriptor is a dict: ``{"id", "xy", "rate", "OD", "AG", "IQ"}``.
+    ``lane_dist`` (perpendicular spatial gate) defaults to ``PASS_LANE_DIST`` (8.0, HCT/FCP);
+    HCO passes a tighter value.
     """
     seg_len = _euclid(passer_xy, receiver_xy)
     if seg_len <= 0 or ball_speed <= 0:
@@ -199,7 +202,7 @@ def find_pass_contester(
         if not isinstance(xy, dict):
             continue
         _t, _proj, perp = _project_onto_segment(xy, passer_xy, receiver_xy)
-        if perp > PASS_LANE_DIST:  # spatial gate
+        if perp > lane_dist:  # spatial gate
             continue
         hit = _earliest_contact(
             xy, float(d.get("rate", 0) or 0), passer_xy, receiver_xy,
@@ -220,6 +223,7 @@ def resolve_pass_contest(
     defenders: Iterable[Dict[str, Any]],
     *,
     offense_modifier: float = 0.0,
+    lane_dist: float = PASS_LANE_DIST,
     rng: Any = random,
 ) -> Dict[str, Any]:
     """Resolve a pass contest (§14). Returns
@@ -243,7 +247,7 @@ def resolve_pass_contest(
     if not isinstance(passer_xy, dict):
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
 
-    contester = find_pass_contester(passer_xy, receiver_xy, ball_speed, defenders)
+    contester = find_pass_contester(passer_xy, receiver_xy, ball_speed, defenders, lane_dist=lane_dist)
     if contester is None:
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
 
