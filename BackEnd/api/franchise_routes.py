@@ -802,14 +802,48 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         )
         return None
 
-    expected_pair = {away_id, home_id}
+    team_object_ids = []
+    for raw_id in (home_id, away_id):
+        try:
+            team_object_ids.append(ObjectId(raw_id))
+        except Exception:
+            pass
+    team_docs_raw = list(db.teams.find({"_id": {"$in": team_object_ids}})) if team_object_ids else []
+    team_docs_by_id = {str(team.get("_id")): team for team in team_docs_raw}
+
+    def _identifier_tokens(*values: Any) -> set[str]:
+        tokens: set[str] = set()
+        for value in values:
+            if value is None:
+                continue
+            raw = str(value).strip()
+            if not raw:
+                continue
+            tokens.add(raw.casefold())
+            tokens.add(raw.replace(" ", "_").casefold())
+            tokens.add(raw.replace("_", " ").casefold())
+        return tokens
+
+    def _team_tokens(canonical_id: str) -> set[str]:
+        team_doc = team_docs_by_id.get(canonical_id, {})
+        values: list[Any] = [canonical_id]
+        for key in ("_id", "id", "team_id", "slug", "name", "display_name"):
+            value = team_doc.get(key) if isinstance(team_doc, dict) else None
+            if value:
+                values.append(value)
+        return _identifier_tokens(*values)
+
+    expected_home_tokens = _team_tokens(home_id)
+    expected_away_tokens = _team_tokens(away_id)
     logger.warning(
-        "🧭 [MODE-RESUME-LOOKUP] start franchise_id=%s week=%s user_team_id=%s expected_away=%s expected_home=%s",
+        "🧭 [MODE-RESUME-LOOKUP] start franchise_id=%s week=%s user_team_id=%s expected_away=%s expected_home=%s expected_away_tokens=%s expected_home_tokens=%s",
         franchise_id,
         next_game.get("week"),
         user_team_id_str,
         away_id,
         home_id,
+        sorted(expected_away_tokens),
+        sorted(expected_home_tokens),
     )
 
     def _anchor_snapshot(doc: dict[str, Any]) -> dict[str, Any]:
@@ -817,20 +851,55 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
         return snapshot or {}
 
-    def _candidate_pair(doc: dict[str, Any]) -> set[str]:
+    def _extract_team_tokens(team_obj: Any) -> set[str]:
+        if not isinstance(team_obj, dict):
+            return set()
+        values: list[Any] = []
+        for key in ("_id", "id", "team_id", "slug", "name", "display_name"):
+            value = team_obj.get(key)
+            if value:
+                values.append(value)
+        return _identifier_tokens(*values)
+
+    def _candidate_side_tokens(doc: dict[str, Any], side: str) -> set[str]:
         snapshot = _anchor_snapshot(doc)
-        ids: set[str] = set()
+        tokens: set[str] = set()
+        direct_keys = {
+            "home": ("home_team_id", "team1_id"),
+            "away": ("away_team_id", "team2_id"),
+        }[side]
         for source in (doc, snapshot):
             if not isinstance(source, dict):
                 continue
-            for key in ("home_team_id", "away_team_id", "team1_id", "team2_id"):
+            for key in direct_keys:
                 value = source.get(key)
                 if value:
-                    ids.add(str(value))
-        return ids
+                    tokens.update(_identifier_tokens(value))
+
+            team_obj = source.get(f"{side}_team")
+            tokens.update(_extract_team_tokens(team_obj))
+
+            teams_obj = source.get("teams") if isinstance(source.get("teams"), dict) else {}
+            for team_key, team_row in teams_obj.items():
+                row_tokens = _identifier_tokens(team_key)
+                row_tokens.update(_extract_team_tokens(team_row))
+                if tokens.intersection(row_tokens):
+                    tokens.update(row_tokens)
+        return tokens
+
+    def _candidate_pair(doc: dict[str, Any]) -> set[str]:
+        return _candidate_side_tokens(doc, "home").union(_candidate_side_tokens(doc, "away"))
 
     def _matches_current_user_game(doc: dict[str, Any]) -> bool:
-        return expected_pair.issubset(_candidate_pair(doc))
+        candidate_home_tokens = _candidate_side_tokens(doc, "home")
+        candidate_away_tokens = _candidate_side_tokens(doc, "away")
+        direct_match = bool(expected_home_tokens.intersection(candidate_home_tokens)) and bool(
+            expected_away_tokens.intersection(candidate_away_tokens)
+        )
+        swapped_match = bool(expected_home_tokens.intersection(candidate_away_tokens)) and bool(
+            expected_away_tokens.intersection(candidate_home_tokens)
+        )
+        return direct_match or swapped_match
 
     game_doc = None
     anchor_cursor = db.games.find(
@@ -887,9 +956,10 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         )
     if not game_doc:
         logger.warning(
-            "🧭 [MODE-RESUME-LOOKUP] no_match franchise_id=%s expected_pair=%s",
+            "🧭 [MODE-RESUME-LOOKUP] no_match franchise_id=%s expected_away_tokens=%s expected_home_tokens=%s",
             franchise_id,
-            sorted(expected_pair),
+            sorted(expected_away_tokens),
+            sorted(expected_home_tokens),
         )
         return None
 
@@ -934,16 +1004,10 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         )
         return None
 
-    team_object_ids = []
-    for raw_id in (home_id, away_id):
-        try:
-            team_object_ids.append(ObjectId(raw_id))
-        except Exception:
-            pass
     team_docs = {
         str(team["_id"]): team.get("name", str(team["_id"]))
-        for team in db.teams.find({"_id": {"$in": team_object_ids}}, {"name": 1})
-    } if team_object_ids else {}
+        for team in team_docs_raw
+    }
     home_name = home_row.get("name") or home_team.get("name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
     away_name = away_row.get("name") or away_team.get("name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
 
@@ -954,13 +1018,13 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "quarter": quarter,
         "clock": source_doc.get("clock") or resume_anchor.get("clock") or game_doc.get("clock") or _clock_from_time_remaining(time_remaining),
         "time_remaining": time_remaining,
-        "home_team_id": source_home_id,
-        "away_team_id": source_away_id,
+        "home_team_id": home_id,
+        "away_team_id": away_id,
         "home_team_name": home_name,
         "away_team_name": away_name,
         "home_score": home_score,
         "away_score": away_score,
-        "user_team_side": "home" if str(user_team_id_str) == source_home_id else "away",
+        "user_team_side": "home" if user_team_id_str == home_id else "away",
         "status": "stoppage_anchor" if resume_anchor else "active_mid_quarter",
         "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type")),
         "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type"),
