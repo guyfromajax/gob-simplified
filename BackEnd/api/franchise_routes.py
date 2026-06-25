@@ -790,48 +790,88 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     if not franchise_id or not away_id or not home_id:
         return None
 
-    game_doc = db.games.find_one(
+    expected_pair = {away_id, home_id}
+
+    def _anchor_snapshot(doc: dict[str, Any]) -> dict[str, Any]:
+        anchor = doc.get("resume_anchor") if isinstance(doc.get("resume_anchor"), dict) else {}
+        snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
+        return snapshot or {}
+
+    def _candidate_pair(doc: dict[str, Any]) -> set[str]:
+        snapshot = _anchor_snapshot(doc)
+        ids: set[str] = set()
+        for source in (doc, snapshot):
+            if not isinstance(source, dict):
+                continue
+            for key in ("home_team_id", "away_team_id", "team1_id", "team2_id"):
+                value = source.get(key)
+                if value:
+                    ids.add(str(value))
+        return ids
+
+    def _matches_current_user_game(doc: dict[str, Any]) -> bool:
+        return expected_pair.issubset(_candidate_pair(doc))
+
+    game_doc = None
+    anchor_cursor = db.games.find(
         {
             "franchise_id": franchise_id,
             "is_final": {"$ne": True},
-            "$or": [
-                {"home_team_id": home_id, "away_team_id": away_id},
-                {"home_team_id": away_id, "away_team_id": home_id},
-                {"team1_id": away_id, "team2_id": home_id},
-                {"team1_id": home_id, "team2_id": away_id},
-            ],
+            "resume_anchor": {"$type": "object"},
         },
         sort=[("_id", -1)],
+        limit=12,
     )
+    for candidate in anchor_cursor:
+        if _matches_current_user_game(candidate):
+            game_doc = candidate
+            break
+
+    if not game_doc:
+        game_doc = db.games.find_one(
+            {
+                "franchise_id": franchise_id,
+                "is_final": {"$ne": True},
+                "$or": [
+                    {"home_team_id": home_id, "away_team_id": away_id},
+                    {"home_team_id": away_id, "away_team_id": home_id},
+                    {"team1_id": away_id, "team2_id": home_id},
+                    {"team1_id": home_id, "team2_id": away_id},
+                ],
+            },
+            sort=[("_id", -1)],
+        )
     if not game_doc:
         return None
 
     resume_anchor = game_doc.get("resume_anchor") if isinstance(game_doc.get("resume_anchor"), dict) else {}
-    source_doc = game_doc
+    source_doc = _anchor_snapshot(game_doc) if resume_anchor else game_doc
 
     try:
-        quarter = int((resume_anchor.get("quarter") if resume_anchor else source_doc.get("quarter", 1)) or 1)
+        quarter = int(source_doc.get("quarter", resume_anchor.get("quarter", 1) if resume_anchor else 1) or 1)
     except (TypeError, ValueError):
         quarter = 1
     try:
-        time_remaining = int(float((resume_anchor.get("time_remaining") if resume_anchor else source_doc.get("time_remaining", 480)) or 480))
+        time_remaining = int(float(source_doc.get("time_remaining", resume_anchor.get("time_remaining", 480) if resume_anchor else 480) or 480))
     except (TypeError, ValueError):
         time_remaining = 480
 
-    home_team = game_doc.get("home_team") if isinstance(game_doc.get("home_team"), dict) else {}
-    away_team = game_doc.get("away_team") if isinstance(game_doc.get("away_team"), dict) else {}
-    teams_obj = game_doc.get("teams") if isinstance(game_doc.get("teams"), dict) else {}
-    home_row = teams_obj.get(home_id, {}) if isinstance(teams_obj.get(home_id), dict) else {}
-    away_row = teams_obj.get(away_id, {}) if isinstance(teams_obj.get(away_id), dict) else {}
+    home_team = source_doc.get("home_team") if isinstance(source_doc.get("home_team"), dict) else {}
+    away_team = source_doc.get("away_team") if isinstance(source_doc.get("away_team"), dict) else {}
+    teams_obj = source_doc.get("teams") if isinstance(source_doc.get("teams"), dict) else {}
+    source_home_id = str(source_doc.get("home_team_id") or game_doc.get("home_team_id") or home_id)
+    source_away_id = str(source_doc.get("away_team_id") or game_doc.get("away_team_id") or away_id)
+    home_row = teams_obj.get(source_home_id, {}) if isinstance(teams_obj.get(source_home_id), dict) else {}
+    away_row = teams_obj.get(source_away_id, {}) if isinstance(teams_obj.get(source_away_id), dict) else {}
 
-    home_score = int((home_row or home_team).get("score", game_doc.get("home_score", 0)) or 0)
-    away_score = int((away_row or away_team).get("score", game_doc.get("away_score", 0)) or 0)
+    home_score = int((home_row or home_team).get("score", source_doc.get("home_score", game_doc.get("home_score", 0))) or 0)
+    away_score = int((away_row or away_team).get("score", source_doc.get("away_score", game_doc.get("away_score", 0))) or 0)
     has_started = (
         quarter > 1
         or time_remaining < 480
         or home_score != 0
         or away_score != 0
-        or bool(game_doc.get("opening_tip_winner"))
+        or bool(source_doc.get("opening_tip_winner") or game_doc.get("opening_tip_winner"))
     )
     if not has_started:
         return None
@@ -846,27 +886,27 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         str(team["_id"]): team.get("name", str(team["_id"]))
         for team in db.teams.find({"_id": {"$in": team_object_ids}}, {"name": 1})
     } if team_object_ids else {}
-    home_name = home_row.get("name") or home_team.get("name") or team_docs.get(home_id, home_id)
-    away_name = away_row.get("name") or away_team.get("name") or team_docs.get(away_id, away_id)
+    home_name = home_row.get("name") or home_team.get("name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
+    away_name = away_row.get("name") or away_team.get("name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
 
     return {
         "game_id": str(game_doc.get("_id")),
         "franchise_id": franchise_id,
         "week": int(next_game.get("week", franchise_doc.get("week", 1)) or 1),
         "quarter": quarter,
-        "clock": (resume_anchor.get("clock") if resume_anchor else None) or game_doc.get("clock") or _clock_from_time_remaining(time_remaining),
+        "clock": source_doc.get("clock") or resume_anchor.get("clock") or game_doc.get("clock") or _clock_from_time_remaining(time_remaining),
         "time_remaining": time_remaining,
-        "home_team_id": home_id,
-        "away_team_id": away_id,
+        "home_team_id": source_home_id,
+        "away_team_id": source_away_id,
         "home_team_name": home_name,
         "away_team_name": away_name,
         "home_score": home_score,
         "away_score": away_score,
-        "user_team_side": "home" if str(user_team_id_str) == home_id else "away",
+        "user_team_side": "home" if str(user_team_id_str) == source_home_id else "away",
         "status": "stoppage_anchor" if resume_anchor else "active_mid_quarter",
-        "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or game_doc.get("timeout_next_play_type")),
-        "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type"),
-        "timeout_trace_id": resume_anchor.get("timeout_trace_id") or game_doc.get("timeout_trace_id"),
+        "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type")),
+        "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type"),
+        "timeout_trace_id": resume_anchor.get("timeout_trace_id") or source_doc.get("timeout_trace_id") or game_doc.get("timeout_trace_id"),
     }
 
 
