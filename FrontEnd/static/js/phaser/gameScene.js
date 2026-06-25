@@ -1075,6 +1075,29 @@ export function createGameScene(Phaser) {
         payload.resume_from_timeout = true;
         // ✅ REMOVED: Timeout resume logging (cluttering console)
       }
+      if (urlParams.get('resume_from_anchor') === 'true') {
+        payload.resume_from_anchor = true;
+        console.warn('[RESUME-ANCHOR-CLIENT] simulate-quarter payload from anchor', {
+          game_id: this.gameId,
+          quarter: this.quarter,
+          resume_from_timeout: !!payload.resume_from_timeout,
+          clock: urlParams.get('clock'),
+        });
+      }
+      if (resumeFromTimeout && urlParams.get('resume_from_anchor') !== 'true') {
+        const futureParams = new URLSearchParams(window.location.search);
+        futureParams.set('resume_from_timeout', 'false');
+        futureParams.set('resume_from_anchor', 'true');
+        if (typeof history !== 'undefined' && history.replaceState) {
+          history.replaceState(null, '', `${window.location.pathname}?${futureParams.toString()}`);
+        }
+        console.warn('[RESUME-ANCHOR-CLIENT] converted timeout-return URL for future refreshes', {
+          game_id: this.gameId,
+          quarter: this.quarter,
+          current_request_resume_from_timeout: true,
+          future_resume_from_anchor: true,
+        });
+      }
       if (urlParams.get('locked_exhausted_user_lineup') === 'true') {
         payload.locked_exhausted_user_lineup = true;
         payload.user_team_side = urlParams.get('my_team');

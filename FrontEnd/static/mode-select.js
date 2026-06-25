@@ -752,6 +752,7 @@ function buildActiveGameCourtUrl(resume) {
   params.set('quarter', String(Number(resume.quarter) || 1));
   params.set('period', formatResumePeriod(resume));
   params.set('resume_from_timeout', resume.resume_from_timeout ? 'true' : 'false');
+  params.set('resume_from_anchor', 'true');
   if (resume.week) params.set('week', String(resume.week));
   if (resume.clock) params.set('clock', resume.clock);
   if (resume.timeout_trace_id) params.set('timeout_trace_id', resume.timeout_trace_id);

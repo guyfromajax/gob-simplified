@@ -531,6 +531,7 @@ try:
         advance_method: str | None = None
         # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
         resume_from_timeout: bool = False
+        resume_from_anchor: bool = False
         locked_exhausted_user_lineup: bool = False
         timeout_trace_id: str | None = None
         # Optional: designated Rim Runner (player id) per team for fast-break resolution
@@ -2265,8 +2266,28 @@ try:
                     away_lineup[pos] = str(pid)
         return home_lineup, away_lineup
 
-    def _build_resume_anchor(db_summary: dict, body) -> dict:
+    def _build_resume_anchor(db_summary: dict, body, timeout_context: dict | None = None) -> dict:
         home_lineup, away_lineup = _extract_saved_lineups(db_summary)
+        snapshot = copy.deepcopy(db_summary)
+        snapshot.pop("resume_anchor", None)
+        timeout_context = timeout_context if isinstance(timeout_context, dict) else {}
+        timeout_next_play_type = (
+            snapshot.get("timeout_next_play_type")
+            or timeout_context.get("timeout_next_play_type")
+        )
+        if body.resume_from_timeout and timeout_next_play_type:
+            snapshot["timeout_next_play_type"] = timeout_next_play_type
+            for key in (
+                "timeout_offense_team_id",
+                "timeout_trace_id",
+                "timeout_seam_ball_handler_id",
+                "timeout_free_throws_remaining",
+                "timeout_free_throws",
+                "timeout_shooter_id",
+                "timeout_one_and_one",
+            ):
+                if timeout_context.get(key) is not None:
+                    snapshot[key] = timeout_context[key]
         return {
             "version": 1,
             "saved_at": datetime.utcnow().isoformat() + "Z",
@@ -2276,10 +2297,11 @@ try:
             "time_remaining": db_summary.get("time_remaining"),
             "shot_clock_remaining": db_summary.get("shot_clock_remaining"),
             "resume_from_timeout": bool(body.resume_from_timeout),
-            "timeout_next_play_type": db_summary.get("timeout_next_play_type"),
-            "timeout_trace_id": db_summary.get("timeout_trace_id"),
+            "timeout_next_play_type": timeout_next_play_type,
+            "timeout_trace_id": snapshot.get("timeout_trace_id") or timeout_context.get("timeout_trace_id"),
             "home_lineup": home_lineup,
             "away_lineup": away_lineup,
+            "snapshot": snapshot,
         }
 
     def _resume_payload_from_saved_doc(
@@ -2290,36 +2312,41 @@ try:
         has_cached_game: bool,
         force_status: str | None = None,
     ) -> dict:
+        resume_anchor = saved.get("resume_anchor") if isinstance(saved.get("resume_anchor"), dict) else {}
+        anchor_snapshot = resume_anchor.get("snapshot") if isinstance(resume_anchor.get("snapshot"), dict) else None
+        source = anchor_snapshot or saved
+
         try:
-            quarter = int(saved.get("quarter", 1) or 1)
+            quarter = int(source.get("quarter", 1) or 1)
         except (TypeError, ValueError):
             quarter = 1
         try:
-            time_remaining = int(float(saved.get("time_remaining", 480) or 480))
+            time_remaining = int(float(source.get("time_remaining", 480) or 480))
         except (TypeError, ValueError):
             time_remaining = 480
-        home_team = saved.get("home_team") if isinstance(saved.get("home_team"), dict) else {}
-        away_team = saved.get("away_team") if isinstance(saved.get("away_team"), dict) else {}
-        home_team_id = str(saved.get("home_team_id") or "")
-        away_team_id = str(saved.get("away_team_id") or "")
-        teams_obj = saved.get("teams") if isinstance(saved.get("teams"), dict) else {}
+
+        home_team = source.get("home_team") if isinstance(source.get("home_team"), dict) else {}
+        away_team = source.get("away_team") if isinstance(source.get("away_team"), dict) else {}
+        home_team_id = str(source.get("home_team_id") or saved.get("home_team_id") or "")
+        away_team_id = str(source.get("away_team_id") or saved.get("away_team_id") or "")
+        teams_obj = source.get("teams") if isinstance(source.get("teams"), dict) else {}
         home_row = teams_obj.get(home_team_id, {}) if home_team_id and isinstance(teams_obj.get(home_team_id), dict) else {}
         away_row = teams_obj.get(away_team_id, {}) if away_team_id and isinstance(teams_obj.get(away_team_id), dict) else {}
         home_score = int((home_row or home_team).get("score", saved.get("home_score", 0)) or 0)
         away_score = int((away_row or away_team).get("score", saved.get("away_score", 0)) or 0)
-        is_final = bool(saved.get("is_final"))
+        is_final = bool(source.get("is_final"))
         has_started = (
             quarter > 1
             or time_remaining < 480
             or home_score != 0
             or away_score != 0
-            or bool(saved.get("opening_tip_winner"))
+            or bool(source.get("opening_tip_winner"))
         )
         if force_status:
             status = force_status
         elif is_final:
             status = "final"
-        elif saved.get("timeout_next_play_type"):
+        elif source.get("timeout_next_play_type"):
             status = "timeout_resume"
         elif time_remaining <= 0:
             status = "quarter_break"
@@ -2328,15 +2355,14 @@ try:
         else:
             status = "pregame"
 
-        home_lineup, away_lineup = _extract_saved_lineups(saved)
-        resume_anchor = saved.get("resume_anchor") if isinstance(saved.get("resume_anchor"), dict) else {}
+        home_lineup, away_lineup = _extract_saved_lineups(source)
 
         return {
             "game_id": str(normalized_game_id or game_id),
             "status": status,
             "has_cached_game": has_cached_game,
             "quarter": quarter,
-            "clock": saved.get("clock") or f"{time_remaining // 60}:{time_remaining % 60:02d}",
+            "clock": source.get("clock") or f"{time_remaining // 60}:{time_remaining % 60:02d}",
             "time_remaining": time_remaining,
             "home_team_id": home_team_id,
             "away_team_id": away_team_id,
@@ -2344,9 +2370,9 @@ try:
             "away_team_name": away_row.get("name") or away_team.get("name"),
             "home_score": home_score,
             "away_score": away_score,
-            "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or saved.get("timeout_next_play_type")),
-            "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or saved.get("timeout_next_play_type"),
-            "timeout_trace_id": resume_anchor.get("timeout_trace_id") or saved.get("timeout_trace_id"),
+            "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or source.get("timeout_next_play_type")),
+            "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or source.get("timeout_next_play_type"),
+            "timeout_trace_id": resume_anchor.get("timeout_trace_id") or source.get("timeout_trace_id"),
             "home_lineup": home_lineup,
             "away_lineup": away_lineup,
         }
@@ -2369,6 +2395,18 @@ try:
                 saved, _ = find_game_doc(games_collection, game_id)
 
         if saved and isinstance(saved.get("resume_anchor"), dict) and not saved.get("is_final"):
+            _anchor = saved.get("resume_anchor") or {}
+            _snap = _anchor.get("snapshot") if isinstance(_anchor.get("snapshot"), dict) else {}
+            logging.warning(
+                "🧭 [RESUME-ANCHOR-READ] game_id=%s quarter=%s clock=%s time_remaining=%s home_score=%s away_score=%s next_play=%s",
+                normalized_game_id,
+                _snap.get("quarter"),
+                _snap.get("clock"),
+                _snap.get("time_remaining"),
+                ((_snap.get("teams") or {}).get(_snap.get("home_team_id") or "", {}) or {}).get("score"),
+                ((_snap.get("teams") or {}).get(_snap.get("away_team_id") or "", {}) or {}).get("score"),
+                _snap.get("timeout_next_play_type"),
+            )
             return _resume_payload_from_saved_doc(
                 game_id=game_id,
                 normalized_game_id=normalized_game_id,
@@ -2866,7 +2904,32 @@ try:
             # Check for timeout state if we have a game_id (existing game)
             # Don't skip Q1 - we could be resuming from a timeout in Q1!
             # The restore_timeout_resume_state function will validate quarter match to prevent stale data
-            if game_id:
+            if game_id and body.resume_from_anchor:
+                anchor_root, _anchor_effective_id = _find_saved_game_doc()
+                anchor = anchor_root.get("resume_anchor") if isinstance(anchor_root, dict) and isinstance(anchor_root.get("resume_anchor"), dict) else {}
+                anchor_snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
+                if anchor_snapshot:
+                    timeout_saved_state = anchor_snapshot
+                    body.quarter = int(anchor_snapshot.get("quarter") or body.quarter or 1)
+                    body.resume_from_timeout = bool(anchor_snapshot.get("timeout_next_play_type") or anchor.get("resume_from_timeout"))
+                    logging.warning(
+                        "🧭 [RESUME-ANCHOR-LOAD] game_id=%s quarter=%s clock=%s time_remaining=%s home_score=%s away_score=%s next_play=%s resume_from_timeout=%s",
+                        game_id,
+                        anchor_snapshot.get("quarter"),
+                        anchor_snapshot.get("clock"),
+                        anchor_snapshot.get("time_remaining"),
+                        ((anchor_snapshot.get("teams") or {}).get(anchor_snapshot.get("home_team_id") or "", {}) or {}).get("score"),
+                        ((anchor_snapshot.get("teams") or {}).get(anchor_snapshot.get("away_team_id") or "", {}) or {}).get("score"),
+                        anchor_snapshot.get("timeout_next_play_type"),
+                        body.resume_from_timeout,
+                    )
+                    if gm is not None:
+                        logging.warning("🔄 [ONGOING_GAMES] Removing game from cache: game_id=%s, reason='resume anchor restore'", game_id)
+                        _drop_cached_game()
+                        gm = None
+                else:
+                    logging.warning("⚠️ [RESUME-ANCHOR-LOAD] requested but no anchor snapshot found game_id=%s", game_id)
+            elif game_id:
                 timeout_saved_state = restore_timeout_resume_state(game_id, body, games_collection)
             
             if timeout_saved_state:
@@ -2952,6 +3015,22 @@ try:
                 db_lookup_time = (time.time() - db_lookup_start) * 1000
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
+                    if body.resume_from_anchor and isinstance(saved.get("resume_anchor"), dict):
+                        anchor = saved.get("resume_anchor") or {}
+                        anchor_snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
+                        if anchor_snapshot:
+                            saved = anchor_snapshot
+                            body.quarter = int(saved.get("quarter") or body.quarter or 1)
+                            logging.warning(
+                                "🧭 [RESUME-ANCHOR-RESTORE] using snapshot game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s",
+                                game_id,
+                                saved.get("quarter"),
+                                saved.get("clock"),
+                                saved.get("time_remaining"),
+                                saved.get("timeout_next_play_type"),
+                            )
+                        else:
+                            logging.warning("⚠️ [RESUME-ANCHOR-RESTORE] resume_anchor missing snapshot game_id=%s", game_id)
                     try:
                         # ✅ UNIFIED STRUCTURE: Get team IDs from top level (unified structure)
                         home_team_id = saved.get("home_team_id")
@@ -4161,6 +4240,46 @@ try:
                 status_code=400,
                 detail=f"Cannot skip quarters. Current quarter is {gm.quarter}, requested {body.quarter}",
             )
+
+        if (
+            games_collection is not None
+            and game_id
+            and not body.full_sim
+            and body.resume_from_timeout
+        ):
+            try:
+                pre_sim_anchor_summary = summarize_game_state(gm, exclude_animations=True)
+                pre_sim_anchor_summary["resume_anchor"] = _build_resume_anchor(
+                    pre_sim_anchor_summary,
+                    body,
+                    timeout_context=locals().get("timeout_saved_state"),
+                )
+                try:
+                    if isinstance(game_id, str) and ObjectId.is_valid(game_id):
+                        pre_sim_anchor_id = ObjectId(game_id)
+                    else:
+                        pre_sim_anchor_id = game_id
+                except Exception:
+                    pre_sim_anchor_id = game_id
+                games_collection.update_one(
+                    {"_id": pre_sim_anchor_id},
+                    {"$set": {"resume_anchor": pre_sim_anchor_summary["resume_anchor"]}},
+                    upsert=False,
+                )
+                _anchor = pre_sim_anchor_summary["resume_anchor"]
+                logging.warning(
+                    "🧭 [RESUME-ANCHOR-SAVE] phase=pre_sim game_id=%s quarter=%s clock=%s time_remaining=%s home_score=%s away_score=%s next_play=%s resume_from_timeout=%s",
+                    game_id,
+                    _anchor.get("quarter"),
+                    _anchor.get("clock"),
+                    _anchor.get("time_remaining"),
+                    ((pre_sim_anchor_summary.get("teams") or {}).get(pre_sim_anchor_summary.get("home_team_id") or "", {}) or {}).get("score"),
+                    ((pre_sim_anchor_summary.get("teams") or {}).get(pre_sim_anchor_summary.get("away_team_id") or "", {}) or {}).get("score"),
+                    _anchor.get("timeout_next_play_type"),
+                    _anchor.get("resume_from_timeout"),
+                )
+            except Exception as e:
+                logging.error("🚨 [RESUME-ANCHOR-SAVE] phase=pre_sim failed game_id=%s: %s", game_id, e, exc_info=True)
     
         try:
             profile_summary_sim = None
@@ -4363,8 +4482,34 @@ try:
             # checkpoint. This API is called immediately after Set Lineup hands
             # control back to the court, after lineups/settings are applied and
             # the restart turn has been generated.
-            if not body.full_sim and not is_final:
-                db_summary["resume_anchor"] = _build_resume_anchor(db_summary, body)
+            should_write_resume_anchor = (
+                not body.full_sim
+                and not is_final
+                and bool(game_id)
+                and (
+                    not body.resume_from_timeout
+                    and not body.resume_from_anchor
+                    and int(body.quarter or 1) > 1
+                )
+            )
+            if should_write_resume_anchor:
+                db_summary["resume_anchor"] = _build_resume_anchor(
+                    db_summary,
+                    body,
+                    timeout_context=locals().get("timeout_saved_state"),
+                )
+                _anchor = db_summary["resume_anchor"]
+                logging.warning(
+                    "🧭 [RESUME-ANCHOR-SAVE] game_id=%s quarter=%s clock=%s time_remaining=%s home_score=%s away_score=%s next_play=%s resume_from_timeout=%s",
+                    game_id,
+                    _anchor.get("quarter"),
+                    _anchor.get("clock"),
+                    _anchor.get("time_remaining"),
+                    ((db_summary.get("teams") or {}).get(db_summary.get("home_team_id") or "", {}) or {}).get("score"),
+                    ((db_summary.get("teams") or {}).get(db_summary.get("away_team_id") or "", {}) or {}).get("score"),
+                    _anchor.get("timeout_next_play_type"),
+                    _anchor.get("resume_from_timeout"),
+                )
             
             # ✅ DEBUG: Log detailed save information for Q4 to diagnose finalize_game() issue
             quarter_saving = db_summary.get('quarter', 'N/A')

@@ -398,6 +398,7 @@ function applyResumeStateToUrl(resumeState) {
   params.set('quarter', String(resumeQuarter));
   params.set('period', periodLabel);
   params.set('resume_from_timeout', resumeState.resume_from_timeout ? 'true' : 'false');
+  params.set('resume_from_anchor', 'true');
   params.delete('active_resume');
   if (resumeState.clock) params.set('clock', resumeState.clock);
   if (resumeState.timeout_trace_id) params.set('timeout_trace_id', resumeState.timeout_trace_id);
@@ -413,6 +414,15 @@ function applyResumeStateToUrl(resumeState) {
   if (typeof history !== 'undefined' && history.replaceState) {
     history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
   }
+  console.warn('[RESUME-ANCHOR-CLIENT] applied anchor URL state', {
+    quarter: resumeQuarter,
+    clock: resumeState.clock,
+    time_remaining: resumeState.time_remaining,
+    home_score: resumeState.home_score,
+    away_score: resumeState.away_score,
+    resume_from_timeout: !!resumeState.resume_from_timeout,
+    timeout_next_play_type: resumeState.timeout_next_play_type || null,
+  });
 
   Object.keys(homeLineup).forEach((key) => delete homeLineup[key]);
   Object.keys(awayLineup).forEach((key) => delete awayLineup[key]);
