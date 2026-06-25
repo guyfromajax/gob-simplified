@@ -1476,6 +1476,32 @@ export function createGameScene(Phaser) {
       } else if (schemaInboundOnFirstTurn) {
         console.warn("🏠 [BENCH_ENTRY] spawn skipped — schema animation_steps handle triangle→setup");
       }
+
+      // Resume/cold-load contract: backend summaries persist authoritative
+      // lineup coords as player.x/player.y, while Phaser sprite creation reads
+      // player.startingCoords. Hydrate that bridge before sprites are created so
+      // a restored inbound/timeout state does not spawn everyone at center court.
+      let resumeCoordsHydrated = 0;
+      actualPlayers.forEach(player => {
+        if (player.startingCoords && player.startingCoords.x != null && player.startingCoords.y != null) {
+          return;
+        }
+        const x = Number(player.x);
+        const y = Number(player.y);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          player.startingCoords = { x, y };
+          resumeCoordsHydrated += 1;
+        }
+      });
+      if (urlParams.get('resume_from_anchor') === 'true' || urlParams.get('active_resume') === 'true') {
+        console.warn('[RESUME-ANCHOR-CLIENT] hydrated player starting coords', {
+          actual_players: actualPlayers.length,
+          hydrated_from_xy: resumeCoordsHydrated,
+          with_starting_coords: actualPlayers.filter(p => p.startingCoords?.x != null && p.startingCoords?.y != null).length,
+          first_turn_type: firstSimTurn?.result_type || null,
+          first_turn_animation_steps: Array.isArray(firstSimTurn?.animation_steps) ? firstSimTurn.animation_steps.length : 0,
+        });
+      }
       
       // Filtered active players from roster
       
@@ -2895,6 +2921,17 @@ export function createGameScene(Phaser) {
 
         const startAnimation = async () => {
           const spriteKeys = Object.keys(this.playerSprites || {});
+          if (urlParams.get('resume_from_anchor') === 'true' || urlParams.get('active_resume') === 'true') {
+            const firstTurn = Array.isArray(simData.turns) ? simData.turns[0] : null;
+            console.warn('[RESUME-ANCHOR-CLIENT] animation start', {
+              sprite_count: spriteKeys.length,
+              turns: Array.isArray(simData.turns) ? simData.turns.length : 0,
+              first_turn_type: firstTurn?.result_type || null,
+              first_turn_animation_steps: Array.isArray(firstTurn?.animation_steps) ? firstTurn.animation_steps.length : 0,
+              first_turn_animations: Array.isArray(firstTurn?.animations) ? firstTurn.animations.length : 0,
+              should_show_matchups_popup: !!this.shouldShowMatchupsPopup,
+            });
+          }
           if (DEBUG_TEAMS) {
             console.log('playerSprites keys:', spriteKeys);
           }

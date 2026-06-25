@@ -369,6 +369,27 @@ If no anchor exists:
 
 - normal game-start or quarter-start controls show as before.
 
+## Player Sprite Coordinate Hydration
+
+Backend resume snapshots persist active player court positions as `player.x` and `player.y` in `simData.players`.
+
+Frontend sprite creation uses `player.startingCoords`.
+
+Therefore, `gameScene.js` must bridge these fields before calling `loadPhaserPlayers(...)`:
+
+```javascript
+player.startingCoords = { x: Number(player.x), y: Number(player.y) }
+```
+
+This matters most on cold browser return from Mode Select. The resume request can produce a valid restart turn, such as `SIDE_INBOUND`, while player rows only carry saved `x/y` positions. If the frontend does not hydrate `startingCoords`, `createPhaserPlayer(...)` falls back to `{ x: 50, y: 25 }`, which stacks all player sprites at center court.
+
+The correct contract is:
+
+- backend owns authoritative player coordinates
+- backend sends those coordinates as `x/y` in `simData.players`
+- frontend copies `x/y` into `startingCoords` before sprite creation
+- frontend remains renderer-only; it does not calculate new gameplay coordinates
+
 ## Expected User Experience
 
 ### Refresh During Active Game
@@ -475,4 +496,3 @@ Potential future work:
 - Add a user-facing timestamp on the Mode Select resume card.
 - Add an explicit abandon/forfeit flow as a separate feature if needed.
 - Consider exact completed-turn resume only if the UX need outweighs the added persistence complexity.
-
