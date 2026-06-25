@@ -113,6 +113,8 @@ Tighter HCO lanes (5–6 vs 8) reflect closer spacing + faster half-court passes
 
 **Build stages:** (1) decision gate — reconstruct def coords, exclude covered-lane dish targets in `should_shoot`; (2) interception contest on thrown dish/kickout → turnover routing; (3) FCP @ 8 (needs a pass-beat audit — FCP's inbound/press-break/advance passes have no contest today).
 
+**Calibration diagnostic** (`_track_hco_pass_lanes`, called from `turn_manager.resolve_half_court_offense`, behind the flag): for every pass step in a resolved HCO turn it logs the closest non-BH defender's perpendicular distance to the pass lane in two bands — **mid-lane help** (t 0.1–0.9, the gate band) and **full-eligible** (t 0.1–1.0, the contest band incl. the receiver's man) — and accumulates game totals in `game_state`, logging the running average each turn (`📏 [HCO PASS LANES] … GAME: passes=N mid_avg=… full_avg=…`). The last HCO turn's line is the game summary. Use it to judge whether `HCO_PASS_LANE_DIST_*` (5–6) is too high/low. Pure observability — wrapped so it can never break a turn.
+
 ---
 
 ### Tunable Constants

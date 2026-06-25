@@ -166,3 +166,17 @@ def test_dish_contest_weak_passer_lane_defender_intercepts(monkeypatch):
     out = PR._hco_resolve_dish_contest(_step(), "PG", "SG", off, deff, _O2D, False, "normal", 6.0,
                                        False, None, _OffTeam(), _Rng6())
     assert out["outcome"] in ("INTERCEPT", "BAT_OOB")
+
+
+# ---------------------------------------------------------------- min_perp_in_lane (tracking)
+
+def test_min_perp_in_lane_bands():
+    from BackEnd.engine.pass_contest import min_perp_in_lane
+    dc = {"mid": {"x": 30, "y": 27},        # perp 2, t≈0.5
+          "recv_man": {"x": 60, "y": 25},    # perp 0, t=1.0
+          "passer_man": {"x": 0, "y": 25},   # t=0 (excluded both bands)
+          "far": {"x": 30, "y": 45}}         # perp 20
+    p, r = {"x": 0, "y": 25}, {"x": 60, "y": 25}
+    assert min_perp_in_lane(p, r, dc, 0.1, 0.9) == 2.0   # mid-lane help only (receiver's man excluded)
+    assert min_perp_in_lane(p, r, dc, 0.1, 1.0) == 0.0   # full band includes the receiver's man
+    assert min_perp_in_lane(p, r, {"passer_man": {"x": 0, "y": 25}}, 0.1, 0.9) is None

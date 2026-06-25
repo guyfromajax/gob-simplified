@@ -111,6 +111,21 @@ def defenders_in_lane(passer_xy, receiver_xy, def_coords, lane_dist,
     return out
 
 
+def min_perp_in_lane(passer_xy, receiver_xy, def_coords, t_min=0.1, t_max=1.0, exclude=None):
+    """Smallest perpendicular distance to the passer→receiver segment among defenders whose
+    projection falls in the band [t_min, t_max]. Returns None if none qualify. Pure geometry, no
+    distance cap — for diagnostics (how close is the nearest potential interceptor?)."""
+    exclude = exclude or set()
+    best = None
+    for did, xy in (def_coords or {}).items():
+        if did in exclude or not xy:
+            continue
+        t, _proj, perp = _project_onto_segment(xy, passer_xy, receiver_xy)
+        if t_min <= t <= t_max and (best is None or perp < best):
+            best = perp
+    return best
+
+
 def _iq_headstart(iq: float) -> float:
     return max(0.0, min(1.0, float(iq) / 100.0)) * PASS_IQ_ANTICIPATION_MAX_SEC
 

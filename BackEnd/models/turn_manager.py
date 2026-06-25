@@ -3299,6 +3299,13 @@ class TurnManager:
     def resolve_half_court_offense(self):
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         result = resolve_half_court_offense_logic(self.game)
+        # Diagnostic (§4 calibration): log closest-defender pass-lane distances. Pure observability;
+        # wrapped so a tracking error can never break the turn.
+        try:
+            from BackEnd.engine.phase_resolution import _track_hco_pass_lanes
+            _track_hco_pass_lanes(result, self.game)
+        except Exception:
+            pass
         self._emit_hco_animation_steps(result)
         return result
 

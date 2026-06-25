@@ -4831,6 +4831,73 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
     return turn_result
 
 
+def _track_hco_pass_lanes(result, game):
+    """Diagnostic (§4 calibration): for every pass step in a resolved HCO motion turn, log the
+    closest non-BH defender's perpendicular distance to the pass lane — **mid-lane help** (t 0.1–0.9,
+    the "truly open" gate band) AND **full-eligible** (t 0.1–1.0, the contest band incl. the
+    receiver's man). Accumulates in game_state and logs the running GAME totals each turn, so the
+    last HCO turn's line is the game summary (total passes + overall averages). Pure observability;
+    behind GOB_DYNAMIC_HCO_MOTION; wrapped by the caller so it can never break a turn."""
+    if not _dynamic_hco_motion_enabled():
+        return
+    game_state = game.game_state
+    if (game_state.get("offense_play_type") or "") != "motion":
+        return
+    steps = ((result or {}).get("skeleton") or {}).get("steps") or []
+    if not steps:
+        return
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+    from BackEnd.engine.pass_contest import min_perp_in_lane
+
+    off_lineup = game.offense_team.lineup
+    def_lineup = game.defense_team.lineup
+    is_away_offense = game.offense_team.team_id == game.away_team.team_id
+    defense_playcall = game_state.get("defense_playcall")
+    zone = is_zone_defense(defense_playcall)
+    def_aggr = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
+    off_to_def = {}
+    if not zone:
+        matchups = get_matchups_for_defending_team(game_state, getattr(game.defense_team, "is_user_team", False))
+        off_to_def = {o: d for d, o in matchups.items()}
+
+    turn_samples = []
+    for step in steps:
+        pa = step.get("pos_actions") or {}
+        passer_pos = next((p for p, a in pa.items() if ((a or {}).get("action") or "").lower() == "pass"), None)
+        receiver_pos = next((p for p, a in pa.items() if ((a or {}).get("action") or "").lower() == "receive"), None)
+        if not passer_pos or not receiver_pos:
+            continue
+        try:
+            def_xy, _coord, _loc, _pt = _hco_step_def_xy(
+                step, passer_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone, defense_playcall)
+            passer_xy, receiver_xy = _pt(_coord(passer_pos)), _pt(_coord(receiver_pos))
+            mid = min_perp_in_lane(passer_xy, receiver_xy, def_xy, 0.1, 0.9)
+            full = min_perp_in_lane(passer_xy, receiver_xy, def_xy, 0.1, 1.0)
+            turn_samples.append((round(mid, 1) if mid is not None else None,
+                                 round(full, 1) if full is not None else None))
+        except Exception:
+            continue
+
+    if not turn_samples:
+        return
+    t = game_state.setdefault("_hco_pass_lane_tracking",
+                              {"count": 0, "mid_sum": 0.0, "mid_n": 0, "full_sum": 0.0, "full_n": 0})
+    for mid, full in turn_samples:
+        t["count"] += 1
+        if mid is not None:
+            t["mid_sum"] += mid
+            t["mid_n"] += 1
+        if full is not None:
+            t["full_sum"] += full
+            t["full_n"] += 1
+    mid_s = f"{t['mid_sum'] / t['mid_n']:.2f}" if t["mid_n"] else "n/a"
+    full_s = f"{t['full_sum'] / t['full_n']:.2f}" if t["full_n"] else "n/a"
+    logging.warning(
+        f"📏 [HCO PASS LANES] this turn (mid/full)={turn_samples} | GAME: passes={t['count']} "
+        f"mid_avg={mid_s} (n={t['mid_n']}) full_avg={full_s} (n={t['full_n']})")
+
+
 def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
     """HCO per-step foul/steal/turnover moment — reuses the HCT attribute contest
     (`_resolve_moment`, same HCT_D8_* levels) but feeds HCO's team modifiers (offensive /
