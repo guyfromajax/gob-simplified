@@ -740,6 +740,117 @@ class GameManager:
         if turn_result.get("fouled_out"):
             self._handle_foul_out_timeout(turn_result)
 
+    def _repair_miss_bounce_rebound_contract(self, result) -> None:
+        """Restore rebound metadata on schema MISS/BLOCK rows before append.
+
+        Migrated shot turns (HCO/HCT/FCP, migrated FB, final-FT DREB, OREB
+        putback miss) must carry ``rebounderId`` + ``rebound_type`` whenever
+        ``ball_bounce_x/y`` are present so discrete DREB promotion can fire and
+        the next HCO turn's entry orchestrator reads a proper prior BH.
+
+        When ``shot_manager`` already resolved the rebound but turn-level fields
+        were stripped (e.g. accidental field loss), recover from
+        ``game_state.last_rebounder`` / ``last_rebound``.
+        """
+        if not isinstance(result, dict):
+            return
+
+        if result.get("quarter_ends_after"):
+            return
+
+        result_type = str(result.get("result_type") or "").upper()
+        if result_type not in ("MISS", "BLOCK"):
+            return
+
+        bx, by = result.get("ball_bounce_x"), result.get("ball_bounce_y")
+        if bx is None or by is None:
+            return
+
+        next_play = str(result.get("next_play_type") or "").upper()
+        if next_play in ("FREE_THROW", "SIP", "SIDE_INBOUND", "BASELINE_INBOUND"):
+            return
+
+        if self.game_state.get("pending_oreb"):
+            return
+
+        from BackEnd.constants.fast_break_play_types import FAST_BREAK_PLAY_KEYS
+
+        current_turn = str(result.get("current_turn") or "")
+        is_migrated_fb = (
+            current_turn == "FAST_BREAK"
+            and result.get("fast_break_play") in FAST_BREAK_PLAY_KEYS
+        )
+        is_putback_miss = (
+            current_turn == "OREB" and result_type == "PUTBACK_MISS"
+        )
+        is_ft_final_dreb = (
+            current_turn == "FREE_THROW"
+            and result_type == "MISS"
+            and int(result.get("free_throws_remaining", 0) or 0) == 0
+        )
+        if current_turn not in ("HCT", "HCO", "FCP") and not (
+            is_migrated_fb or is_putback_miss or is_ft_final_dreb
+        ):
+            return
+
+        if result.get("rebounderId") and result.get("rebound_type"):
+            return
+
+        last_rebound = self.game_state.get("last_rebound")
+        last_rebounder = self.game_state.get("last_rebounder")
+        rebounder_id = getattr(last_rebounder, "player_id", None) if last_rebounder else None
+
+        repaired = False
+        if rebounder_id and last_rebound in ("DREB", "OREB"):
+            result["rebounderId"] = str(rebounder_id)
+            result["rebound_type"] = str(last_rebound)
+            repaired = True
+
+        if not result.get("next_play_type"):
+            rebound_type = str(result.get("rebound_type") or "").upper()
+            if rebound_type == "DREB":
+                npt = self.game_state.get("offensive_state", "HCO")
+                if npt not in ("HCO", "FAST_BREAK", "HCT", "FCP", "DREB"):
+                    npt = "HCO"
+                result["next_play_type"] = npt
+                repaired = True
+            elif rebound_type == "OREB":
+                result["next_play_type"] = "OREB"
+                repaired = True
+
+        if result.get("rebounderId") and result.get("rebound_type"):
+            if repaired:
+                logging.warning(
+                    "🩹 [MISS BOUNCE REBOUND REPAIR] Restored rebound contract "
+                    "from game_state before append. current_turn=%s result_type=%s "
+                    "rebounderId=%s rebound_type=%s next_play_type=%s "
+                    "ball_bounce=(%s, %s)",
+                    current_turn,
+                    result_type,
+                    result.get("rebounderId"),
+                    result.get("rebound_type"),
+                    result.get("next_play_type"),
+                    bx,
+                    by,
+                )
+            return
+
+        logging.error(
+            "❌ [MISS BOUNCE REBOUND CONTRACT] Schema bounce without rebound "
+            "metadata and no game_state recovery. current_turn=%s "
+            "result_type=%s next_play_type=%s ball_bounce_x=%s "
+            "ball_bounce_y=%s has_animation_steps=%s "
+            "game_state.last_rebound=%s game_state.last_rebounder=%s",
+            current_turn,
+            result_type,
+            result.get("next_play_type"),
+            bx,
+            by,
+            bool(result.get("animation_steps")),
+            last_rebound,
+            rebounder_id,
+        )
+
     def _build_dreb_turn_from_miss(self, miss_turn):
         """Construct a discrete DREB turn from a just-finished MISS turn.
 
@@ -1175,6 +1286,11 @@ class GameManager:
         result = self.turn_manager.run_micro_turn()
         _perf["run_micro_turn"] = (_time.time() - _t0) * 1000
 
+        # Schema MISS/BLOCK rows must carry rebound metadata whenever bounce
+        # coords exist — otherwise discrete DREB promotion is skipped and the
+        # next HCO entry orchestrator sees a loose-ball prior turn.
+        self._repair_miss_bounce_rebound_contract(result)
+
         # ✅ SS&S: Centralized next_turn determination (single source of truth)
         # Sets explicit next_turn based on result and conditions
         # This ensures ALL turns have accurate next_turn (no None values)
@@ -1211,7 +1327,8 @@ class GameManager:
             oreb_turn = self.turn_manager.resolve_offensive_rebound_turn()
             if oreb_turn:
                 # print(f"📦 OREB turn created: {oreb_turn.get('result_type')} - {oreb_turn.get('text')}")
-                
+                self._repair_miss_bounce_rebound_contract(oreb_turn)
+
                 # ✅ SS&S: Set next_turn for OREB turns (same centralized logic)
                 oreb_turn["next_turn"] = self.determine_next_turn(oreb_turn)
                 

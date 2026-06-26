@@ -191,6 +191,10 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 
 ## Current Investigation (January 2025)
 
+### ✅ Addressed (Jun 2026): HCO entry `current_bh_id is None` after MISS with schema bounce
+- **Issue:** Prior turn was **HCO MISS** with `ball_bounce_x/y` and schema `animation_steps`, but `rebounderId` / `rebound_type` / `next_play_type` were missing → discrete **DREB** promotion skipped → next **HCO** turn's entry orchestrator logged `[HCO ENTRY BUG]` (loose-ball prior turn, no `final_ball_handler_id`).
+- **Fix:** `game_manager._repair_miss_bounce_rebound_contract()` runs in `simulate_macro_turn` before `_append_turn`, restoring rebound metadata from `game_state.last_rebounder` / `last_rebound` when bounce coords exist on migrated MISS/BLOCK rows. See `Turn_by_Turn_System.md` (Discrete DREB turn §2) and `Rebound_System.md` (MISS/BLOCK turn contract).
+
 ### ✅ Addressed (May 2026): Discrete HCO / HCT / FB MISS → DREB → HCO outlet (`AnimationEngine`)
 - **Fix:** After discrete **`DREB`** `animation_steps` `playTurn`, `AnimationEngine._maybeRunDiscreteDrebOutletLeadIn` calls **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP**, using the prior **MISS/BLOCK** turn for **`dreb_outlet_pass`** / get-back. Skips **FAST_BREAK** next and **`force_foul_after_dreb`**. See `FrontEnd/static/js/phaser/animation/AnimationEngine.js` and **`Turn_by_Turn_System.md`** (Discrete `DREB` turn).
 - **Remaining (optional hardening):** suppress duplicate embedded rebound animation on the MISS when `next_play_type === "DREB"` if double-capture is still visible; HCO step-0 tolerance tuning if any edge case remains.
