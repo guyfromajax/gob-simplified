@@ -191,8 +191,11 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
       }
     }
 
-    // Final Turn: announce "Final Shot" at start of Final Turn shot attempt (not FINAL_HOLD / FLSS)
-    if (turn.final_turn && turn.result_type !== 'FINAL_HOLD' && !turn.flss) {
+    // Final Turn / FLSS: announce "Final Shot" at start of terminal EOQ shot attempts.
+    const isTerminalFinalShotAttempt =
+      (turn.final_turn || turn.flss || turn.final_shot_possession)
+      && turn.result_type !== 'FINAL_HOLD';
+    if (isTerminalFinalShotAttempt) {
       announceGameEvent('FINAL_SHOT', turn, scene);
     }
 

@@ -454,6 +454,41 @@ def _append_final_turn_walkup_if_needed(
     return elapsed_so_far + delta
 
 
+def _normalize_flss_terminal_clock_burn(
+    steps: List[AnimationStep],
+    clock_remaining_at_turn_start: float,
+    shot_clock_remaining_at_turn_start: float,
+) -> None:
+    """Terminal FLSS turns must burn the full remaining game clock to 0:00.
+
+    FLSS skeleton steps are short (~1 game-sec); extend step 0 and restamp
+    per-step ``clock`` fields so schema playback drives the scoreboard to zero.
+    """
+    if not steps:
+        return
+    clock_start = max(0.0, float(clock_remaining_at_turn_start))
+    shot_start = max(0.0, float(shot_clock_remaining_at_turn_start))
+    if clock_start <= 0:
+        return
+    current_sum = sum(float((s.get("end") or {}).get("time_elapsed") or 0) for s in steps)
+    if current_sum <= 0:
+        return
+    shortfall = clock_start - current_sum
+    if shortfall > 0:
+        first_end = steps[0].setdefault("end", {})
+        first_end["time_elapsed"] = float(first_end.get("time_elapsed") or 0) + shortfall
+    elapsed = 0.0
+    for step in steps:
+        t = float((step.get("end") or {}).get("time_elapsed") or 0)
+        step.setdefault("start", {}).setdefault("clock", {})
+        step["start"]["clock"]["clock_remaining"] = max(0.0, clock_start - elapsed)
+        step["start"]["clock"]["shot_clock_remaining"] = max(0.0, shot_start - elapsed)
+        elapsed += t
+        step.setdefault("end", {}).setdefault("clock", {})
+        step["end"]["clock"]["clock_remaining"] = max(0.0, clock_start - elapsed)
+        step["end"]["clock"]["shot_clock_remaining"] = max(0.0, shot_start - elapsed)
+
+
 # --- Per-step builders -----------------------------------------------------
 
 
@@ -990,6 +1025,7 @@ def build_skeleton_animation_steps(
         (turn_type == "HCO")
         and isinstance(prior_turn, dict)
         and not turn_result.get("final_turn")
+        and not turn_result.get("flss")
     )
     if is_hco_turn:
         prior_final_coords = _normalize_player_coord_map(
@@ -1256,11 +1292,23 @@ def build_skeleton_animation_steps(
     # seed skeleton step 0 from prior final_coords (FCP-style fallback).
     fcp_seed_coords: Optional[Dict[str, GridCoord]] = None
     hco_seed_coords: Optional[Dict[str, GridCoord]] = None
-    if turn_type == "FCP" and isinstance(prior_turn, dict):
+    flss_seed_coords: Optional[Dict[str, GridCoord]] = None
+    if turn_result.get("flss") and isinstance(prior_turn, dict):
+        shooter_id = turn_result.get("shooter_id")
+        shooter_coords = turn_result.get("shooter_coords") or {}
+        if shooter_id and isinstance(shooter_coords, dict):
+            flss_seed_coords = _normalize_player_coord_map(
+                prior_turn.get("final_coords") or {}
+            )
+            flss_seed_coords[str(shooter_id)] = {
+                "x": float(shooter_coords.get("x", 50)),
+                "y": float(shooter_coords.get("y", 25)),
+            }
+    elif turn_type == "FCP" and isinstance(prior_turn, dict):
         prior_fc = prior_turn.get("final_coords") or {}
         if isinstance(prior_fc, dict) and prior_fc:
             fcp_seed_coords = _normalize_player_coord_map(prior_fc)
-    elif turn_type == "HCO" and reset_count == 0 and isinstance(prior_turn, dict):
+    elif turn_type == "HCO" and reset_count == 0 and isinstance(prior_turn, dict) and not turn_result.get("flss"):
         prior_fc = _normalize_player_coord_map(prior_turn.get("final_coords") or {})
         if prior_fc:
             hco_seed_coords = prior_fc
@@ -1287,6 +1335,11 @@ def build_skeleton_animation_steps(
         # coords = prior prepended step end coords.
         if i == 0 and (reset_count > 0 or final_turn_walkup_prepended) and steps:
             start_coords = dict(steps[-1]["end"]["coords"])
+        elif i == 0 and flss_seed_coords:
+            anim_step0 = _coords_at_movement_index(animations, i)
+            start_coords = dict(anim_step0) if anim_step0 else {}
+            for pid, coord in flss_seed_coords.items():
+                start_coords[pid] = dict(coord)
         elif i == 0 and fcp_seed_coords:
             # FCP: step 0 starts from BIP-end (randomized setup). See
             # comment above the loop. Falls back to the legacy animations
@@ -1709,6 +1762,13 @@ def build_skeleton_animation_steps(
             # doesn't teleport. No-op for STEAL → FAST_BREAK (handled by the
             # after_steal FB emitter).
             _append_post_steal_hco_transition(steps, turn_result, game)
+
+    if turn_result.get("flss") and steps:
+        _normalize_flss_terminal_clock_burn(
+            steps,
+            clock_remaining_at_turn_start,
+            shot_clock_remaining_at_turn_start,
+        )
 
     return steps
 

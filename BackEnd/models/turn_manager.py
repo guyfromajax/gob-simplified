@@ -1704,10 +1704,21 @@ class TurnManager:
                 and result.get("animation_steps")
             ):
                 self._emit_hco_animation_steps(result)
-            result["time_elapsed"] = 1
+            clock_before = int(self.game.game_state.get("time_remaining", 0) or 0)
+            if result.get("quarter_ends_after") and clock_before > 0:
+                result["time_elapsed"] = clock_before
+                result["clock_start"] = clock_before
+                result["clock_end"] = 0
+            else:
+                result["time_elapsed"] = max(
+                    1,
+                    int(result.get("time_elapsed") or 1),
+                )
             result["quarter_ends_after"] = True
             result["next_play_type"] = None
             result.pop("next_turn", None)
+            result["final_shot_possession"] = True
+            self.game.game_state.pop("final_shot_possession_active", None)
             log_eoq_step(
                 self.game,
                 "FLSS",
@@ -3493,6 +3504,8 @@ class TurnManager:
                     "shooter_id": result.get("shooter_id"),
                 },
             )
+            result["final_shot_possession"] = True
+            result["forced_shot_reason"] = result.get("forced_shot_reason") or "FLSS"
             self._emit_hco_animation_steps(result)
             return result
         log_eoq_step(
