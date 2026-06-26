@@ -32,7 +32,7 @@ This doc is the single source of truth for the contract. Code is the implementat
 | Fast Break — After Steal | ✅ Migrated | `after_steal_fast_break_step_emitter.build_after_steal_fast_break_animation_steps` |
 | Free Throw | ✅ Migrated | `ft_step_emitter.build_ft_animation_steps` |
 | Timeout | ⏳ Not migrated (low priority — minimal animation) | — |
-| Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). `time_elapsed = time_remaining` quarter-clock drain is intentional, outside the ledger |
+| Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). Frontend renders the **full** ``animation_steps[]`` via `playTurn()` (no step-0 skip or parallel alignment tween). Step 0 hold pacing is backend ``_step_t_floor_game_seconds`` (~3s/4s remaining before pass/shoot). `time_elapsed = time_remaining` quarter-clock drain is intentional, outside the ledger |
 
 ---
 

@@ -1224,6 +1224,19 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
+      if (payload.resume_from_anchor && typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
+        const consumedParams = new URLSearchParams(window.location.search);
+        consumedParams.delete('resume_from_anchor');
+        consumedParams.delete('active_resume');
+        consumedParams.set('resume_from_timeout', 'false');
+        history.replaceState(null, '', `${window.location.pathname}?${consumedParams.toString()}`);
+        console.warn('[RESUME-ANCHOR-CLIENT] consumed anchor URL state after successful resume', {
+          game_id: this.gameId,
+          quarter: this.quarter,
+          response_quarter: simData.quarter,
+          clock: simData.clock || null,
+        });
+      }
       // ✅ TIMEOUT: Store simData in scene for timeout button manager access
       this.simData = simData;
       const _tsm0 = simData.team_scoreboard_meta;

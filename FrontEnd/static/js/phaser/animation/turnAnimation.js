@@ -5662,15 +5662,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 }
 
 /**
- * Phase 4: Final Turn alignment — tween offense and defense to oDestinations/dDestinations.
- * Coordinates are final display-oriented backend values. If the live owner differs from the
- * step-0 handler, preserve the live owner so ShotAnimationSystem can animate the entry pass.
+ * Phase 4: Final Turn alignment — **legacy fallback** when ``animation_steps`` is absent.
+ * Tweens offense and defense to oDestinations/dDestinations (backend display-oriented coords).
  */
 /**
- * After runFinalTurnAlignment (and optional step-0 entry pass), patch schema step 1
- * start.coords from live sprites so playTurn's entry snap matches alignment positions.
- * Step 0 is rendered outside schema playback; its gated end.coords can still reflect
- * prior-possession / interrupted coords for non-gate movers.
+ * Legacy: patched schema step 1 start.coords after FE ``runFinalTurnAlignment``.
+ * Superseded by UESS full-schema playback from step 0 (no skip, no coord patch).
  */
 export function patchFinalTurnSchemaEntryStepFromAlignment({ scene, stepsToPlay, sprites }) {
   if (!scene || !Array.isArray(stepsToPlay) || stepsToPlay.length === 0 || !sprites) {

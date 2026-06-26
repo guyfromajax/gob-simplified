@@ -212,7 +212,7 @@ All handlers follow this pattern:
 | `handleDefault()` | `HCO`, `DEFAULT`, `FOUL`, `CHARGE`, `DEAD_BALL`, `DEAD BALL` | Default/fallback handler (skeleton) | `playTurnAnimation()` | None |
 | `handleTimeout()` | `TIMEOUT` | Timeout handling | Direct implementation | None |
 | `handleFinalHold()` | `FINAL_HOLD` | Final Turn clock-out hold | Direct implementation (text scroll + `holdClockOutMs` wait) | None |
-| `handleFinalTurnShot()` | `FINAL_TURN_SHOT` (detected) | Final Turn shot (alignment then shot) | `runFinalTurnAlignment()` → `ShotAnimationSystem` | `playTurnAnimation()` |
+| `handleFinalTurnShot()` | `FINAL_TURN_SHOT` (detected) | Final Turn shot fallback when `animation_steps` missing | `runSchemaPlaybackTurn()` if steps present; else `ShotAnimationSystem` / `playTurnAnimation()` | Normal Final Turn shots with steps never reach this handler — `processTurn` schema gate runs first |
 
 Note: `DEAD BALL` is registered under both spellings — the backend sends `"DEAD BALL"` (with space); `"DEAD_BALL"` is kept defensively. `CHARGE` maps to `handleDefault` (skeleton animation, no shot) so `finalizeTurnAfterAnimation` can announce "Charge!".
 
@@ -466,9 +466,8 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 **Registered for:** `FINAL_TURN_SHOT` (reached via `determineHandler` when `final_turn === true` + shot attempt)
 
 **What it does:**
-- Runs `runFinalTurnAlignment()` — tweens offense/defense to `oDestinations` / `dDestinations`
-- Holds the ball until the late-pass window (`_holdFinalTurnBallUntilLatePassWindow`)
-- Then runs the standard shot animation (`ShotAnimationSystem`, falling back to `playTurnAnimation()`)
+- **Primary path (UESS):** When `turnData.animation_steps` is present, `processTurn` routes to `runSchemaPlaybackTurn()` before this handler runs — full schema playback from step 0 (alignment + step-0 floor + pass/drive/shoot), then quarter-end hold when `quarter_ends_after`.
+- **Fallback (legacy):** If no schema steps, runs `runFinalTurnAlignment()` + imperative late-pass hold, then `ShotAnimationSystem` / `playTurnAnimation()`.
 
 ## Registered Result Types
 

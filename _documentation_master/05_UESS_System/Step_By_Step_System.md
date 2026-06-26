@@ -454,7 +454,7 @@ the result of these stages.)
   remain in place. The universal helper is NOT applied to Triangle.
 
 
-**Final Shot** (end-of-quarter `final_turn`) — legacy `animations[]` path: when a turn has `final_turn` + a skeleton, `turn_manager` renders it via `Animator.skeleton_to_animations` (BH/shooter movement, then shot; no schema steps).
+**Final Shot** (end-of-quarter ``final_turn``) — UESS schema path: ``turn_manager._emit_hco_animation_steps`` → ``build_skeleton_animation_steps`` emits full ``animation_steps[]``. Skeleton step 0 is Final Turn alignment (all ten players to ``oDestinations`` / ``dDestinations`` spots); backend stamps ``_step_t_floor_game_seconds`` on step 0 so the clock burns until ~3s (Outside) or ~4s (Attack) remain before pass/drive/shoot steps. Frontend plays the **full** step list from index 0 via ``runSchemaPlaybackTurn`` / ``playTurn()`` — no step-0 skip, FE alignment tween, or coord patch. Legacy ``Animator.skeleton_to_animations`` / ``animations[]`` remains fallback when schema steps are absent.
 
 ---
 

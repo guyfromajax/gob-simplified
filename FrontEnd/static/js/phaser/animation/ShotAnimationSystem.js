@@ -354,7 +354,8 @@ export class ShotAnimationSystem {
     
     // ✅ CRITICAL FIX: If we are coming directly from an inbound or opening tip, the ball should already be attached
     // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
-    // Phase 5: Final Turn — ball already attached to ball handler in runFinalTurnAlignment.
+    // Phase 5: Final Turn with schema steps — ball owner is set by step 0
+    // ``ball_start.owner_player_id`` in UESS playback (prior-turn handler).
     let step0OwnerSprite = null;
     if (!previousTurnWasShot && !fromInbound && !fromOpeningTip && !turnData.final_turn && !requiresStep0EntryPass) {
       for (const anim of turnData.animations) {

@@ -31,6 +31,31 @@ export async function fetchGameState(gameId) {
   }
 }
 
+async function fetchResumeState(gameId) {
+  if (!gameId) return null;
+
+  try {
+    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
+      headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+    });
+    if (!res.ok) return null;
+    const resumeState = await res.json();
+    if (!resumeState || resumeState.status !== 'stoppage_anchor') return null;
+    console.warn('[RESUME-ANCHOR-CLIENT] loaded anchor UI state', {
+      game_id: resumeState.game_id || gameId,
+      quarter: resumeState.quarter,
+      clock: resumeState.clock,
+      time_remaining: resumeState.time_remaining,
+      home_score: resumeState.home_score,
+      away_score: resumeState.away_score,
+    });
+    return resumeState;
+  } catch (err) {
+    console.warn('⚠️ [COURT RESUME] Could not fetch anchor UI state:', err);
+    return null;
+  }
+}
+
 function normTeamsSlot(s) {
   if (s == null || s === '') return '';
   return String(s).toUpperCase().replace(/\s+/g, '_').replace(/-/g, '_');
@@ -239,6 +264,27 @@ export function displayAccumulatedScores(gameData, homeTeam, awayTeam) {
   console.log('📊 Scoreboard updated with accumulated scores:', { homeScore, awayScore });
 }
 
+export function displayAccumulatedClockState(gameData) {
+  if (!gameData) return;
+
+  const clockEl = document.getElementById('game-clock');
+  const quarterEl = document.getElementById('quarter');
+  const shotClockEl = document.getElementById('shot-clock');
+  const quarter = Number(gameData.quarter) || 1;
+  const clock = gameData.clock || (
+    Number.isFinite(Number(gameData.time_remaining))
+      ? `${Math.floor(Number(gameData.time_remaining) / 60)}:${String(Math.floor(Number(gameData.time_remaining) % 60)).padStart(2, '0')}`
+      : null
+  );
+  const period = quarter <= 4 ? `Q${quarter}` : `OT${quarter - 4}`;
+
+  if (clockEl && clock) clockEl.textContent = clock;
+  if (quarterEl) quarterEl.textContent = period;
+  if (shotClockEl && gameData.shot_clock_remaining != null) {
+    shotClockEl.textContent = String(gameData.shot_clock_remaining);
+  }
+}
+
 /**
  * Update player stat tables with accumulated stats
  * @param {Object} gameData - Game data from backend
@@ -415,15 +461,20 @@ export async function initializeGameStats() {
   const gameId = urlParams.get('game_id');
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');
+  const wantsAnchorUi =
+    urlParams.get('active_resume') === 'true' || urlParams.get('resume_from_anchor') === 'true';
   
   if (!homeTeam || !awayTeam) return;
 
   setScoreboardHeaderDefaults(homeTeam, awayTeam);
   if (!gameId) return;
   
-  const gameData = await fetchGameState(gameId);
+  const gameData = wantsAnchorUi
+    ? (await fetchResumeState(gameId)) || await fetchGameState(gameId)
+    : await fetchGameState(gameId);
   if (gameData) {
     displayAccumulatedHeaderState(gameData, homeTeam, awayTeam);
+    displayAccumulatedClockState(gameData);
     displayAccumulatedScores(gameData, homeTeam, awayTeam);
     displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam);
     displayTeamBoxScore(gameData, homeTeam, awayTeam);

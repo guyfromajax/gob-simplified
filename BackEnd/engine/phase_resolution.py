@@ -5518,6 +5518,16 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
                 step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
         skeleton = {"steps": [step0, step1, step2]}
+    # UESS pacing: step 0 alignment holds until ~3s (Outside) or ~4s (Attack)
+    # remain on the game clock before the pass/drive/shoot sequence. The
+    # emitter honors ``_step_t_floor_game_seconds`` over the generic HCO
+    # floor so players settle, then wait at destination for the hold beat.
+    time_remaining_sec = float(game_state.get("time_remaining") or 0)
+    late_target_sec = 4.0 if shot_type == "Attack" else 3.0
+    reserve_for_pass_shot_sec = 3.5 if shot_type == "Attack" else 2.0
+    step0_floor = max(0.0, time_remaining_sec - late_target_sec - reserve_for_pass_shot_sec)
+    if step0_floor > 0 and skeleton.get("steps"):
+        skeleton["steps"][0]["_step_t_floor_game_seconds"] = step0_floor
     log_eoq_step(
         game,
         "FINAL_SHOT",

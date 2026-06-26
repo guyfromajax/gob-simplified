@@ -195,7 +195,9 @@ Refresh starts on `court.html` with an existing `game_id`.
 Flow:
 
 1. `bootGame.js` loads.
-2. `initGame()` calls `/api/game/{game_id}/resume-state` if a game is present and the URL is not already a direct timeout resume.
+2. `initGame()` calls `/api/game/{game_id}/resume-state` if a game is present and either:
+   - `active_resume=true`, or
+   - the URL is not already a direct timeout resume.
 3. If the endpoint returns `stoppage_anchor`, the page hides the normal pre-game controls.
 4. The page shows a `Game In Progress` modal.
 5. User presses `Resume Game`.
@@ -215,11 +217,38 @@ Key frontend function:
 
 - `FrontEnd/static/js/phaser/bootGame.js`
 - `applyResumeStateToUrl(resumeState)`
+- `applyResumeStateToCourtChrome(resumeState)`
 
 Key backend behavior:
 
 - `BackEnd/api/api.py`
 - when `body.resume_from_anchor` is true, the backend loads `game.resume_anchor.snapshot`, drops stale in-memory game state, and resumes from the anchor.
+
+## Court UI Hydration
+
+During an active mid-game resume, the visible court UI must use the saved stoppage anchor as its source of truth before the user presses `Resume Game`.
+
+This matters because the normal game document can be ahead of the resume anchor. Example: the latest saved game document may contain several turns after the last stoppage, while the resume anchor intentionally points back to the last timeout, player foul-out, or quarter-break lineup return. Showing the normal game document behind the modal makes the court appear to have the wrong score, clock, fouls, or stat panels.
+
+Rules:
+
+- If `active_resume=true` or `resume_from_anchor=true`, `loadGameStats.js` first calls `/api/game/{game_id}/resume-state`.
+- If that endpoint returns `status: "stoppage_anchor"`, the returned anchor payload paints:
+  - scoreboard scores
+  - game clock
+  - quarter label
+  - shot clock when available
+  - timeout/foul header state
+  - player stat panels
+  - team stat panels
+- Only non-resume page loads should prefer `/api/game/{game_id}` for initial court stats.
+- `bootGame.js` also applies the compact anchor score/clock values through `applyResumeStateToCourtChrome(resumeState)` so the modal chrome cannot show stale values while the full stat panels hydrate.
+
+Backend support:
+
+- `/api/game/{game_id}/resume-state` returns a game-state-shaped anchor payload, not just a modal summary.
+- The payload includes the anchor `score`, `teams`, `home_team`, `away_team`, `box_score`, `team_totals`, `team_stats`, `team_scoreboard_meta`, `fouls`, `timeouts`, `clock`, and `shot_clock_remaining`.
+- Name-keyed score and box-score entries are included for compatibility with the existing court renderer.
 
 ## Browser Close / Later Return Flow
 
@@ -321,6 +350,13 @@ Used by:
 - `gameScene.js`
 - `/api/simulate-quarter`
 
+Lifecycle rule:
+
+- `resume_from_anchor=true` is a one-shot restore flag.
+- After the first successful `/api/simulate-quarter` response from that anchor, `gameScene.js` removes `resume_from_anchor` and `active_resume` from the browser URL and sets `resume_from_timeout=false`.
+- On the same successful backend save, `/api/simulate-quarter` unsets `game.resume_anchor`.
+- This prevents a stale anchor, for example `Q1 2:36`, from being restored again after the user later reaches the next quarter break or lineup return.
+
 ### `resume_from_timeout=true`
 
 Preserves the existing timeout/foul-out restart path when the anchor's next play is a timeout-style restart.
@@ -348,11 +384,13 @@ When `/api/simulate-quarter` receives `resume_from_anchor=true`:
 5. It sets `resume_from_timeout` if the snapshot includes a timeout next play.
 6. It drops any stale `ongoing_games` cache entry for that game.
 7. If a saved game document is loaded later in the function, the saved document is replaced with the anchor snapshot before constructing the `GameManager`.
+8. After a successful save, the consumed `resume_anchor` is removed from the game document.
 
 Relevant logs:
 
 - `[RESUME-ANCHOR-LOAD]`
 - `[RESUME-ANCHOR-RESTORE]`
+- `[RESUME-ANCHOR-CONSUME]`
 - `[TIMEOUT TRACE] simulate-quarter loaded-timeout`
 
 ## Frontend Court Load Guard

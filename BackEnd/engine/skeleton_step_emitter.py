@@ -863,7 +863,15 @@ def build_skeleton_animation_steps(
     # already at step 0 position and in frontcourt, nothing prepends. The
     # ``turn_type`` parameter scopes this to HCO; FCP turns skip the
     # orchestrator (their entry seam is the BIP setup positions path).
-    is_hco_turn = (turn_type == "HCO") and isinstance(prior_turn, dict)
+    # Final Turn carries its own alignment + pass/shoot skeleton; skip the
+    # generic HCO entry orchestrator (Handoff/Kickout/Walk Up) so step 0
+    # seeds from prior_final_coords and ball ownership stays on the live
+    # handler until the skeleton pass step fires.
+    is_hco_turn = (
+        (turn_type == "HCO")
+        and isinstance(prior_turn, dict)
+        and not turn_result.get("final_turn")
+    )
     if is_hco_turn:
         prior_final_coords = _normalize_player_coord_map(
             prior_turn.get("final_coords") or {}
@@ -1232,6 +1240,19 @@ def build_skeleton_animation_steps(
             {"owner_player_id": owner_id_end} if owner_id_end
             else {"owner_player_id": bh_id_fallback}
         )
+
+        # Final Turn step 0: keep the live prior-turn ball owner on the
+        # attached ball at step start (not the skeleton step-0 handler).
+        # Step 1+ pass/receive moves ownership when BH ≠ shooter.
+        if (
+            i == 0
+            and reset_count == 0
+            and turn_result.get("final_turn")
+            and isinstance(prior_turn, dict)
+        ):
+            prior_owner = _resolve_prior_ball_handler_id(prior_turn, turn_result)
+            if prior_owner:
+                ball_start = {"owner_player_id": prior_owner}
 
         # Detect pass step (ball ownership transfer) early — used both by
         # gate selection (FCP) and by the later ball_motion_style /

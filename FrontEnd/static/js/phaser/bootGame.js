@@ -434,6 +434,25 @@ function applyResumeStateToUrl(resumeState) {
   });
 }
 
+function applyResumeStateToCourtChrome(resumeState) {
+  if (!resumeState || typeof document === 'undefined') return;
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  const clockEl = document.getElementById('game-clock');
+  const quarterEl = document.getElementById('quarter');
+  const shotClockEl = document.getElementById('shot-clock');
+  const resumeQuarter = Number(resumeState.quarter) || quarter || 1;
+  const period = resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`;
+
+  if (homeScoreEl && resumeState.home_score != null) homeScoreEl.textContent = String(resumeState.home_score);
+  if (awayScoreEl && resumeState.away_score != null) awayScoreEl.textContent = String(resumeState.away_score);
+  if (clockEl && resumeState.clock) clockEl.textContent = String(resumeState.clock);
+  if (quarterEl) quarterEl.textContent = period;
+  if (shotClockEl && resumeState.shot_clock_remaining != null) {
+    shotClockEl.textContent = String(resumeState.shot_clock_remaining);
+  }
+}
+
 /**
  * Show scrolling text popup with shot results during Sim Quarter
  * @param {Object} lastSummary - Game summary from backend with turns array
@@ -2719,7 +2738,7 @@ async function initGame() {
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   let activeResume = urlParams.get('active_resume') === 'true';
   let resumeState = null;
-  if (gameId && !resumeFromTimeout) {
+  if (gameId && (activeResume || !resumeFromTimeout)) {
     try {
       const resumeStateResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
@@ -2727,6 +2746,9 @@ async function initGame() {
       if (resumeStateResponse.ok) {
         resumeState = await resumeStateResponse.json();
         activeResume = !!(resumeState && resumeState.status === 'stoppage_anchor');
+        if (activeResume) {
+          applyResumeStateToCourtChrome(resumeState);
+        }
       }
     } catch (error) {
       console.warn('⚠️ [COURT RESUME] Could not check resume-state:', error);
@@ -2772,6 +2794,9 @@ async function initGame() {
               resumeGameButton.textContent = state && state.status === 'stoppage_anchor' ? 'Resume Game' : 'Resume Unavailable';
             }
             resumeState = state;
+            if (state && state.status === 'stoppage_anchor') {
+              applyResumeStateToCourtChrome(state);
+            }
           })
           .catch(() => {
             if (resumeGameSubtitle) {

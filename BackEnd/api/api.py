@@ -2356,6 +2356,50 @@ try:
             status = "pregame"
 
         home_lineup, away_lineup = _extract_saved_lineups(source)
+        home_team_name = home_row.get("name") or home_team.get("name")
+        away_team_name = away_row.get("name") or away_team.get("name")
+
+        score = source.get("score") if isinstance(source.get("score"), dict) else {}
+        score = dict(score)
+        if home_team_name:
+            score[home_team_name] = home_score
+        if away_team_name:
+            score[away_team_name] = away_score
+
+        box_score = source.get("box_score") if isinstance(source.get("box_score"), dict) else {}
+        box_score = dict(box_score)
+        if home_team_id and home_team_id not in box_score and isinstance(home_row.get("box_score"), dict):
+            box_score[home_team_id] = home_row.get("box_score") or {}
+        if away_team_id and away_team_id not in box_score and isinstance(away_row.get("box_score"), dict):
+            box_score[away_team_id] = away_row.get("box_score") or {}
+        if home_team_name and home_team_name not in box_score:
+            if home_team_id and isinstance(box_score.get(home_team_id), dict):
+                box_score[home_team_name] = box_score.get(home_team_id) or {}
+            elif isinstance(home_team.get("box_score"), dict):
+                box_score[home_team_name] = home_team.get("box_score") or {}
+        if away_team_name and away_team_name not in box_score:
+            if away_team_id and isinstance(box_score.get(away_team_id), dict):
+                box_score[away_team_name] = box_score.get(away_team_id) or {}
+            elif isinstance(away_team.get("box_score"), dict):
+                box_score[away_team_name] = away_team.get("box_score") or {}
+
+        team_totals = source.get("team_totals") if isinstance(source.get("team_totals"), dict) else {}
+        team_totals = dict(team_totals)
+        if home_team_name and home_team_name not in team_totals:
+            if isinstance(home_row.get("totals"), dict):
+                team_totals[home_team_name] = home_row.get("totals") or {}
+            elif isinstance(home_team.get("totals"), dict):
+                team_totals[home_team_name] = home_team.get("totals") or {}
+        if away_team_name and away_team_name not in team_totals:
+            if isinstance(away_row.get("totals"), dict):
+                team_totals[away_team_name] = away_row.get("totals") or {}
+            elif isinstance(away_team.get("totals"), dict):
+                team_totals[away_team_name] = away_team.get("totals") or {}
+
+        team_stats = source.get("team_stats") if isinstance(source.get("team_stats"), dict) else {}
+        team_scoreboard_meta = source.get("team_scoreboard_meta") if isinstance(source.get("team_scoreboard_meta"), dict) else {}
+        fouls = source.get("fouls") if isinstance(source.get("fouls"), dict) else {}
+        timeouts = source.get("timeouts") if isinstance(source.get("timeouts"), dict) else {}
 
         return {
             "game_id": str(normalized_game_id or game_id),
@@ -2366,10 +2410,23 @@ try:
             "time_remaining": time_remaining,
             "home_team_id": home_team_id,
             "away_team_id": away_team_id,
-            "home_team_name": home_row.get("name") or home_team.get("name"),
-            "away_team_name": away_row.get("name") or away_team.get("name"),
+            "home_team_name": home_team_name,
+            "away_team_name": away_team_name,
             "home_score": home_score,
             "away_score": away_score,
+            "score": score,
+            "teams": teams_obj,
+            "home_team": home_team,
+            "away_team": away_team,
+            "box_score": box_score,
+            "team_totals": team_totals,
+            "team_stats": team_stats,
+            "team_scoreboard_meta": team_scoreboard_meta,
+            "fouls": fouls,
+            "timeouts": timeouts,
+            "home_team_timeouts": source.get("home_team_timeouts"),
+            "away_team_timeouts": source.get("away_team_timeouts"),
+            "shot_clock_remaining": source.get("shot_clock_remaining"),
             "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or source.get("timeout_next_play_type")),
             "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or source.get("timeout_next_play_type"),
             "timeout_trace_id": resume_anchor.get("timeout_trace_id") or source.get("timeout_trace_id"),
@@ -4519,8 +4576,16 @@ try:
                 logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
             
             save_update = {"$set": db_summary}
-            if is_final:
+            if is_final or body.resume_from_anchor:
                 save_update["$unset"] = {"resume_anchor": ""}
+                if body.resume_from_anchor and not is_final:
+                    logging.warning(
+                        "🧭 [RESUME-ANCHOR-CONSUME] cleared used anchor game_id=%s quarter=%s clock=%s time_remaining=%s",
+                        game_id,
+                        db_summary.get("quarter"),
+                        db_summary.get("clock"),
+                        db_summary.get("time_remaining"),
+                    )
             games_collection.update_one({"_id": game_id_oid}, save_update, upsert=True)
 
             # Stash the user's coaching archetype for this period (franchise only).

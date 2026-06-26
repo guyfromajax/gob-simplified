@@ -10,14 +10,13 @@
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 37. Player Foul Out Next Step bug
 38 Fast Break, aninate defender back on pass
+39. Not playing SFX on blocks
 
 ##New Features
-24. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 28. Micro Movements
 109. More dynamic HCO animations for Set Plays
 103. Player images
 111. Marketing Screenshot Tool Build
-112. Nail court.html refresh behavior
 
 ##Full Product Readiness
 102. Team court images
@@ -30,6 +29,7 @@
 114. Better defense stat tracking
 116. User account -- link X & Facebook?
 117. More action on Signing Day
+118. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report

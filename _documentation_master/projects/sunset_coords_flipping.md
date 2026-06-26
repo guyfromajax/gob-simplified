@@ -11,8 +11,7 @@
 - Final Turn `oDestinations` and `dDestinations` now leave the backend in final
   display orientation.
 - Away-offense alignment uses the canonical `x_away = 100 - x_home` mirror.
-- `runFinalTurnAlignment()` renders backend coordinates directly and no longer
-  derives offense orientation or applies `101 - x`.
+- Final Turn **schema** alignment is skeleton step 0 in ``animation_steps[]`` (UESS playback from index 0). ``runFinalTurnAlignment()`` renders backend ``oDestinations`` / ``dDestinations`` directly (legacy fallback when schema steps are absent) and no longer derives offense orientation or applies ``101 - x``.
 - Deterministic tests assert home/away parity for offense alignment, defense
   alignment, representative MAKE/MISS variants, AIRBALL, and BLOCK endpoints.
 - The active schema shot path was traced before editing. Shooter endpoints,
@@ -136,8 +135,7 @@ The following locations are the initial audit targets in
 - Legacy inbound pressure defender setup: converted to render backend
   `dDestinations` directly; static formations and frontend flipping removed.
 - BIP general setup fallback: removed after backend payload and caller tracing.
-- Final Turn `runFinalTurnAlignment()`: converted to render backend
-  destinations directly; frontend orientation logic removed.
+- Final Turn alignment: **primary** animation is UESS ``animation_steps`` skeleton step 0 (backend archetypes + ``_step_t_floor_game_seconds`` hold). ``runFinalTurnAlignment()`` remains **legacy fallback** only when a Final Turn turn lacks schema steps; it renders backend ``oDestinations`` / ``dDestinations`` directly with no frontend orientation flip.
 
 ### Remaining frontend audit targets
 
@@ -300,9 +298,7 @@ the supplied coordinates.
 
 ### Final Turn
 
-Remove offense-team orientation detection and `flipCoords()` from
-`runFinalTurnAlignment()`. Iterate over backend `oDestinations` and
-`dDestinations`, convert grid coordinates to pixels, and animate.
+**Primary:** UESS ``animation_steps`` step 0 (backend-owned alignment + ``_step_t_floor_game_seconds``). **Legacy fallback:** remove offense-team orientation detection and ``flipCoords()`` from ``runFinalTurnAlignment()`` — iterate backend ``oDestinations`` / ``dDestinations``, convert grid to pixels, and animate.
 
 ### OREB kickout
 

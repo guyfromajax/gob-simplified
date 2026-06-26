@@ -327,29 +327,8 @@ export class AnimationEngine {
 
     if (isFinalTurnShot) {
       const { logEoqStep } = await import('../utils/eoqDebugLog.js');
-      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_alignment', 'START', turnData, context);
-      const { runFinalTurnAlignment } = await import('./turnAnimation.js');
-      await runFinalTurnAlignment({
-        scene: this.scene,
-        playerSprites: sprites,
-        ballSprite,
-        turnData,
-      });
-      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_alignment', 'END', turnData, context);
-      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_entry_pass', 'START', turnData, context);
-      await this._runFinalTurnStep0EntryPassIfNeeded(turnData, sprites, ballSprite);
-      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_entry_pass', 'END', turnData, context);
-      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_hold_until_shot_window', 'START', turnData, context);
-      await this._holdFinalTurnBallUntilShotWindow(turnData);
-      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_hold_until_shot_window', 'END', turnData, context);
-      if (steps.length > 1) {
-        stepsToPlay = steps.slice(1);
-      }
-      const { patchFinalTurnSchemaEntryStepFromAlignment } = await import('./turnAnimation.js');
-      patchFinalTurnSchemaEntryStepFromAlignment({
-        scene: this.scene,
-        stepsToPlay,
-        sprites,
+      logEoqStep(this.scene, 'FINAL_SHOT', 'schema_playback', 'START', turnData, context, {
+        animation_step_count: steps.length,
       });
     }
 
@@ -1850,28 +1829,21 @@ export class AnimationEngine {
   }
 
   /**
-   * Phase 4: Final Turn shot — tween offense/defense to oDestinations/dDestinations (alignment),
-   * then run standard shot animation (ShotAnimationSystem or playTurnAnimation).
+   * Final Turn shot — legacy handler registration only. Turns with
+   * ``animation_steps`` are rendered by ``runSchemaPlaybackTurn`` (pure UESS)
+   * before ``determineHandler`` runs; this path is the no-steps fallback.
    */
   async handleFinalTurnShot(turnData, context) {
-    const { logEoqStep } = await import('../utils/eoqDebugLog.js');
-    logEoqStep(this.scene, 'FINAL_SHOT', 'turn_animation', 'START', turnData, context);
-
-    const { runFinalTurnAlignment } = await import('./turnAnimation.js');
-    logEoqStep(this.scene, 'FINAL_SHOT', 'alignment', 'START', turnData, context);
-    await runFinalTurnAlignment({
-      scene: this.scene,
-      playerSprites: context.playerSprites,
-      ballSprite: context.ballSprite,
-      turnData
-    });
-    logEoqStep(this.scene, 'FINAL_SHOT', 'alignment', 'END', turnData, context);
-
-    logEoqStep(this.scene, 'FINAL_SHOT', 'hold_until_shot_window', 'START', turnData, context);
-    await this._holdFinalTurnBallUntilShotWindow(turnData);
-    logEoqStep(this.scene, 'FINAL_SHOT', 'hold_until_shot_window', 'END', turnData, context);
-
-    logEoqStep(this.scene, 'FINAL_SHOT', 'shot_animation', 'START', turnData, context);
+    if (await this.runSchemaPlaybackTurn(turnData, context)) {
+      if (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
+        this.scene._previousTurnWasShot = true;
+      }
+      return;
+    }
+    console.warn(
+      "AnimationEngine: Final Turn shot missing animation_steps — legacy fallback",
+      { turnIndex: turnData?.index ?? null, result_type: turnData?.result_type },
+    );
     if (this.shotSystem) {
       await this.shotSystem.processShot(turnData);
     } else {
@@ -1884,20 +1856,12 @@ export class AnimationEngine {
         ballSprite: context.ballSprite,
         onAction: context.onAction,
         turnIndex: context.turnIndex,
-        onUpdate: context.onUpdate
+        onUpdate: context.onUpdate,
       });
     }
-    logEoqStep(this.scene, 'FINAL_SHOT', 'shot_animation', 'END', turnData, context);
-    if (turnData.result_type === "MAKE" || turnData.result_type === "MISS" || turnData.result_type === "BLOCK") {
-      this.scene._previousTurnWasShot = true;
-    }
-    // Final play of quarter: hold ball at rim (make) or bounce (miss), announce "It's Good" on make, then quarter end (no BIP/rebound)
     if (turnData.quarter_ends_after) {
-      logEoqStep(this.scene, 'FINAL_SHOT', 'quarter_end_hold', 'START', turnData, context);
       await this._finishFinalTurnQuarterEnd(turnData, context);
-      logEoqStep(this.scene, 'FINAL_SHOT', 'quarter_end_hold', 'END', turnData, context);
     }
-    logEoqStep(this.scene, 'FINAL_SHOT', 'turn_animation', 'END', turnData, context);
   }
 
   async handleDefensiveStop(turnData, context) {
