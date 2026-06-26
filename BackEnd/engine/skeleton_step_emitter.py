@@ -365,11 +365,13 @@ def _append_final_turn_entry_pass_if_needed(
     elapsed_so_far: float,
 ) -> float:
     """After Final Turn alignment (schema step 0), pass from the live prior-turn
-    owner to the skeleton ball handler when they differ (common after SIP where
-    the inbound receiver is SG but Final Turn BH is often PG). Uses the
-    universal ``build_pass_step`` helper at ``PASS_GRID_SPOTS_PER_GAME_SECOND``.
+    owner to the skeleton ball handler when they differ (e.g. PG holds after SIP
+    but the skeleton drew SF/SG as BH). Uses the universal ``build_pass_step``
+    helper at ``PASS_GRID_SPOTS_PER_GAME_SECOND``.
     """
     if not turn_result.get("final_turn") or not steps or not isinstance(prior_turn, dict):
+        return elapsed_so_far
+    if turn_result.get("final_turn_include_entry_pass") is False:
         return elapsed_so_far
     prior_owner = _resolve_prior_ball_handler_id(prior_turn, turn_result)
     bh_id = _final_turn_skeleton_bh_id(skeleton_steps, off_lineup)
@@ -380,6 +382,8 @@ def _append_final_turn_entry_pass_if_needed(
     clock_r = clock_remaining_at_turn_start - elapsed_so_far
     shot_r = shot_clock_remaining_at_turn_start - elapsed_so_far
     try:
+        entry_index = len(steps)
+        skeleton_step_one_index = entry_index + 1
         entry = build_pass_step(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
@@ -388,15 +392,66 @@ def _append_final_turn_entry_pass_if_needed(
             receiver_id=str(bh_id),
             clock_remaining_at_start=clock_r,
             shot_clock_remaining_at_start=shot_r,
-            next_step_index=len(steps),
+            next_step_index=skeleton_step_one_index,
             pass_speed_grid_per_game_sec=float(PASS_GRID_SPOTS_PER_GAME_SECOND),
             metadata_reason="final_turn_entry_pass",
         )
     except ValueError:
         return elapsed_so_far
     entry.setdefault("start", {})["ball_motion_style"] = "pass"
+    # Defensive: ``build_pass_step`` must not point back at this step.
+    entry["end"]["next"] = {"kind": "next_step", "index": skeleton_step_one_index}
     steps.append(entry)
     return elapsed_so_far + float(entry["end"]["time_elapsed"])
+
+
+def _append_final_turn_walkup_if_needed(
+    *,
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+    prior_turn: Optional[Dict[str, Any]],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    animations: List[Dict[str, Any]],
+    clock_remaining_at_turn_start: float,
+    shot_clock_remaining_at_turn_start: float,
+    elapsed_so_far: float,
+) -> float:
+    """Bring the ball upcourt before Final Turn alignment when entering from BIP/SIP."""
+    if not turn_result.get("final_turn") or not turn_result.get("final_turn_include_walkup"):
+        return elapsed_so_far
+    if not isinstance(prior_turn, dict):
+        return elapsed_so_far
+    prior_final_coords = _normalize_player_coord_map(prior_turn.get("final_coords") or {})
+    if not prior_final_coords:
+        return elapsed_so_far
+    setup_coords = _coords_at_movement_index(animations, 0)
+    if not setup_coords:
+        return elapsed_so_far
+    bh_id = _resolve_prior_ball_handler_id(prior_turn, turn_result)
+    if not bh_id:
+        from BackEnd.engine.phase_resolution import get_ball_handler_from_skeleton
+
+        skeleton = turn_result.get("skeleton") or {}
+        bh_player = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=0)
+        if bh_player is not None:
+            pid = getattr(bh_player, "player_id", None)
+            bh_id = str(pid) if pid is not None else None
+    if not bh_id:
+        return elapsed_so_far
+    delta = _append_hco_minimum_entry_walkup(
+        steps=steps,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        prior_final_coords=prior_final_coords,
+        end_coords=setup_coords,
+        bh_id=str(bh_id),
+        clock_remaining_at_start=clock_remaining_at_turn_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_turn_start,
+        elapsed_so_far=elapsed_so_far,
+        metadata_reason="final_turn_entry_walkup",
+    )
+    return elapsed_so_far + delta
 
 
 # --- Per-step builders -----------------------------------------------------
@@ -895,6 +950,7 @@ def build_skeleton_animation_steps(
     steps: List[AnimationStep] = []
     elapsed_so_far = 0.0
     final_turn_entry_inserted = 0
+    final_turn_walkup_prepended = 0
 
     # =========================================================================
     # HCO Entry Orchestrator — dynamically determines whether to prepend
@@ -1209,11 +1265,27 @@ def build_skeleton_animation_steps(
         if prior_fc:
             hco_seed_coords = prior_fc
 
+    if turn_result.get("final_turn") and reset_count == 0:
+        before_walk = len(steps)
+        elapsed_so_far = _append_final_turn_walkup_if_needed(
+            steps=steps,
+            turn_result=turn_result,
+            prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            animations=animations,
+            clock_remaining_at_turn_start=clock_remaining_at_turn_start,
+            shot_clock_remaining_at_turn_start=shot_clock_remaining_at_turn_start,
+            elapsed_so_far=elapsed_so_far,
+        )
+        if len(steps) > before_walk:
+            final_turn_walkup_prepended = 1
+            hco_seed_coords = None
+
     for i in range(num_steps):
-        # When Reset prepended, skeleton step 0's start coords = Reset's last
-        # step end coords (so the schema's start-matches-prior-end contract
-        # holds across the seam).
-        if i == 0 and reset_count > 0:
+        # When Reset or Final Turn walk-up prepended, skeleton step 0's start
+        # coords = prior prepended step end coords.
+        if i == 0 and (reset_count > 0 or final_turn_walkup_prepended) and steps:
             start_coords = dict(steps[-1]["end"]["coords"])
         elif i == 0 and fcp_seed_coords:
             # FCP: step 0 starts from BIP-end (randomized setup). See

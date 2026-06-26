@@ -5518,15 +5518,44 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
                 step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
         skeleton = {"steps": [step0, step1, step2]}
-    # UESS pacing: step 0 alignment holds until ~3s (Outside) or ~4s (Attack)
-    # remain on the game clock before the pass/drive/shoot sequence. The
-    # emitter honors ``_step_t_floor_game_seconds`` over the generic HCO
-    # floor so players settle, then wait at destination for the hold beat.
-    time_remaining_sec = float(game_state.get("time_remaining") or 0)
-    late_target_sec = 4.0 if shot_type == "Attack" else 3.0
-    step0_floor = max(0.0, time_remaining_sec - late_target_sec)
-    if step0_floor > 0 and skeleton.get("steps"):
-        skeleton["steps"][0]["_step_t_floor_game_seconds"] = step0_floor
+    prior_turns = getattr(game, "turns", None) or []
+    prior_turn = prior_turns[-1] if prior_turns else None
+    from BackEnd.engine.final_turn_pacing import (
+        apply_step0_hold_floor,
+        evaluate_final_turn_pacing,
+    )
+
+    pacing = evaluate_final_turn_pacing(
+        game,
+        skeleton=skeleton,
+        o_destinations=o_destinations,
+        position_to_spot=position_to_spot,
+        bh_pos=bh_pos,
+        shooter_pos=shooter_pos,
+        shot_type=shot_type,
+        bh_is_shooter=bh_is_shooter,
+        prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
+    )
+    log_eoq_step(
+        game,
+        "FINAL_SHOT",
+        "pacing_preflight",
+        "END",
+        shooter=shooter,
+        shooter_pos=shooter_pos,
+        extra={
+            "can_meet_anchor": pacing.can_meet_anchor,
+            "reason": pacing.reason,
+            "step0_hold_floor": pacing.step0_hold_floor,
+            "include_entry_pass": pacing.include_entry_pass,
+            "include_walkup": pacing.include_walkup,
+            "anchor_clock": pacing.anchor_clock,
+        },
+    )
+    if not pacing.can_meet_anchor:
+        return {"route_flss": True, "flss_reason": pacing.reason}
+
+    apply_step0_hold_floor(skeleton, pacing.step0_hold_floor)
     log_eoq_step(
         game,
         "FINAL_SHOT",
@@ -5574,6 +5603,9 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     shot_result["dDestinations"] = d_destinations
     shot_result["skeleton"] = skeleton
     shot_result["final_turn"] = True
+    shot_result["final_turn_include_entry_pass"] = pacing.include_entry_pass
+    shot_result["final_turn_include_walkup"] = pacing.include_walkup
+    shot_result["final_turn_anchor_clock"] = pacing.anchor_clock
     # Player Momentum: flag a made Final Shot so the next break reset adds the
     # Final-Shot bonus on top of the reset (Player_Momentum_System.md).
     if shot_result.get("result_type") == "MAKE":

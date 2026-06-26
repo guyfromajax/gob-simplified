@@ -96,13 +96,6 @@ describe('AnimationEngine', () => {
       expect(engine._isFinalTurnSchemaShot({ final_turn: true, result_type: 'FINAL_HOLD' })).toBe(false);
       expect(engine._isFinalTurnSchemaShot({ final_turn: false, result_type: 'MISS' })).toBe(false);
     });
-
-    test('_getFinalTurnShotWindowTargetSec uses 3 outside and 4 attack', async () => {
-      await expect(engine._getFinalTurnShotWindowTargetSec({ offensive_playcall: 'Outside' }))
-        .resolves.toBe(3);
-      await expect(engine._getFinalTurnShotWindowTargetSec({ offensive_playcall: 'Attack' }))
-        .resolves.toBe(4);
-    });
   });
 
   describe('Shot Attempt Detection', () => {

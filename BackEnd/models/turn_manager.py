@@ -1471,33 +1471,6 @@ class TurnManager:
             else:
                 result = self._build_shot_clock_violation_result(state)
                 low_clock_branch = "SHOT_CLOCK_LE_0_VIOLATION"
-        elif state in clock_enforced_states and game_clock_remaining <= 1:
-            if sl.would_take_final_shot(self.game, game_clock_remaining):
-                from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
-                from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
-
-                log_eoq_routing_decision(
-                    self.game,
-                    branch="GAME_CLOCK_LE_1_FLSS",
-                    game_clock_remaining=game_clock_remaining,
-                    would_final_shot=True,
-                )
-                log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state})
-                result = resolve_flss_shot_logic(self.game, state)
-                result["forced_shot"] = True
-                result["forced_shot_reason"] = "FLSS"
-                log_eoq_step(
-                    self.game,
-                    "FLSS",
-                    "resolve_flss",
-                    "END",
-                    extra={
-                        "result_type": result.get("result_type"),
-                        "flss_zone": result.get("flss_zone"),
-                        "shooter_id": result.get("shooter_id"),
-                    },
-                )
-                low_clock_branch = "GAME_CLOCK_LE_1_FLSS"
         elif state in clock_enforced_states and shot_clock_remaining <= 1:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
@@ -3436,19 +3409,6 @@ class TurnManager:
             if anim_steps is None:
                 return
             result["animation_steps"] = anim_steps
-            # Skip the schema-burn time_elapsed override for Final Shot / FLSS —
-            # those turns deliberately burn the entire remaining quarter
-            # clock (``time_remaining``) or a fixed 1s terminal tick.
-            if result.get("final_turn") is True or result.get("flss") is True:
-                return
-            # Align result["time_elapsed"] with the schema's total
-            # game-clock burn for MAKE/MISS/BLOCK. The legacy
-            # step_clock_seconds-based time_elapsed counts only
-            # skeleton-step durations; the [ball_flight] + [bounce]
-            # sub-steps add ball-arc + bounce game-sec that must
-            # also decrement the game clock (shot clock is pinned
-            # across those sub-steps — handled separately via
-            # ``_shot_detach_elapsed_seconds``).
             result_type_for_te = (result.get("result_type") or "").upper()
             if result_type_for_te in ("MAKE", "MISS", "BLOCK") and anim_steps:
                 first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
@@ -3457,7 +3417,21 @@ class TurnManager:
                 cs_end = last_clock.get("clock_remaining")
                 if cs_start is not None and cs_end is not None:
                     schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
-                    result["time_elapsed"] = int(round(schema_game_burn))
+                    te = int(round(schema_game_burn))
+                    if result.get("final_turn") is True or result.get("flss") is True:
+                        te = max(1, te)
+                    result["time_elapsed"] = te
+            if result.get("final_turn") is True and not result.get("flss"):
+                from BackEnd.engine.final_turn_pacing import verify_animation_steps_anchor
+
+                shot_type = result.get("offensive_playcall") or result.get("current_playcall") or "Outside"
+                if anim_steps and not verify_animation_steps_anchor(anim_steps, str(shot_type)):
+                    logging.warning(
+                        "Final Turn anchor verification failed after emit "
+                        "(shot_type=%s, step_count=%s)",
+                        shot_type,
+                        len(anim_steps),
+                    )
         except Exception as e:
             logging.warning(
                 "build_skeleton_animation_steps (HCO) failed: %s", e
@@ -3489,6 +3463,38 @@ class TurnManager:
         result = resolve_final_turn_shot_logic(
             self.game, o_dest, d_dest, position_to_spot, bh_pos
         )
+        if isinstance(result, dict) and result.get("route_flss"):
+            from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
+            from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
+
+            log_eoq_routing_decision(
+                self.game,
+                branch="FINAL_SHOT_BUDGET_FLSS",
+                game_clock_remaining=self.game.game_state.get("time_remaining"),
+                would_final_shot=True,
+                extra={"flss_reason": result.get("flss_reason")},
+            )
+            log_eoq_step(
+                self.game,
+                "FLSS",
+                "resolve_flss",
+                "START",
+                extra={"reason": result.get("flss_reason"), "from": "final_turn_pacing"},
+            )
+            result = resolve_flss_shot_logic(self.game, "HCO")
+            log_eoq_step(
+                self.game,
+                "FLSS",
+                "resolve_flss",
+                "END",
+                extra={
+                    "result_type": result.get("result_type"),
+                    "flss_zone": result.get("flss_zone"),
+                    "shooter_id": result.get("shooter_id"),
+                },
+            )
+            self._emit_hco_animation_steps(result)
+            return result
         log_eoq_step(
             self.game,
             "FINAL_SHOT",
