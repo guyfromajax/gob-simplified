@@ -419,27 +419,6 @@ def evaluate_final_turn_pacing(
     can_meet = math.isclose(clock_at_anchor, anchor, abs_tol=ANCHOR_TOLERANCE_SEC) or clock_at_anchor >= anchor - ANCHOR_TOLERANCE_SEC
 
     include_entry_pass = needs_entry
-    if needs_entry and not can_meet:
-        # Retry budget without entry pass — treat live owner as BH for the rest.
-        retry_entry = 0.0
-        retry_budget = time_remaining - walkup_seconds - retry_entry - pre_anchor_move - anchor
-        if retry_budget >= alignment_seconds - 1e-6:
-            retry_hold = max(0.0, retry_budget)
-            retry_step0 = max(alignment_seconds, retry_hold)
-            retry_clock = time_remaining - walkup_seconds - retry_step0 - retry_entry - pre_anchor_move
-            if retry_clock >= anchor - ANCHOR_TOLERANCE_SEC:
-                return FinalTurnPacingPlan(
-                    can_meet_anchor=True,
-                    step0_hold_floor=retry_hold,
-                    include_entry_pass=False,
-                    include_walkup=include_walkup,
-                    anchor_clock=anchor,
-                    walkup_seconds=walkup_seconds,
-                    alignment_seconds=alignment_seconds,
-                    entry_pass_seconds=0.0,
-                    pre_anchor_move_seconds=pre_anchor_move,
-                    reason="entry_pass_omitted_for_anchor",
-                )
 
     if not can_meet:
         return FinalTurnPacingPlan(

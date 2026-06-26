@@ -125,3 +125,35 @@ def test_pacing_hold_floor_accounts_for_move_beats(monkeypatch):
 def test_attack_anchor_target_is_four_seconds():
     assert LATE_TARGET_ATTACK == 4.0
     assert LATE_TARGET_OUTSIDE == 3.0
+
+
+def test_pacing_does_not_omit_required_entry_pass_for_anchor():
+    """When live owner != skeleton BH, never skip entry pass to salvage anchor."""
+    prior = {
+        "final_ball_handler_id": "home_PF",
+        "final_coords": {
+            f"home_{pos}": {"x": 50.0, "y": 25.0} for pos in POSITIONS
+        },
+    }
+    game = _game(time_remaining=8, prior_turn=prior)
+    o_dest = {pos: {"x": 64 + i, "y": 25} for i, pos in enumerate(POSITIONS)}
+    plan = evaluate_final_turn_pacing(
+        game,
+        skeleton={
+            "steps": [
+                {"pos_actions": {"PG": {"action": "handle_ball", "location": "deep upper wing"}}},
+                {"pos_actions": {"PG": {"action": "pass", "location": "deep key"}, "SG": {"action": "receive", "location": "upper wing"}}},
+                {"pos_actions": {"SG": {"action": "shoot", "location": "upper wing"}}},
+            ]
+        },
+        o_destinations=o_dest,
+        position_to_spot={pos: "deep upper wing" for pos in POSITIONS},
+        bh_pos="PG",
+        shooter_pos="SG",
+        shot_type="Outside",
+        bh_is_shooter=False,
+        prior_turn=prior,
+    )
+    assert plan.reason != "entry_pass_omitted_for_anchor"
+    if plan.can_meet_anchor:
+        assert plan.include_entry_pass is True

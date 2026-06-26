@@ -1338,6 +1338,11 @@ def build_skeleton_animation_steps(
             final_turn_walkup_prepended = 1
             hco_seed_coords = None
 
+    # All prepended steps (Reset, Final Turn walk-up) shift skeleton indices in
+    # the emitted ``animation_steps`` array. Capture once here — walk-up is
+    # appended after ``reset_count`` is set above.
+    skeleton_base_index = len(steps)
+
     for i in range(num_steps):
         # When Reset or Final Turn walk-up prepended, skeleton step 0's start
         # coords = prior prepended step end coords.
@@ -1641,7 +1646,7 @@ def build_skeleton_animation_steps(
             entry_offset = final_turn_entry_inserted if i > 0 else 0
             next_step = {
                 "kind": "next_step",
-                "index": i + 1 + reset_count + entry_offset,
+                "index": skeleton_base_index + i + 1 + entry_offset,
             }
         else:
             next_step = _resolve_final_step_next(turn_result)

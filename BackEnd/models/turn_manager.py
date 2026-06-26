@@ -3544,9 +3544,17 @@ class TurnManager:
         off_team = game.offense_team
         off_lineup = off_team.lineup
         is_away_offense = off_team.team_id == game.away_team.team_id
-        # Ball handler position: 60% PG, 30% SG, 10% SF
-        r = random.random()
-        bh_pos = "PG" if r < 0.60 else ("SG" if r < 0.90 else "SF")
+        from BackEnd.utils.shared import get_player_position
+
+        # Prefer the live ball handler when they are a perimeter spot; otherwise
+        # draw a setup BH (60% PG / 30% SG / 10% SF) for variety.
+        live_bh = game.game_state.get("last_ball_handler")
+        live_bh_pos = get_player_position(off_lineup, live_bh) if live_bh else None
+        if live_bh_pos in ("PG", "SG", "SF"):
+            bh_pos = live_bh_pos
+        else:
+            r = random.random()
+            bh_pos = "PG" if r < 0.60 else ("SG" if r < 0.90 else "SF")
         # Deep wings (random order for PG/SG)
         wings = ["deep upper wing", "deep lower wing"]
         random.shuffle(wings)
