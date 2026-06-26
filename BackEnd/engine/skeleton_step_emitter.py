@@ -2270,7 +2270,7 @@ def _build_post_shot_sub_steps(
     # `announceGameEvent('BLOCK')` in ShotAnimationSystem that the schema
     # short-circuit skips (audit bug 4). Blocker is on the defensive team
     # → opposite of `away_offense`.
-    if result_type == "BLOCK":
+    if result_type == "BLOCK" and not turn_result.get("foul_block_contact"):
         blocker_id = turn_result.get("blocker_id")
         if blocker_id:
             flight_step["end"]["announcement"] = {
@@ -2279,6 +2279,7 @@ def _build_post_shot_sub_steps(
                 "hold_ms": 1000,
                 "style": "primary",
                 "player_data": {"playerId": str(blocker_id)},
+                "meta": {"sfx": "block_announce"},
             }
     elif is_airball:
         airball_ann = _airball_announcement(turn_result, away_offense)

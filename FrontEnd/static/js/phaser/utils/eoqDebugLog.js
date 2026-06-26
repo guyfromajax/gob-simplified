@@ -2,19 +2,16 @@
  * Frontend step tracing for Final Shot and FLSS.
  * Filter browser console with: EOQ-TRACE
  *
- * Disable with: window.GOB_EOQ_TRACE = false
+ * On by default. Disable with: window.GOB_EOQ_TRACE = false
  */
 
 import { pixelsToGrid } from './gridToPixels.js';
 
-export function isEoqTraceEnabled(scene) {
+export function isEoqTraceEnabled(_scene) {
   if (typeof window !== 'undefined' && window.GOB_EOQ_TRACE === false) {
     return false;
   }
-  if (typeof window !== 'undefined' && window.GOB_EOQ_TRACE === true) {
-    return true;
-  }
-  return !scene?.simData?._is_full_simulation;
+  return true;
 }
 
 function roundCoord(n) {

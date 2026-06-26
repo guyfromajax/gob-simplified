@@ -2,7 +2,7 @@
 Structured step tracing for Final Shot and FLSS (EOQ perfection debugging).
 
 All messages use the prefix [EOQ-TRACE] for easy filtering in server logs.
-Disabled during full simulations unless game_state['eoq_trace'] is explicitly True.
+On by default. Disable with game_state['eoq_trace'] = False (e.g. bulk sims).
 """
 
 from __future__ import annotations
@@ -20,11 +20,7 @@ _TRACE_PREFIX = "[EOQ-TRACE]"
 
 def is_eoq_trace_enabled(game) -> bool:
     gs = getattr(game, "game_state", None) or {}
-    if gs.get("eoq_trace") is False:
-        return False
-    if gs.get("eoq_trace") is True:
-        return True
-    return not bool(gs.get("_is_full_simulation"))
+    return gs.get("eoq_trace") is not False
 
 
 def snapshot_time(game) -> Dict[str, Any]:
