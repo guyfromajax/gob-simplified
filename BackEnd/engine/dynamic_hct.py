@@ -861,9 +861,8 @@ def _select_pass_receiver(
     """§6 pass: the ball goes to one of the two teammates closest to the BH
     (chosen at random between those two).
 
-    Over-and-back is detected after the pass completes (see the main loop).
-
-    ``exclude`` drops positions from the pool (FCP: SF still at the BIP spot).
+    Over-and-back: detected after the pass completes via ``over_and_back`` (see
+    FCP pre-pass awareness gate). ``exclude`` drops positions from the pool.
     """
     skip = {bh_pos} | set(exclude or ())
     others = [p for p in POSITIONS if p not in skip]
@@ -2705,6 +2704,61 @@ def compute_dynamic_hct_turn(
         """
         off_targets[pos] = dict(off_coords[pos])
 
+    def _execute_hold_beat(
+        hold_label: str = "hold (BH holds the ball 1-2s while the defense closes)",
+    ) -> str:
+        """§5 hold resolution. Returns ``"break"`` or ``"continue"`` for the outer loop."""
+        nonlocal result_type, text_suffix
+        hold_snap_off, hold_snap_def = _snap_loop_coords()
+        hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
+        _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
+        _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
+        _append_loop_segment(
+            "hct_hold",
+            hold_seconds,
+            ("off", bh_pos),
+            bh_pos,
+            hold_label,
+            snap_off=hold_snap_off,
+            snap_def=hold_snap_def,
+        )
+        shot_clock -= hold_seconds
+
+        moment2, in_range2 = play.detect_moment(bh_xy, def_coords, is_away_offense)
+        if moment2 == "trap":
+            outcome, score_ratio, credited = _resolve_attack("trap", in_range2)
+            if _apply_moment_outcome(
+                outcome, score_ratio, credited, context="two-defender trap (after hold)"
+            ):
+                _stamp_reach_in()
+                return "break"
+            _advance(label="advance (BH beats the two-defender trap after hold)")
+            _stamp_reach_in()
+            shot_clock -= loop_segments[-1]["seconds"]
+            return "continue"
+        if moment2 == "none":
+            if dribble_alive:
+                status = _do_broken_hct_cutoff()
+                if status == "FAST_BREAK":
+                    result_type = "FAST_BREAK_SHOT"
+                    text_suffix = " open floor — fast break!"
+                    return "break"
+                if status == "HCO":
+                    result_type = "HCO"
+                    text_suffix = " open floor — they break the trap & establish their half court offense"
+                    return "break"
+                if status == "TERMINAL":
+                    return "break"
+            return "continue"
+        outcome, score_ratio, credited = _resolve_attack("pressure", in_range2)
+        terminal = _apply_moment_outcome(
+            outcome, score_ratio, credited, context="single-defender pressure (after hold)"
+        )
+        _stamp_reach_in()
+        if terminal:
+            return "break"
+        return "continue"
+
     # --- §4 loop ------------------------------------------------------------
     for _ in range(MAX_LOOP_ITERATIONS):
         frontcourt_established = frontcourt_established or _crossed_half_court(
@@ -2792,76 +2846,15 @@ def compute_dynamic_hct_turn(
             continue
 
         if decision == "hold":
-            # §5 hold resolution: BH holds the ball for random(1,2)s while the
-            # defense keeps closing. Outcome depends on what reaches the BH.
-            hold_snap_off, hold_snap_def = _snap_loop_coords()
-            hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
-            # D15: defense keeps closing during the hold at its own rate.
-            _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
-            # D15b: off-ball offense keep hustling toward their setup spots.
-            _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
-            _append_loop_segment(
-                "hct_hold",
-                hold_seconds,
-                ("off", bh_pos),
-                bh_pos,
-                "hold (BH holds the ball 1-2s while the defense closes)",
-                snap_off=hold_snap_off,
-                snap_def=hold_snap_def,
-            )
-            shot_clock -= hold_seconds
-
-            moment2, in_range2 = play.detect_moment(bh_xy, def_coords, is_away_offense)
-            if moment2 == "trap":
-                # A second defender arrived during the hold → Trap Moment.
-                outcome, score_ratio, credited = _resolve_attack("trap", in_range2)
-                if _apply_moment_outcome(
-                    outcome, score_ratio, credited, context="two-defender trap (after hold)"
-                ):
-                    _stamp_reach_in()  # tag the terminal stopper/dead-ball segment
-                    break
-                _advance(label="advance (BH beats the two-defender trap after hold)")
-                _stamp_reach_in()  # tag the beaten-trap advance segment
-                shot_clock -= loop_segments[-1]["seconds"]
-                continue
-            if moment2 == "none":
-                # No defender reached the BH before the window elapsed.
-                if dribble_alive:
-                    # Broken-HCT cutoff race (D21).
-                    status = _do_broken_hct_cutoff()
-                    if status == "FAST_BREAK":
-                        result_type = "FAST_BREAK_SHOT"
-                        text_suffix = " open floor — fast break!"
-                        break
-                    if status == "HCO":
-                        result_type = "HCO"
-                        text_suffix = " open floor — they break the trap & establish their half court offense"
-                        break
-                    if status == "TERMINAL":
-                        break
-                # Dribble-dead (can't drive) or RETAIN → re-read (pass/hold)
-                # next iteration; everyone kept moving during the hold beat, so a
-                # defender will eventually reach him.
-                continue
-            # Pressure (single defender reached the holding BH): D8 unifies the
-            # hold contest with the attribute-driven moment model (same engine as
-            # Attack). Terminal outcomes end the turn; otherwise the BH retains
-            # and we re-read next iteration.
-            outcome, score_ratio, credited = _resolve_attack("pressure", in_range2)
-            terminal = _apply_moment_outcome(
-                outcome, score_ratio, credited, context="single-defender pressure (after hold)"
-            )
-            # Terminal → tag the stopper segment; non-terminal (BH retains, no
-            # advance segment here) → tag the hold beat so the reach-in renders
-            # during the hold the defender pressured.
-            _stamp_reach_in()
-            if terminal:
+            if _execute_hold_beat() == "break":
                 break
             continue
 
         # decision == "pass" → §6 pass branch. The ball goes to one of the two
         # teammates closest to the BH; the receiver becomes the new ball handler
         # and the loop continues from him (enables a non-PG HCT-end BH → D7).
+        from BackEnd.engine.over_and_back import is_over_and_back_pass
+
         pass_exclude: Optional[set] = None
         if turn_mode == "fcp":
             from BackEnd.engine.fcp_inbound_release import sf_cleared_for_fcp_pass
@@ -2872,6 +2865,22 @@ def compute_dynamic_hct_turn(
         receiver_pos = _select_pass_receiver(
             bh_pos, off_coords, is_away_offense, exclude=pass_exclude
         )
+        if turn_mode == "fcp":
+            from BackEnd.engine.over_and_back import passer_commits_over_and_back_pass
+
+            if (
+                is_over_and_back_pass(
+                    frontcourt_established,
+                    off_coords[receiver_pos],
+                    is_away_offense,
+                )
+                and not passer_commits_over_and_back_pass(ball_handler)
+            ):
+                if _execute_hold_beat(
+                    "hold (BH reads over-and-back, keeps the dribble)"
+                ) == "break":
+                    break
+                continue
         passer_pos = bh_pos
         # Once he passes, the ex-BH is off-ball — freeze him so the stale x=44
         # setup pull doesn't drag him back across half court.
@@ -2968,8 +2977,8 @@ def compute_dynamic_hct_turn(
         loop_segments.append(pass_seg)
         shot_clock -= pass_seconds
 
-        if frontcourt_established and _in_backcourt(
-            off_coords[receiver_pos]["x"], is_away_offense
+        if is_over_and_back_pass(
+            frontcourt_established, off_coords[receiver_pos], is_away_offense
         ):
             result_type = "DEAD BALL"
             turnover_type = "OVER_BACK"

@@ -985,6 +985,14 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
 
     home_score = int((home_row or home_team).get("score", source_doc.get("home_score", game_doc.get("home_score", 0))) or 0)
     away_score = int((away_row or away_team).get("score", source_doc.get("away_score", game_doc.get("away_score", 0))) or 0)
+    resume_from_timeout = bool(
+        resume_anchor.get("resume_from_timeout")
+        or source_doc.get("timeout_next_play_type")
+        or game_doc.get("timeout_next_play_type")
+    )
+    anchor_type = resume_anchor.get("anchor_type") if resume_anchor else None
+    if resume_anchor and not anchor_type:
+        anchor_type = "timeout" if resume_from_timeout else "quarter_break"
     has_started = (
         quarter > 1
         or time_remaining < 480
@@ -1026,14 +1034,16 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "away_score": away_score,
         "user_team_side": "home" if user_team_id_str == home_id else "away",
         "status": "stoppage_anchor" if resume_anchor else "active_mid_quarter",
-        "resume_from_timeout": bool(resume_anchor.get("resume_from_timeout") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type")),
+        "anchor_type": anchor_type,
+        "resume_from_timeout": resume_from_timeout,
         "timeout_next_play_type": resume_anchor.get("timeout_next_play_type") or source_doc.get("timeout_next_play_type") or game_doc.get("timeout_next_play_type"),
         "timeout_trace_id": resume_anchor.get("timeout_trace_id") or source_doc.get("timeout_trace_id") or game_doc.get("timeout_trace_id"),
     }
     logger.warning(
-        "🧭 [MODE-RESUME-RETURN] game_id=%s status=%s quarter=%s clock=%s time_remaining=%s away_score=%s home_score=%s resume_from_timeout=%s next_play=%s",
+        "🧭 [MODE-RESUME-RETURN] game_id=%s status=%s type=%s quarter=%s clock=%s time_remaining=%s away_score=%s home_score=%s resume_from_timeout=%s next_play=%s",
         payload.get("game_id"),
         payload.get("status"),
+        payload.get("anchor_type"),
         payload.get("quarter"),
         payload.get("clock"),
         payload.get("time_remaining"),

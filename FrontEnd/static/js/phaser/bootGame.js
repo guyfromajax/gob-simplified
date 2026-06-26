@@ -399,6 +399,7 @@ function applyResumeStateToUrl(resumeState) {
   params.set('period', periodLabel);
   params.set('resume_from_timeout', resumeState.resume_from_timeout ? 'true' : 'false');
   params.set('resume_from_anchor', 'true');
+  if (resumeState.anchor_type) params.set('anchor_type', resumeState.anchor_type);
   params.delete('active_resume');
   if (resumeState.clock) params.set('clock', resumeState.clock);
   if (resumeState.timeout_trace_id) params.set('timeout_trace_id', resumeState.timeout_trace_id);
@@ -420,6 +421,7 @@ function applyResumeStateToUrl(resumeState) {
     time_remaining: resumeState.time_remaining,
     home_score: resumeState.home_score,
     away_score: resumeState.away_score,
+    anchor_type: resumeState.anchor_type || null,
     resume_from_timeout: !!resumeState.resume_from_timeout,
     timeout_next_play_type: resumeState.timeout_next_play_type || null,
   });
@@ -432,6 +434,62 @@ function applyResumeStateToUrl(resumeState) {
     if (homePid) homeLineup[pos] = String(homePid);
     if (awayPid) awayLineup[pos] = String(awayPid);
   });
+}
+
+function redirectQuarterBreakResumeToSetLineup(resumeState) {
+  if (!resumeState || typeof window === 'undefined') return false;
+  const resumeQuarter = Number(resumeState.quarter) || quarter || 1;
+  const helper = window.TimeoutNavigationHelper;
+  const sourceParams = new URLSearchParams(window.location.search);
+  const overrides = {
+    home: resumeState.home_team_name || sourceParams.get('home') || homeTeam,
+    away: resumeState.away_team_name || sourceParams.get('away') || awayTeam,
+    home_id: resumeState.home_team_id || sourceParams.get('home_id') || resumeState.home_team_name || homeTeam,
+    away_id: resumeState.away_team_id || sourceParams.get('away_id') || resumeState.away_team_name || awayTeam,
+    mode: sourceParams.get('mode') || mode,
+    my_team: sourceParams.get('my_team') || userTeamSide || 'home',
+    team_id: sourceParams.get('team_id') || teamId || '',
+    user_team_id: sourceParams.get('user_team_id') || sourceParams.get('team_id') || teamId || '',
+    franchise_id: sourceParams.get('franchise_id') || '',
+    tournament_id: sourceParams.get('tournament_id') || '',
+    week: sourceParams.get('week') || '',
+    home_score: resumeState.home_score,
+    away_score: resumeState.away_score
+  };
+  const targetGameId = resumeState.game_id || gameId || sourceParams.get('game_id');
+  let params;
+  if (helper && typeof helper.buildGameNavigationParams === 'function') {
+    params = helper.buildGameNavigationParams({
+      sourceParams,
+      targetQuarter: resumeQuarter,
+      gameId: targetGameId,
+      resumeFromTimeout: false,
+      lineup: {},
+      myTeamSide: overrides.my_team,
+      clock: resumeState.clock || sourceParams.get('clock'),
+      overrides
+    });
+  } else {
+    params = new URLSearchParams();
+    params.set('quarter', String(resumeQuarter));
+    params.set('period', resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`);
+    Object.entries(overrides).forEach(([key, value]) => {
+      if (value) params.set(key, String(value));
+    });
+    if (targetGameId) params.set('game_id', String(targetGameId));
+    params.set('resume_from_timeout', 'false');
+  }
+  params.set('quarter_break_from', 'mid_game_resume');
+  params.set('anchor_type', 'quarter_break');
+  params.delete('active_resume');
+  params.delete('resume_from_anchor');
+  console.warn('[RESUME-ANCHOR-CLIENT] routing quarter_break anchor to set-lineup', {
+    quarter: resumeQuarter,
+    clock: resumeState.clock,
+    game_id: targetGameId,
+  });
+  window.location.href = `/set-lineup.html?${params.toString()}`;
+  return true;
 }
 
 function applyResumeStateToCourtChrome(resumeState) {
@@ -2825,6 +2883,9 @@ async function initGame() {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
       if (resumeState) {
         applyResumeStateToUrl(resumeState);
+        if (resumeState.anchor_type === 'quarter_break' && redirectQuarterBreakResumeToSetLineup(resumeState)) {
+          return;
+        }
       } else if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
         params.delete('active_resume');

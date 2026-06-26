@@ -753,8 +753,11 @@ function buildActiveGameCourtUrl(resume) {
   params.set('period', formatResumePeriod(resume));
   params.set('resume_from_timeout', resume.resume_from_timeout ? 'true' : 'false');
   params.set('resume_from_anchor', 'true');
+  if (resume.anchor_type) params.set('anchor_type', resume.anchor_type);
   if (resume.week) params.set('week', String(resume.week));
   if (resume.clock) params.set('clock', resume.clock);
+  if (resume.home_score !== undefined && resume.home_score !== null) params.set('home_score', String(resume.home_score));
+  if (resume.away_score !== undefined && resume.away_score !== null) params.set('away_score', String(resume.away_score));
   if (resume.timeout_trace_id) params.set('timeout_trace_id', resume.timeout_trace_id);
   return './court.html?' + params.toString();
 }
