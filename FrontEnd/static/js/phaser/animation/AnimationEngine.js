@@ -1793,6 +1793,15 @@ export class AnimationEngine {
         shot_clock_remaining: 0,
       });
     }
+    const { playEndOfQuarterAirhorn } = await import('../utils/quarterEndAirhorn.js');
+    const clockStart = Number(
+      turnData?.clock_start ?? turnData?.clockStart ?? turnData?.time_elapsed ?? 0,
+    );
+    playEndOfQuarterAirhorn(this.scene, {
+      ...turnData,
+      clock_start: clockStart,
+      clock_end: 0,
+    });
     const animationConfig = (await import('./animation_config.js')).default;
     const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
     if (turnData.result_type === 'MAKE') {

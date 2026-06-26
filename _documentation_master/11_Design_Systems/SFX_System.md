@@ -112,8 +112,8 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 **End of quarter airhorn**
 
-- Trigger: game clock reaches **0:00** on the turn that ends the quarter (`clock_end === 0`, `clock_start > 0`). Fires **immediately** when the clock tween hits zero (or at turn start if there is no clock tween for that turn).
-- File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js`, called from `AnimationRouter.js` clock interpolation (`onUpdate` / `onComplete`). Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`.
+- Trigger: game clock reaches **0:00** on the turn that ends the quarter (`clock_end === 0`, `clock_start > 0`). Primary path: `AnimationRouter.js` clock interpolation (`onUpdate` / `onComplete`). **Fallback:** Final Shot / FLSS quarter-end hold (`AnimationEngine._finishFinalTurnQuarterEnd`) also calls `playEndOfQuarterAirhorn` when schema playback finishes before the linear clock tween completes (dedupe prevents double-fire).
+- File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js`. Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`.
 - Scope: live turn-by-turn court playback (Q1–Q4). Not tied to the quarter-break locker-room screen or the "Quarter X Complete!" popup.
 
 **Defense Matchup Modal**

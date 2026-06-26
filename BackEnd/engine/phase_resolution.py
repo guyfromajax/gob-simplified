@@ -5524,8 +5524,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     # floor so players settle, then wait at destination for the hold beat.
     time_remaining_sec = float(game_state.get("time_remaining") or 0)
     late_target_sec = 4.0 if shot_type == "Attack" else 3.0
-    reserve_for_pass_shot_sec = 3.5 if shot_type == "Attack" else 2.0
-    step0_floor = max(0.0, time_remaining_sec - late_target_sec - reserve_for_pass_shot_sec)
+    step0_floor = max(0.0, time_remaining_sec - late_target_sec)
     if step0_floor > 0 and skeleton.get("steps"):
         skeleton["steps"][0]["_step_t_floor_game_seconds"] = step0_floor
     log_eoq_step(
