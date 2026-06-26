@@ -1581,6 +1581,15 @@ def build_skeleton_animation_steps(
             t = max(0.05, natural_t)
         elif gate_kind == "flss_drive_driver" and not is_pass_step:
             t = max(float(step_floor or 0.05), natural_t)
+        elif (
+            step_floor is not None
+            and turn_result.get("final_turn")
+            and i == 0
+            and not is_pass_step
+        ):
+            # Final Shot alignment hold is budgeted to hit the outside/attack
+            # anchor — do not let slow movers extend step 0 past the floor.
+            t = float(step_floor)
         elif step_floor is not None:
             t = max(float(step_floor), natural_t, ball_pass_t)
         else:

@@ -233,6 +233,7 @@ def build_walk_up_step(
     other_archetype: PlayerArchetype = "standard",
     gate_player_ids: Optional[List[str]] = None,
     gate_offense_required_count: Optional[int] = None,
+    gate_mandatory_player_ids: Optional[List[str]] = None,
     metadata_reason: str = "walk_up",
     min_t_game_sec: float = 0.05,
 ) -> AnimationStep:
@@ -249,6 +250,10 @@ def build_walk_up_step(
     When ``gate_offense_required_count`` is set (FCP BIP setup only today),
     T = the arrival time of the Nth-fastest offensive player among the five
     on-court (e.g. 4 → advance once four offense players reach destination).
+    Optional ``gate_mandatory_player_ids`` (combinable with the N-of-M gate)
+    raises T to each listed player's natural arrival time so they always
+    reach destination — used so the inbound passer reaches the baseline OOB
+    spot before the hold/pass steps.
 
     When ``gate_player_ids`` is ``None`` (default), gates on the slowest of
     ALL players — preserves legacy behavior for callers that want everyone
@@ -301,6 +306,12 @@ def build_walk_up_step(
             gate_slowest_id, slowest_t = sorted_arrivals[idx]
         else:
             gate_slowest_id, slowest_t = None, 0.0
+        mandatory_ids = {str(p) for p in (gate_mandatory_player_ids or []) if p}
+        for pid in mandatory_ids:
+            mandatory_t = offense_arrivals.get(pid, natural_t.get(pid, 0.0))
+            if mandatory_t > slowest_t:
+                slowest_t = mandatory_t
+                gate_slowest_id = pid
     elif gate_player_ids:
         gate_set = {str(g) for g in gate_player_ids if g}
         gate_items = [(pid, ti) for pid, ti in natural_t.items() if pid in gate_set]
@@ -342,15 +353,20 @@ def build_walk_up_step(
     gate_id = gate_slowest_id or _slowest_mover_id(start_coords, final_end_coords)
     gate_target = final_end_coords.get(gate_id) if gate_id else None
     if use_offense_n_of_m and gate_offense_required_count:
+        n_of_m_meta: Dict[str, Any] = {
+            "required_count": int(gate_offense_required_count),
+            "total_offense_count": len(_offense_player_ids(off_lineup)),
+            "gate_player_id": str(gate_id) if gate_id else None,
+            "reason": metadata_reason,
+        }
+        if gate_mandatory_player_ids:
+            n_of_m_meta["mandatory_player_ids"] = [
+                str(p) for p in gate_mandatory_player_ids if p
+            ]
         advance_trigger: AdvanceTrigger = {
             "condition": "offense_players_reach_position",
             "T_game_seconds": float(t),
-            "metadata": {
-                "required_count": int(gate_offense_required_count),
-                "total_offense_count": len(_offense_player_ids(off_lineup)),
-                "gate_player_id": str(gate_id) if gate_id else None,
-                "reason": metadata_reason,
-            },
+            "metadata": n_of_m_meta,
         }
     elif gate_id and gate_target:
         advance_trigger: AdvanceTrigger = {
@@ -1128,7 +1144,8 @@ def build_bip_animation_steps(
       (the dynamically-chosen inbound baseline spot) carrying the ball.
       Other 9 continue toward their setup positions if not yet there.
       Gate = slower of [SF reaches inbound, PG reaches receive] for normal
-      BIP/HCT; **FCP only** = 4 of 5 offensive players reach FCP setup coords.
+      BIP/HCT; **FCP only** = 4 of 5 offensive players reach FCP setup coords
+      **and** SF must reach the baseline inbound spot (mandatory passer gate).
     - **Step 3 — Passer hold**: 1-game-sec beat where SF holds the ball at
       the inbound spot before the pass. All 10 stationary for normal BIP;
       **FCP only** SF holds while the other nine continue toward setup.
@@ -1216,6 +1233,7 @@ def build_bip_animation_steps(
         other_archetype=other_arch,
         gate_player_ids=None if fcp_setup else [str(sf_id), str(pg_id)],
         gate_offense_required_count=4 if fcp_setup else None,
+        gate_mandatory_player_ids=[str(sf_id)] if fcp_setup else None,
         metadata_reason="bip_fcp_setup" if fcp_setup else "bip_sf_to_inbound",
     )
 

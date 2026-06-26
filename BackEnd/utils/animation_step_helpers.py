@@ -67,6 +67,14 @@ def build_final_ball_handler_id(turn_result: Dict[str, Any]) -> Optional[str]:
     if not isinstance(turn_result, dict):
         return None
 
+    # STEAL: possession flips — the stealer owns the ball at turn end even when
+    # the last loop segment still shows the victim holding (dynamic FCP/HCT).
+    result_type = str(turn_result.get("result_type") or "").upper()
+    if result_type == "STEAL":
+        stealer_id = turn_result.get("stealer_id") or turn_result.get("stealerId")
+        if stealer_id:
+            return str(stealer_id)
+
     steps = turn_result.get("animation_steps")
     if isinstance(steps, list) and steps:
         last = steps[-1]

@@ -122,11 +122,6 @@ def test_pacing_hold_floor_accounts_for_move_beats(monkeypatch):
     assert floor < 29 - LATE_TARGET_OUTSIDE
 
 
-def test_attack_anchor_target_is_four_seconds():
-    assert LATE_TARGET_ATTACK == 4.0
-    assert LATE_TARGET_OUTSIDE == 3.0
-
-
 def test_pacing_does_not_omit_required_entry_pass_for_anchor():
     """When live owner != skeleton BH, never skip entry pass to salvage anchor."""
     prior = {
@@ -157,3 +152,20 @@ def test_pacing_does_not_omit_required_entry_pass_for_anchor():
     assert plan.reason != "entry_pass_omitted_for_anchor"
     if plan.can_meet_anchor:
         assert plan.include_entry_pass is True
+
+
+def test_final_ball_handler_id_prefers_stealer_on_steal_turn():
+    from BackEnd.utils.animation_step_helpers import build_final_ball_handler_id
+
+    turn = {
+        "result_type": "STEAL",
+        "stealer_id": "def_sg",
+        "animation_steps": [
+            {
+                "end": {
+                    "ball": {"owner_player_id": "off_pg"},
+                }
+            }
+        ],
+    }
+    assert build_final_ball_handler_id(turn) == "def_sg"

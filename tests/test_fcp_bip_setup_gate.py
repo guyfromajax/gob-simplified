@@ -1,4 +1,4 @@
-"""FCP BIP setup step uses a bespoke 4-of-5 offense advance gate."""
+"""FCP BIP setup step uses a 4-of-5 offense advance gate plus mandatory SF baseline."""
 
 from BackEnd.models.player import Player
 from BackEnd.utils.transition_bridge import build_bip_animation_steps
@@ -73,6 +73,35 @@ def test_fcp_bip_step2_uses_four_of_five_offense_gate():
     assert trigger["metadata"]["required_count"] == 4
     assert trigger["metadata"]["total_offense_count"] == 5
     assert trigger["metadata"]["reason"] == "bip_fcp_setup"
+    assert trigger["metadata"]["mandatory_player_ids"] == [ids["SF"]]
+
+
+def test_fcp_bip_step2_sf_reaches_inbound_when_slowest_offensive_mover():
+    """SF must reach baseline OOB even when teammates beat the 4-of-5 gate first."""
+    off, defn = _lineups()
+    off["SF"].attributes["AG"] = 5
+    for pos in ("PG", "SG", "PF", "C"):
+        off[pos].attributes["AG"] = 99
+
+    prior, setup, ids = _prior_and_setup(off, defn)
+
+    steps = build_bip_animation_steps(
+        off_lineup=off,
+        def_lineup=defn,
+        prior_final_coords=prior,
+        setup_coords=setup,
+        sf_id=ids["SF"],
+        pg_id=ids["PG"],
+        ball_start_coord={"x": 6.0, "y": 25.0},
+        fcp_setup=True,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=20.0,
+    )
+
+    sf_end = steps[1]["end"]["coords"][ids["SF"]]
+    sf_target = setup[ids["SF"]]
+    assert sf_end["x"] == sf_target["x"]
+    assert sf_end["y"] == sf_target["y"]
 
 
 def test_non_fcp_bip_step2_still_gates_on_sf_and_pg():

@@ -291,6 +291,14 @@ FREE_THROW_SHOT_GRID_PER_GAME_SECOND = 12  # FT shot ball motion (grid/game-sec)
 # intentional, a "settle" feels different per bounce length.
 BOUNCE_STEP_GAME_SECONDS = 300.0 / 350.0
 
+# OREB putback minimum game-clock burn (game-sec). Putbacks are self-contained
+# shot attempts whose UESS schema burn is only ~1-2s (the make [hold] beat is
+# clock-paused and the putback flight is short), so the master clock is floored
+# here to the designed rebound-capture+putback cost. OREB_KICKOUT is NOT floored
+# — its reset time is burned by the following HCO turn's entry orchestrator.
+# See Rebound_System.md §OREB clock burn.
+OREB_PUTBACK_MIN_TIME_ELAPSED = 3
+
 # Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec
 # clock so FE wall-clock matches the legacy reference timings.

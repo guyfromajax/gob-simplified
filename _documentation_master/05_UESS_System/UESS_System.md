@@ -168,6 +168,8 @@ Set via `game_state["uess_clock_authority_mode"]`:
 
 `uess_clock_elapsed_authority = "ledger"` (default). `turn.time_elapsed` derived from the ledger, not from the legacy sum of animation step times.
 
+**OREB exception:** `OREB` turns (`PUTBACK_MAKE`/`PUTBACK_MISS`/`OREB_KICKOUT`) derive `time_elapsed` from the schema's total game-clock burn (`cs_start − cs_end`) in `_stamp_oreb_animation_steps`, not the ledger. Putbacks floor that burn at `OREB_PUTBACK_MIN_TIME_ELAPSED = 3` (self-contained shot attempt); `OREB_KICKOUT` uses the raw burn (its reset time is burned by the following HCO turn's entry orchestrator). See [`Rebound_System.md`](../06_Gameplay_Systems/Rebound_System.md) §OREB clock burn.
+
 ---
 
 ## 6. Ownership pass-lifecycle contract

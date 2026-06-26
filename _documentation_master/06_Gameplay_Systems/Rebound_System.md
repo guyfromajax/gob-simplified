@@ -122,6 +122,19 @@ The visible kickout setup/pass is prepended to the following HCO turn by `build_
 
 Frontend kickout spot selection and legacy fallback pass behavior have been removed; the frontend renders backend `animation_steps` only.
 
+### OREB clock burn
+
+OREB turns are UESS-compliant (`oreb_step_emitter.py` → `animation_steps[]`). `_stamp_oreb_animation_steps` (`turn_manager.py`) realigns `time_elapsed` to the schema's total game-clock burn — same principle as HCO/FCP. The raw schema burn is small, so the master clock is floored per result type:
+
+| Result type | `time_elapsed` | Why |
+|---|---|---|
+| `PUTBACK_MAKE` / `PUTBACK_MISS` | `max(OREB_PUTBACK_MIN_TIME_ELAPSED, round(burn))` | Self-contained shot attempt; nothing downstream absorbs the time. Raw burn is only ~1–2s (make `[hold]` beat is clock-paused, putback flight is short), so floor to the designed **3s** rebound-capture+putback cost. |
+| `OREB_KICKOUT` | `round(burn)` (no floor) | Just the board-secure beat (~0–1s). The reset/bring-up time is burned by the **following HCO turn's** entry orchestrator (`build_kickout_step` in `transition_bridge.py`). Flooring here would double-count it. |
+
+- **Constant:** `OREB_PUTBACK_MIN_TIME_ELAPSED = 3` (`BackEnd/constants/__init__.py`).
+- **History:** before the floor, putbacks burned ~1–2s and `OREB_KICKOUT` rounded to **0s** — the UESS migration's schema-derived realignment had clobbered the legacy hardcoded `_oreb_te = 3`. The floor restores putback intent; kickout correctly stays at the raw burn.
+- The legacy `_oreb_te = 3` assignments remain only because they still feed `oreb_hold_seconds` (consumed by the FE legacy animation path); the `time_elapsed` they set is overwritten by the realignment.
+
 **Rebound Resolution Flow** (`calculate_bounce_spot`, `determine_rebounder`, `select_rebounder_by_score`, `calculate_rebound_score` — all in `BackEnd/utils/shared.py`)
 
 1. **Calculate the missed-shot bounce spot** (`calculate_bounce_spot`). Variance widens with shot distance (distance from shooter spot to basket), x is always outward from the basket into the paint:

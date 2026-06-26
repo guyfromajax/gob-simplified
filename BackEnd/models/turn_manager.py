@@ -18,6 +18,7 @@ from collections import defaultdict
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 from BackEnd.constants import ACTIONS
 from BackEnd.constants import (
+    OREB_PUTBACK_MIN_TIME_ELAPSED,
     PLAYCALL_ATTRIBUTE_WEIGHTS,
     POSITION_LIST,
     STRATEGY_CALL_DICTS,
@@ -4107,7 +4108,21 @@ class TurnManager:
                     cs_end = last_clock.get("clock_remaining")
                     if cs_start is not None and cs_end is not None:
                         schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
-                        result["time_elapsed"] = int(round(schema_game_burn))
+                        burn = int(round(schema_game_burn))
+                        # Putbacks are self-contained shot attempts — nothing
+                        # downstream absorbs their clock, so floor the burn at the
+                        # designed 3s rebound-capture+putback cost. (The raw schema
+                        # burn is only ~1-2s because the make [hold] beat is
+                        # clock-paused and the putback flight is short.)
+                        #
+                        # OREB_KICKOUT keeps the raw burn: the kickout turn is just
+                        # the board-secure beat; the reset/bring-up time is burned by
+                        # the FOLLOWING HCO turn's entry orchestrator (kickout/handoff
+                        # /walk-up step in skeleton_step_emitter). Flooring it here
+                        # would double-count that reset time.
+                        if result_type in ("PUTBACK_MAKE", "PUTBACK_MISS"):
+                            burn = max(OREB_PUTBACK_MIN_TIME_ELAPSED, burn)
+                        result["time_elapsed"] = burn
         except Exception as e:
             logging.warning("build_oreb_animation_steps failed: %s", e)
         return result

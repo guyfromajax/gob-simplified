@@ -82,7 +82,8 @@ The stopper system truncates FCP **"base"** variant skeletons at strategic point
 **Clock start and inbound pass**
 
 - Game and shot clocks start only after the inbound receiver has the ball (same as BIP→HCO and SIP).
-- The inbound pass runs during BASELINE_INBOUND; FCP animates SF→PG inbound in `runInboundSetup()`.
+- The inbound pass runs during BASELINE_INBOUND; FCP animates SF→PG inbound via UESS `animation_steps` (legacy: `runInboundSetup()`).
+- **FCP BIP step 2** advances when 4 of 5 offense reach press-break setup **and** SF reaches the baseline inbound spot (mandatory passer gate — see `BIP_System.md`).
 - When FCP directly follows BIP, the backend skips leading inbound-equivalent skeleton steps so inbound is not doubled.
 - See [`BIP_System.md`](./BIP_System.md) § "BASELINE_INBOUND → FCP".
 

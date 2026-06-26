@@ -1044,4 +1044,11 @@ def build_dynamic_hct_animation_steps(
             steps, loop_segments, prior_final_coords, setup_coords, off_lineup, def_lineup
         )
 
+    # Universal steal → HCO/HCT/FCP handoff (skeleton emitter already does this
+    # for legacy HCO steals; dynamic FCP/HCT must match).
+    if (turn_result.get("result_type") or "").upper() == "STEAL" and steps:
+        from BackEnd.engine.skeleton_step_emitter import _append_post_steal_hco_transition
+
+        _append_post_steal_hco_transition(steps, turn_result, game)
+
     return steps

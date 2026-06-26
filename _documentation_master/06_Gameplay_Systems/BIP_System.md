@@ -155,6 +155,7 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
   - Generated in home orientation; flipped via `getAwayTeamCoords` for away offense
   - Full details: `FCP_HCT_System.md` → "FCP Starting Alignment" (FCP-only doc; HCT → `HCT_System.md`)
 - `offense_setup_positions` is built from those `o_dest` coords — **not** from skeleton step 0. Players animate from BIP-end coords toward the first post-inbound skeleton step at archetype rate (non-gate movers freeze at the interrupted coord per UESS §9.5 — no teleport)
+- **BIP step 2 gate (FCP):** advance when **4 of 5** offense players reach setup **and** SF has reached the baseline inbound spot (`gate_mandatory_player_ids` on the inbound passer). Without the mandatory SF gate, step 2 could end before SF walked OOB, breaking the hold and inbound pass visuals.
 - SF is the inbounder (baseline inbound spot)
 - (`get_skeleton_for_turn` step-0 sourcing remains only as the fallback for hypothetical future pressure types — neither HCT nor FCP uses it)
 
