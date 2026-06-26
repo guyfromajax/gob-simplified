@@ -337,6 +337,68 @@ def _walk_ball_owners(
     return walks
 
 
+def _final_turn_skeleton_bh_id(
+    skeleton_steps: List[Dict[str, Any]],
+    off_lineup: Dict[str, Any],
+) -> Optional[str]:
+    """Return the player id for the Final Turn skeleton step-0 ball handler."""
+    if not skeleton_steps:
+        return None
+    pos_actions = skeleton_steps[0].get("pos_actions") or {}
+    for pos in _OFFENSE_POSITIONS:
+        action = (pos_actions.get(pos) or {}).get("action")
+        if action == "handle_ball":
+            return _player_id_at_pos(off_lineup, pos)
+    return None
+
+
+def _append_final_turn_entry_pass_if_needed(
+    *,
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+    prior_turn: Optional[Dict[str, Any]],
+    skeleton_steps: List[Dict[str, Any]],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    clock_remaining_at_turn_start: float,
+    shot_clock_remaining_at_turn_start: float,
+    elapsed_so_far: float,
+) -> float:
+    """After Final Turn alignment (schema step 0), pass from the live prior-turn
+    owner to the skeleton ball handler when they differ (common after SIP where
+    the inbound receiver is SG but Final Turn BH is often PG). Uses the
+    universal ``build_pass_step`` helper at ``PASS_GRID_SPOTS_PER_GAME_SECOND``.
+    """
+    if not turn_result.get("final_turn") or not steps or not isinstance(prior_turn, dict):
+        return elapsed_so_far
+    prior_owner = _resolve_prior_ball_handler_id(prior_turn, turn_result)
+    bh_id = _final_turn_skeleton_bh_id(skeleton_steps, off_lineup)
+    if not prior_owner or not bh_id or str(prior_owner) == str(bh_id):
+        return elapsed_so_far
+    from BackEnd.utils.transition_bridge import build_pass_step
+
+    clock_r = clock_remaining_at_turn_start - elapsed_so_far
+    shot_r = shot_clock_remaining_at_turn_start - elapsed_so_far
+    try:
+        entry = build_pass_step(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            start_coords=steps[-1]["end"]["coords"],
+            passer_id=str(prior_owner),
+            receiver_id=str(bh_id),
+            clock_remaining_at_start=clock_r,
+            shot_clock_remaining_at_start=shot_r,
+            next_step_index=len(steps),
+            pass_speed_grid_per_game_sec=float(PASS_GRID_SPOTS_PER_GAME_SECOND),
+            metadata_reason="final_turn_entry_pass",
+        )
+    except ValueError:
+        return elapsed_so_far
+    entry.setdefault("start", {})["ball_motion_style"] = "pass"
+    steps.append(entry)
+    return elapsed_so_far + float(entry["end"]["time_elapsed"])
+
+
 # --- Per-step builders -----------------------------------------------------
 
 
@@ -832,6 +894,7 @@ def build_skeleton_animation_steps(
 
     steps: List[AnimationStep] = []
     elapsed_so_far = 0.0
+    final_turn_entry_inserted = 0
 
     # =========================================================================
     # HCO Entry Orchestrator — dynamically determines whether to prepend
@@ -1241,9 +1304,10 @@ def build_skeleton_animation_steps(
             else {"owner_player_id": bh_id_fallback}
         )
 
-        # Final Turn step 0: keep the live prior-turn ball owner on the
-        # attached ball at step start (not the skeleton step-0 handler).
-        # Step 1+ pass/receive moves ownership when BH ≠ shooter.
+        # Final Turn step 0: keep the live prior-turn ball owner on the ball
+        # through alignment + clock hold. Do not transfer to the skeleton BH
+        # here — ``_append_final_turn_entry_pass_if_needed`` emits a canonical
+        # pass step when prior owner ≠ BH (e.g. SIP receiver SG → BH PG).
         if (
             i == 0
             and reset_count == 0
@@ -1253,6 +1317,9 @@ def build_skeleton_animation_steps(
             prior_owner = _resolve_prior_ball_handler_id(prior_turn, turn_result)
             if prior_owner:
                 ball_start = {"owner_player_id": prior_owner}
+                ball_end = {"owner_player_id": prior_owner}
+                owner_id_start = prior_owner
+                owner_id_end = prior_owner
 
         # Detect pass step (ball ownership transfer) early — used both by
         # gate selection (FCP) and by the later ball_motion_style /
@@ -1424,7 +1491,11 @@ def build_skeleton_animation_steps(
         # so the chain references the final steps array correctly.
         next_step: NextStep
         if i < num_steps - 1:
-            next_step = {"kind": "next_step", "index": i + 1 + reset_count}
+            entry_offset = final_turn_entry_inserted if i > 0 else 0
+            next_step = {
+                "kind": "next_step",
+                "index": i + 1 + reset_count + entry_offset,
+            }
         else:
             next_step = _resolve_final_step_next(turn_result)
 
@@ -1517,6 +1588,22 @@ def build_skeleton_animation_steps(
         )
         steps.append(step)
         elapsed_so_far += t
+
+        if i == 0 and reset_count == 0 and turn_result.get("final_turn"):
+            before_len = len(steps)
+            elapsed_so_far = _append_final_turn_entry_pass_if_needed(
+                steps=steps,
+                turn_result=turn_result,
+                prior_turn=prior_turn,
+                skeleton_steps=skeleton_steps,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                clock_remaining_at_turn_start=clock_remaining_at_turn_start,
+                shot_clock_remaining_at_turn_start=shot_clock_remaining_at_turn_start,
+                elapsed_so_far=elapsed_so_far,
+            )
+            if len(steps) > before_len:
+                final_turn_entry_inserted = 1
 
     # Post-shot positioning. For MAKE/MISS/BLOCK results, build schema-pure
     # [ball_flight] (+ [bounce] for miss/block) sub-steps that follow the
