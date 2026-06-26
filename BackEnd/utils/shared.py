@@ -942,6 +942,7 @@ def resolve_offensive_rebound(game, rebounder):
         build_oreb_kickout_snapshot,
         build_oreb_putback_attempt_snapshot,
     )
+    from BackEnd.utils.eoq_clock_progression import should_force_oreb_putback
 
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -966,7 +967,9 @@ def resolve_offensive_rebound(game, rebounder):
             "position_snapshots": [],
         }
 
-    if random.random() < 0.90:  # 90% putback attempt, 10% kickout
+    if random.random() < 0.90 or should_force_oreb_putback(
+        int(game.game_state.get("time_remaining") or 0)
+    ):
         oreb_putback_snap = build_oreb_putback_attempt_snapshot(game, off_lineup, def_lineup)
         attrs = rebounder.attributes
         time_elapsed = random.randint(1, 5)

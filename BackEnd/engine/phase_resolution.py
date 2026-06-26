@@ -2570,6 +2570,11 @@ def resolve_free_throw_logic(game):
             result["offense_rebounders"] = off_crash
             result["defense_rebounders"] = def_crash
 
+    if game_state["free_throws_remaining"] <= 0:
+        from BackEnd.utils.eoq_clock_progression import apply_eoq_final_free_throw_routing
+
+        apply_eoq_final_free_throw_routing(game, result, makes_shot=makes_shot)
+
     attach_position_snapshots(result, [ft_snap])
     return result
 
@@ -5596,9 +5601,6 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         )
     finally:
         game_state.pop("final_turn", None)
-    # Use time_elapsed = time_remaining for the turn so clock goes to 0 and quarter/game end triggers
-    time_remaining = game_state.get("time_remaining", 24)
-    shot_result["time_elapsed"] = int(time_remaining)
     shot_result["oDestinations"] = o_destinations
     shot_result["dDestinations"] = d_destinations
     shot_result["skeleton"] = skeleton
@@ -5606,6 +5608,9 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     shot_result["final_turn_include_entry_pass"] = pacing.include_entry_pass
     shot_result["final_turn_include_walkup"] = pacing.include_walkup
     shot_result["final_turn_anchor_clock"] = pacing.anchor_clock
+    from BackEnd.utils.eoq_clock_progression import mark_late_clock_eoq_turn
+
+    mark_late_clock_eoq_turn(shot_result)
     # Player Momentum: flag a made Final Shot so the next break reset adds the
     # Final-Shot bonus on top of the reset (Player_Momentum_System.md).
     if shot_result.get("result_type") == "MAKE":

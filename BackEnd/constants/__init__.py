@@ -297,7 +297,7 @@ BOUNCE_STEP_GAME_SECONDS = 300.0 / 350.0
 # here to the designed rebound-capture+putback cost. OREB_KICKOUT is NOT floored
 # — its reset time is burned by the following HCO turn's entry orchestrator.
 # See Rebound_System.md §OREB clock burn.
-OREB_PUTBACK_MIN_TIME_ELAPSED = 3
+OREB_PUTBACK_MIN_TIME_ELAPSED = 2
 
 # Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec

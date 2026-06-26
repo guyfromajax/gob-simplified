@@ -237,11 +237,14 @@ def should_run_out_clock(game, time_remaining_seconds):
 def would_take_final_shot(game, time_remaining_seconds):
     """
     True when this possession should attempt a Final Shot (not run-out, force foul, or quick shot).
-    Uses final_shot_possession_active set when Final Turn shot is triggered for the period.
+    Clock-driven: active when Final Turn shot is flagged for this turn, or Q4+ trailing/tied
+    end-game branch applies.
     """
     gs = getattr(game, "game_state", None) or {}
     if gs.get("final_shot_possession_active") or gs.get("final_turn_shot_this_turn"):
         return True
+    if gs.get("flss_possession_pending"):
+        return False
     quarter = getattr(game, "quarter", None)
     if quarter is None or quarter < 4:
         return False

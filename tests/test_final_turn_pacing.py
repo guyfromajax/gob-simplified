@@ -107,6 +107,7 @@ def test_pacing_hold_floor_accounts_for_move_beats(monkeypatch):
     random_values = iter([0.01, 0, 0, 0, 0, 0, 0])
     monkeypatch.setattr(random, "random", lambda: next(random_values, 0))
     monkeypatch.setattr(random, "choice", lambda values: values[0])
+    monkeypatch.setattr(random, "randint", lambda a, b: 3)
 
     game = _game(time_remaining=29)
     result = phase_resolution.resolve_final_turn_shot_logic(
@@ -119,7 +120,7 @@ def test_pacing_hold_floor_accounts_for_move_beats(monkeypatch):
     assert result.get("route_flss") is not True
     floor = result["skeleton"]["steps"][0].get("_step_t_floor_game_seconds")
     assert floor is not None
-    assert floor < 29 - LATE_TARGET_OUTSIDE
+    assert floor < 29 - 3
 
 
 def test_pacing_does_not_omit_required_entry_pass_for_anchor():

@@ -555,9 +555,9 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     result["flss_vo"] = flss_vo
     result["flss_heave_sfx"] = heave_sfx
     result["flss_pull_up"] = drive_plan.pull_up_jumper
-    result["time_elapsed"] = int(max(1, round(time_remaining)))
-    result["quarter_ends_after"] = True
-    result["next_play_type"] = None
+    from BackEnd.utils.eoq_clock_progression import mark_late_clock_eoq_turn
+
+    mark_late_clock_eoq_turn(result)
     result["forced_shot"] = True
     result["forced_shot_reason"] = "FLSS"
     result["current_turn"] = current_state

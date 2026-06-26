@@ -1880,24 +1880,25 @@ class ShotManager:
                         result["defense_release_coords"] = {}
 
                         if stat == "OREB":
-                            possession_flips = False
-                            self.game_state.pop("_shot_dreb_fb_play_key", None)
-                            if self.game_state.get("final_turn"):
-                                result["quarter_ends_after"] = True
-                                result["next_play_type"] = None
-                            else:
-                                self.game_state["pending_oreb"] = {
-                                    "rebounder": rebounder,
-                                    "rebounder_id": getattr(rebounder, "player_id", None),
-                                    "from_block": getattr(self, "_block_spot", None) is not None,
-                                }
-                                result["next_play_type"] = "OREB"
+                            from BackEnd.utils.eoq_clock_progression import (
+                                apply_post_miss_rebound_routing,
+                            )
+
+                            possession_flips = apply_post_miss_rebound_routing(
+                                self.game, result, rebounder, stat
+                            )
                         else:
-                            possession_flips = True
-                            if self.game_state.get("final_turn"):
-                                result["quarter_ends_after"] = True
-                                result["next_play_type"] = None
+                            from BackEnd.utils.eoq_clock_progression import (
+                                apply_post_miss_rebound_routing,
+                                should_route_eoq_rebound,
+                            )
+
+                            if should_route_eoq_rebound(self.game, result):
+                                possession_flips = apply_post_miss_rebound_routing(
+                                    self.game, result, rebounder, stat
+                                )
                             else:
+                                possession_flips = True
                                 self.game_state["offensive_state"] = "HCO"
                                 self.game_state["last_rebounder"] = rebounder
                                 result["next_play_type"] = "HCO"
@@ -2057,26 +2058,26 @@ class ShotManager:
                 # Running this shared post-rebound transition block for FB can double-process state.
                 if not is_fast_break:
                     if stat == "OREB":
-                        possession_flips = False
-                        self.game_state.pop("_shot_dreb_fb_play_key", None)
-                        if self.game_state.get("final_turn"):
-                            result["quarter_ends_after"] = True
-                            result["next_play_type"] = None
-                        else:
-                            # Store OREB info for game_manager to create a separate OREB turn
-                            self.game_state["pending_oreb"] = {
-                                "rebounder": rebounder,
-                                "rebounder_id": getattr(rebounder, "player_id", None),
-                                "from_block": getattr(self, "_block_spot", None) is not None,
-                            }
-                            result["next_play_type"] = "OREB"
+                        from BackEnd.utils.eoq_clock_progression import (
+                            apply_post_miss_rebound_routing,
+                        )
+
+                        possession_flips = apply_post_miss_rebound_routing(
+                            self.game, result, rebounder, stat
+                        )
                     else:
-                        # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
-                        possession_flips = True
-                        if self.game_state.get("final_turn"):
-                            result["quarter_ends_after"] = True
-                            result["next_play_type"] = None
+                        from BackEnd.utils.eoq_clock_progression import (
+                            apply_post_miss_rebound_routing,
+                            should_route_eoq_rebound,
+                        )
+
+                        if should_route_eoq_rebound(self.game, result):
+                            possession_flips = apply_post_miss_rebound_routing(
+                                self.game, result, rebounder, stat
+                            )
                         else:
+                            # DREB - determine next play type (or Force Foul: forgo FB/HCO and outlet)
+                            possession_flips = True
                             events.append({
                                 "event_type": "defReb",
                                 "rebounderId": getattr(rebounder, "player_id", None),
@@ -2313,6 +2314,11 @@ class ShotManager:
         # in which overlay map" — see canonicalize_post_shot_overlays docstring.
         from BackEnd.utils.shared import canonicalize_post_shot_overlays
         canonicalize_post_shot_overlays(result)
+        if result.get("result_type") == "MAKE" and result.get("next_play_type") == "BASELINE_INBOUND":
+            if self.game_state.get("final_turn") or result.get("flss"):
+                from BackEnd.utils.eoq_clock_progression import apply_post_make_late_clock_routing
+
+                apply_post_make_late_clock_routing(self.game, result)
         if result.get("quarter_ends_after"):
             from BackEnd.engine.eoq_perfection import log_block_bounce_debug, strip_terminal_rebound_fields
 
@@ -2771,32 +2777,33 @@ class ShotManager:
                 rebounder, rebound_team, stat = determine_rebounder(self.game, bounce_spot, exclude_player_ids, penalize_player_ids)
                 
                 if stat == "OREB":
-                    # OREB: Use standard OREB system
                     rebounder.record_stat("OREB")
                     text += f"{shooter} misses the layup -- {get_name_safe(rebounder)} grabs the offensive rebound!"
                     result["rebounderId"] = getattr(rebounder, "player_id", None)
                     result["rebound_type"] = "OREB"
-                    possession_flips = False
-                    if self.game_state.get("final_turn"):
-                        result["quarter_ends_after"] = True
-                        result["next_play_type"] = None
-                    else:
-                        self.game_state["pending_oreb"] = {
-                            "rebounder": rebounder,
-                            "rebounder_id": getattr(rebounder, "player_id", None),
-                            "from_block": getattr(self, "_block_spot", None) is not None,
-                        }
+                    from BackEnd.utils.eoq_clock_progression import (
+                        apply_post_miss_rebound_routing,
+                    )
+
+                    possession_flips = apply_post_miss_rebound_routing(
+                        self.game, result, rebounder, stat
+                    )
                 else:
-                    # DREB: Transition to HCO with outlet step
-                    rebounder.record_stat("DREB")
-                    text += f"{shooter} misses the layup -- {get_name_safe(rebounder)} grabs the defensive rebound."
-                    result["rebounderId"] = getattr(rebounder, "player_id", None)
-                    result["rebound_type"] = "DREB"
-                    possession_flips = True
-                    if self.game_state.get("final_turn"):
-                        result["quarter_ends_after"] = True
-                        result["next_play_type"] = None
+                    from BackEnd.utils.eoq_clock_progression import (
+                        apply_post_miss_rebound_routing,
+                        should_route_eoq_rebound,
+                    )
+
+                    if should_route_eoq_rebound(self.game, result):
+                        possession_flips = apply_post_miss_rebound_routing(
+                            self.game, result, rebounder, stat
+                        )
                     else:
+                        rebounder.record_stat("DREB")
+                        text += f"{shooter} misses the layup -- {get_name_safe(rebounder)} grabs the defensive rebound."
+                        result["rebounderId"] = getattr(rebounder, "player_id", None)
+                        result["rebound_type"] = "DREB"
+                        possession_flips = True
                         text += " -- entering half court."
                         self.game_state["offensive_state"] = "HCO"
                         self.game_state["last_rebounder"] = rebounder

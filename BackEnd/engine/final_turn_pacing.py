@@ -1,14 +1,15 @@
 """Final Turn shot choreography budget and anchor pacing (UESS).
 
 Preflight simulates game-clock burn for walk-up, alignment, optional entry pass,
-move/pass beats, and verifies the anchor step (outside shoot @ 3s, attack drive
-@ 4s) can start on time. When the budget fails, callers route to FLSS instead
+move/pass beats, and verifies the anchor step (outside shoot @ randint(1,3)s,
+attack drive @ randint(2,4)s) can start on time. When the budget fails, callers route to FLSS instead
 of emitting a partial Final Shot play.
 """
 
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -20,11 +21,24 @@ from BackEnd.constants import (
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, _euclid
 from BackEnd.utils.shared import _extract_step_location_coords, get_away_player_coords
 
-LATE_TARGET_OUTSIDE = 3.0
+LATE_TARGET_OUTSIDE = 3.0  # legacy default for tests/docs only
 LATE_TARGET_ATTACK = 4.0
 BACKCOURT_X_HOME = 71.0
 BACKCOURT_X_AWAY = 29.0
 ANCHOR_TOLERANCE_SEC = 0.35
+
+
+def roll_anchor_clock(shot_type: str) -> float:
+    """Roll per-possession anchor: outside shoot @ 1–3s, attack drive start @ 2–4s."""
+    if str(shot_type).lower() == "attack":
+        return float(random.randint(2, 4))
+    return float(random.randint(1, 3))
+
+
+def _late_target(shot_type: str, anchor_clock: Optional[float] = None) -> float:
+    if anchor_clock is not None:
+        return float(anchor_clock)
+    return roll_anchor_clock(shot_type)
 
 
 @dataclass
@@ -39,10 +53,6 @@ class FinalTurnPacingPlan:
     entry_pass_seconds: float
     pre_anchor_move_seconds: float
     reason: str = ""
-
-
-def _late_target(shot_type: str) -> float:
-    return LATE_TARGET_ATTACK if str(shot_type).lower() == "attack" else LATE_TARGET_OUTSIDE
 
 
 def _spot_coords(spot: str, *, is_away_offense: bool) -> Dict[str, float]:
@@ -370,7 +380,7 @@ def evaluate_final_turn_pacing(
     """Return whether standard Final Shot choreography can hit the anchor clock."""
     skeleton_steps = skeleton.get("steps") or []
     time_remaining = float((getattr(game, "game_state", None) or {}).get("time_remaining") or 0)
-    anchor = _late_target(shot_type)
+    anchor = roll_anchor_clock(shot_type)
     off_lineup = game.offense_team.lineup
     is_away_offense = game.offense_team.team_id == game.away_team.team_id
     alignment_by_id = _alignment_coords_by_player_id(o_destinations, off_lineup)
@@ -473,8 +483,10 @@ def find_anchor_animation_step_index(
 def verify_animation_steps_anchor(
     animation_steps: List[Dict[str, Any]],
     shot_type: str,
+    *,
+    anchor_clock: Optional[float] = None,
 ) -> bool:
-    """Post-emit check: anchor step starts near 3s (outside) or 4s (attack)."""
+    """Post-emit check: anchor step starts near the rolled anchor clock."""
     idx = find_anchor_animation_step_index(animation_steps, shot_type)
     if idx is None:
         return False
@@ -482,5 +494,5 @@ def verify_animation_steps_anchor(
     remaining = clock.get("clock_remaining")
     if remaining is None:
         return False
-    target = _late_target(shot_type)
+    target = _late_target(shot_type, anchor_clock)
     return float(remaining) >= target - ANCHOR_TOLERANCE_SEC

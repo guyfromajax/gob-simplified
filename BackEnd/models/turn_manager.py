@@ -1270,16 +1270,13 @@ class TurnManager:
                 game_state["free_throws_remaining"] = 0
                 game_state["one_and_one"] = False
 
-        # ✅ Final Turn (Q4/OT): clear "triggered" flag when quarter/period changes so each period gets one chance
-        quarter = getattr(self.game, "quarter", None)
         if game_state.get("_last_final_turn_quarter") != quarter:
             game_state["_last_final_turn_quarter"] = quarter
-            game_state["final_turn_triggered_this_period"] = False
             game_state.pop("final_shot_possession_active", None)
+            game_state.pop("flss_possession_pending", None)
 
-        # ✅ Final Turn (Phase 6): first possession with time_remaining <= 30s triggers Final Turn (all quarters + OT).
-        # OREB and Fast Break: excluded by design — state must be HCO, HCT, or FCP. The *next* turn after OREB/FB
-        # (when time is still <= 30 and quarter >= 4) is the one evaluated for Final Turn.
+        # ✅ Final Turn: clock-driven — any possession with time_remaining <= 30s
+        # (HCO/HCT/FCP, not OREB/FB) may run full Final Shot setup or Q4 situational branches.
         time_remaining_sec = game_state.get("time_remaining")
         final_turn_eligible = (
             quarter is not None
@@ -1287,10 +1284,9 @@ class TurnManager:
             and int(time_remaining_sec) <= 30
             and state != "FAST_BREAK"
             and state in ("HCO", "HCT", "FCP")
-            and not game_state.get("final_turn_triggered_this_period")
+            and not game_state.get("flss_possession_pending")
         )
         if final_turn_eligible:
-            game_state["final_turn_triggered_this_period"] = True
             if quarter >= 4:
                 # Q4/OT: decide subtype (FINAL_HOLD, Force Foul, Quick Shot, or normal final shot)
                 slow = sl.is_slow_it_down(self.game, time_remaining_sec)
@@ -1433,6 +1429,9 @@ class TurnManager:
 
                 result = build_run_out_clock_result(self.game, max(game_clock_remaining, 0))
                 low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
+            elif game_state.get("final_turn_shot_this_turn"):
+                # Final Turn wins over FLSS when both would trigger at 0:00.
+                pass
             elif sl.would_take_final_shot(self.game, game_clock_remaining):
                 from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
                 from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
@@ -1627,8 +1626,25 @@ class TurnManager:
                 # Store EV score in scouting data
                 self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
                 
-                # Final Turn shot uses dedicated resolver (Phase 2 will add alignment + shot); for now stub to normal HCO
-                if game_state.pop("final_turn_shot_this_turn", False):
+                # Final Turn shot uses dedicated resolver; FLSS follow-up after BIP/SIP.
+                if game_state.pop("flss_possession_pending", False):
+                    from BackEnd.engine.eoq_debug_log import log_eoq_step
+                    from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
+
+                    log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state, "from": "post_inbound"})
+                    result = resolve_flss_shot_logic(self.game, state)
+                    log_eoq_step(
+                        self.game,
+                        "FLSS",
+                        "resolve_flss",
+                        "END",
+                        extra={
+                            "result_type": result.get("result_type"),
+                            "flss_zone": result.get("flss_zone"),
+                            "shooter_id": result.get("shooter_id"),
+                        },
+                    )
+                elif game_state.pop("final_turn_shot_this_turn", False):
                     from BackEnd.engine.eoq_debug_log import log_eoq_step
 
                     log_eoq_step(self.game, "FINAL_SHOT", "resolve_final_turn_shot", "START")
@@ -1698,6 +1714,7 @@ class TurnManager:
 
         if isinstance(result, dict) and result.get("flss") and result.get("skeleton"):
             from BackEnd.engine.eoq_debug_log import log_eoq_step
+            from BackEnd.utils.eoq_clock_progression import finalize_flss_post_emit
 
             log_eoq_step(self.game, "FLSS", "post_process_emit_steps", "START")
             if not (
@@ -1705,19 +1722,7 @@ class TurnManager:
                 and result.get("animation_steps")
             ):
                 self._emit_hco_animation_steps(result)
-            clock_before = int(self.game.game_state.get("time_remaining", 0) or 0)
-            if result.get("quarter_ends_after") and clock_before > 0:
-                result["time_elapsed"] = clock_before
-                result["clock_start"] = clock_before
-                result["clock_end"] = 0
-            else:
-                result["time_elapsed"] = max(
-                    1,
-                    int(result.get("time_elapsed") or 1),
-                )
-            result["quarter_ends_after"] = True
-            result["next_play_type"] = None
-            result.pop("next_turn", None)
+            finalize_flss_post_emit(self.game, result)
             result["final_shot_possession"] = True
             self.game.game_state.pop("final_shot_possession_active", None)
             log_eoq_step(
@@ -1729,6 +1734,7 @@ class TurnManager:
                     "animation_step_count": len(result.get("animation_steps") or []),
                     "result_type": result.get("result_type"),
                     "shooter_id": result.get("shooter_id"),
+                    "quarter_ends_after": result.get("quarter_ends_after"),
                 },
             )
 
@@ -3437,7 +3443,10 @@ class TurnManager:
                 from BackEnd.engine.final_turn_pacing import verify_animation_steps_anchor
 
                 shot_type = result.get("offensive_playcall") or result.get("current_playcall") or "Outside"
-                if anim_steps and not verify_animation_steps_anchor(anim_steps, str(shot_type)):
+                anchor_clock = result.get("final_turn_anchor_clock")
+                if anim_steps and not verify_animation_steps_anchor(
+                    anim_steps, str(shot_type), anchor_clock=anchor_clock
+                ):
                     logging.warning(
                         "Final Turn anchor verification failed after emit "
                         "(shot_type=%s, step_count=%s)",

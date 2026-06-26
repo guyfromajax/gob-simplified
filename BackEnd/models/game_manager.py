@@ -1316,7 +1316,10 @@ class GameManager:
                 or is_ft_final_miss_dreb
             )
             and result.get("rebound_type") == "DREB"
-            and result.get("next_play_type") in ("HCO", "FAST_BREAK")
+            and (
+                result.get("next_play_type") in ("HCO", "FAST_BREAK")
+                or result.get("terminal_dreb_eoq")
+            )
         )
         if dreb_promotion_candidate and not dreb_promotion_eligible:
             logging.error(
@@ -1335,13 +1338,19 @@ class GameManager:
             dreb_turn = self._build_dreb_turn_from_miss(result)
             if dreb_turn:
                 # MISS turn now leads to DREB; DREB carries forward the
-                # original next_play_type (HCO or FAST_BREAK).
+                # original next_play_type (HCO or FAST_BREAK), unless terminal EOQ.
                 original_next = result["next_play_type"]
                 result["next_play_type"] = "DREB"
                 result["next_turn"] = "DREB"
                 if dreb_turn.get("result_type") != "FOUL":
-                    dreb_turn["next_play_type"] = original_next
-                    dreb_turn["next_turn"] = original_next
+                    if result.get("terminal_dreb_eoq"):
+                        from BackEnd.utils.eoq_clock_progression import finalize_terminal_dreb_turn
+
+                        dreb_turn["terminal_dreb_eoq"] = True
+                        finalize_terminal_dreb_turn(self, dreb_turn)
+                    else:
+                        dreb_turn["next_play_type"] = original_next
+                        dreb_turn["next_turn"] = original_next
 
                 self._append_turn(dreb_turn)
                 # DREB turn doesn't go through the main _micro_turn flow,
@@ -1649,6 +1658,9 @@ class GameManager:
             else:
                 # ✅ Situational Logic: Force Foul after SIP — set pending so next turn is the foul
                 self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "SIDE_INBOUND")
+                from BackEnd.utils.eoq_clock_progression import schedule_flss_after_inbound
+
+                schedule_flss_after_inbound(self, sip_gate_result)
                 self.turn_manager._attach_clock_contract(
                     inbound_payload,
                     clock_start=int(self.game_state.get("time_remaining", 0)),
@@ -1763,6 +1775,9 @@ class GameManager:
             else:
                 # ✅ Situational Logic: Force Foul after BIP — set pending so next turn is the foul
                 self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "BASELINE_INBOUND")
+                from BackEnd.utils.eoq_clock_progression import schedule_flss_after_inbound
+
+                schedule_flss_after_inbound(self, last_turn)
                 bip_clock_start = int(self.game_state.get("time_remaining", 0))
                 bip_clock_runoff = self._resolve_post_make_bip_clock_runoff(last_turn)
                 inbound_payload["time_elapsed"] = self._apply_game_clock_elapsed(
