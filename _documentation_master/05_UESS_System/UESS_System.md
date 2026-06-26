@@ -32,7 +32,8 @@ This doc is the single source of truth for the contract. Code is the implementat
 | Fast Break — After Steal | ✅ Migrated | `after_steal_fast_break_step_emitter.build_after_steal_fast_break_animation_steps` |
 | Free Throw | ✅ Migrated | `ft_step_emitter.build_ft_animation_steps` |
 | Timeout | ⏳ Not migrated (low priority — minimal animation) | — |
-| Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). Frontend renders the **full** ``animation_steps[]`` via `playTurn()` (no step-0 skip or parallel alignment tween). Step 0 hold pacing is backend ``_step_t_floor_game_seconds`` (~3s/4s remaining before pass/shoot). `time_elapsed = time_remaining` quarter-clock drain is intentional, outside the ledger |
+| Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). Frontend renders the **full** ``animation_steps[]`` via `playTurn()` (no step-0 skip or parallel alignment tween). Step 0 hold pacing is backend ``_step_t_floor_game_seconds`` computed backward from a **rolled anchor** (outside shoot @ 1–3s, attack drive @ 2–4s). ``time_elapsed`` derives from schema burn after emit (not a forced full-clock drain). See [`Situational_Logic_System.md`](../06_Gameplay_Systems/Situational_Logic_System.md) §Final Turn. |
+| FLSS | ✅ Migrated | Same emitter path as Final Shot/HCO; sprint drive + shoot @ ~1s. Post-emit clock/quarter-end via `eoq_clock_progression.finalize_flss_post_emit`. |
 
 ---
 
@@ -168,7 +169,7 @@ Set via `game_state["uess_clock_authority_mode"]`:
 
 `uess_clock_elapsed_authority = "ledger"` (default). `turn.time_elapsed` derived from the ledger, not from the legacy sum of animation step times.
 
-**OREB exception:** `OREB` turns (`PUTBACK_MAKE`/`PUTBACK_MISS`/`OREB_KICKOUT`) derive `time_elapsed` from the schema's total game-clock burn (`cs_start − cs_end`) in `_stamp_oreb_animation_steps`, not the ledger. Putbacks floor that burn at `OREB_PUTBACK_MIN_TIME_ELAPSED = 3` (self-contained shot attempt); `OREB_KICKOUT` uses the raw burn (its reset time is burned by the following HCO turn's entry orchestrator). See [`Rebound_System.md`](../06_Gameplay_Systems/Rebound_System.md) §OREB clock burn.
+**OREB exception:** `OREB` turns (`PUTBACK_MAKE`/`PUTBACK_MISS`/`OREB_KICKOUT`) derive `time_elapsed` from the schema's total game-clock burn (`cs_start − cs_end`) in `_stamp_oreb_animation_steps`, not the ledger. Putbacks floor that burn at `OREB_PUTBACK_MIN_TIME_ELAPSED = 2` (self-contained shot attempt); `OREB_KICKOUT` uses the raw burn (its reset time is burned by the following HCO turn's entry orchestrator). See [`Rebound_System.md`](../06_Gameplay_Systems/Rebound_System.md) §OREB clock burn.
 
 ---
 

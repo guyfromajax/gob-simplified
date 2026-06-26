@@ -516,6 +516,38 @@ export function playFlssVoSfx(scene, turnData) {
 const ONCE_PER_TURN_SECONDARY_HEADLINES = new Set(["Press!", "Trap!", "Fast Break!"]);
 let secondaryCourtEventSfxPlayedThisTurn = new Set();
 
+/** Final Shot stinger: at most once per quarter (covers Final Turn + follow-up FLSS). */
+let finalShotSfxQuarterTracker = null;
+let finalShotSfxPlayedThisQuarter = false;
+
+function syncFinalShotSfxQuarter(quarter) {
+  const q = Number(quarter);
+  if (!Number.isFinite(q) || q < 1) {
+    return false;
+  }
+  if (finalShotSfxQuarterTracker !== q) {
+    finalShotSfxQuarterTracker = q;
+    finalShotSfxPlayedThisQuarter = false;
+  }
+  return true;
+}
+
+function tryConsumeFinalShotSfxSlot(quarter) {
+  const hasQuarter = syncFinalShotSfxQuarter(quarter);
+  if (!hasQuarter) {
+    if (finalShotSfxPlayedThisQuarter) {
+      return false;
+    }
+    finalShotSfxPlayedThisQuarter = true;
+    return true;
+  }
+  if (finalShotSfxPlayedThisQuarter) {
+    return false;
+  }
+  finalShotSfxPlayedThisQuarter = true;
+  return true;
+}
+
 /** Reset Press / Trap / Fast Break secondary stingers for a new turn. */
 export function resetSecondaryAnnounceCourtSfxDedup() {
   secondaryCourtEventSfxPlayedThisTurn = new Set();
@@ -523,16 +555,20 @@ export function resetSecondaryAnnounceCourtSfxDedup() {
 
 /**
  * Headline → secondary-tier SFX filename, with once-per-turn dedupe for
- * Press / Trap / Fast Break. Returns null when no headline match or the
- * once-per-turn gate has already consumed this turn's stinger.
+ * Press / Trap / Fast Break and once-per-quarter dedupe for Final Shot.
+ * Returns null when no headline match or a dedupe gate has already fired.
  *
  * Mirrors ``playSecondaryAnnounceCourtSfx`` but does not play — callers put
  * the returned filename on the announcement payload (``data.sfx``) so the
  * actual play happens at overlay mount time in ``court.html``, synced to
  * the visual entry per SFX_System.md.
+ *
+ * @param {string} headline
+ * @param {{ quarter?: number|null }} [options]
  */
-export function resolveSecondaryAnnounceCourtSfxFile(headline) {
+export function resolveSecondaryAnnounceCourtSfxFile(headline, options = {}) {
   const text = String(headline || "").trim();
+  const quarter = options.quarter;
   let filename = null;
   switch (text) {
     case "Press!":
@@ -551,6 +587,9 @@ export function resolveSecondaryAnnounceCourtSfxFile(headline) {
       filename = "slow-it-down-braddock.mp3";
       break;
     case "Final Shot":
+      if (!tryConsumeFinalShotSfxSlot(quarter)) {
+        return null;
+      }
       filename = pickRandomCourtEventFile(["sammy-final-shot.mp3", "final-shot-braddock.mp3"]);
       break;
     case "No Fast Break":
@@ -599,11 +638,12 @@ export function resolveAnnounceMetaCourtSfxFile(key) {
 
 /**
  * Secondary-announcement court stingers (SFX_System.md — Court Event SFX).
- * Press!, Trap!, and Fast Break! play at most once per turn; other mapped headlines
- * still fire on every matching showSecondaryAnnouncement call.
+ * Press!, Trap!, and Fast Break! play at most once per turn; Final Shot at most
+ * once per quarter; other mapped headlines fire on every matching call.
  */
 export function playSecondaryAnnounceCourtSfx(scene, headline) {
   const text = String(headline || "").trim();
+  const quarter = scene?.quarter ?? scene?.simData?.quarter ?? null;
   let filename = null;
   switch (text) {
     case "Press!":
@@ -622,6 +662,9 @@ export function playSecondaryAnnounceCourtSfx(scene, headline) {
       filename = "slow-it-down-braddock.mp3";
       break;
     case "Final Shot":
+      if (!tryConsumeFinalShotSfxSlot(quarter)) {
+        return null;
+      }
       filename = pickRandomCourtEventFile(["sammy-final-shot.mp3", "final-shot-braddock.mp3"]);
       break;
     case "No Fast Break":

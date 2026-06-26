@@ -10,8 +10,11 @@ While these HSSG's (Hardcore Sports Sim Gamers) hate losing games, they understa
 If they lose a game because their palyers made a mistke, their player missed a key shot, or their opponent simply ouplayed them in the final two minutes, they'll fight to come back stronger for the next game. If they lose a game due to faulty logic or buggy execution in EOG moments, they will completely walk away from the game and never give it another chance.
 
 ##Tasks
-**Eliminate Faulty Next Turns After Shot Resolution**
-- Don't animate or exeucte rebound turns or BIP after a Final Shot (HCO or Free Throw). The ball should hold at the rim on a make or bounce the the bounce spot on a miss. We hold this beat for 2 wall seconds, then display the end of quarter modal.
+**Eliminate Faulty Next Turns After Shot Resolution** — ✅ **Updated (clock-driven EOQ, 2026-06)**
+- Quarter end is driven by `time_remaining` reaching 0, not automatic on every Final Turn shot.
+- When clock **> 0** after a late-clock shot or final FT: make → BIP → FLSS; miss OREB → putback; miss DREB → terminal rebound + clock burn; shooting foul → FTs then same rules after last attempt.
+- When clock **= 0**: no BIP, OREB, or DREB follow-up; frontend holds at rim/bounce (`holdFinalShotMs`, 2s) then quarter-end modal.
+- See [`Situational_Logic_System.md`](../06_Gameplay_Systems/Situational_Logic_System.md) §Final Turn and `BackEnd/utils/eoq_clock_progression.py`.
 
 **Block Bugs on Final** (need to verify these still exist and if so, need to fix them)
 - When a block occurs, we get a double announce of the block in some instances
@@ -35,8 +38,9 @@ If they lose a game because their palyers made a mistke, their player missed a k
     - Clock runs to 0:00, we sound teh airhorn, and present the EOG/EOQ modal -- whichever we currently show at the end of the game. Note this situation will never lead to an overtime.
 
 **Force Shots Exactly When Clock Reaches 0:00**
-- Condition: if the team wit teh ball is looking to execute a Fianl Shot, we will still enter the final shot if the clock condition allows us to.
-- If the clock reaches 0:00 before th offense team is able to execute the Final Shot logic, whomever is holding the ball at 0:01 will attempt a shot from the location he is at at that point. This will be called Forced Last Second Shot (FLSS)
+- Condition: if the team with the ball is in a Final Turn possession, we still enter Final Turn when the clock allows (preflight + rolled anchor).
+- **Tie-break:** If Final Turn and FLSS would both trigger, **Final Turn wins** (`final_turn_shot_this_turn` defers low-clock FLSS routing).
+- If preflight fails or clock is already 0 without Final Turn flagged → **FLSS** (Forced Last Second Shot).
 - FLSS logic
     - if the player's x grid spot is >= 64 (flipped for away offense), we execute the shot as normal.
         - if he's at an inside shot location, he shoots an inside shot, else he shoots an outside shot

@@ -165,7 +165,9 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
 
     // ========== FINAL TURN (end of quarter/game) — secondary tier ==========
     case 'FINAL_SHOT':
-      showSecondaryAnnouncement("Final Shot", offenseTeam);
+      showSecondaryAnnouncement("Final Shot", offenseTeam, null, {
+        quarter: turnData?.quarter ?? scene?.quarter ?? scene?.simData?.quarter ?? null,
+      });
       break;
 
     case 'DEFENSIVE_STOP':

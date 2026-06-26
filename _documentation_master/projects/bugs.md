@@ -1,10 +1,10 @@
 
 ##End of Game / End of Quarter perfection
-6. Don't animate rebound / BIP on Final Shot FT
+6. ~~Don't animate rebound / BIP on Final Shot FT~~ — addressed by clock-driven EOQ (2026-06): no follow-up when `time_remaining == 0`; OREB/BIP/FLSS when time remains. Verify in play.
 48. Double block announce on Final Shot
-49. No OREB putback attempts on missed final shot
-43. Add a run out the clock animation
-44. Full court shots
+49. ~~No OREB putback attempts on missed final shot~~ — addressed: late-clock miss + OREB now sets `pending_oreb`. Verify in play.
+43. Add a run out the clock animation — ✅ shipped (`build_run_out_clock_result`)
+44. Full court shots — ✅ FLSS heave path
 
 ##Bugs 
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot

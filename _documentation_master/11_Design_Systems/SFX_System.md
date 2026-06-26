@@ -151,6 +151,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 - Trigger: immediately when the **Final Shot** secondary announce appears.
 - File: **50/50** random each show — `sammy-final-shot.mp3` or `final-shot-braddock.mp3`
+- **Once per quarter:** the stinger plays at most once per period. If it already fired on the structured Final Turn possession, a follow-up FLSS after BIP (late-clock make) still shows the headline but **does not** replay the SFX (`resolveSecondaryAnnounceCourtSfxFile` in `gameSfx.js`).
 
 **Block Announce**
 

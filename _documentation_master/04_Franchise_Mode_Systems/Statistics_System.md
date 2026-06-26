@@ -190,10 +190,10 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **DEF_S** (Defensive Success): Incremented for defender when putback is missed
 
 **Putback vs Kickout:**
-- **Putback (90% chance)**: Rebounder attempts shot immediately
+- **Putback (90% chance, or 100% when `time_remaining < 6`)**: Rebounder attempts shot immediately
   - Tracks FGA, FGM, PTS, PIP for rebounder
   - Tracks DEF_A, DEF_S for defender
-- **Kickout (10% chance)**: Rebounder passes out, transitions to HCO
+- **Kickout (10% chance; suppressed when `time_remaining < 6`)**: Rebounder passes out, transitions to HCO
   - Only tracks OREB for rebounder
   - No shot attempt stats tracked
 

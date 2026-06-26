@@ -454,7 +454,7 @@ the result of these stages.)
   remain in place. The universal helper is NOT applied to Triangle.
 
 
-**Final Shot** (end-of-quarter ``final_turn``) — UESS schema path: ``turn_manager._emit_hco_animation_steps`` → ``build_skeleton_animation_steps`` emits full ``animation_steps[]``. Skeleton step 0 is Final Turn alignment (all ten players to ``oDestinations`` / ``dDestinations`` spots); backend stamps ``_step_t_floor_game_seconds`` on step 0 so the clock burns until ~3s (Outside) or ~4s (Attack) remain before pass/drive/shoot steps. Frontend plays the **full** step list from index 0 via ``runSchemaPlaybackTurn`` / ``playTurn()`` — no step-0 skip, FE alignment tween, or coord patch. Legacy ``Animator.skeleton_to_animations`` / ``animations[]`` remains fallback when schema steps are absent.
+**Final Shot** (end-of-quarter ``final_turn``) — UESS schema path: ``turn_manager._emit_hco_animation_steps`` → ``build_skeleton_animation_steps`` emits full ``animation_steps[]``. Skeleton step 0 is Final Turn alignment (all ten players to ``oDestinations`` / ``dDestinations`` spots); backend stamps ``_step_t_floor_game_seconds`` on step 0 so the clock burns until the **rolled anchor** (outside shoot @ ``randint(1,3)`` s, attack drive @ ``randint(2,4)`` s) before pass/drive/shoot steps. Preflight failure routes to **FLSS**. Frontend plays the **full** step list from index 0 via ``runSchemaPlaybackTurn`` / ``playTurn()`` — no step-0 skip, FE alignment tween, or coord patch. ``time_elapsed`` = schema burn after emit. Legacy ``Animator.skeleton_to_animations`` / ``animations[]`` remains fallback when schema steps are absent.
 
 ---
 

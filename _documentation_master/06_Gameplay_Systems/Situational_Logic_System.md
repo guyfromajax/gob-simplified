@@ -2,7 +2,7 @@
 
 **Score Delta** = Offense Team Score − Defense Team Score (zero in the case of a tie).
 
-All logic below applies only when **quarter ≥ 4**. Evaluate the time-band table first to determine Slow It Down, Quick Shot, shot ratios, and Force Foul; then apply Execution.
+All logic below applies only when **quarter ≥ 4**, except **Final Turn / FLSS** (clock ≤ 30s), which applies in **all quarters and OT**. Evaluate the time-band table first to determine Slow It Down, Quick Shot, shot ratios, and Force Foul; then apply Execution.
 
 ---
 
@@ -76,49 +76,113 @@ At **turn end** (or at specific animation moments), the system announces shot re
 
 ## Final Turn Execution
 
-**Trigger:** The first possession with `time_remaining ≤ 30` seconds that is **not** OREB and **not** Fast Break (i.e. state is HCO, HCT, or FCP) is eligible for Final Turn. Only one Final Turn is triggered per quarter/OT (`final_turn_triggered_this_period`). The *next* turn after an OREB or Fast Break (when time is still ≤ 30 and quarter ≥ 4) is the one evaluated for Final Turn.
+**Scope:** All quarters and OT. Q4/OT also applies the Slow It Down / Quick Shot / Force Foul / Run Out branches at the end of this section.
 
-**Qs 1–3:**
-- The first team to take possession of the ball with ≤ 30 seconds remaining will hold for the final shot, so time_elapsed will be equal to time remaining.
-  - This applies to all turn types except OREB and Fast Break. OREB and Fast Break will execute as normal.
-  - If the result of a Final Turn turn is a Shot Attempt, it will use the entire time remaining as time elapsed, the team will shoot, and the quarter will end afterward. Note: if there is a shooting foul, the free throw(s) will run as normal then we'll enter Quarter Break.
-  - Note: for future instances there may be an offensive foul, non-shooting defensive foul, steal, or dead ball turnover, but for now, those will not be possible.
-  - **Starting Alignment:** The offense and defense will both enter "Final Turn State", with locations defined below:
-    - Offense positions for Final Turn State setup:
-      - Randomly choose ball handler: 60% chance PG, 30% SG, 10% SF.
-        - If SF is ball handler, then flip his placement logic below with SG, so the ball handler always starts at either deep upper wing or deep lower wing.
-      - PG: deep lower wing or deep upper wing (chosen at random).
-      - SG: deep lower wing or deep upper wing (whichever the PG does not line up at).
-      - SF / PF: each randomly assigned to one of upper corner, lower corner, upper midCorner, lower midCorner (note: one must be in an upper location and one must be in a lower location).
-      - C: key.
-    - Defense lines up in a 2-3 zone or 3-2 zone (chosen randomly).
-  - **Play Execution:**
-    - Shot choice will be chosen at random: 50% outside, 50% Attack.
-    - Shooter will be chosen at random:
-      - If Outside, each player will be ranked according to their SH Attribute (if two players are tied, rank them randomly): #1: 50% chance, #2: 30%, #3: 20%, #4: 9%, #5: 1%.
-      - If Attack, each player will be ranked according to the sum of their SC + AG Attributes (if two players are tied, rank them randomly): #1: 50% chance, #2: 30%, #3: 20%, #4: 9%, #5: 1%.
-      - The shooter moves to the wing on the vertical half of the court of his starting spot (if he's in an upper spot, he goes to upper wing; if he's in a lower spot, he goes to lower wing). If he's the C, he chooses lower wing or upper wing at random.
-      - If the shooter is the ball handler, he dribbles to that wing location. If he's not the ball handler, he moves to his location, then the ball handler passes the ball to him.
-        - If the ball handler and shooter are on the same vertical half of the court, they stay on that half. If they are on opposite vertical halves, the ball handler will dribble to the deep key then execute the pass.
-        - As the ball handler and shooter move to their spots during this step, the other 3 or 4 players (all except ball handler and shooter) will move to one of the following locations on the opposite vertical half. So if the shooter is at the upper wing, all other players move to spots at lower, and vice versa for lower wing.
-          - Locations: midWing, wing, midCorner, corner, deep wing, deep baseline.
-          - Two or more players cannot occupy the same spot.
-        - **Explicit:** When the ball handler is not the shooter, he moves to **deep key** (not key) before the pass; all other offensive players (the 3 or 4 who are neither ball handler nor shooter) move to random, distinct spots on the opposite vertical half from the shooter’s wing, from the set: midWing, wing, midCorner, corner, deep wing, deep baseline.
-        - **Outside shot:** With **3 seconds** remaining on the scoreboard, the shooter attempts his shot from the wing (one step: shoot at wing). Same animation pipeline as Motion outside.
-        - **Attack shot:** With **4 seconds** remaining, the shooter drives to the basket then shoots (drive + shoot steps reuse Motion attack logic).
-        - **UESS schema playback (alignment + pacing):** Final Turn shot attempts render through the same pure-renderer path as HCO — the frontend plays the full backend ``animation_steps[]`` payload from step 0 through shot resolution with **no** parallel alignment tween, step-0 skip, coord patch, or imperative clock-hold hooks. **Backend preflight** (``final_turn_pacing.py``) simulates walk-up, alignment, optional entry pass, move/pass beats, and routes to **FLSS** when the graph cannot place the anchor (outside **shot attempt @ 3s**, attack **drive start @ 4s**). **Step 0 (alignment)** moves all ten players to Final Turn starting spots; ``_step_t_floor_game_seconds`` on step 0 is computed **backward** from the anchor so prior beats fit. Optional **walk-up** prepends when entering from backcourt (BIP/SIP). Entry pass inserts only when budget allows (``final_turn_include_entry_pass``). Schema ``clock.start`` / ``clock.end`` on each step drive scoreboard display; ``time_elapsed`` derives from schema burn after emit.
-      - Execute the shot via our standard shot attempt logic, and process the result as we do all shot attempts with 0 seconds remaining in the quarter. Process Make or Miss; if no shooting foul the quarter ends; if Charge on attack shot, the quarter ends; **if blocking foul on Final Turn attack shot, award exactly two free throws (no and-1, no 3 FTs for a three-point attempt)**; if shooting foul, the quarter ends with the number of free throw(s). After the shot (or FTs if shooting foul), quarter ends and game ends if it is the final period.
-  - **Alignment (backend-owned):** The backend emits `oDestinations` and `dDestinations` in final display orientation for diagnostics and legacy consumers. Home offense uses the home-authored Final Turn templates; away offense mirrors both maps with `x_away = 100 - x_home` before emission. **Animation** uses the UESS ``animation_steps`` payload (skeleton step 0 + emitter), not FE-side coord inference. Defense uses 2-3 or 3-2 zone templates with the PG at **topLane** (not key) for Final Turn setup.
-  - **Announcement:** "Final Shot" is announced at the start of a Final Turn shot attempt (see Announcement System); not shown for FINAL_HOLD.
+### Clock-driven gate
 
-- **Final play of the quarter (post-shot behavior):** When the Final Turn shot (or the last free throw after a Final Turn shooting foul) ends the period, the following applies. The backend marks the turn with `quarter_ends_after` and does **not** create a follow-up turn (no BIP, no rebound turn). The frontend then holds, announces if applicable, and runs the existing quarter-end flow without requesting or animating a next turn.
-  - **Final Turn shot (make):** Backend does not create or append a BASELINE_INBOUND turn. Frontend: after the shot animation completes, hold the ball at the rim for the configured hold (**2 seconds**), announce **"It's Good!"** (reuse existing announcement), then end the quarter. No BIP; no players moving to inbound; everyone stays in place.
-  - **Final Turn shot (miss):** Backend does not set `pending_oreb` and does not create or append a DREB or OREB turn (no rebound animation or follow-up). Frontend: after the shot animation completes, hold the ball at the bounce spot for the configured hold (**2 seconds**), then end the quarter. No rebound turn is requested or animated.
-  - **Final Turn shooting foul:** Free throw(s) run as normal. After the last free throw, backend does not create BIP when the quarter ends (`time_remaining == 0`). Frontend: after the last FT animation, hold for the configured hold (**2 seconds**), then end the quarter (no BIP). Config: `finalTurn.holdFinalShotMs` (currently **2000 ms** in `animation_config.js`) controls the hold duration for these cases. (Two consumer call sites use a `?? 3000` fallback and one uses `?? 2000`, but the config value is always set, so the effective hold is 2000 ms.)
+**Trigger:** Any possession with `time_remaining ≤ 30` seconds that is **not** OREB and **not** Fast Break (state is HCO, HCT, or FCP) is eligible for late-clock execution. There is **no** one-shot-per-period cap — multiple late possessions can occur until the game clock reaches 0.
 
-**Q4 (and OT):**
-- If Slow It Down is true and Force Foul is false: produce a **FINAL_HOLD** turn. The offense and defense get into Starting Alignments, and the offense holds the ball until the clock reaches 0 (`time_elapsed = time_remaining`). No shot is attempted. Quarter (or game) ends after this turn.
-- If Slow It Down is true and Force Foul is true: execute the Force Foul (existing logic); no special Final Turn alignment for that possession.
-- If Quick Shot: treat as a normal quick shot turn (no Final Turn alignment or play execution). In the last 30 seconds, this applies only when the offense is trailing by **more than 3**.
-- If not Slow It Down, and not Quick Shot, and not Force Foul: treat as the same final shot logic as above (trailing or tied; a team leading should never enter this instance).
-  - Special case: if the offense is trailing by **exactly 3** in a Final Shot situation, the shot type is forced to **Outside**. The shooter does not use the Attack / drive-to-basket branch.
+**Excluded:** OREB and Fast Break turns execute normally; the *next* turn after them is re-evaluated if clock is still ≤ 30.
+
+**Follow-up possessions** (made shot or SIP with time still on the clock) skip full Final Turn setup. After BIP/SIP the backend sets `flss_possession_pending`; the next offense turn runs **FLSS** (sprint-and-shoot with ~1s remaining).
+
+**Implementation:** `BackEnd/utils/eoq_clock_progression.py`, `BackEnd/models/turn_manager.py`, `BackEnd/engine/final_turn_pacing.py`.
+
+---
+
+### Full Final Turn setup (structured possession)
+
+When eligible and not routed to FLSS, Run Out, Force Foul, Quick Shot, or FINAL_HOLD:
+
+**Ball handler:** Prefer live `last_ball_handler` if PG/SG/SF; else random 60% PG / 30% SG / 10% SF.
+
+**Starting alignment (offense):**
+- PG / SG: deep upper wing or deep lower wing (random, distinct).
+- SF / PF: upper corner, lower corner, upper midCorner, lower midCorner (one upper, one lower).
+- C: key.
+- If SF is ball handler, SF/SG wing placement is swapped so the BH is always on a deep wing.
+
+**Defense:** Random 2-3 or 3-2 zone; PG at **topLane** (not key).
+
+**Shot choice:** 50% Outside / 50% Attack, except Q4+ trailing by **exactly 3** → forced Outside three.
+
+**Shooter weights:** Rank by SH (outside) or SC+AG (attack); weighted random 50 / 30 / 20 / 9 / 1.
+
+**Play execution (movement):**
+- Shooter moves to upper or lower wing on his vertical half (C picks wing at random).
+- If BH is shooter: dribble to wing. If not: BH passes from deep key when crossing halves; other 3–4 players fill opposite-half spots (midWing, wing, midCorner, corner, deep wing, deep baseline) without duplication.
+
+**Variable shot anchors** (rolled once per possession → `final_turn_anchor_clock`):
+- **Outside:** shoot attempt at `random.randint(1, 3)` seconds remaining.
+- **Attack:** drive start at `random.randint(2, 4)` seconds remaining.
+
+**UESS schema playback:** `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps`. Frontend plays full `animation_steps[]` from step 0 — no FE alignment tween, step-0 skip, or coord patch.
+
+**Backend preflight** (`final_turn_pacing.py`): Simulates walk-up, alignment, optional entry pass, and move/pass beats backward from the rolled anchor. Sets `_step_t_floor_game_seconds` on skeleton step 0. Routes to **FLSS** when the graph cannot meet the anchor.
+
+**Final Turn vs FLSS tie-break:** If both would trigger at 0:00, **Final Turn wins** — low-clock routing defers to `resolve_final_turn_shot()` when `final_turn_shot_this_turn` is already set.
+
+**Blocking foul on attack:** Exactly 2 FTs (no and-1, no 3 FTs for a three) when `game_state["final_turn"]` during shot resolve.
+
+**Alignment (backend-owned):** `oDestinations` / `dDestinations` in display orientation; away mirrors with `x_away = 100 - x_home`.
+
+**Announcement:** "Final Shot" when `turn.final_turn` and `result_type !== 'FINAL_HOLD'`.
+
+---
+
+### FLSS — Forced Last Second Shot
+
+**When:**
+- Final Turn preflight budget fails (`route_flss`), or
+- `game_clock ≤ 0` on an eligible possession and Final Turn is **not** already flagged, or
+- `flss_possession_pending` after late-clock BIP/SIP.
+
+**What:** BH sprints for `time_remaining − 1` game seconds, then shoots with ~1s on the clock. No alignment / entry-pass graph.
+
+**Implementation:** `BackEnd/engine/eoq_perfection.py` → `resolve_flss_shot_logic()`, `compute_flss_drive_plan()`, `build_flss_skeleton_steps()`.
+
+Zone logic (normal / penalty / heave) unchanged from EOQ brief. Heave remains terminal.
+
+---
+
+### Post-shot progression when clock > 0
+
+Quarter end is **clock-driven**. After shot resolution (or the **final** FT of a trip), if `time_remaining > 0`:
+
+| Outcome | Next step |
+|--------|-----------|
+| **Make, no foul** | BIP/SIP → `flss_possession_pending` → FLSS |
+| **Miss / Block, OREB** | `pending_oreb` → putback (see OREB rules) |
+| **Miss / Block, DREB** | Terminal DREB: rebound animation, clock → 0:00, no outlet |
+| **Shooting foul** | FTs (clock stopped); branch after **last** FT only |
+
+When `time_remaining == 0`: `quarter_ends_after`, no BIP/OREB/DREB follow-up. Frontend quarter-end hold (`holdFinalShotMs`, default **2000 ms**).
+
+Turns in this chain carry `late_clock_eoq: true`.
+
+---
+
+### OREB rules (universal)
+
+- **Putback vs kickout:** Normally 90% / 10% (`resolve_offensive_rebound`). When **`time_remaining < 6`**, always putback.
+- **Putback floor:** `OREB_PUTBACK_MIN_TIME_ELAPSED = 2` (all putbacks).
+- **Block → OREB:** Same late-clock routing as a miss when applicable.
+
+Non-shooting fouls use standard situational logic by time remaining.
+
+---
+
+### Qs 1–3
+
+Same structured Final Turn and clock-driven post-shot progression as Q4 trailing/tied, without Q4-only Run Out / Slow+Force / Quick Shot branches.
+
+---
+
+### Q4 (and OT) situational branches
+
+- **Run Out The Clock** (`should_run_out_clock`): Winning or blowout loss (>18), ≤30s, no force-foul defense → move all players offense-side, clock to 0, no shot.
+- **FINAL_HOLD:** Slow It Down, Force Foul false → hold until 0.
+- **Slow + Force Foul:** Execute Force Foul; no Final Turn alignment.
+- **Quick Shot:** Normal quick-shot HCO (no Final Turn setup). Last 30s only when trailing by **more than 3**.
+- **Otherwise (trailing/tied):** Full Final Turn setup.
+- **Trailing by exactly 3:** Forced Outside three.

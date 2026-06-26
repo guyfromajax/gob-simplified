@@ -406,7 +406,8 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
       : resolveAnnounceMetaCourtSfxFile(rawMetaSfx);
   }
   if (!sfxFile) {
-    sfxFile = resolveSecondaryAnnounceCourtSfxFile(text);
+    const quarter = meta?.quarter ?? scene?.quarter ?? scene?.simData?.quarter ?? null;
+    sfxFile = resolveSecondaryAnnounceCourtSfxFile(text, { quarter });
   }
   const data = {
     tier: 'secondary',

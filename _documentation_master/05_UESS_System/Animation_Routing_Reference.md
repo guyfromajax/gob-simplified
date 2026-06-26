@@ -280,7 +280,7 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 - Updates active player display (shooter)
 - Routes to `FreeThrowAnimationSystem` (if available) or falls back to `runFreeThrowSequence()`
 - Appends text scroll with free throw result
-- On `quarter_ends_after` (e.g. Final Turn shooting foul → FTs): shows 0:00, holds `holdFinalShotMs` (default 3000ms) — no BIP. EOQ airhorn fires from `AnimationRouter` when the game clock tween hits 0:00 (see `SFX_System.md`).
+- On `quarter_ends_after` when `time_remaining == 0` after the last FT: shows 0:00, holds `holdFinalShotMs` (default 2000ms) — no BIP. When clock remains after the last FT in a late-clock chain, normal BIP → FLSS progression applies (see `Situational_Logic_System.md`). EOQ airhorn fires from `AnimationRouter` when the game clock tween hits 0:00 (see `SFX_System.md`).
 - **Note:** `onUpdate` is called inside `runFreeThrowSequence` (no double counting)
 
 **Key Features:**
@@ -466,7 +466,7 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 **Registered for:** `FINAL_TURN_SHOT` (reached via `determineHandler` when `final_turn === true` + shot attempt)
 
 **What it does:**
-- **Primary path (UESS):** When `turnData.animation_steps` is present, `processTurn` routes to `runSchemaPlaybackTurn()` before this handler runs — full schema playback from step 0 (alignment + step-0 floor + pass/drive/shoot), then quarter-end hold when `quarter_ends_after`.
+- **Primary path (UESS):** When `turnData.animation_steps` is present, `processTurn` routes to `runSchemaPlaybackTurn()` before this handler runs — full schema playback from step 0 (alignment + step-0 floor + pass/drive/shoot). Quarter-end hold runs only when `quarter_ends_after` (clock at 0). If clock remains, backend may chain BIP → FLSS or OREB/DREB per `eoq_clock_progression`.
 - **Fallback (legacy):** If no schema steps, runs `runFinalTurnAlignment()` + imperative late-pass hold, then `ShotAnimationSystem` / `playTurnAnimation()`.
 
 ## Registered Result Types
