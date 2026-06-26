@@ -461,8 +461,9 @@ def _normalize_flss_terminal_clock_burn(
 ) -> None:
     """Terminal FLSS turns must burn the full remaining game clock to 0:00.
 
-    FLSS skeleton steps are short (~1 game-sec); extend step 0 and restamp
-    per-step ``clock`` fields so schema playback drives the scoreboard to zero.
+    Sprint-drive FLSS steps carry explicit per-step floors (drive budget + 1s
+    shot window); only restamp ``clock`` fields. Legacy stationary FLSS still
+    extends step 0 when emitted step times under-burn the remaining clock.
     """
     if not steps:
         return
@@ -473,8 +474,15 @@ def _normalize_flss_terminal_clock_burn(
     current_sum = sum(float((s.get("end") or {}).get("time_elapsed") or 0) for s in steps)
     if current_sum <= 0:
         return
+    has_sprint_drive = any(
+        (s.get("start") or {})
+        .get("advance_trigger", {})
+        .get("metadata", {})
+        .get("reason") == "flss_sprint_drive"
+        for s in steps
+    )
     shortfall = clock_start - current_sum
-    if shortfall > 0:
+    if shortfall > 0 and not has_sprint_drive:
         first_end = steps[0].setdefault("end", {})
         first_end["time_elapsed"] = float(first_end.get("time_elapsed") or 0) + shortfall
     elapsed = 0.0
@@ -1483,6 +1491,13 @@ def build_skeleton_animation_steps(
                     gate_id = _player_id_at_pos(off_lineup, driver_pos)
                     gate_kind = "attack_drive_driver"
 
+        # 1c) FLSS sprint drive — gate on ball handler until 1s remains.
+        if gate_id is None and turn_type == "HCO" and skeleton_steps[i].get("_flss_sprint_drive"):
+            driver_pos = skeleton_steps[i].get("_flss_gate_driver_pos")
+            if driver_pos:
+                gate_id = _player_id_at_pos(off_lineup, driver_pos)
+                gate_kind = "flss_drive_driver"
+
         # 2) FCP stopper action step (truncated final skeleton step before
         # the appended event marker). Gate on the players involved in the
         # stop action.
@@ -1553,9 +1568,14 @@ def build_skeleton_animation_steps(
             if i < len(skeleton_steps) else None
         )
         if gate_kind == "shooter" and not is_pass_step:
-            t = max(0.05, natural_t)
+            if turn_result.get("flss") and step_floor is not None:
+                t = max(float(step_floor), natural_t)
+            else:
+                t = max(0.05, natural_t)
         elif gate_kind == "attack_drive_driver" and not is_pass_step:
             t = max(0.05, natural_t)
+        elif gate_kind == "flss_drive_driver" and not is_pass_step:
+            t = max(float(step_floor or 0.05), natural_t)
         elif step_floor is not None:
             t = max(float(step_floor), natural_t, ball_pass_t)
         else:
@@ -1603,6 +1623,8 @@ def build_skeleton_animation_steps(
             }
         elif gate_id and gate_coord:
             advance_trigger = _build_advance_trigger_player_reaches(gate_id, gate_coord, t)
+            if skeleton_steps[i].get("_flss_sprint_drive"):
+                advance_trigger.setdefault("metadata", {})["reason"] = "flss_sprint_drive"
         else:
             # No movement detected — fall back to ball-handler's end coord.
             fallback_id = bh_id_fallback or "unknown"

@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import random
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
@@ -188,6 +189,135 @@ def build_run_out_clock_result(game, time_remaining_sec: int) -> dict:
     }
 
 
+FLSS_BASKET_X_HOME = 91.0
+FLSS_BASKET_X_AWAY = 9.0
+FLSS_SHOT_WINDOW_GAME_SECONDS = 1.0
+
+
+def _flss_basket_x(*, is_home_offense: bool) -> float:
+    return FLSS_BASKET_X_HOME if is_home_offense else FLSS_BASKET_X_AWAY
+
+
+def _flss_toplane_x(*, is_home_offense: bool) -> float:
+    home_x = float(HCO_STRING_SPOTS["topLane"]["x"])
+    return home_x if is_home_offense else 100.0 - home_x
+
+
+@dataclass(frozen=True)
+class FlssDrivePlan:
+    start_x: float
+    start_y: float
+    end_x: float
+    end_y: float
+    drive_budget: float
+    pull_up_jumper: bool
+    shot_window_seconds: float
+
+
+def compute_flss_drive_plan(
+    shooter: Any,
+    start_x: float,
+    start_y: float,
+    time_remaining: float,
+    *,
+    is_home_offense: bool,
+) -> FlssDrivePlan:
+    """Sprint toward the basket until ``time_remaining - 1`` game seconds, then shoot.
+
+    If the BH would reach the rim before that window closes, stop at topLane x
+    (when it lies on the drive path) for a pull-up outside jumper instead.
+    """
+    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+
+    sx = float(start_x)
+    sy = float(start_y)
+    drive_budget = max(0.0, float(time_remaining) - FLSS_SHOT_WINDOW_GAME_SECONDS)
+    sprint_rate = float(_ag_grid_per_game_sec(shooter, "sprint"))
+    direction = 1.0 if is_home_offense else -1.0
+    basket_x = _flss_basket_x(is_home_offense=is_home_offense)
+    toplane_x = _flss_toplane_x(is_home_offense=is_home_offense)
+
+    dist_to_basket = abs(basket_x - sx)
+    max_drive_dist = sprint_rate * drive_budget
+
+    if is_home_offense:
+        toplane_in_path = sx < toplane_x < basket_x
+    else:
+        toplane_in_path = basket_x < toplane_x < sx
+
+    pull_up = bool(toplane_in_path and max_drive_dist >= dist_to_basket)
+    if pull_up:
+        end_x = toplane_x
+    elif drive_budget <= 0.0:
+        end_x = sx
+    else:
+        end_x = sx + direction * min(max_drive_dist, dist_to_basket)
+        if is_home_offense:
+            end_x = min(end_x, basket_x)
+        else:
+            end_x = max(end_x, basket_x)
+
+    end_x = round(max(1.0, min(99.0, end_x)), 2)
+    return FlssDrivePlan(
+        start_x=sx,
+        start_y=sy,
+        end_x=end_x,
+        end_y=sy,
+        drive_budget=drive_budget,
+        pull_up_jumper=pull_up,
+        shot_window_seconds=FLSS_SHOT_WINDOW_GAME_SECONDS,
+    )
+
+
+def build_flss_skeleton_steps(
+    shooter_pos: str,
+    *,
+    spot_start: str,
+    spot_end: str,
+    start_coords: Dict[str, float],
+    end_coords: Dict[str, float],
+    drive_plan: FlssDrivePlan,
+) -> List[Dict[str, Any]]:
+    """Two-step FLSS graph: optional sprint drive, then terminal shot."""
+    steps: List[Dict[str, Any]] = []
+    stand = {"action": "stand", "location": "key"}
+
+    if drive_plan.drive_budget > 0.0:
+        drive_action: Dict[str, Any] = {
+            "action": ACTIONS["DRIVE"],
+            "location": spot_end,
+            "coords": dict(end_coords),
+            "archetype": "sprint",
+        }
+        step0: Dict[str, Any] = {
+            "timestamp": 0,
+            "pos_actions": {pos: dict(stand) for pos in POSITION_LIST},
+            "_flss_sprint_drive": True,
+            "_flss_gate_driver_pos": shooter_pos,
+            "_step_t_floor_game_seconds": drive_plan.drive_budget,
+        }
+        step0["pos_actions"][shooter_pos] = drive_action
+        if drive_plan.pull_up_jumper:
+            step0["_flss_pull_up"] = True
+        steps.append(step0)
+
+    shoot_action: Dict[str, Any] = {
+        "action": ACTIONS["SHOOT"],
+        "location": spot_end,
+        "coords": dict(end_coords),
+    }
+    step_shoot: Dict[str, Any] = {
+        "timestamp": 300 if steps else 0,
+        "pos_actions": {pos: dict(stand) for pos in POSITION_LIST},
+        "_step_t_floor_game_seconds": drive_plan.shot_window_seconds,
+    }
+    step_shoot["pos_actions"][shooter_pos] = shoot_action
+    if drive_plan.pull_up_jumper:
+        step_shoot["_flss_pull_up"] = True
+    steps.append(step_shoot)
+    return steps
+
+
 def _flss_defender_coords(shooter_coords: Dict[str, float], *, is_home_offense: bool) -> Dict[str, float]:
     sx = float(shooter_coords.get("x", 50))
     sy = float(shooter_coords.get("y", 25))
@@ -248,12 +378,23 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     shooter_coords = getattr(shooter, "coords", None) or {"x": 50, "y": 25}
     sx = float(shooter_coords.get("x", 50))
     sy = float(shooter_coords.get("y", 25))
-    shooter.coords = {"x": sx, "y": sy}
-    zone = classify_flss_zone(sx, is_home_offense=is_home_off)
+    time_remaining = float(game_state.get("time_remaining") or FLSS_SHOT_WINDOW_GAME_SECONDS)
+    drive_plan = compute_flss_drive_plan(
+        shooter,
+        sx,
+        sy,
+        time_remaining,
+        is_home_offense=is_home_off,
+    )
+    ex = drive_plan.end_x
+    ey = drive_plan.end_y
+    shooter_coords = {"x": ex, "y": ey}
+    shooter.coords = dict(shooter_coords)
+    zone = classify_flss_zone(ex, is_home_offense=is_home_off)
     home_basket = _attacking_home_basket(is_home_off)
 
     flss_vo = zone != "normal"
-    heave_sfx = flss_heave_sfx_eligible(sx, is_home_offense=is_home_off)
+    heave_sfx = flss_heave_sfx_eligible(ex, is_home_offense=is_home_off)
 
     log_eoq_step(
         game,
@@ -264,6 +405,9 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         shooter_pos=shooter_pos,
         extra={
             "shooter_coords": {"x": sx, "y": sy},
+            "drive_end_coords": {"x": ex, "y": ey},
+            "drive_budget": drive_plan.drive_budget,
+            "pull_up_jumper": drive_plan.pull_up_jumper,
             "flss_zone": zone,
             "flss_vo": flss_vo,
             "flss_heave_sfx": heave_sfx,
@@ -271,7 +415,8 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         },
     )
 
-    spot_label = game.turn_manager._coords_to_nearest_spot({"x": sx, "y": sy})
+    spot_start = game.turn_manager._coords_to_nearest_spot({"x": sx, "y": sy})
+    spot_end = game.turn_manager._coords_to_nearest_spot(shooter_coords)
     log_eoq_step(
         game,
         "FLSS",
@@ -279,17 +424,16 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         "START",
         shooter=shooter,
         shooter_pos=shooter_pos,
-        extra={"spot_label": spot_label},
+        extra={"spot_start": spot_start, "spot_end": spot_end},
     )
-    step0 = {"timestamp": 0, "pos_actions": {}}
-    step1 = {"timestamp": 300, "pos_actions": {}}
-    for pos in POSITION_LIST:
-        if pos == shooter_pos:
-            step0["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": spot_label}
-            step1["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": spot_label}
-        else:
-            step0["pos_actions"][pos] = {"action": "stand", "location": "key"}
-            step1["pos_actions"][pos] = {"action": "stand", "location": "key"}
+    skeleton_steps = build_flss_skeleton_steps(
+        shooter_pos,
+        spot_start=spot_start,
+        spot_end=spot_end,
+        start_coords={"x": sx, "y": sy},
+        end_coords=shooter_coords,
+        drive_plan=drive_plan,
+    )
 
     defender = None
     if zone == "penalty" and def_lineup:
@@ -302,12 +446,12 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
 
     if zone == "heave":
         log_eoq_step(game, "FLSS", "heave_resolve", "START", shooter=shooter, shooter_pos=shooter_pos)
-        made, points = _resolve_flss_heave(shooter, sx, is_home_offense=is_home_off)
+        made, points = _resolve_flss_heave(shooter, ex, is_home_offense=is_home_off)
         result_type = "MAKE" if made else "MISS"
         result: Dict[str, Any] = {
             "result_type": result_type,
             "current_turn": current_state,
-            "time_elapsed": 1,
+            "time_elapsed": int(max(1, round(time_remaining))),
             "offense_team_id": off_team.team_id,
             "shooter_id": getattr(shooter, "player_id", None),
             "shot_type": "outside",
@@ -316,11 +460,12 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             "flss_zone": zone,
             "flss_vo": flss_vo,
             "flss_heave_sfx": heave_sfx,
+            "flss_pull_up": drive_plan.pull_up_jumper,
             "quarter_ends_after": True,
             "next_play_type": None,
             "possession_flips": False,
-            "skeleton": {"steps": [step0, step1]},
-            "shooter_coords": {"x": sx, "y": sy},
+            "skeleton": {"steps": skeleton_steps},
+            "shooter_coords": dict(shooter_coords),
         }
         if made:
             apply_scoring(
@@ -335,8 +480,8 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             shooter.record_stat("FGA")
             if points == 3:
                 shooter.record_stat("3PTA")
-            result["ball_bounce_x"] = sx + (2 if is_home_off else -2)
-            result["ball_bounce_y"] = sy
+            result["ball_bounce_x"] = ex + (2 if is_home_off else -2)
+            result["ball_bounce_y"] = ey
             result["text"] = f"{get_name_safe(shooter)} misses the desperation heave."
         strip_terminal_rebound_fields(result)
         log_eoq_step(
@@ -353,15 +498,17 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     # normal / penalty — standard shot pipeline
     log_eoq_step(game, "FLSS", "build_skeleton", "END", extra={"zone": zone})
     log_eoq_step(game, "FLSS", "pipeline_resolve_shot", "START", shooter=shooter, shooter_pos=shooter_pos)
-    if zone == "normal":
-        inside = is_inside_paint_grid(sx, sy, home_basket=home_basket)
+    if drive_plan.pull_up_jumper:
+        shot_type = "outside"
+    elif zone == "normal":
+        inside = is_inside_paint_grid(ex, ey, home_basket=home_basket)
         shot_type = "inside" if inside else "outside"
     else:
         shot_type = "outside"
 
     roles = {
-        "skeleton": {"steps": [step0, step1]},
-        "steps": [step0, step1],
+        "skeleton": {"steps": skeleton_steps},
+        "steps": skeleton_steps,
         "ball_handler": ball_handler,
         "shooter": shooter,
         "passer": None,
@@ -373,8 +520,9 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         "flss_zone": zone,
         "flss_vo": flss_vo,
         "flss_heave_sfx": heave_sfx,
-        "shooter_location": spot_label,
-        "shot_spot": {"x": sx, "y": sy},
+        "flss_pull_up": drive_plan.pull_up_jumper,
+        "shooter_location": spot_end,
+        "shot_spot": dict(shooter_coords),
     }
 
     if zone == "penalty":
@@ -406,7 +554,8 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     result["flss_zone"] = zone
     result["flss_vo"] = flss_vo
     result["flss_heave_sfx"] = heave_sfx
-    result["time_elapsed"] = 1
+    result["flss_pull_up"] = drive_plan.pull_up_jumper
+    result["time_elapsed"] = int(max(1, round(time_remaining)))
     result["quarter_ends_after"] = True
     result["next_play_type"] = None
     result["forced_shot"] = True

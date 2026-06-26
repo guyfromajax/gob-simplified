@@ -332,6 +332,7 @@ This matters because the normal game document can be ahead of the resume anchor.
 Rules:
 
 - If `active_resume=true` or `resume_from_anchor=true`, `loadGameStats.js` first calls `/api/game/{game_id}/resume-state`.
+- If `consume_resume_anchor=true`, `loadGameStats.js` also calls `/api/game/{game_id}/resume-state`; this is the Set Lineup return path for a quarter-break resume.
 - If that endpoint returns `status: "stoppage_anchor"`, the returned anchor payload paints:
   - scoreboard scores
   - game clock
@@ -340,6 +341,7 @@ Rules:
   - timeout/foul header state
   - player stat panels
   - team stat panels
+- Resume and consume paths must not fall back to `/api/game/{game_id}` for initial court stats. The generic game document may be ahead of the anchor and can create mixed score/clock/quarter displays.
 - Only non-resume page loads should prefer `/api/game/{game_id}` for initial court stats.
 - `bootGame.js` also applies the compact anchor score/clock values through `applyResumeStateToCourtChrome(resumeState)` so the modal chrome cannot show stale values while the full stat panels hydrate.
 
@@ -348,6 +350,7 @@ Backend support:
 - `/api/game/{game_id}/resume-state` returns a game-state-shaped anchor payload, not just a modal summary.
 - The payload includes the anchor `score`, `teams`, `home_team`, `away_team`, `box_score`, `team_totals`, `team_stats`, `team_scoreboard_meta`, `fouls`, `timeouts`, `clock`, and `shot_clock_remaining`.
 - Name-keyed score and box-score entries are included for compatibility with the existing court renderer.
+- When a `resume_anchor` exists, `/resume-state` derives score, clock, quarter, and stat payloads from the anchor snapshot only. It may use the surrounding saved game document for identity fallback, but it must not pull scoreboard or clock values from the newer generic game document.
 
 ## Browser Close / Later Return Flow
 

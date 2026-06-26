@@ -462,7 +462,9 @@ export async function initializeGameStats() {
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');
   const wantsAnchorUi =
-    urlParams.get('active_resume') === 'true' || urlParams.get('resume_from_anchor') === 'true';
+    urlParams.get('active_resume') === 'true' ||
+    urlParams.get('resume_from_anchor') === 'true' ||
+    urlParams.get('consume_resume_anchor') === 'true';
   
   if (!homeTeam || !awayTeam) return;
 
@@ -470,7 +472,7 @@ export async function initializeGameStats() {
   if (!gameId) return;
   
   const gameData = wantsAnchorUi
-    ? (await fetchResumeState(gameId)) || await fetchGameState(gameId)
+    ? await fetchResumeState(gameId)
     : await fetchGameState(gameId);
   if (gameData) {
     displayAccumulatedHeaderState(gameData, homeTeam, awayTeam);

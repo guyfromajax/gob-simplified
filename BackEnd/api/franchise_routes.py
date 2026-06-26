@@ -966,25 +966,85 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     resume_anchor = game_doc.get("resume_anchor") if isinstance(game_doc.get("resume_anchor"), dict) else {}
     source_doc = _anchor_snapshot(game_doc) if resume_anchor else game_doc
 
+    def _parse_int(value, default: int) -> int:
+        if value is None:
+            return default
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return default
+
+    def _norm_key(value) -> str:
+        return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+    def _find_team_row(teams: dict, *candidates):
+        if not isinstance(teams, dict):
+            return {}
+        raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
+        normalized = {_norm_key(c) for c in raw_candidates}
+        for candidate in raw_candidates:
+            row = teams.get(candidate)
+            if isinstance(row, dict):
+                return row
+        for key, row in teams.items():
+            if not isinstance(row, dict):
+                continue
+            if _norm_key(key) in normalized:
+                return row
+            row_candidates = {
+                _norm_key(row.get("team_id")),
+                _norm_key(row.get("_id")),
+                _norm_key(row.get("name")),
+                _norm_key(row.get("slug")),
+            }
+            if normalized.intersection(row_candidates):
+                return row
+        return {}
+
+    def _score_from_source(row: dict, team: dict, score_map: dict, names: list[str], direct_key: str) -> int:
+        for value in (
+            row.get("score") if isinstance(row, dict) else None,
+            team.get("score") if isinstance(team, dict) else None,
+            source_doc.get(direct_key),
+        ):
+            if value is not None:
+                return _parse_int(value, 0)
+        if isinstance(score_map, dict):
+            for name in names:
+                if name and score_map.get(name) is not None:
+                    return _parse_int(score_map.get(name), 0)
+            normalized_score = {_norm_key(k): v for k, v in score_map.items()}
+            for name in names:
+                key = _norm_key(name)
+                if key and normalized_score.get(key) is not None:
+                    return _parse_int(normalized_score.get(key), 0)
+        return 0
+
     try:
         quarter = int(source_doc.get("quarter", resume_anchor.get("quarter", 1) if resume_anchor else 1) or 1)
     except (TypeError, ValueError):
         quarter = 1
-    try:
-        time_remaining = int(float(source_doc.get("time_remaining", resume_anchor.get("time_remaining", 480) if resume_anchor else 480) or 480))
-    except (TypeError, ValueError):
-        time_remaining = 480
+    time_remaining = _parse_int(
+        source_doc.get("time_remaining", resume_anchor.get("time_remaining") if resume_anchor else None),
+        480,
+    )
 
     home_team = source_doc.get("home_team") if isinstance(source_doc.get("home_team"), dict) else {}
     away_team = source_doc.get("away_team") if isinstance(source_doc.get("away_team"), dict) else {}
     teams_obj = source_doc.get("teams") if isinstance(source_doc.get("teams"), dict) else {}
     source_home_id = str(source_doc.get("home_team_id") or game_doc.get("home_team_id") or home_id)
     source_away_id = str(source_doc.get("away_team_id") or game_doc.get("away_team_id") or away_id)
-    home_row = teams_obj.get(source_home_id, {}) if isinstance(teams_obj.get(source_home_id), dict) else {}
-    away_row = teams_obj.get(source_away_id, {}) if isinstance(teams_obj.get(source_away_id), dict) else {}
-
-    home_score = int((home_row or home_team).get("score", source_doc.get("home_score", game_doc.get("home_score", 0))) or 0)
-    away_score = int((away_row or away_team).get("score", source_doc.get("away_score", game_doc.get("away_score", 0))) or 0)
+    home_row = _find_team_row(teams_obj, source_home_id, home_id, home_team.get("name"), source_doc.get("home_team_name"))
+    away_row = _find_team_row(teams_obj, source_away_id, away_id, away_team.get("name"), source_doc.get("away_team_name"))
+    score_map = source_doc.get("score") if isinstance(source_doc.get("score"), dict) else {}
+    team_docs = {
+        str(team["_id"]): team.get("name", str(team["_id"]))
+        for team in team_docs_raw
+    }
+    home_name = home_row.get("name") or home_team.get("name") or source_doc.get("home_team_name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
+    away_name = away_row.get("name") or away_team.get("name") or source_doc.get("away_team_name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
+    home_score = _score_from_source(home_row, home_team, score_map, [home_name, source_home_id, home_id], "home_score")
+    away_score = _score_from_source(away_row, away_team, score_map, [away_name, source_away_id, away_id], "away_score")
     resume_from_timeout = bool(
         resume_anchor.get("resume_from_timeout")
         or source_doc.get("timeout_next_play_type")
@@ -1011,13 +1071,6 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
             bool(resume_anchor),
         )
         return None
-
-    team_docs = {
-        str(team["_id"]): team.get("name", str(team["_id"]))
-        for team in team_docs_raw
-    }
-    home_name = home_row.get("name") or home_team.get("name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
-    away_name = away_row.get("name") or away_team.get("name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
 
     payload = {
         "game_id": str(game_doc.get("_id")),

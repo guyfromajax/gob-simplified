@@ -2341,25 +2341,93 @@ try:
         anchor_snapshot = resume_anchor.get("snapshot") if isinstance(resume_anchor.get("snapshot"), dict) else None
         source = anchor_snapshot or saved
 
+        def _parse_int(value, default: int) -> int:
+            if value is None:
+                return default
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                return default
+
+        def _norm_key(value) -> str:
+            return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+        def _find_team_row(teams: dict, *candidates):
+            if not isinstance(teams, dict):
+                return {}
+            raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
+            normalized = {_norm_key(c) for c in raw_candidates}
+            for candidate in raw_candidates:
+                row = teams.get(candidate)
+                if isinstance(row, dict):
+                    return row
+            for key, row in teams.items():
+                if not isinstance(row, dict):
+                    continue
+                if _norm_key(key) in normalized:
+                    return row
+                row_candidates = {
+                    _norm_key(row.get("team_id")),
+                    _norm_key(row.get("_id")),
+                    _norm_key(row.get("name")),
+                    _norm_key(row.get("slug")),
+                }
+                if normalized.intersection(row_candidates):
+                    return row
+            return {}
+
+        def _score_from_source(row: dict, team: dict, score_map: dict, names: list[str], direct_key: str) -> int:
+            for value in (
+                row.get("score") if isinstance(row, dict) else None,
+                team.get("score") if isinstance(team, dict) else None,
+                source.get(direct_key),
+            ):
+                if value is not None:
+                    return _parse_int(value, 0)
+            if isinstance(score_map, dict):
+                for name in names:
+                    if name and score_map.get(name) is not None:
+                        return _parse_int(score_map.get(name), 0)
+                normalized_score = {_norm_key(k): v for k, v in score_map.items()}
+                for name in names:
+                    key = _norm_key(name)
+                    if key and normalized_score.get(key) is not None:
+                        return _parse_int(normalized_score.get(key), 0)
+            return 0
+
         try:
             quarter = int(source.get("quarter", 1) or 1)
         except (TypeError, ValueError):
             quarter = 1
-        try:
-            time_remaining = int(float(source.get("time_remaining", 480) or 480))
-        except (TypeError, ValueError):
-            time_remaining = 480
+        time_remaining = _parse_int(source.get("time_remaining"), 480)
 
         home_team = source.get("home_team") if isinstance(source.get("home_team"), dict) else {}
         away_team = source.get("away_team") if isinstance(source.get("away_team"), dict) else {}
         home_team_id = str(source.get("home_team_id") or saved.get("home_team_id") or "")
         away_team_id = str(source.get("away_team_id") or saved.get("away_team_id") or "")
         teams_obj = source.get("teams") if isinstance(source.get("teams"), dict) else {}
-        home_row = teams_obj.get(home_team_id, {}) if home_team_id and isinstance(teams_obj.get(home_team_id), dict) else {}
-        away_row = teams_obj.get(away_team_id, {}) if away_team_id and isinstance(teams_obj.get(away_team_id), dict) else {}
-        home_score = int((home_row or home_team).get("score", saved.get("home_score", 0)) or 0)
-        away_score = int((away_row or away_team).get("score", saved.get("away_score", 0)) or 0)
+        source_score = source.get("score") if isinstance(source.get("score"), dict) else {}
+        home_row = _find_team_row(
+            teams_obj,
+            home_team_id,
+            source.get("home_team_id"),
+            saved.get("home_team_id"),
+            home_team.get("name"),
+            source.get("home_team_name"),
+        )
+        away_row = _find_team_row(
+            teams_obj,
+            away_team_id,
+            source.get("away_team_id"),
+            saved.get("away_team_id"),
+            away_team.get("name"),
+            source.get("away_team_name"),
+        )
         is_final = bool(source.get("is_final"))
+        home_team_name = home_row.get("name") or home_team.get("name") or source.get("home_team_name")
+        away_team_name = away_row.get("name") or away_team.get("name") or source.get("away_team_name")
+        home_score = _score_from_source(home_row, home_team, source_score, [home_team_name, home_team_id, source.get("home_team_id")], "home_score")
+        away_score = _score_from_source(away_row, away_team, source_score, [away_team_name, away_team_id, source.get("away_team_id")], "away_score")
         has_started = (
             quarter > 1
             or time_remaining < 480
@@ -2381,8 +2449,6 @@ try:
             status = "pregame"
 
         home_lineup, away_lineup = _extract_saved_lineups(source)
-        home_team_name = home_row.get("name") or home_team.get("name")
-        away_team_name = away_row.get("name") or away_team.get("name")
 
         score = source.get("score") if isinstance(source.get("score"), dict) else {}
         score = dict(score)

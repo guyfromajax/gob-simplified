@@ -2,7 +2,9 @@
 
 from BackEnd.constants import is_inside_paint_grid
 from BackEnd.engine.eoq_perfection import (
+    build_flss_skeleton_steps,
     classify_flss_zone,
+    compute_flss_drive_plan,
     flss_heave_sfx_eligible,
     strip_terminal_rebound_fields,
 )
@@ -75,3 +77,49 @@ def test_strip_terminal_rebound_fields():
     assert "rebounderId" not in payload
     assert "rebound_type" not in payload
     assert payload["ball_bounce_x"] == 85
+
+
+class _Shooter:
+    attributes = {"AG": 50}
+
+
+def test_flss_drive_plan_sprints_toward_basket_home():
+    plan = compute_flss_drive_plan(_Shooter(), 50, 25, 7, is_home_offense=True)
+    assert plan.drive_budget == 6.0
+    assert plan.end_x > 50
+    assert plan.end_x <= 91
+
+
+def test_flss_drive_plan_pull_up_at_toplane():
+    plan = compute_flss_drive_plan(_Shooter(), 60, 25, 10, is_home_offense=True)
+    assert plan.pull_up_jumper is True
+    assert plan.end_x == 74.0
+
+
+def test_flss_drive_plan_no_pull_up_when_past_toplane():
+    plan = compute_flss_drive_plan(_Shooter(), 78, 25, 10, is_home_offense=True)
+    assert plan.pull_up_jumper is False
+    assert plan.end_x > 78
+
+
+def test_flss_drive_plan_away_offense():
+    plan = compute_flss_drive_plan(_Shooter(), 50, 25, 7, is_home_offense=False)
+    assert plan.drive_budget == 6.0
+    assert plan.end_x < 50
+
+
+def test_build_flss_skeleton_steps_includes_drive_and_shoot():
+    plan = compute_flss_drive_plan(_Shooter(), 50, 25, 7, is_home_offense=True)
+    steps = build_flss_skeleton_steps(
+        "PG",
+        spot_start="deep key",
+        spot_end="topLane",
+        start_coords={"x": 50, "y": 25},
+        end_coords={"x": plan.end_x, "y": 25},
+        drive_plan=plan,
+    )
+    assert len(steps) == 2
+    assert steps[0]["_flss_sprint_drive"] is True
+    assert steps[0]["pos_actions"]["PG"]["archetype"] == "sprint"
+    assert steps[1]["pos_actions"]["PG"]["action"] == "shoot"
+    assert steps[1]["_step_t_floor_game_seconds"] == 1.0
