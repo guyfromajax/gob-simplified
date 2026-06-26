@@ -2794,9 +2794,10 @@ async function initGame() {
   // 3. If it's truly a timeout resume, the helper should have set it to 'true'
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
+  const consumeResumeAnchor = urlParams.get('consume_resume_anchor') === 'true';
   let activeResume = urlParams.get('active_resume') === 'true';
   let resumeState = null;
-  if (gameId && (activeResume || !resumeFromTimeout)) {
+  if (!consumeResumeAnchor && gameId && (activeResume || !resumeFromTimeout)) {
     try {
       const resumeStateResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},

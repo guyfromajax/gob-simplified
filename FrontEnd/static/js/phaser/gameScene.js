@@ -1084,6 +1084,14 @@ export function createGameScene(Phaser) {
           clock: urlParams.get('clock'),
         });
       }
+      if (urlParams.get('consume_resume_anchor') === 'true') {
+        payload.consume_resume_anchor = true;
+        console.warn('[RESUME-ANCHOR-CLIENT] simulate-quarter payload consume-only anchor', {
+          game_id: this.gameId,
+          quarter: this.quarter,
+          quarter_break_from: urlParams.get('quarter_break_from'),
+        });
+      }
       if (resumeFromTimeout && urlParams.get('resume_from_anchor') !== 'true') {
         const futureParams = new URLSearchParams(window.location.search);
         futureParams.set('resume_from_timeout', 'false');
@@ -1224,10 +1232,12 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
-      if (payload.resume_from_anchor && typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
+      if ((payload.resume_from_anchor || payload.consume_resume_anchor) && typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
         const consumedParams = new URLSearchParams(window.location.search);
         consumedParams.delete('resume_from_anchor');
+        consumedParams.delete('consume_resume_anchor');
         consumedParams.delete('active_resume');
+        consumedParams.delete('anchor_type');
         consumedParams.set('resume_from_timeout', 'false');
         history.replaceState(null, '', `${window.location.pathname}?${consumedParams.toString()}`);
         console.warn('[RESUME-ANCHOR-CLIENT] consumed anchor URL state after successful resume', {
@@ -1235,6 +1245,7 @@ export function createGameScene(Phaser) {
           quarter: this.quarter,
           response_quarter: simData.quarter,
           clock: simData.clock || null,
+          consume_only: !!payload.consume_resume_anchor,
         });
       }
       // ✅ TIMEOUT: Store simData in scene for timeout button manager access

@@ -2378,6 +2378,12 @@ async function init() {
       // Pass through quarter_break_from for quarter-break navigation context
       const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
+      if (quarterBreakFrom === 'mid_game_resume') {
+        params.set('consume_resume_anchor', 'true');
+        params.delete('active_resume');
+        params.delete('resume_from_anchor');
+        params.delete('anchor_type');
+      }
 
       if (rimRunnerPlayerId && myTeamSide) {
         const k = myTeamSide === 'home' ? 'home_rim_runner_player_id' : 'away_rim_runner_player_id';

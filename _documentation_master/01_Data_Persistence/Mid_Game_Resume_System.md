@@ -303,6 +303,15 @@ Flow:
 9. `gameScene.js` includes `resume_from_anchor=true` in the `/api/simulate-quarter` payload for direct gameplay resumes.
 10. Backend restores the saved anchor snapshot before simulation.
 
+Quarter-break resumes use a different one-shot handoff:
+
+- `bootGame.js` routes to `set-lineup.html`.
+- `set-lineup.js` returns to `court.html` with `consume_resume_anchor=true`.
+- `bootGame.js` skips the resume-state modal check for that one return.
+- `gameScene.js` sends `consume_resume_anchor=true` to `/api/simulate-quarter`.
+- Backend clears the durable `resume_anchor` after the successful save without restoring the old anchor snapshot.
+- `gameScene.js` removes `consume_resume_anchor` and `anchor_type` from the URL after the successful response.
+
 Key frontend function:
 
 - `FrontEnd/static/js/phaser/bootGame.js`
@@ -485,6 +494,17 @@ Rules:
 - `quarter_break` routes to `set-lineup.html` with `quarter_break_from=mid_game_resume`.
 - `timeout` and `foul_out` stay on `court.html` and start gameplay after the modal button.
 - Durable truth remains the backend `resume_anchor`; the URL value is only a convenience for frontend routing.
+
+### `consume_resume_anchor=true`
+
+One-shot request flag used only after a quarter-break resume routes through Set Lineup.
+
+Rules:
+
+- It tells `/api/simulate-quarter` to clear the durable `resume_anchor` after the submitted next-quarter lineup starts successfully.
+- It does **not** restore `resume_anchor.snapshot`.
+- It prevents a quarter-break anchor from looping the user back to Set Lineup after they already submitted the lineup.
+- It is removed from the URL after the first successful response.
 
 ## Backend Load Path
 
