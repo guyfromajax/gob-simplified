@@ -2708,7 +2708,7 @@ def compute_dynamic_hct_turn(
         hold_label: str = "hold (BH holds the ball 1-2s while the defense closes)",
     ) -> str:
         """§5 hold resolution. Returns ``"break"`` or ``"continue"`` for the outer loop."""
-        nonlocal result_type, text_suffix
+        nonlocal result_type, text_suffix, shot_clock
         hold_snap_off, hold_snap_def = _snap_loop_coords()
         hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
         _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
