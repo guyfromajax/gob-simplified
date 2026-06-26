@@ -16,6 +16,8 @@ The player sprite system renders the 10 on-court players as headshot-centered ma
 | Ball attach point | `(sprite.x, sprite.y)` — center of the headshot (offset infrastructure preserved but currently `{0, 0}`) |
 | Feature flags | `USE_HEADSHOT_MARKER` (legacy ↔ v1+) and `USE_MARKER_V2_FEATURES` (v1 ↔ v2) in `markerConfig.js` |
 
+Coordinate conversion lives in `FrontEnd/static/js/phaser/utils/gridToPixels.js`. It exports both `gridToPixels(...)` and the inverse `pixelsToGrid(...)`. Animation/debug modules that snapshot live sprite positions should import `pixelsToGrid(...)` from this shared utility instead of carrying one-off inverse math.
+
 ## Architecture
 
 ```
