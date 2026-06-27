@@ -1268,6 +1268,15 @@ try:
         from bson import ObjectId
         db_summary = summarize_game_state(gm, exclude_animations=True)
         db_summary["timeout_reason"] = timeout_reason
+        db_summary["resume_anchor"] = _build_resume_anchor(
+            db_summary,
+            {
+                "game_id": game_id,
+                "quarter": gm.quarter,
+                "resume_from_timeout": True,
+            },
+            timeout_context=db_summary,
+        )
         trace_id = db_summary.get("timeout_trace_id") or gm.game_state.get("timeout_trace_id")
         game_id_type = type(game_id).__name__
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Saving with _id: '{game_id}' (type: {game_id_type})")
@@ -1302,6 +1311,16 @@ try:
             db_summary.get("clock"),
             db_summary.get("time_remaining"),
             db_summary.get("timeout_next_play_type"),
+        )
+        logging.warning(
+            "🧭 [RESUME-ANCHOR-SAVE] phase=timeout_modal type=%s game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s resume_from_timeout=%s",
+            db_summary["resume_anchor"].get("anchor_type"),
+            game_id,
+            db_summary["resume_anchor"].get("quarter"),
+            db_summary["resume_anchor"].get("clock"),
+            db_summary["resume_anchor"].get("time_remaining"),
+            db_summary["resume_anchor"].get("timeout_next_play_type"),
+            db_summary["resume_anchor"].get("resume_from_timeout"),
         )
         
         # ✅ DIAGNOSTIC: Verify what was actually saved to DB
@@ -4400,6 +4419,8 @@ try:
             and game_id
             and not body.full_sim
             and body.resume_from_timeout
+            and body.resume_from_anchor
+            and not body.consume_resume_anchor
         ):
             try:
                 pre_sim_anchor_summary = summarize_game_state(gm, exclude_animations=True)

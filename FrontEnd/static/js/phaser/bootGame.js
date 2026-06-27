@@ -436,11 +436,15 @@ function applyResumeStateToUrl(resumeState) {
   });
 }
 
-function redirectQuarterBreakResumeToSetLineup(resumeState) {
+function redirectResumeAnchorToSetLineup(resumeState) {
   if (!resumeState || typeof window === 'undefined') return false;
+  const anchorType = resumeState.anchor_type || 'quarter_break';
+  const supportedAnchorTypes = new Set(['quarter_break', 'timeout', 'foul_out']);
+  if (!supportedAnchorTypes.has(anchorType)) return false;
   const resumeQuarter = Number(resumeState.quarter) || quarter || 1;
   const helper = window.TimeoutNavigationHelper;
   const sourceParams = new URLSearchParams(window.location.search);
+  const shouldResumeFromTimeout = anchorType === 'timeout' || anchorType === 'foul_out' || !!resumeState.resume_from_timeout || !!resumeState.timeout_next_play_type;
   const overrides = {
     home: resumeState.home_team_name || sourceParams.get('home') || homeTeam,
     away: resumeState.away_team_name || sourceParams.get('away') || awayTeam,
@@ -463,7 +467,7 @@ function redirectQuarterBreakResumeToSetLineup(resumeState) {
       sourceParams,
       targetQuarter: resumeQuarter,
       gameId: targetGameId,
-      resumeFromTimeout: false,
+      resumeFromTimeout: shouldResumeFromTimeout,
       lineup: {},
       myTeamSide: overrides.my_team,
       clock: resumeState.clock || sourceParams.get('clock'),
@@ -477,15 +481,20 @@ function redirectQuarterBreakResumeToSetLineup(resumeState) {
       if (value) params.set(key, String(value));
     });
     if (targetGameId) params.set('game_id', String(targetGameId));
-    params.set('resume_from_timeout', 'false');
+    params.set('resume_from_timeout', shouldResumeFromTimeout ? 'true' : 'false');
   }
   params.set('quarter_break_from', 'mid_game_resume');
-  params.set('anchor_type', 'quarter_break');
+  params.set('anchor_type', anchorType);
+  if (resumeState.timeout_next_play_type) params.set('timeout_next_play_type', String(resumeState.timeout_next_play_type));
+  if (resumeState.timeout_trace_id) params.set('timeout_trace_id', String(resumeState.timeout_trace_id));
   params.delete('active_resume');
   params.delete('resume_from_anchor');
-  console.warn('[RESUME-ANCHOR-CLIENT] routing quarter_break anchor to set-lineup', {
+  console.warn('[RESUME-ANCHOR-CLIENT] routing resume anchor to set-lineup', {
+    anchor_type: anchorType,
     quarter: resumeQuarter,
     clock: resumeState.clock,
+    resume_from_timeout: shouldResumeFromTimeout,
+    timeout_next_play_type: resumeState.timeout_next_play_type || null,
     game_id: targetGameId,
   });
   window.location.href = `/set-lineup.html?${params.toString()}`;
@@ -2886,7 +2895,7 @@ async function initGame() {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
       if (resumeState) {
         applyResumeStateToUrl(resumeState);
-        if (resumeState.anchor_type === 'quarter_break' && redirectQuarterBreakResumeToSetLineup(resumeState)) {
+        if (redirectResumeAnchorToSetLineup(resumeState)) {
           return;
         }
       } else if (typeof window !== 'undefined') {
