@@ -5022,6 +5022,48 @@ try:
                 gm.game_state.get("shot_clock_remaining"),
                 pending_terminal_ft,
             )
+            if game_id:
+                try:
+                    try:
+                        if isinstance(game_id, str) and ObjectId.is_valid(game_id):
+                            quarter_save_id = ObjectId(game_id)
+                        else:
+                            quarter_save_id = game_id
+                    except Exception:
+                        quarter_save_id = game_id
+
+                    db_summary = summarize_game_state(gm, exclude_animations=True)
+                    db_summary["quarter"] = next_quarter
+                    if isinstance(db_summary.get("game_state"), dict):
+                        db_summary["game_state"]["quarter"] = next_quarter
+                    save_update = {"$set": db_summary}
+                    if not is_final:
+                        db_summary["resume_anchor"] = _build_resume_anchor(
+                            db_summary,
+                            {
+                                "game_id": game_id,
+                                "quarter": next_quarter,
+                                "resume_from_timeout": False,
+                            },
+                            anchor_type="quarter_break",
+                        )
+                        save_update = {"$set": db_summary}
+                        _anchor = db_summary["resume_anchor"]
+                        logging.warning(
+                            "🧭 [RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return type=%s game_id=%s quarter=%s clock=%s time_remaining=%s home_score=%s away_score=%s",
+                            _anchor.get("anchor_type"),
+                            game_id,
+                            _anchor.get("quarter"),
+                            _anchor.get("clock"),
+                            _anchor.get("time_remaining"),
+                            ((db_summary.get("teams") or {}).get(db_summary.get("home_team_id") or "", {}) or {}).get("score"),
+                            ((db_summary.get("teams") or {}).get(db_summary.get("away_team_id") or "", {}) or {}).get("score"),
+                        )
+                    else:
+                        save_update["$unset"] = {"resume_anchor": ""}
+                    games_collection.update_one({"_id": quarter_save_id}, save_update, upsert=True)
+                except Exception as e:
+                    logging.error("⚠️ [RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return failed: %s", e)
             early_return = {
                 "quarter_complete": True,
                 "game_id": game_id,

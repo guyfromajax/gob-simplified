@@ -23,6 +23,7 @@ Current implementation status:
 - `resume_from_anchor=true` is now treated as a one-shot restore flag and consumed after successful restore.
 - Court UI hydration in active resume mode reads `/api/game/{game_id}/resume-state`, not the generic `/api/game/{game_id}` document.
 - Quarter-break anchors are created immediately when a non-final quarter completes.
+- Quarter-break anchors are also created on the `/api/simulate-turn` early-return quarter-complete path, so a duplicate/preloaded 0:00 turn cannot leave an older timeout/foul-out anchor active.
 - Timeout and foul-out anchors remain tied to the post-lineup restart state because they depend on submitted lineups and next-play metadata.
 - Resume anchors now include `anchor_type` so the frontend can route quarter-break anchors through Set Lineup while timeout/foul-out anchors can start gameplay directly.
 
@@ -72,6 +73,7 @@ Current implemented anchor points:
 - after returning from Set Lineup after a timeout
 - after returning from Set Lineup after a player foul-out
 - immediately when a non-final quarter ends
+- immediately when `/api/simulate-turn` is called after a non-final quarter has already reached `0:00`
 
 This may lose some turns if the user closes the browser mid-flow before the next stable anchor, but it avoids returning them to a random-looking state with missing sprites, incorrect clock setup, or mismatched UI controls.
 
@@ -141,13 +143,30 @@ Location:
 
 - `BackEnd/api/api.py`
 - save path: `/api/simulate-turn` quarter-complete save
-- log marker: `[RESUME-ANCHOR-SAVE] phase=quarter_complete type=quarter_break`
+- early-return save path: `/api/simulate-turn` when the saved game is already at `0:00` and no terminal free throw is pending
+- log markers:
+  - `[RESUME-ANCHOR-SAVE] phase=quarter_complete type=quarter_break`
+  - `[RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return type=quarter_break`
 
 Reason:
 
 - Quarter end is a natural user exit point.
 - The user should not lose progress through the completed quarter.
 - Waiting until Set Lineup return can lose the completed-quarter anchor if the user exits before lineup submission.
+- The early-return save prevents stale timeout/foul-out anchors from surviving when a duplicate/preloaded turn request discovers that the quarter is already complete.
+
+#### Live quarter-start navigation
+
+Normal live navigation from Set Lineup into the next quarter is not a cold resume event.
+
+Frontend rule:
+
+- `court.html?...quarter_break_from=play_quarter`
+- `court.html?...quarter_break_from=sim_quarter`
+
+These routes must not fetch or obey `/api/game/{game_id}/resume-state` before starting the quarter. They are already part of the active gameplay flow, and honoring a stored resume anchor here can incorrectly pull the user backward into an older stoppage.
+
+Cold resume routes from Mode Select continue to use `active_resume=true` and do fetch `/resume-state`.
 
 #### Timeout anchor
 

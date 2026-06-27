@@ -2795,9 +2795,11 @@ async function initGame() {
   const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   const consumeResumeAnchor = urlParams.get('consume_resume_anchor') === 'true';
+  const quarterBreakFrom = urlParams.get('quarter_break_from');
+  const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
   let activeResume = urlParams.get('active_resume') === 'true';
   let resumeState = null;
-  if (!consumeResumeAnchor && gameId && (activeResume || !resumeFromTimeout)) {
+  if (!consumeResumeAnchor && !liveQuarterStart && gameId && (activeResume || !resumeFromTimeout)) {
     try {
       const resumeStateResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
