@@ -24,7 +24,7 @@
 ## Resolved Design (decisions locked — 2026-06)
 
 **Flag:** `GOB_DYNAMIC_HCO_SETPLAY` (separate from motion's `GOB_DYNAMIC_HCO_MOTION`; independent rollout).
-**Coverage:** **man defense first**; zone deferred to a follow-up (the zone def-coord reconstruction already exists from motion).
+**Coverage:** **man + zone together** (revised). The zone pieces are already built/proven from motion (moment-walk is man+zone, def-coord reconstruction, zone on-ball defender), and Stage A's `skip_upfront_events` disables the up-front tables for *all* set plays — so man-only would leave **zone** set plays event-less. Doing both retires the up-front event tables for set plays entirely.
 **Model: OVERLAY.** The up-front **variant roll** (successful / mid_play_change / contested / broken) still selects the skeleton; the dynamic per-step layer overlays on the chosen variant skeleton. (Variant selection STAYS.)
 
 **Per-step layer (walks the chosen variant skeleton):**
@@ -41,11 +41,10 @@
 
 **Reused from motion (no re-build):** `should_shoot` + truly-open gate + interception · `_disruption_branch` · `build_subtle_beat` non-BH reads · `_resolve_freelance` · `_resolve_hco_moment_walk` (man).
 
-**Implementation note:** set-play skeletons key pos_actions by `pos1..pos5` (motion uses PG/SG/…) and carry 4 variants × ≥2 versions (motion = `base_loop`). `_motion_bh_at_step` keys off the `handle_ball`/`receive` action (key-name agnostic), but other motion-resolver assumptions need an audit when pointing it at a set-play variant skeleton.
+**Implementation note (slot mapping — RESOLVED):** set-play skeletons key pos_actions by `pos1..pos5` in the DB, BUT `get_hco_skeleton` already runs `_apply_set_play_runtime_position_mapping` → `_remap_set_play_steps_to_canonical(target_shooter)`, which remaps slots → canonical lineup positions (PG/SG/…) **before** the skeleton reaches `resolve_half_court_offense_logic`. So a set-play variant skeleton arrives **position-keyed, just like motion's `base_loop`** — the motion machinery (resolver helpers, moment-walk, def-coord reconstruction) can walk it directly. No slot-mapping work needed in the dynamic layer.
 
 **Staged plan:**
-- **A — Flag + gating:** add `GOB_DYNAMIC_HCO_SETPLAY`; under it, keep variant selection but turn OFF the up-front event tables for set plays (`skip_upfront_events` extends to set); route set plays (man) toward the dynamic per-step walk.
-- **B — Per-step walk on the variant skeleton:** universal hot read + defense-forced disruption (battle with `offense_reads=False`) + forced-subtle progression (recovery roll → re-enter / freelance).
-- **C — Per-step moment (man)** on set plays.
+- **A — Flag + gating ✅:** `GOB_DYNAMIC_HCO_SETPLAY` gate + `skip_upfront_events` extended to set plays under the flag + the recovery-roll helper (`_setplay_recovery_roll`). Tested.
+- **B — Per-step walk on the variant skeleton (in progress):** a set-play dynamic resolver that REUSES motion's inner helpers (`should_shoot` + truly-open gate, `decide_step_action`/`_disruption_branch`, `build_subtle_beat`, `_execute_motion_decision`, `_resolve_freelance`) but (1) forces `offense_reads=False` and (2) after a defense-forced subtle, runs `_setplay_recovery_roll` → re-enter next defined step / freelance. Routed in the SHOT path under the flag (parallel to motion's `resolve_motion_offense_shot`).
+- **C — Per-step moment (man + zone)** on set plays — reuse `_resolve_hco_moment_walk` (already man+zone).
 - **D — Tests + prototype + doc.**
-- **Later:** zone.

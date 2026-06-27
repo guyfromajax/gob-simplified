@@ -4589,6 +4589,21 @@ def _dynamic_hco_setplay_enabled():
     return os.environ.get("GOB_DYNAMIC_HCO_SETPLAY", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _setplay_recovery_roll(game, rng=None):
+    """Set-play forced-subtle recovery (Dynamic_HCO_SP_Brief): after the defense knocks the BH off
+    the play and he chooses to hold rather than shoot/dish, he either re-enters the set-play
+    skeleton or is forced into freelance. `offense_score = (team_chemistry + offensive_efficiency)
+    × d6` vs `defense_score = (team_chemistry + defensive_efficiency) × d6` (each team's own
+    chemistry). Returns True → re-enter the skeleton at the next defined step; False → freelance."""
+    import random as _r
+    rng = rng or _r
+    oa = (getattr(game.offense_team, "team_attributes", {}) or {})
+    da = (getattr(game.defense_team, "team_attributes", {}) or {})
+    offense_score = (float(oa.get("team_chemistry", 7) or 7) + float(oa.get("offensive_efficiency", 0) or 0)) * rng.randint(1, 6)
+    defense_score = (float(da.get("team_chemistry", 7) or 7) + float(da.get("defensive_efficiency", 0) or 0)) * rng.randint(1, 6)
+    return offense_score > defense_score
+
+
 # Coach VO clips fired when the offense consciously breaks pattern on a hot read. One is
 # chosen at random on the BACKEND (logic + SS&S-reproducible) and stamped on the turn result;
 # the FE shows the "Hot Read!" call and plays the chosen clip (pure renderer). See SFX_System.md.
