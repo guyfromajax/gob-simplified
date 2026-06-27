@@ -17,6 +17,7 @@ Supported return paths:
 - Mode Select franchise card routing back to an active game
 - Timeout / foul-out style restart flows where the next turn is already known
 - Quarter-break resume through Set Lineup
+- Live quarter-to-quarter transitions through Set Lineup without triggering the resume modal
 
 Current implementation details:
 
@@ -26,6 +27,7 @@ Current implementation details:
 - Timeout and foul-out anchors are created when their modal state is saved, before the user enters Set Lineup.
 - Cold resume routes every supported anchor type through Set Lineup before gameplay.
 - Set Lineup returns from cold resume must send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
+- Normal live quarter breaks must send `quarter_break_from=play_quarter` to Set Lineup and preserve it when returning to `court.html`; this marker tells the court boot code not to read the durable resume anchor or show the mid-game resume modal.
 - Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
 
 Primary files:
@@ -34,6 +36,7 @@ Primary files:
 - Backend Mode Select active-game lookup: `BackEnd/api/franchise_routes.py`
 - Court resume modal and URL hydration: `FrontEnd/static/js/phaser/bootGame.js`
 - Court resume request flagging: `FrontEnd/static/js/phaser/gameScene.js`
+- Lineup return URL preservation: `FrontEnd/static/set-lineup.js`
 - Mode Select active-game card and routing: `FrontEnd/static/mode-select.js`
 - Mode Select resume card markup: `FrontEnd/static/mode-select.html`
 
@@ -448,6 +451,23 @@ It means:
 - show the `Game In Progress` modal
 - block auto-start
 - clear the flag when the user presses `Resume Game`
+
+### `quarter_break_from=play_quarter`
+
+Frontend live-quarter guard used for normal in-game Q1→Q2, Q2→Q3, and Q3→Q4 transitions.
+
+It means:
+
+- the user is already in the game flow
+- the transition is a live quarter break, not a cold browser-return resume
+- `bootGame.js` must not check `/resume-state` to show the mid-game resume modal on this load
+
+Lifecycle rule:
+
+- Every non-final live quarter-complete path in `gameScene.js` must add `quarter_break_from=play_quarter` when sending the user to `set-lineup.html`.
+- `set-lineup.js` must preserve the marker when returning to `court.html`.
+- Do not set `resume_from_anchor=true`, `consume_resume_anchor=true`, or `active_resume=true` for normal live quarter transitions.
+- Missing this marker causes `court.html` to treat the next quarter as a possible cold resume and can incorrectly show the `Game In Progress` modal from the durable anchor.
 
 ## Backend Load Path
 

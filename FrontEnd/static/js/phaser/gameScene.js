@@ -3105,6 +3105,7 @@ export function createGameScene(Phaser) {
                 }
               });
             }
+            params.set('quarter_break_from', 'play_quarter');
 
             // Create locker room popup
             const popup = document.createElement('div');
@@ -3187,6 +3188,7 @@ export function createGameScene(Phaser) {
             lineup: {}, // Lineup will be set on lineup screen
             myTeamSide: urlParams.get('my_team')
           });
+          params.set('quarter_break_from', 'play_quarter');
           
           // ✅ REMOVED: Navigation params debug logging (cluttering console)
           
