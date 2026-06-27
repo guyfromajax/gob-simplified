@@ -488,7 +488,7 @@ function redirectResumeAnchorToSetLineup(resumeState) {
   if (resumeState.timeout_next_play_type) params.set('timeout_next_play_type', String(resumeState.timeout_next_play_type));
   if (resumeState.timeout_trace_id) params.set('timeout_trace_id', String(resumeState.timeout_trace_id));
   params.delete('active_resume');
-  params.delete('resume_from_anchor');
+  params.set('resume_from_anchor', 'true');
   console.warn('[RESUME-ANCHOR-CLIENT] routing resume anchor to set-lineup', {
     anchor_type: anchorType,
     quarter: resumeQuarter,

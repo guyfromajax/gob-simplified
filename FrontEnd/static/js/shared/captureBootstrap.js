@@ -25,12 +25,14 @@
   if (!isCaptureEnv()) return;
   window.GOB_CAPTURE_BOOTSTRAPPED = true;
 
-  function staticPrefix() {
+  function assetUrl(path) {
     if (window.API_CONFIG && typeof window.API_CONFIG.buildStaticPath === 'function') {
-      return window.API_CONFIG.buildStaticPath('');
+      return window.API_CONFIG.buildStaticPath(path);
     }
-    var hostname = window.location.hostname;
-    return (hostname === 'localhost' || hostname === '127.0.0.1') ? '/static' : '';
+    var prefix = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? '/static'
+      : '';
+    return prefix + path;
   }
 
   function loadScript(src) {
@@ -71,17 +73,15 @@
     else document.addEventListener('DOMContentLoaded', paint, { once: true });
   }
 
-  var prefix = staticPrefix();
-  var base = prefix + '/js/shared/';
-  var html2canvasLocal = prefix + '/js/vendor/html2canvas.min.js';
+  var html2canvasLocal = assetUrl('/js/vendor/html2canvas.min.js');
   var html2canvasCdn = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
 
   loadScript(html2canvasLocal)
     .catch(function () { return loadScript(html2canvasCdn); })
-    .then(function () { return loadScript(base + 'captureUtils.js'); })
-    .then(function () { return loadScript(base + 'captureDom.js'); })
-    .then(function () { return loadScript(base + 'captureCourt.js'); })
-    .then(function () { return loadScript(base + 'captureControls.js'); })
+    .then(function () { return loadScript(assetUrl('/js/shared/captureUtils.js')); })
+    .then(function () { return loadScript(assetUrl('/js/shared/captureDom.js')); })
+    .then(function () { return loadScript(assetUrl('/js/shared/captureCourt.js')); })
+    .then(function () { return loadScript(assetUrl('/js/shared/captureControls.js')); })
     .then(function () {
       if (window.GOBCaptureControls && typeof window.GOBCaptureControls.init === 'function') {
         window.GOBCaptureControls.init();

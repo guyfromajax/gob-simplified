@@ -201,17 +201,20 @@ Flow:
 3. If the endpoint returns `stoppage_anchor`, the page hides the normal pre-game controls.
 4. The page shows a `Game In Progress` modal.
 5. User presses `Resume Game`.
-6. `applyResumeStateToUrl(resumeState)` updates the URL with:
+6. `applyResumeStateToUrl(resumeState)` updates the current court URL with:
    - `quarter`
    - `period`
    - `clock`
    - `resume_from_timeout`
    - `resume_from_anchor=true`
    - lineup player IDs from the anchor
-7. The resume modal is removed.
-8. `handleButtonClick(true)` starts the game from the anchor state.
-9. `gameScene.js` includes `resume_from_anchor=true` in the `/api/simulate-quarter` payload.
-10. Backend restores the saved anchor snapshot before simulation.
+7. `redirectResumeAnchorToSetLineup(resumeState)` routes all supported anchor types through Set Lineup.
+8. The Set Lineup URL must preserve `resume_from_anchor=true`.
+9. When the user submits Set Lineup, `set-lineup.js` must send both:
+   - `resume_from_anchor=true`
+   - `consume_resume_anchor=true`
+10. `gameScene.js` includes both flags in the `/api/simulate-quarter` payload.
+11. Backend restores the saved anchor snapshot first, then clears the anchor after the successful save.
 
 Key frontend function:
 
@@ -353,9 +356,23 @@ Used by:
 Lifecycle rule:
 
 - `resume_from_anchor=true` is a one-shot restore flag.
+- If a resume anchor routes through Set Lineup, this flag must survive both hops:
+  - `court.html` resume modal to `set-lineup.html`
+  - `set-lineup.html` return to `court.html`
+- Do not replace `resume_from_anchor=true` with only `consume_resume_anchor=true`; that clears the saved anchor without restoring it and can reload newer non-anchor score/stats.
 - After the first successful `/api/simulate-quarter` response from that anchor, `gameScene.js` removes `resume_from_anchor` and `active_resume` from the browser URL and sets `resume_from_timeout=false`.
 - On the same successful backend save, `/api/simulate-quarter` unsets `game.resume_anchor`.
 - This prevents a stale anchor, for example `Q1 2:36`, from being restored again after the user later reaches the next quarter break or lineup return.
+
+### `consume_resume_anchor=true`
+
+Tells the backend to clear `game.resume_anchor` after the anchor-backed restore succeeds.
+
+Lifecycle rule:
+
+- `consume_resume_anchor=true` is paired with `resume_from_anchor=true` on Set Lineup returns from cold resume.
+- It is not a substitute for `resume_from_anchor=true`.
+- The backend restore order is: load anchor snapshot, simulate/save from that snapshot, then unset `resume_anchor`.
 
 ### `resume_from_timeout=true`
 

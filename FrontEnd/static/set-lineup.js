@@ -2380,9 +2380,8 @@ async function init() {
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);
       if (quarterBreakFrom === 'mid_game_resume') {
         params.set('consume_resume_anchor', 'true');
+        params.set('resume_from_anchor', 'true');
         params.delete('active_resume');
-        params.delete('resume_from_anchor');
-        params.delete('anchor_type');
       }
 
       if (rimRunnerPlayerId && myTeamSide) {
