@@ -3280,10 +3280,13 @@ def resolve_hco_outcome(game, skeleton):
 
     # Dynamic HCO migration: motion turns resolve foul/steal/turnover PER STEP (the attribute-
     # driven moment walk in resolve_half_court_offense_logic), so skip these up-front percentile
-    # tables for motion when the flag is on. Set plays + the flag-off path keep the up-front
-    # tables. See Dynamic_HCO_Motion_Brief.md / HCT_System.md.
+    # tables for motion when the flag is on. Set plays do the same under their OWN flag (overlay
+    # model — variant selection STAYS, but events come from the per-step moment). The flag-off
+    # path keeps the up-front tables. See Dynamic_HCO_Motion_Brief.md / Dynamic_HCO_SP_Brief.md.
+    _opt = game_state.get("offense_play_type", "")
     skip_upfront_events = (
-        game_state.get("offense_play_type", "") == "motion" and _dynamic_hco_motion_enabled()
+        (_opt == "motion" and _dynamic_hco_motion_enabled())
+        or (_opt in ("set", "set_play") and _dynamic_hco_setplay_enabled())
     )
 
     # Execute checks in randomized order
@@ -4575,6 +4578,15 @@ def _dynamic_hco_motion_enabled():
     """Feature gate. Truthy GOB_DYNAMIC_HCO_MOTION env var enables the dynamic path."""
     import os
     return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _dynamic_hco_setplay_enabled():
+    """Feature gate for Dynamic HCO **Set Plays** (overlay model — separate from motion). Truthy
+    GOB_DYNAMIC_HCO_SETPLAY enables: variant selection stays, but the up-front event tables are
+    skipped in favor of the per-step moment, and the per-step dynamic layer (hot read / defense-
+    forced subtle / freelance) overlays the chosen variant skeleton. See Dynamic_HCO_SP_Brief.md."""
+    import os
+    return os.environ.get("GOB_DYNAMIC_HCO_SETPLAY", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 # Coach VO clips fired when the offense consciously breaks pattern on a hot read. One is
