@@ -11,6 +11,22 @@ from typing import Any, Dict, Optional
 
 LATE_CLOCK_THRESHOLD = 30
 OREB_PUTBACK_ONLY_THRESHOLD = 6
+# Preflight may only fall back to FLSS at or below this clock; above it we emit
+# best-effort Final Turn (walk-up consumes game time per Situational_Logic_System.md).
+FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK = 8
+LATE_CLOCK_BIP_RUNOFF_SECONDS = 2
+
+TIMEOUT_SNAPSHOT_KEYS = (
+    "timeout_next_play_type",
+    "timeout_offense_team_id",
+    "timeout_trace_id",
+    "timeout_seam_ball_handler_id",
+    "timeout_free_throws_remaining",
+    "timeout_free_throws",
+    "timeout_shooter_id",
+    "timeout_one_and_one",
+    "timeout_reason",
+)
 
 
 def is_late_clock_eoq(time_remaining: Optional[int]) -> bool:
@@ -30,15 +46,41 @@ def mark_late_clock_eoq_turn(result: Dict[str, Any]) -> None:
     result["late_clock_eoq"] = True
 
 
+def activate_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
+    """Mark that an EOQ possession chain is in progress for this quarter."""
+    game_state["late_clock_eoq_chain_active"] = True
+
+
+def is_late_clock_eoq_chain_active(game_state: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(game_state, dict):
+        return False
+    return bool(game_state.get("late_clock_eoq_chain_active"))
+
+
+def clear_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
+    game_state.pop("late_clock_eoq_chain_active", None)
+    game_state.pop("flss_possession_pending", None)
+    game_state.pop("final_shot_possession_active", None)
+
+
 def _late_chain_active(game: Any, result: Dict[str, Any]) -> bool:
     gs = getattr(game, "game_state", None) or {}
     return bool(
-        gs.get("final_turn")
+        is_late_clock_eoq_chain_active(gs)
+        or gs.get("final_turn")
         or result.get("late_clock_eoq")
         or result.get("flss")
         or result.get("final_turn")
         or gs.get("flss_possession_pending")
     )
+
+
+def should_route_final_turn_to_flss(time_remaining: Optional[int]) -> bool:
+    """True when preflight budget failure should route to FLSS instead of full Final Turn."""
+    tr = int(time_remaining or 0)
+    if tr <= 0:
+        return True
+    return tr <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK
 
 
 def should_route_eoq_rebound(game: Any, result: Dict[str, Any]) -> bool:
@@ -67,6 +109,7 @@ def apply_post_miss_rebound_routing(
             result["next_play_type"] = None
             result.pop("next_turn", None)
             return False
+        activate_late_clock_eoq_chain(gs)
         gs["pending_oreb"] = {
             "rebounder": rebounder,
             "rebounder_id": getattr(rebounder, "player_id", None),
@@ -100,7 +143,7 @@ def apply_post_miss_rebound_routing(
 
 
 def apply_post_make_late_clock_routing(game: Any, result: Dict[str, Any]) -> None:
-    """Tag makes in a late-clock chain so BIP/SIP can route to FLSS."""
+    """Tag makes in an active late-clock chain so BIP/SIP can route to FLSS."""
     gs = game.game_state
     time_remaining = int(gs.get("time_remaining") or 0)
     if time_remaining <= 0:
@@ -108,8 +151,10 @@ def apply_post_make_late_clock_routing(game: Any, result: Dict[str, Any]) -> Non
         result["next_play_type"] = None
         result.pop("next_turn", None)
         return
-    if _late_chain_active(game, result) or is_late_clock_eoq(time_remaining):
-        mark_late_clock_eoq_turn(result)
+    if not _late_chain_active(game, result):
+        return
+    activate_late_clock_eoq_chain(gs)
+    mark_late_clock_eoq_turn(result)
 
 
 def apply_eoq_final_free_throw_routing(
@@ -131,6 +176,7 @@ def apply_eoq_final_free_throw_routing(
     if not is_late_clock_eoq(time_remaining):
         return
 
+    activate_late_clock_eoq_chain(gs)
     mark_late_clock_eoq_turn(result)
 
     if makes_shot:
@@ -163,22 +209,53 @@ def schedule_flss_after_inbound(game: Any, inbound_source_turn: Optional[Dict[st
         return
     if int(game.game_state.get("time_remaining") or 0) <= 0:
         return
+    activate_late_clock_eoq_chain(game.game_state)
     game.game_state["flss_possession_pending"] = True
     game.game_state["offensive_state"] = "HCO"
+
+
+def resolve_late_clock_bip_runoff(last_turn: dict | None, time_remaining: int) -> int:
+    """Game-clock seconds to burn on BIP after a late-clock EOQ-chain make."""
+    if not isinstance(last_turn, dict):
+        return 0
+    if not last_turn.get("late_clock_eoq"):
+        return 0
+    if time_remaining <= 0:
+        return 0
+    return max(0, min(LATE_CLOCK_BIP_RUNOFF_SECONDS, int(time_remaining)))
+
+
+def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
+    """Force remaining game clock onto the turn when the period ends on this possession."""
+    if not isinstance(result, dict):
+        return
+    clock_before = int(getattr(game, "game_state", {}).get("time_remaining") or 0)
+    if clock_before <= 0:
+        return
+    terminal = bool(
+        result.get("quarter_ends_after")
+        or (
+            result.get("next_play_type") is None
+            and result.get("next_turn") is None
+            and str(result.get("result_type") or "").upper()
+            in {"MAKE", "MISS", "BLOCK", "PUTBACK_MAKE", "PUTBACK_MISS", "FINAL_HOLD", "RUN_OUT_CLOCK"}
+        )
+    )
+    if not terminal:
+        return
+    result["time_elapsed"] = clock_before
+    result["clock_start"] = clock_before
+    result["clock_end"] = 0
+    result["quarter_ends_after"] = True
+    result["next_play_type"] = None
+    result.pop("next_turn", None)
 
 
 def finalize_terminal_dreb_turn(game: Any, dreb_turn: Dict[str, Any]) -> None:
     """Burn remaining game clock after terminal late-clock DREB animation."""
     if not dreb_turn.get("terminal_dreb_eoq"):
         return
-    clock_before = int(game.game_state.get("time_remaining") or 0)
-    dreb_turn["quarter_ends_after"] = True
-    dreb_turn["next_play_type"] = None
-    dreb_turn.pop("next_turn", None)
-    if clock_before > 0:
-        dreb_turn["time_elapsed"] = clock_before
-        dreb_turn["clock_start"] = clock_before
-        dreb_turn["clock_end"] = 0
+    ensure_quarter_end_clock_drain(game, dreb_turn)
 
 
 def finalize_flss_post_emit(game: Any, result: Dict[str, Any]) -> None:
@@ -202,21 +279,21 @@ def finalize_flss_post_emit(game: Any, result: Dict[str, Any]) -> None:
     if clock_before <= 0 or (
         result.get("quarter_ends_after") and not result.get("next_play_type")
     ):
-        if clock_before > 0:
-            result["time_elapsed"] = clock_before
-            result["clock_start"] = clock_before
-            result["clock_end"] = 0
-        result["quarter_ends_after"] = True
-        result["next_play_type"] = None
-        result.pop("next_turn", None)
+        ensure_quarter_end_clock_drain(game, result)
         return
 
+    # Low-clock makes must burn the full remaining second so BIP is skipped at 0:00.
+    if clock_before <= 1 and result_type == "MAKE":
+        result["time_elapsed"] = clock_before
+
     mark_late_clock_eoq_turn(result)
+    activate_late_clock_eoq_chain(game.game_state)
 
     if result_type == "MAKE" and result.get("next_play_type") == "BASELINE_INBOUND":
         return
 
     if result_type in ("MISS", "BLOCK") and result.get("terminal_dreb_eoq"):
+        ensure_quarter_end_clock_drain(game, result)
         return
 
     if result_type in ("MISS", "BLOCK") and result.get("next_play_type") == "OREB":
@@ -226,3 +303,15 @@ def finalize_flss_post_emit(game: Any, result: Dict[str, Any]) -> None:
         return
 
     result["time_elapsed"] = max(1, int(result.get("time_elapsed") or 1))
+
+
+def scrub_timeout_fields_from_snapshot(snapshot: Dict[str, Any]) -> None:
+    """Remove timeout restart metadata from a quarter-break anchor snapshot."""
+    if not isinstance(snapshot, dict):
+        return
+    gs = snapshot.get("game_state")
+    if isinstance(gs, dict):
+        for key in TIMEOUT_SNAPSHOT_KEYS:
+            gs.pop(key, None)
+    for key in TIMEOUT_SNAPSHOT_KEYS:
+        snapshot.pop(key, None)

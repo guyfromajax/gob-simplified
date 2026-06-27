@@ -5798,10 +5798,23 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
             "anchor_clock": pacing.anchor_clock,
         },
     )
-    if not pacing.can_meet_anchor:
+    from BackEnd.utils.eoq_clock_progression import should_route_final_turn_to_flss
+
+    time_remaining_now = int(game_state.get("time_remaining") or 0)
+    if not pacing.can_meet_anchor and should_route_final_turn_to_flss(time_remaining_now):
         return {"route_flss": True, "flss_reason": pacing.reason}
 
-    apply_step0_hold_floor(skeleton, pacing.step0_hold_floor)
+    if not pacing.can_meet_anchor:
+        log_eoq_step(
+            game,
+            "FINAL_SHOT",
+            "pacing_best_effort",
+            "END",
+            extra={"reason": pacing.reason, "time_remaining": time_remaining_now},
+        )
+        apply_step0_hold_floor(skeleton, 0.0)
+    else:
+        apply_step0_hold_floor(skeleton, pacing.step0_hold_floor)
     log_eoq_step(
         game,
         "FINAL_SHOT",

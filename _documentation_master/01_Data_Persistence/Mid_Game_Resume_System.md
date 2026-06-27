@@ -8,7 +8,7 @@ The system intentionally resumes from a **stable stoppage anchor**, not from an 
 
 ## Current Status
 
-**Implemented for franchise court resume.**
+**Implemented for franchise court resume; active stabilization ongoing.**
 
 Supported return paths:
 
@@ -16,6 +16,16 @@ Supported return paths:
 - Browser close / later return through Mode Select
 - Mode Select franchise card routing back to an active game
 - Timeout / foul-out style restart flows where the next turn is already known
+- Quarter-break resume through Set Lineup
+
+Current implementation details:
+
+- `game.resume_anchor` is the durable source of truth for mid-game resume.
+- Quarter-break anchors are created immediately when a non-final quarter completes.
+- Quarter-break anchors are also created on the `/api/simulate-turn` early-return quarter-complete path so stale timeout/foul-out anchors do not survive a duplicate/preloaded `0:00` request.
+- Timeout and foul-out anchors are created when their modal state is saved, before the user enters Set Lineup.
+- Cold resume routes every supported anchor type through Set Lineup before gameplay.
+- Set Lineup returns from cold resume must send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
 
 Primary files:
 
@@ -34,7 +44,7 @@ That project plan explains the original Option A + B-lite design. This document 
 
 ## Core Principle
 
-The user-facing resume target is the latest **lineup-return stoppage anchor**.
+The user-facing resume target is the latest **stable stoppage anchor**.
 
 That means the resume system does not try to restore:
 
@@ -45,9 +55,10 @@ That means the resume system does not try to restore:
 
 Instead, it restores from the last coherent point where the game had a known restart state:
 
-- after returning from Set Lineup at a quarter break
-- after returning from Set Lineup after a timeout
-- after returning from Set Lineup after a player foul-out
+- when a non-final quarter ends
+- when `/api/simulate-turn` is called after a non-final quarter has already reached `0:00`
+- when a timeout modal is created
+- when a player foul-out modal is created
 
 This may lose some turns if the user closes the browser mid-flow, but it avoids returning them to a random-looking state with missing sprites, incorrect clock setup, or mismatched UI controls.
 
@@ -62,6 +73,7 @@ Shape:
 ```json
 {
   "version": 1,
+  "anchor_type": "quarter_break | timeout | foul_out",
   "saved_at": "2026-06-25T15:00:00Z",
   "game_id": "...",
   "quarter": 1,
@@ -95,36 +107,77 @@ The `snapshot` is a compact game document produced from `summarize_game_state(gm
 
 ## When Anchors Are Saved
 
-### Pre-sim timeout/foul-out save
+### Quarter-break anchor
 
-When `/api/simulate-quarter` is called with `resume_from_timeout=true`, the backend writes a pre-simulation anchor before the next animated turn begins.
+The backend creates a `quarter_break` anchor immediately when a non-final quarter ends.
 
-Location:
+Behavior:
 
-- `BackEnd/api/api.py`
-- log marker: `[RESUME-ANCHOR-SAVE] phase=pre_sim`
-
-Why this exists:
-
-- After lineup return, the game is at a coherent restart point.
-- If the user closes the browser before or during the next animated possession, the resume point should remain the lineup-return anchor, not the later arbitrary state.
-
-### Quarter-break lineup return save
-
-For normal quarter transitions, `/api/simulate-quarter` writes a `resume_anchor` when all of the following are true:
-
-- not a full sim
-- not final
-- a `game_id` exists
-- not currently resuming from timeout
-- not currently resuming from an existing anchor
-- requested quarter is greater than 1
+- The anchor is created before or alongside the end-of-quarter / locker-room modal.
+- The anchor captures the completed-quarter scoreboard, stats, clock, lineups, and restart context.
+- The anchor is not created when the game is final, including final overtime.
+- If the user closes the browser on the EOQ modal or before submitting the next lineup, Mode Select should offer resume from this quarter-break anchor.
 
 Location:
 
 - `BackEnd/api/api.py`
-- variable: `should_write_resume_anchor`
-- log marker: `[RESUME-ANCHOR-SAVE]`
+- save path: `/api/simulate-turn` quarter-complete save
+- early-return save path: `/api/simulate-turn` when the saved game is already at `0:00` and no terminal free throw is pending
+- log markers:
+  - `[RESUME-ANCHOR-SAVE] phase=quarter_complete type=quarter_break`
+  - `[RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return type=quarter_break`
+
+Reason:
+
+- Quarter end is a natural exit point.
+- The user should not lose progress through the completed quarter.
+- The early-return save prevents stale timeout/foul-out anchors from surviving when a duplicate/preloaded turn request discovers that the quarter is already complete.
+
+### Timeout anchor
+
+The backend creates a `timeout` anchor when the timeout modal state is saved, before the user enters Set Lineup.
+
+Behavior:
+
+- The anchor includes `timeout_next_play_type`.
+- The anchor includes timeout trace metadata and any SIP / FT restart fields.
+- If the next play is a free throw, the designated free-throw shooter lock state must be preserved.
+- Cold resume from this anchor routes to Set Lineup before gameplay.
+- Returning from Set Lineup uses the preserved restart metadata to generate the first live turn.
+
+Location:
+
+- `BackEnd/api/api.py`
+- save path: timeout modal save through `handle_timeout_save_and_response(...)`
+- log marker: `[RESUME-ANCHOR-SAVE] phase=timeout_modal type=timeout`
+
+### Foul-out anchor
+
+The backend creates a `foul_out` anchor when the foul-out timeout modal state is saved, before the user enters Set Lineup.
+
+Behavior:
+
+- The anchor preserves the post-foul-out restart state.
+- If the restart is a free throw, FT shooter lock state must be preserved.
+- If the lineup required an exhausted/emergency player rule, the resulting context must be preserved.
+- Cold resume from this anchor routes to Set Lineup before gameplay so the user can submit a legal replacement lineup.
+
+Location:
+
+- `BackEnd/api/api.py`
+- save path: foul-out modal save through `handle_timeout_save_and_response(...)`
+- discriminator: timeout save metadata has `timeout_reason: "FOUL_OUT"`
+- log marker: `[RESUME-ANCHOR-SAVE] phase=timeout_modal type=foul_out`
+
+### Legacy direct pre-sim anchor compatibility
+
+There is still a guarded compatibility path in `/api/simulate-quarter` that can write a pre-sim anchor only when all are true:
+
+- `resume_from_timeout=true`
+- `resume_from_anchor=true`
+- `consume_resume_anchor=false`
+
+This is not the normal anchor creation path. Normal cold resume through Set Lineup returns with both `resume_from_anchor=true` and `consume_resume_anchor=true`, so it restores the existing anchor and then clears it.
 
 ### Final game cleanup
 
@@ -271,7 +324,10 @@ Flow:
    - game ID, week, quarter, period, and clock
 6. `bootGame.js` sees `active_resume=true` and shows the `Game In Progress` modal.
 7. The game does **not** auto-start while this modal is visible.
-8. User presses `Resume Game`, which clears `active_resume`, applies the anchor URL state, and starts the game.
+8. User presses `Resume Game`.
+9. `bootGame.js` applies the anchor URL state and routes to Set Lineup.
+10. Set Lineup returns to `court.html` with both `resume_from_anchor=true` and `consume_resume_anchor=true`.
+11. The backend restores from `resume_anchor.snapshot`, simulates from that anchor, saves the restored state, then clears the anchor.
 
 Key frontend files:
 
@@ -490,11 +546,14 @@ Reasons:
 
 Backend:
 
-- `[RESUME-ANCHOR-SAVE] phase=pre_sim`
-- `[RESUME-ANCHOR-SAVE]`
+- `[RESUME-ANCHOR-SAVE] phase=timeout_modal type=timeout|foul_out`
+- `[RESUME-ANCHOR-SAVE] phase=quarter_complete type=quarter_break`
+- `[RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return type=quarter_break`
+- `[RESUME-ANCHOR-SAVE] phase=pre_sim` for guarded legacy direct-anchor compatibility only
 - `[RESUME-ANCHOR-READ]`
 - `[RESUME-ANCHOR-LOAD]`
 - `[RESUME-ANCHOR-RESTORE]`
+- `[RESUME-ANCHOR-CONSUME]`
 - `[MODE-RESUME-LOOKUP]`
 - `[MODE-RESUME-RETURN]`
 
@@ -553,10 +612,12 @@ Potential future work:
 - Consider exact completed-turn resume only if the UX need outweighs the added persistence complexity.
 
 
-**Mid Work Plan Notes, Patches vs System**
-The right way to make it bulletproof is to define one formal resume contract:
+## Current SS&S Contract
+
+The formal resume contract is:
+
 1. One source of truth: game.resume_anchor is the only source for mid-game resume.
-2. One lifecycle: create anchor only after lineup return; consume anchor after successful resume; replace anchor only at next lineup return.
+2. One lifecycle: create anchors at stable stoppages, route cold resume through Set Lineup, restore once, then consume.
 3. One API: court and Mode Select both read resume eligibility/state from the same backend contract.
 4. One frontend mode: if active resume exists, court boots into resume_pending, hydrates all UI from anchor, blocks sim until button press.
 5. One backend behavior: resume_from_anchor=true restores once, simulates, then clears the anchor.

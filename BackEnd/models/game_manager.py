@@ -135,7 +135,8 @@ class GameManager:
         Return game-clock runoff seconds to apply during the made-shot baseline inbound.
 
         Rule: let clock continue through BIP only for made field goals when more than
-        60 seconds remain in the quarter. Free throws/timeouts keep existing stoppages.
+        60 seconds remain in the quarter. Late-clock EOQ-chain makes still burn a short
+        runoff so the game clock cannot stall at 0:01.
         """
         if not isinstance(last_turn, dict):
             return 0
@@ -143,6 +144,11 @@ class GameManager:
         if result_type not in {"MAKE", "PUTBACK_MAKE"}:
             return 0
         time_remaining = int(self.game_state.get("time_remaining", 0) or 0)
+        from BackEnd.utils.eoq_clock_progression import resolve_late_clock_bip_runoff
+
+        late_runoff = resolve_late_clock_bip_runoff(last_turn, time_remaining)
+        if late_runoff > 0:
+            return late_runoff
         if time_remaining <= self._POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS:
             return 0
         configured = int(

@@ -3,11 +3,20 @@
 from types import SimpleNamespace
 
 from BackEnd.utils.eoq_clock_progression import (
+    activate_late_clock_eoq_chain,
+    apply_post_make_late_clock_routing,
     apply_post_miss_rebound_routing,
+    clear_late_clock_eoq_chain,
+    ensure_quarter_end_clock_drain,
+    finalize_flss_post_emit,
+    is_late_clock_eoq_chain_active,
+    resolve_late_clock_bip_runoff,
     roll_anchor_clock,
     schedule_flss_after_inbound,
+    scrub_timeout_fields_from_snapshot,
     should_force_oreb_putback,
     should_route_eoq_rebound,
+    should_route_final_turn_to_flss,
 )
 from BackEnd.engine.final_turn_pacing import evaluate_final_turn_pacing
 
@@ -45,6 +54,7 @@ def test_late_clock_oreb_sets_pending():
     assert flips is False
     assert game.game_state["pending_oreb"]["rebounder_id"] == "r1"
     assert result["next_play_type"] == "OREB"
+    assert is_late_clock_eoq_chain_active(game.game_state) is True
 
 
 def test_schedule_flss_after_inbound():
@@ -52,6 +62,7 @@ def test_schedule_flss_after_inbound():
     schedule_flss_after_inbound(game, {"late_clock_eoq": True})
     assert game.game_state["flss_possession_pending"] is True
     assert game.game_state["offensive_state"] == "HCO"
+    assert is_late_clock_eoq_chain_active(game.game_state) is True
 
 
 def test_roll_anchor_clock_ranges(monkeypatch):
@@ -85,3 +96,70 @@ def test_pacing_uses_rolled_anchor(monkeypatch):
         prior_turn=None,
     )
     assert plan.anchor_clock == 1.0
+
+
+def test_should_route_final_turn_to_flss_only_at_low_clock():
+    assert should_route_final_turn_to_flss(20) is False
+    assert should_route_final_turn_to_flss(8) is True
+    assert should_route_final_turn_to_flss(0) is True
+
+
+def test_post_make_tags_only_inside_active_chain():
+    game = SimpleNamespace(game_state={"time_remaining": 20})
+    result = {"result_type": "MAKE", "next_play_type": "BASELINE_INBOUND"}
+    apply_post_make_late_clock_routing(game, result)
+    assert "late_clock_eoq" not in result
+
+    activate_late_clock_eoq_chain(game.game_state)
+    game.game_state["final_turn"] = True
+    apply_post_make_late_clock_routing(game, result)
+    assert result.get("late_clock_eoq") is True
+
+
+def test_late_clock_bip_runoff():
+    assert resolve_late_clock_bip_runoff({"late_clock_eoq": True}, 17) == 2
+    assert resolve_late_clock_bip_runoff({"late_clock_eoq": True}, 1) == 1
+    assert resolve_late_clock_bip_runoff({}, 17) == 0
+
+
+def test_finalize_flss_burns_last_second_on_make():
+    game = SimpleNamespace(game_state={"time_remaining": 1})
+    result = {
+        "flss": True,
+        "result_type": "MAKE",
+        "next_play_type": "BASELINE_INBOUND",
+        "animation_steps": [],
+        "time_elapsed": 0,
+    }
+    finalize_flss_post_emit(game, result)
+    assert result["time_elapsed"] == 1
+
+
+def test_ensure_quarter_end_clock_drain():
+    game = SimpleNamespace(game_state={"time_remaining": 3})
+    result = {"quarter_ends_after": True, "result_type": "MISS"}
+    ensure_quarter_end_clock_drain(game, result)
+    assert result["time_elapsed"] == 3
+    assert result["clock_end"] == 0
+
+
+def test_scrub_timeout_fields_from_snapshot():
+    snapshot = {
+        "timeout_next_play_type": "SIDE_INBOUND",
+        "timeout_trace_id": "abc",
+        "game_state": {"timeout_next_play_type": "SIDE_INBOUND"},
+    }
+    scrub_timeout_fields_from_snapshot(snapshot)
+    assert "timeout_next_play_type" not in snapshot
+    assert "timeout_next_play_type" not in snapshot["game_state"]
+
+
+def test_clear_late_clock_eoq_chain():
+    gs = {
+        "late_clock_eoq_chain_active": True,
+        "flss_possession_pending": True,
+        "final_shot_possession_active": True,
+    }
+    clear_late_clock_eoq_chain(gs)
+    assert is_late_clock_eoq_chain_active(gs) is False
+    assert "flss_possession_pending" not in gs

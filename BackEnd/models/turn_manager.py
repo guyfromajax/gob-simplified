@@ -1270,13 +1270,18 @@ class TurnManager:
                 game_state["free_throws_remaining"] = 0
                 game_state["one_and_one"] = False
 
+        from BackEnd.utils.eoq_clock_progression import (
+            activate_late_clock_eoq_chain,
+            clear_late_clock_eoq_chain,
+            is_late_clock_eoq_chain_active,
+        )
+
         if game_state.get("_last_final_turn_quarter") != quarter:
             game_state["_last_final_turn_quarter"] = quarter
-            game_state.pop("final_shot_possession_active", None)
-            game_state.pop("flss_possession_pending", None)
+            clear_late_clock_eoq_chain(game_state)
 
-        # ✅ Final Turn: clock-driven — any possession with time_remaining <= 30s
-        # (HCO/HCT/FCP, not OREB/FB) may run full Final Shot setup or Q4 situational branches.
+        # ✅ Final Turn: clock-driven — first eligible possession at <=30s runs full
+        # Final Shot setup; follow-ups in the EOQ chain use FLSS / OREB / terminal DREB.
         time_remaining_sec = game_state.get("time_remaining")
         final_turn_eligible = (
             quarter is not None
@@ -1285,6 +1290,7 @@ class TurnManager:
             and state != "FAST_BREAK"
             and state in ("HCO", "HCT", "FCP")
             and not game_state.get("flss_possession_pending")
+            and not is_late_clock_eoq_chain_active(game_state)
         )
         if final_turn_eligible:
             if quarter >= 4:
@@ -1325,6 +1331,7 @@ class TurnManager:
                     )
                     game_state["final_turn_shot_this_turn"] = True
                     game_state["final_shot_possession_active"] = True
+                    activate_late_clock_eoq_chain(game_state)
                     log_eoq_step(
                         self.game,
                         "FINAL_SHOT",
@@ -1345,6 +1352,7 @@ class TurnManager:
                 )
                 game_state["final_turn_shot_this_turn"] = True
                 game_state["final_shot_possession_active"] = True
+                activate_late_clock_eoq_chain(game_state)
                 log_eoq_step(
                     self.game,
                     "FINAL_SHOT",
@@ -1740,6 +1748,9 @@ class TurnManager:
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
+            from BackEnd.utils.eoq_clock_progression import ensure_quarter_end_clock_drain
+
+            ensure_quarter_end_clock_drain(self.game, result)
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
             
@@ -3439,6 +3450,14 @@ class TurnManager:
                     if result.get("final_turn") is True or result.get("flss") is True:
                         te = max(1, te)
                     result["time_elapsed"] = te
+                    if (
+                        result.get("final_turn") is True
+                        and not result.get("flss")
+                        and result_type_for_te == "MAKE"
+                    ):
+                        clock_tr = int(self.game.game_state.get("time_remaining") or 0)
+                        if 0 < clock_tr <= 1:
+                            result["time_elapsed"] = clock_tr
             if result.get("final_turn") is True and not result.get("flss"):
                 from BackEnd.engine.final_turn_pacing import verify_animation_steps_anchor
 
@@ -3487,7 +3506,9 @@ class TurnManager:
         if isinstance(result, dict) and result.get("route_flss"):
             from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
             from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
+            from BackEnd.utils.eoq_clock_progression import activate_late_clock_eoq_chain
 
+            activate_late_clock_eoq_chain(self.game.game_state)
             log_eoq_routing_decision(
                 self.game,
                 branch="FINAL_SHOT_BUDGET_FLSS",

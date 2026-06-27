@@ -2327,7 +2327,13 @@ try:
             or timeout_context.get("timeout_next_play_type")
         )
         resume_from_timeout = bool(_body_get(body, "resume_from_timeout", False))
-        if resume_from_timeout and timeout_next_play_type:
+        if resolved_anchor_type == "quarter_break":
+            resume_from_timeout = False
+            timeout_next_play_type = None
+            from BackEnd.utils.eoq_clock_progression import scrub_timeout_fields_from_snapshot
+
+            scrub_timeout_fields_from_snapshot(snapshot)
+        elif resume_from_timeout and timeout_next_play_type:
             snapshot["timeout_next_play_type"] = timeout_next_play_type
             for key in (
                 "timeout_offense_team_id",
@@ -2521,7 +2527,9 @@ try:
         timeouts = source.get("timeouts") if isinstance(source.get("timeouts"), dict) else {}
         resume_from_timeout = bool(resume_anchor.get("resume_from_timeout") or source.get("timeout_next_play_type"))
         anchor_type = resume_anchor.get("anchor_type") or source.get("resume_anchor_type")
-        if resume_anchor and not anchor_type:
+        if anchor_type == "quarter_break":
+            resume_from_timeout = False
+        elif resume_anchor and not anchor_type:
             anchor_type = "timeout" if resume_from_timeout else "quarter_break"
 
         return {
@@ -5456,8 +5464,11 @@ try:
                 reset_matchups_to_defaults(gm.game_state)
                 logging.info("✅ QUARTER BREAK: Reset man defense matchups to defaults")
 
-                # Final Shot is a one-possession execution flag and must not survive a quarter boundary.
+                # Final Shot / EOQ chain flags must not survive a quarter boundary.
                 gm.game_state.pop("final_turn_shot_this_turn", None)
+                from BackEnd.utils.eoq_clock_progression import clear_late_clock_eoq_chain
+
+                clear_late_clock_eoq_chain(gm.game_state)
                 
                 # ✅ QUARTER BREAK: Clear timeout state when quarter completes (not a timeout resume)
                 # This ensures quarter breaks are treated as new quarter starts, not timeout resumes
