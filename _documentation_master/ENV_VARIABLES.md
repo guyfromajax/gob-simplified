@@ -44,6 +44,19 @@
 
 ---
 
+## Feature Flags (Backend)
+
+Gate experimental gameplay paths. All default **off** (legacy behavior) unless set truthy (`1`/`true`/`yes`/`on`). Read at request time via `os.environ.get` in `BackEnd/engine/phase_resolution.py` — set on the **Railway** backend service (the Netlify frontend never runs this code). Roll out on **staging first** (`develop`), verify with real games, then promote to production.
+
+| Variable | Purpose | Default | Docs |
+|----------|---------|---------|------|
+| `GOB_DYNAMIC_HCO_MOTION` | Dynamic HCO **motion** plays — per-step attribute walk (reads/shoot/subtle/freelance) + per-step moment, replacing the up-front outcome tables. Man + zone. | off | [Dynamic_HCO_Motion_System.md](06_Gameplay_Systems/Dynamic_HCO_Motion_System.md) |
+| `GOB_DYNAMIC_HCO_SETPLAY` | Dynamic HCO **set plays** — overlay model: variant roll still picks the skeleton, then a per-step walk (offense never self-subtles; defense can force subtle → recover or freelance) + per-step moment. Man + zone. Independent of the motion flag. | off | [Dynamic_HCO_SP_System.md](06_Gameplay_Systems/Dynamic_HCO_SP_System.md) |
+
+**Rollback:** set the variable to `0` (or remove it) and redeploy/restart the service — instantly reverts that turn type to the legacy path. No code change.
+
+---
+
 ## Frontend (Netlify / Static)
 
 No env vars in frontend code. API base URL is derived from `window.location.hostname` in `api-config.js`. Sentry DSN comes from backend `/app-config`.
