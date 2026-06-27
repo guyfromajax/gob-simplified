@@ -46,6 +46,29 @@ def mark_late_clock_eoq_turn(result: Dict[str, Any]) -> None:
     result["late_clock_eoq"] = True
 
 
+def infer_eoq_trace_role(result: Dict[str, Any]) -> str:
+    """Map a turn result to an EOQ trace role (avoid labeling normal HCO as FINAL_SHOT)."""
+    if result.get("eoq_trace_role"):
+        return str(result["eoq_trace_role"])
+    if result.get("flss"):
+        return "FLSS"
+    if result.get("final_turn") or result.get("final_shot_possession"):
+        return "FINAL_SHOT"
+    if result.get("terminal_dreb_eoq"):
+        return "DREB_TERMINAL"
+    rt = str(result.get("result_type") or "").upper()
+    if rt == "FREE_THROW":
+        return "FREE_THROW"
+    npt = str(result.get("next_play_type") or result.get("next_turn") or "")
+    if npt == "OREB" or rt in ("PUTBACK_MAKE", "PUTBACK_MISS"):
+        return "OREB"
+    if npt in ("BASELINE_INBOUND", "SIDE_INBOUND"):
+        return "BIP"
+    if result.get("late_clock_eoq"):
+        return "EOQ_CHAIN"
+    return "EOQ"
+
+
 def activate_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
     """Mark that an EOQ possession chain is in progress for this quarter."""
     game_state["late_clock_eoq_chain_active"] = True
@@ -111,7 +134,6 @@ def apply_post_miss_rebound_routing(
             result["next_play_type"] = None
             result.pop("next_turn", None)
             return False
-        activate_late_clock_eoq_chain(gs)
         gs["pending_oreb"] = {
             "rebounder": rebounder,
             "rebounder_id": getattr(rebounder, "player_id", None),
@@ -119,7 +141,11 @@ def apply_post_miss_rebound_routing(
         }
         result["next_play_type"] = "OREB"
         result["next_turn"] = "OREB"
-        mark_late_clock_eoq_turn(result)
+        # EOQ chain starts on Final Shot arming, not on every offensive rebound.
+        # Only tag/extend the chain when late clock AND already in an EOQ possession.
+        if is_late_clock_eoq(time_remaining) and _late_chain_active(game, result):
+            activate_late_clock_eoq_chain(gs)
+            mark_late_clock_eoq_turn(result)
         return False
 
     # DREB

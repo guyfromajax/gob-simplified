@@ -9,6 +9,7 @@ from BackEnd.utils.eoq_clock_progression import (
     clear_late_clock_eoq_chain,
     ensure_quarter_end_clock_drain,
     finalize_flss_post_emit,
+    infer_eoq_trace_role,
     is_late_clock_eoq_chain_active,
     resolve_late_clock_bip_runoff,
     roll_anchor_clock,
@@ -55,6 +56,42 @@ def test_late_clock_oreb_sets_pending():
     assert game.game_state["pending_oreb"]["rebounder_id"] == "r1"
     assert result["next_play_type"] == "OREB"
     assert is_late_clock_eoq_chain_active(game.game_state) is True
+
+
+def test_early_clock_oreb_does_not_arm_eoq_chain():
+    """OREB at 5:00 must not block the first Final Shot at <=30s."""
+    rebounder = SimpleNamespace(player_id="r1")
+    game = SimpleNamespace(
+        game_state={"time_remaining": 295},
+        shot_manager=SimpleNamespace(_block_spot=None),
+    )
+    result = {"result_type": "MISS"}
+    flips = apply_post_miss_rebound_routing(game, result, rebounder, "OREB")
+    assert flips is False
+    assert game.game_state["pending_oreb"]["rebounder_id"] == "r1"
+    assert result["next_play_type"] == "OREB"
+    assert is_late_clock_eoq_chain_active(game.game_state) is False
+    assert "late_clock_eoq" not in result
+
+
+def test_late_clock_oreb_without_chain_does_not_arm():
+    rebounder = SimpleNamespace(player_id="r1")
+    game = SimpleNamespace(
+        game_state={"time_remaining": 25},
+        shot_manager=SimpleNamespace(_block_spot=None),
+    )
+    result = {"result_type": "MISS"}
+    flips = apply_post_miss_rebound_routing(game, result, rebounder, "OREB")
+    assert flips is False
+    assert result["next_play_type"] == "OREB"
+    assert is_late_clock_eoq_chain_active(game.game_state) is False
+    assert "late_clock_eoq" not in result
+
+
+def test_infer_eoq_trace_role_not_final_shot_for_late_clock_tag_only():
+    assert infer_eoq_trace_role({"late_clock_eoq": True, "result_type": "MISS"}) == "EOQ_CHAIN"
+    assert infer_eoq_trace_role({"final_turn": True, "result_type": "MISS"}) == "FINAL_SHOT"
+    assert infer_eoq_trace_role({"next_play_type": "OREB", "result_type": "MISS"}) == "OREB"
 
 
 def test_schedule_flss_after_inbound():

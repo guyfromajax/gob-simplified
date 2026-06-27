@@ -1796,9 +1796,9 @@ class TurnManager:
                 or result.get("late_clock_eoq")
                 or result.get("eoq_trace_seq")
             ):
-                role = result.get("eoq_trace_role") or (
-                    "FLSS" if result.get("flss") else "FINAL_SHOT"
-                )
+                from BackEnd.utils.eoq_clock_progression import infer_eoq_trace_role
+
+                role = infer_eoq_trace_role(result)
                 log_eoq_turn(
                     self.game,
                     str(role),
