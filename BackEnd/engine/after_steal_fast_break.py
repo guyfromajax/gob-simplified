@@ -517,8 +517,8 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
     if made and d_foul and foul_player:
         stealer.add_momentum(MO_AND_ONE_DELTA)
 
-    # Shot-split diagnostic: after-steal fast break is always a 2pt attempt.
-    record_shot_split(game, is_three=is_three, defended=contested, made=made)
+    # Shot diagnostics: after-steal fast break is always a 2pt attempt.
+    record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="Fast Break")
 
     # Variant + extras for the rim animation (RATTLE / BANK / SWISH / etc.).
     shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", 100)

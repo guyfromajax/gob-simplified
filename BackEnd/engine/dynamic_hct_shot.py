@@ -297,8 +297,8 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
-    # Shot-split diagnostic: HCT fast-break drive is always a 2pt at-rim attempt.
-    record_shot_split(game, is_three=is_three, defended=contested, made=made)
+    # Shot diagnostics: HCT fast-break drive is always a 2pt at-rim attempt.
+    record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="HCT")
     if made:
         shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
@@ -711,8 +711,8 @@ def _finalize_ab_shot(
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
-    # Shot-split diagnostic: HCT attack-basket shot (can be 2pt or 3pt).
-    record_shot_split(game, is_three=is_three, defended=contested, made=made)
+    # Shot diagnostics: HCT attack-basket shot (can be 2pt or 3pt).
+    record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="HCT")
     if made:
         shooter.record_stat("FGA")
         if is_three:

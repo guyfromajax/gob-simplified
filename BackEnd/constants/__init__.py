@@ -198,7 +198,7 @@ TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointer
 # home crowd / other systems can substitute an adjusted value at call site).
 FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.40
 # Three-point shot threshold modifier: shot_threshold += (THREE_POINT_SHOT_THRESHOLD_INCREASE - (random(1,5)*momentum))
-THREE_POINT_SHOT_THRESHOLD_INCREASE = 40
+THREE_POINT_SHOT_THRESHOLD_INCREASE = 55
 
 # HCO Resolution System constants
 # Target averages per game:

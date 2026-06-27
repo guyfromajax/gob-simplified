@@ -222,7 +222,7 @@ Shot resolution uses the following base constants:
 - **Otherwise**: `off_team.team_attributes["shot_threshold"]`
 
 #### Step 4: Apply Three-Point Modifier
-- If `is_three`: `shot_threshold += (THREE_POINT_SHOT_THRESHOLD_INCREASE - (random.randint(1, 5) * momentum))`, where `THREE_POINT_SHOT_THRESHOLD_INCREASE = 40`
+- If `is_three`: `shot_threshold += (THREE_POINT_SHOT_THRESHOLD_INCREASE - (random.randint(1, 5) * momentum))`, where `THREE_POINT_SHOT_THRESHOLD_INCREASE = 55`
 - Higher momentum = easier three-pointers
 
 #### Step 5: Apply Variant Modifier
@@ -308,7 +308,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Motion offense**: Determines `shot_type` during shot resolution (checks possibilities, builds weighted list, selects)
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
-3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `40 - (random(1-5) * momentum)` (`THREE_POINT_SHOT_THRESHOLD_INCREASE = 40`; higher momentum = easier threes)
+3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `55 - (random(1-5) * momentum)` (`THREE_POINT_SHOT_THRESHOLD_INCREASE = 55`; higher momentum = easier threes)
 4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)

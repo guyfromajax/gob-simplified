@@ -64,7 +64,7 @@ Levels 1–5 map to aggression indices 0–4.
 | `SOFT_PROB` | 0.16 | |
 | `THREE_POINTER_FOUL_MISS_CHANCE` | 0.4 | chance defensive shooting foul forces miss on 3PT |
 | `TWO_POINTER_FOUL_MISS_CHANCE` | 0.2 | chance defensive shooting foul forces miss on 2PT |
-| `THREE_POINT_SHOT_THRESHOLD_INCREASE` | 40 | shot_threshold += (this - (random(1,5)*momentum)) for 3PT |
+| `THREE_POINT_SHOT_THRESHOLD_INCREASE` | 55 | shot_threshold += (this - (random(1,5)*momentum)) for 3PT |
 
 ---
 

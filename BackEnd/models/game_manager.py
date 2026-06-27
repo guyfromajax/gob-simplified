@@ -224,6 +224,10 @@ class GameManager:
                 "2pt_def": {"make": 0, "miss": 0},
                 "2pt_undef": {"make": 0, "miss": 0},
             },
+            # FGA-by-turn-type diagnostic (both teams combined).
+            "fga_by_turn_type": {
+                "HCO": 0, "HCT": 0, "FCP": 0, "Fast Break": 0, "OREB": 0,
+            },
             "motion_attack_shot_tracker": {
                 "total": 0,
                 "driver_shoot": 0,
