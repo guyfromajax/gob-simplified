@@ -3718,6 +3718,20 @@ export function createGameScene(Phaser) {
             turn.shot_clock_remaining = turnData.shot_clock_remaining;
           }
 
+          try {
+            const { logEoqApiReceipt } = await import('./utils/eoqDebugLog.js');
+            logEoqApiReceipt(this, turnData, {
+              turn_count: turnCount,
+              quarter_complete: turnData.quarter_complete,
+              time_remaining: turnData.time_remaining,
+              clock: turnData.clock,
+              clock_start: turnData.clock_start,
+              clock_end: turnData.clock_end,
+            });
+          } catch (_eoqLogErr) {
+            // trace only
+          }
+
           // ✅ FIX: Check if this is the final turn of the quarter AFTER getting the turn
           // This ensures the final turn is animated before handling quarter completion
           if (turnData.quarter_complete) {

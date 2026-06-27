@@ -5606,6 +5606,26 @@ try:
             # Debug log for unexpected quarter complete
             if quarter_complete and gm.game_state["time_remaining"] != 0:
                 logging.warning(f"⚠️ Quarter complete but time_remaining != 0: {gm.game_state['time_remaining']}")
+
+            try:
+                from BackEnd.engine.eoq_debug_log import log_eoq_api_response
+
+                log_eoq_api_response(
+                    gm.turn_manager.game,
+                    game_id=game_id,
+                    turn_num=len(gm.turns),
+                    turns_in_response=new_turns,
+                    response_meta={
+                        "quarter_complete": quarter_complete,
+                        "time_remaining": gm.game_state.get("time_remaining"),
+                        "clock": gm.game_state.get("clock"),
+                        "quarter": gm.quarter,
+                        "response_clock_start": _contract[0],
+                        "response_clock_end": _contract[1],
+                    },
+                )
+            except Exception:
+                pass
             
             # ⏱️ PERFORMANCE: Log total endpoint time
             total_time = (time.time() - start_time) * 1000

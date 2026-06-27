@@ -1478,6 +1478,18 @@ class GameManager:
 
                         dreb_turn["terminal_dreb_eoq"] = True
                         finalize_terminal_dreb_turn(self, dreb_turn)
+                        try:
+                            from BackEnd.engine.eoq_debug_log import log_eoq_turn
+
+                            log_eoq_turn(
+                                self.turn_manager.game,
+                                "DREB_TERMINAL",
+                                dreb_turn,
+                                phase="POST_CLOCK",
+                                game_id=self.game_id,
+                            )
+                        except Exception:
+                            pass
                     else:
                         dreb_turn["next_play_type"] = original_next
                         dreb_turn["next_turn"] = original_next
@@ -1924,6 +1936,24 @@ class GameManager:
                 if not next_defensive_setup:
                     self.game_state["_prev_offense_positions_for_hco"] = inbound_payload.get("oDestinations") or {}
                 self._append_turn(inbound_payload, text="Baseline inbound after made shot")
+                if last_turn and last_turn.get("late_clock_eoq"):
+                    try:
+                        from BackEnd.engine.eoq_debug_log import log_eoq_turn
+
+                        log_eoq_turn(
+                            self.turn_manager.game,
+                            "BIP",
+                            inbound_payload,
+                            phase="POST_EMIT",
+                            game_id=self.game_id,
+                            extra={
+                                "source_make_result_type": last_turn.get("result_type"),
+                                "bip_clock_runoff": bip_clock_runoff,
+                                "flss_pending": self.game_state.get("flss_possession_pending"),
+                            },
+                        )
+                    except Exception:
+                        pass
             
             # Preserve offensive_state for next API call
             if next_defensive_setup:

@@ -1275,6 +1275,11 @@ class TurnManager:
             clear_late_clock_eoq_chain,
             is_late_clock_eoq_chain_active,
         )
+        from BackEnd.engine.eoq_debug_log import (
+            begin_eoq_trace_sequence,
+            log_eoq_chain_event,
+            log_eoq_turn,
+        )
 
         if game_state.get("_last_final_turn_quarter") != quarter:
             game_state["_last_final_turn_quarter"] = quarter
@@ -1332,6 +1337,16 @@ class TurnManager:
                     game_state["final_turn_shot_this_turn"] = True
                     game_state["final_shot_possession_active"] = True
                     activate_late_clock_eoq_chain(game_state)
+                    begin_eoq_trace_sequence(self.game)
+                    log_eoq_chain_event(
+                        self.game,
+                        "FINAL_SHOT_TRIGGERED",
+                        extra={
+                            "quarter_gte_4": True,
+                            "time_remaining_sec": time_remaining_sec,
+                            "offensive_state": state,
+                        },
+                    )
                     log_eoq_step(
                         self.game,
                         "FINAL_SHOT",
@@ -1353,6 +1368,16 @@ class TurnManager:
                 game_state["final_turn_shot_this_turn"] = True
                 game_state["final_shot_possession_active"] = True
                 activate_late_clock_eoq_chain(game_state)
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "FINAL_SHOT_TRIGGERED",
+                    extra={
+                        "quarter_gte_4": False,
+                        "time_remaining_sec": time_remaining_sec,
+                        "offensive_state": state,
+                    },
+                )
                 log_eoq_step(
                     self.game,
                     "FINAL_SHOT",
@@ -1636,9 +1661,19 @@ class TurnManager:
                 
                 # Final Turn shot uses dedicated resolver; FLSS follow-up after BIP/SIP.
                 if game_state.pop("flss_possession_pending", False):
-                    from BackEnd.engine.eoq_debug_log import log_eoq_step
+                    from BackEnd.engine.eoq_debug_log import (
+                        begin_eoq_trace_sequence,
+                        log_eoq_chain_event,
+                        log_eoq_step,
+                    )
                     from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
 
+                    begin_eoq_trace_sequence(self.game)
+                    log_eoq_chain_event(
+                        self.game,
+                        "FLSS_POSSESSION_START",
+                        extra={"offensive_state": state, "from": "flss_possession_pending"},
+                    )
                     log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state, "from": "post_inbound"})
                     result = resolve_flss_shot_logic(self.game, state)
                     log_eoq_step(
@@ -1721,7 +1756,7 @@ class TurnManager:
             result["next_turn"] = result["next_play_type"]
 
         if isinstance(result, dict) and result.get("flss") and result.get("skeleton"):
-            from BackEnd.engine.eoq_debug_log import log_eoq_step
+            from BackEnd.engine.eoq_debug_log import log_eoq_step, log_eoq_turn
             from BackEnd.utils.eoq_clock_progression import finalize_flss_post_emit
 
             log_eoq_step(self.game, "FLSS", "post_process_emit_steps", "START")
@@ -1733,6 +1768,7 @@ class TurnManager:
             finalize_flss_post_emit(self.game, result)
             result["final_shot_possession"] = True
             self.game.game_state.pop("final_shot_possession_active", None)
+            log_eoq_turn(self.game, "FLSS", result, phase="POST_EMIT", turn_num=turn_num)
             log_eoq_step(
                 self.game,
                 "FLSS",
@@ -1749,9 +1785,31 @@ class TurnManager:
         # STEP 4: Final updates (clock, logs, animation)
         try:
             from BackEnd.utils.eoq_clock_progression import ensure_quarter_end_clock_drain
+            from BackEnd.engine.eoq_debug_log import log_eoq_turn
 
             ensure_quarter_end_clock_drain(self.game, result)
             self.update_clock_and_possession(result)
+            if (
+                result.get("final_turn")
+                or result.get("flss")
+                or result.get("final_shot_possession")
+                or result.get("late_clock_eoq")
+                or result.get("eoq_trace_seq")
+            ):
+                role = result.get("eoq_trace_role") or (
+                    "FLSS" if result.get("flss") else "FINAL_SHOT"
+                )
+                log_eoq_turn(
+                    self.game,
+                    str(role),
+                    result,
+                    phase="POST_CLOCK",
+                    turn_num=turn_num,
+                    extra={
+                        "time_remaining_after": self.game.game_state.get("time_remaining"),
+                        "clock_after": self.game.game_state.get("clock"),
+                    },
+                )
             self.logger.log_turn_result(result)
             
             # ✅ DEBUG: Log offensive_state after handler execution (current turn → next turn)
@@ -3472,6 +3530,11 @@ class TurnManager:
                         shot_type,
                         len(anim_steps),
                     )
+            if result.get("final_turn") or result.get("flss") or result.get("final_shot_possession"):
+                from BackEnd.engine.eoq_debug_log import log_eoq_turn
+
+                role = "FLSS" if result.get("flss") else "FINAL_SHOT"
+                log_eoq_turn(self.game, role, result, phase="POST_EMIT")
         except Exception as e:
             logging.warning(
                 "build_skeleton_animation_steps (HCO) failed: %s", e

@@ -318,7 +318,11 @@ export class AnimationEngine {
     });
 
     if (turnData?.flss) {
-      const { logEoqStep } = await import('../utils/eoqDebugLog.js');
+      const { logEoqStep, logEoqTurn } = await import('../utils/eoqDebugLog.js');
+      logEoqTurn(this.scene, 'PLAYBACK_START', turnData, context, {
+        animation_step_count: steps.length,
+        flss_zone: turnData.flss_zone,
+      });
       logEoqStep(this.scene, 'FLSS', 'schema_playback', 'START', turnData, context, {
         animation_step_count: steps.length,
         flss_zone: turnData.flss_zone,
@@ -326,7 +330,10 @@ export class AnimationEngine {
     }
 
     if (isFinalTurnShot) {
-      const { logEoqStep } = await import('../utils/eoqDebugLog.js');
+      const { logEoqStep, logEoqTurn } = await import('../utils/eoqDebugLog.js');
+      logEoqTurn(this.scene, 'PLAYBACK_START', turnData, context, {
+        animation_step_count: steps.length,
+      });
       logEoqStep(this.scene, 'FINAL_SHOT', 'schema_playback', 'START', turnData, context, {
         animation_step_count: steps.length,
       });
@@ -380,11 +387,15 @@ export class AnimationEngine {
     if (isFinalTurnShot && turnData?.quarter_ends_after) {
       await this._finishFinalTurnQuarterEnd(turnData, context);
     } else if (turnData?.flss && turnData?.quarter_ends_after) {
-      const { logEoqStep } = await import('../utils/eoqDebugLog.js');
+      const { logEoqStep, logEoqTurn } = await import('../utils/eoqDebugLog.js');
+      logEoqTurn(this.scene, 'PLAYBACK_END', turnData, context);
       logEoqStep(this.scene, 'FLSS', 'schema_playback_complete', 'END', turnData, context, {
         animation_step_count: stepsToPlay?.length ?? 0,
       });
       await this._finishFinalTurnQuarterEnd(turnData, context);
+    } else if (isFinalTurnShot || turnData?.flss) {
+      const { logEoqTurn } = await import('../utils/eoqDebugLog.js');
+      logEoqTurn(this.scene, 'PLAYBACK_END', turnData, context);
     }
 
     return true;

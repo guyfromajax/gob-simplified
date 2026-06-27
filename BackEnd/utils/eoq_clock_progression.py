@@ -61,6 +61,8 @@ def clear_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
     game_state.pop("late_clock_eoq_chain_active", None)
     game_state.pop("flss_possession_pending", None)
     game_state.pop("final_shot_possession_active", None)
+    game_state.pop("eoq_trace_seq", None)
+    game_state.pop("eoq_trace_turn_in_seq", None)
 
 
 def _late_chain_active(game: Any, result: Dict[str, Any]) -> bool:
@@ -212,6 +214,21 @@ def schedule_flss_after_inbound(game: Any, inbound_source_turn: Optional[Dict[st
     activate_late_clock_eoq_chain(game.game_state)
     game.game_state["flss_possession_pending"] = True
     game.game_state["offensive_state"] = "HCO"
+    try:
+        from BackEnd.engine.eoq_debug_log import begin_eoq_trace_sequence, log_eoq_chain_event
+
+        begin_eoq_trace_sequence(game)
+        log_eoq_chain_event(
+            game,
+            "FLSS_SCHEDULED_AFTER_INBOUND",
+            extra={
+                "inbound_source_result_type": inbound_source_turn.get("result_type"),
+                "inbound_source_late_clock_eoq": inbound_source_turn.get("late_clock_eoq"),
+                "time_remaining": game.game_state.get("time_remaining"),
+            },
+        )
+    except Exception:
+        pass
 
 
 def resolve_late_clock_bip_runoff(last_turn: dict | None, time_remaining: int) -> int:

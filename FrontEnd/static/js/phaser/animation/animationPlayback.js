@@ -17,7 +17,7 @@
  */
 
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { logEoqStep, isEoqTraceEnabled } from "../utils/eoqDebugLog.js";
+import { logEoqStep, logEoqSchemaStep, isEoqTraceEnabled } from "../utils/eoqDebugLog.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { attachBallToPlayer } from "./ballManager.js";
 // IMPORTANT: import `detachBall` from BallControllerAdapter — not from
@@ -1099,18 +1099,21 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       stepId: step.id ?? null,
     });
 
-    const eoqFlow = options.turnData?.flss
-      ? "FLSS"
-      : (options.turnData?.final_turn ? "FINAL_SHOT" : null);
+    const td = options.turnData;
+    const eoqFlow = td?.flss
+      ? 'FLSS'
+      : (td?.final_turn || td?.final_shot_possession || td?.eoq_trace_role === 'FINAL_SHOT')
+        ? 'FINAL_SHOT'
+        : (td?.eoq_trace_role || (td?.eoq_trace_seq ? 'EOQ' : null));
     if (eoqFlow && isEoqTraceEnabled(scene)) {
-      logEoqStep(
+      logEoqSchemaStep(
         scene,
         eoqFlow,
-        `schema_step_${currentIndex}`,
+        currentIndex,
         "START",
         options.turnData,
+        step,
         { playerSprites: sprites },
-        { step_id: step.id ?? null, step_index: currentIndex },
       );
     }
 
@@ -1121,14 +1124,14 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
     });
 
     if (eoqFlow && isEoqTraceEnabled(scene)) {
-      logEoqStep(
+      logEoqSchemaStep(
         scene,
         eoqFlow,
-        `schema_step_${currentIndex}`,
+        currentIndex,
         "END",
         options.turnData,
+        step,
         { playerSprites: sprites },
-        { step_id: step.id ?? null, step_index: currentIndex },
       );
     }
     tracePlayback(scene, "turn:next", {
