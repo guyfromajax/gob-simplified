@@ -5970,7 +5970,31 @@ def resolve_half_court_offense_logic(game):
     # CRITICAL: Always create a deep copy to avoid mutating cached skeleton
     if final_skeleton:
         final_skeleton = copy.deepcopy(final_skeleton)
-    
+
+    # Dynamic HCO Set Plays (Stage C): per-step foul/steal/turnover MOMENT on the EXECUTED variant
+    # skeleton, replacing the up-front event tables (already skipped via skip_upfront_events under
+    # the flag). Man + zone — _resolve_hco_moment_walk handles both. Runs here, AFTER the variant
+    # skeleton is chosen + deep-copied, so the walk reads the actual play and the reach-in step
+    # indices align with the emitted skeleton; runs BEFORE the shot-clock block so a hard outcome
+    # (which clears result != "SHOT") correctly pre-empts the would-be shot. Mirrors the motion
+    # moment walk above. (variant selection unaffected — Dynamic_HCO_SP_Brief, Stage C.)
+    if (offense_play_type in ("set", "set_play") and result == "SHOT"
+            and _dynamic_hco_setplay_enabled() and final_skeleton):
+        _sp_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
+        _sp_moment_result = _resolve_hco_moment_walk(
+            final_skeleton, game, off_lineup, def_lineup, reach_in_tags=_sp_reach_in_tags,
+        )
+        if _sp_moment_result:
+            result = _sp_moment_result
+        # Stamp the (failed) steal-attempt reach-in on every non-terminal contested step (terminal
+        # outcomes get theirs via the stopper step). final_skeleton is already deep-copied, so the
+        # cached skeleton is never mutated and indices align with the walked skeleton.
+        if _sp_reach_in_tags and final_skeleton.get("steps"):
+            _fsteps = final_skeleton["steps"]
+            for _idx, _rid in _sp_reach_in_tags:
+                if 0 <= _idx < len(_fsteps):
+                    _fsteps[_idx]["reach_in_def_id"] = _rid
+
     # Shot clock violation: if result is SHOT but shot clock would hit 0 during this turn, either violation or shot-at-1 (Shot_Clock_System.md).
     # Motion only: optional recalibration — chance to take a shot from an earlier step to avoid violation (Shot_Clock_System.md — Second Chance System).
     if result == "SHOT" and final_skeleton and "steps" in final_skeleton:
