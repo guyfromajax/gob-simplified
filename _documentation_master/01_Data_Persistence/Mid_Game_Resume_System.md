@@ -26,6 +26,7 @@ Current implementation details:
 - Timeout and foul-out anchors are created when their modal state is saved, before the user enters Set Lineup.
 - Cold resume routes every supported anchor type through Set Lineup before gameplay.
 - Set Lineup returns from cold resume must send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
+- Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
 
 Primary files:
 
@@ -67,6 +68,8 @@ This may lose some turns if the user closes the browser mid-flow, but it avoids 
 Resume anchors are stored on the existing `games` document in a nested `resume_anchor` object.
 
 The anchor is built in `BackEnd/api/api.py` by `_build_resume_anchor(...)`.
+
+Writes use `resolve_game_write_id(...)`, which first calls `find_game_doc(...)` and then updates the id form already used by the saved game document. This prevents split-brain persistence where timeout anchors are written to a string-id duplicate while quarter-break anchors are written to the ObjectId document.
 
 Shape:
 

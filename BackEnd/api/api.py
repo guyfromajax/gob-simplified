@@ -1135,6 +1135,24 @@ try:
                 pass
         return None, None
 
+    def resolve_game_write_id(games_collection, game_id: str):
+        """
+        Resolve the existing game document id before writes.
+
+        Do not blindly upsert a string id first: if the canonical document uses
+        ObjectId, that creates a duplicate string-id game document and splits
+        resume anchors across two records.
+        """
+        _saved, effective_id = find_game_doc(games_collection, game_id)
+        if effective_id is not None:
+            return effective_id
+        if isinstance(game_id, str) and len(game_id) == 24:
+            try:
+                return ObjectId(game_id)
+            except (ValueError, TypeError):
+                return game_id
+        return game_id
+
     def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest, games_collection) -> dict | None:
         """
         Unified function to restore timeout resume state from DB.
@@ -1280,14 +1298,8 @@ try:
         trace_id = db_summary.get("timeout_trace_id") or gm.game_state.get("timeout_trace_id")
         game_id_type = type(game_id).__name__
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Saving with _id: '{game_id}' (type: {game_id_type})")
-        result = games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-        if result.matched_count == 0 and isinstance(game_id, str) and len(game_id) == 24:
-            try:
-                result = games_collection.update_one({"_id": ObjectId(game_id)}, {"$set": db_summary}, upsert=True)
-                if result.matched_count > 0:
-                    logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Retried with ObjectId - matched: {result.matched_count}")
-            except (ValueError, TypeError):
-                pass
+        write_id = resolve_game_write_id(games_collection, game_id)
+        result = games_collection.update_one({"_id": write_id}, {"$set": db_summary}, upsert=True)
         logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Update result - matched: {result.matched_count}, modified: {result.modified_count}, upserted_id: {result.upserted_id}")
         
         # ✅ DIAGNOSTIC: Log what was saved in db_summary
@@ -1325,14 +1337,8 @@ try:
         
         # ✅ DIAGNOSTIC: Verify what was actually saved to DB
         from bson import ObjectId
-        logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Verifying save - querying with _id: '{game_id}' (type: {type(game_id).__name__})")
-        saved_doc = games_collection.find_one({"_id": game_id})
-        if not saved_doc and isinstance(game_id, str):
-            logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] String query failed during verification, trying ObjectId...")
-            try:
-                saved_doc = games_collection.find_one({"_id": ObjectId(game_id)})
-            except Exception as e:
-                logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] ObjectId verification query failed: {e}")
+        logger.warning(f"🔍 [TIMEOUT-SAVE DEBUG] Verifying save - querying with resolved _id: '{write_id}' (type: {type(write_id).__name__})")
+        saved_doc = games_collection.find_one({"_id": write_id})
         if saved_doc:
             saved_id_type = type(saved_doc.get("_id")).__name__
             saved_id_value = str(saved_doc.get("_id"))
@@ -4446,13 +4452,7 @@ try:
                     body,
                     timeout_context=locals().get("timeout_saved_state"),
                 )
-                try:
-                    if isinstance(game_id, str) and ObjectId.is_valid(game_id):
-                        pre_sim_anchor_id = ObjectId(game_id)
-                    else:
-                        pre_sim_anchor_id = game_id
-                except Exception:
-                    pre_sim_anchor_id = game_id
+                pre_sim_anchor_id = resolve_game_write_id(games_collection, game_id)
                 games_collection.update_one(
                     {"_id": pre_sim_anchor_id},
                     {"$set": {"resume_anchor": pre_sim_anchor_summary["resume_anchor"]}},
@@ -4663,13 +4663,7 @@ try:
             
             # ✅ FIX: Ensure game_id is converted to ObjectId for consistent database storage
             # This ensures the _id format matches when we try to find it later
-            try:
-                if isinstance(game_id, str) and ObjectId.is_valid(game_id):
-                    game_id_oid = ObjectId(game_id)
-                else:
-                    game_id_oid = game_id
-            except Exception:
-                game_id_oid = game_id
+            game_id_oid = resolve_game_write_id(games_collection, game_id)
             
             # Ensure _id is set in db_summary for upsert to work correctly
             db_summary["_id"] = game_id_oid
@@ -5066,13 +5060,7 @@ try:
             )
             if game_id:
                 try:
-                    try:
-                        if isinstance(game_id, str) and ObjectId.is_valid(game_id):
-                            quarter_save_id = ObjectId(game_id)
-                        else:
-                            quarter_save_id = game_id
-                    except Exception:
-                        quarter_save_id = game_id
+                    quarter_save_id = resolve_game_write_id(games_collection, game_id)
 
                     db_summary = summarize_game_state(gm, exclude_animations=True)
                     db_summary["quarter"] = next_quarter
@@ -5519,13 +5507,7 @@ try:
             if game_id and quarter_complete:
                 db_save_start = time.time()
                 try:
-                    try:
-                        if isinstance(game_id, str) and ObjectId.is_valid(game_id):
-                            quarter_save_id = ObjectId(game_id)
-                        else:
-                            quarter_save_id = game_id
-                    except Exception:
-                        quarter_save_id = game_id
+                    quarter_save_id = resolve_game_write_id(games_collection, game_id)
                     db_summary = summarize_game_state(gm, exclude_animations=True)
                     save_update = {"$set": db_summary}
                     if not is_final:
