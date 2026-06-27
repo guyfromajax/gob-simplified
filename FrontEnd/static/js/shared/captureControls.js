@@ -26,18 +26,23 @@
       '  position: fixed;',
       '  top: 12px;',
       '  right: 12px;',
-      '  z-index: 99999;',
+      '  z-index: 100002;',
       '  display: none;',
       '  align-items: center;',
       '  gap: 6px;',
       '  padding: 6px 10px;',
       '  border-radius: 999px;',
-      '  background: rgba(0, 0, 0, 0.72);',
+      '  background: rgba(120, 0, 0, 0.88);',
+      '  border: 1px solid rgba(255, 59, 48, 0.65);',
+      '  box-shadow: 0 0 12px rgba(255, 59, 48, 0.35);',
       '  color: #fff;',
       '  font: 600 12px/1 Inter, system-ui, sans-serif;',
       '  letter-spacing: 0.04em;',
       '  pointer-events: none;',
       '  user-select: none;',
+      '}',
+      'body.gob-capture-court-page #gob-capture-rec {',
+      '  top: calc(var(--scoreboard-height, 120px) + 8px);',
       '}',
       '#gob-capture-rec.is-armed {',
       '  display: inline-flex;',
@@ -129,14 +134,29 @@
   }
 
   function init() {
-    if (!window.API_CONFIG || !window.API_CONFIG.isCaptureEnv || !window.API_CONFIG.isCaptureEnv()) {
+    if (window.API_CONFIG && typeof window.API_CONFIG.isCaptureEnv === 'function') {
+      if (!window.API_CONFIG.isCaptureEnv()) return;
+    } else if (!window.GOB_CAPTURE_BOOTSTRAPPED) {
       return;
     }
-    setArmed(false);
-    renderIndicator();
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('pageshow', disarm);
-    window.addEventListener('pagehide', disarm);
+
+    function start() {
+      if (window.GOBCaptureCourt && window.GOBCaptureCourt.isCourtPage()) {
+        document.body.classList.add('gob-capture-court-page');
+      }
+      setArmed(false);
+      renderIndicator();
+      window.addEventListener('keydown', onKeyDown);
+      window.addEventListener('pageshow', disarm);
+      window.addEventListener('pagehide', disarm);
+      console.info('[GOBCapture] ready — Shift+C to arm, c to capture');
+    }
+
+    if (document.body) {
+      start();
+    } else {
+      document.addEventListener('DOMContentLoaded', start, { once: true });
+    }
   }
 
   window.GOBCaptureControls = {
