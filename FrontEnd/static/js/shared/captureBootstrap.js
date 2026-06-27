@@ -44,8 +44,40 @@
     });
   }
 
-  var base = staticPrefix() + '/js/shared/';
-  var chain = loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js')
+  function showBootstrapError(message) {
+    console.error('[GOBCapture] bootstrap failed:', message);
+    function paint() {
+      if (!document.body) return;
+      var el = document.getElementById('gob-capture-rec');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'gob-capture-rec';
+        document.body.appendChild(el);
+      }
+      el.style.cssText = [
+        'position:fixed',
+        'top:12px',
+        'right:12px',
+        'z-index:100002',
+        'padding:6px 10px',
+        'border-radius:999px',
+        'background:rgba(120,0,0,0.9)',
+        'color:#fff',
+        'font:600 11px/1 Inter,system-ui,sans-serif',
+      ].join(';');
+      el.textContent = 'CAP load failed — check console';
+    }
+    if (document.body) paint();
+    else document.addEventListener('DOMContentLoaded', paint, { once: true });
+  }
+
+  var prefix = staticPrefix();
+  var base = prefix + '/js/shared/';
+  var html2canvasLocal = prefix + '/js/vendor/html2canvas.min.js';
+  var html2canvasCdn = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+
+  loadScript(html2canvasLocal)
+    .catch(function () { return loadScript(html2canvasCdn); })
     .then(function () { return loadScript(base + 'captureUtils.js'); })
     .then(function () { return loadScript(base + 'captureDom.js'); })
     .then(function () { return loadScript(base + 'captureCourt.js'); })
@@ -54,9 +86,8 @@
       if (window.GOBCaptureControls && typeof window.GOBCaptureControls.init === 'function') {
         window.GOBCaptureControls.init();
       }
+    })
+    .catch(function (err) {
+      showBootstrapError(err && err.message ? err.message : String(err));
     });
-
-  chain.catch(function (err) {
-    console.warn('[GOBCapture] bootstrap failed:', err);
-  });
 })();

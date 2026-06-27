@@ -7,6 +7,7 @@
   var armed = false;
   var capturing = false;
   var stylesInjected = false;
+  var started = false;
 
   function isTypingTarget(target) {
     if (!target) return false;
@@ -14,6 +15,10 @@
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
     if (target.isContentEditable) return true;
     return false;
+  }
+
+  function isCaptureKey(event) {
+    return event && (event.code === 'KeyC' || event.key === 'c' || event.key === 'C');
   }
 
   function injectStyles() {
@@ -27,16 +32,15 @@
       '  top: 12px;',
       '  right: 12px;',
       '  z-index: 100002;',
-      '  display: none;',
+      '  display: inline-flex;',
       '  align-items: center;',
       '  gap: 6px;',
       '  padding: 6px 10px;',
       '  border-radius: 999px;',
-      '  background: rgba(120, 0, 0, 0.88);',
-      '  border: 1px solid rgba(255, 59, 48, 0.65);',
-      '  box-shadow: 0 0 12px rgba(255, 59, 48, 0.35);',
-      '  color: #fff;',
-      '  font: 600 12px/1 Inter, system-ui, sans-serif;',
+      '  background: rgba(40, 40, 48, 0.88);',
+      '  border: 1px solid rgba(255, 255, 255, 0.18);',
+      '  color: rgba(255, 255, 255, 0.82);',
+      '  font: 600 11px/1 Inter, system-ui, sans-serif;',
       '  letter-spacing: 0.04em;',
       '  pointer-events: none;',
       '  user-select: none;',
@@ -45,11 +49,19 @@
       '  top: calc(var(--scoreboard-height, 120px) + 8px);',
       '}',
       '#gob-capture-rec.is-armed {',
-      '  display: inline-flex;',
+      '  background: rgba(120, 0, 0, 0.92);',
+      '  border-color: rgba(255, 59, 48, 0.65);',
+      '  box-shadow: 0 0 12px rgba(255, 59, 48, 0.35);',
+      '  color: #fff;',
       '}',
       '#gob-capture-rec .gob-capture-rec-dot {',
+      '  font-size: 13px;',
+      '}',
+      '#gob-capture-rec.is-idle .gob-capture-rec-dot {',
+      '  color: rgba(255, 255, 255, 0.45);',
+      '}',
+      '#gob-capture-rec.is-armed .gob-capture-rec-dot {',
       '  color: #ff3b30;',
-      '  font-size: 14px;',
       '  animation: gob-capture-rec-pulse 1.6s ease-in-out infinite;',
       '}',
       '@keyframes gob-capture-rec-pulse {',
@@ -66,8 +78,12 @@
     if (el) return el;
     el = document.createElement('div');
     el.id = 'gob-capture-rec';
+    el.className = 'is-idle';
     el.setAttribute('aria-live', 'polite');
-    el.innerHTML = '<span class="gob-capture-rec-dot" aria-hidden="true">●</span><span>REC</span>';
+    el.innerHTML = [
+      '<span class="gob-capture-rec-dot" aria-hidden="true">○</span>',
+      '<span class="gob-capture-rec-label">CAP · Shift+C</span>',
+    ].join('');
     document.body.appendChild(el);
     return el;
   }
@@ -75,6 +91,11 @@
   function renderIndicator() {
     var el = ensureIndicator();
     el.classList.toggle('is-armed', armed);
+    el.classList.toggle('is-idle', !armed);
+    var dot = el.querySelector('.gob-capture-rec-dot');
+    var label = el.querySelector('.gob-capture-rec-label');
+    if (dot) dot.textContent = armed ? '●' : '○';
+    if (label) label.textContent = armed ? 'REC · c' : 'CAP · Shift+C';
     el.setAttribute('aria-label', armed ? 'Screen capture armed' : 'Screen capture disarmed');
   }
 
@@ -82,7 +103,7 @@
     armed = !!next;
     renderIndicator();
     if (window.GOBCaptureUtils) {
-      window.GOBCaptureUtils.setEventTag(armed ? 'manual' : 'manual');
+      window.GOBCaptureUtils.setEventTag('manual');
     }
     console.info('[GOBCapture]', armed ? 'armed — press c to capture' : 'disarmed');
   }
@@ -118,19 +139,35 @@
 
   function onKeyDown(event) {
     if (!event || isTypingTarget(event.target)) return;
+    if (!isCaptureKey(event)) return;
 
-    var key = event.key;
-    if (key === 'c' || key === 'C') {
-      if (event.shiftKey) {
-        event.preventDefault();
-        setArmed(!armed);
-        return;
-      }
-      if (key === 'c' && armed) {
-        event.preventDefault();
-        runManualCapture();
-      }
+    if (event.shiftKey) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setArmed(!armed);
+      return;
     }
+
+    if (armed && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
+      && (event.key === 'c' || event.code === 'KeyC')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      runManualCapture();
+    }
+  }
+
+  function start() {
+    if (started) return;
+    started = true;
+    if (window.GOBCaptureCourt && window.GOBCaptureCourt.isCourtPage()) {
+      document.body.classList.add('gob-capture-court-page');
+    }
+    setArmed(false);
+    renderIndicator();
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('pageshow', disarm);
+    window.addEventListener('pagehide', disarm);
+    console.info('[GOBCapture] ready — Shift+C to arm, c to capture');
   }
 
   function init() {
@@ -140,22 +177,10 @@
       return;
     }
 
-    function start() {
-      if (window.GOBCaptureCourt && window.GOBCaptureCourt.isCourtPage()) {
-        document.body.classList.add('gob-capture-court-page');
-      }
-      setArmed(false);
-      renderIndicator();
-      window.addEventListener('keydown', onKeyDown);
-      window.addEventListener('pageshow', disarm);
-      window.addEventListener('pagehide', disarm);
-      console.info('[GOBCapture] ready — Shift+C to arm, c to capture');
-    }
-
-    if (document.body) {
-      start();
-    } else {
+    if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+      start();
     }
   }
 
