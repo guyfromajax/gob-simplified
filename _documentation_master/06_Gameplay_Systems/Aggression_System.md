@@ -12,8 +12,8 @@ Both paths use the same D8 bases and the same per-turn **`aggression_call`** mul
 
 | | FCP / HCT | HCO |
 |---|-----------|-----|
-| **Shared D8 bases (decisive win, before agg)** | Defense wins → **30%** any event (`DEF_WIN_BASE 0.30`). Offense wins → **20%** reach-in (`DFOUL_BASE 0.20`). | Same constants |
-| **Rate scaler** | Full strength (`event_scalar = 1.0`) | **Half strength** (`HCO_MOMENT_SCALAR = 0.5`) → effective peaks ~**15%** / ~**10%** at decisive margin |
+| **Shared D8 bases (decisive win, before agg)** | Defense wins → **25%** any event (`DEF_WIN_BASE 0.25`). Offense wins → **25%** reach-in (`DFOUL_BASE 0.25`). | Same constants |
+| **Rate scaler** | Full strength (`event_scalar = 1.0`) | **Half strength** (`HCO_MOMENT_SCALAR = 0.5`) → effective peaks ~**12.5%** / ~**12.5%** at decisive margin |
 | **When step checks run** | Every press/trap loop beat with a defender in range | Only after an **engagement roll** passes; then checked per motion skeleton step |
 | **Engagement gate** | None — always contest when geometry says so | **Strategy slider 0–4** → **5%–75%** of possessions attempt any moment (`MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION`) |
 | **Team ratings in the contest** | `pt_efficiency` (def) / `pt_opp_modifier` (off) | `defensive_efficiency` / `offensive_efficiency` |

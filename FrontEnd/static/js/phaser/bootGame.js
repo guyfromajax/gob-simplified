@@ -2043,6 +2043,9 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
       backgroundColor: '#1e1e1e',
       parent: 'phaser-container',
       audio: { noAudio: true },
+      render: API_CONFIG?.isCaptureEnv?.()
+        ? { preserveDrawingBuffer: true }
+        : undefined,
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,

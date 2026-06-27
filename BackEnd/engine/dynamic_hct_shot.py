@@ -47,6 +47,7 @@ from typing import Any, Dict, Iterator, List, Optional
 from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.utils.shot_geometry import classify_shot_value
+from BackEnd.utils.shot_split_tracker import record_shot_split
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -296,6 +297,8 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
+    # Shot-split diagnostic: HCT fast-break drive is always a 2pt at-rim attempt.
+    record_shot_split(game, is_three=is_three, defended=contested, made=made)
     if made:
         shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
@@ -708,6 +711,8 @@ def _finalize_ab_shot(
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
+    # Shot-split diagnostic: HCT attack-basket shot (can be 2pt or 3pt).
+    record_shot_split(game, is_three=is_three, defended=contested, made=made)
     if made:
         shooter.record_stat("FGA")
         if is_three:

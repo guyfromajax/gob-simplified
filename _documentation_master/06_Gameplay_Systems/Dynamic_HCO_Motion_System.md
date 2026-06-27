@@ -131,10 +131,10 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | `PASS_LANE_DIST` | pass_contest.py | `8.0` | HCT lane distance (and the param default). Shared pure model. |
 | `FCP_PASS_LANE_DIST` | *(planned)* | `8.0` | FCP lane distance once FCP pass contests are wired (Roadmap). |
 | `HCT_D8_GLOBAL_SCALAR` | dynamic_hct.py | `1.0` | Global per-moment frequency (affects HCT/FCP/HCO). |
-| `HCT_D8_DEF_WIN_BASE` | dynamic_hct.py | `0.45` | Base P(any event) when defense fully wins the contest. |
+| `HCT_D8_DEF_WIN_BASE` | dynamic_hct.py | `0.25` | Base P(any event) when defense fully wins the contest. |
 | `HCT_D8_P_EVENT_MAX` | dynamic_hct.py | `0.60` | Cap on per-moment event probability. |
 | `HCT_D8_AGG_MULT` | dynamic_hct.py | `{passive:0.7, normal:1.0, aggressive:1.3}` | Aggression multiplier on event prob (uses `aggression_call` string). |
-| `HCT_D8_DFOUL_BASE` / `HCT_D8_P_DFOUL_MAX` | dynamic_hct.py | `0.12` / `0.25` | Base / cap for D_FOUL on a decisive blow-by. |
+| `HCT_D8_DFOUL_BASE` | dynamic_hct.py | `0.25` | Base P(D_FOUL) on a decisive blow-by (no separate cap). |
 | `HCT_D8_S_SENS` / `HCT_D8_DB_SENS` / `HCT_D8_O_SENS_IQ` | dynamic_hct.py | `1.2` / `1.0` / `0.8` | Steal / dead-ball / charge sensitivity to attribute gaps. |
 | `HCT_D8_W_PTEFF` / `W_PTOPP` / `W_FIGHT` / `W_DISC_REACH` | dynamic_hct.py | `0.04` each | Team-modifier weights (pt_efficiency, pt_opp, fight, discipline). |
 

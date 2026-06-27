@@ -6,6 +6,7 @@ from BackEnd.constants.momentum import (
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import mo_shot_roll
+from BackEnd.utils.shot_split_tracker import record_shot_split
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
@@ -964,6 +965,8 @@ class ShotManager:
                         shooter.record_stat("FGA")
                         if is_three:
                             shooter.record_stat("3PTA")
+                        # Shot-split diagnostic (block-recon AND-1 path is always defended).
+                        record_shot_split(self.game, is_three=is_three, defended=has_contest, made=made_from_foul)
                         if made_from_foul:
                             apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
                             if pip_stat_eligible:
@@ -1284,6 +1287,9 @@ class ShotManager:
         shooter.record_stat("FGA")
         if is_three:
             shooter.record_stat("3PTA")
+
+        # Shot-split diagnostic: 2/3pt × defended/undefended × make/miss.
+        record_shot_split(self.game, is_three=is_three, defended=has_contest, made=made)
 
         # Shot_Result_List: record make (True) / clean miss or block (False);
         # skip a miss that drew a shooting foul (Player_Momentum_System.md).

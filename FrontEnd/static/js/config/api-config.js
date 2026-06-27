@@ -185,9 +185,33 @@ const API_CONFIG = {
   getAuthHeaders() {
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
     return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }
+  },
+
+  /**
+   * Staging-only screen capture tool gate.
+   * True for localhost + Netlify/Railway staging hosts; false for production.
+   */
+  isCaptureEnv() {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (hostname === 'staging.geekedoutbasketball.com') return true;
+    if (hostname === 'gob-test.netlify.app') return true;
+    if ((hostname.includes('.netlify.app') || hostname.includes('.railway.app'))
+      && (hostname.includes('staging') || hostname.includes('test'))) {
+      return true;
+    }
+    return false;
+  },
 };
 
 // Make it globally available
 window.API_CONFIG = API_CONFIG;
+
+(function loadCaptureBootstrap() {
+  if (typeof document === 'undefined' || !API_CONFIG.isCaptureEnv()) return;
+  const script = document.createElement('script');
+  script.src = API_CONFIG.buildStaticPath('/js/shared/captureBootstrap.js');
+  script.async = true;
+  document.head.appendChild(script);
+})();
 

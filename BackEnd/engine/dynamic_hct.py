@@ -223,7 +223,7 @@ HCT_D8_OFOUL_W0 = 20.0
 # Game-plan aggression dial → steal weight + event-fire rate + D_FOUL prob.
 HCT_D8_AGG_MULT = {"passive": 0.7, "normal": 1.0, "aggressive": 1.3}
 HCT_D8_GLOBAL_SCALAR = 1.0        # master per-moment event-frequency knob
-HCT_D8_DEF_WIN_BASE = 0.30        # base P(any event) when defense fully wins
+HCT_D8_DEF_WIN_BASE = 0.25        # base P(any event) when defense fully wins
 HCT_D8_P_EVENT_MAX = 0.60         # cap on per-moment event prob
 HCT_D8_M_REF = 25.0               # margin that counts as a "decisive" win
 HCT_D8_REF = 50.0                 # league-average attribute (centering)
@@ -236,7 +236,7 @@ HCT_D8_DISC_SCALE = 20.0          # discipline normalizer (team attrs ≈ ±10)
 HCT_D8_W_PTEFF = 0.04             # def pt_efficiency → steal factor
 HCT_D8_W_PTOPP = 0.04             # off pt_opp_modifier → resist self-TO
 HCT_D8_W_FIGHT = 0.04             # OFFENSE fight → fewer D-wins events (= W_DISC_REACH)
-HCT_D8_DFOUL_BASE = 0.20          # base P(D_FOUL) on a decisive blow-by
+HCT_D8_DFOUL_BASE = 0.25          # base P(D_FOUL) on a decisive blow-by
 HCT_D8_W_DISC_REACH = 0.04        # team discipline → fewer reach fouls
 HCT_D8_W_AG_BEATEN = 0.6          # defender AG deficit vs BH → reach foul
 

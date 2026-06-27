@@ -4,6 +4,7 @@ import logging
 
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.utils.player_momentum import mo_shot_roll, team_momentum
+from BackEnd.utils.shot_split_tracker import record_shot_split
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
@@ -1078,6 +1079,8 @@ def resolve_offensive_rebound(game, rebounder):
                 game.game_state.get("offensive_state"),
                 "oreb_putback",
             )
+        # Shot-split diagnostic: OREB putback is always a 2pt inside attempt.
+        record_shot_split(game, is_three=False, defended=contested, made=made)
         rebounder.record_stat("FGA")
 
         # Shot_Result_List: record make (True) / clean miss (False); skip a miss
@@ -2815,6 +2818,10 @@ def summarize_game_state(game, exclude_animations=True):
         "no_defender_shots": int(game.game_state.get("no_defender_shots", 0) or 0),
         "no_defender_shots_breakdown": deepcopy(game.game_state.get("no_defender_shots_breakdown", {}))
         if isinstance(game.game_state.get("no_defender_shots_breakdown", {}), dict)
+        else {},
+        # Shot-split diagnostic — persist so the cumulative survives quarter-by-quarter DB round trips.
+        "shot_split_tracking": deepcopy(game.game_state.get("shot_split_tracking", {}))
+        if isinstance(game.game_state.get("shot_split_tracking", {}), dict)
         else {},
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),

@@ -157,11 +157,11 @@ Constants: `FCP_READ_STRONG_HANDLER_SUM`, `FCP_READ_LOW_TIER_CHOICES` in `dynami
 
 1. **What the dial is:** Per-turn defense `aggression_call` (passive / normal / aggressive) scales **event volume after a defender engages** — it does **not** change who wins the encounter (`d_score` vs `o_score`); it only amplifies outcomes once that winner is decided.
 
-2. **Defense wins the encounter:** `p_event = DEF_WIN_BASE (**0.30**) × margin × agg (0.7 / 1.0 / 1.3) × …`, capped at **60%** — then a weighted roll for steal / dead-ball TO / charge; tune **`HCT_D8_DEF_WIN_BASE`**, **`HCT_D8_P_EVENT_MAX`**, **`HCT_D8_AGG_MULT`** for overall press chaos.
+2. **Defense wins the encounter:** `p_event = DEF_WIN_BASE (**0.25**) × margin × agg (0.7 / 1.0 / 1.3) × …`, capped at **60%** — then a weighted roll for steal / dead-ball TO / charge; tune **`HCT_D8_DEF_WIN_BASE`**, **`HCT_D8_P_EVENT_MAX`**, **`HCT_D8_AGG_MULT`** for overall press chaos.
 
-3. **Offense wins the encounter:** `p_dfoul = DFOUL_BASE (**0.20**) × margin × agg × discipline & AG-gap terms` (no artificial cap; clamped to valid probability 0–100%) — tune **`HCT_D8_DFOUL_BASE`**, **`HCT_D8_W_DISC_REACH`**, and **`HCT_D8_W_AG_BEATEN`** for reach-in frequency on blow-bys.
+3. **Offense wins the encounter:** `p_dfoul = DFOUL_BASE (**0.25**) × margin × agg × discipline & AG-gap terms` (no artificial cap; clamped to valid probability 0–100%) — tune **`HCT_D8_DFOUL_BASE`**, **`HCT_D8_W_DISC_REACH`**, and **`HCT_D8_W_AG_BEATEN`** for reach-in frequency on blow-bys.
 
-4. **Asymmetry to know when tuning:** Same agg multiplier on both branches, but **0.30 vs 0.20 bases** and a **60% cap on defense-wins events only** mean aggressive is still **reward-heavy when the press is winning checks** and **foul-heavy when it's losing them**; steals get **extra** agg via `steal_factor` (only knob that double-dips).
+4. **Asymmetry to know when tuning:** Same **0.25** base and agg multiplier on both branches, but a **60% cap on defense-wins events only** still makes aggressive **reward-heavy when the press is winning checks**; steals get **extra** agg via `steal_factor` (only knob that double-dips). Reach-ins on blow-bys scale with agg but have no separate cap.
 
 5. **Out of scope for this dial:** Pass interceptions (§14 `pass_contest`), FCP engagement geometry (who closes first), steal→fast-break odds (0–4 strategy slider), and HCO moment rate (`event_scalar = 0.5`, separate engagement % table) — don't touch D8 expecting those to move.
 

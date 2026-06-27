@@ -1478,8 +1478,10 @@ try:
             gm.quarter = saved["quarter"]
 
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
+        from BackEnd.utils.shot_split_tracker import restore_shot_split_from_saved
 
         restore_home_crowd_from_saved(gm.game_state, saved)
+        restore_shot_split_from_saved(gm.game_state, saved)
     
     def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
         """
@@ -1587,8 +1589,10 @@ try:
             gm.game_state["opening_lineup"] = copy.deepcopy(saved["opening_lineup"])
 
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
+        from BackEnd.utils.shot_split_tracker import restore_shot_split_from_saved
 
         restore_home_crowd_from_saved(gm.game_state, saved)
+        restore_shot_split_from_saved(gm.game_state, saved)
         
         # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)
         if "score" in saved and isinstance(saved["score"], dict):
@@ -1686,6 +1690,11 @@ try:
         game = run_simulation(home_team, away_team, body.home_lineup, body.away_lineup)
         # print("Right before summarize_game_state")
         # print("🧪 Turns sample:", game.turns[:3])
+
+        # Shot-split diagnostic chart (2/3pt × defended/undefended × make/miss).
+        from BackEnd.utils.shot_split_tracker import format_shot_split_summary
+        print(format_shot_split_summary(game))
+
         summary = summarize_game_state(game)
     
         # Build a consolidated score map from available sources
@@ -4590,6 +4599,10 @@ try:
         
         # Get is_final status
         is_final = frontend_summary.get("is_final", False)
+        # Shot-split diagnostic chart at game end (quarter-by-quarter path).
+        if is_final:
+            from BackEnd.utils.shot_split_tracker import format_shot_split_summary
+            print(format_shot_split_summary(gm))
         summary_time = (time.time() - summary_start) * 1000
     
         # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
