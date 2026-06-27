@@ -968,7 +968,15 @@ def resolve_offensive_rebound(game, rebounder):
             "position_snapshots": [],
         }
 
-    if random.random() < 0.90 or should_force_oreb_putback(
+    # Putback vs kickout split scales with the OFFENSE team's aggression call:
+    # aggressive 90/10, normal 75/25, passive 60/40 (putback/kickout). A roll
+    # of 1–100 ≤ the putback% → putback attempt, else kickout. The end-of-period
+    # clock guard still forces a putback regardless (no time to run a kickout).
+    aggression_call = off_team.strategy_calls.get("aggression_call", "normal")
+    oreb_putback_pct = {"aggressive": 90, "normal": 75, "passive": 60}.get(
+        aggression_call, 75
+    )
+    if random.randint(1, 100) <= oreb_putback_pct or should_force_oreb_putback(
         int(game.game_state.get("time_remaining") or 0)
     ):
         oreb_putback_snap = build_oreb_putback_attempt_snapshot(game, off_lineup, def_lineup)

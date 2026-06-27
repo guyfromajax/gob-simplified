@@ -86,7 +86,20 @@ HCO has a single on-ball defender, so it does **not** use FCP/HCT's multi-defend
 - **SHOOT / KICKOUT_SHOOT / HOT_READ_SHOOT** terminate and append shot steps via `_execute_motion_decision`. If no shot fires by the last step, force one (with a `SUBTLE_FORCED_SHOT_PENALTY` if the clock forced it).
 
 #### Universal Shoot Decision (`should_shoot`)
-Two-stage: **(1) is this an optimal look?** — shot-type mismatch score from the read map + openness vs the `_shoot_threshold` bar (`SHOOT_THRESHOLD_BASE` lowered by clock drain + tempo). **(2) read tier** — `(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT` shoot if optimal else progress; `> SHOOT_READ_SAFE` progress; else random. Shot type (attack vs outside) is a team-biased weighted pick (`_weighted_attack_or_outside`).
+Two-stage: **(1) is this an optimal look?** — shot-type mismatch score from the read map + openness vs the `_shoot_threshold` bar (`SHOOT_THRESHOLD_BASE` lowered by clock drain + tempo). **(2) read tier** — `(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT` shoot if optimal else progress; `> SHOOT_READ_SAFE` progress; else non-strategic ("random"). Shot type (attack vs outside) is a team-biased weighted pick (`_weighted_attack_or_outside`).
+
+##### Random-tier shoot progression
+The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it rolls `randint(1,100) ≤ _random_tier_shoot_pct(shot_clock, tempo)`, a clock+tempo progression (low early, high late) that stops undisciplined possessions from dumping early shots. Buckets (`RANDOM_TIER_SHOOT_PCT` in `motion_step_decision.py`):
+
+| Shot-clock bucket | slow | normal | fast |
+|---|---|---|---|
+| Early (23–30s) | 5% | 15% | 25% |
+| Mid (12–22s) | 25% | 35% | 45% |
+| Late (4–11s) | 48% | 58% | 68% |
+| Very late (1–3s) | 95% | 95% | 95% |
+| Forced (<1s) | 100% (existing `<1s` forced-shot backstop) |
+
+Tempo shifts ±10 in Early/Mid/Late; Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
 
 ---
 

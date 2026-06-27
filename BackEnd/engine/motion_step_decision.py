@@ -162,6 +162,21 @@ SHOOT_TEMPO_ADJ = {"slow": -8, "normal": 0, "fast": 8}  # fast lowers the bar (s
 SHOOT_READ_RIGHT = 200             # read tier: optimal decision (shoot/dish if optimal, else progress)
 SHOOT_READ_SAFE = 125              # read tier: safe decision (progress)
 
+# Non-strategic ("random") read-tier shoot probability (1–100) by shot-clock
+# bucket and tempo — a clock+tempo progression (low early, high late) that
+# replaces the old flat 50/50, so undisciplined possessions stop dumping early
+# shots. Tempo shifts ±10 in the Early/Mid/Late buckets; the Very-late (1–3s)
+# bucket is a flat 95% for all tempos (clock pressure dominates). Below 1s the
+# forced-shot backstop applies upstream. Rows are ordered high→low shot clock.
+# See Dynamic_HCO_Motion_System.md §random-tier shoot progression.
+RANDOM_TIER_SHOOT_PCT = (
+    # (min_shot_clock, {"slow", "normal", "fast"})
+    (23, {"slow": 5,  "normal": 15, "fast": 25}),   # Early     (23–30s)
+    (12, {"slow": 25, "normal": 35, "fast": 45}),   # Mid       (12–22s)
+    (4,  {"slow": 48, "normal": 58, "fast": 68}),   # Late      (4–11s)
+    (1,  {"slow": 95, "normal": 95, "fast": 95}),   # Very late (1–3s)
+)
+
 
 def _weighted_attack_or_outside(player, off_team, rng):
     """Weighted attack-vs-outside pick biased by team emphasis (`strategy_settings` attack/outside,
@@ -191,6 +206,18 @@ def _shoot_read_tier(shooter, off_team, rng):
     if read > SHOOT_READ_SAFE:
         return "safe"
     return "random"
+
+
+def _random_tier_shoot_pct(shot_clock, tempo_call):
+    """Shoot probability (1–100) for the non-strategic read tier — clock+tempo
+    progression (low early, high late). See RANDOM_TIER_SHOOT_PCT."""
+    clock = float(shot_clock or 0)
+    tempo = tempo_call if tempo_call in ("slow", "normal", "fast") else "normal"
+    for min_clock, row in RANDOM_TIER_SHOOT_PCT:
+        if clock >= min_clock:
+            return row[tempo]
+    # clock < 1s (forced-shot region) — fall to the very-late floor defensively.
+    return RANDOM_TIER_SHOOT_PCT[-1][1][tempo]
 
 
 def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_call, openness, rng):
@@ -249,8 +276,10 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
             return {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
                     "via_pass": best["via_pass"], "hot_read": best["mismatch"]}
         return None  # nothing optimal → progress
-    # non-strategic: 50/50 shoot (self, forced/contested) vs progress
-    if rng.random() < 0.5:
+    # non-strategic: clock+tempo shoot progression (low early, high late)
+    # instead of a flat 50/50, so undisciplined possessions stop dumping early
+    # shots. Very-late (1–3s) is ~95% for all tempos; <1s forced upstream.
+    if rng.randint(1, 100) <= _random_tier_shoot_pct(shot_clock, tempo_call):
         return {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
                 "via_pass": False, "hot_read": False}
     return None

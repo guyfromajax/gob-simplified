@@ -133,7 +133,7 @@ OREB turns are UESS-compliant (`oreb_step_emitter.py` → `animation_steps[]`). 
 | `OREB_KICKOUT` | `round(burn)` (no floor) | Just the board-secure beat (~0–1s). The reset/bring-up time is burned by the **following HCO turn's** entry orchestrator (`build_kickout_step` in `transition_bridge.py`). Flooring here would double-count it. |
 
 - **Constant:** `OREB_PUTBACK_MIN_TIME_ELAPSED = 2` (`BackEnd/constants/__init__.py`).
-- **Putback vs kickout decision** (`resolve_offensive_rebound` in `shared.py`): normally 90% putback / 10% kickout. When **`time_remaining < 6`**, always putback (no kickout) — applies universally, including late-clock OREB chains.
+- **Putback vs kickout decision** (`resolve_offensive_rebound` in `shared.py`): scales with the **offense team's `aggression_call`** — aggressive **90/10**, normal **75/25**, passive **60/40** (putback/kickout). Roll `randint(1,100) ≤ putback%` → putback, else kickout. When **`time_remaining < 6`** (`should_force_oreb_putback`), always putback (no kickout) — applies universally, including late-clock OREB chains.
 - **History:** putback floor was 3s through early 2026; lowered to **2s** for clock-driven EOQ so putback make/miss can drain the period. Kickout correctly stays at the raw burn.
 - The legacy `_oreb_te = 3` assignments remain only because they still feed `oreb_hold_seconds` (consumed by the FE legacy animation path); the `time_elapsed` they set is overwritten by the realignment.
 
