@@ -44,7 +44,7 @@ import random
 from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional
 
-from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+from BackEnd.constants import AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS, HOME_RIM_COORDS
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.utils.shot_geometry import classify_shot_value
 from BackEnd.utils.shot_split_tracker import record_shot_split
@@ -484,9 +484,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
 # Shot-gather → release beat (game-seconds). The defenders collapse for this
 # long, and the D6 contest is evaluated at their release-time positions.
 AB_SHOT_BEAT_SECONDS = 0.8
-# D6 shot-defender proximity box (relative to the shooter, in grid spots).
-AB_SHOT_DEFENDER_X_BOX = 4
-AB_SHOT_DEFENDER_Y_BOX = 6
+# D6 shot-defender proximity: Euclidean grid spots (``CONTEST_EUCLIDEAN_RADIUS``).
 # Distance-to-rim split for the shoot-in-place shot type.
 AB_INSIDE_SHOT_MAX_DIST = 12.0
 # §7 drive (2D-2b): minimum drive duration, dish probability, inside-spot pool
@@ -517,7 +515,7 @@ def _collapse_defenders_and_pick(
     Each defender moves (standard pace, interrupted to ``t`` game-seconds) toward
     the rim band; returns ``(defender_end_coords, shot_defender, shot_defender_id,
     contested)`` where the shot defender is the nearest defender ending within
-    the 4x/6y box of ``shot_spot`` (``None`` → uncontested).
+    ``CONTEST_EUCLIDEAN_RADIUS`` grid spots of ``shot_spot`` (``None`` → uncontested).
     """
     from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
     from BackEnd.utils.transition_bridge import _interrupted_coord
@@ -560,13 +558,9 @@ def _collapse_defenders_and_pick(
         if did is None or did not in end_coords:
             continue
         end = end_coords[did]
-        if (
-            abs(end["x"] - shot_spot["x"]) <= AB_SHOT_DEFENDER_X_BOX
-            and abs(end["y"] - shot_spot["y"]) <= AB_SHOT_DEFENDER_Y_BOX
-        ):
-            d = _euclid(end, shot_spot)
-            if best is None or d < best:
-                best, shot_defender, shot_defender_id = d, player, did
+        d = _euclid(end, shot_spot)
+        if d <= CONTEST_EUCLIDEAN_RADIUS and (best is None or d < best):
+            best, shot_defender, shot_defender_id = d, player, did
     return end_coords, shot_defender, shot_defender_id, shot_defender is not None
 
 
@@ -905,7 +899,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
     ``dyn["ab_seed"]`` carries the shooter position + the offense/defense coords
     at the moment the BH reached the Attack Basket Area. We apply the **D5**
     rim-protection collapse (defenders close toward the rim cluster), pick the
-    **D6** shot defender (any defender ending within 4x/6y of the shooter at the
+    **D6** shot defender (any defender ending within ``CONTEST_EUCLIDEAN_RADIUS`` of the shooter at the
     shot release), and resolve a contested-or-not jump shot via
     ``ShotManager.calculate_shot_score`` (no auto-make — half-court shots are
     rolled against the threshold). Returns a shot turn_result; the caller merges

@@ -17,7 +17,7 @@ render. Schema emitters remain pure renderers.
 
 Spec (mirrors Steal-FB, per discussion 2026-05-27)
 --------------------------------------------------
-- **Shooter target**: ``basket_x ± random.randint(2, 3)`` toward center,
+- **Shooter target**: ``basket_x ± random.randint(2, 4)`` toward center,
   ``y = random.randint(19, 31)``.
 - **Defender single target**: ``shooter_x ± 2`` toward basket (one
   point all racing defenders converge on); same y as shooter.
@@ -32,9 +32,11 @@ Spec (mirrors Steal-FB, per discussion 2026-05-27)
       Get-back defenders.
     - CR: exclude Stopper; race pool = Trail + Get-back defenders.
     - Steal-FB: no exclusions; all 5 defenders race.
-- **Contested decision** (at t_shooter): find the closest defender to
-  basket on x. If past shooter's x → contested with that defender as
-  shot defender. Else → uncontested.
+- **Contested decision** (at t_shooter): among racing defenders at their
+  end positions, any defender within ``CONTEST_EUCLIDEAN_RADIUS`` (11)
+  grid spots of the shooter **and** trailing the shooter on x by at most
+  ``FB_CONTEST_MAX_X_TRAIL`` (3) spots counts as a contest. Nearest
+  qualifying defender is the shot defender; else uncontested.
 - **Shot resolution** (caller does this): uncontested → automatic MAKE
   (apply_defense=False); contested → ``calculate_shot_score``
   threshold check.
@@ -52,6 +54,7 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, List, Optional
 
+from BackEnd.constants import CONTEST_EUCLIDEAN_RADIUS
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
@@ -67,6 +70,12 @@ DEFENDER_FREEZE_CLAMP_GRID_SPOTS: int = 6
 _HOME_BASKET_X: float = 91.0
 _AWAY_BASKET_X: float = 9.0
 
+# Shooter lands basket_x ± uniform integer in [FB_SHOOTER_X_OFFSET_MIN, FB_SHOOTER_X_OFFSET_MAX].
+FB_SHOOTER_X_OFFSET_MIN = 2
+FB_SHOOTER_X_OFFSET_MAX = 4
+# Defender may trail the shooter on x by up to this many grid spots and still contest.
+FB_CONTEST_MAX_X_TRAIL = 3
+
 
 def _safe_id(obj: Any) -> Optional[str]:
     if obj is None:
@@ -78,8 +87,8 @@ def _safe_id(obj: Any) -> Optional[str]:
 
 
 def _compute_shooter_target(is_away_offense: bool) -> GridCoord:
-    """Shooter target: 2-3 spots out from basket on x, y ∈ [19, 31]."""
-    distance = random.randint(2, 3)
+    """Shooter target: 2-4 spots out from basket on x, y ∈ [19, 31]."""
+    distance = random.randint(FB_SHOOTER_X_OFFSET_MIN, FB_SHOOTER_X_OFFSET_MAX)
     if is_away_offense:
         x = _AWAY_BASKET_X + distance  # AWAY shoots at x=9 → out from x=9
     else:
@@ -141,6 +150,50 @@ def _clamp_defender_freeze(
     return {"x": clamped_x, "y": pos["y"]}
 
 
+def _defender_x_trail_spots(
+    defender_x: float, shooter_x: float, is_away_offense: bool
+) -> float:
+    """How many x grid spots the defender trails the shooter (0 if even or ahead)."""
+    if is_away_offense:
+        return max(0.0, float(defender_x) - float(shooter_x))
+    return max(0.0, float(shooter_x) - float(defender_x))
+
+
+def _defender_contests_fb_shot(
+    defender_pos: GridCoord,
+    shooter_target: GridCoord,
+    is_away_offense: bool,
+) -> bool:
+    """True when defender is within contest radius and x-trail is ≤ max trail."""
+    if _euclid(defender_pos, shooter_target) > CONTEST_EUCLIDEAN_RADIUS:
+        return False
+    trail = _defender_x_trail_spots(
+        defender_pos["x"], shooter_target["x"], is_away_offense
+    )
+    return trail <= FB_CONTEST_MAX_X_TRAIL
+
+
+def _pick_fb_shot_defender(
+    traversals: List[Dict[str, Any]],
+    defender_end_coords: Dict[str, GridCoord],
+    shooter_target: GridCoord,
+    is_away_offense: bool,
+) -> tuple[bool, Optional[str]]:
+    """Nearest qualifying defender at t_shooter, or uncontested."""
+    best_id: Optional[str] = None
+    best_dist: Optional[float] = None
+    for t in traversals:
+        d_id = t["id"]
+        end = defender_end_coords.get(d_id, t["start"])
+        if not _defender_contests_fb_shot(end, shooter_target, is_away_offense):
+            continue
+        dist = _euclid(end, shooter_target)
+        if best_dist is None or dist < best_dist:
+            best_dist = dist
+            best_id = d_id
+    return best_id is not None, best_id
+
+
 def compute_fb_shot_geometry(
     *,
     shooter: Any,
@@ -184,11 +237,11 @@ def compute_fb_shot_geometry(
         - ``first_arriver_id``: Optional[str] — defender who reached the
           defender_target first, or ``None`` if no defender arrived
           before ``t_shooter``.
-        - ``contested``: bool — True if closest defender's x is past
-          shooter's x at t_shooter.
-        - ``shot_defender_id``: Optional[str] — id of the defender to use
-          for ``calculate_shot_score`` (the closest defender past shooter,
-          or None for uncontested).
+        - ``contested``: bool — True if a qualifying defender is within
+          ``CONTEST_EUCLIDEAN_RADIUS`` of the shooter and trails on x by
+          at most ``FB_CONTEST_MAX_X_TRAIL`` at t_shooter.
+        - ``shot_defender_id``: Optional[str] — nearest qualifying defender
+          for ``calculate_shot_score``, or None if uncontested.
         - ``t_shooter_game_seconds``: float — shooter's traversal time to
           shot spot. Schema emitter can use this for the shot step's
           ``advance_trigger.T_game_seconds``.
@@ -256,35 +309,10 @@ def compute_fb_shot_geometry(
                 t["start"], defender_target, t["rate"], t_shooter
             )
 
-    # --- Contested decision: find closest defender to basket --------------
-    contested = False
-    shot_defender_id: Optional[str] = None
-    if traversals:
-        if is_away_offense:
-            # AWAY basket at x=9 → "closer to basket" = smaller x.
-            closest = min(
-                traversals,
-                key=lambda t: defender_end_coords.get(t["id"], t["start"])["x"],
-            )
-            closest_x = defender_end_coords.get(
-                closest["id"], closest["start"]
-            )["x"]
-            # Past shooter (closer to basket) if defender_x < shooter_x.
-            if closest_x < shooter_target["x"]:
-                contested = True
-                shot_defender_id = closest["id"]
-        else:
-            # HOME basket at x=91 → "closer to basket" = larger x.
-            closest = max(
-                traversals,
-                key=lambda t: defender_end_coords.get(t["id"], t["start"])["x"],
-            )
-            closest_x = defender_end_coords.get(
-                closest["id"], closest["start"]
-            )["x"]
-            if closest_x > shooter_target["x"]:
-                contested = True
-                shot_defender_id = closest["id"]
+    # --- Contested decision: Euclidean + x-trail gate ---------------------
+    contested, shot_defender_id = _pick_fb_shot_defender(
+        traversals, defender_end_coords, shooter_target, is_away_offense
+    )
 
     return {
         "shooter_target": shooter_target,

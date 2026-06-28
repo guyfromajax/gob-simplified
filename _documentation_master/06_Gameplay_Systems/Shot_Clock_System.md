@@ -151,7 +151,7 @@ Both are clamped to `>= 0`.
 
 - `BackEnd/models/turn_manager.py` — shot-clock derivation (`shot_clock_end`, `game_seconds_at_shot`), contract attach, reset-for-next-turn.
 - `BackEnd/engine/phase_resolution.py` — shot-clock-0 handling in `resolve_half_court_offense_logic`: violation vs forced shot (`violation_threshold`), Motion second-chance recalibration (`recalibration_score`, `_motion_shot_recalibrated`); dynamic HCO/set-play walks may stamp `_hco_shot_clock_est` for finer at-attempt tier diagnostics.
-- `BackEnd/utils/shot_split_tracker.py` — end-of-game **HCO shot-clock tier** report (`hco_shot_tier_counts`): every HCO FGA via `record_shot_split` uses `_hco_shot_clock_est` when present, else `shot_clock_remaining` at resolve time. Grep `END-OF-GAME SHOT DIAGNOSTICS`.
+- `BackEnd/utils/shot_split_tracker.py` — end-of-game **HCO shot-clock tier** report (`hco_shot_tier_counts`): every HCO FGA via `record_shot_split` / `ShotManager._record_shot_diagnostics`. At-attempt clock: dynamic `_hco_shot_clock_est` when stamped, else `shot_clock_remaining − elapsed_to_shot_step` (same detach math as `turn_manager._shot_detach_elapsed_seconds`). Grep `END-OF-GAME SHOT DIAGNOSTICS`.
 - `BackEnd/api/api.py` — `/api/call-timeout` min-reconciliation; `/api/simulate-quarter?resume_from_timeout=true` restore.
 - Frontend clock display / snap: `FrontEnd/static/js/phaser/utils/gameClock.js`, `court.html`; see `clock_sync_system.md` §9.
 

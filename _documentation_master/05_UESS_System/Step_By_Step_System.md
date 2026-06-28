@@ -416,7 +416,7 @@ the result of these stages.)
 - If BH wins: `hold_up=False`, proceed to stage 2.
 
 **Stage 2: Shot location** (universal helper — gated by `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `_CR`)
-- New: shooter target = `basket_x ± random(2, 3)` toward center,
+- New: shooter target = `basket_x ± random(2, 4)` toward center,
   `y = random.randint(19, 31)`. Replaces the play-specific shot spot.
 - Legacy path preserved behind the flag for revert.
 
@@ -434,8 +434,10 @@ the result of these stages.)
   (no-pull-backward edge case for defenders starting inside the zone).
 - Stopper and Outlet defender stay at their end-of-preceding-step
   positions (no movement during the shot step).
-- Contested if closest defender's x is past shooter's x at t_shooter;
-  else uncontested.
+- Contested if a racing defender at t_shooter is within
+  `CONTEST_EUCLIDEAN_RADIUS` (11) of the shooter **and** trails on x by
+  at most `FB_CONTEST_MAX_X_TRAIL` (3); nearest qualifier is shot
+  defender; else uncontested.
 
 **Stage 4: Shot resolution**
 - `calculate_shot_score(shooter, ..., defender=first_arriver_or_None, apply_defense=contested)`.

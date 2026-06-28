@@ -1,12 +1,17 @@
 import random
 import logging
+import math
 from BackEnd.constants.momentum import (
     MO_BLOCK_DELTA,
     MO_CHARGE_DELTA,
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import mo_shot_roll
-from BackEnd.utils.shot_split_tracker import record_shot_split, classify_resolve_shot_turn_type
+from BackEnd.utils.shot_split_tracker import (
+    record_shot_split,
+    classify_resolve_shot_turn_type,
+    resolve_hco_shot_clock_at_attempt,
+)
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
@@ -24,7 +29,8 @@ from BackEnd.constants import (
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
     HARD_PROB,
-    SOFT_PROB
+    SOFT_PROB,
+    CONTEST_EUCLIDEAN_RADIUS,
 )
 from BackEnd.constants.shot_variants import (
     select_shot_variant,
@@ -72,8 +78,6 @@ from BackEnd.constants.fast_break_play_types import (
 )
 
 # Location-based contest / rim shortcuts (see Shot_System.md)
-CONTEST_DEFENDER_DX_MAX = 8
-CONTEST_DEFENDER_DY_MAX = 8
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
@@ -263,6 +267,26 @@ class ShotManager:
             return calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
         _, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
         return calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
+
+    def _record_shot_diagnostics(self, roles, off_lineup, shot_step_index, *, is_three, has_contest, made):
+        """Shot-split + HCO tier tallies (at-attempt shot clock via skeleton detach math)."""
+        turn_type = classify_resolve_shot_turn_type(self.game_state, roles)
+        hco_sc = None
+        if turn_type == "HCO":
+            hco_sc = resolve_hco_shot_clock_at_attempt(
+                self.game_state,
+                roles,
+                shot_step_index=shot_step_index,
+                off_lineup=off_lineup,
+            )
+        record_shot_split(
+            self.game,
+            is_three=is_three,
+            defended=has_contest,
+            made=made,
+            turn_type=turn_type,
+            hco_shot_clock=hco_sc,
+        )
 
     def _ensure_schema_miss_bounce_for_free_throw(self, result, roles, shooter, off_team):
         """MISS → FREE_THROW turns need ``ball_bounce_x/y`` for schema ``needs_bounce``."""
@@ -720,9 +744,7 @@ class ShotManager:
         motion_uncontested = bool(roles.get("motion_attack_uncontested"))
         contest_radius = None
         if motion_geometry:
-            from BackEnd.engine.attack_drive_clearance import ATTACK_DRIVE_CONTEST_RADIUS
-            import math
-            contest_radius = ATTACK_DRIVE_CONTEST_RADIUS
+            contest_radius = CONTEST_EUCLIDEAN_RADIUS
             contest_pairs: list = []
             for candidate in (def_lineup or {}).values():
                 if candidate is None:
@@ -758,7 +780,7 @@ class ShotManager:
                 if candidate is None:
                     continue
                 candidate_x, candidate_y = _player_xy(candidate)
-                if abs(candidate_x - sx) <= CONTEST_DEFENDER_DX_MAX and abs(candidate_y - sy) <= CONTEST_DEFENDER_DY_MAX:
+                if math.hypot(candidate_x - sx, candidate_y - sy) <= CONTEST_EUCLIDEAN_RADIUS:
                     geometry_has_contest = True
                     break
         if motion_geometry:
@@ -966,9 +988,9 @@ class ShotManager:
                         if is_three:
                             shooter.record_stat("3PTA")
                         # Shot diagnostics (block-recon AND-1 path is always defended).
-                        record_shot_split(
-                            self.game, is_three=is_three, defended=has_contest, made=made_from_foul,
-                            turn_type=classify_resolve_shot_turn_type(self.game_state, roles),
+                        self._record_shot_diagnostics(
+                            roles, off_lineup, shot_step_index,
+                            is_three=is_three, has_contest=has_contest, made=made_from_foul,
                         )
                         if made_from_foul:
                             apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
@@ -1302,9 +1324,9 @@ class ShotManager:
             shooter.record_stat("3PTA")
 
         # Shot diagnostics: 2/3pt × defended/undefended × make/miss, + FGA by turn type.
-        record_shot_split(
-            self.game, is_three=is_three, defended=has_contest, made=made,
-            turn_type=classify_resolve_shot_turn_type(self.game_state, roles),
+        self._record_shot_diagnostics(
+            roles, off_lineup, shot_step_index,
+            is_three=is_three, has_contest=has_contest, made=made,
         )
 
         # Shot_Result_List: record make (True) / clean miss or block (False);

@@ -11,10 +11,12 @@ as end-of-game charts:
    FLSS buzzer attempts are intentionally omitted from this breakdown.)
 
 3. ``hco_shot_tier_counts`` — HCO field-goal attempts by shot-clock tier at
-   attempt time. Every HCO FGA recorded via ``record_shot_split`` increments
-   this tally (not tied to subtle movement or the dynamic walk). Clock at
-   attempt: ``game_state.pop("_hco_shot_clock_est")`` when the dynamic HCO
-   resolver stamped it, else ``game_state["shot_clock_remaining"]``.
+   attempt time. Every HCO FGA via ``record_shot_split`` increments this tally.
+   Clock at attempt (in priority order):
+   (1) dynamic-walk ``_hco_shot_clock_est`` when stamped;
+   (2) ``shot_at_one_second`` → 1s;
+   (3) ``shot_clock_remaining − elapsed_to_shot_step`` via
+   ``calc_skeleton_step_timing_contract`` (same detach math as ``turn_manager``).
 
 Coverage (all tallies where applicable): HCO, FCP, Final Shot, and regular Fast Break via
 ``ShotManager.resolve_shot``; Dynamic HCT via ``resolve_hct_fast_break_shot``
@@ -78,26 +80,97 @@ def classify_resolve_shot_turn_type(game_state, roles):
     return "HCO"
 
 
-def hco_shot_clock_at_attempt(game_state) -> float | None:
-    """Shot clock (game seconds) to use for HCO tier diagnostics at FGA time.
+def _is_hco_skeleton_shot(game_state, roles) -> bool:
+    """True when roles carry a half-court skeleton shot (not FB/FCP/HCT)."""
+    if not isinstance(roles, dict):
+        return False
+    if roles.get("is_fast_break"):
+        return False
+    if not roles.get("steps"):
+        return False
+    gs = (game_state or {}).get("offensive_state")
+    if gs in ("FAST_BREAK", "FCP", "HCT"):
+        return False
+    return True
 
-    Prefers the dynamic-walk at-attempt estimate when stamped; otherwise falls
-    back to the live ``shot_clock_remaining`` on game_state (legacy/static HCO).
-    Pops ``_hco_shot_clock_est`` so it is consumed once per shot.
+
+def _elapsed_seconds_to_shot_step(step_clock_seconds, resolution_step_index) -> int:
+    """Mirror ``turn_manager._shot_detach_elapsed_seconds`` (diagnostics only)."""
+    if not isinstance(step_clock_seconds, list) or not step_clock_seconds:
+        return 0
+    try:
+        secs = [max(0, int(s or 0)) for s in step_clock_seconds]
+    except (TypeError, ValueError):
+        return 0
+    max_index = len(secs) - 1
+    try:
+        idx = int(resolution_step_index)
+    except (TypeError, ValueError):
+        idx = max_index
+    idx = max(0, min(max_index, idx))
+    return int(sum(secs[: idx + 1]))
+
+
+def resolve_hco_shot_clock_at_attempt(
+    game_state,
+    roles,
+    *,
+    shot_step_index=None,
+    off_lineup=None,
+) -> float | None:
+    """Shot clock (game seconds) at HCO FGA time for tier diagnostics.
+
+    Priority:
+    1. ``_hco_shot_clock_est`` from dynamic motion/set-play walk (popped once).
+    2. Shot-at-1 path (``shot_at_one_second`` on game_state).
+    3. Possession-start ``shot_clock_remaining`` minus skeleton elapsed through
+       ``shot_step_index`` (same source as turn-end shot-clock detach).
     """
     if not isinstance(game_state, dict):
         return None
+
     est = game_state.pop("_hco_shot_clock_est", None)
     if est is not None:
-        return float(est)
-    raw = game_state.get("shot_clock_remaining")
-    if raw is None:
-        return None
-    return float(raw)
+        return max(0.0, float(est))
+
+    if game_state.get("shot_at_one_second"):
+        return 1.0
+
+    if not _is_hco_skeleton_shot(game_state, roles):
+        raw = game_state.get("shot_clock_remaining")
+        return float(raw) if raw is not None else None
+
+    steps = roles.get("steps") or []
+    from BackEnd.utils.shared import calc_skeleton_step_timing_contract
+
+    timing = calc_skeleton_step_timing_contract(
+        steps,
+        resolution_step_index=shot_step_index,
+        include_hco_step1_bringup=True,
+        prev_offense_positions=game_state.get("_prev_offense_positions_for_hco"),
+        phase_type="HCO",
+        off_lineup=off_lineup,
+    )
+    elapsed = _elapsed_seconds_to_shot_step(
+        timing.get("step_clock_seconds") or [],
+        timing.get("resolution_step_index"),
+    )
+    start = float(game_state.get("shot_clock_remaining", 30) or 30)
+    return max(0.0, start - elapsed)
 
 
-def record_shot_split(game, *, is_three: bool, defended: bool, made: bool,
-                      turn_type=None) -> None:
+def record_shot_split(
+    game,
+    *,
+    is_three: bool,
+    defended: bool,
+    made: bool,
+    turn_type=None,
+    hco_shot_clock=None,
+    roles=None,
+    shot_step_index=None,
+    off_lineup=None,
+) -> None:
     """Register one field-goal attempt.
 
     Always updates ``shot_split_tracking``. When ``turn_type`` is one of the
@@ -128,7 +201,14 @@ def record_shot_split(game, *, is_three: bool, defended: bool, made: bool,
         by_turn[turn_type] = int(by_turn.get(turn_type, 0) or 0) + 1
 
     if turn_type == "HCO":
-        shot_clock = hco_shot_clock_at_attempt(state)
+        shot_clock = hco_shot_clock
+        if shot_clock is None and roles is not None:
+            shot_clock = resolve_hco_shot_clock_at_attempt(
+                state,
+                roles,
+                shot_step_index=shot_step_index,
+                off_lineup=off_lineup,
+            )
         if shot_clock is not None:
             record_hco_shot_tier(game, shot_clock)
 

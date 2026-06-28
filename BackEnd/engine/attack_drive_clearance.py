@@ -7,7 +7,7 @@ import math
 import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
+from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS
 from BackEnd.utils.defense_identity import defense_zone_shell_variant
 from BackEnd.utils.defense_utils import is_zone_defense
 from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
@@ -37,7 +37,7 @@ _BLAST_RADIUS_SPOTS = frozenset(
     }
 )
 _CENTRAL_DRIVE_DESTINATIONS = frozenset({"midLane", "basketSpot"})
-ATTACK_DRIVE_CONTEST_RADIUS = 10.0
+ATTACK_DRIVE_CONTEST_RADIUS = float(CONTEST_EUCLIDEAN_RADIUS)
 ATTACK_DRIVE_INSIDE_RADIUS = 15.0
 PERIMETER_OFFENSE_READ_BASE = 150
 PERIMETER_DEFENSE_READ_BASE = 125

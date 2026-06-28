@@ -734,9 +734,9 @@ inline in `after_steal_fast_break.py`, refactored into a reusable helper.
 
 | Component | Rule |
 |---|---|
-| **Shooter target x** | `basket_x ± random.randint(2, 3)` toward center. AWAY basket=9 → x ∈ {11, 12}. HOME basket=91 → x ∈ {88, 89}. |
+| **Shooter target x** | `basket_x ± random.randint(2, 4)` toward center. AWAY basket=9 → x ∈ {11, 12, 13}. HOME basket=91 → x ∈ {87, 88, 89}. |
 | **Shooter target y** | `random.randint(19, 31)` (uniform random integer in that range). |
-| **Defender single target x** | `shooter_x ± 2` toward basket. AWAY → x ∈ {9, 10}. HOME → x ∈ {90, 91}. |
+| **Defender single target x** | `shooter_x ± 2` toward basket (same y as shooter). |
 | **Defender single target y** | Same as shooter's y. |
 
 ## Race + freeze
@@ -750,10 +750,22 @@ inline in `after_steal_fast_break.py`, refactored into a reusable helper.
 
 ## Contested decision
 
-At `t_shooter`, find the defender whose x is closest to basket. If that
-defender's x is past the shooter's x (closer to basket), the shot is
-**contested** with that defender as the shot defender. Otherwise
+At `t_shooter`, evaluate each racing defender's end position. A defender
+**contests** when **both** are true:
+
+1. **Euclidean distance** to the shooter ≤ `CONTEST_EUCLIDEAN_RADIUS` (11 grid spots)
+2. **X trail** ≤ `FB_CONTEST_MAX_X_TRAIL` (3 grid spots) — the defender may
+   trail the shooter by 1, 2, or 3 x spots (or be even/ahead on x) and
+   still qualify; more than 3 spots behind on x does not contest even if
+   within 11 Euclidean.
+
+The **nearest** qualifying defender is the shot defender. If none qualify →
 **uncontested**.
+
+| Direction | "Trailing" on x |
+|---|---|
+| HOME offense (basket x=91) | Defender x < shooter x; trail = `shooter_x − defender_x` |
+| AWAY offense (basket x=9) | Defender x > shooter x; trail = `defender_x − shooter_x` |
 
 | Case | Shot resolution |
 |---|---|
@@ -804,8 +816,8 @@ Returns:
 | `defender_target` | GridCoord | The single point defenders race to |
 | `defender_end_coords` | dict[pid, GridCoord] | End positions for the race pool only |
 | `first_arriver_id` | str \| None | Defender who reached the target before `t_shooter`, or None |
-| `contested` | bool | True if a defender is closer to basket than shooter at t_shooter |
-| `shot_defender_id` | str \| None | Defender to use in `calculate_shot_score` (None if uncontested) |
+| `contested` | bool | True if a defender is within 11 Euclidean of the shooter and trails on x by ≤ 3 at t_shooter |
+| `shot_defender_id` | str \| None | Nearest qualifying defender for `calculate_shot_score` (None if uncontested) |
 | `t_shooter_game_seconds` | float | Shooter's traversal time — drives the shot step's advance trigger |
 
 ## UESS compliance

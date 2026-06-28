@@ -155,8 +155,8 @@ def _sample_unique_offense_spots(
 
 
 def _compute_bh_target(is_away_offense: bool) -> Dict[str, float]:
-    """BH target: 2-3 grid spots from basket on x, y ∈ [19, 31]."""
-    distance = random.randint(2, 3)
+    """BH target: 2-4 grid spots from basket on x, y ∈ [19, 31]."""
+    distance = random.randint(2, 4)
     if is_away_offense:
         x = 9.0 + distance  # AWAY basket at x=9 → BH at x=11..12
     else:

@@ -280,6 +280,11 @@ BURST_GRID_PER_GAME_SEC       = 32  # archetype "burst"       — peak explosive
 # during the HCT broken-HCT drive step and the ABA Fast Break drive step.
 HCT_DRIFT_PROBABILITY = 0.5
 
+# Geometry-based shot contest: defender within this many Euclidean grid spots of
+# the shooter counts as contested (non-HCO resolve_shot, motion attack drive,
+# dynamic HCT Attack-Basket). Normal HCO set-play shots stay role-based.
+CONTEST_EUCLIDEAN_RADIUS = 11
+
 # Shot ball motion: ball flight rate during the [ball_flight] HCO sub-step.
 # FE mirrors this in animationPlayback.js (grid-distance / rate × tickMs).
 # ~27 grid/game-sec at tickMs=350 is main-branch-equivalent (~333 px/s horizontal).

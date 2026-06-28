@@ -6,7 +6,7 @@
 2. **Playcall Mapping**: `{"inside": "Inside", "outside": "Outside", "attack": "Attack"}`
 3. **Skeleton Timestamp Offsets**: +300ms between drive and next step; +600ms drive → dish shoot (game-clock hints only — UESS emitter uses distance-based step T)
 4. **Attack Drive Geometry** (`BackEnd/engine/attack_drive_clearance.py`):
-   - `ATTACK_DRIVE_CONTEST_RADIUS = 10` — guarded / contested (euclidean grid spots)
+   - `ATTACK_DRIVE_CONTEST_RADIUS` = `CONTEST_EUCLIDEAN_RADIUS` (11) — guarded / contested (euclidean grid spots)
    - `ATTACK_DRIVE_INSIDE_RADIUS = 15` — dish receiver inside vs outside classification
    - Read bases / floor: `PERIMETER_OFFENSE_READ_BASE = 150`, `PERIMETER_DEFENSE_READ_BASE = 125`, `HELP_READ_BASE = 100`, `READ_THRESHOLD_FLOOR = -3`
    - `DRIVE_CONTEST_DEF_BONUS_MULTIPLIER = 2` — defense chemistry + efficiency bonus on drive contest
