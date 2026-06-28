@@ -50,7 +50,7 @@ Gate experimental gameplay paths. All default **off** (legacy behavior) unless s
 
 | Variable | Purpose | Default | Docs |
 |----------|---------|---------|------|
-| `GOB_DYNAMIC_HCO_MOTION` | Dynamic HCO **motion** plays — per-step attribute walk (reads/shoot/subtle/freelance) + per-step moment, replacing the up-front outcome tables. Man + zone. | off | [Dynamic_HCO_Motion_System.md](06_Gameplay_Systems/Dynamic_HCO_Motion_System.md) |
+| `GOB_DYNAMIC_HCO_MOTION` | Dynamic HCO **motion** plays — per-step attribute walk (reads/shoot/subtle/freelance) + per-step moment, replacing the up-front outcome tables. Man + zone. | off | [Dynamic_HCO_System.md](06_Gameplay_Systems/Dynamic_HCO_System.md) |
 | `GOB_DYNAMIC_HCO_SETPLAY` | Dynamic HCO **set plays** — overlay model: variant roll still picks the skeleton, then a per-step walk (offense never self-subtles; defense can force subtle → recover or freelance) + per-step moment. Man + zone. Independent of the motion flag. | off | [Dynamic_HCO_SP_System.md](06_Gameplay_Systems/Dynamic_HCO_SP_System.md) |
 
 **Rollback:** set the variable to `0` (or remove it) and redeploy/restart the service — instantly reverts that turn type to the legacy path. No code change.

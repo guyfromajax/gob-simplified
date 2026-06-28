@@ -40,6 +40,8 @@
 
 ### Final-Turn Resolution Guardrail (February 2026)
 
+EOQ clock-driven possession chains (Final Shot, FLSS, terminal DREB) are documented in [`EOQ_System.md`](EOQ_System.md).
+
 - At `0:00`, EOG resolution now follows one consistent rule:
   - If free throws are pending, run the free throws first, then resolve to End of Game or Overtime based on the post-FT score.
   - If free throws are not pending, resolve directly to End of Game or Overtime (skip other in-turn interruption flows).

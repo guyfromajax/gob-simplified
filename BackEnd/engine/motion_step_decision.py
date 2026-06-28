@@ -156,26 +156,57 @@ def _neutral_branch(off_aggr, def_aggr, rng):
 # tempo-scaled bar) then (2) does the shooter make the right call? (read tier). Shares the
 # read map's raw mismatch scores with the (now label-only) hot read — one computation.
 # --------------------------------------------------------------------------- #
-SHOOT_THRESHOLD_BASE = 30          # "optimal look" bar at a full clock, normal tempo (mismatch-score scale)
-SHOT_CLOCK_START = 30              # clock used to scale clock_relief
-SHOOT_TEMPO_ADJ = {"slow": -8, "normal": 0, "fast": 8}  # fast lowers the bar (shoot sooner)
+SHOT_CLOCK_START = 30              # clamp ceiling for shot-clock-scaled bars
 SHOOT_READ_RIGHT = 200             # read tier: optimal decision (shoot/dish if optimal, else progress)
 SHOOT_READ_SAFE = 125              # read tier: safe decision (progress)
 
-# Non-strategic ("random") read-tier shoot probability (1–100) by shot-clock
-# bucket and tempo — a clock+tempo progression (low early, high late) that
-# replaces the old flat 50/50, so undisciplined possessions stop dumping early
-# shots. Tempo shifts ±10 in the Early/Mid/Late buckets; the Very-late (1–3s)
-# bucket is a flat 95% for all tempos (clock pressure dominates). Below 1s the
-# forced-shot backstop applies upstream. Rows are ordered high→low shot clock.
-# See Dynamic_HCO_Motion_System.md §random-tier shoot progression.
-RANDOM_TIER_SHOOT_PCT = (
-    # (min_shot_clock, {"slow", "normal", "fast"})
-    (23, {"slow": 5,  "normal": 15, "fast": 25}),   # Early     (23–30s)
-    (12, {"slow": 25, "normal": 35, "fast": 45}),   # Mid       (12–22s)
-    (4,  {"slow": 48, "normal": 58, "fast": 68}),   # Late      (4–11s)
-    (1,  {"slow": 95, "normal": 95, "fast": 95}),   # Very late (1–3s)
-)
+
+# Shot-clock tiers — shared by the random-tier % grid and the SM-precedence grid.
+# Boundaries (high→low): Early ≥23, Mid ≥15, Late ≥6, Very late ≥1, Forced <1.
+# See Dynamic_HCO_System.md §Tunable Constants.
+def _shot_clock_tier(shot_clock):
+    c = float(shot_clock or 0)
+    if c >= 23:
+        return "early"
+    if c >= 15:
+        return "mid"
+    if c >= 6:
+        return "late"
+    if c >= 1:
+        return "very_late"
+    return "forced"  # <1s — forced-shot region (handled upstream)
+
+
+# Optimal-look bar (continuous): bar = clock × steepness × tempo_mult. A look's
+# 0–100 mismatch quality must clear the bar to be "optimal" — higher = fewer /
+# later shots. Self-shot and hot-read dish share the same steepness (both 1.6);
+# tempo scales the bar (slow demands a better look — work the ball; fast shoots
+# sooner). See Dynamic_HCO_System.md §Tunable Constants.
+OPTIMAL_BAR_STEEPNESS = 1.6
+OPTIMAL_BAR_TEMPO_MULT = {"slow": 1.2, "normal": 1.0, "fast": 0.8}
+
+# Non-strategic ("random") read-tier shoot probability (1–100) by shot-clock tier
+# and tempo — a clock+tempo progression (low early, high late) so undisciplined
+# possessions stop dumping early shots. Very-late is a flat 95% (clock pressure
+# dominates); <1s is the forced-shot backstop upstream.
+RANDOM_TIER_SHOOT_PCT = {
+    "early":     {"slow": 5,  "normal": 15, "fast": 25},
+    "mid":       {"slow": 25, "normal": 35, "fast": 45},
+    "late":      {"slow": 48, "normal": 58, "fast": 68},
+    "very_late": {"slow": 95, "normal": 95, "fast": 95},
+}
+
+# Subtle-movement precedence: per shot-clock tier, the tempos for which subtle
+# movement takes precedence over the shoot decision (the offense works the ball
+# instead of shooting). Gated upstream by the turn's offense_reads / alterations
+# roll — NOT a second alterations roll. Precedence retreats as the clock drains
+# and as tempo speeds up. See Dynamic_HCO_System.md §Tunable Constants.
+SM_PRECEDENCE_TEMPOS = {
+    "early":     ("slow", "normal", "fast"),
+    "mid":       ("slow", "normal"),
+    "late":      ("slow",),
+    "very_late": (),
+}
 
 
 def _weighted_attack_or_outside(player, off_team, rng):
@@ -192,10 +223,10 @@ def _weighted_attack_or_outside(player, off_team, rng):
 
 
 def _shoot_threshold(shot_clock, tempo_call):
-    """The optimal-shot bar, lowered as the clock drains and for faster tempo."""
+    """Optimal-look bar = clock × steepness × tempo_mult (continuous). Drops as the
+    clock drains; slow tempo raises it (work the ball), fast lowers it (shoot sooner)."""
     clock = max(0.0, min(float(shot_clock or 0), SHOT_CLOCK_START))
-    clock_relief = SHOOT_THRESHOLD_BASE * (1.0 - clock / SHOT_CLOCK_START)
-    return SHOOT_THRESHOLD_BASE - clock_relief - SHOOT_TEMPO_ADJ.get(tempo_call, 0)
+    return clock * OPTIMAL_BAR_STEEPNESS * OPTIMAL_BAR_TEMPO_MULT.get(tempo_call, 1.0)
 
 
 def _shoot_read_tier(shooter, off_team, rng):
@@ -211,13 +242,20 @@ def _shoot_read_tier(shooter, off_team, rng):
 def _random_tier_shoot_pct(shot_clock, tempo_call):
     """Shoot probability (1–100) for the non-strategic read tier — clock+tempo
     progression (low early, high late). See RANDOM_TIER_SHOOT_PCT."""
-    clock = float(shot_clock or 0)
+    tier = _shot_clock_tier(shot_clock)
+    if tier == "forced":
+        tier = "very_late"  # <1s forced-shot region — fall to the very-late floor
     tempo = tempo_call if tempo_call in ("slow", "normal", "fast") else "normal"
-    for min_clock, row in RANDOM_TIER_SHOOT_PCT:
-        if clock >= min_clock:
-            return row[tempo]
-    # clock < 1s (forced-shot region) — fall to the very-late floor defensively.
-    return RANDOM_TIER_SHOOT_PCT[-1][1][tempo]
+    return RANDOM_TIER_SHOOT_PCT[tier][tempo]
+
+
+def sm_takes_precedence(shot_clock, tempo_call):
+    """True when subtle movement should take precedence over the shoot decision at
+    this shot-clock tier + tempo. The caller gates this on the turn's offense_reads
+    (alterations) roll — this is NOT a second alterations roll. See SM_PRECEDENCE_TEMPOS."""
+    tier = _shot_clock_tier(shot_clock)
+    tempo = tempo_call if tempo_call in ("slow", "normal", "fast") else "normal"
+    return tempo in SM_PRECEDENCE_TEMPOS.get(tier, ())
 
 
 def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_call, openness, rng):
@@ -247,7 +285,7 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     ``allow_dish=False`` (no re-dish).
 
     ``blocked_dish_targets`` (a set of positions) are teammates whose passing lane is covered —
-    the hot-read "truly open" gate (see Dynamic_HCO_Motion_System.md §4). They're excluded as
+    the hot-read "truly open" gate (see Dynamic_HCO_System.md §4). They're excluded as
     dish candidates: the offense won't dish into a covered lane."""
     shooter = off_lineup.get(shooter_pos)
     if shooter is None:

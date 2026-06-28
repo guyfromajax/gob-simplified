@@ -32,7 +32,7 @@ This doc is the single source of truth for the contract. Code is the implementat
 | Fast Break — After Steal | ✅ Migrated | `after_steal_fast_break_step_emitter.build_after_steal_fast_break_animation_steps` |
 | Free Throw | ✅ Migrated | `ft_step_emitter.build_ft_animation_steps` |
 | Timeout | ⏳ Not migrated (low priority — minimal animation) | — |
-| Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). Frontend renders the **full** ``animation_steps[]`` via `playTurn()` (no step-0 skip or parallel alignment tween). Step 0 hold pacing is backend ``_step_t_floor_game_seconds`` computed backward from a **rolled anchor** (outside shoot @ 1–3s, attack drive @ 2–4s). ``time_elapsed`` derives from schema burn after emit (not a forced full-clock drain). See [`Situational_Logic_System.md`](../06_Gameplay_Systems/Situational_Logic_System.md) §Final Turn. |
+| Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). Frontend renders the **full** ``animation_steps[]`` via `playTurn()` (no step-0 skip or parallel alignment tween). Step 0 hold pacing is backend ``_step_t_floor_game_seconds`` computed backward from a **rolled anchor** (outside shoot @ 1–3s, attack drive @ 2–4s). ``time_elapsed`` derives from schema burn after emit (not a forced full-clock drain). See [`EOQ_System.md`](../06_Gameplay_Systems/EOQ_System.md) §Final Shot. |
 | FLSS | ✅ Migrated | Same emitter path as Final Shot/HCO; sprint drive + shoot @ ~1s. Post-emit clock/quarter-end via `eoq_clock_progression.finalize_flss_post_emit`. |
 
 ---

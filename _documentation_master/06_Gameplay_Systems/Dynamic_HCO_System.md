@@ -1,8 +1,56 @@
-## Dynamic HCO Motion System ✅ **SHIPPING (flagged)** (June 2026)
+## Dynamic HCO System ✅ **SHIPPING (flagged)** (June 2026)
 
-**Feature gate:** env var `GOB_DYNAMIC_HCO_MOTION` (`1`/`true`/`yes`/`on`). Off → legacy HCO motion path (up-front outcome tables + static skeleton). This doc describes the ON path.
+**Feature gate:** env var `GOB_DYNAMIC_HCO_MOTION` (`1`/`true`/`yes`/`on`) for motion plays; `GOB_DYNAMIC_HCO_SETPLAY` for set plays. Off → legacy HCO path (up-front outcome tables + static skeleton). This doc describes the ON path.
 
-**Scope today:** half-court **offense, motion plays, man + zone defense**. Set plays are deferred (see [Deferred / Roadmap](#deferred--roadmap)). The companion working brief is [projects/Dynamic_HCO_Motion_Brief.md](../projects/Dynamic_HCO_Motion_Brief.md) — this file is the authoritative system doc; the brief holds build-phase scratch + rationale.
+**Scope:** half-court **offense — motion plays and set plays, man + zone defense**. (Set-play sections are a work in progress; a full sweep across motion/set-play × man/zone is pending.) The companion working brief is [projects/Dynamic_HCO_Motion_Brief.md](../projects/Dynamic_HCO_Motion_Brief.md) — this file is the authoritative system doc; the brief holds build-phase scratch + rationale.
+
+---
+
+## Tunable Constants
+
+Shot-timing dials, all in [`BackEnd/engine/motion_step_decision.py`](../../BackEnd/engine/motion_step_decision.py) and wired by `_resolve_motion_offense_shot_dynamic` in `phase_resolution.py`. These govern *when* within a motion turn the ball handler shoots, dishes, or works the ball.
+
+### Shot-clock tiers (`_shot_clock_tier`)
+Shared by the random-% grid and the SM-precedence grid.
+
+| Tier | Shot clock |
+|---|---|
+| Early | ≥ 23s |
+| Mid | 15–22s |
+| Late | 6–14s |
+| Very late | 1–5s |
+| Forced | < 1s (forced shot, handled upstream) |
+
+### Optimal-look bar (`_shoot_threshold`)
+A look's 0–100 mismatch quality must clear the bar to be **optimal**. Continuous:
+`bar = clock × OPTIMAL_BAR_STEEPNESS × OPTIMAL_BAR_TEMPO_MULT[tempo]`
+- `OPTIMAL_BAR_STEEPNESS = 1.6` — self-shot and hot-read dish share it.
+- `OPTIMAL_BAR_TEMPO_MULT = {slow: 1.2, normal: 1.0, fast: 0.8}`
+
+Higher bar = fewer/later shots; slow tempo demands a better look (work the ball), fast shoots sooner. Self stays slightly favored over the dish via the self-only openness bonus + self-wins-ties tiebreaker (not the bar). Illustrative values (normal tempo): 30s → 48, 22s → 35, 15s → 24, 8s → 13.
+
+### Random-tier shoot % (`RANDOM_TIER_SHOOT_PCT`)
+Non-strategic ("random") read tier: `randint(1,100) ≤ %` → shoot (self only). Low early, high late.
+
+| Tier | slow | normal | fast |
+|---|---|---|---|
+| Early | 5 | 15 | 25 |
+| Mid | 25 | 35 | 45 |
+| Late | 48 | 58 | 68 |
+| Very late | 95 | 95 | 95 |
+
+### Subtle-movement precedence (`SM_PRECEDENCE_TEMPOS`)
+When the turn's `offense_reads` (alterations) roll is on, these tempos make **subtle movement take precedence over the shoot decision** — the BH works the ball and defers his shot/hot-read. Reuses the per-turn alterations roll (NOT a second roll). Precedence retreats as the clock drains and tempo speeds up.
+
+| Tier | slow | normal | fast |
+|---|---|---|---|
+| Early | ✓ | ✓ | ✓ |
+| Mid | ✓ | ✓ | ✗ |
+| Late | ✓ | ✗ | ✗ |
+| Very late | ✗ | ✗ | ✗ |
+
+### Read tiers (`_shoot_read_tier`)
+`(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT (200)` → right (take the best optimal look, self or dish); `> SHOOT_READ_SAFE (125)` → safe (always progress); else random (use the % grid above). SM-precedence is evaluated **before** this — when it fires, the read tier is bypassed for that step.
 
 ---
 

@@ -33,4 +33,4 @@ step
 | set_play | Base Post Play | 148 / 380 — 38% |
 | set_play | Pick & Roll – Entry Pass | 216 / 520 — 41% |
 
-**Implication:** ~40–68% of per-step player actions are holds. That's *correct* basketball spacing (only 1–2 players are active per beat; the rest hold position), but rendered as perfectly-still sprites it looks dead. The fix is **render-only idle micro-motion** on held sprites — NOT editing the skeletons (their stationary spacing + timing are intentional and shared by motion *and* set plays). See [Dynamic_HCO_Motion_System.md](../06_Gameplay_Systems/Dynamic_HCO_Motion_System.md).
+**Implication:** ~40–68% of per-step player actions are holds. That's *correct* basketball spacing (only 1–2 players are active per beat; the rest hold position), but rendered as perfectly-still sprites it looks dead. The fix is **render-only idle micro-motion** on held sprites — NOT editing the skeletons (their stationary spacing + timing are intentional and shared by motion *and* set plays). See [Dynamic_HCO_System.md](../06_Gameplay_Systems/Dynamic_HCO_System.md).

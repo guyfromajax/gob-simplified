@@ -4684,7 +4684,7 @@ HCO_ZONE_MOMENT_SCALAR = 0.5   # zone-defense dial (defaults equal to man; tune 
 # subtle-movement/defense-pressure gates (those keep the flat randint(0,4) <= slider form).
 MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION = {0: 5, 1: 20, 2: 35, 3: 50, 4: 75}
 
-# HCO passing-lane perpendicular distance by defense aggression_call (Dynamic_HCO_Motion_System §4).
+# HCO passing-lane perpendicular distance by defense aggression_call (Dynamic_HCO_System §4).
 # Tighter than HCT/FCP (8.0) — closer half-court spacing + faster passes. Normal tempo is rolled
 # once per game (randint 5-6) and cached in game_state (stable all game; no per-pass roll).
 HCO_PASS_LANE_DIST_BY_AGGRESSION = {"passive": 6.0, "aggressive": 5.0}
@@ -5071,7 +5071,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     from BackEnd.engine.motion_step_decision import (
         decide_step_action, should_shoot, _choose_attack_or_outside, _step_locations,
         SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT, SUBTLE_MOVEMENT, FREELANCE_FORCED,
-        SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY,
+        SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY, sm_takes_precedence,
     )
     from BackEnd.engine.motion_subtle import build_subtle_beat
     from BackEnd.utils.defense_utils import is_zone_defense
@@ -5159,27 +5159,41 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             steps[i], bh_pos, off_lineup, def_lineup, off_to_def,
             is_away_offense, _def_aggr_call, _hco_lane_dist,
             zone=zone, defense_playcall=game_state.get("defense_playcall"))
-        shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
-                             shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
-                             blocked_dish_targets=blocked_dish)
-        if shoot:
-            logging.warning(
-                f"🎯 [DYNAMIC MOTION] step {i}: SHOOT {shoot['shooter_pos']} "
-                f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
-            )
-            _dec = {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]}
-            return _apply_dish_contest(_dec, _execute_motion_decision(
-                skeleton, output_steps, steps[i], bh_pos, bh_location, _dec,
-                game, off_lineup, def_lineup, is_away_offense,
-            ), steps[i], bh_pos)
+        # SM-precedence: when the offense is reading this turn (offense_reads — the
+        # per-turn alterations roll, reused, NOT a second roll) and the shot-clock
+        # tier/tempo says "work the ball", subtle movement takes precedence over the
+        # shoot decision — the BH defers his shot/hot-read and keeps the offense
+        # moving. Precedence retreats as the clock drains / tempo speeds up.
+        sm_precede = offense_reads and sm_takes_precedence(shot_clock_est, tempo)
 
-        # 2. Movement matrix — only when the offense alters and/or the defense pressures.
-        # Neither engaged → static skeleton: just progress to the next step.
-        if not offense_reads and not defense_pressure:
+        if not sm_precede:
+            shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
+                                 shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
+                                 blocked_dish_targets=blocked_dish)
+            if shoot:
+                logging.warning(
+                    f"🎯 [DYNAMIC MOTION] step {i}: SHOOT {shoot['shooter_pos']} "
+                    f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
+                )
+                _dec = {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]}
+                return _apply_dish_contest(_dec, _execute_motion_decision(
+                    skeleton, output_steps, steps[i], bh_pos, bh_location, _dec,
+                    game, off_lineup, def_lineup, is_away_offense,
+                ), steps[i], bh_pos)
+
+        # 2. Movement matrix. Under SM-precedence we force a subtle-movement beat
+        # (reusing the branch below, incl. its <1s forced-shot backstop). Otherwise
+        # the matrix runs only when the offense alters and/or the defense pressures;
+        # neither engaged → static skeleton: just progress to the next step.
+        if sm_precede:
+            logging.warning(f"🟡 [DYNAMIC MOTION] step {i}: SM-precedence → subtle movement")
+            decision = {"action": SUBTLE_MOVEMENT}
+        elif not offense_reads and not defense_pressure:
             continue
-        bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
-        decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
-                                      offense_reads=offense_reads, defense_pressure=defense_pressure)
+        else:
+            bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
+            decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
+                                          offense_reads=offense_reads, defense_pressure=defense_pressure)
         action = decision.get("action")
         logging.warning(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
@@ -5283,7 +5297,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
     from BackEnd.engine.motion_step_decision import (
         decide_step_action, should_shoot, _choose_attack_or_outside, _step_locations,
         SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT, SUBTLE_MOVEMENT, FREELANCE_FORCED,
-        SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY,
+        SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY, sm_takes_precedence,
     )
     from BackEnd.engine.motion_subtle import build_subtle_beat
     from BackEnd.utils.defense_utils import is_zone_defense
