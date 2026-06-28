@@ -180,10 +180,11 @@ def _shot_clock_tier(shot_clock):
 
 # Optimal-look bar (continuous): bar = clock × steepness × tempo_mult. A look's
 # 0–100 mismatch quality must clear the bar to be "optimal" — higher = fewer /
-# later shots. Self-shot and hot-read dish share the same steepness (both 1.6);
-# tempo scales the bar (slow demands a better look — work the ball; fast shoots
-# sooner). See Dynamic_HCO_System.md §Tunable Constants.
-OPTIMAL_BAR_STEEPNESS = 1.6
+# later shots. Self-shot and hot-read dish share the same steepness; tempo scales
+# the bar (slow demands a better look — work the ball; fast shoots sooner).
+# Raised 1.6→2.0 to push more HCO shots from the Mid (15-22s) tier into Late
+# (6-14s) and cut total FGA. See Dynamic_HCO_System.md §Tunable Constants.
+OPTIMAL_BAR_STEEPNESS = 2.0
 OPTIMAL_BAR_TEMPO_MULT = {"slow": 1.2, "normal": 1.0, "fast": 0.8}
 
 # Non-strategic ("random") read-tier shoot probability (1–100) by shot-clock tier
