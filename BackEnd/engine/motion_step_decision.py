@@ -158,8 +158,12 @@ def _neutral_branch(off_aggr, def_aggr, rng):
 # read map's raw mismatch scores with the (now label-only) hot read — one computation.
 # --------------------------------------------------------------------------- #
 SHOT_CLOCK_START = 30              # clamp ceiling for shot-clock-scaled bars
-SHOOT_READ_RIGHT = 200             # read tier: optimal decision (shoot/dish if optimal, else progress)
-SHOOT_READ_SAFE = 125              # read tier: safe decision (progress)
+# Read tiers (HCO only — used only by should_shoot in the motion + set-play dynamic walks).
+# Widened the "safe" band (300/100 vs old 200/125) so far more steps resolve as "safe" (always
+# progress / work the ball, never shoot) — cuts FGA by deferring shots, and notably shrinks the
+# bar-immune "random" tier that was chucking in the Mid shot-clock tier. See Dynamic_HCO_System.md.
+SHOOT_READ_RIGHT = 300             # read tier: optimal decision (shoot/dish if optimal, else progress)
+SHOOT_READ_SAFE = 100              # read tier: safe decision (always progress / work the ball)
 
 
 # Shot-clock tiers — shared by the random-tier % grid and the SM-precedence grid.
