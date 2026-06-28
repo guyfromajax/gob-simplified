@@ -31,7 +31,7 @@ made = shot_score >= shot_threshold
 
 **Yes — you can just tell an agent in chat and point them at this doc.** Example prompt:
 
-> Change team shot_threshold scale to MIN **60** (MAX/MID derive automatically). Follow `_documentation_master/06_Gameplay_Systems/Shot_Threshold_Scale_Tuning.md`. Run parity tests. Do not change runtime modifiers unless I ask.
+> Change team shot_threshold scale to MIN **60** (MAX/MID derive automatically). Follow `_documentation_master/04_Franchise_Mode_Systems/Shot_Threshold_Scale_Tuning.md`. Run parity tests. Do not change runtime modifiers unless I ask.
 
 **What the agent should do:**
 
@@ -111,5 +111,5 @@ When retuning feel beyond moving the storage window, grep and revisit:
 
 ## Related docs
 
-- [Shot_System.md](./Shot_System.md) — resolution flow and threshold modifiers
-- [Team_Attribute_System.md](../04_Franchise_Mode_Systems/Team_Attribute_System.md) — init ranges and UI copy
+- [Shot_System.md](../06_Gameplay_Systems/Shot_System.md) — resolution flow and threshold modifiers
+- [Team_Attribute_System.md](./Team_Attribute_System.md) — init ranges and UI copy

@@ -184,3 +184,92 @@ def format_turn_type_fga_summary(game) -> str:
     lines.append(f"{'TOTAL':<12}: {total:>4} FGA")
     lines.append("==========================================================")
     return "\n".join(lines)
+
+
+# --- hco_shot_tier_counts (HCO shot attempts by shot-clock tier) ------------
+
+# Display label → tier key, in report order.
+_HCO_TIER_ROWS = (
+    ("Early (23-30s)", "early"),
+    ("Mid (15-22s)", "mid"),
+    ("Late (6-14s)", "late"),
+    ("Very late (1-5s)", "very_late"),
+    ("Forced (<1s)", "forced"),
+)
+_HCO_TIERS = tuple(key for _label, key in _HCO_TIER_ROWS)
+
+
+def _hco_shot_clock_tier(shot_clock):
+    """Shot-clock → tier. Mirrors motion_step_decision._shot_clock_tier — keep
+    the boundaries (23 / 15 / 6 / 1) in sync if they change."""
+    c = float(shot_clock or 0)
+    if c >= 23:
+        return "early"
+    if c >= 15:
+        return "mid"
+    if c >= 6:
+        return "late"
+    if c >= 1:
+        return "very_late"
+    return "forced"
+
+
+def record_hco_shot_tier(game, shot_clock) -> None:
+    """Record one HCO shot attempt in the shot-clock-tier tally, by the clock at
+    the moment the shot was attempted. No-op without a usable game_state."""
+    state = getattr(game, "game_state", None)
+    if not isinstance(state, dict):
+        return
+    counts = state.get("hco_shot_tier_counts")
+    if not isinstance(counts, dict):
+        counts = {t: 0 for t in _HCO_TIERS}
+        state["hco_shot_tier_counts"] = counts
+    tier = _hco_shot_clock_tier(shot_clock)
+    counts[tier] = int(counts.get(tier, 0) or 0) + 1
+
+
+def restore_hco_shot_tier_from_saved(game_state, saved) -> None:
+    """Reapply cumulative HCO shot-tier counts from a loaded game document
+    (quarter-by-quarter persistence)."""
+    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+        return
+    prior = saved.get("hco_shot_tier_counts")
+    if not isinstance(prior, dict):
+        return
+    game_state["hco_shot_tier_counts"] = {t: int(prior.get(t, 0) or 0) for t in _HCO_TIERS}
+
+
+def format_hco_shot_tier_summary(game) -> str:
+    """Render the end-of-game HCO-shots-by-shot-clock-tier report."""
+    state = getattr(game, "game_state", None) or {}
+    counts = state.get("hco_shot_tier_counts") or {}
+
+    total = sum(int(counts.get(t, 0) or 0) for t in _HCO_TIERS)
+    lines = [
+        "",
+        "======= HCO SHOT ATTEMPTS BY SHOT-CLOCK TIER =======",
+    ]
+    for label, t in _HCO_TIER_ROWS:
+        n = int(counts.get(t, 0) or 0)
+        share = (n / total * 100.0) if total else 0.0
+        lines.append(f"{label:<18}: {n:>4}  ({share:5.1f}%)")
+    lines.append(f"{'TOTAL':<18}: {total:>4}")
+    lines.append("====================================================")
+    return "\n".join(lines)
+
+
+# --- master end-of-game report ---------------------------------------------
+
+
+def format_master_eog_report(game) -> str:
+    """One consolidated end-of-game shot-diagnostics report — all tallies in a
+    single block. Grep ``END-OF-GAME SHOT DIAGNOSTICS`` to find it in stdout."""
+    return "\n".join([
+        "",
+        "################# END-OF-GAME SHOT DIAGNOSTICS #################",
+        format_shot_split_summary(game),
+        format_turn_type_fga_summary(game),
+        format_hco_shot_tier_summary(game),
+        "###############################################################",
+        "",
+    ])

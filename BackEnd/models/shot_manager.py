@@ -6,7 +6,7 @@ from BackEnd.constants.momentum import (
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import mo_shot_roll
-from BackEnd.utils.shot_split_tracker import record_shot_split, classify_resolve_shot_turn_type
+from BackEnd.utils.shot_split_tracker import record_shot_split, classify_resolve_shot_turn_type, record_hco_shot_tier
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
@@ -1232,6 +1232,16 @@ class ShotManager:
                         return result
 
             made = shot_score >= shot_threshold
+            # 🔎 Make/miss reconciliation diagnostic — this `shot_threshold` (team
+            # shot_threshold + 3pt/variant/zone modifiers) is what drives FG%, NOT
+            # the Motion optimal-look bar (that only gates shot SELECTION upstream).
+            logging.warning(
+                "🎯 [SHOT RECON] state=%s type=%s is_three=%s contest=%s "
+                "shot_score=%.1f shot_threshold=%.1f → %s",
+                self.game_state.get("offensive_state"), shot_type, bool(is_three),
+                bool(has_contest), float(shot_score or 0), float(shot_threshold or 0),
+                "MAKE" if made else "MISS",
+            )
             if getattr(self, "_block_spot", None):
                 made = False  # Block reconciliation decided block; use miss path with block spot
 
@@ -1296,6 +1306,11 @@ class ShotManager:
             self.game, is_three=is_three, defended=has_contest, made=made,
             turn_type=classify_resolve_shot_turn_type(self.game_state, roles),
         )
+        # HCO shot-clock-tier tally: use the at-attempt shot clock stamped by the
+        # dynamic HCO walk (`_hco_shot_clock_est`); present only for HCO shots.
+        _hco_sc = self.game_state.pop("_hco_shot_clock_est", None)
+        if _hco_sc is not None:
+            record_hco_shot_tier(self.game, _hco_sc)
 
         # Shot_Result_List: record make (True) / clean miss or block (False);
         # skip a miss that drew a shooting foul (Player_Momentum_System.md).

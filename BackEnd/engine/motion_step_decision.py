@@ -11,6 +11,7 @@ Scores use brief "form B": (raw_helper + team_modifier) * random.randint(1,6) �
 a single roll, with the raw (roll-free) helper variants from BackEnd.utils.shared
 so there is no double random.
 """
+import logging
 import random as _random
 from BackEnd.constants import HCO_STRING_SPOTS
 from BackEnd.utils.shared import (
@@ -305,6 +306,13 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
                                            shot_clock, tempo_call, 0.0, rng)
             if opt and q > best["quality"]:
                 best = {"pos": pos, "type": t, "quality": q, "optimal": opt, "mismatch": mm, "via_pass": True}
+
+    # 🔎 Optimal-bar diagnostic: confirms the new clock×steepness×tempo bar is live.
+    logging.warning(
+        "🪟 [SHOT-SELECT] clock=%.1f tempo=%s bar=%.1f best_q=%.1f optimal=%s via_pass=%s",
+        float(shot_clock or 0), tempo_call, float(_shoot_threshold(shot_clock, tempo_call)),
+        float(best["quality"]), best["optimal"], best["via_pass"],
+    )
 
     tier = _shoot_read_tier(shooter, off_team, rng)
     if tier == "safe":

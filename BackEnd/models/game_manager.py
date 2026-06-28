@@ -228,6 +228,10 @@ class GameManager:
             "fga_by_turn_type": {
                 "HCO": 0, "HCT": 0, "FCP": 0, "Fast Break": 0, "OREB": 0,
             },
+            # HCO shot attempts by shot-clock tier (at-attempt clock).
+            "hco_shot_tier_counts": {
+                "early": 0, "mid": 0, "late": 0, "very_late": 0, "forced": 0,
+            },
             "motion_attack_shot_tracker": {
                 "total": 0,
                 "driver_shoot": 0,

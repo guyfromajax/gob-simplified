@@ -28,7 +28,7 @@ Applies to all trainable player attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, 
 | **Min** | 50 |
 | **Max** | 250 |
 
-Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES`. Tuning: **Shot_Threshold_Scale_Tuning.md**.
+Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES`. Tuning: [Shot_Threshold_Scale_Tuning.md](../04_Franchise_Mode_Systems/Shot_Threshold_Scale_Tuning.md).
 
 ### rebound_modifier
 

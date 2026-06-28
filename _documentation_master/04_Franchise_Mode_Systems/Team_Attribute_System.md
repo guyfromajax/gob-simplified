@@ -5,7 +5,7 @@
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: 50 to 250; see Shot_Threshold_Scale_Tuning.md)
+   - `shot_threshold` - Shot attempt threshold (range: 50 to 250; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4)
@@ -48,7 +48,7 @@ The Team Attribute Management System handles the initialization, storage, and up
 All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
-- `shot_threshold` - Shot attempt threshold (range: 50 to 250, center at 150 for pill display; see Shot_Threshold_Scale_Tuning.md)
+- `shot_threshold` - Shot attempt threshold (range: 50 to 250, center at 150 for pill display; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
 - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4, center at 0.2 for pill display)
@@ -71,14 +71,14 @@ All team attributes are stored in team objects across all game modes:
 **Single Game & Tournament Mode:**
 - Attribute range: `random.randint(-10, 10)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(50, 250)` (from `TEAM_ATTR_RANGES`; see Shot_Threshold_Scale_Tuning.md)
+- `shot_threshold`: `random.randint(50, 250)` (from `TEAM_ATTR_RANGES`; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
 **Franchise Mode:**
 - Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(130, 140)` (slightly better than MID 150; see Shot_Threshold_Scale_Tuning.md)
+- `shot_threshold`: `random.randint(130, 140)` (slightly better than MID 150; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
@@ -193,7 +193,7 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 This is the team's intangible mindset to convert baskets. Their overall belief in their identity as a basketball team who scores points. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-**Scale reference (50–250, MID 150):** To change the scale, see **Shot_Threshold_Scale_Tuning.md** (agent workflow + manual checklist).
+**Scale reference (50–250, MID 150):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
 
 | Area | Current value |
 |------|---------------|
@@ -225,7 +225,7 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
   Condition: team FG% `> 50%`.
   Range: **both** teams `+= random.randint(-10, -5)`.
 
-**UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **150** as center, **50** at the favorable end and **250** at the unfavorable end. Shared helpers: `FrontEnd/static/js/shared/teamShotThresholdScale.js`. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red. See **Shot_Threshold_Scale_Tuning.md**.
+**UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **150** as center, **50** at the favorable end and **250** at the unfavorable end. Shared helpers: `FrontEnd/static/js/shared/teamShotThresholdScale.js`. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red. See **[Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md)**.
 
 ### Rebounding (`rebound_modifier`) (range: 0.0 to 0.4)
 This is the team's intangible mindset when it comes to rebounding. Their overall belief in their identity as a basketball team who gets more rebounds than their opponent. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.

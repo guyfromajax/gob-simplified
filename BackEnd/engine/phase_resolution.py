@@ -5148,6 +5148,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
+        game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
         output_steps.append(steps[i])  # players arrive at skeleton step i
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
@@ -5232,6 +5233,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                 )
             beat["_step_t_floor_game_seconds"] = elapsed
             shot_clock_est -= elapsed
+            game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock (post-subtle)
             output_steps.append(beat)
 
             # Post-subtle shoot decision (brief: subtle movement can lead to a shot). The BH is
@@ -5367,6 +5369,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
+        game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
         output_steps.append(steps[i])  # players arrive at skeleton step i
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
@@ -5436,6 +5439,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
                 )
             beat["_step_t_floor_game_seconds"] = elapsed
             shot_clock_est -= elapsed
+            game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock (post-subtle)
             output_steps.append(beat)
 
             # Post-subtle the BH reads shoot / hot-read pass / hold. should_shoot covers shoot
