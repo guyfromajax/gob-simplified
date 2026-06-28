@@ -704,6 +704,11 @@ class TeamManager:
             dict: Team attributes with mode-specific randomization
         """
         from BackEnd.constants import TEAM_ATTR_RANGES
+        from BackEnd.constants.shot_threshold_scale import (
+            FRANCHISE_INIT_HI,
+            FRANCHISE_INIT_LO,
+            TOURNAMENT_SEED_ST_RANGES,
+        )
 
         # Tournament seed-based ranges (Mode_Init_System.md): Seed 1 = best, Seed 8 = worst
         if mode == "tournament" and tournament_seed is not None and 1 <= tournament_seed <= 8:
@@ -711,22 +716,19 @@ class TeamManager:
                 a_lo, a_hi = 5, 10
                 tc_lo, tc_hi = 20, 25
                 rm_lo, rm_hi = 30, 40  # 0.30-0.40
-                st_lo, st_hi = 10, 110
             elif tournament_seed <= 4:
                 a_lo, a_hi = -2, 10
                 tc_lo, tc_hi = 12, 25
                 rm_lo, rm_hi = 15, 40  # 0.15-0.40
-                st_lo, st_hi = 10, 160
             elif tournament_seed <= 7:
                 a_lo, a_hi = -8, 5
                 tc_lo, tc_hi = 8, 18
                 rm_lo, rm_hi = 1, 40  # 0.01-0.40
-                st_lo, st_hi = 60, 210
             else:  # seed 8
                 a_lo, a_hi = -10, -2
                 tc_lo, tc_hi = 7, 12
                 rm_lo, rm_hi = 1, 20  # 0.01-0.20
-                st_lo, st_hi = 110, 210
+            st_lo, st_hi = TOURNAMENT_SEED_ST_RANGES[tournament_seed]
             attr_range = (a_lo, a_hi)
             team_chemistry = random.randint(tc_lo, tc_hi)
             rebound_modifier = round(random.randint(rm_lo, rm_hi) / 100.0, 2)
@@ -738,7 +740,7 @@ class TeamManager:
                 attr_range = (-1, 1)
                 team_chemistry = random.randint(7, 10)
                 rebound_modifier = 0.2
-                shot_threshold = random.randint(100, 120)
+                shot_threshold = random.randint(FRANCHISE_INIT_LO, FRANCHISE_INIT_HI)
             else:
                 # Single Game or tournament fallback (no seed)
                 st_lo, st_hi = TEAM_ATTR_RANGES["shot_threshold"]

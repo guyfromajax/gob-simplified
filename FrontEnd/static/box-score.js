@@ -1156,7 +1156,7 @@ function renderAttributeChangePills(container, attributeDeltas) {
 
   const ATTR_CONFIG = {
     // invert: raw delta sign flipped in copy (raw −10 → display +10 green); pill fill uses same golf-score sense.
-    shot_threshold: { label: 'Shooting', scale: 100, invert: true },
+    shot_threshold: { label: 'Shooting', scale: window.TeamShotThresholdScale?.HALF_SPAN ?? 100, invert: true },
     rebound_modifier: { label: 'Rebounding', scale: 0.2, invert: false },
     offensive_efficiency: { label: 'Offense', scale: 10, invert: false },
     defensive_efficiency: { label: 'Defense', scale: 10, invert: false },
@@ -1173,7 +1173,7 @@ function renderAttributeChangePills(container, attributeDeltas) {
     offensiveefficiency: { label: 'Offense', scale: 10, invert: false },
     defensiveefficiency: { label: 'Defense', scale: 10, invert: false },
     reboundmodifier: { label: 'Rebounding', scale: 0.2, invert: false },
-    shotthreshold: { label: 'Shooting', scale: 100, invert: true }, // same as shot_threshold
+    shotthreshold: { label: 'Shooting', scale: window.TeamShotThresholdScale?.HALF_SPAN ?? 100, invert: true }, // same as shot_threshold
     teamchemistry: { label: 'Chemistry', scale: 10, invert: false },
     momentumscore: { label: 'Momentum', scale: 10, invert: false },
     fbefficiency: { label: 'Fast Break', scale: 10, invert: false },

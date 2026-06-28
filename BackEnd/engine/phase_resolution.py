@@ -3572,8 +3572,8 @@ def apply_balancing_system(game, game_state, off_team, def_team):
     
     If a team is leading or trailing by the adjusted threshold amount or more,
     temporarily override shot_threshold for that HCO turn:
-    - Trailing team: shot_threshold = -10 (easier shots)
-    - Leading team: shot_threshold = 190 (harder shots)
+    - Trailing team: shot_threshold = BALANCING_TRAILING (easier shots)
+    - Leading team: shot_threshold = BALANCING_LEADING (harder shots)
     
     Args:
         game: GameManager object
@@ -3584,6 +3584,8 @@ def apply_balancing_system(game, game_state, off_team, def_team):
     Returns:
         None (modifies game_state with balancing_shot_threshold_override if applicable)
     """
+    from BackEnd.constants.shot_threshold_scale import BALANCING_LEADING, BALANCING_TRAILING
+
     # Get current quarter
     quarter = game_state.get("quarter", 1)
     
@@ -3638,12 +3640,12 @@ def apply_balancing_system(game, game_state, off_team, def_team):
         # Apply balancing override
         if is_trailing:
             # Trailing team gets easier shots
-            game_state["balancing_shot_threshold_override"] = -10
-            # logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} trailing by {abs_score_diff} (threshold: {adjusted_threshold}, fight: {fight}) → shot_threshold = -10")
+            game_state["balancing_shot_threshold_override"] = BALANCING_TRAILING
+            # logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} trailing by {abs_score_diff} (threshold: {adjusted_threshold}, fight: {fight}) → shot_threshold = {BALANCING_TRAILING}")
         else:  # is_leading
             # Leading team gets harder shots
-            game_state["balancing_shot_threshold_override"] = 190
-            # logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} leading by {abs_score_diff} (threshold: {adjusted_threshold}, discipline: {discipline}) → shot_threshold = 190")
+            game_state["balancing_shot_threshold_override"] = BALANCING_LEADING
+            # logging.warning(f"⚖️ [BALANCING] Q{quarter}: {off_team.name} leading by {abs_score_diff} (threshold: {adjusted_threshold}, discipline: {discipline}) → shot_threshold = {BALANCING_LEADING}")
     else:
         # Clear any previous override if threshold not met
         game_state.pop("balancing_shot_threshold_override", None)

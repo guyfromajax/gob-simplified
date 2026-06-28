@@ -549,7 +549,9 @@ TEMPO_PARAMS = {
 }
 
 # Team attribute clamps (min, max) for shot_threshold and rebound_modifier. Used by team init and training.
+from BackEnd.constants.shot_threshold_scale import team_attr_range as _shot_threshold_team_attr_range
+
 TEAM_ATTR_RANGES = {
-    "shot_threshold": (10, 210),
+    "shot_threshold": _shot_threshold_team_attr_range(),
     "rebound_modifier": (0.0, 0.4),
 }

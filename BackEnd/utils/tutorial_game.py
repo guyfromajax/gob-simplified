@@ -36,10 +36,11 @@ logger = logging.getLogger(__name__)
 
 
 # fte_inject_state.md §3 — opponent nerf via forced make/miss shot_threshold.
-# COMPUTER value tuned down from 210 → 110 (per Coach) so the tutorial game
-# stays winnable but the AI puts up some shots; 210 was too extreme.
-USER_SHOT_THRESHOLD = 10
-COMPUTER_SHOT_THRESHOLD = 110
+# Values track shot_threshold_scale (MIN / MID); update both when retuning scale.
+from BackEnd.constants.shot_threshold_scale import TUTORIAL_COMPUTER, TUTORIAL_USER
+
+USER_SHOT_THRESHOLD = TUTORIAL_USER
+COMPUTER_SHOT_THRESHOLD = TUTORIAL_COMPUTER
 
 
 # fte_inject_state.md §2 — strategy_settings: all keys = 2 except fc_press / hc_trap = 1.

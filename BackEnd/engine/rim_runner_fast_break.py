@@ -397,7 +397,9 @@ def _triangle_build_turn_result(
     }
 
     if custom_corner_override:
-        game_state["fast_break_shot_threshold_override"] = 190 - int(
+        from BackEnd.constants.shot_threshold_scale import FAST_BREAK_CORNER_THRESHOLD_BASE
+
+        game_state["fast_break_shot_threshold_override"] = FAST_BREAK_CORNER_THRESHOLD_BASE - int(
             off_team.team_attributes.get("fb_efficiency", 0) or 0
         )
         game_state["fast_break_force_threshold_no_three_bonus"] = True

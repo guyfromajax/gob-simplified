@@ -331,6 +331,10 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 - Shooting foul calibration for realistic outcomes
 - Player positioning system for fast break opportunities
 
+## Related
+
+- **Team attribute scale (50–250, center 150):** [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md)
+
 ### Key Files
 
 - `BackEnd/models/shot_manager.py`: `resolve_shot()`, `_build_shot_classification()`, `_stamp_shot_classification()`, `_hco_zone_shot_threshold_delta()`, `calculate_shot_score()`, `check_defensive_foul_on_shot()`, `resolve_fast_break_shot()`

@@ -14,6 +14,7 @@
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
+  <script src="/js/shared/teamShotThresholdScale.js"></script>
   <script src="/defense-display.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
@@ -4325,8 +4326,7 @@
       let value = originalValue;
 
       if (attrKey === 'shot_threshold') {
-        maxValue = 100;
-        value = 110 - originalValue; // Golf score: 10 best (right), 210 worst (left), center 110
+        ({ maxValue, value } = window.TeamShotThresholdScale.pillFillFromRaw(originalValue));
       } else if (attrKey === 'rebound_modifier') {
         maxValue = 0.2;
         value = originalValue - 0.2;

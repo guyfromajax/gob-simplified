@@ -1404,9 +1404,7 @@ function createPill(originalValue, attrKey) {
   let value = originalValue;
   
   if (attrKey === 'shot_threshold') {
-    // Golf score: raw 10 best (right), 210 worst (left); center 110; ±100 span for fill.
-    maxValue = 100;
-    value = 110 - originalValue;
+    ({ maxValue, value } = window.TeamShotThresholdScale.pillFillFromRaw(originalValue));
   } else if (attrKey === 'rebound_modifier') {
     // Rebound modifier is 0.0-0.4, center at 0.2
     // We'll show deviation from 0.2
