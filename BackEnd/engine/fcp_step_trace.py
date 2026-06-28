@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 # Set False to silence FCP step traces in server logs / stdout.
-LOG_FCP_STEP_COORDS = True
+LOG_FCP_STEP_COORDS = False
 
 
 def _fmt_xy(c: Optional[Dict[str, Any]]) -> str:
