@@ -174,6 +174,8 @@ Driven by `gameScene.js`: `momentumValueForTeam()` reads `turn.{home,away}_team_
 
 The **player tooltip** momentum bar (and the **set-lineup** bar) read live MO: each turn's `player_momentum` is folded into `playerStats[id].MO`, and the tooltip reads `playerStats.MO` (falling back to the load-time `player.attributes.MO`). Both scale the fill over `±MO_MAX` (=5).
 
+**Pre-game set-lineup:** MO must come from the **game doc** after `init-game` (MO = 0), not franchise roster FPD (training Inspire can persist MO there). `loadRoster()` merges via `getActiveGameId()` so the URL written by `init-game` is used even when the page loaded without `game_id`. See `Lineup_Selection_Screen.md` § Pre-Game EM/MO Display Fix (2026-06).
+
 ---
 
 ## Frontend momentum display (icons / callouts / sprite FX)

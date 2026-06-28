@@ -1,7 +1,7 @@
 """Shot diagnostics tracker (per-game, both teams combined).
 
-Two independent per-game tallies, both stored on ``game.game_state`` and
-rendered as end-of-game charts:
+Three independent per-game tallies, stored on ``game.game_state`` and rendered
+as end-of-game charts:
 
 1. ``shot_split_tracking`` — every field-goal attempt across three binary
    dimensions: 2pt/3pt × defended/undefended × make/miss.
@@ -10,7 +10,13 @@ rendered as end-of-game charts:
    type that generated them: HCO, HCT, FCP, Fast Break, OREB. (Final Shot /
    FLSS buzzer attempts are intentionally omitted from this breakdown.)
 
-Coverage (both tallies): HCO, FCP, Final Shot, and regular Fast Break via
+3. ``hco_shot_tier_counts`` — HCO field-goal attempts by shot-clock tier at
+   attempt time. Every HCO FGA recorded via ``record_shot_split`` increments
+   this tally (not tied to subtle movement or the dynamic walk). Clock at
+   attempt: ``game_state.pop("_hco_shot_clock_est")`` when the dynamic HCO
+   resolver stamped it, else ``game_state["shot_clock_remaining"]``.
+
+Coverage (all tallies where applicable): HCO, FCP, Final Shot, and regular Fast Break via
 ``ShotManager.resolve_shot``; Dynamic HCT via ``resolve_hct_fast_break_shot``
 + ``_finalize_ab_shot``; After-Steal Fast Break via
 ``resolve_after_steal_fast_break``; OREB putbacks via
@@ -72,6 +78,24 @@ def classify_resolve_shot_turn_type(game_state, roles):
     return "HCO"
 
 
+def hco_shot_clock_at_attempt(game_state) -> float | None:
+    """Shot clock (game seconds) to use for HCO tier diagnostics at FGA time.
+
+    Prefers the dynamic-walk at-attempt estimate when stamped; otherwise falls
+    back to the live ``shot_clock_remaining`` on game_state (legacy/static HCO).
+    Pops ``_hco_shot_clock_est`` so it is consumed once per shot.
+    """
+    if not isinstance(game_state, dict):
+        return None
+    est = game_state.pop("_hco_shot_clock_est", None)
+    if est is not None:
+        return float(est)
+    raw = game_state.get("shot_clock_remaining")
+    if raw is None:
+        return None
+    return float(raw)
+
+
 def record_shot_split(game, *, is_three: bool, defended: bool, made: bool,
                       turn_type=None) -> None:
     """Register one field-goal attempt.
@@ -102,6 +126,11 @@ def record_shot_split(game, *, is_three: bool, defended: bool, made: bool,
             by_turn = _empty_fga_by_turn_type()
             state["fga_by_turn_type"] = by_turn
         by_turn[turn_type] = int(by_turn.get(turn_type, 0) or 0) + 1
+
+    if turn_type == "HCO":
+        shot_clock = hco_shot_clock_at_attempt(state)
+        if shot_clock is not None:
+            record_hco_shot_tier(game, shot_clock)
 
 
 def restore_shot_split_from_saved(game_state, saved) -> None:

@@ -6,7 +6,7 @@ from BackEnd.constants.momentum import (
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import mo_shot_roll
-from BackEnd.utils.shot_split_tracker import record_shot_split, classify_resolve_shot_turn_type, record_hco_shot_tier
+from BackEnd.utils.shot_split_tracker import record_shot_split, classify_resolve_shot_turn_type
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
@@ -1306,11 +1306,6 @@ class ShotManager:
             self.game, is_three=is_three, defended=has_contest, made=made,
             turn_type=classify_resolve_shot_turn_type(self.game_state, roles),
         )
-        # HCO shot-clock-tier tally: use the at-attempt shot clock stamped by the
-        # dynamic HCO walk (`_hco_shot_clock_est`); present only for HCO shots.
-        _hco_sc = self.game_state.pop("_hco_shot_clock_est", None)
-        if _hco_sc is not None:
-            record_hco_shot_tier(self.game, _hco_sc)
 
         # Shot_Result_List: record make (True) / clean miss or block (False);
         # skip a miss that drew a shooting foul (Player_Momentum_System.md).

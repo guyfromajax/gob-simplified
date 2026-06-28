@@ -50,21 +50,28 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 **NG color bands (lineup bars and grid view aligned):** Red &lt;70%, Orange 70–80%, Yellow 80–89%, Green 90–100%.
 
 **Data Flow:**
-- **Pre-Game**: Roster loads → Game initialized (`/api/init-game`) → Game data merged → All players get EM/MO/CH
+- **Pre-Game**: Roster loads → Game initialized (`/api/init-game`, `game_id` written to URL) → Game data merged via `getActiveGameId()` → All players get game EM/MO/NG (MO = 0 at init)
 - **In-Game**: Roster loads → Game data fetched → Stats/attributes merged → Lineup players display current values
 
 **Mode-Specific Handling:**
-- **Single Game (sunset)**: Roster base attributes + Game stats/attributes (EM, MO, CH, NG)
-- **Franchise**: Roster evolved attributes + Game stats/NG
-- **Tournament (sunset)**: Roster base + tournament attributes + Game stats/NG
+- **All modes:** Roster loads first; when a `game_id` is available (URL or just written by `init-game`), `/api/game/{gameId}` merges **game** stats and attributes (EM, MO, NG) onto roster rows. Gameplay MO always starts at **0** at init (`Player.randomize_game_attributes`); franchise roster docs may still carry training MO in FPD — the merge must win for display.
+- **Single Game (sunset)**: Roster base attributes + merged game stats/attributes
+- **Franchise**: Roster evolved attributes + merged game stats/attributes (do not show FPD training MO pre-game)
+- **Tournament (sunset)**: Roster base + tournament attributes + merged game stats/attributes
 
 ### Pre-Game EM/MO Display Fix
 
-**Issue:** EM/MO not displaying on pre-game lineup screen despite initialization.
+**Issue (2025):** EM/MO not displaying on pre-game lineup screen despite initialization.
 
 **Root Cause:** `/api/game/{gameId}` only returned lineup players (5), not all roster players (12).
 
 **Fix:** Changed to `team.get_all_players()` to return all players, ensuring all roster players get EM/MO attributes.
+
+**Issue (2026-06):** Pre-game MO bars showed stale non-zero values (e.g. Culture Builder Inspire MO on franchise roster) every game; court showed 0 correctly.
+
+**Root Cause:** Franchise command center opens set-lineup **without** `game_id`. `loadRoster()` calls `init-game`, writes `game_id` to the URL via `replaceState`, but the page-load `gameId` const stayed `null`, so the game merge was skipped and MO came from `/roster/...` (FPD) instead of the initialized game doc.
+
+**Fix:** After `init-game`, resolve the active id with `getActiveGameId()` (reads URL, falls back to page-load snapshot) before fetching `/api/game/...` and merging EM/MO/NG. Code: `FrontEnd/static/set-lineup.js` — `getActiveGameId()`, `loadRoster()` merge block.
 
 ### Player Eligibility Filtering (Fouled Out)
 

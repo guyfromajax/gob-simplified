@@ -54,6 +54,11 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
 // Note: This is a snapshot of initial URL state - always read from window.location.search when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
+/** game_id from URL (updated by init-game replaceState); falls back to page-load snapshot. */
+function getActiveGameId() {
+  const fromUrl = new URLSearchParams(window.location.search).get('game_id');
+  return fromUrl || gameId || null;
+}
 let exhaustedUserLineupLocked = urlParams.get('locked_exhausted_user_lineup') === 'true';
 
 /** @returns {boolean} true if response was 401/403 and redirect was triggered — caller must stop. */
@@ -481,7 +486,7 @@ function getLineupPlaybookUrl() {
   if (resolvedTeamId) params.set('team_id', resolvedTeamId);
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (tournamentId) params.set('tournament_id', tournamentId);
-  const currentGameId = gameId ? new URLSearchParams(window.location.search).get('game_id') : null;
+  const currentGameId = getActiveGameId();
   if (currentGameId) params.set('game_id', currentGameId);
   if (typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(qp)) {
     params.set('debug_pc', '1');
@@ -788,14 +793,17 @@ async function loadRoster() {
     console.log("Resuming from timeout - skipping init-game (game should already exist)");
   }
   
-  // If there's an active game, fetch current player energy levels
+  // If there's an active game, fetch current player energy levels.
+  // Use getActiveGameId() — init-game may have just written game_id to the URL while the
+  // page-load `gameId` const is still null (franchise pre-game flow).
   // Pass actual quarter from URL params to ensure correct stats loading (not hardcoded quarter=1)
   // Backend detects new game scenarios when quarter=1 is requested but saved game is Q2+
-  if (gameId) {
-    console.log("Loading current player energy from game:", gameId);
+  const mergeGameId = getActiveGameId();
+  if (mergeGameId) {
+    console.log("Loading current player energy from game:", mergeGameId);
     try {
         // ✅ HYBRID APPROACH: Use source=db to ensure fresh data from database
-        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${gameId}`)}?quarter=${quarter}&source=db`, { headers: API_CONFIG.getAuthHeaders() });
+        const gameRes = await fetch(`${API_CONFIG.buildUrl(`/api/game/${mergeGameId}`)}?quarter=${quarter}&source=db`, { headers: API_CONFIG.getAuthHeaders() });
         if (abortIfAccessDenied(gameRes)) return;
         if (gameRes.ok) {
           const gameData = await gameRes.json();
@@ -867,10 +875,18 @@ async function loadRoster() {
               rosterPlayer.fouled_out = true;
             }
             
-            // Attributes: EM and MO
+            // Attributes: EM and MO from game doc (overrides franchise roster training MO)
             if (gp.attributes) {
-              rosterPlayer.attributes.EM = gp.attributes.EM ?? rosterPlayer.attributes.EM ?? 50;
-              rosterPlayer.attributes.MO = gp.attributes.MO ?? rosterPlayer.attributes.MO ?? 0;
+              if (gp.attributes.EM != null) {
+                rosterPlayer.attributes.EM = gp.attributes.EM;
+              } else if (rosterPlayer.attributes.EM == null) {
+                rosterPlayer.attributes.EM = 50;
+              }
+              if (gp.attributes.MO != null) {
+                rosterPlayer.attributes.MO = gp.attributes.MO;
+              } else if (rosterPlayer.attributes.MO == null) {
+                rosterPlayer.attributes.MO = 0;
+              }
               rosterPlayer.EM = rosterPlayer.attributes.EM;
               rosterPlayer.MO = rosterPlayer.attributes.MO;
             }

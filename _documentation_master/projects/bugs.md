@@ -1,22 +1,16 @@
-
-##End of Game / End of Quarter perfection
-6. ~~Don't animate rebound / BIP on Final Shot FT~~ — addressed by clock-driven EOQ (2026-06): no follow-up when `time_remaining == 0`; OREB/BIP/FLSS when time remains. Verify in play.
-48. Double block announce on Final Shot
-49. ~~No OREB putback attempts on missed final shot~~ — addressed: late-clock miss + OREB now sets `pending_oreb`. Verify in play.
-43. Add a run out the clock animation — ✅ shipped (`build_run_out_clock_result`)
-44. Full court shots — ✅ FLSS heave path
-
 ##Bugs 
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 37. Player Foul Out Next Step bug
 38 Fast Break, aninate defender back on pass
-39. Not playing SFX on blocks
 
-##New Features
-28. Micro Movements
-109. More dynamic HCO animations for Set Plays
-103. Player images
-111. Marketing Screenshot Tool Build
+##Micro Movements
+28. Make HCO defensers un-attached to the offender at all costs
+29. Claude Design's designs
+30. MM SFX
+
+##Player Images
+1. Set up Cloudflare
+2. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
 
 ##Full Product Readiness
 102. Team court images
@@ -30,6 +24,9 @@
 116. User account -- link X & Facebook?
 117. More action on Signing Day
 118. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
+119. PvP sim
+120. PvP live
+121. Tunable Constants file
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report
@@ -334,6 +331,12 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
   2. OR attach handlers before showing button
   3. OR show loading state until initialization is complete
 - **Priority**: Medium (affects user experience and test reliability)
+
+### ✅ Fixed: Pre-Game Set-Lineup MO Bars Show Stale Non-Zero Values (June 2026)
+- **Issue**: At pre-game set-lineup, starter MO bars showed persistent non-zero fills (same every game); court correctly showed MO 0.
+- **Root Cause**: `init-game` wrote `game_id` to the URL but `loadRoster()` still used the page-load `gameId` const (null), skipped `/api/game/...` merge, and displayed MO from franchise roster (FPD training Inspire).
+- **Fix**: `getActiveGameId()` in `set-lineup.js` reads URL after `init-game`; game doc EM/MO/NG merge runs before slot render.
+- **Docs**: `Lineup_Selection_Screen.md`, `Player_Momentum_System.md`.
 
 ### 🔍 Investigating: Slow Lineup Screen Load in Single Game Mode
 - **Issue**: Lineup screen takes 5-10 seconds to load player data when starting a Single Game, despite network request completing in only 294ms (49.4 kB response). The delay occurs after the network response is received, indicating a frontend processing bottleneck.
