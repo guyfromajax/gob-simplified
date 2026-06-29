@@ -84,7 +84,7 @@ def test_turn_payload_includes_clock_quarter_fouls():
     assert result["awayFouls"] == 1
 
 
-def test_pts_reconciliation_adjusts_player_stats():
+def test_pts_reconciliation_does_not_patch_player_stats():
     game = build_mock_game()
     tm = game.turn_manager
 
@@ -109,9 +109,8 @@ def test_pts_reconciliation_adjusts_player_stats():
     tm.resolve_half_court_offense = types.MethodType(lambda self: fake_turn(), tm)
     result = tm.run_micro_turn()
 
-    # Exactly one player should receive the corrective points
-    players = [p for p in game.home_team.lineup.values() if p.stats["game"].get("PTS")]
-    assert len(players) == 1
-    player = players[0]
-    assert player.stats["game"]["PTS"] == 3
-    assert result["deltas"][player.player_id]["stats"]["PTS"] == 3
+    # PTS must stay derived from shooting stats — never patched onto lineup[0]
+    assert all(p.stats["game"].get("PTS", 0) == 0 for p in game.home_team.get_all_players())
+    assert "deltas" not in result or not any(
+        entry.get("stats", {}).get("PTS") for entry in result.get("deltas", {}).values()
+    )

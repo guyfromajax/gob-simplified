@@ -904,8 +904,11 @@ class TeamManager:
         self.team_fouls += 1
 
     def update_team_stats(self):
+        from BackEnd.utils.shared import sync_player_pts_from_shooting
+
         totals = {}
         for player in self.players.values():
+            sync_player_pts_from_shooting(player)
             for stat, val in player.stats["game"].items():
                 if stat == "Outlet_Score_List":
                     # Outlet_Score_List is an array - concatenate lists from all players

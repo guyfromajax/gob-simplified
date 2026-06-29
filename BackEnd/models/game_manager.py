@@ -2166,6 +2166,8 @@ class GameManager:
     def get_box_score(self):
         """Get box score with all players (lineup + bench) to match team totals."""
         import logging
+        from BackEnd.utils.shared import derive_pts_from_shooting_stats
+
         box_score = {}
         for team in [self.home_team, self.away_team]:
             team_box = {}
@@ -2173,11 +2175,13 @@ class GameManager:
             # First, add lineup players with their positions
             for pos, player in team.lineup.items():
                 if player:  # Skip None players
+                    game_stats = dict(player.stats["game"])
+                    game_stats["PTS"] = derive_pts_from_shooting_stats(game_stats)
                     team_box[pos] = {
                     "name": player.get_name(),
                         "playerId": player.player_id,
                         "jersey": player.jersey,
-                    **player.stats["game"]
+                    **game_stats
                 }
             # Then add bench players (players not in current lineup)
             lineup_player_ids = {p.player_id for p in team.lineup.values() if p}
@@ -2188,11 +2192,13 @@ class GameManager:
                     # Handle multiple bench players with same position by appending player_id
                     if pos in team_box:
                         pos = f"{pos}_{player.player_id[:8]}"
+                    game_stats = dict(player.stats["game"])
+                    game_stats["PTS"] = derive_pts_from_shooting_stats(game_stats)
                     team_box[pos] = {
                         "name": player.get_name(),
                         "playerId": player.player_id,
                         "jersey": player.jersey,
-                        **player.stats["game"]
+                        **game_stats
         }
             # ✅ SS&S: Use team_id as key instead of team.name
             team_key = team.team_id if team.team_id else team.name

@@ -11,25 +11,25 @@ SPAN. Keep FrontEnd/static/js/shared/teamShotThresholdScale.js in sync.
 SPAN = 200
 HALF_SPAN = SPAN // 2  # 100 — max pill deviation from center in either direction
 
-MIN = 50
-MAX = MIN + SPAN  # 250
-MID = MIN + HALF_SPAN  # 150
+MIN = 30
+MAX = MIN + SPAN  # 230
+MID = MIN + HALF_SPAN  # 130
 
-# Score-balancing one-turn overrides sit 20 below min / 20 below max (legacy −10 / 190).
+# Score-balancing one-turn overrides sit 20 below min / 20 below max.
 BALANCING_MARGIN = 20
-BALANCING_TRAILING = MIN - BALANCING_MARGIN  # 30
-BALANCING_LEADING = MAX - BALANCING_MARGIN  # 230
+BALANCING_TRAILING = MIN - BALANCING_MARGIN  # 10
+BALANCING_LEADING = MAX - BALANCING_MARGIN  # 210
 
 # Franchise new-team init: slightly better than league average (10–20 below MID).
-FRANCHISE_INIT_LO = MID - 20  # 130
-FRANCHISE_INIT_HI = MID - 10  # 140
+FRANCHISE_INIT_LO = MID - 20  # 110
+FRANCHISE_INIT_HI = MID - 10  # 120
 
 # FTE tutorial forced make / average opponent (fte_inject_state.md §3).
-TUTORIAL_USER = MIN  # 50 — forced make
-TUTORIAL_COMPUTER = MID  # 150 — winnable opponent
+TUTORIAL_USER = MIN  # 30 — forced make
+TUTORIAL_COMPUTER = MID  # 130 — winnable opponent
 
-# Rim-runner custom corner FB threshold base (was 190 when MAX was 210).
-FAST_BREAK_CORNER_THRESHOLD_BASE = MAX - BALANCING_MARGIN  # 230
+# Rim-runner custom corner FB threshold base.
+FAST_BREAK_CORNER_THRESHOLD_BASE = MAX - BALANCING_MARGIN  # 210
 
 # Tournament seed shot_threshold ranges (seed 1 = best shooters, 8 = worst).
 TOURNAMENT_SEED_ST_RANGES = {

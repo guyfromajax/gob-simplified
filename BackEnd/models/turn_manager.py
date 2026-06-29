@@ -4999,20 +4999,23 @@ class TurnManager:
         #     self.game.switch_possession()
 
     def _reconcile_player_points(self, result):
-        """Ensure summed player PTS match the official team score.
+        """Keep player PTS aligned with shooting stats; log team-score drift.
 
-        This check runs when a possession ends or the quarter expires. If the
-        total points recorded across players for a team does not match the
-        team's score, a corrective delta is added and the discrepancy is
-        logged. This prevents clients from double counting when ``turn.points``
-        is present in the payload.
+        Runs when a possession ends or the quarter expires. PTS is always
+        derived from FGM / 3PTM / FTM — never patched onto a single lineup
+        player (that produced PTS vs makes mismatches on the box score).
         """
+        from BackEnd.utils.shared import sync_player_pts_from_shooting
+
         possession_end = result.get("possession_flips")
         quarter_end = self.game.game_state.get("time_remaining", 0) == 0
         if not (possession_end or quarter_end):
             return
 
         for team in (self.game.home_team, self.game.away_team):
+            for player in team.get_all_players():
+                sync_player_pts_from_shooting(player)
+
             team_score = self.game.score[team.name]
             total_pts = sum(
                 player.stats["game"].get("PTS", 0) for player in team.get_all_players()
@@ -5021,23 +5024,17 @@ class TurnManager:
                 continue
 
             diff = team_score - total_pts
-            # Log the discrepancy for debugging/auditing purposes
-            self.logger.log(f"ptsReconcile:{team.name}:{total_pts}->{team_score}")
-
-            # Choose a player to receive the adjustment. Prefer the players on
-            # the floor (``team.lineup``) so the correction reflects what
-            # viewers see.  Fall back to the full roster for edge cases where
-            # the lineup has not yet been populated.
-            players = list(team.lineup.values()) or list(team.get_all_players())
-            if not players:
-                continue  # nothing we can do
-            player = players[0]
-            player.stats["game"]["PTS"] = player.stats["game"].get("PTS", 0) + diff
-
-            # Reflect the correction in the deltas payload
-            deltas = result.setdefault("deltas", {})
-            entry = deltas.setdefault(player.player_id, {"team": team.name, "stats": {}})
-            entry["stats"]["PTS"] = entry["stats"].get("PTS", 0) + diff
+            self.logger.log(
+                f"ptsReconcile:{team.name}:{total_pts}->{team_score}:diff={diff}"
+            )
+            logging.warning(
+                "Player PTS sum (%s) != team score (%s) for %s (diff=%s); "
+                "PTS left derived from shooting stats — investigate scoring path",
+                total_pts,
+                team_score,
+                team.name,
+                diff,
+            )
 
     def derive_passer_from_steps(self, steps, shooter_pos):
         """

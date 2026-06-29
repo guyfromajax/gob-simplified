@@ -15,6 +15,7 @@ from BackEnd.constants import (
     TURNOVER_CALC_DICT,
     POSITION_LIST,
     HCO_STRING_SPOTS,
+    OREB_REBOUND_SCORE_DISCOUNT,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -1639,12 +1640,17 @@ def select_rebounder_by_score(
     upper_count = sum(1 for entry in entries if entry["distance"] <= float(upper_half_distance))
     lower_half_discount = 0.7 if upper_count >= 2 else 0.95
 
+    off_team_id = getattr(off_team, "team_id", None)
     for entry in entries:
         player = entry["player"]
         team = entry["team"]
         value = calculate_rebound_score(player) + (_team_chemistry(team) * _team_rebound_modifier(team))
         if entry["distance"] > float(upper_half_distance):
             value *= lower_half_discount
+        # Offensive rebounders are discounted — defense's box-out / positioning edge on a
+        # miss (otherwise offense and defense were scored equally). See OREB_REBOUND_SCORE_DISCOUNT.
+        if off_team_id is not None and getattr(team, "team_id", None) == off_team_id:
+            value *= OREB_REBOUND_SCORE_DISCOUNT
         pid = getattr(player, "player_id", None)
         if pid is not None and str(pid) in penalized:
             value *= 0.8
@@ -2143,6 +2149,23 @@ def resolve_steal_attempt(offense_value, defense_value, soft_steal, hard_steal, 
     
     # 3) Otherwise nothing happens; possession continues
     return "NO_EVENT"
+
+
+def derive_pts_from_shooting_stats(stats):
+    """PTS from field goals and free throws: (2 * FGM) + 3PTM + FTM."""
+    if not stats:
+        return 0
+    return (
+        (2 * int(stats.get("FGM", 0) or 0))
+        + int(stats.get("3PTM", 0) or 0)
+        + int(stats.get("FTM", 0) or 0)
+    )
+
+
+def sync_player_pts_from_shooting(player):
+    """Overwrite stored PTS with the canonical shooting-stat formula."""
+    s = player.stats["game"]
+    s["PTS"] = derive_pts_from_shooting_stats(s)
 
 
 def apply_scoring(game, team, player, points, stats):

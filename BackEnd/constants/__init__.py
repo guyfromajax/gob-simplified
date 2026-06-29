@@ -304,6 +304,13 @@ BOUNCE_STEP_GAME_SECONDS = 300.0 / 350.0
 # See Rebound_System.md §OREB clock burn.
 OREB_PUTBACK_MIN_TIME_ELAPSED = 2
 
+# Offensive-rebound score discount. Offensive rebounders' final rebound value is
+# multiplied by this in select_rebounder_by_score, modeling the defense's box-out /
+# positioning advantage on a miss (which the scoring otherwise ignores — offense and
+# defense were scored equally). Lower = fewer offensive rebounds. Tune against the
+# week-aggregate OREB% (D1 target ~30%); 1.0 = no discount (legacy behavior).
+OREB_REBOUND_SCORE_DISCOUNT = 0.7
+
 # Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec
 # clock so FE wall-clock matches the legacy reference timings.

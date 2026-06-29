@@ -172,8 +172,10 @@ class Player:
     def record_stat(self, stat, amount=1):
         self.stats["game"][stat] += amount
         if stat in {"FGM", "3PTM", "FTM"}:
+            from BackEnd.utils.shared import derive_pts_from_shooting_stats
+
             s = self.stats["game"]
-            s["PTS"] = (2 * s["FGM"]) + s["3PTM"] + s["FTM"]
+            s["PTS"] = derive_pts_from_shooting_stats(s)
         elif stat in {"OREB", "DREB"}:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]

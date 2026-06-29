@@ -12,6 +12,15 @@ function playSound(filename) {
 
 let gameData = null;
 
+/** PTS from shooting stats — must match BackEnd derive_pts_from_shooting_stats. */
+function derivePtsFromShootingStats(stats) {
+  if (!stats) return 0;
+  const fgm = Number(stats.FGM) || 0;
+  const threePm = Number(stats['3PTM']) || 0;
+  const ftm = Number(stats.FTM) || 0;
+  return (2 * fgm) + threePm + ftm;
+}
+
 function hexToRgbString(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
   return result
@@ -961,7 +970,7 @@ function renderPlayerStatsTable(team, players) {
       // Clear row and build it properly
       row.innerHTML = '';
       row.appendChild(nameCell);
-      row.appendChild(createTableCell(stats.PTS || 0));
+      row.appendChild(createTableCell(derivePtsFromShootingStats(stats)));
       row.appendChild(createTableCell(`${stats.FGM || 0}/${stats.FGA || 0}`));
       row.appendChild(createTableCell(`${stats['3PTM'] || 0}/${stats['3PTA'] || 0}`));
       row.appendChild(createTableCell(`${stats.FTM || 0}/${stats.FTA || 0}`));
