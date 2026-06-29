@@ -386,6 +386,51 @@ const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
 
+const COURT_BOOT_MODES = Object.freeze({
+  LIVE_QUARTER_ENTRY: 'live_quarter_entry',
+  COLD_RESUME_ENTRY: 'cold_resume_entry',
+  ANCHOR_RESTORE_ENTRY: 'anchor_restore_entry',
+  TIMEOUT_DIRECT_ENTRY: 'timeout_direct_entry',
+  NORMAL_ENTRY: 'normal_entry',
+});
+
+function classifyCourtBootMode(params) {
+  const quarterBreakFrom = params.get('quarter_break_from');
+  const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
+  if (liveQuarterStart) return COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
+  if (params.get('resume_from_anchor') === 'true' || params.get('consume_resume_anchor') === 'true') {
+    return COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY;
+  }
+  if (params.get('active_resume') === 'true') return COURT_BOOT_MODES.COLD_RESUME_ENTRY;
+  if (params.get('resume_from_timeout') === 'true') return COURT_BOOT_MODES.TIMEOUT_DIRECT_ENTRY;
+  return COURT_BOOT_MODES.NORMAL_ENTRY;
+}
+
+function normalizeCourtBootUrl(bootMode) {
+  if (typeof window === 'undefined' || typeof history === 'undefined' || !history.replaceState) return;
+  if (bootMode !== COURT_BOOT_MODES.LIVE_QUARTER_ENTRY) return;
+  const params = new URLSearchParams(window.location.search);
+  let changed = false;
+  ['active_resume', 'resume_from_anchor', 'consume_resume_anchor', 'anchor_type'].forEach((key) => {
+    if (params.has(key)) {
+      params.delete(key);
+      changed = true;
+    }
+  });
+  if (params.get('resume_from_timeout') !== 'false') {
+    params.set('resume_from_timeout', 'false');
+    changed = true;
+  }
+  if (changed) {
+    history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+    console.warn('[COURT BOOT MODE] normalized stale resume flags for live quarter entry', {
+      boot_mode: bootMode,
+      quarter_break_from: params.get('quarter_break_from'),
+      full_params: Object.fromEntries(params.entries()),
+    });
+  }
+}
+
 // ✅ SS&S: Import shared status display utility
 import { showStatus, hideStatus } from './utils/statusDisplay.js';
 
@@ -2804,14 +2849,35 @@ async function initGame() {
   // 1. If it's a new Q1 game, param is intentionally omitted → false is correct
   // 2. If gameId exists but param is missing (stale URL), false is safer than true
   // 3. If it's truly a timeout resume, the helper should have set it to 'true'
-  const urlResumeFromTimeoutParam = urlParams.get('resume_from_timeout');
+  const bootParams = new URLSearchParams(window.location.search);
+  const bootMode = classifyCourtBootMode(bootParams);
+  normalizeCourtBootUrl(bootMode);
+  const normalizedBootParams = new URLSearchParams(window.location.search);
+  const urlResumeFromTimeoutParam = normalizedBootParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
-  const consumeResumeAnchor = urlParams.get('consume_resume_anchor') === 'true';
-  const quarterBreakFrom = urlParams.get('quarter_break_from');
-  const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
-  let activeResume = urlParams.get('active_resume') === 'true';
+  const consumeResumeAnchor = normalizedBootParams.get('consume_resume_anchor') === 'true';
+  const liveQuarterStart = bootMode === COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
+  const shouldProbeResumeState =
+    !liveQuarterStart &&
+    !consumeResumeAnchor &&
+    !!gameId &&
+    (
+      bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY ||
+      bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
+    );
+  let activeResume = bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY;
   let resumeState = null;
-  if (!consumeResumeAnchor && !liveQuarterStart && gameId && (activeResume || !resumeFromTimeout)) {
+  console.warn('[COURT BOOT MODE] classified court entry', {
+    boot_mode: bootMode,
+    game_id: gameId,
+    quarter_break_from: normalizedBootParams.get('quarter_break_from'),
+    resume_from_timeout: normalizedBootParams.get('resume_from_timeout'),
+    active_resume: normalizedBootParams.get('active_resume'),
+    resume_from_anchor: normalizedBootParams.get('resume_from_anchor'),
+    consume_resume_anchor: normalizedBootParams.get('consume_resume_anchor'),
+    should_probe_resume_state: shouldProbeResumeState,
+  });
+  if (shouldProbeResumeState) {
     try {
       const resumeStateResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
@@ -2847,8 +2913,8 @@ async function initGame() {
   if (resumeGameContainer) {
     if (activeResume && gameId) {
       const resumeQuarter = Number(resumeState && resumeState.quarter) || quarter;
-      const period = urlParams.get('period') || (resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`);
-      const clock = (resumeState && resumeState.clock) || urlParams.get('clock') || '';
+      const period = normalizedBootParams.get('period') || (resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`);
+      const clock = (resumeState && resumeState.clock) || normalizedBootParams.get('clock') || '';
       if (resumeGameSubtitle) {
         resumeGameSubtitle.textContent = `Resume ${period}${clock ? ' · ' + clock : ''} from the last stoppage.`;
       }

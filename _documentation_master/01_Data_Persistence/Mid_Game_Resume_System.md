@@ -22,12 +22,14 @@ Supported return paths:
 Current implementation details:
 
 - `game.resume_anchor` is the durable source of truth for mid-game resume.
+- `bootGame.js` classifies every court load into one boot mode before deciding whether to read resume state, show the resume modal, auto-start, or treat the page as normal live gameplay.
 - Quarter-break anchors are created immediately when a non-final quarter completes.
 - Quarter-break anchors are also created on the `/api/simulate-turn` early-return quarter-complete path so stale timeout/foul-out anchors do not survive a duplicate/preloaded `0:00` request.
 - Timeout and foul-out anchors are created when their modal state is saved, before the user enters Set Lineup.
 - Cold resume routes every supported anchor type through Set Lineup before gameplay.
 - Set Lineup returns from cold resume must send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
 - Normal live quarter breaks must send `quarter_break_from=play_quarter` to Set Lineup and preserve it when returning to `court.html`; this marker tells the court boot code not to read the durable resume anchor or show the mid-game resume modal.
+- Live quarter entries are authoritative. If stale resume flags survive into a live quarter URL, `bootGame.js` strips them and `loadGameStats.js` ignores them.
 - Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
 
 Primary files:
@@ -402,6 +404,28 @@ if (resumeFromTimeout && !activeResume && gameId && homeTeam && awayTeam) {
   handleButtonClick(true);
 }
 ```
+
+## Court Boot Classifier
+
+`FrontEnd/static/js/phaser/bootGame.js` owns the frontend boot-mode decision. This classifier is the single frontend authority for whether `court.html` is entering live gameplay, restoring an anchor, or showing the `Game In Progress` modal.
+
+Boot modes:
+
+- `live_quarter_entry`: `quarter_break_from=play_quarter` or `quarter_break_from=sim_quarter`
+- `anchor_restore_entry`: `resume_from_anchor=true` or `consume_resume_anchor=true`
+- `cold_resume_entry`: `active_resume=true`
+- `timeout_direct_entry`: `resume_from_timeout=true`
+- `normal_entry`: no resume-specific intent
+
+Rules:
+
+- `live_quarter_entry` always wins over stale resume flags.
+- `live_quarter_entry` strips `active_resume`, `resume_from_anchor`, `consume_resume_anchor`, and `anchor_type` from the URL and forces `resume_from_timeout=false`.
+- Only `cold_resume_entry` or `normal_entry` may probe `/api/game/:game_id/resume-state` for the resume modal.
+- `anchor_restore_entry` restores from the anchor through `/api/simulate-quarter` and then consumes it.
+- `timeout_direct_entry` may auto-start because it is already an in-game timeout/foul-out restart, not a cold browser return.
+
+`FrontEnd/static/js/phaser/utils/loadGameStats.js` must apply the same live-quarter guard when deciding whether to hydrate from `/resume-state`. This matters because court stats hydrate before `bootGame.js` starts Phaser.
 
 ## URL Flags
 

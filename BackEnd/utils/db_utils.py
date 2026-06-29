@@ -168,15 +168,74 @@ def _player_slot_rating(player: Player, pos: str) -> float:
     return get_player_rating(player, POSITION_TRAITS[pos])
 
 
+_LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+
+def _player_rt_max(player: Player) -> float:
+    """Blowout-selection RT for a player = his HIGHEST slot rating across all five positions."""
+    return max(_player_slot_rating(player, pos) for pos in _LINEUP_POSITIONS)
+
+
+def _team_score_margin(team, game_state) -> Optional[int]:
+    """The team's own scoring margin (its score − opponent's) from game_state, or None if it can't
+    be resolved. Shared by the conservative-strategy and blowout-lineup situational overrides."""
+    if not isinstance(game_state, dict):
+        return None
+    score_map = game_state.get("score") or {}
+    name = getattr(team, "name", None)
+    if not isinstance(score_map, dict) or name not in score_map:
+        return None
+    my_score = int(score_map.get(name, 0) or 0)
+    opp_score = None
+    for other, val in score_map.items():
+        if other != name:
+            opp_score = int(val or 0)
+            break
+    if opp_score is None:
+        return None
+    return my_score - opp_score
+
+
+def _blowout_lineup_active(team, game_state) -> bool:
+    """True when a comfortably-winning COMPUTER team should rest its starters (garbage time) and
+    build the lineup from its LOWEST-RT players. Margin-of-victory thresholds by quarter/time
+    (Computer_Team_GamePlan_System.md §Blowout Situation). Never Q1/Q2/OT; re-checked at every
+    lineup set, so it reverts automatically once the margin drops back under threshold."""
+    if not isinstance(team, TeamManager) or getattr(team, "is_user_team", False):
+        return False
+    margin = _team_score_margin(team, game_state)
+    if margin is None:
+        return False
+    quarter = int(game_state.get("quarter") or 1)
+    if quarter == 3:
+        return margin > 50
+    if quarter == 4:
+        time_remaining = float(game_state.get("time_remaining") or 0)
+        if time_remaining > 239:
+            return margin > 35
+        if time_remaining > 59:
+            return margin > 25
+        if time_remaining > 0:
+            return margin > 20
+    return False  # Q1, Q2, OT (quarter >= 5) → never
+
+
 def build_unified_autoset_lineup_from_eligible(
     eligible_players: List[Player],
     team_chemistry: float,
     force_include_ids: Optional[List[str]] = None,
+    *,
+    prefer_lowest_rt: bool = False,
 ) -> Dict[str, Player]:
     """
     Canonical autoset selection after eligibility + waterfall: shuffle role order,
     then for each fill slot use team-chemistry pool size N: top N by slot rating,
     random if N > 1 else top player.
+
+    ``prefer_lowest_rt`` (blowout / garbage time): seat the team's WORST players instead — rank
+    by each player's RT (highest slot rating across positions) and take the LOWEST N. Same
+    eligibility waterfall and chemistry pools; only the ranking is inverted. Forced-include
+    players (e.g. a locked FT shooter) still play.
 
     ``force_include_ids`` lists player ids that MUST appear in the returned five
     (e.g. the pending free-throw shooter, who cannot be benched while owed FTs —
@@ -208,8 +267,13 @@ def build_unified_autoset_lineup_from_eligible(
             continue  # pre-seated by force-include
         n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
         available = [p for p in eligible_players if p.player_id not in assigned_ids]
-        rated = [(p, _player_slot_rating(p, pos)) for p in available]
-        rated.sort(key=lambda t: (-t[1], t[0].player_id))
+        if prefer_lowest_rt:
+            # Blowout: rank by per-player RT (best slot rating across positions), LOWEST first.
+            rated = [(p, _player_rt_max(p)) for p in available]
+            rated.sort(key=lambda t: (t[1], t[0].player_id))
+        else:
+            rated = [(p, _player_slot_rating(p, pos)) for p in available]
+            rated.sort(key=lambda t: (-t[1], t[0].player_id))
         if not rated:
             raise ValueError(f"No available players left for autoset at fill index {fill_idx}")
         take = min(max(1, n), len(rated))
@@ -441,8 +505,13 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
     if shooter_id and any(str(p.player_id) == shooter_id for p in eligible_players):
         force_include = [shooter_id]
 
+    # Blowout (garbage time): a comfortably-winning computer team rests its starters and seats
+    # its lowest-RT players instead. Re-checked here each lineup set, so it auto-reverts when the
+    # margin drops back. See Computer_Team_GamePlan_System.md §Blowout Situation.
+    prefer_lowest_rt = _blowout_lineup_active(team, game_state)
     return build_unified_autoset_lineup_from_eligible(
-        eligible_players, tc, force_include_ids=force_include
+        eligible_players, tc, force_include_ids=force_include,
+        prefer_lowest_rt=prefer_lowest_rt,
     )
 
 
@@ -467,6 +536,47 @@ def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dic
             team.lineup[pos] = player
 
     return team.lineup
+
+
+# In-game CONSERVATIVE strategy override (Computer_Team_GamePlan_System.md §In-Game Strategy
+# Settings Adjustments). When a computer team is comfortably leading it sits on the lead — these
+# eight settings are re-rolled with low-weighted likelihoods. The other settings (inside, attack,
+# outside, play_calling, defense) keep their normal computed values. Each entry: (values, weights).
+_CONSERVATIVE_STRATEGY_ROLLS = {
+    "offense":     ([0, 1, 2], [60, 30, 10]),
+    "aggression":  ([0, 1, 2], [60, 30, 10]),
+    "hc_trap":     ([0, 1],    [90, 10]),
+    "fc_press":    ([0, 1],    [90, 10]),
+    "tempo":       ([0, 1],    [90, 10]),
+    "alterations": ([0, 1],    [90, 10]),
+    "fast_breaks": ([0, 1],    [90, 10]),
+    "rebounding":  ([0, 1],    [90, 10]),
+}
+
+
+def _conservative_strategy_active(team: TeamManager, game_state) -> bool:
+    """True when the computer team is comfortably leading (sit-on-the-lead conditions):
+    Q1–Q3 → lead > 20; Q4+ (incl. OT) → lead > 20 when > 239s remain, else lead > 15.
+    Lead is the computer team's own margin (its score − opponent's), read from game_state.
+    """
+    lead = _team_score_margin(team, game_state)
+    if lead is None:
+        return False
+    quarter = int(game_state.get("quarter") or 1)
+    if quarter < 4:
+        return lead > 20
+    time_remaining = float(game_state.get("time_remaining") or 0)
+    return lead > 20 if time_remaining > 239 else lead > 15
+
+
+def _apply_conservative_strategy_override(settings: dict, team: TeamManager, game_state) -> dict:
+    """If the team is comfortably leading, override the eight 'sit on the lead' settings with the
+    low-weighted conservative rolls; all other settings keep their normal computed values."""
+    if not _conservative_strategy_active(team, game_state):
+        return settings
+    for key, (values, weights) in _CONSERVATIVE_STRATEGY_ROLLS.items():
+        settings[key] = random.choices(values, weights=weights, k=1)[0]
+    return settings
 
 
 def autoset_strategy_settings(team: TeamManager, game_state=None):
@@ -498,6 +608,10 @@ def autoset_strategy_settings(team: TeamManager, game_state=None):
     # (Game_Init_System.md § Computer Team Strategy Logic). Falls back to the
     # legacy random init internally if five players can't be resolved.
     new_strategy_settings = team._compute_strategic_strategy_settings(game_state)
+    # Sit-on-the-lead override: when comfortably ahead, dial the eight conservative settings down
+    # (other settings keep their computed values). Only fires here — i.e. at the quarter-break /
+    # timeout / foul-out instances that call autoset — never at game init (no lead at 0–0).
+    new_strategy_settings = _apply_conservative_strategy_override(new_strategy_settings, team, game_state)
     team.strategy_settings = new_strategy_settings
     
     new_inside = new_strategy_settings.get('inside', 'MISSING')

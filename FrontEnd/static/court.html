@@ -6417,7 +6417,7 @@
     // Apply vibrant colors based on teams in URL
     const staticPath = API_CONFIG.getStaticPath();
     const vibrantColorsModule = await import(`${staticPath}/js/phaser/utils/vibrantColors.js`);
-    const loadGameStatsModule = await import(`${staticPath}/js/phaser/utils/loadGameStats.js`);
+    const loadGameStatsModule = await import(`${staticPath}/js/phaser/utils/loadGameStats.js?v=midgame-boot-classifier-1`);
     const { applyVibrantColors, getVibrantColor } = vibrantColorsModule;
     const { initializeGameStats } = loadGameStatsModule;
 
@@ -6980,7 +6980,7 @@
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
-    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=uess-turn-preload-1`;
+    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=midgame-boot-classifier-1`;
     document.head.appendChild(bootGameScript);
   </script>
   <script>

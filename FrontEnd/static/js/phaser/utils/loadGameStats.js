@@ -461,10 +461,14 @@ export async function initializeGameStats() {
   const gameId = urlParams.get('game_id');
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');
+  const quarterBreakFrom = urlParams.get('quarter_break_from');
+  const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
   const wantsAnchorUi =
-    urlParams.get('active_resume') === 'true' ||
-    urlParams.get('resume_from_anchor') === 'true' ||
-    urlParams.get('consume_resume_anchor') === 'true';
+    !liveQuarterStart && (
+      urlParams.get('active_resume') === 'true' ||
+      urlParams.get('resume_from_anchor') === 'true' ||
+      urlParams.get('consume_resume_anchor') === 'true'
+    );
   
   if (!homeTeam || !awayTeam) return;
 
