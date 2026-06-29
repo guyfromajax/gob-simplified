@@ -9067,7 +9067,8 @@ def _apply_training_squad_progression_and_report(
 # cleared at season rollover in finish_season.
 # ---------------------------------------------------------------------------
 
-NEWS_UPSET_RANK_GAP = 19  # winner_rank - loser_rank must exceed this
+NEWS_UPSET_RANK_GAP = 29  # winner_rank - loser_rank must exceed this
+NEWS_UPSET_LOSER_RANK_MAX = 64  # losing team must be ranked 1–64 (inclusive)
 NEWS_PS_ALL_STARS_MIN_GAIN = 4  # weekly cumulative attribute gain must exceed this
 
 NEWS_ATTRIBUTE_FULL_NAMES = {
@@ -9105,7 +9106,8 @@ def _build_week_upset_report_story(
     team_name_map: dict[str, str],
 ) -> dict[str, Any] | None:
     """Week {n} Upset Report: games where the winner's entering-week natl_rank was
-    more than NEWS_UPSET_RANK_GAP spots worse than the loser's. None when no games qualify."""
+    more than NEWS_UPSET_RANK_GAP spots worse than the loser's, and the losing team
+    was ranked 1–NEWS_UPSET_LOSER_RANK_MAX. None when no games qualify."""
     upsets: list[tuple[int, str]] = []
     for row in results or []:
         away_id = str(row.get("away_id") or "")
@@ -9126,6 +9128,9 @@ def _build_week_upset_report_story(
             continue
         gap = int(winner_rank) - int(loser_rank)
         if gap <= NEWS_UPSET_RANK_GAP:
+            continue
+        loser_rank_int = int(loser_rank)
+        if loser_rank_int < 1 or loser_rank_int > NEWS_UPSET_LOSER_RANK_MAX:
             continue
         line = (
             f"#{winner_rank}. {team_name_map.get(winner_id, winner_id)} upset "

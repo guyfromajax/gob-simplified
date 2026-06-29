@@ -309,7 +309,7 @@ OREB_PUTBACK_MIN_TIME_ELAPSED = 2
 # positioning advantage on a miss (which the scoring otherwise ignores — offense and
 # defense were scored equally). Lower = fewer offensive rebounds. Tune against the
 # week-aggregate OREB% (D1 target ~30%); 1.0 = no discount (legacy behavior).
-OREB_REBOUND_SCORE_DISCOUNT = 0.7
+OREB_REBOUND_SCORE_DISCOUNT = 0.8
 
 # Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec

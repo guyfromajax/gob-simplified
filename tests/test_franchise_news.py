@@ -24,16 +24,24 @@ def _result_row(away_id, home_id, away_score, home_score):
 
 
 def test_upset_report_qualification_boundary_and_format():
-    ranks = {"t1": 35, "t2": 14, "t3": 30, "t4": 12, "t5": 60, "t6": 3, "t7": 100, "t8": 20}
+    ranks = {
+        "t1": 95, "t2": 10,   # gap 85, loser 10 -> qualifies
+        "t3": 59, "t4": 30,   # gap 29 -> excluded (must be > 29)
+        "t5": 60, "t6": 3,    # gap 57, loser 3 -> qualifies
+        "t7": 100, "t8": 20,  # gap 80, loser 20 -> qualifies
+        "t9": 100, "t10": 65,  # gap 35 but loser rank > 64 -> excluded
+    }
     names = {
         "t1": "Alpha", "t2": "Beta", "t3": "Gamma", "t4": "Delta",
         "t5": "Epsilon", "t6": "Zeta", "t7": "Eta", "t8": "Theta",
+        "t9": "Iota", "t10": "Kappa",
     }
     results = [
-        _result_row("t1", "t2", 80, 72),   # gap 21 -> qualifies (away winner), loser rank 14
-        _result_row("t4", "t3", 70, 75),   # gap 18 -> excluded (home winner, 30-12=18)
-        _result_row("t6", "t5", 90, 95),   # gap 57 -> qualifies (home winner), loser rank 3
-        _result_row("t7", "t8", 66, 60),   # gap 80 -> qualifies (away winner), loser rank 20
+        _result_row("t1", "t2", 80, 72),      # away winner
+        _result_row("t3", "t4", 70, 75),      # home winner, gap exactly 29
+        _result_row("t6", "t5", 90, 95),      # home winner (Epsilon over Zeta)
+        _result_row("t7", "t8", 66, 60),      # away winner
+        _result_row("t9", "t10", 77, 70),    # away winner, loser rank 65
     ]
 
     story = franchise_routes._build_week_upset_report_story(5, results, ranks, names)
@@ -43,10 +51,10 @@ def test_upset_report_qualification_boundary_and_format():
     assert story["week"] == 5
     assert story["type"] == "upset_report"
     assert story["story_id"] == "w5-upset-report"
-    # Ascending by losing team's natl_rank (3, 14, 20) — not by rank gap.
+    # Ascending by losing team's natl_rank (3, 10, 20).
     assert story["lines"] == [
         "#60. Epsilon upset #3. Zeta by a score of 95-90.",
-        "#35. Alpha upset #14. Beta by a score of 80-72.",
+        "#95. Alpha upset #10. Beta by a score of 80-72.",
         "#100. Eta upset #20. Theta by a score of 66-60.",
     ]
 
@@ -54,12 +62,20 @@ def test_upset_report_qualification_boundary_and_format():
 def test_upset_report_returns_none_when_no_games_qualify():
     ranks = {"t1": 10, "t2": 5}
     names = {"t1": "Alpha", "t2": "Beta"}
-    # Gap of exactly 19 must NOT qualify (criteria is > 19).
-    ranks_boundary = {"t1": 24, "t2": 5}
+    # Gap of exactly 29 must NOT qualify (criteria is > 29).
+    ranks_boundary = {"t1": 34, "t2": 5}
     results = [_result_row("t1", "t2", 80, 72)]
 
     assert franchise_routes._build_week_upset_report_story(3, results, ranks, names) is None
     assert franchise_routes._build_week_upset_report_story(3, results, ranks_boundary, names) is None
+
+
+def test_upset_report_excludes_loser_rank_above_64():
+    ranks = {"t1": 100, "t2": 65}  # gap 35 > 29, but loser rank > 64
+    names = {"t1": "Alpha", "t2": "Beta"}
+    results = [_result_row("t1", "t2", 80, 72)]
+
+    assert franchise_routes._build_week_upset_report_story(3, results, ranks, names) is None
 
 
 def _gain_record(name, deltas, rt=42, pos="PG", team_id="t-default"):
@@ -329,7 +345,7 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
     class _FakeFtdCollection:
         def find(self, _query, _projection=None):
             return [
-                {"team_id": team_a, "natl_rank": 40},
+                {"team_id": team_a, "natl_rank": 50},
                 {"team_id": team_b, "natl_rank": 11},
             ]
 
@@ -345,7 +361,7 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
             {"story_id": "w1-upset-report", "week": 1, "headline": "Week 1 Upset Report", "lines": []}
         ]
     }
-    results = [_result_row(team_a, team_b, 88, 81)]  # gap 29 upset
+    results = [_result_row(team_a, team_b, 88, 81)]  # gap 39 upset, loser rank 11
     gains = [_gain_record("Al Smith", {"SC": 5, "SH": 4}, rt=33, pos="PG")]
 
     franchise_routes._append_franchise_week_news(franchise_id, franchise_doc, 2, results, gains)
@@ -356,7 +372,7 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
         "w2-ps-all-stars",
         "w1-upset-report",
     ]
-    assert news[0]["lines"] == ["#40. Underdog U upset #11. Favorite State by a score of 88-81."]
+    assert news[0]["lines"] == ["#50. Underdog U upset #11. Favorite State by a score of 88-81."]
 
 
 def test_append_franchise_week_news_skips_eos_weeks(monkeypatch):

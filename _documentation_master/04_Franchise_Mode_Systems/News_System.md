@@ -16,7 +16,7 @@
 
 **Regular Season Games Run**
 ##Headline: "Week {week #} Upset Report"
-- Criteria: List all games where the winning team had a natl_rank value > 19 of the team it beat. If no games qualify, this news is not generated for that week.
+- Criteria: List all games where (1) the winning team's entering-week `natl_rank` is **more than 29 spots worse** than the team it beat (`winner_rank - loser_rank > 29`), and (2) the **losing team** was ranked **1–64** (inclusive). If no games qualify, this news is not generated for that week.
 - Content
     "#{winning team rank}. {winning team name} upset #{losing team rank}.{losing team name} by a score of {final score}.
     - list each game on its own line
