@@ -114,6 +114,99 @@ function setScoreboardHeaderDefaults(homeTeam, awayTeam) {
   if (awayFoulsEl) awayFoulsEl.textContent = 'F: 0';
 }
 
+function numericValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function objectHasNonZeroNumber(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) {
+    return value.some((item) => objectHasNonZeroNumber(item));
+  }
+  return Object.values(value).some((item) => {
+    if (typeof item === 'number') return item !== 0;
+    if (typeof item === 'string' && item.trim() !== '') {
+      const n = Number(item);
+      return Number.isFinite(n) && n !== 0;
+    }
+    return item && typeof item === 'object' ? objectHasNonZeroNumber(item) : false;
+  });
+}
+
+function getTeamRows(gameData) {
+  return Object.values(gameData?.teams || {}).filter((team) => team && typeof team === 'object');
+}
+
+function isPreAnchorQ1DirtyGame(gameData) {
+  if (!gameData || typeof gameData !== 'object') return false;
+  if (gameData.resume_anchor || gameData.status === 'stoppage_anchor') return false;
+
+  const quarter = numericValue(gameData.quarter) || 1;
+  if (quarter !== 1) return false;
+
+  const timeRemaining = gameData.time_remaining == null ? 480 : numericValue(gameData.time_remaining);
+  const clock = typeof gameData.clock === 'string' ? gameData.clock.trim() : '';
+  const shotClock = gameData.shot_clock_remaining == null ? 30 : numericValue(gameData.shot_clock_remaining);
+
+  if (timeRemaining !== 480) return true;
+  if (clock && clock !== '8:00') return true;
+  if (shotClock !== 30) return true;
+  if (objectHasNonZeroNumber(gameData.score)) return true;
+  if (objectHasNonZeroNumber(gameData.box_score)) return true;
+  if (objectHasNonZeroNumber(gameData.team_totals)) return true;
+  if (objectHasNonZeroNumber(gameData.team_stats)) return true;
+  if (objectHasNonZeroNumber(gameData.fouls)) return true;
+  if (objectHasNonZeroNumber(gameData.no_defender_shots)) return true;
+
+  for (const team of getTeamRows(gameData)) {
+    if (numericValue(team.score) !== 0) return true;
+    if (numericValue(team.team_fouls) !== 0) return true;
+    if (team.timeouts != null && numericValue(team.timeouts) !== 4) return true;
+    if (objectHasNonZeroNumber(team.points_by_quarter)) return true;
+    if (objectHasNonZeroNumber(team.box_score)) return true;
+    if (objectHasNonZeroNumber(team.team_game_stats)) return true;
+    if (objectHasNonZeroNumber(team.totals)) return true;
+  }
+
+  const players = Array.isArray(gameData.players) ? gameData.players : [];
+  return players.some((player) => {
+    if (!player || typeof player !== 'object') return false;
+    if (objectHasNonZeroNumber(player.stats)) return true;
+    const attrs = player.attributes || {};
+    if (attrs.MO != null && numericValue(attrs.MO) !== 0) return true;
+    return false;
+  });
+}
+
+function resetPreAnchorCourtChrome(homeTeam, awayTeam) {
+  setScoreboardHeaderDefaults(homeTeam, awayTeam);
+
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  const clockEl = document.getElementById('game-clock');
+  const quarterEl = document.getElementById('quarter');
+  const shotClockEl = document.getElementById('shot-clock');
+  const homeStatsBody = document.getElementById('home-stats-body');
+  const awayStatsBody = document.getElementById('away-stats-body');
+
+  if (homeScoreEl) homeScoreEl.textContent = '0';
+  if (awayScoreEl) awayScoreEl.textContent = '0';
+  if (clockEl) clockEl.textContent = '8:00';
+  if (quarterEl) quarterEl.textContent = 'Q1';
+  if (shotClockEl) shotClockEl.textContent = '30';
+  if (homeStatsBody) homeStatsBody.innerHTML = '';
+  if (awayStatsBody) awayStatsBody.innerHTML = '';
+  window.currentPlayerStats = { home: {}, away: {} };
+
+  if (typeof window.setTeamBoxData === 'function') {
+    window.setTeamBoxData({
+      home: { offense: {}, defense: {}, attributes: {}, totals: {} },
+      away: { offense: {}, defense: {}, attributes: {}, totals: {} },
+    });
+  }
+}
+
 export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   setScoreboardHeaderDefaults(homeTeam, awayTeam);
 
@@ -462,6 +555,7 @@ export async function initializeGameStats() {
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');
   const quarterBreakFrom = urlParams.get('quarter_break_from');
+  const quarter = Number(urlParams.get('quarter') || 1);
   const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
   const wantsAnchorUi =
     !liveQuarterStart && (
@@ -478,6 +572,19 @@ export async function initializeGameStats() {
   const gameData = wantsAnchorUi
     ? await fetchResumeState(gameId)
     : await fetchGameState(gameId);
+  if (!wantsAnchorUi && !liveQuarterStart && quarter === 1 && isPreAnchorQ1DirtyGame(gameData)) {
+    window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true;
+    window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = gameId;
+    console.warn('[PRE-ANCHOR-Q1-REFRESH] dirty pre-anchor game doc detected; suppressing accumulated stats', {
+      game_id: gameId,
+      quarter: gameData?.quarter,
+      clock: gameData?.clock,
+      time_remaining: gameData?.time_remaining,
+      score: gameData?.score,
+    });
+    resetPreAnchorCourtChrome(homeTeam, awayTeam);
+    return;
+  }
   if (gameData) {
     displayAccumulatedHeaderState(gameData, homeTeam, awayTeam);
     displayAccumulatedClockState(gameData);

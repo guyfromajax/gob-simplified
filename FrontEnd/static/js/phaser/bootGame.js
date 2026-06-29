@@ -2014,6 +2014,107 @@ function resetGameContext() {
   if (awayScoreEl) awayScoreEl.textContent = 0;
 }
 
+function isPreAnchorQ1RefreshPending() {
+  return typeof window !== 'undefined' && window.__GOB_PRE_ANCHOR_Q1_REFRESH__ === true;
+}
+
+function replaceGameIdInUrl(newGameId) {
+  if (!newGameId || typeof window === 'undefined' || typeof history === 'undefined' || !history.replaceState) return;
+  const params = new URLSearchParams(window.location.search);
+  params.set('game_id', String(newGameId));
+  params.set('quarter', '1');
+  params.set('period', 'Q1');
+  params.set('resume_from_timeout', 'false');
+  ['active_resume', 'resume_from_anchor', 'consume_resume_anchor', 'anchor_type', 'clock'].forEach((key) => {
+    params.delete(key);
+  });
+  history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+}
+
+function resetPreAnchorScoreChrome() {
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  const clockEl = document.getElementById('game-clock');
+  const quarterEl = document.getElementById('quarter');
+  const shotClockEl = document.getElementById('shot-clock');
+  if (homeScoreEl) homeScoreEl.textContent = '0';
+  if (awayScoreEl) awayScoreEl.textContent = '0';
+  if (clockEl) clockEl.textContent = '8:00';
+  if (quarterEl) quarterEl.textContent = 'Q1';
+  if (shotClockEl) shotClockEl.textContent = '30';
+}
+
+async function ensureFreshGameForPreAnchorQ1Refresh() {
+  if (!isPreAnchorQ1RefreshPending()) return;
+
+  const live = readLiveSearchParams();
+  const liveQuarter = Number(live.get('quarter') || 1);
+  if (liveQuarter !== 1) return;
+
+  const oldGameId = gameId || live.get('game_id') || null;
+  const payload = {
+    home_team: homeTeam,
+    away_team: awayTeam,
+    mode,
+  };
+
+  if (mode === 'tournament' && tournamentId) payload.tournament_id = tournamentId;
+  if (mode === 'franchise' && franchiseId) payload.franchise_id = franchiseId;
+  if (userTeamSide) payload.user_team_side = userTeamSide;
+
+  console.warn('[PRE-ANCHOR-Q1-REFRESH] creating fresh initialized game before gameplay restart', {
+    old_game_id: oldGameId,
+    mode,
+    home_team: homeTeam,
+    away_team: awayTeam,
+  });
+
+  const res = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}: ${res.statusText}`;
+    try {
+      const errorData = await res.json();
+      detail = errorData.detail || errorData.message || detail;
+    } catch (err) {
+      try {
+        detail = await res.text();
+      } catch (err2) {
+        /* keep default detail */
+      }
+    }
+    throw new Error(`Could not initialize fresh pre-anchor game: ${detail}`);
+  }
+
+  const data = await res.json();
+  const newGameId = data?.game_id ? String(data.game_id) : null;
+  if (!newGameId) {
+    throw new Error('Could not initialize fresh pre-anchor game: response missing game_id');
+  }
+
+  gameId = newGameId;
+  quarter = 1;
+  periodLabel = 'Q1';
+  gameStore.setGameId(newGameId);
+  replaceGameIdInUrl(newGameId);
+  resetPreAnchorScoreChrome();
+
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = false;
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH_REPLACED_GAME_ID__ = newGameId;
+
+  console.warn('[PRE-ANCHOR-Q1-REFRESH] fresh initialized game ready', {
+    old_game_id: oldGameId,
+    new_game_id: newGameId,
+  });
+}
+
 
 async function fetchTeamRoster(teamName) {
   // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
@@ -2181,6 +2282,14 @@ async function showPopup(score) {
 }
 
 async function handleButtonClick(animate, options = {}) {
+  try {
+    await ensureFreshGameForPreAnchorQ1Refresh();
+  } catch (error) {
+    console.error('❌ [PRE-ANCHOR-Q1-REFRESH] Failed to create fresh game before Play Quarter:', error);
+    alert(`Could not restart the pre-anchor game cleanly: ${error.message || error}`);
+    return;
+  }
+
   // ✅ PHASE 2: Validate game_id before starting game
   try {
     await validateGameIdIfPresent();
@@ -2328,6 +2437,14 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
 
 async function handleSimQuarter() {
   if (typeof window.playSound === 'function') window.playSound('positive-beep.wav');
+  try {
+    await ensureFreshGameForPreAnchorQ1Refresh();
+  } catch (error) {
+    console.error('❌ [PRE-ANCHOR-Q1-REFRESH] Failed to create fresh game before Sim Quarter:', error);
+    alert(`Could not restart the pre-anchor game cleanly: ${error.message || error}`);
+    return;
+  }
+
   // ✅ FIX: Calculate next quarter (handle pre-game screen where quarter = 0)
   // On pre-game screen (quarter = 0), nextQuarter = 0 + 1 = 1 (correct)
   // On Q1 break (quarter = 1), nextQuarter = 1 + 1 = 2 (correct)
@@ -2596,6 +2713,14 @@ async function handleSimQuarter() {
 async function handleSimFullGame() {
   if (typeof window.playSound === 'function') window.playSound('positive-plop.wav');
   if (isSimulating) return;
+
+  try {
+    await ensureFreshGameForPreAnchorQ1Refresh();
+  } catch (error) {
+    console.error('❌ [PRE-ANCHOR-Q1-REFRESH] Failed to create fresh game before Sim Full Game:', error);
+    alert(`Could not restart the pre-anchor game cleanly: ${error.message || error}`);
+    return;
+  }
   
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
   if (!gameId) {

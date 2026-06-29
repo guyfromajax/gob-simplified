@@ -68,6 +68,147 @@ Instead, it restores from the last coherent point where the game had a known res
 
 This may lose some turns if the user closes the browser mid-flow, but it avoids returning them to a random-looking state with missing sprites, incorrect clock setup, or mismatched UI controls.
 
+## Pre-Anchor Q1 Refresh Contract
+
+Before the first stable anchor exists, the game has no durable mid-game resume target.
+
+This applies when the user refreshes `court.html` during Q1 before any of these have occurred:
+
+- timeout modal
+- player foul-out modal
+- non-final quarter break
+
+Expected behavior:
+
+- Browser close / later return through Mode Select does not show a mid-game resume card.
+- Browser refresh may show the normal Play Quarter / Sim Full Game controls.
+- The refreshed court must not display partial scores, partial player stats, partial team stats, or stale clock values from the abandoned pre-anchor gameplay.
+- The next Play Quarter / Sim Full Game action must not continue from the dirty partial gameplay state.
+
+Product rule:
+
+> Pre-anchor Q1 refresh abandons live gameplay progress, but preserves setup and baseline initialization.
+
+### Preserve
+
+The system should preserve setup data that existed before gameplay began:
+
+- matchup identity
+- `mode`
+- `franchise_id`
+- `tournament_id`
+- `week`
+- `home`
+- `away`
+- `home_id`
+- `away_id`
+- `home_team_id`
+- `away_team_id`
+- `my_team`
+- `team_id`
+- `user_team_side`
+- selected user lineup from URL params
+- selected computer lineup if already encoded in URL params
+- game plan / strategy settings
+- playbook settings
+- team attributes
+- scouting data
+- FTD baselines
+- team record/display metadata such as rank, wins, losses, colors, logos, and profile fields when present
+- initialized roster identity data such as player id, name, jersey, height, photo, and team colors
+- `game_stats_initialized=true`
+
+### Reset
+
+The system should discard gameplay data created after opening tip and before the refresh:
+
+- `score`
+- `home_team.score`
+- `away_team.score`
+- `quarter` back to `1`
+- `clock` / `time_remaining` back to Q1 start: `8:00` / `480`
+- `shot_clock_remaining` back to `30`
+- `turns`
+- animation payloads
+- last turn payloads
+- play-by-play state
+- `box_score`
+- `teams[*].box_score`
+- `teams[*].team_game_stats`
+- player `stats.game`
+- player fouls
+- team fouls
+- timeouts consumed during abandoned gameplay
+- `team_timeouts`
+- `computer_timeouts`
+- points by quarter
+- possession / offense / defense live state
+- `offensive_state`
+- `current_playcall`
+- `defense_playcall`
+- `start_box_score`
+- `team_scoreboard_meta`
+- `timeout_*` fields
+- `pending_computer_timeout`
+- `timeout_called`
+- foul-out pending or foul-out lock fields
+- `_prev_offense_positions_for_hco`
+- `motion_attack_shot_tracker`
+- `no_defender_shots` and related diagnostic counters
+- `last_*` live trackers
+- `free_throws*`
+- `one_and_one`
+- `shooter`
+- `flss_*` pending state
+- `resume_anchor`
+- all resume URL flags once normalized
+
+### Player Baseline Rule
+
+Player baseline initialization must be preserved, while gameplay mutations must be reset.
+
+The persisted summary currently stores player runtime attributes as:
+
+```json
+{
+  "EM": 0,
+  "CH": 0,
+  "MO": 0,
+  "NG": 1.0
+}
+```
+
+Contract:
+
+- preserve baseline initialized `EM`
+- preserve baseline initialized `CH`
+- preserve baseline initialized `MO` only if it is still the pregame baseline value
+- preserve baseline initialized `NG` only if it is still the pregame baseline value
+- reset gameplay-mutated `MO`
+- reset gameplay-mutated `NG`
+- reset live `x` / `y` coordinates to lineup/default starting locations
+- reset player game stats and fouls
+
+Because `MO` and `NG` can be mutated during gameplay, the implemented pre-anchor Q1 refresh path does **not** try to surgically clean the dirty game document.
+
+Implemented behavior:
+
+1. `initializeGameStats()` detects dirty Q1 game documents that have no `resume_anchor`.
+2. When dirty pre-anchor Q1 state is detected, the court suppresses accumulated stat hydration and paints clean pregame chrome:
+   - score `0-0`
+   - `Q1`
+   - `8:00`
+   - shot clock `30`
+   - no partial player or team stats
+3. The court sets `window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true`.
+4. Before Play Quarter, Sim Quarter, or Sim Full Game starts, `bootGame.js` calls `/api/init-game` with the preserved setup payload.
+5. The response `game_id` replaces the dirty URL `game_id`.
+6. Gameplay starts from the fresh initialized game document.
+
+This intentionally abandons the dirty pre-anchor game document instead of mutating it in place. Once the first stable anchor exists, this fresh-game replacement path is no longer used; the Mid Game Resume System resumes from anchors on the existing game document.
+
+The abandoned pre-anchor document may remain in the database until normal cleanup handles it. It is no longer referenced by the active browser URL after the fresh replacement is created.
+
 ## Resume Anchor
 
 Resume anchors are stored on the existing `games` document in a nested `resume_anchor` object.

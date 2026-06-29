@@ -8,7 +8,8 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **June 21 Update** Added Half-Court Trap plays. Made player attributes (RB, ST, IQ) and proximity to the ball bounce spot on missed shots more relevant to rebounding logic. Added the Player Momentum system. Added three Advanced Tutorial topics (Momentum, Presses & Traps, Practice Squads).
+- **June 29 Update** Added deeper step-by-step execution logic and outcomes for half-court offense, half-court traps, and full-court presses. Improved end-of-quarter logic. Reduced the number of offensive rebounds. Added better computer team logic for blowout situations. Built the mid-game resume system. Deepened the impact of aggression settings for all turn types.
 
 Source:
 - `FrontEnd/static/mode-select.html`
+- Bump `ALPHA_DISCLAIMER_VERSION` in `FrontEnd/static/mode-select.js` whenever this copy changes so returning users see the box again until they dismiss it.
