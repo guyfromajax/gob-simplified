@@ -1,6 +1,6 @@
 # End of Quarter (EOQ) System
 
-**Status:** Active — clock-driven EOQ with structured Final Shot, FLSS chains, and observability (2026-06).
+**Status:** Active — clock-driven EOQ with structured Final Shot, runway-based follow-ups, FLSS, and observability (2026-06).
 
 This document is the **canonical reference** for end-of-quarter gameplay logic and execution: when the period ends, how **Final Shot** arms and runs, how **FLSS** and follow-up possessions work, and which backend flags/API fields agents should inspect.
 
@@ -15,9 +15,9 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 ## 1. Design principles
 
 1. **Quarter end is clock-driven.** A period ends when `game_state.time_remaining` reaches **0**, not when a possession flag fires alone.
-2. **Final Shot runs once per chain.** The first eligible possession at **≤ 30s** runs the full Final Turn setup (alignment + rolled anchor + UESS schema). Follow-ups use **FLSS**, **OREB putback**, or **terminal DREB** — not a second full Final Turn setup.
+2. **First Final Shot is gate-driven; follow-ups are runway-driven.** The first eligible half-court possession at **≤ 30s** arms full Final Turn setup (alignment + rolled anchor + UESS schema). After the first EOQ terminal shot completes, each subsequent HCO/HCT/FCP entry at ≤ 30s runs **`can_run_final_turn_followup()`**: enough runway → another full Final Turn; otherwise → FLSS.
 3. **Backend owns routing.** The frontend renders turn payloads (`animation_steps`, flags). It must not decide EOQ branches locally.
-4. **OREB ≠ EOQ chain.** Offensive rebounds happen all game. They route to putback turns but **do not** start the EOQ chain unless clock ≤ 30 **and** a chain is already active (see §5).
+4. **OREB ≠ EOQ chain start.** Offensive rebounds happen all game. They route to putback turns but **do not** start the EOQ chain unless clock ≤ 30 **and** a chain is already active (see §5). OREB kickout → HCO at ≤ 30 with chain inactive still arms the **first** Final Shot.
 
 ---
 
@@ -28,13 +28,14 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | EOQ routing, chain flags, rebound/make/FT follow-ups | `BackEnd/utils/eoq_clock_progression.py` |
 | Final Shot gate, `resolve_final_turn_shot()`, emit | `BackEnd/models/turn_manager.py` |
 | Final Turn shot logic, shooter weights, blocking-foul FT rule | `BackEnd/engine/phase_resolution.py` → `resolve_final_turn_shot_logic()` |
-| Preflight / anchor budget, FLSS fallback gate | `BackEnd/engine/final_turn_pacing.py` |
+| Preflight / anchor budget, follow-up runway, FLSS fallback gate | `BackEnd/engine/final_turn_pacing.py` → `can_run_final_turn_followup()` |
 | FLSS sprint-and-shoot | `BackEnd/engine/eoq_perfection.py` |
 | Structured debug logs (`[EOQ-TRACE]`) | `BackEnd/engine/eoq_debug_log.py` |
 | FE trace helper | `FrontEnd/static/js/phaser/utils/eoqDebugLog.js` |
+| FE Final Shot announcement + SFX suppress | `FrontEnd/static/js/phaser/animation/turnPreparation.js`, `announcements.js` |
 | Q4 situational predicates | `BackEnd/utils/situational_logic.py` |
 | Quarter-break chain scrub | `BackEnd/api/api.py` (on `quarter_complete`) |
-| Unit tests | `tests/test_eoq_clock_progression.py` |
+| Unit tests | `tests/test_eoq_clock_progression.py`, `tests/test_final_turn_pacing.py` |
 
 **Constants** (in `eoq_clock_progression.py`):
 
@@ -43,7 +44,8 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `LATE_CLOCK_THRESHOLD` | 30 | Late-clock EOQ window (seconds) |
 | `OREB_PUTBACK_ONLY_THRESHOLD` | 6 | Under 6s → always putback (no kickout) |
 | `FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK` | 8 | Preflight failure routes to FLSS only at ≤ 8s; above that, best-effort Final Turn |
-| `LATE_CLOCK_BIP_RUNOFF_SECONDS` | 2 | Game-clock burn on BIP after late-clock make |
+| `POST_DREB_FLSS_MIN_CLOCK` | 2 | Post-DREB FLSS when chain active and clock **> 2s**; terminal DREB at ≤ 2s |
+| `LATE_CLOCK_BIP_RUNOFF_SECONDS` | 2 | Game-clock burn on BIP after late-clock make or `late_clock_ft_resolution` |
 
 ---
 
@@ -51,10 +53,12 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 
 | Flag | Set when | Cleared when | Purpose |
 |------|----------|--------------|---------|
-| `late_clock_eoq_chain_active` | Final Shot arms; extended during active EOQ chain | `clear_late_clock_eoq_chain()` at quarter boundary | **Blocks re-arming** full Final Shot on follow-up possessions |
-| `final_turn_shot_this_turn` | Final Shot gate passes | Popped when turn resolves | Routes turn to `resolve_final_turn_shot()` |
+| `late_clock_eoq_chain_active` | Final Shot arms; extended during active EOQ chain | `clear_late_clock_eoq_chain()` at quarter boundary | Marks EOQ chain in progress; blocks **first** Final Shot gate only |
+| `final_turn_shot_this_turn` | Final Shot gate or follow-up runway passes | Popped when turn resolves | Routes turn to `resolve_final_turn_shot()` |
 | `final_shot_possession_active` | Same as above | Cleared after turn stamped | Internal arming guard |
-| `flss_possession_pending` | After late-clock BIP/SIP make (or FT make in chain) | Popped at FLSS turn start | Next offense turn → FLSS |
+| `suppress_final_shot_sfx` | Follow-up Final Turn armed (`EOQ_FOLLOWUP_FINAL_TURN`) | Popped when turn resolves; stamped on turn payload | FE skips Final Shot stinger on repeat full Final Turns |
+| `flss_possession_pending` | FLSS follow-up chosen; or `schedule_flss_after_inbound` after chain make | Popped at FLSS turn start | Next offense turn → FLSS (may be overridden at entry by runway check) |
+| `final_shot_ran_this_chain` | First EOQ terminal shot completes (`final_turn` or FLSS w/ `final_shot_possession`) | Quarter break clear | Enables runway-based follow-up routing |
 | `flss_from_dreb` | After discrete DREB when EOQ chain + clock > 2s | Popped at FLSS resolve | Rebounder = BH; post-DREB FLSS sprint |
 | `pending_oreb` | Miss/block OREB | Consumed on putback turn | Putback possession |
 | `eoq_trace_seq` / `eoq_trace_turn_in_seq` | EOQ trace enabled | Quarter break clear | Correlate logs FE ↔ BE |
@@ -70,6 +74,8 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `terminal_dreb_eoq` | Terminal defensive rebound (clock burn, no outlet) |
 | `flss_after_dreb` | Miss/block turn in chain: DREB → FLSS when clock > 2s |
 | `skip_dreb_outlet_lead_in` | DREB turn payload: FE skips HCO outlet lead-in before FLSS |
+| `suppress_final_shot_sfx` | Repeat full Final Turn in same EOQ sequence: FE skips Final Shot stinger (announcement text may still show) |
+| `late_clock_ft_resolution` | Last FT at ≤ 30s resolved: tags turn for BIP runoff only; **does not** start chain |
 | `final_turn_anchor_clock` | Rolled shoot/drive anchor (seconds) |
 | `quarter_ends_after` | Period ends after this turn; no BIP/OREB follow-up |
 
@@ -89,25 +95,29 @@ On quarter break, `api.py` clears EOQ flags (`clear_late_clock_eoq_chain`, drops
 
 ```mermaid
 flowchart TD
-    A[Possession entry] --> B{time <= 30 and HCO/HCT/FCP?}
+    A[Possession entry HCO/HCT/FCP] --> B{time <= 30?}
     B -->|No| Z[Normal possession]
-    B -->|Yes| C{chain_active?}
-    C -->|No| D{Final Shot eligible?}
-    C -->|Yes| E[Follow-up: FLSS / OREB / terminal DREB]
-    D -->|Q4 branches| F[Situational override?]
-    D -->|Qs 1-3 or Q4 trailing/tied| G[Arm Final Shot]
-    F -->|Run out / Hold / Force / Quick| H[Non-Final paths]
-    F -->|Else| G
+    B -->|Yes| C{final_shot_ran_this_chain?}
+    C -->|Yes| R[can_run_final_turn_followup]
+    R -->|runway OK| G2[Arm Final Turn suppress SFX]
+    R -->|no runway| L[FLSS]
+    C -->|No| D{chain_active?}
+    D -->|Yes| E[Follow-up FLSS / OREB / terminal DREB]
+    D -->|No| F{final_turn_eligible?}
+    F -->|Q4 situational| H[Run out / Hold / Force / Quick]
+    F -->|Yes Qs1-3 or Q4| G[Arm first Final Shot]
     G --> I[activate_late_clock_eoq_chain]
+    G2 --> I
     I --> J[resolve_final_turn_shot]
     J -->|preflight OK| K[UESS Final Turn animation]
-    J -->|preflight fail <=8s| L[FLSS]
+    J -->|preflight fail <=8s| L
     K --> M{clock > 0 after shot?}
-    M -->|Make| N[BIP -> flss_pending -> FLSS]
+    M -->|Make| N[BIP -> may schedule FLSS]
     M -->|Miss OREB| O[Putback if chain active]
-    M -->|Miss DREB, clock > 2s| R[DREB -> FLSS from rebounder]
-    M -->|Miss DREB, clock <= 2s| P[Terminal DREB]
+    M -->|Miss DREB clock > 2s| P2[DREB -> FLSS from rebounder]
+    M -->|Miss DREB clock <= 2s| P[Terminal DREB]
     M -->|No| Q[quarter_ends_after]
+    N --> R
 ```
 
 ### What starts the chain
@@ -129,9 +139,11 @@ flowchart TD
 
 **Do not** call `activate_late_clock_eoq_chain()` on every OREB. Early-quarter OREBs (e.g. at 5:00) used to permanently block Final Shot because the gate requires `not late_clock_eoq_chain_active`. OREB routing still sets `pending_oreb` for putbacks; chain activation is gated in `apply_post_miss_rebound_routing()`.
 
+**Do not** start the chain on the last FT of a trip (`apply_eoq_final_free_throw_routing`). That path tags `late_clock_ft_resolution` on the turn for BIP runoff only. Terminal DREB / post-DREB FLSS on FT miss applies **only when the chain was already active** (e.g. shooting foul during Final Shot). Otherwise FT miss → OREB/DREB → next HCO entry can still arm the **first** Final Shot.
+
 ---
 
-## 6. Final Shot — trigger gate
+## 6. Final Shot — trigger gate (first possession)
 
 Evaluated at **possession entry** in `turn_manager.run_micro_turn()` (before state routing):
 
@@ -147,15 +159,48 @@ final_turn_eligible =
 
 **Also:** at start of each quarter, if `_last_final_turn_quarter != quarter`, call `clear_late_clock_eoq_chain()`.
 
-**Excluded at entry (re-evaluated next turn):** Fast Break, OREB putback turn, possessions while `flss_possession_pending` is set, any possession after chain is already active.
+**Excluded at first-gate entry:** Fast Break, OREB putback turn, possessions while `flss_possession_pending` is set (unless overridden — see §6b).
 
 **Important:** Eligibility uses clock **at possession start**, not when the shot is released. A possession entering at 0:43 will not arm Final Shot even if the shot occurs at 0:28.
 
-When the gate passes:
+When the first gate passes:
 
 1. Set `final_turn_shot_this_turn`, `final_shot_possession_active`.
 2. `activate_late_clock_eoq_chain(game_state)`.
 3. Log `CHAIN` event `FINAL_SHOT_TRIGGERED` (when EOQ trace enabled).
+
+After the turn completes, if `final_turn` **or** (`flss` and `final_shot_possession`), set **`final_shot_ran_this_chain`**.
+
+---
+
+## 6b. Follow-up routing (after first EOQ terminal shot)
+
+**Condition** (evaluated at the same possession entry point, **after** the first-gate block):
+
+```text
+final_shot_ran_this_chain
+AND int(time_remaining) <= 30
+AND state != FAST_BREAK
+AND state in (HCO, HCT, FCP)
+```
+
+**Decision:** `can_run_final_turn_followup()` in `final_turn_pacing.py`:
+
+- Builds conservative Final Turn skeleton scenarios (Outside @ 3s anchor, Attack @ 4s anchor; BH-shooter and pass-to-shooter variants).
+- Simulates walk-up from `prior_turn.final_coords`, alignment, entry pass, and pre-anchor moves via `evaluate_final_turn_pacing()`.
+- **If any scenario fits** → arm another full Final Turn:
+  - Set `final_turn_shot_this_turn`, `final_shot_possession_active`, `suppress_final_shot_sfx`.
+  - Clear `flss_possession_pending` if set (overrides inbound-scheduled FLSS).
+  - Log `CHAIN` / `EOQ_FOLLOWUP_FINAL_TURN`.
+- **Else** → FLSS:
+  - Set `flss_possession_pending` if not already set.
+  - Log `CHAIN` / `EOQ_FOLLOWUP_FLSS`.
+
+**Design intent:** Replace the old “chain active → always BIP → FLSS” loop with a per-entry runway check. Entry context matters: OREB kickout, BIP with runoff, DREB outlet, and press setup all change available time.
+
+**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows “Final Shot” announcement but skips court stinger.
+
+**Not re-evaluated on:** OREB putback turns, BIP/SIP bypass turns, discrete DREB turns, FT line. The next **half-court entry** after those paths runs this check.
 
 ---
 
@@ -195,7 +240,9 @@ At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` already set, Fi
 
 ### Frontend announcement
 
-**"Final Shot"** when `turn.final_turn` (or `final_shot_possession`) and `result_type !== 'FINAL_HOLD'`. See [`Announcement_System.md`](Announcement_System.md).
+**"Final Shot"** when `turn.final_turn` (or `final_shot_possession` or `flss`) and `result_type !== 'FINAL_HOLD'`. See [`Announcement_System.md`](Announcement_System.md).
+
+When `turn.suppress_final_shot_sfx === true`, pass `suppressCourtSfx` to the secondary announcement so the stinger does not replay.
 
 ---
 
@@ -205,10 +252,11 @@ At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` already set, Fi
 
 | Condition | Source |
 |-----------|--------|
-| `flss_possession_pending` after late-clock BIP/SIP | `schedule_flss_after_inbound()` |
+| Follow-up runway check fails (`EOQ_FOLLOWUP_FLSS`) | `turn_manager.run_micro_turn()` after `final_shot_ran_this_chain` |
+| `flss_possession_pending` after late-clock BIP/SIP make in chain | `schedule_flss_after_inbound()` — may be cleared at entry if follow-up runway favors Final Turn |
 | Final Turn preflight budget fail at ≤ 8s | `resolve_final_turn_shot()` |
+| Post-DREB when chain active and clock > 2s | `schedule_flss_after_dreb()` |
 | Game clock ≤ 0, eligible, Final Turn not already flagged | `turn_manager` low-clock branch |
-| Low-clock routing when preflight impossible | `should_route_final_turn_to_flss()` |
 
 **What:** Ball handler sprints for `time_remaining − 1` game seconds, shoots with ~1s on clock. No full alignment / entry-pass graph.
 
@@ -226,19 +274,19 @@ After shot resolution or the **last FT** of a trip, if `time_remaining > 0`:
 
 | Outcome | Next step |
 |---------|-----------|
-| **Make, no foul** | BIP/SIP → `schedule_flss_after_inbound` → `flss_possession_pending` → FLSS |
-| **Miss / Block, OREB** | `pending_oreb` → putback turn |
-| **Miss / Block, DREB** (late chain, clock **> 2s**) | Discrete DREB → `schedule_flss_after_dreb` → `flss_possession_pending` → FLSS (rebounder = BH, sprint + teammates cruise drift) |
+| **Make, no foul** (in chain) | BIP/SIP → `schedule_flss_after_inbound` may set `flss_possession_pending` → **next HCO/HCT/FCP entry runs §6b runway check** (Final Turn or FLSS) |
+| **Miss / Block, OREB** | `pending_oreb` → putback turn; kickout → HCO may arm first Final Shot or §6b follow-up |
+| **Miss / Block, DREB** (late chain, clock **> 2s**) | Discrete DREB → `schedule_flss_after_dreb` → FLSS (rebounder = BH; no HCO outlet) |
 | **Miss / Block, DREB** (late chain, clock **≤ 2s**) | `terminal_dreb_eoq` → DREB animation → clock drain |
-| **Miss / Block, DREB** (not in chain) | Normal HCO for defense |
-| **Shooting foul** | FTs; after **last** FT apply same rules via `apply_eoq_final_free_throw_routing` |
+| **Miss / Block, DREB** (not in chain) | Normal HCO for defense; next entry at ≤ 30 may arm first Final Shot |
+| **Last FT at ≤ 30s** | `apply_eoq_final_free_throw_routing` → OREB / BIP / DREB with `late_clock_ft_resolution` — **does not** start chain; next half-court entry arms first Final Shot or §6b follow-up |
 
 When `time_remaining == 0`:
 
 - Set `quarter_ends_after`; no BIP / OREB / DREB follow-up.
 - FE hold at rim (`holdFinalShotMs`, default 2000 ms) then quarter-break flow.
 
-**BIP clock runoff:** `resolve_late_clock_bip_runoff()` burns up to 2s on inbound after late-clock make.
+**BIP clock runoff:** `resolve_late_clock_bip_runoff()` burns up to 2s on inbound when prior turn has `late_clock_eoq` **or** `late_clock_ft_resolution`.
 
 Turns in an active chain carry `late_clock_eoq: true` when tagged by make/miss/FLSS/OREB-in-chain paths.
 
@@ -254,7 +302,7 @@ Universal rules (all quarters):
 
 **EOQ-specific:**
 
-- Putback turn does **not** re-arm Final Shot if chain already active.
+- Putback turn does **not** run Final Shot on itself; kickout → next HCO/HCT/FCP entry uses first gate (§6) or follow-up runway (§6b).
 - OREB at **> 30s** or **without active chain:** putback only; no `late_clock_eoq` tag, no chain activation.
 
 ---
@@ -283,9 +331,11 @@ Enabled by default (`game_state['eoq_trace'] !== false`). Filter logs: **`[EOQ-T
 
 | Event | Meaning |
 |-------|---------|
-| `CHAIN` / `FINAL_SHOT_TRIGGERED` | Full Final Shot armed — **must appear** for real Final Turn |
+| `CHAIN` / `FINAL_SHOT_TRIGGERED` | **First** full Final Shot armed — must appear for initial Final Turn |
+| `CHAIN` / `EOQ_FOLLOWUP_FINAL_TURN` | Runway check passed → repeat full Final Turn (SFX suppressed) |
+| `CHAIN` / `EOQ_FOLLOWUP_FLSS` | Runway check failed → FLSS on this entry |
 | `CHAIN` / `FLSS_POSSESSION_START` | FLSS turn starting |
-| `CHAIN` / `FLSS_SCHEDULED_AFTER_INBOUND` | Make + time left → inbound then FLSS |
+| `CHAIN` / `FLSS_SCHEDULED_AFTER_INBOUND` | Make + time left → inbound; next entry may override via §6b |
 | `CHAIN` / `FLSS_SCHEDULED_AFTER_DREB` | Chain DREB + time left → FLSS (no outlet) |
 | `TURN` role `FINAL_SHOT` | Turn has `final_turn` or `final_shot_possession` |
 | `TURN` role `EOQ_CHAIN` | `late_clock_eoq` only — **not** full Final Shot |
@@ -293,11 +343,12 @@ Enabled by default (`game_state['eoq_trace'] !== false`). Filter logs: **`[EOQ-T
 
 **Debugging checklist when Final Shot “didn’t trigger”:**
 
-1. Was `FINAL_SHOT_TRIGGERED` logged? If no → gate failed.
-2. Was `late_clock_eoq_chain_active` already true at entry? → premature chain (historically: early OREB bug).
-3. Did possession **start** above 30s?
-4. Q4 situational branch (Run Out, Quick Shot, Force Foul, Hold)?
-5. Turn payload: `final_turn` null → backend never armed it (FE cannot fix).
+1. Was `FINAL_SHOT_TRIGGERED` logged? If no → first gate failed (see below).
+2. Was `final_shot_ran_this_chain` already true? → look for `EOQ_FOLLOWUP_FINAL_TURN` or `EOQ_FOLLOWUP_FLSS` instead.
+3. Was `late_clock_eoq_chain_active` true **before** first Final Shot? → premature chain (FT trip or early OREB bug).
+4. Did possession **start** above 30s?
+5. Q4 situational branch (Run Out, Quick Shot, Force Foul, Hold)?
+6. Turn payload: `final_turn` null and no `flss` → backend never armed terminal EOQ shot.
 
 Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EOQ_TRACE = false` (FE).
 
@@ -307,11 +358,14 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 
 | Symptom | Likely cause |
 |---------|----------------|
-| No Final Shot all quarter | `late_clock_eoq_chain_active` stuck true before first ≤30 possession |
-| Trace says `FINAL_SHOT` but no announcement | Trace role was `EOQ_CHAIN` mislabeled (pre-2026) or `late_clock_eoq` without `final_turn` |
-| FLSS loop without ever seeing Final Shot | Chain never started; makes keep scheduling FLSS after inbound in late clock |
+| No Final Shot all quarter | `late_clock_eoq_chain_active` stuck true before first ≤30 possession (FT trip or early OREB) |
+| Trace says `FINAL_SHOT` but no announcement | Trace role was `EOQ_CHAIN` mislabeled or `late_clock_eoq` without `final_turn` |
+| FLSS loop, never saw first Final Turn | Chain started on FT path before fix; or every entry fails §6b runway (check clock after BIP runoff) |
+| Full Final Turn after make when expecting FLSS | §6b runway check passed; `EOQ_FOLLOWUP_FINAL_TURN` in trace |
+| Final Shot stinger twice in last 30s | Missing `suppress_final_shot_sfx` on follow-up Final Turn |
 | Quarter ends at 0:01, no airhorn | Clock never drained to 0 on terminal turn |
-| Full HCO outlet after Final Shot DREB in chain | `flss_after_dreb` not set (chain inactive) or FE ran outlet despite `skip_dreb_outlet_lead_in` |
+| Full HCO outlet after Final Shot DREB in chain | `flss_after_dreb` not set or FE ran outlet despite `skip_dreb_outlet_lead_in` |
+| Kickout → HCO, no Final Shot | Chain already active from side door; or clock > 30 at HCO entry |
 | Resume after timeout, weird EOQ | Stale timeout anchor / chain flags — see [`Mid_Game_Resume_System.md`](../01_Data_Persistence/Mid_Game_Resume_System.md) |
 
 ---
@@ -320,5 +374,7 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 
 | Date | Note |
 |------|------|
+| 2026-06 | Runway-based follow-up routing (`can_run_final_turn_followup`, §6b); repeat Final Turn SFX suppress |
+| 2026-06 | FT last-shot routing no longer starts chain (`late_clock_ft_resolution`); first Final Shot preserved after FT/OREB paths |
 | 2026-06 | Post-DREB FLSS when chain active and clock > 2s; terminal DREB at ≤ 2s |
 | 2026-06 | Initial EOQ_System.md; OREB chain gate fix documented; trace role `EOQ_CHAIN` vs `FINAL_SHOT` |

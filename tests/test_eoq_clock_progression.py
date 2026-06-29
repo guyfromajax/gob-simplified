@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from BackEnd.utils.eoq_clock_progression import (
     activate_late_clock_eoq_chain,
+    apply_eoq_final_free_throw_routing,
     apply_post_make_late_clock_routing,
     apply_post_miss_rebound_routing,
     clear_late_clock_eoq_chain,
@@ -191,7 +192,53 @@ def test_post_make_tags_only_inside_active_chain():
 def test_late_clock_bip_runoff():
     assert resolve_late_clock_bip_runoff({"late_clock_eoq": True}, 17) == 2
     assert resolve_late_clock_bip_runoff({"late_clock_eoq": True}, 1) == 1
+    assert resolve_late_clock_bip_runoff({"late_clock_ft_resolution": True}, 17) == 2
     assert resolve_late_clock_bip_runoff({}, 17) == 0
+
+
+def test_final_ft_routing_does_not_start_chain_on_make():
+    game = SimpleNamespace(game_state={"time_remaining": 28})
+    result = {"result_type": "FREE_THROW"}
+    apply_eoq_final_free_throw_routing(game, result, makes_shot=True)
+    assert result.get("late_clock_ft_resolution") is True
+    assert "late_clock_eoq" not in result
+    assert is_late_clock_eoq_chain_active(game.game_state) is False
+    assert result["next_play_type"] == "BASELINE_INBOUND"
+    schedule_flss_after_inbound(game, result)
+    assert "flss_possession_pending" not in game.game_state
+
+
+def test_final_ft_routing_does_not_start_chain_on_oreb_miss():
+    game = SimpleNamespace(game_state={"time_remaining": 28, "last_rebound": "OREB"})
+    rebounder = SimpleNamespace(player_id="r1")
+    game.game_state["last_rebounder"] = rebounder
+    result = {"result_type": "FREE_THROW", "rebound_type": "OREB"}
+    apply_eoq_final_free_throw_routing(game, result, makes_shot=False)
+    assert result.get("late_clock_ft_resolution") is True
+    assert is_late_clock_eoq_chain_active(game.game_state) is False
+    assert result["next_play_type"] == "OREB"
+    assert game.game_state["pending_oreb"]["rebounder_id"] == "r1"
+
+
+def test_final_ft_dreb_terminal_only_when_chain_active():
+    rebounder = SimpleNamespace(player_id="r1")
+    game = SimpleNamespace(
+        game_state={
+            "time_remaining": 2,
+            "last_rebound": "DREB",
+            "last_rebounder": rebounder,
+        }
+    )
+    result = {"result_type": "FREE_THROW", "rebound_type": "DREB"}
+    apply_eoq_final_free_throw_routing(game, result, makes_shot=False)
+    assert result["next_play_type"] == "DREB"
+    assert "terminal_dreb_eoq" not in result
+    assert "flss_after_dreb" not in result
+
+    activate_late_clock_eoq_chain(game.game_state)
+    result2 = {"result_type": "FREE_THROW", "rebound_type": "DREB"}
+    apply_eoq_final_free_throw_routing(game, result2, makes_shot=False)
+    assert result2["terminal_dreb_eoq"] is True
 
 
 def test_finalize_flss_burns_last_second_on_make():

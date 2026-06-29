@@ -196,7 +196,9 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
       (turn.final_turn || turn.flss || turn.final_shot_possession)
       && turn.result_type !== 'FINAL_HOLD';
     if (isTerminalFinalShotAttempt) {
-      announceGameEvent('FINAL_SHOT', turn, scene);
+      announceGameEvent('FINAL_SHOT', turn, scene, {
+        suppressCourtSfx: turn.suppress_final_shot_sfx === true,
+      });
     }
 
     turn._contextAnnouncementsShown = true;

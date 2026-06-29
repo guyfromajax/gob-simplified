@@ -49,6 +49,11 @@ def mark_late_clock_eoq_turn(result: Dict[str, Any]) -> None:
     result["late_clock_eoq"] = True
 
 
+def mark_late_clock_ft_resolution(result: Dict[str, Any]) -> None:
+    """Tag last-FT resolution at <=30s without starting the EOQ chain."""
+    result["late_clock_ft_resolution"] = True
+
+
 def infer_eoq_trace_role(result: Dict[str, Any]) -> str:
     """Map a turn result to an EOQ trace role (avoid labeling normal HCO as FINAL_SHOT)."""
     if result.get("eoq_trace_role"):
@@ -89,6 +94,8 @@ def clear_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
     game_state.pop("flss_from_dreb", None)
     game_state.pop("_flss_after_dreb_rebounder_id", None)
     game_state.pop("final_shot_possession_active", None)
+    game_state.pop("final_shot_ran_this_chain", None)
+    game_state.pop("suppress_final_shot_sfx", None)
     game_state.pop("eoq_trace_seq", None)
     game_state.pop("eoq_trace_turn_in_seq", None)
 
@@ -222,8 +229,11 @@ def apply_eoq_final_free_throw_routing(
     if not is_late_clock_eoq(time_remaining):
         return
 
-    activate_late_clock_eoq_chain(gs)
-    mark_late_clock_eoq_turn(result)
+    # Do not start the EOQ chain here — the first HCO/HCT/FCP entry at <=30s should
+    # still arm full Final Shot. Chain follow-ups (FLSS, terminal DREB) require an
+    # active chain from Final Shot or FLSS.
+    mark_late_clock_ft_resolution(result)
+    chain_active = is_late_clock_eoq_chain_active(gs)
 
     if makes_shot:
         result["next_play_type"] = "BASELINE_INBOUND"
@@ -244,14 +254,15 @@ def apply_eoq_final_free_throw_routing(
     elif rebound_type == "DREB":
         result["next_play_type"] = "DREB"
         result["next_turn"] = "DREB"
-        if should_route_post_dreb_flss(time_remaining):
-            result["flss_after_dreb"] = True
-            rebounder = gs.get("last_rebounder")
-            rebounder_id = getattr(rebounder, "player_id", None) if rebounder is not None else None
-            if rebounder_id is not None:
-                gs["_flss_after_dreb_rebounder_id"] = rebounder_id
-        else:
-            result["terminal_dreb_eoq"] = True
+        if chain_active:
+            if should_route_post_dreb_flss(time_remaining):
+                result["flss_after_dreb"] = True
+                rebounder = gs.get("last_rebounder")
+                rebounder_id = getattr(rebounder, "player_id", None) if rebounder is not None else None
+                if rebounder_id is not None:
+                    gs["_flss_after_dreb_rebounder_id"] = rebounder_id
+            else:
+                result["terminal_dreb_eoq"] = True
 
 
 def schedule_flss_after_dreb(
@@ -328,7 +339,7 @@ def resolve_late_clock_bip_runoff(last_turn: dict | None, time_remaining: int) -
     """Game-clock seconds to burn on BIP after a late-clock EOQ-chain make."""
     if not isinstance(last_turn, dict):
         return 0
-    if not last_turn.get("late_clock_eoq"):
+    if not last_turn.get("late_clock_eoq") and not last_turn.get("late_clock_ft_resolution"):
         return 0
     if time_remaining <= 0:
         return 0

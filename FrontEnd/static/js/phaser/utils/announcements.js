@@ -405,7 +405,9 @@ export function showSecondaryAnnouncement(text, team = 'home', playerData = null
       ? rawMetaSfx
       : resolveAnnounceMetaCourtSfxFile(rawMetaSfx);
   }
-  if (!sfxFile) {
+  if (meta?.suppressCourtSfx) {
+    sfxFile = null;
+  } else if (!sfxFile) {
     const quarter = meta?.quarter ?? scene?.quarter ?? scene?.simData?.quarter ?? null;
     sfxFile = resolveSecondaryAnnounceCourtSfxFile(text, { quarter });
   }

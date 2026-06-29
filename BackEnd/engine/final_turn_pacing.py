@@ -365,6 +365,103 @@ def _estimate_pre_anchor_move_seconds(
     return total
 
 
+def _build_preflight_final_turn_skeleton(
+    *,
+    bh_pos: str,
+    shooter_pos: str,
+    shot_type: str,
+    bh_is_shooter: bool,
+    position_to_spot: Dict[str, str],
+) -> Dict[str, Any]:
+    """Minimal Final Turn skeleton for EOQ follow-up runway checks."""
+    from BackEnd.constants import ACTIONS
+
+    step0: Dict[str, Any] = {"timestamp": 0, "pos_actions": {}}
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        spot = position_to_spot.get(pos, "key")
+        step0["pos_actions"][pos] = {
+            "action": ACTIONS["HANDLE"] if pos == bh_pos else "stand",
+            "location": spot,
+        }
+    shot_wing = "upper wing"
+    step1: Dict[str, Any] = {"timestamp": 300, "pos_actions": {}}
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        if bh_is_shooter and pos == bh_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shot_wing}
+        elif not bh_is_shooter and pos == bh_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "deep key"}
+        elif pos == shooter_pos:
+            step1["pos_actions"][pos] = {"action": ACTIONS["RECEIVE"], "location": shot_wing}
+        else:
+            step1["pos_actions"][pos] = {
+                "action": "stand",
+                "location": position_to_spot.get(pos, "key"),
+            }
+    if str(shot_type).lower() == "attack":
+        step2: Dict[str, Any] = {
+            "timestamp": 600,
+            "pos_actions": {
+                shooter_pos: {"action": ACTIONS["DRIVE"], "location": "basketSpot"},
+            },
+        }
+        step3: Dict[str, Any] = {
+            "timestamp": 900,
+            "pos_actions": {
+                shooter_pos: {"action": ACTIONS["SHOOT"], "location": "basketSpot"},
+            },
+        }
+        return {"steps": [step0, step1, step2, step3]}
+    step2 = {
+        "timestamp": 600,
+        "pos_actions": {
+            shooter_pos: {"action": ACTIONS["SHOOT"], "location": shot_wing},
+        },
+    }
+    return {"steps": [step0, step1, step2]}
+
+
+def can_run_final_turn_followup(
+    game: Any,
+    *,
+    o_destinations: Dict[str, Dict[str, float]],
+    position_to_spot: Dict[str, str],
+    bh_pos: str,
+    prior_turn: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """True when any reasonable Final Turn choreography fits the remaining clock."""
+    scenarios = (
+        ("Attack", 4.0, False),
+        ("Outside", 3.0, False),
+        ("Attack", 4.0, True),
+        ("Outside", 3.0, True),
+    )
+    alt_shooter = next((p for p in ("SF", "SG", "PF", "PG") if p != bh_pos), "SF")
+    for shot_type, anchor, bh_is_shooter in scenarios:
+        shooter_pos = bh_pos if bh_is_shooter else alt_shooter
+        skeleton = _build_preflight_final_turn_skeleton(
+            bh_pos=bh_pos,
+            shooter_pos=shooter_pos,
+            shot_type=shot_type,
+            bh_is_shooter=bh_is_shooter,
+            position_to_spot=position_to_spot,
+        )
+        pacing = evaluate_final_turn_pacing(
+            game,
+            skeleton=skeleton,
+            o_destinations=o_destinations,
+            position_to_spot=position_to_spot,
+            bh_pos=bh_pos,
+            shooter_pos=shooter_pos,
+            shot_type=shot_type,
+            bh_is_shooter=bh_is_shooter,
+            prior_turn=prior_turn,
+            anchor_clock=anchor,
+        )
+        if pacing.can_meet_anchor:
+            return True
+    return False
+
+
 def evaluate_final_turn_pacing(
     game: Any,
     *,
@@ -376,11 +473,12 @@ def evaluate_final_turn_pacing(
     shot_type: str,
     bh_is_shooter: bool,
     prior_turn: Optional[Dict[str, Any]] = None,
+    anchor_clock: Optional[float] = None,
 ) -> FinalTurnPacingPlan:
     """Return whether standard Final Shot choreography can hit the anchor clock."""
     skeleton_steps = skeleton.get("steps") or []
     time_remaining = float((getattr(game, "game_state", None) or {}).get("time_remaining") or 0)
-    anchor = roll_anchor_clock(shot_type)
+    anchor = float(anchor_clock) if anchor_clock is not None else roll_anchor_clock(shot_type)
     off_lineup = game.offense_team.lineup
     is_away_offense = game.offense_team.team_id == game.away_team.team_id
     alignment_by_id = _alignment_coords_by_player_id(o_destinations, off_lineup)

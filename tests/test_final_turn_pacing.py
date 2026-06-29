@@ -170,3 +170,51 @@ def test_final_ball_handler_id_prefers_stealer_on_steal_turn():
         ],
     }
     assert build_final_ball_handler_id(turn) == "def_sg"
+
+
+def test_can_run_final_turn_followup_with_runway():
+    from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup
+
+    prior = {
+        "final_coords": {
+            f"home_{pos}": {"x": 64.0, "y": 25.0}
+            for pos in POSITIONS
+        },
+        "final_ball_handler_id": "home_PG",
+    }
+    game = _game(time_remaining=18, prior_turn=prior)
+    o_dest = {pos: {"x": 64.0, "y": 25.0} for pos in POSITIONS}
+    position_to_spot = {pos: "key" for pos in POSITIONS}
+    position_to_spot["PG"] = "deep upper wing"
+    position_to_spot["SG"] = "deep lower wing"
+    assert can_run_final_turn_followup(
+        game,
+        o_destinations=o_dest,
+        position_to_spot=position_to_spot,
+        bh_pos="PG",
+        prior_turn=prior,
+    ) is True
+
+
+def test_can_run_final_turn_followup_without_runway():
+    from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup
+
+    prior = {
+        "final_coords": {
+            "home_PG": {"x": 10.0, "y": 25.0},
+            **{f"home_{pos}": {"x": 12.0, "y": 25.0} for pos in POSITIONS if pos != "PG"},
+        },
+        "final_ball_handler_id": "home_PG",
+    }
+    game = _game(time_remaining=3, prior_turn=prior)
+    o_dest = {pos: {"x": 64.0, "y": 25.0} for pos in POSITIONS}
+    position_to_spot = {pos: "key" for pos in POSITIONS}
+    position_to_spot["PG"] = "deep upper wing"
+    position_to_spot["SG"] = "deep lower wing"
+    assert can_run_final_turn_followup(
+        game,
+        o_destinations=o_dest,
+        position_to_spot=position_to_spot,
+        bh_pos="PG",
+        prior_turn=prior,
+    ) is False

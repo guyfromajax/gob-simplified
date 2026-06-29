@@ -1386,6 +1386,40 @@ class TurnManager:
                     extra={"flags_set": True},
                 )
 
+        elif (
+            game_state.get("final_shot_ran_this_chain")
+            and time_remaining_sec is not None
+            and int(time_remaining_sec) <= 30
+            and state != "FAST_BREAK"
+            and state in ("HCO", "HCT", "FCP")
+        ):
+            # After the first EOQ terminal shot, pick full Final Turn vs FLSS by runway.
+            if self._eoq_followup_can_run_final_turn():
+                game_state.pop("flss_possession_pending", None)
+                game_state["final_turn_shot_this_turn"] = True
+                game_state["final_shot_possession_active"] = True
+                game_state["suppress_final_shot_sfx"] = True
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "EOQ_FOLLOWUP_FINAL_TURN",
+                    extra={
+                        "time_remaining_sec": time_remaining_sec,
+                        "offensive_state": state,
+                    },
+                )
+            elif not game_state.get("flss_possession_pending"):
+                game_state["flss_possession_pending"] = True
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "EOQ_FOLLOWUP_FLSS",
+                    extra={
+                        "time_remaining_sec": time_remaining_sec,
+                        "offensive_state": state,
+                    },
+                )
+
         # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
         from BackEnd.engine.phase_resolution import (
             resolve_non_shooting_foul,
@@ -1799,6 +1833,11 @@ class TurnManager:
 
             ensure_quarter_end_clock_drain(self.game, result)
             self.update_clock_and_possession(result)
+            if result.get("final_turn") or (
+                result.get("flss") and result.get("final_shot_possession")
+            ):
+                game_state["final_shot_ran_this_chain"] = True
+
             if (
                 result.get("final_turn")
                 or result.get("flss")
@@ -3550,10 +3589,26 @@ class TurnManager:
                 "build_skeleton_animation_steps (HCO) failed: %s", e
             )
 
+    def _eoq_followup_can_run_final_turn(self) -> bool:
+        from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup
+
+        prior_turns = getattr(self.game, "turns", None) or []
+        prior_turn = prior_turns[-1] if prior_turns else None
+        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        return can_run_final_turn_followup(
+            self.game,
+            o_destinations=o_dest,
+            position_to_spot=position_to_spot,
+            bh_pos=bh_pos,
+            prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
+        )
+
     def resolve_final_turn_shot(self):
         """Final Turn shot (≤30s): alignment (Phase 2) + shot execution (Phase 3)."""
         from BackEnd.engine.eoq_debug_log import log_eoq_step
         from BackEnd.engine.phase_resolution import resolve_final_turn_shot_logic
+
+        suppress_sfx = bool(self.game.game_state.pop("suppress_final_shot_sfx", False))
 
         log_eoq_step(self.game, "FINAL_SHOT", "alignment_build", "START")
         o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
@@ -3610,6 +3665,8 @@ class TurnManager:
             )
             result["final_shot_possession"] = True
             result["forced_shot_reason"] = result.get("forced_shot_reason") or "FLSS"
+            if suppress_sfx:
+                result["suppress_final_shot_sfx"] = True
             self._emit_hco_animation_steps(result)
             return result
         log_eoq_step(
@@ -3636,6 +3693,8 @@ class TurnManager:
                 "time_elapsed": result.get("time_elapsed"),
             },
         )
+        if suppress_sfx:
+            result["suppress_final_shot_sfx"] = True
         return result
 
     def _build_final_turn_offense_alignment(self):

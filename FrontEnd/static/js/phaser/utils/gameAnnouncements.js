@@ -167,6 +167,7 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
     case 'FINAL_SHOT':
       showSecondaryAnnouncement("Final Shot", offenseTeam, null, {
         quarter: turnData?.quarter ?? scene?.quarter ?? scene?.simData?.quarter ?? null,
+        suppressCourtSfx: context?.suppressCourtSfx === true,
       });
       break;
 
