@@ -7,7 +7,7 @@ function playSound(filename) {
 }
 
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
-const ALPHA_DISCLAIMER_VERSION = '2026-06-29-hco-aggression-alpha-box';
+const ALPHA_DISCLAIMER_VERSION = '2026-06-29-mid-game-autosave-alpha-box';
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
@@ -48,6 +48,7 @@ const A1_CONFERENCE_TEAMS = [
 
 let currentFranchise = null;
 let currentActiveGameResume = null;
+let currentCpuSimResume = null;
 let currentLeaderboardData = null;
 let currentLeaderboardView = 'geek_points';
 
@@ -726,6 +727,7 @@ function wireAlphaBanner() {
 
 function renderFranchiseEmptyState() {
   currentActiveGameResume = null;
+  currentCpuSimResume = null;
   if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
   if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
   if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'none';
@@ -734,6 +736,25 @@ function renderFranchiseEmptyState() {
 function formatResumePeriod(resume) {
   const q = Number(resume && resume.quarter) || 1;
   return q <= 4 ? 'Q' + q : 'OT' + (q - 4);
+}
+
+function cpuSimNeedsResume(cpuSimResume) {
+  return !!(
+    cpuSimResume &&
+    cpuSimResume.phase_b_required &&
+    cpuSimResume.can_resume_phase_b
+  );
+}
+
+function formatCpuSimProgress(cpuSimResume) {
+  const completed = Number(cpuSimResume && cpuSimResume.completed_matchups) || 0;
+  const expected = Number(cpuSimResume && cpuSimResume.expected_matchups) || 0;
+  const failed = Number(cpuSimResume && cpuSimResume.failed_matchups) || 0;
+  const week = Number(cpuSimResume && cpuSimResume.week) || Number(currentFranchise && currentFranchise.week) || 1;
+  const base = expected > 0
+    ? `Week ${week} · ${completed}/${expected} computer games complete`
+    : `Week ${week} · Computer games need to finish`;
+  return failed > 0 ? `${base} · ${failed} retrying` : base;
 }
 
 function buildActiveGameCourtUrl(resume) {
@@ -788,9 +809,11 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
   renderCareerSummary(commandCenterData);
   currentActiveGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
+  currentCpuSimResume = commandCenterData && cpuSimNeedsResume(commandCenterData.cpu_sim_resume) ? commandCenterData.cpu_sim_resume : null;
   console.warn('[MODE-RESUME-CLIENT] render franchise card', {
     has_command_center_data: !!commandCenterData,
     has_active_game_resume: !!currentActiveGameResume,
+    has_cpu_sim_resume: !!currentCpuSimResume,
     game_id: currentActiveGameResume && currentActiveGameResume.game_id,
     status: currentActiveGameResume && currentActiveGameResume.status,
     quarter: currentActiveGameResume && currentActiveGameResume.quarter,
@@ -799,7 +822,10 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
     home_score: currentActiveGameResume && currentActiveGameResume.home_score,
   });
   if (currentActiveGameResume && franchiseResumeCard) {
+    franchiseResumeCard.classList.remove('franchise-resume-card-cpu');
     franchiseResumeCard.hidden = false;
+    const kicker = franchiseResumeCard.querySelector('.franchise-resume-kicker');
+    if (kicker) kicker.textContent = 'Game In Progress';
     if (franchiseResumeMatchup) {
       franchiseResumeMatchup.textContent = (currentActiveGameResume.away_team_name || 'Away') + ' at ' + (currentActiveGameResume.home_team_name || 'Home');
     }
@@ -810,7 +836,25 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
       franchiseResumeScore.textContent = String(currentActiveGameResume.away_score ?? 0) + ' - ' + String(currentActiveGameResume.home_score ?? 0);
     }
     if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Resume Game →';
+  } else if (currentCpuSimResume && franchiseResumeCard) {
+    franchiseResumeCard.classList.add('franchise-resume-card-cpu');
+    franchiseResumeCard.hidden = false;
+    const kicker = franchiseResumeCard.querySelector('.franchise-resume-kicker');
+    if (kicker) kicker.textContent = 'Finishing Week';
+    if (franchiseResumeMatchup) {
+      franchiseResumeMatchup.textContent = 'Finishing Computer Games';
+    }
+    if (franchiseResumeDetail) {
+      franchiseResumeDetail.textContent = formatCpuSimProgress(currentCpuSimResume);
+    }
+    if (franchiseResumeScore) {
+      const completed = Number(currentCpuSimResume.completed_matchups) || 0;
+      const expected = Number(currentCpuSimResume.expected_matchups) || 0;
+      franchiseResumeScore.textContent = expected > 0 ? `${completed}/${expected}` : '...';
+    }
+    if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Finish Week →';
   } else {
+    if (franchiseResumeCard) franchiseResumeCard.classList.remove('franchise-resume-card-cpu');
     if (franchiseResumeCard) franchiseResumeCard.hidden = true;
     if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Enter Franchise →';
   }
@@ -830,6 +874,18 @@ function goToFranchiseCommandCenter() {
         url: resumeUrl,
       });
       window.location.href = resumeUrl;
+      return;
+    }
+    if (currentCpuSimResume) {
+      const params = new URLSearchParams();
+      params.set('franchise_id', currentFranchise.franchise_id);
+      params.set('finish_cpu_sims', '1');
+      if (currentCpuSimResume.week) params.set('week', String(currentCpuSimResume.week));
+      console.warn('[MODE-RESUME-CLIENT] route cpu sim recovery', {
+        franchise_id: currentFranchise.franchise_id,
+        week: currentCpuSimResume.week,
+      });
+      window.location.href = './franchise-command-center.html?' + params.toString();
       return;
     }
     console.warn('[MODE-RESUME-CLIENT] route fcc', {

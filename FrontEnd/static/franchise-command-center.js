@@ -15,6 +15,61 @@ async function fetchJSON(url) {
   }
 }
 
+function fccCpuSimNeedsRecovery(data) {
+  const resume = data && data.cpu_sim_resume;
+  return !!(resume && resume.phase_b_required && resume.can_resume_phase_b);
+}
+
+function fccCpuSimProgressCopy(resume) {
+  const week = Number(resume && resume.week) || 1;
+  const completed = Number(resume && resume.completed_matchups) || 0;
+  const expected = Number(resume && resume.expected_matchups) || 0;
+  if (expected > 0) {
+    return `Week ${week} · ${completed}/${expected} computer games complete`;
+  }
+  return `Week ${week} · finishing computer games`;
+}
+
+async function recoverCpuSimsBeforeFccRender(topData) {
+  if (!fccCpuSimNeedsRecovery(topData)) return topData;
+  const resume = topData.cpu_sim_resume || {};
+  const week = Number(resume.week || topData.week || 0);
+  if (!franchiseId || !week) return topData;
+
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+    window.PageLoadOverlay.show({
+      variant: 'pulse',
+      label: 'Simulating Computer Games',
+      title: 'Finishing Week',
+      subtitle: fccCpuSimProgressCopy(resume),
+      teamName: topData.team || '',
+      assetKey: 'banner_primary',
+    });
+  }
+
+  try {
+    const mod = await import('/js/phaser/utils/franchisePhaseBClient.js');
+    const res = await mod.getOrStartFranchisePhaseB({ franchise_id: franchiseId, week });
+    if (!res || !res.ok) {
+      let detail = '';
+      try {
+        detail = res ? await res.text() : '';
+      } catch (_) {}
+      throw new Error(`phase-b failed (${res ? res.status : 'no response'}) ${detail}`);
+    }
+    try {
+      localStorage.removeItem('franchise_complete_week_pending');
+      localStorage.removeItem('franchise_eog_pgpc_snapshot');
+    } catch (_) {}
+    const refreshed = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+    return refreshed || topData;
+  } catch (err) {
+    console.error('[FCC CPU SIM RESUME] Could not finish computer games:', err);
+    alert('Could not finish computer games. Please try again.');
+    return topData;
+  }
+}
+
 let franchiseId = null;
 const userTeamName = localStorage.getItem('franchise_user_team') || '';
 // ✅ SS&S: Store team ObjectId for consistent navigation
@@ -3093,10 +3148,12 @@ async function init() {
     // showing it directly causes a stale-data flash on FCC entry.
   }
   const topDataStartTime = performance.now();
-  const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+  let topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  topData = await recoverCpuSimsBeforeFccRender(topData);
+  if (!topData) return;
   const previousWeek = Number(commandCenterTopDataCache?.week || 0);
   const nextWeek = Number(topData?.week || 0);
   if (previousWeek && nextWeek && previousWeek !== nextWeek) {
@@ -3574,6 +3631,12 @@ function updatePlayButton(data) {
   const regionQualified = !!data.region_qualified;
   const hasEosGameThisWeek = !!data.has_eos_game_this_week;
   
+  if (fccCpuSimNeedsRecovery(data)) {
+    playNowBtn.textContent = 'Finish Computer Games';
+    playNowBtn.dataset.mode = 'finish-cpu-sims';
+    return;
+  }
+
   // Fallback: infer eliminated from bracket when API doesn't return user_eliminated/offer_sim_rest
   let userTeamEliminated = false;
   if (eosTournamentActive && eosTournament && userTeamId && userEliminated == null) {
@@ -3723,6 +3786,17 @@ playNowBtn.addEventListener('click', async () => {
   playSound('confirm-1-lowervol.wav');
   const confirmSfxReady = waitForConfirmSfx();
   const mode = playNowBtn.dataset.mode || 'play';
+
+  if (mode === 'finish-cpu-sims') {
+    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+    const recovered = await recoverCpuSimsBeforeFccRender(topData);
+    if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
+      window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    } else {
+      updatePlayButton(recovered || topData);
+    }
+    return;
+  }
   
   if (mode === 'training') {
     const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);

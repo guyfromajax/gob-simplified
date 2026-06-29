@@ -158,6 +158,17 @@ class FcpOffballAttackState:
             if pos in self._dest:
                 off_targets[pos] = dict(self._dest[pos])
 
+    def kick_press_break_on_pass(
+        self,
+        receiver_xy: Dict[str, Any],
+        off_coords: Dict[str, Dict[str, int]],
+        receiver_pos: str,
+        off_targets: Dict[str, Dict[str, int]],
+    ) -> None:
+        """Re-route off-ball sprint targets from the new ball handler on pass receipt."""
+        self.refresh_incremental(receiver_xy, off_coords, receiver_pos, force=True)
+        self.sync_off_targets(off_targets, receiver_pos)
+
     def enter_aba_mode(
         self,
         off_coords: Dict[str, Dict[str, int]],

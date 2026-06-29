@@ -69,3 +69,16 @@ def test_c_respects_bh_vertical_half():
 def test_deep_key_anchor_backcourt_side():
     pt = _random_near_deep_key(is_away_offense=False)
     assert pt["x"] < 50
+
+
+def test_kick_press_break_on_pass_routes_from_receiver():
+    state = FcpOffballAttackState(is_away_offense=False)
+    off_targets = {pos: dict(OFF[pos]) for pos in OFF}
+    receiver_pos = "PF"
+    state.kick_press_break_on_pass(
+        OFF[receiver_pos], OFF, receiver_pos, off_targets
+    )
+    assert state._incremental_active
+    sg_dest = off_targets["SG"]
+    assert FCP_BACKCOURT_X_MIN <= sg_dest["x"] <= FCP_BACKCOURT_X_MAX
+    assert off_targets[receiver_pos] == OFF[receiver_pos]

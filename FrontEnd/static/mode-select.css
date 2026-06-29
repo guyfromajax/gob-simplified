@@ -733,6 +733,11 @@ body.mode-select-page .franchise-resume-card {
   backdrop-filter: blur(4px);
 }
 
+body.mode-select-page .franchise-resume-card.franchise-resume-card-cpu {
+  border-color: rgba(52, 236, 39, 0.42);
+  background: rgba(8, 18, 16, 0.88);
+}
+
 body.mode-select-page .franchise-resume-card[hidden] {
   display: none !important;
 }

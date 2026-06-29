@@ -818,6 +818,7 @@ def build_dynamic_hct_animation_steps(
                 if did and did in end_coords
             }
             if passer_id and receiver_id and passer_id in prev_end_coords and receiver_id in prev_end_coords:
+                pass_cont_archetype = "sprint" if is_fcp else "standard"
                 step = build_pass_step(
                     off_lineup=off_lineup,
                     def_lineup=def_lineup,
@@ -825,7 +826,7 @@ def build_dynamic_hct_animation_steps(
                     passer_id=passer_id,
                     receiver_id=receiver_id,
                     continuing_targets=continuing_targets,
-                    continuing_archetype="standard",
+                    continuing_archetype=pass_cont_archetype,
                     clock_remaining_at_start=prev_clock_end["clock_remaining"],
                     shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
                     next_step_index=next_index,

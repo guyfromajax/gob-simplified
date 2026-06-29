@@ -370,6 +370,11 @@ def test_start_cpu_sims_partial_persists_without_advancing_week():
     assert len(rows) == 1
     cd = _week_result_for_pair(rows, ids[2], ids[3])
     assert int(cd["away_score"]) == 54 and int(cd["home_score"]) == 58
+    job = doc.get("cpu_sim_jobs", {}).get("1") or {}
+    assert job.get("status") == "complete"
+    assert job.get("expected_matchups") == 1
+    assert job.get("completed_matchups") == 1
+    assert job.get("matchups")
     db.games.delete_many({})
     db.teams.delete_many({})
     db.franchises.delete_many({})
@@ -455,6 +460,10 @@ def test_phase_a_then_phase_b_then_second_phase_b_is_idempotent():
     doc_mid = db.franchises.find_one({"_id": ObjectId(franchise_id)})
     assert doc_mid.get("week") == 1
     assert doc_mid.get("post_game_status", {}).get("phase_a_user_week") == 1
+    summary_mid = franchise_routes._cpu_sim_job_public_summary(doc_mid, 1)
+    assert summary_mid["phase_a_complete"] is True
+    assert summary_mid["phase_b_required"] is True
+    assert summary_mid["can_resume_phase_b"] is True
 
     with patch.object(
         franchise_routes,
@@ -470,6 +479,11 @@ def test_phase_a_then_phase_b_then_second_phase_b_is_idempotent():
     doc_done = db.franchises.find_one({"_id": ObjectId(franchise_id)})
     assert doc_done["week"] == 2
     assert len(doc_done.get("results", {}).get("1") or []) == 2
+    job_done = doc_done.get("cpu_sim_jobs", {}).get("1") or {}
+    assert job_done.get("status") == "finalized"
+    summary_done = franchise_routes._cpu_sim_job_public_summary(doc_done, 1)
+    assert summary_done["phase_b_required"] is False
+    assert summary_done["status"] == "finalized"
 
     rb2 = client.post(
         "/franchise/complete-week/phase-b",
@@ -479,6 +493,78 @@ def test_phase_a_then_phase_b_then_second_phase_b_is_idempotent():
     assert rb2.json().get("idempotent") is True
     assert rb2.json().get("results") == []
 
+    db.games.delete_many({})
+    db.teams.delete_many({})
+    db.franchises.delete_many({})
+
+
+def test_cpu_sim_public_summary_phase_b_incomplete_and_finalized():
+    """cpu_sim_resume is exposed only while phase B still has durable work to finish."""
+    franchise_id, ids = setup_franchise()
+    doc = db.franchises.find_one({"_id": ObjectId(franchise_id)})
+    doc["post_game_status"] = {"phase_a_user_week": 1}
+    doc["cpu_sim_jobs"] = {
+        "1": {
+            "week": 1,
+            "status": "partial",
+            "matchups": {
+                "cpu": {
+                    "away_id": str(ids[2]),
+                    "home_id": str(ids[3]),
+                    "status": "pending",
+                }
+            },
+        }
+    }
+    summary = franchise_routes._cpu_sim_job_public_summary(doc, 1)
+    assert summary["phase_a_complete"] is True
+    assert summary["phase_b_required"] is True
+    assert summary["can_resume_phase_b"] is True
+    assert summary["expected_matchups"] == 1
+    assert summary["completed_matchups"] == 0
+
+    doc["cpu_sim_jobs"]["1"]["status"] = "finalized"
+    finalized = franchise_routes._cpu_sim_job_public_summary(doc, 1)
+    assert finalized["status"] == "finalized"
+    assert finalized["phase_b_required"] is False
+    db.games.delete_many({})
+    db.teams.delete_many({})
+    db.franchises.delete_many({})
+
+
+def test_cpu_sim_stale_running_matchup_is_reclaimed():
+    """A stale running CPU matchup becomes pending so phase B can retry it."""
+    franchise_id, ids = setup_franchise()
+    franchise_doc = db.franchises.find_one({"_id": ObjectId(franchise_id)})
+    stale_key = franchise_routes._cpu_sim_matchup_key(ids[2], ids[3])
+    franchise_doc["cpu_sim_jobs"] = {
+        "1": {
+            "week": 1,
+            "status": "running",
+            "phase": "start_cpu_sims",
+            "matchups": {
+                stale_key: {
+                    "away_id": str(ids[2]),
+                    "home_id": str(ids[3]),
+                    "status": "running",
+                    "updated_at": "2000-01-01T00:00:00Z",
+                    "attempts": 1,
+                }
+            },
+        }
+    }
+    job = franchise_routes._build_cpu_sim_job(
+        franchise_doc,
+        1,
+        franchise_doc["schedule"][0],
+        ids[0],
+        ids[1],
+        [],
+        phase="phase_b",
+    )
+    row = job["matchups"][stale_key]
+    assert row["status"] == "pending"
+    assert row.get("stale_reclaimed_at")
     db.games.delete_many({})
     db.teams.delete_many({})
     db.franchises.delete_many({})

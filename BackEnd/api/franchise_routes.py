@@ -113,6 +113,7 @@ RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
 RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
 POSTSEASON_TRAINING_DISABLED_WEEKS = range(27, 35)
 POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS = range(27, 35)
+CPU_SIM_RUNNING_STALE_SECONDS = 180
 
 
 def _week_in_policy_range(week: Any, policy_weeks: range) -> bool:
@@ -3302,6 +3303,339 @@ def _franchise_cpu_full_sim_max_workers() -> int:
         return 4
 
 
+def _utc_now_iso() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def _cpu_sim_matchup_key(away_id: Any, home_id: Any) -> str:
+    """Stable unordered CPU-sim matchup key used only for orchestration state."""
+    return "|".join(sorted([str(away_id), str(home_id)]))
+
+
+def _cpu_sim_user_matchup_key(team1_id: Any, team2_id: Any) -> str:
+    if team1_id is None or team2_id is None:
+        return ""
+    return _cpu_sim_matchup_key(team1_id, team2_id)
+
+
+def _cpu_sim_job_path(week: int) -> str:
+    return f"cpu_sim_jobs.{str(week)}"
+
+
+def _cpu_sim_completed_matchup_from_result(row: dict) -> dict[str, Any] | None:
+    if not isinstance(row, dict):
+        return None
+    away_id = row.get("away_id")
+    home_id = row.get("home_id")
+    if away_id is None or home_id is None:
+        return None
+    return {
+        "away_id": str(away_id),
+        "home_id": str(home_id),
+        "away_score": row.get("away_score"),
+        "home_score": row.get("home_score"),
+        "status": "complete",
+        "updated_at": _utc_now_iso(),
+    }
+
+
+def _cpu_sim_status_priority(status: Any) -> int:
+    return {
+        "pending": 0,
+        "running": 1,
+        "failed": 2,
+        "complete": 3,
+    }.get(str(status or ""), 0)
+
+
+def _cpu_sim_is_stale_running(row: dict, *, now_ts: float | None = None) -> bool:
+    if not isinstance(row, dict) or row.get("status") != "running":
+        return False
+    raw = row.get("updated_at") or row.get("started_at")
+    if not raw:
+        return True
+    try:
+        clean = str(raw).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean)
+        if dt.tzinfo is not None:
+            started = dt.timestamp()
+        else:
+            started = dt.replace(tzinfo=None).timestamp()
+    except Exception:
+        return True
+    now = now_ts if now_ts is not None else datetime.utcnow().timestamp()
+    return (now - started) > CPU_SIM_RUNNING_STALE_SECONDS
+
+
+def _merge_cpu_sim_matchup_state(existing: dict | None, incoming: dict | None) -> dict:
+    existing = dict(existing or {})
+    incoming = dict(incoming or {})
+    if not existing:
+        return incoming
+    if not incoming:
+        return existing
+
+    if _cpu_sim_status_priority(existing.get("status")) > _cpu_sim_status_priority(incoming.get("status")):
+        merged = {**incoming, **existing}
+    else:
+        merged = {**existing, **incoming}
+    if existing.get("status") == "complete" or incoming.get("status") == "complete":
+        merged["status"] = "complete"
+        for src in (existing, incoming):
+            for key in ("game_id", "away_score", "home_score", "completed_at"):
+                if src.get(key) is not None:
+                    merged[key] = src.get(key)
+    return merged
+
+
+def _compute_cpu_sim_job_rollup(job: dict) -> dict:
+    matchups = job.get("matchups") if isinstance(job.get("matchups"), dict) else {}
+    expected = len(matchups)
+    complete = 0
+    failed = 0
+    running = 0
+    pending = 0
+    for row in matchups.values():
+        status = row.get("status") if isinstance(row, dict) else None
+        if status == "complete":
+            complete += 1
+        elif status == "failed":
+            failed += 1
+        elif status == "running":
+            running += 1
+        else:
+            pending += 1
+    job["expected_matchups"] = expected
+    job["completed_matchups"] = complete
+    job["failed_matchups"] = failed
+    job["running_matchups"] = running
+    job["pending_matchups"] = pending
+    if job.get("status") == "finalized":
+        job["updated_at"] = job.get("updated_at") or _utc_now_iso()
+        return job
+    if expected and complete >= expected:
+        job["status"] = "complete"
+        job.setdefault("completed_at", _utc_now_iso())
+    elif failed:
+        job["status"] = "failed"
+    elif running:
+        job["status"] = "running"
+    elif complete:
+        job["status"] = "partial"
+    else:
+        job["status"] = "pending"
+    job["updated_at"] = _utc_now_iso()
+    return job
+
+
+def _build_cpu_sim_job(
+    franchise_doc: dict,
+    week: int,
+    week_games: list,
+    team1_id: Any,
+    team2_id: Any,
+    results: list,
+    *,
+    phase: str,
+) -> dict:
+    wk = str(week)
+    existing_jobs = franchise_doc.get("cpu_sim_jobs") if isinstance(franchise_doc, dict) else {}
+    existing_job = dict((existing_jobs or {}).get(wk) or {})
+    existing_matchups = existing_job.get("matchups") if isinstance(existing_job.get("matchups"), dict) else {}
+    user_key = _cpu_sim_user_matchup_key(team1_id, team2_id)
+    now_iso = _utc_now_iso()
+
+    matchups: dict[str, dict] = {}
+    for idx, pair in enumerate(week_games):
+        if not pair or len(pair) < 2:
+            continue
+        away_id, home_id = pair[0], pair[1]
+        key = _cpu_sim_matchup_key(away_id, home_id)
+        if user_key and key == user_key:
+            continue
+        base = {
+            "away_id": str(away_id),
+            "home_id": str(home_id),
+            "schedule_index": idx,
+            "status": "pending",
+            "attempts": 0,
+            "updated_at": now_iso,
+        }
+        matchups[key] = _merge_cpu_sim_matchup_state(existing_matchups.get(key), base)
+
+    for row in results or []:
+        completed = _cpu_sim_completed_matchup_from_result(row)
+        if not completed:
+            continue
+        key = _cpu_sim_matchup_key(completed["away_id"], completed["home_id"])
+        if key in matchups:
+            completed["completed_at"] = completed.get("completed_at") or now_iso
+            matchups[key] = _merge_cpu_sim_matchup_state(matchups.get(key), completed)
+
+    now_ts = datetime.utcnow().timestamp()
+    for key, row in list(matchups.items()):
+        if _cpu_sim_is_stale_running(row, now_ts=now_ts):
+            retry = dict(row)
+            retry["status"] = "pending"
+            retry["stale_reclaimed_at"] = now_iso
+            retry["updated_at"] = now_iso
+            matchups[key] = retry
+
+    job = {
+        **existing_job,
+        "version": 1,
+        "week": int(week),
+        "phase": phase,
+        "started_at": existing_job.get("started_at") or now_iso,
+        "updated_at": now_iso,
+        "matchups": matchups,
+    }
+    return _compute_cpu_sim_job_rollup(job)
+
+
+def _persist_cpu_sim_job(franchise_id: ObjectId, week: int, local_job: dict) -> dict:
+    """Persist orchestration state without clobbering completed rows from another request."""
+    wk = str(week)
+    fresh = db.franchises.find_one({"_id": franchise_id}, {_cpu_sim_job_path(week): 1}) or {}
+    fresh_jobs = fresh.get("cpu_sim_jobs") if isinstance(fresh.get("cpu_sim_jobs"), dict) else {}
+    fresh_job = dict((fresh_jobs or {}).get(wk) or {})
+    fresh_matchups = fresh_job.get("matchups") if isinstance(fresh_job.get("matchups"), dict) else {}
+    local_matchups = local_job.get("matchups") if isinstance(local_job.get("matchups"), dict) else {}
+    merged_matchups: dict[str, dict] = {}
+    for key in set(fresh_matchups.keys()) | set(local_matchups.keys()):
+        merged_matchups[key] = _merge_cpu_sim_matchup_state(
+            fresh_matchups.get(key),
+            local_matchups.get(key),
+        )
+    merged_job = {**fresh_job, **local_job, "matchups": merged_matchups}
+    merged_job = _compute_cpu_sim_job_rollup(merged_job)
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {_cpu_sim_job_path(week): merged_job}},
+    )
+    return merged_job
+
+
+def _cpu_sim_mark_job_running(job: dict, *, phase: str) -> dict:
+    job = dict(job or {})
+    job["phase"] = phase
+    job["status"] = "running"
+    job["running_started_at"] = _utc_now_iso()
+    job["updated_at"] = _utc_now_iso()
+    return job
+
+
+def _cpu_sim_mark_matchup_running(job: dict, away_id: Any, home_id: Any, *, engine: str) -> dict:
+    key = _cpu_sim_matchup_key(away_id, home_id)
+    matchups = dict(job.get("matchups") or {})
+    row = dict(matchups.get(key) or {})
+    now_iso = _utc_now_iso()
+    row.update({
+        "away_id": str(away_id),
+        "home_id": str(home_id),
+        "simulation_engine": engine,
+        "status": "running",
+        "started_at": row.get("started_at") or now_iso,
+        "updated_at": now_iso,
+        "attempts": int(row.get("attempts") or 0) + 1,
+        "last_error": None,
+    })
+    matchups[key] = row
+    job["matchups"] = matchups
+    return _compute_cpu_sim_job_rollup(job)
+
+
+def _cpu_sim_mark_matchup_complete(
+    job: dict,
+    away_id: Any,
+    home_id: Any,
+    *,
+    engine: str,
+    away_score: Any,
+    home_score: Any,
+    game_id: Any = None,
+) -> dict:
+    key = _cpu_sim_matchup_key(away_id, home_id)
+    matchups = dict(job.get("matchups") or {})
+    row = dict(matchups.get(key) or {})
+    now_iso = _utc_now_iso()
+    row.update({
+        "away_id": str(away_id),
+        "home_id": str(home_id),
+        "simulation_engine": engine,
+        "status": "complete",
+        "away_score": away_score,
+        "home_score": home_score,
+        "game_id": str(game_id) if game_id else row.get("game_id"),
+        "completed_at": now_iso,
+        "updated_at": now_iso,
+        "last_error": None,
+    })
+    matchups[key] = row
+    job["matchups"] = matchups
+    return _compute_cpu_sim_job_rollup(job)
+
+
+def _cpu_sim_mark_matchup_failed(job: dict, away_id: Any, home_id: Any, *, engine: str, error: Any) -> dict:
+    key = _cpu_sim_matchup_key(away_id, home_id)
+    matchups = dict(job.get("matchups") or {})
+    row = dict(matchups.get(key) or {})
+    now_iso = _utc_now_iso()
+    row.update({
+        "away_id": str(away_id),
+        "home_id": str(home_id),
+        "simulation_engine": engine,
+        "status": "failed",
+        "updated_at": now_iso,
+        "last_error": str(error),
+    })
+    matchups[key] = row
+    job["matchups"] = matchups
+    return _compute_cpu_sim_job_rollup(job)
+
+
+def _cpu_sim_job_public_summary(franchise_doc: dict | None, week: int | None = None) -> dict | None:
+    """Return the durable CPU sim status the frontend needs for recovery UI."""
+    if not isinstance(franchise_doc, dict):
+        return None
+    try:
+        resolved_week = int(week if week is not None else franchise_doc.get("week", 1) or 1)
+    except (TypeError, ValueError):
+        resolved_week = 1
+
+    jobs = franchise_doc.get("cpu_sim_jobs") if isinstance(franchise_doc.get("cpu_sim_jobs"), dict) else {}
+    raw_job = jobs.get(str(resolved_week)) if isinstance(jobs, dict) else None
+    job = _compute_cpu_sim_job_rollup(raw_job) if isinstance(raw_job, dict) else None
+    post_game_status = franchise_doc.get("post_game_status") or {}
+    try:
+        phase_a_week = int(post_game_status.get("phase_a_user_week") or 0)
+    except (TypeError, ValueError):
+        phase_a_week = 0
+    phase_a_complete = phase_a_week == resolved_week
+    status = str((job or {}).get("status") or "pending")
+    phase_b_required = bool(phase_a_complete and status != "finalized")
+
+    if not job and not phase_b_required:
+        return None
+
+    return {
+        "week": resolved_week,
+        "status": status,
+        "phase": (job or {}).get("phase") or ("phase_b" if phase_b_required else None),
+        "phase_a_complete": phase_a_complete,
+        "phase_b_required": phase_b_required,
+        "can_resume_phase_b": phase_b_required,
+        "expected_matchups": int((job or {}).get("expected_matchups", 0) or 0),
+        "completed_matchups": int((job or {}).get("completed_matchups", 0) or 0),
+        "failed_matchups": int((job or {}).get("failed_matchups", 0) or 0),
+        "updated_at": (job or {}).get("updated_at"),
+        "started_at": (job or {}).get("started_at"),
+        "completed_at": (job or {}).get("completed_at"),
+        "finalized_at": (job or {}).get("finalized_at"),
+        "last_error": (job or {}).get("last_error"),
+    }
+
+
 _FRANCHISE_CPU_FULL_SIM_FTD_PROJECTION = {
     "team_id": 1,
     "team_attributes": 1,
@@ -5110,6 +5444,30 @@ def _complete_week_finish_cpu_and_persist(
 
     # Phase 2: stable matchup keys + dedupe so phase-B retries / merged rows cannot double-count games.
     results = _dedupe_franchise_week_results_by_matchup([dict(r) for r in results])
+    cpu_job_phase = "start_cpu_sims" if persist_cpu_results_only else "phase_b"
+    cpu_job = _build_cpu_sim_job(
+        franchise_doc,
+        week,
+        week_games,
+        team1_id,
+        team2_id,
+        results,
+        phase=cpu_job_phase,
+    )
+    cpu_job = _persist_cpu_sim_job(
+        franchise_id,
+        week,
+        _cpu_sim_mark_job_running(cpu_job, phase=cpu_job_phase),
+    )
+    logger.info(
+        "[CPU-SIM-JOB] running franchise_id=%s week=%s phase=%s complete=%s expected=%s failed=%s",
+        franchise_id_str,
+        week,
+        cpu_job_phase,
+        cpu_job.get("completed_matchups"),
+        cpu_job.get("expected_matchups"),
+        cpu_job.get("failed_matchups"),
+    )
     # Phase 3: deferred full turn-based sims (run in parallel, persist sequentially).
     full_jobs: list[tuple[int, Any, Any, str, str]] = []
 
@@ -5151,6 +5509,15 @@ def _complete_week_finish_cpu_and_persist(
         # — leaving bracket.round2 (etc.) null while results looked complete (week 28 semis stuck).
         existing_result_row = _week_results_row_for_matchup(results, away_id, home_id)
         if existing_result_row:
+            cpu_job = _cpu_sim_mark_matchup_complete(
+                cpu_job,
+                away_id,
+                home_id,
+                engine="existing_result",
+                away_score=existing_result_row.get("away_score"),
+                home_score=existing_result_row.get("home_score"),
+                game_id=existing.get("_id") if existing else None,
+            )
             if (
                 week in ft.EOS_WEEKS
                 and week_games_meta
@@ -5188,12 +5555,22 @@ def _complete_week_finish_cpu_and_persist(
                     )
             continue
         if existing:
-            results.append({
+            existing_row = {
                 "away_id": str(existing["team1_id"]),
                 "home_id": str(existing["team2_id"]),
                 "away_score": existing["team1_score"],
                 "home_score": existing["team2_score"],
-            })
+            }
+            results.append(existing_row)
+            cpu_job = _cpu_sim_mark_matchup_complete(
+                cpu_job,
+                away_id,
+                home_id,
+                engine=str(existing.get("simulation_engine") or "existing_game"),
+                away_score=existing_row["away_score"],
+                home_score=existing_row["home_score"],
+                game_id=existing.get("_id"),
+            )
             if week in ft.EOS_WEEKS and week_games_meta and idx < len(week_games_meta):
                 g_meta = week_games_meta[idx]
                 logger.warning(
@@ -5219,6 +5596,11 @@ def _complete_week_finish_cpu_and_persist(
         if week_games_meta and idx < len(week_games_meta):
             g = week_games_meta[idx]
             if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
+                cpu_job = _persist_cpu_sim_job(
+                    franchise_id,
+                    week,
+                    _cpu_sim_mark_matchup_running(cpu_job, away_id, home_id, engine="distant"),
+                )
                 home_ftd = ftd_by_team_id.get(str(home_id), {})
                 away_ftd = ftd_by_team_id.get(str(away_id), {})
                 home_combined = _distant_sim_team_combined(
@@ -5260,6 +5642,19 @@ def _complete_week_finish_cpu_and_persist(
                     "away_score": sim_res["team1_score"],
                     "home_score": sim_res["team2_score"],
                 })
+                cpu_job = _persist_cpu_sim_job(
+                    franchise_id,
+                    week,
+                    _cpu_sim_mark_matchup_complete(
+                        cpu_job,
+                        away_id,
+                        home_id,
+                        engine="distant",
+                        away_score=sim_res["team1_score"],
+                        home_score=sim_res["team2_score"],
+                        game_id=distant_game_id,
+                    ),
+                )
                 winner_id = home_id if home_score > away_score else away_id
                 ftp.record_tournament_game_result(
                     franchise_doc,
@@ -5297,6 +5692,11 @@ def _complete_week_finish_cpu_and_persist(
         ):
             is_distant = False
         if is_distant:
+            cpu_job = _persist_cpu_sim_job(
+                franchise_id,
+                week,
+                _cpu_sim_mark_matchup_running(cpu_job, away_id, home_id, engine="distant"),
+            )
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             away_ftd = ftd_by_team_id.get(str(away_id), {})
             home_combined = _distant_sim_team_combined(
@@ -5306,6 +5706,7 @@ def _complete_week_finish_cpu_and_persist(
                 away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
             )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
+            _distant_game_id = None
             try:
                 sim_res, _distant_game_id = _persist_distant_franchise_game(
                     franchise_id=franchise_id,
@@ -5340,6 +5741,19 @@ def _complete_week_finish_cpu_and_persist(
                 "away_score": sim_res["team1_score"],
                 "home_score": sim_res["team2_score"],
             })
+            cpu_job = _persist_cpu_sim_job(
+                franchise_id,
+                week,
+                _cpu_sim_mark_matchup_complete(
+                    cpu_job,
+                    away_id,
+                    home_id,
+                    engine="distant",
+                    away_score=sim_res["team1_score"],
+                    home_score=sim_res["team2_score"],
+                    game_id=_distant_game_id,
+                ),
+            )
             winner_id_rs = home_id if home_score > away_score else away_id
             _award_gp_sim(winner_id_rs, None, (away_id, home_id))
             continue
@@ -5378,6 +5792,9 @@ def _complete_week_finish_cpu_and_persist(
             max_workers,
         )
         future_meta = {}
+        for sched_idx, aid, hid, an, hn in full_jobs:
+            cpu_job = _cpu_sim_mark_matchup_running(cpu_job, aid, hid, engine="cpu_full")
+        cpu_job = _persist_cpu_sim_job(franchise_id, week, cpu_job)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for sched_idx, aid, hid, an, hn in full_jobs:
                 fut = executor.submit(
@@ -5473,6 +5890,19 @@ def _complete_week_finish_cpu_and_persist(
                         "home_score": sim_res["team2_score"],
                     }
                 )
+                cpu_job = _persist_cpu_sim_job(
+                    franchise_id,
+                    week,
+                    _cpu_sim_mark_matchup_complete(
+                        cpu_job,
+                        aid,
+                        hid,
+                        engine="cpu_full_fallback",
+                        away_score=sim_res["team1_score"],
+                        home_score=sim_res["team2_score"],
+                        game_id=None,
+                    ),
+                )
                 continue
 
             away_score, home_score, summary = sim_ok[job_idx]
@@ -5540,6 +5970,19 @@ def _complete_week_finish_cpu_and_persist(
                     "home_score": sim_res["team2_score"],
                 }
             )
+            cpu_job = _persist_cpu_sim_job(
+                franchise_id,
+                week,
+                _cpu_sim_mark_matchup_complete(
+                    cpu_job,
+                    aid,
+                    hid,
+                    engine="cpu_full",
+                    away_score=away_score,
+                    home_score=home_score,
+                    game_id=computer_game_id,
+                ),
+            )
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
 
@@ -5584,11 +6027,26 @@ def _complete_week_finish_cpu_and_persist(
             {"_id": franchise_id},
             {"$set": partial_update},
         )
+        cpu_job = _persist_cpu_sim_job(
+            franchise_id,
+            week,
+            _build_cpu_sim_job(
+                {**franchise_doc, "cpu_sim_jobs": {str(week): cpu_job}},
+                week,
+                week_games,
+                team1_id,
+                team2_id,
+                merged_results,
+                phase=cpu_job_phase,
+            ),
+        )
         logger.info(
-            "[START-CPU-SIMS] persisted partial week results franchise_id=%s week=%s row_count=%s",
+            "[START-CPU-SIMS] persisted partial week results franchise_id=%s week=%s row_count=%s cpu_complete=%s/%s",
             franchise_id_str,
             week,
             len(results),
+            cpu_job.get("completed_matchups"),
+            cpu_job.get("expected_matchups"),
         )
         return {
             "status": "ok",
@@ -5596,6 +6054,12 @@ def _complete_week_finish_cpu_and_persist(
             "week": week,
             "results_count": len(results),
             "persist_cpu_results_only": True,
+            "cpu_sim_job": {
+                "status": cpu_job.get("status"),
+                "completed_matchups": cpu_job.get("completed_matchups"),
+                "expected_matchups": cpu_job.get("expected_matchups"),
+                "failed_matchups": cpu_job.get("failed_matchups"),
+            },
         }
 
     finalized = _try_finalize_franchise_week_if_complete(
@@ -5610,6 +6074,7 @@ def _complete_week_finish_cpu_and_persist(
     )
     if finalized is None:
         dedup_n = len(_dedupe_franchise_week_results_by_matchup(results))
+        _persist_cpu_sim_job(franchise_id, week, cpu_job)
         logger.error(
             "[COMPLETE-WEEK] Week %s incomplete after CPU loop franchise_id=%s "
             "(deduped_rows=%s expected_matchups=%s); refusing week advance",
@@ -5625,6 +6090,18 @@ def _complete_week_finish_cpu_and_persist(
                 "franchise week was not advanced."
             ),
         )
+    finalized_job = dict(cpu_job)
+    finalized_job["status"] = "finalized"
+    finalized_job["finalized_at"] = _utc_now_iso()
+    finalized_job["updated_at"] = finalized_job["finalized_at"]
+    finalized_job = _persist_cpu_sim_job(franchise_id, week, finalized_job)
+    if isinstance(finalized, dict):
+        finalized["cpu_sim_job"] = {
+            "status": finalized_job.get("status"),
+            "completed_matchups": finalized_job.get("completed_matchups"),
+            "expected_matchups": finalized_job.get("expected_matchups"),
+            "failed_matchups": finalized_job.get("failed_matchups"),
+        }
     return finalized
 
 @router.post("/franchise/complete-week")
@@ -5978,6 +6455,18 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     )
     results = [dict(r) for r in saved]
 
+    pre_summary = _cpu_sim_job_public_summary(franchise_doc, req.week)
+    if pre_summary:
+        logger.info(
+            "[CPU-SIM-RESUME] phase-b recovery start franchise_id=%s week=%s status=%s completed=%s/%s failed=%s",
+            req.franchise_id,
+            req.week,
+            pre_summary.get("status"),
+            pre_summary.get("completed_matchups"),
+            pre_summary.get("expected_matchups"),
+            pre_summary.get("failed_matchups"),
+        )
+
     out = _complete_week_finish_cpu_and_persist(
         franchise_doc,
         franchise_id,
@@ -5998,6 +6487,17 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     out["idempotent"] = False
     if eos_heal_summary:
         out["eos_heal"] = eos_heal_summary
+    post_summary = out.get("cpu_sim_job")
+    if post_summary:
+        logger.info(
+            "[CPU-SIM-RESUME] phase-b recovery complete franchise_id=%s week=%s status=%s completed=%s/%s failed=%s",
+            req.franchise_id,
+            req.week,
+            post_summary.get("status"),
+            post_summary.get("completed_matchups"),
+            post_summary.get("expected_matchups"),
+            post_summary.get("failed_matchups"),
+        )
     return out
 
 @router.get("/franchise/current")
@@ -6258,6 +6758,19 @@ def command_center_data(
             except Exception as e:
                 logger.debug("active game resume lookup failed: %s", e)
                 response["active_game_resume"] = None
+        response["cpu_sim_resume"] = _cpu_sim_job_public_summary(franchise_doc, week) if franchise_doc else None
+        if response.get("cpu_sim_resume"):
+            _csr = response["cpu_sim_resume"]
+            logger.info(
+                "[CPU-SIM-RESUME] command-center status franchise_id=%s week=%s status=%s phase_b_required=%s completed=%s/%s failed=%s",
+                franchise_id,
+                _csr.get("week"),
+                _csr.get("status"),
+                _csr.get("phase_b_required"),
+                _csr.get("completed_matchups"),
+                _csr.get("expected_matchups"),
+                _csr.get("failed_matchups"),
+            )
         recruiting_results = franchise_doc.get("recruiting_results", {}) if franchise_doc else {}
         current_results_week = week if week is not None and str(week) in (recruiting_results or {}) else None
         response["current_recruiting_results_week"] = current_results_week

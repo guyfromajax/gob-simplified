@@ -193,7 +193,7 @@ Before an FCP pass that **would** be over-and-back (`frontcourt_established` + r
 
 #### Off-ball attack routing (current)
 
-During **`hct_advance`** beats (after attack wins pressure), non-BH offenders route via `fcp_offball_attack.py`. Engagement / converge / hold / pass use **`off_targets`** (SF release included from turn init).
+During **`hct_advance`**, **`hct_hold`**, and **`hct_pass`** beats, non-BH offenders route via `fcp_offball_attack.py` (sprint toward press-break destinations keyed to the live ball handler). **Engagement** and **converge** still use static BIP **`off_targets`** until the first pass or advance activates incremental routing.
 
 **Ball-progress tiers** (BH **x**, home orientation; away mirrored). Half-open partition — PF and C share the same boundary operators:
 

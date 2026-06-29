@@ -799,6 +799,35 @@ Potential future work:
 - Add an explicit abandon/forfeit flow as a separate feature if needed.
 - Consider exact completed-turn resume only if the UX need outweighs the added persistence complexity.
 
+## Related: Franchise CPU Sim Resume
+
+Mid Game Resume owns the user's active game resume path. It does not own computer-game simulation for the rest of the franchise week.
+
+Computer games are covered by the adjacent Franchise CPU Sim Resume work stream:
+
+- project plan: `_documentation_master/projects/franchise_cpu_sim_resume_plan.md`
+- backend entry points:
+  - `POST /franchise/complete-week/start-cpu-sims`
+  - `POST /franchise/complete-week/phase-b`
+  - `_complete_week_finish_cpu_and_persist`
+- durable state:
+  - `franchises.cpu_sim_jobs.{week}`
+
+Contract:
+
+- completed CPU games are retained
+- completed `franchise.results.{week}` rows are retained
+- missing/stale/failed CPU matchups are resumable
+- phase B remains the final authority for week advancement
+- Mid Game Resume can restore the user game independently while CPU sims continue or are resumed later
+
+As of 2026-06-29, backend durable CPU sim job state and frontend recovery surfaces are implemented:
+
+- `GET /franchise/command-center/data` exposes `cpu_sim_resume`.
+- Mode Select shows a “Finishing Computer Games” card only when the user has no active game resume and phase B still needs to finish.
+- FCC is the recovery surface. It keeps the page-load overlay visible, resumes phase B, reloads authoritative command-center data, then renders.
+- If phase B cannot finish, FCC keeps the main CTA pointed at `Finish Computer Games` instead of exposing normal week actions.
+
 
 ## Current SS&S Contract
 

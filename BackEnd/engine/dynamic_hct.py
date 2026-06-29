@@ -2712,7 +2712,11 @@ def compute_dynamic_hct_turn(
         hold_snap_off, hold_snap_def = _snap_loop_coords()
         hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
         _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
-        _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
+        if turn_mode == "fcp" and fcp_offball is not None:
+            fcp_offball.refresh_incremental(bh_xy, off_coords, bh_pos, force=False)
+            _fcp_move_offense(bh_xy, hold_seconds)
+        else:
+            _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
         _append_loop_segment(
             "hct_hold",
             hold_seconds,
@@ -2955,10 +2959,26 @@ def compute_dynamic_hct_turn(
             off_coords[receiver_pos], def_coords, is_away_offense, pass_seconds,
             def_lineup, off_coords, play=play,
         )
-        _move_offense(
-            off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
-            exclude={receiver_pos},
-        )
+        if turn_mode == "fcp" and fcp_offball is not None:
+            # Route teammates up the floor from the *receiver's* progress band
+            # (not stale BIP setup targets). Receiver holds to catch; passer
+            # stays parked until they become off-ball next beat.
+            fcp_offball.kick_press_break_on_pass(
+                off_coords[receiver_pos],
+                off_coords,
+                receiver_pos,
+                off_targets,
+            )
+            _fcp_move_offense(
+                off_coords[receiver_pos],
+                pass_seconds,
+                exclude={receiver_pos},
+            )
+        else:
+            _move_offense(
+                off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
+                exclude={receiver_pos},
+            )
         pass_seg = _pass_segment(
             passer_pos, receiver_pos, off_coords, def_coords, pass_seconds,
             label=f"pass (backcourt outlet {passer_pos}\u2192{receiver_pos})",
@@ -2998,6 +3018,10 @@ def compute_dynamic_hct_turn(
         bh_drive_rate = ag_to_grid_per_game_sec(
             (getattr(ball_handler, "attributes", None) or {}).get("AG", 50)
         )
+        if turn_mode == "fcp" and fcp_offball is not None:
+            fcp_offball.kick_press_break_on_pass(
+                bh_xy, off_coords, bh_pos, off_targets
+            )
         dribble_alive = True
         continue
     else:
