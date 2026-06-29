@@ -2,7 +2,7 @@
 
 > **Canonical scale module:** `BackEnd/constants/shot_threshold_scale.py`  
 > **Frontend mirror:** `FrontEnd/static/js/shared/teamShotThresholdScale.js`  
-> **Current values:** MIN **30**, MAX **230**, MID **130** (span always 200; MID = MIN + 100)
+> **Current values:** MIN **10**, MAX **210**, MID **110** (span always 200; MID = MIN + 100)
 
 ## What this attribute is
 
@@ -49,29 +49,29 @@ made = shot_score >= shot_threshold
 
 **Span rule:** delta between lower and upper is always **200**; MID is always **MIN + 100** (= MAX − 100).
 
-## Wired consumers (current scale: 30–230, MID 130)
+## Wired consumers (current scale: 10–210, MID 110)
 
 When **`MIN`** changes, these values re-derive from `BackEnd/constants/shot_threshold_scale.py` (except items in the manual checklist below).
 
 | Area | Current value | Code / notes |
 |------|---------------|--------------|
-| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **30 – 230** | Init, training, EOG clamp |
-| **Franchise init** | **110 – 120** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — 10–20 below MID |
-| **Single-game init** | **30 – 230** | Full clamp range, uniform random |
+| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **10 – 210** | Init, training, EOG clamp |
+| **Franchise init** | **90 – 100** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — 10–20 below MID |
+| **Single-game init** | **10 – 210** | Full clamp range, uniform random |
 | **Tournament seeds** | See table below | `TOURNAMENT_SEED_ST_RANGES` |
-| **Score balancing** | Trailing **10**, leading **210** | `MIN − 20` / `MAX − 20` |
-| **Rim-runner corner FB** | **210 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
-| **FTE tutorial** | User **30**, computer **130** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
-| **UI pills** | Center **130**, span **30–230** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
+| **Score balancing** | Trailing **−10**, leading **190** | `MIN − 20` / `MAX − 20` |
+| **Rim-runner corner FB** | **190 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
+| **FTE tutorial** | User **10**, computer **110** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
+| **UI pills** | Center **110**, span **10–210** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
 
 **Tournament seed shot_threshold ranges:**
 
 | Seed | Range | Notes |
 |------|-------|-------|
-| 1 | 30 – 130 | Best shooters |
-| 2 – 4 | 30 – 180 | |
-| 5 – 7 | 80 – 230 | |
-| 8 | 130 – 230 | Worst shooters |
+| 1 | 10 – 110 | Best shooters |
+| 2 – 4 | 10 – 160 | |
+| 5 – 7 | 60 – 210 | |
+| 8 | 110 – 210 | Worst shooters |
 
 ## Frontend files (import shared scale — do not hardcode MID)
 

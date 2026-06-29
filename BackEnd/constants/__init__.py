@@ -121,6 +121,10 @@ BLOCK_Y_ROLL_MAX = 4
 # Secondary block attempt roll: z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX); attempt when z <= defense fight
 BLOCK_FIGHT_RANGE_MIN = 0
 BLOCK_FIGHT_RANGE_MAX = 10
+# Third block attempt roll (individual rim protector): z = random.randint(BLOCK_PLAYER_ROLL_MIN,
+# BLOCK_PLAYER_ROLL_MAX); attempt when z <= shot_defender ID + (defense defensive_efficiency × defender height-rating 0-10)
+BLOCK_PLAYER_ROLL_MIN = 1
+BLOCK_PLAYER_ROLL_MAX = 300
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 

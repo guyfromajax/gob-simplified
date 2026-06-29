@@ -24,6 +24,8 @@ from BackEnd.constants import (
     BLOCK_Y_ROLL_MAX,
     BLOCK_FIGHT_RANGE_MIN,
     BLOCK_FIGHT_RANGE_MAX,
+    BLOCK_PLAYER_ROLL_MIN,
+    BLOCK_PLAYER_ROLL_MAX,
     THREE_POINT_SHOT_THRESHOLD_INCREASE,
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
@@ -941,6 +943,16 @@ class ShotManager:
                     z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
                     defense_fight = def_team.team_attributes.get("fight", 0)
                     should_attempt_block_reconciliation = z <= defense_fight
+                if not should_attempt_block_reconciliation:
+                    # Third trigger: the individual shot defender's rim-protection ability —
+                    # ID + (team defensive_efficiency × defender height-rating 0-10) vs a 1-300 roll.
+                    z3 = random.randint(BLOCK_PLAYER_ROLL_MIN, BLOCK_PLAYER_ROLL_MAX)
+                    def_eff = def_team.team_attributes.get("defensive_efficiency", 0) or 0
+                    def_height_val = height_to_block_score(
+                        getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                    )
+                    player_block_threshold = (defender.attributes.get("ID", 0) or 0) + (def_eff * def_height_val)
+                    should_attempt_block_reconciliation = z3 <= player_block_threshold
                 if should_attempt_block_reconciliation:
                     # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                     shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
@@ -1253,15 +1265,27 @@ class ShotManager:
                             result["foul_count"] = blocking_foul_out_info["foul_count"]
                         return result
 
-            made = shot_score >= shot_threshold
-            # 🔎 Make/miss reconciliation diagnostic — this `shot_threshold` (team
-            # shot_threshold + 3pt/variant/zone modifiers) is what drives FG%, NOT
-            # the Motion optimal-look bar (that only gates shot SELECTION upstream).
+            # Undefended OUTSIDE shots use a bespoke make rule (design): shot_score must clear
+            # 210 − shooter CH + shooter's Euclidean distance to the basket — higher chemistry /
+            # closer = easier. Undefended inside & attack shots keep their existing handling
+            # (rim-unguarded shortcut or the standard shot_threshold compare). `shot_threshold`
+            # itself is left intact for downstream variant selection; `_make_bar` is the effective
+            # bar used for the decision (and the recon log).
+            if not has_contest and shot_type == "outside":
+                _undef_ch = float((getattr(shooter, "attributes", None) or {}).get("CH", 0) or 0)
+                _make_bar = 210.0 - _undef_ch + math.hypot(float(sx) - float(bx), float(sy) - float(by))
+                made = shot_score > _make_bar
+            else:
+                _make_bar = shot_threshold
+                made = shot_score >= shot_threshold
+            # 🔎 Make/miss reconciliation diagnostic — `_make_bar` is the effective bar (team
+            # shot_threshold + 3pt/variant/zone modifiers, OR the undefended-outside formula).
+            # This drives FG%, NOT the Motion optimal-look bar (that only gates SELECTION upstream).
             logging.warning(
                 "🎯 [SHOT RECON] state=%s type=%s is_three=%s contest=%s "
                 "shot_score=%.1f shot_threshold=%.1f → %s",
                 self.game_state.get("offensive_state"), shot_type, bool(is_three),
-                bool(has_contest), float(shot_score or 0), float(shot_threshold or 0),
+                bool(has_contest), float(shot_score or 0), float(_make_bar or 0),
                 "MAKE" if made else "MISS",
             )
             if getattr(self, "_block_spot", None):

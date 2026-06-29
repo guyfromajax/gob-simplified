@@ -23,7 +23,7 @@
    - **Non-HCO** (FCP, HCT, fast break): Euclidean geometry — **every** player in the defensive lineup is checked, and `has_contest` is true if any lies within **`CONTEST_EUCLIDEAN_RADIUS` (11)** grid spots of the shooter.
 4. **Rim box:** Axis-aligned box around the attacking basket: **|shooter_x − basket_x| ≤ 6** and **|shooter_y − basket_y| ≤ 6** (same margin on both axes).
 5. **Unguarded rim shortcut (99% make):** If `shot_type` is **inside** or **attack**, the attempt is **not** a three-pointer, the shooter is **in the rim box**, and **`has_contest` is false** → resolve make/miss as **make** unless `random.randint(1, 100) == 100` (1% miss). This path **does not** run `calculate_shot_score` defense, **does not** run block reconciliation, charge/blocking foul, or defensive shooting fouls.
-6. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`.
+6. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`. **Make/miss then differs by shot type:** undefended **outside** uses the bespoke rule `shot_score > (210 − shooter.CH + euclidean(shooter, basket))` (see Step 9); undefended **inside/attack** use the standard `shot_score >= shot_threshold`.
 7. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
 
 **Three-point classification**
@@ -150,6 +150,7 @@
 
 9. Determine Make/Miss
    - made = shot_score >= shot_threshold
+   - **Undefended OUTSIDE exception:** when `has_contest` is false **and** `shot_type == "outside"`, use the bespoke rule `made = shot_score > (210 − shooter.CH + euclidean(shooter, basket))` (strictly `>`; higher chemistry / closer to the basket = easier). `shot_threshold` is left intact for downstream variant selection. Undefended **inside/attack** shots are unchanged (rim-unguarded shortcut or the standard compare).
 
 10. Shooting Foul Calibration (if d_foul)
    - if is_three: 40% chance foul forces miss (THREE_POINTER_FOUL_MISS_CHANCE = 0.4)
@@ -282,6 +283,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 
 #### Step 9: Determine Make/Miss
 - `made = shot_score >= shot_threshold`
+- **Undefended OUTSIDE exception** (`not has_contest and shot_type == "outside"`): `made = shot_score > (210 − shooter.CH + euclidean(shooter, basket))` — strictly `>`; higher chemistry / closer = easier. `shot_threshold` is preserved for downstream variant selection (the effective bar is logged as `shot_threshold` in `[SHOT RECON]`). Undefended inside/attack are unchanged.
 
 #### Step 10: Shooting Foul Calibration
 - If d_foul: 3pt=40% miss chance, 2pt=20% miss chance
