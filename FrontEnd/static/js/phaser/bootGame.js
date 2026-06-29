@@ -406,6 +406,47 @@ function classifyCourtBootMode(params) {
   return COURT_BOOT_MODES.NORMAL_ENTRY;
 }
 
+function hasResumeFlowFlags(params) {
+  return (
+    params.get('active_resume') === 'true' ||
+    params.get('resume_from_anchor') === 'true' ||
+    params.get('consume_resume_anchor') === 'true' ||
+    params.get('resume_from_timeout') === 'true' ||
+    params.get('quarter_break_from') === 'mid_game_resume'
+  );
+}
+
+function clearPreAnchorQ1RefreshState(reason, extra = {}) {
+  if (typeof window === 'undefined') return;
+  if (window.__GOB_PRE_ANCHOR_Q1_REFRESH__) {
+    console.warn('[PRE-ANCHOR-Q1-REFRESH] cleared stale reset request', {
+      reason,
+      armed_game_id: window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ || null,
+      ...extra,
+    });
+  }
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = false;
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = null;
+}
+
+async function hasBackendResumeAnchor(gameIdToCheck) {
+  if (!gameIdToCheck || !API_CONFIG || typeof fetch !== 'function') return false;
+  try {
+    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameIdToCheck)}/resume-state`), {
+      headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!(data && data.status === 'stoppage_anchor');
+  } catch (error) {
+    console.warn('[PRE-ANCHOR-Q1-REFRESH] resume-state guard check failed; blocking fresh reset', {
+      game_id: gameIdToCheck,
+      error: error && error.message ? error.message : String(error),
+    });
+    return true;
+  }
+}
+
 function normalizeCourtBootUrl(bootMode) {
   if (typeof window === 'undefined' || typeof history === 'undefined' || !history.replaceState) return;
   if (bootMode !== COURT_BOOT_MODES.LIVE_QUARTER_ENTRY) return;
@@ -2049,9 +2090,32 @@ async function ensureFreshGameForPreAnchorQ1Refresh() {
 
   const live = readLiveSearchParams();
   const liveQuarter = Number(live.get('quarter') || 1);
-  if (liveQuarter !== 1) return;
+  if (liveQuarter !== 1) {
+    clearPreAnchorQ1RefreshState('not_q1', { live_quarter: liveQuarter });
+    return;
+  }
+  if (hasResumeFlowFlags(live)) {
+    clearPreAnchorQ1RefreshState('resume_flow_flags', {
+      game_id: live.get('game_id') || gameId || null,
+      flags: Object.fromEntries(live.entries()),
+    });
+    return;
+  }
 
   const oldGameId = gameId || live.get('game_id') || null;
+  const armedGameId = typeof window !== 'undefined' ? window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ : null;
+  if (armedGameId && oldGameId && String(armedGameId) !== String(oldGameId)) {
+    clearPreAnchorQ1RefreshState('armed_game_id_mismatch', {
+      armed_game_id: armedGameId,
+      current_game_id: oldGameId,
+    });
+    return;
+  }
+  if (await hasBackendResumeAnchor(oldGameId)) {
+    clearPreAnchorQ1RefreshState('backend_resume_anchor', { game_id: oldGameId });
+    return;
+  }
+
   const payload = {
     home_team: homeTeam,
     away_team: awayTeam,

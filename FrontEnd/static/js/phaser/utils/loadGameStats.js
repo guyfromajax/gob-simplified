@@ -56,6 +56,36 @@ async function fetchResumeState(gameId) {
   }
 }
 
+function hasResumeFlowFlags(urlParams) {
+  return (
+    urlParams.get('active_resume') === 'true' ||
+    urlParams.get('resume_from_anchor') === 'true' ||
+    urlParams.get('consume_resume_anchor') === 'true' ||
+    urlParams.get('resume_from_timeout') === 'true' ||
+    urlParams.get('quarter_break_from') === 'mid_game_resume'
+  );
+}
+
+function clearPreAnchorQ1RefreshFlag(reason, gameId = null) {
+  if (typeof window === 'undefined') return;
+  if (window.__GOB_PRE_ANCHOR_Q1_REFRESH__) {
+    console.warn('[PRE-ANCHOR-Q1-REFRESH] cleared stale reset flag', {
+      reason,
+      game_id: gameId || window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ || null,
+    });
+  }
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = false;
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = null;
+}
+
+function hasActiveResumeAnchor(gameData) {
+  if (!gameData || typeof gameData !== 'object') return false;
+  if (gameData.status === 'stoppage_anchor') return true;
+  const anchor = gameData.resume_anchor;
+  if (!anchor || typeof anchor !== 'object') return false;
+  return !anchor.status || anchor.status === 'stoppage_anchor';
+}
+
 function normTeamsSlot(s) {
   if (s == null || s === '') return '';
   return String(s).toUpperCase().replace(/\s+/g, '_').replace(/-/g, '_');
@@ -563,6 +593,7 @@ export async function initializeGameStats() {
       urlParams.get('resume_from_anchor') === 'true' ||
       urlParams.get('consume_resume_anchor') === 'true'
     );
+  const resumeFlowFlags = hasResumeFlowFlags(urlParams);
   
   if (!homeTeam || !awayTeam) return;
 
@@ -572,7 +603,24 @@ export async function initializeGameStats() {
   const gameData = wantsAnchorUi
     ? await fetchResumeState(gameId)
     : await fetchGameState(gameId);
-  if (!wantsAnchorUi && !liveQuarterStart && quarter === 1 && isPreAnchorQ1DirtyGame(gameData)) {
+  if (resumeFlowFlags || hasActiveResumeAnchor(gameData)) {
+    clearPreAnchorQ1RefreshFlag(
+      resumeFlowFlags ? 'resume_flow_flags' : 'active_resume_anchor',
+      gameId
+    );
+  }
+  if (
+    !resumeFlowFlags &&
+    !wantsAnchorUi &&
+    !liveQuarterStart &&
+    quarter === 1 &&
+    isPreAnchorQ1DirtyGame(gameData)
+  ) {
+    const resumeState = await fetchResumeState(gameId);
+    if (resumeState && resumeState.status === 'stoppage_anchor') {
+      clearPreAnchorQ1RefreshFlag('backend_resume_anchor', gameId);
+      return;
+    }
     window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true;
     window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = gameId;
     console.warn('[PRE-ANCHOR-Q1-REFRESH] dirty pre-anchor game doc detected; suppressing accumulated stats', {

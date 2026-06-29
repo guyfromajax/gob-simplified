@@ -89,6 +89,25 @@ Product rule:
 
 > Pre-anchor Q1 refresh abandons live gameplay progress, but preserves setup and baseline initialization.
 
+Critical hierarchy:
+
+> Resume anchor existence disables pre-anchor reset. Do not add or rely on a separate "disable pre-anchor reset" flag.
+
+The pre-anchor Q1 refresh path is allowed only when all of these are true:
+
+- the URL is Q1
+- the URL is not a live quarter entry (`quarter_break_from=play_quarter` / `sim_quarter`)
+- the URL has no resume-flow flags:
+  - `active_resume=true`
+  - `resume_from_anchor=true`
+  - `consume_resume_anchor=true`
+  - `resume_from_timeout=true`
+  - `quarter_break_from=mid_game_resume`
+- the normal game document is dirty
+- the game has no active backend resume anchor
+
+Once the first timeout, player foul-out, or non-final quarter-break anchor is written, the game is no longer pre-anchor. From that moment, any dirty Q1 state must be resolved through the resume anchor on the existing game document, not by creating a fresh game id.
+
 ### Preserve
 
 The system should preserve setup data that existed before gameplay began:
@@ -193,7 +212,7 @@ Because `MO` and `NG` can be mutated during gameplay, the implemented pre-anchor
 
 Implemented behavior:
 
-1. `initializeGameStats()` detects dirty Q1 game documents that have no `resume_anchor`.
+1. `initializeGameStats()` detects dirty Q1 game documents only when there are no resume-flow URL flags and no active backend resume anchor.
 2. When dirty pre-anchor Q1 state is detected, the court suppresses accumulated stat hydration and paints clean pregame chrome:
    - score `0-0`
    - `Q1`
@@ -201,9 +220,13 @@ Implemented behavior:
    - shot clock `30`
    - no partial player or team stats
 3. The court sets `window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true`.
-4. Before Play Quarter, Sim Quarter, or Sim Full Game starts, `bootGame.js` calls `/api/init-game` with the preserved setup payload.
-5. The response `game_id` replaces the dirty URL `game_id`.
-6. Gameplay starts from the fresh initialized game document.
+4. Before Play Quarter, Sim Quarter, or Sim Full Game starts, `bootGame.js` re-checks:
+   - no resume-flow URL flags are present
+   - the armed game id still matches the current URL game id
+   - `/api/game/{game_id}/resume-state` does not report `status=stoppage_anchor`
+5. Only if those checks still pass, `bootGame.js` calls `/api/init-game` with the preserved setup payload.
+6. The response `game_id` replaces the dirty URL `game_id`.
+7. Gameplay starts from the fresh initialized game document.
 
 This intentionally abandons the dirty pre-anchor game document instead of mutating it in place. Once the first stable anchor exists, this fresh-game replacement path is no longer used; the Mid Game Resume System resumes from anchors on the existing game document.
 
