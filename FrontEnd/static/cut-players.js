@@ -42,7 +42,7 @@
     var title = document.getElementById('cut-modal-title');
     var message = document.getElementById('cut-modal-message');
     var actions = document.getElementById('cut-modal-actions');
-    title.textContent = config.title || 'Assign Training Squad';
+    title.textContent = config.title || 'Assign Practice Squad';
     message.textContent = config.message || '';
     if (accent) {
       accent.className = 'gob-modal-accent';
@@ -116,7 +116,7 @@
       submitBtn.classList.remove('is-dead');
       return;
     }
-    status.textContent = 'You need to assign ' + cutCount + ' player' + (cutCount === 1 ? '' : 's') + ' to the training squad. Selected: ' + selectedCount + '.';
+    status.textContent = 'You need to assign ' + cutCount + ' player' + (cutCount === 1 ? '' : 's') + ' to the practice squad. Selected: ' + selectedCount + '.';
     var active = selectedCount === cutCount;
     submitBtn.disabled = !active;
     submitBtn.classList.toggle('is-dead', !active);
@@ -202,7 +202,7 @@
     }
     showModal({
       title: 'Leave Without Assigning?',
-      message: 'You have selected players for the training squad but have not submitted them. Are you sure you want to leave?',
+      message: 'You have selected players for the practice squad but have not submitted them. Are you sure you want to leave?',
       accent: 'is-red',
       actions: [
         { label: 'Stay', variant: 'gob-modal-btn-primary' },
@@ -225,8 +225,8 @@
       return player.name;
     });
     showModal({
-      title: 'Confirm Training Squad',
-      message: 'You are going to assign ' + formatNames(namesInOrder) + ' to the training squad. They will be ineligible to play this season, but available for training camp next season. Proceed?',
+      title: 'Confirm Practice Squad',
+      message: 'You are going to assign ' + formatNames(namesInOrder) + ' to the practice squad. They will be ineligible to play this season, but available for training camp next season. Proceed?',
       accent: 'is-red',
       actions: [
         { label: 'Cancel', variant: 'gob-modal-btn-secondary' },
@@ -243,30 +243,19 @@
               })
             })
               .then(function (res) {
-                if (!res.ok) throw new Error('Failed to assign training squad');
+                if (!res.ok) throw new Error('Failed to assign practice squad');
                 return res.json();
               })
-              .then(function (data) {
+              .then(function () {
                 playSound('confirm-1-lowervol.wav');
-                showModal({
-                  title: 'Training Squad Assigned',
-                  message: formatNames(data.cut_names || namesInOrder) + ' have been assigned to the training squad.',
-                  accent: 'is-green',
-                  actions: [{
-                    label: 'Back To Locker Room',
-                    variant: 'gob-modal-btn-primary',
-                    onClick: function () {
-                      allowLeave = true;
-                      window.location.href = buildFccUrl();
-                    }
-                  }]
-                });
+                allowLeave = true;
+                window.location.href = buildFccUrl();
               })
               .catch(function (err) {
                 console.error(err);
                 showModal({
                   title: 'Assignment Failed',
-                  message: 'Unable to assign players to the training squad.',
+                  message: 'Unable to assign players to the practice squad.',
                   actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
                 });
               });

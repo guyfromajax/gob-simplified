@@ -41,7 +41,7 @@
     head.className = 'tsr-report-head';
     var title = document.createElement('h2');
     title.className = 'tsr-report-title';
-    title.textContent = 'Week #' + report.week + ' Training Squad Development';
+    title.textContent = 'Week #' + report.week + ' Practice Squad Development';
     head.appendChild(title);
 
     var toggle = document.createElement('div');
@@ -112,7 +112,7 @@
         if (!reports.length) {
           var p = document.createElement('p');
           p.className = 'tsr-empty';
-          p.textContent = 'No Training Squad development reports yet. The first one publishes after your Week 6 game.';
+          p.textContent = 'No Practice Squad development reports yet. The first one publishes after your Week 6 game.';
           container.appendChild(p);
           return;
         }
@@ -125,7 +125,7 @@
         console.error(err);
         var p = document.createElement('p');
         p.className = 'tsr-empty';
-        p.textContent = 'Unable to load Training Squad development reports.';
+        p.textContent = 'Unable to load Practice Squad development reports.';
         container.appendChild(p);
       });
   }

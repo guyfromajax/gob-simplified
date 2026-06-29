@@ -9055,7 +9055,7 @@ def _apply_training_squad_progression_and_report(
     season_inbox.insert(0, {
         "type": "training_squad_report",
         "week": int(completed_week),
-        "message": "Week #" + str(int(completed_week)) + " Training Squad Development report",
+        "message": "Week #" + str(int(completed_week)) + " Practice Squad Development report",
     })
     franchise_doc["season_inbox"] = season_inbox
     return weekly_gains

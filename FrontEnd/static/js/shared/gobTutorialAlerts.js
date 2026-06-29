@@ -87,7 +87,7 @@
      alert can never re-queue/re-show within the same page session. */
   var presented = {};
 
-  /* FCC-return coordination: the Training Squad modal must wait for the Team
+  /* FCC-return coordination: the Practice Squad modal must wait for the Team
      Attributes (and any other FCC-return) tutorial alert to resolve before it
      shows. `returnAlertsSettled` flips true once this load's FCC-return alert has
      been shown-and-dismissed, or determined not-eligible. Consumers register via
@@ -444,7 +444,7 @@
   function scheduleDrainRetry() {
     if (drainTimer) return;
     if (drainRetries >= MAX_DRAIN_RETRIES) {
-      // Give up retrying this load; don't block the Training Squad modal forever.
+      // Give up retrying this load; don't block the Practice Squad modal forever.
       markReturnAlertsSettled();
       return; // re-evaluated on next FCC load
     }
@@ -532,7 +532,7 @@
     }).then(function () {
       applyNavGlow();
       /* If no FCC-return alert ended up showing (none eligible / already seen),
-         settle now so the Training Squad modal can proceed. If one IS showing,
+         settle now so the Practice Squad modal can proceed. If one IS showing,
          finish() settles on dismissal. */
       maybeMarkSettledIfIdle();
     });
