@@ -54,8 +54,11 @@ from BackEnd.constants import (
     FB_PASS_GRID_SPOTS_PER_GAME_SECOND,
     FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY,
     FB_PASS_MIN_GAME_SECONDS,
+    HCO_STRING_SPOTS,
     HOME_RIM_COORDS,
 )
+from BackEnd.engine.skeleton_step_emitter import _compute_pass_meet_point
+from BackEnd.utils.shared import get_away_player_coords
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -784,6 +787,104 @@ def _resolve_shot_next(turn_result: Dict[str, Any]) -> NextStep:
     return {"kind": "next_step", "index": 999}
 
 
+# --- Lane pass (shot branch) helpers ---------------------------------------
+
+LANE_PASS_LEAD_RAW_THRESHOLD = 125
+
+
+def _fb_spot_coords(spot: str, is_away_offense: bool) -> GridCoord:
+    coords = dict(HCO_STRING_SPOTS.get(spot, {"x": 50, "y": 25}))
+    if is_away_offense:
+        coords = get_away_player_coords(coords)
+    return {"x": float(coords["x"]), "y": float(coords["y"])}
+
+
+def _lane_pass_vertical_half(y: float) -> str:
+    return "upper" if float(y) > 25.0 else "lower"
+
+
+def _calculate_lane_pass_raw_score(bh_player: Any, fb_efficiency: int) -> float:
+    """Animation-only lane-pass quality roll for the outlet receiver (BH).
+
+    ``((PS*0.6 + ST*0.2 + IQ*0.2) + fb_efficiency) * d6`` with
+    ``fb_efficiency`` clamped to the same −10…+10 band used in RR resolution.
+    """
+    attrs = getattr(bh_player, "attributes", None) or {}
+    fb_eff = max(-10, min(10, int(fb_efficiency or 0)))
+    composite = (
+        float(attrs.get("PS", 0) or 0) * 0.6
+        + float(attrs.get("ST", 0) or 0) * 0.2
+        + float(attrs.get("IQ", 0) or 0) * 0.2
+        + float(fb_eff)
+    )
+    return composite * random.randint(1, 6)
+
+
+def _lane_pass_getback_targets(
+    getback_ids: List[Any],
+    step_start_coords: Dict[str, GridCoord],
+    rr_y: float,
+    is_away_offense: bool,
+    basket_spot: GridCoord,
+) -> Dict[str, GridCoord]:
+    """Assign get-back sprint targets for the lane-pass help-defender beat."""
+    valid = [
+        str(pid)
+        for pid in (getback_ids or [])
+        if pid is not None and str(pid) in step_start_coords
+    ]
+    if not valid:
+        return {}
+
+    half = _lane_pass_vertical_half(rr_y)
+    mid_post = _fb_spot_coords(f"{half} midPost", is_away_offense)
+
+    if len(valid) == 1:
+        return {valid[0]: dict(basket_spot)}
+
+    def _dist_to_basket(pid: str) -> float:
+        return _euclid(step_start_coords[pid], basket_spot)
+
+    min_dist = min(_dist_to_basket(pid) for pid in valid)
+    tied_closest = [pid for pid in valid if abs(_dist_to_basket(pid) - min_dist) < 1e-6]
+    basket_id = random.choice(tied_closest)
+    targets: Dict[str, GridCoord] = {basket_id: dict(basket_spot)}
+    remaining = [pid for pid in valid if pid != basket_id]
+
+    if len(valid) == 2:
+        targets[remaining[0]] = dict(mid_post)
+        return targets
+
+    remaining_sorted = sorted(remaining, key=_dist_to_basket)
+    targets[remaining_sorted[0]] = dict(mid_post)
+    for pid in remaining_sorted[1:]:
+        targets[pid] = dict(basket_spot)
+    return targets
+
+
+def _commit_lane_pass_sprint_mover(
+    *,
+    pid: str,
+    target: GridCoord,
+    step_start_coords: Dict[str, GridCoord],
+    end_coords: Dict[str, GridCoord],
+    destinations: Dict[str, Optional[GridCoord]],
+    actions: Dict[str, PlayerAction],
+    archetype: Dict[str, PlayerArchetype],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    t: float,
+) -> None:
+    if pid not in step_start_coords:
+        return
+    player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+    rate = _ag_grid_per_game_sec(player, "sprint")
+    actions[pid] = "cut"
+    archetype[pid] = "sprint"
+    destinations[pid] = dict(target)
+    end_coords[pid] = _interrupted_coord(step_start_coords[pid], target, rate, t)
+
+
 # --- Branch step builders: Shot branch -------------------------------------
 
 
@@ -801,9 +902,14 @@ def _build_lane_pass_step(
 ) -> Optional[AnimationStep]:
     """Shot branch step 2: lane pass (BH → RR catch).
 
-    Gate: ball reaches RR at the carried ``rr_to`` target. RR continues toward
-    the offense basket spot with the same ``burst`` / ``sprint`` archetype
-    selected in step 0; ball flies passer → RR target concurrently.
+    Pass quality (animation-only): fresh roll on the outlet receiver using
+    ``((PS*0.6 + ST*0.2 + IQ*0.2) + fb_efficiency) * d6``. Raw score
+    **> 125** → lead pass to ``rr_to`` at sharp FB pass rate (40); else pass
+    to RR's step-start coords at sloppy rate (30).
+
+    Non-passer/non-receiver players sprint toward ``basketSpot`` (get-backs
+    split basket vs same-half ``midPost`` when two or more). All help
+    defenders/offense freeze at interrupted coords when the ball reaches RR.
 
     ``step.start.announcement = "Fast Break!"`` secondary, offense side,
     passer headshot, decision pill + FB play subtitle.
@@ -819,15 +925,42 @@ def _build_lane_pass_step(
     bh_coord = step_start_coords[bh_id]
     rr_coord = step_start_coords[rr_id]
     rr_to = phase.get("rr_to") or {}
-    catch_grid: GridCoord = {
-        "x": float(rr_to.get("x", rr_coord["x"])),
-        "y": float(rr_to.get("y", rr_coord["y"])),
-    }
 
+    bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
     rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
-    rr_archetype = _rr_payload_archetype(phase)
-    rr_rate = _ag_grid_per_game_sec(rr_player, rr_archetype)
-    t = max(0.3, _traversal_seconds(rr_coord, catch_grid, rr_rate))
+    fb_eff = int(phase.get("fb_efficiency") or 0)
+    raw_score = _calculate_lane_pass_raw_score(bh_player, fb_eff)
+    lead_pass = raw_score > LANE_PASS_LEAD_RAW_THRESHOLD
+    pass_rate = (
+        float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
+        if lead_pass
+        else float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY)
+    )
+
+    if lead_pass:
+        catch_grid: GridCoord = {
+            "x": float(rr_to.get("x", rr_coord["x"])),
+            "y": float(rr_to.get("y", rr_coord["y"])),
+        }
+        rr_archetype = _rr_payload_archetype(phase)
+        rr_rate = _ag_grid_per_game_sec(rr_player, rr_archetype)
+        meet_point = _compute_pass_meet_point(
+            bh_coord,
+            rr_coord,
+            catch_grid,
+            rr_rate,
+            ball_rate=pass_rate,
+        )
+        ball_pass_t = _traversal_seconds(bh_coord, meet_point, pass_rate)
+        rr_time = _traversal_seconds(rr_coord, catch_grid, rr_rate)
+    else:
+        catch_grid = dict(rr_coord)
+        meet_point = dict(catch_grid)
+        rr_archetype = "stationary"
+        ball_pass_t = _traversal_seconds(bh_coord, meet_point, pass_rate)
+        rr_time = 0.0
+
+    t = max(float(FB_PASS_MIN_GAME_SECONDS), ball_pass_t, rr_time)
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
     archetype: Dict[str, PlayerArchetype] = {
@@ -842,12 +975,55 @@ def _build_lane_pass_step(
 
     actions[bh_id] = "pass"
     actions[rr_id] = "receive"
-    archetype[rr_id] = rr_archetype
-    destinations[rr_id] = dict(catch_grid)
-    end_coords[rr_id] = dict(catch_grid)
+    if lead_pass:
+        archetype[rr_id] = _rr_payload_archetype(phase)
+        destinations[rr_id] = dict(catch_grid)
+        end_coords[rr_id] = dict(catch_grid)
+    else:
+        archetype[rr_id] = "stationary"
 
-    # Ball state continuity (see _build_outlet_pass_step). BH had the ball
-    # at end of step 1; lane pass is BallAttached(BH) → BallAttached(RR).
+    basket_spot = _fb_spot_coords("basketSpot", is_away_offense)
+    getback_targets = _lane_pass_getback_targets(
+        fb_roles.get("getback_player_ids") or [],
+        step_start_coords,
+        rr_coord["y"],
+        is_away_offense,
+        basket_spot,
+    )
+    excluded = {bh_id, rr_id}
+    for pid, target in getback_targets.items():
+        if pid in excluded:
+            continue
+        _commit_lane_pass_sprint_mover(
+            pid=pid,
+            target=target,
+            step_start_coords=step_start_coords,
+            end_coords=end_coords,
+            destinations=destinations,
+            actions=actions,
+            archetype=archetype,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            t=t,
+        )
+        excluded.add(pid)
+
+    for pid in step_start_coords:
+        if pid in excluded:
+            continue
+        _commit_lane_pass_sprint_mover(
+            pid=pid,
+            target=basket_spot,
+            step_start_coords=step_start_coords,
+            end_coords=end_coords,
+            destinations=destinations,
+            actions=actions,
+            archetype=archetype,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            t=t,
+        )
+
     ball_start: BallState = {"owner_player_id": bh_id}
     ball_end: BallState = {"owner_player_id": rr_id}
 
@@ -858,10 +1034,10 @@ def _build_lane_pass_step(
             "from_player_id": bh_id,
             "to_player_id": rr_id,
             "target_coords": dict(catch_grid),
+            "pass_grid_per_game_second": float(pass_rate),
         },
     }
 
-    bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
     announcement: Announcement = {
         "text": "Fast Break!",
         "team": "away" if is_away_offense else "home",
@@ -892,16 +1068,9 @@ def _build_lane_pass_step(
         "clock": clock_start,
         "advance_trigger": advance_trigger,
         "announcement": announcement,
-        # FE pass-mode machinery: drives ball detach + tween at the
-        # canonical pass grid/game-sec rate, and re-attaches to the
-        # receiver on tween onComplete. Without this, the FE falls back
-        # to using step T (RR's short sprint, ~0.3 game-sec) as the ball
-        # duration — and since the passer is mid-court while catch_grid
-        # is near the rim, the ball teleports across that distance in the
-        # tiny step T window. See animationPlayback.js `isSchemaPassStep`
-        # and the `ball_motion_style === "pass"` branches in
-        # `renderBallTransition`.
         "ball_motion_style": "pass",
+        "ball_arrival_coord": dict(meet_point),
+        "pass_grid_per_game_second": float(pass_rate),
     }
     end: StepEnd = {
         "coords": end_coords,

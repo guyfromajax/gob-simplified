@@ -1014,6 +1014,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         "outlet_defender_to": od_to,
         "other_players": other_moves,
         "is_away_offense": is_away_offense,
+        "fb_efficiency": fb_eff,
     }
 
     fb_roles["ball_handler"] = ball_handler

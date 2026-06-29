@@ -269,6 +269,11 @@ class StepStart(TypedDict, total=False):
     cutting). Backend pre-resolves the meet-point; FE consumes it
     without recomputing."""
 
+    pass_grid_per_game_second: float
+    """Optional. When ``ball_motion_style="pass"``, the FE ball tween uses
+    this grid/game-sec rate instead of the HCO default (24). FB lane-pass
+    steps stamp 40 (sharp) or 30 (sloppy) from the backend pass-quality roll."""
+
     sfx_on_step_start: StepSfx
     """Optional. SFX cue fired at the START of step processing in the FE
     (``playAnimationStep``), BEFORE any tween / ball motion and independent

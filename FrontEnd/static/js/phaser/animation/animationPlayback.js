@@ -391,9 +391,13 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     const dxGrid = endCoord.x - startCoord.x;
     const dyGrid = endCoord.y - startCoord.y;
     const gridDist = Math.hypot(dxGrid, dyGrid);
+    const passRate =
+      step.start?.pass_grid_per_game_second
+      ?? step.start?.advance_trigger?.metadata?.pass_grid_per_game_second
+      ?? PASS_BALL_GRID_PER_GAME_SEC;
     ballDurationMs = Math.max(
       50,
-      Math.round((gridDist / PASS_BALL_GRID_PER_GAME_SEC) * clockSecondMs),
+      Math.round((gridDist / passRate) * clockSecondMs),
     );
   }
 

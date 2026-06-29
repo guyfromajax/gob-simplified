@@ -5,8 +5,12 @@ from BackEnd.engine.rim_runner_fast_break import (
     _resolve_triangle_setup_payload,
 )
 from BackEnd.engine.rim_runner_step_emitter import (
+    LANE_PASS_LEAD_RAW_THRESHOLD,
     _build_burst_step,
+    _build_lane_pass_step,
     _build_outlet_pass_step,
+    _calculate_lane_pass_raw_score,
+    _lane_pass_getback_targets,
     is_lane_pass_to_rr_resolution_turn,
 )
 from BackEnd.engine.triangle_step_emitter import build_triangle_animation_steps
@@ -264,3 +268,127 @@ def test_triangle_lane_pass_miss_builds_animation_steps():
     assert terminal.get("kind") == "turn_stop"
     assert terminal.get("event") == "SHOT_ATTEMPT"
     assert terminal.get("payload", {}).get("schema_rendered_arc") is True
+
+
+def test_lane_pass_raw_score_includes_fb_efficiency():
+    bh = _player("bh", 45, 15, ag=50, iq=50, ch=50)
+    bh.attributes = {"PS": 50, "ST": 50, "IQ": 50, "AG": 50, "CH": 50}
+    with __import__("unittest").mock.patch(
+        "BackEnd.engine.rim_runner_step_emitter.random.randint", return_value=1
+    ):
+        assert _calculate_lane_pass_raw_score(bh, 5) == 55.0
+
+
+def test_lane_pass_getback_targets_two_defenders():
+    basket = {"x": 87.0, "y": 25.0}
+    coords = {
+        "gb_near": {"x": 70.0, "y": 25.0},
+        "gb_far": {"x": 50.0, "y": 25.0},
+    }
+    targets = _lane_pass_getback_targets(
+        ["gb_near", "gb_far"],
+        coords,
+        rr_y=30.0,
+        is_away_offense=False,
+        basket_spot=basket,
+    )
+    assert targets["gb_near"] == basket
+    assert targets["gb_far"]["x"] == 80.0
+    assert targets["gb_far"]["y"] == 32.0
+
+
+def test_lane_pass_step_lead_pass_moves_help_defenders():
+    off = {
+        "PG": _player("bh", 45, 15, ag=50, iq=80, ch=80),
+        "PF": _player("rr", 60, 30, ag=80, iq=80, ch=80),
+        "SG": _player("trail", 40, 25, ag=50, iq=50, ch=50),
+    }
+    deff = {
+        "PG": _player("gb1", 55, 26, ag=70, iq=50, ch=50),
+        "SG": _player("gb2", 50, 20, ag=70, iq=50, ch=50),
+    }
+    start_coords = {
+        "bh": {"x": 45.0, "y": 15.0},
+        "rr": {"x": 60.0, "y": 30.0},
+        "trail": {"x": 40.0, "y": 25.0},
+        "gb1": {"x": 55.0, "y": 26.0},
+        "gb2": {"x": 50.0, "y": 20.0},
+    }
+    fb_roles = {
+        "getback_player_ids": ["gb1", "gb2"],
+        "rim_runner_burst_phase": {
+            "outlet_receiver_id": "bh",
+            "rr_id": "rr",
+            "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "sprint"},
+            "fb_efficiency": 0,
+        },
+    }
+    turn_result = {"fast_break_play": "rim_runner", "rim_runner_pass_attempted": True}
+
+    with __import__("unittest").mock.patch(
+        "BackEnd.engine.rim_runner_step_emitter._calculate_lane_pass_raw_score",
+        return_value=float(LANE_PASS_LEAD_RAW_THRESHOLD + 1),
+    ):
+        step = _build_lane_pass_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off,
+            def_lineup=deff,
+            step_start_coords=start_coords,
+            is_away_offense=False,
+            clock_remaining_at_start=400.0,
+            shot_clock_remaining_at_start=24.0,
+            next_step_index=3,
+        )
+
+    assert step is not None
+    assert step["start"]["pass_grid_per_game_second"] == 40.0
+    assert step["start"]["ball_arrival_coord"] is not None
+    assert step["end"]["coords"]["rr"]["x"] == 87.0
+    assert step["start"]["destination"]["trail"]["x"] == 87.0
+    assert step["start"]["destination"]["gb1"]["x"] == 87.0
+    assert step["start"]["destination"]["gb2"]["x"] == 80.0
+    assert step["start"]["action"]["trail"] == "cut"
+    assert step["start"]["archetype"]["trail"] == "sprint"
+    assert step["end"]["time_elapsed"] >= 0.5
+
+
+def test_lane_pass_step_no_lead_passes_to_rr_start():
+    off = {"PG": _player("bh", 45, 15), "PF": _player("rr", 60, 30)}
+    deff = {}
+    start_coords = {
+        "bh": {"x": 45.0, "y": 15.0},
+        "rr": {"x": 60.0, "y": 30.0},
+    }
+    fb_roles = {
+        "getback_player_ids": [],
+        "rim_runner_burst_phase": {
+            "outlet_receiver_id": "bh",
+            "rr_id": "rr",
+            "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "sprint"},
+            "fb_efficiency": 0,
+        },
+    }
+    turn_result = {"fast_break_play": "rim_runner", "rim_runner_pass_attempted": True}
+
+    with __import__("unittest").mock.patch(
+        "BackEnd.engine.rim_runner_step_emitter._calculate_lane_pass_raw_score",
+        return_value=float(LANE_PASS_LEAD_RAW_THRESHOLD),
+    ):
+        step = _build_lane_pass_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off,
+            def_lineup=deff,
+            step_start_coords=start_coords,
+            is_away_offense=False,
+            clock_remaining_at_start=400.0,
+            shot_clock_remaining_at_start=24.0,
+            next_step_index=3,
+        )
+
+    assert step is not None
+    assert step["start"]["pass_grid_per_game_second"] == 30.0
+    assert step["start"]["advance_trigger"]["metadata"]["target_coords"] == start_coords["rr"]
+    assert step["end"]["coords"]["rr"] == start_coords["rr"]
+    assert step["start"]["ball_arrival_coord"] == start_coords["rr"]
