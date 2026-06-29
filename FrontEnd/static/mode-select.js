@@ -873,6 +873,14 @@ function goToFranchiseCommandCenter() {
         game_id: currentActiveGameResume && currentActiveGameResume.game_id,
         url: resumeUrl,
       });
+      console.info('[MGR-RESUME-CLIENT] mode-select route resume', {
+        franchise_id: currentFranchise.franchise_id,
+        game_id: currentActiveGameResume && currentActiveGameResume.game_id,
+        quarter: currentActiveGameResume && currentActiveGameResume.quarter,
+        clock: currentActiveGameResume && currentActiveGameResume.clock,
+        away_score: currentActiveGameResume && currentActiveGameResume.away_score,
+        home_score: currentActiveGameResume && currentActiveGameResume.home_score,
+      });
       window.location.href = resumeUrl;
       return;
     }

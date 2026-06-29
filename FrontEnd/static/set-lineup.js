@@ -2398,6 +2398,13 @@ async function init() {
         params.set('consume_resume_anchor', 'true');
         params.set('resume_from_anchor', 'true');
         params.delete('active_resume');
+        console.info('[MGR-RESUME-CLIENT] lineup return from resume', {
+          game_id: currentGameId,
+          quarter,
+          clock: currentUrlParams.get('clock'),
+          resume_from_timeout: resumeFromTimeout,
+          next_play: currentUrlParams.get('timeout_next_play_type'),
+        });
       }
 
       if (rimRunnerPlayerId && myTeamSide) {

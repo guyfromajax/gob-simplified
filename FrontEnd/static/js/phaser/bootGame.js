@@ -3011,6 +3011,15 @@ async function initGame() {
         resumeState = await resumeStateResponse.json();
         activeResume = !!(resumeState && resumeState.status === 'stoppage_anchor');
         if (activeResume) {
+          console.info('[MGR-RESUME-CLIENT] court boot resume pending', {
+            game_id: gameId,
+            quarter: resumeState.quarter,
+            clock: resumeState.clock,
+            away_score: resumeState.away_score,
+            home_score: resumeState.home_score,
+            anchor_type: resumeState.anchor_type,
+            next_play: resumeState.timeout_next_play_type,
+          });
           applyResumeStateToCourtChrome(resumeState);
         }
       }
@@ -3087,6 +3096,14 @@ async function initGame() {
   if (resumeGameButton) {
     resumeGameButton.addEventListener('click', async () => {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
+      console.info('[MGR-RESUME-CLIENT] resume modal accepted', {
+        game_id: gameId,
+        has_resume_state: !!resumeState,
+        quarter: resumeState && resumeState.quarter,
+        clock: resumeState && resumeState.clock,
+        anchor_type: resumeState && resumeState.anchor_type,
+        next_play: resumeState && resumeState.timeout_next_play_type,
+      });
       if (resumeState) {
         applyResumeStateToUrl(resumeState);
         if (redirectResumeAnchorToSetLineup(resumeState)) {

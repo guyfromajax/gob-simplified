@@ -2613,6 +2613,15 @@ try:
                 ((_snap.get("teams") or {}).get(_snap.get("away_team_id") or "", {}) or {}).get("score"),
                 _snap.get("timeout_next_play_type"),
             )
+            logging.info(
+                "[MGR-RESUME] resume-state loaded game_id=%s anchor_type=%s quarter=%s clock=%s time_remaining=%s next_play=%s",
+                normalized_game_id,
+                _anchor.get("anchor_type"),
+                _snap.get("quarter"),
+                _snap.get("clock"),
+                _snap.get("time_remaining"),
+                _snap.get("timeout_next_play_type"),
+            )
             return _resume_payload_from_saved_doc(
                 game_id=game_id,
                 normalized_game_id=normalized_game_id,
@@ -3111,6 +3120,13 @@ try:
             # Don't skip Q1 - we could be resuming from a timeout in Q1!
             # The restore_timeout_resume_state function will validate quarter match to prevent stale data
             if game_id and body.resume_from_anchor:
+                logging.info(
+                    "[MGR-RESUME] restore requested game_id=%s quarter=%s consume_only=%s resume_from_timeout=%s",
+                    game_id,
+                    body.quarter,
+                    body.consume_resume_anchor,
+                    body.resume_from_timeout,
+                )
                 anchor_root, _anchor_effective_id = _find_saved_game_doc()
                 anchor = anchor_root.get("resume_anchor") if isinstance(anchor_root, dict) and isinstance(anchor_root.get("resume_anchor"), dict) else {}
                 anchor_snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
@@ -4696,6 +4712,15 @@ try:
                 if (body.resume_from_anchor or body.consume_resume_anchor) and not is_final:
                     logging.warning(
                         "🧭 [RESUME-ANCHOR-CONSUME] cleared used anchor game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
+                        game_id,
+                        db_summary.get("quarter"),
+                        db_summary.get("clock"),
+                        db_summary.get("time_remaining"),
+                        body.resume_from_anchor,
+                        body.consume_resume_anchor,
+                    )
+                    logging.info(
+                        "[MGR-RESUME] anchor cleared game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
                         game_id,
                         db_summary.get("quarter"),
                         db_summary.get("clock"),

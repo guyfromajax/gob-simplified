@@ -1111,6 +1111,17 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         payload.get("resume_from_timeout"),
         payload.get("timeout_next_play_type"),
     )
+    logger.info(
+        "[MGR-RESUME] command-center active_game_resume game_id=%s status=%s anchor_type=%s quarter=%s clock=%s away_score=%s home_score=%s next_play=%s",
+        payload.get("game_id"),
+        payload.get("status"),
+        payload.get("anchor_type"),
+        payload.get("quarter"),
+        payload.get("clock"),
+        payload.get("away_score"),
+        payload.get("home_score"),
+        payload.get("timeout_next_play_type"),
+    )
     return payload
 
 
