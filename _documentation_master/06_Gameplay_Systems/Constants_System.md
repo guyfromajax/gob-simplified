@@ -74,8 +74,8 @@ Used for TEAM_ATTR_CLAMPS (e.g. training, team init). Min/max clamp for generate
 
 | Key | Current value | Notes |
 |-----|---------------|--------|
-| `shot_threshold_min` | 10 | `BackEnd/constants/shot_threshold_scale.py` |
-| `shot_threshold_max` | 210 | same; span always 200, mid = min + 100 |
+| `shot_threshold_min` | 30 | `BackEnd/constants/shot_threshold_scale.py` |
+| `shot_threshold_max` | 230 | same; span always 200, mid = min + 100 |
 | `rebound_modifier_min` | 0.0 | |
 | `rebound_modifier_max` | 0.4 | |
 
