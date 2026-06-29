@@ -13,6 +13,7 @@ from BackEnd.db import (
     teams_collection,
     franchise_players_data_collection,
 )
+from BackEnd.utils.game_id_utils import franchise_matchup_claim_key
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.team_play_utils import iter_team_plays
 logger = logging.getLogger(__name__)
@@ -1702,10 +1703,21 @@ def finalize_game(
                     return
 
         claim_token = str(game.get("_id") or game_id)
-        existing_claim_doc = db.franchises.find_one({"_id": fid}, {"applied_games": 1}) or {}
+        matchup_key = franchise_matchup_claim_key(game)
+        existing_claim_doc = db.franchises.find_one(
+            {"_id": fid}, {"applied_games": 1, "applied_matchups": 1}
+        ) or {}
         existing_claims = [str(g) for g in (existing_claim_doc.get("applied_games") or []) if g is not None]
+        existing_matchups = [
+            str(m) for m in (existing_claim_doc.get("applied_matchups") or []) if m is not None
+        ]
         if claim_token in existing_claims or str(game_id) in existing_claims:
             logger.warning(f"⚠️ [FINALIZE_GAME] Game {claim_token} already in applied_games, skipping (idempotent)")
+            return
+        if matchup_key and matchup_key in existing_matchups:
+            logger.warning(
+                f"⚠️ [FINALIZE_GAME] Matchup {matchup_key} already in applied_matchups, skipping (idempotent)"
+            )
             return
 
         claim_values = []
@@ -1715,12 +1727,20 @@ def finalize_game(
             if candidate not in claim_values:
                 claim_values.append(candidate)
 
-        claim_filter = {"_id": fid}
-        if claim_values:
-            claim_filter["$and"] = [{"applied_games": {"$ne": candidate}} for candidate in claim_values]
+        claim_filter: Dict[str, Any] = {"_id": fid}
+        claim_and: list[Dict[str, Any]] = [
+            {"applied_games": {"$ne": candidate}} for candidate in claim_values
+        ]
+        if matchup_key:
+            claim_and.append({"applied_matchups": {"$ne": matchup_key}})
+        if claim_and:
+            claim_filter["$and"] = claim_and
+        claim_update: Dict[str, Any] = {"$addToSet": {"applied_games": claim_token}}
+        if matchup_key:
+            claim_update["$addToSet"]["applied_matchups"] = matchup_key
         claim_result = db.franchises.update_one(
             claim_filter,
-            {"$addToSet": {"applied_games": claim_token}},
+            claim_update,
         )
         if claim_result.modified_count == 0:
             logger.warning(f"⚠️ [FINALIZE_GAME] Franchise game claim failed for {claim_token}, skipping (idempotent)")

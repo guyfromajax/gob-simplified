@@ -29,7 +29,7 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 |---|---|
 | `games` | Live + completed game documents (per-game team/play/defense state) |
 | `tournaments` | Tournament-mode master docs |
-| `franchises` | Franchise master doc: week, schedule `results`, `season_news`, `season_inbox`, recruiting flags, user team fields |
+| `franchises` | Franchise master doc: week, schedule `results`, `season_news`, `season_inbox`, recruiting flags, user team fields; **`applied_games`** (finalized game `_id` strings) and **`applied_matchups`** (franchise-week matchup keys for stat rollup idempotency — see `Box_Score_System.md` §5) |
 | `franchise_team_data` (FTD) | Per-franchise, per-team state: plays copies, playbook settings, scouting, `natl_rank`, recruiting orders |
 | `franchise_players_data` (FPD) | Per-franchise player docs: meta, attributes, position ratings, season/career stats |
 | `franchise_recruits_data` (FRD) | Per-franchise recruit pool: attributes, archetype, `year`, `Home Region`, `Lean` |

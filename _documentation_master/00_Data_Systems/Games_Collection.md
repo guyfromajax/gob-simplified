@@ -5,7 +5,7 @@ The `games` collection stores live and completed game documents for all modes. G
 ## Document Structure (current)
 
 **Identification / metadata:**
-- `_id` — created as a **string** (24-char hex from `generate_game_id()`, `BackEnd/utils/game_id_utils.py`); some flows (simulate-quarter, EOS) may use `ObjectId`. When updating a game doc, try string first, then `ObjectId` if the update matched 0 docs (pattern: `_set_team_attribute_changes_on_game()` in `franchise_routes.py`).
+- `_id` — 24-char hex from `generate_game_id()` (`BackEnd/utils/game_id_utils.py`). **Writes must use the canonical id:** `resolve_game_write_id()` finds an existing doc (string or `ObjectId`) before upserting — blind upsert on a string `_id` when the live doc uses `ObjectId` (or vice versa) creates **two Mongo records for one game**, which historically bypassed `applied_games`-only idempotency and double-rolled FPD season stats. `simulate_quarter_endpoint` (`BackEnd/api/api.py`) already resolves via `resolve_game_write_id`; franchise phase A uses `_persist_franchise_user_game_snapshot` and `purge_game_id_format_duplicates`.
 - `game_id` (str) — duplicate identifier for compatibility
 - `mode` — `"single"`, `"tournament"`, or `"franchise"`
 - `franchise_id` (str) / `tournament_id` (str) — set for those modes only
@@ -55,7 +55,7 @@ Principle: only games linked to an active Franchise or Tournament instance are k
 
 Implemented behavior:
 - **Single game:** deleted via `POST /api/games/delete-completed-single` once the user leaves (only when `is_final` and not linked to a franchise/tournament). Not deleted while the user is viewing the Box Score.
-- **Franchise:** prior-week duplicate games are purged during save-result; all franchise games are cascade-deleted when the franchise is deleted or reset (`db.games.delete_many({"franchise_id": str(fid)})`).
+- **Franchise:** duplicate game docs for the same week/matchup are purged when phase A persists the user snapshot (`_persist_franchise_user_game_snapshot`) and during **`/franchise/save-result`** (legacy path). All franchise games cascade-delete when the franchise is deleted or reset (`db.games.delete_many({"franchise_id": str(fid)})`).
 - **Tournament:** games cascade-delete with their tournament (`tournament_routes.py`, `admin_routes.py`).
 
 ## Related Docs

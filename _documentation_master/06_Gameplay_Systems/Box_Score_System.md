@@ -63,6 +63,7 @@ The franchise EOG flow for the user's game (driven by `FrontEnd/static/js/phaser
 
 1. **Final save** — the Q4/OT `simulate-quarter` call saves the game doc with `is_final: true` and the complete `teams[*].box_score`, and returns the doc as `final_game_document`.
 2. **Phase A** — `finalizeGame.js` POSTs `/franchise/complete-week/phase-a` with the week, result row, and `game_document` (passing the doc eliminates a race with the Q4 save). The backend:
+   - when `game_document` is present, persists it via **`_persist_franchise_user_game_snapshot`** — writes to the **canonical** games `_id` (`resolve_game_write_id`), purges string/ObjectId duplicate docs for the same hex id, and deletes other week/matchup game docs for that franchise week (see `Games_Collection.md`);
    - persists the user's result row into `franchises.results.{week}`;
    - calls **`stat_updater.finalize_game(game_id, mode="franchise", franchise_id=...)`** — the season/career rollup (Section 5);
    - records a coaching-archetype change for the community-highlights feed if the user's lead archetype moved;
@@ -80,11 +81,25 @@ Notes on the other paths and modes:
 
 `BackEnd/utils/stat_updater.py`:
 
-- **Idempotency:** claims the game by atomically adding it to `franchises.applied_games`; a game already claimed is skipped, so the multiple finalize call-sites (phase A, complete-week fallback, save-result) can't double-count.
+- **Idempotency (two claims):**
+  - **`franchises.applied_games`** — atomic `$addToSet` on the game doc's `_id` string. Prevents the same finalize call-site from running twice with the same id.
+  - **`franchises.applied_matchups`** — atomic `$addToSet` on `{week}:{sorted_home_team_id}:{sorted_away_team_id}` (`franchise_matchup_claim_key` in `BackEnd/utils/game_id_utils.py`). Prevents the **same franchise-week game** from rolling up twice when two Mongo `games` records exist for one played game (historically: simulate-quarter saved under **ObjectId** `_id` while phase-A upserted a **string** `_id` duplicate — different `applied_games` tokens, same box score → ~2× FPD `season`).
+  - Either claim already present → early return; FPD is not updated. Multiple finalize call-sites (phase A, complete-week fallback, save-result) remain safe.
 - **Source:** the game doc's `box_score` (top level, else built from `teams[*].box_score`, else legacy `home_team`/`away_team`). The `players[]` array is deliberately **not** used — it only reliably holds the final lineup.
 - **Processing:** every player row in the box score gets all stat fields `$inc`'d into both `season.*` and `career.*` (non-stat fields like `name`/`jersey`/`pos` skipped; `MIN` seconds → minutes), plus `GP + 1`, and `meta.team_id` set to the team's ObjectId string.
 - **Destination:** `franchise_players_data` (FPD), one doc per `(franchise_id, player_id)`. Missing FPD docs are created on the fly from the universal `players` doc with zeroed stats.
+- **Not practice squad:** PS game stats roll into FPD/FRD **`ps_season_stats`** only (`BackEnd/practice_squad/stats.py`); they do not feed `season` or Team Stats aggregation.
 - `apply_stats_from_summary` is an older equivalent that writes to the universal `players` collection; it survives only on a legacy `franchise_manager.py` path.
+
+### Box score vs season totals (display split)
+
+| Surface | Data source | Scope |
+|---|---|---|
+| Post-game **box score** page | Game doc `teams[*].box_score` + `team_totals` | **This game only** |
+| FCC **Player Stats** / roster season columns | FPD `season` via `/franchise/state` | **Season cumulative** |
+| FCC / league **Team Stats** tab | Sum of FPD `season` over FTD roster (`aggregate_team_stats_from_players`) | **Season cumulative**; W/L and PF/PA from `franchise.results` |
+
+If FPD `season` was double-rolled (pre-fix saves), the box score for a single game can be correct while Player Stats and Team Stats show ~2× shooting volume. **`GP`** on affected players is often **2** after one game played. Existing inflated FPD rows are not auto-repaired; new games after the fix rollup once.
 
 ## 6. Display Surfaces
 
@@ -126,7 +141,8 @@ Returns `box_score` (top level, built from `teams[*].box_score` if needed), per-
 | Per-turn live writes | `BackEnd/utils/stat_updater.py` (`update_game_stats`) |
 | Season/career rollup | `BackEnd/utils/stat_updater.py` (`finalize_game`) |
 | Distant generation | `BackEnd/models/distant_game_stats.py` |
-| EOG orchestration | `BackEnd/api/franchise_routes.py` (phase A/B, `_persist_distant_franchise_game`, `_finalize_team_attributes_for_game`, `update_team_attributes_after_game`) |
+| EOG orchestration | `BackEnd/api/franchise_routes.py` (phase A/B, `_persist_franchise_user_game_snapshot`, `_persist_distant_franchise_game`, `_finalize_team_attributes_for_game`, `update_team_attributes_after_game`) |
+| Canonical game `_id` writes | `BackEnd/utils/game_id_utils.py` (`resolve_game_write_id`, `purge_game_id_format_duplicates`, `franchise_matchup_claim_key`) |
 | EOG snapshot rules | `BackEnd/eog_attr_rules.py` (`build_eog_inputs_from_game_doc`) |
 | Client EOG trigger | `FrontEnd/static/js/phaser/finalizeGame.js` |
 | Post-game UI | `FrontEnd/static/box-score.html`, `FrontEnd/static/box-score.js` |

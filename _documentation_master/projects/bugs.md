@@ -188,6 +188,15 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 
 ## Current Investigation (January 2025)
 
+### ✅ Fixed (Jun 2026): Franchise season stats ~2× box score (Player Stats + Team Stats)
+- **Symptom:** Box score shows correct game totals (e.g. Morristown **79 FGA**), but FCC Player Stats and Team Stats sum to ~**2×** (e.g. **164 FGA**). Not practice squad (`ps_season_stats` is separate).
+- **Root cause:** `finalize_game()` idempotency used **`applied_games` by game `_id` only**. Phase-A persisted `game_document` with a **string `_id` upsert** while simulate-quarter saves the canonical doc under **ObjectId `_id`** — two Mongo records for one game. A second finalize with the other `_id` bypassed the guard and rolled the same box score into FPD `season` again.
+- **Fix:**
+  - **`applied_matchups`** claim in `finalize_game()` (`week:sorted_team_ids`) alongside `applied_games`.
+  - Phase-A uses **`resolve_game_write_id`**, purges string/ObjectId duplicates, and deletes other week/matchup game docs before finalize (`_persist_franchise_user_game_snapshot`).
+  - Team aggregator dedupes duplicate player IDs in FTD rosters.
+- **Existing saves:** Inflated FPD `season` totals remain until repaired (check `GP` — likely **2** after one game). New games after deploy will rollup once.
+
 ### ✅ Addressed (Jun 2026): HCO entry `current_bh_id is None` after MISS with schema bounce
 - **Issue:** Prior turn was **HCO MISS** with `ball_bounce_x/y` and schema `animation_steps`, but `rebounderId` / `rebound_type` / `next_play_type` were missing → discrete **DREB** promotion skipped → next **HCO** turn's entry orchestrator logged `[HCO ENTRY BUG]` (loose-ball prior turn, no `final_ball_handler_id`).
 - **Fix:** `game_manager._repair_miss_bounce_rebound_contract()` runs in `simulate_macro_turn` before `_append_turn`, restoring rebound metadata from `game_state.last_rebounder` / `last_rebound` when bounce coords exist on migrated MISS/BLOCK rows. See `Turn_by_Turn_System.md` (Discrete DREB turn §2) and `Rebound_System.md` (MISS/BLOCK turn contract).

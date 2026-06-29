@@ -423,9 +423,12 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - Used for frontend stat updates without full roster refresh
 
 **Stat Persistence:**
-- Game stats: Stored in game document
-- Season stats: Aggregated across games in tournament/franchise mode
-- Career stats: Aggregated across all seasons for franchise mode
+- **Game stats:** Stored on the game document (`teams[*].box_score`); box score page reads this doc directly (single-game totals).
+- **Franchise season/career:** Rolled into **`franchise_players_data` (FPD)** at EOG by `stat_updater.finalize_game()` (franchise branch). FCC Player Stats and `/franchise/team-stats` read FPD `season`, not the last game doc.
+- **Franchise rollup idempotency:** `franchises.applied_games` (game `_id`) plus `franchises.applied_matchups` (`week:sorted_team_ids`) — see `Box_Score_System.md` §5.
+- **Practice squad:** PS stats → FPD/FRD **`ps_season_stats`** only; not merged into `season` or team league tables.
+- **Tournament season:** Tournament document `players.*.season` (same finalize pattern, tournament idempotency).
+- **Career stats (franchise):** FPD `career.*`, incremented alongside `season` each finalized game.
 
 **Stats Page Scoped Leaders:**
 - `stats.html` shows Individual Leaders for `conference`, `region`, and `national` scopes.

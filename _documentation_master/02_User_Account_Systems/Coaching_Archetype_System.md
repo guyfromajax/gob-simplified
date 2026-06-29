@@ -58,7 +58,7 @@ Deliberate asymmetry: Offensive Athleticism allows ST/AG/ND; Defensive Athletici
 
 - **Per quarter, every period counts** (Q1–Q4 + OT, simmed or played). The quarter's archetype is stashed on the game (`archetype_periods`, keyed by quarter) and folded into the user's counters at game completion.
 - **Dedup** per `(game_id, quarter)` — refreshes / timeouts / foul-outs / mid-quarter subs don't double-count.
-- **Commit once** at completion (idempotent via finalize_game's `applied_games` claim). Abandoned games count 0; CPU-vs-CPU games attribute to no one.
+- **Commit once** at completion (idempotent via `finalize_game`'s franchise claims: `applied_games` per game `_id` and `applied_matchups` per franchise-week matchup — same guard that prevents double FPD stat rollup). Abandoned games count 0; CPU-vs-CPU games attribute to no one.
 - **Win/loss** — each completed user game increments `record.wins` or `record.losses`; `total_games = wins + losses`; `win_rate = round(100 * wins / total_games)` (0 when no games).
 - **lead_archetype** — denormalized highest-count key the UI reads for the badge. Tie-break = most recently incremented this game; `""` until the user has games.
 - **Display** — archetype share = `archetypes.<key> / archetypes.total`.

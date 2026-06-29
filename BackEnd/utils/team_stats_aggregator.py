@@ -60,8 +60,12 @@ def aggregate_team_stats_from_players(
         for team_id_str, pids in franchise_team_rosters.items():
             if team_id_str not in team_stats_map:
                 continue
+            seen_pids: set[str] = set()
             for pid in pids:
                 pid_str = str(pid)
+                if pid_str in seen_pids:
+                    continue
+                seen_pids.add(pid_str)
                 pdata = players.get(pid_str)
                 if not pdata:
                     continue

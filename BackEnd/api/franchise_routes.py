@@ -26,6 +26,7 @@ from BackEnd.db import (
     franchise_team_data_collection,
     franchise_players_data_collection,
     franchise_recruits_data_collection,
+    games_collection,
 )
 from BackEnd.utils.shared import format_height, summarize_game_state
 from BackEnd.utils.player_year import format_player_year_display
@@ -38,7 +39,11 @@ from BackEnd.tournament import franchise_tournament_progression as ftp
 from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.utils.roster_builder import build_roster_players
 from BackEnd.utils.command_center_data import build_command_center_base
-from BackEnd.utils.game_id_utils import generate_game_id
+from BackEnd.utils.game_id_utils import (
+    generate_game_id,
+    purge_game_id_format_duplicates,
+    resolve_game_write_id,
+)
 from BackEnd.models.training_execution_v2 import (
     TEAM_ATTR_CLAMPS,
     PLAYER_ATTR_CLAMP,
@@ -2190,6 +2195,53 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     }
 
 
+def _persist_franchise_user_game_snapshot(
+    *,
+    game_id: str,
+    payload: dict,
+    franchise_id: str,
+    week: int,
+    away_id: Any = None,
+    home_id: Any = None,
+) -> str:
+    """
+    Persist the final user-game snapshot on the canonical games _id.
+
+    Avoids string/ObjectId duplicate game docs (which bypass applied_games and
+    double-apply FPD season stats) and purges other week/matchup duplicates.
+    """
+    incoming_set = {k: v for k, v in payload.items() if k != "_id"}
+    incoming_set["franchise_id"] = str(franchise_id)
+    incoming_set["week"] = week
+
+    write_id = resolve_game_write_id(games_collection, str(game_id))
+    games_collection.update_one({"_id": write_id}, {"$set": incoming_set}, upsert=True)
+    purge_game_id_format_duplicates(games_collection, str(game_id), keep_id=write_id)
+
+    keep_ids: list[Any] = [write_id, str(write_id)]
+    if isinstance(write_id, ObjectId):
+        keep_ids.append(str(write_id))
+    if ObjectId.is_valid(str(game_id)):
+        try:
+            keep_ids.append(ObjectId(str(game_id)))
+        except Exception:
+            pass
+
+    if away_id and home_id:
+        games_collection.delete_many(
+            {
+                "franchise_id": str(franchise_id),
+                "week": week,
+                "$or": [
+                    {"team1_id": away_id, "team2_id": home_id},
+                    {"team1_id": home_id, "team2_id": away_id},
+                ],
+                "_id": {"$nin": keep_ids},
+            }
+        )
+    return str(write_id)
+
+
 def _resolve_team_name_from_any(team_ref) -> str | None:
     if not team_ref:
         return None
@@ -4000,21 +4052,14 @@ def _complete_week_process_user_game_block(
             # Persist provided final snapshot so finalize/EOG read canonical data.
             # Exclude _id from payload to avoid immutable-field update errors.
             if isinstance(summary, dict):
-                incoming_set = {k: v for k, v in summary.items() if k != "_id"}
-                incoming_set["franchise_id"] = str(req.franchise_id)
-                incoming_set["week"] = req.week
-                user_game_id_str = str(user_game_id)
-                db.games.update_one(
-                    {"_id": user_game_id_str},
-                    {"$set": incoming_set},
-                    upsert=True,
+                user_game_id = _persist_franchise_user_game_snapshot(
+                    game_id=str(user_game_id),
+                    payload=summary,
+                    franchise_id=str(req.franchise_id),
+                    week=req.week,
+                    away_id=team1_id,
+                    home_id=team2_id,
                 )
-                if ObjectId.is_valid(user_game_id_str):
-                    # If a legacy ObjectId duplicate exists, sync it too.
-                    db.games.update_one(
-                        {"_id": ObjectId(user_game_id_str)},
-                        {"$set": incoming_set},
-                    )
         else:
             # Fallback: Look up from database (for backward compatibility)
             logger.info(f"🔍 [COMPLETE_WEEK] game_document not provided, looking up from database...")
@@ -5352,6 +5397,22 @@ def _complete_week_finish_cpu_and_persist(
                 sim_ok[sched_idx] = fut.result()
             except Exception as ex:
                 sim_err[sched_idx] = ex
+
+        # Week-level aggregate shot diagnostics across all CPU full sims this week.
+        # Each summary carries the shot tallies stamped by summarize_game_state; we sum
+        # them and print one per-week report (avg FGA/FG%/3PTA/3PT% + percentage splits).
+        # Grep ``WEEK AGGREGATE``. (User game prints its own per-game report separately.)
+        try:
+            from BackEnd.utils.shot_split_tracker import (
+                merge_shot_diagnostics, format_week_aggregate_report,
+            )
+            _week_summaries = [s for (_a, _h, s) in sim_ok.values() if isinstance(s, dict)]
+            _merged, _ngames = merge_shot_diagnostics(_week_summaries)
+            if _ngames:
+                print(f"[WEEK AGGREGATE] franchise={franchise_id_str} week={week}")
+                print(format_week_aggregate_report(_merged, _ngames))
+        except Exception as _agg_e:
+            logger.warning("[WEEK AGGREGATE] shot diagnostics failed: %s", _agg_e)
 
         for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:

@@ -382,3 +382,101 @@ def format_master_eog_report(game) -> str:
         "###############################################################",
         "",
     ])
+
+
+# --- week-level aggregate across multiple games ----------------------------
+
+
+def merge_shot_diagnostics(summaries):
+    """Sum the three tallies across a list of game summaries (or game_state dicts).
+
+    Each summary carries top-level ``shot_split_tracking`` / ``fga_by_turn_type``
+    / ``hco_shot_tier_counts`` (as stamped by ``summarize_game_state``). Returns
+    ``(merged_dict, num_games)`` — num_games counts only summaries that actually
+    carried shot data.
+    """
+    merged = {
+        "shot_split_tracking": _empty_tracking(),
+        "fga_by_turn_type": _empty_fga_by_turn_type(),
+        "hco_shot_tier_counts": {t: 0 for t in _HCO_TIERS},
+    }
+    n = 0
+    for s in summaries or []:
+        if not isinstance(s, dict):
+            continue
+        sst = s.get("shot_split_tracking")
+        fbt = s.get("fga_by_turn_type")
+        tier = s.get("hco_shot_tier_counts")
+        if not any(isinstance(x, dict) and x for x in (sst, fbt, tier)):
+            continue  # no shot data on this summary — don't count it as a game
+        n += 1
+        for k in _KEYS:
+            b = (sst or {}).get(k) or {}
+            merged["shot_split_tracking"][k]["make"] += int(b.get("make", 0) or 0)
+            merged["shot_split_tracking"][k]["miss"] += int(b.get("miss", 0) or 0)
+        for tt in _TURN_TYPES:
+            merged["fga_by_turn_type"][tt] += int((fbt or {}).get(tt, 0) or 0)
+        for t in _HCO_TIERS:
+            merged["hco_shot_tier_counts"][t] += int((tier or {}).get(t, 0) or 0)
+    return merged, n
+
+
+def format_week_aggregate_report(merged, num_games) -> str:
+    """Render the per-week aggregate shot-diagnostics report across ``num_games``
+    full-game sims (``num_teams = 2 × num_games``): per-team averages plus the
+    percentage splits of every tracked dimension. Grep ``WEEK AGGREGATE``."""
+    sst = (merged or {}).get("shot_split_tracking") or {}
+    fbt = (merged or {}).get("fga_by_turn_type") or {}
+    tier = (merged or {}).get("hco_shot_tier_counts") or {}
+    num_teams = max(0, int(num_games)) * 2
+
+    def _att(key):
+        b = sst.get(key) or {}
+        return int(b.get("make", 0) or 0) + int(b.get("miss", 0) or 0)
+
+    def _make(key):
+        return int((sst.get(key) or {}).get("make", 0) or 0)
+
+    total_fga = sum(_att(k) for k in _KEYS)
+    total_fgm = sum(_make(k) for k in _KEYS)
+    tpa = _att("3pt_def") + _att("3pt_undef")
+    tpm = _make("3pt_def") + _make("3pt_undef")
+
+    def _per_team(x):
+        return (x / num_teams) if num_teams else 0.0
+
+    def _pct(num, den):
+        return (num / den * 100.0) if den else 0.0
+
+    lines = [
+        "",
+        f"========= WEEK AGGREGATE — SHOT DIAGNOSTICS ({num_games} games / {num_teams} teams) =========",
+        "Per-team averages:",
+        f"  FGA  {_per_team(total_fga):5.1f}   FG%  {_pct(total_fgm, total_fga):5.1f}%",
+        f"  3PTA {_per_team(tpa):5.1f}   3PT% {_pct(tpm, tpa):5.1f}%",
+        "",
+        "Shot split (% of all FGA  |  make%):",
+    ]
+    for label, key in _ROWS:
+        att = _att(key)
+        lines.append(
+            f"  {label:<16}: {_pct(att, total_fga):5.1f}% of FGA  "
+            f"({_pct(_make(key), att):5.1f}% make, {att} att)"
+        )
+
+    tt_total = sum(int(fbt.get(tt, 0) or 0) for tt in _TURN_TYPES)
+    lines.append("")
+    lines.append("FGA by turn type (% of turn-type FGA):")
+    for tt in _TURN_TYPES:
+        v = int(fbt.get(tt, 0) or 0)
+        lines.append(f"  {tt:<12}: {_pct(v, tt_total):5.1f}%  ({v})")
+
+    tier_total = sum(int(tier.get(t, 0) or 0) for t in _HCO_TIERS)
+    lines.append("")
+    lines.append("HCO shots by shot-clock tier (%):")
+    for label, t in _HCO_TIER_ROWS:
+        v = int(tier.get(t, 0) or 0)
+        lines.append(f"  {label:<18}: {_pct(v, tier_total):5.1f}%  ({v})")
+
+    lines.append("============================================================================")
+    return "\n".join(lines)
