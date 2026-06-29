@@ -170,6 +170,19 @@ def _player_slot_rating(player: Player, pos: str) -> float:
 
 _LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
+# ── Computer-team situational-override tunables (Computer_Team_GamePlan_System.md) ──
+# Conservative strategy (sit on the lead): lead thresholds + the late-Q4 time split.
+CONSERVATIVE_LEAD_THRESHOLD = 20            # Q1–Q3, and Q4+ when > CONSERVATIVE_LATE_Q4_SECONDS remain
+CONSERVATIVE_LATE_Q4_LEAD_THRESHOLD = 15    # Q4+ when ≤ CONSERVATIVE_LATE_Q4_SECONDS remain
+CONSERVATIVE_LATE_Q4_SECONDS = 239
+# Blowout lineup (rest starters): margin-of-victory thresholds + Q4 time splits.
+BLOWOUT_Q3_MARGIN = 50
+BLOWOUT_Q4_MARGIN_EARLY = 35                # Q4, > BLOWOUT_Q4_EARLY_SECONDS remain
+BLOWOUT_Q4_MARGIN_MID = 25                  # Q4, > BLOWOUT_Q4_MID_SECONDS remain
+BLOWOUT_Q4_MARGIN_LATE = 20                 # Q4, > 0 remain
+BLOWOUT_Q4_EARLY_SECONDS = 239
+BLOWOUT_Q4_MID_SECONDS = 59
+
 
 def _player_rt_max(player: Player) -> float:
     """Blowout-selection RT for a player = his HIGHEST slot rating across all five positions."""
@@ -208,15 +221,15 @@ def _blowout_lineup_active(team, game_state) -> bool:
         return False
     quarter = int(game_state.get("quarter") or 1)
     if quarter == 3:
-        return margin > 50
+        return margin > BLOWOUT_Q3_MARGIN
     if quarter == 4:
         time_remaining = float(game_state.get("time_remaining") or 0)
-        if time_remaining > 239:
-            return margin > 35
-        if time_remaining > 59:
-            return margin > 25
+        if time_remaining > BLOWOUT_Q4_EARLY_SECONDS:
+            return margin > BLOWOUT_Q4_MARGIN_EARLY
+        if time_remaining > BLOWOUT_Q4_MID_SECONDS:
+            return margin > BLOWOUT_Q4_MARGIN_MID
         if time_remaining > 0:
-            return margin > 20
+            return margin > BLOWOUT_Q4_MARGIN_LATE
     return False  # Q1, Q2, OT (quarter >= 5) → never
 
 
@@ -564,9 +577,11 @@ def _conservative_strategy_active(team: TeamManager, game_state) -> bool:
         return False
     quarter = int(game_state.get("quarter") or 1)
     if quarter < 4:
-        return lead > 20
+        return lead > CONSERVATIVE_LEAD_THRESHOLD
     time_remaining = float(game_state.get("time_remaining") or 0)
-    return lead > 20 if time_remaining > 239 else lead > 15
+    if time_remaining > CONSERVATIVE_LATE_Q4_SECONDS:
+        return lead > CONSERVATIVE_LEAD_THRESHOLD
+    return lead > CONSERVATIVE_LATE_Q4_LEAD_THRESHOLD
 
 
 def _apply_conservative_strategy_override(settings: dict, team: TeamManager, game_state) -> dict:

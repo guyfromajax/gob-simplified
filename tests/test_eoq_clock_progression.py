@@ -13,11 +13,13 @@ from BackEnd.utils.eoq_clock_progression import (
     is_late_clock_eoq_chain_active,
     resolve_late_clock_bip_runoff,
     roll_anchor_clock,
+    schedule_flss_after_dreb,
     schedule_flss_after_inbound,
     scrub_timeout_fields_from_snapshot,
     should_force_oreb_putback,
     should_route_eoq_rebound,
     should_route_final_turn_to_flss,
+    should_route_post_dreb_flss,
 )
 from BackEnd.engine.final_turn_pacing import evaluate_final_turn_pacing
 
@@ -30,10 +32,16 @@ def test_should_force_oreb_putback_under_six():
     assert should_force_oreb_putback(6) is False
 
 
-def test_late_clock_dreb_routes_terminal():
+def test_should_route_post_dreb_flss():
+    assert should_route_post_dreb_flss(3) is True
+    assert should_route_post_dreb_flss(2) is False
+    assert should_route_post_dreb_flss(1) is False
+
+
+def test_late_clock_dreb_routes_terminal_at_low_clock():
     rebounder = SimpleNamespace(player_id="r1")
     game = SimpleNamespace(
-        game_state={"time_remaining": 8, "final_turn": True},
+        game_state={"time_remaining": 2, "final_turn": True},
         shot_manager=SimpleNamespace(_block_spot=None),
     )
     result = {"flss": True}
@@ -42,6 +50,22 @@ def test_late_clock_dreb_routes_terminal():
     assert flips is True
     assert result["terminal_dreb_eoq"] is True
     assert result["next_play_type"] == "DREB"
+    assert "flss_after_dreb" not in result
+
+
+def test_late_clock_dreb_routes_flss_when_clock_remains():
+    rebounder = SimpleNamespace(player_id="r1")
+    game = SimpleNamespace(
+        game_state={"time_remaining": 8, "late_clock_eoq_chain_active": True},
+        shot_manager=SimpleNamespace(_block_spot=None),
+    )
+    result = {"late_clock_eoq": True, "final_turn": True}
+    flips = apply_post_miss_rebound_routing(game, result, rebounder, "DREB")
+    assert flips is True
+    assert result.get("terminal_dreb_eoq") is not True
+    assert result["flss_after_dreb"] is True
+    assert result["next_play_type"] == "DREB"
+    assert game.game_state["_flss_after_dreb_rebounder_id"] == "r1"
 
 
 def test_late_clock_oreb_sets_pending():
@@ -100,6 +124,17 @@ def test_schedule_flss_after_inbound():
     assert game.game_state["flss_possession_pending"] is True
     assert game.game_state["offensive_state"] == "HCO"
     assert is_late_clock_eoq_chain_active(game.game_state) is True
+
+
+def test_schedule_flss_after_dreb():
+    rebounder = SimpleNamespace(player_id="r9")
+    dreb_turn = {"late_clock_eoq": True, "flss_after_dreb": True}
+    game = SimpleNamespace(game_state={"time_remaining": 5, "offensive_state": "HCO"})
+    schedule_flss_after_dreb(game, dreb_turn, rebounder)
+    assert game.game_state["flss_possession_pending"] is True
+    assert game.game_state["flss_from_dreb"] is True
+    assert game.game_state["last_ball_handler"] is rebounder
+    assert dreb_turn["flss_possession_pending"] is True
 
 
 def test_roll_anchor_clock_ranges(monkeypatch):

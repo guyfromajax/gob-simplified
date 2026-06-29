@@ -12,7 +12,8 @@ If they lose a game because their palyers made a mistke, their player missed a k
 ##Tasks
 **Eliminate Faulty Next Turns After Shot Resolution** — ✅ **Updated (clock-driven EOQ, 2026-06)**
 - Quarter end is driven by `time_remaining` reaching 0, not automatic on every Final Turn shot.
-- When clock **> 0** after a late-clock shot or final FT: make → BIP → FLSS; miss OREB → putback; miss DREB → terminal rebound + clock burn; shooting foul → FTs then same rules after last attempt.
+- When clock **> 2** after a late-clock shot or final FT in an **active EOQ chain**: make → BIP → FLSS; miss OREB → putback; miss DREB → discrete DREB → FLSS (rebounder sprint-and-shoot, no HCO outlet); shooting foul → FTs then same rules after last attempt.
+- When clock **≤ 2** in chain after miss DREB (or final FT DREB): terminal DREB + full clock burn.
 - When clock **= 0**: no BIP, OREB, or DREB follow-up; frontend holds at rim/bounce (`holdFinalShotMs`, 2s) then quarter-end modal.
 - See [`EOQ_System.md`](../06_Gameplay_Systems/EOQ_System.md) and [`Situational_Logic_System.md`](../06_Gameplay_Systems/Situational_Logic_System.md) §Final Turn and `BackEnd/utils/eoq_clock_progression.py`.
 

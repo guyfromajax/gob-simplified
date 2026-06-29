@@ -55,6 +55,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `final_turn_shot_this_turn` | Final Shot gate passes | Popped when turn resolves | Routes turn to `resolve_final_turn_shot()` |
 | `final_shot_possession_active` | Same as above | Cleared after turn stamped | Internal arming guard |
 | `flss_possession_pending` | After late-clock BIP/SIP make (or FT make in chain) | Popped at FLSS turn start | Next offense turn → FLSS |
+| `flss_from_dreb` | After discrete DREB when EOQ chain + clock > 2s | Popped at FLSS resolve | Rebounder = BH; post-DREB FLSS sprint |
 | `pending_oreb` | Miss/block OREB | Consumed on putback turn | Putback possession |
 | `eoq_trace_seq` / `eoq_trace_turn_in_seq` | EOQ trace enabled | Quarter break clear | Correlate logs FE ↔ BE |
 
@@ -67,6 +68,8 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `flss` / `flss_zone` | Forced Last Second Shot turn |
 | `late_clock_eoq` | Turn is part of an active late-clock EOQ chain |
 | `terminal_dreb_eoq` | Terminal defensive rebound (clock burn, no outlet) |
+| `flss_after_dreb` | Miss/block turn in chain: DREB → FLSS when clock > 2s |
+| `skip_dreb_outlet_lead_in` | DREB turn payload: FE skips HCO outlet lead-in before FLSS |
 | `final_turn_anchor_clock` | Rolled shoot/drive anchor (seconds) |
 | `quarter_ends_after` | Period ends after this turn; no BIP/OREB follow-up |
 
@@ -102,7 +105,8 @@ flowchart TD
     K --> M{clock > 0 after shot?}
     M -->|Make| N[BIP -> flss_pending -> FLSS]
     M -->|Miss OREB| O[Putback if chain active]
-    M -->|Miss DREB| P[Terminal DREB]
+    M -->|Miss DREB, clock > 2s| R[DREB -> FLSS from rebounder]
+    M -->|Miss DREB, clock <= 2s| P[Terminal DREB]
     M -->|No| Q[quarter_ends_after]
 ```
 
@@ -119,6 +123,7 @@ flowchart TD
 - Late-clock **makes** in chain → `apply_post_make_late_clock_routing`.
 - **FLSS** post-emit → `finalize_flss_post_emit`.
 - **BIP after make** → `schedule_flss_after_inbound`.
+- **DREB after miss/block in chain (clock > 2s)** → `schedule_flss_after_dreb` (rebounder = ball handler; no HCO outlet).
 
 ### Critical bug class (fixed 2026-06)
 
@@ -223,7 +228,8 @@ After shot resolution or the **last FT** of a trip, if `time_remaining > 0`:
 |---------|-----------|
 | **Make, no foul** | BIP/SIP → `schedule_flss_after_inbound` → `flss_possession_pending` → FLSS |
 | **Miss / Block, OREB** | `pending_oreb` → putback turn |
-| **Miss / Block, DREB** (late chain) | `terminal_dreb_eoq` → DREB animation → clock drain |
+| **Miss / Block, DREB** (late chain, clock **> 2s**) | Discrete DREB → `schedule_flss_after_dreb` → `flss_possession_pending` → FLSS (rebounder = BH, sprint + teammates cruise drift) |
+| **Miss / Block, DREB** (late chain, clock **≤ 2s**) | `terminal_dreb_eoq` → DREB animation → clock drain |
 | **Miss / Block, DREB** (not in chain) | Normal HCO for defense |
 | **Shooting foul** | FTs; after **last** FT apply same rules via `apply_eoq_final_free_throw_routing` |
 
@@ -280,6 +286,7 @@ Enabled by default (`game_state['eoq_trace'] !== false`). Filter logs: **`[EOQ-T
 | `CHAIN` / `FINAL_SHOT_TRIGGERED` | Full Final Shot armed — **must appear** for real Final Turn |
 | `CHAIN` / `FLSS_POSSESSION_START` | FLSS turn starting |
 | `CHAIN` / `FLSS_SCHEDULED_AFTER_INBOUND` | Make + time left → inbound then FLSS |
+| `CHAIN` / `FLSS_SCHEDULED_AFTER_DREB` | Chain DREB + time left → FLSS (no outlet) |
 | `TURN` role `FINAL_SHOT` | Turn has `final_turn` or `final_shot_possession` |
 | `TURN` role `EOQ_CHAIN` | `late_clock_eoq` only — **not** full Final Shot |
 | `STEP` flow `FINAL_SHOT` / `FLSS` | Pipeline substeps |
@@ -304,6 +311,7 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 | Trace says `FINAL_SHOT` but no announcement | Trace role was `EOQ_CHAIN` mislabeled (pre-2026) or `late_clock_eoq` without `final_turn` |
 | FLSS loop without ever seeing Final Shot | Chain never started; makes keep scheduling FLSS after inbound in late clock |
 | Quarter ends at 0:01, no airhorn | Clock never drained to 0 on terminal turn |
+| Full HCO outlet after Final Shot DREB in chain | `flss_after_dreb` not set (chain inactive) or FE ran outlet despite `skip_dreb_outlet_lead_in` |
 | Resume after timeout, weird EOQ | Stale timeout anchor / chain flags — see [`Mid_Game_Resume_System.md`](../01_Data_Persistence/Mid_Game_Resume_System.md) |
 
 ---
@@ -312,4 +320,5 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 
 | Date | Note |
 |------|------|
+| 2026-06 | Post-DREB FLSS when chain active and clock > 2s; terminal DREB at ≤ 2s |
 | 2026-06 | Initial EOQ_System.md; OREB chain gate fix documented; trace role `EOQ_CHAIN` vs `FINAL_SHOT` |

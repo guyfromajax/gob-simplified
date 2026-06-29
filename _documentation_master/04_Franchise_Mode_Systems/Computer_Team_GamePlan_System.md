@@ -51,4 +51,44 @@ When the lead becomes a true blowout, build the lineup with the **same autobuild
 
 ---
 
+---
+
+## Tunable Constants
+
+All dials live in [`BackEnd/utils/db_utils.py`](../../BackEnd/utils/db_utils.py). The code is the source of truth; values below are the current settings.
+
+### Conservative strategy — trigger thresholds
+
+| Constant | Value | Effect |
+|---|---|---|
+| `CONSERVATIVE_LEAD_THRESHOLD` | 20 | Lead needed in Q1–Q3 (and Q4+ before the late split). Higher → triggers in fewer games. |
+| `CONSERVATIVE_LATE_Q4_LEAD_THRESHOLD` | 15 | Lead needed in late Q4+ (≤ time split). Lower → sits on smaller late leads. |
+| `CONSERVATIVE_LATE_Q4_SECONDS` | 239 | Q4+ boundary where the lead requirement drops from 20 → 15. |
+
+### Conservative strategy — re-roll weights (`_CONSERVATIVE_STRATEGY_ROLLS`)
+
+Lower-skewed weights = more aggressively scaled-back play when leading. Eight settings; the other five keep normal values.
+
+| Settings | `(values, weights)` |
+|---|---|
+| `offense`, `aggression` | `([0,1,2], [60,30,10])` |
+| `hc_trap`, `fc_press` | `([0,1], [90,10])` |
+| `tempo`, `alterations` | `([0,1], [90,10])` |
+| `fast_breaks`, `rebounding` | `([0,1], [90,10])` |
+
+### Blowout lineup — trigger thresholds
+
+| Constant | Value | Effect |
+|---|---|---|
+| `BLOWOUT_Q3_MARGIN` | 50 | Margin to rest starters in Q3. |
+| `BLOWOUT_Q4_MARGIN_EARLY` | 35 | Q4 margin, > early time split remaining. |
+| `BLOWOUT_Q4_MARGIN_MID` | 25 | Q4 margin, > mid time split remaining. |
+| `BLOWOUT_Q4_MARGIN_LATE` | 20 | Q4 margin, any time remaining. |
+| `BLOWOUT_Q4_EARLY_SECONDS` | 239 | Q4 boundary: early (35) → mid (25) margin tier. |
+| `BLOWOUT_Q4_MID_SECONDS` | 59 | Q4 boundary: mid (25) → late (20) margin tier. |
+
+Lower margins → starters pulled sooner. All blowout thresholds are above the conservative ones by design (scale back strategy first, rest starters later).
+
+---
+
 See `Timeout_System.md` (underlying `autoset_strategy_settings` lineup + strategy re-set) and `Game_Init_System.md` (`_compute_strategic_strategy_settings`, the normal non-situational computation).

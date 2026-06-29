@@ -1607,6 +1607,13 @@ def build_skeleton_animation_steps(
             off_lineup,
             def_lineup,
         )
+        if turn_result.get("flss") and i == num_steps - 1:
+            _stamp_flss_shooter_on_step_end(
+                final_end_coords,
+                turn_result,
+                off_lineup,
+                skeleton_steps[i],
+            )
 
         clock_start: ClockState = {
             "clock_remaining": clock_remaining_at_turn_start - elapsed_so_far,
@@ -2238,6 +2245,57 @@ def _airball_announcement(
 _SHOOTING_FOUL_ON_MISS_RESULT_TYPES = frozenset({"MISS", "PUTBACK_MISS"})
 
 
+def _resolve_turn_shooter_grid_coord(turn_result: Dict[str, Any]) -> Optional[GridCoord]:
+    """Live shot origin for FLSS / forced shots when skeleton coords are missing."""
+    for key in ("shooter_coords", "shot_spot"):
+        raw = turn_result.get(key)
+        if isinstance(raw, dict) and raw.get("x") is not None:
+            return {"x": float(raw["x"]), "y": float(raw.get("y", 25))}
+    roles = turn_result.get("roles")
+    if isinstance(roles, dict):
+        raw = roles.get("shot_spot")
+        if isinstance(raw, dict) and raw.get("x") is not None:
+            return {"x": float(raw["x"]), "y": float(raw.get("y", 25))}
+    shooter = turn_result.get("shooter")
+    shooter_coords = getattr(shooter, "coords", None)
+    if isinstance(shooter_coords, dict) and shooter_coords.get("x") is not None:
+        return {
+            "x": float(shooter_coords["x"]),
+            "y": float(shooter_coords.get("y", 25)),
+        }
+    return None
+
+
+def _resolve_shooter_shot_spot(
+    turn_result: Dict[str, Any],
+    shoot_step: AnimationStep,
+    shooter_id: str,
+) -> Optional[GridCoord]:
+    """Shooter grid at release — schema step first, then turn-level fallbacks."""
+    coords = (shoot_step.get("end") or {}).get("coords") or {}
+    shot_spot = coords.get(str(shooter_id)) or coords.get(shooter_id)
+    if isinstance(shot_spot, dict) and shot_spot.get("x") is not None:
+        return {"x": float(shot_spot["x"]), "y": float(shot_spot.get("y", 25))}
+    return _resolve_turn_shooter_grid_coord(turn_result)
+
+
+def _stamp_flss_shooter_on_step_end(
+    final_end_coords: Dict[str, GridCoord],
+    turn_result: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    skeleton_step: Dict[str, Any],
+) -> None:
+    """Ensure FLSS terminal shoot step includes the shooter for post-shot sub-steps."""
+    shooter_id = _safe_id(turn_result.get("shooter_id")) or _safe_id(turn_result.get("shooter"))
+    if not shooter_id:
+        shooter_pos = _shooter_pos_in_step(skeleton_step)
+        if shooter_pos:
+            shooter_id = _safe_id(_player_id_at_pos(off_lineup, shooter_pos))
+    coord = _resolve_turn_shooter_grid_coord(turn_result)
+    if shooter_id and coord:
+        final_end_coords[str(shooter_id)] = dict(coord)
+
+
 def _find_terminal_shoot_step(steps: List[AnimationStep]) -> Optional[AnimationStep]:
     """Last step whose start actions include ``shoot`` (FB lane-pass may be
     ``steps[-1]`` when shot-motion build failed). Falls back to ``steps[-1]``."""
@@ -2437,9 +2495,17 @@ def _build_post_shot_sub_steps(
         _safe_id(turn_result.get("shooter"))
         or _safe_id(turn_result.get("shooter_id"))
     )
-    shot_spot = shoot_step["end"]["coords"].get(shooter_id) if shooter_id else None
+    shot_spot = (
+        _resolve_shooter_shot_spot(turn_result, shoot_step, shooter_id)
+        if shooter_id
+        else None
+    )
     if not shooter_id or shot_spot is None:
         return  # Can't build ball flight without shooter coord.
+
+    # Keep shooter coord on the terminal shoot step for downstream readers.
+    shoot_end_coords = shoot_step.setdefault("end", {}).setdefault("coords", {})
+    shoot_end_coords[str(shooter_id)] = dict(shot_spot)
 
     overlay_players = _collect_overlay_players(turn_result)
     _apply_overlay_motion_to_shoot_step(

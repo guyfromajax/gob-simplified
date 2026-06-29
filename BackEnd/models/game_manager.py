@@ -1378,15 +1378,31 @@ class GameManager:
                     oreb_turn.get("current_turn") == "OREB"
                     and oreb_turn.get("result_type") == "PUTBACK_MISS"
                     and oreb_turn.get("rebound_type") == "DREB"
-                    and oreb_turn.get("next_play_type") in ("HCO", "FAST_BREAK")
+                    and (
+                        oreb_turn.get("next_play_type") in ("HCO", "FAST_BREAK")
+                        or oreb_turn.get("terminal_dreb_eoq")
+                        or oreb_turn.get("flss_after_dreb")
+                    )
                 ):
                     dreb_turn = self._build_dreb_turn_from_miss(oreb_turn)
                     if dreb_turn:
                         original_next = oreb_turn["next_play_type"]
                         oreb_turn["next_play_type"] = "DREB"
                         oreb_turn["next_turn"] = "DREB"
-                        dreb_turn["next_play_type"] = original_next
-                        dreb_turn["next_turn"] = original_next
+                        if oreb_turn.get("terminal_dreb_eoq"):
+                            from BackEnd.utils.eoq_clock_progression import finalize_terminal_dreb_turn
+
+                            dreb_turn["terminal_dreb_eoq"] = True
+                            finalize_terminal_dreb_turn(self, dreb_turn)
+                        elif oreb_turn.get("flss_after_dreb"):
+                            dreb_turn["late_clock_eoq"] = bool(oreb_turn.get("late_clock_eoq"))
+                            dreb_turn["flss_after_dreb"] = True
+                            dreb_turn["skip_dreb_outlet_lead_in"] = True
+                            dreb_turn["next_play_type"] = "HCO"
+                            dreb_turn["next_turn"] = "HCO"
+                        else:
+                            dreb_turn["next_play_type"] = original_next
+                            dreb_turn["next_turn"] = original_next
                         # Possession already flipped by the OREB-loop flip
                         # block above (oreb_turn.possession_flips=True →
                         # switch_possession). _build_dreb_turn_from_miss
@@ -1395,8 +1411,25 @@ class GameManager:
                         # rebounding team back to defense. Clear it.
                         dreb_turn["possession_flips"] = False
                         self._append_turn(dreb_turn)
-                        self._maybe_stamp_hco_setup(dreb_turn)
+                        if not oreb_turn.get("flss_after_dreb"):
+                            self._maybe_stamp_hco_setup(dreb_turn)
                         self.turn_manager.update_clock_and_possession(dreb_turn)
+                        if oreb_turn.get("flss_after_dreb"):
+                            from BackEnd.utils.eoq_clock_progression import schedule_flss_after_dreb
+
+                            rebounder_id = (
+                                oreb_turn.get("rebounderId")
+                                or self.game_state.pop("_flss_after_dreb_rebounder_id", None)
+                            )
+                            rebounder = None
+                            if rebounder_id is not None:
+                                for player in (self.offense_team.lineup or {}).values():
+                                    if player is not None and str(player.player_id) == str(rebounder_id):
+                                        rebounder = player
+                                        break
+                            if rebounder is None:
+                                rebounder = self.game_state.get("last_rebounder")
+                            schedule_flss_after_dreb(self, dreb_turn, rebounder)
 
                 # If the OREB turn resulted in another OREB, resolve_offensive_rebound_turn
                 # will have set pending_oreb again. The while loop will process it.
@@ -1457,6 +1490,7 @@ class GameManager:
             and (
                 result.get("next_play_type") in ("HCO", "FAST_BREAK")
                 or result.get("terminal_dreb_eoq")
+                or result.get("flss_after_dreb")
             )
         )
         if dreb_promotion_candidate and not dreb_promotion_eligible:
@@ -1498,14 +1532,21 @@ class GameManager:
                             )
                         except Exception:
                             pass
+                    elif result.get("flss_after_dreb"):
+                        dreb_turn["late_clock_eoq"] = bool(result.get("late_clock_eoq"))
+                        dreb_turn["flss_after_dreb"] = True
+                        dreb_turn["skip_dreb_outlet_lead_in"] = True
+                        dreb_turn["next_play_type"] = "HCO"
+                        dreb_turn["next_turn"] = "HCO"
                     else:
                         dreb_turn["next_play_type"] = original_next
                         dreb_turn["next_turn"] = original_next
 
                 self._append_turn(dreb_turn)
-                # DREB turn doesn't go through the main _micro_turn flow,
-                # so stamp hco_setup here for its DREB → HCO transition.
-                self._maybe_stamp_hco_setup(dreb_turn)
+                if not result.get("flss_after_dreb"):
+                    # DREB turn doesn't go through the main _micro_turn flow,
+                    # so stamp hco_setup here for its DREB → HCO transition.
+                    self._maybe_stamp_hco_setup(dreb_turn)
                 self.turn_manager.update_clock_and_possession(dreb_turn)
 
                 if (
@@ -1515,7 +1556,23 @@ class GameManager:
                     old_offense = self.offense_team.name
                     self.switch_possession()
                     dreb_turn["possession_flips"] = False
-                    if dreb_turn.get("next_play_type") == "HCO":
+                    if result.get("flss_after_dreb"):
+                        from BackEnd.utils.eoq_clock_progression import schedule_flss_after_dreb
+
+                        rebounder_id = (
+                            result.get("rebounderId")
+                            or self.game_state.pop("_flss_after_dreb_rebounder_id", None)
+                        )
+                        rebounder = None
+                        if rebounder_id is not None:
+                            for player in (self.offense_team.lineup or {}).values():
+                                if player is not None and str(player.player_id) == str(rebounder_id):
+                                    rebounder = player
+                                    break
+                        if rebounder is None:
+                            rebounder = self.game_state.get("last_rebounder")
+                        schedule_flss_after_dreb(self, dreb_turn, rebounder)
+                    elif dreb_turn.get("next_play_type") == "HCO":
                         prev_positions = {}
                         for pos, player in (self.offense_team.lineup or {}).items():
                             if player is None:

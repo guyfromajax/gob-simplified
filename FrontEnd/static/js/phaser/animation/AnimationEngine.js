@@ -815,6 +815,14 @@ export class AnimationEngine {
       return;
     }
 
+    if (turnData?.skip_dreb_outlet_lead_in || turnData?.flss_after_dreb || turnData?.flss_possession_pending) {
+      console.warn(tag, "skip: flss_after_dreb", {
+        turn_index: turnData?.index ?? this.scene?.currentTurn,
+        next_play_type: turnData?.next_play_type,
+      });
+      return;
+    }
+
     const nextRaw = turnData?.next_play_type;
     const next = typeof nextRaw === "string" ? nextRaw.toUpperCase() : "";
     if (next === "FAST_BREAK") {

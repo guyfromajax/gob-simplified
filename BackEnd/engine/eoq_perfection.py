@@ -269,6 +269,26 @@ def compute_flss_drive_plan(
     )
 
 
+def _compute_flss_drift_endpoint(
+    start: Dict[str, float],
+    drive_budget: float,
+    player: Any,
+    *,
+    is_home_offense: bool,
+) -> Dict[str, float]:
+    """Offense teammates drift toward the attacking basket during post-DREB FLSS."""
+    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+
+    sx = float(start.get("x", 50))
+    sy = float(start.get("y", 25))
+    direction = 1.0 if is_home_offense else -1.0
+    basket_x = _flss_basket_x(is_home_offense=is_home_offense)
+    rate = float(_ag_grid_per_game_sec(player, "cruise"))
+    max_dist = rate * max(0.0, float(drive_budget))
+    target_x = sx + direction * min(max_dist, abs(basket_x - sx) * 0.85)
+    return {"x": round(max(1.0, min(99.0, target_x)), 2), "y": sy}
+
+
 def build_flss_skeleton_steps(
     shooter_pos: str,
     *,
@@ -277,6 +297,9 @@ def build_flss_skeleton_steps(
     start_coords: Dict[str, float],
     end_coords: Dict[str, float],
     drive_plan: FlssDrivePlan,
+    off_lineup: Optional[Dict[str, Any]] = None,
+    is_home_offense: Optional[bool] = None,
+    from_dreb: bool = False,
 ) -> List[Dict[str, Any]]:
     """Two-step FLSS graph: optional sprint drive, then terminal shot."""
     steps: List[Dict[str, Any]] = []
@@ -299,6 +322,23 @@ def build_flss_skeleton_steps(
         step0["pos_actions"][shooter_pos] = drive_action
         if drive_plan.pull_up_jumper:
             step0["_flss_pull_up"] = True
+        if from_dreb and off_lineup and is_home_offense is not None:
+            for pos, player in off_lineup.items():
+                if pos == shooter_pos or not player:
+                    continue
+                player_start = getattr(player, "coords", None) or {"x": 50, "y": 25}
+                drift_end = _compute_flss_drift_endpoint(
+                    player_start,
+                    drive_plan.drive_budget,
+                    player,
+                    is_home_offense=is_home_offense,
+                )
+                step0["pos_actions"][pos] = {
+                    "action": ACTIONS["CUT"],
+                    "location": spot_end,
+                    "coords": dict(drift_end),
+                    "archetype": "cruise",
+                }
         steps.append(step0)
 
     shoot_action: Dict[str, Any] = {
@@ -373,6 +413,16 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             "flss": True,
         }
 
+    from_dreb = bool(game_state.pop("flss_from_dreb", False))
+    if from_dreb:
+        log_eoq_step(
+            game,
+            "FLSS",
+            "post_dreb_start",
+            "START",
+            extra={"ball_handler_id": getattr(ball_handler, "player_id", None)},
+        )
+
     shooter = ball_handler
     shooter_pos = get_player_position(off_lineup, shooter) or "PG"
     shooter_coords = getattr(shooter, "coords", None) or {"x": 50, "y": 25}
@@ -433,6 +483,9 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         start_coords={"x": sx, "y": sy},
         end_coords=shooter_coords,
         drive_plan=drive_plan,
+        off_lineup=off_lineup if from_dreb else None,
+        is_home_offense=is_home_off if from_dreb else None,
+        from_dreb=from_dreb,
     )
 
     defender = None
@@ -467,6 +520,8 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             "skeleton": {"steps": skeleton_steps},
             "shooter_coords": dict(shooter_coords),
         }
+        if from_dreb:
+            result["flss_from_dreb"] = True
         if made:
             apply_scoring(
                 game,
@@ -480,8 +535,11 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             shooter.record_stat("FGA")
             if points == 3:
                 shooter.record_stat("3PTA")
-            result["ball_bounce_x"] = ex + (2 if is_home_off else -2)
-            result["ball_bounce_y"] = ey
+            from BackEnd.utils.shared import calculate_bounce_spot
+
+            bounce_spot = calculate_bounce_spot(game, shooter_coords=shooter_coords)
+            result["ball_bounce_x"] = bounce_spot["x"]
+            result["ball_bounce_y"] = bounce_spot["y"]
             result["text"] = f"{get_name_safe(shooter)} misses the desperation heave."
         strip_terminal_rebound_fields(result)
         log_eoq_step(
@@ -555,12 +613,22 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     result["flss_vo"] = flss_vo
     result["flss_heave_sfx"] = heave_sfx
     result["flss_pull_up"] = drive_plan.pull_up_jumper
+    if from_dreb:
+        result["flss_from_dreb"] = True
     from BackEnd.utils.eoq_clock_progression import mark_late_clock_eoq_turn
 
     mark_late_clock_eoq_turn(result)
     result["forced_shot"] = True
     result["forced_shot_reason"] = "FLSS"
     result["current_turn"] = current_state
+    result["shooter_coords"] = dict(shooter_coords)
+    if str(result.get("result_type") or "").upper() == "MISS":
+        if result.get("ball_bounce_x") is None or result.get("ball_bounce_y") is None:
+            from BackEnd.utils.shared import calculate_bounce_spot
+
+            bounce_spot = calculate_bounce_spot(game, shooter_coords=shooter_coords)
+            result["ball_bounce_x"] = bounce_spot["x"]
+            result["ball_bounce_y"] = bounce_spot["y"]
     log_eoq_step(
         game,
         "FLSS",

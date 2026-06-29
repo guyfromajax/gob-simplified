@@ -1668,13 +1668,23 @@ class TurnManager:
                     )
                     from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
 
+                    flss_from_dreb = bool(game_state.get("flss_from_dreb"))
                     begin_eoq_trace_sequence(self.game)
                     log_eoq_chain_event(
                         self.game,
                         "FLSS_POSSESSION_START",
-                        extra={"offensive_state": state, "from": "flss_possession_pending"},
+                        extra={
+                            "offensive_state": state,
+                            "from": "flss_from_dreb" if flss_from_dreb else "flss_possession_pending",
+                        },
                     )
-                    log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state, "from": "post_inbound"})
+                    log_eoq_step(
+                        self.game,
+                        "FLSS",
+                        "resolve_flss",
+                        "START",
+                        extra={"state": state, "from": "post_dreb" if flss_from_dreb else "post_inbound"},
+                    )
                     result = resolve_flss_shot_logic(self.game, state)
                     log_eoq_step(
                         self.game,
@@ -4672,11 +4682,21 @@ class TurnManager:
                     elif rebound_type == "OREB" and new_rebounder is None:
                         logging.error(f"❌ [PUTBACK MISS => REBOUND] Cannot set pending_oreb - rebounder not found! ID: {rebounder_id}, Type: {rebound_type}")
                     elif rebound_data.get("rebound_type") == "DREB":
-                        # Defensive rebound - preserve next_play_type from original shot
-                        # FB eligibility + play key are set on the miss shot turn (`pending_dreb_fb_play_key` / offensive_state).
-                        # Don't recalculate here.
-                        next_play_type = game_state.get("offensive_state", "HCO")
-                        result["next_play_type"] = next_play_type
+                        from BackEnd.utils.eoq_clock_progression import (
+                            apply_post_miss_rebound_routing,
+                            is_late_clock_eoq_chain_active,
+                            should_route_eoq_rebound,
+                        )
+
+                        if new_rebounder and should_route_eoq_rebound(self.game, result):
+                            if is_late_clock_eoq_chain_active(game_state) and not result.get("late_clock_eoq"):
+                                result["late_clock_eoq"] = True
+                            apply_post_miss_rebound_routing(
+                                self.game, result, new_rebounder, "DREB"
+                            )
+                        else:
+                            next_play_type = game_state.get("offensive_state", "HCO")
+                            result["next_play_type"] = next_play_type
                 
                 # Compute stat deltas (same as run_micro_turn)
                 # Exclude REB from deltas since it's automatically calculated from OREB + DREB

@@ -15,6 +15,9 @@ OREB_PUTBACK_ONLY_THRESHOLD = 6
 # best-effort Final Turn (walk-up consumes game time per Situational_Logic_System.md).
 FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK = 8
 LATE_CLOCK_BIP_RUNOFF_SECONDS = 2
+# Post-DREB in an active EOQ chain: FLSS when clock remains above this threshold;
+# at or below → terminal DREB (capture animation + full clock burn).
+POST_DREB_FLSS_MIN_CLOCK = 2
 
 TIMEOUT_SNAPSHOT_KEYS = (
     "timeout_next_play_type",
@@ -83,6 +86,8 @@ def is_late_clock_eoq_chain_active(game_state: Optional[Dict[str, Any]]) -> bool
 def clear_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
     game_state.pop("late_clock_eoq_chain_active", None)
     game_state.pop("flss_possession_pending", None)
+    game_state.pop("flss_from_dreb", None)
+    game_state.pop("_flss_after_dreb_rebounder_id", None)
     game_state.pop("final_shot_possession_active", None)
     game_state.pop("eoq_trace_seq", None)
     game_state.pop("eoq_trace_turn_in_seq", None)
@@ -106,6 +111,13 @@ def should_route_final_turn_to_flss(time_remaining: Optional[int]) -> bool:
     if tr <= 0:
         return True
     return tr <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK
+
+
+def should_route_post_dreb_flss(time_remaining: Optional[int]) -> bool:
+    """True when enough game clock remains for post-DREB FLSS (rebounder sprint-and-shoot)."""
+    if time_remaining is None:
+        return False
+    return int(time_remaining) > POST_DREB_FLSS_MIN_CLOCK
 
 
 def should_route_eoq_rebound(game: Any, result: Dict[str, Any]) -> bool:
@@ -156,11 +168,17 @@ def apply_post_miss_rebound_routing(
         return True
 
     if is_late_clock_eoq(time_remaining) and _late_chain_active(game, result):
-        result["terminal_dreb_eoq"] = True
         mark_late_clock_eoq_turn(result)
         result["next_play_type"] = "DREB"
         result["next_turn"] = "DREB"
         gs.pop("_shot_dreb_fb_play_key", None)
+        if should_route_post_dreb_flss(time_remaining):
+            result["flss_after_dreb"] = True
+            rebounder_id = getattr(rebounder, "player_id", None)
+            if rebounder_id is not None:
+                gs["_flss_after_dreb_rebounder_id"] = rebounder_id
+        else:
+            result["terminal_dreb_eoq"] = True
         return True
 
     gs["offensive_state"] = "HCO"
@@ -224,9 +242,58 @@ def apply_eoq_final_free_throw_routing(
         result["next_play_type"] = "OREB"
         result["next_turn"] = "OREB"
     elif rebound_type == "DREB":
-        result["terminal_dreb_eoq"] = True
         result["next_play_type"] = "DREB"
         result["next_turn"] = "DREB"
+        if should_route_post_dreb_flss(time_remaining):
+            result["flss_after_dreb"] = True
+            rebounder = gs.get("last_rebounder")
+            rebounder_id = getattr(rebounder, "player_id", None) if rebounder is not None else None
+            if rebounder_id is not None:
+                gs["_flss_after_dreb_rebounder_id"] = rebounder_id
+        else:
+            result["terminal_dreb_eoq"] = True
+
+
+def schedule_flss_after_dreb(
+    game: Any,
+    dreb_source_turn: Optional[Dict[str, Any]],
+    rebounder: Any = None,
+) -> None:
+    """After discrete DREB in an EOQ chain when clock remains, next possession is FLSS."""
+    if not isinstance(dreb_source_turn, dict):
+        return
+    gs = game.game_state
+    time_remaining = int(gs.get("time_remaining") or 0)
+    if time_remaining <= 0 or not should_route_post_dreb_flss(time_remaining):
+        return
+    if not (
+        dreb_source_turn.get("late_clock_eoq")
+        or dreb_source_turn.get("flss_after_dreb")
+        or is_late_clock_eoq_chain_active(gs)
+    ):
+        return
+    activate_late_clock_eoq_chain(gs)
+    gs["flss_possession_pending"] = True
+    gs["flss_from_dreb"] = True
+    gs["offensive_state"] = "HCO"
+    if rebounder is not None:
+        gs["last_ball_handler"] = rebounder
+    dreb_source_turn["flss_possession_pending"] = True
+    try:
+        from BackEnd.engine.eoq_debug_log import begin_eoq_trace_sequence, log_eoq_chain_event
+
+        begin_eoq_trace_sequence(game)
+        log_eoq_chain_event(
+            game,
+            "FLSS_SCHEDULED_AFTER_DREB",
+            extra={
+                "dreb_late_clock_eoq": dreb_source_turn.get("late_clock_eoq"),
+                "rebounder_id": getattr(rebounder, "player_id", None),
+                "time_remaining": time_remaining,
+            },
+        )
+    except Exception:
+        pass
 
 
 def schedule_flss_after_inbound(game: Any, inbound_source_turn: Optional[Dict[str, Any]]) -> None:

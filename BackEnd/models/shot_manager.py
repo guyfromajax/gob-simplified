@@ -255,6 +255,22 @@ class ShotManager:
         logging.debug(f"🔍 [SHOT LOCATION] No shoot action found for {shooter_pos} in any step")
         return (None, None)
 
+    def _shooter_grid_for_bounce(self, roles, shooter):
+        """Display-grid shot origin for bounce math (prefers live coords over spot name)."""
+        shot_spot = roles.get("shot_spot")
+        if isinstance(shot_spot, dict) and shot_spot.get("x") is not None:
+            return {
+                "x": float(shot_spot["x"]),
+                "y": float(shot_spot.get("y", 25)),
+            }
+        shooter_coords = getattr(shooter, "coords", None)
+        if isinstance(shooter_coords, dict) and shooter_coords.get("x") is not None:
+            return {
+                "x": float(shooter_coords["x"]),
+                "y": float(shooter_coords.get("y", 25)),
+            }
+        return None
+
     def _compute_miss_bounce_spot(self, roles, shooter, off_team):
         """Grid coord where a missed shot's ball rests for schema ``[bounce]``."""
         foul_block_spot_used = getattr(self, "_foul_block_spot", None)
@@ -267,6 +283,9 @@ class ShotManager:
             is_away_offense = off_team.team_id == self.game.away_team.team_id
             basket_x = 9 if is_away_offense else 91
             return calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
+        grid = self._shooter_grid_for_bounce(roles, shooter)
+        if grid:
+            return calculate_bounce_spot(self.game, shooter_coords=grid)
         _, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
         return calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
 
@@ -2004,8 +2023,7 @@ class ShotManager:
                     if block_spot_used:
                         bounce_spot = block_spot_used
                     else:
-                        shooter_pos, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
-                        bounce_spot = calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
+                        bounce_spot = self._compute_miss_bounce_spot(roles, shooter, off_team)
 
                 # For fast-break misses, rebound outcome is fully resolved above in the
                 # FAST_BREAK-specific block. Do not run the shared HCO rebound pipeline,

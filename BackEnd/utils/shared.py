@@ -1351,90 +1351,82 @@ def calculate_block_spot(shooter_x, shooter_y, is_away_offense):
     return {"x": block_x, "y": block_y}
 
 
-def calculate_bounce_spot(game, basket_x=None, basket_y=25, shooter_spot=None):
+def _bounce_variance_for_shot_distance(distance: float):
+    """Return (x_offset_min, x_offset_max, y_variance) from shooter-to-basket distance."""
+    if distance < 15:
+        return 2, 6, 6
+    if distance <= 20:
+        return 2, 8, 8
+    if distance <= 30:
+        return 3, 14, 10
+    if distance <= 45:
+        return 5, 22, 12
+    return 8, min(40, max(12, int(distance * 0.55))), 14
+
+
+def calculate_bounce_spot(
+    game,
+    basket_x=None,
+    basket_y=25,
+    shooter_spot=None,
+    shooter_coords=None,
+):
     """
     Calculate the bounce spot coordinates for a missed shot.
-    Uses distance-based variance: longer shots have wider bounce variance.
-    
+    Uses distance-based variance: longer shots bounce farther from the basket.
+
     Args:
         game: GameManager instance
         basket_x: X coordinate of the basket (if None, determines from offense team)
         basket_y: Y coordinate of the basket (default 25)
         shooter_spot: Optional string name of shooter's spot (e.g., "key", "upper wing")
-                     If provided, calculates distance to determine variance range
-    
+        shooter_coords: Optional display-grid ``{x, y}`` for live shot location (FLSS, etc.)
+
     Returns:
         dict: {"x": float, "y": float} - bounce spot coordinates
     """
     import math
     from BackEnd.constants import HCO_STRING_SPOTS
-    
+
     if basket_x is None:
-        # Determine basket based on which team is on offense
         off_team = game.offense_team
         is_away_offense = off_team.team_id == game.away_team.team_id
-
-        # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9)
         basket_x = 9 if is_away_offense else 91
     else:
-        # Caller passed basket_x explicitly; infer orientation from its value
-        # so shooter_coords below can be flipped to match.
         is_away_offense = basket_x < 50
 
-    # Determine variance ranges based on shot distance
-    if shooter_spot and shooter_spot in HCO_STRING_SPOTS:
-        # `HCO_STRING_SPOTS` is keyed in HOME orientation (e.g., upper wing at
-        # x=76). For away-offense distance math we must flip to display
-        # orientation so shooter and basket are in the same frame — otherwise
-        # the distance is computed across the entire court and the shot is
-        # always classified "long," over-inflating bounce variance.
+    resolved_shooter_coords = None
+    if isinstance(shooter_coords, dict) and shooter_coords.get("x") is not None:
+        resolved_shooter_coords = {
+            "x": float(shooter_coords["x"]),
+            "y": float(shooter_coords.get("y", basket_y)),
+        }
+    elif shooter_spot and shooter_spot in HCO_STRING_SPOTS:
         spot_home = HCO_STRING_SPOTS[shooter_spot]
         if is_away_offense:
-            shooter_coords = {"x": 100 - spot_home["x"], "y": spot_home["y"]}
+            resolved_shooter_coords = {"x": 100 - spot_home["x"], "y": spot_home["y"]}
         else:
-            shooter_coords = dict(spot_home)
+            resolved_shooter_coords = dict(spot_home)
 
-        # Calculate distance from shooter to basket (using actual basket coordinates)
+    if resolved_shooter_coords is not None:
         distance = math.sqrt(
-            (shooter_coords["x"] - basket_x) ** 2 +
-            (shooter_coords["y"] - basket_y) ** 2
+            (resolved_shooter_coords["x"] - basket_x) ** 2
+            + (resolved_shooter_coords["y"] - basket_y) ** 2
         )
-        
-        # Classify shot distance
-        if distance < 15:
-            # Short shot: x = 2-6 (outward only), y = ±6
-            x_variance_max = 6
-            y_variance = 6
-        elif distance <= 20:
-            # Medium shot: x = 2-8 (outward only), y = ±8
-            x_variance_max = 8
-            y_variance = 8
-        else:
-            # Long shot: x = 2-10 (outward only), y = ±10
-            x_variance_max = 10
-            y_variance = 10
+        x_min, x_max, y_variance = _bounce_variance_for_shot_distance(distance)
     else:
-        # Default to medium if shooter spot not provided
-        x_variance_max = 8
-        y_variance = 8
-    
-    # X variance: inward from basket toward midcourt (where rebounders gather).
-    # Home team shooting at home rim (x=91): bounce goes left, into the paint (x < 91)
-    # Away team shooting at away rim (x=9): bounce goes right, into the paint (x > 9)
+        x_min, x_max, y_variance = 2, 8, 8
+
     if basket_x == 91:
-        x_offset = random.randint(2, x_variance_max)
+        x_offset = random.randint(x_min, x_max)
         bounce_x = basket_x - x_offset
     else:
-        x_offset = random.randint(2, x_variance_max)
+        x_offset = random.randint(x_min, x_max)
         bounce_x = basket_x + x_offset
-    
-    # Y variance: ±variance from basket
+
     bounce_y = basket_y + random.randint(-y_variance, y_variance)
-    
-    # Clamp to valid court bounds
     bounce_x = max(0, min(100, bounce_x))
     bounce_y = max(0, min(50, bounce_y))
-    
     return {"x": bounce_x, "y": bounce_y}
 
 
