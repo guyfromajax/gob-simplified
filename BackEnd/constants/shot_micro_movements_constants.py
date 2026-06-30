@@ -6,7 +6,7 @@ CONTEST_DEFENSE_WIN_THRESHOLD = -150.0
 
 # Footwork geometry
 MICRO_STEP_GRID = 4.5
-JAB_STEP_GRID = 0.8
+JAB_STEP_GRID = 2.0
 JAB_COUNTER_MULTIPLIER = 2.0
 
 # Defender track / contact gaps (grid units)
