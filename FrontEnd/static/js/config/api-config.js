@@ -202,6 +202,80 @@ const API_CONFIG = {
     }
     return false;
   },
+
+  // ===========================================================================
+  // Player image resolution (Cloudflare R2 + Image Transformations)
+  // ---------------------------------------------------------------------------
+  // Canonical masters live in R2 at: players/master/<uuid>.png, served via the
+  // custom domain assets.geekedoutgames.com. Cloudflare Image Transformations
+  // resize + convert to AVIF/WebP on the fly. ALL player-image surfaces should
+  // resolve through getPlayerImageUrl()/getGenericHeadshotUrl() — do not build
+  // image paths inline.
+  // ===========================================================================
+
+  // --- Tunable constants ---
+  PLAYER_IMAGE_REMOTE_BASE: 'https://assets.geekedoutgames.com', // R2 custom domain
+  PLAYER_IMAGE_MASTER_PREFIX: 'players/master',                  // object key prefix
+  // Named render sizes (px width). `full` = untransformed master.
+  PLAYER_IMAGE_SIZES: { thumb: 128, card: 256, modal: 512, full: null },
+
+  /**
+   * Whether player images are served from remote R2/CDN.
+   * - Explicit override wins: set window.PLAYER_IMAGE_REMOTE = true|false.
+   * - localhost/127.0.0.1 default to LOCAL static (dev never requires Cloudflare).
+   * - All other hosts (staging/prod) default to REMOTE.
+   * The explicit override is also the single kill-switch for a safe rollback.
+   * @returns {boolean}
+   */
+  usePlayerImageRemote() {
+    if (typeof window !== 'undefined' && typeof window.PLAYER_IMAGE_REMOTE === 'boolean') {
+      return window.PLAYER_IMAGE_REMOTE;
+    }
+    const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+    if (host === 'localhost' || host === '127.0.0.1') return false;
+    return true;
+  },
+
+  /**
+   * Build a Cloudflare Image Transformations URL for an R2 object.
+   * @private
+   */
+  _remotePlayerImageUrl(objectPath, size) {
+    const width = this.PLAYER_IMAGE_SIZES[size];
+    const base = this.PLAYER_IMAGE_REMOTE_BASE;
+    if (!width) return `${base}/${objectPath}`; // full master, no transform
+    return `${base}/cdn-cgi/image/width=${width},format=auto/${objectPath}`;
+  },
+
+  /**
+   * Resolve a player headshot URL (remote transformed, or local static fallback).
+   * Pair with an onerror handler that falls back to getGenericHeadshotUrl().
+   * @param {string} playerId - player UUID (filenames are <uuid>.png)
+   * @param {Object} [opts]
+   * @param {('thumb'|'card'|'modal'|'full')} [opts.size='card'] - named render size
+   * @returns {string}
+   */
+  getPlayerImageUrl(playerId, opts = {}) {
+    const size = opts.size || 'card';
+    if (!playerId) return this.getGenericHeadshotUrl(opts);
+    if (this.usePlayerImageRemote()) {
+      return this._remotePlayerImageUrl(`${this.PLAYER_IMAGE_MASTER_PREFIX}/${playerId}.png`, size);
+    }
+    return this.buildStaticPath(`/images/players/${playerId}.png`);
+  },
+
+  /**
+   * Resolve the generic fallback headshot URL.
+   * @param {Object} [opts] - { size }
+   * @returns {string}
+   */
+  getGenericHeadshotUrl(opts = {}) {
+    const size = opts.size || 'card';
+    if (this.usePlayerImageRemote()) {
+      return this._remotePlayerImageUrl(`${this.PLAYER_IMAGE_MASTER_PREFIX}/generic_headshot.png`, size);
+    }
+    return this.buildStaticPath('/images/players/generic_headshot.png');
+  },
 };
 
 // Make it globally available

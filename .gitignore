@@ -31,3 +31,7 @@ package-lock.json
 # God mode config overrides (per-environment, not committed)
 config_overrides.json
 FrontEnd/static/sounds/
+
+# Cloudflare R2 credentials (never commit)
+scripts/.r2.env
+.r2.env

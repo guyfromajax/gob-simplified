@@ -1598,11 +1598,13 @@ export function createGameScene(Phaser) {
         
         if (!tooltip) return;
         
-        // Set player image (use static prefix for localhost)
+        // Set player image via central resolver (R2 + transforms); generic fallback on error.
         const base = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') ? '/static' : '');
-        const playerPhoto = player.photo || `${base}/images/players/${playerId}.png`;
-        image.src = playerPhoto;
+        image.src = (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl)
+          ? window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' })
+          : `${base}/images/players/${playerId}.png`;
         image.onerror = () => {
+          image.onerror = null;
           image.src = `${base}/images/players/generic_headshot.png`;
         };
         

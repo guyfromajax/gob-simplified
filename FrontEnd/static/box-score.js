@@ -495,8 +495,16 @@ async function renderPlayerOfTheGameSection() {
     statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
     if (potgPortrait && potg.playerId) {
       potgPortrait.style.display = '';
-      potgPortrait.src = `${staticBase}/images/players/${potg.playerId}.png`;
+      potgPortrait.src = window.API_CONFIG?.getPlayerImageUrl
+        ? window.API_CONFIG.getPlayerImageUrl(potg.playerId, { size: 'card' })
+        : `${staticBase}/images/players/${potg.playerId}.png`;
       potgPortrait.alt = potg.name || '';
+      potgPortrait.onerror = function () {
+        this.onerror = null;
+        this.src = window.API_CONFIG?.getGenericHeadshotUrl
+          ? window.API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
+          : `${staticBase}/images/players/generic_headshot.png`;
+      };
     } else if (potgPortrait) {
       potgPortrait.style.display = 'none';
     }

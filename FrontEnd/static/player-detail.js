@@ -361,9 +361,13 @@
     const height = formatHeight(heightValue);
     const weightValue = player.weight || player.WT || '--';
     const jersey = (typeof player.jersey === 'number') ? player.jersey : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '' ? player.jersey : '');
-    const fallbackPhoto = `${staticPrefix}/images/players/${player._id}.png`;
-    const genericPhoto = `${staticPrefix}/images/players/generic_headshot.png`;
-    const photo = normalizePhotoUrl(player.photo, staticPrefix) || fallbackPhoto;
+    const fallbackPhoto = window.API_CONFIG?.getPlayerImageUrl
+      ? window.API_CONFIG.getPlayerImageUrl(player._id, { size: 'modal' })
+      : `${staticPrefix}/images/players/${player._id}.png`;
+    const genericPhoto = window.API_CONFIG?.getGenericHeadshotUrl
+      ? window.API_CONFIG.getGenericHeadshotUrl({ size: 'modal' })
+      : `${staticPrefix}/images/players/generic_headshot.png`;
+    const photo = fallbackPhoto;
     const attributes = player.attributes || {};
     const year = formatYear(player.year);
     const positionAbbrev = getHighestPosition(player);

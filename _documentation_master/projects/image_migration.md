@@ -81,32 +81,29 @@ Add one helper `API_CONFIG.getPlayerImageUrl(player, size)`; replace all ~10 cal
 The previously-planned nameserver migration is **not needed** and has been dropped.
 
 ### Phase 1: Cloudflare setup
-1. ~~Create R2 bucket `gob-player-images`~~ — DONE.
-2. Connect custom domain `assets.geekedoutgames.com`; confirm public read.
-3. Enable **Image Transformations**; verify a `/cdn-cgi/image/...` URL works.
-4. Avoid prod use of `r2.dev` dev URL.
-5. **Set CORS headers** (needed for Phaser/WebGL — see Phase 4).
+1. ✅ DONE — R2 bucket `gob-player-images` created.
+2. ✅ DONE — custom domain `assets.geekedoutgames.com` connected; public read verified (200 + checksum match, 2026-06-30).
+3. ✅ DONE (2026-06-30) — **Image Transformations** enabled on `geekedoutgames.com` zone (required subscribing to the free "Images & Stream — $0/mo" plan with **"Use my own storage"** = $0; images stay in R2). Verified live: a 4.6 MB master serves as AVIF at **3.4 KB / 7.3 KB / 16 KB** for width 128/256/512 (`format=auto` → AVIF/WebP/PNG fallback). URL pattern: `https://assets.geekedoutgames.com/cdn-cgi/image/width=<W>,format=auto,fit=cover/players/master/<uuid>.png`. Free tier = 5,000 unique transforms/mo.
+4. ✅ N/A — not using `r2.dev`; custom domain only.
+5. ⬜ TODO — **Set CORS headers** (needed for Phaser/WebGL — see Phase 4).
 
-### Phase 2: Upload masters
-1. Upload `FrontEnd/static/images/players/*` → `players/master/...` (rclone or aws-cli against R2).
-2. Preserve UUID filenames; upload `generic_headshot.png`.
-3. Manifest per file: `player_uuid, local_path, asset_key, file_size, checksum, upload_status`.
-4. Verify uploaded count == local count.
-5. Spot-check (originals + transformed variants) in browser:
-   - Xenon Fletcher `8487cb3b-887b-472a-90d9-f46caa572d46.png`
-   - Emery Landraneau `1ac0782e-e1b3-4cb6-9462-b1ff032ed9ed.png`
-   - `generic_headshot.png`
+### Phase 2: Upload masters — ✅ DONE (2026-06-30)
+- Script: `scripts/upload_player_images_to_r2.py` (boto3 → R2 S3 API; reads `scripts/.r2.env`, gitignored).
+- Idempotent: skips objects whose stored `sha256` metadata matches local → re-run = only new/changed images upload. **This is the runbook for adding new players.**
+- Result: **98/98 uploaded** to `players/master/<uuid>.png`, 0 failed. Remote count == local count; 8 checksum spot-checks all matched.
+- Manifest: `scripts/r2_upload_manifest.csv` (filename, asset_key, remote_url, file_size, sha256, status).
+- Credentials: R2 Account API token "R2 Account Token", Object Read & Write, scoped to bucket only. (Optional: rotate token at project end — secret transited IDE sync.)
 
 ### Phase 3: DB backfill
 1. Add `photo_asset_key` (+ `photo_version=1`) for every player with a matching image.
 2. Don't remove/overwrite `photo`. Preserve IDs/filenames exactly.
 3. Log mismatches. Summary: `players_scanned, with_remote, missing_remote, orphaned_remote, updated, skipped`.
 
-### Phase 4: Centralized fallback-aware resolution
-- Implement `getPlayerImageUrl(player, size)` in `api-config.js`; migrate all surfaces below.
-- **Phaser CORS:** cross-origin textures taint WebGL without correct CORS + `crossOrigin:'anonymous'` on load. Handle the Phaser preload path deliberately, separate from `<img>` surfaces.
-
-Surfaces to audit: roster, set-lineup, player modal/account, Phaser headshot preload, announcements (primary + secondary), foul-out popup, POTG popup, Community Highlights, any stat/player cards.
+### Phase 4: Centralized fallback-aware resolution — ✅ CODE DONE (2026-06-30)
+- Added `API_CONFIG.getPlayerImageUrl(playerId, {size})` + `getGenericHeadshotUrl({size})` + `usePlayerImageRemote()` kill-switch in `FrontEnd/static/js/config/api-config.js`. Sizes: thumb 128 / card 256 / modal 512 / full. localhost → local static; staging/prod → remote; `window.PLAYER_IMAGE_REMOTE=true|false` overrides (rollback switch).
+- Migrated surfaces (14 files, all parse clean): roster.js, player-detail.js, box-score.js, training-report.js, set-lineup.js (×2), shared/potg.js, phaser/gameScene.js (tooltip), phaser/bootGame.js (made-shot), utils/announcements.js (its `getPlayerImageUrl`), utils/foulOutPopup.js, utils/defenseMatchupsPopup.js, utils/gameCompletionPopup.js. Each keeps an onerror→generic fallback (generic stays deployed locally).
+- **Phaser WebGL textures:** `setup/preloadPlayerHeadshots.js` now loads via resolver + `scene.load.crossOrigin='anonymous'`. **REQUIRES** a CORS response header on the asset zone (see ⬜ below) or on-court markers fall back to initials (graceful).
+- ⬜ TODO (dashboard): add `Access-Control-Allow-Origin` header on `assets.geekedoutgames.com` (Transform Rule / Modify Response Header) so WebGL headshot textures load cross-origin.
 
 ### Phase 5: Env config
 ```text

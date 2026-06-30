@@ -1598,14 +1598,18 @@ function updateSlotDisplay(slot) {
       rightWidth = `${fillPercent}%`;
     }
     
-    const imgBase = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/' : '/images/players/');
-    const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/images/players/generic_headshot.png') : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
+    const playerImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getPlayerImageUrl)
+      ? API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' })
+      : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? `/static/images/players/${playerId}.png` : `/images/players/${playerId}.png`);
+    const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getGenericHeadshotUrl)
+      ? API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
+      : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
     const slotDisplayName =
       typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
     // Build slot content HTML
     slotContent.innerHTML = `
       <div class="player-image-container">
-        <img class="player-image" src="${imgBase}${playerId}.png" 
+        <img class="player-image" src="${playerImg}"
              onerror="this.src='${genericImg}'" alt="${player.name}">
       </div>
       <div class="slot-info">
@@ -2706,14 +2710,18 @@ function createCardFront(player) {
     headshotContainer.style.transform = 'scale(1)';
   });
   
-  // Player image (use static prefix for localhost)
-  const playerImgBase = staticPrefix + '/images/players/';
+  // Player image
   const img = document.createElement('img');
   img.className = 'player-headshot';
-  img.src = player.photo || `${playerImgBase}${getPlayerStableId(player)}.png`;
+  img.src = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getPlayerImageUrl)
+    ? API_CONFIG.getPlayerImageUrl(getPlayerStableId(player), { size: 'card' })
+    : `${staticPrefix}/images/players/${getPlayerStableId(player)}.png`;
   img.alt = player.name;
   img.onerror = () => {
-    img.src = staticPrefix + '/images/players/generic_headshot.png';
+    img.onerror = null;
+    img.src = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getGenericHeadshotUrl)
+      ? API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
+      : `${staticPrefix}/images/players/generic_headshot.png`;
   };
   headshotContainer.appendChild(img);
   

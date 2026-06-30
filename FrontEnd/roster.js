@@ -155,10 +155,21 @@ function createPlayerCard(player) {
   
   const headshot = document.createElement('img');
   headshot.className = 'player-headshot';
-  headshot.src = `/static/images/players/${player._id}.png`;
+  headshot.src = window.API_CONFIG?.getPlayerImageUrl
+    ? window.API_CONFIG.getPlayerImageUrl(player._id, { size: 'card' })
+    : `/static/images/players/${player._id}.png`;
   headshot.alt = player.name || 'Unknown';
   headshot.onerror = function() {
-    this.style.display = 'none';
+    // Fall back to generic headshot once, then hide if that also fails.
+    const generic = window.API_CONFIG?.getGenericHeadshotUrl
+      ? window.API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
+      : '/static/images/players/generic_headshot.png';
+    if (this.dataset.fellBack !== '1' && this.src !== generic) {
+      this.dataset.fellBack = '1';
+      this.src = generic;
+    } else {
+      this.style.display = 'none';
+    }
   };
   
   headshotContainer.appendChild(headshot);

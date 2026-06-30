@@ -69,8 +69,11 @@ function inferTeamFromBoxScoreKey(key, teamCtx) {
 
 function getPlayerImage(player) {
   const id = player.playerId || player._id || player.player_id || '';
-  const prefix = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static' : '');
-  return player.photo || (id ? `${prefix}/images/players/${id}.png` : `${prefix}/images/players/generic_headshot.png`);
+  if (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl) {
+    return window.API_CONFIG.getPlayerImageUrl(id, { size: 'card' });
+  }
+  const prefix = (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static' : '';
+  return id ? `${prefix}/images/players/${id}.png` : `${prefix}/images/players/generic_headshot.png`;
 }
 
 function buildCandidates(gameData, scoreOverride = null) {
@@ -95,7 +98,7 @@ function buildCandidates(gameData, scoreOverride = null) {
     };
 
     existing.name = raw.name || existing.name;
-    existing.photo = raw.photo || existing.photo;
+    existing.photo = getPlayerImage(raw) || existing.photo;
     if (fallbackTeam) {
       existing.team = fallbackTeam;
       existing.teamName = fallbackTeam === 'home' ? teamCtx.homeTeamName : teamCtx.awayTeamName;

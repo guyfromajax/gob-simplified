@@ -273,13 +273,16 @@ export function normalizeHeadshotUrl(url) {
   return url;
 }
 
-/** Build player image URL with static prefix (localhost vs production). Prefer explicit photo; else /players/{playerId}.png when id known; else generic. Card img onerror maps to generic. */
+/** Build player headshot URL via the central resolver (R2 + transforms). `photo` is
+ * kept for signature compatibility but ignored — id-based remote URL is canonical.
+ * Card img onerror maps to generic. */
 export function getPlayerImageUrl(photo, playerId) {
-  const base = (typeof window !== 'undefined' && window.API_CONFIG?.buildStaticPath)
-    ? window.API_CONFIG.buildStaticPath('/images/players/')
-    : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/');
+  if (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl) {
+    return window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' });
+  }
+  const base = (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/';
   const filename = playerId ? `${playerId}.png` : 'generic_headshot.png';
-  return normalizeHeadshotUrl(photo || `${base}${filename}`);
+  return normalizeHeadshotUrl(`${base}${filename}`);
 }
 
 /** Resolve team secondary color from scene (home/away by team_id). Returns hex string or fallback. */

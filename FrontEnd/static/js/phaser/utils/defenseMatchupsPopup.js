@@ -212,7 +212,9 @@ function formatPlayerName(fullName) {
  */
 function createPlayerRow(player, teamType, position, currentMatchups, guardingUserPos = null) {
     const staticPrefix = (typeof window !== 'undefined' && window.API_CONFIG?.getStaticPath) ? window.API_CONFIG.getStaticPath() : ((window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1') ? '/static' : '');
-    const headshotSrc = player.headshot_url ? (staticPrefix + player.headshot_url) : '';
+    const headshotSrc = (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl)
+        ? window.API_CONFIG.getPlayerImageUrl(player.player_id, { size: 'card' })
+        : (player.headshot_url ? (staticPrefix + player.headshot_url) : '');
     const genericHeadshotSrc = staticPrefix + '/images/players/generic_headshot.png';
     const isUserTeam = teamType === 'user';
     const borderColor = isUserTeam 

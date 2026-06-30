@@ -231,7 +231,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     if (resolvedGameDoc) {
       potg = calculatePlayerOfTheGame(resolvedGameDoc, { gameId, scoreOverride });
       if (potg?.playerId) {
-        potgImageUrl = `${staticBase}/images/players/${potg.playerId}.png`;
+        potgImageUrl = (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl)
+          ? window.API_CONFIG.getPlayerImageUrl(potg.playerId, { size: 'modal' })
+          : `${staticBase}/images/players/${potg.playerId}.png`;
       }
     }
   } catch (err) {

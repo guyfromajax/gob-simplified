@@ -135,8 +135,12 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   const playerId = imagePlayerId != null ? String(imagePlayerId) : '';
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const staticPrefix = (hostname === 'localhost' || hostname === '127.0.0.1') ? '/static' : '';
-  let photoUrl = playerId ? `/images/players/${playerId}.png` : '';
-  if (photoUrl) photoUrl = staticPrefix + photoUrl;
+  let photoUrl = '';
+  if (playerId) {
+    photoUrl = (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl)
+      ? window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' })
+      : staticPrefix + `/images/players/${playerId}.png`;
+  }
   const defaultPlayerImg = staticPrefix + '/images/players/generic_headshot.png';
   const safePhotoUrl = photoUrl ? photoUrl.replace(/"/g, '&quot;') : '';
   const safeDefaultImg = defaultPlayerImg.replace(/"/g, '&quot;');

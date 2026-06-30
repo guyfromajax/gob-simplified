@@ -21,6 +21,13 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
   const queued = [];
   const queuedUrls = [];
 
+  // Headshots are served cross-origin from the R2 asset domain in staging/prod.
+  // WebGL textures of cross-origin images require CORS (anonymous) loading +
+  // an Access-Control-Allow-Origin header on the asset zone. Same-origin (local
+  // dev) ignores this, so it is always safe to set. Restored in onComplete.
+  const prevCrossOrigin = scene.load.crossOrigin;
+  scene.load.crossOrigin = "anonymous";
+
   for (const player of players) {
     const id = player?.playerId ?? player?.player_id ?? player?._id;
     if (!id || id === "ball" || id === "Ball") continue;
@@ -50,6 +57,7 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
   return new Promise((resolve) => {
     const failed = [];
     const onComplete = () => {
+      scene.load.crossOrigin = prevCrossOrigin;
       scene.load.off("loaderror", onLoadError);
       const loaded = queued.filter((k) => scene.textures.exists(k));
       // Unconditional one-line summary so we can verify load health without a debug flag.

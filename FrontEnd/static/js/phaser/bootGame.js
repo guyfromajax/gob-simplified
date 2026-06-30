@@ -1455,19 +1455,20 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
         // SS&S: Use same environment-aware path logic as announcement system
         const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         
-        // Normalize playerPhoto path based on environment
-        let playerPhoto = event.playerPhoto;
-        if (playerPhoto) {
-          // If we have a photo path, normalize it for the current environment
+        // Resolve made-shot player image. Prefer the central resolver (R2 + transforms)
+        // by player id; fall back to legacy photo-path normalization only if the
+        // resolver is unavailable.
+        let playerPhoto = '';
+        if (event.playerId && typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl) {
+          playerPhoto = window.API_CONFIG.getPlayerImageUrl(event.playerId, { size: 'card' });
+        } else if (event.playerPhoto) {
+          playerPhoto = event.playerPhoto;
           if (!isLocalhost && playerPhoto.startsWith('/static/')) {
-            // Production: remove /static/ prefix
             playerPhoto = playerPhoto.replace('/static', '');
           } else if (isLocalhost && !playerPhoto.startsWith('/static/') && playerPhoto.startsWith('/images/')) {
-            // Localhost: add /static/ prefix if missing
             playerPhoto = '/static' + playerPhoto;
           }
         } else if (event.playerId) {
-          // Construct path based on environment (fallback if no photo provided)
           const staticPrefix = isLocalhost ? '/static' : '';
           playerPhoto = `${staticPrefix}/images/players/${event.playerId}.png`;
         }

@@ -682,11 +682,8 @@ function getTrainingReportPlayerInitials(name) {
 
 function getTrainingReportPlayerPortraitUrl(player) {
   const playerId = player?.player_id || player?._id || player?.id || '';
-  if (player?.photo) return player.photo;
-  if (window.API_CONFIG && typeof window.API_CONFIG.buildStaticPath === 'function') {
-    return playerId
-      ? window.API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`)
-      : window.API_CONFIG.buildStaticPath('/images/players/generic_headshot.png');
+  if (window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function') {
+    return window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' });
   }
   return playerId ? `/images/players/${playerId}.png` : '/images/players/generic_headshot.png';
 }
