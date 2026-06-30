@@ -294,6 +294,8 @@ CONTEST_EUCLIDEAN_RADIUS = 11
 # ~27 grid/game-sec at tickMs=350 is main-branch-equivalent (~333 px/s horizontal).
 # Slower than passes by design — shooters are deliberate, passes are quick-twitch.
 SHOT_BALL_GRID_PER_GAME_SECOND = 27
+# Arc [ball_flight] only — slower hang time than straight release (grid/game-sec).
+ARC_SHOT_BALL_GRID_PER_GAME_SECOND = 20
 FREE_THROW_SHOT_GRID_PER_GAME_SECOND = 12  # FT shot ball motion (grid/game-sec)
 # Bounce sub-step T: fixed 300ms wall-clock at tickMs=350. Ball rate during
 # bounce therefore varies with distance (rim → bounce_coords) — that spread is

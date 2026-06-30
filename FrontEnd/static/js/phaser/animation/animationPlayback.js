@@ -65,6 +65,8 @@ function ballCoordFromState(ballState, playerCoords) {
 
 /** Mirrors `BackEnd.constants.SHOT_BALL_GRID_PER_GAME_SECOND`. */
 const SHOT_BALL_GRID_PER_GAME_SEC = 27;
+/** Mirrors `BackEnd.constants.ARC_SHOT_BALL_GRID_PER_GAME_SECOND`. */
+const ARC_SHOT_BALL_GRID_PER_GAME_SEC = 20;
 /** Mirrors `BackEnd.constants.FREE_THROW_SHOT_GRID_PER_GAME_SECOND` (UESS §11.1). */
 const FREE_THROW_BALL_GRID_PER_GAME_SEC = 12;
 /** Minimum step-playback wait for a shot [ball_flight] step (FE only).
@@ -130,6 +132,11 @@ function isFtReturnTeleportStep(step) {
 }
 
 function shotBallGridRate(step) {
+  const meta = step?.start?.advance_trigger?.metadata;
+  const stamped = Number(meta?.ball_grid_per_game_second);
+  if (Number.isFinite(stamped) && stamped > 0) {
+    return stamped;
+  }
   return isFreeThrowShotStep(step)
     ? FREE_THROW_BALL_GRID_PER_GAME_SEC
     : SHOT_BALL_GRID_PER_GAME_SEC;

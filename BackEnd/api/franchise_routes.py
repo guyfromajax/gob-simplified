@@ -907,7 +907,37 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         )
         return direct_match or swapped_match
 
+    def _parse_anchor_saved_at(value: Any) -> datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+            except ValueError:
+                return datetime.min
+        return datetime.min
+
+    def _parse_anchor_quarter(doc: dict[str, Any]) -> int:
+        anchor = doc.get("resume_anchor") if isinstance(doc.get("resume_anchor"), dict) else {}
+        snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else {}
+        for value in (snapshot.get("quarter"), anchor.get("quarter"), doc.get("quarter")):
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                continue
+        return 0
+
+    def _candidate_sort_key(doc: dict[str, Any]) -> tuple[int, datetime, Any]:
+        anchor = doc.get("resume_anchor") if isinstance(doc.get("resume_anchor"), dict) else {}
+        oid = doc.get("_id")
+        return (
+            _parse_anchor_quarter(doc),
+            _parse_anchor_saved_at(anchor.get("saved_at")),
+            oid if isinstance(oid, ObjectId) else ObjectId("000000000000000000000000"),
+        )
+
     game_doc = None
+    matched_candidates: list[dict[str, Any]] = []
     anchor_cursor = db.games.find(
         {
             "franchise_id": franchise_id,
@@ -922,8 +952,8 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     for candidate in anchor_cursor:
         anchor_candidate_count += 1
         if _matches_current_user_game(candidate):
-            game_doc = candidate
-            break
+            matched_candidates.append(candidate)
+            continue
         if len(rejected_candidates) < 5:
             rejected_candidates.append(
                 {
@@ -933,11 +963,31 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
                 }
             )
 
+    if matched_candidates:
+        game_doc = max(matched_candidates, key=_candidate_sort_key)
+
+    matched_sample = []
+    for candidate in matched_candidates[:8]:
+        anchor = candidate.get("resume_anchor") if isinstance(candidate.get("resume_anchor"), dict) else {}
+        snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else {}
+        matched_sample.append(
+            {
+                "game_id": str(candidate.get("_id")),
+                "anchor_type": anchor.get("anchor_type"),
+                "anchor_quarter": _parse_anchor_quarter(candidate),
+                "saved_at": anchor.get("saved_at"),
+                "clock": snapshot.get("clock") or anchor.get("clock") or candidate.get("clock"),
+                "time_remaining": snapshot.get("time_remaining") or anchor.get("time_remaining") or candidate.get("time_remaining"),
+            }
+        )
+
     logger.warning(
-        "🧭 [MODE-RESUME-LOOKUP] anchored_scan franchise_id=%s candidates=%s matched_game_id=%s rejected_sample=%s",
+        "🧭 [MODE-RESUME-LOOKUP] anchored_scan franchise_id=%s candidates=%s matched=%s selected_game_id=%s matched_sample=%s rejected_sample=%s",
         franchise_id,
         anchor_candidate_count,
+        len(matched_candidates),
         str(game_doc.get("_id")) if game_doc else None,
+        matched_sample,
         rejected_candidates,
     )
 

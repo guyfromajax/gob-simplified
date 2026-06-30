@@ -36,7 +36,6 @@ from BackEnd.constants import (
     PASS_GRID_SPOTS_PER_GAME_SECOND,
     RATTLE_HOP_GAME_SECONDS,
     RATTLE_MAKE_SETTLE_GAME_SECONDS,
-    SHOT_BALL_GRID_PER_GAME_SECOND,
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
@@ -2542,7 +2541,14 @@ def _build_post_shot_sub_steps(
     )
 
     flight_dist = _euclid(shot_spot, ball_flight_end)
-    flight_t = max(0.05, flight_dist / SHOT_BALL_GRID_PER_GAME_SECOND)
+    uses_arc_flight = result_type != "BLOCK" and bool(turn_result.get("uses_shot_arc"))
+    from BackEnd.utils.shot_ball_arc import (
+        shot_ball_flight_grid_rate,
+        stamp_shot_ball_arc_metadata,
+    )
+
+    flight_rate = shot_ball_flight_grid_rate(uses_arc=uses_arc_flight)
+    flight_t = max(0.05, flight_dist / flight_rate)
     flight_trigger: AdvanceTrigger = {
         "condition": "shot_resolved",
         "T_game_seconds": float(flight_t),
@@ -2556,7 +2562,6 @@ def _build_post_shot_sub_steps(
         flight_trigger["metadata"],
         turn_result.get("shot_score_pre_defense"),
     )
-    from BackEnd.utils.shot_ball_arc import stamp_shot_ball_arc_metadata
 
     stamp_shot_ball_arc_metadata(
         flight_trigger["metadata"],

@@ -432,6 +432,8 @@ All tunables live in `BackEnd/constants/shot_micro_movements_constants.py`:
 | `SHOT_ARC_PROBABILITY` | see code | Per-family arc roll (0–1) |
 | `SHOT_ARC_FAMILY_STYLE` | see code | Family → style mult key |
 
+Straight `[ball_flight]` uses `SHOT_BALL_GRID_PER_GAME_SECOND` (27) in `BackEnd/constants/__init__.py`. Arc flights use `ARC_SHOT_BALL_GRID_PER_GAME_SECOND` (20) — stamped on step `T_game_seconds` and `metadata.ball_grid_per_game_second`.
+
 Registry tables (`FAMILY_BUCKET`, `BUCKET_BEHAVIOR`, beat builders) live in `shot_micro_movements.py`. Arc geometry helpers live in `BackEnd/utils/shot_ball_arc.py`.
 
 ---
@@ -485,7 +487,7 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 
 ### 17.2 Shot ball arc (`[ball_flight]` only)
 
-When `uses_shot_arc: true` on the turn, the backend stamps `advance_trigger.metadata.shot_ball_arc` on the schema `[ball_flight]` step. FE tweens a skewed parabola; non-arc shots keep the existing straight flight (same grid-rate duration).
+When `uses_shot_arc: true` on the turn, the backend stamps `advance_trigger.metadata.shot_ball_arc` on the schema `[ball_flight]` step. FE tweens a skewed parabola; non-arc shots keep the existing straight flight at **27 grid/game-sec**. **Arc flights** use **20 grid/game-sec** (`ARC_SHOT_BALL_GRID_PER_GAME_SECOND`) — backend sets both `T_game_seconds` on the step and `metadata.ball_grid_per_game_second` for FE playback.
 
 **Roll** (`roll_shot_arc`) runs at `select_and_stamp_shot_micro` time and stores `uses_shot_arc` on the turn. **Blocks** always omit arc metadata (flat flight). **Free throws** are exempt (no micro stamp).
 

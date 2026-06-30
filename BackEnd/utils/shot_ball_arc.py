@@ -10,7 +10,12 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, Optional
 
-from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+from BackEnd.constants import (
+    ARC_SHOT_BALL_GRID_PER_GAME_SECOND,
+    AWAY_RIM_COORDS,
+    HOME_RIM_COORDS,
+    SHOT_BALL_GRID_PER_GAME_SECOND,
+)
 from BackEnd.constants.shot_micro_movements_constants import (
     APEX_BIAS,
     APEX_HEIGHT_REF,
@@ -38,6 +43,13 @@ def roll_shot_arc(family_id: str) -> bool:
     if prob <= 0.0:
         return False
     return random.random() < prob
+
+
+def shot_ball_flight_grid_rate(*, uses_arc: bool) -> float:
+    """Grid/game-sec rate for schema [ball_flight] (straight vs arc)."""
+    if uses_arc:
+        return float(ARC_SHOT_BALL_GRID_PER_GAME_SECOND)
+    return float(SHOT_BALL_GRID_PER_GAME_SECOND)
 
 
 def compute_shot_ball_arc(
@@ -86,3 +98,4 @@ def stamp_shot_ball_arc_metadata(
     )
     if arc:
         metadata["shot_ball_arc"] = arc
+        metadata["ball_grid_per_game_second"] = float(ARC_SHOT_BALL_GRID_PER_GAME_SECOND)

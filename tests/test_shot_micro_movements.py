@@ -247,6 +247,36 @@ class TestShotBallArc:
         assert flat["apex_pos"] <= 0.60
         assert tall["apex_pos"] <= flat["apex_pos"]
 
+    def test_arc_flight_rate_slower_than_straight(self):
+        from BackEnd.constants import (
+            ARC_SHOT_BALL_GRID_PER_GAME_SECOND,
+            SHOT_BALL_GRID_PER_GAME_SECOND,
+        )
+        from BackEnd.utils.shot_ball_arc import shot_ball_flight_grid_rate
+
+        assert ARC_SHOT_BALL_GRID_PER_GAME_SECOND == 20
+        assert shot_ball_flight_grid_rate(uses_arc=True) == 20.0
+        assert shot_ball_flight_grid_rate(uses_arc=False) == float(
+            SHOT_BALL_GRID_PER_GAME_SECOND,
+        )
+
+    def test_stamp_metadata_includes_arc_flight_rate(self):
+        from BackEnd.utils.shot_ball_arc import stamp_shot_ball_arc_metadata
+
+        metadata: dict = {}
+        stamp_shot_ball_arc_metadata(
+            metadata,
+            {
+                "result_type": "MAKE",
+                "uses_shot_arc": True,
+                "micro_movement_family": "fade_away",
+            },
+            {"x": 81.2, "y": 25.0},
+            away_offense=False,
+        )
+        assert "shot_ball_arc" in metadata
+        assert metadata["ball_grid_per_game_second"] == 20.0
+
     def test_roll_shot_arc_probabilities(self, monkeypatch):
         from BackEnd.utils import shot_ball_arc as arc_mod
 

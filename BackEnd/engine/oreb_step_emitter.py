@@ -49,7 +49,6 @@ from BackEnd.constants import (
     MADE_SHOT_SWEET_SPOT_HOME_RIM,
     RATTLE_HOP_GAME_SECONDS,
     RATTLE_MAKE_SETTLE_GAME_SECONDS,
-    SHOT_BALL_GRID_PER_GAME_SECOND,
 )
 from BackEnd.engine.skeleton_step_emitter import (
     _RATTLE_VARIANTS,
@@ -388,7 +387,14 @@ def _build_ball_flight_step(
     if flight_end is None:
         flight_end = _sweet_spot_coords(is_away_offense) if is_make else _rim_coords(is_away_offense)
     dist = _euclid(shot_spot, flight_end)
-    t = dist / float(SHOT_BALL_GRID_PER_GAME_SECOND) if dist > 0 else 0.0
+    uses_arc_flight = bool(turn_result and turn_result.get("uses_shot_arc"))
+    from BackEnd.utils.shot_ball_arc import (
+        shot_ball_flight_grid_rate,
+        stamp_shot_ball_arc_metadata,
+    )
+
+    flight_rate = shot_ball_flight_grid_rate(uses_arc=uses_arc_flight)
+    t = dist / flight_rate if dist > 0 else 0.0
 
     actions, archetypes, destinations = _stationary_maps(start_coords)
     end_coords: Dict[str, GridCoord] = {
