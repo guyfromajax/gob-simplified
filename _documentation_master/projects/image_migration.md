@@ -85,7 +85,7 @@ The previously-planned nameserver migration is **not needed** and has been dropp
 2. ✅ DONE — custom domain `assets.geekedoutgames.com` connected; public read verified (200 + checksum match, 2026-06-30).
 3. ✅ DONE (2026-06-30) — **Image Transformations** enabled on `geekedoutgames.com` zone (required subscribing to the free "Images & Stream — $0/mo" plan with **"Use my own storage"** = $0; images stay in R2). Verified live: a 4.6 MB master serves as AVIF at **3.4 KB / 7.3 KB / 16 KB** for width 128/256/512 (`format=auto` → AVIF/WebP/PNG fallback). URL pattern: `https://assets.geekedoutgames.com/cdn-cgi/image/width=<W>,format=auto,fit=cover/players/master/<uuid>.png`. Free tier = 5,000 unique transforms/mo.
 4. ✅ N/A — not using `r2.dev`; custom domain only.
-5. ⬜ TODO — **Set CORS headers** (needed for Phaser/WebGL — see Phase 4).
+5. ✅ DONE (2026-06-30) — **CORS** via Response Header Transform Rule "CORS for player image assets" on geekedoutgames.com (all requests → `Set static: Access-Control-Allow-Origin: *`). Verified `access-control-allow-origin: *` on both transformed + direct image responses.
 
 ### Phase 2: Upload masters — ✅ DONE (2026-06-30)
 - Script: `scripts/upload_player_images_to_r2.py` (boto3 → R2 S3 API; reads `scripts/.r2.env`, gitignored).
@@ -103,7 +103,7 @@ The previously-planned nameserver migration is **not needed** and has been dropp
 - Added `API_CONFIG.getPlayerImageUrl(playerId, {size})` + `getGenericHeadshotUrl({size})` + `usePlayerImageRemote()` kill-switch in `FrontEnd/static/js/config/api-config.js`. Sizes: thumb 128 / card 256 / modal 512 / full. localhost → local static; staging/prod → remote; `window.PLAYER_IMAGE_REMOTE=true|false` overrides (rollback switch).
 - Migrated surfaces (14 files, all parse clean): roster.js, player-detail.js, box-score.js, training-report.js, set-lineup.js (×2), shared/potg.js, phaser/gameScene.js (tooltip), phaser/bootGame.js (made-shot), utils/announcements.js (its `getPlayerImageUrl`), utils/foulOutPopup.js, utils/defenseMatchupsPopup.js, utils/gameCompletionPopup.js. Each keeps an onerror→generic fallback (generic stays deployed locally).
 - **Phaser WebGL textures:** `setup/preloadPlayerHeadshots.js` now loads via resolver + `scene.load.crossOrigin='anonymous'`. **REQUIRES** a CORS response header on the asset zone (see ⬜ below) or on-court markers fall back to initials (graceful).
-- ⬜ TODO (dashboard): add `Access-Control-Allow-Origin` header on `assets.geekedoutgames.com` (Transform Rule / Modify Response Header) so WebGL headshot textures load cross-origin.
+- ✅ DONE (2026-06-30) — CORS Transform Rule deployed; `access-control-allow-origin: *` confirmed on transformed + direct responses. WebGL headshot textures will load cross-origin.
 
 ### Phase 5: Env config
 ```text
