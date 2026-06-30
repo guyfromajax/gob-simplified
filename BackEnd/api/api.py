@@ -4698,9 +4698,10 @@ try:
             db_summary["_id"] = game_id_oid
 
             # Court persistence: quarter-break anchors are written when the
-            # quarter actually ends in /api/simulate-turn. This save path only
-            # keeps timeout/foul-out pre-sim anchors or consumes an anchor after
-            # a successful restore.
+            # quarter actually ends in /api/simulate-turn. Consuming an anchor
+            # means "restore from it for this request"; the durable rollback
+            # point remains until a newer stoppage anchor replaces it or the
+            # game becomes final.
             
             # ✅ DEBUG: Log detailed save information for Q4 to diagnose finalize_game() issue
             quarter_saving = db_summary.get('quarter', 'N/A')
@@ -4710,27 +4711,27 @@ try:
                 logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
             
             save_update = {"$set": db_summary}
-            if is_final or body.consume_resume_anchor:
+            if is_final:
                 save_update["$unset"] = {"resume_anchor": ""}
-                if body.consume_resume_anchor and not is_final:
-                    logging.warning(
-                        "🧭 [RESUME-ANCHOR-CONSUME] cleared used anchor game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
-                        game_id,
-                        db_summary.get("quarter"),
-                        db_summary.get("clock"),
-                        db_summary.get("time_remaining"),
-                        body.resume_from_anchor,
-                        body.consume_resume_anchor,
-                    )
-                    logging.info(
-                        "[MGR-RESUME] anchor cleared game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
-                        game_id,
-                        db_summary.get("quarter"),
-                        db_summary.get("clock"),
-                        db_summary.get("time_remaining"),
-                        body.resume_from_anchor,
-                        body.consume_resume_anchor,
-                    )
+            elif body.consume_resume_anchor:
+                logging.warning(
+                    "🧭 [RESUME-ANCHOR-CONSUME] preserved durable anchor game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
+                    game_id,
+                    db_summary.get("quarter"),
+                    db_summary.get("clock"),
+                    db_summary.get("time_remaining"),
+                    body.resume_from_anchor,
+                    body.consume_resume_anchor,
+                )
+                logging.info(
+                    "[MGR-RESUME] anchor preserved after consume game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
+                    game_id,
+                    db_summary.get("quarter"),
+                    db_summary.get("clock"),
+                    db_summary.get("time_remaining"),
+                    body.resume_from_anchor,
+                    body.consume_resume_anchor,
+                )
             games_collection.update_one({"_id": game_id_oid}, save_update, upsert=True)
 
             # Stash the user's coaching archetype for this period (franchise only).
