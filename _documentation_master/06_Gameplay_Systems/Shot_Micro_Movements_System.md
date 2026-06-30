@@ -63,7 +63,7 @@ Frontend (UESS playback)
 | `BackEnd/constants/shot_micro_movements_constants.py` | Tunable geometry, timing, movement pools |
 | `BackEnd/models/shot_manager.py` | Contest + family telemetry; block gate uses `contest_result` |
 | `FrontEnd/static/js/phaser/animation/flourishes.js` | Render pump_fake, rattle, bite, shot_dip |
-| `FrontEnd/static/js/phaser/animation/animation_config.js` | FE flourish defaults |
+| `FrontEnd/static/js/phaser/animation/animation_config.js` | Flourish defaults (`pumpFake.amplitudeGrid`, `pumpFake.durationMs`) |
 
 ---
 
@@ -178,6 +178,23 @@ Arc spot coords come from `HCO_STRING_SPOTS` (home catalog), mirrored via `get_a
 
 Perpendicular jab sign: shooter above midcourt (`y > 25`) jabs toward lower side; below midcourt jabs toward upper; at `y = 25` defaults to +y.
 
+### 6.5 Pump fake calibration (v1)
+
+Used by `set_pump`, `dribble_pump_shoot`, and `pump_dribble_shoot` (pump beat only).
+
+| Parameter | Value | Where |
+|-----------|-------|--------|
+| **Amplitude** | **2 grid** on screen Y (out, then yoyo back to start) | FE `flourish.pumpFake.amplitudeGrid` |
+| **Direction sign** | Shooter grid **y > 25** → **+** pixel Y; **else** → **−** pixel Y | FE `runPumpFake()` — shooter position via `pixelsToGrid` |
+| **Wall time** | **380 ms** total (**190 ms** out + **190 ms** back) | FE `flourish.pumpFake.durationMs`; tween uses `durationMs / 2` per leg with `yoyo: true` |
+| **Game clock** | **1.05 s** on the pump micro step | BE `PUMP_FAKE_FLOURISH_BEAT_T` |
+| **Shooter sprite** | Stationary (no coord change) | BE flourish only; FE render-space ball tween |
+| **Ease** | `Quad.easeOut` | FE default |
+
+Backend stamps `step.start.flourish[shooterId] = { kind: "pump_fake", target: "ball" }`. Optional flourish overrides: `amplitude_grid`, `duration_ms` (see `animationStepSchema.js`).
+
+Wall time and game time are **independent**: the sim step burns 1.05 game-seconds while the ball tween runs 380 ms real time at 1× playback.
+
 ---
 
 ## 7. Buckets and Defender Behavior
@@ -260,7 +277,8 @@ This prevents micro from replacing the sprint animation or shooting from mid-cou
 | Beat type | Duration |
 |-----------|----------|
 | **Coord-changing beats** (`move`, `move_to`) | Organic: `distance / ag_rate(archetype)`, floor `MICRO_MOVE_STEP_T_FLOOR` (0.15 s) |
-| **Flourish-only beats** (`pump_fake`) | Fixed `MICRO_FLOURISH_BEAT_T` (0.4 s) |
+| **`pump_fake` flourish beat** | **1.05 s** game (`PUMP_FAKE_FLOURISH_BEAT_T`); FE ball tween **380 ms** wall (190 ms × 2) — see §6.5 |
+| **Other flourish-only beats** | `MICRO_FLOURISH_BEAT_T` (0.4 s game) |
 | **Terminal shoot beat** | `max(MICRO_MOVE_STEP_T_FLOOR, MICRO_FLOURISH_BEAT_T)` |
 
 Per-player **`tween_durations`** are stamped via `stamp_tween_durations()` so fast finishers don’t “lazy drift” through step T.
@@ -277,7 +295,7 @@ Game clock and shot clock decrement through each micro beat’s `end.time_elapse
 |------|---------|-----|
 | **Displacement** | Emitted `end.coords` (seal, wall, glue, stranded, bite side-step) | Standard step tweens |
 | **Cosmetic** | `step.start.flourish[playerId]` | `runFlourish()` — render space only, never mutates gameplay coords |
-| **Pump fake** | Flourish on shooter entry, `target: "ball"` | Ball sprite bobs; **shooter container does not move** |
+| **Pump fake** | Flourish on shooter entry, `target: "ball"` | Ball bobs **2 grid** Y (**190 ms** each way, **380 ms** wall); y>25 → +, else −; sim step **1.05 s** game |
 | **Bite** | Defender coord nudge + `bite` flourish | Reach-in-style lunge toward ball |
 | **Rattle** | Stamped on shoot beat per contest | Horizontal oscillation on shooter/defender sprite |
 
@@ -369,13 +387,13 @@ for (const [playerId, flourish] of Object.entries(flourishMap)) {
 
 | `kind` | Renderer | Notes |
 |--------|----------|-------|
-| `pump_fake` | Ball vertical bob | Shooter sprite stationary |
+| `pump_fake` | Ball **2 grid** Y bob + yoyo return (**380 ms** wall: 190 ms out + 190 ms back); sign from shooter grid y vs 25 | Shooter sprite stationary |
 | `rattle` | Sprite horizontal oscillation | `cycles` from backend |
 | `bite` | Defender lunge toward ball | Reuses reach-in geometry |
 | `shot_dip` | Single-cycle rattle | Placeholder depth motion |
 | `reach_in` | (pre-existing) | Not used by micro v1 |
 
-Defaults: `animation_config.js` → `flourish.pumpFake`, `flourish.rattle`.
+Defaults: `animation_config.js` → `flourish.pumpFake` (`amplitudeGrid: 2`, `durationMs: 380`), `flourish.rattle`.
 
 Unknown kinds are accepted no-ops (schema contract).
 
@@ -399,7 +417,8 @@ All tunables live in `BackEnd/constants/shot_micro_movements_constants.py`:
 | `DEFENDER_GLUE_CLAMP_MIN` | 1.3 | Min shooter–defender separation |
 | `MUSCLE_LOSS_COMPLETION` | 0.11 | A-bucket defense_win move scale |
 | `MICRO_MOVE_STEP_T_FLOOR` | 0.15 s | Min coord beat duration |
-| `MICRO_FLOURISH_BEAT_T` | 0.4 s | Fixed flourish beat |
+| `MICRO_FLOURISH_BEAT_T` | 0.4 s | Fixed flourish beat (non-pump) |
+| `PUMP_FAKE_FLOURISH_BEAT_T` | 1.05 s | `pump_fake` micro step game-clock burn |
 | `ARC_SPOT_OCCUPIED_RADIUS` | 3.0 | Teammate blocks adjacent arc spot |
 | `TRAVEL_SHOOT_MIN_GRID` | 1.5 | Shooter travel on terminal step → insert-after mode |
 
@@ -465,9 +484,10 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 3. **FB shot spot:** After-steal / Rim Runner shots release at `bh_target` / `shot_spot` (2–4 from rim), not mid-court steal origin.
 4. **Contested:** `contest_result` and `contest_margin` present when `has_contest: true`.
 5. **Block gate:** No `result_type: BLOCK` when `contest_result: offense_win` on inside/attack contested shots.
-6. **FE:** Pump fake visible as ball bob; rattle on contested release; defender glue/stranded on fade/jab families.
-7. **Away outside dribble:** `dribble_shoot` / composite families — `move_to` target stays on offense half (display x &lt; 50 away, &gt; 50 home).
-8. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
+6. **FE pump fake:** **2 grid** Y bob; **190 ms** out + **190 ms** back (**380 ms** wall); shooter **y > 25** → + pixel Y, else −; sim step **1.05 s** game. Shooter sprite stationary.
+7. **FE other:** Rattle on contested release; defender glue/stranded on fade/jab families.
+8. **Away outside dribble:** `dribble_shoot` / composite families — `move_to` target stays on offense half (display x &lt; 50 away, &gt; 50 home).
+9. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
 
 Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion, away arc mirror).
 

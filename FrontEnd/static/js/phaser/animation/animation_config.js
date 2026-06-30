@@ -115,8 +115,8 @@ const defaults = {
       ease: 'Back.easeOut',
     },
     pumpFake: {
-      amplitudePx: 8,
-      durationMs: 280,
+      amplitudeGrid: 2, // Out 2 grid on Y, yoyo returns 2 grid to shooter
+      durationMs: 380, // 190ms out + 190ms back (wall time)
       ease: 'Quad.easeOut',
     },
     rattle: {

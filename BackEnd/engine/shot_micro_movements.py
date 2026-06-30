@@ -30,6 +30,7 @@ from BackEnd.constants.shot_micro_movements_constants import (
     OUTSIDE_ARC_SPOT_ORDER,
     OUTSIDE_MOVING_FAMILIES,
     OUTSIDE_STATIC_FALLBACK_FAMILIES,
+    PUMP_FAKE_FLOURISH_BEAT_T,
     TRAVEL_SHOOT_MIN_GRID,
 )
 from BackEnd.utils.animation_step_helpers import (
@@ -595,9 +596,14 @@ def build_shot_micro_steps(
         elif kind == "flourish":
             who = beat.get("who", "shooter")
             pid = shooter_id if who == "shooter" else defender_id
+            flourish_kind = beat.get("flourish", "pump_fake")
             if pid:
-                flourish_map[str(pid)] = {"kind": beat.get("flourish", "pump_fake"), "target": "ball"}
-            step_t = MICRO_FLOURISH_BEAT_T
+                flourish_map[str(pid)] = {"kind": flourish_kind, "target": "ball"}
+            step_t = (
+                PUMP_FAKE_FLOURISH_BEAT_T
+                if flourish_kind == "pump_fake"
+                else MICRO_FLOURISH_BEAT_T
+            )
         elif kind == "shot":
             actions[shooter_id] = "shoot"
             archetypes[shooter_id] = "shot_motion"

@@ -19,6 +19,7 @@
 import { animationConfig } from "./animation_config.js";
 import { playStealReachInSfx } from "../utils/gameSfx.js";
 import { isPassInterception } from "../utils/announcements.js";
+import { pixelsToGrid } from "../utils/gridToPixels.js";
 
 /**
  * Resolve a render-space move target for a sprite/container, mirroring
@@ -317,17 +318,31 @@ function runRattle(scene, sprite, flourish) {
   if (tween) tween.__uessBoundaryIgnore = true;
 }
 
-function runPumpFake(scene, _sprite, flourish, ballSprite) {
+function runPumpFake(scene, sprite, flourish, ballSprite) {
   if (!ballSprite || !scene?.tweens) return;
   const cfg = animationConfig.flourish?.pumpFake || {};
-  const ampPx = Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 8;
+  const width = scene.game?.config?.width;
+  const height = scene.game?.config?.height;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+
+  const amplitudeGrid = Number.isFinite(flourish?.amplitude_grid)
+    ? flourish.amplitude_grid
+    : (Number.isFinite(cfg.amplitudeGrid) ? cfg.amplitudeGrid : 2);
+  const ampPx = amplitudeGrid * (height / 50);
+
+  let shooterGridY = 25;
+  if (sprite && Number.isFinite(sprite.x) && Number.isFinite(sprite.y)) {
+    shooterGridY = pixelsToGrid(sprite.x, sprite.y, width, height).y;
+  }
+  const sign = shooterGridY > 25 ? 1 : -1;
+
   const durationMs = Number.isFinite(flourish?.duration_ms)
     ? flourish.duration_ms
-    : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 280);
+    : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 380);
   const baseY = ballSprite.y;
   const tween = scene.tweens.add({
     targets: ballSprite,
-    y: baseY - ampPx,
+    y: baseY + sign * ampPx,
     duration: durationMs / 2,
     ease: flourish?.ease || cfg.ease || "Quad.easeOut",
     yoyo: true,

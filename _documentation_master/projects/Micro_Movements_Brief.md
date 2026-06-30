@@ -13,8 +13,8 @@
     - Pullup Attack Shot (any attack shot not attempted at a near basket spot)
         (player sprite moves 1 x spot toward the basket then animates shot)
 - Outside Shots
-    - Set Outside Shot (player shoots from his receiving locaiton)
-    - Set Outside Shot with Pump Fake (add a pump fake effect, defender bites?, then shoot from reception point)
+    - Set Outside Shot (player shoots from his receiving location)
+    - Set Outside Shot with Pump Fake — **v1:** ball bobs **2 grid** on Y (shooter stationary); **190 ms** out + **190 ms** back (**380 ms** wall); sim step **1.05 s** game; sign: shooter grid y>25 → + pixel Y else −; defender may **bite** on contested pump (bucket D). See [`Shot_Micro_Movements_System.md`](../06_Gameplay_Systems/Shot_Micro_Movements_System.md) §6.5.
     - Dribble & Shoot Outside Shot 
     - Dribble & Shoot Outside Shot with Pump Fake
     - Pump Fake & the Dribble & Shoot Outside Shot

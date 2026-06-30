@@ -22,6 +22,7 @@ MUSCLE_LOSS_COMPLETION = 0.11
 # Step timing floors (game-seconds)
 MICRO_MOVE_STEP_T_FLOOR = 0.15
 MICRO_FLOURISH_BEAT_T = 0.4
+PUMP_FAKE_FLOURISH_BEAT_T = 1.05  # pump_fake micro beat — aligns ~380ms wall at 1× playback
 
 # Outside arc occupancy: teammate within this euclidean distance blocks a spot
 ARC_SPOT_OCCUPIED_RADIUS = 3.0
