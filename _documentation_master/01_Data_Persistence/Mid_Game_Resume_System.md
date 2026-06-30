@@ -84,6 +84,16 @@ Mode Select should set `active_resume=true`, but it should not set `resume_from_
 
 Set Lineup returns from a cold resume with both `resume_from_anchor=true` and `consume_resume_anchor=true`. That combination is not modal state. It means the user already accepted resume, adjusted lineups, and the next gameplay request should restore/consume the anchor. Court boot must not show the `Game In Progress` modal again for this URL shape, or it creates a modal -> Set Lineup -> modal loop.
 
+Live timeout/foul-out returns must not convert the URL to `resume_from_anchor=true` after gameplay starts. A normal live timeout return can set `resume_from_timeout=true` for the immediate restart turn, then normalize that flag back to `false` for future refreshes. Future refreshes should discover the durable anchor by calling `/api/game/{game_id}/resume-state`, not by relying on a stale URL restore flag.
+
+Backend anchor clearing is explicit:
+
+- clear `resume_anchor` when `consume_resume_anchor=true`
+- clear `resume_anchor` when the game becomes final
+- do not clear `resume_anchor` merely because `resume_from_anchor=true`
+
+This prevents normal continued play after a timeout/foul-out from destroying the last stable resume anchor.
+
 ## Pre-Anchor Q1 Refresh Contract
 
 Before the first stable anchor exists, the game has no durable mid-game resume target.

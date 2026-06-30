@@ -105,6 +105,8 @@ Each loop iteration (after step 0 walk-up):
 6. **Emit segment** — append to `loop_segments`; decrement shot clock by segment duration.
 7. **Advance** (non-terminal) — BH random advance; defenders move via interrupted AG rates toward `play.defense_targets()`; off-ball offense tracks actual coords.
 
+**Pass receipt (off-ball re-key):** When the pass completes and a new teammate becomes BH (e.g. PG→SG), `_refresh_hct_off_targets_for_bh` rebuilds alias-map spacing for **SG-as-handler** — fresh pos1..pos4 range targets for the other four; the new BH keeps their **catch spot** (no x=44 snap). Teammates sprint toward those targets during pass flight and on subsequent hold/advance beats.
+
 **Dribble-dead:** winning an attack cutoff collision → BH picks up dribble; loop continues **pass/hold only**.
 
 ---

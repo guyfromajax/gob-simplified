@@ -4707,9 +4707,9 @@ try:
                 logging.info(f"🎯 [SAVE] Q4/FINAL SAVE: game_id={game_id}, quarter={quarter_saving}, is_final={is_final_saving}, gm.quarter={gm.quarter}")
             
             save_update = {"$set": db_summary}
-            if is_final or body.resume_from_anchor or body.consume_resume_anchor:
+            if is_final or body.consume_resume_anchor:
                 save_update["$unset"] = {"resume_anchor": ""}
-                if (body.resume_from_anchor or body.consume_resume_anchor) and not is_final:
+                if body.consume_resume_anchor and not is_final:
                     logging.warning(
                         "🧭 [RESUME-ANCHOR-CONSUME] cleared used anchor game_id=%s quarter=%s clock=%s time_remaining=%s restore=%s consume_only=%s",
                         game_id,

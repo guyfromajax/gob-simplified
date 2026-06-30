@@ -504,6 +504,24 @@ def _build_step_1_targets(
     return off_targets, def_targets
 
 
+def _refresh_hct_off_targets_for_bh(
+    bh_pos: str,
+    off_coords: Dict[str, Dict[str, int]],
+    off_targets: Dict[str, Dict[str, int]],
+    is_away_offense: bool,
+) -> None:
+    """Re-key alias-map spacing when a new teammate becomes ball handler.
+
+    The live BH keeps their current catch/dribble spot (no x=44 snap on pass
+    receipt). Every other offender draws fresh pos1..pos4 range targets for the
+    new handler's alias map.
+    """
+    bh = bh_pos.upper()
+    off_targets[bh] = dict(off_coords[bh_pos])
+    for alias_key, real_pos in _alias_map(bh).items():
+        off_targets[real_pos] = _pos_target(alias_key, is_away_offense)
+
+
 def _player_id(player) -> str:
     return getattr(player, "player_id", str(id(player))) if player is not None else ""
 
@@ -2975,6 +2993,10 @@ def compute_dynamic_hct_turn(
                 exclude={receiver_pos},
             )
         else:
+            if turn_mode == "hct":
+                _refresh_hct_off_targets_for_bh(
+                    receiver_pos, off_coords, off_targets, is_away_offense
+                )
             _move_offense(
                 off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
                 exclude={receiver_pos},

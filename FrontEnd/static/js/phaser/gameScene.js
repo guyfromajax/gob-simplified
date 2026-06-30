@@ -1095,7 +1095,6 @@ export function createGameScene(Phaser) {
       if (resumeFromTimeout && urlParams.get('resume_from_anchor') !== 'true') {
         const futureParams = new URLSearchParams(window.location.search);
         futureParams.set('resume_from_timeout', 'false');
-        futureParams.set('resume_from_anchor', 'true');
         if (typeof history !== 'undefined' && history.replaceState) {
           history.replaceState(null, '', `${window.location.pathname}?${futureParams.toString()}`);
         }
@@ -1103,7 +1102,8 @@ export function createGameScene(Phaser) {
           game_id: this.gameId,
           quarter: this.quarter,
           current_request_resume_from_timeout: true,
-          future_resume_from_anchor: true,
+          future_resume_from_timeout: false,
+          future_resume_from_anchor: false,
         });
       }
       if (urlParams.get('locked_exhausted_user_lineup') === 'true') {
