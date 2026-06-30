@@ -30,6 +30,7 @@ from BackEnd.constants.shot_micro_movements_constants import (
     OUTSIDE_ARC_SPOT_ORDER,
     OUTSIDE_MOVING_FAMILIES,
     OUTSIDE_STATIC_FALLBACK_FAMILIES,
+    TRAVEL_SHOOT_MIN_GRID,
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
@@ -655,6 +656,84 @@ def _find_terminal_shoot_index(steps: List[AnimationStep]) -> Optional[int]:
     return None
 
 
+def _resolve_shooter_id_from_step(
+    shoot_step: AnimationStep,
+    turn_result: Dict[str, Any],
+) -> Optional[str]:
+    shooter_id = str(
+        turn_result.get("shooter_id")
+        or turn_result.get("shooter")
+        or ""
+    )
+    if hasattr(turn_result.get("shooter"), "player_id"):
+        shooter_id = str(turn_result["shooter"].player_id)
+    start_coords = (shoot_step.get("start") or {}).get("coords") or {}
+    if not shooter_id or shooter_id not in start_coords:
+        for pid, act in ((shoot_step.get("start") or {}).get("action") or {}).items():
+            if act == "shoot":
+                shooter_id = str(pid)
+                break
+    if not shooter_id or shooter_id not in start_coords:
+        return None
+    return shooter_id
+
+
+def _shooter_travel_grid_distance(
+    shoot_step: AnimationStep,
+    shooter_id: str,
+) -> float:
+    start_coords = (shoot_step.get("start") or {}).get("coords") or {}
+    end_coords = (shoot_step.get("end") or {}).get("coords") or {}
+    sc = start_coords.get(shooter_id)
+    ec = end_coords.get(shooter_id)
+    if not sc or not ec:
+        return 0.0
+    return _euclid(sc, ec)
+
+
+def _is_travel_shoot_step(shoot_step: AnimationStep, shooter_id: str) -> bool:
+    """True when the terminal [shoot] step includes meaningful sprint-to-spot."""
+    return _shooter_travel_grid_distance(shoot_step, shooter_id) >= TRAVEL_SHOOT_MIN_GRID
+
+
+def _demote_travel_shoot_step(shoot_step: AnimationStep, shooter_id: str) -> None:
+    """Keep the travel tween; drop ``shoot`` until the micro chain release beat."""
+    start = shoot_step.get("start") or {}
+    actions = start.get("action") or {}
+    if actions.get(shooter_id) != "shoot":
+        return
+    archetypes = start.get("archetype") or {}
+    arch = archetypes.get(shooter_id, "standard")
+    actions[shooter_id] = "sprint" if arch == "sprint" else "cut"
+
+
+def _bump_next_step_indices(
+    steps: List[AnimationStep],
+    from_index: int,
+    delta: int,
+) -> None:
+    """Shift ``next_step`` indices strictly above ``from_index``."""
+    if delta <= 0:
+        return
+    for step in steps:
+        nxt = step.get("end", {}).get("next")
+        if not isinstance(nxt, dict) or nxt.get("kind") != "next_step":
+            continue
+        idx = nxt.get("index")
+        if isinstance(idx, int) and idx > from_index:
+            nxt["index"] = idx + delta
+
+
+def _wire_micro_chain(
+    micro_steps: List[AnimationStep],
+    base_index: int,
+    next_step: NextStep,
+) -> None:
+    for i, step in enumerate(micro_steps[:-1]):
+        step["end"]["next"] = {"kind": "next_step", "index": base_index + i + 1}
+    micro_steps[-1]["end"]["next"] = next_step
+
+
 def inject_shot_micro_before_post_shot(
     steps: List[AnimationStep],
     turn_result: Dict[str, Any],
@@ -662,7 +741,7 @@ def inject_shot_micro_before_post_shot(
     def_lineup: Dict[str, Any],
     away_offense: bool,
 ) -> None:
-    """Shared hook: replace terminal [shoot] with micro chain when stamped."""
+    """Shared hook: in-place terminal [shoot] → micro chain; travel+shoot → insert after."""
     apply_shot_micro_steps_to_chain(
         steps, turn_result, off_lineup, def_lineup, away_offense,
     )
@@ -693,21 +772,18 @@ def apply_shot_micro_steps_to_chain(
     if not start_coords:
         return
 
-    shooter_id = str(
-        turn_result.get("shooter_id")
-        or turn_result.get("shooter")
-        or ""
-    )
-    if hasattr(turn_result.get("shooter"), "player_id"):
-        shooter_id = str(turn_result["shooter"].player_id)
-    if not shooter_id or shooter_id not in start_coords:
-        for pid, act in ((shoot_step.get("start") or {}).get("action") or {}).items():
-            if act == "shoot":
-                shooter_id = str(pid)
-                break
+    shooter_id = _resolve_shooter_id_from_step(shoot_step, turn_result)
     if not shooter_id:
         logging.warning("[MICRO] no shooter_id for micro steps")
         return
+
+    travel_shoot = _is_travel_shoot_step(shoot_step, shooter_id)
+    end_coords = (shoot_step.get("end") or {}).get("coords") or {}
+    micro_start_coords = (
+        {pid: dict(c) for pid, c in end_coords.items()}
+        if travel_shoot and end_coords
+        else start_coords
+    )
 
     defender_id = None
     defender = turn_result.get("defender")
@@ -716,10 +792,16 @@ def apply_shot_micro_steps_to_chain(
     elif turn_result.get("defender_id"):
         defender_id = str(turn_result["defender_id"])
 
-    clock_start = (shoot_step.get("start") or {}).get("clock") or {
-        "clock_remaining": 0.0,
-        "shot_clock_remaining": 0.0,
-    }
+    if travel_shoot:
+        clock_start = (shoot_step.get("end") or {}).get("clock") or {
+            "clock_remaining": 0.0,
+            "shot_clock_remaining": 0.0,
+        }
+    else:
+        clock_start = (shoot_step.get("start") or {}).get("clock") or {
+            "clock_remaining": 0.0,
+            "shot_clock_remaining": 0.0,
+        }
     next_step = (shoot_step.get("end") or {}).get("next") or {
         "kind": "next_step",
         "index": shoot_idx + 1,
@@ -731,7 +813,7 @@ def apply_shot_micro_steps_to_chain(
     micro_steps = build_shot_micro_steps(
         family_id=str(family_id),
         contest_result=contest_result,
-        start_coords=start_coords,
+        start_coords=micro_start_coords,
         shooter_id=shooter_id,
         defender_id=defender_id,
         off_lineup=off_lineup,
@@ -745,20 +827,29 @@ def apply_shot_micro_steps_to_chain(
     if not micro_steps:
         return
 
+    if travel_shoot:
+        _demote_travel_shoot_step(shoot_step, shooter_id)
+        insert_at = shoot_idx + 1
+        delta = len(micro_steps)
+        steps[insert_at:insert_at] = micro_steps
+        shoot_step["end"]["next"] = {"kind": "next_step", "index": insert_at}
+        _bump_next_step_indices(steps, insert_at, delta)
+        _wire_micro_chain(micro_steps, insert_at, next_step)
+        logging.debug(
+            "[MICRO] insert after travel idx=%d family=%s contest=%s "
+            "travel=%.1f n_beats=%d",
+            shoot_idx, family_id, contest_result,
+            _shooter_travel_grid_distance(shoot_step, shooter_id),
+            len(micro_steps),
+        )
+        return
+
     base_index = shoot_idx
     delta = len(micro_steps) - 1
     steps[shoot_idx : shoot_idx + 1] = micro_steps
     if delta:
-        for step in steps:
-            nxt = step.get("end", {}).get("next")
-            if isinstance(nxt, dict) and nxt.get("kind") == "next_step":
-                idx = nxt.get("index")
-                if isinstance(idx, int) and idx > base_index:
-                    nxt["index"] = idx + delta
-
-    for i, step in enumerate(micro_steps[:-1]):
-        step["end"]["next"] = {"kind": "next_step", "index": base_index + i + 1}
-    micro_steps[-1]["end"]["next"] = next_step
+        _bump_next_step_indices(steps, base_index, delta)
+    _wire_micro_chain(micro_steps, base_index, next_step)
 
     logging.debug(
         "[MICRO] replaced shoot step idx=%d family=%s contest=%s n_beats=%d",

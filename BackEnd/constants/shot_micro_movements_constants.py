@@ -67,3 +67,7 @@ OUTSIDE_MOVING_FAMILIES = frozenset({
 })
 
 OUTSIDE_STATIC_FALLBACK_FAMILIES = ("set", "set_pump")
+
+# Shooter displacement on the terminal [shoot] step above this → travel+shoot
+# (FB drive / sprint-to-spot). Micro inserts after travel; in-place shoots replace.
+TRAVEL_SHOOT_MIN_GRID = 1.5

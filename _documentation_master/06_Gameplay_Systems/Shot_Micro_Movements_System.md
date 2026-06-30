@@ -14,7 +14,7 @@ On eligible shot turns the backend:
 
 1. Selects a **movement family** (jab step, fade, pump-fake chain, etc.) from the shooter’s `shot_type`.
 2. When contested, resolves a **contest result** (`offense_win`, `neutral`, `defense_win`) from offensive vs defensive rolls.
-3. Emits a short **micro chain** of `AnimationStep`s that **replaces the terminal `[shoot]` step** at the shot spot.
+3. Emits a short **micro chain** of `AnimationStep`s **at the shot spot** — replacing an in-place terminal `[shoot]` step, or **inserting after** a travel+shoot sprint step (fast break).
 4. Hands off to the existing **`_build_post_shot_sub_steps`** pipeline (`[ball_flight]`, variant hops, `[hold]` / `[bounce]`).
 
 The frontend renders gameplay coords from the schema and dispatches **flourishes** (pump fake, rattle, bite) in render space only.
@@ -44,8 +44,10 @@ Shot resolution (rules)
 
 Skeleton / HCT / FB / OREB emitter
   ├─ … upstream steps (pass, cut, drive, etc.)
-  ├─ terminal [shoot] step (placeholder)
-  ├─ inject_shot_micro_before_post_shot()  ← replaces [shoot] with micro chain
+  ├─ terminal [shoot] step — in-place (HCO) OR travel+shoot (FB drive)
+  ├─ inject_shot_micro_before_post_shot()
+  │     ├─ in-place: replace [shoot] with micro chain
+  │     └─ travel+shoot (≥ TRAVEL_SHOOT_MIN_GRID): keep sprint, insert micro after
   └─ _build_post_shot_sub_steps()          ← ball flight, variant, hold/bounce
 
 Frontend (UESS playback)
@@ -226,16 +228,30 @@ On bucket **A** move beats when `contest_result == defense_win`, shooter displac
 
 ---
 
-## 8. Step Placement (Option B)
+## 8. Step Placement
 
-Micro chain placement is **locked to Option B**:
+Micro footwork always runs **at the shot spot** (travel step `end.coords` or in-place shoot start). Two hook modes:
 
-1. Upstream skeleton steps bring players to the shot moment.
-2. Emitter emits a **terminal `[shoot]` step** as today.
-3. **`inject_shot_micro_before_post_shot`** finds that step and **replaces it** with N micro beats (last beat = `shoot`).
-4. **`_build_post_shot_sub_steps`** appends ball flight and follow-ups unchanged.
+### 8.1 In-place shoot (HCO / FCP / OREB putback / attack-basket at spot)
 
-This preserves a single post-shot contract across HCO, HCT, FB, and OREB.
+1. Upstream skeleton steps bring the shooter to the release coord.
+2. Terminal `[shoot]` step has **negligible shooter displacement** (start ≈ end, &lt; `TRAVEL_SHOOT_MIN_GRID`).
+3. **`inject_shot_micro_before_post_shot`** **replaces** that step with N micro beats (last beat = `shoot`).
+
+### 8.2 Travel + shoot (fast break drive / sprint-to-spot)
+
+Used when the terminal `[shoot]` step is also the **sprint to `bh_target` / `shot_spot`** (after-steal FB, Rim Runner shot branch, HCT FB drive, etc.):
+
+1. Shooter displacement on that step ≥ **`TRAVEL_SHOOT_MIN_GRID`** (1.5 grid).
+2. Hook **preserves** the travel step (demotes shooter action from `shoot` → `sprint` or `cut`).
+3. Micro chain is **inserted after** travel, seeded from travel **`end.coords`** (the coded FB shot spot).
+4. Clock for micro beats starts from travel **`end.clock`**.
+
+This prevents micro from replacing the sprint animation or shooting from mid-court.
+
+### 8.3 Post-shot (unchanged)
+
+**`_build_post_shot_sub_steps`** appends ball flight and follow-ups after the terminal micro **`shoot`** beat.
 
 ---
 
@@ -251,7 +267,7 @@ Per-player **`tween_durations`** are stamped via `stamp_tween_durations()` so fa
 
 Game clock and shot clock decrement through each micro beat’s `end.time_elapsed`.
 
-**Attack drive** time is **not** double-counted: drive travel lives in upstream skeleton steps (`build_attack_drive_sequence` / motion append); micro only burns at-spot footwork.
+**Attack drive (HCO motion)** and **FB sprint steps** burn on their own travel step; micro only adds at-spot footwork afterward.
 
 ---
 
@@ -383,6 +399,7 @@ All tunables live in `BackEnd/constants/shot_micro_movements_constants.py`:
 | `MICRO_MOVE_STEP_T_FLOOR` | 0.15 s | Min coord beat duration |
 | `MICRO_FLOURISH_BEAT_T` | 0.4 s | Fixed flourish beat |
 | `ARC_SPOT_OCCUPIED_RADIUS` | 3.0 | Teammate blocks adjacent arc spot |
+| `TRAVEL_SHOOT_MIN_GRID` | 1.5 | Shooter travel on terminal step → insert-after mode |
 
 Registry tables (`FAMILY_BUCKET`, `BUCKET_BEHAVIOR`, beat builders) live in `shot_micro_movements.py`.
 
@@ -435,7 +452,7 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 | Second defender contest animation | Not rendered; only primary defender track |
 | Per-turn RNG seed | Uses global `random` like rest of sim |
 | Static legacy HCT emitter | Not hooked |
-| Triangle FB lane-pass shot | Uses shared rim-runner lane chain (hooked via rim runner path when `_build_post_shot_sub_steps` runs) |
+| Away outside dribble targets | `move_to` uses home `HCO_STRING_SPOTS` without away mirror — separate fix |
 | Tunable polish | Footwork amplitudes/timing may need playtest pass |
 
 ---
@@ -443,13 +460,14 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 ## 19. Verification Checklist
 
 1. **Telemetry:** Turn JSON includes `micro_movement_family` on MAKE/MISS/BLOCK FG attempts.
-2. **Step count:** `animation_steps` has more steps than pre-micro on the same skeleton (terminal shoot replaced by 1–3 beats).
-3. **Contested:** `contest_result` and `contest_margin` present when `has_contest: true`.
-4. **Block gate:** No `result_type: BLOCK` when `contest_result: offense_win` on inside/attack contested shots.
-5. **FE:** Pump fake visible as ball bob; rattle on contested release; defender glue/stranded on fade/jab families.
-6. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
+2. **Step count:** HCO — terminal shoot replaced by 1–3 micro beats; FB — travel step preserved + micro inserted after (net +N steps).
+3. **FB shot spot:** After-steal / Rim Runner shots release at `bh_target` / `shot_spot` (2–4 from rim), not mid-court steal origin.
+4. **Contested:** `contest_result` and `contest_margin` present when `has_contest: true`.
+5. **Block gate:** No `result_type: BLOCK` when `contest_result: offense_win` on inside/attack contested shots.
+6. **FE:** Pump fake visible as ball bob; rattle on contested release; defender glue/stranded on fade/jab families.
+7. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
 
-Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, coords snapshot).
+Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion).
 
 ---
 

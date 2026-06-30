@@ -8,6 +8,7 @@ from BackEnd.constants.shot_micro_movements_constants import (
 )
 from BackEnd.engine.shot_micro_movements import (
     FAMILY_BUCKET,
+    apply_shot_micro_steps_to_chain,
     build_micro_coords_snapshot,
     resolve_contest,
     select_micro_movement,
@@ -66,3 +67,84 @@ class TestCoordsSnapshot:
             {"PG": P()}, {}, "s1", 91.0, 25.0,
         )
         assert coords["s1"] == {"x": 91.0, "y": 25.0}
+
+
+class TestTravelShootInsertion:
+    def test_inserts_micro_after_fb_drive(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda pool: "straight_inside",
+        )
+        travel: dict = {
+            "start": {
+                "coords": {
+                    "s1": {"x": 50.0, "y": 25.0},
+                    "d1": {"x": 48.0, "y": 25.0},
+                },
+                "destination": {"s1": {"x": 88.0, "y": 25.0}, "d1": None},
+                "action": {"s1": "shoot", "d1": "stationary"},
+                "archetype": {"s1": "sprint", "d1": "standard"},
+                "ball": {"owner_player_id": "s1"},
+                "clock": {"clock_remaining": 10.0, "shot_clock_remaining": 8.0},
+            },
+            "end": {
+                "coords": {
+                    "s1": {"x": 88.0, "y": 25.0},
+                    "d1": {"x": 86.0, "y": 25.0},
+                },
+                "ball": {"owner_player_id": "s1"},
+                "time_elapsed": 2.0,
+                "clock": {"clock_remaining": 8.0, "shot_clock_remaining": 6.0},
+                "next": {"kind": "next_step", "index": 1},
+            },
+        }
+        steps = [travel]
+        turn_result = {
+            "result_type": "MAKE",
+            "micro_movement_family": "straight_inside",
+            "shooter_id": "s1",
+            "shot_type": "inside",
+            "has_contest": False,
+        }
+        apply_shot_micro_steps_to_chain(steps, turn_result, {}, {}, False)
+
+        assert len(steps) == 2
+        assert steps[0]["start"]["action"]["s1"] == "sprint"
+        assert steps[0]["end"]["next"]["index"] == 1
+        assert steps[1]["start"]["coords"]["s1"] == {"x": 88.0, "y": 25.0}
+        assert steps[1]["start"]["action"]["s1"] == "shoot"
+
+    def test_in_place_shoot_still_replaces(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda pool: "straight_inside",
+        )
+        shoot: dict = {
+            "start": {
+                "coords": {"s1": {"x": 88.0, "y": 25.0}},
+                "destination": {"s1": None},
+                "action": {"s1": "shoot"},
+                "archetype": {"s1": "shot_motion"},
+                "ball": {"owner_player_id": "s1"},
+                "clock": {"clock_remaining": 8.0, "shot_clock_remaining": 6.0},
+            },
+            "end": {
+                "coords": {"s1": {"x": 88.0, "y": 25.0}},
+                "ball": {"owner_player_id": "s1"},
+                "time_elapsed": 0.4,
+                "clock": {"clock_remaining": 7.6, "shot_clock_remaining": 5.6},
+                "next": {"kind": "next_step", "index": 1},
+            },
+        }
+        steps = [shoot]
+        turn_result = {
+            "result_type": "MISS",
+            "micro_movement_family": "straight_inside",
+            "shooter_id": "s1",
+            "shot_type": "inside",
+            "has_contest": False,
+        }
+        apply_shot_micro_steps_to_chain(steps, turn_result, {}, {}, False)
+
+        assert len(steps) == 1
+        assert steps[0]["start"]["action"]["s1"] == "shoot"
