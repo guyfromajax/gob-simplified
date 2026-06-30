@@ -17,7 +17,7 @@
 
 **Location: contest range, rim box, `has_contest` (implemented in `shot_manager.py`)**
 1. **Shooter coordinates:** `roles["shot_spot"]` `{x,y}` when present; otherwise `shooter.coords` (defaults x=50, y=25 if missing).
-2. **Attacking basket:** Home offense attacks the away rim `AWAY_RIM_COORDS` (x≈9, y≈25); away offense attacks `HOME_RIM_COORDS` (x≈91, y≈25). Same convention as the rest of the court engine.
+2. **Attacking basket (display orientation):** Home offense attacks `HOME_RIM_COORDS` (x≈91, y≈25); away offense attacks `AWAY_RIM_COORDS` (x≈9, y≈25). Matches animation payloads, `HCO_STRING_SPOTS`, and `_animation_transition_basket_xy` in `shot_manager.py`. Away spots mirror with `x → 100 − x`, y unchanged.
 3. **Contest (`has_contest`):** Two paths:
    - **HCO / Final Turn** (`offensive_state == "HCO"`): `has_contest = bool(defender or second_defender)` — i.e. **role-based** (whether a contesting defender role is assigned), not a geometry box.
    - **Non-HCO** (FCP, HCT, fast break): Euclidean geometry — **every** player in the defensive lineup is checked, and `has_contest` is true if any lies within **`CONTEST_EUCLIDEAN_RADIUS` (11)** grid spots of the shooter.

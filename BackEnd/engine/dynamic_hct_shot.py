@@ -223,9 +223,14 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
             shot_defense_score_for_sfx,
             d_foul,
             foul_player,
+            shot_defense_score_raw,
         ) = shot_manager.calculate_shot_score(
             shooter, None, None, shot_defender, shot_type, defense_playcall,
             is_three, True, None, bh_target, apply_defense=True,
+        )
+        from BackEnd.engine.shot_micro_movements import resolve_contest
+        contest_result, contest_margin = resolve_contest(
+            shot_score_pre_defense, shot_defense_score_raw,
         )
         shot_threshold = off_team.team_attributes["shot_threshold"]
         made = shot_score >= shot_threshold
@@ -236,10 +241,14 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
             shot_defense_score_for_sfx,
             d_foul,
             foul_player,
+            _shot_defense_score_raw,
         ) = shot_manager.calculate_shot_score(
             shooter, None, None, None, shot_type, defense_playcall,
             is_three, True, None, bh_target, apply_defense=False,
         )
+        contest_result = None
+        contest_margin = None
+        shot_defense_score_raw = 0.0
         made = True
         game_state["no_defender_shots"] = int(
             game_state.get("no_defender_shots", 0) or 0
@@ -460,6 +469,21 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)
 
+    from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
+    select_and_stamp_shot_micro(
+        turn_result,
+        shot_type=shot_type,
+        shooter_id=str(shooter_id),
+        shooter_x=float(bh_target["x"]),
+        shooter_y=float(bh_target["y"]),
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        has_contest=bool(contested),
+        contest_result=contest_result if contested else None,
+        contest_margin=contest_margin if contested else None,
+        shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+    )
+
     if d_foul and foul_player:
         turn_result["foul_player_id"] = _safe_id(foul_player)
         turn_result["foul_team"] = "DEFENSE"
@@ -598,13 +622,14 @@ def _roll_ab_shot(
         shot_defense_score_for_sfx,
         d_foul,
         foul_player,
+        shot_defense_score_raw,
     ) = shot_manager.calculate_shot_score(
         shooter, None, None, shot_defender if contested else None, shot_type,
         defense_playcall, is_three, is_paint, None, shot_spot,
         apply_defense=contested,
     )
     made = shot_score >= off_team.team_attributes["shot_threshold"]
-    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three, shot_classification
+    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw
 
 
 def _finalize_ab_shot(
@@ -630,6 +655,7 @@ def _finalize_ab_shot(
     shot_moment_coords: Optional[Dict[str, Dict[str, float]]] = None,
     extra_seed: Optional[Dict[str, Any]] = None,
     text_prefix: str = " they go to work in the paint",
+    shot_defense_score_raw: float = 0.0,
 ) -> Dict[str, Any]:
     """Shared make/miss → turn_result tail for the §7 in-Attack-Basket shots
     (foul FTs, variant, scoring, rebound, pressure-type, next_play_type, plus
@@ -874,6 +900,27 @@ def _finalize_ab_shot(
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)
 
+    from BackEnd.engine.shot_micro_movements import resolve_contest, select_and_stamp_shot_micro
+    contest_result = None
+    contest_margin = None
+    if contested:
+        contest_result, contest_margin = resolve_contest(
+            shot_score_pre_defense, shot_defense_score_raw,
+        )
+    select_and_stamp_shot_micro(
+        turn_result,
+        shot_type=shot_type,
+        shooter_id=str(shooter_id),
+        shooter_x=float(shot_spot["x"]),
+        shooter_y=float(shot_spot["y"]),
+        off_lineup=off_team.lineup or {},
+        def_lineup=def_team.lineup or {},
+        has_contest=bool(contested),
+        contest_result=contest_result,
+        contest_margin=contest_margin,
+        shot_defense_score_raw=float(shot_defense_score_raw),
+    )
+
     if d_foul and foul_player:
         turn_result["foul_player_id"] = _safe_id(foul_player)
         turn_result["foul_team"] = "DEFENSE"
@@ -935,7 +982,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
     shot_type = (
         "inside" if _euclid(shot_spot, basket) <= AB_INSIDE_SHOT_MAX_DIST else "outside"
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -950,6 +997,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
         is_three=is_three, shot_classification=shot_classification,
         shot_moment_coords=_coords_by_player_id(off_lineup, seed_off),
         text_prefix=" they go to work in the paint",
+        shot_defense_score_raw=shot_defense_score_raw,
     )
 
 
@@ -1050,7 +1098,7 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
             def_lineup, seed_def, shot_spot, is_away_offense, collapse_t,
         )
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -1098,4 +1146,5 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
         is_three=is_three, shot_classification=shot_classification,
         shot_moment_coords=shot_moment_coords,
         extra_seed=extra_seed, text_prefix=" they attack the rim",
+        shot_defense_score_raw=shot_defense_score_raw,
     )

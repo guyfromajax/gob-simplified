@@ -20,7 +20,7 @@
 
 ### 1.3 Block Attempt Check
 
-Gating: requires `has_contest` and a shot defender, and `shot_type` in (`inside`, `attack`). Two rolls, in order:
+Gating: requires `has_contest`, a shot defender, `shot_type` in (`inside`, `attack`), and **contest_result** in (`neutral`, `defense_win`). **`offense_win` contests cannot be blocked** (shot micro-movements contest layer). Three rolls, in order:
 
 1. **Aggression roll:** **x** = defense team’s aggression level (numeric **0–4**): `def_team.strategy_settings["aggression"]` (default 2). **y** = `random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)` (currently **0–4**). If **y <= x** → block attempt → run block reconciliation.
 2. **Fight roll (secondary trigger):** if the aggression roll fails, **z** = `random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)` (currently **0–10**); if **z <= defense `team_attributes["fight"]`** → block attempt anyway.
@@ -69,6 +69,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 ### 1.6 Animation: Block vs Shot
 
+- **Shot micro-movements (v1):** On eligible block turns, the schema emitter plays the **micro footwork chain** at the shot spot first (terminal `[shoot]` replacement), then the existing BLOCK post-shot sub-steps (`[ball_flight]` to block spot, no variant/bounce hops). CHARGE / blocking-foul early returns skip micro entirely.
 - When the outcome is a **block** (not a shooting foul, not “else” to standard shot):
   - Animate the ball to the **block spot** (not the rim), then run the same miss path (bounce, rebound). The block spot is used as the reference for both the ball flight target and the bounce/rebound so the ball does not snap to the opposite side of the court.
   - **Frontend:** In `ShotAnimationSystem`, (1) ball flight uses `ball_bounce_x`/`ball_bounce_y` as the target when `result_type === 'BLOCK'`; (2) in the miss path, `rimCoords` for BLOCK is also set from the block spot (not `getRimCoordinates`) so the bounce and rebound logic use the block spot as the reference; (3) shot **variant** animations (rattle/backboard) are skipped for BLOCK.

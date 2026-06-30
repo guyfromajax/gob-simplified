@@ -445,6 +445,7 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             shot_defense_score_for_sfx,
             d_foul,
             foul_player,
+            shot_defense_score_raw,
         ) = shot_manager.calculate_shot_score(
             stealer,        # shooter
             None,           # passer
@@ -458,6 +459,10 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             bh_target,      # shooter_location
             apply_defense=True,
         )
+        from BackEnd.engine.shot_micro_movements import resolve_contest
+        contest_result, contest_margin = resolve_contest(
+            shot_score_pre_defense, shot_defense_score_raw,
+        )
         shot_threshold = off_team.team_attributes["shot_threshold"]
         made = shot_score >= shot_threshold
     else:
@@ -468,11 +473,15 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
             shot_defense_score_for_sfx,
             d_foul,
             foul_player,
+            _shot_defense_score_raw,
         ) = shot_manager.calculate_shot_score(
             stealer, None, None, None, shot_type, defense_playcall,
             is_three, True, None, bh_target,
             apply_defense=False,
         )
+        contest_result = None
+        contest_margin = None
+        shot_defense_score_raw = 0.0
         made = True
         # Track no-defender breakdown for stats parity with OREB putback path.
         game_state["no_defender_shots"] = int(
@@ -751,6 +760,21 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
 
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)
+
+    from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
+    select_and_stamp_shot_micro(
+        turn_result,
+        shot_type=shot_type,
+        shooter_id=str(stealer_id),
+        shooter_x=float(bh_target["x"]),
+        shooter_y=float(bh_target["y"]),
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        has_contest=bool(contested),
+        contest_result=contest_result if contested else None,
+        contest_margin=contest_margin if contested else None,
+        shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+    )
 
     if d_foul and foul_player:
         turn_result["foul_player_id"] = _safe_id(foul_player)

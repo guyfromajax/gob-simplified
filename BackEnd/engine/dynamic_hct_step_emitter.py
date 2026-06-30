@@ -49,6 +49,7 @@ from BackEnd.utils.animation_step_schema import (
     StepStart,
 )
 from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
 from BackEnd.utils.transition_bridge import (
     _interrupted_coord,
     build_pass_step,
@@ -907,6 +908,9 @@ def build_dynamic_hct_animation_steps(
         step_clock_seconds.append(round(float(drive_step["end"]["time_elapsed"]), 2))
 
         # Ball flight / variant / hold-or-bounce sub-steps (shared builder).
+        inject_shot_micro_before_post_shot(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense,
+        )
         _build_post_shot_sub_steps(
             steps, turn_result, off_lineup, def_lineup, is_away_offense,
         )
@@ -942,6 +946,9 @@ def build_dynamic_hct_animation_steps(
         )
         steps.append(shot_step)
         step_clock_seconds.append(round(float(shot_step["end"]["time_elapsed"]), 2))
+        inject_shot_micro_before_post_shot(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense,
+        )
         _build_post_shot_sub_steps(
             steps, turn_result, off_lineup, def_lineup, is_away_offense,
         )
@@ -1015,6 +1022,9 @@ def build_dynamic_hct_animation_steps(
             steps.append(shot_step)
             step_clock_seconds.append(round(float(shot_step["end"]["time_elapsed"]), 2))
 
+        inject_shot_micro_before_post_shot(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense,
+        )
         _build_post_shot_sub_steps(
             steps, turn_result, off_lineup, def_lineup, is_away_offense,
         )

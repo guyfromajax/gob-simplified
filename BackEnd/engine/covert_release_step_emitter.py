@@ -1308,6 +1308,10 @@ def build_covert_release_animation_steps(
     if result_type in ("MAKE", "MISS", "BLOCK"):
         try:
             from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+            from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+            inject_shot_micro_before_post_shot(
+                steps, turn_result, off_lineup, def_lineup, is_away_offense,
+            )
             _build_post_shot_sub_steps(
                 steps, turn_result, off_lineup, def_lineup, is_away_offense,
             )

@@ -114,6 +114,17 @@ const defaults = {
       durationMs: 450, // Full out-and-back (yoyo)
       ease: 'Back.easeOut',
     },
+    pumpFake: {
+      amplitudePx: 8,
+      durationMs: 280,
+      ease: 'Quad.easeOut',
+    },
+    rattle: {
+      amplitudePx: 4,
+      cycleMs: 120,
+      cycles: 3,
+      ease: 'Sine.easeInOut',
+    },
   },
   possession: {
     msPerTick: 1,
@@ -160,6 +171,8 @@ export const animationConfig = {
   heartbeat: { ...defaults.heartbeat, ...(overrides.heartbeat || {}) },
   flourish: {
     reachIn: { ...defaults.flourish.reachIn, ...(overrides.flourish?.reachIn || {}) },
+    pumpFake: { ...defaults.flourish.pumpFake, ...(overrides.flourish?.pumpFake || {}) },
+    rattle: { ...defaults.flourish.rattle, ...(overrides.flourish?.rattle || {}) },
   },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,

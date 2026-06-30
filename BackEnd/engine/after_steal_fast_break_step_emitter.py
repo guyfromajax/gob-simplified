@@ -41,6 +41,7 @@ from typing import Any, Dict, List, Optional
 from BackEnd.engine.skeleton_step_emitter import (
     _build_post_shot_sub_steps,
 )
+from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -319,6 +320,9 @@ def build_after_steal_fast_break_animation_steps(
     # launch + arrival SFX), variant sub-steps (RATTLE hops / BANK / etc.),
     # then [hold] on make or [bounce] on miss. Shooting-foul-on-miss
     # announcement stamped on the terminal step.
+    inject_shot_micro_before_post_shot(
+        steps, turn_result, off_lineup, def_lineup, is_away_offense,
+    )
     _build_post_shot_sub_steps(
         steps, turn_result, off_lineup, def_lineup, is_away_offense,
     )

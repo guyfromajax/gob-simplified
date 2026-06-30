@@ -274,6 +274,74 @@ export function awaitReachInFlourish(scene, sprite, ballSprite, turnData = null,
   });
 }
 
+function runRattle(scene, sprite, flourish) {
+  const cfg = animationConfig.flourish?.rattle || {};
+  const resolved = resolveRenderTarget(sprite);
+  if (!resolved) return;
+
+  const ampPx = Number.isFinite(flourish?.amplitude_grid)
+    ? flourish.amplitude_grid * ((scene.game?.config?.width || 800) / 100)
+    : (Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 4);
+  const cycles = Number.isFinite(flourish?.cycles) ? flourish.cycles : (cfg.cycles || 3);
+  const cycleMs = Number.isFinite(cfg.cycleMs) ? cfg.cycleMs : 120;
+  const ease = flourish?.ease || cfg.ease || "Sine.easeInOut";
+
+  let restore;
+  let tweenProps;
+  if (resolved.mode === "origin") {
+    const baseOX = Number(sprite.displayOriginX);
+    const baseOY = Number(sprite.displayOriginY);
+    tweenProps = { displayOriginX: baseOX - ampPx, displayOriginY: baseOY };
+    restore = () => {
+      sprite.displayOriginX = baseOX;
+      sprite.displayOriginY = baseOY;
+    };
+  } else {
+    const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
+    tweenProps = { x: `+=${ampPx}` };
+    restore = () => {
+      for (const b of bases) b.c.x = b.x;
+    };
+  }
+
+  const tween = scene.tweens.add({
+    targets: resolved.targets,
+    ...tweenProps,
+    duration: cycleMs,
+    ease,
+    yoyo: true,
+    repeat: Math.max(0, cycles - 1),
+    onComplete: restore,
+    onStop: restore,
+  });
+  if (tween) tween.__uessBoundaryIgnore = true;
+}
+
+function runPumpFake(scene, _sprite, flourish, ballSprite) {
+  if (!ballSprite || !scene?.tweens) return;
+  const cfg = animationConfig.flourish?.pumpFake || {};
+  const ampPx = Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 8;
+  const durationMs = Number.isFinite(flourish?.duration_ms)
+    ? flourish.duration_ms
+    : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 280);
+  const baseY = ballSprite.y;
+  const tween = scene.tweens.add({
+    targets: ballSprite,
+    y: baseY - ampPx,
+    duration: durationMs / 2,
+    ease: flourish?.ease || cfg.ease || "Quad.easeOut",
+    yoyo: true,
+    repeat: 0,
+    onComplete: () => { ballSprite.y = baseY; },
+    onStop: () => { ballSprite.y = baseY; },
+  });
+  if (tween) tween.__uessBoundaryIgnore = true;
+}
+
+function runBite(scene, sprite, flourish, ballSprite) {
+  runReachIn(scene, sprite, { ...flourish, kind: "reach_in", target: "ball" }, ballSprite);
+}
+
 /**
  * Render a flourish. Dispatches by `flourish.kind`. Unknown / not-yet-rendered
  * kinds are accepted no-ops (placeholders). Visual-only — never throws.
@@ -293,8 +361,18 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
       case "reach_in":
         runReachIn(scene, sprite, flourish, opts.ballSprite, opts.turnData);
         return;
-      // pump_fake / bite / gather / rattle / shot_dip / dribble / pickup / dunk:
-      // accepted-but-unrendered placeholders for now.
+      case "pump_fake":
+        runPumpFake(scene, sprite, flourish, opts.ballSprite);
+        return;
+      case "bite":
+        runBite(scene, sprite, flourish, opts.ballSprite);
+        return;
+      case "rattle":
+        runRattle(scene, sprite, flourish);
+        return;
+      case "shot_dip":
+        runRattle(scene, sprite, { ...flourish, cycles: flourish.cycles || 1 });
+        return;
       default:
         return;
     }

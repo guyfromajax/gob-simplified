@@ -66,6 +66,7 @@ from BackEnd.utils.shared import (
     increment_motion_attack_shot_tracker,
     format_motion_attack_shot_tracker,
 )
+from BackEnd.engine.shot_micro_movements import resolve_contest, select_and_stamp_shot_micro
 from BackEnd.utils.defense_utils import (
     defender_player_from_random_slot_fallback,
     is_zone_defense,
@@ -112,12 +113,11 @@ def _shooter_xy_from_roles(roles, shooter):
 
 
 def _attacking_basket_xy(off_team, game):
-    """Basket being attacked: home offense → away rim (x≈9); away offense → home rim (x≈91)."""
-    from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+    """Display-oriented basket being attacked (same as animation / HCO_STRING_SPOTS).
 
-    if off_team.team_id == game.home_team.team_id:
-        return float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"])
-    return float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"])
+    Home offense → HOME_RIM (x≈91); away offense → AWAY_RIM (x≈9).
+    """
+    return _animation_transition_basket_xy(off_team, game)
 
 def _animation_transition_basket_xy(team, game):
     """
@@ -874,6 +874,10 @@ class ShotManager:
             )
         charge_result = None
         defense_applied_defenders = []
+        shot_defense_score_raw = 0.0
+        contest_result = None
+        contest_margin = None
+        micro_movement_family = None
 
         if rim_unguarded_99:
             # Unguarded attempt in rim box: 99% make; skip defense, fouls, block recon, charge.
@@ -890,6 +894,7 @@ class ShotManager:
                 shot_defense_score_for_sfx,
                 d_foul,
                 foul_player,
+                shot_defense_score_raw,
             ) = self.calculate_shot_score(
                 shooter,
                 passer,
@@ -920,7 +925,7 @@ class ShotManager:
             # ✅ New: returns shot_score (post-defense), pre_defense_shot_score, and foul info
             # Use shot_type instead of playcall for shot score calculation
             # No contest → omit defensive scoring and shooting-foul rolls (still full offense / gravity).
-            shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player = self.calculate_shot_score(
+            shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, shot_defense_score_raw = self.calculate_shot_score(
                 shooter,
                 passer,
                 screener,
@@ -933,6 +938,10 @@ class ShotManager:
                 shooter_location_str,
                 apply_defense=has_contest,
             )
+            if has_contest:
+                contest_result, contest_margin = resolve_contest(
+                    shot_score_pre_defense, shot_defense_score_raw,
+                )
             if forced_shot and not roles.get("flss"):
                 # Forced shots keep standard defender/defense scoring, then apply hard penalty.
                 shot_score -= 100
@@ -951,10 +960,15 @@ class ShotManager:
             if motion_defense_bonus > 0 and has_contest:
                 shot_score -= motion_defense_bonus * 0.2
 
-            # ✅ BLOCK ATTEMPT (inside/attack only): before charge check, run block reconciliation when y <= x
+            # ✅ BLOCK ATTEMPT (inside/attack only): contested neutral/defense_win only
             block_spot = None
             block_defender_used = None
-            if has_contest and shot_type in ("inside", "attack") and defender:
+            if (
+                has_contest
+                and shot_type in ("inside", "attack")
+                and defender
+                and contest_result in ("neutral", "defense_win")
+            ):
                 x = def_team.strategy_settings.get("aggression", 2)
                 y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
                 should_attempt_block_reconciliation = y <= x
@@ -1063,6 +1077,19 @@ class ShotManager:
                             },
                         }
                         self._stamp_shot_classification(result, shot_classification)
+                        select_and_stamp_shot_micro(
+                            result,
+                            shot_type=shot_type,
+                            shooter_id=str(shooter.player_id),
+                            shooter_x=float(sx),
+                            shooter_y=float(sy),
+                            off_lineup=off_lineup,
+                            def_lineup=def_lineup,
+                            has_contest=bool(has_contest),
+                            contest_result=contest_result,
+                            contest_margin=contest_margin,
+                            shot_defense_score_raw=float(shot_defense_score_raw or 0),
+                        )
                         if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
                             result["fouled_out"] = True
                             result["foul_out_player"] = {
@@ -2255,6 +2282,22 @@ class ShotManager:
         
         is_block_outcome = getattr(self, "_block_spot", None) is not None
 
+        _micro_scratch: Dict[str, Any] = {}
+        select_and_stamp_shot_micro(
+            _micro_scratch,
+            shot_type=shot_type,
+            shooter_id=str(shooter.player_id),
+            shooter_x=float(sx),
+            shooter_y=float(sy),
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            has_contest=bool(has_contest),
+            contest_result=contest_result,
+            contest_margin=contest_margin,
+            shot_defense_score_raw=float(shot_defense_score_raw or 0),
+        )
+        micro_movement_family = _micro_scratch.get("micro_movement_family")
+
         shot_variant = None
         shot_variant_extras = {}
         if not is_block_outcome:
@@ -2289,6 +2332,11 @@ class ShotManager:
             "shot_score": shot_score,
             "shot_score_pre_defense": shot_score_pre_defense,
             "shot_defense_score_for_sfx": shot_defense_score_for_sfx,
+            "shot_defense_score_raw": float(shot_defense_score_raw or 0) if has_contest else None,
+            "has_contest": bool(has_contest),
+            "micro_movement_family": micro_movement_family,
+            "contest_result": contest_result if has_contest else None,
+            "contest_margin": contest_margin if has_contest else None,
             "shot_variant": shot_variant,
             "sfx": {
                 "shot_type": shot_type,
@@ -2441,6 +2489,7 @@ class ShotManager:
 
         shot_score = 0
         shot_defense_score_for_sfx = 0
+        shot_defense_score_raw = 0.0
         attrs = shooter.attributes
         # Use shot_type instead of playcall for attribute weights
         # Map shot_type to playcall name for weights lookup
@@ -2497,6 +2546,7 @@ class ShotManager:
 
             # Track defense score for statistics
             self.defense_scores.append(defense_score)
+            shot_defense_score_raw = float(defense_score)
 
             # Check defensive foul with shot_type-specific thresholds
             d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, shot_type, shooter, shooter_location)
@@ -2594,7 +2644,7 @@ class ShotManager:
         # print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
 
         # help_defender is always None now (help defense removed)
-        return shot_score, pre_defense_shot_score, shot_defense_score_for_sfx, d_foul, foul_player
+        return shot_score, pre_defense_shot_score, shot_defense_score_for_sfx, d_foul, foul_player, shot_defense_score_raw
 
     
     def check_defensive_foul_on_shot(self, defender, defense_score, shot_type, shooter=None, shooter_location=None):

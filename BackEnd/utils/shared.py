@@ -1040,6 +1040,7 @@ def resolve_offensive_rebound(game, rebounder):
                 shot_defense_score_for_sfx,
                 d_foul,
                 foul_player,
+                shot_defense_score_raw,
             ) = shot_manager.calculate_shot_score(
                 rebounder,
                 None,
@@ -1053,6 +1054,10 @@ def resolve_offensive_rebound(game, rebounder):
                 "oreb_putback",
                 apply_defense=True,
             )
+            from BackEnd.engine.shot_micro_movements import resolve_contest
+            putback_contest_result, putback_contest_margin = resolve_contest(
+                shot_score_pre_defense, shot_defense_score_raw,
+            )
             shot_threshold = off_team.team_attributes["shot_threshold"]
             shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, game)
             made = shot_score >= shot_threshold
@@ -1064,6 +1069,7 @@ def resolve_offensive_rebound(game, rebounder):
                 _,
                 shot_score_pre_defense,
                 shot_defense_score_for_sfx,
+                _,
                 _,
                 _,
             ) = shot_manager.calculate_shot_score(
@@ -1079,6 +1085,9 @@ def resolve_offensive_rebound(game, rebounder):
                 "oreb_putback",
                 apply_defense=False,
             )
+            putback_contest_result = None
+            putback_contest_margin = None
+            shot_defense_score_raw = 0.0
             made = random.randint(1, 100) < 100
 
         if not contested:
@@ -1156,6 +1165,21 @@ def resolve_offensive_rebound(game, rebounder):
         event["shot_classification_source"] = putback_classification["classification_source"]
         if _putback_variant_extras:
             event.update(_putback_variant_extras)
+
+        from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
+        select_and_stamp_shot_micro(
+            event,
+            shot_type=shot_type,
+            shooter_id=str(getattr(rebounder, "player_id", "")),
+            shooter_x=shooter_x,
+            shooter_y=shooter_y,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            has_contest=contested,
+            contest_result=putback_contest_result if contested else None,
+            contest_margin=putback_contest_margin if contested else None,
+            shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+        )
 
         if made:
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])

@@ -651,6 +651,11 @@ def build_oreb_animation_steps(
     steps.append(shoot_step)
     elapsed += shoot_step["end"]["time_elapsed"]
 
+    from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+    inject_shot_micro_before_post_shot(
+        steps, turn_result, off_lineup, def_lineup, is_away_offense,
+    )
+
     # --- [ball_flight] + variant rim action -------------------------------
     # Rattle / bank variants terminate the flight at their start point
     # (rattle start coord / bank point) so the per-hop / settle / graze

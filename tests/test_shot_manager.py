@@ -1,7 +1,35 @@
 import pytest
 
 from tests.test_utils import build_mock_game
-from BackEnd.models.shot_manager import ShotManager
+from BackEnd.models.shot_manager import (
+    ShotManager,
+    _attacking_basket_xy,
+    _animation_transition_basket_xy,
+    _shot_in_rim_box,
+)
+
+
+def test_attacking_basket_xy_matches_display_orientation():
+    game = build_mock_game()
+    home_bx, home_by = _attacking_basket_xy(game.home_team, game)
+    away_bx, away_by = _attacking_basket_xy(game.away_team, game)
+    assert (home_bx, home_by) == (91.0, 25.0)
+    assert (away_bx, away_by) == (9.0, 25.0)
+    assert _attacking_basket_xy(game.home_team, game) == _animation_transition_basket_xy(
+        game.home_team, game
+    )
+    assert _attacking_basket_xy(game.away_team, game) == _animation_transition_basket_xy(
+        game.away_team, game
+    )
+
+
+def test_shot_in_rim_box_uses_display_attacking_basket():
+    """basketSpot (87,25) is in the rim box around HOME_RIM (91,25), not AWAY_RIM (9,25)."""
+    assert _shot_in_rim_box(87, 25, 91, 25) is True
+    assert _shot_in_rim_box(87, 25, 9, 25) is False
+    # Mirrored away paint spot
+    assert _shot_in_rim_box(13, 25, 9, 25) is True
+    assert _shot_in_rim_box(13, 25, 91, 25) is False
 
 
 def test_resolve_shot_returns_make_or_miss():

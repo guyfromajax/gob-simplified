@@ -1786,6 +1786,11 @@ def build_skeleton_animation_steps(
     # apply (which is itself a no-op when overlay maps are empty — the
     # common case for those result types).
     if steps:
+        from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+
+        inject_shot_micro_before_post_shot(
+            steps, turn_result, off_lineup, def_lineup, away_offense,
+        )
         _build_post_shot_sub_steps(
             steps, turn_result, off_lineup, def_lineup, away_offense,
         )

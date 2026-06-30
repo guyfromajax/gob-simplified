@@ -1893,12 +1893,16 @@ def _finalize_rr_steps(
     _ensure_turn_shooter_for_post_shot(turn_result)
     try:
         from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+        from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
         away_team_id = getattr(getattr(game, "away_team", None), "team_id", None)
         offense_team_id = getattr(getattr(game, "offense_team", None), "team_id", None)
         away_offense = bool(
             away_team_id is not None
             and offense_team_id is not None
             and str(offense_team_id) == str(away_team_id)
+        )
+        inject_shot_micro_before_post_shot(
+            steps, turn_result, off_lineup, def_lineup, away_offense,
         )
         _build_post_shot_sub_steps(
             steps, turn_result, off_lineup, def_lineup, away_offense,
