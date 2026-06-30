@@ -2556,6 +2556,14 @@ def _build_post_shot_sub_steps(
         flight_trigger["metadata"],
         turn_result.get("shot_score_pre_defense"),
     )
+    from BackEnd.utils.shot_ball_arc import stamp_shot_ball_arc_metadata
+
+    stamp_shot_ball_arc_metadata(
+        flight_trigger["metadata"],
+        turn_result,
+        shot_spot,
+        away_offense,
+    )
 
     # Bounce step requires backend-stamped ball_bounce coords. AIRBALL takes
     # the OOB continuation path instead (no rebound visual per spec).

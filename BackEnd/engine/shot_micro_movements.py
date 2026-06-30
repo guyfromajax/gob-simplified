@@ -347,6 +347,9 @@ def select_and_stamp_shot_micro(
         shot_defense_score_raw=shot_defense_score_raw if has_contest else None,
         has_contest=has_contest,
     )
+    from BackEnd.utils.shot_ball_arc import roll_shot_arc
+
+    turn_result["uses_shot_arc"] = roll_shot_arc(family_id)
     return family_id
 
 
@@ -492,6 +495,7 @@ def _build_family_beats(
         if target:
             return [
                 {"kind": "move_to", "coord": target, "archetype": "cruise"},
+                {"kind": "flourish", "who": "shooter", "flourish": "gather"},
                 {"kind": "shot"},
             ]
         return [{"kind": "shot"}]
@@ -513,6 +517,7 @@ def _build_family_beats(
         ]
         if target:
             beats.append({"kind": "move_to", "coord": target, "archetype": "cruise", "beat_bucket": "B"})
+            beats.append({"kind": "flourish", "who": "shooter", "flourish": "gather", "beat_bucket": "B"})
         beats.append({"kind": "shot", "beat_bucket": "B"})
         return beats
     return [{"kind": "shot"}]

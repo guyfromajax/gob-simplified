@@ -337,6 +337,7 @@ Stamped on `turn_result` for eligible shot turns:
 | `contest_margin` | float | Contested only |
 | `shot_defense_score_raw` | float | Contested only |
 | `has_contest` | bool | Always |
+| `uses_shot_arc` | bool | When family is in `SHOT_ARC_PROBABILITY` map |
 
 Self-contained shot paths (`dynamic_hct_shot`, `after_steal_fast_break`, OREB putback in `shared.py`) call `select_and_stamp_shot_micro()` directly because they bypass `ShotManager.resolve_shot()`.
 
@@ -421,8 +422,15 @@ All tunables live in `BackEnd/constants/shot_micro_movements_constants.py`:
 | `PUMP_FAKE_FLOURISH_BEAT_T` | 1.05 s | `pump_fake` micro step game-clock burn |
 | `ARC_SPOT_OCCUPIED_RADIUS` | 3.0 | Teammate blocks adjacent arc spot |
 | `TRAVEL_SHOOT_MIN_GRID` | 1.5 | Shooter travel on terminal step → insert-after mode |
+| `ARC_BASE` | 20 px | Ball-arc apex floor |
+| `ARC_SLOPE` | 4.5 px/grid | Ball-arc distance scaling |
+| `APEX_BIAS` | 0.54 | Arc peak horizontal progress (before clamp) |
+| `APEX_HEIGHT_REF` | 140 px | Flatter arcs peak later |
+| `SHOT_ARC_STYLE_MULT` | see code | Per-style height multiplier |
+| `SHOT_ARC_PROBABILITY` | see code | Per-family arc roll (0–1) |
+| `SHOT_ARC_FAMILY_STYLE` | see code | Family → style mult key |
 
-Registry tables (`FAMILY_BUCKET`, `BUCKET_BEHAVIOR`, beat builders) live in `shot_micro_movements.py`.
+Registry tables (`FAMILY_BUCKET`, `BUCKET_BEHAVIOR`, beat builders) live in `shot_micro_movements.py`. Arc geometry helpers live in `BackEnd/utils/shot_ball_arc.py`.
 
 ---
 
@@ -463,6 +471,41 @@ Multi-beat families (`under_and_up`, `dribble_pump_shoot`, `pump_dribble_shoot`)
 
 Each beat is a separate `AnimationStep` with its own gate, clock burn, and defender displacement.
 
+### 17.1 Gather beat (dribble-into-shot outside)
+
+| Family | Beat sequence |
+|--------|----------------|
+| `dribble_shoot` | `[ arc_dribble ] → [ gather ] → [ shot ]` |
+| `pump_dribble_shoot` | `[ pump ] → [ arc_dribble ] → [ gather ] → [ shot ]` |
+
+- `gather` = stationary `gather` flourish at the arc-destination spot (**0.4 s** game, `MICRO_FLOURISH_BEAT_T`).
+- **Not** added to `dribble_pump_shoot` (pump already settles) or static set / set_pump families.
+
+### 17.2 Shot ball arc (`[ball_flight]` only)
+
+When `uses_shot_arc: true` on the turn, the backend stamps `advance_trigger.metadata.shot_ball_arc` on the schema `[ball_flight]` step. FE tweens a skewed parabola; non-arc shots keep the existing straight flight (same grid-rate duration).
+
+**Roll** (`roll_shot_arc`) runs at `select_and_stamp_shot_micro` time and stores `uses_shot_arc` on the turn. **Blocks** always omit arc metadata (flat flight). **Free throws** are exempt (no micro stamp).
+
+| `micro_movement_family` | Arc probability | Style mult key |
+|-------------------------|-----------------|----------------|
+| `fade_away` | 1.0 (always) | `fade` |
+| `jab_step` | 0.5 | `set` |
+| `set`, `set_pump` | 0.5 each | `set` |
+| `dribble_shoot`, `dribble_pump_shoot`, `pump_dribble_shoot` | 0.5 each | `outside` |
+| All other families | — (flat) | — |
+
+**Apex height** (grid distance release → attacking rim):
+
+```
+apex_px = (ARC_BASE + ARC_SLOPE * dist_grid) * style_mult[style]
+apex_pos = clamp(APEX_BIAS + 0.06 * (1 - min(1, apex_px / APEX_HEIGHT_REF)), 0.50, 0.60)
+```
+
+Tunable in `shot_micro_movements_constants.py` — see §15. Logic in `BackEnd/utils/shot_ball_arc.py`.
+
+**Wired emitters:** HCO skeleton, Dynamic HCT, after-steal FB, Rim Runner, Covert Release, OREB putback (each calls `inject_shot_micro_before_post_shot` + shared `[ball_flight]` builders).
+
 ---
 
 ## 18. v1 Limitations and Future Work
@@ -488,8 +531,10 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 7. **FE other:** Rattle on contested release; defender glue/stranded on fade/jab families.
 8. **Away outside dribble:** `dribble_shoot` / composite families — `move_to` target stays on offense half (display x &lt; 50 away, &gt; 50 home).
 9. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
+10. **Ball arc:** Fade always arcs; jab + all outside families ~50%; straight `[ball_flight]` when roll false; blocks flat; apex scales with grid dist × style mult.
+11. **Gather:** `dribble_shoot` / `pump_dribble_shoot` plant before release; other outside families unchanged.
 
-Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion, away arc mirror).
+Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion, away arc mirror, ball arc geometry, gather beats).
 
 ---
 
@@ -499,6 +544,7 @@ Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, tr
 |------|------|
 | `BackEnd/engine/shot_micro_movements.py` | Core system |
 | `BackEnd/constants/shot_micro_movements_constants.py` | Constants + pools |
+| `BackEnd/utils/shot_ball_arc.py` | Ball-arc roll + geometry stamping |
 | `BackEnd/models/shot_manager.py` | Contest, telemetry, block gate |
 | `BackEnd/engine/skeleton_step_emitter.py` | HCO/FCP/Final hook |
 | `BackEnd/engine/dynamic_hct_step_emitter.py` | Dynamic HCT hook |

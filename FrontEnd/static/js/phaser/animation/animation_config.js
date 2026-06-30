@@ -125,6 +125,11 @@ const defaults = {
       cycles: 3,
       ease: 'Sine.easeInOut',
     },
+    gather: {
+      amplitudeGrid: 0.6, // Subtle square-up dip (render space; no gameplay coord change)
+      durationMs: 400, // ~MICRO_FLOURISH_BEAT_T at 1× playback
+      ease: 'Quad.easeOut',
+    },
   },
   possession: {
     msPerTick: 1,
@@ -173,6 +178,7 @@ export const animationConfig = {
     reachIn: { ...defaults.flourish.reachIn, ...(overrides.flourish?.reachIn || {}) },
     pumpFake: { ...defaults.flourish.pumpFake, ...(overrides.flourish?.pumpFake || {}) },
     rattle: { ...defaults.flourish.rattle, ...(overrides.flourish?.rattle || {}) },
+    gather: { ...defaults.flourish.gather, ...(overrides.flourish?.gather || {}) },
   },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,

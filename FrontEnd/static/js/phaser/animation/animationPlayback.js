@@ -145,6 +145,18 @@ function shotBallTweenDurationMs(gridDist, clockSecondMs, step = null) {
   return Math.max(SHOT_BALL_MIN_TWEEN_MS, fromRate);
 }
 
+/** Skewed parabola height factor 0→1→0; peaks at `apexPos` (backend-authored). */
+function shotBallArcShape(p, apexPos) {
+  const pos = Math.max(1e-6, Math.min(1 - 1e-6, Number(apexPos) || 0.54));
+  const t = Math.max(0, Math.min(1, Number(p) || 0));
+  if (t < pos) {
+    const u = (pos - t) / pos;
+    return 1 - u * u;
+  }
+  const u = (t - pos) / (1 - pos);
+  return 1 - u * u;
+}
+
 /** Mid-skeleton HCO pass: ownership transfers, ball uses pass motion rate. */
 function isSchemaPassStep(step) {
   const startOwner = isBallAttached(step?.start?.ball)
@@ -425,36 +437,64 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     }
   }
 
+  const shotBallArc = step.start?.advance_trigger?.metadata?.shot_ball_arc;
+  const arcApexPx = Number(shotBallArc?.apex_px);
+  const arcApexPos = Number(shotBallArc?.apex_pos);
+  const useSkewedArc = (
+    isShotBallMotionStep(step)
+    && Number.isFinite(arcApexPx)
+    && arcApexPx > 0
+    && Number.isFinite(arcApexPos)
+  );
+
+  const onBallTweenComplete = (resolve) => {
+    if (attachOnCompleteSprite) {
+      attachBallToPlayer(scene, ballSprite, attachOnCompleteSprite);
+    }
+    const arrivalSfx = step.start?.sfx_on_ball_arrival;
+    if (arrivalSfx?.file) {
+      playGameSfx(
+        scene,
+        arrivalSfx.file,
+        typeof arrivalSfx.volume === "number" ? arrivalSfx.volume : 0.7,
+        { event: arrivalSfx.event || "ball_arrival" },
+      );
+    }
+    const timedSfx = step.start?.timed_sfx;
+    if (Array.isArray(timedSfx) && timedSfx.length > 0) {
+      scheduleTimedSfxCues(scene, timedSfx);
+    }
+    resolve({ tweenStarted: true });
+  };
+
   const tweenPromise = new Promise((resolve) => {
+    if (useSkewedArc) {
+      const progress = { t: 0 };
+      scene.tweens.add({
+        targets: progress,
+        t: 1,
+        duration: ballDurationMs,
+        ease: "Linear",
+        onUpdate: () => {
+          const p = progress.t;
+          const lift = arcApexPx * shotBallArcShape(p, arcApexPos);
+          ballSprite.setPosition(
+            startPx.x + (endPx.x - startPx.x) * p,
+            startPx.y + (endPx.y - startPx.y) * p - lift,
+          );
+        },
+        onComplete: () => onBallTweenComplete(resolve),
+        onStop: () => resolve({ tweenStarted: true }),
+      });
+      return;
+    }
     scene.tweens.add({
       targets: ballSprite,
       x: endPx.x,
       y: endPx.y,
       duration: ballDurationMs,
       ease: "Linear",
-      onComplete: () => {
-        if (attachOnCompleteSprite) {
-          attachBallToPlayer(scene, ballSprite, attachOnCompleteSprite);
-        }
-        // Generic ball-arrival SFX cue (SFX_System.md). Currently
-        // used by HCO mid-skeleton pass steps (receive-{strong|medium|weak}.wav).
-        // Fires the moment the ball reaches its destination (meet-point for
-        // moving receivers; receiver coord for stationary).
-        const arrivalSfx = step.start?.sfx_on_ball_arrival;
-        if (arrivalSfx?.file) {
-          playGameSfx(
-            scene,
-            arrivalSfx.file,
-            typeof arrivalSfx.volume === "number" ? arrivalSfx.volume : 0.7,
-            { event: arrivalSfx.event || "ball_arrival" },
-          );
-        }
-        const timedSfx = step.start?.timed_sfx;
-        if (Array.isArray(timedSfx) && timedSfx.length > 0) {
-          scheduleTimedSfxCues(scene, timedSfx);
-        }
-        resolve({ tweenStarted: true });
-      },
+      onComplete: () => onBallTweenComplete(resolve),
       onStop: () => resolve({ tweenStarted: true }),
     });
   });

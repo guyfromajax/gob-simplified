@@ -353,6 +353,48 @@ function runPumpFake(scene, sprite, flourish, ballSprite) {
   if (tween) tween.__uessBoundaryIgnore = true;
 }
 
+function runGather(scene, sprite, flourish) {
+  const cfg = animationConfig.flourish?.gather || {};
+  const resolved = resolveRenderTarget(sprite);
+  if (!resolved || !scene?.tweens) return;
+
+  const height = scene.game?.config?.height || 768;
+  const amplitudeGrid = Number.isFinite(flourish?.amplitude_grid)
+    ? flourish.amplitude_grid
+    : (Number.isFinite(cfg.amplitudeGrid) ? cfg.amplitudeGrid : 0.6);
+  const ampPx = amplitudeGrid * (height / 50);
+  const durationMs = Number.isFinite(flourish?.duration_ms)
+    ? flourish.duration_ms
+    : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 400);
+  const ease = flourish?.ease || cfg.ease || "Quad.easeOut";
+
+  let restore;
+  let tweenProps;
+  if (resolved.mode === "origin") {
+    const baseOY = Number(sprite.displayOriginY);
+    tweenProps = { displayOriginY: baseOY + ampPx * 0.35 };
+    restore = () => { sprite.displayOriginY = baseOY; };
+  } else {
+    const bases = resolved.targets.map((c) => ({ c, y: c.y }));
+    tweenProps = { y: `+=${ampPx * 0.35}` };
+    restore = () => {
+      for (const b of bases) b.c.y = b.y;
+    };
+  }
+
+  const tween = scene.tweens.add({
+    targets: resolved.mode === "origin" ? sprite : resolved.targets,
+    ...tweenProps,
+    duration: durationMs / 2,
+    ease,
+    yoyo: true,
+    repeat: 0,
+    onComplete: restore,
+    onStop: restore,
+  });
+  if (tween) tween.__uessBoundaryIgnore = true;
+}
+
 function runBite(scene, sprite, flourish, ballSprite) {
   runReachIn(scene, sprite, { ...flourish, kind: "reach_in", target: "ball" }, ballSprite);
 }
@@ -384,6 +426,9 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
         return;
       case "rattle":
         runRattle(scene, sprite, flourish);
+        return;
+      case "gather":
+        runGather(scene, sprite, flourish);
         return;
       case "shot_dip":
         runRattle(scene, sprite, { ...flourish, cycles: flourish.cycles || 1 });

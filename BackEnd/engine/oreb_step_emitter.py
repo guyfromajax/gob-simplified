@@ -408,6 +408,14 @@ def _build_ball_flight_step(
             trigger["metadata"],
             turn_result.get("shot_score_pre_defense"),
         )
+        from BackEnd.utils.shot_ball_arc import stamp_shot_ball_arc_metadata
+
+        stamp_shot_ball_arc_metadata(
+            trigger["metadata"],
+            turn_result,
+            shot_spot,
+            is_away_offense,
+        )
 
     shot_variant = (turn_result or {}).get("shot_variant") if turn_result else None
     # The SFX helpers branch on a normalized MAKE/MISS (the PUTBACK_MAKE/MISS

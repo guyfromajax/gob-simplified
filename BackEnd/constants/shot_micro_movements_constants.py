@@ -72,3 +72,41 @@ OUTSIDE_STATIC_FALLBACK_FAMILIES = ("set", "set_pump")
 # Shooter displacement on the terminal [shoot] step above this → travel+shoot
 # (FB drive / sprint-to-spot). Micro inserts after travel; in-place shoots replace.
 TRAVEL_SHOOT_MIN_GRID = 1.5
+
+# --- Shot ball-arc geometry (tunable; see Shot_Micro_Movements_System.md §7) ---
+# Apex height: apex_px = (ARC_BASE + ARC_SLOPE * dist_grid) * style_mult
+ARC_BASE = 20.0  # px floor
+ARC_SLOPE = 4.5  # px per grid unit (release → attacking rim)
+APEX_BIAS = 0.54  # horizontal progress 0→1 where arc peaks (before clamp)
+APEX_HEIGHT_REF = 140.0  # px — flatter shots peak later via apex_pos formula
+
+# Per-style height multipliers (on top of distance scaling)
+SHOT_ARC_STYLE_MULT = {
+    "strong": 0.85,
+    "fade": 1.50,
+    "pullup": 0.80,
+    "set": 0.95,
+    "outside": 1.00,
+}
+
+# Per micro-movement-family arc probability (missing → no arc roll / flat release)
+SHOT_ARC_PROBABILITY = {
+    "fade_away": 1.0,
+    "jab_step": 0.5,
+    "set": 0.5,
+    "set_pump": 0.5,
+    "dribble_shoot": 0.5,
+    "dribble_pump_shoot": 0.5,
+    "pump_dribble_shoot": 0.5,
+}
+
+# Family → style key for apex_px style_mult lookup
+SHOT_ARC_FAMILY_STYLE = {
+    "fade_away": "fade",
+    "jab_step": "set",
+    "set": "set",
+    "set_pump": "set",
+    "dribble_shoot": "outside",
+    "dribble_pump_shoot": "outside",
+    "pump_dribble_shoot": "outside",
+}

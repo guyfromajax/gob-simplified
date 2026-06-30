@@ -194,7 +194,99 @@ class TestAwayOutsideDribbleMirror:
             next_step={"kind": "next_step", "index": 2},
             apply_contest_layer=False,
         )
-        assert len(steps) == 2
+        assert len(steps) == 3
         move_dest = steps[0]["end"]["coords"]["s1"]
         assert move_dest["x"] < 50.0
-        assert steps[1]["start"]["coords"]["s1"]["x"] < 50.0
+        assert steps[1]["start"]["flourish"]["s1"]["kind"] == "gather"
+        assert steps[2]["start"]["action"]["s1"] == "shoot"
+        assert steps[2]["start"]["coords"]["s1"]["x"] < 50.0
+
+
+class TestShotBallArc:
+    def test_apex_sanity_checks(self):
+        from BackEnd.utils.shot_ball_arc import compute_shot_ball_arc
+
+        # strong ~7.6 grid → ~46px (style mult 0.85)
+        strong = compute_shot_ball_arc(
+            {"x": 92.4, "y": 25.0},
+            away_offense=False,
+            family_id="strong_inside",
+        )
+        assert strong is None  # no arc style for strong_inside
+
+        fade = compute_shot_ball_arc(
+            {"x": 81.2, "y": 25.0},
+            away_offense=False,
+            family_id="fade_away",
+        )
+        assert fade is not None
+        assert fade["apex_px"] == pytest.approx(96.1, abs=1.0)
+
+        outside = compute_shot_ball_arc(
+            {"x": 68.0, "y": 25.0},
+            away_offense=False,
+            family_id="dribble_shoot",
+        )
+        assert outside is not None
+        assert outside["apex_px"] == pytest.approx(123.5, abs=2.0)
+
+    def test_apex_pos_past_midpoint(self):
+        from BackEnd.utils.shot_ball_arc import compute_shot_ball_arc
+
+        flat = compute_shot_ball_arc(
+            {"x": 83.4, "y": 25.0},
+            away_offense=False,
+            family_id="fade_away",
+        )
+        tall = compute_shot_ball_arc(
+            {"x": 68.0, "y": 25.0},
+            away_offense=False,
+            family_id="dribble_shoot",
+        )
+        assert flat["apex_pos"] >= 0.54
+        assert flat["apex_pos"] <= 0.60
+        assert tall["apex_pos"] <= flat["apex_pos"]
+
+    def test_roll_shot_arc_probabilities(self, monkeypatch):
+        from BackEnd.utils import shot_ball_arc as arc_mod
+
+        monkeypatch.setattr(arc_mod.random, "random", lambda: 0.3)
+        assert arc_mod.roll_shot_arc("fade_away") is True
+        assert arc_mod.roll_shot_arc("set") is True
+        monkeypatch.setattr(arc_mod.random, "random", lambda: 0.6)
+        assert arc_mod.roll_shot_arc("jab_step") is False
+        assert arc_mod.roll_shot_arc("strong_inside") is False
+
+
+class TestGatherBeats:
+    def test_pump_dribble_shoot_includes_gather(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda candidates: candidates[0],
+        )
+        from BackEnd.engine.shot_micro_movements import _build_family_beats
+
+        beats = _build_family_beats(
+            "pump_dribble_shoot",
+            {"x": 75.0, "y": 30.0},
+            away_offense=False,
+            off_lineup={},
+            all_coords={"s1": {"x": 75.0, "y": 30.0}},
+            shooter_id="s1",
+        )
+        kinds = [b["kind"] for b in beats]
+        assert kinds == ["flourish", "move_to", "flourish", "shot"]
+        assert beats[2]["flourish"] == "gather"
+
+    def test_dribble_pump_shoot_no_gather(self):
+        from BackEnd.engine.shot_micro_movements import _build_family_beats
+
+        beats = _build_family_beats(
+            "dribble_pump_shoot",
+            {"x": 75.0, "y": 30.0},
+            away_offense=False,
+            off_lineup={},
+            all_coords={"s1": {"x": 75.0, "y": 30.0}},
+            shooter_id="s1",
+        )
+        assert not any(b.get("flourish") == "gather" for b in beats)
