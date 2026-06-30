@@ -35,3 +35,6 @@ FrontEnd/static/sounds/
 # Cloudflare R2 credentials (never commit)
 scripts/.r2.env
 .r2.env
+
+# Player image upload staging (never commit bulk images)
+assets_staging/

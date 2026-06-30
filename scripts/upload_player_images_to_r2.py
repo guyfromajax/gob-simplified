@@ -3,7 +3,10 @@
 Upload player images to Cloudflare R2 (bucket: gob-player-images).
 
 Reads credentials from scripts/.r2.env (gitignored).
-Uploads FrontEnd/static/images/players/*.png  ->  players/master/<filename>
+Uploads <source>/*.png  ->  R2 key players/master/<filename>
+
+Default source is the gitignored staging dir assets_staging/players/ so new bulk
+images never enter the repo. Override with --source.
 
 Idempotent: skips any object already present in R2 whose stored sha256 metadata
 matches the local file, so re-running only uploads new/changed images. This is
@@ -12,8 +15,9 @@ the intended workflow for adding new player images over time.
 Writes an audit manifest to scripts/r2_upload_manifest.csv.
 
 Usage:
-    ./venv/bin/python3 scripts/upload_player_images_to_r2.py --dry-run   # preview
-    ./venv/bin/python3 scripts/upload_player_images_to_r2.py             # upload
+    ./venv/bin/python3 scripts/upload_player_images_to_r2.py --dry-run            # preview (staging dir)
+    ./venv/bin/python3 scripts/upload_player_images_to_r2.py                      # upload staging dir
+    ./venv/bin/python3 scripts/upload_player_images_to_r2.py --source <dir>       # upload from <dir>
 """
 import argparse
 import csv
@@ -25,9 +29,11 @@ import boto3
 from botocore.exceptions import ClientError
 
 # ---- Tunable constants ------------------------------------------------------
-ENV_FILE      = "scripts/.r2.env"
-SOURCE_DIR    = "FrontEnd/static/images/players"
-KEY_PREFIX    = "players/master/"          # R2 object key prefix for canonical masters
+ENV_FILE          = "scripts/.r2.env"
+# Default source: a gitignored staging dir so new bulk images never enter the repo.
+# Override with --source (e.g. the legacy FrontEnd dir during initial migration).
+DEFAULT_SOURCE    = "assets_staging/players"
+KEY_PREFIX        = "players/master/"      # R2 object key prefix for canonical masters
 CONTENT_TYPE  = "image/png"
 CACHE_CONTROL = "public, max-age=86400"     # 1 day at origin; CDN/transform layer caches longer
 MANIFEST_PATH = "scripts/r2_upload_manifest.csv"
@@ -71,7 +77,10 @@ def remote_sha256(s3, bucket, key):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="preview without uploading")
+    ap.add_argument("--source", default=DEFAULT_SOURCE,
+                    help=f"directory of <uuid>.png files to upload (default: {DEFAULT_SOURCE})")
     args = ap.parse_args()
+    source_dir = args.source
 
     env = load_env(ENV_FILE)
     s3 = boto3.client(
@@ -83,17 +92,19 @@ def main():
     )
     bucket = env["R2_BUCKET"]
 
-    files = sorted(f for f in os.listdir(SOURCE_DIR) if f.lower().endswith(".png"))
+    if not os.path.isdir(source_dir):
+        sys.exit(f"Source dir not found: {source_dir}  (create it or pass --source <dir>)")
+    files = sorted(f for f in os.listdir(source_dir) if f.lower().endswith(".png"))
     if not files:
-        sys.exit(f"No .png files found in {SOURCE_DIR}")
+        sys.exit(f"No .png files found in {source_dir}")
 
     mode = "DRY RUN — nothing will be uploaded" if args.dry_run else "UPLOADING"
-    print(f"[{mode}] {len(files)} local PNG(s) -> s3://{bucket}/{KEY_PREFIX}\n")
+    print(f"[{mode}] {len(files)} local PNG(s) from {source_dir} -> s3://{bucket}/{KEY_PREFIX}\n")
 
     rows = []
     uploaded = skipped = failed = 0
     for i, fname in enumerate(files, 1):
-        local_path = os.path.join(SOURCE_DIR, fname)
+        local_path = os.path.join(source_dir, fname)
         key = KEY_PREFIX + fname
         size = os.path.getsize(local_path)
         digest = sha256_of(local_path)
