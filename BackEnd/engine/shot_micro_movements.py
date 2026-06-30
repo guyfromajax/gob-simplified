@@ -39,6 +39,7 @@ from BackEnd.utils.animation_step_helpers import (
     _player_lookup_by_id,
     stamp_tween_durations,
 )
+from BackEnd.utils.shared import get_away_player_coords
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -182,11 +183,31 @@ def _spot_occupied(spot: GridCoord, teammates: List[GridCoord]) -> bool:
     return False
 
 
-def _nearest_arc_spot_name(shooter_coord: GridCoord) -> Optional[str]:
+def _infer_away_offense_from_display_coord(coord: GridCoord) -> bool:
+    """True when ``coord`` is on the away-attacking half (display frame)."""
+    d_away = _euclid(coord, AWAY_RIM_COORDS)
+    d_home = _euclid(coord, HOME_RIM_COORDS)
+    if abs(d_away - d_home) < 0.5:
+        return float(coord["x"]) < 50.0
+    return d_away < d_home
+
+
+def _arc_spot_display_coord(spot_name: str, away_offense: bool) -> Optional[GridCoord]:
+    """Named HCO arc spot in display orientation (mirrors x for away offense)."""
+    home = HCO_STRING_SPOTS.get(spot_name)
+    if not home:
+        return None
+    coord = {"x": float(home["x"]), "y": float(home["y"])}
+    if away_offense:
+        coord = get_away_player_coords(coord)
+    return coord
+
+
+def _nearest_arc_spot_name(shooter_coord: GridCoord, away_offense: bool) -> Optional[str]:
     best_name = None
     best_dist = float("inf")
     for name in OUTSIDE_ARC_SPOT_ORDER:
-        spot = HCO_STRING_SPOTS.get(name)
+        spot = _arc_spot_display_coord(name, away_offense)
         if not spot:
             continue
         d = _euclid(shooter_coord, spot)
@@ -212,13 +233,14 @@ def _adjacent_arc_spots(spot_name: str) -> List[str]:
 def _pick_outside_dribble_target(
     shooter_coord: GridCoord,
     teammates: List[GridCoord],
+    away_offense: bool,
 ) -> Optional[GridCoord]:
-    spot_name = _nearest_arc_spot_name(shooter_coord)
+    spot_name = _nearest_arc_spot_name(shooter_coord, away_offense)
     if not spot_name:
         return None
     candidates: List[GridCoord] = []
     for neighbor in _adjacent_arc_spots(spot_name):
-        spot = HCO_STRING_SPOTS.get(neighbor)
+        spot = _arc_spot_display_coord(neighbor, away_offense)
         if spot and not _spot_occupied(spot, teammates):
             candidates.append(dict(spot))
     if not candidates:
@@ -233,13 +255,16 @@ def select_micro_movement(
     shooter_id: str,
     off_lineup: Dict[str, Any],
     all_coords: Dict[str, GridCoord],
+    away_offense: Optional[bool] = None,
 ) -> str:
+    if away_offense is None:
+        away_offense = _infer_away_offense_from_display_coord(shooter_coord)
     pool = list(MOVEMENT_POOL_BY_SHOT_TYPE.get(shot_type, MOVEMENT_POOL_BY_SHOT_TYPE["outside"]))
     choice = random.choice(pool)
     if choice not in OUTSIDE_MOVING_FAMILIES:
         return choice
     teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-    if _pick_outside_dribble_target(shooter_coord, teammates) is None:
+    if _pick_outside_dribble_target(shooter_coord, teammates, away_offense) is None:
         return random.choice(OUTSIDE_STATIC_FALLBACK_FAMILIES)
     return choice
 
@@ -297,8 +322,11 @@ def select_and_stamp_shot_micro(
     contest_result: Optional[ContestResult],
     contest_margin: Optional[float],
     shot_defense_score_raw: float,
+    away_offense: Optional[bool] = None,
 ) -> str:
     shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
+    if away_offense is None:
+        away_offense = _infer_away_offense_from_display_coord(shooter_coord)
     all_coords = build_micro_coords_snapshot(
         off_lineup, def_lineup, shooter_id, shooter_x, shooter_y,
     )
@@ -308,6 +336,7 @@ def select_and_stamp_shot_micro(
         shooter_id=str(shooter_id),
         off_lineup=off_lineup,
         all_coords=all_coords,
+        away_offense=away_offense,
     )
     stamp_micro_telemetry(
         turn_result,
@@ -458,7 +487,7 @@ def _build_family_beats(
         return [{"kind": "flourish", "who": "shooter", "flourish": "pump_fake"}, {"kind": "shot"}]
     if family_id == "dribble_shoot":
         teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-        target = _pick_outside_dribble_target(shooter_coord, teammates)
+        target = _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
         if target:
             return [
                 {"kind": "move_to", "coord": target, "archetype": "cruise"},
@@ -467,7 +496,7 @@ def _build_family_beats(
         return [{"kind": "shot"}]
     if family_id == "dribble_pump_shoot":
         teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-        target = _pick_outside_dribble_target(shooter_coord, teammates)
+        target = _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
         if target:
             return [
                 {"kind": "move_to", "coord": target, "archetype": "cruise", "beat_bucket": "B"},
@@ -477,7 +506,7 @@ def _build_family_beats(
         return [{"kind": "flourish", "who": "shooter", "flourish": "pump_fake"}, {"kind": "shot"}]
     if family_id == "pump_dribble_shoot":
         teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-        target = _pick_outside_dribble_target(shooter_coord, teammates)
+        target = _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
         beats: List[Dict[str, Any]] = [
             {"kind": "flourish", "who": "shooter", "flourish": "pump_fake", "beat_bucket": "D"},
         ]

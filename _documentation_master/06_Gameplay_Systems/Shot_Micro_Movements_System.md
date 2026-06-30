@@ -167,12 +167,12 @@ Each family expands to an ordered list of beats. The **last beat is always `shot
 
 Moving outside families (`dribble_shoot`, `dribble_pump_shoot`, `pump_dribble_shoot`):
 
-1. Find nearest HCO arc spot to shooter (`OUTSIDE_ARC_SPOT_ORDER`).
+1. Find nearest HCO arc spot to shooter (`OUTSIDE_ARC_SPOT_ORDER`), comparing against **display-oriented** coords.
 2. Consider **adjacent** spots along the arc (lower/higher y neighbor).
 3. Reject spots occupied by a teammate within **`ARC_SPOT_OCCUPIED_RADIUS`** (3 grid).
 4. If no valid target → fall back to static family (`set` or `set_pump`).
 
-Arc spot coords come from `HCO_STRING_SPOTS` (home orientation).
+Arc spot coords come from `HCO_STRING_SPOTS` (home catalog), mirrored via `get_away_player_coords` when `away_offense` is true — same display frame as skeleton emitter coords. Without mirroring, away shooters nearest-neighbor against home spots (x ≈ 57–88) and `move_to` sends them cross-court.
 
 ### 6.4 Jab direction
 
@@ -303,6 +303,8 @@ Micro geometry uses the same contract as Shot System and UESS:
 - Backend mirrors `x → 100 − x` before emit; frontend renders coords as-is.
 
 Rim-relative move vectors (`strong_inside`, `fade_away`) use `_unit_toward_rim()` from the shooter’s display coord.
+
+Outside dribble `move_to` targets resolve named arc spots through `_arc_spot_display_coord()` (same `get_away_player_coords` mirror as skeleton spots).
 
 ---
 
@@ -452,7 +454,6 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 | Second defender contest animation | Not rendered; only primary defender track |
 | Per-turn RNG seed | Uses global `random` like rest of sim |
 | Static legacy HCT emitter | Not hooked |
-| Away outside dribble targets | `move_to` uses home `HCO_STRING_SPOTS` without away mirror — separate fix |
 | Tunable polish | Footwork amplitudes/timing may need playtest pass |
 
 ---
@@ -465,9 +466,10 @@ Each beat is a separate `AnimationStep` with its own gate, clock burn, and defen
 4. **Contested:** `contest_result` and `contest_margin` present when `has_contest: true`.
 5. **Block gate:** No `result_type: BLOCK` when `contest_result: offense_win` on inside/attack contested shots.
 6. **FE:** Pump fake visible as ball bob; rattle on contested release; defender glue/stranded on fade/jab families.
-7. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
+7. **Away outside dribble:** `dribble_shoot` / composite families — `move_to` target stays on offense half (display x &lt; 50 away, &gt; 50 home).
+8. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
 
-Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion).
+Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion, away arc mirror).
 
 ---
 

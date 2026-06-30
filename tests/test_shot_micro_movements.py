@@ -8,8 +8,10 @@ from BackEnd.constants.shot_micro_movements_constants import (
 )
 from BackEnd.engine.shot_micro_movements import (
     FAMILY_BUCKET,
+    _pick_outside_dribble_target,
     apply_shot_micro_steps_to_chain,
     build_micro_coords_snapshot,
+    build_shot_micro_steps,
     resolve_contest,
     select_micro_movement,
 )
@@ -148,3 +150,51 @@ class TestTravelShootInsertion:
 
         assert len(steps) == 1
         assert steps[0]["start"]["action"]["s1"] == "shoot"
+
+
+class TestAwayOutsideDribbleMirror:
+    """Away offense must pick arc targets on the left half (display x < 50)."""
+
+    AWAY_UPPER_WING = {"x": 27.0, "y": 40.0}  # mirror of home upper wing (73, 40)
+
+    def test_nearest_spot_uses_mirrored_coords(self):
+        from BackEnd.engine.shot_micro_movements import _nearest_arc_spot_name
+
+        assert _nearest_arc_spot_name(self.AWAY_UPPER_WING, away_offense=True) == "upper wing"
+        assert _nearest_arc_spot_name({"x": 73.0, "y": 40.0}, away_offense=False) == "upper wing"
+
+    def test_dribble_target_stays_on_away_half(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda candidates: candidates[0],
+        )
+        target = _pick_outside_dribble_target(
+            self.AWAY_UPPER_WING, teammates=[], away_offense=True,
+        )
+        assert target is not None
+        assert target["x"] < 50.0
+
+    def test_build_micro_move_to_stays_on_away_half(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda candidates: candidates[0],
+        )
+        start = {"s1": dict(self.AWAY_UPPER_WING)}
+        steps = build_shot_micro_steps(
+            family_id="dribble_shoot",
+            contest_result=None,
+            start_coords=start,
+            shooter_id="s1",
+            defender_id=None,
+            off_lineup={},
+            def_lineup={},
+            away_offense=True,
+            clock_start={"clock_remaining": 8.0, "shot_clock_remaining": 6.0},
+            shot_type="outside",
+            next_step={"kind": "next_step", "index": 2},
+            apply_contest_layer=False,
+        )
+        assert len(steps) == 2
+        move_dest = steps[0]["end"]["coords"]["s1"]
+        assert move_dest["x"] < 50.0
+        assert steps[1]["start"]["coords"]["s1"]["x"] < 50.0
