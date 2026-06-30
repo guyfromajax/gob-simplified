@@ -398,10 +398,10 @@ function classifyCourtBootMode(params) {
   const quarterBreakFrom = params.get('quarter_break_from');
   const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
   if (liveQuarterStart) return COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
+  if (params.get('active_resume') === 'true') return COURT_BOOT_MODES.COLD_RESUME_ENTRY;
   if (params.get('resume_from_anchor') === 'true' || params.get('consume_resume_anchor') === 'true') {
     return COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY;
   }
-  if (params.get('active_resume') === 'true') return COURT_BOOT_MODES.COLD_RESUME_ENTRY;
   if (params.get('resume_from_timeout') === 'true') return COURT_BOOT_MODES.TIMEOUT_DIRECT_ENTRY;
   return COURT_BOOT_MODES.NORMAL_ENTRY;
 }
@@ -3052,9 +3052,12 @@ async function initGame() {
     !!gameId &&
     (
       bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY ||
+      bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY ||
       bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
     );
-  let activeResume = bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY;
+  let activeResume =
+    bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY ||
+    bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY;
   let resumeState = null;
   console.warn('[COURT BOOT MODE] classified court entry', {
     boot_mode: bootMode,

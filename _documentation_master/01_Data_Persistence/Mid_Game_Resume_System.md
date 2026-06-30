@@ -68,6 +68,20 @@ Instead, it restores from the last coherent point where the game had a known res
 
 This may lose some turns if the user closes the browser mid-flow, but it avoids returning them to a random-looking state with missing sprites, incorrect clock setup, or mismatched UI controls.
 
+## URL Flag Semantics
+
+Resume URL flags have distinct meanings and must not be used interchangeably:
+
+- `active_resume=true`: Mode Select found a durable resume anchor and is routing the user to `court.html` to decide whether to resume. This means **resume available**, not restore consumed.
+- `resume_from_anchor=true`: the court or Set Lineup flow is actively restoring from the saved anchor.
+- `consume_resume_anchor=true`: the next backend restore request should consume/clear the anchor after successful restore.
+- `resume_from_timeout=true`: the next gameplay turn should use timeout/foul-out restart semantics, usually SIP or free throw.
+- `quarter_break_from=mid_game_resume`: cold resume has routed through Set Lineup and is returning to court.
+
+Mode Select should set `active_resume=true`, but it should not set `resume_from_anchor=true`. The latter is only added after the user accepts the court resume modal or after Set Lineup returns from a cold resume flow.
+
+`bootGame.js` is intentionally defensive: if an older URL contains both `active_resume=true` and `resume_from_anchor=true`, `active_resume` wins and the page must still probe `/api/game/{game_id}/resume-state`, hide Play Quarter controls, and show the resume modal.
+
 ## Pre-Anchor Q1 Refresh Contract
 
 Before the first stable anchor exists, the game has no durable mid-game resume target.
@@ -862,3 +876,168 @@ The formal resume contract is:
 4. One frontend mode: if active resume exists, court boots into resume_pending, hydrates all UI from anchor, blocks sim until button press.
 5. One backend behavior: resume_from_anchor=true restores once, simulates, then clears the anchor.
 6. Tests for flows: browser refresh, browser close/return, timeout anchor, foul-out anchor, quarter-break anchor, Q1 to Q2 transition, and no stale-anchor reuse.
+
+## System Hardening Plan: Central Court Entry Resolver
+
+The current implementation has been stabilized incrementally, but several frontend modules still infer resume state independently:
+
+- `mode-select.js`
+- `bootGame.js`
+- `loadGameStats.js`
+- `set-lineup.js`
+- `gameScene.js`
+
+That distributed inference is the main fragility risk. A future hardening pass should centralize court-entry classification into one resolver so UI behavior, URL handling, backend restore flags, and pre-anchor reset rules are derived from the same state.
+
+### Goal
+
+Create one court-entry decision layer that answers:
+
+> Given the current URL and backend resume state, what kind of court entry is this?
+
+All frontend modules should consume that resolved state instead of independently interpreting URL flags.
+
+### Target State Enum
+
+The resolver should return one of these states:
+
+| State | Meaning | Primary UI behavior |
+|---|---|---|
+| `new_game_entry` | No game id or clean new game start | Show Play Quarter / Sim Full Game controls |
+| `pre_anchor_dirty_q1` | Q1 game has partial gameplay but no resume anchor | Suppress dirty stats; next play/sim creates a fresh game id |
+| `anchor_available` | Backend has `resume_anchor.status=stoppage_anchor`; user has not accepted resume | Show `Game In Progress` modal; block gameplay |
+| `anchor_lineup_entry` | Cold resume accepted and routed to Set Lineup | Show Set Lineup from anchor snapshot |
+| `anchor_restore_entry` | Set Lineup returned and backend should restore from anchor | Simulate from anchor; consume anchor after successful restore |
+| `live_quarter_entry` | Normal quarter-to-quarter transition without browser exit | Do not show resume modal; show normal quarter controls |
+| `timeout_direct_entry` | Live timeout/foul-out return that should start directly | Hide Play Quarter controls; auto-start only for valid live return |
+| `final_game` | Game complete | No resume; route normally |
+| `invalid_resume_state` | URL claims resume but backend has no valid anchor | Fail visibly or route to safe recovery; never silently init a fresh game |
+
+### Authority Rules
+
+1. Backend resume state outranks URL flags.
+2. `game.resume_anchor.status=stoppage_anchor` means the game is not pre-anchor.
+3. `active_resume=true` means resume is available; it does not mean restore should run.
+4. `resume_from_anchor=true` means restore is being requested.
+5. `consume_resume_anchor=true` means the backend may clear the anchor after successful restore.
+6. `quarter_break_from=play_quarter|sim_quarter` means normal live quarter entry and should suppress the resume modal.
+7. Fresh game-id creation is allowed only in `pre_anchor_dirty_q1`.
+
+### Resolver Inputs
+
+The resolver should accept:
+
+- current URL params
+- current `game_id`
+- backend `/api/game/{game_id}/resume-state` response, when available
+- optionally the normal `/api/game/{game_id}` response for dirty pre-anchor detection
+
+The resolver should not directly mutate URL, DOM, or backend state. It should be pure enough to unit test.
+
+### Resolver Output
+
+The resolver should return:
+
+- `state`
+- `game_id`
+- `quarter`
+- `period`
+- `clock`
+- `home_score`
+- `away_score`
+- `anchor_type`
+- `resume_from_timeout`
+- `next_play_type`
+- `should_show_resume_modal`
+- `should_show_pregame_controls`
+- `should_route_to_set_lineup`
+- `should_autostart`
+- `should_create_fresh_pre_anchor_game`
+- `should_consume_anchor`
+- `reason`
+
+### Migration Plan
+
+#### Phase 1: Descriptive Resolver, No Behavior Change
+
+- Add shared resolver module, likely under `FrontEnd/static/js/phaser/utils/`.
+- Wire `bootGame.js` to call it and log the resolved state.
+- Do not change existing behavior in this phase.
+- Compare resolver output against current behavior in logs.
+
+Search logs:
+
+- `[MGR-ENTRY-RESOLVER]`
+
+#### Phase 2: Court Boot Adopts Resolver
+
+- Replace `bootGame.js` local boot classification with resolver output.
+- Use resolver output to decide:
+  - resume modal visibility
+  - pre-game button visibility
+  - whether gameplay can auto-start
+  - whether to route through Set Lineup
+
+#### Phase 3: Stats Hydration Adopts Resolver
+
+- Replace `loadGameStats.js` local resume/pre-anchor inference.
+- Use resolver output to decide:
+  - anchor snapshot hydration
+  - normal game-doc hydration
+  - dirty pre-anchor suppression
+
+#### Phase 4: Set Lineup Return Adopts Resolver Semantics
+
+- Ensure `set-lineup.js` emits only documented flags:
+  - cold resume return: `resume_from_anchor=true`, `consume_resume_anchor=true`, `quarter_break_from=mid_game_resume`
+  - live quarter return: `quarter_break_from=play_quarter|sim_quarter`, `resume_from_timeout=false`
+  - live timeout/foul-out return: `resume_from_timeout=true`
+
+#### Phase 5: Backend Contract Tests
+
+- Add tests for:
+  - `/api/game/{game_id}/resume-state`
+  - anchor creation at timeout modal
+  - anchor creation at foul-out modal
+  - anchor creation at non-final quarter complete
+  - anchor clearing only after successful restore/consume
+  - no active resume after final game
+
+#### Phase 6: Frontend State Matrix Tests
+
+Unit test the resolver for:
+
+- fresh Q1 game
+- dirty Q1 before first anchor
+- dirty Q1 with anchor
+- Mode Select cold return with active anchor
+- browser refresh on court with active anchor
+- normal Q1 to Q2 live transition
+- timeout Set Lineup return
+- foul-out Set Lineup return
+- Set Lineup return from cold resume
+- consumed anchor after restore
+- final game
+- stale URL with conflicting flags
+
+### Anti-Regression Rules
+
+- Do not introduce a new durable frontend resume flag.
+- Do not create another source of truth outside `game.resume_anchor`.
+- Do not let URL flags alone prove a resume exists.
+- Do not let dirty Q1 detection create a fresh game if backend resume-state says an anchor exists.
+- Do not auto-start gameplay while the `Game In Progress` modal is visible.
+- Do not show Play Quarter / Sim Full Game controls in `anchor_available`.
+- Do not show the resume modal in `live_quarter_entry`.
+
+### Success Criteria
+
+The hardening pass is complete when:
+
+- one resolver owns court-entry classification
+- all listed frontend modules consume resolver output or documented backend state
+- every state in the matrix has automated coverage
+- browser refresh and browser close/return behave identically when a resume anchor exists
+- Q1 pre-anchor refresh remains isolated to games with no anchor
+- normal quarter transitions never trigger the resume modal
+- no code path can call `/api/init-game` for a game with an active resume anchor
