@@ -1,16 +1,23 @@
 ##Bugs 
 14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
 37. Player Foul Out Next Step bug
-38 Fast Break, aninate defender back on pass
+39. Fine tune FLSS bounce spot placement
+42. Not corretly registring 2pt and 3pt shot attempts based on geo
+43. Verify symmetyr in FCP and HCT steals / d fouls
 
 ##Micro Movements
 28. Make HCO defensers un-attached to the offender at all costs
-29. Claude Design's designs
-30. MM SFX
+30. Micro Movement SFX
+31. Deal with awkward no movement beats/steps
+32. FAst Break shots, if defender is back have him attempt to cut off drive to the basket
 
 ##Player Images
-1. Set up Cloudflare
-2. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
+1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
+
+##Verify as Perfect
+1. Mid Game Resume System
+2. EOQ Perfection
+3. Account for micro shot movements in Final Shot
 
 ##Full Product Readiness
 102. Team court images
@@ -27,6 +34,7 @@
 119. PvP sim
 120. PvP live
 121. Tunable Constants file
+122. Get Aggressive Logic
 
 ##Full Season Playthrough ideas (6-11-26)
 1. Training Camp News Report

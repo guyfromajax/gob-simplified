@@ -141,12 +141,18 @@
  *   for any omitted field. First shipped: "reach_in" (defender steal attempt
  *   on a Dynamic-HCT contest moment). Other kinds are accepted-but-unrendered
  *   placeholders for now.
- * @property {("reach_in"|"pump_fake"|"bite"|"gather"|"rattle"|"shot_dip"|"dribble"|"pickup"|"dunk")} kind
+ * @property {("reach_in"|"pump_fake"|"bite"|"gather"|"rattle"|"shot_dip"|"dribble"|"pickup"|"dunk"|"fumble")} kind
  * @property {number} [amplitude_grid]   Lunge distance in GRID units (rendered, not gameplay). Omitted → FE default.
  * @property {number} [duration_ms]      Wall-clock out-and-back duration. Omitted → FE default.
  * @property {string} [ease]             Phaser ease (e.g. "Back.easeOut"). Omitted → FE default.
  * @property {("ball"|"rim"|"x"|"y")} [target]   What the motion points at. "reach_in" uses "ball".
  * @property {number} [cycles]           Oscillation count (rattle); ignored otherwise.
+ * @property {number} [mag_px]           Render-space stumble amplitude (fumble).
+ * @property {number} [freq_hz]          Stumble oscillation rate (fumble).
+ * @property {number} [rim_unit_x]       Toward-rim unit vector x (fumble).
+ * @property {number} [rim_unit_y]       Toward-rim unit vector y (fumble).
+ * @property {number} [perp_x]           Rim-perpendicular unit vector x (fumble).
+ * @property {number} [perp_y]           Rim-perpendicular unit vector y (fumble).
  */
 
 /**

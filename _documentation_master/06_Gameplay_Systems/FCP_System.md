@@ -179,17 +179,19 @@ After BIP, SF sprints off the baseline **starting on the first FCP segment** (en
 
 Module: `fcp_inbound_release.py` (target + pass gate); wired in `compute_dynamic_hct_turn` via `off_targets["SF"]` + `FcpOffballAttackState.set_sf_inbound_release`.
 
-#### Over-and-back awareness (FCP, current)
+#### Over-and-back awareness (FCP + HCT)
 
-Before an FCP pass that **would** be over-and-back (`frontcourt_established` + receiver in backcourt), the passer may **read the violation and hold** instead of throwing the pass.
+Before a pass that **would** be over-and-back (`frontcourt_established` + receiver in backcourt), the passer may **read the violation and hold** instead of throwing the pass.
 
 | Rule | Detail |
 |------|--------|
 | **Threshold** | `0.8 × PS + 0.2 × CH` (passer attributes) |
 | **Roll** | `randint(1, 100)` — pass **only if** `roll > threshold` |
-| **On hold** | Normal §5 hold beat (`hold (BH reads over-and-back, keeps the dribble)`) |
+| **Grace beat** | The **first BH** to establish frontcourt (dribble, advance, or pass receipt) gets **one beat** where any backward outlet is **always** a hold — teammates sprint toward **x∈[51,57]** if still in backcourt |
+| **On hold** | Normal §5 hold beat (grace label vs over-and-back read label) |
 | **On pass** | Pass resolves as usual; post-pass violation still fires if the ball lands backcourt |
-| **Scope** | FCP only today; primitives in `over_and_back.py` for future HCO / universal pass paths |
+| **Off-ball urgency** | Once `frontcourt_established`, non-BH offenders still in backcourt override targets to the cross-half band (HCT `off_targets`; FCP `FcpOffballAttackState`) |
+| **Scope** | FCP + HCT dynamic loop; primitives in `over_and_back.py` |
 
 #### Off-ball attack routing (current)
 

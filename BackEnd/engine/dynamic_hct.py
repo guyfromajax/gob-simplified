@@ -522,6 +522,30 @@ def _refresh_hct_off_targets_for_bh(
         off_targets[real_pos] = _pos_target(alias_key, is_away_offense)
 
 
+def _apply_cross_half_urgency(
+    off_coords: Dict[str, Dict[str, int]],
+    off_targets: Dict[str, Dict[str, int]],
+    bh_pos: str,
+    frontcourt_established: bool,
+    is_away_offense: bool,
+) -> None:
+    """Once FC is established, backcourt non-BH sprint toward x∈[51,57] (HCT)."""
+    if not frontcourt_established:
+        return
+    from BackEnd.engine.over_and_back import cross_half_urgency_target, in_backcourt
+
+    for pos in POSITIONS:
+        if pos == bh_pos:
+            continue
+        if in_backcourt(float(off_coords[pos]["x"]), is_away_offense):
+            off_targets[pos] = cross_half_urgency_target(
+                off_coords[pos],
+                is_away_offense,
+                clamp_fn=_clamp_xy,
+                flip_fn=_flip,
+            )
+
+
 def _player_id(player) -> str:
     return getattr(player, "player_id", str(id(player))) if player is not None else ""
 
@@ -2218,6 +2242,9 @@ def compute_dynamic_hct_turn(
     # clears when the turn ends. Drives the 10-second rule (no longer applies
     # after establishment) and over-and-back detection on backcourt passes.
     frontcourt_established = False
+    # One-beat grace for the first BH to establish frontcourt (dribble or pass
+    # receipt): backward outlet passes become hold instead of pass.
+    frontcourt_grace_bh_pos: Optional[str] = None
     # D8 — set for the emergent foul/steal terminals. ``foul_team`` is
     # "OFFENSE" (charge) or "DEFENSE" (reach); ``foul_player`` / ``stealer``
     # carry the credited Player so the wrapper can record stats + route.
@@ -2346,6 +2373,9 @@ def compute_dynamic_hct_turn(
         aba_only: bool = False,
     ) -> None:
         """FCP off-ball routes: incremental press-break or ABA flood."""
+        _apply_cross_half_urgency(
+            off_coords, off_targets, bh_pos, frontcourt_established, is_away_offense
+        )
         if fcp_offball is None:
             _move_offense(off_coords, off_targets, seconds, off_lineup, bh_pos, exclude=exclude)
             return
@@ -2357,6 +2387,9 @@ def compute_dynamic_hct_turn(
             fcp_offball.refresh_incremental(
                 bh_xy_ref, off_coords, bh_pos, force=first,
             )
+        fcp_offball.apply_cross_half_urgency(
+            off_coords, bh_pos, off_targets, frontcourt_established
+        )
         fcp_offball.move_offense(
             off_coords,
             off_lineup,
@@ -2734,6 +2767,9 @@ def compute_dynamic_hct_turn(
             fcp_offball.refresh_incremental(bh_xy, off_coords, bh_pos, force=False)
             _fcp_move_offense(bh_xy, hold_seconds)
         else:
+            _apply_cross_half_urgency(
+                off_coords, off_targets, bh_pos, frontcourt_established, is_away_offense
+            )
             _move_offense(off_coords, off_targets, hold_seconds, off_lineup, bh_pos)
         _append_loop_segment(
             "hct_hold",
@@ -2782,10 +2818,21 @@ def compute_dynamic_hct_turn(
         return "continue"
 
     # --- §4 loop ------------------------------------------------------------
+    loop_bh_pos = bh_pos
+
+    def _finish_loop_iteration() -> None:
+        nonlocal frontcourt_grace_bh_pos
+        if frontcourt_grace_bh_pos == loop_bh_pos:
+            frontcourt_grace_bh_pos = None
+
     for _ in range(MAX_LOOP_ITERATIONS):
+        loop_bh_pos = bh_pos
+        was_fc_established = frontcourt_established
         frontcourt_established = frontcourt_established or _crossed_half_court(
             bh_xy["x"], is_away_offense
         )
+        if frontcourt_established and not was_fc_established:
+            frontcourt_grace_bh_pos = loop_bh_pos
 
         # 1) Time terminals (checked at the top of each iteration).
         if shot_clock <= 0:
@@ -2855,6 +2902,7 @@ def compute_dynamic_hct_turn(
                     break
                 if status == "TERMINAL":
                     break
+                _finish_loop_iteration()
                 continue  # RETAIN → dribble-dead, re-read next iteration
             mlabel = "two-defender trap" if moment == "trap" else "single-defender pressure"
             outcome, score_ratio, credited = _resolve_attack(moment, in_range)
@@ -2865,17 +2913,19 @@ def compute_dynamic_hct_turn(
             _advance(label=f"advance (BH beats the {mlabel})")
             _stamp_reach_in()  # tag the beaten-pressure advance segment
             shot_clock -= loop_segments[-1]["seconds"]
+            _finish_loop_iteration()
             continue
 
         if decision == "hold":
             if _execute_hold_beat() == "break":
                 break
+            _finish_loop_iteration()
             continue
 
         # decision == "pass" → §6 pass branch. The ball goes to one of the two
         # teammates closest to the BH; the receiver becomes the new ball handler
         # and the loop continues from him (enables a non-PG HCT-end BH → D7).
-        from BackEnd.engine.over_and_back import is_over_and_back_pass
+        from BackEnd.engine.over_and_back import should_hold_instead_of_backcourt_pass
 
         pass_exclude: Optional[set] = None
         if turn_mode == "fcp":
@@ -2887,22 +2937,23 @@ def compute_dynamic_hct_turn(
         receiver_pos = _select_pass_receiver(
             bh_pos, off_coords, is_away_offense, exclude=pass_exclude
         )
-        if turn_mode == "fcp":
-            from BackEnd.engine.over_and_back import passer_commits_over_and_back_pass
-
-            if (
-                is_over_and_back_pass(
-                    frontcourt_established,
-                    off_coords[receiver_pos],
-                    is_away_offense,
-                )
-                and not passer_commits_over_and_back_pass(ball_handler)
-            ):
-                if _execute_hold_beat(
-                    "hold (BH reads over-and-back, keeps the dribble)"
-                ) == "break":
-                    break
-                continue
+        if should_hold_instead_of_backcourt_pass(
+            frontcourt_established,
+            off_coords[receiver_pos],
+            is_away_offense,
+            ball_handler,
+            frontcourt_grace_bh_pos,
+            bh_pos,
+        ):
+            hold_label = (
+                "hold (BH waits for teammates to clear half court)"
+                if frontcourt_grace_bh_pos == bh_pos
+                else "hold (BH reads over-and-back, keeps the dribble)"
+            )
+            if _execute_hold_beat(hold_label) == "break":
+                break
+            _finish_loop_iteration()
+            continue
         passer_pos = bh_pos
         # Once he passes, the ex-BH is off-ball — freeze him so the stale x=44
         # setup pull doesn't drag him back across half court.
@@ -2997,6 +3048,9 @@ def compute_dynamic_hct_turn(
                 _refresh_hct_off_targets_for_bh(
                     receiver_pos, off_coords, off_targets, is_away_offense
                 )
+            _apply_cross_half_urgency(
+                off_coords, off_targets, passer_pos, frontcourt_established, is_away_offense
+            )
             _move_offense(
                 off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
                 exclude={receiver_pos},
@@ -3018,6 +3072,8 @@ def compute_dynamic_hct_turn(
             )
         loop_segments.append(pass_seg)
         shot_clock -= pass_seconds
+
+        from BackEnd.engine.over_and_back import is_over_and_back_pass
 
         if is_over_and_back_pass(
             frontcourt_established, off_coords[receiver_pos], is_away_offense
@@ -3045,6 +3101,7 @@ def compute_dynamic_hct_turn(
                 bh_xy, off_coords, bh_pos, off_targets
             )
         dribble_alive = True
+        _finish_loop_iteration()
         continue
     else:
         # Iteration backstop hit without a terminal — settle into HCO.

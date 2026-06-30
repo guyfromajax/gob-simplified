@@ -777,10 +777,13 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   }
 
   const clockSecondMs = scene?.gameClock?.getState?.().tickMs || 350;
-  const durationMs = Math.max(
-    50,
-    Math.round(step.end.time_elapsed * clockSecondMs),
-  );
+  const wallClockHoldMs = step.start?.advance_trigger?.metadata?.wall_clock_hold_ms;
+  const durationMs = Number.isFinite(wallClockHoldMs) && wallClockHoldMs > 0
+    ? Math.max(50, Math.round(wallClockHoldMs))
+    : Math.max(
+      50,
+      Math.round(step.end.time_elapsed * clockSecondMs),
+    );
 
   const width = scene.game?.config?.width;
   const height = scene.game?.config?.height;

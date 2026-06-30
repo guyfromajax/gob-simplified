@@ -310,6 +310,32 @@ class FcpOffballAttackState:
                 self._dest[pos] = _spot_xy(spot, self.is_away_offense)
         self._phase[pos] = phase
 
+    def apply_cross_half_urgency(
+        self,
+        off_coords: Dict[str, Dict[str, int]],
+        bh_pos: str,
+        off_targets: Dict[str, Dict[str, int]],
+        frontcourt_established: bool,
+    ) -> None:
+        """After FC is established, override backcourt non-BH routes to cross half."""
+        if not frontcourt_established:
+            return
+        from BackEnd.engine.over_and_back import cross_half_urgency_target, in_backcourt
+
+        for pos in POSITIONS:
+            if pos == bh_pos:
+                continue
+            if in_backcourt(float(off_coords[pos]["x"]), self.is_away_offense):
+                dest = cross_half_urgency_target(
+                    off_coords[pos],
+                    self.is_away_offense,
+                    clamp_fn=_clamp_xy,
+                    flip_fn=_flip,
+                )
+                self._dest[pos] = dest
+                self._phase[pos] = "cross_half_urgency"
+                off_targets[pos] = dict(dest)
+
     def move_offense(
         self,
         off_coords: Dict[str, Dict[str, int]],

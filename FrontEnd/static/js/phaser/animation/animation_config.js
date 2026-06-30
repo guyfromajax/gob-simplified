@@ -130,6 +130,11 @@ const defaults = {
       durationMs: 400, // ~MICRO_FLOURISH_BEAT_T at 1× playback
       ease: 'Quad.easeOut',
     },
+    fumble: {
+      magPx: 11,
+      freqHz: 6,
+      durationMs: 660,
+    },
   },
   possession: {
     msPerTick: 1,
@@ -179,6 +184,7 @@ export const animationConfig = {
     pumpFake: { ...defaults.flourish.pumpFake, ...(overrides.flourish?.pumpFake || {}) },
     rattle: { ...defaults.flourish.rattle, ...(overrides.flourish?.rattle || {}) },
     gather: { ...defaults.flourish.gather, ...(overrides.flourish?.gather || {}) },
+    fumble: { ...defaults.flourish.fumble, ...(overrides.flourish?.fumble || {}) },
   },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,

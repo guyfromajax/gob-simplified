@@ -190,7 +190,7 @@ class Flourish(TypedDict, total=False):
 
     kind: Literal[
         "reach_in", "pump_fake", "bite", "gather",
-        "rattle", "shot_dip", "dribble", "pickup", "dunk",
+        "rattle", "shot_dip", "dribble", "pickup", "dunk", "fumble",
     ]
     amplitude_grid: float
     """Lunge distance in GRID units (converted to px + rendered, NOT gameplay).
@@ -203,6 +203,18 @@ class Flourish(TypedDict, total=False):
     """What the motion points at. ``"reach_in"`` uses ``"ball"``."""
     cycles: int
     """Oscillation count (``"rattle"``); ignored by other kinds."""
+    mag_px: float
+    """Render-space stumble amplitude (``"fumble"``). Omitted → FE default."""
+    freq_hz: float
+    """Stumble oscillation rate (``"fumble"``). Omitted → FE default."""
+    rim_unit_x: float
+    """Toward-rim unit vector x (display orientation, ``"fumble"``)."""
+    rim_unit_y: float
+    """Toward-rim unit vector y (display orientation, ``"fumble"``)."""
+    perp_x: float
+    """Rim-perpendicular unit vector x (``"fumble"``)."""
+    perp_y: float
+    """Rim-perpendicular unit vector y (``"fumble"``)."""
 
 
 # --- Step start / end -------------------------------------------------------

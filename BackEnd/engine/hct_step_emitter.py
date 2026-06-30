@@ -426,6 +426,16 @@ def build_hct_animation_steps(
     if steps:
         _apply_post_shot_overlay(steps[-1], turn_result)
 
+    away_offense = bool(
+        getattr(off_team, "team_id", None)
+        == getattr(getattr(game, "away_team", None), "team_id", None)
+    )
+    from BackEnd.engine.dead_ball_fumble import inject_dead_ball_fumble_before_turn_stop
+
+    inject_dead_ball_fumble_before_turn_stop(
+        steps, turn_result, away_offense=away_offense,
+    )
+
     return steps
 
 

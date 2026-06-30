@@ -395,6 +395,83 @@ function runGather(scene, sprite, flourish) {
   if (tween) tween.__uessBoundaryIgnore = true;
 }
 
+function runFumble(scene, sprite, flourish) {
+  const cfg = animationConfig.flourish?.fumble || {};
+  const resolved = resolveRenderTarget(sprite);
+  if (!resolved || !scene?.tweens) return;
+
+  const magPx = Number.isFinite(flourish?.mag_px)
+    ? flourish.mag_px
+    : (Number.isFinite(cfg.magPx) ? cfg.magPx : 11);
+  const freqHz = Number.isFinite(flourish?.freq_hz)
+    ? flourish.freq_hz
+    : (Number.isFinite(cfg.freqHz) ? cfg.freqHz : 6);
+  const totalMs = Number.isFinite(flourish?.duration_ms)
+    ? flourish.duration_ms
+    : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 660);
+  const ux = Number.isFinite(flourish?.rim_unit_x) ? flourish.rim_unit_x : 1;
+  const uy = Number.isFinite(flourish?.rim_unit_y) ? flourish.rim_unit_y : 0;
+  const perpX = Number.isFinite(flourish?.perp_x) ? flourish.perp_x : -uy;
+  const perpY = Number.isFinite(flourish?.perp_y) ? flourish.perp_y : ux;
+
+  if (sprite.__fumbleTween && sprite.__fumbleTween.isPlaying?.()) return;
+
+  let restore;
+  let applyOffset;
+  if (resolved.mode === "origin") {
+    const baseOX = Number(sprite.displayOriginX);
+    const baseOY = Number(sprite.displayOriginY);
+    applyOffset = (offsetX, offsetY) => {
+      sprite.displayOriginX = baseOX - offsetX;
+      sprite.displayOriginY = baseOY - offsetY;
+    };
+    restore = () => {
+      sprite.displayOriginX = baseOX;
+      sprite.displayOriginY = baseOY;
+      sprite.__fumbleTween = null;
+    };
+  } else {
+    const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
+    applyOffset = (offsetX, offsetY) => {
+      for (const b of bases) {
+        b.c.x = b.x + offsetX;
+        b.c.y = b.y + offsetY;
+      }
+    };
+    restore = () => {
+      for (const b of bases) {
+        b.c.x = b.x;
+        b.c.y = b.y;
+      }
+      sprite.__fumbleTween = null;
+    };
+  }
+
+  const tween = scene.tweens.addCounter({
+    from: 0,
+    to: 1,
+    duration: Math.max(1, totalMs),
+    onUpdate: (tw) => {
+      const elapsedSec = (tw.elapsed || 0) / 1000;
+      const phase = elapsedSec * freqHz * Math.PI * 2;
+      const alongRim = Math.sin(phase) * magPx;
+      const alongPerp = Math.sin(phase * 1.5 + 0.7) * magPx * 0.6;
+      applyOffset(
+        ux * alongRim + perpX * alongPerp,
+        uy * alongRim + perpY * alongPerp,
+      );
+    },
+    onComplete: restore,
+    onStop: restore,
+  });
+  if (tween) {
+    tween.__uessBoundaryIgnore = true;
+    sprite.__fumbleTween = tween;
+  } else {
+    restore();
+  }
+}
+
 function runBite(scene, sprite, flourish, ballSprite) {
   runReachIn(scene, sprite, { ...flourish, kind: "reach_in", target: "ball" }, ballSprite);
 }
@@ -429,6 +506,9 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
         return;
       case "gather":
         runGather(scene, sprite, flourish);
+        return;
+      case "fumble":
+        runFumble(scene, sprite, flourish);
         return;
       case "shot_dip":
         runRattle(scene, sprite, { ...flourish, cycles: flourish.cycles || 1 });

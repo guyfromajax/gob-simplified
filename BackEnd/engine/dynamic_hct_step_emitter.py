@@ -1062,4 +1062,10 @@ def build_dynamic_hct_animation_steps(
 
         _append_post_steal_hco_transition(steps, turn_result, game)
 
+    from BackEnd.engine.dead_ball_fumble import inject_dead_ball_fumble_before_turn_stop
+
+    inject_dead_ball_fumble_before_turn_stop(
+        steps, turn_result, away_offense=is_away_offense,
+    )
+
     return steps

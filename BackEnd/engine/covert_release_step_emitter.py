@@ -1333,6 +1333,12 @@ def build_covert_release_animation_steps(
             outcome_step, off_lineup, def_lineup
         )
 
+    from BackEnd.engine.dead_ball_fumble import inject_dead_ball_fumble_before_turn_stop
+
+    inject_dead_ball_fumble_before_turn_stop(
+        steps, turn_result, away_offense=is_away_offense,
+    )
+
     return steps
 
 

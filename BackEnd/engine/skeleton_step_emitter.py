@@ -1817,6 +1817,12 @@ def build_skeleton_animation_steps(
             shot_clock_remaining_at_turn_start,
         )
 
+    from BackEnd.engine.dead_ball_fumble import inject_dead_ball_fumble_before_turn_stop
+
+    inject_dead_ball_fumble_before_turn_stop(
+        steps, turn_result, away_offense=away_offense,
+    )
+
     return steps
 
 

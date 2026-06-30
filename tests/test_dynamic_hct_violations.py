@@ -1,6 +1,7 @@
 """Half-court clock violations and over-and-back in the dynamic HCT/FCP loop."""
 
 from BackEnd.engine.dynamic_hct import (
+    _apply_cross_half_urgency,
     _crossed_half_court,
     _in_backcourt,
     _select_pass_receiver,
@@ -39,3 +40,19 @@ def test_select_pass_receiver_allows_backcourt_outlet_after_half_court():
         for _ in range(30)
     }
     assert "SG" in picks
+
+
+def test_cross_half_urgency_overrides_backcourt_targets():
+    off_coords = {
+        "PG": {"x": 55, "y": 25},
+        "SG": {"x": 40, "y": 25},
+        "SF": {"x": 60, "y": 20},
+        "PF": {"x": 58, "y": 30},
+        "C": {"x": 62, "y": 25},
+    }
+    off_targets = {pos: dict(off_coords[pos]) for pos in off_coords}
+    _apply_cross_half_urgency(
+        off_coords, off_targets, "PG", frontcourt_established=True, is_away_offense=False
+    )
+    assert off_targets["SG"]["x"] >= 51
+    assert off_targets["PG"] == off_coords["PG"]

@@ -376,7 +376,8 @@ export async function finalizeTurnAfterAnimation({
   } else if (
     (turn.result_type === 'DEAD BALL' || turn.result_type === 'TURNOVER') &&
     !turn.bat_oob &&
-    !turn.rim_runner_bat_oob
+    !turn.rim_runner_bat_oob &&
+    !turn.suppress_turn_prep_turnover_announce
   ) {
     // Batted-OOB is a DEAD BALL where the offense RETAINS — not a turnover. Its
     // headline is announced at turn start (BATTED_OOB), so skip the turnover one.
