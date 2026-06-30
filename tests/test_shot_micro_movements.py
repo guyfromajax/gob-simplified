@@ -258,6 +258,39 @@ class TestShotBallArc:
         assert arc_mod.roll_shot_arc("strong_inside") is False
 
 
+class TestShotManagerMicroTelemetryMerge:
+    """ShotManager.resolve_shot uses a scratch dict; arc requires uses_shot_arc on turn."""
+
+    def test_scratch_merge_includes_uses_shot_arc(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
+
+        turn: dict = {}
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda pool: "fade_away",
+        )
+        select_and_stamp_shot_micro(
+            turn,
+            shot_type="inside",
+            shooter_id="s1",
+            shooter_x=81.2,
+            shooter_y=25.0,
+            off_lineup={},
+            def_lineup={},
+            has_contest=False,
+            contest_result=None,
+            contest_margin=None,
+            shot_defense_score_raw=0.0,
+        )
+        # Mirror shot_manager.resolve_shot scratch → result merge.
+        result = {
+            "micro_movement_family": turn.get("micro_movement_family"),
+            "uses_shot_arc": bool(turn.get("uses_shot_arc")),
+        }
+        assert result["micro_movement_family"] == "fade_away"
+        assert result["uses_shot_arc"] is True
+
+
 class TestGatherBeats:
     def test_pump_dribble_shoot_includes_gather(self, monkeypatch):
         monkeypatch.setattr(

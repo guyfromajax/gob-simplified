@@ -339,7 +339,9 @@ Stamped on `turn_result` for eligible shot turns:
 | `has_contest` | bool | Always |
 | `uses_shot_arc` | bool | When family is in `SHOT_ARC_PROBABILITY` map |
 
-Self-contained shot paths (`dynamic_hct_shot`, `after_steal_fast_break`, OREB putback in `shared.py`) call `select_and_stamp_shot_micro()` directly because they bypass `ShotManager.resolve_shot()`.
+Self-contained shot paths (`dynamic_hct_shot`, `after_steal_fast_break`, OREB putback in `shared.py`) call `select_and_stamp_shot_micro()` directly on the turn dict because they bypass `ShotManager.resolve_shot()`.
+
+**HCO / FCP / Final turns** go through `ShotManager.resolve_shot()`, which stamps micro telemetry via a scratch dict then merges onto the turn. Both `micro_movement_family` **and** `uses_shot_arc` must be copied — `[ball_flight]` arc metadata is gated on `uses_shot_arc` at emit time (`stamp_shot_ball_arc_metadata`).
 
 ---
 
@@ -531,7 +533,7 @@ Tunable in `shot_micro_movements_constants.py` — see §15. Logic in `BackEnd/u
 7. **FE other:** Rattle on contested release; defender glue/stranded on fade/jab families.
 8. **Away outside dribble:** `dribble_shoot` / composite families — `move_to` target stays on offense half (display x &lt; 50 away, &gt; 50 home).
 9. **Excluded:** FT turns, CHARGE turns — no micro fields, no extra pre-shot beats.
-10. **Ball arc:** Fade always arcs; jab + all outside families ~50%; straight `[ball_flight]` when roll false; blocks flat; apex scales with grid dist × style mult.
+10. **Ball arc:** Fade always arcs; jab + all outside families ~50%; straight `[ball_flight]` when roll false; blocks flat; apex scales with grid dist × style mult. HCO turns carry `uses_shot_arc` from `shot_manager` (required for `[ball_flight]` metadata).
 11. **Gather:** `dribble_shoot` / `pump_dribble_shoot` plant before release; other outside families unchanged.
 
 Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, travel+shoot insertion, away arc mirror, ball arc geometry, gather beats).
@@ -545,7 +547,7 @@ Unit tests: `tests/test_shot_micro_movements.py` (contest resolver, registry, tr
 | `BackEnd/engine/shot_micro_movements.py` | Core system |
 | `BackEnd/constants/shot_micro_movements_constants.py` | Constants + pools |
 | `BackEnd/utils/shot_ball_arc.py` | Ball-arc roll + geometry stamping |
-| `BackEnd/models/shot_manager.py` | Contest, telemetry, block gate |
+| `BackEnd/models/shot_manager.py` | Contest, telemetry, block gate; copies `uses_shot_arc` onto HCO turn |
 | `BackEnd/engine/skeleton_step_emitter.py` | HCO/FCP/Final hook |
 | `BackEnd/engine/dynamic_hct_step_emitter.py` | Dynamic HCT hook |
 | `BackEnd/engine/dynamic_hct_shot.py` | HCT shot resolution telemetry |

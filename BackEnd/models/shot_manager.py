@@ -2297,6 +2297,7 @@ class ShotManager:
             shot_defense_score_raw=float(shot_defense_score_raw or 0),
         )
         micro_movement_family = _micro_scratch.get("micro_movement_family")
+        uses_shot_arc = bool(_micro_scratch.get("uses_shot_arc"))
 
         shot_variant = None
         shot_variant_extras = {}
@@ -2335,6 +2336,7 @@ class ShotManager:
             "shot_defense_score_raw": float(shot_defense_score_raw or 0) if has_contest else None,
             "has_contest": bool(has_contest),
             "micro_movement_family": micro_movement_family,
+            "uses_shot_arc": uses_shot_arc,
             "contest_result": contest_result if has_contest else None,
             "contest_margin": contest_margin if has_contest else None,
             "shot_variant": shot_variant,
