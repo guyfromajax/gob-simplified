@@ -3055,9 +3055,14 @@ async function initGame() {
       bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY ||
       bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
     );
-  let activeResume =
-    bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY ||
-    bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY;
+  let activeResume = bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY;
+  if (bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY && !consumeResumeAnchor) {
+    // Backward compatibility for stale URLs that already contain
+    // resume_from_anchor=true before the user accepted the resume modal.
+    // Set Lineup returns with consume_resume_anchor=true; that path must not
+    // re-open the modal or it loops before the backend can consume the anchor.
+    activeResume = true;
+  }
   let resumeState = null;
   console.warn('[COURT BOOT MODE] classified court entry', {
     boot_mode: bootMode,

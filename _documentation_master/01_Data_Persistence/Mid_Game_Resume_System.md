@@ -82,6 +82,8 @@ Mode Select should set `active_resume=true`, but it should not set `resume_from_
 
 `bootGame.js` is intentionally defensive: if an older URL contains both `active_resume=true` and `resume_from_anchor=true`, `active_resume` wins and the page must still probe `/api/game/{game_id}/resume-state`, hide Play Quarter controls, and show the resume modal.
 
+Set Lineup returns from a cold resume with both `resume_from_anchor=true` and `consume_resume_anchor=true`. That combination is not modal state. It means the user already accepted resume, adjusted lineups, and the next gameplay request should restore/consume the anchor. Court boot must not show the `Game In Progress` modal again for this URL shape, or it creates a modal -> Set Lineup -> modal loop.
+
 ## Pre-Anchor Q1 Refresh Contract
 
 Before the first stable anchor exists, the game has no durable mid-game resume target.
