@@ -365,6 +365,7 @@ def simulate_quarter(
     starting_possession: str | None = None,
     turn_by_turn_mode: bool = False,
     resume_from_timeout: bool = False,
+    lineup_checkpoint: bool = False,
 ):
     """Simulate a single quarter on an existing ``GameManager``.
 
@@ -400,19 +401,30 @@ def simulate_quarter(
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
         logging.info(f"✅ simulate_quarter: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
     
-    # ✅ QUARTER BREAK: Rebuild computer team's lineup at start of each new quarter
-    # This allows computer team to adjust based on energy/foul restrictions
+    # Rebuild the computer team's lineup only at explicit lineup checkpoints
+    # (Set Lineup return) or full-sim paths. Plain court refreshes should keep
+    # the persisted active lineup to avoid dead sprites and hidden state drift.
     computer_team = gm.away_team if not gm.away_team.is_user_team else gm.home_team
-    if not computer_team.is_user_team and not (away_lineup_ids if computer_team == gm.away_team else home_lineup_ids):
+    should_rebuild_computer_lineup = lineup_checkpoint or not turn_by_turn_mode
+    if (
+        should_rebuild_computer_lineup
+        and not computer_team.is_user_team
+        and not (away_lineup_ids if computer_team == gm.away_team else home_lineup_ids)
+    ):
         # Only rebuild if no explicit lineup was provided and this is the computer team
         try:
             from BackEnd.utils.db_utils import autoset_strategy_settings
             computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
             # Autoset strategy settings for computer team
             autoset_strategy_settings(computer_team, gm.game_state)
-            logging.info(f"✅ QUARTER BREAK: Rebuilt computer team ({computer_team.name}) lineup for Q{gm.quarter} with energy/foul filtering and autoset strategy settings")
+            logging.info(
+                "✅ LINEUP CHECKPOINT: Rebuilt computer team (%s) lineup for Q%s "
+                "with energy/foul filtering and autoset strategy settings",
+                computer_team.name,
+                gm.quarter,
+            )
         except Exception as e:
-            logging.error(f"⚠️ QUARTER BREAK: Failed to rebuild computer team lineup: {e}")
+            logging.error(f"⚠️ LINEUP CHECKPOINT: Failed to rebuild computer team lineup: {e}")
             # Don't fail quarter start if lineup rebuild fails - use existing lineup
 
     # ✅ Player Momentum reset at quarter breaks (Q2+; Q3 start = halftime).

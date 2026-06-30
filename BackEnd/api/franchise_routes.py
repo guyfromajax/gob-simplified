@@ -942,25 +942,6 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     )
 
     if not game_doc:
-        game_doc = db.games.find_one(
-            {
-                "franchise_id": franchise_id,
-                "is_final": {"$ne": True},
-                "$or": [
-                    {"home_team_id": home_id, "away_team_id": away_id},
-                    {"home_team_id": away_id, "away_team_id": home_id},
-                    {"team1_id": away_id, "team2_id": home_id},
-                    {"team1_id": home_id, "team2_id": away_id},
-                ],
-            },
-            sort=[("_id", -1)],
-        )
-        logger.warning(
-            "🧭 [MODE-RESUME-LOOKUP] fallback_exact_query franchise_id=%s matched_game_id=%s",
-            franchise_id,
-            str(game_doc.get("_id")) if game_doc else None,
-        )
-    if not game_doc:
         logger.warning(
             "🧭 [MODE-RESUME-LOOKUP] no_match franchise_id=%s expected_away_tokens=%s expected_home_tokens=%s",
             franchise_id,
@@ -970,6 +951,13 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         return None
 
     resume_anchor = game_doc.get("resume_anchor") if isinstance(game_doc.get("resume_anchor"), dict) else {}
+    if not resume_anchor:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] matched_without_anchor_ignored game_id=%s franchise_id=%s",
+            str(game_doc.get("_id")),
+            franchise_id,
+        )
+        return None
     source_doc = _anchor_snapshot(game_doc) if resume_anchor else game_doc
 
     def _parse_int(value, default: int) -> int:

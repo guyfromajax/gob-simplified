@@ -807,7 +807,10 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
   renderCareerSummary(commandCenterData);
-  currentActiveGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
+  const activeGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
+  currentActiveGameResume = activeGameResume && activeGameResume.status === 'stoppage_anchor'
+    ? activeGameResume
+    : null;
   currentCpuSimResume = commandCenterData && cpuSimNeedsResume(commandCenterData.cpu_sim_resume) ? commandCenterData.cpu_sim_resume : null;
   console.warn('[MODE-RESUME-CLIENT] render franchise card', {
     has_command_center_data: !!commandCenterData,

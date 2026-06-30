@@ -219,6 +219,7 @@ function applyPlayerDetailLinkBehavior(linkEl, playerId) {
 async function validatePointersOnLoad() {
   const mode = modeParam || 'single';
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const resumeFromAnchor = urlParams.get('resume_from_anchor') === 'true' || urlParams.get('consume_resume_anchor') === 'true';
   const currentQuarter = parseInt(urlParams.get('quarter'), 10) || 1;
   
   // For single mode, game_id is required for Q2+ or timeout resume
@@ -728,7 +729,7 @@ async function loadRoster() {
     return;
   }
 
-  const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress;
+  const shouldInitGame = !gameId && homeTeam && awayTeam && !resumeFromTimeout && !resumeFromAnchor && !initGameInProgress;
   
   if (shouldInitGame) {
     console.log("No gameId found - initializing new game for pre-game lineup");
@@ -2313,6 +2314,7 @@ async function init() {
       const currentUrlParams = new URLSearchParams(window.location.search);
       let currentGameId = currentUrlParams.get('game_id') || null;
       let resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
+      const resumeFromAnchor = currentUrlParams.get('resume_from_anchor') === 'true' || currentUrlParams.get('consume_resume_anchor') === 'true';
       const modeParam = currentUrlParams.get('mode') || 'single';
       
       // ✅ CRITICAL FIX: Only force resumeFromTimeout=false for quarter breaks (quarter > 1)
@@ -2329,7 +2331,7 @@ async function init() {
       // (FTE v2 tutorial mode is NOT here — init-game runs earlier on the
       // situation page so the engine state + roster are available when this
       // page loads. By the time the user hits Play, game_id is already in URL.)
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && modeParam === 'single' && quarter === 1) {
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !resumeFromAnchor && modeParam === 'single' && quarter === 1) {
         if (!initGameInProgress) {
           console.log('⏳ [SET-LINEUP] PLAY GAME: game_id not found, calling init-game...');
           initGameInProgress = true;
@@ -2391,6 +2393,7 @@ async function init() {
         myTeamSide: myTeamSide,
         clock: currentUrlParams.get('clock')
       });
+      params.set('lineup_checkpoint', 'true');
       // Pass through quarter_break_from for quarter-break navigation context
       const quarterBreakFrom = currentUrlParams.get('quarter_break_from');
       if (quarterBreakFrom) params.set('quarter_break_from', quarterBreakFrom);

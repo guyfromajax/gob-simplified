@@ -533,6 +533,7 @@ try:
         resume_from_timeout: bool = False
         resume_from_anchor: bool = False
         consume_resume_anchor: bool = False
+        lineup_checkpoint: bool = False
         locked_exhausted_user_lineup: bool = False
         timeout_trace_id: str | None = None
         # Optional: designated Rim Runner (player id) per team for fast-break resolution
@@ -4563,6 +4564,7 @@ try:
                             body.starting_possession,
                             turn_by_turn_mode=turn_by_turn_mode,
                             resume_from_timeout=body.resume_from_timeout,
+                            lineup_checkpoint=body.lineup_checkpoint,
                         )
                     profile_summary_sim = run_profiled(_sim, top_n=80)
                     sim_time = (time.time() - sim_start) * 1000
@@ -4576,6 +4578,7 @@ try:
                         body.starting_possession,
                         turn_by_turn_mode=turn_by_turn_mode,
                         resume_from_timeout=body.resume_from_timeout,
+                        lineup_checkpoint=body.lineup_checkpoint,
                     )
                     sim_time = (time.time() - sim_start) * 1000
             finally:

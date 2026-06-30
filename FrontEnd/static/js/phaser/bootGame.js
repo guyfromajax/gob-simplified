@@ -2087,95 +2087,8 @@ function resetPreAnchorScoreChrome() {
 
 async function ensureFreshGameForPreAnchorQ1Refresh() {
   if (!isPreAnchorQ1RefreshPending()) return;
-
-  const live = readLiveSearchParams();
-  const liveQuarter = Number(live.get('quarter') || 1);
-  if (liveQuarter !== 1) {
-    clearPreAnchorQ1RefreshState('not_q1', { live_quarter: liveQuarter });
-    return;
-  }
-  if (hasResumeFlowFlags(live)) {
-    clearPreAnchorQ1RefreshState('resume_flow_flags', {
-      game_id: live.get('game_id') || gameId || null,
-      flags: Object.fromEntries(live.entries()),
-    });
-    return;
-  }
-
-  const oldGameId = gameId || live.get('game_id') || null;
-  const armedGameId = typeof window !== 'undefined' ? window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ : null;
-  if (armedGameId && oldGameId && String(armedGameId) !== String(oldGameId)) {
-    clearPreAnchorQ1RefreshState('armed_game_id_mismatch', {
-      armed_game_id: armedGameId,
-      current_game_id: oldGameId,
-    });
-    return;
-  }
-  if (await hasBackendResumeAnchor(oldGameId)) {
-    clearPreAnchorQ1RefreshState('backend_resume_anchor', { game_id: oldGameId });
-    return;
-  }
-
-  const payload = {
-    home_team: homeTeam,
-    away_team: awayTeam,
-    mode,
-  };
-
-  if (mode === 'tournament' && tournamentId) payload.tournament_id = tournamentId;
-  if (mode === 'franchise' && franchiseId) payload.franchise_id = franchiseId;
-  if (userTeamSide) payload.user_team_side = userTeamSide;
-
-  console.warn('[PRE-ANCHOR-Q1-REFRESH] creating fresh initialized game before gameplay restart', {
-    old_game_id: oldGameId,
-    mode,
-    home_team: homeTeam,
-    away_team: awayTeam,
-  });
-
-  const res = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {}),
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    let detail = `HTTP ${res.status}: ${res.statusText}`;
-    try {
-      const errorData = await res.json();
-      detail = errorData.detail || errorData.message || detail;
-    } catch (err) {
-      try {
-        detail = await res.text();
-      } catch (err2) {
-        /* keep default detail */
-      }
-    }
-    throw new Error(`Could not initialize fresh pre-anchor game: ${detail}`);
-  }
-
-  const data = await res.json();
-  const newGameId = data?.game_id ? String(data.game_id) : null;
-  if (!newGameId) {
-    throw new Error('Could not initialize fresh pre-anchor game: response missing game_id');
-  }
-
-  gameId = newGameId;
-  quarter = 1;
-  periodLabel = 'Q1';
-  gameStore.setGameId(newGameId);
-  replaceGameIdInUrl(newGameId);
-  resetPreAnchorScoreChrome();
-
-  window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = false;
-  window.__GOB_PRE_ANCHOR_Q1_REFRESH_REPLACED_GAME_ID__ = newGameId;
-
-  console.warn('[PRE-ANCHOR-Q1-REFRESH] fresh initialized game ready', {
-    old_game_id: oldGameId,
-    new_game_id: newGameId,
+  clearPreAnchorQ1RefreshState('simplified_mgr_v1_no_anchor_reset_disabled', {
+    game_id: gameId || readLiveSearchParams().get('game_id') || null,
   });
 }
 
@@ -3055,14 +2968,7 @@ async function initGame() {
       bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY ||
       bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
     );
-  let activeResume = bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY;
-  if (bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY && !consumeResumeAnchor) {
-    // Backward compatibility for stale URLs that already contain
-    // resume_from_anchor=true before the user accepted the resume modal.
-    // Set Lineup returns with consume_resume_anchor=true; that path must not
-    // re-open the modal or it loops before the backend can consume the anchor.
-    activeResume = true;
-  }
+  let activeResume = false;
   let resumeState = null;
   console.warn('[COURT BOOT MODE] classified court entry', {
     boot_mode: bootMode,
@@ -3181,13 +3087,20 @@ async function initGame() {
         if (redirectResumeAnchorToSetLineup(resumeState)) {
           return;
         }
-      } else if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        params.delete('active_resume');
-        params.set('resume_from_anchor', 'true');
-        if (typeof history !== 'undefined' && history.replaceState) {
-          history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+      }
+      if (!resumeState || resumeState.status !== 'stoppage_anchor') {
+        console.warn('[MGR-RESUME-CLIENT] resume modal accepted without verified anchor; blocking URL-only restore', {
+          game_id: gameId,
+          boot_mode: bootMode,
+        });
+        if (resumeGameSubtitle) {
+          resumeGameSubtitle.textContent = 'Could not verify the active game state. Return to Mode Select and try again.';
         }
+        if (resumeGameButton) {
+          resumeGameButton.disabled = true;
+          resumeGameButton.textContent = 'Resume Unavailable';
+        }
+        return;
       }
       if (resumeGameContainer) resumeGameContainer.remove();
       try {

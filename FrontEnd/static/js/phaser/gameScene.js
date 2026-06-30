@@ -1110,6 +1110,9 @@ export function createGameScene(Phaser) {
         payload.locked_exhausted_user_lineup = true;
         payload.user_team_side = urlParams.get('my_team');
       }
+      if (urlParams.get('lineup_checkpoint') === 'true') {
+        payload.lineup_checkpoint = true;
+      }
       if (timeoutTraceId) {
         payload.timeout_trace_id = timeoutTraceId;
       }

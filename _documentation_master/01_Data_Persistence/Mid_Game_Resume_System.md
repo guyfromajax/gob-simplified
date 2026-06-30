@@ -8,29 +8,33 @@ The system intentionally resumes from a **stable stoppage anchor**, not from an 
 
 ## Current Status
 
-**Implemented for franchise court resume; active stabilization ongoing.**
+**Simplified MGR v1 is the active target contract.**
 
 Supported return paths:
 
 - Browser refresh on `court.html`
 - Browser close / later return through Mode Select
 - Mode Select franchise card routing back to an active game
-- Timeout / foul-out style restart flows where the next turn is already known
+- Timeout / foul-out anchors
 - Quarter-break resume through Set Lineup
 - Live quarter-to-quarter transitions through Set Lineup without triggering the resume modal
 
-Current implementation details:
+Active implementation direction:
 
 - `game.resume_anchor` is the durable source of truth for mid-game resume.
-- `bootGame.js` classifies every court load into one boot mode before deciding whether to read resume state, show the resume modal, auto-start, or treat the page as normal live gameplay.
+- No active `resume_anchor` means no Mid Game Resume behavior.
+- Active `resume_anchor` means the user should see the MGR modal and, after accepting it, route through Set Lineup.
 - Quarter-break anchors are created immediately when a non-final quarter completes.
 - Quarter-break anchors are also created on the `/api/simulate-turn` early-return quarter-complete path so stale timeout/foul-out anchors do not survive a duplicate/preloaded `0:00` request.
 - Timeout and foul-out anchors are created when their modal state is saved, before the user enters Set Lineup.
-- Cold resume routes every supported anchor type through Set Lineup before gameplay.
-- Set Lineup returns from cold resume must send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
+- Refresh and browser-close return both use the same anchor rule: backend resume state decides whether MGR exists.
+- Accepting the MGR modal always routes through Set Lineup.
+- Set Lineup return from MGR is the only path that should send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
 - Normal live quarter breaks must send `quarter_break_from=play_quarter` to Set Lineup and preserve it when returning to `court.html`; this marker tells the court boot code not to read the durable resume anchor or show the mid-game resume modal.
 - Live quarter entries are authoritative. If stale resume flags survive into a live quarter URL, `bootGame.js` strips them and `loadGameStats.js` ignores them.
 - Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
+
+The simplified v1 intentionally does **not** support arbitrary mid-quarter recovery before the first stable anchor. If the user refreshes or closes the browser before any timeout, foul-out, or non-final quarter-break anchor exists, MGR is unavailable and normal non-MGR flow applies.
 
 Primary files:
 
@@ -47,6 +51,84 @@ Historical plan:
 - `_documentation_master/projects/court_persistence_plan.md`
 
 That project plan explains the original Option A + B-lite design. This document is the current system reference.
+
+## Simplified MGR v1 Contract
+
+This section is the active work plan.
+
+### Product Rule
+
+> MGR only resumes from explicit stable stoppage anchors.
+
+The supported anchors are:
+
+- timeout modal
+- player foul-out modal
+- non-final quarter break
+
+No anchor means no MGR. The system should not try to preserve or reconstruct arbitrary mid-quarter refresh state.
+
+### User Flow
+
+When a valid anchor exists:
+
+1. Browser refresh or browser close/return detects the active anchor through backend resume state.
+2. Court shows the `Game In Progress` modal.
+3. Gameplay does not start behind the modal.
+4. User presses `Resume Game`.
+5. User is routed to Set Lineup.
+6. User and computer lineups are established on Set Lineup.
+7. Set Lineup returns to `court.html` with `resume_from_anchor=true`, `consume_resume_anchor=true`, and `quarter_break_from=mid_game_resume`.
+8. Backend restores from `game.resume_anchor.snapshot`.
+9. Backend consumes the anchor after successful restore.
+10. Gameplay continues from the restored anchor using the Set Lineup selections.
+
+When no valid anchor exists:
+
+- Mode Select does not show active-game resume.
+- Court does not show the MGR modal.
+- Court does not route to Set Lineup for MGR.
+- Backend does not restore or consume an anchor.
+- Normal non-MGR game flow applies.
+
+### Implementation Checklist
+
+- [x] Disable pre-anchor Q1 fresh-game reset behavior.
+- [x] Ensure Mode Select only exposes resume when backend `active_game_resume` exists and reports `status=stoppage_anchor`.
+- [x] Ensure court only shows the MGR modal when `/api/game/{game_id}/resume-state` returns `status=stoppage_anchor`.
+- [x] Ensure accepting the MGR modal always routes to Set Lineup.
+- [x] Ensure Set Lineup return from MGR is the only path that sends `consume_resume_anchor=true`.
+- [x] Ensure backend clears `resume_anchor` only on explicit consume or final game.
+- [x] Ensure live timeout/foul-out returns do not convert the URL into `resume_from_anchor=true`.
+- [x] Ensure computer lineup rebuilds only happen at explicit lineup checkpoints, full sim/CPU sim paths, or other non-court-refresh contexts.
+- [x] Ensure no code path calls `/api/init-game` for a game with an active resume anchor.
+
+### Sunset / Disabled Behaviors
+
+These behaviors are being removed from the active v1 contract because they increased state complexity and second-order bug risk:
+
+- Pre-anchor Q1 refresh fresh-game replacement.
+- Direct timeout auto-start as an MGR cold/refresh resume path.
+- URL-only proof that a resume exists.
+- `resume_from_anchor=true` before the user accepts the MGR modal.
+- Hidden computer lineup rebuild while staying on `court.html` after refresh.
+- Attempting to make arbitrary mid-quarter refresh look like a coherent exact restore.
+
+### Reduced Test Matrix
+
+Required before treating the simplified feature as stable:
+
+| Scenario | Expected result |
+|---|---|
+| Refresh before first anchor | No MGR modal; no hidden lineup mutation; normal non-MGR flow |
+| Browser close before first anchor | Mode Select has no resume card; routes normally |
+| Timeout anchor then refresh | MGR modal -> Set Lineup -> restore/consume |
+| Timeout anchor then browser close/return | Mode Select resume card -> court MGR modal -> Set Lineup -> restore/consume |
+| Foul-out anchor then refresh | MGR modal -> Set Lineup -> restore/consume |
+| Non-final quarter break anchor then refresh | MGR modal -> Set Lineup -> restore/consume |
+| Live Q1 -> Q2 transition without leaving | No MGR modal; normal Set Lineup quarter flow |
+| Set Lineup return from MGR | No second MGR modal; backend consumes anchor after successful restore |
+| Final game | Anchor cleared; no MGR resume |
 
 ## Core Principle
 
@@ -94,9 +176,13 @@ Backend anchor clearing is explicit:
 
 This prevents normal continued play after a timeout/foul-out from destroying the last stable resume anchor.
 
-## Pre-Anchor Q1 Refresh Contract
+## Sunset: Pre-Anchor Q1 Refresh Contract
 
-Before the first stable anchor exists, the game has no durable mid-game resume target.
+This section documents behavior that is being sunset for simplified MGR v1.
+
+Before the first stable anchor exists, the game has no durable mid-game resume target. Earlier versions attempted to make Q1 refresh safe by detecting a dirty pre-anchor game document, suppressing partial stats, and creating a fresh initialized game id before gameplay restarted.
+
+That behavior is no longer part of the active v1 contract.
 
 This applies when the user refreshes `court.html` during Q1 before any of these have occurred:
 
@@ -104,14 +190,14 @@ This applies when the user refreshes `court.html` during Q1 before any of these 
 - player foul-out modal
 - non-final quarter break
 
-Expected behavior:
+Simplified v1 expected behavior:
 
 - Browser close / later return through Mode Select does not show a mid-game resume card.
-- Browser refresh may show the normal Play Quarter / Sim Full Game controls.
-- The refreshed court must not display partial scores, partial player stats, partial team stats, or stale clock values from the abandoned pre-anchor gameplay.
-- The next Play Quarter / Sim Full Game action must not continue from the dirty partial gameplay state.
+- Browser refresh does not show the MGR modal.
+- Browser refresh must not invisibly rebuild computer lineups while staying on `court.html`.
+- Browser refresh uses normal non-MGR behavior until a stable anchor exists.
 
-Product rule:
+Deprecated product rule:
 
 > Pre-anchor Q1 refresh abandons live gameplay progress, but preserves setup and baseline initialization.
 
@@ -119,7 +205,7 @@ Critical hierarchy:
 
 > Resume anchor existence disables pre-anchor reset. Do not add or rely on a separate "disable pre-anchor reset" flag.
 
-The pre-anchor Q1 refresh path is allowed only when all of these are true:
+The deprecated pre-anchor Q1 refresh path was previously allowed only when all of these were true:
 
 - the URL is Q1
 - the URL is not a live quarter entry (`quarter_break_from=play_quarter` / `sim_quarter`)
@@ -133,6 +219,8 @@ The pre-anchor Q1 refresh path is allowed only when all of these are true:
 - the game has no active backend resume anchor
 
 Once the first timeout, player foul-out, or non-final quarter-break anchor is written, the game is no longer pre-anchor. From that moment, any dirty Q1 state must be resolved through the resume anchor on the existing game document, not by creating a fresh game id.
+
+Simplified v1 implementation should disable the fresh-game replacement path entirely. The preserve/reset details below remain historical reference for the deprecated behavior.
 
 ### Preserve
 
@@ -234,29 +322,19 @@ Contract:
 - reset live `x` / `y` coordinates to lineup/default starting locations
 - reset player game stats and fouls
 
-Because `MO` and `NG` can be mutated during gameplay, the implemented pre-anchor Q1 refresh path does **not** try to surgically clean the dirty game document.
+Because `MO` and `NG` can be mutated during gameplay, the deprecated pre-anchor Q1 refresh path did **not** try to surgically clean the dirty game document.
 
-Implemented behavior:
+Deprecated implementation behavior:
 
-1. `initializeGameStats()` detects dirty Q1 game documents only when there are no resume-flow URL flags and no active backend resume anchor.
-2. When dirty pre-anchor Q1 state is detected, the court suppresses accumulated stat hydration and paints clean pregame chrome:
-   - score `0-0`
-   - `Q1`
-   - `8:00`
-   - shot clock `30`
-   - no partial player or team stats
-3. The court sets `window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true`.
-4. Before Play Quarter, Sim Quarter, or Sim Full Game starts, `bootGame.js` re-checks:
-   - no resume-flow URL flags are present
-   - the armed game id still matches the current URL game id
-   - `/api/game/{game_id}/resume-state` does not report `status=stoppage_anchor`
-5. Only if those checks still pass, `bootGame.js` calls `/api/init-game` with the preserved setup payload.
-6. The response `game_id` replaces the dirty URL `game_id`.
-7. Gameplay starts from the fresh initialized game document.
+- `initializeGameStats()` previously detected dirty Q1 game documents and armed `window.__GOB_PRE_ANCHOR_Q1_REFRESH__`.
+- `bootGame.js` previously used that flag to call `/api/init-game`, replace the URL `game_id`, and restart from a fresh initialized game document.
+- This path is disabled in simplified MGR v1. `initializeGameStats()` clears any stale pre-anchor reset flag, and `ensureFreshGameForPreAnchorQ1Refresh()` is intentionally inert.
 
-This intentionally abandons the dirty pre-anchor game document instead of mutating it in place. Once the first stable anchor exists, this fresh-game replacement path is no longer used; the Mid Game Resume System resumes from anchors on the existing game document.
+Current simplified behavior:
 
-The abandoned pre-anchor document may remain in the database until normal cleanup handles it. It is no longer referenced by the active browser URL after the fresh replacement is created.
+- If no durable `game.resume_anchor` exists, the MGR system does not intervene.
+- A dirty pre-anchor Q1 refresh may show the current game document state, but it must not create a replacement game document.
+- Once the first timeout, foul-out, or non-final quarter break creates an anchor, refresh/close recovery uses the normal MGR path: modal -> Set Lineup -> restore/consume.
 
 ## Resume Anchor
 
@@ -575,25 +653,28 @@ Diagnostic logs:
 
 The court resume modal is intentionally blocking.
 
-Rules:
+Simplified v1 rules:
 
 - If `active_resume=true`, show the modal and wait for user input.
 - Do not auto-start the game behind the modal.
-- On `Resume Game`, remove the modal and start the game.
-- Direct timeout resumes without `active_resume=true` can still auto-start.
+- On `Resume Game`, route through Set Lineup.
+- Set Lineup return sends `resume_from_anchor=true` and `consume_resume_anchor=true`.
+- Do not use direct timeout auto-start as a cold/refresh MGR resume path.
 
 This distinction matters:
 
-- Browser refresh may resume directly after the URL has already been normalized.
+- Browser refresh with an active anchor must show the modal.
 - Browser close / return from Mode Select must pause at the modal so the user understands they are entering an active game.
 
-The guard lives in `FrontEnd/static/js/phaser/bootGame.js`:
+Deprecated direct-timeout guard in `FrontEnd/static/js/phaser/bootGame.js`:
 
 ```javascript
 if (resumeFromTimeout && !activeResume && gameId && homeTeam && awayTeam) {
   handleButtonClick(true);
 }
 ```
+
+Simplified v1 should remove or bypass this guard for MGR cold/refresh resume. Timeout-specific live gameplay may still use timeout restart semantics, but MGR recovery should always go through modal -> Set Lineup -> restore/consume.
 
 ## Court Boot Classifier
 
@@ -604,18 +685,37 @@ Boot modes:
 - `live_quarter_entry`: `quarter_break_from=play_quarter` or `quarter_break_from=sim_quarter`
 - `anchor_restore_entry`: `resume_from_anchor=true` or `consume_resume_anchor=true`
 - `cold_resume_entry`: `active_resume=true`
-- `timeout_direct_entry`: `resume_from_timeout=true`
+- `timeout_direct_entry`: `resume_from_timeout=true` (deprecated for MGR cold/refresh resume)
 - `normal_entry`: no resume-specific intent
 
 Rules:
 
 - `live_quarter_entry` always wins over stale resume flags.
 - `live_quarter_entry` strips `active_resume`, `resume_from_anchor`, `consume_resume_anchor`, and `anchor_type` from the URL and forces `resume_from_timeout=false`.
-- Only `cold_resume_entry` or `normal_entry` may probe `/api/game/:game_id/resume-state` for the resume modal.
+- `cold_resume_entry` and refresh/normal entries may probe `/api/game/:game_id/resume-state` for the resume modal.
 - `anchor_restore_entry` restores from the anchor through `/api/simulate-quarter` and then consumes it.
-- `timeout_direct_entry` may auto-start because it is already an in-game timeout/foul-out restart, not a cold browser return.
+- `timeout_direct_entry` should not be used for MGR cold/refresh resume in simplified v1.
 
 `FrontEnd/static/js/phaser/utils/loadGameStats.js` must apply the same live-quarter guard when deciding whether to hydrate from `/resume-state`. This matters because court stats hydrate before `bootGame.js` starts Phaser.
+
+## Lineup Checkpoint Contract
+
+`lineup_checkpoint=true` is the explicit signal that the user has just exited `set-lineup.html`.
+
+Only requests with this flag may perform checkpoint lineup work such as rebuilding the computer team's lineup from energy/foul restrictions and autosetting computer strategy. Plain `court.html` refreshes must not rebuild the computer lineup, because the user never left the court and existing sprites still represent the active lineup.
+
+Current wiring:
+
+- `FrontEnd/static/set-lineup.js` adds `lineup_checkpoint=true` to court navigation after the user submits a lineup.
+- `FrontEnd/static/js/phaser/gameScene.js` forwards the flag in `/api/simulate-quarter`.
+- `BackEnd/api/api.py` accepts `lineup_checkpoint`.
+- `BackEnd/main.py::simulate_quarter()` rebuilds the computer lineup only when `lineup_checkpoint=true` or when the request is a full-sim path (`turn_by_turn_mode=false`).
+
+This keeps the MGR flow consistent:
+
+- refresh/close with an anchor: modal -> Set Lineup -> `lineup_checkpoint=true` -> restore/consume
+- refresh without leaving court and without a Set Lineup submit: no hidden lineup mutation
+- full sim: computer lineup automation remains allowed
 
 ## URL Flags
 
@@ -886,10 +986,13 @@ The formal resume contract is:
 2. One lifecycle: create anchors at stable stoppages, route cold resume through Set Lineup, restore once, then consume.
 3. One API: court and Mode Select both read resume eligibility/state from the same backend contract.
 4. One frontend mode: if active resume exists, court boots into resume_pending, hydrates all UI from anchor, blocks sim until button press.
-5. One backend behavior: resume_from_anchor=true restores once, simulates, then clears the anchor.
-6. Tests for flows: browser refresh, browser close/return, timeout anchor, foul-out anchor, quarter-break anchor, Q1 to Q2 transition, and no stale-anchor reuse.
+5. One backend behavior: `consume_resume_anchor=true` clears the anchor after a successful restore; `resume_from_anchor=true` alone does not clear it.
+6. One v1 scope: no anchor means no MGR behavior.
+7. Tests for flows: browser refresh, browser close/return, timeout anchor, foul-out anchor, quarter-break anchor, Q1 to Q2 transition, and no stale-anchor reuse.
 
-## System Hardening Plan: Central Court Entry Resolver
+## Deferred Future Hardening: Central Court Entry Resolver
+
+This is no longer the active v1 plan. It remains useful future context if the team later chooses to support broader entry-state handling or exact mid-quarter recovery.
 
 The current implementation has been stabilized incrementally, but several frontend modules still infer resume state independently:
 

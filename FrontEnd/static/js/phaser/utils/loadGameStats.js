@@ -609,29 +609,8 @@ export async function initializeGameStats() {
       gameId
     );
   }
-  if (
-    !resumeFlowFlags &&
-    !wantsAnchorUi &&
-    !liveQuarterStart &&
-    quarter === 1 &&
-    isPreAnchorQ1DirtyGame(gameData)
-  ) {
-    const resumeState = await fetchResumeState(gameId);
-    if (resumeState && resumeState.status === 'stoppage_anchor') {
-      clearPreAnchorQ1RefreshFlag('backend_resume_anchor', gameId);
-      return;
-    }
-    window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true;
-    window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = gameId;
-    console.warn('[PRE-ANCHOR-Q1-REFRESH] dirty pre-anchor game doc detected; suppressing accumulated stats', {
-      game_id: gameId,
-      quarter: gameData?.quarter,
-      clock: gameData?.clock,
-      time_remaining: gameData?.time_remaining,
-      score: gameData?.score,
-    });
-    resetPreAnchorCourtChrome(homeTeam, awayTeam);
-    return;
+  if (!resumeFlowFlags && !wantsAnchorUi && !liveQuarterStart && quarter === 1 && isPreAnchorQ1DirtyGame(gameData)) {
+    clearPreAnchorQ1RefreshFlag('simplified_mgr_v1_no_anchor_reset_disabled', gameId);
   }
   if (gameData) {
     displayAccumulatedHeaderState(gameData, homeTeam, awayTeam);
