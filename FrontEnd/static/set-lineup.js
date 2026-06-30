@@ -716,6 +716,8 @@ async function loadRoster() {
   // ✅ CRITICAL FIX: Don't init if game_id exists in URL (game already exists) or if resuming from timeout
   // This prevents creating a new game when resuming from timeout, which would reset all game state
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const resumeFromAnchor = urlParams.get('resume_from_anchor') === 'true'
+    || urlParams.get('consume_resume_anchor') === 'true';
 
   // FTE v2 tutorial: init-game is supposed to run on the tutorial-situation
   // page (NOT here). If tutorial mode lands on set-lineup without a game_id,
