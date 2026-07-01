@@ -212,3 +212,20 @@ def inject_dead_ball_fumble_before_turn_stop(
         turn_stop_next=turn_stop_next,
     )
     steps.append(fumble_step)
+
+
+def propagate_fumble_turn_flags(
+    source: Dict[str, Any],
+    dest: Dict[str, Any],
+) -> None:
+    """Copy fumble announce fields from an emitter working copy onto the canonical turn.
+
+    Dynamic FCP builds steps against ``dict(turn_result)``; inject stamps
+    ``suppress_turn_prep_turnover_announce`` and ``turnover_type`` on that copy.
+    Merge them back so the FE turn-prep path stays suppressed.
+    """
+    if source.get("suppress_turn_prep_turnover_announce"):
+        dest["suppress_turn_prep_turnover_announce"] = True
+    turnover_type = source.get("turnover_type")
+    if turnover_type:
+        dest["turnover_type"] = turnover_type

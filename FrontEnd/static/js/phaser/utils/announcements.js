@@ -763,6 +763,14 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       return;
     }
 
+    // Dead-ball fumble beat announces on step.end; skip legacy turn-prep turnover.
+    if (
+      (turnData.result_type === 'TURNOVER' || turnData.result_type === 'DEAD BALL') &&
+      turnData.suppress_turn_prep_turnover_announce
+    ) {
+      return;
+    }
+
     // Handle all turnover types: TURNOVER, DEAD BALL (from HCT/FCP), and non-steal STEAL results
     if (turnData.result_type === 'TURNOVER' || turnData.result_type === 'DEAD BALL') {
       // Non-steal turnovers - show victim's photo in offense team color

@@ -241,6 +241,31 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 **Announcement Timing:**
 - Announcements occur after animation completes (frontend handles timing)
 
+### Dead-ball turnover fumble beat (UESS, 2026-06)
+
+For travel / double-dribble class dead-ball turnovers (not shot clock, steals, or batted OOB), emitters insert a **fumble schema step** immediately before the terminal `turn_stop: DEAD_BALL_TURNOVER`:
+
+1. **Stumble** — stationary step, `flourish[fumble]` on the ball handler, `wall_clock_hold_ms` (660 ms), zero game/shot clock burn.
+2. **Whistle headline** — `step.end.announcement` with backend 50/50 `"Travel!"` / `"Double Dribble!"` + `whistle-1-lowervol.wav`.
+
+**Announce migration:** The fumble step owns the turnover headline. On inject, the backend stamps:
+
+- `turnover_type` — `"TRAVEL"` or `"DOUBLE_DRIBBLE"` (BE roll, not FE random)
+- `suppress_turn_prep_turnover_announce: true` — skips legacy turn-prep turnover announce
+
+**FE guards (both must respect suppress):**
+
+- `turnPreparation.js` → `finalizeTurnAfterAnimation` → `announceGameEvent('TURNOVER', …)`
+- `announcements.js` → `announceFromTurnData` (legacy non-router path)
+
+**Wired emitters:** `skeleton_step_emitter`, `dynamic_hct_step_emitter`, `hct_step_emitter`, `covert_release_step_emitter`; dynamic FCP via `build_dynamic_fcp_animation_steps` → `build_dynamic_hct_animation_steps`.
+
+**Dynamic FCP copy contract:** `build_dynamic_fcp_animation_steps` shallow-copies the turn dict before calling the HCT emitter (FCP alias keys). Fumble inject mutates that **copy**. `propagate_fumble_turn_flags(payload, turn_result)` merges `suppress_turn_prep_turnover_announce` and `turnover_type` back onto the canonical turn so the FE does not double-fire (in-step announce + turn-prep announce).
+
+**Excluded:** `turnover_type == "SHOT_CLOCK"`, steals, batted OOB (`bat_oob`, `rim_runner_bat_oob`).
+
+**Key files:** `BackEnd/engine/dead_ball_fumble.py`, `BackEnd/constants/dead_ball_fumble_constants.py`, `BackEnd/engine/dynamic_fcp_step_emitter.py`, `FrontEnd/static/js/phaser/animation/flourishes.js`, `tests/test_dead_ball_fumble.py`.
+
 ### Key Implementation Details
 
 **Deep Copy Protection** (in `apply_stopper_system_to_skeleton`, after the HCO/SHOT early-returns):
@@ -332,6 +357,11 @@ _(Line numbers approximate, verified 2026-06-13; `phase_resolution.py` shifts fr
   - `_is_fcp_stopper_action_step()` / `_resolve_fcp_stopper_gate_ids()` - Stopper-step gating for FCP schema playback
 - `BackEnd/engine/dynamic_hct_step_emitter.py`
   - `build_dynamic_hct_animation_steps()` - Schema steps for dynamic HCT
+- `BackEnd/engine/dynamic_fcp_step_emitter.py`
+  - `build_dynamic_fcp_animation_steps()` - Dynamic FCP wrapper; merges fumble announce flags back to canonical turn
+- `BackEnd/engine/dead_ball_fumble.py`
+  - `inject_dead_ball_fumble_before_turn_stop()` - Fumble beat + announce migration flags
+  - `propagate_fumble_turn_flags()` - Copy suppress / turnover_type from emitter working copy
 - `BackEnd/models/turn_manager.py`
   - `_emit_hco_animation_steps()` - Single HCO injection point (calls `build_skeleton_animation_steps`); also stamps `current_turn="HCO"` so stopper outcomes pass the FE schema-playback gate
   - FCP/HCT schema emission wiring in `run_micro_turn`

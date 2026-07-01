@@ -21,4 +21,8 @@ def build_dynamic_fcp_animation_steps(
 
     payload = dict(turn_result)
     payload.setdefault("fcp_skip_walk_up", True)
-    return build_dynamic_hct_animation_steps(payload, game)
+    steps = build_dynamic_hct_animation_steps(payload, game)
+    from BackEnd.engine.dead_ball_fumble import propagate_fumble_turn_flags
+
+    propagate_fumble_turn_flags(payload, turn_result)
+    return steps

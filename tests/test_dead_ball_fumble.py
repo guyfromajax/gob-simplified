@@ -6,6 +6,7 @@ from BackEnd.engine.dead_ball_fumble import (
     build_dead_ball_fumble_step,
     inject_dead_ball_fumble_before_turn_stop,
     is_dead_ball_fumble_turn,
+    propagate_fumble_turn_flags,
     roll_dead_ball_fumble_label,
 )
 
@@ -113,6 +114,43 @@ class TestInjectDeadBallFumble:
         turn = {"result_type": "DEAD BALL", "victim_id": "bh1"}
         inject_dead_ball_fumble_before_turn_stop(steps, turn, away_offense=False)
         assert len(steps) == 1
+
+
+class TestPropagateFumbleTurnFlags:
+    def test_copies_suppress_and_turnover_type(self):
+        source = {
+            "suppress_turn_prep_turnover_announce": True,
+            "turnover_type": "DOUBLE_DRIBBLE",
+        }
+        dest = {"result_type": "DEAD BALL"}
+        propagate_fumble_turn_flags(source, dest)
+        assert dest["suppress_turn_prep_turnover_announce"] is True
+        assert dest["turnover_type"] == "DOUBLE_DRIBBLE"
+
+    def test_no_op_when_source_unstamped(self):
+        dest = {"result_type": "DEAD BALL"}
+        propagate_fumble_turn_flags({}, dest)
+        assert "suppress_turn_prep_turnover_announce" not in dest
+
+
+class TestDynamicFcpFumbleFlagMerge:
+    def test_merges_flags_from_emitter_copy(self, monkeypatch):
+        from BackEnd.engine.dynamic_fcp_step_emitter import build_dynamic_fcp_animation_steps
+
+        def fake_build(payload, _game):
+            payload["suppress_turn_prep_turnover_announce"] = True
+            payload["turnover_type"] = "TRAVEL"
+            return [{"start": {"coords": {}}, "end": {"coords": {}, "next": None}}]
+
+        monkeypatch.setattr(
+            "BackEnd.engine.dynamic_hct_step_emitter.build_dynamic_hct_animation_steps",
+            fake_build,
+        )
+        canonical = {"result_type": "DEAD BALL", "fcp_loop_segments": [{}]}
+        steps = build_dynamic_fcp_animation_steps(canonical, None)
+        assert steps is not None
+        assert canonical["suppress_turn_prep_turnover_announce"] is True
+        assert canonical["turnover_type"] == "TRAVEL"
 
 
 class TestBuildDeadBallFumbleStep:
