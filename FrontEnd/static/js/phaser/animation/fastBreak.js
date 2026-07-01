@@ -835,7 +835,7 @@ async function tweenTriangleSpriteToGrid(scene, sprite, grid, width, height, { b
   });
 }
 
-async function animateTriangleSetupPhase(scene, turnData, playerSprites, ballSprite, width, height) {
+async function animateTriangleSetupPhase(scene, turnData, playerSprites, ballSprite, width, height, rrReDrivenAfter = false) {
   const payload = getTriangleSetupPayload(turnData);
   if (!payload) return { payload: null, snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
   const sid = (id) => (id != null ? String(id) : null);
@@ -866,7 +866,9 @@ async function animateTriangleSetupPhase(scene, turnData, playerSprites, ballSpr
   };
 
   queueMove(payload.ball_handler_id, payload.ball_handler_to, { burst: false });
+  const rrBeforeLen = promises.length;
   queueMove(payload.rim_runner_id, payload.rim_runner_to, { burst: false });
+  const rrTrianglePromise = promises.length > rrBeforeLen ? promises[promises.length - 1] : null;
   queueMove(payload.trailer_id, payload.trailer_to, { burst: false });
   for (const corner of payload.corner_players || []) {
     queueMove(corner.player_id, corner.to, { burst: Boolean(corner.burst) });
@@ -880,7 +882,19 @@ async function animateTriangleSetupPhase(scene, turnData, playerSprites, ballSpr
   const bhSprite = playerSprites?.[sid(payload.ball_handler_id)];
   if (bhSprite) attachBallToPlayer(scene, ballSprite, bhSprite, { reason: "triangle_setup" });
 
-  await Promise.all(promises);
+  const rrSprite = playerSprites?.[sid(payload.rim_runner_id)];
+  if (rrReDrivenAfter && rrSprite && scene.tweens && rrTrianglePromise) {
+    // Option A (dead-air fix): the shot decision lead-in / lane pass re-drives the RR from its
+    // live position next, so awaiting the RR's setup sprint here is pure dead air. Stop it
+    // (prevents a double-tween with the re-drive) and settle only the other movers.
+    scene.tweens.killTweensOf(rrSprite);
+    // Killing the tween rejects its promise (tweenPlayerTo onStop). Consume it so the
+    // filtered-out RR promise can't surface as an unhandled rejection.
+    void Promise.allSettled([rrTrianglePromise]);
+    await Promise.all(promises.filter((p) => p !== rrTrianglePromise));
+  } else {
+    await Promise.all(promises);
+  }
   commitRrLiveSpriteGrid(playerSprites, width, height);
   return { payload, snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 }
@@ -1885,7 +1899,32 @@ export async function runFastBreakSequence({
   }
   
   scene.events?.emit("fb:start");
-  
+
+  // Phase-2 routing is a pure classification of turnData; compute it up front so the
+  // burst + triangle-setup phases know whether the rim runner will be RE-DRIVEN by a
+  // downstream pass. Option A (dead-air fix): when the RR is about to be re-driven (lane
+  // pass, or the triangle setup / shot decision lead-in), skip awaiting its long downcourt
+  // sprint here — that wait is pure dead air, since the downstream stage spawns a fresh RR
+  // tween from the RR's live position. Endings that need the RR to settle (hold-up, stop)
+  // keep the barrier.
+  const result = turnData.result_type;
+  const isBlockingFoul =
+    result === "FOUL" &&
+    turnData.foul_team === "DEFENSE" &&
+    turnData.text?.toLowerCase().includes("blocking foul");
+  const phase2Kind = classifyFastBreakPhase2(turnData, { isBlockingFoul });
+  const triangleSetupRequired =
+    isTriangleSequence(turnData) &&
+    !turnData.rim_runner_outlet_failed &&
+    Boolean(getTriangleSetupPayload(turnData));
+  const lanePassWillFollow = shouldAnimateRimRunnerLanePass(turnData, phase2Kind);
+  const isShotPhase2 =
+    phase2Kind === "fast_break_shot" || phase2Kind === "fast_break_shot_foul";
+  // Burst RR is re-driven by the lane pass OR the triangle setup that follows it.
+  const rrReDrivenAfterBurst = lanePassWillFollow || triangleSetupRequired;
+  // Triangle-setup RR is re-driven by the lane pass OR the shot decision lead-in.
+  const rrReDrivenAfterTriangleSetup = lanePassWillFollow || isShotPhase2;
+
   // ============================================================================
   // PHASE 1: Rim Runner burst + outlet (or standard Covert-style outlet)
   // ============================================================================
@@ -1896,7 +1935,8 @@ export async function runFastBreakSequence({
       playerSprites,
       ballSprite,
       width,
-      height
+      height,
+      rrReDrivenAfterBurst
     );
     leadInUnit = turnData.roles?.is_steal_entry
       ? "fb.lead_in.from_hco_steal"
@@ -1970,13 +2010,7 @@ export async function runFastBreakSequence({
   // ============================================================================
   // PHASE 2: FAST BREAK RESOLUTION — contract-ordered routing (Rim Runner + generic FB)
   // ============================================================================
-  const result = turnData.result_type;
-  const isBlockingFoul =
-    result === "FOUL" &&
-    turnData.foul_team === "DEFENSE" &&
-    turnData.text?.toLowerCase().includes("blocking foul");
-
-  const phase2Kind = classifyFastBreakPhase2(turnData, { isBlockingFoul });
+  // result / isBlockingFoul / phase2Kind / triangleSetupRequired hoisted above PHASE 1.
   const branchKind = deriveFbBranchKind(turnData, phase2Kind);
   initFbTelemetryContext(scene, { turnData, turnIndex, branchKind });
   if (branchKind === "rr_outlet_denied") {
@@ -1991,13 +2025,13 @@ export async function runFastBreakSequence({
 
   try {
     const resolutionStartMs = Date.now();
-    const triangleSetupRequired =
-      isTriangleSequence(turnData) &&
-      !turnData.rim_runner_outlet_failed &&
-      Boolean(getTriangleSetupPayload(turnData));
+    // triangleSetupRequired hoisted above PHASE 1.
 
     if (triangleSetupRequired) {
-      await animateTriangleSetupPhase(scene, turnData, playerSprites, ballSprite, width, height);
+      await animateTriangleSetupPhase(
+        scene, turnData, playerSprites, ballSprite, width, height,
+        rrReDrivenAfterTriangleSetup,
+      );
     }
 
     if (shouldAnimateRimRunnerLanePass(turnData, phase2Kind)) {
@@ -2204,7 +2238,7 @@ export async function runFastBreakSequence({
  *
  * Each burst target uses one tween at universal speed (`getPlayerDuration` = distance ÷ AG×game-speed px/s).
  */
-async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height) {
+async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSprite, width, height, rrReDrivenAfter = false) {
   const phase = turnData.roles?.rim_runner_burst_phase;
   if (!phase) return { branch: "none", snapshot: captureRrLiveSnapshot(playerSprites, width, height) };
 
@@ -2362,7 +2396,17 @@ async function animateRimRunnerBurstPhase(scene, turnData, playerSprites, ballSp
     // would diverge from visual positions when secondary tweens are killed mid-flight.
     commitRrLiveSpriteGrid(playerSprites, width, height);
   } else {
-    if (secondary.length) {
+    if (rrReDrivenAfter && rrSprite && scene.tweens) {
+      // Option A (dead-air fix): a downstream stage (lane pass / triangle setup) re-drives the
+      // RR from its live position next, so awaiting the RR's long downcourt sprint here is pure
+      // dead air. Stop the RR sprint (prevents a double-tween with the re-drive) and settle only
+      // the OTHER movers; the RR's rr_to still commits to the logical grid below.
+      scene.tweens.killTweensOf(rrSprite);
+      const others = secondary.filter((_, idx) => secondarySprites[idx] !== rrSprite);
+      if (others.length) {
+        await Promise.all(others);
+      }
+    } else if (secondary.length) {
       await Promise.all(secondary);
     }
     // Commit burst endpoints into logical grid state before branch-specific follow-up

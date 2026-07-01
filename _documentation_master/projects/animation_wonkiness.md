@@ -78,6 +78,8 @@ So: this is **engineering, not a Claude Design task.** Claude Design would only 
 
 **Fix direction:** don't put the RR tween in the awaited `secondary` set (let the lane pass spawn a fresh RR catch tween from live position, which it already does), or clamp the RR burst duration so it can't outlast the outlet beat.
 
+**✅ FIXED (2026-06-30, Option A — scoped).** The dispatcher now computes phase-2 routing up front and derives `rrReDrivenAfterBurst` / `rrReDrivenAfterTriangleSetup`, passing them into `animateRimRunnerBurstPhase` and `animateTriangleSetupPhase`. When the RR is about to be re-driven by a downstream pass — the lane pass (`animateRimRunnerLanePass`) or the triangle setup / shot decision lead-in, all of which spawn a fresh RR tween from live position — the phase **stops the RR sprint and awaits only the other movers** instead of the whole `secondary`/`promises` set. Endings that need the RR to settle (hold-up, defensive stop) keep the barrier. No dependency on the global `isCriticalEventPatternEnabled()` flag (left off; the `animateDefensiveStop` hang is untouched). See `Fast_Break_System.md` → "Rim-runner sprint barrier (dead-air fix)".
+
 ## Bucket 4 — Defenders move before the ball detaches (HCO passes)
 
 **This one needs a caveat — the mechanism found is in the *legacy* engine, but the live path is the schema engine.** In legacy `turnAnimation.js` the bug is real and clear: pass-step defenders are deferred, the step `await passerPromise`s, and defenders are started *before* the ball detaches through a chain of `await import()` ticks (`turnAnimation.js:4868-4890, 4897-4901, 5060-5091`). Zone + Set-Play amplify it (bigger defender reposition tweens, real passer pre-movement).
@@ -92,7 +94,7 @@ So: this is **engineering, not a Claude Design task.** Claude Design would only 
 |---|--------|--------------------|-----------|--------|
 | 1 | Turn-transition pauses | Backend emitters (2 files) | **High** | Low — start here, biggest win/effort |
 | 2 | HCO step pauses (Motion) | Backend (clock/visual split) | **High** | Medium |
-| 3 | RR/Triangle FB step pause | Frontend fastBreak.js | **High** | Low–Med |
+| 3 | RR/Triangle FB step pause | Frontend fastBreak.js | **✅ Fixed 2026-06-30** | Low–Med |
 | 4 | Defender/ball desync | Needs engine confirmation first | **Medium** | Investigate before fixing |
 
 Recommended order: knock out **Bucket 2 first** (two conditional `hold_ms` edits, immediately visible), then **Bucket 3**, then **Bucket 1** (the clock-vs-visual split is the meatiest but well-understood), and treat **Bucket 4** as investigate-then-fix rather than assuming the legacy-engine patch applies.
