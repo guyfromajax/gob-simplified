@@ -435,7 +435,12 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
         or game_state.get("defense_call")
         or "man"
     )
-    shot_type = "inside"  # at-the-rim shot
+    # Steal FB is a drive-to-the-rim finish (the stealer sprints and finishes himself, ~2-4 grid
+    # from the basket), so it scores as an ATTACK shot — the shooter is weighted by Attack
+    # (SC/AG drive-finishing) rather than Inside (SC/ST post) attribute weights, and draws the
+    # attack defensive-foul profile. is_paint stays True below (the finish is physically in the
+    # paint → the rim contest stays ID-focused defense, matching resolve_shot's FB attack path).
+    shot_type = "attack"  # drive-to-the-rim finish
     is_three = False
 
     if contested and shot_defender is not None:
