@@ -6120,12 +6120,17 @@ def resolve_half_court_offense_logic(game):
                                 break
 
                     # No recalibration (or failed recalibration): violation vs shot-at-1
+                    from BackEnd.utils.shot_clock_policy import can_commit_shot_clock_violation
+
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
                     iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
                     intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Shot_Clock_System.md)
                     violation_threshold = 60 + chemistry + discipline + intelligence
                     x = random.randint(1, 100)
-                    if x > violation_threshold:
+                    if (
+                        can_commit_shot_clock_violation(game_state)
+                        and x > violation_threshold
+                    ):
                         # Path A: shot clock violation (current behavior)
                         game_state["shot_clock_violation_step_index"] = i
                         result = "SHOT_CLOCK_VIOLATION"

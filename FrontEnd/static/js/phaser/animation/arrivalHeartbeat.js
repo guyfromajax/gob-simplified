@@ -374,6 +374,8 @@ export function applyIdleWander(scene, sprite, opts = {}) {
       if (finished) return;
       finished = true;
       targets.restore();
+      // Re-pin the photo clip to the restored position in this same frame (see below).
+      if (typeof sprite.__syncMask === "function") sprite.__syncMask();
       // Re-establish the normal heartbeat from true rest (replaces the wander store entry).
       if (sprite.active !== false && !sprite.destroyed) startHeartbeatForSprite(scene, sprite);
       else store.delete(key);
@@ -396,6 +398,10 @@ export function applyIdleWander(scene, sprite, opts = {}) {
           (1 - wy) * Math.sin(2 * Math.PI * fy2 * s + phy2)
         );
         targets.apply(ox, oy);
+        // Re-pin the masked photo's clip circle to the photo IN THIS FRAME. The marker's
+        // scene-`update` mask sync can lag a sustained per-frame render-space move enough to
+        // leave a faint detached "ghost" of the headshot; syncing in lockstep prevents it.
+        if (typeof sprite.__syncMask === "function") sprite.__syncMask();
       },
       onComplete: finish,
       onStop: finish,

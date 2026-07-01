@@ -45,15 +45,29 @@ When Score Delta falls in neither Slow It Down nor Quick Shot for that band → 
   - Foul animation: move the defensive fouling player's sprite to the offensive player being fouled sprite, execute the announcement system with the fouling player image and text "Quick Foul".
 - If Force Foul = False: proceed to next step.
 - Override Offense Team’s Fast Break setting to 0 (temp override; revert when Slow It Down no longer applies).
-- Next step (if Force Foul = False): offense tempo = "slow".
+- Next step (if Force Foul = False): offense tempo = `"slow"` (see **Offense tempo overrides** below).
 - **Playcall (HCO):** Call a **motion** play only. Select from motion plays that have a **non-zero percentage** in the offense team’s playbook settings (weighted by those percentages). If no motion play has a percentage assigned, choose any motion play at random. Playbook set-play percentages and motion/set mix do not apply. User Playcall Center overrides still take precedence when set.
 
 **When Quick Shot applies (per time-band table):**
-- Offense tempo = "fast".
+- Offense tempo = `"fast"` (see **Offense tempo overrides** below).
 - Override Defense Team's FCP & HCT settings to 0 (temp override; revert when Quick Shot no longer applies).
 - **Playcall (HCO):** Call a **set play** with **outside** shot focus only. All outside set plays are eligible; choose one at **uniform random**. Playbook percentages and motion/set mix do not apply. User Playcall Center overrides still take precedence when set.
 
 Temp overrides (Fast Break, FCP, HCT) are re-evaluated each turn and revert when the situation no longer applies.
+
+---
+
+## Offense tempo overrides
+
+When **Slow It Down** or **Quick Shot** applies, the offense team’s `tempo_call` is set to `"slow"` or `"fast"` respectively. This overrides the backend computer sim tempo roll from `strategy_settings["tempo"]` for **all** offense teams (user and CPU).
+
+**Precedence (highest wins):**
+
+1. **Playcall Center tempo** — user’s `tempo_override` when the user’s team is on offense (`set_strategy_calls()` in `turn_manager.py`). Cleared after one use; clearing via ✕ (`tempo_override: null`) removes the PC call so situational tempo applies again on the next turn.
+2. **Situational tempo** — `"slow"` (Slow It Down) or `"fast"` (Quick Shot) from `get_situational_tempo_override()` when Q4/OT bands apply.
+3. **Backend sim tempo** — random roll from `strategy_settings["tempo"]` when no situational override is active.
+
+**Implementation:** `BackEnd/models/turn_manager.py` → `set_strategy_calls()` applies the stack above. `BackEnd/utils/situational_logic.py` → `get_situational_tempo_override()`.
 
 ---
 

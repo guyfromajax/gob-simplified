@@ -366,3 +366,43 @@ def test_clock_reconciliation_off_mode_no_raise_on_mismatch():
     recon = result.get("uess_clock_reconciliation") or {}
     assert recon.get("mode") == "off"
     assert recon.get("within_tolerance") is False
+
+
+def _setup_q4_slow_it_down_offense(game):
+    """Q4 2:30 left, offense ahead by 15 → Slow It Down."""
+    game.quarter = 4
+    game.game_state["quarter"] = 4
+    game.game_state["time_remaining"] = 150
+    game.score = {"Lancaster": 90, "Bentley-Truman": 75}
+    game.offense_team.strategy_settings["tempo"] = 0  # CPU would pick fast tempo bucket
+
+
+def test_situational_tempo_overrides_backend_sim():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    assert game.offense_team.strategy_calls["tempo_call"] == "slow"
+
+
+def test_playcall_center_tempo_overrides_situational():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    game.game_state["user_team_side"] = "home"
+    game.offense_team.strategy_calls["tempo_override"] = "fast"
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    assert game.offense_team.strategy_calls["tempo_call"] == "fast"
+    assert game.offense_team.strategy_calls["tempo_override"] is None
+
+
+def test_situational_tempo_resumes_after_pc_tempo_cleared():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    game.game_state["user_team_side"] = "home"
+    tm = TurnManager(game)
+    game.offense_team.strategy_calls["tempo_override"] = "normal"
+    tm.set_strategy_calls()
+    assert game.offense_team.strategy_calls["tempo_call"] == "normal"
+    tm.set_strategy_calls()
+    assert game.offense_team.strategy_calls["tempo_call"] == "slow"

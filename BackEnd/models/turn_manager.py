@@ -1164,12 +1164,10 @@ class TurnManager:
         quarter = getattr(self.game, "quarter", None)
         if sl.is_situational_active(quarter) and time_remaining is not None:
             if sl.is_slow_it_down(self.game, time_remaining):
-                self.game.offense_team.strategy_calls["tempo_call"] = "slow"
                 game_state["_situational_fast_break_override_team_id"] = self.game.offense_team.team_id
             else:
                 game_state.pop("_situational_fast_break_override_team_id", None)
             if sl.is_quick_shot(self.game, time_remaining):
-                self.game.offense_team.strategy_calls["tempo_call"] = "fast"
                 game_state["_situational_quick_shot_fcp_hct_override"] = True
             else:
                 game_state.pop("_situational_quick_shot_fcp_hct_override", None)
@@ -1241,8 +1239,15 @@ class TurnManager:
         # STEP 3: Route based on offensive state
         result = None
         from BackEnd.utils import situational_logic as sl
+        from BackEnd.utils.shot_clock_policy import (
+            can_commit_shot_clock_violation,
+            sync_late_game_shot_clock,
+        )
+
+        sync_late_game_shot_clock(game_state)
         shot_clock_remaining = int(game_state.get("shot_clock_remaining", min(30, int(game_state.get("time_remaining", 30) or 30))))
         game_clock_remaining = int(game_state.get("time_remaining", 0) or 0)
+        shot_clock_violations_allowed = can_commit_shot_clock_violation(game_state)
 
         # Defensive scrub: free_throws_remaining can occasionally leak across non-FT turns.
         # Keep FT state only when there is coherent FT context.
@@ -1528,7 +1533,11 @@ class TurnManager:
                 result["text"] = "Clock expires before a shot."
                 result["forced_shot"] = False
                 low_clock_branch = "GAME_CLOCK_LE_0_FINAL_HOLD"
-        elif state in clock_enforced_states and shot_clock_remaining <= 0:
+        elif (
+            shot_clock_violations_allowed
+            and state in clock_enforced_states
+            and shot_clock_remaining <= 0
+        ):
             # At exact 0 shot clock: temporary 50/50 behavior.
             # 1) Forced shot path
             # 2) Shot clock violation path
@@ -1538,7 +1547,11 @@ class TurnManager:
             else:
                 result = self._build_shot_clock_violation_result(state)
                 low_clock_branch = "SHOT_CLOCK_LE_0_VIOLATION"
-        elif state in clock_enforced_states and shot_clock_remaining <= 1:
+        elif (
+            shot_clock_violations_allowed
+            and state in clock_enforced_states
+            and shot_clock_remaining <= 1
+        ):
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
             low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
@@ -3095,21 +3108,29 @@ class TurnManager:
         user_team_side = self.game.game_state.get("user_team_side")
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
         
+        # Offense tempo layering: backend sim roll → situational (Q4/OT) → Playcall Center override.
+        from BackEnd.utils import situational_logic as sl
+        tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
+        self.game.offense_team.strategy_calls["tempo_call"] = random.choice(
+            STRATEGY_CALL_DICTS["tempo"][tempo_setting]
+        )
+        time_remaining = self.game.game_state.get("time_remaining")
+        quarter = getattr(self.game, "quarter", None)
+        if sl.is_situational_active(quarter) and time_remaining is not None:
+            situational_tempo = sl.get_situational_tempo_override(self.game, time_remaining)
+            if situational_tempo:
+                self.game.offense_team.strategy_calls["tempo_call"] = situational_tempo
         if is_offense_user:
             tempo_override = self.game.offense_team.strategy_calls.get("tempo_override")
             if tempo_override:
                 self.game.offense_team.strategy_calls["tempo_call"] = tempo_override
-                # Clear override after use
-                old_tempo_override = self.game.offense_team.strategy_calls.get("tempo_override")
+                old_tempo_override = tempo_override
                 self.game.offense_team.strategy_calls["tempo_override"] = None
-                logging.warning(f"🔴 [OVERRIDE CLEARED] Tempo override CLEARED after use: '{old_tempo_override}' for {self.game.offense_team.name}")
+                logging.warning(
+                    f"🔴 [OVERRIDE CLEARED] Tempo override CLEARED after use: "
+                    f"'{old_tempo_override}' for {self.game.offense_team.name}"
+                )
                 logging.info(f"🎮 [PLAYCALL OVERRIDE] Using tempo override: {tempo_override}")
-            else:
-                tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
-                self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
-        else:
-            tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
-            self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         
         # ✅ Aggression is NOT rolled per turn. It is rolled per BREAK (game start, quarter
         # break, timeout, foul-out) into strategy_calls["aggression_roll"] by
@@ -4328,6 +4349,12 @@ class TurnManager:
         # / block→HCO handoff — a clean turnover, never HCO's 50/50. Unified ~2s
         # window covers both the putback and block→HCO paths, and catches the
         # clock expiring mid-progression before the next shot.
+        from BackEnd.utils.shot_clock_policy import (
+            can_commit_shot_clock_violation,
+            sync_late_game_shot_clock,
+        )
+
+        sync_late_game_shot_clock(game_state)
         entry_shot_clock = int(
             game_state.get(
                 "shot_clock_remaining",
@@ -4335,7 +4362,10 @@ class TurnManager:
             ) or 0
         )
         OREB_MIN_SHOT_CLOCK_FOR_ATTEMPT = 2  # ≤ this can't reach a shot → turnover
-        if entry_shot_clock <= OREB_MIN_SHOT_CLOCK_FOR_ATTEMPT:
+        if (
+            can_commit_shot_clock_violation(game_state)
+            and entry_shot_clock <= OREB_MIN_SHOT_CLOCK_FOR_ATTEMPT
+        ):
             # Credit the offensive rebound only if the shot clock was > 0 at the
             # start of the OREB turn (the board was secured with time on the
             # clock). It was recorded upstream on the block/miss turn, so uncredit
@@ -5039,6 +5069,15 @@ class TurnManager:
         self.game.game_state["shot_clock_remaining"] = raw_shot_end
         if current_turn_shot_clock_reset_reason:
             result["shot_clock_reset_reason"] = current_turn_shot_clock_reset_reason
+
+        from BackEnd.utils.shot_clock_policy import (
+            is_shot_clock_enforced,
+            sync_late_game_shot_clock,
+        )
+
+        sync_late_game_shot_clock(self.game.game_state)
+        if not is_shot_clock_enforced(self.game.game_state):
+            raw_shot_end = int(self.game.game_state.get("shot_clock_remaining") or 0)
 
         # Shot clock violations are now resolved via the stopper system (phase_resolution) before we get here;
         # we no longer overwrite the result when raw_shot_end == 0.

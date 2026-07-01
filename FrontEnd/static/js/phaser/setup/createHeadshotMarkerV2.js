@@ -155,6 +155,10 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
     maskGraphics.y = container.y + (photoChild?.y || 0);
   };
   scene.events.on("update", syncMask);
+  // Exposed so render-space movers (idle wander / flourishes) can re-pin the clip to the
+  // photo IN THE SAME FRAME they move the children — the scene-`update` sync above can lag a
+  // sustained per-frame move enough to leave the "detached ghost" described above.
+  container.__syncMask = syncMask;
   container.once("destroy", () => {
     scene.events.off("update", syncMask);
     if (maskGraphics.scene) maskGraphics.destroy();

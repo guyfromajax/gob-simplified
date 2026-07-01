@@ -2165,6 +2165,9 @@ def compute_dynamic_hct_turn(
 
     # Seed the running shot clock once (§4 Time terminals). Decremented per
     # segment so the loop is strictly bounded.
+    from BackEnd.utils.shot_clock_policy import sync_late_game_shot_clock
+
+    sync_late_game_shot_clock(game_state)
     shot_clock = float(game_state.get("shot_clock_remaining", 30) or 30)
     # 10-second rule is measured against ACTUAL elapsed time from possession start
     # (not an absolute shot-clock threshold), and is disabled when the quarter has
@@ -2835,7 +2838,9 @@ def compute_dynamic_hct_turn(
             frontcourt_grace_bh_pos = loop_bh_pos
 
         # 1) Time terminals (checked at the top of each iteration).
-        if shot_clock <= 0:
+        from BackEnd.utils.shot_clock_policy import can_commit_shot_clock_violation
+
+        if shot_clock <= 0 and can_commit_shot_clock_violation(game_state):
             # D9 — shot-clock violation: turnover → SIP, possession flips.
             result_type = "DEAD BALL"
             turnover_type = "SHOT_CLOCK"

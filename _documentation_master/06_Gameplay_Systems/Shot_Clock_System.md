@@ -8,9 +8,11 @@
 
 ## Shot Clock Rules
 
-Whenever the game clock is running, the shot clock runs, with one exception.
+Whenever the game clock is running, the shot clock runs, with two exceptions.
 
 **Exception — shot attempt:** When a shot is attempted, the shot clock **stops** at that moment (in game time). The game clock keeps running for the rest of the turn.
+
+**Exception — late game (≤ 30s on game clock):** When `time_remaining ≤ 30`, the shot clock is **disabled for the rest of the quarter**. Backend pins `shot_clock_remaining` to the game clock (`BackEnd/utils/shot_clock_policy.py`) and **shot-clock violations cannot occur** (HCO mid-skeleton check, turn-start violation/forced-shot branches, OREB dead-ball gate, HCT/FCP loop terminals). Only the game clock ends the period or forces EOQ shots.
 
 Shot clock reset triggers (authoritative policy):
 
@@ -40,6 +42,13 @@ Inbound receive by itself does **not** reset shot clock.
 
 The backend does **not** track shot clock independently. For each turn it derives shot clock end as follows (`turn_manager.py`):
 
+| Area | Path |
+|------|------|
+| Late-game off rule (≤ 30s game clock) | `BackEnd/utils/shot_clock_policy.py` |
+| Turn-start violation / forced-shot branches | `BackEnd/models/turn_manager.py` |
+| HCO mid-skeleton violation | `BackEnd/engine/phase_resolution.py` |
+| HCT/FCP loop terminals | `BackEnd/engine/dynamic_hct.py` |
+
 1. **Current turn's contract**
    - **Game clock:** `game_seconds_elapsed = clock_start - clock_end` (full turn). The game clock always uses this full elapsed value.
    - **Shot clock (non–shot-attempt turns):** `shot_clock_end = shot_clock_start - game_seconds_elapsed`, clamped to 0 (same as game clock delta).
@@ -53,7 +62,7 @@ The backend does **not** track shot clock independently. For each turn it derive
    - Order of operations: compute derived `shot_clock_end` → attach contract (so current turn shows start→end) → then, if reset, set game_state for next turn to 30.
 
 3. **Shot clock at 0**
-   - If the derived `shot_clock_end` would be 0 and the turn is in a clock-enforced state (HCO, FCP, HCT, FAST_BREAK), the backend triggers shot-clock-violation / forced-shot logic instead of using that result (see below).
+   - If the derived `shot_clock_end` would be 0 and the turn is in a clock-enforced state (HCO, FCP, HCT, FAST_BREAK), the backend triggers shot-clock-violation / forced-shot logic **only when `time_remaining > 30`** (see late-game exception above).
 
 ### Live clock end-of-turn snap (frontend)
 
@@ -80,11 +89,11 @@ If a shot attempt results, the ball handler shoots from his location at the poin
 
 > Variable names above are illustrative (intent only); the code does not require these exact names.
 
-**Coverage:** this violation-vs-forced-shot logic is **not universal** — it applies to the clock-enforced states `HCO`, `FCP`, `HCT`, `FAST_BREAK` (a turn-start check when `shot_clock_remaining <= 0`, plus the HCO mid-skeleton check above). `OREB`/putback is handled separately (below).
+**Coverage:** this violation-vs-forced-shot logic is **not universal** — it applies to the clock-enforced states `HCO`, `FCP`, `HCT`, `FAST_BREAK` when **`time_remaining > 30`** (a turn-start check when `shot_clock_remaining <= 0`, plus the HCO mid-skeleton check above). `OREB`/putback is handled separately (below). At ≤ 30 game clock, violations are disabled entirely.
 
 ### OREB shot clock → dead-ball turnover
 
-The OREB possession needs enough **carried** shot clock (no reset after a block — see § Shot clock reset instances) to reach a shot. Checked once at the top of the OREB turn (`resolve_offensive_rebound_turn`):
+The OREB possession needs enough **carried** shot clock (no reset after a block — see § Shot clock reset instances) to reach a shot. Checked once at the top of the OREB turn (`resolve_offensive_rebound_turn`) **only when `time_remaining > 30`**:
 
 - If the carried `shot_clock_remaining` `<= ~2s` (the pre-shot window — too little to reach the putback shot, or to run the block→HCO reset into a shot), the possession is **killed as a clean dead-ball / `SHOT_CLOCK` turnover** — *always a turnover, never the HCO 50/50 forced-shot path*. Covers both the entry case (already ≤0) and the clock expiring mid-progression before the next shot. Applies to **both** the miss→OREB→putback path and the block→OREB→HCO path (the gate fires before the HCO handoff).
 - **OREB credit:** the offensive rebound is credited only if `shot_clock_remaining > 0` at the start of the OREB turn. The board is recorded upstream (on the block/miss turn); if the clock had already expired (`== 0`), it is uncredited (`record_stat("OREB", -1)`).
