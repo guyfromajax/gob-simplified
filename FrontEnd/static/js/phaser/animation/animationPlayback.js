@@ -998,6 +998,15 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       ballDurationMs: ballTransitionPromise?.expectedDurationMs ?? null,
       // Per-mover tween durations: compare defender durations vs ballDurationMs to
       // confirm/quantify the "defender settles before ball arrives" duration mismatch.
+      // `moversFlat` prints inline (OFF/DEF role, dur, dist) so no console-expand needed.
+      moversFlat: stepMoverDurations
+        .map((m) => {
+          const role = m.teamId != null && scene?.offenseTeamId != null
+            ? (String(m.teamId) === String(scene.offenseTeamId) ? "OFF" : "DEF")
+            : "?";
+          return `${role} ${String(m.playerId).slice(0, 4)} ${m.durationMs}ms ${m.distGrid}g`;
+        })
+        .join("  |  "),
       moverDurations: stepMoverDurations,
     });
   }
