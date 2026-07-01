@@ -43,6 +43,22 @@ let dontShowAgainThisGame = false; // Track "Don't show again" checkbox state
 const SESSION_STORAGE_KEY_PREFIX = 'defenseMatchupsDontShow_';
 const ANNOUNCE_SESSION_KEY_PREFIX = 'defenseMatchupsAnnouncePlayed_';
 
+function showMatchupsTransitionOverlay() {
+    if (typeof window === 'undefined') return;
+    window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__ = true;
+    if (window.PageLoadOverlay && typeof window.PageLoadOverlay.show === 'function') {
+        window.PageLoadOverlay.show('Loading game...');
+    }
+}
+
+function hideMatchupsTransitionOverlay() {
+    if (typeof window === 'undefined') return;
+    window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__ = false;
+    if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+        window.PageLoadOverlay.hide();
+    }
+}
+
 function hasDefenseMatchupAnnouncePlayed(gameId) {
     if (!gameId || typeof sessionStorage === 'undefined') return false;
     return sessionStorage.getItem(ANNOUNCE_SESSION_KEY_PREFIX + gameId) === '1';
@@ -397,9 +413,14 @@ function initializeDragAndDrop(popup, gameId, onResolve) {
     const submitButton = popup.querySelector('.submit-matchups-button');
     submitButton.addEventListener('click', async () => {
         if (typeof window.playSound === 'function') window.playSound('confirm-1-lowervol.wav');
-        await handleSubmit(popup, gameId);
-        if (onResolve) {
+        submitButton.disabled = true;
+        showMatchupsTransitionOverlay();
+        const submitted = await handleSubmit(popup, gameId);
+        if (submitted && onResolve) {
             onResolve(); // Resolve promise to allow animation to continue
+        } else if (!submitted) {
+            submitButton.disabled = false;
+            hideMatchupsTransitionOverlay();
         }
     });
     
@@ -573,10 +594,12 @@ async function handleSubmit(popup, gameId) {
         
         // Close popup
         popup.remove();
+        return true;
         
     } catch (error) {
         console.error("❌ DEFENSE MATCHUPS: Failed to save:", error);
         alert(`Failed to save matchups: ${error.message}`);
+        return false;
     }
 }
 

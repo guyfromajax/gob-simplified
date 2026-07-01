@@ -72,6 +72,8 @@ So: this is **engineering, not a Claude Design task.** Claude Design would only 
 
 **Fix direction:** make the boundary hold conditional on `next_play_type` (zero it for live continuations, keep for dead-ball), or add a `non_blocking` announcement flag so the overlay shows while play continues.
 
+**Phase 4 RR/Triangle finisher (July 2026):** Reusing after-steal `_build_drive_step` / `_build_meet_drive_step` stamped a **blocking** second `"Fast Break!"` on drive/meet step `start` (legacy RR `fastBreak.js` drive-to-rim had no such callout). Combined with lane-pass `non_blocking` FB + loose `turnPreparation` `rim_runner_sequence` gate, users heard FB on the wrong turn. Fix: finisher calls pass `stamp_start_announcement=False`; FE skips turn-start FB when `animation_steps` present; finisher movers use HCO **`standard`** pace (see Fast Break System doc).
+
 ## Bucket 3 — Step pause in RR / Triangle FB (outlet → rim-runner pass)
 
 **Root cause: a frontend await-barrier** (this one *is* pure FE — fastBreak.js is the unmigrated legacy engine). After the outlet pass lands, the phase does `await Promise.all(secondary)` (`fastBreak.js:2364-2367`, Triangle equiv at `:883`) — where `secondary` includes the rim runner's long sprint tween. The receiver already holds the ball; everything visible is static except the RR finishing his glide, and the lane pass is blocked behind that barrier → dead air. There's a ready-made escape hatch (`isCriticalEventPatternEnabled()`) that kills the barrier, but it's **defaulted off** pending an unrelated `animateDefensiveStop` hang (`fastBreak.js:173-180`).

@@ -147,6 +147,30 @@ def _fb_secondary_announcement(team: str) -> Announcement:
     }
 
 
+def _apply_finisher_pace_archetypes(
+    archetypes: Dict[str, PlayerArchetype],
+    start_coords: Dict[str, GridCoord],
+    *,
+    stealer_id: str,
+    fb_drive: Optional[Dict[str, Any]] = None,
+) -> None:
+    """RR/Triangle finisher: driver + cutoff defenders use HCO ``standard`` pace.
+
+    Trailing offense, get-backs, and other non-cutoff movers keep ``sprint``.
+    """
+    cutoff_ids: set[str] = set()
+    if fb_drive:
+        for key in ("stopper_id", "d8_credited_player_id", "shot_defender_id"):
+            raw = fb_drive.get(key)
+            if raw is not None:
+                cutoff_ids.add(str(raw))
+    for pid in start_coords:
+        if pid == stealer_id or pid in cutoff_ids:
+            archetypes[pid] = "standard"
+        else:
+            archetypes.setdefault(pid, "sprint")
+
+
 def _build_drive_step(
     *,
     start_coords: Dict[str, GridCoord],
@@ -161,11 +185,14 @@ def _build_drive_step(
     off_lineup: Optional[Dict[str, Any]] = None,
     def_lineup: Optional[Dict[str, Any]] = None,
     archetypes_override: Optional[Dict[str, PlayerArchetype]] = None,
+    finisher_pace: bool = False,
+    stamp_start_announcement: bool = True,
+    fb_drive: Optional[Dict[str, Any]] = None,
 ) -> AnimationStep:
     """The single drive step: stealer sprints to BH target while defenders
     sprint to defender target (with first-arrival freeze) and other-4
     offensive players sprint to their HCO setup spots. Ball stays with the
-    stealer. "Fast Break!" fires on ``start``.
+    stealer. "Fast Break!" fires on ``start`` when ``stamp_start_announcement``.
 
     Advance trigger gates on the stealer reaching ``bh_target``. The FE
     tweens each player from their ``start.coords`` to ``end.coords`` over
@@ -173,8 +200,16 @@ def _build_drive_step(
     """
     actions: Dict[str, PlayerAction] = {pid: "sprint" for pid in start_coords}
     archetypes: Dict[str, PlayerArchetype] = dict(archetypes_override or {})
-    for pid in start_coords:
-        archetypes.setdefault(pid, "sprint")
+    if finisher_pace:
+        _apply_finisher_pace_archetypes(
+            archetypes,
+            start_coords,
+            stealer_id=stealer_id,
+            fb_drive=fb_drive,
+        )
+    else:
+        for pid in start_coords:
+            archetypes.setdefault(pid, "sprint")
     full_end_coords = {
         pid: dict(end_coords.get(pid, start_coords[pid])) for pid in start_coords
     }
@@ -195,7 +230,8 @@ def _build_drive_step(
     # in shot motion at the BH target. The post-shot sub-step builder
     # transitions the shot animation from there.
     actions[stealer_id] = "shoot"
-    archetypes[stealer_id] = "sprint"
+    if not finisher_pace:
+        archetypes[stealer_id] = "sprint"
 
     trigger: AdvanceTrigger = {
         "condition": "player_reaches_position",
@@ -220,8 +256,9 @@ def _build_drive_step(
             "shot_clock_remaining": float(shot_clock_remaining),
         },
         "advance_trigger": trigger,
-        "announcement": _fb_secondary_announcement(team),
     }
+    if stamp_start_announcement:
+        start["announcement"] = _fb_secondary_announcement(team)
     if off_lineup is not None and def_lineup is not None:
         stamp_tween_durations(
             start,
@@ -268,14 +305,24 @@ def _build_meet_drive_step(
     end_announcement: Optional[Announcement] = None,
     off_lineup: Optional[Dict[str, Any]] = None,
     def_lineup: Optional[Dict[str, Any]] = None,
+    finisher_pace: bool = False,
+    stamp_start_announcement: bool = True,
 ) -> AnimationStep:
     """Drive step gated on BH + stopper reaching the cutoff meet."""
     actions: Dict[str, PlayerAction] = {pid: "sprint" for pid in start_coords}
     archetypes: Dict[str, PlayerArchetype] = dict(
         fb_drive.get("defender_archetypes") or {}
     )
-    for pid in start_coords:
-        archetypes.setdefault(pid, "sprint")
+    if finisher_pace:
+        _apply_finisher_pace_archetypes(
+            archetypes,
+            start_coords,
+            stealer_id=stealer_id,
+            fb_drive=fb_drive,
+        )
+    else:
+        for pid in start_coords:
+            archetypes.setdefault(pid, "sprint")
     full_end_coords = {
         pid: dict(end_coords.get(pid, start_coords[pid])) for pid in start_coords
     }
@@ -315,8 +362,9 @@ def _build_meet_drive_step(
             "shot_clock_remaining": float(shot_clock_remaining),
         },
         "advance_trigger": trigger,
-        "announcement": _fb_secondary_announcement(team),
     }
+    if stamp_start_announcement:
+        start["announcement"] = _fb_secondary_announcement(team)
     if off_lineup is not None and def_lineup is not None:
         stamp_tween_durations(
             start,

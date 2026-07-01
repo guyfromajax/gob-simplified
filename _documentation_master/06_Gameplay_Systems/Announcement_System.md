@@ -109,7 +109,7 @@ The Announcement System provides visual feedback for game events using timing-ba
 **Announcements:**
 - **"Press!"** - Triggered when `result_type === 'BASELINE_INBOUND'` and `next_defensive_setup === 'FCP'`. Stripe = defense team primary color.
 - **"Trap!"** - Triggered when `result_type === 'BASELINE_INBOUND'` and `next_defensive_setup === 'HCT'`. Stripe = defense team primary color.
-- **"Fast Break!"** - Triggered when `turn.fast_break === true`, `turn.current_turn === 'FAST_BREAK'`, or `turn.roles?.rim_runner_sequence === true`, but suppressed if:
+- **"Fast Break!"** - Triggered only when `turn.current_turn === 'FAST_BREAK'`, **except** migrated schema FB turns (`animation_steps` present) which stamp the callout on the lane-pass step instead. Suppressed if:
   - `result_type === 'STEAL'`
   - Text includes "steal"
   - `turn.roles?.is_steal_entry` is true (steal-initiated Fast Break)

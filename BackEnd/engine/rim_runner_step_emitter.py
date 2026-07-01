@@ -874,13 +874,14 @@ def _commit_lane_pass_sprint_mover(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     t: float,
+    mover_archetype: PlayerArchetype = "sprint",
 ) -> None:
     if pid not in step_start_coords:
         return
     player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-    rate = _ag_grid_per_game_sec(player, "sprint")
+    rate = _ag_grid_per_game_sec(player, mover_archetype)
     actions[pid] = "cut"
-    archetype[pid] = "sprint"
+    archetype[pid] = mover_archetype
     destinations[pid] = dict(target)
     end_coords[pid] = _interrupted_coord(step_start_coords[pid], target, rate, t)
 
@@ -1005,6 +1006,7 @@ def _build_lane_pass_step(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             t=t,
+            mover_archetype="sprint",
         )
         excluded.add(pid)
 
@@ -1022,6 +1024,7 @@ def _build_lane_pass_step(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             t=t,
+            mover_archetype="standard",
         )
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -2052,6 +2055,8 @@ def _build_finisher_drive_resolution_steps(
             end_announcement=end_ann,
             off_lineup=off_lineup,
             def_lineup=def_lineup,
+            finisher_pace=True,
+            stamp_start_announcement=False,
         )
         if meet_step["start"].get("advance_trigger"):
             meet_step["start"]["advance_trigger"]["metadata"]["kind"] = "rim_runner_meet"
@@ -2111,6 +2116,9 @@ def _build_finisher_drive_resolution_steps(
                 next_step_index=len(steps) + 1,
                 off_lineup=off_lineup,
                 def_lineup=def_lineup,
+                finisher_pace=True,
+                stamp_start_announcement=False,
+                fb_drive=fb_drive,
             )
             shot_drive["start"]["action"][stealer_id] = "shoot"
             if shot_drive["start"].get("advance_trigger"):
@@ -2150,6 +2158,9 @@ def _build_finisher_drive_resolution_steps(
                 off_lineup=off_lineup,
                 def_lineup=def_lineup,
                 archetypes_override=fb_drive.get("defender_archetypes"),
+                finisher_pace=True,
+                stamp_start_announcement=False,
+                fb_drive=fb_drive,
             )
             drive_step["start"]["advance_trigger"]["metadata"] = trigger_meta
             steps.append(drive_step)

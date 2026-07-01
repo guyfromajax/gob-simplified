@@ -377,3 +377,110 @@ def test_finisher_meet_step_rebased_next_index_and_motion():
     assert meet_step["start"].get("tween_durations")
     def_end = meet_step["end"]["coords"]["Bentley-Truman-PG"]
     assert def_end["x"] < 91.0
+
+
+def test_finisher_drive_steps_skip_blocking_fast_break_announcement():
+    """Phase 4 RR/Triangle finisher must not stamp a second blocking FB callout."""
+    meet = {"x": 70, "y": 25}
+    shot_spot = {"x": 88, "y": 25}
+    end_coords = {
+        f"Lancaster-{pos}": {"x": 60.0, "y": 25.0}
+        for pos in ("PG", "SG", "SF", "PF", "C")
+    }
+    end_coords["Lancaster-PF"] = dict(shot_spot)
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        end_coords[f"Bentley-Truman-{pos}"] = {"x": 50.0, "y": 25.0}
+
+    start_coords = {pid: {"x": 65.0, "y": 25.0} for pid in end_coords}
+    turn_result = {
+        "result_type": "MAKE",
+        "shooter": SimpleNamespace(player_id="Lancaster-PF"),
+        "meet_coords": meet,
+        "bh_target": shot_spot,
+        "t_meet_game_seconds": 1.0,
+        "t_shooter_game_seconds": 2.0,
+        "rr_end_coords": end_coords,
+        "roles": {"rim_runner_burst_phase": {"rr_id": "Lancaster-PF"}},
+        "fb_drive_resolution": {
+            "outcome": "NEUTRAL",
+            "stop_decision": {"action": "shoot"},
+            "stopper_id": "Bentley-Truman-PG",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 2.0,
+            "defender_archetypes": {"Bentley-Truman-PG": "sprint"},
+        },
+        "stop_decision_action": "shoot",
+        "shot_score_pre_defense": 100,
+        "shot_defense_score_for_sfx": 0,
+        "shot_type": "attack",
+    }
+
+    game = build_mock_game()
+    for team in (game.home_team, game.away_team):
+        for pos, player in team.lineup.items():
+            player.player_id = f"{team.name}-{pos}"
+            player.coords = {"x": 50.0, "y": 25.0}
+
+    steps = _build_finisher_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        off_lineup=game.home_team.lineup,
+        def_lineup=game.away_team.lineup,
+        is_away_offense=False,
+        clock_remaining=600.0,
+        shot_clock_remaining=24.0,
+        fb_roles=turn_result["roles"],
+    )
+
+    assert steps is not None
+    drive_meet_steps = [
+        step
+        for step in steps
+        if (step["start"].get("advance_trigger") or {}).get("metadata", {}).get("kind")
+        in ("rim_runner_drive", "rim_runner_meet")
+    ]
+    assert drive_meet_steps, "expected finisher drive/meet steps"
+    for step in drive_meet_steps:
+        ann = step["start"].get("announcement")
+        assert ann is None or ann.get("text") != "Fast Break!"
+
+
+def test_finisher_pace_uses_standard_for_driver_and_cutoff_defenders():
+    from BackEnd.engine.after_steal_fast_break_step_emitter import _build_drive_step
+
+    start_coords = {
+        "Lancaster-PF": {"x": 65.0, "y": 25.0},
+        "Lancaster-PG": {"x": 60.0, "y": 25.0},
+        "Bentley-Truman-PG": {"x": 70.0, "y": 25.0},
+    }
+    end_coords = {pid: dict(coord) for pid, coord in start_coords.items()}
+    end_coords["Lancaster-PF"] = {"x": 88.0, "y": 25.0}
+
+    game = build_mock_game()
+    for team in (game.home_team, game.away_team):
+        for pos, player in team.lineup.items():
+            player.player_id = f"{team.name}-{pos}"
+            player.coords = {"x": 50.0, "y": 25.0}
+
+    step = _build_drive_step(
+        start_coords=start_coords,
+        end_coords=end_coords,
+        stealer_id="Lancaster-PF",
+        bh_target={"x": 88.0, "y": 25.0},
+        is_away_offense=False,
+        clock_remaining=600.0,
+        shot_clock_remaining=24.0,
+        t_game_seconds=1.0,
+        next_step_index=1,
+        off_lineup=game.home_team.lineup,
+        def_lineup=game.away_team.lineup,
+        finisher_pace=True,
+        stamp_start_announcement=False,
+        fb_drive={"stopper_id": "Bentley-Truman-PG"},
+    )
+
+    archetypes = step["start"]["archetype"]
+    assert archetypes["Lancaster-PF"] == "standard"
+    assert archetypes["Bentley-Truman-PG"] == "standard"
+    assert archetypes["Lancaster-PG"] == "sprint"

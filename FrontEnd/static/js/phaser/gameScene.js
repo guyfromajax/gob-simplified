@@ -3030,6 +3030,13 @@ export function createGameScene(Phaser) {
             console.error('🎬 GameScene: Failed to initialize BallController:', error);
           }
 
+          if (typeof window !== 'undefined' && window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__) {
+            window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__ = false;
+            if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+              window.PageLoadOverlay.hide();
+            }
+          }
+
           this.tweens.add({
             targets: this.ballSprite,
             scale: { from: 1, to: 1.3 },

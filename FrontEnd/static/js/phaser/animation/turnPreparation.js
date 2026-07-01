@@ -153,16 +153,23 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     // Check: 1) Not a STEAL turn itself, 2) Text doesn't mention steal, 3) Not a steal-initiated Fast Break (is_steal_entry flag)
     // Intent: announce when entering a FAST_BREAK turn (fast_break flag and/or current_turn) — Rim Runner, Covert Release, etc.
     const isStealInitiatedFastBreak = turn.roles?.is_steal_entry;
+    // Only announce on true FAST_BREAK turns. Do not key off `rim_runner_sequence`
+    // alone — that flag lives on FB `roles` and must not leak to BIP/HCO rows.
+    // Migrated FB turns (RR/Triangle/after_steal with animation_steps) stamp
+    // "Fast Break!" on the lane-pass or drive schema step instead; skip the
+    // turn-start duplicate (Phase 4 UESS regression fix).
+    const isFastBreakTurn = turn.current_turn === 'FAST_BREAK';
+    const hasSchemaFbSteps =
+      isFastBreakTurn
+      && Array.isArray(turn.animation_steps)
+      && turn.animation_steps.length > 0;
     const fastBreakIntent =
-      turn.fast_break === true ||
-      turn.current_turn === 'FAST_BREAK' ||
-      turn.roles?.rim_runner_sequence === true;
-    if (
-      fastBreakIntent &&
-      turn.result_type !== 'STEAL' &&
-      !turn.text?.toLowerCase().includes('steal') &&
-      !isStealInitiatedFastBreak
-    ) {
+      isFastBreakTurn
+      && !hasSchemaFbSteps
+      && turn.result_type !== 'STEAL'
+      && !turn.text?.toLowerCase().includes('steal')
+      && !isStealInitiatedFastBreak;
+    if (fastBreakIntent) {
       announceGameEvent('FAST_BREAK', turn, scene);
     }
     if (turn.rim_runner_bat_oob) {

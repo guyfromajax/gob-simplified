@@ -751,7 +751,19 @@ Unified geo-based resolver for **all FB play keys** (`covert_release`, `rim_runn
 ### Drive geometry
 
 - **BH path:** straight segment **drive-step start → pre-rolled `shot_spot`** (rim band: `basket_x ± randint(2,4)`, `y ∈ [19,31]`).
-- **Rates / animation:** **`sprint`** for BH and cutoff defenders; logic rates = animation archetype rates (`_ag_grid_per_game_sec`).
+- **Rates / animation:** **`sprint`** for BH and cutoff defenders in **after-steal** drive resolution; logic rates = animation archetype rates (`_ag_grid_per_game_sec`). **RR/Triangle finisher** (Phase 4 UESS): driver + cutoff defenders + pass/receive-area helpers use HCO **`standard`** pace (14 grid/game-sec @ AG=50); get-backs and RR burst/outlet remain **`sprint`** / **`burst`**.
+
+#### Phase 4 finisher announcements *(RR / Triangle — July 2026)*
+
+Phase 4 wired RR/Triangle finishers through **`_build_finisher_drive_resolution_steps`** (`rim_runner_step_emitter.py`), reusing **`_build_drive_step` / `_build_meet_drive_step`** from the after-steal emitter. Those helpers always stamped **`start.announcement = "Fast Break!"`** with **`hold_ms: 1000`** (blocking). Legacy RR **`fastBreak.js`** drive-to-rim had **no** second FB callout — only turn-start FB + lane-pass overlay.
+
+| Source | Blocking? | When |
+|---|---|---|
+| `turnPreparation.js` turn-start | Yes (legacy FB only) | Suppressed when `animation_steps` present |
+| Lane-pass step (`append_lane_pass…`) | No (`non_blocking: true`) | RR/Triangle open lane |
+| Drive/meet step (`_build_drive_step`) | Yes (after-steal default) | **Off** for RR/Triangle finisher (`stamp_start_announcement=False`) |
+
+**Regression:** Triple stack (turn-start + lane-pass + blocking drive) could bleed into the next possession row; loose **`roles.rim_runner_sequence`** gate could fire FB on BIP/HCO. Fixes: finisher `stamp_start_announcement=False`; FE requires `current_turn === 'FAST_BREAK'` and skips turn-start when schema steps exist.
 - **Defender pool:** all five defenders; **geo-gated** only (no hard-coded get-back / outlet exclusions). Outlet contest defenders are organically excluded when **`drift`** on the drive step prevents a timely meet.
 - **Path corridor:** `FB_CUTOFF_PATH_CORRIDOR = 14` (perpendicular distance to segment); **`defender_time_slack = 1.0`**. No aggression re-roll.
 - **Selection:** `best_cutoff_on_drive()` — **earliest meet** on path (farthest-from-rim intercept); tie → closer defender to meet. One winner; others continue toward **`basketSpot`** for rebound position.
