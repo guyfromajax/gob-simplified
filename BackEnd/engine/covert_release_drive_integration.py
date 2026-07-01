@@ -256,6 +256,7 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             foul_player = credited or stopper
             possession_flips = False
             game_state["foul_team"] = "DEFENSE"
+            game_state["shooter"] = ball_handler
             game_state["offensive_state"] = "FREE_THROW"
             game_state["free_throws"] = 2
             game_state["free_throws_remaining"] = 2

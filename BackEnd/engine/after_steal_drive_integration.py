@@ -498,6 +498,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                 foul_player.record_stat("F")
                 def_team.team_fouls += 1
             text_tail = "defensive foul!"
+            game_state["shooter"] = stealer
             game_state["offensive_state"] = "FREE_THROW"
             game_state["free_throws"] = 2
             game_state["free_throws_remaining"] = 2

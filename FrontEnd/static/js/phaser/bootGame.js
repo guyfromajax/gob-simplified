@@ -3095,6 +3095,18 @@ async function initGame() {
   if (resumeGameButton) {
     resumeGameButton.addEventListener('click', async () => {
       if (typeof window.playSound === 'function') window.playSound('positive-slide.wav');
+      const showResumeTransitionOverlay = () => {
+        if (typeof window !== 'undefined' && window.PageLoadOverlay && typeof window.PageLoadOverlay.show === 'function') {
+          window.PageLoadOverlay.show('Loading resumed game...');
+        }
+      };
+      const hideResumeTransitionOverlay = () => {
+        if (typeof window !== 'undefined' && window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+          window.PageLoadOverlay.hide();
+        }
+      };
+      resumeGameButton.disabled = true;
+      showResumeTransitionOverlay();
       console.info('[MGR-RESUME-CLIENT] resume modal accepted', {
         game_id: gameId,
         has_resume_state: !!resumeState,
@@ -3118,9 +3130,9 @@ async function initGame() {
           resumeGameSubtitle.textContent = 'Could not verify the active game state. Return to Mode Select and try again.';
         }
         if (resumeGameButton) {
-          resumeGameButton.disabled = true;
           resumeGameButton.textContent = 'Resume Unavailable';
         }
+        hideResumeTransitionOverlay();
         return;
       }
       if (resumeGameContainer) resumeGameContainer.remove();
@@ -3128,6 +3140,11 @@ async function initGame() {
         await handleButtonClick(true, { resumeActive: false });
       } catch (error) {
         console.error('🚨 RESUME CLICKED: handleButtonClick failed:', error);
+        if (resumeGameButton) {
+          resumeGameButton.disabled = false;
+          resumeGameButton.textContent = 'Resume Game';
+        }
+        hideResumeTransitionOverlay();
       }
     });
   }

@@ -48,6 +48,49 @@ def _seed_rr_finisher(game):
     return rr, bh, fb_roles, fb_animations
 
 
+def test_rr_finisher_defensive_foul_stores_ft_shooter(monkeypatch):
+    meet = {"x": 75, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "D_FOUL",
+            "meet_x": meet["x"],
+            "meet_y": meet["y"],
+            "stopper_id": "Bentley-Truman-SF",
+            "d8_credited_player_id": "Bentley-Truman-SF",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {"Bentley-Truman-SF": meet},
+            "defender_archetypes": {"Bentley-Truman-SF": "sprint"},
+        },
+    )
+
+    game = build_mock_game()
+    rr, bh, fb_roles, fb_animations = _seed_rr_finisher(game)
+    result = resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=rr,
+        shot_spot={"x": 88, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=RIM_RUNNER,
+        off_team=game.offense_team,
+        def_team=game.defense_team,
+        off_lineup=game.offense_team.lineup,
+        def_lineup=game.defense_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=True,
+        fb_open=True,
+    )
+
+    assert result is not None
+    assert result["result_type"] == "FOUL"
+    assert result["next_play_type"] == "FREE_THROW"
+    assert game.game_state["shooter"] is rr
+    assert game.game_state["free_throws_remaining"] == 2
+
+
 def test_rr_finisher_neutral_hco(monkeypatch):
     meet = {"x": 75, "y": 25}
     monkeypatch.setattr(

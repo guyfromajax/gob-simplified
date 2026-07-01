@@ -230,6 +230,7 @@ def resolve_attack_drive_finisher_turn(
             foul_player = credited or stopper
             possession_flips = False
             game_state["foul_team"] = "DEFENSE"
+            game_state["shooter"] = shooter
             game_state["offensive_state"] = "FREE_THROW"
             game_state["free_throws"] = 2
             game_state["free_throws_remaining"] = 2
