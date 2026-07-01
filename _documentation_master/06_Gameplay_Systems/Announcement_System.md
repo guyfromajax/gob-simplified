@@ -417,8 +417,8 @@ A banner with a `hold_ms` value freezes **all** on-court animation for that many
 | "Rebound!" (DREB) | 1000ms — **suppressed on DREB→FAST_BREAK** | `dreb_step_emitter.py` | Defensive rebound secured |
 | "Rebound!" (OREB) | 1000ms | `oreb_step_emitter.py:277` | Offensive rebound secured |
 | "Fast Break!" (after steal) | 1000ms (`FB_ANNOUNCE_HOLD_MS`) | `after_steal_fast_break_step_emitter.py:111` | Steal → fast-break drive start |
-| "Fast Break!" (rim runner) | 1000ms | `rim_runner_step_emitter.py:1049` | Rim-runner fast break start |
-| "Fast Break!" (triangle) | 1000ms | `triangle_step_emitter.py:238` | Triangle fast break start |
+| "Fast Break!" (rim runner) | ~~1000ms~~ **non-blocking** | `rim_runner_step_emitter.py` | Rim-runner lane pass to RR |
+| "Fast Break!" (triangle) | ~~1000ms~~ **non-blocking** | `triangle_step_emitter.py` | Triangle lane pass to RR |
 | "It's Good!" | 1000ms (`MAKE_HOLD_MS`) | `skeleton_step_emitter.py:2158` | Made shot |
 | "It's Good! And 1!" | 1000ms (`MAKE_HOLD_MS`) | `skeleton_step_emitter.py:2145` | Made shot + foul |
 | "It's Good!" (free throw) | 1000ms | `ft_step_emitter.py:757` | Made free throw |
@@ -442,3 +442,11 @@ The DREB "Rebound!" banner is **suppressed** (banner + its 1000ms hold both remo
 - **Toggle:** `SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK` in `dreb_step_emitter.py` (default `True`). Flip to `False` to restore the banner on fast breaks — nothing else needs to change.
 - **Signal:** `next_is_fast_break` is passed from `game_manager._build_dreb_turn_from_miss` as `bool(game_state["pending_dreb_fb_play_key"])` (set on the miss turn in `shot_manager`, popped later in `phase_resolution` — reliably present at DREB-build time).
 - **Mechanism:** when suppressed, `dreb_step_emitter` sets `step.end.announcement = None`; the FE skips falsy announcements (`if (step.end?.announcement)`), so no banner and no `waitMsRespectingPause` hold.
+
+### Non-blocking announcements (2026-06-30)
+
+A schema announcement flagged **`non_blocking: true`** shows its overlay **without freezing play** — no clock pause, no `hold_ms` wait. The callout rides *alongside* the step's live motion instead of gating it. This is the reusable alternative to suppression when you want to keep the banner but drop the freeze.
+
+- **Mechanism:** `animationPlayback.js` → `runStepAnnouncement` early-returns after showing the overlay when `non_blocking` is set (skips the clock pause + `waitMsRespectingPause`). `hold_ms` is ignored for the freeze; the overlay's on-screen duration is owned by `court.html`.
+- **In use:** the RR + Triangle fast-break **lane-pass** "Fast Break!" callouts (`rim_runner_step_emitter.py`, `triangle_step_emitter.py`). These previously froze the court for 1000ms **before** the pass to the rim runner (a schema `step.start.announcement` hold); now the banner shows while the lane pass animates. To revert to the freeze, remove `non_blocking` from those two announcement dicts.
+- **Note:** setting `hold_ms: 0` alone does **not** remove a freeze — the FE defaults a non-positive hold to 1000ms (`animationPlayback.js`). Use `non_blocking` (show + continue) or drop the announcement (suppress) instead.

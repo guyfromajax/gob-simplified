@@ -1046,7 +1046,11 @@ def _build_lane_pass_step(
             **_decision_pill_meta(turn_result),
             "eventSubtitle": _fb_play_label(turn_result.get("fast_break_play")),
         },
+        # Non-blocking: the "Fast Break!" callout rides ALONGSIDE the lane pass to the
+        # rim runner instead of freezing the court for a full second before it. The FE
+        # shows the overlay without a clock pause / hold wait. See Announcement_System.md.
         "hold_ms": 1000,
+        "non_blocking": True,
         "style": "secondary",
     }
 

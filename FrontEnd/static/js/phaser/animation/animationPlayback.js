@@ -672,9 +672,15 @@ function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, heig
  */
 async function runStepAnnouncement(scene, announcement, sprites = null, step = null, turnData = null) {
   if (!scene || !announcement?.text) return;
+  // Non-blocking announcements (backend `non_blocking: true`) show the overlay WITHOUT
+  // freezing play: no clock pause, no hold wait. Used where the callout should ride
+  // alongside live motion (e.g. the fast-break lane pass) instead of a boundary freeze.
+  const nonBlocking = announcement.non_blocking === true;
   const reason = "step_announcement";
-  scene.gameClock?.pause?.(reason);
-  scene.shotClock?.pause?.(reason);
+  if (!nonBlocking) {
+    scene.gameClock?.pause?.(reason);
+    scene.shotClock?.pause?.(reason);
+  }
 
   // Announcement-tied SFX is carried on the payload (`data.sfx`) and played
   // by court.html at overlay mount — single source of truth, synced to the
@@ -745,6 +751,11 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
     }
   } catch (err) {
     console.warn("runStepAnnouncement: showAnnouncement failed", err);
+  }
+  if (nonBlocking) {
+    // Fire-and-forget: overlay is up, play continues underneath. Its on-screen
+    // display duration is managed by court.html's overlay, not by a freeze here.
+    return;
   }
   const holdMs = Number.isFinite(announcement.hold_ms) && announcement.hold_ms > 0
     ? announcement.hold_ms
