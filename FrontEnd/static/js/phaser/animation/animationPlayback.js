@@ -91,7 +91,7 @@ function shouldTracePlayback(scene = null) {
 // Item 4 (defender/ball desync) debugging session: these labels print by default,
 // no `window.UESS_TRACE_PLAYBACK` needed. Every other trace label stays flag-gated so
 // the console isn't flooded by per-step/per-turn traces. To revert, empty this set.
-const ALWAYS_TRACE_LABELS = new Set(["pass:release"]);
+const ALWAYS_TRACE_LABELS = new Set(["pass:release", "step:movers"]);
 
 function tracePlayback(scene, label, payload = {}) {
   if (!ALWAYS_TRACE_LABELS.has(label) && !shouldTracePlayback(scene)) return;
@@ -985,6 +985,28 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     options,
   );
 
+  // Inline mover summary (OFF/DEF role, dur, dist) so no console-expand is needed.
+  const moversFlat = stepMoverDurations
+    .map((m) => {
+      const role = m.teamId != null && scene?.offenseTeamId != null
+        ? (String(m.teamId) === String(scene.offenseTeamId) ? "OFF" : "DEF")
+        : "?";
+      return `${role} ${String(m.playerId).slice(0, 4)} ${m.durationMs}ms ${m.distGrid}g`;
+    })
+    .join("  |  ");
+
+  // EVERY step's movers (always-on). Lets us see whether defenders move on the step
+  // BEFORE a pass (cross-step — the eye reads it as "defenders moved before the ball")
+  // vs on the pass step itself. `isPassStep:false` lines with DEF movers right before an
+  // isPassStep:true line = the cross-step pattern.
+  tracePlayback(scene, "step:movers", {
+    turnIndex: options.turnData?.index ?? null,
+    isPassStep,
+    ballDurationMs: ballTransitionPromise?.expectedDurationMs ?? null,
+    advanceReason: step.start?.advance_trigger?.reason ?? null,
+    moversFlat,
+  });
+
   if (isPassStep) {
     tracePlayback(scene, "pass:release", {
       turnIndex: options.turnData?.index ?? null,
@@ -996,17 +1018,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       offenseTeamId: scene?.offenseTeamId ?? null,
       ballArrivalCoord: step.start?.ball_arrival_coord ?? null,
       ballDurationMs: ballTransitionPromise?.expectedDurationMs ?? null,
-      // Per-mover tween durations: compare defender durations vs ballDurationMs to
-      // confirm/quantify the "defender settles before ball arrives" duration mismatch.
-      // `moversFlat` prints inline (OFF/DEF role, dur, dist) so no console-expand needed.
-      moversFlat: stepMoverDurations
-        .map((m) => {
-          const role = m.teamId != null && scene?.offenseTeamId != null
-            ? (String(m.teamId) === String(scene.offenseTeamId) ? "OFF" : "DEF")
-            : "?";
-          return `${role} ${String(m.playerId).slice(0, 4)} ${m.durationMs}ms ${m.distGrid}g`;
-        })
-        .join("  |  "),
+      moversFlat,
       moverDurations: stepMoverDurations,
     });
   }
