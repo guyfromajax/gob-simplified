@@ -514,9 +514,13 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
       case "idle_wander":
         // Rides the heartbeat system (single owner of the sprite's idle offset) so it
         // can never leave a residual "ghost" offset. Spans the step's own wall-clock.
+        // Backend assigns a role-based `style` + `dir` by geography; FE renders it in place.
         applyIdleWander(scene, sprite, {
           seed: flourish.seed,
-          radiusGrid: flourish.radius_grid,
+          style: flourish.style,
+          dirX: flourish.dir_x,
+          dirY: flourish.dir_y,
+          radiusGrid: flourish.amplitude_grid ?? flourish.radius_grid,
           durationMs: flourish.duration_ms ?? opts.stepDurationMs,
         });
         return;

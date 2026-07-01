@@ -1119,6 +1119,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     rebound = game_state.get("last_rebound") == "DREB"
     from BackEnd.constants.fast_break_play_types import (
         AFTER_STEAL,
+        COVERT_RELEASE,
         RIM_RUNNER,
         TRIANGLE,
         ensure_fast_break_plays,
@@ -1226,6 +1227,29 @@ def resolve_fast_break_logic(game: "GameManager"):
                 logging.warning("build_triangle_animation_steps failed: %s", e)
 
         return rr_result
+
+    if rebound and fb_play_key == COVERT_RELEASE:
+        from BackEnd.constants import USE_FB_DRIVE_RESOLUTION_CR
+
+        if USE_FB_DRIVE_RESOLUTION_CR:
+            from BackEnd.engine.covert_release_drive_integration import (
+                resolve_covert_release_fast_break,
+            )
+
+            turn_result = resolve_covert_release_fast_break(game)
+            try:
+                from BackEnd.engine.covert_release_step_emitter import (
+                    build_covert_release_animation_steps,
+                )
+
+                anim_steps = build_covert_release_animation_steps(turn_result, game)
+                if anim_steps is not None:
+                    turn_result["animation_steps"] = anim_steps
+            except Exception as e:
+                logging.warning(
+                    "build_covert_release_animation_steps failed: %s", e
+                )
+            return turn_result
 
     if rebound:
         #resetting last_rebound to avoid carry over bugs
@@ -4674,35 +4698,78 @@ def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
     return reads
 
 
-def _roll_subtle_idle_motion(off_lineup, def_lineup, bh_pos, rng):
-    """Seeded render-space idle-wander assignments for a subtle beat (COSMETIC; UESS-safe).
+def _roll_subtle_idle_motion(
+    beat, off_lineup, def_lineup, bh_pos, bh_location, off_to_def, locations, is_away_offense, rng
+):
+    """Seeded, geography-based render-space idle motion for a subtle beat (COSMETIC; UESS-safe).
 
-    All non-BH players (offense off-ball + every defender) get an ``idle_wander`` flourish; the
-    BH gets one on a coin flip (``BH_IDLE_WANDER_PROBABILITY``), else he relies on the always-on
-    NG heartbeat. Purely cosmetic — never affects the sim — but rolled here (seeded RNG) so the
-    payload fully determines the render (FE stays a pure renderer). Returns
-    ``{str(player_id): {"kind": "idle_wander", "seed": int, "radius_grid": float}}``."""
+    Assigns each player a role-based motion STYLE by where they're standing (inside spot vs
+    perimeter, `INSIDE_SPOTS`) + role (offense / defense / ball handler), plus a unit direction
+    the FE renders it along. Purely cosmetic — never affects the sim — but rolled here (seeded
+    RNG) so the payload fully determines the render (FE stays a pure renderer). v1 styles:
+    jockey (inside), jab (perimeter off-ball), shuffle (perimeter D), survey_rock (perimeter BH;
+    else still = omitted → heartbeat only). Defender role uses the man matchup's guarded player;
+    zone defenders default to shuffle (paired post-D physics is v1.1). Returns
+    ``{str(pid): {"kind","style","seed","dir_x","dir_y","amplitude_grid"}}``."""
+    from BackEnd.engine.motion_read_map import is_inside_location
     from BackEnd.engine.motion_step_decision import (
-        SUBTLE_IDLE_WANDER_RADIUS_GRID,
-        BH_IDLE_WANDER_PROBABILITY,
+        SUBTLE_IDLE_STYLE_AMPLITUDE_GRID,
+        BH_SURVEY_PROBABILITY,
     )
+    pos_actions = (beat or {}).get("pos_actions") or {}
     bh_player = (off_lineup or {}).get(bh_pos)
     bh_id = getattr(bh_player, "player_id", None)
+    # Display-x sign toward the offense's basket (matches basket_x = 9 away / 91 home).
+    basket_sign_x = -1.0 if is_away_offense else 1.0
+    _bh_c = (pos_actions.get(bh_pos) or {}).get("coords") or {}
+    bh_x, bh_y = float(_bh_c.get("x", 50.0)), float(_bh_c.get("y", 25.0))
+
+    def _unit(dx, dy):
+        d = (dx * dx + dy * dy) ** 0.5
+        return (0.0, 1.0) if d < 1e-6 else (dx / d, dy / d)
+
+    def _entry(style, direction):
+        return {
+            "kind": "idle_wander",
+            "style": style,
+            "seed": rng.randint(0, 2**31 - 1),
+            "dir_x": round(direction[0], 3),
+            "dir_y": round(direction[1], 3),
+            "amplitude_grid": SUBTLE_IDLE_STYLE_AMPLITUDE_GRID.get(style, 0.8),
+        }
+
     motion = {}
-    for lineup in (off_lineup, def_lineup):
-        for _pos, player in (lineup or {}).items():
-            if not player:
-                continue
-            pid = getattr(player, "player_id", None)
-            if pid is None:
-                continue
-            if pid == bh_id and rng.random() >= BH_IDLE_WANDER_PROBABILITY:
-                continue  # BH stands this beat (heartbeat pulse only)
-            motion[str(pid)] = {
-                "kind": "idle_wander",
-                "seed": rng.randint(0, 2**31 - 1),
-                "radius_grid": SUBTLE_IDLE_WANDER_RADIUS_GRID,
-            }
+    # Offense — style by the player's own location.
+    for off_pos, player in (off_lineup or {}).items():
+        pid = getattr(player, "player_id", None)
+        if pid is None:
+            continue
+        inside = is_inside_location(locations.get(off_pos))
+        is_bh = pid == bh_id
+        if inside:
+            motion[str(pid)] = _entry("jockey", (basket_sign_x, 0.0))
+        elif is_bh:
+            if rng.random() >= BH_SURVEY_PROBABILITY:
+                continue  # perimeter BH stands still (heartbeat only)
+            motion[str(pid)] = _entry("survey_rock", (0.0, 1.0))
+        else:
+            _c = (pos_actions.get(off_pos) or {}).get("coords") or {}
+            motion[str(pid)] = _entry(
+                "jab", _unit(bh_x - float(_c.get("x", 50.0)), bh_y - float(_c.get("y", 25.0)))
+            )
+
+    # Defense — role from the offensive player each defender guards (man matchup). Zone has no
+    # matchup here → perimeter shuffle (paired post-D physics lands in v1.1).
+    for def_pos, player in (def_lineup or {}).items():
+        pid = getattr(player, "player_id", None)
+        if pid is None:
+            continue
+        guarded_off_pos = next((o for o, d in (off_to_def or {}).items() if d == def_pos), None)
+        if guarded_off_pos and is_inside_location(locations.get(guarded_off_pos)):
+            motion[str(pid)] = _entry("jockey", (basket_sign_x, 0.0))
+        else:
+            motion[str(pid)] = _entry("shuffle", (0.0, 1.0))
+
     return motion
 
 
@@ -5244,9 +5311,10 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             beat["_subtle_movement"]["defender_reads"] = _roll_subtle_defender_reads(
                 def_lineup, def_eff, random
             )
-            # Cosmetic render-space idle-wander (fills the frozen tail of the beat; UESS-safe).
+            # Cosmetic render-space idle motion (role-based; fills the frozen tail; UESS-safe).
             beat["_subtle_movement"]["idle_motion"] = _roll_subtle_idle_motion(
-                off_lineup, def_lineup, bh_pos, random
+                beat, off_lineup, def_lineup, bh_pos, bh_location,
+                off_to_def, locations, is_away_offense, random,
             )
             lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
             elapsed = float(random.randint(lo, hi))
@@ -5469,9 +5537,10 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
             beat["_subtle_movement"]["defender_reads"] = _roll_subtle_defender_reads(
                 def_lineup, def_eff, random
             )
-            # Cosmetic render-space idle-wander (fills the frozen tail of the beat; UESS-safe).
+            # Cosmetic render-space idle motion (role-based; fills the frozen tail; UESS-safe).
             beat["_subtle_movement"]["idle_motion"] = _roll_subtle_idle_motion(
-                off_lineup, def_lineup, bh_pos, random
+                beat, off_lineup, def_lineup, bh_pos, bh_location,
+                off_to_def, locations, is_away_offense, random,
             )
             lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
             elapsed = float(random.randint(lo, hi))

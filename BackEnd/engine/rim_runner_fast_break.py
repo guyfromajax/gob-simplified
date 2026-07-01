@@ -376,6 +376,21 @@ def _triangle_build_turn_result(
         raise ValueError(f"Triangle branch missing shooter: {branch}")
 
     defender_count = 1 if defender is not None else 0
+
+    from BackEnd.constants import USE_FB_DRIVE_RESOLUTION_TRIANGLE
+    from BackEnd.engine.rim_runner_drive_integration import apply_triangle_unified_contest
+
+    if USE_FB_DRIVE_RESOLUTION_TRIANGLE:
+        u_defender, u_count = apply_triangle_unified_contest(
+            def_lineup=def_lineup,
+            shot_spot={"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+            is_away_offense=bool(setup_payload.get("is_away_offense")),
+            branch=branch,
+        )
+        if u_count >= 0:
+            defender = u_defender
+            defender_count = u_count
+
     fb_roles["ball_handler"] = ball_handler
     fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
     fb_roles["passer"] = passer
@@ -411,6 +426,38 @@ def _triangle_build_turn_result(
         game, off_lineup, def_lineup, rr_snap_roles, "fb_triangle_pre_shot"
     )
     fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
+
+    if branch == "triangle_bh_drive":
+        from BackEnd.engine.rim_runner_drive_integration import resolve_attack_drive_finisher_turn
+
+        drive_turn = resolve_attack_drive_finisher_turn(
+            game=game,
+            shooter=shooter,
+            shot_spot={"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+            fb_roles=fb_roles,
+            fb_animations=fb_animations,
+            fb_play_key=TRIANGLE,
+            off_team=off_team,
+            def_team=def_team,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=bool(setup_payload.get("is_away_offense")),
+            ball_handler=ball_handler,
+            pass_attempted=False,
+            fb_open=fb_open,
+            apply_rr_metadata=_apply_rr_decision_metadata,
+            extra_turn_fields={
+                "triangle_branch": branch,
+                "triangle_sequence": True,
+            },
+        )
+        if drive_turn is not None:
+            game_state.pop("fast_break_shot_threshold_override", None)
+            game_state.pop("fast_break_force_threshold_no_three_bonus", None)
+            attach_position_snapshots(drive_turn, [rr_snap])
+            drive_turn["triangle_branch"] = branch
+            return drive_turn
+
     turn_result = game.shot_manager.resolve_shot(shot_roles)
     game_state.pop("fast_break_shot_threshold_override", None)
     game_state.pop("fast_break_force_threshold_no_three_bonus", None)
@@ -1318,6 +1365,28 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
         )
+        from BackEnd.engine.rim_runner_drive_integration import resolve_attack_drive_finisher_turn
+
+        drive_turn = resolve_attack_drive_finisher_turn(
+            game=game,
+            shooter=rr,
+            shot_spot=roles.get("shot_spot"),
+            fb_roles=fb_roles,
+            fb_animations=fb_animations,
+            fb_play_key=fb_play_key,
+            off_team=off_team,
+            def_team=def_team,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            ball_handler=ball_handler,
+            pass_attempted=True,
+            fb_open=fb_open,
+            apply_rr_metadata=_apply_rr_decision_metadata,
+            rr_snap_roles=rr_snap_roles,
+        )
+        if drive_turn is not None:
+            return drive_turn
         # Universal geometry: replace shot_spot + defender + contested
         # decision per spec. Gated by feature flag for revert. Race pool
         # excludes Stopper and Outlet defender.
@@ -1389,6 +1458,28 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
         )
+        from BackEnd.engine.rim_runner_drive_integration import resolve_attack_drive_finisher_turn
+
+        drive_turn = resolve_attack_drive_finisher_turn(
+            game=game,
+            shooter=rr,
+            shot_spot=roles.get("shot_spot"),
+            fb_roles=fb_roles,
+            fb_animations=fb_animations,
+            fb_play_key=fb_play_key,
+            off_team=off_team,
+            def_team=def_team,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            ball_handler=ball_handler,
+            pass_attempted=True,
+            fb_open=fb_open,
+            apply_rr_metadata=_apply_rr_decision_metadata,
+            rr_snap_roles=rr_snap_roles,
+        )
+        if drive_turn is not None:
+            return drive_turn
         # Universal geometry: catch-and-shoot path (no primary_def). No
         # stopper to exclude; still exclude outlet defender.
         if USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR and fb_play_key == RIM_RUNNER:
@@ -1576,6 +1667,28 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     rr_snap = build_fast_break_pre_shot_snapshot(
         game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
     )
+    from BackEnd.engine.rim_runner_drive_integration import resolve_attack_drive_finisher_turn
+
+    drive_turn = resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=rr,
+        shot_spot=roles.get("shot_spot"),
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=fb_play_key,
+        off_team=off_team,
+        def_team=def_team,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        is_away_offense=is_away_offense,
+        ball_handler=ball_handler,
+        pass_attempted=True,
+        fb_open=fb_open,
+        apply_rr_metadata=_apply_rr_decision_metadata,
+        rr_snap_roles=rr_snap_roles,
+    )
+    if drive_turn is not None:
+        return drive_turn
     # Universal geometry: completion-shot path after intercept fall-through.
     if USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR and fb_play_key == RIM_RUNNER:
         _apply_universal_geometry_for_rr_shot(

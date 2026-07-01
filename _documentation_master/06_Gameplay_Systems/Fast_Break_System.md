@@ -1,6 +1,8 @@
 ## Fast Break System ✅ **COMPLETE** (January 2025; Rim Runner March 2025; FB shot contest grid unification March 2026)
 
 > **Canonical reference (Bible):** This document is the **single source of truth** for sustained Fast Break knowledge—selection logic, coordinates, defensive stops, shot attempts, constants, and file touchpoints. In-flight implementation checklists may live in `docs/To Do/FB_Playcall_Update.md`; SS&S process notes for FB shot routing live in `docs/To Do/Archive/fast_break_shot_spot_process_review.md`. If something conflicts, **treat this file as authoritative** unless the team explicitly updates both.
+>
+> **Planned overhaul (June 2026):** **FB Drive Cutoff & Stop Decision** (below) is the approved design for a geo-based drive resolver across all FB play keys. It **supersedes** the CR outlet-phase cutoff (Steps 5–8 in *Fast Break Resolution Flow*), the get-back-only shot-defender gates, and the point-race **`compute_fb_shot_geometry`** helper. A full doc reconciliation will follow implementation; until then, treat the new section as authoritative where it conflicts with older subsections.
 
 **Base Constants**
 
@@ -365,11 +367,13 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 ### Defensive Stop vs. Shot Attempt Determination
 
+> **Legacy (pre–June 2026 overhaul):** The outlet-phase drive cutoff below is **removed** by the approved **FB Drive Cutoff & Stop Decision** section. Kept for reference until implementation lands.
+
 **Logic (HOME Orientation):**
 
 **Home / Away orientation:** Drive target is always toward the attacking basket (home +x, away −x). Cutoff geometry is orientation-agnostic — it uses the BH start→target segment, not a fixed “ahead in x” gate.
 
-**Drive Cutoff (Covert Release — replaces ahead/±y geography + AG/BH skill check):**
+**Drive Cutoff (Covert Release — legacy outlet-phase; superseded):**
 
 Shared module: `BackEnd/engine/cutoff_resolution.py` (also used by HCT `_do_broken_hct_cutoff`).
 
@@ -721,7 +725,122 @@ The outlet passer tracks:
     -Step 3: Lead In
 
 
-# Universal Fast Break Shot Geometry Helper
+---
+
+## FB Drive Cutoff & Stop Decision *(approved design — implementation pending, June 2026)*
+
+> **Work plan:** [`projects/FB_Drive_Cutoff_Work_Plan.md`](../projects/FB_Drive_Cutoff_Work_Plan.md)
+
+Unified geo-based resolver for **all FB play keys** (`covert_release`, `rim_runner`, `triangle`, `after_steal`). Replaces the split between (a) CR outlet-phase cutoff + universal HCO stop and (b) the point-race **`compute_fb_shot_geometry`** model.
+
+**Planned modules:** `BackEnd/engine/fb_drive_resolution.py` (`resolve_fb_drive_step`), `BackEnd/engine/fb_stop_decision.py`, `BackEnd/utils/fb_geo_helpers.py`. Emitters remain pure renderers; resolver stamps `fb_drive_resolution` on the turn.
+
+### Scope
+
+| Applies to | Rule |
+|---|---|
+| **Drive cutoff / stop** | **`shot_type = attack`** drives only (rim band, Triangle BH drive to lowPost, RR finisher drives, etc.) |
+| **Shot-defender proximity** | **All FB shot types** — `CONTEST_EUCLIDEAN_RADIUS` (11) **and** `FB_CONTEST_MAX_X_TRAIL` (3); FB-only (HCO keeps its own contest rules) |
+| **Spot-up shots** (Triangle wing/corner 3, etc.) | No drive cutoff; contest via 11 + x-trail only |
+| **RR hold-up** (OR declines lane pass, no cutoff) | Still auto-**HCO**; dynamic stop tree does not run |
+
+**Outlet-phase cutoff removed:** CR (and any path using `resolve_fast_break_logic` Steps 5–6) no longer stops at outlet. Outlet pass completes → **one shot-drive step** runs this resolver.
+
+**After-steal:** Model 2 stops enabled (not MAKE/MISS-only). Steal-specific meet filter below.
+
+### Drive geometry
+
+- **BH path:** straight segment **drive-step start → pre-rolled `shot_spot`** (rim band: `basket_x ± randint(2,4)`, `y ∈ [19,31]`).
+- **Rates / animation:** **`sprint`** for BH and cutoff defenders; logic rates = animation archetype rates (`_ag_grid_per_game_sec`).
+- **Defender pool:** all five defenders; **geo-gated** only (no hard-coded get-back / outlet exclusions). Outlet contest defenders are organically excluded when **`drift`** on the drive step prevents a timely meet.
+- **Path corridor:** `FB_CUTOFF_PATH_CORRIDOR = 14` (perpendicular distance to segment); **`defender_time_slack = 1.0`**. No aggression re-roll.
+- **Selection:** `best_cutoff_on_drive()` — **earliest meet** on path (farthest-from-rim intercept); tie → closer defender to meet. One winner; others continue toward **`basketSpot`** for rebound position.
+- **Failed prior stopper:** permanently excluded from a second cutoff attempt; **`drift`** on drive step, then sprint on later steps.
+- **Committed cutoff / outlet-denial defenders:** **`drift`** archetype on the **drive step only** (`DRIFT_GRID_PER_GAME_SEC`).
+
+**No geometric meet:** BH clean path to `shot_spot`; all defenders sprint to **`basketSpot`** (or interpolated chase); contest evaluated at shot time.
+
+#### After-steal meet filter *(steal entry only)*
+
+General corridor + race excludes hopeless trailing stops, but does **not** require the intercept to sit **ahead** of the BH on x. For **`after_steal`**, a meet is valid only if meet **`x` is ≥ 1 grid spot toward the basket from the BH’s drive-step start `x`** (HOME: `meet_x ≥ bh_start_x + 1`; AWAY: `meet_x ≤ bh_start_x - 1`). Invalid → defender treated as no cutoff (→ `basketSpot` / contest path). DREB FB paths omit this filter.
+
+### Meet resolution order *(never double foul)*
+
+1. Arrival race → **`cutoff_meet_x/y`**
+2. **`resolve_cutoff_contest`** (D8, steal excluded) → terminal on `DEAD BALL` / `O_FOUL` / `D_FOUL`
+3. **`calculate_charge`** → terminal on `CHARGE` / `BLOCKING_FOUL` (non-shooting charge moment at meet)
+4. **`POS_O`** → BH beats stopper; single drive step to rim (see **POS_O shimmy**)
+5. **`NEUTRAL`** → dynamic stop decision (see below); **two schema steps**
+6. If BH later **shoots** from stop: **shooting foul only** via `calculate_shot_score` (no second D8/charge). Pass → new shooter gets full foul stack on their action.
+
+### Dynamic stop decision (`NEUTRAL` only)
+
+**Geo gates**
+
+| Action | Eligibility |
+|---|---|
+| **Shoot** | BH Euclidean ≤ **24** to attacking basket **OR** nearest `HCO_STRING_SPOTS` label ∈ **`key`**, **`upper midWing`**, **`lower midWing`** (label proximity — no extra distance cap on the label) |
+| **Pass** | Closest teammate to basket; same **≤ 24 Euclidean** **or** nearest label ∈ **`key`**, **midWings**, **wings**, **midCorners**, **corners**; teammate **`SH > 49`** |
+
+**Optimal priority**
+
+1. **Pass** if pass geo + SH gate pass  
+2. Else **shoot** if `calculate_shot_score(...) >= shot_threshold` with stop defender contesting (`apply_defense=True`) — same make gate as `resolve_shot`; **no separate heuristic**  
+3. Else **HCO**
+
+**Stop-and-shoot shot type** (at meet coord): motion rule — Euclidean to basket ≤ **`ATTACK_DRIVE_INSIDE_RADIUS` (15)** → **`inside`**; else **`outside`** pull-up (not `attack`).
+
+**Read gate** (`_player_read`, same thresholds as HCT ABA: **200 / 125**)
+
+- **> 200** → take optimal action  
+- **> 125** → **HCO** (safe)  
+- **≤ 125** → random among **geo-valid** options: shoot + HCO always in pool; pass only when pass geo valid  
+
+**HCO entry:** existing orchestrator (`skeleton_step_emitter` + `transition_bridge`) — backcourt **handoff** (x &lt; 71 home / &gt; 29 away); frontcourt BH ≠ PG **kickout**; else **walk-up**.
+
+Stop defender **auto-contests** any pull-up (no re-pick).
+
+### Animation / advance triggers
+
+| Outcome | Steps | Advance trigger |
+|---|---|---|
+| **`POS_O`** | **1** — start → meet → shimmy knot → `shot_spot` | BH reaches **`shot_spot`** |
+| **`NEUTRAL`** | **2** — (1) drive to meet; (2) shoot / pass / HCO | Step 1: **slower of BH + stopper** at meet. Step 2: pass = ball reaches receiver; shoot = **immediate** post-shot sub-steps (no gather beat); HCO = handoff/kickout/walk-up gates |
+| **No meet** | **1** — BH to `shot_spot` | BH reaches **`shot_spot`** |
+
+#### POS_O shimmy *(single step — not a second schema step)*
+
+When BH beats the stopper, path is **three knots in one step**: `start → meet → shimmy_point → shot_spot`. Magnitude **2 grid spots** dodge **away from stopper** (pick larger lateral separation at meet).
+
+**Shimmy axis from drive approach** (segment into meet, or meet → `shot_spot`):
+
+| Approach | Dominance | Shimmy offset |
+|---|---|---|
+| **Key / top-of-key** (mostly ±x toward rim) | `\|dx\| ≥ \|dy\|` | **±2 y** |
+| **Baseline / side** (mostly ±y toward lane) | `\|dy\| > \|dx\|` | **±2 x** |
+| **Arc / diagonal** | neither dominates | **Combined x+y** — unit vector **perpendicular** to drive direction, scaled to **2** grid Euclidean (typically splits both axes) |
+
+Sign: side that increases distance from stopper at meet. Clamp to court bounds.
+
+### Stats *(gameplay geo; stats by player id)*
+
+- **Gameplay roles:** geo only — remove `num_getback in (1,2)` shot-defender gate.
+- **`offense_getback` IDs:** retained on prior shot turn for scouting (“designated get-back”).
+- **`FB_A_D`:** designated get-back **plus** any defender who geo-participated (cutoff attempt, stopper, shot defender). Failed cutoff attempt counts **`FB_A_D`**, not **`FB_S_D`**.
+- **Team `zero/one/two_defenders_back`:** geo count of defenders who attempted cutoff or finished in contest range.
+
+### Supersedes *(post-implementation cleanup)*
+
+- CR **Steps 5–6** outlet cutoff + `map_cutoff_outcome_to_fb` → universal HCO stop  
+- **`compute_fb_shot_geometry`** point-race + first-arriver freeze  
+- Get-back-only **`fb_roles["defender"]`** assignment  
+- CR outlet-pass step **sharp-outlet IQ read** cutoff positioning (replaced by drive-step geo)  
+- Triangle corner-3 **6-spot** defender radius → **11 + x-trail**  
+- After-steal **MAKE/MISS-only** (no stop branch)
+
+---
+
+# Universal Fast Break Shot Geometry Helper *(legacy — superseded by FB Drive Cutoff & Stop Decision above; retained until migration complete)*
 
 Shared backend module that computes shooter target, defender race
 outcome, and contested decision for FB shot attempts across Rim Runner,

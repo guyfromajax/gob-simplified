@@ -48,8 +48,22 @@ SUBTLE_FORCED_SHOT_PENALTY = 50
 # leaves everyone stationary. To avoid a frozen court, all non-BH players get a render-space
 # "idle_wander" flourish (organic within-radius drift spanning the beat); the BH gets one on a
 # coin flip (else he stands with the always-on NG heartbeat pulse). Seeded (SS&S-reproducible).
-SUBTLE_IDLE_WANDER_RADIUS_GRID = 1.0   # max render-space drift radius (grid units)
-BH_IDLE_WANDER_PROBABILITY = 0.5       # chance the BH also idle-wanders (else stand + heartbeat)
+SUBTLE_IDLE_WANDER_RADIUS_GRID = 1.0   # legacy fallback radius (grid units) when no style amp
+BH_IDLE_WANDER_PROBABILITY = 0.5       # (legacy) kept for compatibility
+
+# Role-based idle-motion styles (v1). Assigned by geography (inside spot vs perimeter) + role;
+# the FE renders each in-place, returning to anchor. Amplitudes in grid units (render-space).
+#   jockey      — inside offense/defense: grounded basket-ward lean/jostle (continuous)
+#   jab         — perimeter off-ball offense: hold → ball-ward jab-step → recover (intermittent)
+#   shuffle     — perimeter defense: lateral in-stance slide (continuous)
+#   survey_rock — perimeter ball handler: gentle lateral survey sway (continuous)
+SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {
+    "jockey": 0.6,
+    "jab": 1.2,
+    "shuffle": 1.0,
+    "survey_rock": 0.5,
+}
+BH_SURVEY_PROBABILITY = 0.5   # perimeter BH: survey-rock vs still (heartbeat only)
 
 
 # --------------------------------------------------------------------------- #

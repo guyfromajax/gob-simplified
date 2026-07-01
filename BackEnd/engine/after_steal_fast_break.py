@@ -322,6 +322,18 @@ def resolve_after_steal_fast_break(game: Any) -> Dict[str, Any]:
     when ``fb_play_key == AFTER_STEAL`` and skips the legacy steal-entry
     path. Returns a fully-formed turn_result ready for schema emission.
     """
+    from BackEnd.constants import USE_FB_DRIVE_RESOLUTION_AFTER_STEAL
+
+    if USE_FB_DRIVE_RESOLUTION_AFTER_STEAL:
+        from BackEnd.engine.after_steal_drive_integration import (
+            resolve_after_steal_with_drive_resolution,
+        )
+
+        return resolve_after_steal_with_drive_resolution(game)
+    return _resolve_after_steal_legacy(game)
+
+
+def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
     from BackEnd.models.shot_manager import ShotManager
     from BackEnd.utils.shared import (
         apply_scoring,

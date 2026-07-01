@@ -97,6 +97,30 @@ FB_CUTOFF_PATH_CORRIDOR_STEAL = 11  # Legacy steal-entry path through resolve_fa
 FB_CUTOFF_DEFENDER_TIME_SLACK_DREB = 1.15  # Defenders get 15% arrival-time credit on DREB breaks
 FB_CUTOFF_DEFENDER_TIME_SLACK_STEAL = 1.0
 
+# FB Drive Cutoff & Stop Decision (June 2026 — see FB_Drive_Cutoff_Work_Plan.md)
+FB_DRIVE_CUTOFF_PATH_CORRIDOR = 14
+FB_DRIVE_CUTOFF_TIME_SLACK = 1.0
+FB_SHOOT_GEO_RADIUS = 24  # Euclidean to attacking basket OR shoot spot-label exception
+FB_POS_O_SHIMMY_MAGNITUDE = 2
+FB_CONTEST_MAX_X_TRAIL = 3  # FB-only; pairs with CONTEST_EUCLIDEAN_RADIUS (11)
+
+FB_SHOOT_GEO_SPOT_LABELS = frozenset(
+    {"key", "upper midWing", "lower midWing"},
+)
+FB_PASS_GEO_SPOT_LABELS = frozenset(
+    {
+        "key",
+        "upper midWing",
+        "lower midWing",
+        "upper wing",
+        "lower wing",
+        "upper midCorner",
+        "lower midCorner",
+        "upper corner",
+        "lower corner",
+    },
+)
+
 # Steal Entry Movement (Steal → Fast Break)
 STEAL_ENTRY_MOVE_X_MIN = 5  # Minimum x movement toward basket
 STEAL_ENTRY_MOVE_X_MAX = 10  # Maximum x movement toward basket

@@ -1762,8 +1762,13 @@ def build_skeleton_animation_steps(
                         continue
                     flourish_map[_pid] = {
                         "kind": "idle_wander",
+                        "style": _params.get("style", "wander"),
                         "seed": int(_params.get("seed", 0)),
-                        "radius_grid": float(_params.get("radius_grid", 1.0)),
+                        "dir_x": float(_params.get("dir_x", 0.0)),
+                        "dir_y": float(_params.get("dir_y", 1.0)),
+                        "amplitude_grid": float(
+                            _params.get("amplitude_grid", _params.get("radius_grid", 1.0))
+                        ),
                     }
         stamp_tween_durations(
             step["start"], final_end_coords, t, off_lineup, def_lineup,

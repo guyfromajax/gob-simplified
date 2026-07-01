@@ -1954,6 +1954,208 @@ def is_lane_pass_to_rr_resolution_turn(
     return bool(turn_result.get("rim_runner_pass_attempted"))
 
 
+def _build_finisher_drive_resolution_steps(
+    *,
+    turn_result: Dict[str, Any],
+    game: Any,
+    start_coords: Dict[str, GridCoord],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+    clock_remaining: float,
+    shot_clock_remaining: float,
+    fb_roles: Dict[str, Any],
+) -> Optional[List[AnimationStep]]:
+    """Drive-resolution steps after lane pass (Phase 4 RR / Triangle finisher)."""
+    from BackEnd.engine.after_steal_fast_break_step_emitter import (
+        _build_drive_step,
+        _build_meet_drive_step,
+        _override_fb_make_announcement,
+    )
+    from BackEnd.engine.covert_release_step_emitter import _build_nice_stop_announcement
+    from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+    from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+
+    result_type = (turn_result.get("result_type") or "").upper()
+    allowed = {
+        "MAKE",
+        "MISS",
+        "BLOCK",
+        "DEFENSIVE_STOP",
+        "FOUL",
+        "CHARGE",
+        "DEAD BALL",
+        "TURNOVER",
+    }
+    if result_type not in allowed:
+        return None
+
+    fb_drive = turn_result.get("fb_drive_resolution") or {}
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    stealer_id = (
+        _safe_id(turn_result.get("shooter"))
+        or _safe_id(fb_roles.get("shooter"))
+        or _safe_id(phase.get("rr_id"))
+    )
+    if not stealer_id or stealer_id not in start_coords:
+        return None
+
+    raw_end_coords = turn_result.get("rr_end_coords") or {}
+    end_coords: Dict[str, GridCoord] = {}
+    for pid, coord in raw_end_coords.items():
+        if isinstance(coord, dict) and "x" in coord and "y" in coord:
+            end_coords[str(pid)] = {"x": float(coord["x"]), "y": float(coord["y"])}
+    for pid, sc in start_coords.items():
+        end_coords.setdefault(pid, dict(sc))
+
+    meet_coords = turn_result.get("meet_coords")
+    outcome = fb_drive.get("outcome")
+    stop_action = turn_result.get("stop_decision_action")
+    is_neutral = outcome == "NEUTRAL"
+    is_terminal = outcome in (
+        "DEAD BALL",
+        "O_FOUL",
+        "D_FOUL",
+        "CHARGE",
+        "BLOCKING_FOUL",
+    )
+    uses_meet_step = is_neutral or is_terminal
+
+    steps: List[AnimationStep] = []
+    clock_r = clock_remaining
+    shot_r = shot_clock_remaining
+    step_start_coords = dict(start_coords)
+
+    if uses_meet_step and meet_coords:
+        t_meet = float(
+            turn_result.get("t_meet_game_seconds")
+            or fb_drive.get("t_meet_game_seconds")
+            or 1.0
+        )
+        meet_target = {"x": float(meet_coords["x"]), "y": float(meet_coords["y"])}
+        end_ann = None
+        if result_type == "DEFENSIVE_STOP":
+            end_ann = _build_nice_stop_announcement(
+                turn_result, fb_roles, def_lineup, is_away_offense
+            )
+        meet_step = _build_meet_drive_step(
+            start_coords=step_start_coords,
+            end_coords=end_coords,
+            stealer_id=stealer_id,
+            meet_target=meet_target,
+            is_away_offense=is_away_offense,
+            clock_remaining=clock_r,
+            shot_clock_remaining=shot_r,
+            t_game_seconds=t_meet,
+            next_step_index=1 if result_type in ("MAKE", "MISS") else 0,
+            fb_drive=fb_drive,
+            end_announcement=end_ann,
+        )
+        if meet_step["start"].get("advance_trigger"):
+            meet_step["start"]["advance_trigger"]["metadata"]["kind"] = "rim_runner_meet"
+        if result_type == "DEFENSIVE_STOP" or is_terminal:
+            meet_step["end"]["next"] = {"kind": "end_of_turn"}
+        steps.append(meet_step)
+        clock_r -= t_meet
+        shot_r -= t_meet
+        step_start_coords = dict(end_coords)
+
+    if result_type in ("MAKE", "MISS", "BLOCK"):
+        if is_neutral and stop_action in ("shoot", "pass"):
+            if stop_action == "pass":
+                recv_id = turn_result.get("pass_receiver_id")
+                if recv_id and recv_id in step_start_coords:
+                    from BackEnd.utils.transition_bridge import build_pass_step
+
+                    try:
+                        pass_step = build_pass_step(
+                            off_lineup=off_lineup,
+                            def_lineup=def_lineup,
+                            start_coords=step_start_coords,
+                            passer_id=stealer_id,
+                            receiver_id=str(recv_id),
+                            clock_remaining_at_start=clock_r,
+                            shot_clock_remaining_at_start=shot_r,
+                            next_step_index=len(steps),
+                            pass_speed_grid_per_game_sec=float(
+                                PASS_GRID_SPOTS_PER_GAME_SECOND
+                            ),
+                            metadata_reason="rim_runner_stop_pass",
+                        )
+                        steps.append(pass_step)
+                        clock_r = pass_step["end"]["clock"]["clock_remaining"]
+                        shot_r = pass_step["end"]["clock"]["shot_clock_remaining"]
+                        step_start_coords = dict(pass_step["end"]["coords"])
+                        stealer_id = str(recv_id)
+                    except ValueError:
+                        pass
+
+            bh_target_raw = turn_result.get("bh_target") or step_start_coords.get(
+                stealer_id, meet_coords or {}
+            )
+            bh_target = {"x": float(bh_target_raw["x"]), "y": float(bh_target_raw["y"])}
+            t_shot = float(turn_result.get("t_shooter_game_seconds") or 0.5)
+            shot_end_coords = dict(step_start_coords)
+            shot_end_coords[stealer_id] = dict(bh_target)
+            shot_drive = _build_drive_step(
+                start_coords=step_start_coords,
+                end_coords=shot_end_coords,
+                stealer_id=stealer_id,
+                bh_target=bh_target,
+                is_away_offense=is_away_offense,
+                clock_remaining=clock_r,
+                shot_clock_remaining=shot_r,
+                t_game_seconds=max(0.35, t_shot * 0.15),
+                next_step_index=len(steps) + 1,
+            )
+            shot_drive["start"]["action"][stealer_id] = "shoot"
+            if shot_drive["start"].get("advance_trigger"):
+                shot_drive["start"]["advance_trigger"]["metadata"]["kind"] = (
+                    "rim_runner_drive"
+                )
+            steps.append(shot_drive)
+        else:
+            bh_target_raw = turn_result.get("bh_target") or end_coords.get(stealer_id)
+            bh_target = {"x": float(bh_target_raw["x"]), "y": float(bh_target_raw["y"])}
+            t_drive = float(
+                turn_result.get("t_shooter_game_seconds")
+                or fb_drive.get("t_drive_game_seconds")
+                or 1.0
+            )
+            trigger_meta = {
+                "target_player_id": stealer_id,
+                "target_coords": dict(bh_target),
+                "kind": "rim_runner_drive",
+            }
+            knots = fb_drive.get("bh_path_knots")
+            if knots and fb_drive.get("outcome") == "POS_O":
+                trigger_meta["path_knots"] = knots
+            drive_step = _build_drive_step(
+                start_coords=start_coords,
+                end_coords=end_coords,
+                stealer_id=stealer_id,
+                bh_target=bh_target,
+                is_away_offense=is_away_offense,
+                clock_remaining=clock_remaining,
+                shot_clock_remaining=shot_clock_remaining,
+                t_game_seconds=t_drive,
+                next_step_index=len(steps) + 1,
+            )
+            drive_step["start"]["advance_trigger"]["metadata"] = trigger_meta
+            steps.append(drive_step)
+
+        inject_shot_micro_before_post_shot(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense
+        )
+        _build_post_shot_sub_steps(
+            steps, turn_result, off_lineup, def_lineup, is_away_offense
+        )
+        if result_type == "MAKE":
+            _override_fb_make_announcement(steps)
+
+    return steps or None
+
+
 def append_lane_pass_to_rr_resolution_steps(
     *,
     turn_result: Dict[str, Any],
@@ -2030,6 +2232,9 @@ def append_lane_pass_to_rr_resolution_steps(
             steps.append(hold_up)
         return _finalize_rr_steps(turn_result, game, steps)
 
+    clock_at = clock_remaining - elapsed
+    sc_at = shot_clock_remaining - elapsed
+
     lane_pass = _build_lane_pass_step(
         turn_result=turn_result,
         fb_roles=fb_roles,
@@ -2048,6 +2253,22 @@ def append_lane_pass_to_rr_resolution_steps(
     coords = dict(lane_pass["end"]["coords"])
     clock_at = clock_remaining - elapsed
     sc_at = shot_clock_remaining - elapsed
+
+    if turn_result.get("fb_drive_resolution"):
+        dr_steps = _build_finisher_drive_resolution_steps(
+            turn_result=turn_result,
+            game=game,
+            start_coords=coords,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            clock_remaining=clock_at,
+            shot_clock_remaining=sc_at,
+            fb_roles=fb_roles,
+        )
+        if dr_steps:
+            steps.extend(dr_steps)
+            return _finalize_rr_steps(turn_result, game, steps)
 
     shot_motion = _build_shot_motion_step(
         turn_result=turn_result,

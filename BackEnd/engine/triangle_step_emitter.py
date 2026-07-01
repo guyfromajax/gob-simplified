@@ -847,6 +847,26 @@ def build_triangle_animation_steps(
         elapsed += float(decision_step["end"]["time_elapsed"])
         last_end_coords = dict(decision_step["end"]["coords"])
 
+    if turn_result.get("fb_drive_resolution"):
+        from BackEnd.engine.rim_runner_step_emitter import (
+            _build_finisher_drive_resolution_steps,
+        )
+
+        dr_steps = _build_finisher_drive_resolution_steps(
+            turn_result=turn_result,
+            game=game,
+            start_coords=last_end_coords,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            clock_remaining=clock_remaining - elapsed,
+            shot_clock_remaining=shot_clock_remaining - elapsed,
+            fb_roles=fb_roles,
+        )
+        if dr_steps:
+            steps.extend(dr_steps)
+            return _finalize_rr_steps(turn_result, game, steps)
+
     shot_motion = _build_triangle_shot_motion_step(
         turn_result=turn_result,
         fb_roles=fb_roles,

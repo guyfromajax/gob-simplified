@@ -266,6 +266,12 @@ FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (sho
 #   _documentation_master/05_GP_Supporting_Systems/Fast_Break_System.md
 USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR = True
 USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR = True
+
+# FB Drive Cutoff & Stop Decision — per-play rollout (see FB_Drive_Cutoff_Work_Plan.md)
+USE_FB_DRIVE_RESOLUTION_AFTER_STEAL = True
+USE_FB_DRIVE_RESOLUTION_CR = True
+USE_FB_DRIVE_RESOLUTION_RR = True
+USE_FB_DRIVE_RESOLUTION_TRIANGLE = True
 RESET_INBOUND_PASS_GRID_PER_GAME_SECOND = 24    # Reset step inbound pass (BH → PG)
 INBOUND_PASS_GRID_PER_GAME_SECOND = 24          # Inbound pass (SF → PG) for BIP / SIP
 HCO_STEP_T_FLOOR_GAME_SECONDS = 0.5             # Min step T for HCO skeleton steps (short-distance steps still visibly play)

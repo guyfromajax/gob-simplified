@@ -1,11 +1,21 @@
 from types import SimpleNamespace
 
+import pytest
+
 from BackEnd.constants.fast_break_play_types import default_fast_break_plays
 from BackEnd.engine.after_steal_fast_break import (
     _record_after_steal_fast_break_stats,
     resolve_after_steal_fast_break,
 )
 from tests.test_utils import build_mock_game
+
+
+@pytest.fixture(autouse=True)
+def _legacy_after_steal_resolver(monkeypatch):
+    """Existing stats/rebound tests target the legacy geometry path."""
+    monkeypatch.setattr(
+        "BackEnd.constants.USE_FB_DRIVE_RESOLUTION_AFTER_STEAL", False
+    )
 
 
 class _Player:
@@ -148,7 +158,7 @@ def test_after_steal_miss_stamps_near_bounce_rebound_attemptors(monkeypatch):
     monkeypatch.setattr(
         game.shot_manager,
         "calculate_shot_score",
-        lambda *_args, **_kwargs: (1, 1, 0, False, None),
+        lambda *_args, **_kwargs: (1, 1, 0, False, None, 0),
     )
     monkeypatch.setattr(
         "BackEnd.utils.shared.calculate_bounce_spot",
@@ -213,11 +223,15 @@ def test_after_steal_miss_filters_rebound_winner_candidates_to_near_bounce(monke
     monkeypatch.setattr(
         game.shot_manager,
         "calculate_shot_score",
-        lambda *_args, **_kwargs: (1, 1, 0, False, None),
+        lambda *_args, **_kwargs: (1, 1, 0, False, None, 0),
     )
     monkeypatch.setattr(
         "BackEnd.utils.shared.calculate_bounce_spot",
         lambda *_args, **_kwargs: bounce,
+    )
+    monkeypatch.setattr(
+        "BackEnd.utils.shared.determine_rebounder",
+        lambda *_args, **_kwargs: (near_off, game.offense_team, "OREB"),
     )
 
     result = resolve_after_steal_fast_break(game)

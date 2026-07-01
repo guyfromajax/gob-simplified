@@ -361,13 +361,52 @@ export function applyIdleWander(scene, sprite, opts = {}) {
       ? opts.durationMs
       : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 900);
 
-    // Seeded, per-axis two-component drift → smooth non-repeating organic motion.
+    // Role-based style + direction (backend-assigned by geography). Safe fallbacks.
+    const style = typeof opts.style === "string" ? opts.style : "survey_rock";
+    let dirX = Number.isFinite(opts.dirX) ? opts.dirX : 0;
+    let dirY = Number.isFinite(opts.dirY) ? opts.dirY : 1;
+    const dLen = Math.hypot(dirX, dirY);
+    if (dLen < 1e-6) { dirX = 0; dirY = 1; } else { dirX /= dLen; dirY /= dLen; }
+    const perpX = -dirY, perpY = dirX;
+
+    // Seeded per-run variation so co-styled players aren't in lockstep.
     const rand = mulberry32((opts.seed | 0) || 1);
-    const fx1 = 0.4 + rand() * 0.5, fx2 = 0.8 + rand() * 0.8;
-    const fy1 = 0.4 + rand() * 0.5, fy2 = 0.8 + rand() * 0.8;
-    const phx1 = rand() * Math.PI * 2, phx2 = rand() * Math.PI * 2;
-    const phy1 = rand() * Math.PI * 2, phy2 = rand() * Math.PI * 2;
-    const wx = 0.55 + rand() * 0.35, wy = 0.55 + rand() * 0.35;
+    const ph1 = rand() * Math.PI * 2, ph2 = rand() * Math.PI * 2;
+    const jit = 0.85 + rand() * 0.3; // ±15% frequency jitter
+
+    // Per-style base rhythm (Hz). jab is intermittent (jabHz jabs/sec); others oscillate.
+    const RHYTHM = {
+      survey_rock: { f1: 0.45, f2: 0.9 },  // gentle lateral sway
+      shuffle:     { f1: 0.9,  f2: 1.7 },  // livelier lateral slide
+      jockey:      { f1: 0.7,  f2: 1.3 },  // grounded lean + jostle
+      jab:         { jabHz: 1.4 },         // hold → quick jab → hold
+    };
+    const rhythm = RHYTHM[style] || RHYTHM.survey_rock;
+
+    // [ox, oy] render-space offset (px) for the style at time s (sec), envelope env (0..1 → 0 ends).
+    const styleOffset = (s, env) => {
+      if (style === "jab") {
+        // Mostly held (offset 0), with a quick out-and-back jab-step along dir a couple times.
+        const cyc = s * (rhythm.jabHz * jit);
+        const ph = cyc - Math.floor(cyc);
+        const pulse = ph < 0.35 ? Math.sin(Math.PI * (ph / 0.35)) : 0;
+        const along = radiusPx * env * pulse;
+        return [dirX * along, dirY * along];
+      }
+      if (style === "jockey") {
+        // Grounded: lean toward the basket (always along +dir) that swells and settles, plus a
+        // small perpendicular jostle — reads as muscling for position, not floating.
+        const along = radiusPx * env * (0.5 + 0.45 * Math.sin(2 * Math.PI * rhythm.f1 * jit * s + ph1));
+        const perp = radiusPx * 0.3 * env * Math.sin(2 * Math.PI * rhythm.f2 * jit * s + ph2);
+        return [dirX * along + perpX * perp, dirY * along + perpY * perp];
+      }
+      // survey_rock + shuffle: symmetric sway/slide back and forth along dir (lateral).
+      const mag = radiusPx * env * (
+        0.7 * Math.sin(2 * Math.PI * rhythm.f1 * jit * s + ph1) +
+        0.3 * Math.sin(2 * Math.PI * rhythm.f2 * jit * s + ph2)
+      );
+      return [dirX * mag, dirY * mag];
+    };
 
     let finished = false;
     const finish = () => {
@@ -389,15 +428,8 @@ export function applyIdleWander(scene, sprite, opts = {}) {
         const s = (tw.elapsed || 0) / 1000;
         const p = Math.min(1, (tw.elapsed || 0) / Math.max(1, totalMs));
         const env = Math.sin(Math.PI * p); // 0 at both ends, 1 at mid-beat — no snap
-        const ox = radiusPx * env * (
-          wx * Math.sin(2 * Math.PI * fx1 * s + phx1) +
-          (1 - wx) * Math.sin(2 * Math.PI * fx2 * s + phx2)
-        );
-        const oy = radiusPx * env * (
-          wy * Math.sin(2 * Math.PI * fy1 * s + phy1) +
-          (1 - wy) * Math.sin(2 * Math.PI * fy2 * s + phy2)
-        );
-        targets.apply(ox, oy);
+        const off = styleOffset(s, env);
+        targets.apply(off[0], off[1]);
         // Re-pin the masked photo's clip circle to the photo IN THIS FRAME. The marker's
         // scene-`update` mask sync can lag a sustained per-frame render-space move enough to
         // leave a faint detached "ghost" of the headshot; syncing in lockstep prevents it.

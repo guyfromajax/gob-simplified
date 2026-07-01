@@ -156,6 +156,10 @@
  * @property {number} [perp_y]           Rim-perpendicular unit vector y (fumble).
  * @property {number} [seed]             Deterministic PRNG seed (idle_wander) — reproduces the exact drift path.
  * @property {number} [radius_grid]      Max render-space drift radius in GRID units (idle_wander).
+ * @property {("jockey"|"jab"|"shuffle"|"survey_rock"|"wander")} [style]  idle_wander role-based motion style (backend-assigned by geography).
+ * @property {number} [dir_x]            idle_wander motion direction unit-vector x (render/grid space).
+ * @property {number} [dir_y]            idle_wander motion direction unit-vector y.
+ * @property {number} [amplitude_grid]   idle_wander style amplitude in GRID units.
  */
 
 /**

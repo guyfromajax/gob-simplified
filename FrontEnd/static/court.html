@@ -1282,6 +1282,17 @@
       flex-shrink: 0;
     }
 
+    #resume-game-container .pre-game-modal-box {
+      width: min(360px, calc(100vw - 40px));
+    }
+
+    #resume-game-container .pre-game-modal-actions {
+      min-height: 88px;
+      padding: 22px 28px;
+      align-items: center;
+      justify-content: center;
+    }
+
     .pre-game-container.hidden {
       display: none !important;
       visibility: hidden !important;
@@ -4479,10 +4490,6 @@
         <div class="pre-game-backdrop"></div>
         <div class="pre-game-modal-box">
           <div class="pre-game-modal-accent"></div>
-          <div class="pre-game-modal-body">
-            <div class="pre-game-modal-title">Game In Progress</div>
-            <div id="resume-game-subtitle" class="pre-game-modal-subtitle">Resume from the last stoppage.</div>
-          </div>
           <div class="pre-game-modal-actions">
             <button id="resume-game-button" class="play-button">Resume Game</button>
           </div>
