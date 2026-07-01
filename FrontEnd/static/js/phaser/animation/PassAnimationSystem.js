@@ -72,11 +72,6 @@ export class PassAnimationSystem {
    * Process a pass turn
    */
   async processPass(turnData, context = {}) {
-    if (false) console.log('[Pass Processing]', {
-      result_type: turnData.result_type,
-      activePass: !!this.activePass
-    });
-    
     if (this.activePass) {
       console.warn('PassAnimationSystem: Already processing a pass, queuing...');
       this.passQueue.push(turnData);
@@ -86,14 +81,6 @@ export class PassAnimationSystem {
     this.activePass = turnData;
     
     try {
-      if (false) console.log('[Processing]', {
-        passer_id: turnData.passer_id,
-        receiver_id: turnData.receiver_id,
-        pass_type: turnData.pass_type,
-        result_type: turnData.result_type,
-        allKeys: Object.keys(turnData)
-      });
-
       // Validate pass data
       if (!this.validatePassData(turnData)) {
         throw new Error('Invalid pass data');

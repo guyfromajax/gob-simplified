@@ -713,14 +713,6 @@ export class AnimationRouter {
           animationCount: turnData.animations?.length || 0,
           currentBallOwner: this.ballController?.currentOwner?.playerId ?? null
         });
-      } else {
-        if (false) console.log('[AnimationRouter]', {
-          result_type: turnData.result_type,
-          turn_index: turnIndex,
-          hasAnimationEngine: !!this.animationEngine,
-          hasBallController: !!this.ballController,
-          hasPlayerSprites: !!this.playerSprites
-        });
       }
 
       // Discrete DREB → HCO/HCT/FCP outlet: `runDefensiveReboundSetup` after DREB `playTurn`

@@ -278,24 +278,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     // Also check if timestamp is 0 (first step) to catch edge cases like post-opening-tip
     const isFirstStepHCO = (stepIndex === 1 || (nextStep && nextStep.timestamp === 0)) && nextStep && nextStep.action === 'pass';
     const shouldDelayPass = isFirstStepHCO;
-    
-    // 🔍 DEBUG: Log pass timing for HCO entry
-    if (nextStep && nextStep.action === 'pass') {
-      if (false) console.log('🔍 [PASS TIMING DEBUG]', {
-        playerId: sprite?.playerId,
-        action: nextStep.action,
-        stepIndex,
-        stepTimestamp: step.timestamp,
-        nextStepTimestamp: nextStep.timestamp,
-        isFirstStepHCO,
-        shouldDelayPass,
-        currentPos: { x: sprite.x, y: sprite.y },
-        targetPos: { x: targetX, y: targetY },
-        distance: Math.hypot(targetX - sprite.x, targetY - sprite.y),
-        duration
-      });
-    }
-    
+
     const tweenConfig = {
       targets: validTargets,
       x: targetX,
@@ -320,24 +303,8 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           if (PASS_DEBUG && currentAction === 'pass') {
             console.log('passStart', { fromId: sprite?.playerId, timestamp: nextStep?.timestamp || step.timestamp });
           }
-          // 🔍 DEBUG: Log when pass is triggered in onStart
-          if (currentAction === 'pass') {
-            if (false) console.log('🔍 [PASS TIMING DEBUG] Pass triggered in onStart (not delayed)', {
-              playerId: sprite?.playerId,
-              timestamp: nextStep?.timestamp || step.timestamp,
-              stepIndex,
-              shouldDelayPass
-            });
-          }
           startPromise = onAction(currentAction, sprite, nextStep?.timestamp || step.timestamp);
           await startPromise;
-        } else if (currentAction === 'pass' && shouldDelayPass) {
-          // 🔍 DEBUG: Log when pass is being delayed
-          if (false) console.log('🔍 [PASS TIMING DEBUG] Pass delayed - will trigger in onComplete', {
-            playerId: sprite?.playerId,
-            timestamp: nextStep?.timestamp || step.timestamp,
-            stepIndex
-          });
         }
       },
       onUpdate: () => {
@@ -378,14 +345,6 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         // ✅ FIX: For first step HCO passes, trigger the pass action after player reaches destination
         const currentAction = nextStep ? nextStep.action : step.action;
         if (shouldDelayPass && currentAction && onAction) {
-          // 🔍 DEBUG: Log when delayed pass is triggered
-          if (false) console.log('🔍 [PASS TIMING DEBUG] Delayed pass triggered in onComplete', {
-            playerId: sprite?.playerId,
-            timestamp: nextStep?.timestamp || step.timestamp,
-            stepIndex,
-            finalPos: { x: sprite.x, y: sprite.y },
-            targetPos: { x: targetX, y: targetY }
-          });
           if (PASS_DEBUG && currentAction === 'pass') {
             console.log('passStart (delayed for HCO entry)', { fromId: sprite?.playerId, timestamp: nextStep?.timestamp || step.timestamp });
           }

@@ -88,8 +88,18 @@ function shouldTracePlayback(scene = null) {
   return Boolean(scene?.__uessTracePlayback);
 }
 
+// Item 4 (defender/ball desync) debugging session: these labels print by default,
+// no `window.UESS_TRACE_PLAYBACK` needed. Every other trace label stays flag-gated so
+// the console isn't flooded by per-step/per-turn traces. To revert, empty this set.
+const ALWAYS_TRACE_LABELS = new Set(["pass:release"]);
+
 function tracePlayback(scene, label, payload = {}) {
-  return;
+  if (!ALWAYS_TRACE_LABELS.has(label) && !shouldTracePlayback(scene)) return;
+  try {
+    console.log(`[UESS_TRACE] ${label}`, payload);
+  } catch (_) {
+    // Diagnostic only; never throw into playback.
+  }
 }
 
 function isShotBallMotionStep(step) {
@@ -355,7 +365,6 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
     // shots now flow through this backend-resolved cue — see
     // `_build_post_shot_sub_steps` in `BackEnd/engine/skeleton_step_emitter.py`.
     const releaseSfx = step.start?.sfx_on_ball_release;
-    console.warn('[SHOT-SFX] ball_release | file=', releaseSfx?.file, '| event=', releaseSfx?.event);
     if (releaseSfx?.file) {
       playGameSfx(
         scene,
@@ -919,6 +928,10 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       .catch((err) => console.warn("flourish dispatch failed", err));
   }
 
+  // Item 4 desync diagnostics: collect each mover's tween duration + delta so the
+  // pass:release trace can show whether defenders finish before the ball arrives.
+  // Cheap (≤10 entries); only surfaced when UESS_TRACE_PLAYBACK is on.
+  const stepMoverDurations = [];
   for (const [playerId, startCoord] of Object.entries(step.start.coords)) {
     const sprite = sprites[playerId];
     const endCoord = step.end.coords[playerId];
@@ -937,6 +950,12 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
 
     const tweenPromise = startSchemaPlayerTween(scene, sprite, endCoord, playerDurationMs, width, height);
     activeStepTweenSprites.push(sprite);
+    stepMoverDurations.push({
+      playerId,
+      teamId: sprite.team_id ?? sprite.team ?? null,
+      durationMs: playerDurationMs,
+      distGrid: Math.round(Math.hypot(dx, dy) * 100) / 100,
+    });
     if (releaseShotOnShooterSettle && String(playerId) === shotReleaseShooterId) {
       shooterTweenPromise = tweenPromise;
       shooterTweenDurationMs = playerDurationMs;
@@ -959,11 +978,16 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     tracePlayback(scene, "pass:release", {
       turnIndex: options.turnData?.index ?? null,
       stepId: step.id ?? null,
+      // Time from step start to ball release. ~0 ⇒ ball detaches in unison with movers.
       elapsedMs: Math.round(performance.now() - stepStartedAtMs),
       passStartOwnerId,
       passEndOwnerId,
+      offenseTeamId: scene?.offenseTeamId ?? null,
       ballArrivalCoord: step.start?.ball_arrival_coord ?? null,
       ballDurationMs: ballTransitionPromise?.expectedDurationMs ?? null,
+      // Per-mover tween durations: compare defender durations vs ballDurationMs to
+      // confirm/quantify the "defender settles before ball arrives" duration mismatch.
+      moverDurations: stepMoverDurations,
     });
   }
 

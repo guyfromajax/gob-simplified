@@ -250,16 +250,6 @@ function handleTurnTransition(scene, turnData) {
       scene.events?.emit('possessionChange', { 
         offenseTeamId: newOffenseTeamId 
       });
-      if (false) console.log('[Offense Updated]', {
-        from: previousOffenseTeamId,
-        to: newOffenseTeamId,
-        result_type: turnData.result_type
-      });
-    } else {
-      if (false) console.log('[Offense Unchanged]', {
-        offenseTeamId: scene.offenseTeamId,
-        result_type: turnData.result_type
-      });
     }
   } else {
     // No offense_team_id provided - keep current (shouldn't happen in normal flow)
@@ -308,21 +298,9 @@ export async function finalizeTurnAfterAnimation({
   // This runs FIRST to ensure possession is correct before other finalization steps
   handleTurnTransition(scene, turn);
   
-  // ✅ DEBUG: Log finalization
-  if (false) console.log('[Finalizing]', {
-    turnIndex: turnIndex ?? turn.index,
-    result_type: turn.result_type,
-    willSetPreviousTurnWasShot: turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK",
-    hasOnUpdate: !!onUpdate
-  });
-  
   // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
   if (turn.result_type === "MAKE" || turn.result_type === "MISS" || turn.result_type === "BLOCK") {
     scene._previousTurnWasShot = true;
-    if (false) console.log('[Previous Turn Shot]', {
-      turnIndex: turnIndex ?? turn.index,
-      result_type: turn.result_type
-    });
   }
   
   // ✅ SS&S: Use central announcement dispatcher for result announcements
@@ -392,10 +370,6 @@ export async function finalizeTurnAfterAnimation({
   if (onUpdate) {
     try {
       onUpdate(turn);
-      if (false) console.log('[onUpdate]', {
-        turnIndex: turnIndex ?? turn.index,
-        result_type: turn.result_type
-      });
     } catch (err) {
       console.error('Scoreboard update failed:', err);
     }

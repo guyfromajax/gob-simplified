@@ -207,15 +207,6 @@ export class ShotAnimationSystem {
    * Process a shot turn with complete player movement
    */
   async processShot(turnData) {
-    // Shot processing (debug log removed)
-    if (false) console.log('[Shot Debug]', {
-      result_type: turnData.result_type,
-      shooter_id: turnData.shooter_id,
-      turn_index: turnData.index,
-      hasPlayerSprites: !!this.playerSprites,
-      playerSpritesCount: this.playerSprites ? Object.keys(this.playerSprites).length : 0
-    });
-    
     const isHCO = turnData.play_type === 'HCO' || turnData.playcall === 'HCO';
     // ✅ REMOVED: Shot attempt logging (cluttering console)
     
@@ -473,14 +464,7 @@ export class ShotAnimationSystem {
    * Animate player movement step by step
    */
   async animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps) {
-    if (false) console.log('[Player Movement Debug]', {
-      maxSteps,
-      result_type: turnData.result_type,
-      skipToEnd: this.scene.skipToEnd,
-      hasBallSprite: !!ballSprite,
-      hasTweens: !!this.scene.tweens
-    });
-    
+
     if (this.scene.skipToEnd) {
       console.log('⚠️ [ShotAnimationSystem.animatePlayerMovement] Skipping - skipToEnd is true');
       return;
