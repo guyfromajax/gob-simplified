@@ -606,6 +606,12 @@ function applyResumeStateToCourtChrome(resumeState) {
   }
 }
 
+function getPublishedCourtResumeState() {
+  if (typeof window === 'undefined') return null;
+  const state = window.__GOB_MGR_RESUME_STATE__;
+  return state && state.status === 'stoppage_anchor' ? state : null;
+}
+
 /**
  * Show scrolling text popup with shot results during Sim Quarter
  * @param {Object} lastSummary - Game summary from backend with turns array
@@ -2969,8 +2975,8 @@ async function initGame() {
       bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY ||
       bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
     );
-  let activeResume = false;
-  let resumeState = null;
+  let resumeState = consumeResumeAnchor ? null : getPublishedCourtResumeState();
+  let activeResume = !!resumeState;
   console.warn('[COURT BOOT MODE] classified court entry', {
     boot_mode: bootMode,
     game_id: gameId,
@@ -2980,8 +2986,22 @@ async function initGame() {
     resume_from_anchor: normalizedBootParams.get('resume_from_anchor'),
     consume_resume_anchor: normalizedBootParams.get('consume_resume_anchor'),
     should_probe_resume_state: shouldProbeResumeState,
+    published_resume_state: !!resumeState,
+    published_resume_state_source: typeof window !== 'undefined' ? window.__GOB_MGR_RESUME_STATE_SOURCE__ || null : null,
   });
-  if (shouldProbeResumeState) {
+  if (activeResume) {
+    console.info('[MGR-RESUME-CLIENT] court boot resume pending from published state', {
+      game_id: gameId,
+      quarter: resumeState.quarter,
+      clock: resumeState.clock,
+      away_score: resumeState.away_score,
+      home_score: resumeState.home_score,
+      anchor_type: resumeState.anchor_type,
+      next_play: resumeState.timeout_next_play_type,
+      source: typeof window !== 'undefined' ? window.__GOB_MGR_RESUME_STATE_SOURCE__ || null : null,
+    });
+    applyResumeStateToCourtChrome(resumeState);
+  } else if (shouldProbeResumeState) {
     try {
       const resumeStateResponse = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},

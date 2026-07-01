@@ -1822,7 +1822,10 @@ class Animator:
             def_movement = []
             def_start = None
             def_end = None
-            
+            # Prior step's ball handler — used to detect a pass (ownership flip) so the
+            # defender's animation holds through the pass step (two-handler model, see below).
+            prev_ball_handler_pos = None
+
             # Process each step
             max_steps = max(
                 len(off_anim.get("movement", [])) 
@@ -1964,6 +1967,24 @@ class Animator:
                     if _subtle_defender_should_freeze(skeleton_step_obj, def_pos, anchor_off_pos):
                         def_coords = dict(def_movement[-1]["coords"])
 
+                # Two-handler pass step (animation-only): the passer owns the START of a pass
+                # step and the receiver the END — a single clean handoff. `hasBallAtStep` flips
+                # to the receiver instantly, so (via the emitter's end=i+1 read) defenders jump
+                # to the post-pass layout a beat EARLY. Hold the defender at his pre-pass
+                # (passer-owned) coord for the pass step's start so his rotation to the receiver
+                # renders ACROSS the pass step, in unison with the ball. Gameplay-safe: the zone
+                # assignment map is stored above at the TRUE (receiver) step, and this never
+                # touches the FINAL step's coord (which Player.coords / the attack-drive geometry
+                # contest read) — only an intermediate pass-step coord is held.
+                if (
+                    prev_ball_handler_pos
+                    and current_ball_handler_pos
+                    and current_ball_handler_pos != prev_ball_handler_pos
+                    and step_index != max_steps - 1
+                    and def_movement
+                ):
+                    def_coords = dict(def_movement[-1]["coords"])
+
                 def_end = def_coords
 
                 # Determine action (guard_ball if ball handler in zone, otherwise guard_offball)
@@ -1979,7 +2000,8 @@ class Animator:
                     "coords": def_coords,
                     "action": action
                 })
-            
+                prev_ball_handler_pos = current_ball_handler_pos
+
             if not def_movement:
                 continue
             
@@ -2139,6 +2161,10 @@ class Animator:
                     ),
                 })
             
+            # Step 0's ball handler is the initial ball_handler_pos; track it so the loop can
+            # detect a pass (ownership flip) and hold the defender through the pass step.
+            prev_ball_handler_pos = ball_handler_pos
+
             # Subsequent steps: Track offensive player
             for step_idx, skeleton_step in enumerate(skeleton_steps[1:], start=1):
                 timestamp = skeleton_step.get("timestamp", step_idx * 800)
@@ -2210,6 +2236,20 @@ class Animator:
                     ):
                         def_coords = dict(def_movement[-1]["coords"])
 
+                    # Two-handler pass step (animation-only): hold the defender at his pre-pass
+                    # (passer-owned) coord for the pass step's start so his rotation renders
+                    # ACROSS the pass step, in unison with the ball — not a beat early. Man
+                    # defense stores no gameplay assignment map, and this never touches the
+                    # FINAL step's coord (read by Player.coords / the geometry contest).
+                    if (
+                        prev_ball_handler_pos
+                        and current_ball_handler_pos
+                        and current_ball_handler_pos != prev_ball_handler_pos
+                        and step_idx != len(skeleton_steps) - 1
+                        and def_movement
+                    ):
+                        def_coords = dict(def_movement[-1]["coords"])
+
                     def_end = def_coords
                     def_movement.append({
                         "timestamp": timestamp,
@@ -2224,6 +2264,7 @@ class Animator:
                             )
                         ),
                     })
+                    prev_ball_handler_pos = current_ball_handler_pos
                 else:
                     # No more offensive movement - stay at last position
                     if def_movement:

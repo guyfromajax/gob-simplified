@@ -525,27 +525,29 @@ Refresh starts on `court.html` with an existing `game_id`.
 
 Flow:
 
-1. `bootGame.js` loads.
-2. `initGame()` calls `/api/game/{game_id}/resume-state` if a game is present and either:
-   - `active_resume=true`, or
-   - the URL is not already a direct timeout resume.
-3. If the endpoint returns `stoppage_anchor`, the page hides the normal pre-game controls.
-4. The page shows a `Game In Progress` modal.
-5. User presses `Resume Game`.
-6. `applyResumeStateToUrl(resumeState)` updates the current court URL with:
+1. `court.html` loads with a `game_id`.
+2. `loadGameStats.js` checks `/api/game/{game_id}/resume-state` before normal game-doc hydration unless this is:
+   - a live quarter transition (`quarter_break_from=play_quarter|sim_quarter`), or
+   - an accepted Set Lineup restore return (`consume_resume_anchor=true`).
+3. If the endpoint returns `stoppage_anchor`, `loadGameStats.js` publishes that anchor to `window.__GOB_MGR_RESUME_STATE__` and paints court stats from the anchor, not from the latest arbitrary game document.
+4. `bootGame.js` consumes the published anchor state before making its own fallback `/resume-state` request.
+5. If an active anchor exists, the page hides the normal Play Quarter / Sim controls.
+6. The page shows a `Game In Progress` modal.
+7. User presses `Resume Game`.
+8. `applyResumeStateToUrl(resumeState)` updates the current court URL with:
    - `quarter`
    - `period`
    - `clock`
    - `resume_from_timeout`
    - `resume_from_anchor=true`
    - lineup player IDs from the anchor
-7. `redirectResumeAnchorToSetLineup(resumeState)` routes all supported anchor types through Set Lineup.
-8. The Set Lineup URL must preserve `resume_from_anchor=true`.
-9. When the user submits Set Lineup, `set-lineup.js` must send both:
+9. `redirectResumeAnchorToSetLineup(resumeState)` routes all supported anchor types through Set Lineup.
+10. The Set Lineup URL must preserve `resume_from_anchor=true`.
+11. When the user submits Set Lineup, `set-lineup.js` must send both:
    - `resume_from_anchor=true`
    - `consume_resume_anchor=true`
-10. `gameScene.js` includes both flags in the `/api/simulate-quarter` payload.
-11. Backend restores the saved anchor snapshot first, then preserves the durable anchor after the successful save.
+12. `gameScene.js` includes both flags in the `/api/simulate-quarter` payload.
+13. Backend restores the saved anchor snapshot first, then preserves the durable anchor after the successful save.
 
 Key frontend function:
 
@@ -566,7 +568,7 @@ This matters because the normal game document can be ahead of the resume anchor.
 
 Rules:
 
-- If `active_resume=true` or `resume_from_anchor=true`, `loadGameStats.js` first calls `/api/game/{game_id}/resume-state`.
+- If `court.html` has a `game_id` and is not a live quarter transition or an accepted Set Lineup restore return, `loadGameStats.js` first calls `/api/game/{game_id}/resume-state`.
 - If that endpoint returns `status: "stoppage_anchor"`, the returned anchor payload paints:
   - scoreboard scores
   - game clock
@@ -575,7 +577,8 @@ Rules:
   - timeout/foul header state
   - player stat panels
   - team stat panels
-- Only non-resume page loads should prefer `/api/game/{game_id}` for initial court stats.
+- Only page loads without a valid backend anchor should prefer `/api/game/{game_id}` for initial court stats.
+- `loadGameStats.js` publishes a valid anchor to `window.__GOB_MGR_RESUME_STATE__` so `bootGame.js` can use the same decision instead of running a separate, potentially divergent UI mode decision.
 - `bootGame.js` also applies the compact anchor score/clock values through `applyResumeStateToCourtChrome(resumeState)` so the modal chrome cannot show stale values while the full stat panels hydrate.
 
 Backend support:
@@ -698,7 +701,7 @@ Rules:
 - `anchor_restore_entry` restores from the anchor through `/api/simulate-quarter` and leaves the durable anchor available for later rollback until replaced or final.
 - `timeout_direct_entry` should not be used for MGR cold/refresh resume in simplified v1.
 
-`FrontEnd/static/js/phaser/utils/loadGameStats.js` must apply the same live-quarter guard when deciding whether to hydrate from `/resume-state`. This matters because court stats hydrate before `bootGame.js` starts Phaser.
+`FrontEnd/static/js/phaser/utils/loadGameStats.js` must apply the same live-quarter guard when deciding whether to hydrate from `/resume-state`. This matters because court stats hydrate before `bootGame.js` starts Phaser. On non-live, non-consumed court loads, `loadGameStats.js` probes `/resume-state` first and publishes a valid anchor to `window.__GOB_MGR_RESUME_STATE__`; `bootGame.js` consumes that published state before showing controls or making its own fallback probe.
 
 ## Lineup Checkpoint Contract
 

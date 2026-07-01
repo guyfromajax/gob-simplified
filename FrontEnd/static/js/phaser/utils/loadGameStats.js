@@ -66,6 +66,28 @@ function hasResumeFlowFlags(urlParams) {
   );
 }
 
+function publishCourtResumeState(resumeState, source = 'loadGameStats') {
+  if (typeof window === 'undefined') return;
+  if (resumeState && resumeState.status === 'stoppage_anchor') {
+    window.__GOB_MGR_RESUME_STATE__ = resumeState;
+    window.__GOB_MGR_RESUME_STATE_SOURCE__ = source;
+    console.warn('[MGR-ENTRY-RESOLVER] published court resume state', {
+      source,
+      game_id: resumeState.game_id || null,
+      quarter: resumeState.quarter,
+      clock: resumeState.clock,
+      time_remaining: resumeState.time_remaining,
+      home_score: resumeState.home_score,
+      away_score: resumeState.away_score,
+      anchor_type: resumeState.anchor_type || null,
+      next_play: resumeState.timeout_next_play_type || null,
+    });
+  } else {
+    delete window.__GOB_MGR_RESUME_STATE__;
+    delete window.__GOB_MGR_RESUME_STATE_SOURCE__;
+  }
+}
+
 function clearPreAnchorQ1RefreshFlag(reason, gameId = null) {
   if (typeof window === 'undefined') return;
   if (window.__GOB_PRE_ANCHOR_Q1_REFRESH__) {
@@ -587,12 +609,8 @@ export async function initializeGameStats() {
   const quarterBreakFrom = urlParams.get('quarter_break_from');
   const quarter = Number(urlParams.get('quarter') || 1);
   const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
-  const wantsAnchorUi =
-    !liveQuarterStart && (
-      urlParams.get('active_resume') === 'true' ||
-      urlParams.get('resume_from_anchor') === 'true' ||
-      urlParams.get('consume_resume_anchor') === 'true'
-    );
+  const acceptedAnchorReturn = urlParams.get('consume_resume_anchor') === 'true';
+  const shouldProbeResumeState = !liveQuarterStart && !acceptedAnchorReturn;
   const resumeFlowFlags = hasResumeFlowFlags(urlParams);
   
   if (!homeTeam || !awayTeam) return;
@@ -600,16 +618,16 @@ export async function initializeGameStats() {
   setScoreboardHeaderDefaults(homeTeam, awayTeam);
   if (!gameId) return;
   
-  const gameData = wantsAnchorUi
-    ? await fetchResumeState(gameId)
-    : await fetchGameState(gameId);
-  if (resumeFlowFlags || hasActiveResumeAnchor(gameData)) {
+  const resumeState = shouldProbeResumeState ? await fetchResumeState(gameId) : null;
+  publishCourtResumeState(resumeState, resumeState ? 'loadGameStats:resume-state' : 'loadGameStats:no-anchor');
+  const gameData = resumeState || await fetchGameState(gameId);
+  if (resumeFlowFlags || resumeState || hasActiveResumeAnchor(gameData)) {
     clearPreAnchorQ1RefreshFlag(
       resumeFlowFlags ? 'resume_flow_flags' : 'active_resume_anchor',
       gameId
     );
   }
-  if (!resumeFlowFlags && !wantsAnchorUi && !liveQuarterStart && quarter === 1 && isPreAnchorQ1DirtyGame(gameData)) {
+  if (!resumeFlowFlags && !resumeState && !liveQuarterStart && quarter === 1 && isPreAnchorQ1DirtyGame(gameData)) {
     clearPreAnchorQ1RefreshFlag('simplified_mgr_v1_no_anchor_reset_disabled', gameId);
   }
   if (gameData) {
