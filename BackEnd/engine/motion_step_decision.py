@@ -43,6 +43,14 @@ SUBTLE_STEP_ELAPSED_BY_TEMPO = {"slow": (3, 4), "normal": (2, 4), "fast": (2, 3)
 # ran the shot clock to expiry (brief: force a shot with 1s left, -50 to shot score).
 SUBTLE_FORCED_SHOT_PENALTY = 50
 
+# Subtle-beat idle motion (COSMETIC; render-space only, never touches gameplay coords). A
+# subtle beat gives the BH + some teammates a small gameplay nudge, then its 2-4s clock budget
+# leaves everyone stationary. To avoid a frozen court, all non-BH players get a render-space
+# "idle_wander" flourish (organic within-radius drift spanning the beat); the BH gets one on a
+# coin flip (else he stands with the always-on NG heartbeat pulse). Seeded (SS&S-reproducible).
+SUBTLE_IDLE_WANDER_RADIUS_GRID = 1.0   # max render-space drift radius (grid units)
+BH_IDLE_WANDER_PROBABILITY = 0.5       # chance the BH also idle-wanders (else stand + heartbeat)
+
 
 # --------------------------------------------------------------------------- #
 # small helpers

@@ -405,3 +405,32 @@ Language Guidance For Offensive Fouls in Announcement System (non lane players /
 Lane locations = lower and upper lowPost, midPost, highPost, basketSpot, midLane, topLane
 
 All Force Fouls announce "Quick Foul!"
+
+---
+
+## Announcements That Carry a Hold (pause animation)
+
+A banner with a `hold_ms` value freezes **all** on-court animation for that many milliseconds while it is displayed. The frontend blocks on it (`animationPlayback.js` → `runStepAnnouncement` → `await waitMsRespectingPause(scene, holdMs)`). Banners without a `hold_ms` show without pausing. This behavior is **intentional** — the list below is a reference, not a bug list.
+
+| Banner text | Hold | Emitter (file:line) | Beat |
+|---|---|---|---|
+| "Rebound!" (DREB) | 1000ms | `dreb_step_emitter.py:224` | Defensive rebound secured |
+| "Rebound!" (OREB) | 1000ms | `oreb_step_emitter.py:277` | Offensive rebound secured |
+| "Fast Break!" (after steal) | 1000ms (`FB_ANNOUNCE_HOLD_MS`) | `after_steal_fast_break_step_emitter.py:111` | Steal → fast-break drive start |
+| "Fast Break!" (rim runner) | 1000ms | `rim_runner_step_emitter.py:1049` | Rim-runner fast break start |
+| "Fast Break!" (triangle) | 1000ms | `triangle_step_emitter.py:238` | Triangle fast break start |
+| "It's Good!" | 1000ms (`MAKE_HOLD_MS`) | `skeleton_step_emitter.py:2158` | Made shot |
+| "It's Good! And 1!" | 1000ms (`MAKE_HOLD_MS`) | `skeleton_step_emitter.py:2145` | Made shot + foul |
+| "It's Good!" (free throw) | 1000ms | `ft_step_emitter.py:757` | Made free throw |
+| "Airball!" | 1000ms | `skeleton_step_emitter.py:2249` | Airballed shot |
+| "BLOCK!" | 1000ms | `skeleton_step_emitter.py:2645` | Blocked shot |
+| "Great Stop!" | 1000ms | `covert_release_step_emitter.py:1135` | Defensive stop |
+| "Interception!" | 1000ms | `rim_runner_step_emitter.py:1303` | Fast-break pass intercepted |
+| "No Fast Break" | 1000ms | `rim_runner_step_emitter.py:1580` | Fast break denied |
+| "FB Outlet Pass Denied!" | 1000ms | `rim_runner_step_emitter.py:1709` | Outlet pass denied |
+| "Out of bounds!" | 650ms | `rim_runner_step_emitter.py:1443` | Ball batted OOB |
+| Turnover headline (e.g. "TURNOVER!") | 1000ms (`FUMBLE_ANNOUNCE_HOLD_MS`) | `dead_ball_fumble.py:161` | Dead-ball fumble turnover |
+
+Constants: `FB_ANNOUNCE_HOLD_MS` = 1000.0 (`after_steal_fast_break_step_emitter.py:58`), `MAKE_HOLD_MS` = 1000.0 (`skeleton_step_emitter.py:2095`), `FUMBLE_ANNOUNCE_HOLD_MS` = 1000 (`constants/dead_ball_fumble_constants.py:9`).
+
+Note: the DREB "Rebound!" hold is the same banner whether the next turn feels clean (shot → DREB) or paused (DREB → HCO/FB); only where it lands in the sequence changes how it feels.

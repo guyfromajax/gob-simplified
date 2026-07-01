@@ -476,6 +476,123 @@ function runBite(scene, sprite, flourish, ballSprite) {
   runReachIn(scene, sprite, { ...flourish, kind: "reach_in", target: "ball" }, ballSprite);
 }
 
+// Deterministic PRNG (mulberry32) so a backend-provided `seed` reproduces the
+// exact same wander path on every render — keeps the FE a pure function of the
+// payload (SS&S-reproducible) even though the motion is cosmetic.
+function mulberry32(a) {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Idle wander: a slow, organic render-space drift within a small radius of the
+ * sprite's anchor, spanning the whole beat. Used to fill "stationary" beats
+ * (e.g. Motion subtle-movement) so the court never fully freezes. Render-space
+ * only (never touches gameplay coords); a sine envelope pins the offset to 0 at
+ * both ends so there is no snap at the step boundary. Fully determined by
+ * `flourish.seed`. Universal — any "pause with real motion" step can stamp it.
+ */
+function runIdleWander(scene, sprite, flourish, opts = {}) {
+  const cfg = animationConfig.flourish?.idleWander || {};
+  const resolved = resolveRenderTarget(sprite);
+  if (!resolved || !scene?.tweens) return;
+  // Never stack: a second wander on the same sprite would corrupt the rest pos.
+  if (sprite.__idleWanderTween && sprite.__idleWanderTween.isPlaying?.()) return;
+
+  const width = scene.game?.config?.width;
+  const height = scene.game?.config?.height;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+  const pxPerGrid = (width / 100 + height / 50) / 2;
+
+  const radiusGrid = Number.isFinite(flourish?.radius_grid)
+    ? flourish.radius_grid
+    : (Number.isFinite(cfg.radiusGrid) ? cfg.radiusGrid : 1.0);
+  const radiusPx = Math.max(0, radiusGrid * pxPerGrid);
+  if (radiusPx < 1e-3) return;
+  // Span the whole beat: prefer an explicit payload duration, else the step's own
+  // wall-clock (passed by the playback dispatcher — scales with playback speed), else default.
+  const totalMs = Number.isFinite(flourish?.duration_ms)
+    ? flourish.duration_ms
+    : (Number.isFinite(opts?.stepDurationMs) && opts.stepDurationMs > 0
+        ? opts.stepDurationMs
+        : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 900));
+
+  // Seeded, per-axis two-component drift → smooth non-repeating organic motion.
+  const rand = mulberry32((flourish?.seed | 0) || 1);
+  const fx1 = 0.4 + rand() * 0.5, fx2 = 0.8 + rand() * 0.8;
+  const fy1 = 0.4 + rand() * 0.5, fy2 = 0.8 + rand() * 0.8;
+  const phx1 = rand() * Math.PI * 2, phx2 = rand() * Math.PI * 2;
+  const phy1 = rand() * Math.PI * 2, phy2 = rand() * Math.PI * 2;
+  const wx = 0.55 + rand() * 0.35; // primary-component weight (x)
+  const wy = 0.55 + rand() * 0.35; // primary-component weight (y)
+
+  let restore;
+  let applyOffset;
+  if (resolved.mode === "origin") {
+    const sp = resolved.targets[0];
+    const baseOX = Number(sp.displayOriginX);
+    const baseOY = Number(sp.displayOriginY);
+    // displayOrigin offset is inverted (see runReachIn).
+    applyOffset = (ox, oy) => {
+      sp.displayOriginX = baseOX - ox;
+      sp.displayOriginY = baseOY - oy;
+    };
+    restore = () => {
+      sp.displayOriginX = baseOX;
+      sp.displayOriginY = baseOY;
+      sprite.__idleWanderTween = null;
+    };
+  } else {
+    const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
+    applyOffset = (ox, oy) => {
+      for (const b of bases) {
+        b.c.x = b.x + ox;
+        b.c.y = b.y + oy;
+      }
+    };
+    restore = () => {
+      for (const b of bases) {
+        b.c.x = b.x;
+        b.c.y = b.y;
+      }
+      sprite.__idleWanderTween = null;
+    };
+  }
+
+  const tween = scene.tweens.addCounter({
+    from: 0,
+    to: 1,
+    duration: Math.max(1, totalMs),
+    onUpdate: (tw) => {
+      const s = (tw.elapsed || 0) / 1000;
+      const p = Math.min(1, (tw.elapsed || 0) / Math.max(1, totalMs));
+      const env = Math.sin(Math.PI * p); // 0 at both ends, 1 at mid-beat
+      const ox = radiusPx * env * (
+        wx * Math.sin(2 * Math.PI * fx1 * s + phx1) +
+        (1 - wx) * Math.sin(2 * Math.PI * fx2 * s + phx2)
+      );
+      const oy = radiusPx * env * (
+        wy * Math.sin(2 * Math.PI * fy1 * s + phy1) +
+        (1 - wy) * Math.sin(2 * Math.PI * fy2 * s + phy2)
+      );
+      applyOffset(ox, oy);
+    },
+    onComplete: restore,
+    onStop: restore,
+  });
+  if (tween) {
+    tween.__uessBoundaryIgnore = true;
+    sprite.__idleWanderTween = tween;
+  } else {
+    restore();
+  }
+}
+
 /**
  * Render a flourish. Dispatches by `flourish.kind`. Unknown / not-yet-rendered
  * kinds are accepted no-ops (placeholders). Visual-only — never throws.
@@ -509,6 +626,9 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
         return;
       case "fumble":
         runFumble(scene, sprite, flourish);
+        return;
+      case "idle_wander":
+        runIdleWander(scene, sprite, flourish, opts);
         return;
       case "shot_dip":
         runRattle(scene, sprite, { ...flourish, cycles: flourish.cycles || 1 });

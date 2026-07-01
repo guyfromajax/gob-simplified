@@ -1750,6 +1750,21 @@ def build_skeleton_animation_steps(
                 step.setdefault("start", {}).setdefault("flourish", {})[reach_in_id] = {
                     "kind": "reach_in", "target": "ball",
                 }
+            # Dynamic HCO Motion subtle beat: the resolver rolled per-player render-space
+            # ``idle_wander`` assignments (cosmetic; fills the frozen tail of the 2-4s beat).
+            # Stamp them as flourishes (FE spans each to the step's own duration). Render-only,
+            # never mutates gameplay coords (UESS-safe); does not clobber a reach_in.
+            idle_motion = ((skeleton_steps[i] or {}).get("_subtle_movement") or {}).get("idle_motion") or {}
+            if idle_motion:
+                flourish_map = step.setdefault("start", {}).setdefault("flourish", {})
+                for _pid, _params in idle_motion.items():
+                    if _pid in flourish_map:
+                        continue
+                    flourish_map[_pid] = {
+                        "kind": "idle_wander",
+                        "seed": int(_params.get("seed", 0)),
+                        "radius_grid": float(_params.get("radius_grid", 1.0)),
+                    }
         stamp_tween_durations(
             step["start"], final_end_coords, t, off_lineup, def_lineup,
         )

@@ -913,7 +913,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         for (const [playerId, flourish] of Object.entries(flourishMap)) {
           const sprite = sprites[playerId];
           if (!sprite || !flourish) continue;
-          runFlourish(scene, sprite, flourish, { ballSprite, turnData: options.turnData });
+          runFlourish(scene, sprite, flourish, { ballSprite, turnData: options.turnData, stepDurationMs: durationMs });
         }
       })
       .catch((err) => console.warn("flourish dispatch failed", err));

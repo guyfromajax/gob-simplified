@@ -4674,6 +4674,38 @@ def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
     return reads
 
 
+def _roll_subtle_idle_motion(off_lineup, def_lineup, bh_pos, rng):
+    """Seeded render-space idle-wander assignments for a subtle beat (COSMETIC; UESS-safe).
+
+    All non-BH players (offense off-ball + every defender) get an ``idle_wander`` flourish; the
+    BH gets one on a coin flip (``BH_IDLE_WANDER_PROBABILITY``), else he relies on the always-on
+    NG heartbeat. Purely cosmetic — never affects the sim — but rolled here (seeded RNG) so the
+    payload fully determines the render (FE stays a pure renderer). Returns
+    ``{str(player_id): {"kind": "idle_wander", "seed": int, "radius_grid": float}}``."""
+    from BackEnd.engine.motion_step_decision import (
+        SUBTLE_IDLE_WANDER_RADIUS_GRID,
+        BH_IDLE_WANDER_PROBABILITY,
+    )
+    bh_player = (off_lineup or {}).get(bh_pos)
+    bh_id = getattr(bh_player, "player_id", None)
+    motion = {}
+    for lineup in (off_lineup, def_lineup):
+        for _pos, player in (lineup or {}).items():
+            if not player:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid is None:
+                continue
+            if pid == bh_id and rng.random() >= BH_IDLE_WANDER_PROBABILITY:
+                continue  # BH stands this beat (heartbeat pulse only)
+            motion[str(pid)] = {
+                "kind": "idle_wander",
+                "seed": rng.randint(0, 2**31 - 1),
+                "radius_grid": SUBTLE_IDLE_WANDER_RADIUS_GRID,
+            }
+    return motion
+
+
 # HCO-specific moment frequency dial: scales the HCT contest's p_event + p_dfoul for HCO ONLY
 # (HCT/FCP keep event_scalar=1.0). Lower = fewer HCO fouls/steals/turnovers. The HCT contest is
 # calibrated for traps (2 defenders); HCO is a single on-ball defender, so we scale it back.
@@ -5212,6 +5244,10 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             beat["_subtle_movement"]["defender_reads"] = _roll_subtle_defender_reads(
                 def_lineup, def_eff, random
             )
+            # Cosmetic render-space idle-wander (fills the frozen tail of the beat; UESS-safe).
+            beat["_subtle_movement"]["idle_motion"] = _roll_subtle_idle_motion(
+                off_lineup, def_lineup, bh_pos, random
+            )
             lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
             elapsed = float(random.randint(lo, hi))
             # Shot-clock expiry backstop: if finishing this beat would leave < 1s, the BH (still
@@ -5432,6 +5468,10 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
                 continue
             beat["_subtle_movement"]["defender_reads"] = _roll_subtle_defender_reads(
                 def_lineup, def_eff, random
+            )
+            # Cosmetic render-space idle-wander (fills the frozen tail of the beat; UESS-safe).
+            beat["_subtle_movement"]["idle_motion"] = _roll_subtle_idle_motion(
+                off_lineup, def_lineup, bh_pos, random
             )
             lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
             elapsed = float(random.randint(lo, hi))

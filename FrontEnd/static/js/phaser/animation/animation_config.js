@@ -135,6 +135,10 @@ const defaults = {
       freqHz: 6,
       durationMs: 660,
     },
+    idleWander: {
+      radiusGrid: 1.0, // Max render-space drift radius (grid units); no gameplay coord change
+      durationMs: 900, // Fallback when the backend omits a per-beat duration
+    },
   },
   possession: {
     msPerTick: 1,
@@ -185,6 +189,7 @@ export const animationConfig = {
     rattle: { ...defaults.flourish.rattle, ...(overrides.flourish?.rattle || {}) },
     gather: { ...defaults.flourish.gather, ...(overrides.flourish?.gather || {}) },
     fumble: { ...defaults.flourish.fumble, ...(overrides.flourish?.fumble || {}) },
+    idleWander: { ...defaults.flourish.idleWander, ...(overrides.flourish?.idleWander || {}) },
   },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,

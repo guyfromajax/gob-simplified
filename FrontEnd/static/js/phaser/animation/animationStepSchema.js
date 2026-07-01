@@ -141,7 +141,7 @@
  *   for any omitted field. First shipped: "reach_in" (defender steal attempt
  *   on a Dynamic-HCT contest moment). Other kinds are accepted-but-unrendered
  *   placeholders for now.
- * @property {("reach_in"|"pump_fake"|"bite"|"gather"|"rattle"|"shot_dip"|"dribble"|"pickup"|"dunk"|"fumble")} kind
+ * @property {("reach_in"|"pump_fake"|"bite"|"gather"|"rattle"|"shot_dip"|"dribble"|"pickup"|"dunk"|"fumble"|"idle_wander")} kind
  * @property {number} [amplitude_grid]   Lunge distance in GRID units (rendered, not gameplay). Omitted → FE default.
  * @property {number} [duration_ms]      Wall-clock out-and-back duration. Omitted → FE default.
  * @property {string} [ease]             Phaser ease (e.g. "Back.easeOut"). Omitted → FE default.
@@ -153,6 +153,8 @@
  * @property {number} [rim_unit_y]       Toward-rim unit vector y (fumble).
  * @property {number} [perp_x]           Rim-perpendicular unit vector x (fumble).
  * @property {number} [perp_y]           Rim-perpendicular unit vector y (fumble).
+ * @property {number} [seed]             Deterministic PRNG seed (idle_wander) — reproduces the exact drift path.
+ * @property {number} [radius_grid]      Max render-space drift radius in GRID units (idle_wander).
  */
 
 /**
