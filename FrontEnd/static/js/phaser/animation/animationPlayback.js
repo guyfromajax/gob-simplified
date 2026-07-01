@@ -8,6 +8,8 @@
  * Backend is the source of truth — it pre-computes start coords, end coords
  * (interrupted positions when applicable), and the step duration. This engine
  * just renders the linear tween from start → end at the prescribed duration.
+ * POS_O FB drives: when ``advance_trigger.metadata.path_knots`` is present,
+ * the gate player chains through meet → shimmy → rim waypoints instead.
  * No advance-trigger detection, no destination math, no per-player rate
  * calculation.
  *
@@ -17,6 +19,10 @@
  */
 
 import { gridToPixels } from "../utils/gridToPixels.js";
+import {
+  resolvePathKnotWaypoints,
+  tweenPlayerThroughPathKnots,
+} from "./pathKnotPlayback.js";
 import { logEoqStep, logEoqSchemaStep, isEoqTraceEnabled } from "../utils/eoqDebugLog.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { attachBallToPlayer } from "./ballManager.js";
@@ -865,6 +871,11 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   // When tween_durations is absent (legacy emitters), fall back to step T.
   const perPlayerDurations = step.start.tween_durations || {};
   const isPassStep = isSchemaPassStep(step);
+  const pathMeta = step.start?.advance_trigger?.metadata || {};
+  const pathKnots = pathMeta.path_knots;
+  const pathSegmentGameSeconds = pathMeta.path_segment_game_seconds;
+  const pathTargetPlayerId =
+    pathMeta.target_player_id != null ? String(pathMeta.target_player_id) : null;
   const shotReleaseGate = shouldAdvanceToShotFlightOnShooterSettle(step, options.steps);
   const releaseShotOnShooterSettle = shotReleaseGate.shouldAdvance;
   const shotReleaseShooterId = shotReleaseGate.shooterId;
@@ -960,7 +971,27 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         ? Math.max(50, Math.round(playerGameSec * clockSecondMs))
         : durationMs;
 
-    const tweenPromise = startSchemaPlayerTween(scene, sprite, endCoord, playerDurationMs, width, height);
+    const pathWaypoints =
+      pathKnots
+      && pathTargetPlayerId
+      && String(playerId) === pathTargetPlayerId
+        ? resolvePathKnotWaypoints(startCoord, pathKnots)
+        : null;
+
+    const tweenPromise = pathWaypoints?.length
+      ? tweenPlayerThroughPathKnots(
+        scene,
+        sprite,
+        startCoord,
+        pathWaypoints,
+        playerDurationMs,
+        pathSegmentGameSeconds,
+        width,
+        height,
+        clockSecondMs,
+        startSchemaPlayerTween,
+      )
+      : startSchemaPlayerTween(scene, sprite, endCoord, playerDurationMs, width, height);
     activeStepTweenSprites.push(sprite);
     stepMoverDurations.push({
       playerId,

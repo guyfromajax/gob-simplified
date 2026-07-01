@@ -355,6 +355,7 @@ def resolve_fb_drive_step(
         t_shimmy = _traverse_seconds(meet, shimmy, bh, "sprint")
         t_rim = _traverse_seconds(shimmy, shot_spot, bh, "sprint")
         payload["t_drive_game_seconds"] = t_bh + t_shimmy + t_rim
+        payload["path_segment_game_seconds"] = [t_bh, t_shimmy, t_rim]
         contested, shot_def_id = _contest_at_shot(ends, shot_spot, is_away_offense=is_away_offense)
         payload["contested"] = contested
         payload["shot_defender_id"] = shot_def_id

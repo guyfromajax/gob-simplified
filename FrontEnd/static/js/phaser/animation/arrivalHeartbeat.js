@@ -118,8 +118,12 @@ function resolveHeartbeatTarget(sprite) {
       mode: "child_local",
       xProp: "x",
       yProp: "y",
-      baseX: Number(firstChild.x),
-      baseY: Number(firstChild.y),
+      // Absolute anchor: the child's TRUE original local position stamped at marker
+      // creation (`__restX/Y`), NOT its current (possibly-drifted) x/y. This is what
+      // breaks the residual-offset perpetuation loop — the heartbeat always re-centers
+      // on the design position. Falls back to current for non-marker sprites.
+      baseX: Number(firstChild.__restX ?? firstChild.x),
+      baseY: Number(firstChild.__restY ?? firstChild.y),
     };
   }
 
@@ -289,7 +293,15 @@ function resolveWanderTargets(sprite) {
       (c) => c && isWritableProperty(c, "x") && isWritableProperty(c, "y"),
     );
     if (movable.length) {
-      const bases = movable.map((c) => ({ c, x: c.x, y: c.y }));
+      // Absolute anchor: capture each child's TRUE original local position (`__restX/Y`,
+      // stamped at marker creation), not its current (possibly-drifted) x/y. `apply` offsets
+      // from it and `restore` snaps back to it, so any prior residual drift self-heals on this
+      // beat instead of being carried forward. Falls back to current for non-marker sprites.
+      const bases = movable.map((c) => ({
+        c,
+        x: c.__restX ?? c.x,
+        y: c.__restY ?? c.y,
+      }));
       return {
         apply: (ox, oy) => {
           for (const b of bases) {

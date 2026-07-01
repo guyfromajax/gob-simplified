@@ -450,6 +450,9 @@ def _build_drive_resolution_animation_steps(
             knots = fb_drive.get("bh_path_knots")
             if knots and fb_drive.get("outcome") == "POS_O":
                 trigger_meta["path_knots"] = knots
+                segs = fb_drive.get("path_segment_game_seconds")
+                if segs:
+                    trigger_meta["path_segment_game_seconds"] = segs
             drive_step = _build_drive_step(
                 start_coords=start_coords,
                 end_coords=end_coords,

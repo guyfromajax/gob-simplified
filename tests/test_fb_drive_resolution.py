@@ -109,6 +109,10 @@ def test_pos_o_path_includes_shimmy_knot(monkeypatch):
     shimmy = result["bh_path_knots"][2]
     assert shimmy["x"] == meet["x"]
     assert abs(shimmy["y"] - meet["y"]) == pytest.approx(2.0)
+    assert len(result["path_segment_game_seconds"]) == 3
+    assert sum(result["path_segment_game_seconds"]) == pytest.approx(
+        result["t_drive_game_seconds"]
+    )
 
 
 def test_d8_foul_skips_charge(monkeypatch):

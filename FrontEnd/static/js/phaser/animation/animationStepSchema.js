@@ -93,7 +93,8 @@
  * @property {number} T_game_seconds
  * @property {Object<string, *>} metadata
  *   Condition-specific extras (e.g. `target_player_id` for
- *   `ball_reaches_player`, `position` for `player_reaches_position`).
+ *   `ball_reaches_player`, `position` for `player_reaches_position`,
+ *   `path_knots` + `path_segment_game_seconds` for POS_O FB drive shimmy).
  *   Loose by design.
  */
 

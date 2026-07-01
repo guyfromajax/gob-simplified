@@ -134,6 +134,17 @@ export function createHeadshotMarkerV2({ scene, player, teamInfo, position, Phas
   // stamina ring → inner hairline → position chip.
   const children = [vig3, vig2, vig1, shadow, insideFill, photoChild, staminaGfx, inner, chipGfx, chipTx];
 
+  // Absolute render-space anchor: stamp each child's TRUE original local position so the
+  // heartbeat + idle-wander systems can baseline/restore to it (not to a captured-from-current,
+  // possibly-drifted value). This is what stops residual "ghost" offsets from perpetuating —
+  // see arrivalHeartbeat.js (`__restX`/`__restY`).
+  for (const child of children) {
+    if (child) {
+      child.__restX = child.x;
+      child.__restY = child.y;
+    }
+  }
+
   const container = scene.add.container(px, py, children);
   container.setSize(96, 168);
   container.setDepth(1);
