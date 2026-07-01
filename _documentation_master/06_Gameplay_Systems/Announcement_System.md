@@ -414,7 +414,7 @@ A banner with a `hold_ms` value freezes **all** on-court animation for that many
 
 | Banner text | Hold | Emitter (file:line) | Beat |
 |---|---|---|---|
-| "Rebound!" (DREB) | 1000ms | `dreb_step_emitter.py:224` | Defensive rebound secured |
+| "Rebound!" (DREB) | 1000ms — **suppressed on DREB→FAST_BREAK** | `dreb_step_emitter.py` | Defensive rebound secured |
 | "Rebound!" (OREB) | 1000ms | `oreb_step_emitter.py:277` | Offensive rebound secured |
 | "Fast Break!" (after steal) | 1000ms (`FB_ANNOUNCE_HOLD_MS`) | `after_steal_fast_break_step_emitter.py:111` | Steal → fast-break drive start |
 | "Fast Break!" (rim runner) | 1000ms | `rim_runner_step_emitter.py:1049` | Rim-runner fast break start |
@@ -434,3 +434,11 @@ A banner with a `hold_ms` value freezes **all** on-court animation for that many
 Constants: `FB_ANNOUNCE_HOLD_MS` = 1000.0 (`after_steal_fast_break_step_emitter.py:58`), `MAKE_HOLD_MS` = 1000.0 (`skeleton_step_emitter.py:2095`), `FUMBLE_ANNOUNCE_HOLD_MS` = 1000 (`constants/dead_ball_fumble_constants.py:9`).
 
 Note: the DREB "Rebound!" hold is the same banner whether the next turn feels clean (shot → DREB) or paused (DREB → HCO/FB); only where it lands in the sequence changes how it feels.
+
+### DREB→FAST_BREAK suppression (2026-06-30, revertible)
+
+The DREB "Rebound!" banner is **suppressed** (banner + its 1000ms hold both removed) when the next play is a fast break, so the break starts with no boundary freeze. DREB→HCO and shot→DREB keep the banner. The rebound **SFX** cue is unaffected — only the visual banner/hold is dropped.
+
+- **Toggle:** `SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK` in `dreb_step_emitter.py` (default `True`). Flip to `False` to restore the banner on fast breaks — nothing else needs to change.
+- **Signal:** `next_is_fast_break` is passed from `game_manager._build_dreb_turn_from_miss` as `bool(game_state["pending_dreb_fb_play_key"])` (set on the miss turn in `shot_manager`, popped later in `phase_resolution` — reliably present at DREB-build time).
+- **Mechanism:** when suppressed, `dreb_step_emitter` sets `step.end.announcement = None`; the FE skips falsy announcements (`if (step.end?.announcement)`), so no banner and no `waitMsRespectingPause` hold.

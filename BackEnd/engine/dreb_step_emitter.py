@@ -50,6 +50,13 @@ from BackEnd.utils.shared import calc_ag_segment_seconds
 
 _OFFENSE_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
+# Revertible toggle (2026-06-30): the DREB "Rebound!" banner carries hold_ms:1000, which
+# freezes the court for a full second at the turn boundary. When the next play is a fast
+# break that pause is dead air that delays the break. Suppress the banner (and its hold)
+# on DREB→FAST_BREAK only. To restore the old behavior, flip this to False — nothing else
+# needs to change. See Announcement_System.md → "Announcements That Carry a Hold".
+SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK = True
+
 
 def _player_iter(off_lineup: Dict[str, Any], def_lineup: Dict[str, Any]):
     for pos in _OFFENSE_POSITIONS:
@@ -83,6 +90,7 @@ def build_dreb_animation_steps(
     offense_rebounders: Optional[List[Any]] = None,
     defense_rebounders: Optional[List[Any]] = None,
     away_offense: bool = False,
+    next_is_fast_break: bool = False,
 ) -> Optional[List[AnimationStep]]:
     """Build the DREB turn's single AnimationStep.
 
@@ -217,6 +225,11 @@ def build_dreb_animation_steps(
             ),
             fouler_id=otb_foul.get("fouler_id") or rebounder_id,
         )
+    elif next_is_fast_break and SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK:
+        # DREB→FAST_BREAK: suppress the "Rebound!" banner + its 1000ms hold so the break
+        # starts immediately (no boundary freeze). Revertible via the module constant.
+        # The rebound SFX cue (start.sfx_on_ball_arrival) is unaffected and still fires.
+        announcement = None
     else:
         announcement = {
             "text": "Rebound!",

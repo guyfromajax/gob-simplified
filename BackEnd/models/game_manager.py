@@ -991,6 +991,12 @@ class GameManager:
             away_offense=(
                 str(self.offense_team.team_id) == str(self.away_team.team_id)
             ),
+            # DREB→FAST_BREAK is flagged on the miss turn via this pending key (set in
+            # shot_manager, consumed later in phase_resolution — still present here).
+            # Used to suppress the "Rebound!" banner's 1000ms hold on fast breaks.
+            next_is_fast_break=bool(
+                self.game_state.get("pending_dreb_fb_play_key")
+            ),
         )
 
         if not animation_steps:
