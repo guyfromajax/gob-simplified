@@ -561,6 +561,31 @@ def rattle_make_settle_sfx(
     }
 
 
+def rebase_animation_step_next_indices(
+    steps: List[Any],
+    base_index: int,
+) -> None:
+    """Offset ``next_step`` / branch indices when appending onto a parent sequence.
+
+    Drive-resolution emitters build a local ``steps`` list with indices
+    0, 1, …; when that list is ``extend``'d after burst/outlet/setup steps,
+    every pointer must shift by ``len(parent_steps)`` or playback loops.
+    """
+    if base_index <= 0 or not steps:
+        return
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        nxt = (step.get("end") or {}).get("next")
+        if not isinstance(nxt, dict):
+            continue
+        kind = nxt.get("kind")
+        if kind == "next_step" and "index" in nxt:
+            nxt["index"] = int(nxt["index"]) + base_index
+        elif kind == "branch" and "next_step_index" in nxt:
+            nxt["next_step_index"] = int(nxt["next_step_index"]) + base_index
+
+
 def stamp_tween_durations(
     start: Dict[str, Any],
     end_coords: Dict[str, GridCoord],

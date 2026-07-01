@@ -864,6 +864,11 @@ def build_triangle_animation_steps(
             fb_roles=fb_roles,
         )
         if dr_steps:
+            from BackEnd.utils.animation_step_helpers import (
+                rebase_animation_step_next_indices,
+            )
+
+            rebase_animation_step_next_indices(dr_steps, len(steps))
             steps.extend(dr_steps)
             return _finalize_rr_steps(turn_result, game, steps)
 

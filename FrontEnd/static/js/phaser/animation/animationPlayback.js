@@ -1291,6 +1291,13 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       });
       return { event: next.event, payload: next.payload };
     }
+    if (next.kind === "end_of_turn") {
+      tracePlayback(scene, "turn:end-of-turn", {
+        turnIndex: options.turnData?.index ?? null,
+        currentIndex,
+      });
+      return null;
+    }
     if (next.kind === "next_step") {
       currentIndex = next.index;
       continue;

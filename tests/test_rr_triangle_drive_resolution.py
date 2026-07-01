@@ -255,3 +255,82 @@ def test_emitter_finisher_drive_includes_path_knots_metadata():
     meta = drive_step["start"]["advance_trigger"]["metadata"]
     assert meta.get("path_knots") is not None
     assert meta["kind"] == "rim_runner_drive"
+
+
+def test_rebase_animation_step_next_indices_offsets_next_step_pointers():
+    from BackEnd.utils.animation_step_helpers import rebase_animation_step_next_indices
+
+    steps = [
+        {"end": {"next": {"kind": "next_step", "index": 1}}},
+        {"end": {"next": {"kind": "next_step", "index": 2}}},
+        {"end": {"next": {"kind": "end_of_turn"}}},
+    ]
+    rebase_animation_step_next_indices(steps, 4)
+    assert steps[0]["end"]["next"]["index"] == 5
+    assert steps[1]["end"]["next"]["index"] == 6
+    assert steps[2]["end"]["next"]["kind"] == "end_of_turn"
+
+
+def test_finisher_meet_step_rebased_next_index_and_motion():
+    """Meet step local next=1 must become global base+1; defenders get interrupted coords."""
+    from BackEnd.utils.animation_step_helpers import rebase_animation_step_next_indices
+
+    meet = {"x": 70, "y": 25}
+    shot_spot = {"x": 88, "y": 25}
+    end_coords = {
+        f"Lancaster-{pos}": {"x": 60.0, "y": 25.0}
+        for pos in ("PG", "SG", "SF", "PF", "C")
+    }
+    end_coords["Lancaster-PF"] = dict(shot_spot)
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        end_coords[f"Bentley-Truman-{pos}"] = {"x": 91.0, "y": 25.0}
+
+    start_coords = {pid: {"x": 65.0, "y": 25.0} for pid in end_coords}
+    turn_result = {
+        "result_type": "MAKE",
+        "shooter": SimpleNamespace(player_id="Lancaster-PF"),
+        "meet_coords": meet,
+        "bh_target": shot_spot,
+        "t_meet_game_seconds": 1.0,
+        "t_shooter_game_seconds": 2.0,
+        "rr_end_coords": end_coords,
+        "roles": {"rim_runner_burst_phase": {"rr_id": "Lancaster-PF"}},
+        "fb_drive_resolution": {
+            "outcome": "NEUTRAL",
+            "stop_decision": {"action": "shoot"},
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 2.0,
+            "defender_archetypes": {"Bentley-Truman-PG": "sprint"},
+        },
+        "stop_decision_action": "shoot",
+        "shot_score_pre_defense": 100,
+        "shot_defense_score_for_sfx": 0,
+        "shot_type": "attack",
+    }
+
+    game = build_mock_game()
+    for team in (game.home_team, game.away_team):
+        for pos, player in team.lineup.items():
+            player.player_id = f"{team.name}-{pos}"
+            player.coords = {"x": 50.0, "y": 25.0}
+
+    dr_steps = _build_finisher_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        off_lineup=game.home_team.lineup,
+        def_lineup=game.away_team.lineup,
+        is_away_offense=False,
+        clock_remaining=600.0,
+        shot_clock_remaining=24.0,
+        fb_roles=turn_result["roles"],
+    )
+    assert dr_steps is not None
+    base = 4
+    rebase_animation_step_next_indices(dr_steps, base)
+
+    meet_step = dr_steps[0]
+    assert meet_step["end"]["next"]["index"] == base + 1
+    assert meet_step["start"].get("tween_durations")
+    def_end = meet_step["end"]["coords"]["Bentley-Truman-PG"]
+    assert def_end["x"] < 91.0

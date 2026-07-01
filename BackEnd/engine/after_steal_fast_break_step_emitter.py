@@ -53,6 +53,12 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.utils.animation_step_helpers import (
+    _ag_grid_per_game_sec,
+    _motion_end_toward_dest,
+    _player_lookup_by_id,
+    stamp_tween_durations,
+)
 
 
 FB_ANNOUNCE_HOLD_MS: float = 1000.0
@@ -103,6 +109,33 @@ def _build_start_coords(
     return start
 
 
+def _apply_drive_step_motion(
+    *,
+    start_coords: Dict[str, GridCoord],
+    full_end_coords: Dict[str, GridCoord],
+    archetypes: Dict[str, PlayerArchetype],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    step_t: float,
+    gate_player_id: str,
+    gate_target: GridCoord,
+) -> Dict[str, GridCoord]:
+    """Interrupted end coords at ``step_t``: gate player → ``gate_target``;
+    all others → their semantic destination in ``full_end_coords``."""
+    interrupted: Dict[str, GridCoord] = {}
+    for pid, sc in start_coords.items():
+        arch = archetypes.get(pid, "sprint")
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        if pid == gate_player_id:
+            target = gate_target
+        else:
+            target = full_end_coords.get(pid, sc)
+        ec, _ = _motion_end_toward_dest(sc, target, rate, step_t)
+        interrupted[pid] = ec
+    return interrupted
+
+
 def _fb_secondary_announcement(team: str) -> Announcement:
     """Drive step start announcement: ``Fast Break!`` (secondary tier)."""
     return {
@@ -125,6 +158,9 @@ def _build_drive_step(
     shot_clock_remaining: float,
     t_game_seconds: float,
     next_step_index: int,
+    off_lineup: Optional[Dict[str, Any]] = None,
+    def_lineup: Optional[Dict[str, Any]] = None,
+    archetypes_override: Optional[Dict[str, PlayerArchetype]] = None,
 ) -> AnimationStep:
     """The single drive step: stealer sprints to BH target while defenders
     sprint to defender target (with first-arrival freeze) and other-4
@@ -136,12 +172,25 @@ def _build_drive_step(
     the trigger's ``T_game_seconds`` (sprint archetype).
     """
     actions: Dict[str, PlayerAction] = {pid: "sprint" for pid in start_coords}
-    archetypes: Dict[str, PlayerArchetype] = {
-        pid: "sprint" for pid in start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
+    archetypes: Dict[str, PlayerArchetype] = dict(archetypes_override or {})
+    for pid in start_coords:
+        archetypes.setdefault(pid, "sprint")
+    full_end_coords = {
         pid: dict(end_coords.get(pid, start_coords[pid])) for pid in start_coords
     }
+    destinations: Dict[str, Optional[GridCoord]] = dict(full_end_coords)
+    step_end_coords = dict(full_end_coords)
+    if off_lineup is not None and def_lineup is not None:
+        step_end_coords = _apply_drive_step_motion(
+            start_coords=start_coords,
+            full_end_coords=full_end_coords,
+            archetypes=archetypes,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_t=float(t_game_seconds),
+            gate_player_id=stealer_id,
+            gate_target=bh_target,
+        )
     # Stealer's archetype for the drive itself is sprint; he ends the drive
     # in shot motion at the BH target. The post-shot sub-step builder
     # transitions the shot animation from there.
@@ -173,8 +222,16 @@ def _build_drive_step(
         "advance_trigger": trigger,
         "announcement": _fb_secondary_announcement(team),
     }
+    if off_lineup is not None and def_lineup is not None:
+        stamp_tween_durations(
+            start,
+            step_end_coords,
+            float(t_game_seconds),
+            off_lineup,
+            def_lineup,
+        )
     end: StepEnd = {
-        "coords": dict(end_coords),
+        "coords": step_end_coords,
         "ball": {"owner_player_id": stealer_id},
         "time_elapsed": float(t_game_seconds),
         "clock": {
@@ -209,6 +266,8 @@ def _build_meet_drive_step(
     next_step_index: int,
     fb_drive: Dict[str, Any],
     end_announcement: Optional[Announcement] = None,
+    off_lineup: Optional[Dict[str, Any]] = None,
+    def_lineup: Optional[Dict[str, Any]] = None,
 ) -> AnimationStep:
     """Drive step gated on BH + stopper reaching the cutoff meet."""
     actions: Dict[str, PlayerAction] = {pid: "sprint" for pid in start_coords}
@@ -217,7 +276,22 @@ def _build_meet_drive_step(
     )
     for pid in start_coords:
         archetypes.setdefault(pid, "sprint")
-    destinations = {pid: dict(end_coords.get(pid, start_coords[pid])) for pid in start_coords}
+    full_end_coords = {
+        pid: dict(end_coords.get(pid, start_coords[pid])) for pid in start_coords
+    }
+    destinations = dict(full_end_coords)
+    step_end_coords = dict(full_end_coords)
+    if off_lineup is not None and def_lineup is not None:
+        step_end_coords = _apply_drive_step_motion(
+            start_coords=start_coords,
+            full_end_coords=full_end_coords,
+            archetypes=archetypes,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            step_t=float(t_game_seconds),
+            gate_player_id=stealer_id,
+            gate_target=meet_target,
+        )
     actions[stealer_id] = "handle_ball"
 
     trigger: AdvanceTrigger = {
@@ -243,8 +317,16 @@ def _build_meet_drive_step(
         "advance_trigger": trigger,
         "announcement": _fb_secondary_announcement(team),
     }
+    if off_lineup is not None and def_lineup is not None:
+        stamp_tween_durations(
+            start,
+            step_end_coords,
+            float(t_game_seconds),
+            off_lineup,
+            def_lineup,
+        )
     end: StepEnd = {
-        "coords": dict(end_coords),
+        "coords": step_end_coords,
         "ball": {"owner_player_id": stealer_id},
         "time_elapsed": float(t_game_seconds),
         "clock": {
@@ -364,6 +446,8 @@ def _build_drive_resolution_animation_steps(
             next_step_index=1 if result_type in ("MAKE", "MISS") else 0,
             fb_drive=fb_drive,
             end_announcement=end_ann,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
         )
         if result_type == "DEFENSIVE_STOP" or is_terminal:
             meet_step["end"]["next"] = {"kind": "end_of_turn"}
@@ -427,6 +511,8 @@ def _build_drive_resolution_animation_steps(
                 shot_clock_remaining=shot_r,
                 t_game_seconds=max(0.35, t_shot * 0.15),
                 next_step_index=len(steps) + 1,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
             )
             shot_drive["start"]["action"][stealer_id] = "shoot"
             steps.append(shot_drive)
@@ -463,6 +549,9 @@ def _build_drive_resolution_animation_steps(
                 shot_clock_remaining=shot_clock_remaining,
                 t_game_seconds=t_drive,
                 next_step_index=1,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                archetypes_override=fb_drive.get("defender_archetypes"),
             )
             drive_step["start"]["advance_trigger"]["metadata"] = trigger_meta
             steps = [drive_step]
@@ -611,6 +700,8 @@ def build_after_steal_fast_break_animation_steps(
         shot_clock_remaining=shot_clock_remaining,
         t_game_seconds=t_drive,
         next_step_index=1,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
     )
     steps: List[AnimationStep] = [drive_step]
 

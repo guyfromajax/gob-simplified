@@ -818,6 +818,8 @@ def _build_cr_drive_resolution_animation_steps(
             next_step_index=len(steps) + (1 if result_type in ("MAKE", "MISS") else 0),
             fb_drive=fb_drive,
             end_announcement=end_ann,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
         )
         if result_type == "DEFENSIVE_STOP" or is_terminal:
             meet_step["end"]["next"] = {"kind": "end_of_turn"}
@@ -882,6 +884,8 @@ def _build_cr_drive_resolution_animation_steps(
                 shot_clock_remaining=shot_r,
                 t_game_seconds=max(0.35, t_shot * 0.15),
                 next_step_index=len(steps) + 1,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
             )
             shot_drive["start"]["action"][stealer_id] = "shoot"
             if shot_drive["start"].get("advance_trigger"):
@@ -921,6 +925,9 @@ def _build_cr_drive_resolution_animation_steps(
                 shot_clock_remaining=shot_r if has_outlet_pass else shot_clock_remaining,
                 t_game_seconds=t_drive,
                 next_step_index=len(steps) + 1,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                archetypes_override=fb_drive.get("defender_archetypes"),
             )
             drive_step["start"]["advance_trigger"]["metadata"] = trigger_meta
             steps.append(drive_step)
