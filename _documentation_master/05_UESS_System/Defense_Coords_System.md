@@ -228,6 +228,21 @@ assignments[closest_defender] = coords
 
 `shared_defense.py` also hosts the HCT trap-defense placement built on the same zone machinery: `HCT_STANDARD_UPPER_SHIFT` / `HCT_STANDARD_LOWER_SHIFT` zone constants (stored home-defending orientation, flipped via `_get_zone_coords` like the HCO zones), `compute_hct_trap_formation()` (two trap defenders offset around the ball handler inside a clamp box), and `resolve_hct_defender_collisions()` (HCT-only same-coordinate collision resolution). Animator entry point: `_position_hct_zone_defenders`. Gameplay rules live in `05_GP_Supporting_Systems/FCP_HCT_System.md`.
 
+### Per-Step Timing: The Two-Handler Pass Step (2026-07)
+
+The sections above cover **where** defenders go. This covers **when** across skeleton steps. `_position_zone_defenders` / `_position_standard_defenders` compute a defender coord per skeleton step, keyed on the **current ball handler** for that step (`hasBallAtStep[step_index]`). The emitter reads `end = movement index i+1`, so a coord authored at step S surfaces as the **end of emitted step S−1**.
+
+**The bug this caused:** on a pass, `hasBallAtStep` flips to the receiver **instantly** at step S. So the defenders' post-pass (receiver-coverage) layout landed at index S → the **end of emitted step S−1** → defenders rotated to guard the receiver a **full beat before** the ball ever detached. Worst in zone (big shell shifts); present but subtle in man.
+
+**The fix — two-handler model:** a pass step is the one step with two *sequential, non-overlapping* ball handlers — the **passer owns the start**, the **receiver owns the end**. So on a step where the ball handler flips vs. the previous step (a pass), the defender's animation **holds at his previous (passer-owned) coord** (`def_movement[-1]`), which makes his rotation to the receiver render **across the pass step**, starting the instant the ball detaches (in unison). Implemented in `_position_zone_defenders` and `_position_standard_defenders` (animator.py) via a `prev_ball_handler_pos` tracker + a pass-step hold.
+
+**Gameplay-safety (animation-only):** the change touches only animation coords, not outcomes —
+- the zone **assignment map** (`zone_defender_assignments_by_step`, read by `_resolve_hco_shot_defenders` for shot contest) is still computed at the **true** step;
+- the hold is **guarded off the final step**, so `player.coords` (synced from the last animation coord and read by the attack-drive geometry contest) is **unchanged**;
+- no extra `assign_all_zone_defenders` / `get_defender_coords` call, so the global RNG stream is untouched (SS&S-reproducible).
+
+**Not addressed (follow-up knobs):** the lag fixes the *beat-early* rotation but does **not** duration-match — a short defender shift still finishes early *within* the pass flight (the 50ms-vs-255ms mismatch). Optional polish: a per-defender pass-step tween delay ("read then commit", ~40% of ball flight) or stretching the defender move to span the ball flight. Both layer on top of the corrected endpoints; attribute-driven timing is a candidate here.
+
 ### Key Files
 
 - `BackEnd/utils/shared_defense.py` - Core defender coordinate logic

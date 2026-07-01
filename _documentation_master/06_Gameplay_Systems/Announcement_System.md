@@ -427,7 +427,7 @@ A banner with a `hold_ms` value freezes **all** on-court animation for that many
 | "Great Stop!" | 1000ms | `covert_release_step_emitter.py:1135` | Defensive stop |
 | "Interception!" | 1000ms | `rim_runner_step_emitter.py:1303` | Fast-break pass intercepted |
 | "No Fast Break" | 1000ms | `rim_runner_step_emitter.py:1580` | Fast break denied |
-| "FB Outlet Pass Denied!" | 1000ms | `rim_runner_step_emitter.py:1709` | Outlet pass denied |
+| "FB Outlet Pass Denied!" | ~~1000ms~~ **non-blocking** | `rim_runner_step_emitter.py` | Outlet pass denied |
 | "Out of bounds!" | 650ms | `rim_runner_step_emitter.py:1443` | Ball batted OOB |
 | Turnover headline (e.g. "TURNOVER!") | 1000ms (`FUMBLE_ANNOUNCE_HOLD_MS`) | `dead_ball_fumble.py:161` | Dead-ball fumble turnover |
 
@@ -448,5 +448,28 @@ The DREB "Rebound!" banner is **suppressed** (banner + its 1000ms hold both remo
 A schema announcement flagged **`non_blocking: true`** shows its overlay **without freezing play** — no clock pause, no `hold_ms` wait. The callout rides *alongside* the step's live motion instead of gating it. This is the reusable alternative to suppression when you want to keep the banner but drop the freeze.
 
 - **Mechanism:** `animationPlayback.js` → `runStepAnnouncement` early-returns after showing the overlay when `non_blocking` is set (skips the clock pause + `waitMsRespectingPause`). `hold_ms` is ignored for the freeze; the overlay's on-screen duration is owned by `court.html`.
-- **In use:** the RR + Triangle fast-break **lane-pass** "Fast Break!" callouts (`rim_runner_step_emitter.py`, `triangle_step_emitter.py`). These previously froze the court for 1000ms **before** the pass to the rim runner (a schema `step.start.announcement` hold); now the banner shows while the lane pass animates. To revert to the freeze, remove `non_blocking` from those two announcement dicts.
+- **In use:** the RR + Triangle fast-break **lane-pass** "Fast Break!" callouts (`rim_runner_step_emitter.py`, `triangle_step_emitter.py`) and the **"FB Outlet Pass Denied!"** callout (`rim_runner_step_emitter.py`, 2026-07-01). These previously froze the court for a full second; now the banner shows while the beat animates. To revert, remove `non_blocking` from the announcement dict.
 - **Note:** setting `hold_ms: 0` alone does **not** remove a freeze — the FE defaults a non-positive hold to 1000ms (`animationPlayback.js`). Use `non_blocking` (show + continue) or drop the announcement (suppress) instead.
+
+### Secondary-style announcements — freeze status (2026-07-01)
+
+Secondary-tier **schema** announcements (`style: "secondary"`) freeze animation exactly like primary ones — a blocking `hold_ms` awaited in `runStepAnnouncement` — **unless** flagged `non_blocking`. (Separately, FE **`showSecondaryAnnouncement`** calls — e.g. the legacy fast-break callouts in `fastBreak.js` — are fire-and-forget and **never** freeze; they're not in this list.)
+
+**Secondary-style that FREEZE:**
+
+| Banner | Hold | Emitter | Beat |
+|---|---|---|---|
+| "Great Stop!" | 1000ms | `covert_release_step_emitter.py` | Defensive stop |
+| "Interception!" | 1000ms | `rim_runner_step_emitter.py` | Fast-break pass intercepted |
+| "No Fast Break" | 1000ms | `rim_runner_step_emitter.py` | Fast break denied |
+| "Out of bounds!" | 650ms | `rim_runner_step_emitter.py` | Ball batted OOB |
+
+**Secondary-style that are non-blocking (show, don't freeze):**
+
+| Banner | Emitter | Beat |
+|---|---|---|
+| "Fast Break!" (rim runner) | `rim_runner_step_emitter.py` | Lane pass to RR |
+| "Fast Break!" (triangle) | `triangle_step_emitter.py` | Lane pass to RR |
+| "FB Outlet Pass Denied!" | `rim_runner_step_emitter.py` | Outlet denied |
+
+Note: the after-steal "Fast Break!" drive callout is `style: "primary"` (not secondary) — it's in the primary/master table above.

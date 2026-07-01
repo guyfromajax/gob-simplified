@@ -88,10 +88,11 @@ function shouldTracePlayback(scene = null) {
   return Boolean(scene?.__uessTracePlayback);
 }
 
-// Item 4 (defender/ball desync) debugging session: these labels print by default,
-// no `window.UESS_TRACE_PLAYBACK` needed. Every other trace label stays flag-gated so
-// the console isn't flooded by per-step/per-turn traces. To revert, empty this set.
-const ALWAYS_TRACE_LABELS = new Set(["pass:release", "step:movers"]);
+// Labels that print WITHOUT the `window.UESS_TRACE_PLAYBACK` flag. Kept empty by default so
+// the prod console stays clean; the full trace layer (incl. `pass:release` with `moversFlat`
+// and per-step `step:movers`) is preserved and prints on demand via
+// `window.UESS_TRACE_PLAYBACK = true`. Add a label here to force it always-on for a debug pass.
+const ALWAYS_TRACE_LABELS = new Set();
 
 function tracePlayback(scene, label, payload = {}) {
   if (!ALWAYS_TRACE_LABELS.has(label) && !shouldTracePlayback(scene)) return;

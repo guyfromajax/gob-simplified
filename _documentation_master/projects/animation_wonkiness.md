@@ -86,6 +86,8 @@ So: this is **engineering, not a Claude Design task.** Claude Design would only 
 
 **But** the live Motion/Set-Play schema engine appears to already do this correctly: player tweens (incl. defenders) and the ball transition start in one synchronous block (`animationPlayback.js:922-956`), and the pass-step code explicitly comments *"release at step start in parallel with all player tweens (passer, receivers, defenders)"* (`animationPlayback.js:304-315`). So either (a) the desync seen is on HCO branches that *don't* emit `animation_steps` and fall back to the legacy engine, or (b) there's a subtler timing detail inside `renderBallTransition`. **This is the one bucket that can't be fully closed from static tracing** — it needs a runtime check: add a trace to confirm which engine renders a Set-Play-vs-Zone pass step that visibly desyncs.
 
+**✅ FIXED (2026-07-01) — it was neither (a) nor (b): a BACKEND step-placement off-by-one.** Live `pass:release` + `step:movers` telemetry (schema engine, `UESS_TRACE_PLAYBACK`) proved the ball detaches in unison (`elapsedMs≈0`) and everything within the pass step starts together. The desync was **cross-step**: the defenders' post-pass rotation was authored a full beat *early*. Cause: defender placement keys off `hasBallAtStep`, which flips to the **receiver instantly** at the pass step S; combined with the emitter's `end = i+1` read, the receiver-coverage coord surfaced as the **end of emitted step S−1**. Fix (two-handler model): on a pass step the defender **holds his pre-pass (passer-owned) coord** so the rotation renders *across* the pass step, in unison with the ball — in `_position_zone_defenders` + `_position_standard_defenders` (animator.py). Animation-only + gameplay-safe (assignment map at true step, final coord untouched, RNG stream unchanged). Full writeup: `05_UESS_System/Defense_Coords_System.md` → "Per-Step Timing: The Two-Handler Pass Step". Follow-up knob (optional): duration-match / ~40% "read-then-commit" reaction delay, possibly attribute-driven.
+
 ---
 
 ## How I'd sequence this
@@ -95,6 +97,6 @@ So: this is **engineering, not a Claude Design task.** Claude Design would only 
 | 1 | Turn-transition pauses | Backend emitters (2 files) | **High** | Low — start here, biggest win/effort |
 | 2 | HCO step pauses (Motion) | Backend (clock/visual split) | **High** | Medium |
 | 3 | RR/Triangle FB step pause | Frontend fastBreak.js | **✅ Fixed 2026-06-30** | Low–Med |
-| 4 | Defender/ball desync | Needs engine confirmation first | **Medium** | Investigate before fixing |
+| 4 | Defender/ball desync | Backend animator (step placement) | **✅ Fixed 2026-07-01** | Two-handler pass-step lag |
 
 Recommended order: knock out **Bucket 2 first** (two conditional `hold_ms` edits, immediately visible), then **Bucket 3**, then **Bucket 1** (the clock-vs-visual split is the meatiest but well-understood), and treat **Bucket 4** as investigate-then-fix rather than assuming the legacy-engine patch applies.

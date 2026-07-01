@@ -1710,7 +1710,10 @@ def _build_outlet_denied_defender_step(
         "team": defense_team,
         "player_data": _build_player_data(defender_player, fallback_id=defender_id),
         "meta": {"sfx": "fb_outlet_denied_court"},
+        # Non-blocking: the callout rides alongside the denied-outlet beat instead of
+        # freezing the court for a full second. See Announcement_System.md.
         "hold_ms": 1000,
+        "non_blocking": True,
         "style": "secondary",
     }
 
