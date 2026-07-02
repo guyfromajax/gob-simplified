@@ -912,6 +912,10 @@ def _build_lane_pass_step(
     split basket vs same-half ``midPost`` when two or more). All help
     defenders/offense freeze at interrupted coords when the ball reaches RR.
 
+    Step ``T`` = ball flight time only (``ball_reaches_player``). RR may still
+    be en route to ``catch_grid``; ``end.coords[rr]`` = pass meet point, not
+    the full catch spot when the ball arrives first.
+
     ``step.start.announcement = "Fast Break!"`` secondary, offense side,
     passer headshot, decision pill + FB play subtitle.
     """
@@ -953,15 +957,13 @@ def _build_lane_pass_step(
             ball_rate=pass_rate,
         )
         ball_pass_t = _traversal_seconds(bh_coord, meet_point, pass_rate)
-        rr_time = _traversal_seconds(rr_coord, catch_grid, rr_rate)
     else:
         catch_grid = dict(rr_coord)
         meet_point = dict(catch_grid)
         rr_archetype = "stationary"
         ball_pass_t = _traversal_seconds(bh_coord, meet_point, pass_rate)
-        rr_time = 0.0
 
-    t = max(float(FB_PASS_MIN_GAME_SECONDS), ball_pass_t, rr_time)
+    t = float(ball_pass_t)
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
     archetype: Dict[str, PlayerArchetype] = {
@@ -979,7 +981,7 @@ def _build_lane_pass_step(
     if lead_pass:
         archetype[rr_id] = _rr_payload_archetype(phase)
         destinations[rr_id] = dict(catch_grid)
-        end_coords[rr_id] = dict(catch_grid)
+        end_coords[rr_id] = dict(meet_point)
     else:
         archetype[rr_id] = "stationary"
 
@@ -1036,7 +1038,7 @@ def _build_lane_pass_step(
         "metadata": {
             "from_player_id": bh_id,
             "to_player_id": rr_id,
-            "target_coords": dict(catch_grid),
+            "target_coords": dict(meet_point),
             "pass_grid_per_game_second": float(pass_rate),
         },
     }

@@ -344,13 +344,16 @@ def test_lane_pass_step_lead_pass_moves_help_defenders():
     assert step is not None
     assert step["start"]["pass_grid_per_game_second"] == 40.0
     assert step["start"]["ball_arrival_coord"] is not None
-    assert step["end"]["coords"]["rr"]["x"] == 87.0
+    assert step["end"]["coords"]["rr"] == step["start"]["ball_arrival_coord"]
+    assert step["end"]["coords"]["rr"]["x"] < 87.0
+    assert step["start"]["destination"]["rr"]["x"] == 87.0
     assert step["start"]["destination"]["trail"]["x"] == 87.0
     assert step["start"]["destination"]["gb1"]["x"] == 87.0
     assert step["start"]["destination"]["gb2"]["x"] == 80.0
     assert step["start"]["action"]["trail"] == "cut"
-    assert step["start"]["archetype"]["trail"] == "sprint"
-    assert step["end"]["time_elapsed"] >= 0.5
+    assert step["start"]["archetype"]["trail"] == "standard"
+    assert step["end"]["time_elapsed"] == step["start"]["advance_trigger"]["T_game_seconds"]
+    assert step["start"]["advance_trigger"]["condition"] == "ball_reaches_player"
 
 
 def test_lane_pass_step_no_lead_passes_to_rr_start():
