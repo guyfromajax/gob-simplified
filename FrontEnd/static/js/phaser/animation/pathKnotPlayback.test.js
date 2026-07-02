@@ -54,6 +54,47 @@ test("computePathSegmentDurationsMs splits proportionally when segments missing"
   assert.equal(durations[1], 500);
 });
 
+test("computePathSegmentDurationsMs stretches segment 0 when rendered start is farther than backend anchor", () => {
+  const renderedStart = { x: 40, y: 25 }; // |40-75| = 35 from meet
+  const backendStart = { x: 60, y: 25 }; // |60-75| = 15 (backend-assumed)
+  const waypoints = [
+    { x: 75, y: 25 },
+    { x: 75, y: 27 },
+    { x: 88, y: 25 },
+  ];
+  const durations = computePathSegmentDurationsMs(
+    renderedStart,
+    waypoints,
+    9999,
+    [1.0, 0.5, 0.8],
+    350,
+    backendStart,
+  );
+  // Preserve backend speed: seg0 scaled by rendered/assumed = 35/15.
+  assert.equal(durations[0], Math.round(350 * (35 / 15)));
+  assert.equal(durations[1], 175);
+  assert.equal(durations[2], 280);
+});
+
+test("computePathSegmentDurationsMs never shrinks segment 0 when rendered start is closer", () => {
+  const renderedStart = { x: 70, y: 25 }; // closer to meet than backend anchor
+  const backendStart = { x: 60, y: 25 };
+  const waypoints = [
+    { x: 75, y: 25 },
+    { x: 75, y: 27 },
+    { x: 88, y: 25 },
+  ];
+  const durations = computePathSegmentDurationsMs(
+    renderedStart,
+    waypoints,
+    9999,
+    [1.0, 0.5, 0.8],
+    350,
+    backendStart,
+  );
+  assert.equal(durations[0], 350);
+});
+
 test("gridDistance is euclidean on grid coords", () => {
   assert.equal(gridDistance({ x: 0, y: 0 }, { x: 3, y: 4 }), 5);
 });

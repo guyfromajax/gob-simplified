@@ -636,15 +636,22 @@ def build_shot_micro_steps(
                 away_offense,
                 pump_direction=pump_dir,
             )
-            end_coords[defender_id] = def_end
             actions[defender_id] = "guard_ball" if kind == "shot" else "stationary"
             archetypes[defender_id] = "standard"
             destinations[defender_id] = def_end
-            if defender_player and kind in ("move", "move_to", "shot"):
+            # Clamp the contest to what the defender can actually cover in this
+            # (short) micro beat. def_end is the semantic target next to the
+            # shooter; if the defender is far away, rendering the full target
+            # over a ~140ms beat teleports him across the court (jet). Interrupt
+            # his motion at his standard rate × step_t so he closes what he can.
+            if defender_player is not None:
                 rate = _ag_grid_per_game_sec(defender_player, "standard")
-                _, _ = _motion_end_toward_dest(
+                clamped, _ = _motion_end_toward_dest(
                     current_coords[defender_id], def_end, rate, step_t,
                 )
+                end_coords[defender_id] = clamped
+            else:
+                end_coords[defender_id] = def_end
 
         clock_step_start: ClockState = {
             "clock_remaining": clock_remaining - elapsed_total,

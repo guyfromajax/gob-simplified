@@ -614,3 +614,49 @@ def test_finisher_pace_uses_standard_for_driver_and_cutoff_defenders():
     assert archetypes["Lancaster-PF"] == "standard"
     assert archetypes["Bentley-Truman-PG"] == "standard"
     assert archetypes["Lancaster-PG"] == "sprint"
+
+
+def test_reachable_defender_ends_clamps_far_defender_for_rebound_geo():
+    """A defender who can't physically get back must not be collapsed onto the
+    rim — otherwise he can win the board / be picked as contester from a spot he
+    never reached (the far-rebounder + closeout-jet bug)."""
+    from BackEnd.engine.cutoff_resolution import POSITIONS
+    from BackEnd.engine.fb_drive_resolution import (
+        _build_defender_ends_at_basket,
+        _reachable_defender_ends,
+    )
+    from BackEnd.utils.animation_step_helpers import (
+        _ag_grid_per_game_sec,
+        _euclid,
+    )
+
+    pos_near, pos_far = POSITIONS[0], POSITIONS[1]
+    near = SimpleNamespace(player_id="d_near", attributes={"AG": 50})
+    far = SimpleNamespace(player_id="d_far", attributes={"AG": 50})
+    def_lineup = {pos_near: near, pos_far: far}
+    def_starts = {pos_near: {"x": 88.0, "y": 25.0}, pos_far: {"x": 18.0, "y": 25.0}}
+
+    ends, arch = _build_defender_ends_at_basket(
+        def_lineup, def_starts, is_away_offense=False,
+    )
+    basket = dict(ends["d_far"])
+    # Baseline bug: both defenders collapsed onto the rim.
+    assert _euclid(def_starts[pos_far], basket) > 30.0
+
+    time_budget = 1.0
+    clamped = _reachable_defender_ends(
+        ends,
+        def_lineup=def_lineup,
+        def_starts=def_starts,
+        archetypes=arch,
+        time_budget=time_budget,
+    )
+
+    far_rate = _ag_grid_per_game_sec(far, arch["d_far"])
+    moved = _euclid(def_starts[pos_far], clamped["d_far"])
+    # Far defender only covers what his rate allows in the drive window …
+    assert moved <= far_rate * time_budget + 1e-6
+    # … so he is NOT sitting under the rim in the selection geometry.
+    assert _euclid(clamped["d_far"], basket) > 1.0
+    # Near defender is within reach and still lands at the rim.
+    assert _euclid(clamped["d_near"], ends["d_near"]) < 1e-6

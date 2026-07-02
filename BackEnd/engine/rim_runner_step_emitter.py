@@ -59,6 +59,7 @@ from BackEnd.constants import (
     HOME_RIM_COORDS,
 )
 from BackEnd.engine.skeleton_step_emitter import _compute_pass_meet_point
+from BackEnd.utils.animation_step_helpers import floor_step_t_to_traversal
 from BackEnd.utils.shared import get_away_player_coords
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
@@ -2091,7 +2092,9 @@ def _build_finisher_drive_resolution_steps(
             stealer_rate = _ag_grid_per_game_sec(
                 _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
             )
-            t_meet = max(t_meet, _traversal_seconds(stealer_start, meet_target, stealer_rate))
+            t_meet = floor_step_t_to_traversal(
+                t_meet, stealer_start, meet_target, stealer_rate
+            )
         end_ann = None
         if result_type == "DEFENSIVE_STOP":
             end_ann = _build_nice_stop_announcement(
@@ -2174,8 +2177,8 @@ def _build_finisher_drive_resolution_steps(
                 shooter_rate = _ag_grid_per_game_sec(
                     _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
                 )
-                gather_t = max(
-                    gather_t, _traversal_seconds(shooter_now, bh_target, shooter_rate)
+                gather_t = floor_step_t_to_traversal(
+                    gather_t, shooter_now, bh_target, shooter_rate
                 )
             shot_drive = _build_drive_step(
                 start_coords=step_start_coords,

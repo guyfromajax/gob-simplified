@@ -990,6 +990,7 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         height,
         clockSecondMs,
         startSchemaPlayerTween,
+        Array.isArray(pathKnots) ? pathKnots[0] : null,
       )
       : startSchemaPlayerTween(scene, sprite, endCoord, playerDurationMs, width, height);
     activeStepTweenSprites.push(sprite);

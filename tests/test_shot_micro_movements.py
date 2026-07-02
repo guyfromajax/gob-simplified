@@ -202,6 +202,65 @@ class TestAwayOutsideDribbleMirror:
         assert steps[2]["start"]["coords"]["s1"]["x"] < 50.0
 
 
+class TestContestDefenderNoJet:
+    """A far contest defender must not be teleported next to the shooter over a
+    short micro beat. Every micro step must keep the defender within his
+    standard-rate reach for that step's duration."""
+
+    def _player(self, pid, x, y):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            player_id=pid,
+            coords={"x": x, "y": y},
+            attributes={"AG": 50, "IQ": 50, "CH": 50},
+        )
+
+    def test_far_defender_contest_is_clamped_per_beat(self):
+        from BackEnd.engine.shot_micro_movements import (
+            _ag_grid_per_game_sec,
+            _euclid,
+            build_shot_micro_steps,
+        )
+
+        shooter = self._player("shooter", 85.0, 25.0)
+        defender = self._player("defender", 40.0, 25.0)  # ~45 grid units away
+        off_lineup = {"C": shooter}
+        def_lineup = {"C": defender}
+        start_coords = {
+            "shooter": {"x": 85.0, "y": 25.0},
+            "defender": {"x": 40.0, "y": 25.0},
+        }
+
+        steps = build_shot_micro_steps(
+            family_id="strong_inside",
+            contest_result="defense_win",
+            start_coords=start_coords,
+            shooter_id="shooter",
+            defender_id="defender",
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            away_offense=False,
+            clock_start={"clock_remaining": 20.0, "shot_clock_remaining": 12.0},
+            shot_type="inside",
+            next_step={"kind": "next_step", "index": 2},
+            apply_contest_layer=True,
+        )
+
+        assert steps
+        rate = _ag_grid_per_game_sec(defender, "standard")
+        for step in steps:
+            s = step["start"]["coords"]["defender"]
+            e = step["end"]["coords"]["defender"]
+            step_t = float(step["end"]["time_elapsed"])
+            delta = _euclid(s, e)
+            # No superhuman speed: distance covered ≤ rate × step duration.
+            assert delta <= rate * step_t + 1e-6, (
+                f"defender jet: {delta:.2f} grid in {step_t:.3f}s "
+                f"(max {rate * step_t:.2f})"
+            )
+
+
 class TestShotBallArc:
     def test_apex_sanity_checks(self):
         from BackEnd.utils.shot_ball_arc import compute_shot_ball_arc

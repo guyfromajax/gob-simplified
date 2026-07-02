@@ -61,15 +61,32 @@ export function computePathSegmentDurationsMs(
   totalDurationMs,
   segmentGameSeconds,
   clockSecondMs,
+  backendStartCoord,
 ) {
   if (
     Array.isArray(segmentGameSeconds)
     && segmentGameSeconds.length === waypoints.length
     && segmentGameSeconds.every((s) => Number.isFinite(Number(s)) && Number(s) >= 0)
   ) {
-    return segmentGameSeconds.map((s) =>
+    const segMs = segmentGameSeconds.map((s) =>
       Math.max(50, Math.round(Number(s) * clockSecondMs)),
     );
+    // Segment 0 is anchored to the sprite's LIVE rendered start but was timed
+    // from the backend's assumed first knot (``bh_start``). If the rendered
+    // start is farther from the first waypoint than the backend assumed (a
+    // coordinate carry-over mismatch), the leg would render faster than
+    // intended → jet. Stretch (never shrink) segment 0 to preserve the
+    // backend's intended speed for that leg.
+    const anchor = normalizeGridCoord(backendStartCoord);
+    const rStart = normalizeGridCoord(startCoord);
+    if (anchor && rStart && waypoints.length) {
+      const assumed = gridDistance(anchor, waypoints[0]);
+      const rendered = gridDistance(rStart, waypoints[0]);
+      if (assumed > 1e-6 && rendered > assumed) {
+        segMs[0] = Math.max(segMs[0], Math.round(segMs[0] * (rendered / assumed)));
+      }
+    }
+    return segMs;
   }
 
   const dists = [];
@@ -109,6 +126,7 @@ export async function tweenPlayerThroughPathKnots(
   height,
   clockSecondMs,
   tweenOne,
+  backendStartCoord,
 ) {
   if (!scene || !sprite || !waypoints?.length) {
     return;
@@ -119,6 +137,7 @@ export async function tweenPlayerThroughPathKnots(
     totalDurationMs,
     segmentGameSeconds,
     clockSecondMs,
+    backendStartCoord,
   );
   for (let i = 0; i < waypoints.length; i += 1) {
     await tweenOne(scene, sprite, waypoints[i], durations[i], width, height);

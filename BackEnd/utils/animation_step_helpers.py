@@ -141,6 +141,31 @@ def _motion_end_toward_dest(
     return {"x": float(x), "y": float(y)}, float(step_t)
 
 
+def floor_step_t_to_traversal(
+    step_t: float,
+    start_coord: Optional[GridCoord],
+    dest_coord: Optional[GridCoord],
+    rate: float,
+) -> float:
+    """Floor a step duration so a mover can actually cover ``start→dest`` at
+    ``rate`` without jetting.
+
+    Fast-break meet/shot steps derive their ``T`` from ball-flight or backend
+    drive times computed off a different reference position than the sprite's
+    rendered spot. When that ``T`` is shorter than the mover's real traversal,
+    ``stamp_tween_durations`` caps the tween at ``T`` and the frontend crams the
+    full distance into it → a jet. Flooring ``T`` at the natural traversal time
+    keeps the mover at his archetype rate. Universal across FB emitters (RR,
+    Triangle, after-steal, covert-release) so the timing math has one home.
+    """
+    if not start_coord or not dest_coord or rate <= 0:
+        return float(step_t)
+    dist = _euclid(start_coord, dest_coord)
+    if dist < 1e-6:
+        return float(step_t)
+    return max(float(step_t), dist / rate)
+
+
 def rebound_attemptor_ids(
     offense_rebounders: Optional[List[Any]],
     defense_rebounders: Optional[List[Any]],

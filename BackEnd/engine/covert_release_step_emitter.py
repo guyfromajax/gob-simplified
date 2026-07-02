@@ -684,6 +684,7 @@ def _build_cr_drive_resolution_animation_steps(
         _build_meet_drive_step,
         _override_fb_make_announcement,
     )
+    from BackEnd.utils.animation_step_helpers import floor_step_t_to_traversal
     from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
     from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
 
@@ -801,6 +802,17 @@ def _build_cr_drive_resolution_animation_steps(
             "x": float(meet_coords["x"]),
             "y": float(meet_coords["y"]),
         }
+        # Floor t_meet at the ball handler's real traversal to the meet so a
+        # short backend meet time doesn't clamp him short and force the next
+        # step to cover the residual instantly → jet.
+        stealer_start = start_coords.get(stealer_id)
+        if stealer_start:
+            stealer_rate = _ag_grid_per_game_sec(
+                _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
+            )
+            t_meet = floor_step_t_to_traversal(
+                t_meet, stealer_start, meet_target, stealer_rate
+            )
         end_ann = None
         if result_type == "DEFENSIVE_STOP":
             end_ann = _build_nice_stop_announcement(
@@ -830,7 +842,10 @@ def _build_cr_drive_resolution_animation_steps(
         steps.append(meet_step)
         clock_r -= t_meet
         shot_r -= t_meet
-        step_start_coords = dict(end_coords)
+        # Carry the meet step's RENDERED end coords forward, not the semantic
+        # ``end_coords`` — otherwise the shot step assumes the shooter is already
+        # on his full spot while the sprite is still en route → snap/jet.
+        step_start_coords = dict(meet_step["end"]["coords"])
     else:
         step_start_coords = dict(start_coords)
 
@@ -874,6 +889,18 @@ def _build_cr_drive_resolution_animation_steps(
             t_shot = float(turn_result.get("t_shooter_game_seconds") or 0.5)
             shot_end_coords = dict(step_start_coords)
             shot_end_coords[stealer_id] = dict(bh_target)
+            # Extend the gather beat if the shooter still has real ground to
+            # cover to ``bh_target`` (meet ≠ shot spot) so he drives in at his
+            # natural rate instead of jetting.
+            gather_t = max(0.35, t_shot * 0.15)
+            shooter_now = step_start_coords.get(stealer_id)
+            if shooter_now:
+                shooter_rate = _ag_grid_per_game_sec(
+                    _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
+                )
+                gather_t = floor_step_t_to_traversal(
+                    gather_t, shooter_now, bh_target, shooter_rate
+                )
             shot_drive = _build_drive_step(
                 start_coords=step_start_coords,
                 end_coords=shot_end_coords,
@@ -882,7 +909,7 @@ def _build_cr_drive_resolution_animation_steps(
                 is_away_offense=is_away_offense,
                 clock_remaining=clock_r,
                 shot_clock_remaining=shot_r,
-                t_game_seconds=max(0.35, t_shot * 0.15),
+                t_game_seconds=gather_t,
                 next_step_index=len(steps) + 1,
                 off_lineup=off_lineup,
                 def_lineup=def_lineup,

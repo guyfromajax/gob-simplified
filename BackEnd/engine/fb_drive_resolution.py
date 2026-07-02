@@ -107,6 +107,53 @@ def _build_defender_ends_at_basket(
     return ends, archetypes
 
 
+def _reachable_defender_ends(
+    ends: Dict[str, GridCoordDict],
+    *,
+    def_lineup: Dict[str, Any],
+    def_starts: Dict[str, GridCoordDict],
+    archetypes: Dict[str, str],
+    time_budget: Optional[float],
+    stopper_pos: Optional[str] = None,
+) -> Dict[str, GridCoordDict]:
+    """Clamp each non-stopper defender's sprint-to-basket end to what he can
+    actually reach in ``time_budget`` game-seconds.
+
+    ``_build_defender_ends_at_basket`` optimistically drops every non-stopper
+    defender onto the rim. Downstream rebound selection
+    (``_resolve_rebound_on_miss`` → ``determine_rebounder``) and shot-contest
+    selection (``_contest_at_shot``) then treat a defender who never got back
+    as if he's standing under the basket — so a player who renders far away can
+    win the board or be designated the contester (which also feeds a closeout
+    jet). Interrupting each defender at his archetype rate × ``time_budget``
+    makes the selection geometry match what the animation actually renders. The
+    stopper (who by construction reaches the meet) is left untouched.
+    """
+    if not time_budget or time_budget <= 0:
+        return ends
+    from BackEnd.utils.animation_step_helpers import (
+        _ag_grid_per_game_sec,
+        _motion_end_toward_dest,
+    )
+
+    clamped = dict(ends)
+    for pos in POSITIONS:
+        if pos == stopper_pos:
+            continue
+        defender = def_lineup.get(pos)
+        if defender is None or pos not in def_starts:
+            continue
+        pid = _player_id(defender)
+        if not pid or pid not in clamped:
+            continue
+        rate = _ag_grid_per_game_sec(defender, archetypes.get(pid, "sprint"))
+        new_end, _ = _motion_end_toward_dest(
+            def_starts[pos], clamped[pid], rate, float(time_budget)
+        )
+        clamped[pid] = new_end
+    return clamped
+
+
 def _contest_at_shot(
     defender_ends: Dict[str, GridCoordDict],
     shooter_pos: GridCoordDict,
@@ -239,6 +286,13 @@ def resolve_fb_drive_step(
             is_away_offense=is_away_offense,
             drift_defender_ids=drift_ids,
         )
+        ends = _reachable_defender_ends(
+            ends,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            archetypes=arch,
+            time_budget=payload["t_drive_game_seconds"],
+        )
         payload["defender_end_coords"] = ends
         payload["defender_archetypes"] = arch
         contested, shot_def_id = _contest_at_shot(ends, shot_spot, is_away_offense=is_away_offense)
@@ -259,6 +313,13 @@ def resolve_fb_drive_step(
             def_starts,
             is_away_offense=is_away_offense,
             drift_defender_ids=drift_ids,
+        )
+        ends = _reachable_defender_ends(
+            ends,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            archetypes=arch,
+            time_budget=payload["t_drive_game_seconds"],
         )
         payload["defender_end_coords"] = ends
         payload["defender_archetypes"] = arch
@@ -293,13 +354,21 @@ def resolve_fb_drive_step(
             meet=meet,
             drift_defender_ids=drift_ids,
         )
-        payload["defender_end_coords"] = ends
-        payload["defender_archetypes"] = arch
         stopper_arch = arch.get(stopper_id, "sprint")
         payload["t_drive_game_seconds"] = max(
             _traverse_seconds(bh_start, meet, bh, "sprint"),
             _traverse_seconds(def_starts[cutoff_pos], meet, stopper, stopper_arch),
         )
+        ends = _reachable_defender_ends(
+            ends,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            archetypes=arch,
+            time_budget=payload["t_drive_game_seconds"],
+            stopper_pos=cutoff_pos,
+        )
+        payload["defender_end_coords"] = ends
+        payload["defender_archetypes"] = arch
         _stamp_geo_ids(stopper_id)
         return payload
 
@@ -314,13 +383,21 @@ def resolve_fb_drive_step(
             meet=meet,
             drift_defender_ids=drift_ids,
         )
-        payload["defender_end_coords"] = ends
-        payload["defender_archetypes"] = arch
         stopper_arch = arch.get(stopper_id, "sprint")
         payload["t_drive_game_seconds"] = max(
             _traverse_seconds(bh_start, meet, bh, "sprint"),
             _traverse_seconds(def_starts[cutoff_pos], meet, stopper, stopper_arch),
         )
+        ends = _reachable_defender_ends(
+            ends,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            archetypes=arch,
+            time_budget=payload["t_drive_game_seconds"],
+            stopper_pos=cutoff_pos,
+        )
+        payload["defender_end_coords"] = ends
+        payload["defender_archetypes"] = arch
         _stamp_geo_ids(stopper_id)
         return payload
 
@@ -356,6 +433,15 @@ def resolve_fb_drive_step(
         t_rim = _traverse_seconds(shimmy, shot_spot, bh, "sprint")
         payload["t_drive_game_seconds"] = t_bh + t_shimmy + t_rim
         payload["path_segment_game_seconds"] = [t_bh, t_shimmy, t_rim]
+        ends = _reachable_defender_ends(
+            ends,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            archetypes=arch,
+            time_budget=payload["t_drive_game_seconds"],
+            stopper_pos=cutoff_pos,
+        )
+        payload["defender_end_coords"] = ends
         contested, shot_def_id = _contest_at_shot(ends, shot_spot, is_away_offense=is_away_offense)
         payload["contested"] = contested
         payload["shot_defender_id"] = shot_def_id
@@ -366,6 +452,15 @@ def resolve_fb_drive_step(
     payload["outcome"] = "NEUTRAL"
     payload["t_drive_game_seconds"] = payload["t_meet_game_seconds"]
     payload["advance_trigger"] = "meet_reached"
+    ends = _reachable_defender_ends(
+        ends,
+        def_lineup=def_lineup,
+        def_starts=def_starts,
+        archetypes=arch,
+        time_budget=payload["t_meet_game_seconds"],
+        stopper_pos=cutoff_pos,
+    )
+    payload["defender_end_coords"] = ends
 
     if shot_manager is not None:
         payload["stop_decision"] = resolve_fb_stop_decision(
