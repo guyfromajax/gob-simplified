@@ -240,3 +240,26 @@ def pick_nearest_contesting_defender(
             best_dist = dist
             best_id = d_id
     return best_id is not None, best_id
+
+
+def stamp_fb_miss_bounce_coords(
+    turn_result: Dict,
+    rebound_ball_spot: Optional[GridCoordDict],
+    fallback_spot: Optional[GridCoordDict],
+) -> None:
+    """Stamp ``ball_bounce_x``/``ball_bounce_y`` on a Fast Break MISS turn.
+
+    The follow-up OREB putback turn is rendered by ``build_oreb_animation_steps``,
+    whose rebound-capture step reads the *prior* turn's ``ball_bounce_x/y``. If
+    those are absent the OREB emitter returns ``None`` and the FE falls back to
+    the legacy renderer — the putback shows but the rebound grab + announcement
+    are skipped. The legacy resolvers (``after_steal_fast_break`` /
+    ``dynamic_hct_shot``) always stamped these; the FB drive-resolution rewrite
+    dropped them. Prefer the resolved rebound ball spot; fall back to the
+    shot/rim target so the field is always populated on a miss.
+    """
+    spot = rebound_ball_spot or fallback_spot
+    if not isinstance(spot, dict) or "x" not in spot or "y" not in spot:
+        return
+    turn_result["ball_bounce_x"] = float(spot["x"])
+    turn_result["ball_bounce_y"] = float(spot["y"])

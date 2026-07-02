@@ -9,6 +9,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _build_burst_step,
     _build_lane_pass_step,
     _build_outlet_pass_step,
+    _build_shot_motion_step,
     _calculate_lane_pass_raw_score,
     _lane_pass_getback_targets,
     is_lane_pass_to_rr_resolution_turn,
@@ -465,3 +466,57 @@ def test_closeout_contest_coord_stops_short_of_shot_spot():
     # Defender already within standoff stays put.
     stay = _closeout_contest_coord({"x": 15.0, "y": 32.0}, {"x": 14.0, "y": 32.0})
     assert stay == {"x": 15.0, "y": 32.0}
+
+
+def test_rr_lane_pass_shot_motion_shooter_ends_at_authoritative_shot_spot():
+    """RR lane-pass quick shot: the shooter must render at the authoritative
+    ``shot_spot`` (not a legacy packet position). Hardens the one reachable
+    non-drive-resolution RR shot path against the Triangle-class jetting bug."""
+    off = {
+        "PG": _player("bh", 30, 25),
+        "PF": _player("rr", 14, 32),
+        "SG": _player("trail", 22, 8),
+    }
+    deff = {
+        "PG": _player("d_ball", 40, 32),
+        "SG": _player("d_off", 24, 12),
+    }
+    start_coords = {
+        "bh": {"x": 30.0, "y": 25.0},
+        "rr": {"x": 14.0, "y": 32.0},
+        "trail": {"x": 22.0, "y": 8.0},
+        "d_ball": {"x": 40.0, "y": 32.0},
+        "d_off": {"x": 24.0, "y": 12.0},
+    }
+    shot_spot = {"x": 14.0, "y": 32.0}
+    fb_roles = {
+        "rim_runner_burst_phase": {"rr_id": "rr"},
+        "shot_spot": shot_spot,
+    }
+    turn_result = {
+        "fast_break_play": "rim_runner",
+        "result_type": "MISS",
+        "defender": deff["PG"],
+        "roles": fb_roles,
+    }
+
+    step = _build_shot_motion_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off,
+        def_lineup=deff,
+        step_start_coords=start_coords,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+    )
+
+    assert step is not None
+    assert step["end"]["coords"]["rr"] == shot_spot
+    assert step["start"]["action"]["rr"] == "shoot"
+    assert step["start"]["advance_trigger"]["metadata"]["target_coords"] == shot_spot
+    # Off-ball players hold; ball defender contests toward the shooter.
+    assert step["end"]["coords"]["trail"] == start_coords["trail"]
+    assert step["end"]["coords"]["d_off"] == start_coords["d_off"]
+    assert step["start"]["action"]["d_ball"] == "guard_ball"
+    # Defender closed toward the shot spot (moved in from x=40 toward x=14).
+    assert step["end"]["coords"]["d_ball"]["x"] < 40.0

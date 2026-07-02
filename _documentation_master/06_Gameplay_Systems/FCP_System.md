@@ -191,6 +191,7 @@ Before a pass that **would** be over-and-back (`frontcourt_established` + receiv
 | **On hold** | Normal §5 hold beat (grace label vs over-and-back read label) |
 | **On pass** | Pass resolves as usual; post-pass violation still fires if the ball lands backcourt |
 | **Off-ball urgency** | Once `frontcourt_established`, non-BH offenders still in backcourt override targets to the cross-half band (HCT `off_targets`; FCP `FcpOffballAttackState`) |
+| **Back-movement gate** | Once `frontcourt_established`, any **off-ball** offender who has crossed half court is **ratcheted at x=50** — his x cannot re-enter the backcourt on any later beat this possession (he may sit on the line). Applied at each segment snapshot via `gate_offense_backcourt_reentry`; the live BH and an in-flight pass receiver are never gated (so over-and-back stays detectable at the true catch spot) |
 | **Scope** | FCP + HCT dynamic loop; primitives in `over_and_back.py` |
 
 #### Off-ball attack routing (current)

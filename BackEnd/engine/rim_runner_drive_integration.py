@@ -27,7 +27,10 @@ from BackEnd.engine.phase_resolution import (
     apply_fast_break_cg_time,
     apply_fb_meet_non_shooting_defensive_foul,
 )
-from BackEnd.utils.fb_geo_helpers import pick_nearest_contesting_defender
+from BackEnd.utils.fb_geo_helpers import (
+    pick_nearest_contesting_defender,
+    stamp_fb_miss_bounce_coords,
+)
 from BackEnd.utils.shared import apply_scoring, get_name_safe
 from BackEnd.utils.position_snapshot_ledger import attach_position_snapshots, build_fast_break_pre_shot_snapshot
 
@@ -352,7 +355,7 @@ def resolve_attack_drive_finisher_turn(
         )
         made = shot["made"]
         d_foul = shot["d_foul"]
-        rebound_type = rebound_ball_spot = rebounder_pid = None
+        rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
         if made:
             shot_shooter.record_stat("FGA")
             apply_scoring(game, off_team, shot_shooter, 2, ["FGM"])
@@ -361,7 +364,7 @@ def resolve_attack_drive_finisher_turn(
             possession_flips = not shot["has_and_one"]
         else:
             shot_shooter.record_stat("FGA")
-            possession_flips, rebound_type, rebound_ball_spot, rebounder_pid = (
+            possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
                 _resolve_rebound_on_miss(
                     game=game,
                     stealer=shot_shooter,
@@ -406,6 +409,10 @@ def resolve_attack_drive_finisher_turn(
             turn_result["rebounderId"] = rebounder_pid
             if rebound_ball_spot:
                 turn_result["ballSpot"] = dict(rebound_ball_spot)
+            if rebound_attemptors:
+                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+            stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         _apply_finisher_scouting(turn_result, off_team=off_team, def_team=def_team, fb_play_key=fb_play_key)
         _record_fast_break_stats(fb_roles, turn_result, game)
@@ -435,7 +442,7 @@ def resolve_attack_drive_finisher_turn(
     )
     made = shot["made"]
     d_foul = shot["d_foul"]
-    rebound_type = rebound_ball_spot = rebounder_pid = None
+    rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
     if made:
         shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
@@ -444,7 +451,7 @@ def resolve_attack_drive_finisher_turn(
         possession_flips = not shot["has_and_one"]
     else:
         shooter.record_stat("FGA")
-        possession_flips, rebound_type, rebound_ball_spot, rebounder_pid = (
+        possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
             _resolve_rebound_on_miss(
                 game=game,
                 stealer=shooter,
@@ -484,6 +491,12 @@ def resolve_attack_drive_finisher_turn(
     if not made and not d_foul and rebound_type:
         turn_result["rebound_type"] = rebound_type
         turn_result["rebounderId"] = rebounder_pid
+        if rebound_ball_spot:
+            turn_result["ballSpot"] = dict(rebound_ball_spot)
+        if rebound_attemptors:
+            turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+            turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+        stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, bh_target)
         turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
     turn_result["sfx"] = {
         "shot_type": "attack",

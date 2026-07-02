@@ -236,3 +236,81 @@ def test_meet_defensive_foul_emits_meet_drive_step(monkeypatch):
     assert steps is not None
     assert len(steps) == 1
     assert steps[0]["end"]["next"] == {"kind": "end_of_turn"}
+
+
+def test_miss_with_oreb_stamps_ball_bounce_coords(monkeypatch):
+    """A drive-resolution MISS that yields an OREB must stamp ball_bounce_x/y so
+    the follow-up OREB putback turn's rebound-capture step renders (regression:
+    the drive-resolution rewrite dropped ball_bounce, only stamping ballSpot,
+    which the OREB emitter doesn't read → OREB fell back to legacy, un-animated
+    + un-announced)."""
+    shot_spot = {"x": 88, "y": 25}
+    bounce = {"x": 86.0, "y": 27.0}
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "POS_O",
+            "meet_x": 70,
+            "meet_y": 25,
+            "shot_spot": shot_spot,
+            "t_drive_game_seconds": 2.0,
+            "contested": False,
+            "defender_end_coords": {},
+            "defender_archetypes": {},
+        },
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_drive_integration._resolve_shot_attempt",
+        lambda **kwargs: {
+            "made": False,
+            "d_foul": False,
+            "foul_player": None,
+            "has_and_one": False,
+            "free_throws_remaining": 0,
+            "fouled_out_info": {},
+            "shot_score": 40,
+            "shot_score_pre_defense": 60,
+            "shot_defense_score_for_sfx": 0,
+            "shot_defense_score_raw": 0,
+            "shot_variant": None,
+            "shot_variant_extras": {},
+            "contest_result": None,
+            "contest_margin": None,
+            "shot_type": "attack",
+            "contested": False,
+            "shot_defender": None,
+            "shot_defender_id": None,
+            "select_and_stamp_shot_micro_kwargs": {
+                "shot_type": "attack",
+                "shooter_id": "home-PG",
+                "shooter_x": 88.0,
+                "shooter_y": 25.0,
+                "off_lineup": {},
+                "def_lineup": {},
+                "has_contest": False,
+                "contest_result": None,
+                "contest_margin": None,
+                "shot_defense_score_raw": 0.0,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_drive_integration._resolve_rebound_on_miss",
+        lambda **kwargs: (
+            False,
+            "OREB",
+            dict(bounce),
+            {"offense_rebounders": ["home-C"], "defense_rebounders": ["away-C"]},
+            "home-C",
+        ),
+    )
+
+    game = build_mock_game()
+    _seed_steal(game)
+    result = resolve_after_steal_fast_break(game)
+
+    assert result["result_type"] == "MISS"
+    assert result["next_play_type"] == "OREB"
+    assert result["ballSpot"] == bounce
+    assert result["ball_bounce_x"] == bounce["x"]
+    assert result["ball_bounce_y"] == bounce["y"]

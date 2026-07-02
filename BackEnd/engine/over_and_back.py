@@ -13,6 +13,10 @@ from typing import Any, Dict, Optional
 OOB_PASS_PS_WEIGHT = 0.8
 OOB_PASS_CH_WEIGHT = 0.2
 
+# Half-court line. Once frontcourt is established, an off-ball offender who has
+# crossed this line may not drift back over it (his x is ratcheted here).
+HALF_COURT_X = 50
+
 # Non-BH offenders still in backcourt after FC is established sprint toward this
 # band (home orientation; flipped for away offense in ``cross_half_urgency_target``).
 CROSS_HALF_URGENCY_X_MIN = 51
@@ -77,6 +81,41 @@ def cross_half_urgency_target(
     if is_away_offense:
         target = flip_fn(target)
     return clamp_fn(target)
+
+
+def gate_offense_backcourt_reentry(
+    off_coords: Dict[str, Dict[str, Any]],
+    ratcheted: set,
+    positions: Any,
+    is_away_offense: bool,
+    frontcourt_established: bool,
+    *,
+    skip: Optional[set] = None,
+) -> None:
+    """Ratchet off-ball offenders at the half-court line once FC is established.
+
+    Any offender who has crossed half court (while ``frontcourt_established``) is
+    added to ``ratcheted`` and can no longer re-enter the backcourt: on every
+    subsequent beat his ``x`` is clamped to :data:`HALF_COURT_X`. Players still in
+    the backcourt are left alone (cross-half urgency pulls them forward). ``skip``
+    (the live ball handler and any in-flight pass receiver) is never gated —
+    gating the receiver would silently suppress over-and-back detection.
+
+    Mutates ``off_coords`` in place. Home offense (``is_away_offense`` False)
+    attacks toward x=100, so the gate floors x at 50; away offense attacks toward
+    x=0, so the same line caps x at 50.
+    """
+    if not frontcourt_established:
+        return
+    skip = skip or set()
+    for pos in positions:
+        if pos in skip:
+            continue
+        x = float(off_coords[pos]["x"])
+        if not in_backcourt(x, is_away_offense):
+            ratcheted.add(pos)
+        elif pos in ratcheted:
+            off_coords[pos]["x"] = HALF_COURT_X
 
 
 def should_hold_instead_of_backcourt_pass(

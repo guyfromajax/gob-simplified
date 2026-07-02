@@ -45,6 +45,7 @@ See ``_documentation_master/00_General_Systems/Step_By_Step_System.md`` —
 from __future__ import annotations
 
 import logging
+import math
 import random
 from typing import Any, Dict, List, Optional
 
@@ -160,6 +161,48 @@ def _movement_end_coord(
             return None
         return {"x": float(coords["x"]), "y": float(coords["y"])}
     return None
+
+
+def _coord_of(raw: Any) -> Optional[GridCoord]:
+    if not isinstance(raw, dict) or "x" not in raw or "y" not in raw:
+        return None
+    return {"x": float(raw["x"]), "y": float(raw["y"])}
+
+
+def shot_spot_from_roles(
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+) -> Optional[GridCoord]:
+    """Authoritative shot spot for a FB shot-motion step, sourced from
+    backend geometry rather than the legacy ``capture_fast_break_animation``
+    packet. Keeps the shooter rendering at the geo-correct spot regardless of
+    live-coord / mid-game-resume state (see the Triangle ``rr_post`` fix)."""
+    roles = turn_result.get("roles") if isinstance(turn_result, dict) else None
+    return _coord_of(
+        (fb_roles or {}).get("shot_spot")
+        or (turn_result or {}).get("shot_spot")
+        or (roles or {}).get("shot_spot")
+    )
+
+
+def closeout_contest_coord(
+    defender_start: GridCoord,
+    shot_spot: GridCoord,
+    standoff: float = 2.0,
+) -> GridCoord:
+    """Deterministic contest position: the defender closes toward the shot
+    spot and stops ``standoff`` grid units short. Pure geometry (no legacy
+    packet) so the closeout is stable across resumes."""
+    dx = float(defender_start["x"]) - float(shot_spot["x"])
+    dy = float(defender_start["y"]) - float(shot_spot["y"])
+    dist = math.hypot(dx, dy)
+    if dist <= standoff or dist == 0.0:
+        return {"x": float(defender_start["x"]), "y": float(defender_start["y"])}
+    scale = standoff / dist
+    return {
+        "x": float(shot_spot["x"]) + dx * scale,
+        "y": float(shot_spot["y"]) + dy * scale,
+    }
 
 
 def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
@@ -1098,31 +1141,34 @@ def _build_shot_motion_step(
     fb_roles: Dict[str, Any],
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
-    animations: List[Dict[str, Any]],
     step_start_coords: Dict[str, GridCoord],
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
 ) -> Optional[AnimationStep]:
     """Shot branch step 3: shot motion (RR → shot spot). Ends with
-    ``turn_stop: SHOT_ATTEMPT``. Reads end coords from legacy
-    ``animations[]`` since ``shot_manager`` has already computed shot spot
-    + defender spot. Mirrors CR's outcome-step pattern.
+    ``turn_stop: SHOT_ATTEMPT``.
+
+    Fully UESS: the shooter's end is the authoritative backend ``shot_spot``
+    (not the legacy ``capture_fast_break_animation`` packet), the primary
+    defender does a deterministic geo closeout, and all off-ball players hold
+    their post-lane-pass positions. This is the reachable lane-pass quick-shot
+    path; anchoring to ``shot_spot`` prevents the RR from jetting to a stale
+    packet spot (same class of bug as the Triangle ``rr_post`` fix).
     """
     phase = fb_roles.get("rim_runner_burst_phase") or {}
     rr_id = _safe_id(phase.get("rr_id"))
     if not rr_id or rr_id not in step_start_coords:
         return None
 
+    # Everyone holds their post-lane-pass position by default (no legacy
+    # ``_movement_end_coord`` lookups).
     end_coords: Dict[str, GridCoord] = {
         pid: dict(step_start_coords[pid]) for pid in step_start_coords
     }
-    for pid in step_start_coords:
-        anim_end = _movement_end_coord(animations, pid)
-        if anim_end is not None:
-            end_coords[pid] = anim_end
 
     rr_coord_start = step_start_coords[rr_id]
-    rr_coord_end = end_coords.get(rr_id, rr_coord_start)
+    shot_spot = shot_spot_from_roles(turn_result, fb_roles)
+    rr_coord_end = shot_spot or dict(rr_coord_start)
     rr_player = _player_lookup_by_id(off_lineup, def_lineup, rr_id)
     rr_rate = _ag_grid_per_game_sec(rr_player, "sprint")
     t = max(0.2, _traversal_seconds(rr_coord_start, rr_coord_end, rr_rate))
@@ -1133,40 +1179,25 @@ def _build_shot_motion_step(
     archetype: Dict[str, PlayerArchetype] = {
         pid: "stationary" for pid in step_start_coords
     }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(end_coords.get(pid, step_start_coords[pid]))
-        for pid in step_start_coords
-    }
 
     actions[rr_id] = "shoot"
     archetype[rr_id] = "sprint"
+    end_coords[rr_id] = dict(rr_coord_end)
 
+    # Primary defender: deterministic geo closeout toward the shot spot,
+    # clamped by sprint rate × t (no teleport, no legacy packet).
     if defender_id and defender_id in step_start_coords:
         actions[defender_id] = "guard_ball"
         archetype[defender_id] = "sprint"
+        d_start = step_start_coords[defender_id]
+        contest = closeout_contest_coord(d_start, rr_coord_end)
+        d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
+        d_rate = _ag_grid_per_game_sec(d_player, "sprint")
+        end_coords[defender_id] = _interrupted_coord(d_start, contest, d_rate, t)
 
-    for pid in step_start_coords:
-        if pid in (rr_id, defender_id):
-            continue
-        if _movement_end_coord(animations, pid) is not None:
-            if _is_offense_player(pid, off_lineup):
-                actions[pid] = "cut"
-                archetype[pid] = "standard"
-            else:
-                actions[pid] = "guard_offball"
-                archetype[pid] = "standard"
-
-    # Clamp non-gate movers via interrupted-coord at archetype rate × t,
-    # mirroring CR's shot-outcome clamp so support players don't teleport.
-    for pid, start_coord in step_start_coords.items():
-        if pid == rr_id:
-            continue
-        target = end_coords.get(pid)
-        if target is None:
-            continue
-        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, archetype[pid])
-        end_coords[pid] = _interrupted_coord(start_coord, target, rate, t)
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(end_coords[pid]) for pid in step_start_coords
+    }
 
     ball_start: BallState = {"owner_player_id": rr_id}
     ball_end: BallState = {"owner_player_id": rr_id}
@@ -2342,7 +2373,6 @@ def append_lane_pass_to_rr_resolution_steps(
         fb_roles=fb_roles,
         off_lineup=off_lineup,
         def_lineup=def_lineup,
-        animations=turn_result.get("animations") or [],
         step_start_coords=coords,
         clock_remaining_at_start=clock_at,
         shot_clock_remaining_at_start=sc_at,

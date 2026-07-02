@@ -2201,6 +2201,24 @@ def compute_dynamic_hct_turn(
 
         return FcpStepTracer.snap_coords(off_coords, def_coords)
 
+    def _gate_offense_backcourt(skip: Optional[set] = None) -> None:
+        """Apply the frontcourt back-movement ratchet to ``off_coords`` in place.
+
+        Off-ball only: ``skip`` always excludes the live BH; pass paths also pass
+        the in-flight receiver so over-and-back stays detectable at their catch
+        spot. No-op until the ball establishes frontcourt this turn.
+        """
+        from BackEnd.engine.over_and_back import gate_offense_backcourt_reentry
+
+        gate_offense_backcourt_reentry(
+            off_coords,
+            frontcourt_ratcheted,
+            POSITIONS,
+            is_away_offense,
+            frontcourt_established,
+            skip={bh_pos} | (skip or set()),
+        )
+
     def _append_loop_segment(
         reason: str,
         seconds: float,
@@ -2213,6 +2231,7 @@ def compute_dynamic_hct_turn(
         dest_def: Optional[Dict[str, Dict[str, int]]] = None,
         note: str = "",
     ) -> Dict[str, Any]:
+        _gate_offense_backcourt()
         seg = _segment(
             reason, off_coords, def_coords, seconds, gate, ball_owner, label,
         )
@@ -2248,6 +2267,11 @@ def compute_dynamic_hct_turn(
     # One-beat grace for the first BH to establish frontcourt (dribble or pass
     # receipt): backward outlet passes become hold instead of pass.
     frontcourt_grace_bh_pos: Optional[str] = None
+    # Off-ball offenders who have crossed half court while frontcourt is
+    # established. Once ratcheted, a player's back-movement is gated at x=50 on
+    # every subsequent beat (he may sit on the line but not re-enter the
+    # backcourt). The live BH / in-flight receiver are never gated.
+    frontcourt_ratcheted: set = set()
     # D8 — set for the emergent foul/steal terminals. ``foul_team`` is
     # "OFFENSE" (charge) or "DEFENSE" (reach); ``foul_player`` / ``stealer``
     # carry the credited Player so the wrapper can record stats + route.
@@ -2718,6 +2742,7 @@ def compute_dynamic_hct_turn(
             return True
         if outcome == "DEAD BALL":
             db_snap_off, db_snap_def = _snap_loop_coords()
+            _gate_offense_backcourt()
             seg, sec = _emit_dead_ball_drive(
                 bh_xy, score_ratio, is_away_offense, bh_drive_rate,
                 off_coords, def_coords, bh_pos, play=play,
@@ -3060,6 +3085,7 @@ def compute_dynamic_hct_turn(
                 off_coords, off_targets, pass_seconds, off_lineup, passer_pos,
                 exclude={receiver_pos},
             )
+        _gate_offense_backcourt(skip={receiver_pos})
         pass_seg = _pass_segment(
             passer_pos, receiver_pos, off_coords, def_coords, pass_seconds,
             label=f"pass (backcourt outlet {passer_pos}\u2192{receiver_pos})",

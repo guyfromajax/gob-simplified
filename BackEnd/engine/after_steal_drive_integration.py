@@ -18,7 +18,10 @@ from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
 from BackEnd.engine.phase_resolution import apply_fb_meet_non_shooting_defensive_foul
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
-from BackEnd.utils.fb_geo_helpers import pick_nearest_contesting_defender
+from BackEnd.utils.fb_geo_helpers import (
+    pick_nearest_contesting_defender,
+    stamp_fb_miss_bounce_coords,
+)
 from BackEnd.utils.shot_split_tracker import record_shot_split
 
 
@@ -698,6 +701,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             if rebound_attemptors:
                 turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
                 turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+            stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         if shot["shot_variant_extras"]:
             turn_result.update(shot["shot_variant_extras"])
@@ -800,6 +804,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         if rebound_attemptors:
             turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
             turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+        stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, bh_target)
         turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
     elif d_foul:
         turn_result["next_play_type"] = "FREE_THROW"

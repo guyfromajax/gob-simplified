@@ -32,6 +32,7 @@ from BackEnd.engine.phase_resolution import (
     calculate_outlet_pass_score,
     get_in_play_defenders,
 )
+from BackEnd.utils.fb_geo_helpers import stamp_fb_miss_bounce_coords
 from BackEnd.utils.shared import apply_scoring, get_name_safe
 
 
@@ -434,6 +435,7 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             turn_result["rebounderId"] = rebounder_pid
             if rebound_ball_spot:
                 turn_result["ballSpot"] = dict(rebound_ball_spot)
+            stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         return turn_result
 
@@ -521,6 +523,12 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
     if not made and not d_foul and rebound_type:
         turn_result["rebound_type"] = rebound_type
         turn_result["rebounderId"] = rebounder_pid
+        if rebound_ball_spot:
+            turn_result["ballSpot"] = dict(rebound_ball_spot)
+        if rebound_attemptors:
+            turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+            turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+        stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, bh_target)
         turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
     turn_result["sfx"] = {
         "shot_type": "attack",

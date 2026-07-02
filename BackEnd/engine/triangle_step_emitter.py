@@ -15,7 +15,6 @@ Outlet-denied and ``triangle_enter_hco`` reuse RR branch steps from
 from __future__ import annotations
 
 import logging
-import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
@@ -51,6 +50,8 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _interrupted_coord,
     is_lane_pass_to_rr_resolution_turn,
     _player_lookup_by_id,
+    closeout_contest_coord,
+    shot_spot_from_roles,
     _resolve_shot_next,
     _safe_id,
     _stamp_tween_durations,
@@ -539,42 +540,11 @@ def _build_triangle_decision_steps(
     return out
 
 
-def _shot_spot_from_roles(
-    turn_result: Dict[str, Any],
-    fb_roles: Dict[str, Any],
-) -> Optional[GridCoord]:
-    """Authoritative shot spot for the shot-motion step.
-
-    Sourced from backend geometry (``fb_roles["shot_spot"]``, stamped per
-    branch in ``_triangle_build_turn_result``) rather than the legacy
-    ``capture_fast_break_animation`` packet, so the shooter always renders at
-    the geo-correct spot regardless of live-coord / mid-game-resume state.
-    """
-    return _coord_dict(
-        fb_roles.get("shot_spot")
-        or turn_result.get("shot_spot")
-        or (turn_result.get("roles") or {}).get("shot_spot")
-    )
-
-
-def _closeout_contest_coord(
-    defender_start: GridCoord,
-    shot_spot: GridCoord,
-    standoff: float = 2.0,
-) -> GridCoord:
-    """Deterministic contest position: the defender closes toward the shot
-    spot and stops ``standoff`` grid units short (right on the shooter). Pure
-    geometry — no legacy packet — so the closeout is stable across resumes."""
-    dx = float(defender_start["x"]) - float(shot_spot["x"])
-    dy = float(defender_start["y"]) - float(shot_spot["y"])
-    dist = math.hypot(dx, dy)
-    if dist <= standoff or dist == 0.0:
-        return {"x": float(defender_start["x"]), "y": float(defender_start["y"])}
-    scale = standoff / dist
-    return {
-        "x": float(shot_spot["x"]) + dx * scale,
-        "y": float(shot_spot["y"]) + dy * scale,
-    }
+# Canonical shot-spot + closeout helpers live in ``rim_runner_step_emitter``
+# so Triangle, RR, and the shared lane-pass builder stay in lock-step. Kept
+# under the private aliases used throughout this module (and its tests).
+_shot_spot_from_roles = shot_spot_from_roles
+_closeout_contest_coord = closeout_contest_coord
 
 
 def _build_triangle_shot_motion_step(
