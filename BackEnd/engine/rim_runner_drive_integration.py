@@ -356,12 +356,24 @@ def resolve_attack_drive_finisher_turn(
         made = shot["made"]
         d_foul = shot["d_foul"]
         rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
+        pressure_type = None
         if made:
             shot_shooter.record_stat("FGA")
             apply_scoring(game, off_team, shot_shooter, 2, ["FGM"])
             shot_shooter.record_stat("FB_PTS", amount=2)
             text_tail = "and scores!"
             possession_flips = not shot["has_and_one"]
+            # Reset offensive_state off FAST_BREAK so the flipped possession
+            # after the baseline inbound doesn't loop back into another FB.
+            # main.py reads offensive_state at BIP to set the next defensive
+            # pressure; without this it stays "FAST_BREAK". Mirrors the
+            # after-steal / covert-release make handling.
+            if not shot["has_and_one"]:
+                try:
+                    pressure_type = game.turn_manager.determine_defensive_pressure_type()
+                except Exception:
+                    pressure_type = "HCO"
+                game_state["offensive_state"] = pressure_type or "HCO"
         else:
             shot_shooter.record_stat("FGA")
             possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
@@ -404,6 +416,8 @@ def resolve_attack_drive_finisher_turn(
         if made:
             turn_result["points"] = 2
             turn_result["scoring_team"] = off_team.name
+            if pressure_type:
+                turn_result["next_defensive_setup"] = pressure_type
         if not made and not d_foul and rebound_type:
             turn_result["rebound_type"] = rebound_type
             turn_result["rebounderId"] = rebounder_pid
@@ -443,12 +457,22 @@ def resolve_attack_drive_finisher_turn(
     made = shot["made"]
     d_foul = shot["d_foul"]
     rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
+    pressure_type = None
     if made:
         shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
         shooter.record_stat("FB_PTS", amount=2)
         text_tail = "and finishes!"
         possession_flips = not shot["has_and_one"]
+        # Reset offensive_state off FAST_BREAK on a made finish so the next
+        # possession (after the baseline inbound) isn't routed into another FB.
+        # Mirrors the after-steal / covert-release make handling.
+        if not shot["has_and_one"]:
+            try:
+                pressure_type = game.turn_manager.determine_defensive_pressure_type()
+            except Exception:
+                pressure_type = "HCO"
+            game_state["offensive_state"] = pressure_type or "HCO"
     else:
         shooter.record_stat("FGA")
         possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
@@ -488,6 +512,8 @@ def resolve_attack_drive_finisher_turn(
     if made:
         turn_result["points"] = 2
         turn_result["scoring_team"] = off_team.name
+        if pressure_type:
+            turn_result["next_defensive_setup"] = pressure_type
     if not made and not d_foul and rebound_type:
         turn_result["rebound_type"] = rebound_type
         turn_result["rebounderId"] = rebounder_pid

@@ -262,6 +262,143 @@ def test_triangle_bh_drive_stamps_fb_drive_resolution(monkeypatch):
     assert len(result["fb_drive_resolution"]["bh_path_knots"]) == 4
 
 
+def _made_shot_stub(shooter_id):
+    return {
+        "made": True,
+        "d_foul": False,
+        "foul_player": None,
+        "has_and_one": False,
+        "free_throws_remaining": 0,
+        "fouled_out_info": {},
+        "shot_score": 200,
+        "shot_score_pre_defense": 180,
+        "shot_defense_score_for_sfx": 0,
+        "shot_defense_score_raw": 0,
+        "shot_variant": None,
+        "shot_variant_extras": {},
+        "contest_result": None,
+        "contest_margin": None,
+        "shot_type": "attack",
+        "contested": False,
+        "shot_defender": None,
+        "shot_defender_id": None,
+        "select_and_stamp_shot_micro_kwargs": {
+            "shot_type": "attack",
+            "shooter_id": shooter_id,
+            "shooter_x": 88.0,
+            "shooter_y": 25.0,
+            "off_lineup": {},
+            "def_lineup": {},
+            "has_contest": False,
+            "contest_result": None,
+            "contest_margin": None,
+            "shot_defense_score_raw": 0.0,
+        },
+    }
+
+
+def test_pos_o_make_resets_offensive_state_off_fast_break(monkeypatch):
+    """Regression: a made POS_O rim finish must clear offensive_state so the
+    flipped possession after the baseline inbound doesn't loop into another FB."""
+    meet = {"x": 70, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "POS_O",
+            "meet_x": meet["x"],
+            "meet_y": meet["y"],
+            "bh_path_knots": [{"x": 55, "y": 25}, meet, {"x": 88, "y": 25}],
+            "t_drive_game_seconds": 2.0,
+            "contested": False,
+            "defender_end_coords": {},
+            "defender_archetypes": {},
+        },
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration._resolve_shot_attempt",
+        lambda **kwargs: _made_shot_stub("Lancaster-PG"),
+    )
+
+    game = build_mock_game()
+    game.game_state["offensive_state"] = "FAST_BREAK"
+    bh = game.home_team.lineup["PG"]
+    bh.player_id = "Lancaster-PG"
+    bh.coords = {"x": 55, "y": 25}
+    fb_animations = [{"playerId": "Lancaster-PG", "end": {"x": 55, "y": 25}}]
+    fb_roles = {"ball_handler": bh, "rim_runner_burst_phase": {"rr_id": "Lancaster-PF"}}
+
+    result = resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=bh,
+        shot_spot={"x": 70, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=TRIANGLE,
+        off_team=game.home_team,
+        def_team=game.away_team,
+        off_lineup=game.home_team.lineup,
+        def_lineup=game.away_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=False,
+        fb_open=True,
+        extra_turn_fields={"triangle_branch": "triangle_bh_drive"},
+    )
+
+    assert result["result_type"] == "MAKE"
+    assert game.game_state["offensive_state"] != "FAST_BREAK"
+    assert result.get("next_defensive_setup")
+
+
+def test_neutral_shoot_make_resets_offensive_state_off_fast_break(monkeypatch):
+    """Regression: a made shot out of a NEUTRAL meet must also clear
+    offensive_state off FAST_BREAK (meet-path make branch)."""
+    meet = {"x": 75, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "NEUTRAL",
+            "meet_x": meet["x"],
+            "meet_y": meet["y"],
+            "stopper_id": "Bentley-Truman-SF",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {"Bentley-Truman-SF": meet},
+            "defender_archetypes": {"Bentley-Truman-SF": "sprint"},
+            "stop_decision": {"action": "shoot", "shot_type": "inside"},
+        },
+    )
+
+    game = build_mock_game()
+    game.game_state["offensive_state"] = "FAST_BREAK"
+    rr, bh, fb_roles, fb_animations = _seed_rr_finisher(game)
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration._resolve_shot_attempt",
+        lambda **kwargs: _made_shot_stub(rr.player_id),
+    )
+
+    result = resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=rr,
+        shot_spot={"x": 88, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=RIM_RUNNER,
+        off_team=game.offense_team,
+        def_team=game.defense_team,
+        off_lineup=game.offense_team.lineup,
+        def_lineup=game.defense_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=True,
+        fb_open=True,
+    )
+
+    assert result["result_type"] == "MAKE"
+    assert game.game_state["offensive_state"] != "FAST_BREAK"
+    assert result.get("next_defensive_setup")
+
+
 def test_triangle_unified_contest_replaces_six_grid(monkeypatch):
     monkeypatch.setattr(
         "BackEnd.engine.rim_runner_drive_integration.pick_nearest_contesting_defender",
