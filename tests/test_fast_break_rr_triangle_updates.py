@@ -13,7 +13,11 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _lane_pass_getback_targets,
     is_lane_pass_to_rr_resolution_turn,
 )
-from BackEnd.engine.triangle_step_emitter import build_triangle_animation_steps
+from BackEnd.engine.triangle_step_emitter import (
+    _build_triangle_shot_motion_step,
+    _closeout_contest_coord,
+    build_triangle_animation_steps,
+)
 from BackEnd.utils.shared import calc_ag_segment_seconds
 
 
@@ -395,3 +399,69 @@ def test_lane_pass_step_no_lead_passes_to_rr_start():
     assert step["start"]["advance_trigger"]["metadata"]["target_coords"] == start_coords["rr"]
     assert step["end"]["coords"]["rr"] == start_coords["rr"]
     assert step["start"]["ball_arrival_coord"] == start_coords["rr"]
+
+
+def test_triangle_shot_motion_shooter_ends_at_authoritative_shot_spot():
+    """RR (shooter) must shoot from the backend ``shot_spot``, never a
+    legacy ``capture_fast_break_animation`` position. Regression for the
+    Triangle ``rr_post`` bug where the RR caught on the block but jetted to a
+    stale mirrored spot on the opposite half after a mid-game resume."""
+    off = {
+        "PG": _player("bh", 30, 32),
+        "PF": _player("rr", 14, 32),
+        "SG": _player("corner", 20, 8),
+    }
+    deff = {
+        "PG": _player("d_ball", 18, 34),
+        "SG": _player("d_off", 22, 12),
+    }
+    start_coords = {
+        "bh": {"x": 30.0, "y": 32.0},
+        "rr": {"x": 14.0, "y": 32.0},
+        "corner": {"x": 20.0, "y": 8.0},
+        "d_ball": {"x": 18.0, "y": 34.0},
+        "d_off": {"x": 22.0, "y": 12.0},
+    }
+    shot_spot = {"x": 14.0, "y": 32.0}
+    fb_roles = {"shooter": off["PF"], "shot_spot": shot_spot}
+    turn_result = {
+        "fast_break_play": "triangle",
+        "shooter": off["PF"],
+        "defender": deff["PG"],
+        # A stale legacy packet on the opposite half — must be IGNORED now.
+        "animations": [
+            {"playerId": "rr", "movement": [{"coords": {"x": 70.0, "y": 8.0}}]},
+        ],
+        "roles": fb_roles,
+    }
+
+    step = _build_triangle_shot_motion_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off,
+        def_lineup=deff,
+        step_start_coords=start_coords,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+    )
+
+    assert step is not None
+    # Shooter is pinned to the authoritative shot spot (the block), not {70, 8}.
+    assert step["end"]["coords"]["rr"] == shot_spot
+    assert step["start"]["action"]["rr"] == "shoot"
+    assert step["start"]["advance_trigger"]["metadata"]["target_coords"] == shot_spot
+    # Off-ball players hold their post-decision positions (no legacy movement).
+    assert step["end"]["coords"]["corner"] == start_coords["corner"]
+    assert step["end"]["coords"]["d_off"] == start_coords["d_off"]
+    assert step["start"]["action"]["corner"] == "stationary"
+    # The ball-defender contests toward the shooter (deterministic geo closeout).
+    assert step["start"]["action"]["d_ball"] == "guard_ball"
+
+
+def test_closeout_contest_coord_stops_short_of_shot_spot():
+    # Defender far from the shot spot ends ~2 grid units short of it.
+    contest = _closeout_contest_coord({"x": 40.0, "y": 32.0}, {"x": 14.0, "y": 32.0})
+    assert contest == {"x": 16.0, "y": 32.0}
+    # Defender already within standoff stays put.
+    stay = _closeout_contest_coord({"x": 15.0, "y": 32.0}, {"x": 14.0, "y": 32.0})
+    assert stay == {"x": 15.0, "y": 32.0}

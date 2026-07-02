@@ -15,6 +15,7 @@ Outlet-denied and ``triangle_enter_hco`` reuse RR branch steps from
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
@@ -48,9 +49,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _fb_play_label,
     _finalize_rr_steps,
     _interrupted_coord,
-    _is_offense_player,
     is_lane_pass_to_rr_resolution_turn,
-    _movement_end_coord,
     _player_lookup_by_id,
     _resolve_shot_next,
     _safe_id,
@@ -540,13 +539,50 @@ def _build_triangle_decision_steps(
     return out
 
 
+def _shot_spot_from_roles(
+    turn_result: Dict[str, Any],
+    fb_roles: Dict[str, Any],
+) -> Optional[GridCoord]:
+    """Authoritative shot spot for the shot-motion step.
+
+    Sourced from backend geometry (``fb_roles["shot_spot"]``, stamped per
+    branch in ``_triangle_build_turn_result``) rather than the legacy
+    ``capture_fast_break_animation`` packet, so the shooter always renders at
+    the geo-correct spot regardless of live-coord / mid-game-resume state.
+    """
+    return _coord_dict(
+        fb_roles.get("shot_spot")
+        or turn_result.get("shot_spot")
+        or (turn_result.get("roles") or {}).get("shot_spot")
+    )
+
+
+def _closeout_contest_coord(
+    defender_start: GridCoord,
+    shot_spot: GridCoord,
+    standoff: float = 2.0,
+) -> GridCoord:
+    """Deterministic contest position: the defender closes toward the shot
+    spot and stops ``standoff`` grid units short (right on the shooter). Pure
+    geometry — no legacy packet — so the closeout is stable across resumes."""
+    dx = float(defender_start["x"]) - float(shot_spot["x"])
+    dy = float(defender_start["y"]) - float(shot_spot["y"])
+    dist = math.hypot(dx, dy)
+    if dist <= standoff or dist == 0.0:
+        return {"x": float(defender_start["x"]), "y": float(defender_start["y"])}
+    scale = standoff / dist
+    return {
+        "x": float(shot_spot["x"]) + dx * scale,
+        "y": float(shot_spot["y"]) + dy * scale,
+    }
+
+
 def _build_triangle_shot_motion_step(
     *,
     turn_result: Dict[str, Any],
     fb_roles: Dict[str, Any],
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
-    animations: List[Dict[str, Any]],
     step_start_coords: Dict[str, GridCoord],
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
@@ -556,16 +592,16 @@ def _build_triangle_shot_motion_step(
     if not shooter_id or shooter_id not in step_start_coords:
         return None
 
+    # Everyone holds their post-decision position by default. Fully UESS: no
+    # legacy ``_movement_end_coord`` lookups — the setup/decision steps already
+    # routed off-ball players into place, so they stay put on the shot step.
     end_coords: Dict[str, GridCoord] = {
         pid: dict(step_start_coords[pid]) for pid in step_start_coords
     }
-    for pid in step_start_coords:
-        anim_end = _movement_end_coord(animations, pid)
-        if anim_end is not None:
-            end_coords[pid] = anim_end
 
     shooter_start = step_start_coords[shooter_id]
-    shooter_end = end_coords.get(shooter_id, shooter_start)
+    shot_spot = _shot_spot_from_roles(turn_result, fb_roles)
+    shooter_end = shot_spot or dict(shooter_start)
     shooter_player = _player_lookup_by_id(off_lineup, def_lineup, shooter_id)
     shooter_rate = _ag_grid_per_game_sec(shooter_player, "sprint")
     t = max(0.2, _traversal_seconds(shooter_start, shooter_end, shooter_rate))
@@ -575,37 +611,25 @@ def _build_triangle_shot_motion_step(
     archetype: Dict[str, PlayerArchetype] = {
         pid: "stationary" for pid in step_start_coords
     }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(end_coords.get(pid, step_start_coords[pid]))
-        for pid in step_start_coords
-    }
 
     actions[shooter_id] = "shoot"
     archetype[shooter_id] = "sprint"
+    end_coords[shooter_id] = dict(shooter_end)
+
+    # Primary defender: deterministic geo closeout toward the shot spot,
+    # clamped by the defender's sprint rate × t (no teleport).
     if defender_id and defender_id in step_start_coords:
         actions[defender_id] = "guard_ball"
         archetype[defender_id] = "sprint"
+        d_start = step_start_coords[defender_id]
+        contest = _closeout_contest_coord(d_start, shooter_end)
+        d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
+        d_rate = _ag_grid_per_game_sec(d_player, "sprint")
+        end_coords[defender_id] = _interrupted_coord(d_start, contest, d_rate, t)
 
-    for pid in step_start_coords:
-        if pid in (shooter_id, defender_id):
-            continue
-        if _movement_end_coord(animations, pid) is not None:
-            if _is_offense_player(pid, off_lineup):
-                actions[pid] = "cut"
-                archetype[pid] = "standard"
-            else:
-                actions[pid] = "guard_offball"
-                archetype[pid] = "standard"
-
-    for pid, start_coord in step_start_coords.items():
-        if pid == shooter_id:
-            continue
-        target = end_coords.get(pid)
-        if target is None:
-            continue
-        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, archetype[pid])
-        end_coords[pid] = _interrupted_coord(start_coord, target, rate, t)
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(end_coords[pid]) for pid in step_start_coords
+    }
 
     ball: BallState = {"owner_player_id": shooter_id}
     advance_trigger: AdvanceTrigger = {
@@ -877,7 +901,6 @@ def build_triangle_animation_steps(
         fb_roles=fb_roles,
         off_lineup=off_lineup,
         def_lineup=def_lineup,
-        animations=turn_result.get("animations") or [],
         step_start_coords=last_end_coords,
         clock_remaining_at_start=clock_remaining - elapsed,
         shot_clock_remaining_at_start=shot_clock_remaining - elapsed,

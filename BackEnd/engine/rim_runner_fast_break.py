@@ -397,6 +397,13 @@ def _triangle_build_turn_result(
     fb_roles["shooter"] = shooter
     fb_roles["defender"] = defender
     fb_roles["defender_count"] = defender_count
+    # Authoritative shot spot for the UESS shot-motion emitter. The Triangle
+    # path resolves the shot from ``shot_roles["shot_spot"]`` but historically
+    # never surfaced it to the animation layer, forcing the emitter to read the
+    # shooter's end from the legacy ``capture_fast_break_animation`` packet
+    # (live/heuristic coords → stale after a mid-game resume → RR jets to the
+    # wrong spot). Stamping it here lets the emitter render the geo-correct spot.
+    fb_roles["shot_spot"] = {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])}
 
     shot_roles = {
         "shooter": shooter,
