@@ -968,6 +968,9 @@ def _build_cr_drive_resolution_animation_steps(
         if result_type == "MAKE":
             _override_fb_make_announcement(steps)
 
+    from BackEnd.engine.fb_terminal_announce import stamp_fb_terminal_freeze
+
+    stamp_fb_terminal_freeze(turn_result, steps, is_away_offense=is_away_offense)
     return steps or None
 
 
@@ -1550,7 +1553,10 @@ def _build_nice_stop_announcement(
         "player_data": player_data,
         "meta": {"sfx": "fb_defensive_stop"},
         "style": "secondary",
+        # Non-blocking: show the callout without freezing the court. See
+        # Announcement_System.md §Secondary-style announcements — freeze status.
         "hold_ms": 1000,
+        "non_blocking": True,
     }
 
 

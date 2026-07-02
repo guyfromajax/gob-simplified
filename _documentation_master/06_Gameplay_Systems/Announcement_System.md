@@ -459,9 +459,6 @@ Secondary-tier **schema** announcements (`style: "secondary"`) freeze animation 
 
 | Banner | Hold | Emitter | Beat |
 |---|---|---|---|
-| "Great Stop!" | 1000ms | `covert_release_step_emitter.py` | Defensive stop |
-| "Interception!" | 1000ms | `rim_runner_step_emitter.py` | Fast-break pass intercepted |
-| "No Fast Break" | 1000ms | `rim_runner_step_emitter.py` | Fast break denied |
 | "Out of bounds!" | 650ms | `rim_runner_step_emitter.py` | Ball batted OOB |
 
 **Secondary-style that are non-blocking (show, don't freeze):**
@@ -471,5 +468,16 @@ Secondary-tier **schema** announcements (`style: "secondary"`) freeze animation 
 | "Fast Break!" (rim runner) | `rim_runner_step_emitter.py` | Lane pass to RR |
 | "Fast Break!" (triangle) | `triangle_step_emitter.py` | Lane pass to RR |
 | "FB Outlet Pass Denied!" | `rim_runner_step_emitter.py` | Outlet denied |
+| "Great Stop!" | `covert_release_step_emitter.py` | Defensive stop (2026-07-02) |
+| "Interception!" | `rim_runner_step_emitter.py` | Fast-break pass intercepted (2026-07-02) |
+| "No Fast Break" | `rim_runner_step_emitter.py` | Fast break denied (2026-07-02) |
 
 Note: the after-steal "Fast Break!" drive callout is `style: "primary"` (not secondary) — it's in the primary/master table above.
+
+### Fast Break foul / turnover freeze — backend-owned (2026-07-02)
+
+Fast Break **terminal** turns that resolve to a **non-shooting foul, charge, or dead-ball turnover** now FREEZE for **1000ms** via a **backend-stamped blocking schema announcement** — not a frontend decision. `BackEnd/engine/fb_terminal_announce.py` builds a `style: "primary"`, `hold_ms: 1000` announcement and `stamp_fb_terminal_freeze()` stamps it on the terminal step's `end.announcement` inside every FB drive-resolution emitter (`after_steal_fast_break_step_emitter`, `covert_release_step_emitter`, and the shared RR/Triangle `_build_finisher_drive_resolution_steps` in `rim_runner_step_emitter`). This mirrors the dead-ball-fumble pattern (`dead_ball_fumble.py`).
+
+- **Scope:** `CHARGE` → "CHARGE!"; `FOUL` (OFFENSE) → weighted offensive language; `FOUL` (DEFENSE) → weighted defensive language; `DEAD BALL` / `TURNOVER` (non-steal) → "Travel!" / "Double Dribble!" (50/50) or typed. **Shooting fouls / and-1 are out of scope** (they live on MAKE/MISS turns with their own announcements). **Batted-OOB is excluded** (offense retains — announced at turn start).
+- **Language ported to backend:** the weighted foul-language tables (formerly `foulAnnouncementLanguage.js`) and the random dead-ball turnover text (formerly `gameAnnouncements.js`) are now selected on the backend so the choice is authoritative and deterministic per turn.
+- **No double banner:** `stamp_fb_terminal_freeze` sets `suppress_turn_prep_turnover_announce` (turnovers) or `suppress_turn_prep_foul_announce` (fouls/charge) on the turn result; `turnPreparation.announceTurnEnd` honors both flags and skips its legacy FE callout for these turns. `team` follows the FE convention (offensive foul/charge color to the defending side; defensive foul + turnover color to the offense side).

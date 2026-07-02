@@ -35,6 +35,19 @@ GridCoordDict = Dict[str, float]
 _TERMINAL_D8 = frozenset({"DEAD BALL", "O_FOUL", "D_FOUL"})
 _TERMINAL_CHARGE = frozenset({"CHARGE", "BLOCKING_FOUL"})
 
+# Charge / blocking-foul is only read near the attacking basket. The meet must
+# be at least this far downcourt: x >= 64 for home offense (attacking high x),
+# x <= 37 for away offense (attacking low x, mirrored).
+_CHARGE_READ_MIN_X_HOME = 64.0
+_CHARGE_READ_MAX_X_AWAY = 37.0
+
+
+def _charge_read_in_play(meet_x: float, *, is_away_offense: bool) -> bool:
+    """Charge/block is only live when the meet is near the attacking basket."""
+    if is_away_offense:
+        return meet_x <= _CHARGE_READ_MAX_X_AWAY
+    return meet_x >= _CHARGE_READ_MIN_X_HOME
+
 
 def _player_id(player: Any) -> Optional[str]:
     if player is None:
@@ -372,7 +385,11 @@ def resolve_fb_drive_step(
         _stamp_geo_ids(stopper_id)
         return payload
 
-    charge_outcome = calculate_charge(bh, stopper, off_team, def_team)
+    charge_outcome = (
+        calculate_charge(bh, stopper, off_team, def_team)
+        if _charge_read_in_play(float(meet["x"]), is_away_offense=is_away_offense)
+        else None
+    )
     if charge_outcome in _TERMINAL_CHARGE:
         payload["outcome"] = charge_outcome
         ends, arch = _build_defender_ends_at_basket(

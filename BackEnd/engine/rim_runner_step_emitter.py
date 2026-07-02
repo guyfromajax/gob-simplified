@@ -1341,7 +1341,10 @@ def _build_lane_pass_intercepted_step(
         "team": defense_team,
         "player_data": _build_player_data(stealer_player, fallback_id=stealer_id),
         "meta": {"sfx": "steal"},
+        # Non-blocking: show the callout without freezing the court. See
+        # Announcement_System.md §Secondary-style announcements — freeze status.
         "hold_ms": 1000,
+        "non_blocking": True,
         "style": "secondary",
     }
 
@@ -1618,7 +1621,10 @@ def _build_hold_up_step(
             "team": "away" if is_away_offense else "home",
             "player_data": _build_player_data(bh_player, fallback_id=bh_id),
             "meta": {**_decision_pill_meta(turn_result), "sfx": "no_fast_break"},
+            # Non-blocking: show the callout without freezing the court. See
+            # Announcement_System.md §Secondary-style announcements — freeze status.
             "hold_ms": 1000,
+            "non_blocking": True,
             "style": "secondary",
         }
 
@@ -2278,6 +2284,9 @@ def _build_finisher_drive_resolution_steps(
         meet_dbg,
     )
 
+    from BackEnd.engine.fb_terminal_announce import stamp_fb_terminal_freeze
+
+    stamp_fb_terminal_freeze(turn_result, steps, is_away_offense=is_away_offense)
     return steps or None
 
 

@@ -315,7 +315,7 @@ export async function finalizeTurnAfterAnimation({
   const homeTeamId = scene.simData?.home_team_id;
   
   // Route to appropriate announcement based on result_type
-  if (turn.result_type === 'CHARGE') {
+  if (turn.result_type === 'CHARGE' && !turn.suppress_turn_prep_foul_announce) {
     // Charge: offensive foul on drive
     announceGameEvent('CHARGE', turn, scene, { 
       foulerId: turn.foul_player_id || turn.shooter_id 
@@ -331,7 +331,10 @@ export async function finalizeTurnAfterAnimation({
       turn.animation_steps.length > 0
     );
     const isBlockingFoul = turn.foul_team === 'DEFENSE' && turn.text?.toLowerCase().includes('blocking foul');
-    if (turn._quickFoulAnnounceDone) {
+    if (turn.suppress_turn_prep_foul_announce) {
+      // Backend schema step (fb_terminal_announce) owns the blocking foul freeze
+      // announcement on Fast Break terminal turns; skip the legacy FE callout.
+    } else if (turn._quickFoulAnnounceDone) {
       // Quick Foul: announce already fired after reach-in (BIP/SIP, DREB, or Final Turn path).
     } else if (isSchemaDrebOtb) {
       // Backend schema step announces OTB after the rebounder reaches/attaches the ball.

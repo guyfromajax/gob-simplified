@@ -650,6 +650,9 @@ def _build_drive_resolution_animation_steps(
         if result_type == "MAKE":
             _override_fb_make_announcement(steps)
 
+    from BackEnd.engine.fb_terminal_announce import stamp_fb_terminal_freeze
+
+    stamp_fb_terminal_freeze(turn_result, steps, is_away_offense=is_away_offense)
     return steps or None
 
 
