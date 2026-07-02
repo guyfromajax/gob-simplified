@@ -2,12 +2,28 @@
  * Unified lineup autoset via POST /api/autoset-lineup (same rules as set-lineup screen / sim).
  */
 
+const REQUIRED_LINEUP_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+function getPlayerId(player) {
+  if (!player || typeof player !== 'object') return null;
+  return player.player_id || player.playerId || player._id || player.id || null;
+}
+
+function validateLineup(lineup, label) {
+  const missing = REQUIRED_LINEUP_POSITIONS.filter((pos) => !lineup || !lineup[pos]);
+  if (missing.length) {
+    throw new Error(`${label} autoset-lineup returned incomplete lineup; missing ${missing.join(', ')}`);
+  }
+}
+
 function buildAutosetPlayersPayload(players) {
   return (players || []).map((p) => {
     const raw = p.stats || {};
     const gameStats = raw.game || raw;
+    const playerId = getPlayerId(p);
     return {
-      _id: p._id,
+      _id: playerId,
+      player_id: playerId,
       first_name: p.first_name || '',
       last_name: p.last_name || '',
       attributes: p.attributes || {},
@@ -57,7 +73,9 @@ export async function fetchAutosetLineupFromRosterApi(rosterJson, gameState) {
     throw new Error(msg);
   }
   const data = await res.json();
-  return data.lineup || {};
+  const lineup = data.lineup || {};
+  validateLineup(lineup, rosterJson.team_name || rosterJson.name || 'team');
+  return lineup;
 }
 
 /**

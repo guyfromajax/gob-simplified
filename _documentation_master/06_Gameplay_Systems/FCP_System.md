@@ -223,6 +223,19 @@ Anchor ladder: midcourt → key → midLane → basketSpot by progress. Help/den
 
 **Def SG/SF release:** when **BH x ≥ 64** (not when their man enters ABA). PG stays on ball. Module: `fcp_pf_c_zone.py`.
 
+#### Defensive mid-court recovery (FCP + HCT)
+
+Companion to the offensive back-movement gate. Once `frontcourt_established`, any defender the active play leaves **holding in the backcourt** (Standard Trap normal-shift guards; FCP Straight Pressure men released "to help" after the press break) is pulled across mid-court so the defense doesn't get stranded when the offense clears the backcourt.
+
+| Rule | Detail |
+|------|--------|
+| **Trigger** | `frontcourt_established` (ball crossed half this possession) — same trigger as the offense gate |
+| **Who** | Any defender whose play-computed target is still in the **backcourt** (behind x=50). Ball/trap/zone/man-following defenders already resolve frontcourt targets and are untouched |
+| **Where** | Nearest **unguarded** offender, denying ball-side (`interpolate(BH → man, 0.6)`); "guarded" is inferred from the non-stranded defenders' targets (within `8`). Falls back to the **key** help spot if every offender is already covered |
+| **Trailing man** | Self-correcting — a legit unguarded backcourt offender is the nearest unguarded man, so his defender stays with him instead of abandoning him |
+| **Speed** | Recovering defenders **sprint** (they catch up rather than trail a beat behind) |
+| **Where applied** | Overlay on the play's `defense_targets` inside `_move_defense`; primitive `_recover_defense_targets` — shared by all HCT/FCP plays |
+
 #### Post-read overrides (shared)
 
 - **D21 — no live dribble:** any `attack` result collapses to `pass`.
@@ -245,6 +258,7 @@ When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, 
 - `tests/test_fcp_inbound_release.py` — SF x=34 tier pick, pass-clear x (14–20), off-ball handoff.
 - `tests/test_fcp_offball_attack.py` — tier boundaries at 34 / 50 / 51 and backcourt release lane.
 - `tests/test_fcp_pf_c_zone.py` — zone geometry, anchor ladder, BH x≥64 man release.
+- `tests/test_defense_recovery.py` — stranded backcourt defenders recover across mid-court; trailing-man and all-covered fallbacks.
 
 #### Related docs
 

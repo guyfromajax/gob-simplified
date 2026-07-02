@@ -170,6 +170,7 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
     drive = resolve_fb_drive_step(
         bh=ball_handler,
         bh_pos=bh_pos,
+        bh_start=bh_start,
         shot_spot=shot_spot,
         off_lineup=off_lineup,
         off_starts=_lineup_starts_by_pos(off_lineup),

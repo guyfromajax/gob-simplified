@@ -1771,6 +1771,73 @@ def _position_defense(
         def_coords[pos] = dict(tgt)
 
 
+# Defensive recovery (mid-court) — once the offense establishes frontcourt, a
+# defender the play left holding in the backcourt sprints across to pick up the
+# nearest UNGUARDED offender (deny ball-side), else drops to the key help spot.
+DEFENSE_RECOVERY_DENY_FRACTION = 0.6   # deny spot: fraction from BH toward the man
+DEFENSE_RECOVERY_GUARDED_RADIUS = 8.0  # an offender within this of a def target is "covered"
+
+
+def _recover_defense_targets(
+    targets: Dict[str, Dict[str, int]],
+    def_coords: Dict[str, Dict[str, int]],
+    off_coords: Optional[Dict[str, Dict[str, int]]],
+    bh_xy: Dict[str, Any],
+    is_away_offense: bool,
+    frontcourt_established: bool,
+) -> set:
+    """Pull stranded backcourt defenders across mid-court once FC is established.
+
+    A defender is *stranded* when the play's own target for him still sits in the
+    backcourt (behind x=50) after the offense has established frontcourt — i.e. the
+    play left him "holding his spot" (Standard Trap normal-shift guards; FCP
+    Straight Pressure men released after the press break). Each stranded defender
+    is redirected to guard the nearest **unguarded** offender (deny ball-side, on
+    the BH→man line); if every offender is already covered he drops to the key
+    help spot. "Covered" is inferred from the *non-stranded* defenders' targets, so
+    no play internals are needed. Self-correcting: a legit trailing backcourt man
+    is the nearest unguarded offender, so his defender stays with him.
+
+    Mutates ``targets`` in place. Returns the set of redirected defender positions
+    (the caller sprints them so they actually catch up).
+    """
+    recovered: set = set()
+    if not frontcourt_established or off_coords is None:
+        return recovered
+    from BackEnd.engine.over_and_back import in_backcourt
+
+    stranded = [
+        pos for pos in POSITIONS if in_backcourt(float(targets[pos]["x"]), is_away_offense)
+    ]
+    if not stranded:
+        return recovered
+
+    # Offenders already covered by a defender who is NOT stranded.
+    guarded: set = set()
+    for dpos in POSITIONS:
+        if dpos in stranded:
+            continue
+        for op in POSITIONS:
+            if _euclid(targets[dpos], off_coords[op]) <= DEFENSE_RECOVERY_GUARDED_RADIUS:
+                guarded.add(op)
+
+    help_spot = _spot("key", is_away_offense)
+    # Assign the stranded defenders (closest-to-their-man first for stable pairing)
+    # to distinct unguarded offenders; deny ball-side, else drop to the help spot.
+    for pos in stranded:
+        unguarded = [op for op in POSITIONS if op not in guarded]
+        if unguarded:
+            man = min(unguarded, key=lambda op: _euclid(def_coords[pos], off_coords[op]))
+            guarded.add(man)
+            targets[pos] = _clamp_xy(
+                _interpolate(bh_xy, off_coords[man], DEFENSE_RECOVERY_DENY_FRACTION)
+            )
+        else:
+            targets[pos] = _clamp_xy(help_spot)
+        recovered.add(pos)
+    return recovered
+
+
 def _move_defense(
     bh_xy: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
@@ -1779,6 +1846,7 @@ def _move_defense(
     def_lineup: Dict[str, Any],
     off_coords: Optional[Dict[str, Dict[str, int]]] = None,
     play: Any = None,
+    frontcourt_established: bool = False,
 ) -> None:
     """D15: move each defender toward its §6 target at the player's rate,
     **interrupted** by the segment duration, tracking actual positions.
@@ -1789,14 +1857,22 @@ def _move_defense(
     back onto him every step). Matches the emitter's interrupted-coord render.
     Mutates ``def_coords`` in place. ``off_coords`` feeds the D22 PF/C coverage.
     ``play`` selects the formation seam (Standard vs. Straight Pressure).
+    ``frontcourt_established`` enables the mid-court recovery overlay
+    (``_recover_defense_targets``): defenders the play left holding in the
+    backcourt sprint across to pick up the nearest unguarded offender.
     """
     targets = (
         play.defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
         if play is not None
         else _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
     )
+    # Once FC is established, pull any defender the play left holding in the
+    # backcourt across mid-court; recovered defenders sprint to catch up.
+    recovered = _recover_defense_targets(
+        targets, def_coords, off_coords, bh_xy, is_away_offense, frontcourt_established
+    )
     for pos in POSITIONS:
-        arch = "sprint" if pos in ("PF", "C") else "standard"
+        arch = "sprint" if (pos in ("PF", "C") or pos in recovered) else "standard"
         rate = _ag_grid_per_game_sec(def_lineup.get(pos), arch)
         if rate <= 0:
             def_coords[pos] = _clamp_xy(targets[pos])
@@ -2442,7 +2518,7 @@ def compute_dynamic_hct_turn(
         bh_xy = off_coords[bh_pos]
         # D15: defenders chase at their own rate (interrupted), so a quicker BH
         # gains separation rather than the defense snapping back onto him.
-        _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play)
+        _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established)
         # D15b: off-ball offense — FCP press-break routes or setup hustle.
         _fcp_move_offense(bh_xy, advance_seconds)
         _append_loop_segment(
@@ -2790,7 +2866,7 @@ def compute_dynamic_hct_turn(
         nonlocal result_type, text_suffix, shot_clock
         hold_snap_off, hold_snap_def = _snap_loop_coords()
         hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
-        _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play)
+        _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established)
         if turn_mode == "fcp" and fcp_offball is not None:
             fcp_offball.refresh_incremental(bh_xy, off_coords, bh_pos, force=False)
             _fcp_move_offense(bh_xy, hold_seconds)
@@ -3056,7 +3132,7 @@ def compute_dynamic_hct_turn(
         pass_snap_off, pass_snap_def = _snap_loop_coords()
         _move_defense(
             off_coords[receiver_pos], def_coords, is_away_offense, pass_seconds,
-            def_lineup, off_coords, play=play,
+            def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established,
         )
         if turn_mode == "fcp" and fcp_offball is not None:
             # Route teammates up the floor from the *receiver's* progress band
