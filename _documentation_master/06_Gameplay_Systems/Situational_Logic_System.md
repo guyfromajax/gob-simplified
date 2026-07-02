@@ -44,7 +44,7 @@ When Score Delta falls in neither Slow It Down nor Quick Shot for that band → 
   - The player being fouled is the offense player receiving the inbound pass on BIP & SIP steps, or the offense player who holds the ball entering the HCO step (no passes); the fouling defender is the defender closest to the player being fouled at the moment of the foul.
   - Foul animation: move the defensive fouling player's sprite to the offensive player being fouled sprite, execute the announcement system with the fouling player image and text "Quick Foul".
 - If Force Foul = False: proceed to next step.
-- Override Offense Team’s Fast Break setting to 0 (temp override; revert when Slow It Down no longer applies).
+- **Conservative defense (temp override):** the Slow It Down (leading) team’s `fast_breaks`, `hc_trap`, `fc_press`, and `aggression` are all treated as **0** for as long as they’re in Slow It Down — see **Slow It Down conservative-defense state** below. These are read-time overrides only; the team’s stored `strategy_settings` (and their DB team doc) are never mutated.
 - Next step (if Force Foul = False): offense tempo = `"slow"` (see **Offense tempo overrides** below).
 - **Playcall (HCO):** Call a **motion** play only. Select from motion plays that have a **non-zero percentage** in the offense team’s playbook settings (weighted by those percentages). If no motion play has a percentage assigned, choose any motion play at random. Playbook set-play percentages and motion/set mix do not apply. User Playcall Center overrides still take precedence when set.
 
@@ -54,6 +54,28 @@ When Score Delta falls in neither Slow It Down nor Quick Shot for that band → 
 - **Playcall (HCO):** Call a **set play** with **outside** shot focus only. All outside set plays are eligible; choose one at **uniform random**. Playbook percentages and motion/set mix do not apply. User Playcall Center overrides still take precedence when set.
 
 Temp overrides (Fast Break, FCP, HCT) are re-evaluated each turn and revert when the situation no longer applies.
+
+---
+
+## Slow It Down conservative-defense state
+
+Slow It Down is fundamentally about a team with a **comfortable late lead** getting conservative. The existing `tempo = "slow"` override handles their **offense** (see **Offense tempo overrides**); this section covers their **defense**.
+
+**Macro team-state.** Each turn we (re)compute a macro, team-level Slow It Down state stored in `game_state["slow_it_down_team_ids"]` (a list, persisted in the game doc). Unlike the offense-perspective `is_slow_it_down()` (used for tempo/playcall), this is evaluated from the **leading team’s** perspective — `leadScore − trailScore` vs the current time-band’s Slow It Down threshold — so it applies **independent of who is on offense**, i.e. it stays in force while the leading team is on **defense** (the opponent’s possession). It is re-evaluated every turn and reverts the moment the lead no longer meets the band threshold (or we leave Q4/OT). `BackEnd/utils/situational_logic.py` → `get_slow_it_down_team_id()`.
+
+**Conservative-defense overrides (all → 0)** for a team in this state, applied at read time only (their stored `strategy_settings` / DB team doc are never mutated):
+
+| Setting | Effect when 0 | Where applied |
+|---------|---------------|---------------|
+| `fast_breaks` | No fast-break release off a defensive rebound (DREB, FT-miss DREB) | `shot_manager.py`, `phase_resolution.py` (via `slow_it_down_defense_setting()`) |
+| `hc_trap` / `fc_press` | No half-court trap / full-court press → straight `HCO` defense after a made shot | `turn_manager._select_defensive_pressure_type()` |
+| `aggression` | Passive defense: `aggression_call = "passive"` (fewer fouls, less steal/help gambling), no transition push off a steal, fewer block attempts, looser zone-defender spacing | `turn_manager.set_strategy_calls()` (resolved `aggression_call`) + raw `strategy_settings["aggression"]` reads in `shot_manager.py` / `phase_resolution.py` (via `slow_it_down_defense_setting()`) |
+
+**Precedence.** The user’s Playcall Center overrides win over these situational overrides:
+- **Aggression:** PC `aggression_override` (user team) > Slow It Down `"passive"` > per-break `aggression_roll`.
+- **Press/Trap:** PC `press_trap_override` (user team) > Slow It Down `HCO`. (Note the Quick Shot `_situational_quick_shot_fcp_hct_override` is checked first and still precedes the PC override, matching existing Quick Shot behavior.)
+
+**Helpers:** `situational_logic.py` → `is_team_slow_it_down(game_state, team_id)`, `slow_it_down_defense_setting(game_state, team, key, raw_value)`, `SLOW_IT_DOWN_CONSERVATIVE_SETTINGS`. **State refresh:** `turn_manager._refresh_situational_team_state()` (called at the start of `set_strategy_calls()` and `determine_defensive_pressure_type()`).
 
 ---
 

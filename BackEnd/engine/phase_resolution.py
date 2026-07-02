@@ -19,6 +19,7 @@ from BackEnd.utils.shared import (
     get_quarter_index_from_game
 )
 from BackEnd.models.shot_manager import ShotManager
+from BackEnd.utils.situational_logic import slow_it_down_defense_setting
 if TYPE_CHECKING:
     from BackEnd.models.turn_manager import TurnManager
 if TYPE_CHECKING:
@@ -492,7 +493,10 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
     is_away_offense = off_team.team_id == game.away_team.team_id
     
     # Get defense aggression level
-    aggression_level = def_team.strategy_settings.get("aggression", "normal")
+    aggression_level = slow_it_down_defense_setting(
+        game.game_state, def_team, "aggression",
+        def_team.strategy_settings.get("aggression", "normal"),
+    )
     aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
     aggression = aggression_map.get(aggression_level, "normal")
     
@@ -2537,7 +2541,10 @@ def resolve_free_throw_logic(game):
                     text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
                     if _FT_MISS_DREB_FAST_BREAK_ENABLED:
                         p_dreb = fast_break_probability_from_slider(
-                            def_team.strategy_settings.get("fast_breaks", 2)
+                            slow_it_down_defense_setting(
+                                game_state, def_team, "fast_breaks",
+                                def_team.strategy_settings.get("fast_breaks", 2),
+                            )
                         )
                         next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
                     else:
@@ -2692,7 +2699,10 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         text = f"{stealer_name} jumps the pass"
         # Stealing team = def_team; single roll uses their aggression only.
         p_steal = fast_break_probability_from_slider(
-            def_team.strategy_settings.get("aggression", 2)
+            slow_it_down_defense_setting(
+                game_state, def_team, "aggression",
+                def_team.strategy_settings.get("aggression", 2),
+            )
         )
         fast_break_roll = random.random()
         if fast_break_roll < p_steal:
@@ -2946,7 +2956,10 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                             })
                         
                         # Get aggression level
-                        aggression_level = def_team.strategy_settings.get("aggression", 2)
+                        aggression_level = slow_it_down_defense_setting(
+                            game.game_state, def_team, "aggression",
+                            def_team.strategy_settings.get("aggression", 2),
+                        )
                         aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
                         aggression = aggression_map.get(aggression_level, "normal")
                         
@@ -3125,7 +3138,10 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                             })
                         
                         # Get aggression level
-                        aggression_level = def_team.strategy_settings.get("aggression", 2)
+                        aggression_level = slow_it_down_defense_setting(
+                            game.game_state, def_team, "aggression",
+                            def_team.strategy_settings.get("aggression", 2),
+                        )
                         aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
                         aggression = aggression_map.get(aggression_level, "normal")
                         
@@ -6383,7 +6399,10 @@ def resolve_half_court_offense_logic(game):
                     })
                 
                 # Get aggression level
-                aggression_level = def_team.strategy_settings.get("aggression", "normal")
+                aggression_level = slow_it_down_defense_setting(
+                    game.game_state, def_team, "aggression",
+                    def_team.strategy_settings.get("aggression", "normal"),
+                )
                 aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
                 aggression = aggression_map.get(aggression_level, "normal")
                 
@@ -7899,7 +7918,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     next_play_type = None
     if result_type == "STEAL":
         p_steal = fast_break_probability_from_slider(
-            def_team.strategy_settings.get("aggression", 2)
+            slow_it_down_defense_setting(
+                game_state, def_team, "aggression",
+                def_team.strategy_settings.get("aggression", 2),
+            )
         )
         if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
@@ -9146,7 +9168,10 @@ def _resolve_full_court_press_dynamic_first_cut(game, def_scouting, text):
             game_state["offensive_state"] = "HCO"
     elif result_type == "STEAL":
         p_steal = fast_break_probability_from_slider(
-            def_team.strategy_settings.get("aggression", 2)
+            slow_it_down_defense_setting(
+                game_state, def_team, "aggression",
+                def_team.strategy_settings.get("aggression", 2),
+            )
         )
         if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
@@ -9404,7 +9429,10 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
     elif result_type == "STEAL":
         # Steal → fast break chance off the takeaway, else settle into HCO.
         p_steal = fast_break_probability_from_slider(
-            def_team.strategy_settings.get("aggression", 2)
+            slow_it_down_defense_setting(
+                game_state, def_team, "aggression",
+                def_team.strategy_settings.get("aggression", 2),
+            )
         )
         if random.random() < p_steal:
             next_play_type = "FAST_BREAK"
@@ -9992,7 +10020,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     next_play_type = None
     if result_type == "STEAL":
         p_steal = fast_break_probability_from_slider(
-            def_team.strategy_settings.get("aggression", 2)
+            slow_it_down_defense_setting(
+                game_state, def_team, "aggression",
+                def_team.strategy_settings.get("aggression", 2),
+            )
         )
         if random.random() < p_steal:
             next_play_type = "FAST_BREAK"

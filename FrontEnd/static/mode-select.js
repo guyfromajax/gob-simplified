@@ -738,6 +738,17 @@ function formatResumePeriod(resume) {
   return q <= 4 ? 'Q' + q : 'OT' + (q - 4);
 }
 
+function formatResumeClockForModeSelect(resume) {
+  const rawClock = resume && resume.clock !== undefined && resume.clock !== null
+    ? String(resume.clock).trim()
+    : '';
+  const normalizedClock = rawClock.replace(/^0(\d):/, '$1:');
+  if (normalizedClock === '0:00') {
+    return '8:00';
+  }
+  return rawClock || 'Last stoppage';
+}
+
 function cpuSimNeedsResume(cpuSimResume) {
   return !!(
     cpuSimResume &&
@@ -832,7 +843,7 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
       franchiseResumeMatchup.textContent = (currentActiveGameResume.away_team_name || 'Away') + ' at ' + (currentActiveGameResume.home_team_name || 'Home');
     }
     if (franchiseResumeDetail) {
-      franchiseResumeDetail.textContent = formatResumePeriod(currentActiveGameResume) + ' · ' + (currentActiveGameResume.clock || 'Last stoppage');
+      franchiseResumeDetail.textContent = formatResumePeriod(currentActiveGameResume) + ' · ' + formatResumeClockForModeSelect(currentActiveGameResume);
     }
     if (franchiseResumeScore) {
       franchiseResumeScore.textContent = String(currentActiveGameResume.away_score ?? 0) + ' - ' + String(currentActiveGameResume.home_score ?? 0);

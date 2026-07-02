@@ -969,7 +969,12 @@ class ShotManager:
                 and defender
                 and contest_result in ("neutral", "defense_win")
             ):
-                x = def_team.strategy_settings.get("aggression", 2)
+                # Slow It Down (Q4/OT) leading team plays passive defense → aggression 0 → fewer blocks.
+                from BackEnd.utils import situational_logic as sl
+                x = sl.slow_it_down_defense_setting(
+                    game_state, def_team, "aggression",
+                    def_team.strategy_settings.get("aggression", 2),
+                )
                 y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)
                 should_attempt_block_reconciliation = y <= x
                 if not should_attempt_block_reconciliation:
@@ -1415,12 +1420,13 @@ class ShotManager:
         # Get strategy settings directly as numeric values (0-4)
         # No need for string conversion - we just need the numbers for probability calculations
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
-        # ✅ Situational Logic (Q4/OT): Slow It Down overrides offense (leading) team's fast break to 0 when they're defense on this shot
-        override_team_id = game_state.get("_situational_fast_break_override_team_id")
-        if override_team_id and getattr(def_team, "team_id", None) == override_team_id:
-            defense_fast_breaks_value = 0
-        else:
-            defense_fast_breaks_value = def_team.strategy_settings.get("fast_breaks", 2)  # Stay vs release for FB
+        # ✅ Situational Logic (Q4/OT): a Slow It Down (leading) team plays conservative defense —
+        # fast_breaks → 0, so they don't release off this defensive rebound (they're def_team here).
+        from BackEnd.utils import situational_logic as sl
+        defense_fast_breaks_value = sl.slow_it_down_defense_setting(
+            game_state, def_team, "fast_breaks",
+            def_team.strategy_settings.get("fast_breaks", 2),  # Stay vs release for FB
+        )
         
         # get_name_safe already imported at top of file
         shooter_name = get_name_safe(shooter)

@@ -114,6 +114,78 @@ def is_slow_it_down(game, time_remaining_seconds):
     return delta >= slow_min
 
 
+# Settings a Slow It Down (leading) team zeroes out for conservative DEFENSE.
+# fast_breaks: don't release for a fast break off a rebound/steal.
+# hc_trap / fc_press: no half-court trap / full-court press (play straight HCO defense).
+# aggression: passive — fewer fouls, less gambling for steals/blocks, no transition push.
+SLOW_IT_DOWN_CONSERVATIVE_SETTINGS = ("fast_breaks", "hc_trap", "fc_press", "aggression")
+
+
+def get_slow_it_down_team_id(game, time_remaining_seconds):
+    """
+    Return the team_id of the team currently in the macro Slow It Down state, or None.
+
+    Unlike ``is_slow_it_down()`` (evaluated from the current offense's perspective, used
+    for offense tempo/playcall), this identifies the LEADING team and checks their margin
+    against the time-band Slow It Down threshold **independent of who is on offense**.
+
+    This drives conservative DEFENSE for the leading team (fast_breaks / hc_trap /
+    fc_press / aggression → 0) even while that team is on defense. Q4/OT only; reverts
+    as soon as the lead no longer meets the current band's threshold.
+    """
+    if not is_situational_active(game.quarter):
+        return None
+    tier = get_situational_tier(time_remaining_seconds)
+    if not tier:
+        return None
+    slow_min = tier.get("slow_min")
+    if slow_min is None:
+        return None
+    home = getattr(game, "home_team", None)
+    away = getattr(game, "away_team", None)
+    if home is None or away is None:
+        return None
+    score = game.score or {}
+    home_score = int(score.get(home.name, 0))
+    away_score = int(score.get(away.name, 0))
+    if home_score == away_score:
+        return None
+    if home_score > away_score:
+        leader, margin = home, home_score - away_score
+    else:
+        leader, margin = away, away_score - home_score
+    if margin >= slow_min:
+        return getattr(leader, "team_id", None)
+    return None
+
+
+def is_team_slow_it_down(game_state, team_id):
+    """True if ``team_id`` is currently flagged in the macro Slow It Down state.
+
+    Reads the ``slow_it_down_team_ids`` field maintained on ``game_state`` (refreshed each
+    turn); comparison is string-normalized to be robust to int/str team_id representations.
+    """
+    if team_id is None:
+        return False
+    ids = (game_state or {}).get("slow_it_down_team_ids") or []
+    return str(team_id) in {str(t) for t in ids}
+
+
+def slow_it_down_defense_setting(game_state, team, key, raw_value):
+    """Effective 0-4 strategy_setting value for ``team``, honoring the Slow It Down override.
+
+    Returns 0 when ``team`` is in the macro Slow It Down state and ``key`` is a
+    conservative-defense setting (see ``SLOW_IT_DOWN_CONSERVATIVE_SETTINGS``); otherwise
+    returns ``raw_value`` unchanged. This is a read-time override only — it never mutates
+    the team's stored ``strategy_settings`` (which stay tied to the team/DB doc).
+    """
+    if key not in SLOW_IT_DOWN_CONSERVATIVE_SETTINGS:
+        return raw_value
+    if is_team_slow_it_down(game_state, getattr(team, "team_id", None)):
+        return 0
+    return raw_value
+
+
 def is_quick_shot(game, time_remaining_seconds):
     """
     True when Score Delta is in this band's Quick Shot range (Q4/OT).

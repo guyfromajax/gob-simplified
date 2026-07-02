@@ -406,3 +406,110 @@ def test_situational_tempo_resumes_after_pc_tempo_cleared():
     assert game.offense_team.strategy_calls["tempo_call"] == "normal"
     tm.set_strategy_calls()
     assert game.offense_team.strategy_calls["tempo_call"] == "slow"
+
+
+# ---------------------------------------------------------------------------
+# Slow It Down macro team-state: conservative DEFENSE overrides
+# (fast_breaks / hc_trap / fc_press / aggression -> 0). See
+# _documentation_master/06_Gameplay_Systems/Situational_Logic_System.md.
+# ---------------------------------------------------------------------------
+from BackEnd.utils import situational_logic as sl
+
+
+def test_slow_it_down_team_id_is_leader_regardless_of_offense():
+    # Leading team is flagged from the LEADING team's perspective, independent of
+    # who is on offense — so it stays in force while they're on defense.
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)  # Lancaster (home) leads 90-75
+    assert sl.get_slow_it_down_team_id(game, 150) == game.home_team.team_id
+    # Flip possession: trailing team (away) on offense; leader (home) now on defense.
+    game.offense_team = game.away_team
+    game.defense_team = game.home_team
+    assert sl.get_slow_it_down_team_id(game, 150) == game.home_team.team_id
+
+
+def test_slow_it_down_reverts_when_lead_below_band_threshold():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    # 1:01-2:00 band needs a >= 9 lead; drop the lead to 5.
+    game.score = {"Lancaster": 80, "Bentley-Truman": 75}
+    assert sl.get_slow_it_down_team_id(game, 150) is None
+    # Not Q4/OT -> never active.
+    game.score = {"Lancaster": 90, "Bentley-Truman": 75}
+    game.quarter = 3
+    game.game_state["quarter"] = 3
+    assert sl.get_slow_it_down_team_id(game, 150) is None
+
+
+def test_slow_it_down_defense_setting_zeroes_conservative_keys():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    gs = game.game_state
+    gs["slow_it_down_team_ids"] = [game.home_team.team_id]
+    leader = game.home_team
+    other = game.away_team
+    for key in ("fast_breaks", "hc_trap", "fc_press", "aggression"):
+        assert sl.slow_it_down_defense_setting(gs, leader, key, 4) == 0
+        assert sl.slow_it_down_defense_setting(gs, other, key, 4) == 4
+    # Non-conservative keys are never overridden, even for the flagged team.
+    assert sl.slow_it_down_defense_setting(gs, leader, "tempo", 4) == 4
+
+
+def test_slow_it_down_sets_aggression_call_passive_on_defense():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    # Put the leading team (home) ON DEFENSE (opponent has the ball).
+    game.offense_team = game.away_team
+    game.defense_team = game.home_team
+    game.roll_aggression_calls()
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    assert game.game_state["slow_it_down_team_ids"] == [game.home_team.team_id]
+    # Leading team is passive; trailing team keeps its normal break roll.
+    assert game.home_team.strategy_calls["aggression_call"] == "passive"
+    assert game.away_team.strategy_calls["aggression_call"] == game.away_team.strategy_calls["aggression_roll"]
+
+
+def test_pc_aggression_override_beats_slow_it_down_passive():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    game.game_state["user_team_side"] = "home"  # leading team is the user team
+    game.roll_aggression_calls()
+    game.home_team.strategy_calls["aggression_override"] = "aggressive"
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    # PC override wins over the situational "passive".
+    assert game.home_team.strategy_calls["aggression_call"] == "aggressive"
+
+
+def test_aggression_reverts_to_roll_when_not_slow_it_down():
+    game = build_mock_game()  # Q1, tied -> no slow it down
+    game.roll_aggression_calls()
+    tm = TurnManager(game)
+    tm.set_strategy_calls()
+    assert game.game_state.get("slow_it_down_team_ids") == []
+    for team in (game.offense_team, game.defense_team):
+        assert team.strategy_calls["aggression_call"] == team.strategy_calls["aggression_roll"]
+
+
+def test_slow_it_down_forces_hco_defense_over_settings():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    # Leading team just scored (offense_team) and would otherwise trap/press.
+    game.offense_team.strategy_settings["hc_trap"] = 4
+    game.offense_team.strategy_settings["fc_press"] = 4
+    tm = TurnManager(game)
+    tm._refresh_situational_team_state()
+    assert tm._select_defensive_pressure_type() == "HCO"
+
+
+def test_pc_press_override_beats_slow_it_down_hco():
+    game = build_mock_game()
+    _setup_q4_slow_it_down_offense(game)
+    game.game_state["user_team_side"] = "home"  # leading team is the user team
+    game.offense_team.strategy_settings["hc_trap"] = 4
+    game.offense_team.strategy_calls["press_trap_override"] = "press"
+    tm = TurnManager(game)
+    tm._refresh_situational_team_state()
+    # PC press override wins over the situational HCO.
+    assert tm._select_defensive_pressure_type() == "FCP"

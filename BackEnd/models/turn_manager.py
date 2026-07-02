@@ -1154,26 +1154,14 @@ class TurnManager:
             for player in team.get_all_players():
                 pre_stats[player.player_id] = player.stats["game"].copy()
 
-        # STEP 1: Set strategy calls (tempo + aggression)
+        # STEP 1: Set strategy calls (tempo + aggression).
+        # NOTE: set_strategy_calls() first calls _refresh_situational_team_state(), which
+        # (re)computes the Q4/OT macro Slow It Down team-state (game_state["slow_it_down_team_ids"])
+        # and the Quick Shot FCP/HCT override for this turn — see that method.
         self.set_strategy_calls()
-        
-        # ✅ Situational Logic (Q4/OT): tempo and temp overrides (revert when situation ends)
-        from BackEnd.utils import situational_logic as sl
         game_state = self.game.game_state
         time_remaining = game_state.get("time_remaining")
         quarter = getattr(self.game, "quarter", None)
-        if sl.is_situational_active(quarter) and time_remaining is not None:
-            if sl.is_slow_it_down(self.game, time_remaining):
-                game_state["_situational_fast_break_override_team_id"] = self.game.offense_team.team_id
-            else:
-                game_state.pop("_situational_fast_break_override_team_id", None)
-            if sl.is_quick_shot(self.game, time_remaining):
-                game_state["_situational_quick_shot_fcp_hct_override"] = True
-            else:
-                game_state.pop("_situational_quick_shot_fcp_hct_override", None)
-        else:
-            game_state.pop("_situational_fast_break_override_team_id", None)
-            game_state.pop("_situational_quick_shot_fcp_hct_override", None)
         
         # ✅ LOG: Check for Playcall Center overrides at start of turn
         # ✅ PERFORMANCE: Skip Playcall Center checks during full simulation (full_sim=True)
@@ -3052,7 +3040,40 @@ class TurnManager:
 
         return random.choice(zone_ids)
 
+    def _refresh_situational_team_state(self):
+        """Refresh the Q4/OT macro situational team-state on ``game_state`` for this turn.
+
+        - ``slow_it_down_team_ids``: the LEADING team (if any) currently in Slow It Down.
+          This drives conservative DEFENSE for that team (fast_breaks / hc_trap / fc_press /
+          aggression → 0) even while they are on defense. Re-evaluated every turn from the
+          leading team's perspective (independent of who's on offense) and reverts as soon as
+          the lead no longer meets the current time-band threshold. Persisted in the game doc.
+        - ``_situational_quick_shot_fcp_hct_override``: offense (trailing) Quick Shot flag that
+          forces the post-score defense to HCO.
+
+        Idempotent and cheap; called at the start of set_strategy_calls() (turn start) and of
+        determine_defensive_pressure_type() so every entry path sees a current state.
+        """
+        from BackEnd.utils import situational_logic as sl
+        game_state = self.game.game_state
+        time_remaining = game_state.get("time_remaining")
+        quarter = getattr(self.game, "quarter", None)
+        slow_it_down_id = None
+        quick_shot = False
+        if sl.is_situational_active(quarter) and time_remaining is not None:
+            slow_it_down_id = sl.get_slow_it_down_team_id(self.game, time_remaining)
+            quick_shot = sl.is_quick_shot(self.game, time_remaining)
+        game_state["slow_it_down_team_ids"] = [slow_it_down_id] if slow_it_down_id is not None else []
+        if quick_shot:
+            game_state["_situational_quick_shot_fcp_hct_override"] = True
+        else:
+            game_state.pop("_situational_quick_shot_fcp_hct_override", None)
+
     def set_strategy_calls(self):
+        # ✅ Situational Logic (Q4/OT): refresh the macro Slow It Down team-state (and Quick Shot
+        # flag) BEFORE resolving aggression, so a Slow It Down team's aggression goes passive.
+        self._refresh_situational_team_state()
+
         # Ensure strategy_settings are initialized for both teams (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict
         # ✅ TRACE: Log current strategy_settings state before checking (potential overwrite point)
@@ -3162,7 +3183,12 @@ class TurnManager:
                 calls["aggression_roll"] = base_roll
             is_user_team = user_team is not None and str(team.team_id) == str(user_team.team_id)
             if is_user_team and aggression_override:
+                # Playcall Center aggression override (user) — highest precedence.
                 calls["aggression_call"] = aggression_override
+            elif sl.is_team_slow_it_down(self.game.game_state, team.team_id):
+                # Q4/OT Slow It Down: leading team plays passive defense (aggression → 0).
+                # Situational; yields to the user's Playcall Center override above.
+                calls["aggression_call"] = "passive"
             else:
                 calls["aggression_call"] = base_roll
         
@@ -5695,6 +5721,9 @@ class TurnManager:
         ``game_state["hct_trap_play"]`` so downstream engines use the same value.
         Mirrors the Fast Break select-once → stash → consume-with-fallback shape.
         """
+        # Ensure the Q4/OT macro Slow It Down / Quick Shot state is current for this
+        # pressure decision, even when reached outside the normal run_micro_turn path.
+        self._refresh_situational_team_state()
         pressure_type = self._select_defensive_pressure_type()
 
         # After a made shot possession flips: the team that just scored
@@ -5734,7 +5763,9 @@ class TurnManager:
         if self.game.game_state.get("_situational_quick_shot_fcp_hct_override"):
             return "HCO"
         
-        # ✅ Playcall Center: If user's team is applying pressure, honor press_trap_override
+        # ✅ Playcall Center: If user's team is applying pressure, honor press_trap_override.
+        # Per Slow It Down spec, the user's PC press/trap override takes precedence over the
+        # situational Slow It Down override below.
         user_team_side = self.game.game_state.get("user_team_side")
         is_user_team = (user_team_side == "home" and def_team.is_home_team) or (user_team_side == "away" and not def_team.is_home_team)
         if is_user_team:
@@ -5745,6 +5776,13 @@ class TurnManager:
                 return "HCT"
             if pt_override == "none":
                 return "HCO"
+        
+        # ✅ Situational Logic (Q4/OT): a Slow It Down (leading) team plays conservative
+        # defense — hc_trap / fc_press → 0, i.e. no trap/press (straight HCO). Applies while
+        # they are on defense; yields to the user's Playcall Center override above.
+        from BackEnd.utils import situational_logic as sl
+        if sl.is_team_slow_it_down(self.game.game_state, getattr(def_team, "team_id", None)):
+            return "HCO"
         
         # Ensure strategy_settings is initialized (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict

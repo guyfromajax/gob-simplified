@@ -36,6 +36,7 @@ Active implementation direction:
 - Normal live quarter breaks must send `quarter_break_from=play_quarter` to Set Lineup and preserve it when returning to `court.html`; this marker tells the court boot code not to read the durable resume anchor or show the mid-game resume modal.
 - Live quarter entries are authoritative. If stale resume flags survive into a live quarter URL, `bootGame.js` strips them and `loadGameStats.js` ignores them.
 - Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
+- Mode Select resume card clock text is display-only. If a quarter-break anchor has already advanced the period but still reports `0:00`, Mode Select displays `8:00` in the resume card so the capsule reads as the next quarter start. This does not mutate the backend clock, URL clock, or court resume logic.
 
 The simplified v1 intentionally does **not** support arbitrary mid-quarter recovery before the first stable anchor. If the user refreshes or closes the browser before any timeout, foul-out, or non-final quarter-break anchor exists, MGR is unavailable and normal non-MGR flow applies.
 
@@ -625,6 +626,8 @@ Key backend file:
 ## Mode Select Active-Game Lookup
 
 Mode Select active-game routing is handled by `_find_active_user_game_resume(...)` in `BackEnd/api/franchise_routes.py`.
+
+Mode Select renders active-game resume details in `FrontEnd/static/mode-select.js`. Its clock label can normalize a `0:00` quarter-break anchor to `8:00` for display only, because the backend may advance the quarter before the persisted clock text has caught up. Do not use this display formatter as game-state authority.
 
 It determines the user's current scheduled game from the franchise schedule, then scans incomplete game documents with a `resume_anchor`.
 
