@@ -1993,6 +1993,9 @@ def _build_finisher_drive_resolution_steps(
         "TURNOVER",
     }
     if result_type not in allowed:
+        logging.warning(
+            "🧩 [RR_DR] skip: result_type=%s not in allowed set", result_type
+        )
         return None
 
     fb_drive = turn_result.get("fb_drive_resolution") or {}
@@ -2003,6 +2006,14 @@ def _build_finisher_drive_resolution_steps(
         or _safe_id(phase.get("rr_id"))
     )
     if not stealer_id or stealer_id not in start_coords:
+        logging.warning(
+            "🧩 [RR_DR] EARLY-None: stealer_id=%s in_start_coords=%s "
+            "(result_type=%s outcome=%s) — no drive/meet steps emitted",
+            stealer_id,
+            bool(stealer_id and stealer_id in start_coords),
+            result_type,
+            fb_drive.get("outcome"),
+        )
         return None
 
     raw_end_coords = turn_result.get("rr_end_coords") or {}
@@ -2175,6 +2186,34 @@ def _build_finisher_drive_resolution_steps(
         )
         if result_type == "MAKE":
             _override_fb_make_announcement(steps)
+
+    stopper_id = _safe_id(turn_result.get("stopper_id"))
+    step_kinds = [
+        (((s.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}).get("kind")
+        for s in steps
+    ]
+    meet_dbg = ""
+    for s in steps:
+        meta = (((s.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {})
+        if meta.get("kind") in ("rim_runner_meet", "after_steal_meet"):
+            rr_s = (s.get("start") or {}).get("coords", {}).get(stealer_id)
+            rr_e = (s.get("end") or {}).get("coords", {}).get(stealer_id)
+            st_s = (s.get("start") or {}).get("coords", {}).get(stopper_id)
+            st_e = (s.get("end") or {}).get("coords", {}).get(stopper_id)
+            meet_dbg = f" meet_step rr:{rr_s}->{rr_e} stopper[{stopper_id}]:{st_s}->{st_e}"
+            break
+    logging.warning(
+        "🧩 [RR_DR] result_type=%s outcome=%s uses_meet=%s meet_coords=%s "
+        "stealer_id=%s n_steps=%d kinds=%s%s",
+        result_type,
+        outcome,
+        uses_meet_step,
+        meet_coords,
+        stealer_id,
+        len(steps),
+        step_kinds,
+        meet_dbg,
+    )
 
     return steps or None
 
