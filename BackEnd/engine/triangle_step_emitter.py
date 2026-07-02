@@ -125,6 +125,7 @@ def _build_parallel_move_step(
     shot_clock_remaining_at_start: float,
     next_step: NextStep,
     announcement: Optional[Announcement] = None,
+    arrival_player_ids: Optional[List[str]] = None,
 ) -> Optional[AnimationStep]:
     if gate_player_id not in step_start_coords:
         return None
@@ -139,6 +140,23 @@ def _build_parallel_move_step(
         0.2,
         _traversal_seconds(step_start_coords[gate_player_id], gate_target, gate_rate),
     )
+
+    # Extend T so any ``arrival_player_ids`` (receivers of the immediately
+    # following ``_build_branch_pass_step``) fully reach their destination
+    # within this step. Without this, a receiver whose run is longer than the
+    # gate player's gets clamped short here, then jetted to his spot in the
+    # pass step (which is timed to the ball flight, not his travel). Taking
+    # the max of the gate + receiver traversals removes that residual so the
+    # receiver is already standing on the pass target when the ball arrives.
+    for pid in arrival_player_ids or ():
+        if pid == gate_player_id or pid not in step_start_coords:
+            continue
+        mover = next((m for m in movers if m[0] == pid), None)
+        if mover is None:
+            continue
+        recv_player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        recv_rate = _ag_grid_per_game_sec(recv_player, mover[2])
+        t = max(t, _traversal_seconds(step_start_coords[pid], mover[1], recv_rate))
 
     actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
     archetype: Dict[str, PlayerArchetype] = {
@@ -225,6 +243,21 @@ def _build_triangle_setup_step(
     if not movers:
         return None
 
+    # Receivers whose pass fires straight off the setup step must fully arrive
+    # within this step so the following ``_build_branch_pass_step`` starts them
+    # on-spot (no residual → no jet). The corner-kick branch drives first, but
+    # the corner is idle during that drive, so his arrival is gated here too.
+    branch = _triangle_branch(turn_result, payload)
+    arrival_ids: List[str] = []
+    if branch == "triangle_rr_post":
+        rr_id = _safe_id(payload.get("rim_runner_id"))
+        if rr_id:
+            arrival_ids.append(rr_id)
+    elif branch in ("triangle_corner_three", "triangle_drive_corner_kick"):
+        corner_id = _safe_id(payload.get("same_side_corner_id"))
+        if corner_id:
+            arrival_ids.append(corner_id)
+
     phase = fb_roles.get("rim_runner_burst_phase") or {}
     bh_player = _player_lookup_by_id(off_lineup, def_lineup, bh_id)
     announcement: Announcement = {
@@ -253,6 +286,7 @@ def _build_triangle_setup_step(
         shot_clock_remaining_at_start=shot_clock_remaining_at_start,
         next_step={"kind": "next_step", "index": next_step_index},
         announcement=announcement,
+        arrival_player_ids=arrival_ids,
     )
 
 
@@ -468,6 +502,14 @@ def _build_triangle_decision_steps(
         )
         return out
 
+    # For the RR-feed branch the pass fires straight off this drive step, so the
+    # RR must fully reach his drive spot within it (no residual → no jet). The
+    # corner-kick branch drives first but kicks to the (idle) corner, whose
+    # arrival is already gated in the setup step, not here.
+    drive_arrival_ids: List[str] = []
+    if branch == "triangle_drive_rr_feed" and rr_id and drive_rr:
+        drive_arrival_ids.append(rr_id)
+
     drive_step = _build_parallel_move_step(
         step_start_coords=cursor_coords,
         movers=movers,
@@ -478,6 +520,7 @@ def _build_triangle_decision_steps(
         clock_remaining_at_start=cursor_clock,
         shot_clock_remaining_at_start=cursor_sc,
         next_step={"kind": "next_step", "index": next_idx},
+        arrival_player_ids=drive_arrival_ids,
     )
     if not append_step(drive_step):
         logging.warning(

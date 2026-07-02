@@ -3032,7 +3032,7 @@ async function initGame() {
       bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY ||
       bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
     );
-  let resumeState = consumeResumeAnchor ? null : getPublishedCourtResumeState();
+  let resumeState = shouldProbeResumeState ? getPublishedCourtResumeState() : null;
   let activeResume = !!resumeState;
   console.warn('[COURT BOOT MODE] classified court entry', {
     boot_mode: bootMode,

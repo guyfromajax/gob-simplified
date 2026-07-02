@@ -620,7 +620,8 @@ export async function initializeGameStats() {
   const quarter = Number(urlParams.get('quarter') || 1);
   const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
   const acceptedAnchorReturn = urlParams.get('consume_resume_anchor') === 'true';
-  const shouldProbeResumeState = !liveQuarterStart && !acceptedAnchorReturn;
+  const liveTimeoutReturn = urlParams.get('resume_from_timeout') === 'true';
+  const shouldProbeResumeState = !liveQuarterStart && !acceptedAnchorReturn && !liveTimeoutReturn;
   const resumeFlowFlags = hasResumeFlowFlags(urlParams);
   
   if (!homeTeam || !awayTeam) return;

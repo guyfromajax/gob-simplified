@@ -173,6 +173,8 @@ Set Lineup returns from a cold resume with both `resume_from_anchor=true` and `c
 
 Live timeout/foul-out returns must not convert the URL to `resume_from_anchor=true` after gameplay starts. A normal live timeout return can set `resume_from_timeout=true` for the immediate restart turn, then normalize that flag back to `false` for future refreshes. Future refreshes should discover the durable anchor by calling `/api/game/{game_id}/resume-state`, not by relying on a stale URL restore flag.
 
+Live timeout/foul-out returns must also not probe or publish `/resume-state` during the immediate court reload. The durable anchor exists for future browser refresh/close recovery, but `resume_from_timeout=true` means the user is already in the normal in-session timeout flow. If `loadGameStats.js` publishes that anchor into `window.__GOB_MGR_RESUME_STATE__`, `bootGame.js` can falsely show the MGR modal and route the user back through Set Lineup again.
+
 Backend anchor clearing is intentionally narrow:
 
 - clear `resume_anchor` when the game becomes final

@@ -15,6 +15,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     is_lane_pass_to_rr_resolution_turn,
 )
 from BackEnd.engine.triangle_step_emitter import (
+    _build_parallel_move_step,
     _build_triangle_shot_motion_step,
     _closeout_contest_coord,
     build_triangle_animation_steps,
@@ -520,3 +521,80 @@ def test_rr_lane_pass_shot_motion_shooter_ends_at_authoritative_shot_spot():
     assert step["start"]["action"]["d_ball"] == "guard_ball"
     # Defender closed toward the shot spot (moved in from x=40 toward x=14).
     assert step["end"]["coords"]["d_ball"]["x"] < 40.0
+
+
+def _parallel_move_fixture():
+    """Gate player has a short run; the pass receiver has a much longer one."""
+    off = {
+        "PG": _player("bh", 45, 25),
+        "PF": _player("rr", 20, 40),
+    }
+    deff = {"PG": _player("d1", 70, 25)}
+    start_coords = {
+        "bh": {"x": 45.0, "y": 25.0},
+        "rr": {"x": 20.0, "y": 40.0},
+        "d1": {"x": 70.0, "y": 25.0},
+    }
+    movers = [
+        ("bh", {"x": 50.0, "y": 25.0}, "sprint", "handle_ball"),
+        ("rr", {"x": 60.0, "y": 10.0}, "sprint", "cut"),
+    ]
+    return off, deff, start_coords, movers
+
+
+def test_parallel_move_step_clamps_receiver_without_arrival_gate():
+    """Baseline: gating only on the (fast-finishing) ball handler clamps a
+    longer-running receiver short of his spot — the residual that later gets
+    jetted away by the ball-flight-timed pass step."""
+    off, deff, start_coords, movers = _parallel_move_fixture()
+    step = _build_parallel_move_step(
+        step_start_coords=start_coords,
+        movers=movers,
+        gate_player_id="bh",
+        ball_owner_id="bh",
+        off_lineup=off,
+        def_lineup=deff,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+        next_step={"kind": "next_step", "index": 2},
+    )
+    assert step is not None
+    # Receiver is clamped short of his target (residual remains).
+    assert step["end"]["coords"]["rr"] != {"x": 60.0, "y": 10.0}
+
+
+def test_parallel_move_step_arrival_gate_lands_receiver_on_spot():
+    """Fix: naming the receiver in ``arrival_player_ids`` extends T to his
+    traversal, so he fully reaches the pass spot within the step — the next
+    pass step starts him on-spot (no residual → no jet)."""
+    off, deff, start_coords, movers = _parallel_move_fixture()
+    baseline = _build_parallel_move_step(
+        step_start_coords=start_coords,
+        movers=movers,
+        gate_player_id="bh",
+        ball_owner_id="bh",
+        off_lineup=off,
+        def_lineup=deff,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+        next_step={"kind": "next_step", "index": 2},
+    )
+    gated = _build_parallel_move_step(
+        step_start_coords=start_coords,
+        movers=movers,
+        gate_player_id="bh",
+        ball_owner_id="bh",
+        off_lineup=off,
+        def_lineup=deff,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+        next_step={"kind": "next_step", "index": 2},
+        arrival_player_ids=["rr"],
+    )
+    assert gated is not None and baseline is not None
+    # Receiver lands exactly on his pass target.
+    assert gated["end"]["coords"]["rr"] == {"x": 60.0, "y": 10.0}
+    # T was extended to cover the slower receiver's full run.
+    assert gated["end"]["time_elapsed"] > baseline["end"]["time_elapsed"]
+    # The gate player still reaches his (shorter) target regardless.
+    assert gated["end"]["coords"]["bh"] == {"x": 50.0, "y": 25.0}
