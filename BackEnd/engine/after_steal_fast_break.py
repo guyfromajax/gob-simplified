@@ -526,7 +526,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         game_state["free_throws_remaining"] = game_state["free_throws"]
         game_state["one_and_one"] = False
         fouled_out_info = check_and_handle_foul_out(
-            foul_player, game_state, def_team
+            foul_player, game_state, def_team, perform_removal=False
         )
         if made:
             has_and_one = True

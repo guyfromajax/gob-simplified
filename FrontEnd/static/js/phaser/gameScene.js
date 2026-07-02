@@ -1235,6 +1235,22 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
+      const acceptedResumeAnchorRestore =
+        payload.resume_from_anchor === true && payload.consume_resume_anchor === true;
+      if (acceptedResumeAnchorRestore) {
+        const firstTurn = Array.isArray(simData.turns) ? simData.turns[0] : null;
+        this._skipFirstRestoredSipSetup = firstTurn?.result_type === "SIDE_INBOUND";
+        if (this._skipFirstRestoredSipSetup) {
+          console.warn('[RESUME-ANCHOR-CLIENT] first restored SIP will skip setup walk-in', {
+            game_id: this.gameId,
+            quarter: this.quarter,
+            first_turn_type: firstTurn?.result_type || null,
+            first_turn_animation_steps: Array.isArray(firstTurn?.animation_steps) ? firstTurn.animation_steps.length : 0,
+          });
+        }
+      } else {
+        this._skipFirstRestoredSipSetup = false;
+      }
       if ((payload.resume_from_anchor || payload.consume_resume_anchor) && typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
         const consumedParams = new URLSearchParams(window.location.search);
         consumedParams.delete('resume_from_anchor');

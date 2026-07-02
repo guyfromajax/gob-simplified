@@ -1200,7 +1200,7 @@ def resolve_offensive_rebound(game, rebounder):
                 game.game_state["free_throws"] = 1
                 game.game_state["free_throws_remaining"] = 1
                 game.game_state["one_and_one"] = False
-                foul_out_info = check_and_handle_foul_out(foul_player, game.game_state, def_team)
+                foul_out_info = check_and_handle_foul_out(foul_player, game.game_state, def_team, perform_removal=False)
 
                 event["possession_flips"] = False
                 event["foul_player_id"] = getattr(foul_player, "player_id", None)
@@ -1229,7 +1229,7 @@ def resolve_offensive_rebound(game, rebounder):
                 game.game_state["free_throws"] = 2
                 game.game_state["free_throws_remaining"] = 2
                 game.game_state["one_and_one"] = False
-                foul_out_info = check_and_handle_foul_out(foul_player, game.game_state, def_team)
+                foul_out_info = check_and_handle_foul_out(foul_player, game.game_state, def_team, perform_removal=False)
 
                 event["foul_player_id"] = getattr(foul_player, "player_id", None)
                 event["foul_team"] = "DEFENSE"

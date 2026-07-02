@@ -1028,7 +1028,7 @@ class ShotManager:
                             self.game_state["free_throws_remaining"] = 2
                             self.game_state["one_and_one"] = False
                         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                        block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
+                        block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team, perform_removal=False)
                         shooter.record_stat("FGA")
                         if is_three:
                             shooter.record_stat("3PTA")
@@ -1219,7 +1219,7 @@ class ShotManager:
 
                         # Check if player fouled out (5th foul)
                         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                        blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team)
+                        blocking_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team, perform_removal=False)
 
                         # Final Turn attack: blocking foul always awards exactly 2 FTs (no and-1, no 3 FTs for three)
                         if self.game_state.get("final_turn") and shot_type == "attack":
@@ -1598,7 +1598,7 @@ class ShotManager:
                 
                 # Check if player fouled out (5th foul)
                 from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team)
+                foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team, perform_removal=False)
                 
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
@@ -1745,7 +1745,7 @@ class ShotManager:
 
                 # Check if player fouled out (5th foul)
                 from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-                foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team)
+                foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team, perform_removal=False)
 
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"

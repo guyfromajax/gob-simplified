@@ -272,7 +272,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         game_state["free_throws"] = 1 if made else 2
         game_state["free_throws_remaining"] = game_state["free_throws"]
         game_state["one_and_one"] = False
-        fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
+        fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
         free_throws_remaining = 1 if made else 2
         has_and_one = made
 
@@ -699,7 +699,7 @@ def _finalize_ab_shot(
         game_state["free_throws"] = 1 if made else (3 if is_three else 2)
         game_state["free_throws_remaining"] = game_state["free_throws"]
         game_state["one_and_one"] = False
-        fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
+        fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
         free_throws_remaining = game_state["free_throws"]
         has_and_one = made
 

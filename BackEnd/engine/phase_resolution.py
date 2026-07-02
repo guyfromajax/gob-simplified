@@ -260,10 +260,20 @@ def apply_bench_energy_recharge(game):
                         player.recharge_energy(0.02)
 
 
-def check_and_handle_foul_out(foul_player, game_state, foul_team):
+def check_and_handle_foul_out(foul_player, game_state, foul_team, *, perform_removal=True):
     """
     Check if player fouled out (5+ fouls) and handle accordingly.
     Returns dict with foul_out info.
+
+    Args:
+        perform_removal: When True (default), immediately remove the fouled-out
+            player from the lineup and sub in a replacement. Inline callers that
+            run DURING turn resolution should pass ``perform_removal=False`` so the
+            fouled-out player stays in the lineup while the turn's animation payload
+            (coords / overlay maps / final_coords) is built — otherwise his sprite
+            has no movement for that turn and renders as a dead, stationary sprite.
+            The removal is then applied once, after the payload is built, by the
+            universal end-of-turn funnel (``GameManager._check_lineups_for_foul_out``).
     """
     if not foul_player:
         return {"fouled_out": False, "foul_count": 0}
@@ -291,7 +301,7 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
         return {"fouled_out": False, "foul_count": foul_count}
     fouled_out = foul_count >= 5
     
-    if fouled_out:
+    if fouled_out and perform_removal:
         # Remove from lineup if currently in lineup (eligibility is derived from F >= 5 elsewhere)
         for pos, player in list(foul_team.lineup.items()):
             if player and hasattr(player, "player_id") and player.player_id == foul_player.player_id:
@@ -675,8 +685,10 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     # Track the foul
     foul_player.record_stat("F")
     
-    # Check if player fouled out and handle accordingly
-    foul_out_info = check_and_handle_foul_out(foul_player, game_state, foul_team)
+    # Check if player fouled out and handle accordingly. Detect-only: the lineup
+    # removal is deferred to the end-of-turn funnel so the fouled-out player stays
+    # animated for this turn (see check_and_handle_foul_out docstring).
+    foul_out_info = check_and_handle_foul_out(foul_player, game_state, foul_team, perform_removal=False)
     
     if foul_team == def_team:
         def_team.team_fouls += 1
@@ -7752,7 +7764,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
-        foul_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
         result_type = "FOUL"
         # ✅ FIX: Check bonus status for defensive fouls in FCP (per game_flows.md)
         # Defensive fouls should route to FREE_THROW if in bonus, otherwise HCO
@@ -7787,7 +7799,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
-        foul_out_info = check_and_handle_foul_out(foul_player, game_state, off_team)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, off_team, perform_removal=False)
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
         # Track FCP success: offensive foul = defensive success
@@ -9097,7 +9109,7 @@ def _resolve_full_court_press_dynamic_first_cut(game, def_scouting, text):
         foul_charged_team = off_team if foul_team == "OFFENSE" else def_team
         foul_charged_team.team_fouls += 1
         foul_out_info = check_and_handle_foul_out(
-            foul_player, game_state, foul_charged_team
+            foul_player, game_state, foul_charged_team, perform_removal=False
         )
         if foul_team == "OFFENSE":
             def_scouting["defense"]["FCP"]["success"] += 1
@@ -9350,7 +9362,7 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         foul_charged_team = off_team if foul_team == "OFFENSE" else def_team
         foul_charged_team.team_fouls += 1
         foul_out_info = check_and_handle_foul_out(
-            foul_player, game_state, foul_charged_team
+            foul_player, game_state, foul_charged_team, perform_removal=False
         )
         if foul_team == "OFFENSE":
             # Charge — defensive success, possession flips to a side inbound.
@@ -9856,7 +9868,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
-        foul_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
         result_type = "FOUL"
         # ✅ FIX: Check bonus status for defensive fouls in HCT (per game_flows.md)
         # Defensive fouls should route to FREE_THROW if in bonus, otherwise HCO
@@ -9890,7 +9902,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         # Check for foul out and capture for result (so game_manager creates timeout + frontend shows popup)
-        foul_out_info = check_and_handle_foul_out(foul_player, game_state, off_team)
+        foul_out_info = check_and_handle_foul_out(foul_player, game_state, off_team, perform_removal=False)
         result_type = "FOUL"
         # Track HCT success: offensive foul = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1

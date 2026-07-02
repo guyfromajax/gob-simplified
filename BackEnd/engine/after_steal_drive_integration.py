@@ -257,7 +257,7 @@ def _resolve_shot_attempt(
         game_state["free_throws"] = 1 if made else 2
         game_state["free_throws_remaining"] = game_state["free_throws"]
         game_state["one_and_one"] = False
-        fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team)
+        fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
         has_and_one = made
         free_throws_remaining = 1 if made else 2
 

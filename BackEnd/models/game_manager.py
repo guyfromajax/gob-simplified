@@ -467,9 +467,15 @@ class GameManager:
         If found and this turn did not already trigger foul-out, run the foul-out process so we
         never miss a player fouling out (e.g. from a code path that didn't call check_and_handle_foul_out).
         """
-        if result.get("fouled_out"):
-            return
         if result.get("timeout_reason"):
+            return
+        # An inline foul path may have already flagged the foul-out during turn
+        # resolution WITHOUT mutating the lineup (perform_removal=False), so the
+        # fouled-out player stayed animated for his own turn. Apply the deferred
+        # removal now — after this turn's payload/final_coords were already built
+        # (in _append_turn) — then let _handle_foul_out_timeout create the popup turn.
+        if result.get("fouled_out"):
+            self._apply_deferred_foul_out_removal(result)
             return
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
         locked_player_ids = {
@@ -542,6 +548,40 @@ class GameManager:
                     logging.info(
                         f"✅ FOUL OUT (end-of-turn check): {foul_out_info.get('foul_player_name', 'Unknown')} "
                         f"has 5 fouls; instigating Player Foul Out process"
+                    )
+                    return
+
+    def _apply_deferred_foul_out_removal(self, result):
+        """Remove an already-flagged fouled-out player from the lineup and sub in a
+        replacement — the deferred half of an inline ``check_and_handle_foul_out``
+        call (which ran with ``perform_removal=False`` so the player stayed animated
+        for his own turn). Runs from the end-of-turn funnel, AFTER the turn's
+        animation payload / final_coords were built, so the fouling-out turn keeps
+        the player's sprite active up until the foul-out popup. Mirrors the removal
+        block in ``check_and_handle_foul_out``.
+        """
+        foul_out_player = result.get("foul_out_player") or {}
+        foul_out_id = (
+            foul_out_player.get("player_id") if isinstance(foul_out_player, dict) else None
+        )
+        if foul_out_id is None:
+            foul_out_id = result.get("foul_player_id")
+        if foul_out_id is None:
+            return
+        foul_out_id_str = str(foul_out_id)
+        from BackEnd.main import _ensure_complete_lineup
+        for team in [self.home_team, self.away_team]:
+            for pos, player in list((team.lineup or {}).items()):
+                if (
+                    player
+                    and hasattr(player, "player_id")
+                    and str(player.player_id) == foul_out_id_str
+                ):
+                    team.lineup[pos] = None
+                    _ensure_complete_lineup(
+                        team,
+                        self.game_state,
+                        allow_incomplete_user_foul_out_transition=True,
                     )
                     return
 

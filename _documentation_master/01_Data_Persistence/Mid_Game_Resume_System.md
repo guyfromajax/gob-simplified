@@ -32,6 +32,7 @@ Active implementation direction:
 - Set Lineup return from MGR is the only path that should send both `resume_from_anchor=true` and `consume_resume_anchor=true`.
 - `consume_resume_anchor=true` means restore from the saved anchor on this request; it does **not** delete the durable anchor.
 - The durable anchor remains available until a newer timeout, foul-out, or non-final quarter-break anchor overwrites it, or until the game becomes final.
+- When the first restored turn is `SIDE_INBOUND`, court playback skips only the SIP setup/walk-in phase because the resume anchor already hydrates player sprites at the SIP setup spots. The inbound pass phase still plays. This skip is scoped to accepted MGR Set Lineup returns and is not applied to normal live Set Lineup returns.
 - Normal live quarter breaks must send `quarter_break_from=play_quarter` to Set Lineup and preserve it when returning to `court.html`; this marker tells the court boot code not to read the durable resume anchor or show the mid-game resume modal.
 - Live quarter entries are authoritative. If stale resume flags survive into a live quarter URL, `bootGame.js` strips them and `loadGameStats.js` ignores them.
 - Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
@@ -83,7 +84,8 @@ When a valid anchor exists:
 7. Set Lineup returns to `court.html` with `resume_from_anchor=true`, `consume_resume_anchor=true`, and `quarter_break_from=mid_game_resume`.
 8. Backend restores from `game.resume_anchor.snapshot`.
 9. Backend preserves the durable anchor after successful restore so later mid-quarter refreshes roll back to the same latest stoppage.
-10. Gameplay continues from the restored anchor using the Set Lineup selections.
+10. If the first restored turn is SIP, the court skips the redundant SIP setup/walk-in animation and plays the inbound pass from the already-hydrated setup spots.
+11. Gameplay continues from the restored anchor using the Set Lineup selections.
 
 When no valid anchor exists:
 

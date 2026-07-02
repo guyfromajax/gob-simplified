@@ -835,6 +835,17 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
 
   const cfg = globalThis?.animation_config?.sideInbound || {};
   const ease = cfg.ease ?? "Linear"; // Use Linear to match HCO step movements
+  const skipSetupWalkIn =
+    scene?._skipFirstRestoredSipSetup === true &&
+    String(turnData?.result_type || "").toUpperCase() === "SIDE_INBOUND";
+  if (skipSetupWalkIn) {
+    scene._skipFirstRestoredSipSetup = false;
+    console.warn("🏠 [SIP RESTORE] skipping setup walk-in; resume anchor already placed players", {
+      result_type: turnData?.result_type,
+      current_turn: turnData?.current_turn,
+      animation_steps: Array.isArray(turnData?.animation_steps) ? turnData.animation_steps.length : 0,
+    });
+  }
 
   const offenseSprites = {};
   const defenseSprites = {};
@@ -939,8 +950,10 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
     );
   };
 
-  Object.entries(oDestinations).forEach(([pos, coords]) => addTween(offenseSprites[pos], coords, pos));
-  Object.entries(dDestinations).forEach(([pos, coords]) => addTween(defenseSprites[pos], coords, pos));
+  if (!skipSetupWalkIn) {
+    Object.entries(oDestinations).forEach(([pos, coords]) => addTween(offenseSprites[pos], coords, pos));
+    Object.entries(dDestinations).forEach(([pos, coords]) => addTween(defenseSprites[pos], coords, pos));
+  }
 
   await Promise.all(promises);
   validateInboundUnitCompletionContract({
@@ -959,6 +972,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
       inboundType: "SIDE_INBOUND",
       phase: "setup_positions",
       requiredMovers: ["all_10_players"],
+      skippedBecauseResumeAnchorAlreadyPlacedPlayers: skipSetupWalkIn,
     },
   });
   
