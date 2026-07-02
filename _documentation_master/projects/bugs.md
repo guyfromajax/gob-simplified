@@ -1,15 +1,7 @@
 ##Bugs 
-14. Charge or Blocking Foul on Fast Break, stop animation immediately don't wait for theor plaeyrs to get to teh spot
-37. Player Foul Out Next Step bug
 39. Fine tune FLSS bounce spot placement
 42. Not corretly registring 2pt and 3pt shot attempts based on geo
-43. Verify symmetyr in FCP and HCT steals / d fouls
-
-##Micro Movements
-28. Make HCO defensers un-attached to the offender at all costs
-30. Micro Movement SFX
-31. Deal with awkward no movement beats/steps
-32. FAst Break shots, if defender is back have him attempt to cut off drive to the basket
+43. Getting some teleport passes in Motion HCO offense
 
 ##Player Images
 1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
@@ -17,13 +9,27 @@
 ##Verify as Perfect
 1. Mid Game Resume System
 2. EOQ Perfection
-3. Account for micro shot movements in Final Shot
 
 ##Full Product Readiness
 102. Team court images
 105. More responsive front end
 106. Monetization plan
 107. Stripe
+119. PvP sim
+120. PvP live
+121. Tunable Constants file
+123. Downloadable game vs Live game dynamics
+124. MM: Make HCO defenders un-attached to the offender at all costs
+125. MM: Micro Movement SFX
+126. MM: Dunks!
+127. Add a new hire news story for user team
+128. Add a badass design appraoch to New Stories
+
+##Full Product Perfection
+1. Training Camp News Report
+2. Week 20 Recruiting Report to Inbox
+3. Recruiting Round Up Results
+25. Fast Break and P/T callouts in the Scouting Report of opponent
 108. Message board
 110. Strategic Geek Points system
 113. Bring logic to screens
@@ -31,18 +37,10 @@
 116. User account -- link X & Facebook?
 117. More action on Signing Day
 118. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
-119. PvP sim
-120. PvP live
-121. Tunable Constants file
-122. Get Aggressive Logic
-
-##Full Season Playthrough ideas (6-11-26)
-1. Training Camp News Report
-2. Week 20 Recruiting Report to Inbox
-3. Recruiting Round Up Results
-5. Add a new hire news story for user team
-6. Add a badass design appraoch to New Stories
-25. Fast Break and P/T callouts in the Scouting Report of opponent
+127. Get Aggressive / Get Conservative settings and Playcall Center buttons
+128. Account for micro shot movements in Final Shot
+129: Loose Balls!
+130. Include all turn types (HCT, FCP, Fast Break, etc) in FLSS / EOG Perfectio
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed

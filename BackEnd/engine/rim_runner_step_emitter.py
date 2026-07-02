@@ -2080,6 +2080,18 @@ def _build_finisher_drive_resolution_steps(
             or 1.0
         )
         meet_target = {"x": float(meet_coords["x"]), "y": float(meet_coords["y"])}
+        # Guard against a stale/short ``t_meet`` clamping the shooter well short
+        # of the meet (the drive payload's meet time can be computed off a
+        # different ``bh_start`` than the shooter's actual rendered position).
+        # If it's too small, the meet step under-moves him and the following
+        # shot step has to cover the residual instantly → jet. Floor it at his
+        # real traversal to the meet at finisher (standard) pace.
+        stealer_start = step_start_coords.get(stealer_id)
+        if stealer_start:
+            stealer_rate = _ag_grid_per_game_sec(
+                _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
+            )
+            t_meet = max(t_meet, _traversal_seconds(stealer_start, meet_target, stealer_rate))
         end_ann = None
         if result_type == "DEFENSIVE_STOP":
             end_ann = _build_nice_stop_announcement(
@@ -2109,7 +2121,11 @@ def _build_finisher_drive_resolution_steps(
         steps.append(meet_step)
         clock_r -= t_meet
         shot_r -= t_meet
-        step_start_coords = dict(end_coords)
+        # Advance the cursor off the meet step's RENDERED end coords, not the
+        # semantic ``end_coords``. Otherwise the next step assumes the shooter
+        # is already at his full position while the sprite is still en route,
+        # and the FE snaps/jets him to catch up on the (short) shot step.
+        step_start_coords = dict(meet_step["end"]["coords"])
 
     if result_type in ("MAKE", "MISS", "BLOCK"):
         if is_neutral and stop_action in ("shoot", "pass"):
@@ -2148,6 +2164,19 @@ def _build_finisher_drive_resolution_steps(
             t_shot = float(turn_result.get("t_shooter_game_seconds") or 0.5)
             shot_end_coords = dict(step_start_coords)
             shot_end_coords[stealer_id] = dict(bh_target)
+            # Gather is a short beat (``t_shot * 0.15``) which assumes the
+            # shooter is already on his spot. If he still has real ground to
+            # cover to ``bh_target`` (e.g. meet ≠ shot spot), extend T to his
+            # natural travel time so he drives in rather than jetting.
+            gather_t = max(0.35, t_shot * 0.15)
+            shooter_now = step_start_coords.get(stealer_id)
+            if shooter_now:
+                shooter_rate = _ag_grid_per_game_sec(
+                    _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
+                )
+                gather_t = max(
+                    gather_t, _traversal_seconds(shooter_now, bh_target, shooter_rate)
+                )
             shot_drive = _build_drive_step(
                 start_coords=step_start_coords,
                 end_coords=shot_end_coords,
@@ -2156,7 +2185,7 @@ def _build_finisher_drive_resolution_steps(
                 is_away_offense=is_away_offense,
                 clock_remaining=clock_r,
                 shot_clock_remaining=shot_r,
-                t_game_seconds=max(0.35, t_shot * 0.15),
+                t_game_seconds=gather_t,
                 next_step_index=len(steps) + 1,
                 off_lineup=off_lineup,
                 def_lineup=def_lineup,

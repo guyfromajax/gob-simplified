@@ -422,6 +422,93 @@ def test_finisher_meet_step_rebased_next_index_and_motion():
     assert def_end["x"] < 91.0
 
 
+def test_finisher_neutral_meet_reaches_meet_and_hands_off_rendered_coords():
+    """Regression: a stale/short ``t_meet`` must not clamp the shooter short of
+    the meet and then jet him on the shot step. The meet step is floored to his
+    real traversal so he actually reaches the meet, and the shot step starts
+    from the meet step's RENDERED end coords (not the stale semantic coords)."""
+    meet = {"x": 9.0, "y": 15.0}
+    shooter_start = {"x": 13.0, "y": 40.0}  # ~25 grid units from the meet
+    shooter_id = "Lancaster-PF"
+
+    start_coords = {
+        f"Lancaster-{pos}": {"x": 13.0, "y": 40.0}
+        for pos in ("PG", "SG", "SF", "PF", "C")
+    }
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        start_coords[f"Bentley-Truman-{pos}"] = {"x": 20.0, "y": 25.0}
+
+    # Deliberately stale rr_end_coords for the shooter (far from the meet) to
+    # prove the shot step reads the meet step's rendered coords, not these.
+    end_coords = {pid: dict(c) for pid, c in start_coords.items()}
+    end_coords[shooter_id] = {"x": 88.0, "y": 25.0}
+
+    turn_result = {
+        "result_type": "MISS",
+        "shooter": SimpleNamespace(player_id=shooter_id),
+        "meet_coords": meet,
+        "bh_target": dict(meet),  # NEUTRAL shoot: shot fires from the meet
+        "t_meet_game_seconds": 0.1,  # stale/too-short — would clamp on old code
+        "t_shooter_game_seconds": 0.1,
+        "rr_end_coords": end_coords,
+        "roles": {"rim_runner_burst_phase": {"rr_id": shooter_id}},
+        "fb_drive_resolution": {
+            "outcome": "NEUTRAL",
+            "stop_decision": {"action": "shoot"},
+            "stopper_id": "Bentley-Truman-PG",
+            "t_meet_game_seconds": 0.1,
+            "t_drive_game_seconds": 0.1,
+            "defender_archetypes": {},
+        },
+        "stop_decision_action": "shoot",
+        "shot_score_pre_defense": 100,
+        "shot_defense_score_for_sfx": 0,
+        "shot_type": "attack",
+    }
+
+    game = build_mock_game()
+    for team in (game.home_team, game.away_team):
+        for pos, player in team.lineup.items():
+            player.player_id = f"{team.name}-{pos}"
+            player.coords = {"x": 20.0, "y": 25.0}
+
+    steps = _build_finisher_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        off_lineup=game.home_team.lineup,
+        def_lineup=game.away_team.lineup,
+        is_away_offense=True,
+        clock_remaining=600.0,
+        shot_clock_remaining=24.0,
+        fb_roles=turn_result["roles"],
+    )
+
+    assert steps is not None
+    meet_step = steps[0]
+    assert meet_step["start"]["advance_trigger"]["metadata"]["kind"] == "rim_runner_meet"
+
+    # Fix 1/2: meet step is floored to the shooter's real traversal, so he
+    # actually arrives at the meet instead of being clamped ~1 unit short.
+    meet_end = meet_step["end"]["coords"][shooter_id]
+    assert meet_end["x"] == pytest.approx(meet["x"], abs=0.5)
+    assert meet_end["y"] == pytest.approx(meet["y"], abs=0.5)
+    assert meet_step["end"]["time_elapsed"] > 1.0  # floored up from 0.1
+
+    # Fix (carry-over): the shot step starts from the meet step's RENDERED end
+    # coords, not the stale semantic rr_end_coords ((88, 25)).
+    drive_step = next(
+        s
+        for s in steps
+        if (s["start"].get("advance_trigger") or {}).get("metadata", {}).get("kind")
+        == "rim_runner_drive"
+    )
+    shot_start = drive_step["start"]["coords"][shooter_id]
+    assert shot_start["x"] == pytest.approx(meet_end["x"], abs=1e-6)
+    assert shot_start["y"] == pytest.approx(meet_end["y"], abs=1e-6)
+    assert shot_start["x"] != pytest.approx(88.0, abs=1.0)
+
+
 def test_finisher_drive_steps_skip_blocking_fast_break_announcement():
     """Phase 4 RR/Triangle finisher must not stamp a second blocking FB callout."""
     meet = {"x": 70, "y": 25}
