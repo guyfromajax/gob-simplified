@@ -138,13 +138,20 @@ def _apply_drive_step_motion(
 
 
 def _fb_secondary_announcement(team: str) -> Announcement:
-    """Drive step start announcement: ``Fast Break!`` (secondary tier)."""
+    """Drive step start announcement: ``Fast Break!``.
+
+    Secondary ribbon + ``non_blocking`` so the callout rides ALONGSIDE the
+    drive instead of freezing the court for a full second. The FE routes on
+    ``style`` (``tier`` is ignored) and only skips the clock pause / hold wait
+    when ``non_blocking`` is true — matches the RR/Triangle callout. See
+    ``Announcement_System.md``.
+    """
     return {
         "text": "Fast Break!",
         "team": team,
         "hold_ms": FB_ANNOUNCE_HOLD_MS,
-        "style": "primary",
-        "tier": "secondary",
+        "non_blocking": True,
+        "style": "secondary",
     }
 
 

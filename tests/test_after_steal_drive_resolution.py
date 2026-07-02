@@ -314,3 +314,17 @@ def test_miss_with_oreb_stamps_ball_bounce_coords(monkeypatch):
     assert result["ballSpot"] == bounce
     assert result["ball_bounce_x"] == bounce["x"]
     assert result["ball_bounce_y"] == bounce["y"]
+
+
+def test_fb_start_announcement_is_secondary_and_non_blocking():
+    """The ``Fast Break!`` drive-start callout (shared by after-steal AND CR via
+    ``_build_drive_step``) must be a secondary, non-blocking ribbon — otherwise
+    the FE routes it to the center overlay and freezes the court ~1s."""
+    from BackEnd.engine.after_steal_fast_break_step_emitter import (
+        _fb_secondary_announcement,
+    )
+
+    ann = _fb_secondary_announcement("home")
+    assert ann["text"] == "Fast Break!"
+    assert ann["style"] == "secondary"
+    assert ann["non_blocking"] is True
