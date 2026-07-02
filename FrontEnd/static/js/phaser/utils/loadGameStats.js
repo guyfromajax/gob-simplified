@@ -100,6 +100,16 @@ function clearPreAnchorQ1RefreshFlag(reason, gameId = null) {
   window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = null;
 }
 
+function armPreAnchorQ1RefreshFlag(reason, gameId = null) {
+  if (typeof window === 'undefined') return;
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH__ = true;
+  window.__GOB_PRE_ANCHOR_Q1_REFRESH_GAME_ID__ = gameId || null;
+  console.warn('[PRE-ANCHOR-Q1-REFRESH] armed clean restart on next play/sim', {
+    reason,
+    game_id: gameId || null,
+  });
+}
+
 function hasActiveResumeAnchor(gameData) {
   if (!gameData || typeof gameData !== 'object') return false;
   if (gameData.status === 'stoppage_anchor') return true;
@@ -628,7 +638,9 @@ export async function initializeGameStats() {
     );
   }
   if (!resumeFlowFlags && !resumeState && !liveQuarterStart && quarter === 1 && isPreAnchorQ1DirtyGame(gameData)) {
-    clearPreAnchorQ1RefreshFlag('simplified_mgr_v1_no_anchor_reset_disabled', gameId);
+    armPreAnchorQ1RefreshFlag('dirty_q1_no_anchor', gameId);
+    resetPreAnchorCourtChrome(homeTeam, awayTeam);
+    return;
   }
   if (gameData) {
     displayAccumulatedHeaderState(gameData, homeTeam, awayTeam);

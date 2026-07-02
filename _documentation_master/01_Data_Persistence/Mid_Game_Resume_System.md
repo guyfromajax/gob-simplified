@@ -181,13 +181,11 @@ Backend anchor clearing is intentionally narrow:
 
 This prevents normal continued play after a timeout/foul-out or quarter-break resume from destroying the last stable rollback point before a newer stoppage anchor exists.
 
-## Sunset: Pre-Anchor Q1 Refresh Contract
-
-This section documents behavior that is being sunset for simplified MGR v1.
+## Pre-Anchor Q1 Refresh Contract
 
 Before the first stable anchor exists, the game has no durable mid-game resume target. Earlier versions attempted to make Q1 refresh safe by detecting a dirty pre-anchor game document, suppressing partial stats, and creating a fresh initialized game id before gameplay restarted.
 
-That behavior is no longer part of the active v1 contract.
+That clean restart behavior is active for browser refresh only. It is intentionally separate from MGR.
 
 This applies when the user refreshes `court.html` during Q1 before any of these have occurred:
 
@@ -199,10 +197,13 @@ Simplified v1 expected behavior:
 
 - Browser close / later return through Mode Select does not show a mid-game resume card.
 - Browser refresh does not show the MGR modal.
-- Browser refresh must not invisibly rebuild computer lineups while staying on `court.html`.
-- Browser refresh uses normal non-MGR behavior until a stable anchor exists.
+- Browser refresh must not paint dirty gameplay scores, player stats, team stats, or playbook stats from the abandoned game document.
+- Browser refresh shows the normal Play Quarter / Sim Game modal with clean pre-game chrome.
+- When the user presses Play Quarter, Sim Quarter, or Sim Full Game, the frontend calls the normal `/api/init-game` path and replaces the URL `game_id` with the newly initialized game document before simulation starts.
+- The abandoned dirty game document is not used for gameplay after the clean restart.
+- Team strategy, playbook, FTD, scouting, and baseline player setup come from the normal backend init pipeline, not from copying stale fields out of the abandoned dirty game document.
 
-Deprecated product rule:
+Product rule:
 
 > Pre-anchor Q1 refresh abandons live gameplay progress, but preserves setup and baseline initialization.
 
@@ -210,7 +211,7 @@ Critical hierarchy:
 
 > Resume anchor existence disables pre-anchor reset. Do not add or rely on a separate "disable pre-anchor reset" flag.
 
-The deprecated pre-anchor Q1 refresh path was previously allowed only when all of these were true:
+The pre-anchor Q1 refresh path is allowed only when all of these are true:
 
 - the URL is Q1
 - the URL is not a live quarter entry (`quarter_break_from=play_quarter` / `sim_quarter`)
@@ -225,11 +226,9 @@ The deprecated pre-anchor Q1 refresh path was previously allowed only when all o
 
 Once the first timeout, player foul-out, or non-final quarter-break anchor is written, the game is no longer pre-anchor. From that moment, any dirty Q1 state must be resolved through the resume anchor on the existing game document, not by creating a fresh game id.
 
-Simplified v1 implementation should disable the fresh-game replacement path entirely. The preserve/reset details below remain historical reference for the deprecated behavior.
-
 ### Preserve
 
-The system should preserve setup data that existed before gameplay began:
+The system preserves setup identity by sending the same matchup/mode context into `/api/init-game`:
 
 - matchup identity
 - `mode`
@@ -245,20 +244,21 @@ The system should preserve setup data that existed before gameplay began:
 - `my_team`
 - `team_id`
 - `user_team_side`
-- selected user lineup from URL params
-- selected computer lineup if already encoded in URL params
+
+The fresh game document then rebuilds these through the official init process:
+
 - game plan / strategy settings
 - playbook settings
 - team attributes
 - scouting data
 - FTD baselines
-- team record/display metadata such as rank, wins, losses, colors, logos, and profile fields when present
-- initialized roster identity data such as player id, name, jersey, height, photo, and team colors
+- team record/display metadata
+- initialized roster identity data
 - `game_stats_initialized=true`
 
 ### Reset
 
-The system should discard gameplay data created after opening tip and before the refresh:
+The system discards gameplay data created after opening tip and before the refresh by not reusing the abandoned game document for simulation:
 
 - `score`
 - `home_team.score`

@@ -2092,10 +2092,67 @@ function resetPreAnchorScoreChrome() {
   if (shotClockEl) shotClockEl.textContent = '30';
 }
 
+async function createFreshGameForPreAnchorQ1Refresh() {
+  const initPayload = {
+    home_team: homeTeam,
+    away_team: awayTeam,
+    mode,
+  };
+  if (userTeamSide) initPayload.user_team_side = userTeamSide;
+  if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
+  if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
+
+  const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
+    method: 'POST',
+    headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(initPayload),
+  });
+  if (!initRes.ok) {
+    let detail = initRes.statusText;
+    try {
+      const body = await initRes.clone().json();
+      detail = body.detail || body.message || body.error || JSON.stringify(body);
+    } catch {
+      try {
+        detail = await initRes.text();
+      } catch {
+        /* keep statusText */
+      }
+    }
+    throw new Error(detail || `init-game failed with ${initRes.status}`);
+  }
+
+  const initData = await initRes.json();
+  const newGameId = initData && initData.game_id;
+  if (!newGameId) {
+    throw new Error('init-game did not return a game_id');
+  }
+
+  gameId = String(newGameId);
+  gameStore.setGameId(gameId);
+  replaceGameIdInUrl(gameId);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('game_home', homeTeam);
+    localStorage.setItem('game_away', awayTeam);
+    localStorage.removeItem('game_id');
+  }
+  resetPreAnchorScoreChrome();
+  console.warn('[PRE-ANCHOR-Q1-REFRESH] created fresh game for clean restart', {
+    game_id: gameId,
+    mode,
+    franchise_id: franchiseId || null,
+    tournament_id: tournamentId || null,
+  });
+  return gameId;
+}
+
 async function ensureFreshGameForPreAnchorQ1Refresh() {
   if (!isPreAnchorQ1RefreshPending()) return;
-  clearPreAnchorQ1RefreshState('simplified_mgr_v1_no_anchor_reset_disabled', {
-    game_id: gameId || readLiveSearchParams().get('game_id') || null,
+  const abandonedGameId = gameId || readLiveSearchParams().get('game_id') || null;
+  const freshGameId = await createFreshGameForPreAnchorQ1Refresh();
+  clearPreAnchorQ1RefreshState('fresh_game_created', {
+    abandoned_game_id: abandonedGameId,
+    fresh_game_id: freshGameId,
   });
 }
 
