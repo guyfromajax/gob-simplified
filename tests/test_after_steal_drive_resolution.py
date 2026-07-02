@@ -173,3 +173,66 @@ def test_emitter_includes_path_knots_metadata_for_pos_o():
     meta = steps[0]["start"]["advance_trigger"]["metadata"]
     assert "path_knots" in meta
     assert len(meta["path_knots"]) == 4
+
+
+def test_meet_defensive_foul_non_bonus_routes_to_side_inbound(monkeypatch):
+    meet = {"x": 75, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "D_FOUL",
+            "meet_x": meet["x"],
+            "meet_y": meet["y"],
+            "stopper_id": "Bentley-Truman-SF",
+            "d8_credited_player_id": "Bentley-Truman-SF",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {"Bentley-Truman-SF": meet},
+            "defender_archetypes": {"Bentley-Truman-SF": "sprint"},
+        },
+    )
+
+    game = build_mock_game()
+    _seed_steal(game)
+    result = resolve_after_steal_fast_break(game)
+
+    assert result["result_type"] == "FOUL"
+    assert result["next_play_type"] == "SIDE_INBOUND"
+    assert game.game_state["free_throws_remaining"] == 0
+    assert result["meet_coords"] == meet
+
+
+def test_meet_defensive_foul_emits_meet_drive_step(monkeypatch):
+    meet = {"x": 75, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.after_steal_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "D_FOUL",
+            "meet_x": meet["x"],
+            "meet_y": meet["y"],
+            "stopper_id": "Bentley-Truman-SF",
+            "d8_credited_player_id": "Bentley-Truman-SF",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {"Bentley-Truman-SF": meet},
+            "defender_archetypes": {"Bentley-Truman-SF": "sprint"},
+        },
+    )
+
+    game = build_mock_game()
+    _seed_steal(game)
+    result = resolve_after_steal_fast_break(game)
+    end_coords = {
+        f"home-{pos}": {"x": 60.0, "y": 25.0}
+        for pos in ("PG", "SG", "SF", "PF", "C")
+    }
+    end_coords["home-PG"] = dict(meet)
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        end_coords[f"away-{pos}"] = {"x": 50.0, "y": 25.0}
+    result["after_steal_end_coords"] = end_coords
+    game.turns = [{"final_coords": {pid: {"x": 50.0, "y": 25.0} for pid in end_coords}}]
+
+    steps = build_after_steal_fast_break_animation_steps(result, game)
+    assert steps is not None
+    assert len(steps) == 1
+    assert steps[0]["end"]["next"] == {"kind": "end_of_turn"}

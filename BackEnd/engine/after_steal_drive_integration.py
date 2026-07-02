@@ -16,6 +16,7 @@ from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
+from BackEnd.engine.phase_resolution import apply_fb_meet_non_shooting_defensive_foul
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
 from BackEnd.utils.fb_geo_helpers import pick_nearest_contesting_defender
 from BackEnd.utils.shot_split_tracker import record_shot_split
@@ -472,6 +473,12 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         )
         stopper = _player_by_id(def_lineup, drive.get("stopper_id"))
         credited = _player_by_id(def_lineup, drive.get("d8_credited_player_id"))
+        foul_transition: Optional[Dict[str, Any]] = None
+        foul_player = None
+        foul_team = None
+        next_play_type = "HCO"
+        next_turn = "HCO"
+        possession_flips = False
 
         if outcome == "DEAD BALL":
             result_type = "DEAD BALL"
@@ -492,16 +499,16 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             result_type = "FOUL"
             foul_team = "DEFENSE"
             foul_player = credited or stopper
-            possession_flips = False
-            game_state["foul_team"] = foul_team
-            if foul_player:
-                foul_player.record_stat("F")
-                def_team.team_fouls += 1
             text_tail = "defensive foul!"
-            game_state["shooter"] = stealer
-            game_state["offensive_state"] = "FREE_THROW"
-            game_state["free_throws"] = 2
-            game_state["free_throws_remaining"] = 2
+            foul_transition = apply_fb_meet_non_shooting_defensive_foul(
+                game,
+                ball_handler=stealer,
+                foul_player=foul_player,
+                time_elapsed_override=max(1, int(round(t_drive + 0.5))),
+            )
+            possession_flips = foul_transition["possession_flips"]
+            next_play_type = foul_transition["next_play_type"]
+            next_turn = foul_transition["next_turn"]
 
         stealer_name = get_name_safe(stealer)
         turn_result: Dict[str, Any] = {
@@ -518,17 +525,26 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             "possession_flips": possession_flips,
             "offense_team_id": off_team.team_id,
             "quarter": game.quarter,
-            "next_play_type": "HCO" if possession_flips else "FREE_THROW",
-            "next_turn": "HCO" if possession_flips else "FREE_THROW",
+            "next_play_type": next_play_type,
+            "next_turn": next_turn,
             "score": dict(game.score),
             "after_steal_end_coords": end_coords,
+            "meet_coords": dict(bh_end),
+            "t_meet_game_seconds": float(drive.get("t_meet_game_seconds") or t_drive),
             "t_shooter_game_seconds": float(drive.get("t_meet_game_seconds") or t_drive),
             "bh_target": dict(bh_end),
             "time_elapsed": max(1, int(round(t_drive + 0.5))),
         }
         if outcome in ("CHARGE", "O_FOUL", "D_FOUL", "BLOCKING_FOUL"):
             turn_result["foul_team"] = foul_team if outcome != "DEAD BALL" else None
-            if foul_player:
+            if foul_transition is not None:
+                if foul_transition.get("foul_player_id"):
+                    turn_result["foul_player_id"] = foul_transition["foul_player_id"]
+                if foul_transition.get("fouled_out"):
+                    turn_result["fouled_out"] = True
+                    turn_result["foul_out_player"] = foul_transition.get("foul_out_player")
+                    turn_result["foul_count"] = foul_transition.get("foul_count")
+            elif foul_player:
                 turn_result["foul_player_id"] = _safe_id(foul_player)
         _record_stats(game, turn_result, stealer, defenders)
         game_state.pop("last_stealer_coords", None)

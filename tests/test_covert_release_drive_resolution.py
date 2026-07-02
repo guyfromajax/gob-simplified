@@ -161,3 +161,30 @@ def test_emitter_includes_path_knots_metadata_for_pos_o():
     meta = drive_step["start"]["advance_trigger"]["metadata"]
     assert meta.get("path_knots") is not None
     assert meta["kind"] == "covert_release_drive"
+
+
+def test_meet_defensive_foul_non_bonus_routes_to_side_inbound(monkeypatch):
+    meet = {"x": 75, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.covert_release_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "D_FOUL",
+            "meet_x": meet["x"],
+            "meet_y": meet["y"],
+            "stopper_id": "Bentley-Truman-SF",
+            "d8_credited_player_id": "Bentley-Truman-SF",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {"Bentley-Truman-SF": meet},
+            "defender_archetypes": {"Bentley-Truman-SF": "sprint"},
+        },
+    )
+
+    game = build_mock_game()
+    _seed_cr(game)
+    result = resolve_covert_release_fast_break(game)
+
+    assert result["result_type"] == "FOUL"
+    assert result["next_play_type"] == "SIDE_INBOUND"
+    assert game.game_state["free_throws_remaining"] == 0
+    assert result["meet_coords"] == meet

@@ -774,6 +774,36 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     
     return result
 
+
+def apply_fb_meet_non_shooting_defensive_foul(
+    game,
+    *,
+    ball_handler,
+    foul_player,
+    time_elapsed_override=None,
+):
+    """Bonus / SIP vs FT transition for meet-terminal non-shooting defensive FB fouls.
+
+    Wraps ``resolve_non_shooting_foul`` so FB drive integrations share the same
+    team-foul, bonus, and foul-out rules as HCO / legacy FB cutoff paths.
+    """
+    if foul_player is None:
+        raise ValueError("foul_player required for meet defensive foul")
+    game.game_state["foul_team"] = "DEFENSE"
+    return resolve_non_shooting_foul(
+        {
+            "ball_handler": ball_handler,
+            "defender": foul_player,
+            "foul_player": foul_player,
+            "shooter": ball_handler,
+            "screener": None,
+            "passer": None,
+        },
+        game,
+        time_elapsed_override=time_elapsed_override,
+    )
+
+
 # #FAST BREAK
 from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_X_MIN,

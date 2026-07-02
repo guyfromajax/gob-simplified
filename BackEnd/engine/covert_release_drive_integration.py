@@ -28,6 +28,7 @@ from BackEnd.engine.phase_resolution import (
     _record_fast_break_stats,
     _record_outlet_pass_stats,
     apply_fast_break_cg_time,
+    apply_fb_meet_non_shooting_defensive_foul,
     calculate_outlet_pass_score,
     get_in_play_defenders,
 )
@@ -236,6 +237,11 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
         stopper = _player_by_id(def_lineup, drive.get("stopper_id"))
         credited = _player_by_id(def_lineup, drive.get("d8_credited_player_id"))
         _record_outlet(outcome not in ("DEAD BALL", "O_FOUL", "CHARGE"))
+        foul_transition = None
+        foul_player = None
+        next_play_type = "HCO"
+        next_turn = "HCO"
+        possession_flips = False
 
         if outcome == "DEAD BALL":
             result_type = "DEAD BALL"
@@ -254,16 +260,16 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
         else:
             result_type = "FOUL"
             foul_player = credited or stopper
-            possession_flips = False
-            game_state["foul_team"] = "DEFENSE"
-            game_state["shooter"] = ball_handler
-            game_state["offensive_state"] = "FREE_THROW"
-            game_state["free_throws"] = 2
-            game_state["free_throws_remaining"] = 2
-            if foul_player:
-                foul_player.record_stat("F")
-                def_team.team_fouls += 1
             text_tail = "defensive foul!"
+            foul_transition = apply_fb_meet_non_shooting_defensive_foul(
+                game,
+                ball_handler=ball_handler,
+                foul_player=foul_player,
+                time_elapsed_override=max(1, int(round(t_drive + 0.5))),
+            )
+            possession_flips = foul_transition["possession_flips"]
+            next_play_type = foul_transition["next_play_type"]
+            next_turn = foul_transition["next_turn"]
 
         bh_name = get_name_safe(ball_handler)
         turn_result = _finalize(
@@ -275,8 +281,8 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
                 "stopper_id": drive.get("stopper_id"),
                 "text": f"Fast Break! {bh_name} pushes, {text_tail}",
                 "possession_flips": possession_flips,
-                "next_play_type": "HCO" if possession_flips else "FREE_THROW",
-                "next_turn": "HCO" if possession_flips else "FREE_THROW",
+                "next_play_type": next_play_type,
+                "next_turn": next_turn,
                 "cr_end_coords": end_coords,
                 "meet_coords": dict(bh_end),
                 "t_meet_game_seconds": float(drive.get("t_meet_game_seconds") or t_drive),
@@ -287,7 +293,14 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
         )
         if result_type in ("FOUL", "CHARGE"):
             turn_result["foul_team"] = game_state.get("foul_team")
-            if foul_player:
+            if foul_transition is not None:
+                if foul_transition.get("foul_player_id"):
+                    turn_result["foul_player_id"] = foul_transition["foul_player_id"]
+                if foul_transition.get("fouled_out"):
+                    turn_result["fouled_out"] = True
+                    turn_result["foul_out_player"] = foul_transition.get("foul_out_player")
+                    turn_result["foul_count"] = foul_transition.get("foul_count")
+            elif foul_player:
                 turn_result["foul_player_id"] = _safe_id(foul_player)
         return turn_result
 
