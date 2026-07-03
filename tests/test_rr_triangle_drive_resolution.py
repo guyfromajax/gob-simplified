@@ -232,6 +232,174 @@ def test_def_starts_seeded_from_live_coords_not_animation_ends(monkeypatch):
         assert coord["x"] != pytest.approx(60.0)
 
 
+def _bh_start_spy(captured):
+    def _spy(**kwargs):
+        captured["bh_start"] = kwargs.get("bh_start")
+        return {
+            "outcome": "NEUTRAL",
+            "meet_x": None,
+            "meet_y": None,
+            "stopper_id": None,
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {},
+            "defender_archetypes": {},
+            "stop_decision": {"action": "HCO"},
+        }
+
+    return _spy
+
+
+def test_rr_bh_start_seeded_from_rr_to_not_animation_packet(monkeypatch):
+    """Regression: the RR drive-onset must be seeded from the emitter's
+    lane-pass catch target (``rim_runner_burst_phase.rr_to``), not the legacy
+    animation packet `end` (x=60) or the RR's live end-of-DREB coords (x=50).
+    """
+    captured = {}
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step",
+        _bh_start_spy(captured),
+    )
+
+    game = build_mock_game()
+    rr, bh, fb_roles, fb_animations = _seed_rr_finisher(game)
+    fb_roles["rim_runner_burst_phase"]["rr_to"] = {
+        "x": 33.0,
+        "y": 37.0,
+        "game_seconds": 0.35,
+        "movement_archetype": "burst",
+    }
+
+    resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=rr,
+        shot_spot={"x": 88, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=RIM_RUNNER,
+        off_team=game.offense_team,
+        def_team=game.defense_team,
+        off_lineup=game.offense_team.lineup,
+        def_lineup=game.defense_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=True,
+        fb_open=True,
+    )
+
+    bh_start = captured["bh_start"]
+    assert bh_start == {"x": 33.0, "y": 37.0}
+    assert bh_start["x"] != pytest.approx(60.0)  # not the animation packet end
+    assert bh_start["x"] != pytest.approx(50.0)  # not the live end-of-DREB coord
+
+
+def test_triangle_bh_drive_bh_start_seeded_from_ball_handler_to(monkeypatch):
+    """Regression: the triangle_bh_drive shooter drives from his triangle setup
+    spot (``triangle_setup_phase.ball_handler_to``), which is what the emitter
+    moves him to before the drive step \u2014 not the animation packet end.
+    """
+    captured = {}
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step",
+        _bh_start_spy(captured),
+    )
+
+    game = build_mock_game()
+    rr, bh, fb_roles, fb_animations = _seed_rr_finisher(game)
+    # Triangle path: no rim_runner_burst_phase.rr_to; drive-onset comes from the
+    # triangle setup payload's ball_handler_to.
+    fb_roles["rim_runner_burst_phase"] = {}
+    fb_roles["triangle_branch"] = "triangle_bh_drive"
+    fb_roles["triangle_setup_phase"] = {
+        "ball_handler_to": {"x": 41.0, "y": 18.0},
+    }
+
+    resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=bh,
+        shot_spot={"x": 88, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=TRIANGLE,
+        off_team=game.offense_team,
+        def_team=game.defense_team,
+        off_lineup=game.offense_team.lineup,
+        def_lineup=game.defense_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=True,
+        fb_open=True,
+    )
+
+    bh_start = captured["bh_start"]
+    assert bh_start == {"x": 41.0, "y": 18.0}
+    assert bh_start["x"] != pytest.approx(60.0)  # not the animation packet end
+
+
+def test_resolver_ignores_animation_packet_for_logic(monkeypatch):
+    """Phase 3: the drive resolver must not read the legacy animation packet for
+    any logic decision. With an EMPTY ``fb_animations`` the turn still resolves
+    (all geometry comes from live/backend coords), and the packet is passed
+    through only as the render artifact ``turn_result["animations"]``.
+    """
+    captured = {}
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step",
+        _bh_start_spy(captured),
+    )
+
+    game = build_mock_game()
+    rr, bh, fb_roles, _ = _seed_rr_finisher(game)
+    fb_roles["rim_runner_burst_phase"]["rr_to"] = {"x": 33.0, "y": 37.0}
+
+    turn = resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=rr,
+        shot_spot={"x": 88, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=[],  # empty legacy packet
+        fb_play_key=RIM_RUNNER,
+        off_team=game.offense_team,
+        def_team=game.defense_team,
+        off_lineup=game.offense_team.lineup,
+        def_lineup=game.defense_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=True,
+        fb_open=True,
+    )
+
+    assert turn is not None
+    assert turn.get("result_type")  # resolved despite an empty animation packet
+    assert turn["animations"] == []  # packet is a render-only passthrough
+    # Drive-onset still came from live/backend geometry, not the packet.
+    assert captured["bh_start"] == {"x": 33.0, "y": 37.0}
+
+
+@pytest.mark.parametrize(
+    "is_away_offense, x_lo, x_hi",
+    [
+        (False, 87.0, 89.0),  # home attacks x=91 rim → 91-(2..4)
+        (True, 11.0, 13.0),   # away attacks x=9 rim → 9+(2..4)
+    ],
+)
+def test_rr_shot_spot_is_rim_relative_not_animator_packet(is_away_offense, x_lo, x_hi):
+    """Phase 2: the Rim Runner shot spot is rim-relative geometry
+    (``_compute_bh_target``) rather than the animator-written ``_bh_final_x/_y``.
+
+    This is the exact helper ``resolve_rim_runner_fast_break`` now stamps into
+    ``roles["shot_spot"]`` at all three RR shot seams. Guards the "shot from the
+    complete other side of the court" regression class: the spot must sit within
+    2–4 grid of the attacking rim, never in the backcourt.
+    """
+    from BackEnd.engine.rim_runner_fast_break import _compute_bh_target as rr_bh_target
+
+    for _ in range(50):
+        spot = rr_bh_target(is_away_offense)
+        assert x_lo <= spot["x"] <= x_hi
+        assert 19.0 <= spot["y"] <= 31.0
+
+
 def test_triangle_bh_drive_stamps_fb_drive_resolution(monkeypatch):
     meet = {"x": 70, "y": 25}
     monkeypatch.setattr(

@@ -3561,6 +3561,24 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
                     if ns:
                         positions[ns] = dict(normalized)
 
+    # UESS observability: a FAST_BREAK turn that produced no `animation_steps`
+    # fell back above to the legacy `animations[]` finals to seed the NEXT
+    # turn's `player.coords`. That is the non-UESS path (an emitter returned
+    # None → FE also rendered legacy). Surface it so cross-turn coord drift is
+    # traceable rather than silent. Paired with the … EMITTER NULL logs.
+    if turn_result.get("fast_break") and not (
+        isinstance(turn_result.get("animation_steps"), list)
+        and turn_result.get("animation_steps")
+    ):
+        logging.warning(
+            "🚨 [FB FINAL_COORDS FALLBACK] fast_break_play=%s result_type=%s "
+            "next_play_type=%s — next turn seeded from legacy animations[] "
+            "(no animation_steps)",
+            turn_result.get("fast_break_play"),
+            turn_result.get("result_type"),
+            turn_result.get("next_play_type"),
+        )
+
     # Re-canonicalize overlay maps for role-exclusivity. shot_manager already
     # calls this at its return points, but callers that mutate
     # `turn_result["roles"]` post-shot (e.g., attaching `outlet_passer` to a

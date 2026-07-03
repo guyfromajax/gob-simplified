@@ -1256,9 +1256,19 @@ def resolve_fast_break_logic(game: "GameManager"):
                 anim_steps = build_rim_runner_animation_steps(rr_result, game)
                 if anim_steps is not None:
                     rr_result["animation_steps"] = anim_steps
+                else:
+                    # The emitter logs its own 🚨 [RR EMITTER NULL] guard line.
+                    logging.warning(
+                        "🚨 [RR EMITTER NULL CONSEQUENCE] result_type=%s "
+                        "next_play_type=%s — animation_steps not set, FE → LEGACY",
+                        rr_result.get("result_type"),
+                        rr_result.get("next_play_type"),
+                    )
             except Exception as e:
-                logging.warning(
-                    "build_rim_runner_animation_steps failed: %s", e
+                logging.exception(
+                    "🚨 [RR EMITTER EXCEPTION] result_type=%s: %s "
+                    "— animation_steps not set, FE → LEGACY",
+                    rr_result.get("result_type"), e,
                 )
         elif fb_play_key == TRIANGLE:
             try:
@@ -1269,8 +1279,20 @@ def resolve_fast_break_logic(game: "GameManager"):
                 anim_steps = build_triangle_animation_steps(rr_result, game)
                 if anim_steps is not None:
                     rr_result["animation_steps"] = anim_steps
+                else:
+                    # The emitter logs its own 🚨 [TRIANGLE EMITTER NULL] guard line.
+                    logging.warning(
+                        "🚨 [TRIANGLE EMITTER NULL CONSEQUENCE] result_type=%s "
+                        "next_play_type=%s — animation_steps not set, FE → LEGACY",
+                        rr_result.get("result_type"),
+                        rr_result.get("next_play_type"),
+                    )
             except Exception as e:
-                logging.warning("build_triangle_animation_steps failed: %s", e)
+                logging.exception(
+                    "🚨 [TRIANGLE EMITTER EXCEPTION] result_type=%s: %s "
+                    "— animation_steps not set, FE → LEGACY",
+                    rr_result.get("result_type"), e,
+                )
 
         return rr_result
 
@@ -1884,9 +1906,10 @@ def resolve_fast_break_logic(game: "GameManager"):
         apply_fast_break_cg_time(result, shot_attempted=False)
 
         # Parallel-build: emit unified AnimationStep[] for Covert Release.
-        # Other FB variants (RR / Triangle / After Steal) still use legacy
-        # rendering until their own migrations land. See
-        # _documentation_master/projects/Animation_System_Updated.md.
+        # All FB variants (CR / RR / Triangle / After-Steal) now emit unified
+        # AnimationStep[] via their own emitters; the legacy renderer is only a
+        # fallback when an emitter returns None (logged as … EMITTER NULL). See
+        # _documentation_master/projects/FB_UESS_Migration.md.
         if fb_play_key == "covert_release":
             try:
                 from BackEnd.engine.covert_release_step_emitter import (
@@ -2283,9 +2306,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     turn_result["fast_break_play"] = fb_play_key
 
     # Parallel-build: emit unified AnimationStep[] for Covert Release.
-    # Other FB variants still use legacy rendering until their own
-    # migrations land. See
-    # _documentation_master/projects/Animation_System_Updated.md.
+    # All FB variants (CR / RR / Triangle / After-Steal) now emit unified
+    # AnimationStep[] via their own emitters; the legacy renderer is only a
+    # fallback when an emitter returns None (logged as … EMITTER NULL). See
+    # _documentation_master/projects/FB_UESS_Migration.md.
     if fb_play_key == "covert_release":
         try:
             from BackEnd.engine.covert_release_step_emitter import (
@@ -2330,9 +2354,21 @@ def resolve_fast_break_logic(game: "GameManager"):
             )
             if anim_steps is not None:
                 turn_result["animation_steps"] = anim_steps
+            else:
+                # The emitter logs its own 🐛 [AFTER_STEAL_NONE site=...] line.
+                logging.warning(
+                    "🚨 [AFTER_STEAL EMITTER NULL CONSEQUENCE] result_type=%s "
+                    "rebound_type=%s next_play_type=%s — animation_steps not set, "
+                    "FE → LEGACY",
+                    turn_result.get("result_type"),
+                    turn_result.get("rebound_type"),
+                    turn_result.get("next_play_type"),
+                )
         except Exception as e:
-            logging.warning(
-                "build_after_steal_fast_break_animation_steps failed: %s", e
+            logging.exception(
+                "🚨 [AFTER_STEAL EMITTER EXCEPTION] result_type=%s: %s "
+                "— animation_steps not set, FE → LEGACY",
+                turn_result.get("result_type"), e,
             )
 
     # ✅ Add safety checks before returning
@@ -4831,6 +4867,48 @@ def _roll_subtle_idle_motion(
     return motion
 
 
+def _stamp_final_turn_idle_motion(
+    skeleton, off_lineup, def_lineup, bh_pos, position_to_spot, is_away_offense, rng
+):
+    """Stamp cosmetic ``idle_wander`` idle motion on the two stationary Final Turn
+    beats — step 0 (alignment hold) and step 1 (off-ball players stand while the
+    BH passes / the shooter receives). Reuses ``_roll_subtle_idle_motion``,
+    resolving each player's coords from that beat's spot locations
+    (``HCO_STRING_SPOTS``, away-flipped) into a throwaway beat copy so the
+    direction math reads correctly WITHOUT mutating the skeleton's ``pos_actions``.
+    Final Turn defense is zone → no man matchup passed (defenders shuffle).
+    Render-only + UESS-safe; call AFTER ``resolve_shot`` so the idle RNG never
+    perturbs the shot outcome."""
+    from BackEnd.constants import HCO_STRING_SPOTS
+    from BackEnd.utils.shared import get_away_player_coords
+
+    steps = (skeleton or {}).get("steps") or []
+    for beat in steps[:2]:
+        pos_actions = beat.get("pos_actions") or {}
+        locations, temp_pa = {}, {}
+        for pos, info in pos_actions.items():
+            loc = (info or {}).get("location", "key")
+            locations[pos] = loc
+            coords = HCO_STRING_SPOTS.get(loc, {"x": 64, "y": 25})
+            temp_pa[pos] = {
+                **(info or {}),
+                "coords": get_away_player_coords(coords) if is_away_offense else dict(coords),
+            }
+        idle = _roll_subtle_idle_motion(
+            {"pos_actions": temp_pa},
+            off_lineup,
+            def_lineup,
+            bh_pos,
+            position_to_spot.get(bh_pos, "key"),
+            {},  # zone defense → no man matchup
+            locations,
+            is_away_offense,
+            rng,
+        )
+        if idle:
+            beat.setdefault("_subtle_movement", {})["idle_motion"] = idle
+
+
 # HCO-specific moment frequency dial: scales the HCT contest's p_event + p_dfoul for HCO ONLY
 # (HCT/FCP keep event_scalar=1.0). Lower = fewer HCO fouls/steals/turnovers. The HCT contest is
 # calibrated for traps (2 defenders); HCO is a single on-ball defender, so we scale it back.
@@ -5920,51 +5998,60 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
             "deep upper wing", "deep upper baseline",
         ]
     random.shuffle(opposite_half_spots)
-    other_positions = [p for p in ["PG", "SG", "SF", "PF", "C"] if p != bh_pos and p != shooter_pos]
-    other_spot_by_pos = {}
-    for i, pos in enumerate(other_positions):
-        other_spot_by_pos[pos] = opposite_half_spots[i % len(opposite_half_spots)]
-    # Skeleton: step 0 alignment, step 1 pass/receive (or BH to wing if BH shoots), step 2 shoot
-    step0 = {"timestamp": 0, "pos_actions": {}}
-    for pos in ["PG", "SG", "SF", "PF", "C"]:
-        spot = position_to_spot.get(pos, "key")
-        step0["pos_actions"][pos] = {
-            "action": ACTIONS["HANDLE"] if pos == bh_pos else "stand",
-            "location": spot,
-        }
-    step1 = {"timestamp": 300, "pos_actions": {}}
-    for pos in ["PG", "SG", "SF", "PF", "C"]:
-        if bh_is_shooter and pos == bh_pos:
-            step1["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shot_wing}
-        elif not bh_is_shooter and pos == bh_pos:
-            step1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "deep key"}
-        elif pos == shooter_pos:
-            step1["pos_actions"][pos] = {"action": ACTIONS["RECEIVE"], "location": shot_wing}
-        else:
-            step1["pos_actions"][pos] = {
-                "action": "stand",
-                "location": other_spot_by_pos.get(pos, position_to_spot.get(pos, "key")),
-            }
     is_away_offense = off_team.team_id == game.away_team.team_id
+    # Attack drive destination — rolled ONCE (RNG) up front so the skip-handoff
+    # rebuild below stays SS&S-stable (the drive tail is bh-independent anyway).
+    attack_destination = None
     if shot_type == "Attack":
-        # Reuse Motion offense logic: drive to basket then shoot (two steps, shooter only in those steps)
-        valid_destinations = _determine_attack_drive_destination(shot_wing)
-        destination = random.choice(valid_destinations) if valid_destinations else "basketSpot"
-        drive_result = _create_attack_drive_shoot_steps(
-            shooter_pos, shot_wing, destination, timestamp=600, is_away_offense=is_away_offense
-        )
-        drive_shoot_steps = drive_result.get("steps", []) if isinstance(drive_result, dict) else drive_result
-        skeleton = {"steps": [step0, step1] + drive_shoot_steps}
-    else:
-        # Outside: shoot at wing (single step 2)
-        step2 = {"timestamp": 600, "pos_actions": {}}
+        _valid_dests = _determine_attack_drive_destination(shot_wing)
+        attack_destination = random.choice(_valid_dests) if _valid_dests else "basketSpot"
+
+    def _assemble_final_shot_skeleton(active_bh_pos, spot_map):
+        """Build the Final Shot skeleton for a given ball-handler position + spot map.
+        Pure/deterministic (NO RNG) so it can be re-assembled if the skip-handoff
+        fallback swaps the acting BH. step0 = alignment, step1 = pass/receive (or
+        BH→wing when BH shoots), tail = shoot (Outside) or drive+shoot (Attack)."""
+        bh_shoots = active_bh_pos == shooter_pos
+        others = [p for p in ["PG", "SG", "SF", "PF", "C"] if p != active_bh_pos and p != shooter_pos]
+        other_spot = {}
+        for idx, pos in enumerate(others):
+            other_spot[pos] = opposite_half_spots[idx % len(opposite_half_spots)]
+        s0 = {"timestamp": 0, "pos_actions": {}}
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            s0["pos_actions"][pos] = {
+                "action": ACTIONS["HANDLE"] if pos == active_bh_pos else "stand",
+                "location": spot_map.get(pos, "key"),
+            }
+        s1 = {"timestamp": 300, "pos_actions": {}}
+        for pos in ["PG", "SG", "SF", "PF", "C"]:
+            if bh_shoots and pos == active_bh_pos:
+                s1["pos_actions"][pos] = {"action": ACTIONS["HANDLE"], "location": shot_wing}
+            elif not bh_shoots and pos == active_bh_pos:
+                s1["pos_actions"][pos] = {"action": ACTIONS["PASS"], "location": "deep key"}
+            elif pos == shooter_pos:
+                s1["pos_actions"][pos] = {"action": ACTIONS["RECEIVE"], "location": shot_wing}
+            else:
+                s1["pos_actions"][pos] = {
+                    "action": "stand",
+                    "location": other_spot.get(pos, spot_map.get(pos, "key")),
+                }
+        if shot_type == "Attack":
+            drive_result = _create_attack_drive_shoot_steps(
+                shooter_pos, shot_wing, attack_destination, timestamp=600, is_away_offense=is_away_offense
+            )
+            tail = drive_result.get("steps", []) if isinstance(drive_result, dict) else drive_result
+            return {"steps": [s0, s1] + list(tail)}
+        s2 = {"timestamp": 600, "pos_actions": {}}
         for pos in ["PG", "SG", "SF", "PF", "C"]:
             if pos == shooter_pos:
-                step2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
+                s2["pos_actions"][pos] = {"action": ACTIONS["SHOOT"], "location": shot_wing}
             else:
-                step1_location = "deep key" if pos == bh_pos else other_spot_by_pos.get(pos, position_to_spot.get(pos, "key"))
-                step2["pos_actions"][pos] = {"action": "stand", "location": step1_location}
-        skeleton = {"steps": [step0, step1, step2]}
+                loc = "deep key" if pos == active_bh_pos else other_spot.get(pos, spot_map.get(pos, "key"))
+                s2["pos_actions"][pos] = {"action": "stand", "location": loc}
+        return {"steps": [s0, s1, s2]}
+
+    # Baseline skeleton with the PG as BH — the geometry basis pacing evaluates.
+    skeleton = _assemble_final_shot_skeleton(bh_pos, position_to_spot)
     prior_turns = getattr(game, "turns", None) or []
     prior_turn = prior_turns[-1] if prior_turns else None
     from BackEnd.engine.final_turn_pacing import (
@@ -5995,6 +6082,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
             "reason": pacing.reason,
             "step0_hold_floor": pacing.step0_hold_floor,
             "include_entry_pass": pacing.include_entry_pass,
+            "handoff_fits": pacing.handoff_fits,
             "include_walkup": pacing.include_walkup,
             "anchor_clock": pacing.anchor_clock,
         },
@@ -6002,18 +6090,53 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     from BackEnd.utils.eoq_clock_progression import should_route_final_turn_to_flss
 
     time_remaining_now = int(game_state.get("time_remaining") or 0)
-    if not pacing.can_meet_anchor and should_route_final_turn_to_flss(time_remaining_now):
-        return {"route_flss": True, "flss_reason": pacing.reason}
-
+    # Final Shot mode cascade (see EOQ_System.md):
+    #   base doesn't fit          → FLSS (late clock) / best-effort (bh=PG, handoff still fires)
+    #   PG had the ball           → pg_direct (no handoff)
+    #   handoff fits              → handoff (bh=PG, delivered handoff-first)
+    #   base fits, handoff doesn't→ skip_handoff (live handler runs it from the PG spot; no FLSS)
+    handoff_mode = "pg_direct"
     if not pacing.can_meet_anchor:
+        if should_route_final_turn_to_flss(time_remaining_now):
+            return {"route_flss": True, "flss_reason": pacing.reason}
+        handoff_mode = "best_effort"
         log_eoq_step(
-            game,
-            "FINAL_SHOT",
-            "pacing_best_effort",
-            "END",
+            game, "FINAL_SHOT", "pacing_best_effort", "END",
             extra={"reason": pacing.reason, "time_remaining": time_remaining_now},
         )
         apply_step0_hold_floor(skeleton, 0.0)
+    elif pacing.include_entry_pass and not pacing.handoff_fits:
+        # Base Final Shot fits but the handoff doesn't → skip it. The live handler
+        # runs the shot from the PG's ball-handler spot (BH↔PG spot swap); making him
+        # the skeleton BH means the emitter naturally emits no handoff (its
+        # prior_owner == skeleton_bh check) and the ball ownership stays consistent.
+        from BackEnd.engine.skeleton_step_emitter import _resolve_prior_ball_handler_id
+        from BackEnd.utils.shared import get_player_position
+
+        live_bh_id = _resolve_prior_ball_handler_id(
+            prior_turn if isinstance(prior_turn, dict) else {}, {}
+        )
+        live_bh_pos = get_player_position(off_lineup, live_bh_id) if live_bh_id else None
+        if live_bh_pos and live_bh_pos != "PG" and off_lineup.get(live_bh_pos):
+            position_to_spot = dict(position_to_spot)
+            position_to_spot["PG"], position_to_spot[live_bh_pos] = (
+                position_to_spot.get(live_bh_pos, "key"),
+                position_to_spot.get("PG", "key"),
+            )
+            o_destinations = dict(o_destinations)
+            o_destinations["PG"], o_destinations[live_bh_pos] = (
+                o_destinations.get(live_bh_pos),
+                o_destinations.get("PG"),
+            )
+            bh_pos = live_bh_pos
+            skeleton = _assemble_final_shot_skeleton(bh_pos, position_to_spot)
+            handoff_mode = "skip_handoff"
+        else:
+            handoff_mode = "handoff"  # couldn't resolve a swap target → fall back to handoff
+        apply_step0_hold_floor(skeleton, pacing.step0_hold_floor)
+    elif pacing.include_entry_pass:
+        handoff_mode = "handoff"
+        apply_step0_hold_floor(skeleton, pacing.step0_hold_floor_with_handoff)
     else:
         apply_step0_hold_floor(skeleton, pacing.step0_hold_floor)
     log_eoq_step(
@@ -6023,7 +6146,12 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         "END",
         shooter=shooter,
         shooter_pos=shooter_pos,
-        extra={"skeleton_step_count": len(skeleton.get("steps") or []), "shot_type": shot_type},
+        extra={
+            "skeleton_step_count": len(skeleton.get("steps") or []),
+            "shot_type": shot_type,
+            "handoff_mode": handoff_mode,
+            "bh_pos": bh_pos,
+        },
     )
     roles = game.turn_manager.assign_roles(
         off_call=shot_type, def_call=game_state.get("defense_playcall", "2-3-zone"), skeleton=skeleton
@@ -6056,11 +6184,20 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         )
     finally:
         game_state.pop("final_turn", None)
+    # Cosmetic idle motion on the two stationary beats (step 0 hold, step 1 stand).
+    # Rolled here — after resolve_shot — so the idle RNG can't shift the shot.
+    _stamp_final_turn_idle_motion(
+        skeleton, off_lineup, def_lineup, bh_pos, position_to_spot, is_away_offense, random
+    )
     shot_result["oDestinations"] = o_destinations
     shot_result["dDestinations"] = d_destinations
     shot_result["skeleton"] = skeleton
     shot_result["final_turn"] = True
-    shot_result["final_turn_include_entry_pass"] = pacing.include_entry_pass
+    # A handoff is emitted only in handoff / best-effort modes (bh stays PG, ball
+    # delivered to him). In skip_handoff the live handler IS the skeleton BH → no
+    # handoff; pg_direct never needed one.
+    shot_result["final_turn_include_entry_pass"] = handoff_mode in ("handoff", "best_effort")
+    shot_result["final_turn_handoff_mode"] = handoff_mode
     shot_result["final_turn_include_walkup"] = pacing.include_walkup
     shot_result["final_turn_anchor_clock"] = pacing.anchor_clock
     from BackEnd.utils.eoq_clock_progression import mark_late_clock_eoq_turn

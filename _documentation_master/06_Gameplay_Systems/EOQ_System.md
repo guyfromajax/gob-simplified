@@ -46,6 +46,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK` | 8 | Preflight failure routes to FLSS only at ≤ 8s; above that, best-effort Final Turn |
 | `POST_DREB_FLSS_MIN_CLOCK` | 2 | Post-DREB FLSS when chain active and clock **> 2s**; terminal DREB at ≤ 2s |
 | `LATE_CLOCK_BIP_RUNOFF_SECONDS` | 2 | Game-clock burn on BIP after late-clock make or `late_clock_ft_resolution` |
+| `FINAL_TURN_HANDOFF_CONVERGE_GRID` | 6.0 | Final Turn handoff **receive radius** — the PG converges to within this many grid of the live handler before the pass (in `constants/__init__.py`). NB: preflight sizes the handoff by the *real* PG→handler travel, not this radius. |
 
 ---
 
@@ -187,7 +188,7 @@ AND state in (HCO, HCT, FCP)
 **Decision:** `can_run_final_turn_followup()` in `final_turn_pacing.py`:
 
 - Builds conservative Final Turn skeleton scenarios (Outside @ 3s anchor, Attack @ 4s anchor; BH-shooter and pass-to-shooter variants).
-- Simulates walk-up from `prior_turn.final_coords`, alignment, entry pass, and pre-anchor moves via `evaluate_final_turn_pacing()`.
+- Simulates walk-up from `prior_turn.final_coords`, alignment, the **PG handoff** (converge+pass, sized by real PG→handler travel), and pre-anchor moves via `evaluate_final_turn_pacing()` — which returns a dual verdict (`can_meet_anchor` = base fits; `handoff_fits`) driving the 4-mode BH cascade in §7.
 - **If any scenario fits** → arm another full Final Turn:
   - Set `final_turn_shot_this_turn`, `final_shot_possession_active`, `suppress_final_shot_sfx`.
   - Clear `flss_possession_pending` if set (overrides inbound-scheduled FLSS).
@@ -224,7 +225,20 @@ When `final_turn_shot_this_turn` is popped during handler routing:
 
 ### Shooter / play rules
 
-- **Ball handler:** Prefer live `last_ball_handler` if PG/SG/SF; else 60% PG / 30% SG / 10% SF.
+- **Ball handler — 4-mode cascade.** The PG is the *preferred* BH; the acting BH depends on whether the ball can be delivered to him within budget. Preflight (`evaluate_final_turn_pacing`) returns a **dual verdict**: `can_meet_anchor` = the base Final Shot (no handoff) fits; `handoff_fits` = base **+** handoff fits. `resolve_final_turn_shot_logic` picks the mode (`final_turn_handoff_mode` on the result):
+
+  | Mode | When | BH | Handoff? |
+  |------|------|----|----------|
+  | `pg_direct` | PG already held the ball | PG | none |
+  | `handoff` | PG didn't, and the handoff fits | PG | **handoff-first** (before alignment) |
+  | `skip_handoff` | PG didn't, base fits but the handoff *doesn't* | **live handler** (swapped into the PG's BH spot; PG↔handler alignment swap) | none |
+  | `best_effort` | base doesn't fit, `time_remaining > 8` | PG | handoff fires (delivery wins; shot may land late) |
+  | *(FLSS)* | base doesn't fit, `time_remaining ≤ 8` | — | routes to FLSS |
+
+  - **Handoff-first ordering.** The handoff is **prepended before alignment** (`_prepend_final_turn_handoff_if_needed` → `build_handoff_step`): the PG sprints from his pre-alignment spot to within `FINAL_TURN_HANDOFF_CONVERGE_GRID` (6) grid of the live handler and receives; the following alignment step then tweens everyone to their Final Shot spots (PG drifts handoff-point→BH spot — no zig-zag). Emitted as 2 sub-steps (converge, pass).
+  - **Handoff cost is the *real* converge travel.** `_estimate_entry_pass_seconds` sizes it as *PG's prior spot → live handler's prior spot* (Euclidean / sprint) **+** a short pass — NOT the 6-grid receive radius. A far-apart PG/handler makes the handoff expensive and can (correctly) tip the possession into `skip_handoff` — the ball still gets a structured Final Shot, just run by the live handler in place.
+  - **Delivery is guaranteed, not flag-gated.** Step 0 pins the ball to the emitter's own skeleton-BH (`_final_turn_skeleton_bh_id`); in `skip_handoff`/`pg_direct` that BH already holds it (emitter self-skips the handoff via its `prior_owner == bh_id` check), and in `handoff`/`best_effort` the prepended handoff delivered it first. When the pacing `include_entry_pass` resolver disagrees with the emitter's, the handoff still fires (logged) rather than stranding the ball.
+- **Idle motion:** Steps 0 (alignment hold) and 1 (off-ball players stand) stamp cosmetic `idle_wander` flourishes (reuses `_roll_subtle_idle_motion`, the Motion subtle-idle roller; zone D → shuffle). Render-only + UESS-safe; rolled *after* `resolve_shot` so the idle RNG never perturbs the shot.
 - **Shot choice:** 50% Outside / 50% Attack; Q4+ trailing by **exactly 3** → forced Outside three.
 - **Shooter weights:** Rank by SH (outside) or SC+AG (attack); weighted random 50 / 30 / 20 / 9 / 1.
 - **Blocking foul on attack:** Exactly **2 FTs** (no and-1) when `game_state["final_turn"]` during resolve.

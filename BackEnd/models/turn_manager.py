@@ -3745,9 +3745,11 @@ class TurnManager:
         return result
 
     def _build_final_turn_offense_alignment(self):
-        """Final Turn offense: BH 60% PG / 30% SG / 10% SF; PG/SG deep wings; SF/PF corners; C key.
+        """Final Turn offense: BH is ALWAYS the PG (delivered a converge+pass handoff when he
+        wasn't the live handler — see the emitter/pacing). PG/SG deep wings; SF/PF corners; C key.
         Returns display-oriented (oDestinations, position_to_spot, bh_pos). Spot names remain
-        home-authored skeleton inputs; only the emitted coordinate map is mirrored for away offense."""
+        home-authored skeleton inputs; only the emitted coordinate map is mirrored for away offense.
+        (The ``bh_pos == "SF"`` branch below is retained but currently unreachable.)"""
         from BackEnd.constants import HCO_STRING_SPOTS
         from BackEnd.utils.shared import get_away_player_coords
         game = self.game
@@ -3756,15 +3758,12 @@ class TurnManager:
         is_away_offense = off_team.team_id == game.away_team.team_id
         from BackEnd.utils.shared import get_player_position
 
-        # Prefer the live ball handler when they are a perimeter spot; otherwise
-        # draw a setup BH (60% PG / 30% SG / 10% SF) for variety.
-        live_bh = game.game_state.get("last_ball_handler")
-        live_bh_pos = get_player_position(off_lineup, live_bh) if live_bh else None
-        if live_bh_pos in ("PG", "SG", "SF"):
-            bh_pos = live_bh_pos
-        else:
-            r = random.random()
-            bh_pos = "PG" if r < 0.60 else ("SG" if r < 0.90 else "SF")
+        # Final Turn BH is ALWAYS the PG (consistency). When the PG wasn't the live ball
+        # handler entering the turn, a deep-key converge+pass handoff (build_handoff_step,
+        # sized/gated by evaluate_final_turn_pacing) delivers the ball to him as step 0; if
+        # it can't fit the budget the turn routes to FLSS. (get_player_position import kept
+        # for callers/logging elsewhere.)
+        bh_pos = "PG"
         # Deep wings (random order for PG/SG)
         wings = ["deep upper wing", "deep lower wing"]
         random.shuffle(wings)

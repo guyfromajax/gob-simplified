@@ -14,7 +14,6 @@ from BackEnd.constants import (
     AWAY_RIM_COORDS,
     HCO_STRING_SPOTS,
     HOME_RIM_COORDS,
-    USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR,
 )
 from BackEnd.constants.fast_break_play_types import RIM_RUNNER, TRIANGLE
 from BackEnd.models.animator import Animator
@@ -37,6 +36,7 @@ from BackEnd.engine.phase_resolution import (
     apply_fast_break_cg_time,
     get_in_play_defenders,
 )
+from BackEnd.engine.after_steal_drive_integration import _compute_bh_target
 
 logger = logging.getLogger(__name__)
 
@@ -690,165 +690,6 @@ def _primary_burst_defender(
     return primary, False
 
 
-def _apply_universal_geometry_for_rr_shot(
-    *,
-    shooter: Any,
-    roles: Dict[str, Any],
-    fb_roles: Dict[str, Any],
-    fb_animations: List[Dict[str, Any]],
-    game: Any,
-    off_lineup: Dict[str, Any],
-    def_lineup: Dict[str, Any],
-    is_away_offense: bool,
-    stopper_id: Optional[str],
-    outlet_defender_id: Optional[str],
-) -> None:
-    """Apply the universal FB shot geometry helper to an RR shot in-flight.
-
-    Mutates ``roles``, ``fb_roles``, ``fb_animations``, and
-    ``game.game_state`` in place:
-
-    - Sets ``roles["shot_spot"]`` to the helper's shooter_target.
-    - Sets ``roles["defender"]`` to the first arriver (or None if uncontested).
-    - Sets ``fast_break_shot_threshold_override`` = 1 when uncontested
-      (matches the existing "no defender → threshold 1 = always make"
-      pattern at line 1128; same effect as Steal-FB's auto-make rule).
-    - Updates ``fb_animations`` end coords for the shooter and racing
-      defenders so the schema emitter renders the new positions. The
-      stopper and outlet defender are NOT updated (they stay at their
-      end-of-preceding-step positions per spec).
-
-    Race pool per spec: all defenders EXCEPT the stopper AND the outlet
-    defender. See docs/projects/Fast_Break_System.md (universal helper
-    section) and Step_By_Step_System.md (RR resolution stages).
-
-    No-op (caller does nothing different) if the helper returns no
-    geometry — caller falls back to whatever was on ``roles`` already.
-    """
-    from BackEnd.utils.fast_break_shot_geometry import compute_fb_shot_geometry
-
-    if shooter is None:
-        return
-
-    shooter_id = getattr(shooter, "player_id", None)
-    if shooter_id is None:
-        return
-    shooter_id = str(shooter_id)
-
-    # Race pool: all defenders EXCEPT stopper + outlet defender.
-    excluded: set = set()
-    if stopper_id is not None:
-        excluded.add(str(stopper_id))
-    if outlet_defender_id is not None:
-        excluded.add(str(outlet_defender_id))
-
-    available_defenders: List[Any] = []
-    defender_starts: Dict[str, Dict[str, float]] = {}
-    for d in def_lineup.values():
-        if d is None:
-            continue
-        d_id = getattr(d, "player_id", None)
-        if d_id is None:
-            continue
-        d_id_str = str(d_id)
-        if d_id_str in excluded:
-            continue
-        available_defenders.append(d)
-        # Start coord = end of preceding step. The animator captured
-        # animations represent the FB trajectory up to this point; their
-        # "end" field is each player's position at end of the prior step.
-        anim_end = None
-        for entry in fb_animations:
-            if entry.get("playerId") == d_id_str or entry.get("playerId") == d_id:
-                anim_end = entry.get("end") or entry.get("end_coords")
-                if isinstance(anim_end, dict):
-                    break
-        if isinstance(anim_end, dict) and "x" in anim_end and "y" in anim_end:
-            defender_starts[d_id_str] = {
-                "x": float(anim_end["x"]),
-                "y": float(anim_end["y"]),
-            }
-        else:
-            # Fallback: live coords on the player object.
-            raw = getattr(d, "coords", None) or {}
-            defender_starts[d_id_str] = {
-                "x": float(raw.get("x", 50.0)),
-                "y": float(raw.get("y", 25.0)),
-            }
-
-    # Shooter start: prefer animation end; fall back to live coords.
-    shooter_start: Dict[str, float] = {"x": 50.0, "y": 25.0}
-    for entry in fb_animations:
-        if entry.get("playerId") == shooter_id or entry.get("playerId") == getattr(shooter, "player_id", None):
-            anim_end = entry.get("end") or entry.get("end_coords")
-            if isinstance(anim_end, dict) and "x" in anim_end and "y" in anim_end:
-                shooter_start = {"x": float(anim_end["x"]), "y": float(anim_end["y"])}
-                break
-    else:
-        raw = getattr(shooter, "coords", None) or {}
-        if isinstance(raw, dict) and "x" in raw and "y" in raw:
-            shooter_start = {"x": float(raw["x"]), "y": float(raw["y"])}
-
-    geometry = compute_fb_shot_geometry(
-        shooter=shooter,
-        shooter_start=shooter_start,
-        available_defenders=available_defenders,
-        defender_starts=defender_starts,
-        is_away_offense=is_away_offense,
-    )
-
-    # Override shot_spot + defender on roles.
-    roles["shot_spot"] = dict(geometry["shooter_target"])
-    if geometry["contested"] and geometry["shot_defender_id"]:
-        # Look up player object by id.
-        for d in def_lineup.values():
-            if d is None:
-                continue
-            if str(getattr(d, "player_id", "")) == geometry["shot_defender_id"]:
-                roles["defender"] = d
-                fb_roles["defender"] = d
-                fb_roles["defender_count"] = 1
-                break
-    else:
-        # Uncontested → no defender; threshold=1 means auto-make.
-        roles["defender"] = None
-        fb_roles["defender"] = None
-        fb_roles["defender_count"] = 0
-        game.game_state["fast_break_shot_threshold_override"] = 1
-
-    # Update fb_animations end coords for shooter + racing defenders so
-    # the schema emitter renders the new positions. Stopper and outlet
-    # defender are intentionally left alone (no movement on shot step).
-    # Must write BOTH `entry["end"]` (downstream BE wiring + FE legacy
-    # paths) AND `entry["movement"][-1]["coords"]` (UESS emitter reads
-    # via `_movement_end_coord`). Writing only `entry["end"]` silently
-    # drops the override at the emitter — shooter renders at the legacy
-    # animator's spot.
-    end_coords_override: Dict[str, Dict[str, float]] = {
-        shooter_id: geometry["shooter_target"],
-        **geometry["defender_end_coords"],
-    }
-    overrides_applied = 0
-    for entry in fb_animations:
-        pid = entry.get("playerId")
-        pid_str = str(pid) if pid is not None else None
-        if pid_str and pid_str in end_coords_override:
-            new_coords = dict(end_coords_override[pid_str])
-            entry["end"] = new_coords
-            mv = entry.get("movement") or []
-            if mv and isinstance(mv[-1], dict):
-                mv[-1]["coords"] = dict(new_coords)
-            overrides_applied += 1
-
-    logging.warning(
-        "🔍 [FB UNIVERSAL RR] shot_spot=%s contested=%s shot_def=%s applied_overrides=%d",
-        geometry["shooter_target"],
-        geometry["contested"],
-        geometry["shot_defender_id"],
-        overrides_applied,
-    )
-
-
 def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     """
     Full Rim Runner resolution for one FAST_BREAK turn (DREB only). Caller increments scouting.
@@ -1356,6 +1197,11 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         game_state["fast_break_shot_threshold_override"] = shot_threshold
 
         animator = Animator(game)
+        # UESS Phase 3: for RR/Triangle this packet is a RENDER ARTIFACT ONLY —
+        # it populates `turn_result["animations"]` as the legacy fallback render
+        # and is never a logic input (bh_start/def_starts/shot_spot are sourced
+        # from live/backend geometry in Phases 1-2). `apply_coords_from_animations_list`
+        # is skipped below, so it also never mutates `player.coords`.
         fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)
         # UESS Phase 1a/1b: RR's and Triangle's schema emitters read
         # `player.coords` as the FB step 0 START state (= end of DREB).
@@ -1366,8 +1212,11 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         # existing CR skip in phase_resolution.py).
         if fb_play_key not in (RIM_RUNNER, TRIANGLE):
             apply_coords_from_animations_list(game, fb_animations)
-        if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
-            roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
+        # UESS Phase 2: RR shot spot is rim-relative geometry (same helper CR /
+        # After-Steal use), NOT the animator-written `_bh_final_x/_y` packet.
+        # Computed once so the pre-shot snapshot, drive resolver, and fallback
+        # all share one geometric spot.
+        roles["shot_spot"] = _compute_bh_target(is_away_offense)
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1394,22 +1243,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         )
         if drive_turn is not None:
             return drive_turn
-        # Universal geometry: replace shot_spot + defender + contested
-        # decision per spec. Gated by feature flag for revert. Race pool
-        # excludes Stopper and Outlet defender.
-        if USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR and fb_play_key == RIM_RUNNER:
-            _apply_universal_geometry_for_rr_shot(
-                shooter=rr,
-                roles=roles,
-                fb_roles=fb_roles,
-                fb_animations=fb_animations,
-                game=game,
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                is_away_offense=is_away_offense,
-                stopper_id=getattr(primary_def, "player_id", None),
-                outlet_defender_id=getattr(outlet_defender, "player_id", None) if outlet_defender else None,
-            )
+        # Legacy fallback (only reachable if RR drive resolution is
+        # flag-disabled): shoot from the rim-relative `roles["shot_spot"]`.
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
         attach_position_snapshots(turn_result, [rr_snap])
@@ -1459,8 +1294,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         # rationale above).
         if fb_play_key not in (RIM_RUNNER, TRIANGLE):
             apply_coords_from_animations_list(game, fb_animations)
-        if fb_roles.get("_bh_final_x") is not None:
-            roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
+        # UESS Phase 2: rim-relative geometry, not the animator `_bh_final_x/_y`.
+        roles["shot_spot"] = _compute_bh_target(is_away_offense)
         rr_snap_roles = {**roles, "ball_handler": ball_handler}
         rr_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1487,21 +1322,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         )
         if drive_turn is not None:
             return drive_turn
-        # Universal geometry: catch-and-shoot path (no primary_def). No
-        # stopper to exclude; still exclude outlet defender.
-        if USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR and fb_play_key == RIM_RUNNER:
-            _apply_universal_geometry_for_rr_shot(
-                shooter=rr,
-                roles=roles,
-                fb_roles=fb_roles,
-                fb_animations=fb_animations,
-                game=game,
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                is_away_offense=is_away_offense,
-                stopper_id=None,
-                outlet_defender_id=getattr(outlet_defender, "player_id", None) if outlet_defender else None,
-            )
+        # Legacy fallback (only reachable if RR drive resolution is
+        # flag-disabled): shoot from the rim-relative `roles["shot_spot"]`.
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
         attach_position_snapshots(turn_result, [rr_snap])
@@ -1668,8 +1490,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     # rationale above).
     if fb_play_key not in (RIM_RUNNER, TRIANGLE):
         apply_coords_from_animations_list(game, fb_animations)
-    if fb_roles.get("_bh_final_x") is not None:
-        roles["shot_spot"] = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
+    # UESS Phase 2: rim-relative geometry, not the animator `_bh_final_x/_y`.
+    roles["shot_spot"] = _compute_bh_target(is_away_offense)
     rr_snap_roles = {**roles, "ball_handler": ball_handler}
     rr_snap = build_fast_break_pre_shot_snapshot(
         game, off_lineup, def_lineup, rr_snap_roles, "fb_rr_pre_shot"
@@ -1696,20 +1518,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     )
     if drive_turn is not None:
         return drive_turn
-    # Universal geometry: completion-shot path after intercept fall-through.
-    if USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR and fb_play_key == RIM_RUNNER:
-        _apply_universal_geometry_for_rr_shot(
-            shooter=rr,
-            roles=roles,
-            fb_roles=fb_roles,
-            fb_animations=fb_animations,
-            game=game,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            is_away_offense=is_away_offense,
-            stopper_id=getattr(primary_def, "player_id", None) if primary_def else None,
-            outlet_defender_id=getattr(outlet_defender, "player_id", None) if outlet_defender else None,
-        )
+    # Legacy fallback (only reachable if RR drive resolution is flag-disabled):
+    # shoot from the rim-relative `roles["shot_spot"]`.
     turn_result = game.shot_manager.resolve_shot(roles)
     game_state.pop("fast_break_shot_threshold_override", None)
     attach_position_snapshots(turn_result, [rr_snap])

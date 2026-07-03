@@ -35,20 +35,41 @@ from BackEnd.utils.shared import apply_scoring, get_name_safe
 from BackEnd.utils.position_snapshot_ledger import attach_position_snapshots, build_fast_break_pre_shot_snapshot
 
 
-def _anim_end_coord(
-    fb_animations: List[Dict[str, Any]],
-    player_id: Optional[str],
-    fallback: Any,
+def _drive_onset_coord(
+    fb_roles: Dict[str, Any],
+    shooter: Any,
 ) -> Dict[str, float]:
-    if player_id:
-        target = str(player_id)
-        for entry in fb_animations or []:
-            pid = entry.get("playerId")
-            if pid is not None and str(pid) == target:
-                anim_end = entry.get("end") or entry.get("end_coords")
-                if isinstance(anim_end, dict) and "x" in anim_end and "y" in anim_end:
-                    return {"x": float(anim_end["x"]), "y": float(anim_end["y"])}
-    return _coord_of(fallback)
+    """Value-correcting drive-onset seed for the finisher drive resolver.
+
+    Sourced from the same backend geometry the UESS step emitters render the
+    drive from, so resolver logic and animation converge on one catch /
+    drive-onset spot (instead of the legacy ``capture_fast_break_animation``
+    packet, whose shooter ``end`` is a rim-relative random rebounder spot or a
+    ``player.coords`` fallback that already diverges from the rendered drive):
+
+    - Rim Runner: the RR's lead-pass catch target
+      (``rim_runner_burst_phase.rr_to``), which the emitter uses as the
+      lane-pass ``catch_grid`` (see ``rim_runner_step_emitter._build_lane_pass_step``).
+    - Triangle ``triangle_bh_drive``: the ball handler's triangle setup spot
+      (``triangle_setup_phase.ball_handler_to``), which the emitter moves him to
+      in the setup step before driving to ``triangle_drive_to``
+      (see ``triangle_step_emitter``).
+
+    Never reads the legacy animation packet. Falls back to the shooter's live
+    ``player.coords`` if neither backend datum is available.
+    """
+    burst = fb_roles.get("rim_runner_burst_phase") or {}
+    rr_to = burst.get("rr_to")
+    if isinstance(rr_to, dict) and "x" in rr_to and "y" in rr_to:
+        return {"x": float(rr_to["x"]), "y": float(rr_to["y"])}
+
+    if fb_roles.get("triangle_branch") == "triangle_bh_drive":
+        setup = fb_roles.get("triangle_setup_phase") or {}
+        bh_to = setup.get("ball_handler_to")
+        if isinstance(bh_to, dict) and "x" in bh_to and "y" in bh_to:
+            return {"x": float(bh_to["x"]), "y": float(bh_to["y"])}
+
+    return _coord_of(shooter)
 
 
 def _pick_unified_contest_defender(
@@ -139,7 +160,13 @@ def resolve_attack_drive_finisher_turn(
         return None
 
     game_state = game.game_state
-    bh_start = _anim_end_coord(fb_animations, shooter_id, shooter)
+    # Seed the drive-onset from live/backend geometry (the same catch/setup spot
+    # the UESS step emitters render the drive from), NOT the legacy
+    # `capture_fast_break_animation` packet. The animation packet's shooter `end`
+    # is a rim-relative random rebounder spot (or a `player.coords` fallback) that
+    # already diverges from the rendered drive, which desynced resolver geometry
+    # (phantom stops / wrong-spot shots) from the animation.
+    bh_start = _drive_onset_coord(fb_roles, shooter)
     bh_pos = _lineup_pos(off_lineup, shooter)
     target = dict(shot_spot) if shot_spot else _compute_bh_target(is_away_offense)
     # Seed the drive-cutoff race from defenders' LIVE positions (end-of-DREB /

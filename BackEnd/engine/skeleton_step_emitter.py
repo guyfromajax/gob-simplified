@@ -29,6 +29,7 @@ from BackEnd.constants import (
     BANK_MAKE_SETTLE_GAME_SECONDS,
     BANK_MISS_GRAZE_GAME_SECONDS,
     BOUNCE_STEP_GAME_SECONDS,
+    FINAL_TURN_HANDOFF_CONVERGE_GRID,
     HCO_STEP_T_FLOOR_GAME_SECONDS,
     HOME_RIM_COORDS,
     MADE_SHOT_SWEET_SPOT_AWAY_RIM,
@@ -351,7 +352,7 @@ def _final_turn_skeleton_bh_id(
     return None
 
 
-def _append_final_turn_entry_pass_if_needed(
+def _prepend_final_turn_handoff_if_needed(
     *,
     steps: List[AnimationStep],
     turn_result: Dict[str, Any],
@@ -359,49 +360,94 @@ def _append_final_turn_entry_pass_if_needed(
     skeleton_steps: List[Dict[str, Any]],
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
+    animations: List[Dict[str, Any]],
+    is_away_offense: bool,
     clock_remaining_at_turn_start: float,
     shot_clock_remaining_at_turn_start: float,
     elapsed_so_far: float,
 ) -> float:
-    """After Final Turn alignment (schema step 0), pass from the live prior-turn
-    owner to the skeleton ball handler when they differ (e.g. PG holds after SIP
-    but the skeleton drew SF/SG as BH). Uses the universal ``build_pass_step``
-    helper at ``PASS_GRID_SPOTS_PER_GAME_SECOND``.
+    """HANDOFF-FIRST: BEFORE Final Turn alignment, deliver the ball to the PG (the
+    Final Turn BH) when he did not hold it entering the turn — the same
+    ``build_handoff_step`` primitive HCO uses. The PG sprints from his pre-alignment
+    spot to within ``FINAL_TURN_HANDOFF_CONVERGE_GRID`` grid of the live handler and
+    receives the pass; the following alignment step then tweens everyone to their
+    Final Shot spots (the PG drifts from the handoff point to his BH spot — no
+    zig-zag). Non-key players drift toward their alignment spots during the handoff
+    (``setup_coords``) so the seam into alignment is continuous. Emits 2 sub-steps
+    (converge, pass), prepended before ``skeleton_base_index`` so the skeleton
+    "next" indices need no offset.
+
+    Self-skips (returns unchanged) when: not a Final Turn, or the skeleton BH
+    already holds the ball (``prior_owner == bh_id``). The latter is true in BOTH
+    pg_direct (BH is the PG who had it) and skip_handoff (the live handler IS the
+    skeleton BH) modes — so no flag gating is needed to suppress the handoff there.
     """
-    if not turn_result.get("final_turn") or not steps or not isinstance(prior_turn, dict):
-        return elapsed_so_far
-    if turn_result.get("final_turn_include_entry_pass") is False:
+    if not turn_result.get("final_turn") or not isinstance(prior_turn, dict):
         return elapsed_so_far
     prior_owner = _resolve_prior_ball_handler_id(prior_turn, turn_result)
     bh_id = _final_turn_skeleton_bh_id(skeleton_steps, off_lineup)
     if not prior_owner or not bh_id or str(prior_owner) == str(bh_id):
         return elapsed_so_far
-    from BackEnd.utils.transition_bridge import build_pass_step
+    # Delivery is driven by the emitter's own ``prior_owner != skeleton BH`` view —
+    # NOT the pacing ``include_entry_pass`` flag (its resolver can diverge when
+    # ``final_ball_handler_id`` is unstamped; gating here could drop a needed
+    # delivery). Fire regardless; log when the flag disagreed so it stays observable.
+    if turn_result.get("final_turn_include_entry_pass") is False:
+        import logging as _handoff_log
+
+        _handoff_log.warning(
+            "🎯 [FINAL TURN HANDOFF] include_entry_pass=False but emitter resolved "
+            "prior_owner=%s ≠ PG=%s — firing handoff anyway (ball delivery wins over "
+            "budget; shot may land a beat late).",
+            prior_owner,
+            bh_id,
+        )
+    from BackEnd.utils.transition_bridge import build_handoff_step
+
+    # Start from where players are just before alignment: the last prepended step's
+    # end (e.g. a walk-up), else the prior turn's final coords.
+    if steps:
+        start_coords = dict(steps[-1]["end"]["coords"])
+    else:
+        start_coords = _normalize_player_coord_map((prior_turn or {}).get("final_coords") or {})
+    if not start_coords or str(prior_owner) not in start_coords or str(bh_id) not in start_coords:
+        return elapsed_so_far
+    setup_coords = _coords_at_movement_index(animations, 0) or None
 
     clock_r = clock_remaining_at_turn_start - elapsed_so_far
     shot_r = shot_clock_remaining_at_turn_start - elapsed_so_far
+    base = len(steps)
     try:
-        entry_index = len(steps)
-        skeleton_step_one_index = entry_index + 1
-        entry = build_pass_step(
+        handoff_steps = build_handoff_step(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
-            start_coords=steps[-1]["end"]["coords"],
-            passer_id=str(prior_owner),
+            start_coords=start_coords,
+            bh_id=str(prior_owner),
             receiver_id=str(bh_id),
+            is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_r,
             shot_clock_remaining_at_start=shot_r,
-            next_step_index=skeleton_step_one_index,
+            next_step_index=base,
             pass_speed_grid_per_game_sec=float(PASS_GRID_SPOTS_PER_GAME_SECOND),
-            metadata_reason="final_turn_entry_pass",
+            metadata_reason="final_turn_handoff",
+            converge_radius_grid=float(FINAL_TURN_HANDOFF_CONVERGE_GRID),
+            setup_coords=setup_coords,
         )
     except ValueError:
         return elapsed_so_far
-    entry.setdefault("start", {})["ball_motion_style"] = "pass"
-    # Defensive: ``build_pass_step`` must not point back at this step.
-    entry["end"]["next"] = {"kind": "next_step", "index": skeleton_step_one_index}
-    steps.append(entry)
-    return elapsed_so_far + float(entry["end"]["time_elapsed"])
+    if not handoff_steps:
+        return elapsed_so_far
+    added = 0.0
+    for k, hs in enumerate(handoff_steps):
+        # Chain sub-steps consecutively; the last points at the (soon-to-be-emitted)
+        # skeleton step 0 (alignment), which lands right after the handoff block.
+        hs["end"]["next"] = {"kind": "next_step", "index": base + k + 1}
+        added += float(hs["end"]["time_elapsed"])
+    # The final sub-step is the pass (ownership transfers there) — tween the ball
+    # at the canonical pass rate.
+    handoff_steps[-1].setdefault("start", {})["ball_motion_style"] = "pass"
+    steps.extend(handoff_steps)
+    return elapsed_so_far + added
 
 
 def _append_final_turn_walkup_if_needed(
@@ -991,7 +1037,7 @@ def build_skeleton_animation_steps(
 
     steps: List[AnimationStep] = []
     elapsed_so_far = 0.0
-    final_turn_entry_inserted = 0
+    final_turn_handoff_prepended = 0
     final_turn_walkup_prepended = 0
 
     # =========================================================================
@@ -1337,15 +1383,37 @@ def build_skeleton_animation_steps(
             final_turn_walkup_prepended = 1
             hco_seed_coords = None
 
-    # All prepended steps (Reset, Final Turn walk-up) shift skeleton indices in
-    # the emitted ``animation_steps`` array. Capture once here — walk-up is
-    # appended after ``reset_count`` is set above.
+        # HANDOFF-FIRST: after any walk-up, deliver the ball to the PG when the live
+        # handler differs (handoff / best-effort modes). Self-skips in pg_direct and
+        # skip_handoff (the skeleton BH already holds the ball). Prepended here so it
+        # precedes alignment and is counted by ``skeleton_base_index`` below.
+        before_handoff = len(steps)
+        elapsed_so_far = _prepend_final_turn_handoff_if_needed(
+            steps=steps,
+            turn_result=turn_result,
+            prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
+            skeleton_steps=skeleton_steps,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            animations=animations,
+            is_away_offense=away_offense,
+            clock_remaining_at_turn_start=clock_remaining_at_turn_start,
+            shot_clock_remaining_at_turn_start=shot_clock_remaining_at_turn_start,
+            elapsed_so_far=elapsed_so_far,
+        )
+        if len(steps) > before_handoff:
+            final_turn_handoff_prepended = 1
+            hco_seed_coords = None
+
+    # All prepended steps (Reset, Final Turn walk-up, Final Turn handoff) shift
+    # skeleton indices in the emitted ``animation_steps`` array. Capture once here —
+    # prepends are appended after ``reset_count`` is set above.
     skeleton_base_index = len(steps)
 
     for i in range(num_steps):
         # When Reset or Final Turn walk-up prepended, skeleton step 0's start
         # coords = prior prepended step end coords.
-        if i == 0 and (reset_count > 0 or final_turn_walkup_prepended) and steps:
+        if i == 0 and (reset_count > 0 or final_turn_walkup_prepended or final_turn_handoff_prepended) and steps:
             start_coords = dict(steps[-1]["end"]["coords"])
         elif i == 0 and flss_seed_coords:
             anim_step0 = _coords_at_movement_index(animations, i)
@@ -1441,22 +1509,23 @@ def build_skeleton_animation_steps(
             else {"owner_player_id": bh_id_fallback}
         )
 
-        # Final Turn step 0: keep the live prior-turn ball owner on the ball
-        # through alignment + clock hold. Do not transfer to the skeleton BH
-        # here — ``_append_final_turn_entry_pass_if_needed`` emits a canonical
-        # pass step when prior owner ≠ BH (e.g. SIP receiver SG → BH PG).
+        # Final Turn step 0 (alignment): the ball is on the SKELETON BH. In handoff /
+        # best-effort modes the handoff-first prepend already delivered it to the PG
+        # before this step; in pg_direct / skip_handoff the skeleton BH held it all
+        # along. Either way, pin step 0's owner to the skeleton BH so the ball flows
+        # continuously from the (prepended) handoff's end into alignment.
         if (
             i == 0
             and reset_count == 0
             and turn_result.get("final_turn")
             and isinstance(prior_turn, dict)
         ):
-            prior_owner = _resolve_prior_ball_handler_id(prior_turn, turn_result)
-            if prior_owner:
-                ball_start = {"owner_player_id": prior_owner}
-                ball_end = {"owner_player_id": prior_owner}
-                owner_id_start = prior_owner
-                owner_id_end = prior_owner
+            ft_bh_id = _final_turn_skeleton_bh_id(skeleton_steps, off_lineup)
+            if ft_bh_id:
+                ball_start = {"owner_player_id": ft_bh_id}
+                ball_end = {"owner_player_id": ft_bh_id}
+                owner_id_start = ft_bh_id
+                owner_id_end = ft_bh_id
 
         # Detect pass step (ball ownership transfer) early — used both by
         # gate selection (FCP) and by the later ball_motion_style /
@@ -1654,14 +1723,13 @@ def build_skeleton_animation_steps(
             )
 
         # Next pointer: linear i+1 except final step (branches on result_type).
-        # When Reset is prepended, shift skeleton step indices by reset_count
-        # so the chain references the final steps array correctly.
+        # All prepends (Reset, Final Turn walk-up + handoff) are already absorbed by
+        # ``skeleton_base_index``, so no per-step offset is needed.
         next_step: NextStep
         if i < num_steps - 1:
-            entry_offset = final_turn_entry_inserted if i > 0 else 0
             next_step = {
                 "kind": "next_step",
-                "index": skeleton_base_index + i + 1 + entry_offset,
+                "index": skeleton_base_index + i + 1,
             }
         else:
             next_step = _resolve_final_step_next(turn_result)
@@ -1775,22 +1843,6 @@ def build_skeleton_animation_steps(
         )
         steps.append(step)
         elapsed_so_far += t
-
-        if i == 0 and reset_count == 0 and turn_result.get("final_turn"):
-            before_len = len(steps)
-            elapsed_so_far = _append_final_turn_entry_pass_if_needed(
-                steps=steps,
-                turn_result=turn_result,
-                prior_turn=prior_turn,
-                skeleton_steps=skeleton_steps,
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                clock_remaining_at_turn_start=clock_remaining_at_turn_start,
-                shot_clock_remaining_at_turn_start=shot_clock_remaining_at_turn_start,
-                elapsed_so_far=elapsed_so_far,
-            )
-            if len(steps) > before_len:
-                final_turn_entry_inserted = 1
 
     # Post-shot positioning. For MAKE/MISS/BLOCK results, build schema-pure
     # [ball_flight] (+ [bounce] for miss/block) sub-steps that follow the

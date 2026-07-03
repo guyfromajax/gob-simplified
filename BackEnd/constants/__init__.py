@@ -255,6 +255,11 @@ FB_PASS_GRID_SPOTS_PER_GAME_SECOND = 40
 FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY = 30  # FB outlet pass when outlet_score < threshold
 FB_OUTLET_QUALITY_THRESHOLD = 50                # sharp/sloppy split on fb_roles["outlet_score"]
 FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (short passes still register)
+# Final Turn handoff: when the PG (always the Final Turn BH) didn't hold the ball
+# entering the turn, the PG sprints up to this many grid (Euclidean) to meet the
+# live handler for a quick converge+pass handoff (reuses build_handoff_step). Also
+# the upper bound the pacing uses to size the handoff for the fit-or-FLSS gate.
+FINAL_TURN_HANDOFF_CONVERGE_GRID = 6.0
 
 # Universal Fast Break shot geometry feature flags. When True, the FB
 # resolver replaces its legacy shot location + shot defender selection +
@@ -264,7 +269,9 @@ FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (sho
 # intentionally untouched. See:
 #   _documentation_master/00_General_Systems/Step_By_Step_System.md
 #   _documentation_master/05_GP_Supporting_Systems/Fast_Break_System.md
-USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR = True
+# NOTE: the RR flag was retired (UESS Phase 4) — Rim Runner now resolves its
+# shot spot via the drive resolver + rim-relative `_compute_bh_target`; the
+# legacy `_apply_universal_geometry_for_rr_shot` adapter was removed.
 USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR = True
 
 # FB Drive Cutoff & Stop Decision — per-play rollout (see FB_Drive_Cutoff_Work_Plan.md)

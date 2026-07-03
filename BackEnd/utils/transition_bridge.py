@@ -87,12 +87,14 @@ def _lane_spot_coords(spot_label: str, is_away_offense: bool) -> GridCoord:
     return {"x": x, "y": y}
 
 
-def _pick_pg_receive_target(bh_coord: GridCoord, is_away_offense: bool) -> GridCoord:
-    """Random point within 10 grid Euclidean of BH. Court-bounds clamped
-    and over-and-back enforced: when BH is at-or-past midcourt in the
-    attacking direction, PG cannot be behind midcourt."""
+def _pick_pg_receive_target(
+    bh_coord: GridCoord, is_away_offense: bool, radius_grid: float = 10.0
+) -> GridCoord:
+    """Random point within ``radius_grid`` grid Euclidean of BH (default 10).
+    Court-bounds clamped and over-and-back enforced: when BH is at-or-past
+    midcourt in the attacking direction, PG cannot be behind midcourt."""
     angle = random.uniform(0.0, 2.0 * math.pi)
-    radius = random.uniform(0.0, 10.0)
+    radius = random.uniform(0.0, float(radius_grid))
     x = float(bh_coord["x"]) + radius * math.cos(angle)
     y = float(bh_coord["y"]) + radius * math.sin(angle)
     x = max(0.0, min(100.0, x))
@@ -431,6 +433,7 @@ def build_handoff_step(
     pass_speed_grid_per_game_sec: float = float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND),
     metadata_reason: str = "handoff",
     setup_coords: Optional[Dict[str, GridCoord]] = None,
+    converge_radius_grid: float = 10.0,
 ) -> List[AnimationStep]:
     """Universal handoff beat — BH delivers ball to ``receiver_id`` (PG).
 
@@ -493,7 +496,9 @@ def build_handoff_step(
         return [hold_step]
 
     bh_coord = start_coords[bh_id]
-    pg_target = _pick_pg_receive_target(bh_coord, is_away_offense)
+    pg_target = _pick_pg_receive_target(
+        bh_coord, is_away_offense, radius_grid=converge_radius_grid
+    )
 
     step_a = _build_handoff_converge_substep(
         off_lineup=off_lineup,

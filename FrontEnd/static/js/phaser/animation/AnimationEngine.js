@@ -605,12 +605,13 @@ export class AnimationEngine {
 
       // SS&S animation refactor: HCO, HCT, and DREB turns route through
       // the unified step-based playback engine when their backend payload
-      // carries `animation_steps`. FAST_BREAK is gated per-variant to avoid
-      // routing un-migrated variants (Triangle / After Steal) through the
-      // new engine prematurely — currently Covert Release and Rim Runner
-      // are migrated. Other turn types fall through to the legacy handler
-      // dispatch below. See:
-      // _documentation_master/projects/Animation_System_Updated.md
+      // carries `animation_steps`. All FAST_BREAK variants (Covert Release,
+      // Rim Runner, Triangle, After Steal) are migrated and route through the
+      // new engine when `animation_steps` is present; a variant only falls
+      // through to the legacy handler if its backend emitter returned None
+      // (logged backend-side as … EMITTER NULL). Other turn types fall
+      // through to the legacy handler dispatch below. See:
+      // _documentation_master/projects/FB_UESS_Migration.md
       const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle", "after_steal"]);
       const isMigratedFbVariant =
         turnData?.current_turn === "FAST_BREAK"

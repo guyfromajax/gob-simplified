@@ -2459,11 +2459,22 @@ def build_rim_runner_animation_steps(
     the legacy renderer.
     """
     if turn_result.get("fast_break_play") != "rim_runner":
+        logging.warning(
+            "🚨 [RR EMITTER NULL] guard=fast_break_play_mismatch "
+            "fast_break_play=%s result_type=%s — FE will fall to LEGACY_HANDLER",
+            turn_result.get("fast_break_play"), turn_result.get("result_type"),
+        )
         return None
 
     fb_roles = turn_result.get("roles") or {}
     burst_phase = fb_roles.get("rim_runner_burst_phase")
     if not burst_phase:
+        logging.warning(
+            "🚨 [RR EMITTER NULL] guard=missing_burst_phase result_type=%s "
+            "fb_roles_keys=%s — FE will fall to LEGACY_HANDLER",
+            turn_result.get("result_type"),
+            list(fb_roles.keys()) if isinstance(fb_roles, dict) else None,
+        )
         return None
 
     off_team = getattr(game, "offense_team", None)
@@ -2476,6 +2487,11 @@ def build_rim_runner_animation_steps(
 
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
+        logging.warning(
+            "🚨 [RR EMITTER NULL] guard=empty_start_coords result_type=%s "
+            "— FE will fall to LEGACY_HANDLER",
+            turn_result.get("result_type"),
+        )
         return None
 
     game_state = getattr(game, "game_state", {}) or {}

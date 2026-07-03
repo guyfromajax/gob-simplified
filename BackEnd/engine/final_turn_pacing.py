@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
     FB_PASS_MIN_GAME_SECONDS,
+    FINAL_TURN_HANDOFF_CONVERGE_GRID,
     HCO_STRING_SPOTS,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
 )
@@ -43,15 +44,22 @@ def _late_target(shot_type: str, anchor_clock: Optional[float] = None) -> float:
 
 @dataclass
 class FinalTurnPacingPlan:
-    can_meet_anchor: bool
-    step0_hold_floor: float
-    include_entry_pass: bool
+    can_meet_anchor: bool          # BASE Final Shot (NO handoff) meets the anchor → the FLSS gate
+    step0_hold_floor: float        # hold floor for the no-handoff path (pg_direct / skip_handoff)
+    include_entry_pass: bool       # a handoff is NEEDED (the PG wasn't the live handler)
     include_walkup: bool
     anchor_clock: float
     walkup_seconds: float
     alignment_seconds: float
     entry_pass_seconds: float
     pre_anchor_move_seconds: float
+    # Dual verdict: whether the handoff ALSO fits on top of the base Final Shot.
+    #   include_entry_pass=False               → pg_direct (PG already had it)
+    #   handoff_fits=True                      → handoff mode (bh=PG, deliver via handoff)
+    #   handoff_fits=False AND can_meet_anchor → skip_handoff (bh=live handler, PG↔handler swap)
+    #   can_meet_anchor=False                  → FLSS / best-effort
+    handoff_fits: bool = True
+    step0_hold_floor_with_handoff: float = 0.0  # hold floor when the handoff is included
     reason: str = ""
 
 
@@ -283,27 +291,51 @@ def _estimate_entry_pass_seconds(
     skeleton_bh_id: Optional[str],
     alignment_coords_by_id: Dict[str, Dict[str, float]],
 ) -> Tuple[float, bool]:
+    """Estimate the Final Turn HANDOFF cost (converge + short pass) when the PG
+    (always the Final Turn BH) did not hold the ball entering the turn — the
+    handoff-first beat that gets the ball to the PG before alignment. Mirrors the
+    real emitted movement: the PG sprints from his **prior** (pre-alignment) spot
+    to meet the live handler, then a short pass. Returns ``(seconds, needs_handoff)``.
+    The ``include_entry_pass`` / ``entry_pass`` names downstream now denote this
+    handoff. NOTE the converge is the *full travel* to the handler — NOT capped at
+    the 6-grid receive radius — so the budget reflects the true positioning cost
+    (see EOQ_System.md). Falls back to alignment coords when prior coords are absent."""
     prior_owner = _prior_ball_handler_id(prior_turn)
     if not prior_owner or not skeleton_bh_id or str(prior_owner) == str(skeleton_bh_id):
         return 0.0, False
-    passer_coord = alignment_coords_by_id.get(str(prior_owner))
-    receiver_coord = alignment_coords_by_id.get(str(skeleton_bh_id))
-    if not passer_coord or not receiver_coord:
-        return 0.0, True
     off_lineup = game.offense_team.lineup
-    receiver = None
+    pg_player = None
     for pos in ("PG", "SG", "SF", "PF", "C"):
         if _player_id_at_pos(off_lineup, pos) == str(skeleton_bh_id):
-            receiver = off_lineup.get(pos)
+            pg_player = off_lineup.get(pos)
             break
-    if not receiver:
+    if not pg_player:
         return 0.0, True
-    dist = _euclid(passer_coord, receiver_coord)
-    seconds = max(
+    # Real converge travel: PG's prior spot → the live handler's prior spot. This is
+    # the movement-into-position the handoff actually costs (the players must close
+    # the gap before the ≤1s pass). Prior coords come from prior_turn.final_coords;
+    # fall back to the alignment map when unavailable.
+    prior_coords = (prior_turn or {}).get("final_coords") or {}
+
+    def _prior_xy(pid: str) -> Optional[Dict[str, float]]:
+        c = prior_coords.get(str(pid)) or prior_coords.get(pid)
+        if isinstance(c, dict) and "x" in c and "y" in c:
+            return {"x": float(c["x"]), "y": float(c["y"])}
+        return alignment_coords_by_id.get(str(pid))
+
+    pg_xy = _prior_xy(str(skeleton_bh_id))
+    handler_xy = _prior_xy(str(prior_owner))
+    if pg_xy and handler_xy:
+        converge_dist = _euclid(pg_xy, handler_xy)
+    else:
+        converge_dist = float(FINAL_TURN_HANDOFF_CONVERGE_GRID)
+    sprint_rate = _ag_grid_per_game_sec(pg_player, "sprint")
+    converge_seconds = float(converge_dist) / max(1e-6, float(sprint_rate))
+    pass_seconds = max(
         float(FB_PASS_MIN_GAME_SECONDS),
-        dist / float(PASS_GRID_SPOTS_PER_GAME_SECOND),
+        float(FINAL_TURN_HANDOFF_CONVERGE_GRID) / float(PASS_GRID_SPOTS_PER_GAME_SECOND),
     )
-    return seconds, True
+    return converge_seconds + pass_seconds, True
 
 
 def _estimate_pre_anchor_move_seconds(
@@ -504,55 +536,41 @@ def evaluate_final_turn_pacing(
         position_to_spot=position_to_spot,
     )
 
-    fixed_before_hold = walkup_seconds + entry_seconds + pre_anchor_move
-    step0_budget = time_remaining - fixed_before_hold - anchor
+    # Two budgets. A path "fits" when its fixed pre-anchor cost + alignment + anchor
+    # ≤ time_remaining (i.e. step0_budget ≥ alignment_seconds); the hold floor is the
+    # leftover slack. base = Final Shot WITHOUT the handoff; handoff = with it.
+    def _fits_and_hold(fixed_before_hold: float) -> Tuple[bool, float]:
+        step0_budget = time_remaining - fixed_before_hold - anchor
+        fits = step0_budget >= alignment_seconds - 1e-6
+        return fits, (max(0.0, step0_budget) if fits else 0.0)
 
-    if step0_budget < alignment_seconds - 1e-6:
-        return FinalTurnPacingPlan(
-            can_meet_anchor=False,
-            step0_hold_floor=0.0,
-            include_entry_pass=needs_entry,
-            include_walkup=include_walkup,
-            anchor_clock=anchor,
-            walkup_seconds=walkup_seconds,
-            alignment_seconds=alignment_seconds,
-            entry_pass_seconds=entry_seconds,
-            pre_anchor_move_seconds=pre_anchor_move,
-            reason="insufficient_time_for_alignment_and_anchor",
-        )
+    base_fixed = walkup_seconds + pre_anchor_move
+    base_fits, base_hold = _fits_and_hold(base_fixed)
+    if needs_entry:
+        handoff_fits, handoff_hold = _fits_and_hold(base_fixed + entry_seconds)
+    else:
+        handoff_fits, handoff_hold = base_fits, base_hold
 
-    hold_floor = max(0.0, step0_budget)
-    step0_duration = max(alignment_seconds, hold_floor)
-    clock_at_anchor = time_remaining - walkup_seconds - step0_duration - entry_seconds - pre_anchor_move
-    can_meet = math.isclose(clock_at_anchor, anchor, abs_tol=ANCHOR_TOLERANCE_SEC) or clock_at_anchor >= anchor - ANCHOR_TOLERANCE_SEC
-
-    include_entry_pass = needs_entry
-
-    if not can_meet:
-        return FinalTurnPacingPlan(
-            can_meet_anchor=False,
-            step0_hold_floor=hold_floor,
-            include_entry_pass=include_entry_pass,
-            include_walkup=include_walkup,
-            anchor_clock=anchor,
-            walkup_seconds=walkup_seconds,
-            alignment_seconds=alignment_seconds,
-            entry_pass_seconds=entry_seconds,
-            pre_anchor_move_seconds=pre_anchor_move,
-            reason="anchor_unreachable",
-        )
+    if not base_fits:
+        reason = "insufficient_time_for_alignment_and_anchor"
+    elif needs_entry and not handoff_fits:
+        reason = "handoff_skipped_base_fits"  # → skip_handoff (bh = live handler)
+    else:
+        reason = "ok"
 
     return FinalTurnPacingPlan(
-        can_meet_anchor=True,
-        step0_hold_floor=hold_floor,
-        include_entry_pass=include_entry_pass,
+        can_meet_anchor=base_fits,
+        step0_hold_floor=base_hold,
+        include_entry_pass=needs_entry,
         include_walkup=include_walkup,
         anchor_clock=anchor,
         walkup_seconds=walkup_seconds,
         alignment_seconds=alignment_seconds,
         entry_pass_seconds=entry_seconds,
         pre_anchor_move_seconds=pre_anchor_move,
-        reason="ok",
+        handoff_fits=bool(handoff_fits),
+        step0_hold_floor_with_handoff=handoff_hold,
+        reason=reason,
     )
 
 
