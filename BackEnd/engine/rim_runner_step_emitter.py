@@ -299,6 +299,21 @@ def _rr_payload_archetype(phase: Dict[str, Any]) -> PlayerArchetype:
     return raw if raw in ("burst", "sprint") else "sprint"
 
 
+def _rr_post_burst_archetype(phase: Dict[str, Any]) -> PlayerArchetype:
+    """Post-burst RR pace for the lane-pass receive/drive.
+
+    The ``burst`` archetype (``BURST_GRID_PER_GAME_SEC`` = 32 g/s) is the peak
+    explosive START only — Step 0's fixed one-game-second advance. It must NOT
+    carry into the lane-pass step or the RR jets to the rim while receiving the
+    pass. Decelerate ``burst`` → ``sprint`` here, mirroring the
+    ``rr_archetype_override="sprint"`` the normal outlet-pass path applies
+    (``triangle_step_emitter``). ``skip_outlet_pass`` turns bypass that outlet
+    step, which is how the burst rate leaked into the lane pass / drive.
+    """
+    payload = _rr_payload_archetype(phase)
+    return "sprint" if payload == "burst" else payload
+
+
 def _stamp_tween_durations(
     start: StepStart,
     end_coords: Dict[str, GridCoord],
@@ -991,7 +1006,7 @@ def _build_lane_pass_step(
             "x": float(rr_to.get("x", rr_coord["x"])),
             "y": float(rr_to.get("y", rr_coord["y"])),
         }
-        rr_archetype = _rr_payload_archetype(phase)
+        rr_archetype = _rr_post_burst_archetype(phase)
         rr_rate = _ag_grid_per_game_sec(rr_player, rr_archetype)
         meet_point = _compute_pass_meet_point(
             bh_coord,
@@ -1023,7 +1038,7 @@ def _build_lane_pass_step(
     actions[bh_id] = "pass"
     actions[rr_id] = "receive"
     if lead_pass:
-        archetype[rr_id] = _rr_payload_archetype(phase)
+        archetype[rr_id] = _rr_post_burst_archetype(phase)
         destinations[rr_id] = dict(catch_grid)
         end_coords[rr_id] = dict(meet_point)
     else:

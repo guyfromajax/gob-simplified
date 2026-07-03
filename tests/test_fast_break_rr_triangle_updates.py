@@ -362,6 +362,50 @@ def test_lane_pass_step_lead_pass_moves_help_defenders():
     assert step["start"]["advance_trigger"]["condition"] == "ball_reaches_player"
 
 
+def test_lane_pass_step_decelerates_rr_burst_to_sprint():
+    """Regression: on skip_outlet_pass turns the RR never hits the outlet-pass
+    ``rr_archetype_override="sprint"``, so a ``burst`` payload used to leak into
+    the lane pass and jet the RR to the rim (~32 g/s). The lane-pass builder
+    must cap the RR at ``sprint`` regardless of the burst payload."""
+    off = {
+        "PG": _player("bh", 45, 15, ag=50, iq=80, ch=80),
+        "PF": _player("rr", 60, 30, ag=80, iq=80, ch=80),
+    }
+    deff = {}
+    start_coords = {
+        "bh": {"x": 45.0, "y": 15.0},
+        "rr": {"x": 60.0, "y": 30.0},
+    }
+    fb_roles = {
+        "rim_runner_burst_phase": {
+            "outlet_receiver_id": "bh",
+            "rr_id": "rr",
+            "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "burst"},
+            "fb_efficiency": 0,
+        },
+    }
+    turn_result = {"fast_break_play": "triangle", "rim_runner_pass_attempted": True}
+
+    with __import__("unittest").mock.patch(
+        "BackEnd.engine.rim_runner_step_emitter._calculate_lane_pass_raw_score",
+        return_value=float(LANE_PASS_LEAD_RAW_THRESHOLD + 1),
+    ):
+        step = _build_lane_pass_step(
+            turn_result=turn_result,
+            fb_roles=fb_roles,
+            off_lineup=off,
+            def_lineup=deff,
+            step_start_coords=start_coords,
+            is_away_offense=False,
+            clock_remaining_at_start=400.0,
+            shot_clock_remaining_at_start=24.0,
+            next_step_index=3,
+        )
+
+    assert step is not None
+    assert step["start"]["archetype"]["rr"] == "sprint"
+
+
 def test_lane_pass_step_no_lead_passes_to_rr_start():
     off = {"PG": _player("bh", 45, 15), "PF": _player("rr", 60, 30)}
     deff = {}
