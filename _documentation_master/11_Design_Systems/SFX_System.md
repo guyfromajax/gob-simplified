@@ -150,9 +150,10 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 **Final Shot Announce**
 
-- Trigger: immediately when the **Final Shot** secondary announce appears.
+- Trigger: immediately when the **Final Shot** secondary announce appears (true Final Turn shots only).
 - File: **50/50** random each show — `sammy-final-shot.mp3` or `final-shot-braddock.mp3`
-- **Once per quarter:** the stinger plays at most once per period. If it already fired on the structured Final Turn possession, a follow-up FLSS after BIP (late-clock make) still shows the headline but **does not** replay the SFX (`resolveSecondaryAnnounceCourtSfxFile` in `gameSfx.js`).
+- **Once per quarter:** the stinger plays at most once per period. If it already fired on the structured Final Turn possession, a follow-up shot still shows the headline but **does not** replay the SFX (`resolveSecondaryAnnounceCourtSfxFile` in `gameSfx.js`).
+- **FLSS disengaged (2026-07-03):** the Final Shot stinger is suppressed for **all FLSS instances**. FLSS attempts (`turn.flss === true`) still show the **Final Shot** headline but pass `suppressCourtSfx` (in `turnPreparation.js`), so the stinger never fires — FLSS carries its own heave/launch coach VO instead (see **FLSS Coach VO** / `playFlssVoSfx`). `suppress_final_shot_sfx` from the backend also still suppresses repeat Final Turn stingers.
 
 **Block Announce**
 

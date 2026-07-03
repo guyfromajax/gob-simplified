@@ -1289,19 +1289,44 @@ def _build_step_back_step(
     return {"start": start, "end": end}
 
 
+def _ball_crossed_midcourt_toward_basket(
+    ball_spot: Optional[Dict[str, Any]],
+    is_away_offense: bool,
+) -> bool:
+    """Whether the ball has advanced past midcourt (x=50) toward the offense's
+    basket. Home offense attacks the ``x >= 50`` half; away offense attacks the
+    ``x <= 50`` half. Fails open (returns ``True``) when the ball spot is
+    unavailable so a missing coordinate never silently swallows the callout.
+    """
+    if not isinstance(ball_spot, dict):
+        return True
+    try:
+        x = float(ball_spot.get("x"))
+    except (TypeError, ValueError):
+        return True
+    return x <= 50.0 if is_away_offense else x >= 50.0
+
+
 def _build_nice_stop_announcement(
     turn_result: Dict[str, Any],
     fb_roles: Dict[str, Any],
     def_lineup: Dict[str, Any],
     is_away_offense: bool,
-) -> Announcement:
+    ball_spot: Optional[Dict[str, Any]] = None,
+) -> Optional[Announcement]:
     """``"Great Stop!"`` announcement payload for the end of the defensive-stop
     motion step. Backend is the single source of truth: stamps the final text,
     resolves the defending team to ``home``/``away`` (so the FE secondary
     overlay can color the stripe via ``gameStore.getColors()``), and carries
     the stinger SFX via ``meta.sfx`` per SFX_System.md §FB Defensive
     Stop Announce. FE drops its legacy "Nice Stop!" text-rewrite branch.
+
+    Returns ``None`` (no callout, no stinger, no hold) when the ball has not
+    crossed midcourt toward the offense's basket — a celebratory "Great Stop!"
+    is reserved for stops after the ball advanced into the attacking half.
     """
+    if not _ball_crossed_midcourt_toward_basket(ball_spot, is_away_offense):
+        return None
     stopper_id = turn_result.get("stopper_id") or fb_roles.get("stopper_id")
     stopper = _player_lookup_by_id({}, def_lineup, stopper_id) if stopper_id else None
     player_data: Optional[Dict[str, Any]] = None
@@ -1483,9 +1508,16 @@ def build_covert_release_animation_steps(
     # `turn_stop` next pointer set by `_resolve_outcome_next`.
     result_type = (turn_result.get("result_type") or "").upper()
     if result_type == "DEFENSIVE_STOP":
-        outcome_step["end"]["announcement"] = _build_nice_stop_announcement(
-            turn_result, fb_roles, def_lineup, is_away_offense
+        # Ball spot at the stop = ball owner's end coord on the outcome step;
+        # gate the "Great Stop!" callout on it crossing midcourt (x=50).
+        stop_ball_spot = (outcome_step["end"].get("coords") or {}).get(
+            ball_owner_for_outcome
         )
+        stop_ann = _build_nice_stop_announcement(
+            turn_result, fb_roles, def_lineup, is_away_offense, ball_spot=stop_ball_spot
+        )
+        if stop_ann is not None:
+            outcome_step["end"]["announcement"] = stop_ann
 
     # Re-canonicalize the post-shot overlay maps now that `fb_roles` (which
     # includes `outlet_passer`) is attached to turn_result. shot_manager

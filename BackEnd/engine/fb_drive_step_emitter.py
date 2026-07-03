@@ -173,8 +173,11 @@ def build_fb_drive_resolution_steps(
             )
         end_ann = None
         if result_type == "DEFENSIVE_STOP":
+            # Gate the "Great Stop!" callout on the ball handler's stop spot
+            # (meet_target) crossing midcourt (x=50) toward the basket.
             end_ann = _build_nice_stop_announcement(
-                turn_result, fb_roles, def_lineup, is_away_offense
+                turn_result, fb_roles, def_lineup, is_away_offense,
+                ball_spot=meet_target,
             )
         meet_step = _build_meet_drive_step(
             start_coords=step_start_coords,

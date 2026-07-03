@@ -3861,8 +3861,19 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   const isHomeOffenseForStop = ballHandlerSpriteForStop?.team === 'home';
   const defenseTeamForStop = isHomeOffenseForStop ? 'away' : 'home';
 
+  // Guard: "Great Stop!" only celebrates a stop once the ball has crossed
+  // midcourt (x=50) toward the offense's basket. Home offense attacks the
+  // x>=50 half; away offense attacks the x<=50 half. Fails open (allows the
+  // callout) when the ball handler's grid position is unavailable.
+  const ballHandlerGridXForStop =
+    typeof ballHandlerSpriteForStop?.gridX === 'number' ? ballHandlerSpriteForStop.gridX : null;
+  const ballCrossedMidcourtForStop =
+    ballHandlerGridXForStop === null
+      ? true
+      : (isHomeOffenseForStop ? ballHandlerGridXForStop >= 50 : ballHandlerGridXForStop <= 50);
+
   // Rim Runner outlet denied: handled in animateRimRunnerOutletDeniedBeat + finalizeRimRunnerNonShotTurn (no Great Stop! here).
-  if (turnData.fast_break === true && turnData.stopper_id) {
+  if (turnData.fast_break === true && turnData.stopper_id && ballCrossedMidcourtForStop) {
     const { showSecondaryAnnouncement, buildSecondaryStopperPlayerData } = await import('../utils/announcements.js');
     const stopperPlayerData = buildSecondaryStopperPlayerData(scene, turnData.stopper_id, playerSprites);
     showSecondaryAnnouncement('Great Stop!', defenseTeamForStop, stopperPlayerData, {
