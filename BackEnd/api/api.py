@@ -4992,6 +4992,14 @@ try:
                 detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
             )
 
+        # Turn-by-turn playback must NEVER run under the full-sim flag: it makes the
+        # animator (skeleton_to_animations) early-return [], so turns resolve but emit
+        # zero animation_steps and don't animate. The flag is only for the full-quarter
+        # sim loop; if it ever leaked into a saved game (e.g. a full-sim that raised
+        # before its cleanup, persisted wholesale by GameManager.to_dict), clear it here
+        # so turn-by-turn playback self-heals. See also the try/finally in simulate_quarter.
+        gm.game_state.pop("_is_full_simulation", None)
+
         logging.warning(
             "🧭 [SIM TURN ENTRY TRACE] game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s offensive_state=%s turns_len=%s",
             game_id,

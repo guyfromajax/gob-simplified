@@ -891,49 +891,55 @@ def simulate_quarter(
     if not turn_by_turn_mode:
         # Set flag to indicate we're in full simulation mode (for immediate timeout handling)
         gm.game_state["_is_full_simulation"] = True
+        try:
         
-        # Safety guard: prevent infinite loops
-        max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
-        turn_count = 0
-        import time as _time
-        _loop_start = _time.time()
+            # Safety guard: prevent infinite loops
+            max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
+            turn_count = 0
+            import time as _time
+            _loop_start = _time.time()
 
-        logging.info(f"🏀 Starting full simulation of Q{gm.quarter}, initial time_remaining={gm.game_state['time_remaining']}")
+            logging.info(f"🏀 Starting full simulation of Q{gm.quarter}, initial time_remaining={gm.game_state['time_remaining']}")
         
-        while gm.game_state["time_remaining"] > 0 or _has_pending_terminal_free_throw(gm):
-            turn_count += 1
-            if turn_count > max_turns:
-                logging.error(f"🚨 Infinite loop detected! Exceeded {max_turns} turns. time_remaining={gm.game_state['time_remaining']}, quarter={gm.quarter}")
-                raise RuntimeError(f"Simulation exceeded {max_turns} turns. Possible infinite loop. time_remaining={gm.game_state['time_remaining']}")
+            while gm.game_state["time_remaining"] > 0 or _has_pending_terminal_free_throw(gm):
+                turn_count += 1
+                if turn_count > max_turns:
+                    logging.error(f"🚨 Infinite loop detected! Exceeded {max_turns} turns. time_remaining={gm.game_state['time_remaining']}, quarter={gm.quarter}")
+                    raise RuntimeError(f"Simulation exceeded {max_turns} turns. Possible infinite loop. time_remaining={gm.game_state['time_remaining']}")
             
-            previous_time = gm.game_state["time_remaining"]
+                previous_time = gm.game_state["time_remaining"]
 
-            # ⏱️ Coarse timer: sample every 10th turn and turn 1 to see macro_turn cost
-            _turn_start = _time.time()
-            # ✅ FULL SIMULATION: Timeouts are just turns - continue simulation
-            # Timeout turns are created and lineups are rebuilt, but simulation continues
-            # until time_remaining <= 0. The break logic only applies to turn-by-turn mode
-            # where the user needs to interact with the timeout.
+                # ⏱️ Coarse timer: sample every 10th turn and turn 1 to see macro_turn cost
+                _turn_start = _time.time()
+                # ✅ FULL SIMULATION: Timeouts are just turns - continue simulation
+                # Timeout turns are created and lineups are rebuilt, but simulation continues
+                # until time_remaining <= 0. The break logic only applies to turn-by-turn mode
+                # where the user needs to interact with the timeout.
 
-            gm.simulate_macro_turn()
+                gm.simulate_macro_turn()
 
-            gm.game_state["team_fouls"] = {
-                gm.home_team.name: gm.home_team.team_fouls,
-                gm.away_team.name: gm.away_team.team_fouls,
-            }
+                gm.game_state["team_fouls"] = {
+                    gm.home_team.name: gm.home_team.team_fouls,
+                    gm.away_team.name: gm.away_team.team_fouls,
+                }
             
-            gm.game_state["team_timeouts"] = {
-                gm.home_team.name: getattr(gm.home_team, 'timeouts', 4),
-                gm.away_team.name: getattr(gm.away_team, 'timeouts', 4),
-            }
+                gm.game_state["team_timeouts"] = {
+                    gm.home_team.name: getattr(gm.home_team, 'timeouts', 4),
+                    gm.away_team.name: getattr(gm.away_team, 'timeouts', 4),
+                }
             
-            # Safety check: ensure time is decreasing
-            if gm.game_state["time_remaining"] >= previous_time and turn_count > 10:
-                # logging.warning(f"⚠️ Time not decreasing! previous={previous_time}, current={gm.game_state['time_remaining']}, turn={turn_count}")
-                pass  # Don't break here, might be legitimate (e.g., fouls, timeouts)
+                # Safety check: ensure time is decreasing
+                if gm.game_state["time_remaining"] >= previous_time and turn_count > 10:
+                    # logging.warning(f"⚠️ Time not decreasing! previous={previous_time}, current={gm.game_state['time_remaining']}, turn={turn_count}")
+                    pass  # Don't break here, might be legitimate (e.g., fouls, timeouts)
         
-        # Clear full simulation flag after loop completes
-        gm.game_state.pop("_is_full_simulation", None)
+        finally:
+            # Always clear the flag — even if the loop raised (e.g. the max_turns
+            # RuntimeError above, or any simulate_macro_turn error). Otherwise it
+            # leaks into game_state, is persisted wholesale by to_dict(), and silently
+            # disables animation generation (skeleton_to_animations early-returns [])
+            # on every subsequent turn-by-turn turn of the saved game.
+            gm.game_state.pop("_is_full_simulation", None)
         
         # ✅ FIX: Clear stale timeout state after quarter completes (when simmed)
         # timeout_next_play_type should only exist during active timeout pauses, not after quarters finish

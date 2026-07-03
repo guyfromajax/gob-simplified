@@ -211,6 +211,8 @@ if (turns.length === 0 && quarter > 1) {
 - After simulation, `gm.quarter` is incremented
 - This means turns created during Q2 simulation have `quarter=1` (the quarter that was active)
 
+**⚠️ `_is_full_simulation` flag — invariant (silent failure mode):** The full-sim loop sets `game_state["_is_full_simulation"]=True` to skip work that a full sim doesn't need. Beyond timeout logic ([`Computer_Timeout_System.md`](Computer_Timeout_System.md)), it makes the **animator early-return `[]`** — `skeleton_to_animations()` returns no animations, so `build_skeleton_animation_steps()` returns `None` and the turn emits **zero `animation_steps`** (no exception, no warning). If this flag ever leaks onto a turn-by-turn/saved game (it's persisted wholesale by `GameManager.to_dict()`), turns **resolve but don't animate** — players freeze in place. Invariants that keep this safe: (1) the flag's set/clear is wrapped in `try/finally` in `simulate_quarter()` so a mid-loop error can't leak it; (2) `simulate_turn_endpoint()` clears it on entry so turn-by-turn playback self-heals. Do **not** rely on the animator's early-return as an error path — it's a deliberate perf skip.
+
 **Frontend Quarter Handling:**
 - Frontend receives `nextQuarter` (the quarter being simulated)
 - Filters turns by `nextQuarter` first, falls back to `nextQuarter - 1` if needed
