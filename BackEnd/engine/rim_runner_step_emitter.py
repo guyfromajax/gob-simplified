@@ -2242,6 +2242,42 @@ def _build_finisher_drive_resolution_steps(
                 segs = fb_drive.get("path_segment_game_seconds")
                 if segs:
                     trigger_meta["path_segment_game_seconds"] = segs
+            # Floor the drive duration to the shooter's real traversal so a
+            # short backend ``t_drive`` (computed off the ``rr_to`` datum, which
+            # can diverge from his actual rendered catch coord) can't clamp him
+            # short of the rim — UESS bakes ``end.coords`` at the interrupted
+            # position reachable within T, so a too-small T leaves him pulling
+            # up inside the arc instead of finishing. Mirrors the meet +
+            # neutral-shoot branches (the last of the three drive seams).
+            shooter_start = start_coords.get(stealer_id)
+            if shooter_start:
+                shooter_rate = _ag_grid_per_game_sec(
+                    _player_lookup_by_id(off_lineup, def_lineup, stealer_id),
+                    "standard",
+                )
+                t_drive = floor_step_t_to_traversal(
+                    t_drive, shooter_start, bh_target, shooter_rate
+                )
+                # POS_O is a curved (knot) drive whose on-screen path is longer
+                # than the straight line to ``bh_target``; floor against the
+                # knot-path length so the curve isn't jetted to hit the rim in T.
+                if (
+                    knots
+                    and fb_drive.get("outcome") == "POS_O"
+                    and shooter_rate > 0
+                ):
+                    path_len = 0.0
+                    prev = shooter_start
+                    for knot in knots:
+                        if (
+                            isinstance(knot, dict)
+                            and "x" in knot
+                            and "y" in knot
+                        ):
+                            path_len += _euclid(prev, knot)
+                            prev = knot
+                    if path_len > 1e-6:
+                        t_drive = max(t_drive, path_len / shooter_rate)
             drive_step = _build_drive_step(
                 start_coords=start_coords,
                 end_coords=end_coords,
