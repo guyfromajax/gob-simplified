@@ -411,6 +411,7 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             "text": "Clock expires with no shooter.",
             "quarter_ends_after": True,
             "flss": True,
+            "suppress_final_shot_sfx": True,  # no stinger on the degenerate no-shooter FLSS
         }
 
     from_dreb = bool(game_state.pop("flss_from_dreb", False))
@@ -510,6 +511,7 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             "shot_type": "outside",
             "is_three": points == 3,
             "flss": True,
+            "suppress_final_shot_sfx": True,  # FLSS heave VO plays instead of the stinger
             "flss_zone": zone,
             "flss_vo": flss_vo,
             "flss_heave_sfx": heave_sfx,
@@ -609,6 +611,9 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         pass
 
     result["flss"] = True
+    # FLSS already fires its own heave/launch VO (playFlssVoSfx) at ball detach, so
+    # suppress the redundant "Final Shot" announcement stinger on all FLSS turns.
+    result["suppress_final_shot_sfx"] = True
     result["flss_zone"] = zone
     result["flss_vo"] = flss_vo
     result["flss_heave_sfx"] = heave_sfx

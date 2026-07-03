@@ -1237,6 +1237,19 @@ export function createGameScene(Phaser) {
       const simData = await res.json();
       const acceptedResumeAnchorRestore =
         payload.resume_from_anchor === true && payload.consume_resume_anchor === true;
+      if (typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
+        const liveEntryParams = new URLSearchParams(window.location.search);
+        const quarterBreakFrom = liveEntryParams.get('quarter_break_from');
+        if (quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter') {
+          liveEntryParams.delete('quarter_break_from');
+          history.replaceState(null, '', `${window.location.pathname}?${liveEntryParams.toString()}`);
+          console.warn('[COURT BOOT MODE] consumed live quarter entry marker after successful quarter start', {
+            game_id: this.gameId,
+            quarter: this.quarter,
+            quarter_break_from: quarterBreakFrom,
+          });
+        }
+      }
       if (acceptedResumeAnchorRestore) {
         const firstTurn = Array.isArray(simData.turns) ? simData.turns[0] : null;
         this._skipFirstRestoredSipSetup = firstTurn?.result_type === "SIDE_INBOUND";

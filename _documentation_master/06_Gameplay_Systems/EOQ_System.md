@@ -57,7 +57,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `late_clock_eoq_chain_active` | Final Shot arms; extended during active EOQ chain | `clear_late_clock_eoq_chain()` at quarter boundary | Marks EOQ chain in progress; blocks **first** Final Shot gate only |
 | `final_turn_shot_this_turn` | Final Shot gate or follow-up runway passes | Popped when turn resolves | Routes turn to `resolve_final_turn_shot()` |
 | `final_shot_possession_active` | Same as above | Cleared after turn stamped | Internal arming guard |
-| `suppress_final_shot_sfx` | Follow-up Final Turn armed (`EOQ_FOLLOWUP_FINAL_TURN`) | Popped when turn resolves; stamped on turn payload | FE skips Final Shot stinger on repeat full Final Turns |
+| `suppress_final_shot_sfx` | Follow-up Final Turn armed (`EOQ_FOLLOWUP_FINAL_TURN`); **and all FLSS turns** (stamped by `resolve_flss_shot_logic`) | Popped when turn resolves; stamped on turn payload | FE skips the Final Shot stinger — on repeat full Final Turns, and on **every FLSS** (which fires its own heave/launch VO instead) |
 | `flss_possession_pending` | FLSS follow-up chosen; or `schedule_flss_after_inbound` after chain make | Popped at FLSS turn start | Next offense turn → FLSS (may be overridden at entry by runway check) |
 | `final_shot_ran_this_chain` | First EOQ terminal shot completes (`final_turn` or FLSS w/ `final_shot_possession`) | Quarter break clear | Enables runway-based follow-up routing |
 | `flss_from_dreb` | After discrete DREB when EOQ chain + clock > 2s | Popped at FLSS resolve | Rebounder = BH; post-DREB FLSS sprint |
@@ -75,7 +75,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `terminal_dreb_eoq` | Terminal defensive rebound (clock burn, no outlet) |
 | `flss_after_dreb` | Miss/block turn in chain: DREB → FLSS when clock > 2s |
 | `skip_dreb_outlet_lead_in` | DREB turn payload: FE skips HCO outlet lead-in before FLSS |
-| `suppress_final_shot_sfx` | Repeat full Final Turn in same EOQ sequence: FE skips Final Shot stinger (announcement text may still show) |
+| `suppress_final_shot_sfx` | Repeat full Final Turn in same EOQ sequence **or any FLSS turn**: FE skips the Final Shot stinger (announcement text may still show; FLSS plays its own heave/launch VO) |
 | `late_clock_ft_resolution` | Last FT at ≤ 30s resolved: tags turn for BIP runoff only; **does not** start chain |
 | `final_turn_anchor_clock` | Rolled shoot/drive anchor (seconds) |
 | `quarter_ends_after` | Period ends after this turn; no BIP/OREB follow-up |
@@ -199,7 +199,7 @@ AND state in (HCO, HCT, FCP)
 
 **Design intent:** Replace the old “chain active → always BIP → FLSS” loop with a per-entry runway check. Entry context matters: OREB kickout, BIP with runoff, DREB outlet, and press setup all change available time.
 
-**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows “Final Shot” announcement but skips court stinger.
+**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns **and all FLSS turns** stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” announcement but skips the court stinger. (FLSS suppresses it universally because it already fires its own heave/launch VO, `playFlssVoSfx`, at ball detach — the stinger would be redundant.)
 
 **Not re-evaluated on:** OREB putback turns, BIP/SIP bypass turns, discrete DREB turns, FT line. The next **half-court entry** after those paths runs this check.
 
