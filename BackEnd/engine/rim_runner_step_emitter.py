@@ -1085,7 +1085,10 @@ def _build_lane_pass_step(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             t=t,
-            mover_archetype="standard",
+            # Full-break budget: the off-ball cast sprints (not standard) toward
+            # the rim on the lane pass so they keep advancing in stride with the
+            # break instead of drifting and then parking on the drive step.
+            mover_archetype="sprint",
         )
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -2278,6 +2281,28 @@ def _build_finisher_drive_resolution_steps(
                             prev = knot
                     if path_len > 1e-6:
                         t_drive = max(t_drive, path_len / shooter_rate)
+            # Full-break budget: keep the off-ball cast crashing toward the rim
+            # through the finish instead of parking at their short-budget spots.
+            # Every non-finisher, non-cutoff player is re-targeted to
+            # ``basketSpot`` at ``sprint`` (the interrupted-coord math still
+            # freezes each mid-run at T, so they advance in stride with the
+            # driver rather than arriving early and standing). The finisher keeps
+            # ``bh_target`` (rim) and cutoff defenders keep their resolver
+            # contest coords + finisher-pace ``standard``.
+            crash_basket = _fb_spot_coords("basketSpot", is_away_offense)
+            cutoff_ids = {
+                str(fb_drive.get(k))
+                for k in ("stopper_id", "d8_credited_player_id", "shot_defender_id")
+                if fb_drive.get(k) is not None
+            }
+            crash_archetypes: Dict[str, PlayerArchetype] = dict(
+                fb_drive.get("defender_archetypes") or {}
+            )
+            for pid in start_coords:
+                if pid == stealer_id or pid in cutoff_ids:
+                    continue
+                end_coords[pid] = dict(crash_basket)
+                crash_archetypes[pid] = "sprint"
             drive_step = _build_drive_step(
                 start_coords=start_coords,
                 end_coords=end_coords,
@@ -2290,7 +2315,7 @@ def _build_finisher_drive_resolution_steps(
                 next_step_index=len(steps) + 1,
                 off_lineup=off_lineup,
                 def_lineup=def_lineup,
-                archetypes_override=fb_drive.get("defender_archetypes"),
+                archetypes_override=crash_archetypes,
                 finisher_pace=True,
                 stamp_start_announcement=False,
                 fb_drive=fb_drive,

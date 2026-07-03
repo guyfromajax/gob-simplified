@@ -357,7 +357,9 @@ def test_lane_pass_step_lead_pass_moves_help_defenders():
     assert step["start"]["destination"]["gb1"]["x"] == 87.0
     assert step["start"]["destination"]["gb2"]["x"] == 80.0
     assert step["start"]["action"]["trail"] == "cut"
-    assert step["start"]["archetype"]["trail"] == "standard"
+    # Full-break budget: off-ball cast sprints toward the rim on the lane pass
+    # (previously ``standard``) so they advance in stride with the break.
+    assert step["start"]["archetype"]["trail"] == "sprint"
     assert step["end"]["time_elapsed"] == step["start"]["advance_trigger"]["T_game_seconds"]
     assert step["start"]["advance_trigger"]["condition"] == "ball_reaches_player"
 
