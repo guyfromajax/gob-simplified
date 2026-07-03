@@ -2027,50 +2027,23 @@ def _build_finisher_drive_resolution_steps(
     shot_clock_remaining: float,
     fb_roles: Dict[str, Any],
 ) -> Optional[List[AnimationStep]]:
-    """Drive-resolution steps after lane pass (Phase 4 RR / Triangle finisher)."""
-    from BackEnd.engine.after_steal_fast_break_step_emitter import (
-        _build_drive_step,
-        _build_meet_drive_step,
-        _override_fb_make_announcement,
-    )
-    from BackEnd.engine.covert_release_step_emitter import _build_nice_stop_announcement
-    from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
-    from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+    """Drive-resolution steps after lane pass (RR / Triangle finisher).
 
-    result_type = (turn_result.get("result_type") or "").upper()
-    allowed = {
-        "MAKE",
-        "MISS",
-        "BLOCK",
-        "DEFENSIVE_STOP",
-        "FOUL",
-        "CHARGE",
-        "DEAD BALL",
-        "TURNOVER",
-    }
-    if result_type not in allowed:
-        logging.warning(
-            "🧩 [RR_DR] skip: result_type=%s not in allowed set", result_type
-        )
-        return None
+    Thin adapter over the universal ``build_fb_drive_resolution_steps``: derives
+    the RR/Triangle ``stealer_id`` (shooter / burst-phase rr) and end coords
+    (``rr_end_coords``), then delegates the meet / neutral / NO_MEET drive
+    orchestration to the shared emitter. RR/Triangle announce "Fast Break!" on
+    the burst/lane pass, so the drive steps pass
+    ``stamp_fb_start_announcement=False`` and don't re-stamp it.
+    """
+    from BackEnd.engine.fb_drive_step_emitter import build_fb_drive_resolution_steps
 
-    fb_drive = turn_result.get("fb_drive_resolution") or {}
     phase = fb_roles.get("rim_runner_burst_phase") or {}
     stealer_id = (
         _safe_id(turn_result.get("shooter"))
         or _safe_id(fb_roles.get("shooter"))
         or _safe_id(phase.get("rr_id"))
     )
-    if not stealer_id or stealer_id not in start_coords:
-        logging.warning(
-            "🧩 [RR_DR] EARLY-None: stealer_id=%s in_start_coords=%s "
-            "(result_type=%s outcome=%s) — no drive/meet steps emitted",
-            stealer_id,
-            bool(stealer_id and stealer_id in start_coords),
-            result_type,
-            fb_drive.get("outcome"),
-        )
-        return None
 
     raw_end_coords = turn_result.get("rr_end_coords") or {}
     end_coords: Dict[str, GridCoord] = {}
@@ -2080,290 +2053,22 @@ def _build_finisher_drive_resolution_steps(
     for pid, sc in start_coords.items():
         end_coords.setdefault(pid, dict(sc))
 
-    meet_coords = turn_result.get("meet_coords")
-    outcome = fb_drive.get("outcome")
-    stop_action = turn_result.get("stop_decision_action")
-    is_neutral = outcome == "NEUTRAL"
-    is_terminal = outcome in (
-        "DEAD BALL",
-        "O_FOUL",
-        "D_FOUL",
-        "CHARGE",
-        "BLOCKING_FOUL",
+    return build_fb_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        end_coords=end_coords,
+        stealer_id=stealer_id or "",
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        is_away_offense=is_away_offense,
+        clock_remaining=clock_remaining,
+        shot_clock_remaining=shot_clock_remaining,
+        fb_roles=fb_roles,
+        kind_prefix="rim_runner",
+        stamp_fb_start_announcement=False,
+        suppress_stinger=False,
     )
-    uses_meet_step = is_neutral or is_terminal
-
-    steps: List[AnimationStep] = []
-    clock_r = clock_remaining
-    shot_r = shot_clock_remaining
-    step_start_coords = dict(start_coords)
-
-    if uses_meet_step and meet_coords:
-        t_meet = float(
-            turn_result.get("t_meet_game_seconds")
-            or fb_drive.get("t_meet_game_seconds")
-            or 1.0
-        )
-        meet_target = {"x": float(meet_coords["x"]), "y": float(meet_coords["y"])}
-        # Guard against a stale/short ``t_meet`` clamping the shooter well short
-        # of the meet (the drive payload's meet time can be computed off a
-        # different ``bh_start`` than the shooter's actual rendered position).
-        # If it's too small, the meet step under-moves him and the following
-        # shot step has to cover the residual instantly → jet. Floor it at his
-        # real traversal to the meet at finisher (standard) pace.
-        stealer_start = step_start_coords.get(stealer_id)
-        if stealer_start:
-            stealer_rate = _ag_grid_per_game_sec(
-                _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
-            )
-            t_meet = floor_step_t_to_traversal(
-                t_meet, stealer_start, meet_target, stealer_rate
-            )
-        end_ann = None
-        if result_type == "DEFENSIVE_STOP":
-            end_ann = _build_nice_stop_announcement(
-                turn_result, fb_roles, def_lineup, is_away_offense
-            )
-        meet_step = _build_meet_drive_step(
-            start_coords=step_start_coords,
-            end_coords=end_coords,
-            stealer_id=stealer_id,
-            meet_target=meet_target,
-            is_away_offense=is_away_offense,
-            clock_remaining=clock_r,
-            shot_clock_remaining=shot_r,
-            t_game_seconds=t_meet,
-            next_step_index=len(steps) + (1 if result_type in ("MAKE", "MISS") else 0),
-            fb_drive=fb_drive,
-            end_announcement=end_ann,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            finisher_pace=True,
-            stamp_start_announcement=False,
-        )
-        if meet_step["start"].get("advance_trigger"):
-            meet_step["start"]["advance_trigger"]["metadata"]["kind"] = "rim_runner_meet"
-        if result_type == "DEFENSIVE_STOP" or is_terminal:
-            meet_step["end"]["next"] = {"kind": "end_of_turn"}
-        steps.append(meet_step)
-        clock_r -= t_meet
-        shot_r -= t_meet
-        # Advance the cursor off the meet step's RENDERED end coords, not the
-        # semantic ``end_coords``. Otherwise the next step assumes the shooter
-        # is already at his full position while the sprite is still en route,
-        # and the FE snaps/jets him to catch up on the (short) shot step.
-        step_start_coords = dict(meet_step["end"]["coords"])
-
-    if result_type in ("MAKE", "MISS", "BLOCK"):
-        if is_neutral and stop_action in ("shoot", "pass"):
-            if stop_action == "pass":
-                recv_id = turn_result.get("pass_receiver_id")
-                if recv_id and recv_id in step_start_coords:
-                    from BackEnd.utils.transition_bridge import build_pass_step
-
-                    try:
-                        pass_step = build_pass_step(
-                            off_lineup=off_lineup,
-                            def_lineup=def_lineup,
-                            start_coords=step_start_coords,
-                            passer_id=stealer_id,
-                            receiver_id=str(recv_id),
-                            clock_remaining_at_start=clock_r,
-                            shot_clock_remaining_at_start=shot_r,
-                            next_step_index=len(steps),
-                            pass_speed_grid_per_game_sec=float(
-                                PASS_GRID_SPOTS_PER_GAME_SECOND
-                            ),
-                            metadata_reason="rim_runner_stop_pass",
-                        )
-                        steps.append(pass_step)
-                        clock_r = pass_step["end"]["clock"]["clock_remaining"]
-                        shot_r = pass_step["end"]["clock"]["shot_clock_remaining"]
-                        step_start_coords = dict(pass_step["end"]["coords"])
-                        stealer_id = str(recv_id)
-                    except ValueError:
-                        pass
-
-            bh_target_raw = turn_result.get("bh_target") or step_start_coords.get(
-                stealer_id, meet_coords or {}
-            )
-            bh_target = {"x": float(bh_target_raw["x"]), "y": float(bh_target_raw["y"])}
-            t_shot = float(turn_result.get("t_shooter_game_seconds") or 0.5)
-            shot_end_coords = dict(step_start_coords)
-            shot_end_coords[stealer_id] = dict(bh_target)
-            # Gather is a short beat (``t_shot * 0.15``) which assumes the
-            # shooter is already on his spot. If he still has real ground to
-            # cover to ``bh_target`` (e.g. meet ≠ shot spot), extend T to his
-            # natural travel time so he drives in rather than jetting.
-            gather_t = max(0.35, t_shot * 0.15)
-            shooter_now = step_start_coords.get(stealer_id)
-            if shooter_now:
-                shooter_rate = _ag_grid_per_game_sec(
-                    _player_lookup_by_id(off_lineup, def_lineup, stealer_id), "standard"
-                )
-                gather_t = floor_step_t_to_traversal(
-                    gather_t, shooter_now, bh_target, shooter_rate
-                )
-            shot_drive = _build_drive_step(
-                start_coords=step_start_coords,
-                end_coords=shot_end_coords,
-                stealer_id=stealer_id,
-                bh_target=bh_target,
-                is_away_offense=is_away_offense,
-                clock_remaining=clock_r,
-                shot_clock_remaining=shot_r,
-                t_game_seconds=gather_t,
-                next_step_index=len(steps) + 1,
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                finisher_pace=True,
-                stamp_start_announcement=False,
-                fb_drive=fb_drive,
-            )
-            shot_drive["start"]["action"][stealer_id] = "shoot"
-            if shot_drive["start"].get("advance_trigger"):
-                shot_drive["start"]["advance_trigger"]["metadata"]["kind"] = (
-                    "rim_runner_drive"
-                )
-            steps.append(shot_drive)
-        else:
-            bh_target_raw = turn_result.get("bh_target") or end_coords.get(stealer_id)
-            bh_target = {"x": float(bh_target_raw["x"]), "y": float(bh_target_raw["y"])}
-            t_drive = float(
-                turn_result.get("t_shooter_game_seconds")
-                or fb_drive.get("t_drive_game_seconds")
-                or 1.0
-            )
-            trigger_meta = {
-                "target_player_id": stealer_id,
-                "target_coords": dict(bh_target),
-                "kind": "rim_runner_drive",
-            }
-            knots = fb_drive.get("bh_path_knots")
-            if knots and fb_drive.get("outcome") == "POS_O":
-                trigger_meta["path_knots"] = knots
-                segs = fb_drive.get("path_segment_game_seconds")
-                if segs:
-                    trigger_meta["path_segment_game_seconds"] = segs
-            # Floor the drive duration to the shooter's real traversal so a
-            # short backend ``t_drive`` (computed off the ``rr_to`` datum, which
-            # can diverge from his actual rendered catch coord) can't clamp him
-            # short of the rim — UESS bakes ``end.coords`` at the interrupted
-            # position reachable within T, so a too-small T leaves him pulling
-            # up inside the arc instead of finishing. Mirrors the meet +
-            # neutral-shoot branches (the last of the three drive seams).
-            shooter_start = start_coords.get(stealer_id)
-            if shooter_start:
-                shooter_rate = _ag_grid_per_game_sec(
-                    _player_lookup_by_id(off_lineup, def_lineup, stealer_id),
-                    "standard",
-                )
-                t_drive = floor_step_t_to_traversal(
-                    t_drive, shooter_start, bh_target, shooter_rate
-                )
-                # POS_O is a curved (knot) drive whose on-screen path is longer
-                # than the straight line to ``bh_target``; floor against the
-                # knot-path length so the curve isn't jetted to hit the rim in T.
-                if (
-                    knots
-                    and fb_drive.get("outcome") == "POS_O"
-                    and shooter_rate > 0
-                ):
-                    path_len = 0.0
-                    prev = shooter_start
-                    for knot in knots:
-                        if (
-                            isinstance(knot, dict)
-                            and "x" in knot
-                            and "y" in knot
-                        ):
-                            path_len += _euclid(prev, knot)
-                            prev = knot
-                    if path_len > 1e-6:
-                        t_drive = max(t_drive, path_len / shooter_rate)
-            # Full-break budget: keep the off-ball cast crashing toward the rim
-            # through the finish instead of parking at their short-budget spots.
-            # Every non-finisher, non-cutoff player is re-targeted to
-            # ``basketSpot`` at ``sprint`` (the interrupted-coord math still
-            # freezes each mid-run at T, so they advance in stride with the
-            # driver rather than arriving early and standing). The finisher keeps
-            # ``bh_target`` (rim) and cutoff defenders keep their resolver
-            # contest coords + finisher-pace ``standard``.
-            crash_basket = _fb_spot_coords("basketSpot", is_away_offense)
-            cutoff_ids = {
-                str(fb_drive.get(k))
-                for k in ("stopper_id", "d8_credited_player_id", "shot_defender_id")
-                if fb_drive.get(k) is not None
-            }
-            crash_archetypes: Dict[str, PlayerArchetype] = dict(
-                fb_drive.get("defender_archetypes") or {}
-            )
-            for pid in start_coords:
-                if pid == stealer_id or pid in cutoff_ids:
-                    continue
-                end_coords[pid] = dict(crash_basket)
-                crash_archetypes[pid] = "sprint"
-            drive_step = _build_drive_step(
-                start_coords=start_coords,
-                end_coords=end_coords,
-                stealer_id=stealer_id,
-                bh_target=bh_target,
-                is_away_offense=is_away_offense,
-                clock_remaining=clock_remaining,
-                shot_clock_remaining=shot_clock_remaining,
-                t_game_seconds=t_drive,
-                next_step_index=len(steps) + 1,
-                off_lineup=off_lineup,
-                def_lineup=def_lineup,
-                archetypes_override=crash_archetypes,
-                finisher_pace=True,
-                stamp_start_announcement=False,
-                fb_drive=fb_drive,
-            )
-            drive_step["start"]["advance_trigger"]["metadata"] = trigger_meta
-            steps.append(drive_step)
-
-        inject_shot_micro_before_post_shot(
-            steps, turn_result, off_lineup, def_lineup, is_away_offense
-        )
-        _build_post_shot_sub_steps(
-            steps, turn_result, off_lineup, def_lineup, is_away_offense
-        )
-        if result_type == "MAKE":
-            _override_fb_make_announcement(steps)
-
-    stopper_id = _safe_id(turn_result.get("stopper_id"))
-    step_kinds = [
-        (((s.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}).get("kind")
-        for s in steps
-    ]
-    meet_dbg = ""
-    for s in steps:
-        meta = (((s.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {})
-        if meta.get("kind") in ("rim_runner_meet", "after_steal_meet"):
-            rr_s = (s.get("start") or {}).get("coords", {}).get(stealer_id)
-            rr_e = (s.get("end") or {}).get("coords", {}).get(stealer_id)
-            st_s = (s.get("start") or {}).get("coords", {}).get(stopper_id)
-            st_e = (s.get("end") or {}).get("coords", {}).get(stopper_id)
-            meet_dbg = f" meet_step rr:{rr_s}->{rr_e} stopper[{stopper_id}]:{st_s}->{st_e}"
-            break
-    logging.warning(
-        "🧩 [RR_DR] result_type=%s outcome=%s uses_meet=%s meet_coords=%s "
-        "stealer_id=%s n_steps=%d kinds=%s%s",
-        result_type,
-        outcome,
-        uses_meet_step,
-        meet_coords,
-        stealer_id,
-        len(steps),
-        step_kinds,
-        meet_dbg,
-    )
-
-    from BackEnd.engine.fb_terminal_announce import stamp_fb_terminal_freeze
-
-    stamp_fb_terminal_freeze(turn_result, steps, is_away_offense=is_away_offense)
-    return steps or None
 
 
 def append_lane_pass_to_rr_resolution_steps(

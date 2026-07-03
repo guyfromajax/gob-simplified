@@ -154,6 +154,28 @@ Additive-only (logging + comments); no logic/flow changes. All four FB emitters 
 
 **Verification:** `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_rr_triangle_drive_resolution.py tests/test_fb_drive_resolution.py tests/test_after_steal_fast_break_stats.py -q` → **31 passed, 1 failed**. The single failure is the pre-existing, unrelated `test_no_meet_all_defenders_to_basket_spot` (documented below). No lint errors on the four edited backend files.
 
+### Post-Phase 5 — Universal drive-step helper (SS&S consolidation) (DONE)
+The drive-resolution orchestration (meet / neutral-shoot / neutral-pass / NO_MEET-POS_O drive + shot-micro → post-shot → make-override → terminal-freeze) had been **copy-pasted into three near-identical orchestrators** and had drifted — the `t_drive` traversal floor + crash-to-basket fixes lived only in the RR/Triangle copy, so After-Steal and Covert Release still finished short of the rim and parked the off-ball cast.
+
+**New single source of truth:** `BackEnd/engine/fb_drive_step_emitter.py::build_fb_drive_resolution_steps`. It returns a fresh 0-based `AnimationStep[]` from the `fb_drive_resolution` payload; each caller builds its own preamble (burst / lane pass / outlet / start snapshot), derives `stealer_id` + `start_coords` + `end_coords`, then delegates.
+
+**Callers (now thin adapters):**
+- `rim_runner_step_emitter._build_finisher_drive_resolution_steps` (RR + Triangle) → `kind_prefix="rim_runner"`, `stamp_fb_start_announcement=False` (FB banner already stamped on burst/lane), `suppress_stinger=False`. Still returns to `append_lane_pass_to_rr_resolution_steps` which rebases + extends.
+- `after_steal_fast_break_step_emitter._build_drive_resolution_animation_steps` → `kind_prefix="after_steal"`, `stamp_fb_start_announcement=True`, `suppress_stinger=True` (Steal FBs show the banner but not the court stinger). No preamble → returns the helper result directly.
+- `covert_release_step_emitter._build_cr_drive_resolution_animation_steps` → keeps its optional outlet-pass preamble, then `kind_prefix="covert_release"`, `stamp_fb_start_announcement=True`, `suppress_stinger=False`; rebases + extends the helper's steps onto the outlet step.
+
+**Per-play divergences are parameters** (`kind_prefix` for advance-trigger metadata, `stamp_fb_start_announcement`, `suppress_stinger`); the offense end-coords key (`rr_end_coords` / `after_steal_end_coords` / `cr_end_coords`) and start-coord source stay caller-side.
+
+**Universal behavior decisions (product, July 2026 — all four types now):**
+- Driver + cutoff defenders use `finisher_pace` (standard/HCO) on the meet/drive (previously After-Steal/CR sprinted the driver).
+- NO_MEET/POS_O drive floors `t_drive` to the shooter's real catch→rim traversal (POS_O against the knot-path length) so he never finishes short of the rim.
+- NO_MEET/POS_O drive crashes the off-ball cast toward `basketSpot` at sprint so they advance in stride instead of parking on short-budget end coords.
+- DEFENSIVE_STOP uses the named-defender "Nice stop" announcement (`_build_nice_stop_announcement`) everywhere (After-Steal previously used the plain team-only text).
+
+**No import cycles:** the helper's module-level imports are cycle-free (`constants`, `animation_step_helpers`, `animation_step_schema`, `shared`); the emitter primitives (`_build_drive_step`, `_build_meet_drive_step`, `_build_nice_stop_announcement`, `_suppress_fast_break_stinger`, post-shot/shot-micro/terminal-freeze) are lazy-imported inside the function, and each caller lazy-imports the helper.
+
+**Verification:** `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_rr_triangle_drive_resolution.py tests/test_fast_break_rr_triangle_updates.py tests/test_after_steal_drive_resolution.py tests/test_after_steal_fast_break_stats.py tests/test_covert_release_drive_resolution.py -q` → **57 passed**. No lint errors on the four backend files. The two known pre-existing/unrelated failures (`test_no_meet_all_defenders_to_basket_spot`, `test_outlet_pass_roles_when_rebounder_is_none`) were confirmed to fail identically on a clean tree (resolver/logic layer, not the emitters).
+
 ---
 
 ## 5. Testing strategy
@@ -171,4 +193,4 @@ Additive-only (logging + comments); no logic/flow changes. All four FB emitters 
 - **Drive-onset vs origin coord (Phase 1) — resolved.** The RR drive starts at the lane-pass catch point, not end-of-DREB, so `bh_start` seeds from `rim_runner_burst_phase.rr_to` (the emitter's catch target), not `player.coords`/`off_starts`. Residual: on a lead pass the rendered step-end can fall slightly short of `rr_to` at the pass meet point (see Phase 1 known residual); a single shared catch-point source is deferred.
 - **Do Phases 1–2 before removing the animator packet (Phase 3+).** The packet currently backstops legacy rendering and `final_coords` fallback; removing inputs first, artifacts later, keeps rollbacks cheap.
 - **Flag-gated rollout:** keep changes reversible via the existing `USE_FB_DRIVE_RESOLUTION_*` flags until Phase 4.
-- **CR & After-Steal are already compliant** — no logic changes needed there; they only benefit from the Phase 5 frontend observability/parity items.
+- **CR & After-Steal are already UESS-compliant** for coord sourcing; beyond the Phase 5 observability items, they now also share the universal `build_fb_drive_resolution_steps` helper (see "Post-Phase 5"), which brought their finish drives to parity with RR/Triangle (finisher pace, `t_drive` floor, crash-to-basket, named "Nice stop").
