@@ -567,109 +567,43 @@ def _build_simplified_outlet_pass_step(
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     next_step_index: int,
-) -> AnimationStep:
+) -> Optional[AnimationStep]:
     """Phase 3 outlet step: passer/receiver stationary; no outlet-phase cutoff."""
-    from BackEnd.constants import (
-        FB_OUTLET_QUALITY_THRESHOLD,
-        FB_PASS_GRID_SPOTS_PER_GAME_SECOND,
-        FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY,
-        FB_PASS_MIN_GAME_SECONDS,
+    from BackEnd.engine.fb_outlet_pass_step_emitter import (
+        MoverTarget,
+        build_fb_outlet_pass_step,
     )
-
-    _outlet_score = fb_roles.get("outlet_score")
-    _pass_rate = (
-        float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
-        if _outlet_score is not None and _outlet_score >= FB_OUTLET_QUALITY_THRESHOLD
-        else float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY)
-    )
-    _dx = float(receiver_coord.get("x", 0)) - float(passer_coord.get("x", 0))
-    _dy = float(receiver_coord.get("y", 0)) - float(passer_coord.get("y", 0))
-    _grid_dist = (_dx * _dx + _dy * _dy) ** 0.5
-    t = max(FB_PASS_MIN_GAME_SECONDS, _grid_dist / _pass_rate)
 
     x_dir = -1 if is_away_offense else 1
 
-    actions: Dict[str, PlayerAction] = {}
-    archetype: Dict[str, PlayerArchetype] = {}
-    destinations: Dict[str, Optional[GridCoord]] = {}
-    end_coords: Dict[str, GridCoord] = {}
-    for pid, coord in all_start_coords.items():
-        actions[pid] = "stationary"
-        archetype[pid] = "stationary"
-        destinations[pid] = coord
-        end_coords[pid] = dict(coord)
-    actions[passer_id] = "pass"
-    actions[receiver_id] = "receive"
-
-    targets: List[tuple] = []
-    excluded = {passer_id, receiver_id}
-    for pid in all_start_coords:
-        if pid in excluded:
+    # Flavor: no resolver payload — the non-key cast drifts a random 1–6 grid
+    # toward the attacking basket (holding y) at ``standard`` before the drive.
+    # (Pass-rate gating + ball continuity + interrupted-coord math + tween
+    # stamping live in the shared ``build_fb_outlet_pass_step`` core.)
+    mover_targets: Dict[str, MoverTarget] = {}
+    for pid, start in all_start_coords.items():
+        if pid in (passer_id, receiver_id):
             continue
-        start = all_start_coords[pid]
         drift = random.randint(1, 6)
         drift_x = max(4.0, min(97.0, float(start["x"]) + drift * x_dir))
-        drift_target: GridCoord = {"x": drift_x, "y": float(start["y"])}
-        targets.append((pid, drift_target, "standard"))
+        mover_targets[pid] = (
+            {"x": drift_x, "y": float(start["y"])},
+            "standard",
+            "cut",
+        )
 
-    for pid, target, arch in targets:
-        start = all_start_coords[pid]
-        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
-        max_traversal = rate * t
-        dist = _euclid(start, target)
-        if dist <= max_traversal or dist == 0.0:
-            end_coords[pid] = {"x": float(target["x"]), "y": float(target["y"])}
-        else:
-            ratio = max_traversal / dist
-            end_coords[pid] = {
-                "x": start["x"] + (target["x"] - start["x"]) * ratio,
-                "y": start["y"] + (target["y"] - start["y"]) * ratio,
-            }
-        destinations[pid] = {"x": float(target["x"]), "y": float(target["y"])}
-        actions[pid] = "cut"
-        archetype[pid] = arch
-
-    _outlet_score_for_meta = fb_roles.get("outlet_score")
-    advance_trigger: AdvanceTrigger = {
-        "condition": "ball_reaches_player",
-        "T_game_seconds": float(t),
-        "metadata": {
-            "from_player_id": passer_id,
-            "to_player_id": receiver_id,
-            "target_coords": dict(receiver_coord),
-            "outlet_score": (
-                int(_outlet_score_for_meta)
-                if _outlet_score_for_meta is not None
-                else None
-            ),
-        },
-    }
-
-    start: StepStart = {
-        "coords": dict(all_start_coords),
-        "destination": destinations,
-        "action": actions,
-        "archetype": archetype,
-        "ball": {"owner_player_id": passer_id},
-        "clock": {
-            "clock_remaining": clock_remaining_at_start,
-            "shot_clock_remaining": shot_clock_remaining_at_start,
-        },
-        "advance_trigger": advance_trigger,
-    }
-    end: StepEnd = {
-        "coords": end_coords,
-        "ball": {"owner_player_id": receiver_id},
-        "time_elapsed": t,
-        "clock": {
-            "clock_remaining": clock_remaining_at_start - t,
-            "shot_clock_remaining": shot_clock_remaining_at_start - t,
-        },
-        "next": {"kind": "next_step", "index": next_step_index},
-    }
-    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
-    return {"start": start, "end": end}
+    return build_fb_outlet_pass_step(
+        passer_id=passer_id,
+        receiver_id=receiver_id,
+        start_coords=all_start_coords,
+        mover_targets=mover_targets,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=next_step_index,
+        outlet_score=fb_roles.get("outlet_score"),
+    )
 
 
 def _build_cr_drive_resolution_animation_steps(
@@ -772,6 +706,8 @@ def _build_cr_drive_resolution_animation_steps(
             shot_clock_remaining_at_start=shot_r,
             next_step_index=1,
         )
+        if outlet_step is None:
+            return None
         steps.append(outlet_step)
         elapsed += float(outlet_step["end"]["time_elapsed"])
         clock_r = float(outlet_step["end"]["clock"]["clock_remaining"])

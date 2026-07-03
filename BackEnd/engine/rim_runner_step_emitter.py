@@ -689,123 +689,66 @@ def _build_outlet_pass_step(
         )
         return None
 
-    passer_coord = step_start_coords[passer_id]
-    receiver_coord = step_start_coords[receiver_id]
+    from BackEnd.engine.fb_outlet_pass_step_emitter import (
+        MoverTarget,
+        build_fb_outlet_pass_step,
+    )
 
     outlet_score = fb_roles.get("outlet_score")
-    pass_rate = (
-        float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND)
-        if outlet_score is not None and outlet_score >= FB_OUTLET_QUALITY_THRESHOLD
-        else float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND_SLOPPY)
-    )
-    dist = _euclid(passer_coord, receiver_coord)
-    t = max(FB_PASS_MIN_GAME_SECONDS, dist / pass_rate)
 
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-
-    actions[passer_id] = "pass"
-    actions[receiver_id] = "receive"
-
+    # Flavor: RR/Triangle movers are resolver-authored off the burst phase —
+    # RR sprints to ``rr_to``, the outlet defender guards to ``outlet_defender_to``,
+    # and ``other_players`` cut / guard-offball to their explicit spots. (Ball
+    # continuity + interrupted-coord math + tween stamping live in the shared
+    # ``build_fb_outlet_pass_step`` core.)
     rr_id = _safe_id(phase.get("rr_id"))
     defender_id = _safe_id(phase.get("outlet_defender_id"))
-    other_targets: Dict[str, GridCoord] = {}
-    if rr_id and isinstance(phase.get("rr_to"), dict):
-        other_targets[rr_id] = {
-            "x": float(phase["rr_to"]["x"]),
-            "y": float(phase["rr_to"]["y"]),
-        }
-    if defender_id and isinstance(phase.get("outlet_defender_to"), dict):
-        other_targets[defender_id] = {
-            "x": float(phase["outlet_defender_to"]["x"]),
-            "y": float(phase["outlet_defender_to"]["y"]),
-        }
+    mover_targets: Dict[str, MoverTarget] = {}
+    if rr_id and isinstance(phase.get("rr_to"), dict) and rr_id in step_start_coords:
+        rr_arch: PlayerArchetype = rr_archetype_override or _rr_payload_archetype(phase)
+        mover_targets[rr_id] = (
+            {"x": float(phase["rr_to"]["x"]), "y": float(phase["rr_to"]["y"])},
+            rr_arch,
+            "sprint",
+        )
+    if (
+        defender_id
+        and isinstance(phase.get("outlet_defender_to"), dict)
+        and defender_id in step_start_coords
+    ):
+        mover_targets[defender_id] = (
+            {
+                "x": float(phase["outlet_defender_to"]["x"]),
+                "y": float(phase["outlet_defender_to"]["y"]),
+            },
+            "standard",
+            "guard_ball",
+        )
     for row in phase.get("other_players") or []:
         pid = _safe_id(row.get("player_id"))
-        if not pid or pid in (passer_id, receiver_id):
+        if not pid or pid in (passer_id, receiver_id) or pid not in step_start_coords:
             continue
-        other_targets[pid] = {
+        target: GridCoord = {
             "x": float(row.get("to_x", step_start_coords.get(pid, {}).get("x", 50))),
             "y": float(row.get("to_y", step_start_coords.get(pid, {}).get("y", 25))),
         }
+        action: PlayerAction = (
+            "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
+        )
+        mover_targets[pid] = (target, "standard", action)
 
-    for pid, target in other_targets.items():
-        if pid not in step_start_coords:
-            continue
-        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        if pid == rr_id:
-            arch: PlayerArchetype = rr_archetype_override or _rr_payload_archetype(phase)
-            action: PlayerAction = "sprint"
-        elif pid == defender_id:
-            arch = "standard"
-            action = "guard_ball"
-        else:
-            arch = "standard"
-            action = (
-                "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-            )
-        archetype[pid] = arch
-        actions[pid] = action
-        destinations[pid] = dict(target)
-        rate = _ag_grid_per_game_sec(player, arch)
-        end_coords[pid] = _interrupted_coord(step_start_coords[pid], target, rate, t)
-
-    # Ball state continuity: step start = attached to passer (carries over from
-    # the prior step's end.ball, which was the burst's BallAttached(passer)).
-    # Step end = attached to receiver. Schema engine's renderBallTransition
-    # detects the ownership change, detaches from passer's parent transform,
-    # tweens world coords, and reattaches at end. Without this (i.e., starting
-    # in_flight here) the detach never fires and the ball renders glued to
-    # the passer's follow callback for the whole step — visible teleport.
-    ball_start: BallState = {"owner_player_id": passer_id}
-    ball_end: BallState = {"owner_player_id": receiver_id}
-
-    advance_trigger: AdvanceTrigger = {
-        "condition": "ball_reaches_player",
-        "T_game_seconds": float(t),
-        "metadata": {
-            "from_player_id": passer_id,
-            "to_player_id": receiver_id,
-            "target_coords": dict(receiver_coord),
-            "outlet_score": int(outlet_score) if outlet_score is not None else None,
-        },
-    }
-
-    clock_start: ClockState = {
-        "clock_remaining": clock_remaining_at_start,
-        "shot_clock_remaining": shot_clock_remaining_at_start,
-    }
-    clock_end: ClockState = {
-        "clock_remaining": clock_remaining_at_start - t,
-        "shot_clock_remaining": shot_clock_remaining_at_start - t,
-    }
-
-    start: StepStart = {
-        "coords": dict(step_start_coords),
-        "destination": destinations,
-        "action": actions,
-        "archetype": archetype,
-        "ball": ball_start,
-        "clock": clock_start,
-        "advance_trigger": advance_trigger,
-    }
-    end: StepEnd = {
-        "coords": end_coords,
-        "ball": ball_end,
-        "time_elapsed": t,
-        "clock": clock_end,
-        "next": {"kind": "next_step", "index": next_step_index},
-    }
-    _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
-    return {"start": start, "end": end}
+    return build_fb_outlet_pass_step(
+        passer_id=passer_id,
+        receiver_id=receiver_id,
+        start_coords=step_start_coords,
+        mover_targets=mover_targets,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        clock_remaining_at_start=clock_remaining_at_start,
+        shot_clock_remaining_at_start=shot_clock_remaining_at_start,
+        next_step_index=next_step_index,
+        outlet_score=outlet_score,
+    )
 
 
 # --- Shot-outcome helpers --------------------------------------------------

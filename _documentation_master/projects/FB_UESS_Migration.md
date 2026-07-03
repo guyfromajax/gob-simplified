@@ -176,6 +176,23 @@ The drive-resolution orchestration (meet / neutral-shoot / neutral-pass / NO_MEE
 
 **Verification:** `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_rr_triangle_drive_resolution.py tests/test_fast_break_rr_triangle_updates.py tests/test_after_steal_drive_resolution.py tests/test_after_steal_fast_break_stats.py tests/test_covert_release_drive_resolution.py -q` → **57 passed**. No lint errors on the four backend files. The two known pre-existing/unrelated failures (`test_no_meet_all_defenders_to_basket_spot`, `test_outlet_pass_roles_when_rebounder_is_none`) were confirmed to fail identically on a clean tree (resolver/logic layer, not the emitters).
 
+### Post-Phase 5 — Universal outlet-pass helper (SS&S consolidation) (DONE)
+The two **live** FB outlet-pass builders (RR/Triangle `_build_outlet_pass_step`, Covert Release `_build_simplified_outlet_pass_step`) were ~60% identical on the pass mechanics and diverged only on the non-key cast's movement. Consolidated the shared core into `BackEnd/engine/fb_outlet_pass_step_emitter.py::build_fb_outlet_pass_step`.
+
+**Shared core (now single source):** sharp/sloppy pass-rate gating on `outlet_score`, `t = max(FB_PASS_MIN_GAME_SECONDS, dist/rate)`, stationary passer(`"pass"`)/receiver(`"receive"`), ball transfer passer→receiver, `ball_reaches_player` advance-trigger (+`outlet_score` metadata), interrupted-coord math, and `_stamp_tween_durations`.
+
+**Flavor (per-play, passed in):** a `mover_targets: {player_id: (target_coord, archetype, action)}` map for the non-key cast.
+- RR/Triangle: resolver-authored off `rim_runner_burst_phase` — RR sprints to `rr_to`, outlet defender `guard_ball` to `outlet_defender_to`, `other_players[]` cut/`guard_offball` to explicit spots; honors `rr_archetype_override` (Triangle → `"sprint"`).
+- Covert Release: random 1–6 grid forward drift at `standard`/`cut` (no resolver payload).
+
+**No gameplay logic moved.** Diligence confirmed both live outlet emitters are pure resolver renderers — the "right read" that decides outcomes lives entirely in the resolver (`fb_stop_decision.py`, `cutoff_resolution.py`), untouched. The only embedded emitter-side read (`player_read ≥ outlet_score×3` cutoff-vs-retreat positioning) is **cosmetic** and lives solely in the flag-gated CR *legacy* `_build_outlet_pass_step`, which was intentionally **not** migrated — it dies with the deferred `USE_FB_DRIVE_RESOLUTION_CR` retirement.
+
+**Blast radius:** zero on HCO/BIP/SIP/Reset — the FB helper is standalone and does not touch the engine-wide `transition_bridge.build_pass_step` (the deeper "rebase onto the shared pass primitive" option was declined in favor of the contained helper).
+
+**Verification:** `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_rr_triangle_drive_resolution.py tests/test_fast_break_rr_triangle_updates.py tests/test_fast_break_outlet_pass.py tests/test_covert_release_drive_resolution.py tests/test_after_steal_drive_resolution.py tests/test_after_steal_fast_break_stats.py -q` → **58 passed, 1 pre-existing unrelated failure** (`test_outlet_pass_roles_when_rebounder_is_none`, resolver layer). No lint errors.
+
+**Not consolidated (by design):** burst step and lane pass are already shared between their only two consumers (RR + Triangle); wrapping them adds indirection with no payoff and no cross-type drift. After-Steal has no outlet/burst/lane. See discussion in the babysit/decision log.
+
 ---
 
 ## 5. Testing strategy
