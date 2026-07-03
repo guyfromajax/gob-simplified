@@ -51,17 +51,6 @@ def _anim_end_coord(
     return _coord_of(fallback)
 
 
-def _def_starts_by_pos_from_animations(
-    fb_animations: List[Dict[str, Any]],
-    def_lineup: Dict[str, Any],
-) -> Dict[str, Dict[str, float]]:
-    return {
-        pos: _anim_end_coord(fb_animations, _safe_id(defender), defender)
-        for pos, defender in (def_lineup or {}).items()
-        if defender is not None
-    }
-
-
 def _pick_unified_contest_defender(
     def_lineup: Dict[str, Any],
     shot_spot: Dict[str, float],
@@ -153,7 +142,16 @@ def resolve_attack_drive_finisher_turn(
     bh_start = _anim_end_coord(fb_animations, shooter_id, shooter)
     bh_pos = _lineup_pos(off_lineup, shooter)
     target = dict(shot_spot) if shot_spot else _compute_bh_target(is_away_offense)
-    def_starts = _def_starts_by_pos_from_animations(fb_animations, def_lineup)
+    # Seed the drive-cutoff race from defenders' LIVE positions (end-of-DREB /
+    # start-of-break, since RR/Triangle deliberately skip
+    # `apply_coords_from_animations_list`), NOT their fast-break animation `end`
+    # coords. The animation ends are get-back destinations near the rim
+    # (`between_key_and_rim()`), which teleport get-back defenders onto the
+    # drive line and credit phantom "Nice stop" cutoffs no one could physically
+    # make. This mirrors the offense seeding on the next line
+    # (`_lineup_starts_by_pos(off_lineup)`), the after-steal path, and CR's
+    # release-moment seeding.
+    def_starts = _lineup_starts_by_pos(def_lineup)
     shot_manager = getattr(game, "shot_manager", None) or ShotManager(game)
 
     drive = resolve_fb_drive_step(

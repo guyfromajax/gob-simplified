@@ -176,6 +176,62 @@ def test_rr_finisher_neutral_hco(monkeypatch):
     assert result["next_play_type"] == "HCO"
 
 
+def test_def_starts_seeded_from_live_coords_not_animation_ends(monkeypatch):
+    """Regression: the drive-cutoff race must seed defenders from their LIVE
+    positions (player.coords), not their fast-break animation `end` coords.
+
+    Animation ends are get-back destinations near the rim, which teleport
+    get-back defenders onto the drive line and credit phantom "Nice stop"
+    cutoffs no defender could physically make. The fixture puts live coords at
+    x=50 and animation ends at x=60, so seeding correctly reads x=50.
+    """
+    captured = {}
+
+    def _spy(**kwargs):
+        captured["def_starts"] = kwargs.get("def_starts")
+        return {
+            "outcome": "NEUTRAL",
+            "meet_x": 75,
+            "meet_y": 25,
+            "stopper_id": "Bentley-Truman-SF",
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "defender_end_coords": {"Bentley-Truman-SF": {"x": 75, "y": 25}},
+            "defender_archetypes": {"Bentley-Truman-SF": "sprint"},
+            "stop_decision": {"action": "HCO"},
+        }
+
+    monkeypatch.setattr(
+        "BackEnd.engine.rim_runner_drive_integration.resolve_fb_drive_step", _spy
+    )
+
+    game = build_mock_game()
+    rr, bh, fb_roles, fb_animations = _seed_rr_finisher(game)
+    resolve_attack_drive_finisher_turn(
+        game=game,
+        shooter=rr,
+        shot_spot={"x": 88, "y": 25},
+        fb_roles=fb_roles,
+        fb_animations=fb_animations,
+        fb_play_key=RIM_RUNNER,
+        off_team=game.offense_team,
+        def_team=game.defense_team,
+        off_lineup=game.offense_team.lineup,
+        def_lineup=game.defense_team.lineup,
+        is_away_offense=False,
+        ball_handler=bh,
+        pass_attempted=True,
+        fb_open=True,
+    )
+
+    def_starts = captured["def_starts"]
+    assert def_starts, "resolve_fb_drive_step should receive def_starts"
+    # Live coords are x=50; animation ends are x=60. Seeding must read live.
+    for coord in def_starts.values():
+        assert coord["x"] == pytest.approx(50.0)
+        assert coord["x"] != pytest.approx(60.0)
+
+
 def test_triangle_bh_drive_stamps_fb_drive_resolution(monkeypatch):
     meet = {"x": 70, "y": 25}
     monkeypatch.setattr(
