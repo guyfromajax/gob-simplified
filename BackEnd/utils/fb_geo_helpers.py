@@ -68,18 +68,41 @@ def _clamp_grid(coord: GridCoordDict) -> GridCoordDict:
     }
 
 
+def _to_attacking_basket_frame(
+    coord: GridCoordDict, *, is_away_offense: bool
+) -> GridCoordDict:
+    """Mirror ``coord`` into the home-attacking frame for label matching.
+
+    ``HCO_STRING_SPOTS`` (and thus ``nearest_spot_label``) are defined only in
+    the HOME orientation (spots clustered near the x=91 basket). For AWAY
+    offense — who attack x=9 — a raw label match treats a *backcourt* position
+    (near the x=91 home spots) as a valid shoot/pass spot, letting the BH
+    "shoot" from the complete other side of the court. Mirror x about mid-court
+    (``home_x + away_x``) so the label proximity is measured against the
+    *attacking* basket. Identity for HOME offense.
+    """
+    if not is_away_offense:
+        return coord
+    return {
+        "x": (_HOME_BASKET_X + _AWAY_BASKET_X) - float(coord["x"]),
+        "y": float(coord["y"]),
+    }
+
+
 def fb_shoot_geo_eligible(coord: GridCoordDict, *, is_away_offense: bool) -> bool:
     """True when BH may shoot from a stop (≤24 to basket or shoot spot-label)."""
     if euclidean_to_basket(coord, is_away_offense=is_away_offense) <= FB_SHOOT_GEO_RADIUS:
         return True
-    return nearest_spot_label(coord) in FB_SHOOT_GEO_SPOT_LABELS
+    framed = _to_attacking_basket_frame(coord, is_away_offense=is_away_offense)
+    return nearest_spot_label(framed) in FB_SHOOT_GEO_SPOT_LABELS
 
 
 def fb_pass_receiver_geo_eligible(coord: GridCoordDict, *, is_away_offense: bool) -> bool:
     """True when a teammate is a valid stop-decision pass target by location."""
     if euclidean_to_basket(coord, is_away_offense=is_away_offense) <= FB_SHOOT_GEO_RADIUS:
         return True
-    return nearest_spot_label(coord) in FB_PASS_GEO_SPOT_LABELS
+    framed = _to_attacking_basket_frame(coord, is_away_offense=is_away_offense)
+    return nearest_spot_label(framed) in FB_PASS_GEO_SPOT_LABELS
 
 
 def defender_x_trail_spots(

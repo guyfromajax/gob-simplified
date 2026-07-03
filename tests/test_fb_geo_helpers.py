@@ -67,6 +67,30 @@ def test_fb_pass_geo_by_wing_label_without_shoot_eligibility():
     assert not fb_shoot_geo_eligible(coord, is_away_offense=False)
 
 
+def test_fb_shoot_geo_away_backcourt_near_home_spot_is_ineligible():
+    # Regression: an AWAY-offense meet at (70, 16) sits right on the HOME-side
+    # "lower midWing" spot, but it is ~62 units from the AWAY basket (x=9) — the
+    # backcourt. The spot-label branch must be measured in the attacking-basket
+    # frame, so this is NOT shoot-eligible for away offense (was the "shot from
+    # the complete other side of the court" bug).
+    coord = {"x": 70.0, "y": 16.0}
+    assert nearest_spot_label(coord) == "lower midWing"  # home-frame label
+    assert euclidean_to_basket(coord, is_away_offense=True) > FB_SHOOT_GEO_RADIUS
+    assert not fb_shoot_geo_eligible(coord, is_away_offense=True)
+    assert not fb_pass_receiver_geo_eligible(coord, is_away_offense=True)
+    # Same raw coord IS a legit perimeter shot for HOME offense (attacking x=91).
+    assert fb_shoot_geo_eligible(coord, is_away_offense=False)
+
+
+def test_fb_shoot_geo_away_at_mirrored_key_is_eligible():
+    # The AWAY equivalent of the home "key" (x=64) is its mirror about mid-court
+    # (x=36). From there an away BH attacks x=9 and should be shoot-eligible via
+    # the (mirrored) key label despite being >24 from the basket.
+    coord = {"x": 36.0, "y": 25.0}
+    assert euclidean_to_basket(coord, is_away_offense=True) > FB_SHOOT_GEO_RADIUS
+    assert fb_shoot_geo_eligible(coord, is_away_offense=True)
+
+
 def test_home_defender_contests_within_radius_and_x_trail():
     shooter = {"x": 88.0, "y": 25.0}
     assert fb_defender_contests_shot({"x": 87.0, "y": 25.0}, shooter, is_away_offense=False)

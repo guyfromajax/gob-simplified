@@ -801,6 +801,8 @@ General corridor + race excludes hopeless trailing stops, but does **not** requi
 | **Shoot** | BH Euclidean ≤ **24** to attacking basket **OR** nearest `HCO_STRING_SPOTS` label ∈ **`key`**, **`upper midWing`**, **`lower midWing`** (label proximity — no extra distance cap on the label) |
 | **Pass** | Closest teammate to basket; same **≤ 24 Euclidean** **or** nearest label ∈ **`key`**, **midWings**, **wings**, **midCorners**, **corners**; teammate **`SH > 49`** |
 
+> **Orientation-aware label gate:** `HCO_STRING_SPOTS` are defined **only in HOME orientation** (spots clustered near the x≈91 basket). The label branch of both geo gates therefore mirrors the coord into the **attacking-basket frame** for away offense (`x → home_x + away_x − x`, i.e. `100 − x`) before matching (`fb_geo_helpers._to_attacking_basket_frame`). Without this, an **away-offense backcourt** position (e.g. a lane-pass catch at x≈70, ~62 units from the away basket at x=9) sits on the HOME-side `lower midWing` label and was wrongly ruled **shoot-eligible** — producing a "shot from the complete other side of the court." The Euclidean-to-basket branch was already orientation-correct; only the label branch needed mirroring.
+
 **Optimal priority**
 
 1. **Pass** if pass geo + SH gate pass  
