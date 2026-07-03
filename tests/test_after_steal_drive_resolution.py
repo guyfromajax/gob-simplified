@@ -328,3 +328,67 @@ def test_fb_start_announcement_is_secondary_and_non_blocking():
     assert ann["text"] == "Fast Break!"
     assert ann["style"] == "secondary"
     assert ann["non_blocking"] is True
+
+
+def test_suppress_fast_break_stinger_flags_only_fast_break_callouts():
+    """Steal FBs keep the ``Fast Break!`` ribbon but must not play the court
+    stinger — every FB callout gets ``meta.suppressCourtSfx`` while other
+    announcements are left untouched."""
+    from BackEnd.engine.after_steal_fast_break_step_emitter import (
+        _suppress_fast_break_stinger,
+    )
+
+    steps = [
+        {"start": {"announcement": {"text": "Fast Break!", "style": "secondary"}}},
+        {"start": {"announcement": {"text": "Great Stop!", "style": "secondary"}}},
+        {"start": {}},
+    ]
+    _suppress_fast_break_stinger(steps)
+    assert steps[0]["start"]["announcement"]["meta"]["suppressCourtSfx"] is True
+    assert "meta" not in steps[1]["start"]["announcement"]
+    # No crash on steps without an announcement.
+    assert "announcement" not in steps[2]["start"]
+
+
+def test_steal_fb_drive_callout_suppresses_court_stinger():
+    """End-to-end: a built steal-FB turn's ``Fast Break!`` schema callout carries
+    ``meta.suppressCourtSfx`` so the FE skips ``fast-break-braddock.mp3``."""
+    shot_spot = {"x": 88, "y": 25}
+    meet = {"x": 70, "y": 25}
+    end_coords = {f"home-{p}": {"x": 60.0, "y": 25.0} for p in ("PG", "SG", "SF", "PF", "C")}
+    end_coords.update({f"away-{p}": {"x": 62.0, "y": 25.0} for p in ("PG", "SG", "SF", "PF", "C")})
+    turn_result = {
+        "result_type": "MAKE",
+        "shooter_id": "home-PG",
+        "ball_handler": SimpleNamespace(player_id="home-PG"),
+        "bh_target": shot_spot,
+        "t_shooter_game_seconds": 2.0,
+        "after_steal_end_coords": end_coords,
+        "fb_drive_resolution": {
+            "outcome": "POS_O",
+            "bh_path_knots": [{"x": 55, "y": 25}, meet, {"x": 70, "y": 27}, shot_spot],
+            "t_drive_game_seconds": 2.0,
+        },
+        "shot_score_pre_defense": 100,
+        "shot_defense_score_for_sfx": 0,
+        "shot_type": "attack",
+        "shot_variant": None,
+    }
+    game = build_mock_game()
+    game.offense_team = game.home_team
+    game.defense_team = game.away_team
+    game.turns = [{"final_coords": {pid: {"x": 50.0, "y": 25.0} for pid in end_coords}}]
+    for pos, player in game.home_team.lineup.items():
+        player.player_id = f"home-{pos}"
+    for pos, player in game.away_team.lineup.items():
+        player.player_id = f"away-{pos}"
+
+    steps = build_after_steal_fast_break_animation_steps(turn_result, game)
+    assert steps is not None
+    fb_callouts = [
+        s for s in steps
+        if (s.get("start") or {}).get("announcement", {}).get("text") == "Fast Break!"
+    ]
+    assert fb_callouts, "expected a Fast Break! callout on the steal FB drive"
+    for step in fb_callouts:
+        assert step["start"]["announcement"]["meta"]["suppressCourtSfx"] is True

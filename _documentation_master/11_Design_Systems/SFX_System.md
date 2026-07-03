@@ -125,7 +125,8 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 - Trigger: immediately when the **Fast Break!** secondary announce appears.
 - File: `fast-break-braddock.mp3`
-- Scope: only when that headline is actually shown. No stinger for steal-entry paths that suppress Fast Break announce, and no stinger for other fast-break copy (`FB Outlet Pass Denied!`, `No Fast Break`, `Great Stop!`, etc.) unless the **Fast Break!** ribbon is shown.
+- Scope: only when that headline is actually shown. No stinger for other fast-break copy (`FB Outlet Pass Denied!`, `No Fast Break`, `Great Stop!`, etc.) unless the **Fast Break!** ribbon is shown.
+- **Steal (after-steal) Fast Breaks — no stinger (2026-07-02):** steal FBs still show the **Fast Break!** ribbon, but the backend flags the schema callout with `meta.suppressCourtSfx` (via `_suppress_fast_break_stinger` in `after_steal_fast_break_step_emitter.py`), so `announcements.js` skips `fast-break-braddock.mp3`. Covert Release / Rim Runner / Triangle keep the stinger. Backend-owned decision; the FE just honors the flag.
 
 **Trap Announce**
 

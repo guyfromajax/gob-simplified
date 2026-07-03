@@ -155,6 +155,24 @@ def _fb_secondary_announcement(team: str) -> Announcement:
     }
 
 
+def _suppress_fast_break_stinger(steps: Optional[List[AnimationStep]]) -> None:
+    """Steal Fast Breaks show the "Fast Break!" ribbon but must NOT play the
+    ``fast-break-braddock.mp3`` court stinger.
+
+    Flags every FB-callout start announcement with ``meta.suppressCourtSfx`` so
+    the FE (``showSecondaryAnnouncement`` → ``announcements.js``) skips the
+    headline-resolved SFX while still showing the banner. Backend-owned; no FE
+    decision. Applied only in this (after-steal) emitter, so Covert Release /
+    Rim Runner / Triangle keep their Fast Break stinger.
+    """
+    if not steps:
+        return
+    for step in steps:
+        ann = (step.get("start") or {}).get("announcement")
+        if isinstance(ann, dict) and ann.get("text") == "Fast Break!":
+            ann.setdefault("meta", {})["suppressCourtSfx"] = True
+
+
 def _apply_finisher_pace_archetypes(
     archetypes: Dict[str, PlayerArchetype],
     start_coords: Dict[str, GridCoord],
@@ -653,6 +671,7 @@ def _build_drive_resolution_animation_steps(
     from BackEnd.engine.fb_terminal_announce import stamp_fb_terminal_freeze
 
     stamp_fb_terminal_freeze(turn_result, steps, is_away_offense=is_away_offense)
+    _suppress_fast_break_stinger(steps)
     return steps or None
 
 
@@ -809,4 +828,5 @@ def build_after_steal_fast_break_animation_steps(
     if result_type == "MAKE":
         _override_fb_make_announcement(steps)
 
+    _suppress_fast_break_stinger(steps)
     return steps
