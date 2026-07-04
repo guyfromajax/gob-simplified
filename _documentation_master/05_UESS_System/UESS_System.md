@@ -7,7 +7,8 @@ The **Universal End-State Sync (UESS)** system is the contract by which every tu
 ## 1. Purpose
 
 - Backend owns all game logic: step/turn results, player coords + actions, ball state, clock state.
-- Frontend is a pure renderer of backend-emitted payloads.
+- **Single coord source.** Game logic and frontend rendering derive from the *same* real-time coords the UESS emitters produce. Logic must never read a parallel positioning source (live `roles`, ad-hoc `shooter.coords`, `def_lineup` re-derivation) that can drift from the emitted step coords. Where legacy logic still does, that is a **known violation under remediation** (§7), not sanctioned behavior.
+- Frontend is a pure renderer of backend-emitted payloads (not yet true on all paths — see §12).
 - Every turn type emits the same `AnimationStep[]` schema, regardless of internal complexity.
 
 This doc is the single source of truth for the contract. Code is the implementation; if they disagree, the code is right and this doc is wrong.
@@ -51,7 +52,7 @@ Required:
 - `destination` — `{player_id → {x, y} | null}` (null = stationary)
 - `action` — `{player_id → PlayerAction}` (vocab below)
 - `archetype` — `{player_id → PlayerArchetype}` (vocab below)
-- `ball` — one of `BallAttached`, `BallInFlight`, `BallLoose`
+- `ball` — one of `BallAttached`, `BallInFlight`, `BallLoose`. **Every ball state resolves to an authoritative position** (see §8.4): `BallAttached` → owner's coords (no explicit coord field), `BallInFlight` → `current_coords`, `BallLoose` → `coords`. Because `BallAttached` carries no coord of its own, an ownership change *is* a ball move and must be continuous — never a teleport (§8.4).
 - `clock` — `{clock_remaining, shot_clock_remaining}` (game-seconds)
 - `advance_trigger` — `{condition, T_game_seconds, metadata}`
 
@@ -130,7 +131,7 @@ Reusable across turn types. Live in [`BackEnd/utils/transition_bridge.py`](../..
 ### Universal helpers ([`animation_step_helpers.py`](../../BackEnd/utils/animation_step_helpers.py))
 
 - `build_final_coords(game)` — snapshots `player.coords` at end of every turn.
-- `build_final_ball_handler_id(turn_result)` — resolves the end-of-turn BH.
+- `build_final_ball_handler_id(turn_result)` — resolves the end-of-turn BH (owner id only; the ball *position* is re-derived from that owner's coords next turn — see §8.4 invariant 4 for the `final_ball_coords` build target that would carry an explicit ball position across the turn seam).
 - `stamp_tween_durations(start, end_coords, T, off_lineup, def_lineup)` — writes per-player tween durations.
 - `build_foul_announcement(text, team, fouler_id, *, hold_ms=1000, style="primary", sfx_key="foul", extra_meta=None)` — canonical step-announcement dict for any foul event. Stamps `meta.sfx` so the whistle always fires at overlay mount. Use this in every UESS step emitter that emits a foul announcement; constructing the dict by hand is what caused the DREB OTB foul to ship silent (no `meta.sfx`, no whistle). Current consumers: `dreb_step_emitter` (OTB), `skeleton_step_emitter` (shooting-foul-on-miss).
 
@@ -195,7 +196,7 @@ The spec'd discrete fields — `ownership_at_turn_start` (`{owner_player_id}` or
 
 ## 7. Per-shot state snapshot contract
 
-**Not yet implemented** (backlog item 9 — largest open item). The spec below is the build target: construct in `ShotManager.resolve_shot` immediately before resolution. Today `resolve_shot` re-derives positioning per branch from live `roles` / `shooter.coords` / `def_lineup`, and the `SHOT_COORD_DEBUG` / `NO_DEFENDER_SHOT` log tags do not exist. (The audit-only `position_snapshots` ledger is separate forensic machinery — different shape, never consumed by `resolve_shot`.)
+**Not yet implemented** (backlog item 9 — largest open item). This is the flagship case of the **single-coord-source contract (§1)**: shot outcomes must resolve from the emitter's real-time coords, not a parallel path. The spec below is the build target: construct in `ShotManager.resolve_shot` immediately before resolution. Today `resolve_shot` re-derives positioning per branch from live `roles` / `shooter.coords` / `def_lineup` — a **known §1 violation under remediation**, not sanctioned behavior — and the `SHOT_COORD_DEBUG` / `NO_DEFENDER_SHOT` log tags do not exist. (The audit-only `position_snapshots` ledger is separate forensic machinery — different shape, never consumed by `resolve_shot`.)
 
 ### 7.1 Purpose
 
@@ -254,6 +255,31 @@ When migrating a turn:
 1. Emit `animation_steps[]` with each step's `end.coords` populated for all 10 active players.
 2. Trust `sync_lineup_coords_from_turn` to write `player.coords` at turn end. Do not write directly.
 3. Within the emitter, ensure step N+1's `start.coords` matches step N's `end.coords` per player.
+4. Uphold **ball-coord continuity (§8.4)**: the ball's resolved position at step N+1 start must equal its resolved position at step N end, and any ownership change must route through a `BallInFlight` (or explicit hand-off) step — never a direct owner swap between two attached states at different positions.
+
+### 8.4 Ball-coord continuity (no teleports)
+
+The ball has an authoritative position at every step and turn boundary, and that position must be **continuous** — the ball never jumps unless a step explicitly directs it (a pass/shot routes through `BallInFlight`; a knocked-loose ball routes through `BallLoose`).
+
+Position by state: `BallAttached` → owner's coords (no explicit coord field), `BallInFlight` → `current_coords`, `BallLoose` → `coords`.
+
+**Invariants:**
+
+1. **Step seam.** The ball's resolved position at `step[N+1].start` equals its resolved position at `step[N].end`. This is the ball analog of §8.1's player rule — but, unlike player coords, it is **not enforced by construction** (`BallAttached` carries no coord to copy forward), so each emitter must uphold it explicitly.
+2. **Ownership changes happen *within* a step, never across a seam.** A change of ball owner must be expressed as a single step whose `start.ball` = `BallAttached{owner:A}` and `end.ball` = `BallAttached{owner:B}` (or via an intermediate `BallInFlight` pass) — the FE tweens that A→B move as a pass over step T. What is a **teleport bug** is an owner (or position) change that appears *across* a seam: step N `end.ball` ≠ step N+1 `start.ball`, or turn-final ball ≠ turn-entry ball. At a seam the FE does not tween — it renders the position delta as an unconditional `setPosition` snap (see "FE rendering model" below).
+3. **Capture continuity.** A `BallLoose{coords:L}` or `BallInFlight{current_coords:F}` → `BallAttached{owner:P}` transition is continuous only if P is at (≈) L / F at capture time. Emitters must seat the catcher at the ball — not snap the ball to the catcher.
+4. **Turn seam.** The ball's position at a turn's first step must equal the prior turn's final ball position. Today the turn-seam carry is **owner id only** (`build_final_ball_handler_id`); the position is re-derived from that owner's coords in the new turn. **Build target:** a `final_ball_coords` snapshot (parallel to `build_final_coords`) so the turn seam carries an explicit ball position, closing the case where the new owner's coord ≠ where the ball actually was.
+
+**Teleport-audit checklist for emitters:** at every step seam and turn seam, confirm the ball's resolved position moved continuously from its prior resolved position — or that a `BallInFlight` / `BallLoose` step explicitly authorizes the jump. Intermittent teleports concentrate at the seams (ownership change, loose→attached capture, turn boundary) because same-owner steps derive position continuously and look fine; the seams are where an unenforced invariant leaks.
+
+**FE rendering model (verified against `animationPlayback.js`, 2026-07).** The frontend is a faithful renderer *within* a step and a naive snapper *at* seams — every teleport originates from a seam discontinuity the backend emits, not from FE logic:
+
+- **Position resolution.** `ballCoordFromState` ([`animationPlayback.js:63`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L63)) resolves `BallAttached` → owner's coord at that boundary, `BallInFlight` → `current_coords`, `BallLoose` → `coords`.
+- **Within a step (tweened, no teleport).** `renderBallTransition` ([`:272`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L272)) tweens the ball from its start-resolved coord to its end-resolved coord over step T, handling all diff cases — including `attached(A)→attached(B)`, which it detaches and tweens as a pass ([`:306`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L306)). An ownership change expressed inside one step renders smoothly.
+- **Step seam (snap — invariant 1).** `renderBallTransition` opens with an *unconditional* `ballSprite.setPosition(startPx)` ([`:293`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L293)); its own comment notes this is "a no-op" only "if previous step ended at the same coord." A step-seam discontinuity therefore renders as a hard snap.
+- **Turn seam (snap — invariant 4).** `playTurn` snaps the ball to the entry step's start state exactly once, unconditionally, via `snapBallToStartState` ([`:1204`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L1204) → [`:532`](../../FrontEnd/static/js/phaser/animation/animationPlayback.js#L532)), with no reconciliation against the prior turn's final ball position — the persistent `ballSprite` carries over, so a turn-final ≠ turn-entry delta snaps. This is precisely the gap the `final_ball_coords` build target (invariant 4) would close.
+
+Because the FE snaps unconditionally at both seams, seam continuity is an emitter obligation, not something the renderer can rescue.
 
 ---
 
@@ -368,4 +394,4 @@ Ball moves at fixed grid/game-sec rate independent of player rates.
 
 Single source of truth for the violation catalog, remediation order, and item statuses: [`UESS_Backlog.md`](../projects/UESS_Backlog.md) (status header at top). Discussion notes: [`projects/offensive_state_hardening.md`](../projects/offensive_state_hardening.md).
 
-**Headline state (June 2026):** All gameplay turn types except Opening Tip and Timeout emit schema steps. The FE is not yet a pure renderer on all paths, and the §6 / §7 contracts remain unbuilt — see the backlog for open items.
+**Headline state (June 2026):** All gameplay turn types except Opening Tip and Timeout emit schema steps. The FE is not yet a pure renderer on all paths, and the §6 / §7 contracts remain unbuilt — see the backlog for open items. Ball-coord continuity (§8.4) is now a documented invariant but is **not enforced by construction** (no `final_ball_coords` snapshot; step-seam continuity is emitter-upheld, not asserted) — the likely source of the intermittent ball-teleport bugs at ownership/turn seams.
