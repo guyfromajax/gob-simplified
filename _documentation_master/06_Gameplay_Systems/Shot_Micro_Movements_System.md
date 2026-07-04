@@ -75,7 +75,7 @@ All **field-goal shot attempts** that emit schema `animation_steps[]` and resolv
 
 | Turn context | Resolution path | Emitter hook |
 |--------------|-----------------|--------------|
-| HCO, FCP, Final Shot, FLSS | `ShotManager.resolve_shot()` | `skeleton_step_emitter.build_skeleton_animation_steps` |
+| HCO, FCP, Final Shot | `ShotManager.resolve_shot()` | `skeleton_step_emitter.build_skeleton_animation_steps` |
 | Dynamic HCT (FB drive, attack-basket shoot/drive) | `dynamic_hct_shot.py` | `dynamic_hct_step_emitter` |
 | After-steal fast break | `after_steal_fast_break.py` | `after_steal_fast_break_step_emitter` |
 | Rim Runner, Covert Release FB | Shared FB shot paths | `rim_runner_step_emitter`, `covert_release_step_emitter` |
@@ -85,6 +85,7 @@ All **field-goal shot attempts** that emit schema `animation_steps[]` and resolv
 
 | Case | Reason |
 |------|--------|
+| **FLSS** | Forced last-second shot — no micro chain (direct release / FLSS skeleton only) |
 | **Free throws** | Separate emitter; no micro chain |
 | **CHARGE** early return | Nullified shot attempt — no micro (Block policy B3) |
 | **Blocking foul** early return (attack charge path) | Nullified shot attempt — no micro (B3) |
@@ -342,6 +343,10 @@ Stamped on `turn_result` for eligible shot turns:
 Self-contained shot paths (`dynamic_hct_shot`, `after_steal_fast_break`, OREB putback in `shared.py`) call `select_and_stamp_shot_micro()` directly on the turn dict because they bypass `ShotManager.resolve_shot()`.
 
 **HCO / FCP / Final turns** go through `ShotManager.resolve_shot()`, which stamps micro telemetry via a scratch dict then merges onto the turn. Both `micro_movement_family` **and** `uses_shot_arc` must be copied — `[ball_flight]` arc metadata is gated on `uses_shot_arc` at emit time (`stamp_shot_ball_arc_metadata`).
+
+**Final Turn clock budget (2026-07-04):** Preflight in `final_turn_pacing.py` reserves `worst_case_final_turn_micro_reserve()` (+ attack drive reserve) when checking anchor fit. At `resolve_shot`, `_final_turn_micro_budget_seconds` (≈ anchor clock at pass/receive for Outside; anchor minus drive for Attack) caps family selection via `max_pre_release_seconds` — families that would burn past 0:00 are excluded; instant-release fallbacks (`set`, `pullup_attack`, `straight_inside`) remain.
+
+**FLSS:** No micro telemetry and `inject_shot_micro_before_post_shot()` is a no-op when `turn_result.flss` is true.
 
 ---
 

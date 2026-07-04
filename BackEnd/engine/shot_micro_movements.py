@@ -249,6 +249,127 @@ def _pick_outside_dribble_target(
     return random.choice(candidates)
 
 
+# Families with no pre-shoot beats — safe when clock budget is exhausted (Final Turn).
+INSTANT_RELEASE_MICRO_FAMILIES = frozenset({"set", "straight_inside", "pullup_attack"})
+
+
+def _estimate_beat_game_seconds(
+    beat: Dict[str, Any],
+    *,
+    shooter_player: Any,
+    shooter_coord: GridCoord,
+) -> float:
+    """Game-clock burn for one micro beat (mirrors ``build_shot_micro_steps``)."""
+    kind = beat.get("kind")
+    if kind == "move":
+        dx, dy = float(beat["dx"]), float(beat["dy"])
+        dest = _offset_coord(shooter_coord, dx, dy)
+        arch = beat.get("archetype", "standard")
+        rate = _ag_grid_per_game_sec(shooter_player, arch)
+        return max(MICRO_MOVE_STEP_T_FLOOR, _euclid(shooter_coord, dest) / max(1e-6, rate))
+    if kind == "move_to":
+        dest = dict(beat["coord"])
+        arch = beat.get("archetype", "cruise")
+        rate = _ag_grid_per_game_sec(shooter_player, arch)
+        return max(MICRO_MOVE_STEP_T_FLOOR, _euclid(shooter_coord, dest) / max(1e-6, rate))
+    if kind == "flourish":
+        flourish_kind = beat.get("flourish", "pump_fake")
+        return (
+            PUMP_FAKE_FLOURISH_BEAT_T
+            if flourish_kind == "pump_fake"
+            else MICRO_FLOURISH_BEAT_T
+        )
+    return MICRO_FLOURISH_BEAT_T
+
+
+def estimate_micro_pre_release_seconds(
+    family_id: str,
+    *,
+    shooter_player: Any,
+    shooter_coord: GridCoord,
+    off_lineup: Dict[str, Any],
+    all_coords: Dict[str, GridCoord],
+    shooter_id: str,
+    away_offense: Optional[bool] = None,
+) -> float:
+    """Seconds of game clock burned on micro beats before the terminal release."""
+    if away_offense is None:
+        away_offense = _infer_away_offense_from_display_coord(shooter_coord)
+    beats = _build_family_beats(
+        family_id,
+        shooter_coord,
+        away_offense,
+        off_lineup,
+        all_coords,
+        shooter_id,
+    )
+    if not beats or (len(beats) == 1 and beats[0].get("kind") == "shot"):
+        return 0.0
+    total = 0.0
+    current = dict(shooter_coord)
+    for beat in beats[:-1]:
+        total += _estimate_beat_game_seconds(
+            beat, shooter_player=shooter_player, shooter_coord=current,
+        )
+        kind = beat.get("kind")
+        if kind == "move":
+            dx, dy = float(beat["dx"]), float(beat["dy"])
+            current = _offset_coord(current, dx, dy)
+        elif kind == "move_to":
+            current = dict(beat["coord"])
+    return total
+
+
+def _instant_release_fallback(shot_type: str) -> str:
+    st = str(shot_type).lower()
+    if st == "attack":
+        return "pullup_attack"
+    if st == "inside":
+        return "straight_inside"
+    return "set"
+
+
+def worst_case_final_turn_micro_reserve(
+    shot_type: str,
+    *,
+    is_away_offense: bool = False,
+) -> float:
+    """Conservative pre-release micro reserve for Final Turn preflight pacing."""
+    st = str(shot_type).lower()
+    pool_key = st if st in MOVEMENT_POOL_BY_SHOT_TYPE else "outside"
+    pool = MOVEMENT_POOL_BY_SHOT_TYPE[pool_key]
+
+    class _SlowShooter:
+        attributes = {"AG": 1}
+
+    slow = _SlowShooter()
+    shooter_id = "__preflight__"
+    if st == "outside":
+        raw = HCO_STRING_SPOTS.get("upper wing", {"x": 83, "y": 18})
+        coord = get_away_player_coords(raw) if is_away_offense else {"x": float(raw["x"]), "y": float(raw["y"])}
+    elif st == "attack":
+        raw = HCO_STRING_SPOTS.get("basketSpot", {"x": 91, "y": 25})
+        coord = get_away_player_coords(raw) if is_away_offense else {"x": float(raw["x"]), "y": float(raw["y"])}
+    else:
+        raw = HCO_STRING_SPOTS.get("key", {"x": 64, "y": 25})
+        coord = get_away_player_coords(raw) if is_away_offense else {"x": float(raw["x"]), "y": float(raw["y"])}
+    all_coords = {shooter_id: coord}
+
+    worst = 0.0
+    for family_id in pool:
+        pre = estimate_micro_pre_release_seconds(
+            family_id,
+            shooter_player=slow,
+            shooter_coord=coord,
+            off_lineup={},
+            all_coords=all_coords,
+            shooter_id=shooter_id,
+            away_offense=is_away_offense,
+        )
+        worst = max(worst, pre)
+    return worst
+
+
 def select_micro_movement(
     shot_type: str,
     *,
@@ -257,16 +378,51 @@ def select_micro_movement(
     off_lineup: Dict[str, Any],
     all_coords: Dict[str, GridCoord],
     away_offense: Optional[bool] = None,
+    max_pre_release_seconds: Optional[float] = None,
+    shooter_player: Optional[Any] = None,
 ) -> str:
     if away_offense is None:
         away_offense = _infer_away_offense_from_display_coord(shooter_coord)
     pool = list(MOVEMENT_POOL_BY_SHOT_TYPE.get(shot_type, MOVEMENT_POOL_BY_SHOT_TYPE["outside"]))
+    if max_pre_release_seconds is not None:
+        player = shooter_player or _player_lookup_by_id(off_lineup, {}, shooter_id)
+        eligible = [
+            family_id
+            for family_id in pool
+            if estimate_micro_pre_release_seconds(
+                family_id,
+                shooter_player=player,
+                shooter_coord=shooter_coord,
+                off_lineup=off_lineup,
+                all_coords=all_coords,
+                shooter_id=shooter_id,
+                away_offense=away_offense,
+            )
+            <= float(max_pre_release_seconds) + 1e-6
+        ]
+        if eligible:
+            pool = eligible
+        else:
+            return _instant_release_fallback(shot_type)
     choice = random.choice(pool)
     if choice not in OUTSIDE_MOVING_FAMILIES:
         return choice
     teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
     if _pick_outside_dribble_target(shooter_coord, teammates, away_offense) is None:
-        return random.choice(OUTSIDE_STATIC_FALLBACK_FAMILIES)
+        fallback = random.choice(OUTSIDE_STATIC_FALLBACK_FAMILIES)
+        if max_pre_release_seconds is not None:
+            player = shooter_player or _player_lookup_by_id(off_lineup, {}, shooter_id)
+            if estimate_micro_pre_release_seconds(
+                fallback,
+                shooter_player=player,
+                shooter_coord=shooter_coord,
+                off_lineup=off_lineup,
+                all_coords=all_coords,
+                shooter_id=shooter_id,
+                away_offense=away_offense,
+            ) > float(max_pre_release_seconds) + 1e-6:
+                return "set"
+        return fallback
     return choice
 
 
@@ -324,6 +480,8 @@ def select_and_stamp_shot_micro(
     contest_margin: Optional[float],
     shot_defense_score_raw: float,
     away_offense: Optional[bool] = None,
+    max_pre_release_seconds: Optional[float] = None,
+    shooter_player: Optional[Any] = None,
 ) -> str:
     shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
     if away_offense is None:
@@ -338,6 +496,8 @@ def select_and_stamp_shot_micro(
         off_lineup=off_lineup,
         all_coords=all_coords,
         away_offense=away_offense,
+        max_pre_release_seconds=max_pre_release_seconds,
+        shooter_player=shooter_player,
     )
     stamp_micro_telemetry(
         turn_result,
@@ -789,6 +949,8 @@ def inject_shot_micro_before_post_shot(
     away_offense: bool,
 ) -> None:
     """Shared hook: in-place terminal [shoot] → micro chain; travel+shoot → insert after."""
+    if turn_result.get("flss"):
+        return
     apply_shot_micro_steps_to_chain(
         steps, turn_result, off_lineup, def_lineup, away_offense,
     )

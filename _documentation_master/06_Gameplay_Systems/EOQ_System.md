@@ -212,7 +212,7 @@ When `final_turn_shot_this_turn` is popped during handler routing:
 1. **`resolve_final_turn_shot()`** (`turn_manager.py`)
 2. **`_build_final_turn_offense_alignment()` / `_build_final_turn_defense_alignment()`** — zone defense, wing/corner/key spots.
 3. **`resolve_final_turn_shot_logic()`** (`phase_resolution.py`) — shooter selection, shot type, foul/shot resolve.
-4. **Preflight** (`final_turn_pacing.py`) — simulates walk-up from rolled anchor; sets `_step_t_floor_game_seconds` on skeleton step 0.
+4. **Preflight** (`final_turn_pacing.py`) — simulates walk-up from rolled anchor; reserves worst-case shot micro-movement burn (+ attack drive reserve); sets `_step_t_floor_game_seconds` on skeleton step 0.
 5. **`_emit_hco_animation_steps()`** → `build_skeleton_animation_steps` — full UESS schema; FE plays from step 0 (no FE alignment tween).
 6. Stamp turn: `final_turn`, `final_shot_possession`, `final_turn_anchor_clock`.
 
@@ -279,6 +279,8 @@ When `turn.suppress_final_shot_sfx === true`, pass `suppressCourtSfx` to the sec
 **Zones:** normal / penalty / heave (heave terminal). See EOQ_Perfection_Brief for zone thresholds.
 
 **Post-emit:** `finalize_flss_post_emit()` — 1s make burn at ≤ 1s clock; quarter drain when terminal.
+
+**Micro-movements:** FLSS does **not** use shot micro-movements — no family selection, no `inject_shot_micro_before_post_shot` (see [`Shot_Micro_Movements_System.md`](Shot_Micro_Movements_System.md)).
 
 ---
 

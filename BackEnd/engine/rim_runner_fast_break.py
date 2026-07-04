@@ -17,6 +17,7 @@ from BackEnd.constants import (
 )
 from BackEnd.constants.fast_break_play_types import RIM_RUNNER, TRIANGLE
 from BackEnd.models.animator import Animator
+from BackEnd.utils.fb_shot_logical_coords import attach_fb_shot_overlay_context
 from BackEnd.utils.shared import (
     apply_coords_from_animations_list,
     calc_ag_segment_seconds,
@@ -465,6 +466,7 @@ def _triangle_build_turn_result(
             drive_turn["triangle_branch"] = branch
             return drive_turn
 
+    attach_fb_shot_overlay_context(shot_roles, fb_roles, off_lineup, def_lineup)
     turn_result = game.shot_manager.resolve_shot(shot_roles)
     game_state.pop("fast_break_shot_threshold_override", None)
     game_state.pop("fast_break_force_threshold_no_three_bonus", None)
@@ -1245,6 +1247,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             return drive_turn
         # Legacy fallback (only reachable if RR drive resolution is
         # flag-disabled): shoot from the rim-relative `roles["shot_spot"]`.
+        attach_fb_shot_overlay_context(roles, fb_roles, off_lineup, def_lineup)
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
         attach_position_snapshots(turn_result, [rr_snap])
@@ -1324,6 +1327,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
             return drive_turn
         # Legacy fallback (only reachable if RR drive resolution is
         # flag-disabled): shoot from the rim-relative `roles["shot_spot"]`.
+        attach_fb_shot_overlay_context(roles, fb_roles, off_lineup, def_lineup)
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
         attach_position_snapshots(turn_result, [rr_snap])
@@ -1520,6 +1524,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         return drive_turn
     # Legacy fallback (only reachable if RR drive resolution is flag-disabled):
     # shoot from the rim-relative `roles["shot_spot"]`.
+    attach_fb_shot_overlay_context(roles, fb_roles, off_lineup, def_lineup)
     turn_result = game.shot_manager.resolve_shot(roles)
     game_state.pop("fast_break_shot_threshold_override", None)
     attach_position_snapshots(turn_result, [rr_snap])

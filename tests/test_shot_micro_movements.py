@@ -412,3 +412,64 @@ class TestGatherBeats:
             shooter_id="s1",
         )
         assert not any(b.get("flourish") == "gather" for b in beats)
+
+
+class TestFinalTurnMicroBudget:
+    def _shooter(self, ag=50):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(player_id="s1", attributes={"AG": ag})
+
+    def test_set_pump_pre_release_exceeds_tight_budget(self):
+        from BackEnd.engine.shot_micro_movements import (
+            estimate_micro_pre_release_seconds,
+            select_micro_movement,
+        )
+
+        coord = {"x": 83.0, "y": 18.0}
+        pre = estimate_micro_pre_release_seconds(
+            "set_pump",
+            shooter_player=self._shooter(),
+            shooter_coord=coord,
+            off_lineup={},
+            all_coords={"s1": coord},
+            shooter_id="s1",
+        )
+        assert pre == pytest.approx(1.05)
+        family = select_micro_movement(
+            "outside",
+            shooter_coord=coord,
+            shooter_id="s1",
+            off_lineup={},
+            all_coords={"s1": coord},
+            max_pre_release_seconds=0.5,
+            shooter_player=self._shooter(),
+        )
+        assert family == "set"
+
+    def test_flss_inject_is_noop(self):
+        from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+
+        steps = [
+            {
+                "start": {
+                    "coords": {"s1": {"x": 80, "y": 25}},
+                    "action": {"s1": "shoot"},
+                },
+                "end": {"coords": {"s1": {"x": 80, "y": 25}}},
+            }
+        ]
+        before = len(steps)
+        inject_shot_micro_before_post_shot(
+            steps,
+            {"flss": True, "result_type": "MISS", "micro_movement_family": "set_pump"},
+            {},
+            {},
+            False,
+        )
+        assert len(steps) == before
+
+    def test_worst_case_outside_reserve_positive(self):
+        from BackEnd.engine.shot_micro_movements import worst_case_final_turn_micro_reserve
+
+        assert worst_case_final_turn_micro_reserve("outside") > 1.0

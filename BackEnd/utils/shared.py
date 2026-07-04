@@ -1757,6 +1757,7 @@ def collect_near_bounce_rebound_attemptors(
     max_distance=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE,
     exclude_player_ids=None,
     coords_already_display_oriented=False,
+    logical_coords_by_id=None,
 ):
     """Return backend-authored failed rebound attemptors near a miss bounce.
 
@@ -1777,6 +1778,8 @@ def collect_near_bounce_rebound_attemptors(
     if rebounder_id is not None:
         excluded.add(str(rebounder_id))
 
+    logical = logical_coords_by_id if isinstance(logical_coords_by_id, dict) else {}
+
     def _ids_near(lineup):
         ids = []
         for player in (lineup or {}).values():
@@ -1785,7 +1788,8 @@ def collect_near_bounce_rebound_attemptors(
             pid = getattr(player, "player_id", None)
             if pid is None or str(pid) in excluded:
                 continue
-            coords = getattr(player, "coords", None) or {}
+            pid_str = str(pid)
+            coords = logical.get(pid_str) or getattr(player, "coords", None) or {}
             try:
                 px = float(coords.get("x"))
                 py = float(coords.get("y"))
@@ -1793,7 +1797,7 @@ def collect_near_bounce_rebound_attemptors(
                 continue
             dist = ((px - bx) ** 2 + (py - by) ** 2) ** 0.5
             if dist <= threshold:
-                ids.append(str(pid))
+                ids.append(pid_str)
         return ids
 
     def _collect():

@@ -218,3 +218,37 @@ def test_can_run_final_turn_followup_without_runway():
         bh_pos="PG",
         prior_turn=prior,
     ) is False
+
+
+def test_evaluate_final_turn_pacing_reserves_micro_seconds():
+    from BackEnd.engine.final_turn_pacing import evaluate_final_turn_pacing
+    from BackEnd.engine.shot_micro_movements import worst_case_final_turn_micro_reserve
+
+    prior = {
+        "final_coords": {f"home_{pos}": {"x": 64.0, "y": 25.0} for pos in POSITIONS},
+        "final_ball_handler_id": "home_PG",
+    }
+    game = _game(time_remaining=12, prior_turn=prior)
+    skeleton = {
+        "steps": [
+            {"pos_actions": {"PG": {"action": "handle_ball", "location": "deep upper wing"}}},
+            {"pos_actions": {"PG": {"action": "pass", "location": "deep key"}, "SG": {"action": "receive", "location": "upper wing"}}},
+            {"pos_actions": {"SG": {"action": "shoot", "location": "upper wing"}}},
+        ]
+    }
+    o_dest = {pos: {"x": 64.0, "y": 25.0} for pos in POSITIONS}
+    plan = evaluate_final_turn_pacing(
+        game,
+        skeleton=skeleton,
+        o_destinations=o_dest,
+        position_to_spot={pos: "deep upper wing" for pos in POSITIONS},
+        bh_pos="PG",
+        shooter_pos="SG",
+        shot_type="Outside",
+        bh_is_shooter=False,
+        prior_turn=prior,
+        anchor_clock=2.0,
+    )
+    assert plan.micro_reserve_seconds == pytest.approx(
+        worst_case_final_turn_micro_reserve("Outside")
+    )

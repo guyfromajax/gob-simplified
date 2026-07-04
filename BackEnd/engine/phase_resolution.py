@@ -6085,6 +6085,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
             "handoff_fits": pacing.handoff_fits,
             "include_walkup": pacing.include_walkup,
             "anchor_clock": pacing.anchor_clock,
+            "micro_reserve_seconds": pacing.micro_reserve_seconds,
         },
     )
     from BackEnd.utils.eoq_clock_progression import should_route_final_turn_to_flss
@@ -6158,6 +6159,12 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     )
     # Set final_turn so shot_manager can apply Final Turn rules (e.g. blocking foul = 2 FTs only on attack)
     game_state["final_turn"] = True
+    from BackEnd.engine.final_turn_pacing import final_turn_attack_drive_reserve_seconds
+
+    micro_budget = float(pacing.anchor_clock)
+    if shot_type == "Attack":
+        micro_budget -= final_turn_attack_drive_reserve_seconds(is_away_offense=is_away_offense)
+    game_state["_final_turn_micro_budget_seconds"] = max(0.05, micro_budget)
     try:
         log_eoq_step(game, "FINAL_SHOT", "resolve_shot", "START", shooter=shooter, shooter_pos=shooter_pos)
         # SS&S / UESS: same pre-resolve shot coord sync as HCO/FCP/HCT — stamps
@@ -6184,6 +6191,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         )
     finally:
         game_state.pop("final_turn", None)
+        game_state.pop("_final_turn_micro_budget_seconds", None)
     # Cosmetic idle motion on the two stationary beats (step 0 hold, step 1 stand).
     # Rolled here — after resolve_shot — so the idle RNG can't shift the shot.
     _stamp_final_turn_idle_motion(

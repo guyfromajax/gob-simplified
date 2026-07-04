@@ -29,6 +29,17 @@ BACKCOURT_X_AWAY = 29.0
 ANCHOR_TOLERANCE_SEC = 0.35
 
 
+def final_turn_attack_drive_reserve_seconds(*, is_away_offense: bool) -> float:
+    """Conservative game-clock burn from wing to basket on Final Turn attack drives."""
+    wing = _spot_coords("upper wing", is_away_offense=is_away_offense)
+    basket = _spot_coords("basketSpot", is_away_offense=is_away_offense)
+
+    class _SlowShooter:
+        attributes = {"AG": 1}
+
+    return _travel_seconds(wing, basket, _SlowShooter(), archetype="shot_motion")
+
+
 def roll_anchor_clock(shot_type: str) -> float:
     """Roll per-possession anchor: outside shoot @ 1–3s, attack drive start @ 2–4s."""
     if str(shot_type).lower() == "attack":
@@ -53,6 +64,7 @@ class FinalTurnPacingPlan:
     alignment_seconds: float
     entry_pass_seconds: float
     pre_anchor_move_seconds: float
+    micro_reserve_seconds: float = 0.0
     # Dual verdict: whether the handoff ALSO fits on top of the base Final Shot.
     #   include_entry_pass=False               → pg_direct (PG already had it)
     #   handoff_fits=True                      → handoff mode (bh=PG, deliver via handoff)
@@ -536,11 +548,18 @@ def evaluate_final_turn_pacing(
         position_to_spot=position_to_spot,
     )
 
+    from BackEnd.engine.shot_micro_movements import worst_case_final_turn_micro_reserve
+
+    micro_reserve = worst_case_final_turn_micro_reserve(
+        shot_type, is_away_offense=is_away_offense,
+    )
+    if str(shot_type).lower() == "attack":
+        micro_reserve += final_turn_attack_drive_reserve_seconds(is_away_offense=is_away_offense)
+
     # Two budgets. A path "fits" when its fixed pre-anchor cost + alignment + anchor
-    # ≤ time_remaining (i.e. step0_budget ≥ alignment_seconds); the hold floor is the
-    # leftover slack. base = Final Shot WITHOUT the handoff; handoff = with it.
+    # + micro reserve ≤ time_remaining; the hold floor is the leftover slack.
     def _fits_and_hold(fixed_before_hold: float) -> Tuple[bool, float]:
-        step0_budget = time_remaining - fixed_before_hold - anchor
+        step0_budget = time_remaining - fixed_before_hold - anchor - micro_reserve
         fits = step0_budget >= alignment_seconds - 1e-6
         return fits, (max(0.0, step0_budget) if fits else 0.0)
 
@@ -568,6 +587,7 @@ def evaluate_final_turn_pacing(
         alignment_seconds=alignment_seconds,
         entry_pass_seconds=entry_seconds,
         pre_anchor_move_seconds=pre_anchor_move,
+        micro_reserve_seconds=micro_reserve,
         handoff_fits=bool(handoff_fits),
         step0_hold_floor_with_handoff=handoff_hold,
         reason=reason,

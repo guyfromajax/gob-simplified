@@ -1082,19 +1082,40 @@ class ShotManager:
                             },
                         }
                         self._stamp_shot_classification(result, shot_classification)
-                        select_and_stamp_shot_micro(
-                            result,
-                            shot_type=shot_type,
-                            shooter_id=str(shooter.player_id),
-                            shooter_x=float(sx),
-                            shooter_y=float(sy),
-                            off_lineup=off_lineup,
-                            def_lineup=def_lineup,
-                            has_contest=bool(has_contest),
-                            contest_result=contest_result,
-                            contest_margin=contest_margin,
-                            shot_defense_score_raw=float(shot_defense_score_raw or 0),
-                        )
+                        if not roles.get("flss"):
+                            _block_micro: Dict[str, Any] = {}
+                            _block_micro_kwargs: Dict[str, Any] = {
+                                "shot_type": shot_type,
+                                "shooter_id": str(shooter.player_id),
+                                "shooter_x": float(sx),
+                                "shooter_y": float(sy),
+                                "off_lineup": off_lineup,
+                                "def_lineup": def_lineup,
+                                "has_contest": bool(has_contest),
+                                "contest_result": contest_result,
+                                "contest_margin": contest_margin,
+                                "shot_defense_score_raw": float(shot_defense_score_raw or 0),
+                                "shooter_player": shooter,
+                            }
+                            if self.game_state.get("final_turn"):
+                                _block_micro_kwargs["max_pre_release_seconds"] = self.game_state.get(
+                                    "_final_turn_micro_budget_seconds"
+                                )
+                            select_and_stamp_shot_micro(_block_micro, **_block_micro_kwargs)
+                            result.update(
+                                {
+                                    k: _block_micro[k]
+                                    for k in (
+                                        "micro_movement_family",
+                                        "uses_shot_arc",
+                                        "contest_result",
+                                        "contest_margin",
+                                        "shot_defense_score_raw",
+                                        "has_contest",
+                                    )
+                                    if k in _block_micro
+                                }
+                            )
                         if block_recon_foul_out_info and block_recon_foul_out_info.get("fouled_out"):
                             result["fouled_out"] = True
                             result["foul_out_player"] = {
@@ -1941,7 +1962,15 @@ class ShotManager:
                 if is_fast_break:
                     # ==================== FAST BREAK REBOUND (x-eligibility) ====================
                     # Eligibility: home offense → x >= 50; away offense → x <= 50. Then standard rebound logic.
+                    from BackEnd.utils.fb_shot_logical_coords import (
+                        build_fb_shot_logical_coords,
+                        coords_for_fb_overlay_player,
+                    )
+
                     is_away_offense = off_team.team_id == self.game.away_team.team_id
+                    logical_coords = build_fb_shot_logical_coords(
+                        roles, off_lineup, def_lineup,
+                    )
                     with temp_lineup_court_absolute_for_away_rebound_math(self.game, is_away_offense):
                         basket_x = 9 if is_away_offense else 91
                         bounce_spot = block_spot_used or calculate_bounce_spot(self.game, basket_x=basket_x, basket_y=25)
@@ -1951,7 +1980,9 @@ class ShotManager:
                             for pos, player in lineup_dict.items():
                                 if player is None:
                                     continue
-                                px = getattr(player, "coords", {}).get("x", 50)
+                                px = coords_for_fb_overlay_player(
+                                    player, logical_coords,
+                                ).get("x", 50)
                                 if is_away_offense and px <= 50:
                                     eligible[pos] = player
                                 elif not is_away_offense and px >= 50:
@@ -1993,6 +2024,7 @@ class ShotManager:
                             getattr(rebounder, "player_id", None),
                             max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
                             coords_already_display_oriented=True,
+                            logical_coords_by_id=logical_coords,
                         )
                         result["offense_rebounders"] = geo_attemptors["offense_rebounders"]
                         result["defense_rebounders"] = geo_attemptors["defense_rebounders"]
@@ -2288,22 +2320,30 @@ class ShotManager:
         
         is_block_outcome = getattr(self, "_block_spot", None) is not None
 
-        _micro_scratch: Dict[str, Any] = {}
-        select_and_stamp_shot_micro(
-            _micro_scratch,
-            shot_type=shot_type,
-            shooter_id=str(shooter.player_id),
-            shooter_x=float(sx),
-            shooter_y=float(sy),
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            has_contest=bool(has_contest),
-            contest_result=contest_result,
-            contest_margin=contest_margin,
-            shot_defense_score_raw=float(shot_defense_score_raw or 0),
-        )
-        micro_movement_family = _micro_scratch.get("micro_movement_family")
-        uses_shot_arc = bool(_micro_scratch.get("uses_shot_arc"))
+        micro_movement_family = None
+        uses_shot_arc = False
+        if not roles.get("flss"):
+            _micro_scratch: Dict[str, Any] = {}
+            _micro_kwargs: Dict[str, Any] = {
+                "shot_type": shot_type,
+                "shooter_id": str(shooter.player_id),
+                "shooter_x": float(sx),
+                "shooter_y": float(sy),
+                "off_lineup": off_lineup,
+                "def_lineup": def_lineup,
+                "has_contest": bool(has_contest),
+                "contest_result": contest_result,
+                "contest_margin": contest_margin,
+                "shot_defense_score_raw": float(shot_defense_score_raw or 0),
+                "shooter_player": shooter,
+            }
+            if self.game_state.get("final_turn"):
+                _micro_kwargs["max_pre_release_seconds"] = self.game_state.get(
+                    "_final_turn_micro_budget_seconds"
+                )
+            select_and_stamp_shot_micro(_micro_scratch, **_micro_kwargs)
+            micro_movement_family = _micro_scratch.get("micro_movement_family")
+            uses_shot_arc = bool(_micro_scratch.get("uses_shot_arc"))
 
         shot_variant = None
         shot_variant_extras = {}
