@@ -62,7 +62,7 @@ All team attributes are stored in team objects across all game modes:
 - `fb_opp_modifier` - Fast break opponent modifier
 - `pt_opp_modifier` - Press/Trap opponent modifier
 
-**Note:** `momentum_score` exists in some legacy code paths but is NOT initialized in the standard `init_team_attributes()` flow. It may be set manually in specific scenarios but is not part of the standard team attribute initialization.
+**Note:** `momentum_score` is not set in `TeamManager.init_team_attributes()` for single/tournament mode. In **franchise mode**, season init sets it to **0** via `franchise_manager.py`; distant sim updates it after each distant game (see § Momentum below).
 
 ### Default Values
 
@@ -348,9 +348,14 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
 
 ### Momentum (`momentum_score`) (range: -10 to 10)
 
-- Initial seed: FTD creation sets `0`.
-- No current franchise progression faucets or sinks in the working code.
-- Note: `momentum_score` exists in clamps / legacy paths, but current training and EOG flows do not update it.
+- Initial seed: Franchise init / season rollover sets **`0`**.
+- **Distant sim only (Phase 2):** updated after each persisted distant franchise game via `_distant_sim_persist_momentum_score_updates()` in `franchise_routes.py`.
+  - **Win:** `+1.5 × chemistry_scale` (+ `+0.5 × (win_streak − 2)` when streak ≥ 3 after the win).
+  - **Loss:** `−0.8 × chemistry_scale` (+ extra **−2.0** when loss ends a win streak ≥ 3).
+  - `chemistry_scale = max(1.0, team_chemistry / 10)`.
+  - Contributes to distant win probability as **`momentum_score × 8`** combined-score points (`BackEnd/constants/distant_sim.py`).
+- Companion distant-sim fields (not UI attrs): `distant_win_streak`, `distant_loss_streak` on FTD `team_attributes`; reset to **0** at season init.
+- Training and EOG flows do **not** update `momentum_score`.
 
 ### Team Chemistry (`team_chemistry`) (range: 7 to 25)
 The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see the impact of this attribute directly — but you will definitely feel it. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.

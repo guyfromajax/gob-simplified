@@ -21,18 +21,21 @@
 |---|---|
 | Player coord step-seam continuity (§8.1) | ✅ Compliant |
 | Ball coord step-seam continuity, within turn (§8.4 inv.1) | ✅ Compliant |
-| Ball ownership expressed within-step (§8.4 inv.2) | ⚠️ At risk — step-0 double resolver |
-| Ball turn-seam continuity (§8.4 inv.4) | ❌ Gap (known — `final_ball_coords` unbuilt) |
+| Ball ownership expressed within-step (§8.4 inv.2) | ✅ **Fixed (Task 3a, 2026-07-04)** — step-0 end owner reconciled |
+| Ball turn-seam continuity (§8.4 inv.4) | 🟡 **Partial (Task 3b)** — `final_ball_coords` built + stamped; entry consumer pending decision |
 | Single coord source for logic (§1 / §7) | ✅ **Fixed (Task 1, 2026-07-04)** — single build; was double build |
 | Clock authority = ledger, all time counted (§5) | ✅ **Fixed (Task 2, 2026-07-04)** — every HCO turn realigns from emitted steps |
 | Entry orchestrator coord+ball continuity (§4) | ✅ Compliant |
 | Setup-geometry fidelity (players reach authored spots) | ⚠️ At risk — BH-only gate |
 | Entry possession safety | ⚠️ Latent risk — no team check |
 
-### Fix these three, in order
-1. **Stamp one animation build and reuse it** — resolve the shot from the *same* build the emitter renders (kill the RNG mismatch). This is the §7 snapshot's real payoff.
-2. **Realign HCO `time_elapsed` from the emitted steps** (copy the FCP/HCT one-liner that HCO is missing).
-3. **Close the two ball seams** — carry an explicit `final_ball_coords` across turns, and make step-0's start/end ball owner come from *one* resolver.
+### Fix these — STATUS (all shipped 2026-07-04, uncommitted; prototype-tested through Task 2)
+1. ✅ **Single animation build** (Task 1) — shot resolves from the same build the FE renders. Prototype-confirmed.
+2. ✅ **Realign `time_elapsed` from emitted steps** (Task 2) — every HCO turn now, not just shots. Prototype-confirmed.
+3. ✅ **Close the ball seams** (Task 3) — 3a phantom-pass fix shipped; 3b `final_ball_coords` snapshot shipped; 3b entry consumer **gated on `[UESS SEAM]` log evidence**.
+4. ✅ **Cold-start coord coverage** (Task 4) — dropped players backfilled; no stale carry.
+
+**Remaining follow-ups (not blocking 100% core compliance):** watch `[UESS SEAM]` logs → build 3b consumer only if it fires; MED-3 entry-gate breadth (quality); re-tune shooting FG% now that logic == render; §11.2 doc walk-up-floor reconciliation.
 
 ### What's genuinely fine (don't touch)
 Entry handoff/kickout/walk-up coord+ball chaining · post-shot `[shoot]→[ball_flight]→[hold]/[bounce]` cursor threading · all-10-player end.coords coverage on the normal path · no mid-emit `player.coords` mutation · cold-start fallbacks · prepend chain `next`-pointer wiring.
@@ -289,6 +292,12 @@ Order: **1 → 2 → 3 → 4.**
 
 ### Task 3 — Close the two ball seams (fixes MED-1 + MED-2, §8.4 inv.2 & inv.4)
 
+**Status (2026-07-04):** 3a ✅ done & verified. 3b split: **snapshot ✅ done & verified**; **entry consumer ⏸ pending decision** (risky rendering change vs. unobserved edge case — see below).
+
+- **3a DONE** — [`skeleton_step_emitter.py:1495-1517`](../../BackEnd/engine/skeleton_step_emitter.py#L1495): at the entry→skeleton step-0 seam, `owner_id_end` is now reconciled to the delivered owner unless the skeleton genuinely transfers in-step, killing the phantom step-0 pass. Verified no-op on the common path (identical before/after emit signature `51bacd8`).
+- **3b snapshot DONE** — [`animation_step_helpers.py build_final_ball_coords`](../../BackEnd/utils/animation_step_helpers.py) + stamp in [`game_manager.py:797-808`](../../BackEnd/models/game_manager.py#L797). Resolves the ball's true rest position (attached→owner coord, loose/in-flight→explicit) at every turn end. Verified 12/12 against emitted last-step ball rest. Additive — nothing consumes it yet, zero behavioral risk.
+- **3b entry consumer — GATED ON EVIDENCE (decision 2026-07-04).** Instead of shipping the risky entry-gather rendering change up front, added **detection-only logging** ([`skeleton_step_emitter.py`](../../BackEnd/engine/skeleton_step_emitter.py), `UESS_SEAM_TELEPORT_GRID_EPSILON = 1.5`): when the HCO entry BH's coord diverges from prior `final_ball_coords` by > 1.5 grid, logs `🎯 [UESS SEAM] HCO entry ball teleport candidate…`. Behavior-neutral (emit signature unchanged). **Next:** watch logs/prototype — if it fires, build the guarded entry-gather reconciliation; if it never fires, MED-2 is a non-issue for HCO and the consumer can be dropped. Grep `[UESS SEAM]` to measure.
+
 Two independent sub-parts; ship together or as 3a then 3b.
 
 **3a — Unify step-0 ball-owner resolution (MED-1, phantom-pass teleport):**
@@ -308,7 +317,10 @@ Two independent sub-parts; ship together or as 3a then 3b.
 
 ---
 
-### Task 4 — Cold-start step-0 coord coverage (fixes MED-4, §8.2)
+### Task 4 — Cold-start step-0 coord coverage (fixes MED-4, §8.2) — ✅ DONE & VERIFIED (2026-07-04)
+
+**Status:** Shipped. New helper `_backfill_missing_active_coords` ([`skeleton_step_emitter.py`](../../BackEnd/engine/skeleton_step_emitter.py)) + an `if i == 0` backfill call in the step loop: at step 0, any active player missing from the animator's `movement[0]` is backfilled from their live `player.coords` (adds only, never overrides). Propagates to `end.coords` via `_build_step_end_coords_with_interrupts` (iterates `start_coords`) → all-10 coverage across the whole chain.
+**Verification (mongomock):** with the animator forced to omit a player, that player appears in the last step's `end.coords` **15/15 after** vs **0/15 before** (pre-fix he was dropped every turn → stale carry). No-op on the common path (all-10 already present → identical 10/10 before/after). Regression: 26 ownership/continuity/serialization/bounds tests pass.
 
 **Goal:** step 0 always covers all 10 players, even when `prior_turn is None` and the animator omits a player from `movement[0]`, so no player carries stale `player.coords` across the seam.
 

@@ -87,6 +87,11 @@ _ACTION_MAP: Dict[str, PlayerAction] = {
 
 _OFFENSE_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
+# UESS §8.4 inv.4 (HCO_UESS_Audit.md Task 3b): grid distance beyond which the
+# HCO entry-seam ball jump (prior final_ball_coords → entry BH coord) is logged
+# as a teleport candidate. Detection-only threshold — does not change behavior.
+UESS_SEAM_TELEPORT_GRID_EPSILON = 1.5
+
 
 def _archetype_for_action(action: PlayerAction, turn_type: str = "HCO") -> PlayerArchetype:
     """Per-player archetype derived from action.
@@ -162,6 +167,46 @@ def _coords_at_movement_index(
         if pid is None:
             continue
         out[str(pid)] = {"x": float(x), "y": float(y)}
+    return out
+
+
+def _backfill_missing_active_coords(
+    coords: Dict[str, GridCoord],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> Dict[str, GridCoord]:
+    """UESS §8.2 cold-start coverage (HCO_UESS_Audit.md Task 4): ensure every
+    active (offense + defense) player with a live coord appears in ``coords``.
+
+    The legacy animator can omit a player from ``movement[0]`` (e.g. a
+    stationary player on the first possession, where ``prior_turn is None`` so
+    there is no ``final_coords`` seed to backfill from). A player dropped from
+    step 0 is absent from every ``end.coords`` and therefore keeps a **stale**
+    ``player.coords`` across the turn seam (``sync_lineup_coords_from_turn``
+    only overrides pids present in the last step). This backfills any missing
+    active player from their live ``player.coords`` — their actual current
+    position, not a default, so no teleport is introduced. Only ADDS missing
+    pids; never overrides an existing entry, so seeded / prepended step-0
+    branches (already all-10) are unaffected.
+    """
+    out = dict(coords)
+    for lineup in (off_lineup, def_lineup):
+        for player in (lineup or {}).values():
+            if player is None:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid is None:
+                continue
+            pid = str(pid)
+            if pid in out:
+                continue
+            pc = getattr(player, "coords", None)
+            if not isinstance(pc, dict):
+                continue
+            x, y = pc.get("x"), pc.get("y")
+            if x is None or y is None:
+                continue
+            out[pid] = {"x": float(x), "y": float(y)}
     return out
 
 
@@ -1101,6 +1146,37 @@ def build_skeleton_animation_steps(
             current_bh_id, step0_bh_id, turn_result
         )
 
+        # UESS §8.4 inv.4 seam DETECTION (HCO_UESS_Audit.md Task 3b): the ball's
+        # turn-start position is the entry BH's coord (current_bh_id), but the
+        # ball actually RESTED at the prior turn's final_ball_coords. When these
+        # diverge the FE snaps the ball across the gap at turn entry — a teleport.
+        # Detection-only (no behavior change): logs so we can measure whether
+        # MED-2 actually fires before adding the risky entry-gather reconciliation.
+        _prior_fbc = (
+            prior_turn.get("final_ball_coords") if isinstance(prior_turn, dict) else None
+        )
+        if (
+            isinstance(_prior_fbc, dict)
+            and current_bh_id
+            and str(current_bh_id) in prior_final_coords
+        ):
+            _owner_xy = prior_final_coords[str(current_bh_id)]
+            try:
+                _seam_gap = (
+                    (float(_owner_xy.get("x")) - float(_prior_fbc.get("x"))) ** 2
+                    + (float(_owner_xy.get("y")) - float(_prior_fbc.get("y"))) ** 2
+                ) ** 0.5
+            except (TypeError, ValueError):
+                _seam_gap = 0.0
+            if _seam_gap > UESS_SEAM_TELEPORT_GRID_EPSILON:
+                import logging as _seam_log
+                _seam_log.warning(
+                    "🎯 [UESS SEAM] HCO entry ball teleport candidate: prior "
+                    "final_ball_coords=%s → BH %s @ %s (gap=%.1f grid, prior=%s)",
+                    _prior_fbc, current_bh_id, _owner_xy, _seam_gap,
+                    prior_turn.get("current_turn") or prior_turn.get("result_type"),
+                )
+
         # HCO step 0 setup coords (where the playcall expects players to be
         # at step 0 start). Resolved from animations[0].movement[0].
         setup_coords = _coords_at_movement_index(animations, 0)
@@ -1446,6 +1522,17 @@ def build_skeleton_animation_steps(
             start_coords = {**anim_start, **prior_end}
         else:
             start_coords = _coords_at_movement_index(animations, i)
+        # UESS §8.2 cold-start coverage (HCO_UESS_Audit.md Task 4): step 0 must
+        # carry ALL active players. The seeded / prepended branches above already
+        # do; the bare ``else`` (cold start, prior_turn is None) can drop a player
+        # the animator omitted from movement[0]. Backfill any missing active
+        # player from live lineup coords (adds only, never overrides) so nobody
+        # keeps a stale player.coords across the turn seam. Propagates to
+        # end.coords via _build_step_end_coords_with_interrupts (iterates start).
+        if i == 0:
+            start_coords = _backfill_missing_active_coords(
+                start_coords, off_lineup, def_lineup
+            )
         end_coords = _coords_at_movement_index(animations, i + 1)
         # Legacy animations[].movement is often 1 waypoint short of the
         # schema's contract (N steps need N+1 waypoints, legacy provides N).
@@ -1496,6 +1583,22 @@ def build_skeleton_animation_steps(
             prepended_owner = _attached_owner_from_step_end(steps[reset_count - 1])
             if prepended_owner:
                 owner_id_start = prepended_owner
+                # MED-1 (HCO_UESS_Audit.md Task 3a): the delivered owner also owns
+                # the END of step 0 UNLESS the skeleton genuinely transfers the
+                # ball in-step (a pass+receive pair → start_owner_pos !=
+                # end_owner_pos). Without this, ``owner_id_end`` keeps
+                # ``_walk_ball_owners``' resolver (PG-first handle_ball/pass),
+                # which can disagree with the delivered owner (``step0_bh_id``,
+                # resolved via handle_ball/receive/shoot) and fabricate a phantom
+                # step-0 pass — a ball teleport at the entry→skeleton seam. When
+                # step 0 DOES transfer, keep the resolved receiver as end owner.
+                step0_has_transfer = (
+                    bool(start_owner_pos)
+                    and bool(end_owner_pos)
+                    and start_owner_pos != end_owner_pos
+                )
+                if not step0_has_transfer:
+                    owner_id_end = prepended_owner
 
         ball_handler_role = roles.get("ball_handler")
         bh_id_fallback = _safe_id(ball_handler_role) or ""

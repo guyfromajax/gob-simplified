@@ -1,14 +1,25 @@
 ##Bugs 
-39. Fine tune FLSS bounce spot placement
 42. Not corretly registring 2pt and 3pt shot attempts based on geo
-43. Getting some teleport passes in Motion HCO offense
 
 ##Player Images
 1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
 
+#UESS Turn Audits
+1. Final Turn (FLSS included?)
+2. OREB
+3. DREB
+4. BIP
+5. SIP
+6. HCT
+7. FCP
+8. Fast Break
+9. Free Throw
+10. Opening Tip
+11. Timeout
+
+
 ##Verify as Perfect
-1. Mid Game Resume System
-2. EOQ Perfection
+1. EOQ Perfection
 
 ##Full Product Readiness
 102. Team court images
@@ -24,6 +35,8 @@
 126. MM: Dunks!
 127. Add a new hire news story for user team
 128. Add a badass design appraoch to New Stories
+129. More overt shooting foul micro animation
+130. Alter computer sim game logic to get more strong 25-1 teams
 
 ##Full Product Perfection
 1. Training Camp News Report
@@ -40,7 +53,8 @@
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 128. Account for micro shot movements in Final Shot
 129: Loose Balls!
-130. Include all turn types (HCT, FCP, Fast Break, etc) in FLSS / EOG Perfectio
+130. Include all turn types (HCT, FCP, Fast Break, etc) in FLSS / EOG Perfection
+131. Centralized Turn Transition Helper / System
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed

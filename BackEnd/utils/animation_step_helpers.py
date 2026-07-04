@@ -97,6 +97,67 @@ def build_final_ball_handler_id(turn_result: Dict[str, Any]) -> Optional[str]:
     return str(pid) if pid else None
 
 
+def build_final_ball_coords(
+    turn_result: Dict[str, Any],
+    final_coords: Optional[Dict[str, GridCoord]] = None,
+) -> Optional[GridCoord]:
+    """Snapshot the ball's actual rendered rest position at turn end, mirroring
+    the FE's ``ballCoordFromState``:
+
+      - BallAttached  → the owner's end coord (last step's ``end.coords``,
+        falling back to ``final_coords``).
+      - BallInFlight  → ``current_coords``.
+      - BallLoose     → ``coords``.
+
+    Returns ``{x, y}`` or ``None`` when there is no unified payload to read.
+    Stamped alongside ``final_ball_handler_id`` so the next turn's entry
+    orchestrator can carry the ball's *true rest position* across the turn seam
+    (UESS §8.4 invariant 4) instead of re-deriving it from the owner's coord
+    alone — the source of intermittent ball teleports at ownership/turn seams.
+    """
+    if not isinstance(turn_result, dict):
+        return None
+    steps = turn_result.get("animation_steps")
+    if not (isinstance(steps, list) and steps):
+        return None
+    last = steps[-1]
+    if not isinstance(last, dict):
+        return None
+    end = last.get("end") or {}
+    ball = end.get("ball") or {}
+    if not isinstance(ball, dict):
+        return None
+
+    def _xy(c: Any) -> Optional[GridCoord]:
+        if not isinstance(c, dict):
+            return None
+        x, y = c.get("x"), c.get("y")
+        if x is None or y is None:
+            return None
+        return {"x": float(x), "y": float(y)}
+
+    # In-flight / loose carry an explicit ball coord.
+    inflight = _xy(ball.get("current_coords"))
+    if inflight is not None:
+        return inflight
+    loose = _xy(ball.get("coords"))
+    if loose is not None:
+        return loose
+
+    # Attached → owner's end coord (schema keys ball position to the owner).
+    owner = ball.get("owner_player_id")
+    if owner is not None:
+        end_coords = end.get("coords") or {}
+        oc = _xy(end_coords.get(str(owner)) if str(owner) in end_coords else end_coords.get(owner))
+        if oc is not None:
+            return oc
+        if isinstance(final_coords, dict):
+            fc = _xy(final_coords.get(str(owner)) if str(owner) in final_coords else final_coords.get(owner))
+            if fc is not None:
+                return fc
+    return None
+
+
 def _player_lookup_by_id(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],

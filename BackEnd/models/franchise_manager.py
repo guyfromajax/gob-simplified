@@ -584,6 +584,8 @@ class FranchiseManager:
                 "rebound_modifier": team_attrs["rebound_modifier"],
                 "team_chemistry": team_attrs["team_chemistry"],
                 "momentum_score": 0,
+                "distant_win_streak": 0,
+                "distant_loss_streak": 0,
                 "offensive_efficiency": team_attrs["offensive_efficiency"],
                 "defensive_efficiency": team_attrs["defensive_efficiency"],
                 "discipline": team_attrs["discipline"],

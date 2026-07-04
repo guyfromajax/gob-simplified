@@ -40,49 +40,30 @@ TUNING_DOC = os.path.join(
 
 
 # ---------------------------------------------------------------------------
-# Distant sim engine — mirrors franchise_routes.py (2026-07-04)
+# Distant sim engine — production helpers (BackEnd/utils/distant_sim_engine.py)
 # ---------------------------------------------------------------------------
 
-
-def distant_momentum_multiplier(team_chemistry_raw: Any) -> int:
-    try:
-        tc_raw = int(team_chemistry_raw)
-    except (TypeError, ValueError):
-        tc_raw = 7
-    tc = max(7, min(25, tc_raw))
-    if tc < 11:
-        return 1
-    if tc < 16:
-        return 2
-    if tc < 21:
-        return 3
-    if tc < 25:
-        return 4
-    return 6
-
-
-def distant_momentum_term(team_chemistry: int, season_wins: int) -> int:
-    mult = distant_momentum_multiplier(team_chemistry)
-    return mult * max(0, int(season_wins))
-
-
-def distant_home_chemistry_bonus(team_chemistry: int) -> int:
-    return 2 * int(team_chemistry)
+from BackEnd.distant_sim_engine import (
+    compute_distant_momentum_score_updates,
+    distant_sim_home_chemistry_bonus,
+    distant_sim_team_combined as production_distant_team_combined,
+)
 
 
 def distant_team_combined(
+    team: SimTeam,
     *,
-    prestige: int,
-    total_player_attrs: int,
-    team_chemistry: int,
     season_wins: int,
+    season_losses: int,
     is_home: bool,
 ) -> int:
-    base = int(prestige) + int(0.1 * total_player_attrs)
-    out = base + distant_momentum_term(team_chemistry, season_wins)
-    if is_home:
-        out += distant_home_chemistry_bonus(team_chemistry)
-    return out
+    return production_distant_team_combined(
+        _sim_team_ftd(team),
+        season_wins=season_wins,
+        season_losses=season_losses,
+        is_home=is_home,
+        fpd_by_player_id=_sim_fpd_for_team(team) or None,
+    )
 
 
 def full_sim_proxy_combined(
@@ -98,7 +79,7 @@ def full_sim_proxy_combined(
     """
     base = int(prestige) + int(0.25 * total_player_attrs)
     if is_home:
-        base += distant_home_chemistry_bonus(team_chemistry)
+        base += distant_sim_home_chemistry_bonus(team_chemistry)
     return base
 
 
@@ -237,6 +218,51 @@ class SimTeam:
     total_player_attrs: int
     team_chemistry: int
     preseason_rank: int = 0
+    momentum_score: float = 0.0
+    distant_win_streak: int = 0
+    distant_loss_streak: int = 0
+    live_player_attrs: int | None = None
+    sim_roster_player_id: str | None = None
+
+
+_SIM_CORE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
+
+
+def _sim_fpd_for_team(team: SimTeam) -> dict[str, dict]:
+    if team.live_player_attrs is None:
+        return {}
+    pid = team.sim_roster_player_id or f"sim-{team.team_id}"
+    per_attr = max(0, team.live_player_attrs // len(_SIM_CORE_ATTRS))
+    return {pid: {"attributes": {k: per_attr for k in _SIM_CORE_ATTRS}}}
+
+
+def _sim_team_ftd(team: SimTeam) -> dict:
+    ftd = {
+        "prestige": team.prestige,
+        "total_player_attrs": team.total_player_attrs,
+        "team_attributes": {
+            "team_chemistry": team.team_chemistry,
+            "momentum_score": team.momentum_score,
+            "distant_win_streak": team.distant_win_streak,
+            "distant_loss_streak": team.distant_loss_streak,
+        },
+    }
+    if team.live_player_attrs is not None:
+        ftd["players"] = [team.sim_roster_player_id or f"sim-{team.team_id}"]
+    return ftd
+
+
+def _apply_momentum_updates_to_sim_teams(winner: SimTeam, loser: SimTeam) -> None:
+    w_updates, l_updates = compute_distant_momentum_score_updates(
+        _sim_team_ftd(winner)["team_attributes"],
+        _sim_team_ftd(loser)["team_attributes"],
+    )
+    winner.momentum_score = float(w_updates["momentum_score"])
+    winner.distant_win_streak = int(w_updates["distant_win_streak"])
+    winner.distant_loss_streak = int(w_updates["distant_loss_streak"])
+    loser.momentum_score = float(l_updates["momentum_score"])
+    loser.distant_win_streak = int(l_updates["distant_win_streak"])
+    loser.distant_loss_streak = int(l_updates["distant_loss_streak"])
 
 
 def _region_for_conference(conference: int) -> str:
@@ -397,6 +423,7 @@ def _combined_for_team(
     team: SimTeam,
     *,
     wins: int,
+    losses: int,
     is_home: bool,
     engine: EngineMode,
     is_user_conference: bool,
@@ -409,10 +436,9 @@ def _combined_for_team(
             is_home=is_home,
         )
     return distant_team_combined(
-        prestige=team.prestige,
-        total_player_attrs=team.total_player_attrs,
-        team_chemistry=team.team_chemistry,
+        team,
         season_wins=wins,
+        season_losses=losses,
         is_home=is_home,
     )
 
@@ -423,6 +449,7 @@ def simulate_season(
     *,
     engine: EngineMode = "distant",
     user_conference: int = 1,
+    live_talent_proxy_per_week: int = 0,
 ) -> dict[str, Any]:
     by_id = {t.team_id: t for t in teams}
     wins: Counter[str] = Counter()
@@ -435,6 +462,8 @@ def simulate_season(
             home = by_id[home_id]
             away_w = wins[away_id]
             home_w = wins[home_id]
+            away_l = losses[away_id]
+            home_l = losses[home_id]
 
             away_conf = away.conference == user_conference
             home_conf = home.conference == user_conference
@@ -443,6 +472,7 @@ def simulate_season(
             away_combined = _combined_for_team(
                 away,
                 wins=away_w,
+                losses=away_l,
                 is_home=False,
                 engine=engine,
                 is_user_conference=away_conf,
@@ -450,6 +480,7 @@ def simulate_season(
             home_combined = _combined_for_team(
                 home,
                 wins=home_w,
+                losses=home_l,
                 is_home=True,
                 engine=engine,
                 is_user_conference=home_conf,
@@ -474,9 +505,18 @@ def simulate_season(
             if home_won:
                 wins[home_id] += 1
                 losses[away_id] += 1
+                _apply_momentum_updates_to_sim_teams(home, away)
             else:
                 wins[away_id] += 1
                 losses[home_id] += 1
+                _apply_momentum_updates_to_sim_teams(away, home)
+
+        if live_talent_proxy_per_week > 0:
+            for t in teams:
+                if t.live_player_attrs is None:
+                    t.live_player_attrs = t.total_player_attrs
+                    t.sim_roster_player_id = f"sim-{t.team_id}"
+                t.live_player_attrs += live_talent_proxy_per_week
 
         if week_idx in (6, 10, 14, 18, 22, 26):
             for t in teams:
@@ -530,6 +570,7 @@ def run_monte_carlo(
     user_conference: int,
     base_teams: list[SimTeam],
     schedule: list[list[tuple[str, str]]],
+    live_talent_proxy_per_week: int = 0,
 ) -> MonteCarloReport:
     rng = random.Random(seed)
     all_final: list[list[int]] = []
@@ -556,6 +597,9 @@ def run_monte_carlo(
                 total_player_attrs=t.total_player_attrs,
                 team_chemistry=rng.randint(7, 10),
                 preseason_rank=t.preseason_rank,
+                momentum_score=0.0,
+                distant_win_streak=0,
+                distant_loss_streak=0,
             )
             for t in base_teams
         ]
@@ -564,6 +608,7 @@ def run_monte_carlo(
             schedule,
             engine=engine,
             user_conference=user_conference,
+            live_talent_proxy_per_week=live_talent_proxy_per_week,
         )
         fw = result["final_wins"]
         season_wins_list = [fw[t.team_id] for t in season_teams]
@@ -772,6 +817,13 @@ def main() -> int:
     )
     parser.add_argument("--write-doc", action="store_true", help="Update Distant_Sim_Tuning.md")
     parser.add_argument("--json", type=str, default=RESULTS_JSON, help="Output JSON path")
+    parser.add_argument(
+        "--live-talent-proxy",
+        type=int,
+        default=0,
+        metavar="N",
+        help="MC-only: add N live roster attrs/week via FPD path (simulates training growth)",
+    )
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -797,6 +849,7 @@ def main() -> int:
             "seed": args.seed,
             "team_source": team_source,
             "conference_mode": args.conference_mode,
+            "live_talent_proxy_per_week": args.live_talent_proxy,
             "run_date": "2026-07-04",
         }
     }
@@ -810,6 +863,7 @@ def main() -> int:
             user_conference=args.user_conference,
             base_teams=base_teams,
             schedule=schedule,
+            live_talent_proxy_per_week=args.live_talent_proxy,
         )
         print_report(report, team_source)
         rd = report_to_dict(report, team_source)

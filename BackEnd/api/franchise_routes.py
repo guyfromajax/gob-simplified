@@ -2371,12 +2371,10 @@ def _build_franchise_game_inbox_entry(
 
 def _distant_sim_home_team_chemistry_bonus(home_ftd: dict) -> int:
     """Home win-roll bonus: 2 × team_chemistry from FTD team_attributes (Distant_Game_Sim_System.md)."""
+    from BackEnd.distant_sim_engine import distant_sim_home_chemistry_bonus
+
     raw = (home_ftd.get("team_attributes") or {}).get("team_chemistry")
-    try:
-        tc = int(raw)
-    except (TypeError, ValueError):
-        tc = 0
-    return 2 * tc
+    return distant_sim_home_chemistry_bonus(raw)
 
 
 def _distant_sim_regular_season_standings(
@@ -2400,30 +2398,45 @@ def _distant_sim_regular_season_standings(
     return calculate_franchise_standings(rs_slice, team_ids_map)
 
 
+def _distant_sim_batch_fpd_map(
+    franchise_id: ObjectId,
+    ftd_by_team_id: dict[str, dict],
+) -> dict[str, dict[str, Any]]:
+    """Batch-load FPD attributes for all active rosters in a distant-sim week."""
+    player_ids: list[str] = []
+    seen: set[str] = set()
+    for doc in ftd_by_team_id.values():
+        for pid in doc.get("players") or []:
+            s = str(pid)
+            if s and s not in seen:
+                seen.add(s)
+                player_ids.append(s)
+    if not player_ids:
+        return {}
+    return _load_fpd_map(franchise_id, player_ids)
+
+
 def _distant_sim_momentum_multiplier(team_chemistry_raw: Any) -> int:
-    """Momentum multiplier from team chemistry (clamped 7–25 for bands). Distant_Game_Sim_System.md."""
-    try:
-        tc_raw = int(team_chemistry_raw)
-    except (TypeError, ValueError):
-        tc_raw = 7
-    tc = max(7, min(25, tc_raw))
-    if tc < 11:
-        return 1
-    if tc < 16:
-        return 2
-    if tc < 21:
-        return 3
-    if tc < 25:
-        return 4
-    return 6
+    """Momentum multiplier from team chemistry. Distant_Game_Sim_System.md."""
+    from BackEnd.distant_sim_engine import distant_sim_momentum_multiplier
+
+    return distant_sim_momentum_multiplier(team_chemistry_raw)
 
 
-def _distant_sim_momentum_term(ftd_doc: dict, season_wins: int) -> int:
-    """mo_multiplier × regular-season wins (Distant_Game_Sim_System.md)."""
+def _distant_sim_momentum_term(
+    ftd_doc: dict,
+    season_wins: int,
+    season_losses: int,
+) -> int:
+    """DISTANT_MO_MULT × (regular-season wins − losses). Distant_Game_Sim_System.md."""
+    from BackEnd.distant_sim_engine import distant_sim_record_momentum
+
     raw = (ftd_doc.get("team_attributes") or {}).get("team_chemistry")
-    mult = _distant_sim_momentum_multiplier(raw)
-    w = max(0, int(season_wins))
-    return mult * w
+    return distant_sim_record_momentum(
+        raw,
+        season_wins=season_wins,
+        season_losses=season_losses,
+    )
 
 
 def _distant_sim_team_combined(
@@ -2432,15 +2445,22 @@ def _distant_sim_team_combined(
     *,
     is_home: bool,
     rs_standings: dict[str, dict[str, int]],
+    fpd_by_player_id: dict[str, dict] | None = None,
 ) -> int:
-    """Base + momentum (RS wins) + home-only 2×chemistry bonus. See Distant_Game_Sim_System.md."""
+    """Base + record momentum (W−L) + season momentum + home bonus. See Distant_Game_Sim_System.md."""
+    from BackEnd.distant_sim_engine import distant_sim_team_combined
+
     tid = str(team_object_id)
-    wins = int((rs_standings.get(tid) or {}).get("W", 0) or 0)
-    base = (ftd_doc.get("prestige") or 0) + int(0.1 * (ftd_doc.get("total_player_attrs") or 0))
-    out = base + _distant_sim_momentum_term(ftd_doc, wins)
-    if is_home:
-        out += _distant_sim_home_team_chemistry_bonus(ftd_doc)
-    return out
+    row = rs_standings.get(tid) or {}
+    wins = int(row.get("W", 0) or 0)
+    losses = int(row.get("L", 0) or 0)
+    return distant_sim_team_combined(
+        ftd_doc,
+        season_wins=wins,
+        season_losses=losses,
+        is_home=is_home,
+        fpd_by_player_id=fpd_by_player_id,
+    )
 
 
 def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
@@ -2506,6 +2526,72 @@ def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, 
     return (losing_score, winning_score)
 
 
+def _distant_sim_persist_momentum_score_updates(
+    franchise_id: ObjectId,
+    *,
+    winner_team_object_id: ObjectId,
+    loser_team_object_id: ObjectId,
+    ftd_cache: dict[str, dict] | None = None,
+) -> None:
+    """Update FTD momentum_score + distant win/loss streaks after a distant game."""
+    from BackEnd.distant_sim_engine import compute_distant_momentum_score_updates
+
+    winner_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id, "team_id": winner_team_object_id},
+        {"team_attributes": 1},
+    )
+    loser_doc = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id, "team_id": loser_team_object_id},
+        {"team_attributes": 1},
+    )
+    if not winner_doc or not loser_doc:
+        return
+
+    winner_updates, loser_updates = compute_distant_momentum_score_updates(
+        winner_doc.get("team_attributes"),
+        loser_doc.get("team_attributes"),
+    )
+    for team_oid, partial in (
+        (winner_team_object_id, winner_updates),
+        (loser_team_object_id, loser_updates),
+    ):
+        set_payload = {f"team_attributes.{k}": v for k, v in partial.items()}
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": team_oid},
+            {"$set": set_payload},
+        )
+        if ftd_cache is not None:
+            cache_key = str(team_oid)
+            cached = ftd_cache.get(cache_key)
+            if cached is not None:
+                team_attrs = cached.setdefault("team_attributes", {})
+                team_attrs.update(partial)
+
+
+def _distant_sim_apply_result_to_standings_cache(
+    rs_standings: dict[str, dict[str, int]],
+    away_id: Any,
+    home_id: Any,
+    away_score: int,
+    home_score: int,
+) -> None:
+    """Increment in-memory RS W/L so later same-week distant sims see updated records."""
+    away_key = str(away_id)
+    home_key = str(home_id)
+    for key in (away_key, home_key):
+        rs_standings.setdefault(key, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+    if home_score > away_score:
+        rs_standings[home_key]["W"] = int(rs_standings[home_key].get("W", 0) or 0) + 1
+        rs_standings[away_key]["L"] = int(rs_standings[away_key].get("L", 0) or 0) + 1
+    else:
+        rs_standings[away_key]["W"] = int(rs_standings[away_key].get("W", 0) or 0) + 1
+        rs_standings[home_key]["L"] = int(rs_standings[home_key].get("L", 0) or 0) + 1
+    rs_standings[home_key]["PF"] = int(rs_standings[home_key].get("PF", 0) or 0) + int(home_score)
+    rs_standings[home_key]["PA"] = int(rs_standings[home_key].get("PA", 0) or 0) + int(away_score)
+    rs_standings[away_key]["PF"] = int(rs_standings[away_key].get("PF", 0) or 0) + int(away_score)
+    rs_standings[away_key]["PA"] = int(rs_standings[away_key].get("PA", 0) or 0) + int(home_score)
+
+
 def _persist_distant_franchise_game(
     *,
     franchise_id: ObjectId,
@@ -2514,6 +2600,7 @@ def _persist_distant_franchise_game(
     home_team_object_id: ObjectId,
     away_score: int,
     home_score: int,
+    ftd_cache: dict[str, dict] | None = None,
 ) -> tuple[dict[str, Any], str]:
     summary = build_distant_game_summary(
         franchise_id=str(franchise_id),
@@ -2531,9 +2618,11 @@ def _persist_distant_franchise_game(
     away_team_id = _normalize_team_id_to_string(away_team_object_id) or str(away_team_object_id)
     if home_score > away_score:
         winner_id, loser_id = home_team_id, away_team_id
+        winner_oid, loser_oid = home_team_object_id, away_team_object_id
         winner_score, loser_score = home_score, away_score
     else:
         winner_id, loser_id = away_team_id, home_team_id
+        winner_oid, loser_oid = away_team_object_id, home_team_object_id
         winner_score, loser_score = away_score, home_score
     _finalize_team_attributes_for_game(
         game_id=game_id,
@@ -2545,6 +2634,12 @@ def _persist_distant_franchise_game(
         winner_score=winner_score,
         loser_score=loser_score,
         week=week,
+    )
+    _distant_sim_persist_momentum_score_updates(
+        franchise_id,
+        winner_team_object_id=winner_oid,
+        loser_team_object_id=loser_oid,
+        ftd_cache=ftd_cache,
     )
 
     sim_res = _save_game_result(
@@ -5525,12 +5620,20 @@ def _complete_week_finish_cpu_and_persist(
         {"franchise_id": franchise_id},
         {
             "team_id": 1,
+            "players": 1,
             "prestige": 1,
             "total_player_attrs": 1,
             "team_attributes.team_chemistry": 1,
+            "team_attributes.momentum_score": 1,
+            "team_attributes.distant_win_streak": 1,
+            "team_attributes.distant_loss_streak": 1,
+            "team_attributes.offensive_efficiency": 1,
+            "team_attributes.defensive_efficiency": 1,
+            "team_attributes.shot_threshold": 1,
         },
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+    distant_fpd_by_player_id = _distant_sim_batch_fpd_map(franchise_id, ftd_by_team_id)
     distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
     team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
     if user_team_id_str and ObjectId.is_valid(user_team_id_str):
@@ -5653,10 +5756,12 @@ def _complete_week_finish_cpu_and_persist(
                 home_ftd = ftd_by_team_id.get(str(home_id), {})
                 away_ftd = ftd_by_team_id.get(str(away_id), {})
                 home_combined = _distant_sim_team_combined(
-                    home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings
+                    home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
+                    fpd_by_player_id=distant_fpd_by_player_id,
                 )
                 away_combined = _distant_sim_team_combined(
-                    away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
+                    away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
+                    fpd_by_player_id=distant_fpd_by_player_id,
                 )
                 home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
                 try:
@@ -5667,6 +5772,7 @@ def _complete_week_finish_cpu_and_persist(
                         home_team_object_id=home_id,
                         away_score=away_score,
                         home_score=home_score,
+                        ftd_cache=ftd_by_team_id,
                     )
                 except Exception:
                     logger.exception(
@@ -5749,10 +5855,12 @@ def _complete_week_finish_cpu_and_persist(
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             away_ftd = ftd_by_team_id.get(str(away_id), {})
             home_combined = _distant_sim_team_combined(
-                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings
+                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
+                fpd_by_player_id=distant_fpd_by_player_id,
             )
             away_combined = _distant_sim_team_combined(
-                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
+                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
+                fpd_by_player_id=distant_fpd_by_player_id,
             )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             _distant_game_id = None
@@ -5764,6 +5872,7 @@ def _complete_week_finish_cpu_and_persist(
                     home_team_object_id=home_id,
                     away_score=away_score,
                     home_score=home_score,
+                    ftd_cache=ftd_by_team_id,
                 )
             except Exception:
                 logger.exception(
@@ -5804,6 +5913,9 @@ def _complete_week_finish_cpu_and_persist(
                 ),
             )
             winner_id_rs = home_id if home_score > away_score else away_id
+            _distant_sim_apply_result_to_standings_cache(
+                distant_rs_standings, away_id, home_id, away_score, home_score
+            )
             _award_gp_sim(winner_id_rs, None, (away_id, home_id))
             continue
     
@@ -13252,12 +13364,20 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         {"franchise_id": franchise_id},
         {
             "team_id": 1,
+            "players": 1,
             "prestige": 1,
             "total_player_attrs": 1,
             "team_attributes.team_chemistry": 1,
+            "team_attributes.momentum_score": 1,
+            "team_attributes.distant_win_streak": 1,
+            "team_attributes.distant_loss_streak": 1,
+            "team_attributes.offensive_efficiency": 1,
+            "team_attributes.defensive_efficiency": 1,
+            "team_attributes.shot_threshold": 1,
         },
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
+    distant_fpd_by_player_id = _distant_sim_batch_fpd_map(franchise_id, ftd_by_team_id)
     distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
 
     results = []
@@ -13272,10 +13392,12 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             away_ftd = ftd_by_team_id.get(str(away_id), {})
             home_combined = _distant_sim_team_combined(
-                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings
+                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
+                fpd_by_player_id=distant_fpd_by_player_id,
             )
             away_combined = _distant_sim_team_combined(
-                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings
+                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
+                fpd_by_player_id=distant_fpd_by_player_id,
             )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             winner_id = home_id if home_score > away_score else away_id

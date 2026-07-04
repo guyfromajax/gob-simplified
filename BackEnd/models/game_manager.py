@@ -793,9 +793,16 @@ class GameManager:
             from BackEnd.utils.animation_step_helpers import (
                 build_final_coords,
                 build_final_ball_handler_id,
+                build_final_ball_coords,
             )
             turn_result["final_coords"] = build_final_coords(self)
             turn_result["final_ball_handler_id"] = build_final_ball_handler_id(turn_result)
+            # UESS §8.4 invariant 4 (HCO_UESS_Audit.md Task 3b): the ball's true
+            # rendered rest position, so the next turn's entry can carry it across
+            # the seam instead of re-deriving from the owner's coord alone.
+            turn_result["final_ball_coords"] = build_final_ball_coords(
+                turn_result, turn_result.get("final_coords")
+            )
 
         self._check_lineups_for_foul_out(turn_result)
         if turn_result.get("fouled_out"):

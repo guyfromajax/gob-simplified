@@ -1,6 +1,6 @@
 # Distant Sim Tuning — Season Momentum & Record Distribution
 
-**Date:** 2026-07-04 · **Scope:** Distant (lightweight) franchise CPU game sim — win probability inputs, season record distribution, national rankings skew · **Status:** Phase 0 complete — baseline measured · **Primary code:** `BackEnd/api/franchise_routes.py` (`_distant_sim_*`, `_run_distant_game_sim`, `_complete_week_finish_cpu_and_persist`) · **Calibration script:** `scripts/distant_sim_monte_carlo.py` · **Primary doc:** [`Distant_Game_Sim_System.md`](../04_Franchise_Mode_Systems/Distant_Game_Sim_System.md)
+**Date:** 2026-07-04 · **Scope:** Distant (lightweight) franchise CPU game sim — win probability inputs, season record distribution, national rankings skew · **Status:** Phase 3 complete — live `talent_signal` from FPD at sim time · **Primary code:** `BackEnd/api/franchise_routes.py`, `BackEnd/distant_sim_engine.py` · **Calibration script:** `scripts/distant_sim_monte_carlo.py` · **Primary doc:** [`Distant_Game_Sim_System.md`](../04_Franchise_Mode_Systems/Distant_Game_Sim_System.md)
 
 ---
 
@@ -33,35 +33,41 @@ See [`Distant_Game_Sim_System.md`](../04_Franchise_Mode_Systems/Distant_Game_Sim
 Computed in `_distant_sim_team_combined()` → rolled in `_run_distant_game_sim()`:
 
 ```
-1. base         = prestige + int(0.1 × total_player_attrs)
-2. momentum     = chemistry_multiplier × season_wins        ← _distant_sim_momentum_term()
-3. home_bonus   = 2 × team_chemistry   (home team only)     ← _distant_sim_home_team_chemistry_bonus()
-4. roll         = randint(1, home_combined + away_combined)
+1. base         = prestige + int(0.1 × talent_signal)
+2. momentum     = DISTANT_MO_MULT × (wins − losses)   ← distant_sim_record_momentum()
+3. season_mo    = momentum_score × 8                    ← distant_sim_season_momentum()
+4. home_bonus   = 2 × team_chemistry   (home team only) ← _distant_sim_home_team_chemistry_bonus()
+5. roll         = randint(1, home_combined + away_combined)
                   home wins if roll ≤ home_combined
 ```
 
-**Chemistry multiplier bands** (`_distant_sim_momentum_multiplier`):
+**`talent_signal`** (Phase 3 — distant-only, not written to FTD for ranking):
+- **Option A:** sum live FPD core attrs for `ftd.players` at sim time (`distant_sim_live_roster_player_attrs`).
+- **Option B (fallback):** frozen `total_player_attrs` + team-attribute composite (`off_eff + def_eff − int(shot_threshold/20)` when present).
+
+**Chemistry multiplier bands** (`distant_sim_momentum_multiplier` — `BackEnd/constants/distant_sim.py`):
 
 | Clamped chemistry | Multiplier |
 |---|---|
-| 7–10 (franchise init range) | **1** |
-| 11–15 | 2 |
-| 16–20 | 3 |
-| 21–24 | 4 |
-| 25 | 6 |
+| 7–10 (franchise init range) | **3** |
+| 11–15 | 4 |
+| 16–20 | 5 |
+| 21–24 | 6 |
+| 25 | 8 |
 
 **FTD fields loaded for distant sim** (batch in `_complete_week_finish_cpu_and_persist`, ~L5524–L5531):
 
 - `prestige`
 - `total_player_attrs` (frozen at season start for v2 franchises)
 - `team_attributes.team_chemistry`
+- `team_attributes.momentum_score` (Phase 2 — compounding season momentum, −10..+10)
+- `team_attributes.distant_win_streak`, `distant_loss_streak` (Phase 2 — streak tracking)
 
 **Not used in distant win roll:**
 
 - Live player attribute growth from training
 - Team attributes updated by training/EOG (`offensive_efficiency`, `defensive_efficiency`, `shot_threshold`, etc.)
-- `momentum_score` FTD field (exists, clamp −10..+10, always 0, never updated)
-- SOS, win streaks, recent form
+- SOS, recent form (beyond distant streak counters)
 - In-game Player MO / Team Momentum (`Player_Momentum_System.md` — per-possession, zeroed at game end)
 
 ### Margin & scores (unchanged by this plan)
@@ -113,9 +119,9 @@ Training improves player attrs on FPD and team attrs on FTD, but v2 franchises f
 
 Floor (200), ceiling (800), and proximity dampeners (`Rank_Prestige_System.md`) keep prestige drift modest over 26 weeks. Good for recruiting integrity, but it means distant sim's primary input doesn't widen much in-season.
 
-### 6. `momentum_score` is a dead hook
+### 6. `momentum_score` was a dead hook — **now wired (Phase 2)**
 
-The team attribute exists (clamps −10..+10), distant training templates zero it out, and EOG/training never touch it (`Team_Attribute_System.md` § Momentum). Natural place for compounding season momentum — just not wired.
+The team attribute exists (clamps −10..+10). Phase 2 updates it after each distant game and feeds `momentum_score × 8` into combined score. Streak bonuses/penalties apply on top of base win/loss deltas. See `Team_Attribute_System.md` § Momentum and `Distant_Game_Sim_System.md`.
 
 ---
 
@@ -321,37 +327,37 @@ The Monte Carlo calibrator (Phase 4) exists precisely to find these values empir
 - [x] **0.3** Run same script against a sample of **full sim** seasons (or historical franchise data if available) to establish the target distribution empirically.
 - [x] **0.4** Document baseline numbers in this file under **Calibration Results** (section below).
 
-### Phase 1 — Differential momentum (highest leverage, smallest diff)
+### Phase 1 — Differential momentum ✅
 
-**Files:** `franchise_routes.py` (`_distant_sim_momentum_term`, `_distant_sim_momentum_multiplier`), `Distant_Game_Sim_System.md`
+**Files:** `BackEnd/distant_sim_engine.py`, `BackEnd/constants/distant_sim.py`, `franchise_routes.py`, `Distant_Game_Sim_System.md`
 
-- [ ] **1.1** Change `_distant_sim_momentum_term` from `mult × wins` to `DISTANT_MO_MULT × (wins - losses)`.
-- [ ] **1.2** Replace chemistry multiplier bands with distant-specific bands (floor 3×, not 1×).
-- [ ] **1.3** Pass losses into momentum term (extend `_distant_sim_team_combined` to read `L` from standings).
-- [ ] **1.4** Update `Distant_Game_Sim_System.md` win-probability section.
-- [ ] **1.5** Add unit tests in `tests/test_distant_sim.py` for momentum term edge cases (0–0, undefeated, winless, mid-season).
-- [ ] **1.6** Re-run Monte Carlo — compare to baseline.
+- [x] **1.1** Change momentum from `mult × wins` to `DISTANT_MO_MULT × (wins - losses)`.
+- [x] **1.2** Replace chemistry multiplier bands with distant-specific bands (floor 3×, not 1×).
+- [x] **1.3** Pass losses into momentum term via `_distant_sim_team_combined` reading `L` from standings.
+- [x] **1.4** Update `Distant_Game_Sim_System.md` win-probability section.
+- [x] **1.5** Add unit tests in `tests/test_distant_sim.py`.
+- [x] **1.6** Re-run Monte Carlo — compare to baseline (see Phase 1 results below).
 
-### Phase 2 — Compounding `momentum_score`
+### Phase 2 — Compounding `momentum_score` ✅
 
-**Files:** `franchise_routes.py` (`_persist_distant_franchise_game` or post-result hook, `_distant_sim_team_combined`), `Team_Attribute_System.md`
+**Files:** `franchise_routes.py`, `BackEnd/distant_sim_engine.py`, `BackEnd/constants/distant_sim.py`, `franchise_manager.py`, `Team_Attribute_System.md`
 
-- [ ] **2.1** Add `_distant_sim_update_momentum_score(winner_ftd, loser_ftd, margin)` — apply WIN_GAIN / LOSS_DECAY with chemistry scale and streak logic.
-- [ ] **2.2** Call from distant game persist path after result is known.
-- [ ] **2.3** Add `season_momentum = momentum_score × DISTANT_MO_SCORE_WEIGHT` to `_distant_sim_team_combined`.
-- [ ] **2.4** Extend FTD batch load to include `team_attributes.momentum_score`.
-- [ ] **2.5** Initialize `momentum_score = 0` at season creation (verify existing behavior).
-- [ ] **2.6** Update docs: `Distant_Game_Sim_System.md`, `Team_Attribute_System.md` (add distant-sim faucets/sinks for momentum_score).
-- [ ] **2.7** Re-run Monte Carlo.
+- [x] **2.1** Add `_distant_sim_persist_momentum_score_updates()` — apply WIN_GAIN / LOSS_DECAY with chemistry scale and streak logic (`compute_distant_momentum_score_updates` in engine).
+- [x] **2.2** Call from distant game persist path after result is known (`_persist_distant_franchise_game`).
+- [x] **2.3** Add `season_momentum = momentum_score × DISTANT_MO_SCORE_WEIGHT` to `_distant_sim_team_combined`.
+- [x] **2.4** Extend FTD batch load to include `team_attributes.momentum_score` + streak fields; in-memory cache updates within same-week batch.
+- [x] **2.5** Initialize `momentum_score = 0`, `distant_win_streak = 0`, `distant_loss_streak = 0` at season creation (`franchise_manager.py`).
+- [x] **2.6** Update docs: `Distant_Game_Sim_System.md`, `Team_Attribute_System.md`.
+- [x] **2.7** Re-run Monte Carlo (see Phase 2 results below).
 
-### Phase 3 — Live talent signal (distant-only base enrichment)
+### Phase 3 — Live talent signal (distant-only base enrichment) ✅
 
-**Files:** `franchise_routes.py` (`_distant_sim_team_combined`, batch load in `_complete_week_finish_cpu_and_persist`)
+**Files:** `BackEnd/distant_sim_engine.py`, `franchise_routes.py` (`_distant_sim_batch_fpd_map`, `_distant_sim_team_combined`, batch load in `_complete_week_finish_cpu_and_persist` + EOS distant path)
 
-- [ ] **3.1** Add `_distant_sim_talent_signal(ftd_doc, fpd_by_player_id)` — recompute live attrs or team_attr composite.
-- [ ] **3.2** Use in base score instead of frozen `total_player_attrs` (distant sim only; do not write back to FTD).
-- [ ] **3.3** Ensure batch load includes needed FPD data (or team_attributes for fallback).
-- [ ] **3.4** Re-run Monte Carlo.
+- [x] **3.1** Add `distant_sim_talent_signal()` / `distant_sim_team_attr_composite()` in engine — live FPD sum or frozen + composite fallback.
+- [x] **3.2** Use in base score via `distant_sim_team_combined(..., fpd_by_player_id=)` (distant sim only; never writes back to FTD).
+- [x] **3.3** Batch-load FPD for all roster `players` in distant-sim week; extend FTD projection with `players` + team attrs for fallback.
+- [x] **3.4** Re-run Monte Carlo (see Phase 3 results below). MC script supports `--live-talent-proxy N` for training-growth simulation.
 
 ### Phase 4 — Tier amplification & streak bonus
 
@@ -383,14 +389,14 @@ The Monte Carlo calibrator (Phase 4) exists precisely to find these values empir
 
 ---
 
-## Constants File (proposed)
+## Constants File (Phases 1–2 implemented)
 
-New file: `BackEnd/constants/distant_sim.py`
+`BackEnd/constants/distant_sim.py`:
 
 ```python
-# Distant sim tuning — change here AND in Distant_Game_Sim_System.md + Distant_Sim_Tuning.md
-
-# Chemistry → record momentum multiplier (distant-specific; floor 3×)
+# Record momentum (Phase 1)
+DISTANT_CHEMISTRY_MIN = 7
+DISTANT_CHEMISTRY_MAX = 25
 DISTANT_MO_MULT_BANDS = [
     (11, 3),   # chemistry 7–10
     (16, 4),   # 11–15
@@ -399,29 +405,17 @@ DISTANT_MO_MULT_BANDS = [
     (26, 8),   # 25
 ]
 
-# Compounding season momentum (momentum_score on FTD)
+# Compounding season momentum (Phase 2)
 DISTANT_MO_WIN_GAIN = 1.5
 DISTANT_MO_LOSS_DECAY = 0.8
-DISTANT_MO_SCORE_WEIGHT = 8          # tune via Monte Carlo
-DISTANT_MO_STREAK_WIN_BONUS = 0.5    # per streak level above 2
-DISTANT_MO_STREAK_LOSS_RESET = 2.0   # partial reset on loss after 3+ streak
-
-# Streak bonus on record momentum
-DISTANT_STREAK_BONUS = 4
-DISTANT_STREAK_PENALTY = 3
-
-# Tier amplification (applied after this week)
-DISTANT_TIER_MIN_WEEK = 10
-DISTANT_TIER_BANDS = [
-    (0.750, 1.50),
-    (0.650, 1.25),
-    (0.550, 1.00),
-    (0.450, 0.90),
-    (0.000, 0.75),
-]
+DISTANT_MO_SCORE_WEIGHT = 8
+DISTANT_MO_STREAK_WIN_BONUS = 0.5
+DISTANT_MO_STREAK_LOSS_RESET = 2.0
+DISTANT_MOMENTUM_SCORE_MIN = -10
+DISTANT_MOMENTUM_SCORE_MAX = 10
 ```
 
-All values marked "tune via Monte Carlo" are starting proposals, not final.
+Engine: `BackEnd/distant_sim_engine.py`
 
 ---
 
@@ -430,11 +424,12 @@ All values marked "tune via Monte Carlo" are starting proposals, not final.
 | File | Role |
 |---|---|
 | `BackEnd/api/franchise_routes.py` | `_distant_sim_*`, `_run_distant_game_sim`, `_persist_distant_franchise_game`, `_complete_week_finish_cpu_and_persist`, `_apply_franchise_distant_cpu_training` |
-| `BackEnd/constants/distant_sim.py` | **New** — tuning constants |
+| `BackEnd/distant_sim_engine.py` | Win-probability helpers (Phase 1+) |
+| `BackEnd/constants/distant_sim.py` | Tuning constants |
 | `BackEnd/models/distant_game_stats.py` | Box score generation (unchanged) |
 | `BackEnd/utils/franchise_rank_prestige.py` | Ranking/prestige (unchanged; distant-only talent recompute must not write here) |
 | `scripts/distant_sim_monte_carlo.py` | **New** — calibration script |
-| `tests/test_distant_sim.py` | **New** — unit tests for momentum/combined score |
+| `tests/test_distant_sim.py` | Unit tests for momentum/combined score |
 | `_documentation_master/04_Franchise_Mode_Systems/Distant_Game_Sim_System.md` | Spec doc (update after each phase) |
 | `_documentation_master/04_Franchise_Mode_Systems/Rank_Prestige_System.md` | Ranking formula (read-only reference) |
 | `_documentation_master/04_Franchise_Mode_Systems/Team_Attribute_System.md` | momentum_score faucets/sinks (update in Phase 2) |
@@ -445,45 +440,6 @@ All values marked "tune via Monte Carlo" are starting proposals, not final.
 
 > **Phase 0 complete (2026-07-04).** 10,000 seasons × 128 teams × 26 games. Team talent from **tsv**. Conference assignment: **mixed**. Seed `42`. Full-sim proxy uses `prestige + int(0.25 × attrs)` with no win-count momentum — reference target only, not live GameManager output.
 
-### Baseline (current distant formula — all games distant)
-
-| Metric | Value |
-|---|---|
-| Teams at 22+ wins (mean/season) | 0.06 |
-| Teams at 18–21 wins (mean/season) | 5.88 |
-| Teams below 8 wins (mean/season) | 2.63 |
-| Median wins (team-season) | 13.0 |
-| Mean wins (team-season) | 13.00 |
-| Preseason top-10 avg final wins | 14.49 |
-| Preseason top-10 P90 final wins | 18 |
-| Preseason bottom-20 avg final wins | 11.51 |
-
-**Hybrid skew (user conference = 1, full-sim proxy in-conf / distant out-of-conf):**
-
-| Metric | Value |
-|---|---|
-| Top-5 from user conference (share) | 3.4% |
-| Top-10 from user conference (share) | 3.9% |
-| User-conf teams at 22+ (mean/season) | _see JSON_ |
-
-### Full-sim proxy reference (all games — tuning target shape)
-
-| Metric | Target (doc) | Full-sim proxy |
-|---|---|---|
-| Teams at 22+ wins | 3–5 | 0.05 |
-| Teams at 18–21 wins | 8–12 | 5.67 |
-| Median wins | ~13 | 13.0 |
-| Preseason top-10 avg final wins | 21–25 | 14.39 |
-
-### Phase 0 checklist
-
-- [x] **0.1** `scripts/distant_sim_monte_carlo.py` built
-- [x] **0.2** Baseline distribution recorded (see above + `scripts/distant_sim_monte_carlo_results.json`)
-- [x] **0.3** Full-sim proxy reference run (same script, `--engine full_proxy`)
-- [x] **0.4** Results documented in this section
-
-Raw JSON: `scripts/distant_sim_monte_carlo_results.json`
-
 ### Phase 0 findings (interpretation)
 
 1. **Record compression is confirmed.** Under the current distant formula, essentially **zero** teams reach 22+ wins (mean **0.06** per season). Preseason top-10 teams finish at **14.5** wins on average — barely above the **13**-win median. Elite cumulative win rate plateaus at **~56%** by mid-season (no runaway separation).
@@ -493,6 +449,64 @@ Raw JSON: `scripts/distant_sim_monte_carlo_results.json`
 3. **Conference assignment matters.** Default **`mixed`** shuffles talent across conferences (realistic). Use **`--conference-mode rank_block`** to reproduce the pathological case where the top 8 teams share a conference and cannibalize each other's records (top-10 avg drops to **13.3** wins).
 
 4. **Hybrid skew** (user conf = full proxy, rest = distant): top-5 share from user conference = **3.4%** with conference 1 as user conf and mixed talent. In-game skew reported by playtesters (3–4 of top 5 from user conf) reflects the **live** full-sim path, not this simplified proxy — re-run hybrid after Phase 1+ tuning.
+
+### Phase 0 baseline (pre-change formula: `mult × wins`, 1× chemistry floor)
+
+| Metric | Value |
+|---|---|
+| Teams at 22+ wins (mean/season) | 0.06 |
+| Preseason top-10 avg final wins | 14.49 |
+| Preseason top-10 P90 final wins | 18 |
+| Median wins | 13.0 |
+
+### Phase 1 results (2026-07-04 — `DISTANT_MO_MULT × (W−L)`, chemistry floor 3×)
+
+10,000 seasons, mixed conferences, seed 42. Same script as Phase 0.
+
+| Metric | Phase 0 | Phase 1 | Target |
+|---|---|---|---|
+| Teams at 22+ wins (mean/season) | 0.06 | **0.07** | 3–5 |
+| Teams at 18–21 wins (mean/season) | 5.88 | **6.22** | 8–12 |
+| Preseason top-10 avg final wins | 14.49 | **14.52** | 21–25 |
+| Preseason top-10 P90 final wins | 18 | 18 | ~23 |
+| Preseason bottom-20 avg final wins | 11.51 | **11.48** | 4–10 |
+| Elite win % (week 26) | ~56% | **~56%** | 78–85% |
+| Median wins | 13.0 | 13.0 | ~13 |
+
+**Phase 1 verdict:** Differential momentum is directionally correct (slightly wider tails, more 22+ team-seasons in the histogram) but **nowhere near target**. Phase 2 (`momentum_score` compounding) and Phase 4 (tier amplification) are required to produce runaway elite records.
+
+### Phase 2 results (2026-07-04 — compounding `momentum_score` + within-week cache)
+
+10,000 seasons, mixed conferences, seed 42. Same script as Phase 0/1.
+
+| Metric | Phase 0 | Phase 1 | Phase 2 | Target |
+|---|---|---|---|---|
+| Teams at 22+ wins (mean/season) | 0.06 | 0.07 | **0.09** | 3–5 |
+| Teams at 18–21 wins (mean/season) | 5.88 | 6.22 | **6.89** | 8–12 |
+| Preseason top-10 avg final wins | 14.49 | 14.52 | **14.54** | 21–25 |
+| Preseason top-10 P90 final wins | 18 | 18 | 18 | ~23 |
+| Preseason bottom-20 avg final wins | 11.51 | 11.48 | **11.45** | 4–10 |
+| Elite win % (week 26) | ~56% | ~56% | **~56%** | 78–85% |
+| Median wins | 13.0 | 13.0 | 13.0 | ~13 |
+
+**Phase 2 verdict:** Compounding `momentum_score` adds marginal tail widening (22+ teams 0.07→0.09; 18–21 bucket 6.22→6.89) but **still far from target**. The ±10 clamp and asymmetric gain/decay (1.5/0.8) limit how much hot teams can pull away — Phase 3 (live talent) and Phase 4 (tier amplification + constant tuning) remain necessary.
+
+### Phase 3 results (2026-07-04 — live `talent_signal` from FPD)
+
+10,000 seasons, mixed conferences, seed 42. Default MC has no FPD (static TSV attrs) — identical to Phase 2 as expected. Production path uses live FPD when roster + batch map available.
+
+| Metric | Phase 2 | Phase 3 (MC baseline) | Target |
+|---|---|---|---|
+| Teams at 22+ wins (mean/season) | 0.09 | **0.09** | 3–5 |
+| Teams at 18–21 wins (mean/season) | 6.89 | **6.89** | 8–12 |
+| Preseason top-10 avg final wins | 14.54 | **14.53** | 21–25 |
+| Elite win % (week 26) | ~56% | **~56%** | 78–85% |
+
+**MC proxy note:** `--live-talent-proxy 15` (+15 roster attrs/week) still **0.09** teams at 22+ — linear attr growth alone does not close the gap; Phase 4 tier amplification + constant tuning required.
+
+**Phase 3 verdict:** Production now reads live FPD at distant-sim time (closes v2 frozen-attrs gap vs full sim). Monte Carlo baseline unchanged without FPD/training simulation. Distribution targets still require Phase 4.
+
+Raw JSON (latest run): `scripts/distant_sim_monte_carlo_results.json`
 
 ---
 
@@ -505,4 +519,6 @@ Raw JSON: `scripts/distant_sim_monte_carlo_results.json`
 | 2026-07-04 | Distant-only live talent recompute | Preserves ranking system's frozen attrs |
 | 2026-07-04 | Monte Carlo before locking constants | Current formula math shows 67% elite-vs-weak — constants must be empirically tuned |
 | 2026-07-04 | Do not change margin/score layer | Problem is win-prob inputs, not box score output |
-| 2026-07-04 | Tier amplification gated to week 10+ | Avoid early-season runaway before sample size is meaningful |
+| 2026-07-04 | Phase 1 shipped: W−L momentum + 3× chemistry floor | Monte Carlo: 22+ teams 0.06→0.07; need Phase 2+4 for targets |
+| 2026-07-04 | Phase 2 shipped: compounding momentum_score + within-week cache | Monte Carlo: 22+ teams 0.07→0.09; still need Phase 3+4 for targets |
+| 2026-07-04 | Phase 3 shipped: live FPD talent_signal at distant sim time | MC baseline unchanged (no FPD in script); production closes training gap |
