@@ -1942,6 +1942,17 @@ class GameManager:
         last_turn = self.turns[-1] if self.turns else None
         # ✅ Final play of quarter: no BIP after make or after FTs when time_remaining == 0
         if last_turn and last_turn.get("next_play_type") == "BASELINE_INBOUND":
+            # And-1 / shooting-foul paths set game_state FT counters but older FB
+            # resolvers sometimes left next_play_type as BIP — do not synthesize an
+            # extra inbound before the FT turn (mirrors OREB putback guard).
+            ft_pending = int(self.game_state.get("free_throws_remaining", 0) or 0)
+            if ft_pending > 0 or self.game_state.get("offensive_state") == "FREE_THROW":
+                last_turn["next_play_type"] = "FREE_THROW"
+                logging.debug(
+                    "✅ [BIP SKIP] Pending free throws (%s) — skip BASELINE_INBOUND synthesis",
+                    ft_pending,
+                )
+                return
             if self.game_state.get("time_remaining", 1) == 0:
                 last_turn["quarter_ends_after"] = True
                 last_turn["next_play_type"] = None

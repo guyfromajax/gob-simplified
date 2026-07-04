@@ -399,6 +399,37 @@ def _resolve_shot_attempt(
     }
 
 
+def _fb_shot_next_play_type(
+    *,
+    made: bool,
+    d_foul: bool,
+    has_and_one: bool = False,
+    rebound_type: Optional[str] = None,
+) -> str:
+    """Post-shot route for FB drive resolution (make / miss / foul)."""
+    if made and not has_and_one:
+        return "BASELINE_INBOUND"
+    if d_foul:
+        return "FREE_THROW"
+    if not made and rebound_type == "OREB":
+        return "OREB"
+    return "HCO"
+
+
+def _stamp_fb_shooting_foul_on_turn(
+    turn_result: Dict[str, Any], shot: Dict[str, Any]
+) -> None:
+    """Stamp FT transition fields when ``_resolve_shot_attempt`` recorded a foul."""
+    if not shot.get("d_foul"):
+        return
+    turn_result["next_play_type"] = "FREE_THROW"
+    ft_rem = shot.get("free_throws_remaining")
+    if ft_rem:
+        turn_result["free_throws_remaining"] = ft_rem
+    if shot.get("has_and_one"):
+        turn_result["has_and_one"] = True
+
+
 def _resolve_rebound_on_miss(
     *,
     game: Any,
@@ -945,8 +976,11 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             "possession_flips": possession_flips,
             "offense_team_id": off_team.team_id,
             "quarter": game.quarter,
-            "next_play_type": "BASELINE_INBOUND" if made and not shot["has_and_one"] else (
-                "FREE_THROW" if d_foul else ("OREB" if not made and rebound_type == "OREB" else "HCO")
+            "next_play_type": _fb_shot_next_play_type(
+                made=made,
+                d_foul=d_foul,
+                has_and_one=shot.get("has_and_one", False),
+                rebound_type=rebound_type if not made else None,
             ),
             "score": dict(game.score),
             "shot_type": shot_type,
@@ -1056,7 +1090,11 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         "possession_flips": possession_flips,
         "offense_team_id": off_team.team_id,
         "quarter": game.quarter,
-        "next_play_type": "BASELINE_INBOUND",
+        "next_play_type": _fb_shot_next_play_type(
+            made=made,
+            d_foul=d_foul,
+            has_and_one=shot.get("has_and_one", False),
+        ),
         "score": dict(game.score),
         "shot_type": "attack",
         "shot_score": shot["shot_score"],
@@ -1083,8 +1121,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
         stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, bh_target)
         turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
-    elif d_foul:
-        turn_result["next_play_type"] = "FREE_THROW"
+    _stamp_fb_shooting_foul_on_turn(turn_result, shot)
     select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
     turn_result.update(shot.get("shot_variant_extras") or {})
     turn_result["shot_variant"] = shot.get("shot_variant")

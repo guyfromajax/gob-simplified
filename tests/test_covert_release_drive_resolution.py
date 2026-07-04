@@ -188,3 +188,62 @@ def test_meet_defensive_foul_non_bonus_routes_to_side_inbound(monkeypatch):
     assert result["next_play_type"] == "SIDE_INBOUND"
     assert game.game_state["free_throws_remaining"] == 0
     assert result["meet_coords"] == meet
+
+
+def test_no_meet_and_one_routes_to_free_throw_not_baseline_inbound(monkeypatch):
+    """Regression: and-1 on a CR rim finish must not leave next_play_type=BIP
+    (Pattern A would synthesize an extra inbound before the FT turn)."""
+    shot_spot = {"x": 88, "y": 25}
+    monkeypatch.setattr(
+        "BackEnd.engine.covert_release_drive_integration.resolve_fb_drive_step",
+        lambda **kwargs: {
+            "outcome": "NO_MEET",
+            "stopper_id": "Bentley-Truman-PG",
+            "shot_defender_id": "Bentley-Truman-PG",
+            "contested": True,
+            "t_drive_game_seconds": 1.5,
+            "defender_end_coords": {"Bentley-Truman-PG": {"x": 80, "y": 25}},
+            "defender_archetypes": {"Bentley-Truman-PG": "sprint"},
+        },
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.covert_release_drive_integration._resolve_shot_attempt",
+        lambda **kwargs: {
+            "made": True,
+            "d_foul": True,
+            "has_and_one": True,
+            "free_throws_remaining": 1,
+            "foul_player": kwargs.get("shot_defender"),
+            "shot_score": 100,
+            "shot_score_pre_defense": 100,
+            "shot_defense_score_for_sfx": 50,
+            "shot_variant": "SWISH",
+            "shot_variant_extras": {},
+            "select_and_stamp_shot_micro_kwargs": {
+                "shot_type": "attack",
+                "shooter_id": "Lancaster-SG",
+                "shooter_x": float(shot_spot["x"]),
+                "shooter_y": float(shot_spot["y"]),
+                "off_lineup": kwargs.get("game").offense_team.lineup,
+                "def_lineup": kwargs.get("game").defense_team.lineup,
+                "has_contest": True,
+                "contest_result": None,
+                "contest_margin": None,
+                "shot_defense_score_raw": 50.0,
+            },
+            "shot_defender_id": "Bentley-Truman-PG",
+        },
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.shot_micro_movements.select_and_stamp_shot_micro",
+        lambda turn_result, **kwargs: None,
+    )
+
+    game = build_mock_game()
+    _seed_cr(game)
+    result = resolve_covert_release_fast_break(game)
+
+    assert result["result_type"] == "MAKE"
+    assert result["next_play_type"] == "FREE_THROW"
+    assert result.get("free_throws_remaining") == 1
+    assert result["possession_flips"] is False

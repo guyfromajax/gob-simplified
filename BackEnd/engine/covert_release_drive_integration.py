@@ -15,12 +15,14 @@ from BackEnd.engine.after_steal_drive_integration import (
     _build_offense_end_coords,
     _compute_bh_target,
     _coord_of,
+    _fb_shot_next_play_type,
     _lineup_pos,
     _lineup_starts_by_pos,
     _player_by_id,
     _resolve_rebound_on_miss,
     _resolve_shot_attempt,
     _safe_id,
+    _stamp_fb_shooting_foul_on_turn,
 )
 from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
 from BackEnd.engine.phase_resolution import (
@@ -410,7 +412,11 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
                 "defender": shot_defender,
                 "text": f"Fast Break! {get_name_safe(ball_handler)} pushes, {text_tail}",
                 "possession_flips": possession_flips,
-                "next_play_type": "BASELINE_INBOUND" if made else "HCO",
+                "next_play_type": _fb_shot_next_play_type(
+                    made=made,
+                    d_foul=d_foul,
+                    has_and_one=shot.get("has_and_one", False),
+                ),
                 "shot_type": shot_type,
                 "shot_score": shot["shot_score"],
                 "cr_end_coords": end_coords,
@@ -437,6 +443,7 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             if rebound_ball_spot:
                 turn_result["ballSpot"] = dict(rebound_ball_spot)
             stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
+        _stamp_fb_shooting_foul_on_turn(turn_result, shot)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         return turn_result
 
@@ -501,7 +508,11 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             "defender": shot_defender,
             "text": f"Fast Break! {get_name_safe(ball_handler)} pushes, {text_tail}",
             "possession_flips": possession_flips,
-            "next_play_type": "BASELINE_INBOUND",
+            "next_play_type": _fb_shot_next_play_type(
+                made=made,
+                d_foul=d_foul,
+                has_and_one=shot.get("has_and_one", False),
+            ),
             "shot_type": "attack",
             "shot_score": shot["shot_score"],
             "shot_score_pre_defense": shot["shot_score_pre_defense"],
@@ -531,6 +542,7 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
         stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, bh_target)
         turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
+    _stamp_fb_shooting_foul_on_turn(turn_result, shot)
     turn_result["sfx"] = {
         "shot_type": "attack",
         "shot_score_pre_defense": shot["shot_score_pre_defense"],
