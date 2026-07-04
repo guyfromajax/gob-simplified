@@ -136,9 +136,9 @@ FB_AS_TIER_LOWER_Y = 18   # lead fan-out anchor (lower/left tier)
 FB_AS_TIER_UPPER_Y = 32   # lead fan-out anchor (upper/right tier)
 FB_AS_TIER_Y_JITTER = 2   # ±jitter on the tier anchor for variability
 
-# On a shot outcome the leads crash to the basket x (keeping their fanned y) so
-# they're in rebound / dish range. Grid spots back from the attacking basket.
-FB_AS_LEAD_REBOUND_X_OFFSET = 6
+# On a shot outcome the leads pull back to the mid-post x (keeping their fanned
+# tier y) so they're in rebound / dish range without clogging the restricted
+# area. The x is sourced from the ``upper/lower midPost`` HCO string spots.
 
 # On a stop → HCO the leads set up on the low blocks.
 FB_AS_LEAD_HCO_SPOTS = ("upper lowPost", "lower lowPost")

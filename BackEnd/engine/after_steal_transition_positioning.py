@@ -1,19 +1,23 @@
-"""Coordinated transition positioning for After-Steal Fast Breaks.
+"""Coordinated transition positioning for Fast Break drive resolution.
 
-Steal FBs start with the whole cast bunched together on the x-grid (the steal
-happens in traffic), so the universal drive helper's blanket rim-crash parked
-every off-ball player on the basket — an unrealistic cluster. This module is the
-resolver-side planner that authors *coordinated* destinations instead: the ball
-handler drives, the two teammates closest to the attacking basket ("leads") fan
-out to the lower/upper spacing tiers, and the two "trailers" spread to the
-3-point arc (or hold on a stop).
+Fast breaks used to park every off-ball player on the basket (the universal
+drive helper's blanket rim-crash) — an unrealistic cluster, especially on steal
+FBs where the whole cast starts bunched on the x-grid. This module is the
+planner that authors *coordinated* destinations instead: the ball handler
+drives, the two teammates closest to the attacking basket ("leads") fan out to
+the lower/upper spacing tiers, and the two "trailers" spread to the 3-point arc
+(or hold on a stop). The defense mirrors it with matchups + help spots.
+
+Originally built for After-Steal, this is now applied to **all** FB play types
+(Rim Runner, Triangle, Covert Release, After-Steal) via
+``author_transition_end_coords`` — the single entry point that authors the
+all-ten end coords (offense spread + defense matchups). Callers derive the
+``outcome_kind`` + role inputs from the ``fb_drive_resolution`` payload.
 
 Pure + unit-testable: functions take/return plain ``{player_id: {x, y}}`` dicts
 (HOME orientation, mirrored for the away offense) and never mutate game state.
 
-Phase 2 covers the **offense**; the defense planner (matchups + help spots)
-lands in Phase 3. See ``Fast_Break_System.md`` §After-Steal Coordinated
-Transition.
+See ``Fast_Break_System.md`` §Coordinated Transition.
 """
 
 from __future__ import annotations
@@ -29,7 +33,6 @@ from BackEnd.constants.fast_break_constants import (
     FB_AS_HELP_SPOTS_UPPER,
     FB_AS_LEAD_DEF_X_OFFSET,
     FB_AS_LEAD_HCO_SPOTS,
-    FB_AS_LEAD_REBOUND_X_OFFSET,
     FB_AS_NO_MEET_CHASE_X_BEHIND,
     FB_AS_TIER_LOWER_Y,
     FB_AS_TIER_UPPER_Y,
@@ -43,8 +46,6 @@ SHOT_KINDS = frozenset({"rim_finish", "pull_up", "pass"})
 HCO_KIND = "hco"
 TERMINAL_KIND = "terminal"
 
-_ATTACKING_BASKET_X_HOME = 91.0
-_ATTACKING_BASKET_X_AWAY = 9.0
 _HALF_COURT_Y = 25.0
 
 
@@ -67,21 +68,10 @@ def _spot_coords(name: str, is_away_offense: bool) -> Coord:
     return {"x": x, "y": y}
 
 
-def _attacking_basket_x(is_away_offense: bool) -> float:
-    return _ATTACKING_BASKET_X_AWAY if is_away_offense else _ATTACKING_BASKET_X_HOME
-
-
 def _x_progress_toward_basket(x: float, is_away_offense: bool) -> float:
     """Higher = closer to the attacking basket. Away attacks low x, so progress
     is mirrored."""
     return _mirror_x(x) if is_away_offense else float(x)
-
-
-def _lead_rebound_x(is_away_offense: bool) -> float:
-    basket = _attacking_basket_x(is_away_offense)
-    if is_away_offense:
-        return basket + FB_AS_LEAD_REBOUND_X_OFFSET
-    return basket - FB_AS_LEAD_REBOUND_X_OFFSET
 
 
 def classify_offense_roles(
@@ -177,8 +167,8 @@ def author_offense_end_coords(
 ) -> Dict[str, Coord]:
     """Author end coords for all five offensive players.
 
-    * ``rim_finish`` / ``pull_up`` / ``pass`` (shot modes): leads crash to the
-      basket x keeping their fanned tier y (rebound / dish range); trailers
+    * ``rim_finish`` / ``pull_up`` / ``pass`` (shot modes): leads pull back to
+      the mid-post x keeping their fanned tier y (rebound / dish range); trailers
       spread to distinct 3-point arc spots.
     * ``hco``: leads set up on the low blocks; trailers hold their spots.
     * ``terminal`` (foul / charge / dead ball): everyone holds.
@@ -213,11 +203,15 @@ def author_offense_end_coords(
             ends[pid] = _clamp(dict(off_start_coords[pid]))
         return ends
 
-    # Shot modes: leads → basket x @ fanned tier y; trailers → arc.
+    # Shot modes: leads → mid-post x @ fanned tier y; trailers → arc. Product
+    # (Jul 2026): pull the leads back off the rim to the mid-post (upper/lower
+    # midPost x) so they hold rebound/dish range without clogging the restricted
+    # area. The fanned tier y (upper ~32 / lower ~18, jittered) keeps them on
+    # distinct strings and near the named midPost anchors.
     tier_y = _assign_lead_tiers(leads, off_start_coords, rng)
-    rebound_x = _lead_rebound_x(is_away_offense)
+    midpost_x = _spot_coords("upper midPost", is_away_offense)["x"]
     for pid in leads:
-        ends[pid] = _clamp({"x": rebound_x, "y": tier_y.get(pid, _HALF_COURT_Y)})
+        ends[pid] = _clamp({"x": midpost_x, "y": tier_y.get(pid, _HALF_COURT_Y)})
     ends.update(_assign_arc_spots(trailers, off_start_coords, is_away_offense, rng))
     return ends
 
@@ -367,3 +361,58 @@ def author_defense_end_coords(
     # (3) Help defenders.
     ends.update(_assign_help_spots(help_defs, def_start_coords, is_away_offense, rng))
     return ends
+
+
+def author_transition_end_coords(
+    *,
+    bh_id: str,
+    bh_start: Coord,
+    bh_end: Coord,
+    off_start_coords: Dict[str, Coord],
+    def_start_coords: Dict[str, Coord],
+    bh_defender_id: Optional[str],
+    meet: Optional[Coord],
+    outcome_kind: str,
+    bh_reaches_rim: bool,
+    beaten_stopper_ids: Optional[List[str]] = None,
+    is_away_offense: bool = False,
+    rng: Optional[Any] = None,
+) -> Dict[str, Coord]:
+    """All-ten coordinated end coords for a FB drive resolution.
+
+    The single entry point shared by every FB play type: authors the offense
+    spread (leads/trailers per ``outcome_kind``) and the defensive matchups (BH
+    defender + lead matchups + help spots), then merges them (offense wins on the
+    unlikely id collision). Callers derive ``outcome_kind``/``meet``/
+    ``bh_defender_id`` etc. from the ``fb_drive_resolution`` payload.
+    """
+    leads, _trailers = classify_offense_roles(
+        stealer_id=bh_id,
+        off_start_coords=off_start_coords,
+        is_away_offense=is_away_offense,
+    )
+    offense = author_offense_end_coords(
+        stealer_id=bh_id,
+        bh_end=bh_end,
+        off_start_coords=off_start_coords,
+        outcome_kind=outcome_kind,
+        is_away_offense=is_away_offense,
+        rng=rng,
+    )
+    defense = author_defense_end_coords(
+        def_start_coords=def_start_coords,
+        bh_defender_id=bh_defender_id,
+        bh_start=bh_start,
+        bh_end=bh_end,
+        meet=meet,
+        bh_reaches_rim=bh_reaches_rim,
+        lead_ids=leads,
+        offense_end_coords=offense,
+        is_away_offense=is_away_offense,
+        beaten_stopper_ids=beaten_stopper_ids,
+        rng=rng,
+    )
+    merged: Dict[str, Coord] = {}
+    merged.update(defense)
+    merged.update(offense)
+    return merged

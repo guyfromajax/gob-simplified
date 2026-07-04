@@ -2011,6 +2011,7 @@ def _build_finisher_drive_resolution_steps(
         kind_prefix="rim_runner",
         stamp_fb_start_announcement=False,
         suppress_stinger=False,
+        author_offball_spread=True,
     )
 
 

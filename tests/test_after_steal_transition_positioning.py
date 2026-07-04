@@ -3,7 +3,6 @@
 import random
 
 from BackEnd.constants.fast_break_constants import (
-    FB_AS_LEAD_REBOUND_X_OFFSET,
     FB_AS_TIER_Y_JITTER,
     FB_AS_TIER_LOWER_Y,
     FB_AS_TIER_UPPER_Y,
@@ -58,7 +57,7 @@ def test_classify_leads_are_two_closest_to_basket_away():
     assert set(trailers) == {"trail_hi", "trail_lo"}
 
 
-def test_rim_finish_leads_crash_basket_x_distinct_tiers():
+def test_rim_finish_leads_pull_to_midpost_distinct_tiers():
     coords = _home_offense()
     bh_end = {"x": 88.0, "y": 25.0}
     ends = author_offense_end_coords(
@@ -70,9 +69,9 @@ def test_rim_finish_leads_crash_basket_x_distinct_tiers():
         rng=random.Random(0),
     )
     assert ends["bh"] == {"x": 88.0, "y": 25.0}
-    rebound_x = 91.0 - FB_AS_LEAD_REBOUND_X_OFFSET
+    midpost_x = float(HCO_STRING_SPOTS["upper midPost"]["x"])
     for lead in ("lead_hi", "lead_lo"):
-        assert ends[lead]["x"] == rebound_x
+        assert ends[lead]["x"] == midpost_x
     # Leads occupy distinct fanned tiers (one low, one high), geometry-true:
     # lead_lo started lower → lower tier.
     assert ends["lead_lo"]["y"] <= FB_AS_TIER_LOWER_Y + FB_AS_TIER_Y_JITTER
@@ -153,8 +152,8 @@ def test_away_offense_mirrors_arc_spots():
         is_away_offense=True,
         rng=random.Random(1),
     )
-    # Away attacks low x → lead rebound x mirrored to ~15, arc spots at low x.
-    assert ends["lead_hi"]["x"] == 9.0 + FB_AS_LEAD_REBOUND_X_OFFSET
+    # Away attacks low x → lead mid-post x mirrored, arc spots at low x.
+    assert ends["lead_hi"]["x"] == float(100 - HCO_STRING_SPOTS["upper midPost"]["x"])
     assert ends["trail_hi"]["x"] <= 36
     assert ends["trail_lo"]["x"] <= 36
 

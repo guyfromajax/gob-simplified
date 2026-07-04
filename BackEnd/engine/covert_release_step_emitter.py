@@ -739,6 +739,7 @@ def _build_cr_drive_resolution_animation_steps(
         kind_prefix="covert_release",
         stamp_fb_start_announcement=True,
         suppress_stinger=False,
+        author_offball_spread=True,
     )
     if dr_steps:
         rebase_animation_step_next_indices(dr_steps, len(steps))

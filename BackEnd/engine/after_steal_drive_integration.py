@@ -215,49 +215,28 @@ def _build_after_steal_end_coords(
     matchups (BH defender + lead matchups + help spots). See
     ``after_steal_transition_positioning``."""
     from BackEnd.engine.after_steal_transition_positioning import (
-        author_defense_end_coords,
-        author_offense_end_coords,
-        classify_offense_roles,
-    )
-
-    off_start = _offense_start_coords_by_id(off_lineup, stealer_id, bh_start)
-    leads, _trailers = classify_offense_roles(
-        stealer_id=stealer_id,
-        off_start_coords=off_start,
-        is_away_offense=is_away_offense,
-    )
-    offense = author_offense_end_coords(
-        stealer_id=stealer_id,
-        bh_end=bh_end,
-        off_start_coords=off_start,
-        outcome_kind=outcome_kind,
-        is_away_offense=is_away_offense,
+        author_transition_end_coords,
     )
 
     outcome = drive.get("outcome")
-    bh_reaches_rim = outcome in ("NO_MEET", "POS_O")
     meet = (
         {"x": float(drive["meet_x"]), "y": float(drive["meet_y"])}
         if drive.get("meet_x") is not None
         else None
     )
-    defense = author_defense_end_coords(
-        def_start_coords=_defense_start_coords_by_id(def_lineup),
-        bh_defender_id=drive.get("stopper_id"),
+    return author_transition_end_coords(
+        bh_id=stealer_id,
         bh_start=bh_start,
         bh_end=bh_end,
+        off_start_coords=_offense_start_coords_by_id(off_lineup, stealer_id, bh_start),
+        def_start_coords=_defense_start_coords_by_id(def_lineup),
+        bh_defender_id=drive.get("stopper_id"),
         meet=meet,
-        bh_reaches_rim=bh_reaches_rim,
-        lead_ids=leads,
-        offense_end_coords=offense,
-        is_away_offense=is_away_offense,
+        outcome_kind=outcome_kind,
+        bh_reaches_rim=outcome in ("NO_MEET", "POS_O"),
         beaten_stopper_ids=drive.get("cascade_beaten_stopper_ids"),
+        is_away_offense=is_away_offense,
     )
-
-    end_coords: Dict[str, Dict[str, float]] = {}
-    end_coords.update(defense)
-    end_coords.update(offense)
-    return end_coords
 
 
 def _resolve_shot_attempt(

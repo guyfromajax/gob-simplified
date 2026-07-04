@@ -704,6 +704,90 @@ def test_emitter_finisher_drive_includes_path_knots_metadata():
     assert meta["kind"] == "rim_runner_drive"
 
 
+def test_finisher_rim_finish_spreads_offball_instead_of_crashing():
+    """RR/Triangle rim finishes now author the coordinated transition spread
+    (leads → mid-post, trailers → arc, defenders → matchups/help) instead of the
+    old blanket crash that parked the whole cast on the rim."""
+    from BackEnd.constants import HCO_STRING_SPOTS
+
+    shot_spot = {"x": 88.0, "y": 25.0}
+    # Bunched near midcourt; offense leads (PG/SG) are closest to the basket,
+    # trailers (SF/C) lag; the shooter (PF) is the ball handler.
+    start_coords = {
+        "Lancaster-PF": {"x": 72.0, "y": 25.0},
+        "Lancaster-PG": {"x": 70.0, "y": 26.0},
+        "Lancaster-SG": {"x": 68.0, "y": 24.0},
+        "Lancaster-SF": {"x": 40.0, "y": 20.0},
+        "Lancaster-C": {"x": 38.0, "y": 35.0},
+        "Bentley-Truman-PG": {"x": 69.0, "y": 25.0},
+        "Bentley-Truman-SG": {"x": 66.0, "y": 28.0},
+        "Bentley-Truman-SF": {"x": 60.0, "y": 22.0},
+        "Bentley-Truman-PF": {"x": 45.0, "y": 20.0},
+        "Bentley-Truman-C": {"x": 43.0, "y": 35.0},
+    }
+    end_coords = {pid: dict(c) for pid, c in start_coords.items()}
+    end_coords["Lancaster-PF"] = dict(shot_spot)
+
+    turn_result = {
+        "result_type": "MAKE",
+        "shooter": SimpleNamespace(player_id="Lancaster-PF"),
+        "bh_target": shot_spot,
+        "t_shooter_game_seconds": 2.0,
+        "rr_end_coords": end_coords,
+        "roles": {"rim_runner_burst_phase": {"rr_id": "Lancaster-PF"}},
+        "fb_drive_resolution": {
+            "outcome": "NO_MEET",
+            "stopper_id": "Bentley-Truman-PG",
+            "meet_x": 78.0,
+            "meet_y": 25.0,
+            "t_drive_game_seconds": 2.0,
+        },
+        "shot_score_pre_defense": 100,
+        "shot_defense_score_for_sfx": 0,
+        "shot_type": "attack",
+    }
+
+    game = build_mock_game()
+    for team in (game.home_team, game.away_team):
+        for pos, player in team.lineup.items():
+            player.player_id = f"{team.name}-{pos}"
+            player.coords = {"x": 50.0, "y": 25.0}
+
+    steps = _build_finisher_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        off_lineup=game.home_team.lineup,
+        def_lineup=game.away_team.lineup,
+        is_away_offense=False,
+        clock_remaining=600.0,
+        shot_clock_remaining=24.0,
+        fb_roles=turn_result["roles"],
+    )
+    assert steps is not None
+    dest = steps[0]["start"]["destination"]
+
+    basket = {"x": 91.0, "y": 25.0}
+    offball_off = ["Lancaster-PG", "Lancaster-SG", "Lancaster-SF", "Lancaster-C"]
+    # No longer a blanket crash: not every off-ball player parks on the rim.
+    assert not all(dest[pid] == basket for pid in offball_off)
+
+    midpost_x = float(HCO_STRING_SPOTS["upper midPost"]["x"])
+    # Leads (closest to the basket) pull back to the mid-post on distinct tiers.
+    assert dest["Lancaster-PG"]["x"] == midpost_x
+    assert dest["Lancaster-SG"]["x"] == midpost_x
+    assert dest["Lancaster-PG"]["y"] != dest["Lancaster-SG"]["y"]
+    # Trailers spread to the 3-point arc downcourt (home arc x >= 64).
+    assert dest["Lancaster-SF"]["x"] >= 64
+    assert dest["Lancaster-C"]["x"] >= 64
+    # Defenders take up coordinated spots, not all crashing the rim.
+    def_dests = {
+        (dest[f"Bentley-Truman-{p}"]["x"], dest[f"Bentley-Truman-{p}"]["y"])
+        for p in ("PG", "SG", "SF", "PF", "C")
+    }
+    assert len(def_dests) >= 3
+
+
 def test_rebase_animation_step_next_indices_offsets_next_step_pointers():
     from BackEnd.utils.animation_step_helpers import rebase_animation_step_next_indices
 

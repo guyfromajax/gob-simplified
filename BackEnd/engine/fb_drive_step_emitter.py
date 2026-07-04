@@ -58,6 +58,107 @@ def _safe_id(obj: Any) -> Optional[str]:
     return str(pid) if pid is not None else None
 
 
+def _derive_transition_outcome_kind(
+    fb_drive: Dict[str, Any], turn_result: Dict[str, Any]
+) -> str:
+    """Map the ``fb_drive_resolution`` outcome to a planner ``outcome_kind``.
+
+    terminal (foul/charge/dead-ball) → ``terminal``; a NEUTRAL stop → ``hco`` /
+    ``pass`` / ``pull_up`` by the BH's stop decision; otherwise the BH shoots at
+    the rim → ``rim_finish``.
+    """
+    outcome = fb_drive.get("outcome")
+    if outcome in ("DEAD BALL", "O_FOUL", "D_FOUL", "CHARGE", "BLOCKING_FOUL"):
+        return "terminal"
+    if outcome == "NEUTRAL":
+        action = (
+            turn_result.get("stop_decision_action")
+            or (fb_drive.get("stop_decision") or {}).get("action")
+        )
+        if action == "HCO":
+            return "hco"
+        if action == "pass":
+            return "pass"
+        return "pull_up"
+    return "rim_finish"
+
+
+def _author_offball_spread_end_coords(
+    *,
+    turn_result: Dict[str, Any],
+    fb_drive: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    stealer_id: str,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+    uses_meet_step: bool,
+    meet_coords: Optional[Dict[str, Any]],
+) -> Dict[str, GridCoord]:
+    """Author the coordinated all-ten transition spread at emit time.
+
+    Slices the offense/defense start coords out of ``start_coords`` (keyed by the
+    lineup player ids), derives the ball handler's finish + ``outcome_kind`` +
+    matchup inputs from the ``fb_drive_resolution`` payload, then delegates to
+    the shared planner. Returns a full ``{pid: {x, y}}`` map (start-coord
+    fallback for any uncovered id) that replaces the caller's off-ball
+    ``end_coords``.
+    """
+    from BackEnd.engine.after_steal_transition_positioning import (
+        author_transition_end_coords,
+    )
+
+    off_ids = {sid for p in off_lineup.values() if (sid := _safe_id(p))}
+    def_ids = {sid for p in def_lineup.values() if (sid := _safe_id(p))}
+    off_start = {
+        pid: {"x": float(c["x"]), "y": float(c["y"])}
+        for pid, c in start_coords.items()
+        if pid in off_ids
+    }
+    def_start = {
+        pid: {"x": float(c["x"]), "y": float(c["y"])}
+        for pid, c in start_coords.items()
+        if pid in def_ids
+    }
+    bh_start = start_coords.get(stealer_id) or {"x": 50.0, "y": 25.0}
+
+    if uses_meet_step and meet_coords:
+        bh_end = {"x": float(meet_coords["x"]), "y": float(meet_coords["y"])}
+    else:
+        raw = (
+            turn_result.get("bh_target")
+            or start_coords.get(stealer_id)
+            or {"x": 50.0, "y": 25.0}
+        )
+        bh_end = {"x": float(raw["x"]), "y": float(raw["y"])}
+
+    planner_meet = (
+        {"x": float(fb_drive["meet_x"]), "y": float(fb_drive["meet_y"])}
+        if fb_drive.get("meet_x") is not None
+        else None
+    )
+    coordinated = author_transition_end_coords(
+        bh_id=stealer_id,
+        bh_start={"x": float(bh_start["x"]), "y": float(bh_start["y"])},
+        bh_end=bh_end,
+        off_start_coords=off_start,
+        def_start_coords=def_start,
+        bh_defender_id=fb_drive.get("stopper_id"),
+        meet=planner_meet,
+        outcome_kind=_derive_transition_outcome_kind(fb_drive, turn_result),
+        bh_reaches_rim=fb_drive.get("outcome") in ("NO_MEET", "POS_O"),
+        beaten_stopper_ids=fb_drive.get("cascade_beaten_stopper_ids"),
+        is_away_offense=is_away_offense,
+    )
+    full: Dict[str, GridCoord] = {
+        pid: {"x": float(c["x"]), "y": float(c["y"])}
+        for pid, c in start_coords.items()
+    }
+    for pid, c in coordinated.items():
+        full[pid] = {"x": float(c["x"]), "y": float(c["y"])}
+    return full
+
+
 def _fb_basket_spot(is_away_offense: bool) -> GridCoord:
     """The ``basketSpot`` HCO string spot, mirrored for the away offense.
 
@@ -87,6 +188,7 @@ def build_fb_drive_resolution_steps(
     stamp_fb_start_announcement: bool = True,
     suppress_stinger: bool = False,
     crash_off_ball_to_basket: bool = True,
+    author_offball_spread: bool = False,
 ) -> Optional[List[AnimationStep]]:
     """Build the drive-resolution ``AnimationStep[]`` (meet / neutral / NO_MEET
     drive + post-shot chain) from the ``fb_drive_resolution`` payload.
@@ -97,11 +199,17 @@ def build_fb_drive_resolution_steps(
 
     ``crash_off_ball_to_basket`` (default ``True``) controls the NO_MEET/POS_O
     drive's blanket off-ball crash: every non-finisher, non-cutoff player is
-    re-targeted to ``basketSpot`` at sprint. RR/Triangle/CR keep this (their
-    off-ball cast has no resolver-authored destinations). After-Steal passes
-    ``False`` so the resolver's coordinated spread (leads/trailers + defensive
-    matchups/help spots in ``end_coords``) is honored instead of clustering the
-    whole cast at the rim.
+    re-targeted to ``basketSpot`` at sprint.
+
+    ``author_offball_spread`` (default ``False``) makes the emitter author the
+    coordinated transition spread here (leads/trailers + defensive matchups/help
+    spots via ``after_steal_transition_positioning.author_transition_end_coords``)
+    from the ``fb_drive_resolution`` payload, replacing the passed-in off-ball
+    ``end_coords`` for every branch and disabling the blanket crash. RR/Triangle/
+    CR pass ``True`` so every FB type spreads the cast instead of clustering at
+    the rim. After-Steal instead pre-authors the identical spread in its resolver
+    and passes it in via ``end_coords`` (``author_offball_spread=False``,
+    ``crash_off_ball_to_basket=False``).
     """
     from BackEnd.engine.after_steal_fast_break_step_emitter import (
         _build_drive_step,
@@ -156,6 +264,20 @@ def build_fb_drive_resolution_steps(
         "BLOCKING_FOUL",
     )
     uses_meet_step = is_neutral or is_terminal
+
+    if author_offball_spread:
+        end_coords = _author_offball_spread_end_coords(
+            turn_result=turn_result,
+            fb_drive=fb_drive,
+            start_coords=start_coords,
+            stealer_id=stealer_id,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            uses_meet_step=uses_meet_step,
+            meet_coords=meet_coords,
+        )
+        crash_off_ball_to_basket = False
 
     steps: List[AnimationStep] = []
     clock_r = float(clock_remaining)
