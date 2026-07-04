@@ -12,7 +12,16 @@ import random
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Tuple
 
-from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
+from BackEnd.constants import (
+    AWAY_RIM_COORDS,
+    HOME_RIM_COORDS,
+    PASS_GRID_SPOTS_PER_GAME_SECOND,
+)
+from BackEnd.constants.fast_break_constants import (
+    FB_AS_MAX_CUTOFF_ATTEMPTS,
+    FB_AS_MAX_PASS_AHEAD,
+    FB_AS_PASS_AHEAD_PROB,
+)
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
@@ -159,6 +168,95 @@ def _build_offense_end_coords(
             continue
         rate = _ag_grid_per_game_sec(player, "sprint")
         end_coords[pid] = _interpolated_position(_coord_of(player), target, rate, t_elapsed)
+    return end_coords
+
+
+def _offense_start_coords_by_id(
+    off_lineup: Dict[str, Any],
+    stealer_id: str,
+    bh_start: Dict[str, float],
+) -> Dict[str, Dict[str, float]]:
+    """All-offense start coords keyed by player_id (BH overridden with his steal
+    coord) for the coordinated transition planner."""
+    coords: Dict[str, Dict[str, float]] = {}
+    for player in off_lineup.values():
+        pid = _safe_id(player)
+        if pid:
+            coords[pid] = _coord_of(player)
+    if stealer_id in coords:
+        coords[stealer_id] = dict(bh_start)
+    return coords
+
+
+def _defense_start_coords_by_id(
+    def_lineup: Dict[str, Any],
+) -> Dict[str, Dict[str, float]]:
+    coords: Dict[str, Dict[str, float]] = {}
+    for player in def_lineup.values():
+        pid = _safe_id(player)
+        if pid:
+            coords[pid] = _coord_of(player)
+    return coords
+
+
+def _build_after_steal_end_coords(
+    *,
+    stealer_id: str,
+    bh_end: Dict[str, float],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    bh_start: Dict[str, float],
+    outcome_kind: str,
+    drive: Dict[str, Any],
+    is_away_offense: bool,
+) -> Dict[str, Dict[str, float]]:
+    """All-10 end coords for an after-steal drive: resolver-authored coordinated
+    OFFENSE spread (leads/trailers per ``outcome_kind``) plus coordinated DEFENSE
+    matchups (BH defender + lead matchups + help spots). See
+    ``after_steal_transition_positioning``."""
+    from BackEnd.engine.after_steal_transition_positioning import (
+        author_defense_end_coords,
+        author_offense_end_coords,
+        classify_offense_roles,
+    )
+
+    off_start = _offense_start_coords_by_id(off_lineup, stealer_id, bh_start)
+    leads, _trailers = classify_offense_roles(
+        stealer_id=stealer_id,
+        off_start_coords=off_start,
+        is_away_offense=is_away_offense,
+    )
+    offense = author_offense_end_coords(
+        stealer_id=stealer_id,
+        bh_end=bh_end,
+        off_start_coords=off_start,
+        outcome_kind=outcome_kind,
+        is_away_offense=is_away_offense,
+    )
+
+    outcome = drive.get("outcome")
+    bh_reaches_rim = outcome in ("NO_MEET", "POS_O")
+    meet = (
+        {"x": float(drive["meet_x"]), "y": float(drive["meet_y"])}
+        if drive.get("meet_x") is not None
+        else None
+    )
+    defense = author_defense_end_coords(
+        def_start_coords=_defense_start_coords_by_id(def_lineup),
+        bh_defender_id=drive.get("stopper_id"),
+        bh_start=bh_start,
+        bh_end=bh_end,
+        meet=meet,
+        bh_reaches_rim=bh_reaches_rim,
+        lead_ids=leads,
+        offense_end_coords=offense,
+        is_away_offense=is_away_offense,
+        beaten_stopper_ids=drive.get("cascade_beaten_stopper_ids"),
+    )
+
+    end_coords: Dict[str, Dict[str, float]] = {}
+    end_coords.update(defense)
+    end_coords.update(offense)
     return end_coords
 
 
@@ -400,6 +498,148 @@ def _record_stats(game, turn_result, stealer, defenders):
     _record_after_steal_fast_break_stats(game, turn_result, stealer, defenders)
 
 
+def _x_progress(x: float, is_away_offense: bool) -> float:
+    """Higher = closer to the attacking basket (away attacks low x)."""
+    return (100.0 - float(x)) if is_away_offense else float(x)
+
+
+def _find_open_pass_ahead(
+    bh: Any,
+    bh_start: Dict[str, float],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+) -> Tuple[Optional[Any], Optional[Dict[str, float]]]:
+    """The teammate furthest ahead of the BH toward the basket to whom an *open*
+    pass exists (no defender can attempt to intercept the lane — Q20). Returns
+    ``(receiver, receiver_coord)`` or ``(None, None)``."""
+    from BackEnd.engine.pass_contest import find_pass_contester
+
+    bh_id = _safe_id(bh)
+    bh_prog = _x_progress(bh_start["x"], is_away_offense)
+
+    defenders: List[Dict[str, Any]] = []
+    for d in def_lineup.values():
+        pid = _safe_id(d)
+        if not pid:
+            continue
+        attrs = getattr(d, "attributes", {}) or {}
+        defenders.append(
+            {
+                "id": pid,
+                "xy": _coord_of(d),
+                "rate": _ag_grid_per_game_sec(d, "sprint"),
+                "IQ": attrs.get("IQ", 50),
+            }
+        )
+
+    best: Optional[Any] = None
+    best_coord: Optional[Dict[str, float]] = None
+    best_prog = bh_prog
+    for p in off_lineup.values():
+        pid = _safe_id(p)
+        if not pid or pid == bh_id:
+            continue
+        rc = _coord_of(p)
+        prog = _x_progress(rc["x"], is_away_offense)
+        if prog <= bh_prog:  # not ahead of the ball handler
+            continue
+        contester = find_pass_contester(
+            bh_start, rc, float(PASS_GRID_SPOTS_PER_GAME_SECOND), defenders
+        )
+        if contester is not None:  # a defender can attempt the pick-off → not open
+            continue
+        if best is None or prog > best_prog:
+            best, best_coord, best_prog = p, rc, prog
+    return best, best_coord
+
+
+def _stamp_pass_ahead(
+    turn_result: Dict[str, Any],
+    pass_chain: List[Dict[str, Any]],
+    off_lineup: Dict[str, Any],
+) -> None:
+    """Record the pass-ahead chain on the turn (for the emitter's leading pass
+    step) and credit the last passer an assist on a make."""
+    if not pass_chain:
+        return
+    turn_result["after_steal_pass_ahead_chain"] = pass_chain
+    if turn_result.get("result_type") == "MAKE":
+        passer = _player_by_id(off_lineup, pass_chain[-1]["passer_id"])
+        if passer is not None:
+            passer.record_stat("AST")
+            turn_result["assist_player_id"] = pass_chain[-1]["passer_id"]
+
+
+def _resolve_drive_with_cascade(
+    *,
+    resolve_kwargs: Dict[str, Any],
+    shot_spot: Dict[str, float],
+    max_attempts: int,
+) -> Dict[str, Any]:
+    """Resolve the BH's drive with a cutoff cascade.
+
+    ``resolve_fb_drive_step`` picks a single best cutoff. If the BH beats it
+    (``POS_O``), the next-closest eligible defender takes over: we re-resolve
+    from the BH's shimmy point with the beaten stopper excluded, up to
+    ``max_attempts`` total cutoff attempts. Cascades that ultimately reach the
+    rim are collapsed into one curved ``POS_O`` drive through every shimmy knot;
+    a later defender who *stops* the BH ends the cascade with his own outcome.
+    Beaten stoppers are recorded on ``cascade_beaten_stopper_ids`` so the
+    defensive planner trails them behind the play.
+    """
+    beaten: List[str] = []
+    knots: Optional[List[Dict[str, float]]] = None
+    total_t = 0.0
+    cur_start = dict(resolve_kwargs["bh_start"])
+    drive: Dict[str, Any] = {}
+
+    for attempt in range(max_attempts):
+        kw = dict(resolve_kwargs)
+        kw["bh_start"] = cur_start
+        kw["excluded_stopper_ids"] = set(beaten)
+        drive = resolve_fb_drive_step(**kw)
+        can_cascade = attempt < max_attempts - 1
+        if (
+            drive.get("outcome") == "POS_O"
+            and can_cascade
+            and drive.get("stopper_id")
+        ):
+            meet = {"x": float(drive["meet_x"]), "y": float(drive["meet_y"])}
+            shimmy_raw = drive.get("shimmy") or meet
+            shimmy = {"x": float(shimmy_raw["x"]), "y": float(shimmy_raw["y"])}
+            if knots is None:
+                start_knot = drive.get("bh_start") or cur_start
+                knots = [{"x": float(start_knot["x"]), "y": float(start_knot["y"])}]
+            knots.append(dict(meet))
+            knots.append(dict(shimmy))
+            segs = drive.get("path_segment_game_seconds") or []
+            total_t += float(segs[0]) if len(segs) >= 1 else 0.0
+            total_t += float(segs[1]) if len(segs) >= 2 else 0.0
+            beaten.append(str(drive.get("stopper_id")))
+            cur_start = dict(shimmy)
+            continue
+        break
+
+    if beaten and drive:
+        drive["cascade_beaten_stopper_ids"] = beaten
+        if drive.get("outcome") in ("NO_MEET", "POS_O"):
+            # BH ultimately reaches the rim after beating ≥1 defender: render as
+            # one curved POS_O drive threading all shimmy knots to the finish.
+            if knots is None:
+                knots = [dict(cur_start)]
+            final = drive.get("shot_spot") or shot_spot
+            knots.append({"x": float(final["x"]), "y": float(final["y"])})
+            total_t += float(drive.get("t_drive_game_seconds") or 0.0)
+            drive["outcome"] = "POS_O"
+            drive["bh_path_knots"] = knots
+            drive.pop("path_segment_game_seconds", None)
+            if total_t > 0:
+                drive["t_drive_game_seconds"] = total_t
+        # NEUTRAL / terminal: keep the final defender's own meet + outcome.
+    return drive
+
+
 def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
     """After-steal FB via unified ``resolve_fb_drive_step`` (Phase 2)."""
     from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
@@ -434,26 +674,72 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         else _coord_of(stealer)
     )
     bh_pos = _lineup_pos(off_lineup, stealer)
-    shot_spot = _compute_bh_target(is_away_offense)
 
+    from BackEnd.constants import USE_FB_AS_PASS_AHEAD
     from BackEnd.models.shot_manager import ShotManager
 
     shot_manager = getattr(game, "shot_manager", None) or ShotManager(game)
-    drive = resolve_fb_drive_step(
-        bh=stealer,
-        bh_pos=bh_pos,
-        bh_start=bh_start,
-        shot_spot=shot_spot,
-        off_lineup=off_lineup,
-        off_starts=_lineup_starts_by_pos(off_lineup),
-        def_lineup=def_lineup,
-        def_starts=_lineup_starts_by_pos(def_lineup),
-        off_team=off_team,
-        def_team=def_team,
-        shot_manager=shot_manager,
-        is_away_offense=is_away_offense,
-        steal_entry=True,
-    )
+
+    # Pass-ahead loop: resolve the current BH's drive (with cutoff cascade); if
+    # he has a clear lane (NO_MEET/POS_O) and an open teammate is ahead, he may
+    # dish ahead and the receiver becomes the new BH — re-run the loop. The
+    # identity vars are reassigned to the final ball handler so every downstream
+    # branch finishes the possession with him.
+    current_bh = stealer
+    current_bh_pos = bh_pos
+    current_bh_start = dict(bh_start)
+    pass_chain: List[Dict[str, Any]] = []
+    drive: Dict[str, Any] = {}
+    shot_spot = _compute_bh_target(is_away_offense)
+    for _hop in range(FB_AS_MAX_PASS_AHEAD + 1):
+        shot_spot = _compute_bh_target(is_away_offense)
+        drive = _resolve_drive_with_cascade(
+            resolve_kwargs=dict(
+                bh=current_bh,
+                bh_pos=current_bh_pos,
+                bh_start=current_bh_start,
+                shot_spot=shot_spot,
+                off_lineup=off_lineup,
+                off_starts=_lineup_starts_by_pos(off_lineup),
+                def_lineup=def_lineup,
+                def_starts=_lineup_starts_by_pos(def_lineup),
+                off_team=off_team,
+                def_team=def_team,
+                shot_manager=shot_manager,
+                is_away_offense=is_away_offense,
+                steal_entry=True,
+            ),
+            shot_spot=shot_spot,
+            max_attempts=FB_AS_MAX_CUTOFF_ATTEMPTS,
+        )
+        if not USE_FB_AS_PASS_AHEAD:
+            break
+        if drive.get("outcome") not in ("NO_MEET", "POS_O"):
+            break
+        if len(pass_chain) >= FB_AS_MAX_PASS_AHEAD:
+            break
+        receiver, receiver_coord = _find_open_pass_ahead(
+            current_bh, current_bh_start, off_lineup, def_lineup, is_away_offense
+        )
+        if receiver is None or random.random() >= FB_AS_PASS_AHEAD_PROB:
+            break
+        pass_chain.append(
+            {
+                "passer_id": _safe_id(current_bh),
+                "passer_start": dict(current_bh_start),
+                "receiver_id": _safe_id(receiver),
+                "receiver_catch": dict(receiver_coord),
+            }
+        )
+        current_bh = receiver
+        current_bh_pos = _lineup_pos(off_lineup, receiver)
+        current_bh_start = dict(receiver_coord)
+
+    # Finish the possession with the final ball handler.
+    stealer = current_bh
+    stealer_id = _safe_id(current_bh)
+    bh_pos = current_bh_pos
+    bh_start = current_bh_start
 
     outcome = drive.get("outcome")
     t_drive = float(drive.get("t_drive_game_seconds") or 1.0)
@@ -466,13 +752,15 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
     # --- Terminal meet outcomes (no shot attempt) -------------------------
     if outcome in ("DEAD BALL", "O_FOUL", "D_FOUL", "CHARGE", "BLOCKING_FOUL"):
         bh_end = meet or dict(shot_spot)
-        end_coords = _build_offense_end_coords(
+        end_coords = _build_after_steal_end_coords(
             stealer_id=stealer_id,
             bh_end=bh_end,
             off_lineup=off_lineup,
-            t_elapsed=float(drive.get("t_meet_game_seconds") or t_drive),
+            def_lineup=def_lineup,
+            bh_start=bh_start,
+            outcome_kind="terminal",
+            drive=drive,
             is_away_offense=is_away_offense,
-            base_end_coords=dict(drive.get("defender_end_coords") or {}),
         )
         stopper = _player_by_id(def_lineup, drive.get("stopper_id"))
         credited = _player_by_id(def_lineup, drive.get("d8_credited_player_id"))
@@ -549,6 +837,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                     turn_result["foul_count"] = foul_transition.get("foul_count")
             elif foul_player:
                 turn_result["foul_player_id"] = _safe_id(foul_player)
+        _stamp_pass_ahead(turn_result, pass_chain, off_lineup)
         _record_stats(game, turn_result, stealer, defenders)
         game_state.pop("last_stealer_coords", None)
         game_state["last_stealer"] = None
@@ -559,13 +848,18 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         stop = drive.get("stop_decision") or {}
         action = stop.get("action", "HCO")
         bh_end = meet or dict(shot_spot)
-        end_coords = _build_offense_end_coords(
+        neutral_kind = (
+            "hco" if action == "HCO" else "pass" if action == "pass" else "pull_up"
+        )
+        end_coords = _build_after_steal_end_coords(
             stealer_id=stealer_id,
             bh_end=bh_end,
             off_lineup=off_lineup,
-            t_elapsed=float(drive.get("t_meet_game_seconds") or t_drive),
+            def_lineup=def_lineup,
+            bh_start=bh_start,
+            outcome_kind=neutral_kind,
+            drive=drive,
             is_away_offense=is_away_offense,
-            base_end_coords=dict(drive.get("defender_end_coords") or {}),
         )
 
         if action == "HCO":
@@ -595,6 +889,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                 "bh_target": dict(bh_end),
                 "time_elapsed": max(1, int(round(t_drive + 1.0))),
             }
+            _stamp_pass_ahead(turn_result, pass_chain, off_lineup)
             _record_stats(game, turn_result, stealer, defenders)
             game_state.pop("last_stealer_coords", None)
             game_state["last_stealer"] = None
@@ -705,6 +1000,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         if shot["shot_variant_extras"]:
             turn_result.update(shot["shot_variant_extras"])
+        _stamp_pass_ahead(turn_result, pass_chain, off_lineup)
         _record_stats(game, turn_result, stealer, defenders)
         game_state.pop("last_stealer_coords", None)
         game_state["last_stealer"] = None
@@ -712,13 +1008,15 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
 
     # --- NO_MEET / POS_O → rim finish ---------------------------------------
     bh_target = dict(shot_spot)
-    end_coords = _build_offense_end_coords(
+    end_coords = _build_after_steal_end_coords(
         stealer_id=stealer_id,
         bh_end=bh_target,
         off_lineup=off_lineup,
-        t_elapsed=t_drive,
+        def_lineup=def_lineup,
+        bh_start=bh_start,
+        outcome_kind="rim_finish",
+        drive=drive,
         is_away_offense=is_away_offense,
-        base_end_coords=dict(drive.get("defender_end_coords") or {}),
     )
     shot_defender = _player_by_id(def_lineup, drive.get("shot_defender_id"))
     contested = bool(drive.get("contested"))
@@ -817,6 +1115,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         "shot_defense_score_for_sfx": shot["shot_defense_score_for_sfx"],
         "shot_variant": shot.get("shot_variant"),
     }
+    _stamp_pass_ahead(turn_result, pass_chain, off_lineup)
     _record_stats(game, turn_result, stealer, defenders)
     game_state.pop("last_stealer_coords", None)
     game_state["last_stealer"] = None

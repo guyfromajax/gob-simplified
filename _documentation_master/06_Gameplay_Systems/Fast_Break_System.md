@@ -242,6 +242,19 @@ When two defenders both retreat to basket defense, the second defender's spot is
 
 **DREB miss chaining:** If a migrated Fast Break shot (`covert_release`, `rim_runner`, `triangle`, or `after_steal`) misses or is blocked and the defense secures the rebound, `GameManager.simulate_macro_turn()` promotes the defensive rebound into a discrete `DREB` turn before routing to the original next play (`HCO` or `FAST_BREAK`). The Fast Break shot turn ends at the schema post-shot bounce / `SHOT_ATTEMPT` stop; the separate `DREB` turn is the authority for rebound capture and ball ownership.
 
+#### After-Steal Coordinated Transition (Jul 2026)
+
+Steal FBs start with the whole cast bunched on the x-grid (the steal happens in traffic), so the universal drive helper's blanket rim-crash parked everyone at the basket — an unrealistic cluster. The after-steal path now authors a **coordinated spread** in the resolver, and the emitter honors it. Module: `BackEnd/engine/after_steal_transition_positioning.py` (pure planner); wired in `after_steal_drive_integration.py`; tunables in `fast_break_constants.py` (`FB_AS_*`).
+
+- **Emitter opt-out**: `build_fb_drive_resolution_steps(..., crash_off_ball_to_basket=False)` for after-steal only (RR/Triangle/CR keep the blanket crash). The resolver's `after_steal_end_coords` are rendered as authored.
+- **Offense roles**: the two teammates closest to the attacking basket are **leads**; the other two are **trailers**. Spacing tiers by y: center (BH) `19–31`, lower `~18`, upper `~32` (±jitter).
+  - *Shot outcomes* (rim finish / pull-up / pass): leads crash to the basket x keeping their fanned y (rebound/dish range); trailers spread to **distinct** 3-point arc spots on their vertical half (or the key), never sharing a spot.
+  - *Stop → HCO*: leads set up on the low blocks (`upper/lower lowPost`); trailers hold.
+  - *Terminal* (foul/charge/dead ball): everyone holds.
+- **Defense matchups**: (1) the BH's primary defender = the resolver's cutoff stopper, or (NO_MEET) the defender closest to the ball handler — he sits on the meet when he stopped the drive, or **trails 3 x-spots behind the finish** (`FB_AS_NO_MEET_CHASE_X_BEHIND`) as a rebound spot when the BH reaches the rim; (2) the next two defenders closest to the basket pick up the two leads, ball-side; (3) the last two drop to distinct, side-biased help spots (`upper/lower highPost`, `topLane`, `upper/lower apex`). Arc trailers are left open (concede the transition three).
+- **Cutoff cascade**: if the BH beats his cutoff (`POS_O`), the next-closest eligible defender takes over — the resolver re-runs `resolve_fb_drive_step` from the shimmy point with the beaten stopper in `excluded_stopper_ids`, up to `FB_AS_MAX_CUTOFF_ATTEMPTS`. Cascades that reach the rim collapse into one curved `POS_O` drive; a later defender who stops the BH ends the cascade with his own outcome. Beaten stoppers (`cascade_beaten_stopper_ids`) trail the play.
+- **Pass-ahead** (`USE_FB_AS_PASS_AHEAD`): when the BH has a clear lane and an **open** teammate is ahead (open ⟺ no defender can attempt to intercept the pass lane, via `pass_contest.find_pass_contester`), he dishes ahead with probability `FB_AS_PASS_AHEAD_PROB` (0.75). The receiver becomes the new ball handler and the drive loop re-runs (bounded by `FB_AS_MAX_PASS_AHEAD`). The emitter prepends a leading pass step per hop (`after_steal_pass_ahead_chain`); on a make the last passer is credited an assist.
+
 ### When Fast Break Activates
 
 **Trigger Conditions:**

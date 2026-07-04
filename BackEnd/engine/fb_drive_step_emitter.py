@@ -86,6 +86,7 @@ def build_fb_drive_resolution_steps(
     kind_prefix: str,
     stamp_fb_start_announcement: bool = True,
     suppress_stinger: bool = False,
+    crash_off_ball_to_basket: bool = True,
 ) -> Optional[List[AnimationStep]]:
     """Build the drive-resolution ``AnimationStep[]`` (meet / neutral / NO_MEET
     drive + post-shot chain) from the ``fb_drive_resolution`` payload.
@@ -93,6 +94,14 @@ def build_fb_drive_resolution_steps(
     Returns a **fresh, 0-based** step list (the caller rebases + extends it onto
     any preamble steps). Returns ``None`` for unsupported ``result_type`` or a
     missing/unseated ``stealer_id``.
+
+    ``crash_off_ball_to_basket`` (default ``True``) controls the NO_MEET/POS_O
+    drive's blanket off-ball crash: every non-finisher, non-cutoff player is
+    re-targeted to ``basketSpot`` at sprint. RR/Triangle/CR keep this (their
+    off-ball cast has no resolver-authored destinations). After-Steal passes
+    ``False`` so the resolver's coordinated spread (leads/trailers + defensive
+    matchups/help spots in ``end_coords``) is honored instead of clustering the
+    whole cast at the rim.
     """
     from BackEnd.engine.after_steal_fast_break_step_emitter import (
         _build_drive_step,
@@ -328,20 +337,26 @@ def build_fb_drive_resolution_steps(
             # parking on their short-budget end coords). The finisher keeps
             # bh_target; cutoff defenders keep their resolver contest coords +
             # finisher-pace standard.
-            crash_basket = _fb_basket_spot(is_away_offense)
-            cutoff_ids = {
-                str(fb_drive.get(k))
-                for k in ("stopper_id", "d8_credited_player_id", "shot_defender_id")
-                if fb_drive.get(k) is not None
-            }
+            #
+            # After-Steal passes ``crash_off_ball_to_basket=False``: its resolver
+            # authors coordinated spread destinations (leads/trailers + defensive
+            # matchups/help spots) in ``end_coords``, so the blanket crash is
+            # skipped to avoid clustering the whole cast at the rim.
             crash_archetypes: Dict[str, PlayerArchetype] = dict(
                 fb_drive.get("defender_archetypes") or {}
             )
-            for pid in start_coords:
-                if pid == stealer_id or pid in cutoff_ids:
-                    continue
-                end_coords[pid] = dict(crash_basket)
-                crash_archetypes[pid] = "sprint"
+            if crash_off_ball_to_basket:
+                crash_basket = _fb_basket_spot(is_away_offense)
+                cutoff_ids = {
+                    str(fb_drive.get(k))
+                    for k in ("stopper_id", "d8_credited_player_id", "shot_defender_id")
+                    if fb_drive.get(k) is not None
+                }
+                for pid in start_coords:
+                    if pid == stealer_id or pid in cutoff_ids:
+                        continue
+                    end_coords[pid] = dict(crash_basket)
+                    crash_archetypes[pid] = "sprint"
             drive_step = _build_drive_step(
                 start_coords=start_coords,
                 end_coords=end_coords,

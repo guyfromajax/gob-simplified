@@ -194,6 +194,18 @@ The two **live** FB outlet-pass builders (RR/Triangle `_build_outlet_pass_step`,
 
 **Not consolidated (by design):** burst step and lane pass are already shared between their only two consumers (RR + Triangle); wrapping them adds indirection with no payoff and no cross-type drift. After-Steal has no outlet/burst/lane. See discussion in the babysit/decision log.
 
+### After-Steal Coordinated Transition (Jul 2026) (DONE)
+
+Steal FBs start bunched on the x-grid, so the universal helper's blanket rim-crash clustered every off-ball player at the basket. Replaced with a resolver-authored coordinated spread + defensive matchups, shipped in 5 phases. New pure planner: `BackEnd/engine/after_steal_transition_positioning.py`; wiring in `after_steal_drive_integration.py`; tunables `FB_AS_*` in `fast_break_constants.py`; flag `USE_FB_AS_PASS_AHEAD`.
+
+- **Phase 1 — emitter opt-out.** `build_fb_drive_resolution_steps` gained `crash_off_ball_to_basket: bool = True`; RR/Triangle/CR keep the crash, after-steal passes `False` so its `after_steal_end_coords` render as authored.
+- **Phase 2 — offense planner.** Two leads (closest to basket) + two trailers; spacing tiers (center BH `19–31`, lower `~18`, upper `~32` ±jitter). Shot outcomes: leads crash to basket-x @ fanned y (rebound/dish), trailers → distinct arc spots per vertical half. HCO: leads → low blocks, trailers hold. Terminal: hold.
+- **Phase 3 — defense planner.** BH defender = stopper or (NO_MEET) closest to BH; on the meet when he stops, else **trails 3 x-spots behind the finish** (`FB_AS_NO_MEET_CHASE_X_BEHIND`) for the rebound. Next two closest defenders take the leads (ball-side); last two → distinct side-biased help spots. Arc trailers left open.
+- **Phase 4 — cutoff cascade.** On `POS_O` the resolver re-runs `resolve_fb_drive_step` from the shimmy with the beaten stopper in `excluded_stopper_ids`, up to `FB_AS_MAX_CUTOFF_ATTEMPTS`. Rim-reaching cascades collapse to one curved `POS_O`; a later stop ends the cascade. Beaten stoppers (`cascade_beaten_stopper_ids`) trail.
+- **Phase 5 — pass-ahead.** Clear lane + open ahead teammate (open ⟺ `pass_contest.find_pass_contester(...) is None`) → dish ahead at `FB_AS_PASS_AHEAD_PROB` (0.75); receiver becomes BH, loop re-runs (≤ `FB_AS_MAX_PASS_AHEAD`). Emitter prepends a leading pass step per hop from `after_steal_pass_ahead_chain`; last passer credited an assist on a make. Gated by `USE_FB_AS_PASS_AHEAD` (verify the pass animation in-app; flip off to disable).
+
+**Verification:** `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_after_steal_transition_positioning.py tests/test_after_steal_drive_resolution.py tests/test_after_steal_fast_break_stats.py -q` → **32 passed**; broader FB-file run **123 passed** (the two pre-existing `test_no_meet_all_defenders_to_basket_spot` / `test_outlet_pass_roles_when_rebounder_is_none` failures deselected — confirmed identical on a clean tree). No lint errors.
+
 ---
 
 ## 5. Testing strategy

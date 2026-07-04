@@ -121,6 +121,67 @@ FB_PASS_GEO_SPOT_LABELS = frozenset(
     },
 )
 
+# --- After-Steal Coordinated Transition Positioning -------------------------
+# Steal FBs start with the cast bunched on the x-grid, so the blanket rim-crash
+# clustered everyone at the basket. The after-steal resolver instead authors a
+# coordinated spread: the ball handler + two "lead" offenders (closest to the
+# attacking basket) + two "trailers". See Fast_Break_System.md
+# §After-Steal Coordinated Transition.
+#
+# Offense spacing tiers (y bands, HOME orientation). The BH occupies the center
+# tier; the two leads fan out to the lower/upper tiers.
+FB_AS_CENTER_TIER_MIN_Y = 19
+FB_AS_CENTER_TIER_MAX_Y = 31
+FB_AS_TIER_LOWER_Y = 18   # lead fan-out anchor (lower/left tier)
+FB_AS_TIER_UPPER_Y = 32   # lead fan-out anchor (upper/right tier)
+FB_AS_TIER_Y_JITTER = 2   # ±jitter on the tier anchor for variability
+
+# On a shot outcome the leads crash to the basket x (keeping their fanned y) so
+# they're in rebound / dish range. Grid spots back from the attacking basket.
+FB_AS_LEAD_REBOUND_X_OFFSET = 6
+
+# On a stop → HCO the leads set up on the low blocks.
+FB_AS_LEAD_HCO_SPOTS = ("upper lowPost", "lower lowPost")
+
+# Trailers set up on the 3-point arc to receive a transition-three. Each trailer
+# picks a distinct spot on its vertical half (or the key). The two trailers may
+# not share a spot.
+FB_AS_ARC_SPOTS_UPPER = (
+    "key",
+    "upper midWing",
+    "upper wing",
+    "upper midCorner",
+    "upper corner",
+)
+FB_AS_ARC_SPOTS_LOWER = (
+    "key",
+    "lower midWing",
+    "lower wing",
+    "lower midCorner",
+    "lower corner",
+)
+
+# Defense side (Phase 3). The BH's primary defender is the resolver's cutoff
+# stopper (or, in the NO_MEET case, the defender closest to the ball handler).
+# The two remaining defenders closest to the basket pick up the two leads; the
+# last two drop to help spots.
+FB_AS_LEAD_DEF_X_OFFSET = 2      # lead defender sits this many x-spots ball-side of his man
+FB_AS_NO_MEET_CHASE_X_BEHIND = 3  # unstopped BH's defender trails this far behind the finish (rebound spot)
+FB_AS_HELP_SPOTS_UPPER = ("upper highPost", "upper apex", "topLane")
+FB_AS_HELP_SPOTS_LOWER = ("lower highPost", "lower apex", "topLane")
+
+# Cutoff cascade (Phase 4): if the BH beats his primary cutoff defender (POS_O),
+# the next-closest defender abandons his assignment to take the ball handler.
+# Total cutoff attempts = initial cutoff + this many cascade takeovers.
+FB_AS_MAX_CUTOFF_ATTEMPTS = 2
+
+# Pass-ahead (Phase 5): when the BH has a clear lane to the rim (NO_MEET/POS_O)
+# and an open teammate is ahead of him, he may dish ahead. The receiver becomes
+# the new ball handler and the drive loop re-runs. Probability the BH takes the
+# open pass rather than finishing himself; and the max hops per possession.
+FB_AS_PASS_AHEAD_PROB = 0.75
+FB_AS_MAX_PASS_AHEAD = 2
+
 # Steal Entry Movement (Steal → Fast Break)
 STEAL_ENTRY_MOVE_X_MIN = 5  # Minimum x movement toward basket
 STEAL_ENTRY_MOVE_X_MAX = 10  # Maximum x movement toward basket

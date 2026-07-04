@@ -414,6 +414,56 @@ def _build_meet_drive_step(
     return {"start": start, "end": end}
 
 
+def _build_pass_ahead_steps(
+    turn_result: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    clock_remaining: float,
+    shot_clock_remaining: float,
+) -> List[AnimationStep]:
+    """Leading pass step(s) for an after-steal pass-ahead (Phase 5). Ball travels
+    passer → receiver while the cast holds; empty list when there was no
+    pass-ahead or the input is degenerate (caller falls back to the plain
+    drive)."""
+    from BackEnd.constants import PASS_GRID_SPOTS_PER_GAME_SECOND, USE_FB_AS_PASS_AHEAD
+    from BackEnd.utils.transition_bridge import build_pass_step
+
+    chain = turn_result.get("after_steal_pass_ahead_chain") or []
+    if not chain or not USE_FB_AS_PASS_AHEAD:
+        return []
+
+    steps: List[AnimationStep] = []
+    coords = dict(start_coords)
+    clock_r = float(clock_remaining)
+    shot_r = float(shot_clock_remaining)
+    for hop in chain:
+        passer_id = str(hop.get("passer_id"))
+        receiver_id = str(hop.get("receiver_id"))
+        if passer_id not in coords or receiver_id not in coords:
+            return []
+        try:
+            step = build_pass_step(
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                start_coords=coords,
+                passer_id=passer_id,
+                receiver_id=receiver_id,
+                clock_remaining_at_start=clock_r,
+                shot_clock_remaining_at_start=shot_r,
+                next_step_index=len(steps) + 1,
+                pass_speed_grid_per_game_sec=float(PASS_GRID_SPOTS_PER_GAME_SECOND),
+                metadata_reason="after_steal_pass_ahead",
+            )
+        except ValueError:
+            return []
+        steps.append(step)
+        coords = dict(step["end"]["coords"])
+        clock_r = float(step["end"]["clock"]["clock_remaining"])
+        shot_r = float(step["end"]["clock"]["shot_clock_remaining"])
+    return steps
+
+
 def _build_drive_resolution_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -475,13 +525,28 @@ def _build_drive_resolution_animation_steps(
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining = float(game_state.get("time_remaining", 0) or 0)
     shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
+
+    # Pass-ahead preamble: if the BH dished ahead in transition, render the
+    # leading pass step(s) (ball travels passer → receiver) before the final
+    # ball handler's drive resolution. Fails open to the plain drive on any
+    # degenerate input.
+    pass_steps = _build_pass_ahead_steps(
+        turn_result, start_coords, off_lineup, def_lineup,
+        clock_remaining, shot_clock_remaining,
+    )
+    if pass_steps:
+        start_coords = dict(pass_steps[-1]["end"]["coords"])
+        clock_remaining = float(pass_steps[-1]["end"]["clock"]["clock_remaining"])
+        shot_clock_remaining = float(
+            pass_steps[-1]["end"]["clock"]["shot_clock_remaining"]
+        )
+
     # Delegate the meet / neutral / NO_MEET drive orchestration to the shared
-    # universal emitter. After-Steal has no preamble (the drive resolution is
-    # the whole turn), so its result is returned directly. After-Steal shows the
-    # "Fast Break!" banner on the drive step but suppresses the court stinger.
+    # universal emitter. After-Steal shows the "Fast Break!" banner on the drive
+    # step but suppresses the court stinger.
     from BackEnd.engine.fb_drive_step_emitter import build_fb_drive_resolution_steps
 
-    return build_fb_drive_resolution_steps(
+    dr_steps = build_fb_drive_resolution_steps(
         turn_result=turn_result,
         game=game,
         start_coords=start_coords,
@@ -496,7 +561,18 @@ def _build_drive_resolution_animation_steps(
         kind_prefix="after_steal",
         stamp_fb_start_announcement=True,
         suppress_stinger=True,
+        crash_off_ball_to_basket=False,
     )
+    if not dr_steps:
+        return None
+    if not pass_steps:
+        return dr_steps
+    from BackEnd.utils.animation_step_helpers import (
+        rebase_animation_step_next_indices,
+    )
+
+    rebase_animation_step_next_indices(dr_steps, len(pass_steps))
+    return pass_steps + dr_steps
 
 
 def _override_fb_make_announcement(steps: List[AnimationStep]) -> None:

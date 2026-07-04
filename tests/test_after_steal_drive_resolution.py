@@ -175,6 +175,321 @@ def test_emitter_includes_path_knots_metadata_for_pos_o():
     assert len(meta["path_knots"]) == 4
 
 
+def test_after_steal_no_meet_honors_resolver_offball_spots():
+    """Phase 1: after-steal opts out of the blanket rim-crash
+    (``crash_off_ball_to_basket=False``), so off-ball players keep the
+    resolver-authored coordinated spread instead of all clustering on
+    ``basketSpot``."""
+    shot_spot = {"x": 88, "y": 25}
+    # Distinct, spread destinations for the off-ball cast (nowhere near the rim).
+    offball_spots = {
+        "home-SG": {"x": 72.0, "y": 14.0},
+        "home-SF": {"x": 72.0, "y": 36.0},
+        "home-PF": {"x": 66.0, "y": 8.0},
+        "home-C": {"x": 66.0, "y": 42.0},
+        "away-SG": {"x": 70.0, "y": 16.0},
+        "away-SF": {"x": 70.0, "y": 34.0},
+        "away-PF": {"x": 62.0, "y": 20.0},
+        "away-C": {"x": 62.0, "y": 30.0},
+        "away-PG": {"x": 80.0, "y": 25.0},
+    }
+    end_coords = dict(offball_spots)
+    end_coords["home-PG"] = dict(shot_spot)
+
+    turn_result = {
+        "result_type": "MAKE",
+        "shooter_id": "home-PG",
+        "ball_handler": SimpleNamespace(player_id="home-PG"),
+        "bh_target": shot_spot,
+        "t_shooter_game_seconds": 2.0,
+        "after_steal_end_coords": end_coords,
+        "fb_drive_resolution": {
+            "outcome": "NO_MEET",
+            "t_drive_game_seconds": 2.0,
+        },
+        "shot_score_pre_defense": 100,
+        "shot_defense_score_for_sfx": 0,
+        "shot_type": "attack",
+        "shot_variant": None,
+    }
+    game = build_mock_game()
+    game.offense_team = game.home_team
+    game.defense_team = game.away_team
+    game.turns = [{"final_coords": {pid: {"x": 40.0, "y": 25.0} for pid in end_coords}}]
+    for pos, player in game.home_team.lineup.items():
+        player.player_id = f"home-{pos}"
+    for pos, player in game.away_team.lineup.items():
+        player.player_id = f"away-{pos}"
+
+    steps = build_after_steal_fast_break_animation_steps(turn_result, game)
+    assert steps is not None
+    destinations = steps[0]["start"]["destination"]
+    for pid, spot in offball_spots.items():
+        assert destinations[pid] == spot, (
+            f"{pid} should keep its resolver spot {spot}, got {destinations[pid]}"
+        )
+
+
+def _pos_o_payload():
+    return {
+        "outcome": "POS_O",
+        "stopper_id": "away-SF",
+        "meet_x": 70,
+        "meet_y": 25,
+        "shimmy": {"x": 70, "y": 27},
+        "bh_start": {"x": 55, "y": 25},
+        "shot_spot": {"x": 88, "y": 25},
+        "path_segment_game_seconds": [1.0, 0.3, 0.5],
+        "t_drive_game_seconds": 1.8,
+    }
+
+
+def test_cascade_collapses_to_pos_o_rim_finish(monkeypatch):
+    """BH beats the first cutoff (POS_O) then finds a clear lane (NO_MEET): the
+    cascade collapses into one curved POS_O drive and records the beaten
+    stopper."""
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    calls = {"n": 0}
+
+    def fake_resolve(**kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            assert not kw.get("excluded_stopper_ids")
+            return _pos_o_payload()
+        assert kw.get("excluded_stopper_ids") == {"away-SF"}
+        assert kw["bh_start"] == {"x": 70, "y": 27}  # advanced to shimmy
+        return {
+            "outcome": "NO_MEET",
+            "t_drive_game_seconds": 0.7,
+            "contested": False,
+            "shot_defender_id": None,
+            "shot_spot": {"x": 88, "y": 25},
+            "bh_start": {"x": 70, "y": 27},
+        }
+
+    monkeypatch.setattr(asi, "resolve_fb_drive_step", fake_resolve)
+    drive = asi._resolve_drive_with_cascade(
+        resolve_kwargs={"bh_start": {"x": 55, "y": 25}},
+        shot_spot={"x": 88, "y": 25},
+        max_attempts=2,
+    )
+    assert calls["n"] == 2
+    assert drive["outcome"] == "POS_O"
+    assert drive["cascade_beaten_stopper_ids"] == ["away-SF"]
+    knots = drive["bh_path_knots"]
+    assert knots[0] == {"x": 55.0, "y": 25.0}
+    assert {"x": 70.0, "y": 25.0} in knots  # meet
+    assert {"x": 70.0, "y": 27.0} in knots  # shimmy
+    assert knots[-1] == {"x": 88.0, "y": 25.0}
+
+
+def test_cascade_second_defender_stops_bh(monkeypatch):
+    """BH beats the first cutoff but a later defender stops him: the cascade ends
+    NEUTRAL with the second stopper credited and the first recorded as beaten."""
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    calls = {"n": 0}
+
+    def fake_resolve(**kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _pos_o_payload()
+        return {
+            "outcome": "NEUTRAL",
+            "stopper_id": "away-PF",
+            "meet_x": 78,
+            "meet_y": 25,
+            "t_meet_game_seconds": 1.0,
+            "t_drive_game_seconds": 1.0,
+            "stop_decision": {"action": "HCO"},
+            "bh_start": {"x": 70, "y": 27},
+        }
+
+    monkeypatch.setattr(asi, "resolve_fb_drive_step", fake_resolve)
+    drive = asi._resolve_drive_with_cascade(
+        resolve_kwargs={"bh_start": {"x": 55, "y": 25}},
+        shot_spot={"x": 88, "y": 25},
+        max_attempts=2,
+    )
+    assert drive["outcome"] == "NEUTRAL"
+    assert drive["stopper_id"] == "away-PF"
+    assert drive["cascade_beaten_stopper_ids"] == ["away-SF"]
+
+
+def test_cascade_no_op_when_first_attempt_not_pos_o(monkeypatch):
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    calls = {"n": 0}
+
+    def fake_resolve(**kw):
+        calls["n"] += 1
+        return {"outcome": "NO_MEET", "t_drive_game_seconds": 1.0, "shot_spot": {"x": 88, "y": 25}}
+
+    monkeypatch.setattr(asi, "resolve_fb_drive_step", fake_resolve)
+    drive = asi._resolve_drive_with_cascade(
+        resolve_kwargs={"bh_start": {"x": 55, "y": 25}},
+        shot_spot={"x": 88, "y": 25},
+        max_attempts=2,
+    )
+    assert calls["n"] == 1
+    assert "cascade_beaten_stopper_ids" not in drive
+
+
+def test_cascade_respects_attempt_cap(monkeypatch):
+    """POS_O on every attempt → stops at the cap and collapses to a rim finish."""
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    calls = {"n": 0}
+
+    def fake_resolve(**kw):
+        calls["n"] += 1
+        payload = _pos_o_payload()
+        payload["stopper_id"] = f"away-{calls['n']}"
+        return payload
+
+    monkeypatch.setattr(asi, "resolve_fb_drive_step", fake_resolve)
+    drive = asi._resolve_drive_with_cascade(
+        resolve_kwargs={"bh_start": {"x": 55, "y": 25}},
+        shot_spot={"x": 88, "y": 25},
+        max_attempts=2,
+    )
+    assert calls["n"] == 2
+    assert drive["outcome"] == "POS_O"
+    # Only the first stopper was beaten-and-excluded; the capped attempt finishes.
+    assert drive["cascade_beaten_stopper_ids"] == ["away-1"]
+
+
+def _pa_player(pid, x, y):
+    return SimpleNamespace(
+        player_id=pid, coords={"x": float(x), "y": float(y)},
+        attributes={"AG": 50, "IQ": 50, "OD": 50, "CH": 50, "PS": 50},
+    )
+
+
+def test_find_open_pass_ahead_returns_ahead_teammate_when_lane_clear():
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    off = {
+        "PG": _pa_player("home-PG", 55, 25),  # BH
+        "SG": _pa_player("home-SG", 78, 25),  # ahead, in front
+        "SF": _pa_player("home-SF", 45, 20),  # behind
+        "PF": _pa_player("home-PF", 40, 30),
+        "C": _pa_player("home-C", 38, 25),
+    }
+    # Defenders nowhere near the PG→SG lane (y≈25).
+    dfn = {pos: _pa_player(f"away-{pos}", 30, 46) for pos in off}
+    receiver, coord = asi._find_open_pass_ahead(
+        off["PG"], {"x": 55, "y": 25}, off, dfn, is_away_offense=False
+    )
+    assert receiver is off["SG"]
+    assert coord == {"x": 78.0, "y": 25.0}
+
+
+def test_find_open_pass_ahead_blocked_by_lane_defender():
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    off = {
+        "PG": _pa_player("home-PG", 55, 25),
+        "SG": _pa_player("home-SG", 78, 25),
+        "SF": _pa_player("home-SF", 45, 20),
+        "PF": _pa_player("home-PF", 40, 30),
+        "C": _pa_player("home-C", 38, 25),
+    }
+    dfn = {pos: _pa_player(f"away-{pos}", 30, 46) for pos in off}
+    dfn["SF"] = _pa_player("away-SF", 66, 25)  # sitting in the PG→SG lane
+    receiver, coord = asi._find_open_pass_ahead(
+        off["PG"], {"x": 55, "y": 25}, off, dfn, is_away_offense=False
+    )
+    assert receiver is None
+    assert coord is None
+
+
+def test_pass_ahead_makes_receiver_the_shooter_and_credits_assist(monkeypatch):
+    from BackEnd.engine import after_steal_drive_integration as asi
+
+    monkeypatch.setattr(
+        asi,
+        "resolve_fb_drive_step",
+        lambda **kw: {
+            "outcome": "NO_MEET",
+            "t_drive_game_seconds": 1.0,
+            "contested": False,
+            "shot_defender_id": None,
+            "shot_spot": {"x": 88, "y": 25},
+            "bh_start": dict(kw.get("bh_start") or {"x": 55, "y": 25}),
+            "defender_end_coords": {},
+            "defender_archetypes": {},
+        },
+    )
+
+    calls = {"n": 0}
+
+    def fake_find(bh, bh_start, off_lineup, def_lineup, is_away):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return off_lineup["SG"], {"x": 78.0, "y": 25.0}
+        return None, None
+
+    monkeypatch.setattr(asi, "_find_open_pass_ahead", fake_find)
+    monkeypatch.setattr(asi.random, "random", lambda: 0.0)  # always take the pass
+    monkeypatch.setattr(
+        asi,
+        "_resolve_shot_attempt",
+        lambda **kw: {
+            "made": True,
+            "d_foul": False,
+            "foul_player": None,
+            "has_and_one": False,
+            "free_throws_remaining": 0,
+            "fouled_out_info": {},
+            "shot_score": 200,
+            "shot_score_pre_defense": 180,
+            "shot_defense_score_for_sfx": 0,
+            "shot_defense_score_raw": 0,
+            "shot_variant": None,
+            "shot_variant_extras": {},
+            "contest_result": None,
+            "contest_margin": None,
+            "shot_type": "attack",
+            "contested": False,
+            "shot_defender": None,
+            "shot_defender_id": None,
+            "select_and_stamp_shot_micro_kwargs": {
+                "shot_type": "attack",
+                "shooter_id": kw.get("shooter") and _safe_id_str(kw["shooter"]),
+                "shooter_x": 88.0,
+                "shooter_y": 25.0,
+                "off_lineup": {},
+                "def_lineup": {},
+                "has_contest": False,
+                "contest_result": None,
+                "contest_margin": None,
+                "shot_defense_score_raw": 0.0,
+            },
+        },
+    )
+
+    game = build_mock_game()
+    _seed_steal(game)
+    sg_id = game.offense_team.lineup["SG"].player_id
+    pg_id = game.offense_team.lineup["PG"].player_id
+
+    result = resolve_after_steal_fast_break(game)
+
+    assert result["result_type"] == "MAKE"
+    assert result["shooter_id"] == sg_id
+    chain = result["after_steal_pass_ahead_chain"]
+    assert len(chain) == 1
+    assert chain[0]["passer_id"] == pg_id
+    assert chain[0]["receiver_id"] == sg_id
+    assert result["assist_player_id"] == pg_id
+
+
+def _safe_id_str(obj):
+    return getattr(obj, "player_id", None)
+
+
 def test_meet_defensive_foul_non_bonus_routes_to_side_inbound(monkeypatch):
     meet = {"x": 75, "y": 25}
     monkeypatch.setattr(

@@ -276,6 +276,10 @@ USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR = True
 
 # FB Drive Cutoff & Stop Decision — per-play rollout (see FB_Drive_Cutoff_Work_Plan.md)
 USE_FB_DRIVE_RESOLUTION_AFTER_STEAL = True
+# After-Steal pass-ahead in transition (Fast_Break_System.md §After-Steal
+# Coordinated Transition). When the BH has a clear lane and an open teammate is
+# ahead, he may dish ahead and the receiver re-runs the drive loop.
+USE_FB_AS_PASS_AHEAD = True
 USE_FB_DRIVE_RESOLUTION_CR = True
 USE_FB_DRIVE_RESOLUTION_RR = True
 USE_FB_DRIVE_RESOLUTION_TRIANGLE = True
