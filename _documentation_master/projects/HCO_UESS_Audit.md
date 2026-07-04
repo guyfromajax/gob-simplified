@@ -23,8 +23,8 @@
 | Ball coord step-seam continuity, within turn (§8.4 inv.1) | ✅ Compliant |
 | Ball ownership expressed within-step (§8.4 inv.2) | ⚠️ At risk — step-0 double resolver |
 | Ball turn-seam continuity (§8.4 inv.4) | ❌ Gap (known — `final_ball_coords` unbuilt) |
-| Single coord source for logic (§1 / §7) | ❌ **Violation — double build** |
-| Clock authority = ledger, all time counted (§5) | ❌ **Violation — entry time uncounted** |
+| Single coord source for logic (§1 / §7) | ✅ **Fixed (Task 1, 2026-07-04)** — single build; was double build |
+| Clock authority = ledger, all time counted (§5) | ✅ **Fixed (Task 2, 2026-07-04)** — every HCO turn realigns from emitted steps |
 | Entry orchestrator coord+ball continuity (§4) | ✅ Compliant |
 | Setup-geometry fidelity (players reach authored spots) | ⚠️ At risk — BH-only gate |
 | Entry possession safety | ⚠️ Latent risk — no team check |
@@ -95,17 +95,15 @@ Both the contested/uncontested boolean **and** the contesting-defender identity 
 
 ---
 
-### HIGH-2 — Entry-orchestrator animation time is never counted in the authoritative clock
+### HIGH-2 — [CORRECTED → MED] Non-shot HCO turns approximate entry time instead of deriving it from the emitted steps
 
-**§5.1 violation.** HCO's emitted `animation_steps` burn `entry_elapsed + skeleton_sum` of game-clock, but `turn.time_elapsed` counts only `skeleton_sum + bringup_allowance`. The entry beat's real seconds vanish from the clock.
+> **Correction (2026-07-04, post-verification):** The original audit claimed "HCO has no realignment, unlike FCP/HCT, and takes the `else` branch at `phase_resolution.py:1640`." **That is wrong.** The FCP/HCT realignment lives in **`turn_manager.py`**, not `phase_resolution.py`, and **HCO has the identical realignment** at [`turn_manager.py:3596-3606`](../../BackEnd/models/turn_manager.py#L3596-L3606) inside `_emit_hco_animation_steps` — it derives `time_elapsed` from the emitted `animation_steps` first/last clock, which **includes** the prepended entry-orchestrator burn. The agent conflated the resolution-dispatch `else` at `turn_manager.py:1640` with the emit path. Severity drops HIGH → **MED**.
 
-- Entry substeps accumulate real time: `skeleton_step_emitter.py:1237, 1264, 1300` (`elapsed_so_far += …` for Handoff/Kickout/Walk-Up), and skeleton step clocks are seeded *after* it: `clock = clock_remaining_at_turn_start - elapsed_so_far - t` (`1690-1692`).
-- But turn time comes from `calc_skeleton_step_timing_contract` (`shared.py:440`) = **skeleton steps only** + a lumped `include_hco_step1_bringup` cruise-distance allowance (`shared.py:577-582`) — a *different model* than the entry orchestrator's actual durations, never reconciled.
-- The final ledger stamp is tautological: `ledger_elapsed = game_clock_before - game_clock_after` (`turn_manager.py:257-272`), and `game_clock_after` was already decremented by the pre-ledger schema step-sum (`turn_manager.py:5072-5073`). So "ledger authority" mirrors the schema-burn and inherits the same omission.
-- **FCP and HCT realign** `result["time_elapsed"] = round(schema_game_burn)` from the emitted steps (`phase_resolution.py:1592-1594` / `1633-1635`). **HCO takes the `else:` branch at `1640` with no realignment.**
+**Real (narrowed) residual.** The emitted-steps realignment fires **only for `result_type in (MAKE, MISS, BLOCK)`** (`turn_manager.py:3596`). **Non-shot HCO turns** — TURNOVER / O_FOUL / STEAL / DEAD_BALL — instead set `time_elapsed = timing_contract["time_elapsed"]` (`phase_resolution.py:6955, 7014, …`), which is `skeleton_sum + include_hco_step1_bringup` (a lumped cruise-distance *approximation* of the bring-up, `shared.py:577-582`) — **not** derived from the emitted steps. So on a non-shot HCO turn with prepended entry steps, the clock burn the FE renders (entry + skeleton) can differ from the counted `time_elapsed` (skeleton + bring-up approximation).
 
-- **Repro:** DREB→HCO frontcourt Kickout emits ~2–4s of positioning+pass in `animation_steps`, but `time_elapsed` carries only the step-0 `bringup` scalar → FE clock ladder and game clock drift on every HCO entry.
-- **Fix direction:** add the FCP/HCT realignment to the HCO branch — derive `time_elapsed` from the emitted `animation_steps` first/last clock so entry time is included.
+- **Compliant today:** every HCO MAKE/MISS/BLOCK turn (realigned from emitted steps, entry included).
+- **Non-compliant:** HCO turnover/foul/steal turns (approximation, may diverge from emitted burn).
+- **Fix direction:** extend the `turn_manager.py:3596` realignment to non-shot HCO result types (or move the realignment to fire for all HCO result types) so **every** HCO turn derives `time_elapsed` from the emitted `animation_steps`, matching shot turns. Small and isolated. See Work Plan **Task 2**.
 
 ---
 
@@ -232,3 +230,98 @@ The clearest teleport candidate inside the emitter.
 - Clock: `turn_manager.py:257-272, 295-296, 5072-5077`; `shared.py:440, 577-582`; `phase_resolution.py:1592-1594, 1633-1640`.
 - Ball seams: `skeleton_step_emitter.py:294-337, 1094, 1416-1417, 1485-1498, 1536-1540, 1690-1692`; `animation_step_helpers.py:48-97`; `phase_resolution.py:348-395`.
 - Player coords: `skeleton_step_emitter.py:142-165, 709-747, 1296, 1364-1367, 1431-1448, 2342, 2892-2925`; `shared.py:3508-3512, 3546-3566`; `transition_bridge.py:224-342`.
+
+---
+---
+
+## Work Plan — HCO → 100% UESS alignment
+
+Four tasks, implemented **one at a time with verification between each** (this is the game's most core execution path). Tasks 1 & 3 both touch the emitter's step-0 region → do **1 before 3**. Task 2 is isolated; Task 4 is narrowest.
+
+**Strict-compliance set:** Tasks 1–4 (all fix real contract violations). **Quality add-ons (optional, not contract violations):** MED-3 entry-gate breadth, MED-6 possession check, LOW-* — tracked but not in this plan unless you want them.
+
+Order: **1 → 2 → 3 → 4.**
+
+---
+
+### Task 1 — Single animation build (fixes HIGH-1, §1/§7) — ✅ DONE & VERIFIED (2026-07-04)
+
+**Status:** Shipped (Option A). `resolve_half_court_offense_logic` ([`phase_resolution.py:7123-7251`](../../BackEnd/engine/phase_resolution.py#L7123)) now defers the animator build until the skeleton is finalized, builds once, and stamps `shot_result["animations"]`; the emitter reuses it instead of rebuilding.
+**Verification (mongomock spy, 10 HCO shot turns):** animator builds per shot turn dropped **2 → 1** (pre-fix sites `7128` + emitter `983`; post-fix site `7234` only). Stamp fired 10/10, `animation_steps` emitted 10/10. Regression: 27 UESS clock/ownership/turn/serialization tests pass; the 4 failures observed are pre-existing (confirmed by git-stash isolation), unrelated to this change. Expected gameplay consequence (accepted): Motion shot outcomes now resolve from the finalized/rendered geometry → FG%/3PT% will shift; re-tune shooting *after* all four tasks land.
+
+**Goal:** HCO shot resolution and the emitted animation use **one** animator build — same RNG draw *and* same (finalized) skeleton — so the coords that decide the outcome are the coords the FE renders.
+
+**Design decision (resolve before coding):**
+- **Option A — build-once-and-stamp (RECOMMENDED).** Build the animator **after** the skeleton is finalized, stamp `turn_result["animations"]`, and let both `resolve_shot` and the emitter consume it. Surgical; the emitter already reuses `turn_result["animations"]` if present (`skeleton_step_emitter.py:965, 976`).
+- **Option B — §7 snapshot.** Emit steps first, build `shot_state_snapshot` from the emitted `end.coords`, resolve the shot from the snapshot. Truer to §7 but inverts resolve/emit order — larger blast radius. Defer to the standalone §7 build.
+
+**Implementation steps (Option A):**
+1. In `resolve_half_court_offense_logic` (`phase_resolution.py`), move the single animator build to **after** the skeleton is finalized — i.e. after the Motion/set-play skeleton modifications (`~7179-7204`), not at the current `7128` (which builds from the *original* skeleton, before Motion edits it).
+2. Stamp `turn_result["animations"] = animations` (the finalized build) so the emitter's guard at `skeleton_step_emitter.py:976` (`if not animations…`) is skipped and it renders the exact build resolve_shot used.
+3. Keep `apply_coords_from_animations_list(game, animations)` (`7232`) + `resolve_shot` (`7235`) reading that same build.
+4. **Match build parameters.** The emitter's internal build passes `add_defenders=True, is_fcp=(turn_type=="FCP"), is_hct=False` (`983-990`); the phase build passes `add_defenders=True` (`7128`). Confirm the stamped build is parameter-equivalent to what the emitter would have built (esp. `is_fcp`/`is_hct` for the shared FCP path — FCP already stamps differently, so scope this change to HCO).
+5. **Motion/set-play paths:** verify the finalized-skeleton build feeds correct coords to `apply_coords`/`resolve_shot` (the modified skeleton is the real one). Ensure early-return paths (pass interception `7173-7175`) are unaffected.
+6. Leave the `position_snapshots` audit ledger as-is (it now records the single build — becomes a true forensic mirror).
+
+**Verification:** play an HCO Motion drive; confirm the defender coords `resolve_shot` reads == the emitted shot-step `end.coords` for those defenders (temp-log both, or diff `position_snapshot` vs emitted step). Contest outcome must match what's rendered. Run a set-play shot + a turnover to confirm no regression.
+
+**Risk:** RNG parameter drift between the two former call sites; FCP shares this emitter (scope the stamp to HCO only).
+
+---
+
+### Task 2 — All HCO turns derive `time_elapsed` from the emitted steps (fixes corrected HIGH-2, §5) — ✅ DONE & VERIFIED (2026-07-04)
+
+**Status:** Shipped. `_emit_hco_animation_steps` ([`turn_manager.py:3595-3606`](../../BackEnd/models/turn_manager.py#L3595)) realignment gate widened from `result_type in (MAKE,MISS,BLOCK)` to `if anim_steps:` — every HCO turn now derives `time_elapsed` from the emitted first/last-step clock. Final Shot / FLSS overrides preserved; Force Foul does not reach this emitter (handled at DREB time in game_manager); no non-shot override existed to clobber (turnover/foul only set `= timing_contract`).
+**Verification (mongomock, 8 non-shot HCO turns — FOUL/DEAD_BALL):** post-fix `time_elapsed == emitted burn` 8/8. Pre-fix (same seed) diverged **8/8**, by up to ~2.4× (e.g. FOUL counted 12 vs rendered 5; DEAD_BALL 6 vs 3) — the counted clock over-burned vs the animation. Regression: 30 clock/ownership tests pass; the 1 failure (`test_make_shot_family…`) is a synthetic-result MAKE test that never routes through this emitter and fails on clean code (pre-existing, from other uncommitted tree changes). **Gameplay consequence (accepted):** game-clock now burns *less* on non-shot HCO turns (matches render) → slightly more possessions/quarter; watch pace + FGA alongside Task 1's FG% shift.
+
+**Goal:** every HCO turn — shot **and** non-shot — derives `time_elapsed` from the emitted `animation_steps`, so entry-orchestrator time is always counted (today only MAKE/MISS/BLOCK are).
+
+**Implementation steps:**
+1. In `_emit_hco_animation_steps` (`turn_manager.py:3595-3606`), extend the realignment condition beyond `("MAKE","MISS","BLOCK")` to also cover non-shot HCO result types (TURNOVER / O_FOUL / STEAL / DEAD_BALL) — or unconditionally realign for HCO, with explicit exclusions.
+2. **Preserve the intentional exceptions:** Final Shot / FLSS already force `time_elapsed = time_remaining` / `max(1, te)` (`3604-3614`) — keep those guards. Do not touch the OREB path (separate, §5.4).
+3. Confirm non-shot downstream consumers of `timing_contract` fields (`step_clock_seconds`, `bringup_per_player_seconds`, shot-clock accounting) still receive what they need — realign only `time_elapsed`, leave the other stamped fields intact.
+
+**Verification:** HCO turnover (and an O_FOUL) with a Kickout/Handoff entry prepended; assert `time_elapsed == round(anim_steps[0].start.clock.clock_remaining − anim_steps[-1].end.clock.clock_remaining)`. Compare to pre-change value to quantify the drift being fixed.
+
+**Risk:** low — mirrors an already-proven realignment; main care is not clobbering Final Shot/FLSS.
+
+---
+
+### Task 3 — Close the two ball seams (fixes MED-1 + MED-2, §8.4 inv.2 & inv.4)
+
+Two independent sub-parts; ship together or as 3a then 3b.
+
+**3a — Unify step-0 ball-owner resolution (MED-1, phantom-pass teleport):**
+1. Reconcile the two resolvers: `get_ball_handler_from_skeleton` (actions `{handle_ball,receive,shoot}`, dict order; `phase_resolution.py:348-395`) vs `_walk_ball_owners` (actions `{handle_ball,pass}`, PG-first; `skeleton_step_emitter.py:294-337`). Pick one action-set + ordering as canonical for step 0.
+2. At the i==0 seam override (`skeleton_step_emitter.py:1495-1498`), reconcile `owner_id_end` too — today only `owner_id_start` is overridden, so `is_pass_step` (`1536-1540`) can turn true when the resolvers disagree.
+3. Add a temporary assert/log `step0_bh_id == ball_walks[0].end_owner` to catch disagreement in the wild; remove once clean.
+
+**3b — Carry `final_ball_coords` across the turn seam (MED-2, §8.4 inv.4 build target):**
+1. Add `build_final_ball_coords(turn_result)` in `animation_step_helpers.py` — resolve the ball's rest position from `animation_steps[-1].end.ball` (attached→owner coord; loose/in-flight→explicit coord).
+2. Stamp `turn_result["final_ball_coords"]` in `_append_turn` (`game_manager.py`), alongside `final_coords` / `final_ball_handler_id`.
+3. In the HCO entry orchestrator, seed step-0 ball **position** from `prior_turn.final_ball_coords` when present; if the step-0 owner's coord differs from the carried ball position, express the reconciliation as a **within-step** move (loose→attached), never a seam snap.
+4. Update UESS_System.md §8.4 invariant 4 to mark `final_ball_coords` **built**.
+
+**Verification:** chain a turn that ends ball-loose or in-flight (e.g. missed-shot → DREB → HCO) into an HCO possession; assert step-0 resolved ball position == prior `final_ball_coords` (no snap). Watch the render for a teleport at the seam. For 3a: force a skeleton whose step-0 tags the BH via `receive`/`shoot` and confirm no phantom pass emits.
+
+**Risk:** 3b interacts with the FE's unconditional turn-entry snap (`animationPlayback.js:1204`) — the carry must make step-0 start == prior end so the snap is a no-op; verify visually.
+
+---
+
+### Task 4 — Cold-start step-0 coord coverage (fixes MED-4, §8.2)
+
+**Goal:** step 0 always covers all 10 players, even when `prior_turn is None` and the animator omits a player from `movement[0]`, so no player carries stale `player.coords` across the seam.
+
+**Implementation steps:**
+1. Make `_coords_at_movement_index` (`skeleton_step_emitter.py:142-165`) **carry forward** the last known coord for a player whose `movement[]` is shorter than the index, instead of dropping them (`153-154`) — OR
+2. At cold start (`reset_count==0` and `prior_turn is None`, the residual exposure), seed step-0 `start_coords` for any missing player from the live lineup coords so all 10 are present before the loop.
+3. Confirm coverage propagates (the end-coords builder already iterates `start_coords.items()`, `709-747`, so fixing start fixes end).
+
+**Verification:** game-opening HCO possession with a stationary player omitted from `movement[0]`; assert all 10 present in `animation_steps[-1].end.coords` and that the player's next-turn `final_coords` is not stale.
+
+**Risk:** choosing the fallback source — must be the player's actual current position, not a default, to avoid introducing the very teleport we're removing.
+
+---
+
+### Cross-task verification (after all four)
+Full HCO possession sweep — Motion make, Motion miss→OREB, set-play make, turnover, foul, steal→HCO, first-possession HCO — checking: (a) contest outcome matches render (T1), (b) game/shot clock matches emitted burn on every result type (T2), (c) no ball teleport at any step or turn seam (T3), (d) all 10 players positioned every step (T4). Then re-run this audit's four traces to confirm each dimension flips to ✅.

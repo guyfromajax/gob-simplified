@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import random
 from typing import Any, Dict, List, Optional, Set
 
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
@@ -206,3 +207,55 @@ def select_offense_getback_list(
 
     eligible.sort(key=lambda item: item[1], reverse=True)
     return [pos for pos, _ in eligible[:num_getback]]
+
+
+def try_emergency_getback_vs_poised_fb(
+    *,
+    off_team: Any,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    game: Any,
+    roles: Dict[str, Any],
+    shooter_pos: Optional[str],
+    shot_step_index: Optional[int],
+    is_home_team_shooting: bool,
+    defense_playcall: str,
+    shooter_id: Optional[str],
+    defense_poised_for_dreb_fb: bool,
+    current_getback_list: List[str],
+) -> List[str]:
+    """Second-chance get-back when offense sent nobody back but defense is poised for DREB→FB.
+
+    Roll ``random.randint(0, 10)``; if ``roll <= fb_opp_modifier`` on the shooting team
+    (they would defend the break), assign one get-back player via
+    ``select_offense_getback_list`` (farthest from the attacking basket, shooter
+    excluded, same eligibility rules as the primary get-back path).
+    """
+    if not defense_poised_for_dreb_fb or current_getback_list:
+        return list(current_getback_list)
+
+    try:
+        fb_opp = int((getattr(off_team, "team_attributes", None) or {}).get("fb_opp_modifier", 0) or 0)
+    except (TypeError, ValueError):
+        fb_opp = 0
+    fb_opp = max(-10, min(10, fb_opp))
+
+    roll = random.randint(0, 10)
+    if roll > fb_opp:
+        return list(current_getback_list)
+
+    emergency = select_offense_getback_list(
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        game=game,
+        roles=roles,
+        shooter_pos=shooter_pos,
+        num_getback=1,
+        shot_step_index=shot_step_index,
+        is_home_team_shooting=is_home_team_shooting,
+        defense_playcall=defense_playcall,
+        shooter_id=shooter_id,
+    )
+    if not emergency:
+        return list(current_getback_list)
+    return list(current_getback_list) + emergency

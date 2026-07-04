@@ -7120,17 +7120,15 @@ def resolve_half_court_offense_logic(game):
             return foul_result
 
     # 3. Shot Result
-    # For SHOT path, animations was never set (it's only set inside event_type != "SHOT").
-    # Build animations from skeleton so apply_coords_from_animations_list can sync coords before resolve_shot.
+    # UESS single-coord-source (§1/§7, HCO_UESS_Audit.md Task 1): DEFER the animator
+    # build until the skeleton is finalized. Motion / dynamic set-play rewrite the
+    # skeleton below (adding pass/receive steps, changing the shooter), so building
+    # here — before those edits — made resolve_shot read one build while the FE
+    # rendered another (a different RNG draw and, for Motion, a different skeleton).
+    # We now build ONCE from the finalized skeleton just before apply_coords, and
+    # stamp it onto shot_result so the step emitter reuses the exact build
+    # resolve_shot's coords came from.
     animations = []
-    if skeleton and "steps" in skeleton:
-        animator = Animator(game)
-        animations = animator.skeleton_to_animations(
-            skeleton,
-            off_lineup,
-            def_lineup,
-            add_defenders=True
-        )
 
     # ✅ MOTION OFFENSE: Check if this is a Motion play and route to Motion shot logic
     offense_play_type = game_state.get("offense_play_type", "")
@@ -7229,11 +7227,28 @@ def resolve_half_court_offense_logic(game):
                 game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
     
     # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
+    # UESS single build: the skeleton is now finalized (Motion / dynamic set-play
+    # edits applied above). Build the animation ONCE and reuse it for coord-sync,
+    # resolve_shot, and (stamped below) the step emitter.
+    if skeleton and "steps" in skeleton:
+        animations = Animator(game).skeleton_to_animations(
+            skeleton,
+            off_lineup,
+            def_lineup,
+            add_defenders=True,
+        )
     apply_coords_from_animations_list(game, animations)
     set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
+    # UESS single-coord-source: reuse the finalized single build for the step
+    # emitter (mirrors the FCP shot path at ~L7855). build_skeleton_animation_steps
+    # consumes shot_result["animations"] instead of rebuilding from the skeleton
+    # with a fresh RNG draw, so the coords the FE renders == the coords
+    # resolve_shot decided the shot from.
+    if animations:
+        shot_result["animations"] = animations
 
     # Player Momentum: a SET PLAY whose EXECUTED skeleton is the "successful"
     # variant routes the ball to the target_shooter by design, so a make here is

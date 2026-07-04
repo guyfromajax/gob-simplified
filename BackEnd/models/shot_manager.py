@@ -1529,6 +1529,7 @@ class ShotManager:
             from BackEnd.utils.getback_selection import (
                 roll_num_getback,
                 select_offense_getback_list,
+                try_emergency_getback_vs_poised_fb,
             )
 
             rand = random.random()
@@ -1547,6 +1548,22 @@ class ShotManager:
                 is_home_team_shooting=is_home_team_shooting,
                 defense_playcall=defense_call,
                 shooter_id=getattr(shooter, "player_id", None),
+            )
+            offense_getback_list = try_emergency_getback_vs_poised_fb(
+                off_team=off_team,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                game=self.game,
+                roles=roles,
+                shooter_pos=shooter_pos_for_getback,
+                shot_step_index=shot_step_index,
+                is_home_team_shooting=is_home_team_shooting,
+                defense_playcall=defense_call,
+                shooter_id=getattr(shooter, "player_id", None),
+                defense_poised_for_dreb_fb=bool(
+                    self.game_state.get("_shot_dreb_fb_play_key")
+                ),
+                current_getback_list=offense_getback_list,
             )
 
             offense_rebounders = [

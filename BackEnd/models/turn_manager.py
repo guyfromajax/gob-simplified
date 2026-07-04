@@ -3593,7 +3593,16 @@ class TurnManager:
                 return
             result["animation_steps"] = anim_steps
             result_type_for_te = (result.get("result_type") or "").upper()
-            if result_type_for_te in ("MAKE", "MISS", "BLOCK") and anim_steps:
+            # UESS §5 clock authority (HCO_UESS_Audit.md Task 2): derive
+            # time_elapsed from the emitted animation_steps for EVERY HCO turn —
+            # shot AND non-shot (TURNOVER / FOUL / STEAL / DEAD_BALL). Non-shot
+            # turns previously kept the `timing_contract` bring-up *approximation*
+            # (skeleton_sum + include_hco_step1_bringup), which omits the actual
+            # entry-orchestrator burn the steps render, so the counted clock could
+            # diverge from the rendered burn. Shot turns already realigned here;
+            # this widens the gate to all result types. Final Shot / FLSS keep
+            # their explicit overrides below (te floor + MAKE clock-out).
+            if anim_steps:
                 first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
                 last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
                 cs_start = first_clock.get("clock_remaining")
