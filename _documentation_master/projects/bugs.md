@@ -1,6 +1,3 @@
-##Bugs 
-42. Not corretly registring 2pt and 3pt shot attempts based on geo
-
 ##Player Images
 1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
 
@@ -16,7 +13,6 @@
 9. Free Throw
 10. Opening Tip
 11. Timeout
-
 
 ##Verify as Perfect
 1. EOQ Perfection

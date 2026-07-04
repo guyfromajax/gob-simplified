@@ -346,3 +346,100 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 - `BackEnd/engine/dynamic_hct_shot.py`: Dynamic HCT procedural shot classification payloads
 - `BackEnd/engine/skeleton_step_emitter.py`: made-three SFX gate from `is_three_point_shot`
 - `BackEnd/engine/phase_resolution.py`: `_apply_attack_penalty()`, `resolve_motion_offense_shot()`, `apply_balancing_system()`
+
+---
+
+## Dunk Selection & Block Interaction
+
+**Status:** Implemented (animation in `shot_micro_movements.py` + `dunkPlayback.js`; selection in `resolve_dunk_micro_stamp()`).  
+**Depends on:** Shot Micro-Movements System, Block System, `HCO_STRING_SPOTS.basketSpot`.
+
+### Scope
+
+Same rules for **all field-goal paths**: HCO, Fast Break, FCP, HCT, OREB putback (any caller that stamps `micro_movement_family` via `select_and_stamp_shot_micro()` with dunk kwargs).
+
+Only **inside** and **attack** shots. Outside shots never dunk.
+
+### Eligibility (location + AG)
+
+Distance = euclidean grid distance from shooter coord to **`basketSpot`** (home `(87, 25)`, away mirrored).
+
+| Distance from basketSpot | AG gate |
+|--------------------------|---------|
+| > 10 | Not eligible |
+| ≤ 8 | Fully eligible (any AG) |
+| ≤ 9 | `AG > 50` |
+| ≤ 10 | `AG > 75` |
+
+### Dunk in play (contact / power)
+
+Uses the same score pair as `resolve_contest()`:
+
+```text
+margin = shot_score_pre_defense − shot_defense_score_raw
+dunk_in_play = (margin + off_fight − def_fight) > 100
+```
+
+Constants: `DUNK_MARGIN_THRESHOLD = 100` in `shot_micro_movements_constants.py`.
+
+### Height feasibility roll
+
+Only when `dunk_in_play`. `roll = random.randint(1, 100)` vs `DUNK_HEIGHT_SCALE[inches]`:
+
+| Height (in) | Scale |
+|-------------|-------|
+| ≤ 68 | 0 |
+| 69–71 | 1 |
+| 72 | 2 |
+| 73 | 5 |
+| 74 | 7 |
+| 75 | 10 |
+| 76 | 12 |
+| 77 | 15 |
+| 78–79 | 17 / 18 |
+| 80 | 20 |
+| 81 | 22 |
+| 82 | 25 |
+| ≥ 83 | 30 |
+
+| Roll | Outcome |
+|------|---------|
+| `roll == scale + 1` | **Missed dunk** — `dunk_miss: true`, forces `result_type: MISS`, full dunk animation through slam, then normal miss bounce (no hold) |
+| `roll ≤ scale` and **MAKE** | **Made dunk** — family `dunk` or `drive_dunk`, skip `[ball_flight]` → `[hold]` |
+| `roll ≤ scale` and **BLOCK** | **Blocked dunk attempt** — same family, `yield_before_slam: true` (rise only), then existing block `[ball_flight]` |
+| `roll ≤ scale` and normal **MISS** | No dunk animation — fall through to normal micro pool |
+| else | No dunk — normal micro pool |
+
+### Animation family
+
+| Distance from basketSpot | `micro_movement_family` |
+|--------------------------|-------------------------|
+| ≤ 8 | `dunk` |
+| 9–10 (AG-qualified) | `drive_dunk` |
+
+See [`Shot_Micro_Movements_System.md`](Shot_Micro_Movements_System.md) for beat timing and FE playback (`micro_beat_kind: "dunk"`).
+
+### Block interaction
+
+Blocks **remain in play** on contested dunk lanes (no special disable). When a block fires on a dunk-eligible attempt that passed the height roll (`roll ≤ scale`):
+
+- Backend stamps `yield_before_slam: true` on the dunk beat metadata.
+- FE stops at the rise apex (p = 0.5); ball stays attached at the approach spot.
+- Post-shot uses the normal **BLOCK** path (`[ball_flight]` → block spot → rebound).
+
+When `contest_result == offense_win` (margin ≥ 150), block attempt is gated off entirely (Block System §1.3) — full dunk lane if height roll passes.
+
+### Telemetry
+
+| Field | When |
+|-------|------|
+| `micro_movement_family` | `dunk` or `drive_dunk` |
+| `dunk_miss` | `true` on missed-dunk roll |
+| `uses_shot_arc` | `false` for dunk families |
+
+### Key files
+
+- `BackEnd/engine/shot_micro_movements.py`: `resolve_dunk_micro_stamp()`, `select_and_stamp_shot_micro()` dunk kwargs
+- `BackEnd/constants/shot_micro_movements_constants.py`: dunk selection thresholds + height scale
+- `BackEnd/engine/skeleton_step_emitter.py`: `_build_post_shot_sub_steps()` MAKE dunk hold skip; MISS dunk bounce wiring
+- `FrontEnd/static/js/phaser/animation/dunkPlayback.js`: `yield_before_slam` vs full slam

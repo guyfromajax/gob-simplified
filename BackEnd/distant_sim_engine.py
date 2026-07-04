@@ -18,6 +18,13 @@ from BackEnd.constants.distant_sim import (
     DISTANT_MO_WIN_GAIN,
     DISTANT_MOMENTUM_SCORE_MAX,
     DISTANT_MOMENTUM_SCORE_MIN,
+    DISTANT_STREAK_BONUS,
+    DISTANT_STREAK_MIN,
+    DISTANT_STREAK_PENALTY,
+    DISTANT_TIER_BANDS,
+    DISTANT_TIER_WEEK_GATE,
+    DISTANT_TALENT_ATTR_MULT,
+    DISTANT_RANKED_FULLSIM_MAX_RANK,
 )
 
 _DISTANT_CORE_PLAYER_ATTRS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT")
@@ -58,17 +65,68 @@ def distant_sim_momentum_multiplier(team_chemistry_raw: Any) -> int:
     return DISTANT_MO_MULT_BANDS[-1][1]
 
 
+def _streak_int(team_attributes: dict | None, key: str) -> int:
+    if not team_attributes:
+        return 0
+    try:
+        return max(0, int(team_attributes.get(key) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def distant_sim_record_momentum(
     team_chemistry_raw: Any,
     *,
     season_wins: int,
     season_losses: int,
+    team_attributes: dict | None = None,
 ) -> int:
-    """DISTANT_MO_MULT × (wins − losses) for regular-season record."""
+    """DISTANT_MO_MULT × (wins − losses) + streak bonus/penalty."""
     mult = distant_sim_momentum_multiplier(team_chemistry_raw)
     wins = max(0, int(season_wins))
     losses = max(0, int(season_losses))
-    return mult * (wins - losses)
+    out = mult * (wins - losses)
+    out += distant_sim_record_streak_bonus(team_attributes)
+    return out
+
+
+def distant_sim_record_streak_bonus(team_attributes: dict | None) -> int:
+    """Additive streak bonus on record momentum (distant_win/loss_streak FTD fields)."""
+    win_streak = _streak_int(team_attributes, "distant_win_streak")
+    loss_streak = _streak_int(team_attributes, "distant_loss_streak")
+    bonus = 0
+    if win_streak >= DISTANT_STREAK_MIN:
+        bonus += DISTANT_STREAK_BONUS * (win_streak - (DISTANT_STREAK_MIN - 1))
+    if loss_streak >= DISTANT_STREAK_MIN:
+        bonus -= DISTANT_STREAK_PENALTY * (loss_streak - (DISTANT_STREAK_MIN - 1))
+    return bonus
+
+
+def distant_sim_tier_multiplier(win_pct: float) -> float:
+    for threshold, mult in DISTANT_TIER_BANDS:
+        if win_pct >= threshold:
+            return mult
+    return DISTANT_TIER_BANDS[-1][1]
+
+
+def distant_sim_tier_adjustment(
+    *,
+    season_wins: int,
+    season_losses: int,
+    record_momentum: int,
+    season_momentum: int,
+    current_week: int,
+) -> int:
+    """Late-season amplification of momentum layers for hot/cold teams."""
+    if int(current_week) < DISTANT_TIER_WEEK_GATE:
+        return 0
+    gp = max(0, int(season_wins)) + max(0, int(season_losses))
+    if gp <= 0:
+        return 0
+    win_pct = int(season_wins) / gp
+    tier_mult = distant_sim_tier_multiplier(win_pct)
+    momentum_sum = record_momentum + season_momentum
+    return int(momentum_sum * (tier_mult - 1.0))
 
 
 def distant_sim_season_momentum(momentum_score_raw: Any) -> int:
@@ -130,16 +188,46 @@ def distant_sim_talent_signal(
 
 
 def distant_sim_base_score(*, prestige: Any, talent_signal: Any) -> int:
-    return int(prestige or 0) + int(0.1 * (talent_signal or 0))
+    return int(prestige or 0) + int(DISTANT_TALENT_ATTR_MULT * (talent_signal or 0))
 
 
-def _streak_int(team_attributes: dict | None, key: str) -> int:
-    if not team_attributes:
-        return 0
-    try:
-        return max(0, int(team_attributes.get(key) or 0))
-    except (TypeError, ValueError):
-        return 0
+def distant_sim_should_promote_ranked_fullsim(
+    away_ftd: dict | None,
+    home_ftd: dict | None,
+    *,
+    max_rank: int | None = None,
+) -> bool:
+    """Phase 5: both teams nationally ranked ≤ cap → full CPU sim instead of distant."""
+    cap = DISTANT_RANKED_FULLSIM_MAX_RANK if max_rank is None else int(max_rank)
+    if cap <= 0:
+        return False
+    away_rank = int((away_ftd or {}).get("natl_rank", 999) or 999)
+    home_rank = int((home_ftd or {}).get("natl_rank", 999) or 999)
+    return away_rank <= cap and home_rank <= cap
+
+
+def distant_sim_apply_result_to_standings_cache(
+    rs_standings: dict[str, dict[str, int]],
+    away_id: Any,
+    home_id: Any,
+    away_score: int,
+    home_score: int,
+) -> None:
+    """Increment in-memory RS W/L so later same-week distant sims see updated records."""
+    away_key = str(away_id)
+    home_key = str(home_id)
+    for key in (away_key, home_key):
+        rs_standings.setdefault(key, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+    if home_score > away_score:
+        rs_standings[home_key]["W"] = int(rs_standings[home_key].get("W", 0) or 0) + 1
+        rs_standings[away_key]["L"] = int(rs_standings[away_key].get("L", 0) or 0) + 1
+    else:
+        rs_standings[away_key]["W"] = int(rs_standings[away_key].get("W", 0) or 0) + 1
+        rs_standings[home_key]["L"] = int(rs_standings[home_key].get("L", 0) or 0) + 1
+    rs_standings[home_key]["PF"] = int(rs_standings[home_key].get("PF", 0) or 0) + int(home_score)
+    rs_standings[home_key]["PA"] = int(rs_standings[home_key].get("PA", 0) or 0) + int(away_score)
+    rs_standings[away_key]["PF"] = int(rs_standings[away_key].get("PF", 0) or 0) + int(away_score)
+    rs_standings[away_key]["PA"] = int(rs_standings[away_key].get("PA", 0) or 0) + int(home_score)
 
 
 def compute_distant_momentum_score_updates(
@@ -194,20 +282,31 @@ def distant_sim_team_combined(
     season_losses: int,
     is_home: bool,
     fpd_by_player_id: dict[str, dict] | None = None,
+    current_week: int = 0,
 ) -> int:
-    """Base + record momentum (W−L) + season momentum + home-only 2×chemistry bonus."""
+    """Base + record momentum + season momentum + tier adj + home-only 2×chemistry bonus."""
     team_attributes = ftd_doc.get("team_attributes") or {}
     raw_chem = team_attributes.get("team_chemistry")
     out = distant_sim_base_score(
         prestige=ftd_doc.get("prestige"),
         talent_signal=distant_sim_talent_signal(ftd_doc, fpd_by_player_id),
     )
-    out += distant_sim_record_momentum(
+    record_mo = distant_sim_record_momentum(
         raw_chem,
         season_wins=season_wins,
         season_losses=season_losses,
+        team_attributes=team_attributes,
     )
-    out += distant_sim_season_momentum(team_attributes.get("momentum_score", 0))
+    season_mo = distant_sim_season_momentum(team_attributes.get("momentum_score", 0))
+    out += record_mo
+    out += season_mo
+    out += distant_sim_tier_adjustment(
+        season_wins=season_wins,
+        season_losses=season_losses,
+        record_momentum=record_mo,
+        season_momentum=season_mo,
+        current_week=current_week,
+    )
     if is_home:
         out += distant_sim_home_chemistry_bonus(raw_chem)
     return out

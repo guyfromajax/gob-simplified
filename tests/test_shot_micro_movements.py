@@ -473,3 +473,325 @@ class TestFinalTurnMicroBudget:
         from BackEnd.engine.shot_micro_movements import worst_case_final_turn_micro_reserve
 
         assert worst_case_final_turn_micro_reserve("outside") > 1.0
+
+
+class TestDunkMicroMovement:
+    def test_dunk_families_registered_bucket_a(self):
+        assert FAMILY_BUCKET["dunk"] == "A"
+        assert FAMILY_BUCKET["drive_dunk"] == "A"
+
+    def test_build_dunk_beats_strong(self):
+        from BackEnd.engine.shot_micro_movements import _build_family_beats
+
+        beats = _build_family_beats(
+            "dunk",
+            {"x": 85.0, "y": 25.0},
+            False,
+            {},
+            {"s1": {"x": 85.0, "y": 25.0}},
+            "s1",
+        )
+        assert [b["kind"] for b in beats] == ["move", "dunk"]
+        assert beats[0]["archetype"] == "burst"
+
+    def test_build_drive_dunk_beats(self):
+        from BackEnd.engine.shot_micro_movements import _build_family_beats
+
+        beats = _build_family_beats(
+            "drive_dunk",
+            {"x": 70.0, "y": 25.0},
+            False,
+            {},
+            {"s1": {"x": 70.0, "y": 25.0}},
+            "s1",
+        )
+        assert [b["kind"] for b in beats] == ["move", "dunk"]
+        assert beats[0]["archetype"] == "sprint"
+
+    def test_dunk_terminal_step_stamps_micro_beat(self):
+        from BackEnd.constants import MADE_SHOT_SWEET_SPOT_HOME_RIM
+        from BackEnd.constants.shot_micro_movements_constants import DUNK_APPROACH_HOME
+
+        steps = build_shot_micro_steps(
+            family_id="dunk",
+            contest_result="neutral",
+            start_coords={"s1": {"x": 85.0, "y": 25.0}},
+            shooter_id="s1",
+            defender_id="d2",
+            off_lineup={},
+            def_lineup={},
+            away_offense=False,
+            clock_start={"clock_remaining": 10.0, "shot_clock_remaining": 8.0},
+            shot_type="inside",
+            next_step={"kind": "turn_stop", "event": "SHOT_ATTEMPT", "payload": {}},
+            apply_contest_layer=True,
+            result_type="MAKE",
+        )
+        assert len(steps) == 2
+        dunk_step = steps[-1]
+        meta = dunk_step["start"]["advance_trigger"]["metadata"]
+        assert meta["micro_beat_kind"] == "dunk"
+        assert meta["approach_coord"] == DUNK_APPROACH_HOME
+        assert meta["resolve_coord"] == MADE_SHOT_SWEET_SPOT_HOME_RIM
+        assert meta["yield_before_slam"] is False
+        assert dunk_step["end"]["ball"] == {"coords": dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)}
+        assert dunk_step["start"]["flourish"]["s1"]["kind"] == "rattle"
+        assert dunk_step["start"]["flourish"]["d2"]["kind"] == "rattle"
+
+    def test_dunk_block_yields_before_slam(self):
+        steps = build_shot_micro_steps(
+            family_id="dunk",
+            contest_result=None,
+            start_coords={"s1": {"x": 85.0, "y": 25.0}},
+            shooter_id="s1",
+            defender_id=None,
+            off_lineup={},
+            def_lineup={},
+            away_offense=False,
+            clock_start={"clock_remaining": 10.0, "shot_clock_remaining": 8.0},
+            shot_type="inside",
+            next_step={"kind": "next_step", "index": 3},
+            apply_contest_layer=False,
+            result_type="BLOCK",
+        )
+        meta = steps[-1]["start"]["advance_trigger"]["metadata"]
+        assert meta["yield_before_slam"] is True
+        assert steps[-1]["end"]["ball"] == {"owner_player_id": "s1"}
+
+    def test_dunk_make_skips_ball_flight_in_post_shot(self):
+        from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+
+        shoot_step = {
+            "start": {
+                "coords": {"s1": {"x": 85.0, "y": 25.0}},
+                "destination": {"s1": {"x": 88.0, "y": 25.0}},
+                "action": {"s1": "shoot"},
+                "archetype": {"s1": "shot_motion"},
+                "clock": {"clock_remaining": 5.0, "shot_clock_remaining": 4.0},
+            },
+            "end": {
+                "coords": {"s1": {"x": 88.0, "y": 25.0}},
+                "ball": {"coords": {"x": 90.0, "y": 25.0}},
+                "clock": {"clock_remaining": 4.0, "shot_clock_remaining": 3.0},
+                "time_elapsed": 1.0,
+                "next": {"kind": "turn_stop", "event": "SHOT_ATTEMPT", "payload": {}},
+            },
+        }
+        steps = [shoot_step]
+        turn = {
+            "result_type": "MAKE",
+            "micro_movement_family": "dunk",
+            "shooter_id": "s1",
+        }
+        _build_post_shot_sub_steps(steps, turn, {}, {}, False)
+        assert len(steps) == 2
+        assert steps[1]["start"]["announcement"]["text"] == "It's Good!"
+        assert shoot_step["end"]["next"] == {"kind": "next_step", "index": 1}
+        assert all(
+            step.get("start", {}).get("ball_motion_style") != "shot"
+            for step in steps
+        )
+
+
+class TestDunkSelection:
+    def _team(self, fight=50):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(team_attributes={"fight": fight})
+
+    def _shooter(self, *, height=80, ag=60, x=85.0, y=25.0):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            height=height,
+            attributes={"AG": ag},
+            player_id="s1",
+        )
+
+    def test_location_eligibility_by_ag(self):
+        from BackEnd.engine.shot_micro_movements import dunk_location_eligible
+
+        assert dunk_location_eligible(7.0, 40) is True
+        assert dunk_location_eligible(9.5, 60) is False
+        assert dunk_location_eligible(9.0, 55) is True
+        assert dunk_location_eligible(9.5, 80) is True
+        assert dunk_location_eligible(10.5, 80) is False
+
+    def test_margin_gate(self):
+        from BackEnd.engine.shot_micro_movements import dunk_in_play_margin
+
+        assert dunk_in_play_margin(200, 50, off_fight=10, def_fight=5) == 155
+        assert dunk_in_play_margin(150, 60, off_fight=0, def_fight=0) == 90
+
+    def test_resolve_returns_none_when_margin_low(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import resolve_dunk_micro_stamp
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 1,
+        )
+        stamp = resolve_dunk_micro_stamp(
+            shot_type="inside",
+            shooter_coord={"x": 85.0, "y": 25.0},
+            shooter_player=self._shooter(),
+            off_team=self._team(),
+            def_team=self._team(),
+            shot_score_pre_defense=150.0,
+            shot_defense_score_raw=60.0,
+            result_type="MAKE",
+            away_offense=False,
+        )
+        assert stamp is None
+
+    def test_resolve_made_dunk_family_by_distance(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import resolve_dunk_micro_stamp
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 10,
+        )
+        close = resolve_dunk_micro_stamp(
+            shot_type="attack",
+            shooter_coord={"x": 85.0, "y": 25.0},
+            shooter_player=self._shooter(height=80),
+            off_team=self._team(),
+            def_team=self._team(),
+            shot_score_pre_defense=200.0,
+            shot_defense_score_raw=50.0,
+            result_type="MAKE",
+            away_offense=False,
+        )
+        assert close == {
+            "family_id": "dunk",
+            "dunk_miss": False,
+            "force_miss": False,
+        }
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 10,
+        )
+        drive = resolve_dunk_micro_stamp(
+            shot_type="attack",
+            shooter_coord={"x": 78.0, "y": 25.0},
+            shooter_player=self._shooter(height=80, ag=80),
+            off_team=self._team(),
+            def_team=self._team(),
+            shot_score_pre_defense=200.0,
+            shot_defense_score_raw=50.0,
+            result_type="MAKE",
+            away_offense=False,
+        )
+        assert drive["family_id"] == "drive_dunk"
+
+    def test_resolve_missed_dunk_roll(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import resolve_dunk_micro_stamp
+
+        # height 80 → scale 20; roll == 21 → missed dunk
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 21,
+        )
+        stamp = resolve_dunk_micro_stamp(
+            shot_type="inside",
+            shooter_coord={"x": 85.0, "y": 25.0},
+            shooter_player=self._shooter(height=80),
+            off_team=self._team(),
+            def_team=self._team(),
+            shot_score_pre_defense=200.0,
+            shot_defense_score_raw=50.0,
+            result_type="MAKE",
+            away_offense=False,
+        )
+        assert stamp["dunk_miss"] is True
+        assert stamp["force_miss"] is True
+
+    def test_select_and_stamp_overrides_micro_family(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
+
+        turn: dict = {}
+        dunk_stamp = {
+            "family_id": "drive_dunk",
+            "dunk_miss": False,
+            "force_miss": False,
+        }
+        select_and_stamp_shot_micro(
+            turn,
+            shot_type="attack",
+            shooter_id="s1",
+            shooter_x=80.0,
+            shooter_y=25.0,
+            off_lineup={},
+            def_lineup={},
+            has_contest=True,
+            contest_result="offense_win",
+            contest_margin=120.0,
+            shot_defense_score_raw=40.0,
+            shooter_player=self._shooter(ag=80),
+            shot_score_pre_defense=200.0,
+            off_team=self._team(),
+            def_team=self._team(),
+            result_type="MAKE",
+            dunk_stamp=dunk_stamp,
+        )
+        assert turn["micro_movement_family"] == "drive_dunk"
+        assert turn["uses_shot_arc"] is False
+
+    def test_dunk_miss_metadata_and_post_shot_bounce(self):
+        from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
+
+        steps = build_shot_micro_steps(
+            family_id="dunk",
+            contest_result=None,
+            start_coords={"s1": {"x": 85.0, "y": 25.0}},
+            shooter_id="s1",
+            defender_id=None,
+            off_lineup={},
+            def_lineup={},
+            away_offense=False,
+            clock_start={"clock_remaining": 10.0, "shot_clock_remaining": 8.0},
+            shot_type="inside",
+            next_step={"kind": "next_step", "index": 3},
+            apply_contest_layer=False,
+            result_type="MISS",
+            dunk_miss=True,
+        )
+        meta = steps[-1]["start"]["advance_trigger"]["metadata"]
+        assert meta["dunk_miss"] is True
+        assert meta["yield_before_slam"] is False
+
+        shoot_step = steps[-1]
+        turn = {
+            "result_type": "MISS",
+            "micro_movement_family": "dunk",
+            "dunk_miss": True,
+            "shooter_id": "s1",
+            "ball_bounce_x": 90.0,
+            "ball_bounce_y": 26.0,
+        }
+        _build_post_shot_sub_steps(steps, turn, {}, {}, False)
+        assert len(steps) == 3
+        assert steps[-1]["start"]["advance_trigger"]["metadata"]["kind"] == "bounce"
+        assert steps[-2]["end"]["next"] == {"kind": "next_step", "index": 2}
+
+    def test_prepare_dunk_stamp_force_miss(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 21,
+        )
+        stamp, made = prepare_dunk_stamp(
+            shot_type="inside",
+            shooter_coord={"x": 85.0, "y": 25.0},
+            shooter_player=self._shooter(height=80),
+            off_team=self._team(),
+            def_team=self._team(),
+            shot_score_pre_defense=200.0,
+            shot_defense_score_raw=50.0,
+            made=True,
+            away_offense=False,
+        )
+        assert stamp is not None
+        assert stamp["force_miss"] is True
+        assert made is False

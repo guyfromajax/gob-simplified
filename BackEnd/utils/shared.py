@@ -1090,6 +1090,22 @@ def resolve_offensive_rebound(game, rebounder):
             shot_defense_score_raw = 0.0
             made = random.randint(1, 100) < 100
 
+        _dunk_stamp = None
+        if shot_type in ("inside", "attack"):
+            from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+            _dunk_stamp, made = prepare_dunk_stamp(
+                shot_type=shot_type,
+                shooter_coord={"x": shooter_x, "y": shooter_y},
+                shooter_player=rebounder,
+                off_team=off_team,
+                def_team=def_team,
+                shot_score_pre_defense=float(shot_score_pre_defense),
+                shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+                made=made,
+                away_offense=off_team.team_id == game.away_team.team_id,
+            )
+
         if not contested:
             game.game_state["no_defender_shots"] = int(game.game_state.get("no_defender_shots", 0) or 0) + 1
             increment_no_defender_shot_breakdown(
@@ -1179,6 +1195,12 @@ def resolve_offensive_rebound(game, rebounder):
             contest_result=putback_contest_result if contested else None,
             contest_margin=putback_contest_margin if contested else None,
             shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+            shooter_player=rebounder,
+            shot_score_pre_defense=float(shot_score_pre_defense),
+            off_team=off_team,
+            def_team=def_team,
+            result_type="MAKE" if made else "MISS",
+            dunk_stamp=_dunk_stamp,
         )
 
         if made:

@@ -859,6 +859,23 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     return step.end?.next ?? null;
   }
 
+  // Dunk micro-beat: custom timeline (approach → rise → slam) + camera rim rattle.
+  const { isDunkMicroBeatStep, playDunkMicroBeat } = await import("./dunkPlayback.js");
+  if (isDunkMicroBeatStep(step)) {
+    const dunkNext = await playDunkMicroBeat(scene, step, sprites, ballSprite, options);
+    if (!shouldFastForwardPlayback(scene)) {
+      snapBallToEndState(scene, step, sprites, ballSprite, width, height);
+    }
+    if (step.end?.announcement) {
+      await runStepAnnouncement(scene, step.end.announcement, sprites, step, options.turnData);
+    }
+    tracePlayback(scene, "step:dunk-beat", {
+      turnIndex: options.turnData?.index ?? null,
+      next: dunkNext ?? null,
+    });
+    return dunkNext;
+  }
+
   // timed_sfx fires from ball tween onComplete (see renderBallTransition), or
   // from the step-end fallback when the ball tween early-returns.
 

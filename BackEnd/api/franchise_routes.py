@@ -2446,8 +2446,9 @@ def _distant_sim_team_combined(
     is_home: bool,
     rs_standings: dict[str, dict[str, int]],
     fpd_by_player_id: dict[str, dict] | None = None,
+    current_week: int = 0,
 ) -> int:
-    """Base + record momentum (W−L) + season momentum + home bonus. See Distant_Game_Sim_System.md."""
+    """Base + record momentum + season momentum + tier adj + home bonus. See Distant_Game_Sim_System.md."""
     from BackEnd.distant_sim_engine import distant_sim_team_combined
 
     tid = str(team_object_id)
@@ -2460,6 +2461,7 @@ def _distant_sim_team_combined(
         season_losses=losses,
         is_home=is_home,
         fpd_by_player_id=fpd_by_player_id,
+        current_week=current_week,
     )
 
 
@@ -2575,21 +2577,11 @@ def _distant_sim_apply_result_to_standings_cache(
     away_score: int,
     home_score: int,
 ) -> None:
-    """Increment in-memory RS W/L so later same-week distant sims see updated records."""
-    away_key = str(away_id)
-    home_key = str(home_id)
-    for key in (away_key, home_key):
-        rs_standings.setdefault(key, {"W": 0, "L": 0, "PF": 0, "PA": 0})
-    if home_score > away_score:
-        rs_standings[home_key]["W"] = int(rs_standings[home_key].get("W", 0) or 0) + 1
-        rs_standings[away_key]["L"] = int(rs_standings[away_key].get("L", 0) or 0) + 1
-    else:
-        rs_standings[away_key]["W"] = int(rs_standings[away_key].get("W", 0) or 0) + 1
-        rs_standings[home_key]["L"] = int(rs_standings[home_key].get("L", 0) or 0) + 1
-    rs_standings[home_key]["PF"] = int(rs_standings[home_key].get("PF", 0) or 0) + int(home_score)
-    rs_standings[home_key]["PA"] = int(rs_standings[home_key].get("PA", 0) or 0) + int(away_score)
-    rs_standings[away_key]["PF"] = int(rs_standings[away_key].get("PF", 0) or 0) + int(away_score)
-    rs_standings[away_key]["PA"] = int(rs_standings[away_key].get("PA", 0) or 0) + int(home_score)
+    from BackEnd.distant_sim_engine import distant_sim_apply_result_to_standings_cache
+
+    distant_sim_apply_result_to_standings_cache(
+        rs_standings, away_id, home_id, away_score, home_score
+    )
 
 
 def _persist_distant_franchise_game(
@@ -5623,6 +5615,7 @@ def _complete_week_finish_cpu_and_persist(
             "players": 1,
             "prestige": 1,
             "total_player_attrs": 1,
+            "natl_rank": 1,
             "team_attributes.team_chemistry": 1,
             "team_attributes.momentum_score": 1,
             "team_attributes.distant_win_streak": 1,
@@ -5757,11 +5750,11 @@ def _complete_week_finish_cpu_and_persist(
                 away_ftd = ftd_by_team_id.get(str(away_id), {})
                 home_combined = _distant_sim_team_combined(
                     home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                    fpd_by_player_id=distant_fpd_by_player_id,
+                    fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
                 )
                 away_combined = _distant_sim_team_combined(
                     away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                    fpd_by_player_id=distant_fpd_by_player_id,
+                    fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
                 )
                 home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
                 try:
@@ -5847,6 +5840,13 @@ def _complete_week_finish_cpu_and_persist(
         ):
             is_distant = False
         if is_distant:
+            from BackEnd.distant_sim_engine import distant_sim_should_promote_ranked_fullsim
+
+            away_ftd = ftd_by_team_id.get(str(away_id), {})
+            home_ftd = ftd_by_team_id.get(str(home_id), {})
+            if distant_sim_should_promote_ranked_fullsim(away_ftd, home_ftd):
+                is_distant = False
+        if is_distant:
             cpu_job = _persist_cpu_sim_job(
                 franchise_id,
                 week,
@@ -5856,11 +5856,11 @@ def _complete_week_finish_cpu_and_persist(
             away_ftd = ftd_by_team_id.get(str(away_id), {})
             home_combined = _distant_sim_team_combined(
                 home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id,
+                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
             )
             away_combined = _distant_sim_team_combined(
                 away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id,
+                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
             )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             _distant_game_id = None
@@ -13367,6 +13367,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             "players": 1,
             "prestige": 1,
             "total_player_attrs": 1,
+            "natl_rank": 1,
             "team_attributes.team_chemistry": 1,
             "team_attributes.momentum_score": 1,
             "team_attributes.distant_win_streak": 1,
@@ -13393,11 +13394,11 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             away_ftd = ftd_by_team_id.get(str(away_id), {})
             home_combined = _distant_sim_team_combined(
                 home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id,
+                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
             )
             away_combined = _distant_sim_team_combined(
                 away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id,
+                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
             )
             home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
             winner_id = home_id if home_score > away_score else away_id

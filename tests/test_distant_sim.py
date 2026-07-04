@@ -6,10 +6,13 @@ from BackEnd.distant_sim_engine import (
     compute_distant_momentum_score_updates,
     distant_sim_momentum_multiplier,
     distant_sim_record_momentum,
+    distant_sim_record_streak_bonus,
     distant_sim_season_momentum,
     distant_sim_talent_signal,
     distant_sim_team_attr_composite,
     distant_sim_team_combined,
+    distant_sim_tier_adjustment,
+    distant_sim_tier_multiplier,
 )
 
 
@@ -22,25 +25,25 @@ def _ftd(*, prestige: int = 500, attrs: int = 1000, chemistry: int = 9) -> dict:
 
 
 def test_franchise_init_chemistry_uses_floor_band():
-    assert distant_sim_momentum_multiplier(7) == 3
-    assert distant_sim_momentum_multiplier(10) == 3
+    assert distant_sim_momentum_multiplier(7) == 8
+    assert distant_sim_momentum_multiplier(10) == 8
 
 
 def test_mid_and_top_chemistry_bands():
-    assert distant_sim_momentum_multiplier(15) == 4
-    assert distant_sim_momentum_multiplier(20) == 5
-    assert distant_sim_momentum_multiplier(24) == 6
-    assert distant_sim_momentum_multiplier(25) == 8
+    assert distant_sim_momentum_multiplier(15) == 10
+    assert distant_sim_momentum_multiplier(20) == 12
+    assert distant_sim_momentum_multiplier(24) == 16
+    assert distant_sim_momentum_multiplier(25) == 22
 
 
 def test_clamp_out_of_range_chemistry():
-    assert distant_sim_momentum_multiplier(3) == 3
-    assert distant_sim_momentum_multiplier(99) == 8
+    assert distant_sim_momentum_multiplier(3) == 8
+    assert distant_sim_momentum_multiplier(99) == 22
 
 
 def test_invalid_chemistry_defaults_to_min_band():
-    assert distant_sim_momentum_multiplier(None) == 3
-    assert distant_sim_momentum_multiplier("bad") == 3
+    assert distant_sim_momentum_multiplier(None) == 8
+    assert distant_sim_momentum_multiplier("bad") == 8
 
 
 def test_even_record_zero_momentum():
@@ -49,19 +52,19 @@ def test_even_record_zero_momentum():
 
 
 def test_winning_record_positive_momentum():
-    assert distant_sim_record_momentum(9, season_wins=15, season_losses=5) == 30
+    assert distant_sim_record_momentum(9, season_wins=15, season_losses=5) == 80
 
 
 def test_losing_record_negative_momentum():
-    assert distant_sim_record_momentum(9, season_wins=5, season_losses=15) == -30
+    assert distant_sim_record_momentum(9, season_wins=5, season_losses=15) == -80
 
 
 def test_undefeated_mid_season_momentum():
-    assert distant_sim_record_momentum(10, season_wins=12, season_losses=0) == 36
+    assert distant_sim_record_momentum(10, season_wins=12, season_losses=0) == 96
 
 
 def test_winless_mid_season_momentum():
-    assert distant_sim_record_momentum(10, season_wins=0, season_losses=12) == -36
+    assert distant_sim_record_momentum(10, season_wins=0, season_losses=12) == -96
 
 
 def test_negative_wl_inputs_clamped_to_zero():
@@ -70,7 +73,7 @@ def test_negative_wl_inputs_clamped_to_zero():
 
 def test_base_only_at_kickoff():
     ftd = _ftd(prestige=600, attrs=1400, chemistry=8)
-    assert distant_sim_team_combined(ftd, season_wins=0, season_losses=0, is_home=False) == 740
+    assert distant_sim_team_combined(ftd, season_wins=0, season_losses=0, is_home=False) == 880
 
 
 def test_home_chemistry_bonus():
@@ -86,7 +89,7 @@ def test_winning_team_higher_combined_than_losing_peer():
     hot_score = distant_sim_team_combined(hot, season_wins=18, season_losses=4, is_home=False)
     cold_score = distant_sim_team_combined(cold, season_wins=6, season_losses=16, is_home=False)
     assert hot_score > cold_score
-    assert hot_score - cold_score == 72
+    assert hot_score - cold_score == 192
 
 
 def test_multiplier_bands_count():
@@ -95,8 +98,8 @@ def test_multiplier_bands_count():
 
 def test_season_momentum_from_score():
     assert distant_sim_season_momentum(0) == 0
-    assert distant_sim_season_momentum(5) == 40
-    assert distant_sim_season_momentum(10) == 80
+    assert distant_sim_season_momentum(5) == 140
+    assert distant_sim_season_momentum(10) == 280
 
 
 def test_momentum_score_clamp():
@@ -125,7 +128,67 @@ def test_team_combined_includes_season_momentum():
     ftd = _ftd(prestige=600, attrs=1400, chemistry=9)
     ftd["team_attributes"]["momentum_score"] = 5
     base = distant_sim_team_combined(ftd, season_wins=0, season_losses=0, is_home=False)
-    assert base == 740 + 40
+    assert base == 880 + 140
+
+
+def test_record_streak_bonus_win_and_loss():
+    assert distant_sim_record_streak_bonus({"distant_win_streak": 2}) == 0
+    assert distant_sim_record_streak_bonus({"distant_win_streak": 3}) == 22
+    assert distant_sim_record_streak_bonus({"distant_win_streak": 5}) == 66
+    assert distant_sim_record_streak_bonus({"distant_loss_streak": 4}) == -36
+
+
+def test_tier_multiplier_bands():
+    assert distant_sim_tier_multiplier(0.80) == 7.0
+    assert distant_sim_tier_multiplier(0.70) == 3.25
+    assert distant_sim_tier_multiplier(0.50) == 0.45
+
+
+def test_tier_adjustment_gated_by_week():
+    assert distant_sim_tier_adjustment(
+        season_wins=18, season_losses=4, record_momentum=90, season_momentum=60, current_week=4
+    ) == 0
+    adj = distant_sim_tier_adjustment(
+        season_wins=20, season_losses=2, record_momentum=90, season_momentum=60, current_week=22
+    )
+    assert adj == int(150 * 6.0)  # .909 win pct → 7.0× → +600% of momentum sum
+
+
+def test_hot_team_higher_combined_with_tier_late_season():
+    hot = _ftd(prestige=600, attrs=1400, chemistry=9)
+    cold = _ftd(prestige=600, attrs=1400, chemistry=9)
+    hot_score = distant_sim_team_combined(
+        hot, season_wins=18, season_losses=4, is_home=False, current_week=22
+    )
+    cold_score = distant_sim_team_combined(
+        cold, season_wins=6, season_losses=16, is_home=False, current_week=22
+    )
+    assert hot_score > cold_score
+    assert hot_score - cold_score > 192
+
+
+def test_ranked_fullsim_promotion_both_top_15():
+    from BackEnd.distant_sim_engine import distant_sim_should_promote_ranked_fullsim
+
+    assert distant_sim_should_promote_ranked_fullsim(
+        {"natl_rank": 8}, {"natl_rank": 12}, max_rank=15
+    )
+
+
+def test_ranked_fullsim_no_promotion_when_one_outside_cap():
+    from BackEnd.distant_sim_engine import distant_sim_should_promote_ranked_fullsim
+
+    assert not distant_sim_should_promote_ranked_fullsim(
+        {"natl_rank": 8}, {"natl_rank": 20}, max_rank=15
+    )
+
+
+def test_ranked_fullsim_disabled_when_cap_zero():
+    from BackEnd.distant_sim_engine import distant_sim_should_promote_ranked_fullsim
+
+    assert not distant_sim_should_promote_ranked_fullsim(
+        {"natl_rank": 1}, {"natl_rank": 2}, max_rank=0
+    )
 
 
 def test_talent_signal_live_from_fpd():
@@ -163,7 +226,7 @@ def test_team_combined_uses_live_fpd_for_base():
         "p1": {"attributes": {"SC": 150, "SH": 150, "ID": 150, "OD": 150, "PS": 150, "BH": 150,
                                "RB": 150, "ST": 150, "AG": 150, "ND": 150, "IQ": 150, "FT": 150}},
     }
-    # live attrs 1800 → base 600 + 180 = 780 (not frozen 700)
+    # live attrs 1800 → base 600 + 360 = 960 (not frozen 700)
     assert distant_sim_team_combined(
         ftd, season_wins=0, season_losses=0, is_home=False, fpd_by_player_id=fpd
-    ) == 780
+    ) == 960

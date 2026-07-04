@@ -6167,9 +6167,36 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     game_state["_final_turn_micro_budget_seconds"] = max(0.05, micro_budget)
     try:
         log_eoq_step(game, "FINAL_SHOT", "resolve_shot", "START", shooter=shooter, shooter_pos=shooter_pos)
+        # UESS single-coord-source (Final_Turn_UESS_Audit.md FT-Task 1, mirrors HCO
+        # Task 1): build the animator ONCE from the finalized skeleton and sync
+        # def_lineup coords + zone_defender_assignments_by_step BEFORE resolve_shot,
+        # then stamp shot_result["animations"] (below) so the emitter reuses the
+        # same build. Without this the resolver never ran the animator, so
+        # resolve_shot read a STALE/empty zone map + prior-turn defender coords →
+        # Final Turn shots resolved as uncontested while the FE rendered real
+        # defenders. Idle motion (_subtle_movement) is stamped separately on the
+        # skeleton and read independently by the emitter, so it is unaffected.
+        # Defensive: mirror the emitter's own guarded animator build — if the
+        # build or coord-sync fails, fall back to the prior behavior (emitter
+        # rebuilds later) rather than crashing the final-turn resolution.
+        final_turn_animations = None
+        try:
+            final_turn_animations = Animator(game).skeleton_to_animations(
+                skeleton, off_lineup, def_lineup, add_defenders=True
+            )
+            apply_coords_from_animations_list(game, final_turn_animations)
+        except Exception as _ft_sync_err:
+            import logging as _ft_sync_log
+            _ft_sync_log.warning(
+                "FT-Task 1: pre-resolve defender sync failed (%s); falling back "
+                "to emitter rebuild for this turn", _ft_sync_err,
+            )
+            final_turn_animations = None
         # SS&S / UESS: same pre-resolve shot coord sync as HCO/FCP/HCT — stamps
         # roles["shot_spot"] from the skeleton shoot step (with away flip) so
         # block reconciliation and ball_bounce_x/y match the schema animation.
+        # AFTER apply_coords so the shot spot uses the skeleton shot location,
+        # not the synced animation coords.
         set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)
         final_snap = build_skeleton_pre_resolve_shot_snapshot(
             game, off_lineup, def_lineup, skeleton, roles, "FINAL_TURN", "final_turn_pre_resolve_shot"
@@ -6200,6 +6227,13 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     shot_result["oDestinations"] = o_destinations
     shot_result["dDestinations"] = d_destinations
     shot_result["skeleton"] = skeleton
+    # UESS single build (FT-Task 1): reuse the finalized single build in the
+    # emitter instead of letting build_skeleton_animation_steps rebuild with a
+    # fresh RNG draw — so the coords the FE renders == the coords resolve_shot
+    # used. Idle motion lives on the skeleton (_subtle_movement) and the emitter
+    # reads it independently, so reusing `animations` does not drop it.
+    if final_turn_animations:
+        shot_result["animations"] = final_turn_animations
     shot_result["final_turn"] = True
     # A handoff is emitted only in handoff / best-effort modes (bh stays PG, ball
     # delivered to him). In skip_handoff the live handler IS the skeleton BH → no

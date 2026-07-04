@@ -325,6 +325,26 @@ def _resolve_shot_attempt(
             game_state, game_state.get("offensive_state"), "after_steal"
         )
 
+    _dunk_stamp = None
+    if shot_type in ("inside", "attack"):
+        from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+        is_away_offense = off_team.team_id == game.away_team.team_id
+        _dunk_stamp, made = prepare_dunk_stamp(
+            shot_type=shot_type,
+            shooter_coord={
+                "x": float(shooter_location["x"]),
+                "y": float(shooter_location["y"]),
+            },
+            shooter_player=shooter,
+            off_team=off_team,
+            def_team=def_team,
+            shot_score_pre_defense=float(shot_score_pre_defense),
+            shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+            made=made,
+            away_offense=is_away_offense,
+        )
+
     has_and_one = False
     free_throws_remaining = 0
     fouled_out_info: Dict[str, Any] = {}
@@ -395,6 +415,12 @@ def _resolve_shot_attempt(
             "contest_result": contest_result if contested else None,
             "contest_margin": contest_margin if contested else None,
             "shot_defense_score_raw": float(shot_defense_score_raw if contested else 0),
+            "shooter_player": shooter,
+            "shot_score_pre_defense": float(shot_score_pre_defense),
+            "off_team": off_team,
+            "def_team": def_team,
+            "result_type": "MAKE" if made else "MISS",
+            "dunk_stamp": _dunk_stamp,
         },
     }
 

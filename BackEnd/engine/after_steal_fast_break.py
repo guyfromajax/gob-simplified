@@ -510,6 +510,22 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
             "after_steal",
         )
 
+    _dunk_stamp = None
+    if shot_type in ("inside", "attack"):
+        from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+        _dunk_stamp, made = prepare_dunk_stamp(
+            shot_type=shot_type,
+            shooter_coord={"x": float(bh_target["x"]), "y": float(bh_target["y"])},
+            shooter_player=stealer,
+            off_team=off_team,
+            def_team=def_team,
+            shot_score_pre_defense=float(shot_score_pre_defense),
+            shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+            made=made,
+            away_offense=is_away_offense,
+        )
+
     # Foul book-keeping (mirrors OREB putback foul path).
     has_and_one = False
     free_throws_remaining = 0
@@ -791,6 +807,12 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         contest_result=contest_result if contested else None,
         contest_margin=contest_margin if contested else None,
         shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+        shooter_player=stealer,
+        shot_score_pre_defense=float(shot_score_pre_defense),
+        off_team=off_team,
+        def_team=def_team,
+        result_type=turn_result.get("result_type"),
+        dunk_stamp=_dunk_stamp,
     )
 
     if d_foul and foul_player:

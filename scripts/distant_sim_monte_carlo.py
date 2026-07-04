@@ -46,8 +46,22 @@ TUNING_DOC = os.path.join(
 from BackEnd.distant_sim_engine import (
     compute_distant_momentum_score_updates,
     distant_sim_home_chemistry_bonus,
+    distant_sim_should_promote_ranked_fullsim,
     distant_sim_team_combined as production_distant_team_combined,
 )
+
+
+def _natl_ranking_score(*, prestige: int, total_player_attrs: int, team_wins: int, week: int = 26) -> float:
+    """Week-26 ranking score proxy (mirrors franchise_rank_prestige.calculate_ranking_score)."""
+    sos_score = (129 - 64.0) * 4
+    if week <= 4:
+        attr_w = {0: 0.10, 1: 0.04, 2: 0.03, 3: 0.02, 4: 0.01}.get(week, 0.01)
+        return prestige + (total_player_attrs * attr_w) + (100 * team_wins)
+    if 5 <= week <= 8:
+        return (0.75 * prestige) + (100 * team_wins) + sos_score
+    if 9 <= week <= 12:
+        return (0.5 * prestige) + (80 * team_wins) + sos_score
+    return (0.25 * prestige) + (60 * team_wins) + sos_score
 
 
 def distant_team_combined(
@@ -56,6 +70,7 @@ def distant_team_combined(
     season_wins: int,
     season_losses: int,
     is_home: bool,
+    current_week: int = 0,
 ) -> int:
     return production_distant_team_combined(
         _sim_team_ftd(team),
@@ -63,6 +78,7 @@ def distant_team_combined(
         season_losses=season_losses,
         is_home=is_home,
         fpd_by_player_id=_sim_fpd_for_team(team) or None,
+        current_week=current_week,
     )
 
 
@@ -427,6 +443,7 @@ def _combined_for_team(
     is_home: bool,
     engine: EngineMode,
     is_user_conference: bool,
+    current_week: int = 0,
 ) -> int:
     if engine == "full_proxy" or (engine == "hybrid" and is_user_conference):
         return full_sim_proxy_combined(
@@ -440,6 +457,7 @@ def _combined_for_team(
         season_wins=wins,
         season_losses=losses,
         is_home=is_home,
+        current_week=current_week,
     )
 
 
@@ -476,6 +494,7 @@ def simulate_season(
                 is_home=False,
                 engine=engine,
                 is_user_conference=away_conf,
+                current_week=week_idx,
             )
             home_combined = _combined_for_team(
                 home,
@@ -484,6 +503,7 @@ def simulate_season(
                 is_home=True,
                 engine=engine,
                 is_user_conference=home_conf,
+                current_week=week_idx,
             )
 
             if engine == "hybrid" and game_is_user_conf:
@@ -557,6 +577,8 @@ class MonteCarloReport:
     preseason_bottom20_avg_wins: float
     top5_user_conf_share: float
     top10_user_conf_share: float
+    top5_user_conf_share_natl_rank: float
+    top10_user_conf_share_natl_rank: float
     win_histogram: dict[str, int]
     elite_win_pct_by_week: dict[str, float]
     sample_elite_final_wins: list[int] = field(default_factory=list)
@@ -576,6 +598,8 @@ def run_monte_carlo(
     all_final: list[list[int]] = []
     top5_user_conf = 0
     top10_user_conf = 0
+    top5_user_natl = 0
+    top10_user_natl = 0
     preseason_top10_totals: list[int] = []
     preseason_bottom20_totals: list[int] = []
     elite_by_week: dict[int, list[float]] = defaultdict(list)
@@ -620,6 +644,20 @@ def run_monte_carlo(
         top5_user_conf += sum(1 for t in ranked[:5] if t.conference == user_conference)
         top10_user_conf += sum(1 for t in ranked[:10] if t.conference == user_conference)
 
+        natl_ranked = sorted(
+            season_teams,
+            key=lambda t: (
+                -_natl_ranking_score(
+                    prestige=t.prestige,
+                    total_player_attrs=t.total_player_attrs,
+                    team_wins=fw[t.team_id],
+                ),
+                t.preseason_rank,
+            ),
+        )
+        top5_user_natl += sum(1 for t in natl_ranked[:5] if t.conference == user_conference)
+        top10_user_natl += sum(1 for t in natl_ranked[:10] if t.conference == user_conference)
+
         preseason_top10_totals.extend(fw[tid] for tid in top10_ids)
         preseason_bottom20_totals.extend(fw[tid] for tid in bottom20_ids)
         rank1_final_wins.append(fw[rank1_id])
@@ -660,6 +698,8 @@ def run_monte_carlo(
         preseason_bottom20_avg_wins=statistics.mean(preseason_bottom20_totals),
         top5_user_conf_share=top5_user_conf / (seasons * 5),
         top10_user_conf_share=top10_user_conf / (seasons * 10),
+        top5_user_conf_share_natl_rank=top5_user_natl / (seasons * 5),
+        top10_user_conf_share_natl_rank=top10_user_natl / (seasons * 10),
         win_histogram={str(k): v for k, v in sorted(hist.items())},
         elite_win_pct_by_week={
             str(wk): statistics.mean(rates) for wk, rates in sorted(elite_by_week.items())
@@ -685,8 +725,10 @@ def print_report(report: MonteCarloReport, team_source: str) -> None:
     print(f"Preseason top-10 P90 final wins:      {report.preseason_top10_p90_wins:.0f}")
     print(f"Preseason bottom-20 avg final wins:   {report.preseason_bottom20_avg_wins:.2f}")
     if report.engine == "hybrid":
-        print(f"Top-5 from user conf (share):        {report.top5_user_conf_share:.1%}")
-        print(f"Top-10 from user conf (share):       {report.top10_user_conf_share:.1%}")
+        print(f"Top-5 from user conf (by wins):      {report.top5_user_conf_share:.1%}")
+        print(f"Top-10 from user conf (by wins):     {report.top10_user_conf_share:.1%}")
+        print(f"Top-5 from user conf (natl rank):    {report.top5_user_conf_share_natl_rank:.1%}")
+        print(f"Top-10 from user conf (natl rank):   {report.top10_user_conf_share_natl_rank:.1%}")
     print("\nElite (preseason top-10) cumulative win % by week:")
     for wk, rate in sorted(report.elite_win_pct_by_week.items(), key=lambda x: int(x[0])):
         print(f"  Week {wk:>2}: {rate:.1%}")

@@ -257,6 +257,22 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
             game_state, game_state.get("offensive_state"), "hct_fast_break",
         )
 
+    _dunk_stamp = None
+    if shot_type in ("inside", "attack"):
+        from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+        _dunk_stamp, made = prepare_dunk_stamp(
+            shot_type=shot_type,
+            shooter_coord={"x": float(bh_target["x"]), "y": float(bh_target["y"])},
+            shooter_player=shooter,
+            off_team=off_team,
+            def_team=def_team,
+            shot_score_pre_defense=float(shot_score_pre_defense),
+            shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+            made=made,
+            away_offense=is_away_offense,
+        )
+
     # --- Foul book-keeping (mirrors after_steal / OREB putback) -------------
     has_and_one = False
     free_throws_remaining = 0
@@ -482,6 +498,12 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         contest_result=contest_result if contested else None,
         contest_margin=contest_margin if contested else None,
         shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+        shooter_player=shooter,
+        shot_score_pre_defense=float(shot_score_pre_defense),
+        off_team=off_team,
+        def_team=def_team,
+        result_type=turn_result.get("result_type"),
+        dunk_stamp=_dunk_stamp,
     )
 
     if d_foul and foul_player:
@@ -684,6 +706,22 @@ def _finalize_ab_shot(
         )
     is_three = bool(shot_classification.get("is_three_point_shot"))
     rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+
+    _dunk_stamp = None
+    if shot_type in ("inside", "attack"):
+        from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+        _dunk_stamp, made = prepare_dunk_stamp(
+            shot_type=shot_type,
+            shooter_coord={"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+            shooter_player=shooter,
+            off_team=off_team,
+            def_team=def_team,
+            shot_score_pre_defense=float(shot_score_pre_defense),
+            shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
+            made=made,
+            away_offense=is_away_offense,
+        )
 
     has_and_one = False
     free_throws_remaining = 0
@@ -919,6 +957,12 @@ def _finalize_ab_shot(
         contest_result=contest_result,
         contest_margin=contest_margin,
         shot_defense_score_raw=float(shot_defense_score_raw),
+        shooter_player=shooter,
+        shot_score_pre_defense=float(shot_score_pre_defense),
+        off_team=off_team,
+        def_team=def_team,
+        result_type=turn_result.get("result_type"),
+        dunk_stamp=_dunk_stamp,
     )
 
     if d_foul and foul_player:

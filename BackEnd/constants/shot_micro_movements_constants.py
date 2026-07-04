@@ -73,6 +73,37 @@ OUTSIDE_STATIC_FALLBACK_FAMILIES = ("set", "set_pump")
 # (FB drive / sprint-to-spot). Micro inserts after travel; in-place shoots replace.
 TRAVEL_SHOOT_MIN_GRID = 1.5
 
+# --- Dunk micro-animation (registered; not in MOVEMENT_POOL — selection is separate) ---
+DUNK_FAMILIES = frozenset({"dunk", "drive_dunk"})
+DUNK_APPROACH_HOME = {"x": 88.0, "y": 25.0}  # just outside home rim (91)
+DUNK_APPROACH_AWAY = {"x": 12.0, "y": 25.0}  # mirror via x → 100 − x
+DUNK_WALL_CLOCK_MIN_MS = 640.0
+DUNK_WALL_CLOCK_RISE_SLAM_MS = 300.0
+DUNK_CLOCK_MS_PER_GAME_SEC = 350.0  # mirrors FE gameClock.tickMs default
+DUNK_MOVE_SPOTS_STRONG = 1.0  # × MICRO_STEP_GRID toward rim
+DUNK_MOVE_SPOTS_DRIVE = 2.0
+# Overridable on step stamp; FE defaults in animation_config.js dunk block
+DUNK_RISE_PX = 22.0
+DUNK_RATTLE_MAG_PX = 6.0
+DUNK_RATTLE_MS = 280.0
+DUNK_BALL_RAISE = 0.35  # fraction of player sprite display height above head
+
+# --- Dunk selection (Shot_System.md § Dunk Selection) ---
+DUNK_MARGIN_THRESHOLD = 100.0
+DUNK_LOCATION_MAX_GRID = 10.0
+DUNK_DRIVE_MAX_DIST = 8.0  # ≤ this → family "dunk"; else "drive_dunk"
+DUNK_AG_THRESHOLD_DIST_9 = 50.0
+DUNK_AG_THRESHOLD_DIST_10 = 75.0
+
+# Height (inches) → feasibility scale (roll = randint(1, 100))
+DUNK_HEIGHT_SCALE_BY_INCH = {
+    **{h: 0 for h in range(50, 69)},
+    69: 1, 70: 1, 71: 1,
+    72: 2, 73: 5, 74: 7, 75: 10, 76: 12, 77: 15,
+    78: 17, 79: 18, 80: 20, 81: 22, 82: 25,
+    **{h: 30 for h in range(83, 120)},
+}
+
 # --- Shot ball-arc geometry (tunable; see Shot_Micro_Movements_System.md §7) ---
 # Apex height: apex_px = (ARC_BASE + ARC_SLOPE * dist_grid) * style_mult
 ARC_BASE = 20.0  # px floor

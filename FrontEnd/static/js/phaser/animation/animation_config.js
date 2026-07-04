@@ -140,6 +140,12 @@ const defaults = {
       durationMs: 900, // Fallback when the backend omits a per-beat duration
     },
   },
+  dunk: {
+    risePx: 22,
+    rattleMagPx: 6,
+    rattleMs: 280,
+    ballRaise: 0.35, // fraction of player sprite display height above head at apex
+  },
   possession: {
     msPerTick: 1,
     minFrameDurationMs: 120,
@@ -191,6 +197,7 @@ export const animationConfig = {
     fumble: { ...defaults.flourish.fumble, ...(overrides.flourish?.fumble || {}) },
     idleWander: { ...defaults.flourish.idleWander, ...(overrides.flourish?.idleWander || {}) },
   },
+  dunk: { ...defaults.dunk, ...(overrides.dunk || {}) },
   possession: {
     msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
     minFrameDurationMs:

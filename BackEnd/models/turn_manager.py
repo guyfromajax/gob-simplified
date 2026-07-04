@@ -3719,6 +3719,17 @@ class TurnManager:
                     "shooter_id": result.get("shooter_id"),
                 },
             )
+            # FT-Task 2 (HIGH-2, Final_Turn_UESS_Audit.md): the FLSS skeleton uses
+            # only drive/shoot/stand actions (never handle_ball/pass), so the
+            # emitter's ball-owner walk yields nothing and its fallback reads
+            # roles.ball_handler — which FLSS never stamped → ball owner "" on every
+            # FLSS pre-shot step. Give the emitter the shooter as ball handler so the
+            # ball attaches to him across the drive + shoot (seam-continuous with his
+            # prior position — see MED-1 in the emitter's flss_seed_coords).
+            if isinstance(result, dict) and result.get("shooter_id"):
+                result.setdefault("roles", {}).setdefault(
+                    "ball_handler", result["shooter_id"]
+                )
             result["final_shot_possession"] = True
             result["forced_shot_reason"] = result.get("forced_shot_reason") or "FLSS"
             if suppress_sfx:

@@ -878,6 +878,7 @@ class ShotManager:
         contest_result = None
         contest_margin = None
         micro_movement_family = None
+        _cached_dunk_stamp = None
 
         if rim_unguarded_99:
             # Unguarded attempt in rim box: 99% make; skip defense, fouls, block recon, charge.
@@ -1406,6 +1407,26 @@ class ShotManager:
             if original_made != made:
                 # logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
                 pass
+
+        if not roles.get("flss") and shot_type in ("inside", "attack"):
+            from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
+
+            is_away_offense_dunk = off_team.team_id == self.game.away_team.team_id
+            _cached_dunk_stamp, made = prepare_dunk_stamp(
+                shot_type=shot_type,
+                shooter_coord={"x": float(sx), "y": float(sy)},
+                shooter_player=shooter,
+                off_team=off_team,
+                def_team=def_team,
+                shot_score_pre_defense=float(shot_score_pre_defense),
+                shot_defense_score_raw=float(shot_defense_score_raw or 0),
+                made=made,
+                is_block=bool(getattr(self, "_block_spot", None)),
+                away_offense=is_away_offense_dunk,
+            )
+            if _cached_dunk_stamp and _cached_dunk_stamp.get("force_miss"):
+                if hasattr(self, "_block_spot"):
+                    del self._block_spot
 
         # Stat tracking (attempts)
         if not defense_applied_defenders:
@@ -2353,7 +2374,13 @@ class ShotManager:
                 "contest_margin": contest_margin,
                 "shot_defense_score_raw": float(shot_defense_score_raw or 0),
                 "shooter_player": shooter,
+                "shot_score_pre_defense": float(shot_score_pre_defense),
+                "off_team": off_team,
+                "def_team": def_team,
+                "result_type": "MAKE" if made else ("BLOCK" if is_block_outcome else "MISS"),
             }
+            if _cached_dunk_stamp is not None:
+                _micro_kwargs["dunk_stamp"] = _cached_dunk_stamp
             if self.game_state.get("final_turn"):
                 _micro_kwargs["max_pre_release_seconds"] = self.game_state.get(
                     "_final_turn_micro_budget_seconds"
@@ -2361,6 +2388,8 @@ class ShotManager:
             select_and_stamp_shot_micro(_micro_scratch, **_micro_kwargs)
             micro_movement_family = _micro_scratch.get("micro_movement_family")
             uses_shot_arc = bool(_micro_scratch.get("uses_shot_arc"))
+            if _micro_scratch.get("dunk_miss"):
+                result["dunk_miss"] = True
 
         shot_variant = None
         shot_variant_extras = {}

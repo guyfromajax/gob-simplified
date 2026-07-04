@@ -1429,10 +1429,19 @@ def build_skeleton_animation_steps(
             flss_seed_coords = _normalize_player_coord_map(
                 prior_turn.get("final_coords") or {}
             )
-            flss_seed_coords[str(shooter_id)] = {
-                "x": float(shooter_coords.get("x", 50)),
-                "y": float(shooter_coords.get("y", 25)),
-            }
+            # FT-Task 2 (MED-1, Final_Turn_UESS_Audit.md): do NOT override the
+            # shooter to the drive-END coord (turn_result["shooter_coords"] is the
+            # shot spot). The shooter starts step 0 at his PRIOR position
+            # (prior final_coords[shooter] == drive start sx,sy) and DRIVES to the
+            # shot spot, so the sprint-drive renders real motion and the ball
+            # (attached to him via HIGH-2) stays seam-continuous with the prior
+            # turn's final ball rest. Only seed the shot-spot coord as a fallback
+            # if prior final_coords is somehow missing the shooter.
+            if str(shooter_id) not in flss_seed_coords:
+                flss_seed_coords[str(shooter_id)] = {
+                    "x": float(shooter_coords.get("x", 50)),
+                    "y": float(shooter_coords.get("y", 25)),
+                }
     elif turn_type == "FCP" and isinstance(prior_turn, dict):
         prior_fc = prior_turn.get("final_coords") or {}
         if isinstance(prior_fc, dict) and prior_fc:
@@ -1625,10 +1634,34 @@ def build_skeleton_animation_steps(
         ):
             ft_bh_id = _final_turn_skeleton_bh_id(skeleton_steps, off_lineup)
             if ft_bh_id:
-                ball_start = {"owner_player_id": ft_bh_id}
-                ball_end = {"owner_player_id": ft_bh_id}
-                owner_id_start = ft_bh_id
-                owner_id_end = ft_bh_id
+                # FT-Task 3 (MED-2, Final_Turn_UESS_Audit.md): pin the ball to the
+                # skeleton BH ONLY when it was actually delivered to him — a handoff
+                # was prepended, or he already held it (prior_owner == ft_bh_id;
+                # pg_direct / skip_handoff). If a handoff was NEEDED but self-skipped
+                # (coords missing → no delivery step emitted), pinning BOTH ends to
+                # ft_bh_id teleports the ball from the prior owner across the turn
+                # seam. In that case, when both endpoints have step-0 coords, express
+                # the delivery WITHIN step 0 (prior_owner → ft_bh_id, tweened as a
+                # pass); otherwise fall back to the pin (best effort).
+                prior_owner_ft = _resolve_prior_ball_handler_id(prior_turn, turn_result)
+                delivered_ft = bool(final_turn_handoff_prepended) or (
+                    prior_owner_ft and str(prior_owner_ft) == str(ft_bh_id)
+                )
+                if (
+                    not delivered_ft
+                    and prior_owner_ft
+                    and str(prior_owner_ft) in start_coords
+                    and str(ft_bh_id) in start_coords
+                ):
+                    ball_start = {"owner_player_id": str(prior_owner_ft)}
+                    ball_end = {"owner_player_id": ft_bh_id}
+                    owner_id_start = str(prior_owner_ft)
+                    owner_id_end = ft_bh_id
+                else:
+                    ball_start = {"owner_player_id": ft_bh_id}
+                    ball_end = {"owner_player_id": ft_bh_id}
+                    owner_id_start = ft_bh_id
+                    owner_id_end = ft_bh_id
 
         # Detect pass step (ball ownership transfer) early — used both by
         # gate selection (FCP) and by the later ball_motion_style /
@@ -1997,6 +2030,47 @@ def build_skeleton_animation_steps(
     inject_dead_ball_fumble_before_turn_stop(
         steps, turn_result, away_offense=away_offense,
     )
+
+    # FT-Task 4 (Final_Turn_UESS_Audit.md): extend the [UESS SEAM] teleport
+    # detection to Final Turn + FLSS. The Task 3b HCO detector is nested in the
+    # is_hco_turn block (excludes final_turn/flss), so these paths were
+    # uninstrumented. Post-build check: compare the prior turn's rendered ball
+    # rest (final_ball_coords) against this turn's emitted step-0 ball position;
+    # log a candidate when they diverge > epsilon. Detection-only, no behavior
+    # change. (Resolves the step-0 ball like the FE: attached → owner's step-0
+    # coord; loose/in-flight → explicit coord.)
+    if (
+        steps
+        and (turn_result.get("final_turn") or turn_result.get("flss"))
+        and isinstance(prior_turn, dict)
+    ):
+        _prior_fbc = prior_turn.get("final_ball_coords")
+        _s0_start = steps[0].get("start") or {}
+        _s0_ball = _s0_start.get("ball") or {}
+        _s0_coords = _s0_start.get("coords") or {}
+        _s0_ball_pos = None
+        if isinstance(_s0_ball, dict):
+            _owner = _s0_ball.get("owner_player_id")
+            if _owner:
+                _s0_ball_pos = _s0_coords.get(str(_owner)) or _s0_coords.get(_owner)
+            else:
+                _s0_ball_pos = _s0_ball.get("current_coords") or _s0_ball.get("coords")
+        if isinstance(_prior_fbc, dict) and isinstance(_s0_ball_pos, dict):
+            try:
+                _seam_gap = (
+                    (float(_s0_ball_pos.get("x")) - float(_prior_fbc.get("x"))) ** 2
+                    + (float(_s0_ball_pos.get("y")) - float(_prior_fbc.get("y"))) ** 2
+                ) ** 0.5
+            except (TypeError, ValueError):
+                _seam_gap = 0.0
+            if _seam_gap > UESS_SEAM_TELEPORT_GRID_EPSILON:
+                import logging as _ft_seam_log
+                _ft_seam_log.warning(
+                    "🎯 [UESS SEAM] %s entry ball teleport candidate: prior "
+                    "final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                    "FLSS" if turn_result.get("flss") else "FINAL_TURN",
+                    _prior_fbc, _s0_ball_pos, _seam_gap,
+                )
 
     return steps
 
@@ -2716,6 +2790,63 @@ def _build_post_shot_sub_steps(
     variant_upper = (shot_variant or "").upper()
     is_rattle = variant_upper in _RATTLE_VARIANTS
     is_airball = variant_upper == "AIRBALL"
+
+    from BackEnd.engine.shot_micro_movements import is_dunk_micro_family
+
+    if is_make and is_dunk_micro_family(turn_result.get("micro_movement_family")):
+        msss = (
+            dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM) if away_offense
+            else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+        )
+        shoot_step.setdefault("end", {})["ball"] = {"coords": dict(msss)}
+        hold_step = _build_make_hold_sub_step(
+            prev_end_coords=dict(shoot_step["end"]["coords"]),
+            prev_clock=dict(shoot_step["end"]["clock"]),
+            ball_coord=dict(msss),
+            shooter_id=str(shooter_id),
+            away_offense=away_offense,
+            turn_result=turn_result,
+            next_step=_shot_attempt_turn_stop(),
+        )
+        shoot_step["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+        steps.append(hold_step)
+        return
+
+    is_dunk_miss = bool(turn_result.get("dunk_miss"))
+    if (
+        result_type == "MISS"
+        and is_dunk_miss
+        and is_dunk_micro_family(turn_result.get("micro_movement_family"))
+    ):
+        bx = turn_result.get("ball_bounce_x")
+        by = turn_result.get("ball_bounce_y")
+        if bx is not None and by is not None:
+            bounce_target: GridCoord = {"x": float(bx), "y": float(by)}
+            bounce_trigger: AdvanceTrigger = {
+                "condition": "fixed_duration",
+                "T_game_seconds": float(BOUNCE_STEP_GAME_SECONDS),
+                "metadata": {
+                    "target_coords": dict(bounce_target),
+                    "kind": "bounce",
+                },
+            }
+            bounce_step = _build_ball_motion_sub_step(
+                start_coords_seed=dict(shoot_step["end"]["coords"]),
+                overlay_players=overlay_players,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                step_t=BOUNCE_STEP_GAME_SECONDS,
+                ball_start_coord=shot_spot,
+                ball_end_coord=bounce_target,
+                clock_start=dict(shoot_step["end"]["clock"]),
+                advance_trigger=bounce_trigger,
+                ball_motion_style=None,
+                next_step=_shot_attempt_turn_stop(),
+            )
+            _stamp_shooting_foul_on_miss_end(bounce_step, turn_result)
+            shoot_step["end"]["next"] = {"kind": "next_step", "index": len(steps)}
+            steps.append(bounce_step)
+            return
 
     ball_flight_end = _variant_flight_end(
         shot_variant, result_type, away_offense, turn_result,

@@ -10,7 +10,13 @@ import logging
 import random
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
-from BackEnd.constants import AWAY_RIM_COORDS, HCO_STRING_SPOTS, HOME_RIM_COORDS
+from BackEnd.constants import (
+    AWAY_RIM_COORDS,
+    HCO_STRING_SPOTS,
+    HOME_RIM_COORDS,
+    MADE_SHOT_SWEET_SPOT_AWAY_RIM,
+    MADE_SHOT_SWEET_SPOT_HOME_RIM,
+)
 from BackEnd.constants.shot_micro_movements_constants import (
     ARC_SPOT_OCCUPIED_RADIUS,
     CONTEST_DEFENSE_WIN_THRESHOLD,
@@ -20,6 +26,24 @@ from BackEnd.constants.shot_micro_movements_constants import (
     DEFENDER_STICK_GAP,
     DEFENDER_TRACK_GAP,
     DEFENDER_WALL_GAP,
+    DUNK_APPROACH_AWAY,
+    DUNK_APPROACH_HOME,
+    DUNK_BALL_RAISE,
+    DUNK_CLOCK_MS_PER_GAME_SEC,
+    DUNK_DRIVE_MAX_DIST,
+    DUNK_FAMILIES,
+    DUNK_HEIGHT_SCALE_BY_INCH,
+    DUNK_LOCATION_MAX_GRID,
+    DUNK_MARGIN_THRESHOLD,
+    DUNK_MOVE_SPOTS_DRIVE,
+    DUNK_MOVE_SPOTS_STRONG,
+    DUNK_AG_THRESHOLD_DIST_9,
+    DUNK_AG_THRESHOLD_DIST_10,
+    DUNK_RATTLE_MAG_PX,
+    DUNK_RATTLE_MS,
+    DUNK_RISE_PX,
+    DUNK_WALL_CLOCK_MIN_MS,
+    DUNK_WALL_CLOCK_RISE_SLAM_MS,
     JAB_COUNTER_MULTIPLIER,
     JAB_STEP_GRID,
     MICRO_FLOURISH_BEAT_T,
@@ -38,6 +62,7 @@ from BackEnd.utils.animation_step_helpers import (
     _euclid,
     _motion_end_toward_dest,
     _player_lookup_by_id,
+    shot_result_sfx,
     stamp_tween_durations,
 )
 from BackEnd.utils.shared import get_away_player_coords
@@ -67,6 +92,8 @@ FAMILY_BUCKET: Dict[str, str] = {
     "set_pump": "D",
     "dribble_pump_shoot": "D+B",
     "pump_dribble_shoot": "D+B",
+    "dunk": "A",
+    "drive_dunk": "A",
 }
 
 BUCKET_OVERRIDE: Dict[Tuple[str, ContestResult], str] = {
@@ -135,6 +162,170 @@ def _perp_jab_direction(shooter_y: float) -> float:
 
 def _offset_coord(base: GridCoord, dx: float, dy: float) -> GridCoord:
     return {"x": float(base["x"]) + dx, "y": float(base["y"]) + dy}
+
+
+def _dunk_approach_coord(away_offense: bool) -> GridCoord:
+    return dict(DUNK_APPROACH_AWAY if away_offense else DUNK_APPROACH_HOME)
+
+
+def _dunk_resolve_coord(away_offense: bool) -> GridCoord:
+    return dict(
+        MADE_SHOT_SWEET_SPOT_AWAY_RIM if away_offense else MADE_SHOT_SWEET_SPOT_HOME_RIM
+    )
+
+
+def _dunk_wall_clock_ms(dist_grid: float, shooter_player: Any) -> float:
+    sprint_rate = max(1e-6, _ag_grid_per_game_sec(shooter_player, "sprint"))
+    return max(
+        DUNK_WALL_CLOCK_MIN_MS,
+        (float(dist_grid) / sprint_rate) * DUNK_CLOCK_MS_PER_GAME_SEC
+        + DUNK_WALL_CLOCK_RISE_SLAM_MS,
+    )
+
+
+def is_dunk_micro_family(family_id: Optional[str]) -> bool:
+    return str(family_id or "") in DUNK_FAMILIES
+
+
+def _basket_spot_coord(away_offense: bool) -> GridCoord:
+    raw = HCO_STRING_SPOTS["basketSpot"]
+    if away_offense:
+        return get_away_player_coords(raw)
+    return {"x": float(raw["x"]), "y": float(raw["y"])}
+
+
+def dunk_height_scale(height_inches: Any) -> int:
+    try:
+        h = int(height_inches if height_inches is not None else 72)
+    except (TypeError, ValueError):
+        h = 72
+    if h in DUNK_HEIGHT_SCALE_BY_INCH:
+        return int(DUNK_HEIGHT_SCALE_BY_INCH[h])
+    if h >= 83:
+        return 30
+    if h <= 68:
+        return 0
+    return 0
+
+
+def dunk_location_eligible(dist_grid: float, agility: float) -> bool:
+    if dist_grid > DUNK_LOCATION_MAX_GRID:
+        return False
+    if dist_grid <= DUNK_DRIVE_MAX_DIST:
+        return True
+    ag = float(agility or 0)
+    if dist_grid <= 9.0:
+        return ag > DUNK_AG_THRESHOLD_DIST_9
+    return ag > DUNK_AG_THRESHOLD_DIST_10
+
+
+def dunk_in_play_margin(
+    shot_score_pre_defense: float,
+    shot_defense_score_raw: float,
+    *,
+    off_fight: float = 0.0,
+    def_fight: float = 0.0,
+) -> float:
+    return (
+        float(shot_score_pre_defense)
+        - float(shot_defense_score_raw)
+        + float(off_fight)
+        - float(def_fight)
+    )
+
+
+def resolve_dunk_micro_stamp(
+    *,
+    shot_type: str,
+    shooter_coord: GridCoord,
+    shooter_player: Any,
+    off_team: Any,
+    def_team: Any,
+    shot_score_pre_defense: float,
+    shot_defense_score_raw: float,
+    result_type: str,
+    away_offense: Optional[bool] = None,
+) -> Optional[Dict[str, Any]]:
+    """Return dunk stamp dict or None (caller falls back to normal micro pool).
+
+    See Shot_System.md § Dunk Selection & Block Interaction.
+    """
+    st = str(shot_type or "").lower()
+    if st not in ("inside", "attack"):
+        return None
+    if away_offense is None:
+        away_offense = _infer_away_offense_from_display_coord(shooter_coord)
+
+    basket = _basket_spot_coord(away_offense)
+    dist = _euclid(shooter_coord, basket)
+    attrs = getattr(shooter_player, "attributes", None) or {}
+    ag = float(attrs.get("AG", 0) or 0)
+    if not dunk_location_eligible(dist, ag):
+        return None
+
+    off_fight = float(getattr(off_team, "team_attributes", {}).get("fight", 0) or 0)
+    def_fight = float(getattr(def_team, "team_attributes", {}).get("fight", 0) or 0)
+    if dunk_in_play_margin(
+        shot_score_pre_defense,
+        shot_defense_score_raw,
+        off_fight=off_fight,
+        def_fight=def_fight,
+    ) <= DUNK_MARGIN_THRESHOLD:
+        return None
+
+    height = getattr(shooter_player, "height", None) or attrs.get("height")
+    scale = dunk_height_scale(height)
+    roll = random.randint(1, 100)
+    family_id = "dunk" if dist <= DUNK_DRIVE_MAX_DIST else "drive_dunk"
+    rt = (result_type or "").upper()
+
+    if roll == scale + 1:
+        return {
+            "family_id": family_id,
+            "dunk_miss": True,
+            "force_miss": True,
+        }
+    if roll <= scale and rt in ("MAKE", "BLOCK"):
+        return {
+            "family_id": family_id,
+            "dunk_miss": False,
+            "force_miss": False,
+        }
+    return None
+
+
+def prepare_dunk_stamp(
+    *,
+    shot_type: str,
+    shooter_coord: GridCoord,
+    shooter_player: Any,
+    off_team: Any,
+    def_team: Any,
+    shot_score_pre_defense: float,
+    shot_defense_score_raw: float,
+    made: bool,
+    is_block: bool = False,
+    away_offense: Optional[bool] = None,
+) -> Tuple[Optional[Dict[str, Any]], bool]:
+    """Resolve dunk stamp once; apply missed-dunk override to ``made``."""
+    st = str(shot_type or "").lower()
+    if st not in ("inside", "attack"):
+        return None, made
+    pre_rt = "MAKE" if made else ("BLOCK" if is_block else "MISS")
+    stamp = resolve_dunk_micro_stamp(
+        shot_type=shot_type,
+        shooter_coord=shooter_coord,
+        shooter_player=shooter_player,
+        off_team=off_team,
+        def_team=def_team,
+        shot_score_pre_defense=float(shot_score_pre_defense),
+        shot_defense_score_raw=float(shot_defense_score_raw or 0),
+        result_type=pre_rt,
+        away_offense=away_offense,
+    )
+    if stamp and stamp.get("force_miss"):
+        return stamp, False
+    return stamp, made
 
 
 def _defender_rim_side_coord(
@@ -279,6 +470,11 @@ def _estimate_beat_game_seconds(
             if flourish_kind == "pump_fake"
             else MICRO_FLOURISH_BEAT_T
         )
+    if kind == "dunk":
+        approach = beat.get("approach_coord") or DUNK_APPROACH_HOME
+        dist = _euclid(shooter_coord, approach)
+        wall_ms = _dunk_wall_clock_ms(dist, shooter_player)
+        return max(MICRO_MOVE_STEP_T_FLOOR, wall_ms / DUNK_CLOCK_MS_PER_GAME_SEC)
     return MICRO_FLOURISH_BEAT_T
 
 
@@ -482,23 +678,58 @@ def select_and_stamp_shot_micro(
     away_offense: Optional[bool] = None,
     max_pre_release_seconds: Optional[float] = None,
     shooter_player: Optional[Any] = None,
+    shot_score_pre_defense: Optional[float] = None,
+    off_team: Optional[Any] = None,
+    def_team: Optional[Any] = None,
+    result_type: Optional[str] = None,
+    dunk_stamp: Optional[Dict[str, Any]] = None,
 ) -> str:
     shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
     if away_offense is None:
         away_offense = _infer_away_offense_from_display_coord(shooter_coord)
-    all_coords = build_micro_coords_snapshot(
-        off_lineup, def_lineup, shooter_id, shooter_x, shooter_y,
-    )
-    family_id = select_micro_movement(
-        shot_type,
-        shooter_coord=shooter_coord,
-        shooter_id=str(shooter_id),
-        off_lineup=off_lineup,
-        all_coords=all_coords,
-        away_offense=away_offense,
-        max_pre_release_seconds=max_pre_release_seconds,
-        shooter_player=shooter_player,
-    )
+
+    family_id: Optional[str] = None
+    if dunk_stamp is None and (
+        shooter_player is not None
+        and shot_score_pre_defense is not None
+        and result_type is not None
+        and off_team is not None
+        and def_team is not None
+    ):
+        dunk_stamp = resolve_dunk_micro_stamp(
+            shot_type=shot_type,
+            shooter_coord=shooter_coord,
+            shooter_player=shooter_player,
+            off_team=off_team,
+            def_team=def_team,
+            shot_score_pre_defense=float(shot_score_pre_defense),
+            shot_defense_score_raw=float(shot_defense_score_raw or 0),
+            result_type=str(result_type),
+            away_offense=away_offense,
+        )
+    if dunk_stamp:
+        family_id = str(dunk_stamp["family_id"])
+        turn_result["dunk_miss"] = bool(dunk_stamp.get("dunk_miss"))
+        if dunk_stamp.get("force_miss"):
+            turn_result["_dunk_force_miss"] = True
+
+    if family_id is None:
+        all_coords = build_micro_coords_snapshot(
+            off_lineup, def_lineup, shooter_id, shooter_x, shooter_y,
+        )
+        family_id = select_micro_movement(
+            shot_type,
+            shooter_coord=shooter_coord,
+            shooter_id=str(shooter_id),
+            off_lineup=off_lineup,
+            all_coords=all_coords,
+            away_offense=away_offense,
+            max_pre_release_seconds=max_pre_release_seconds,
+            shooter_player=shooter_player,
+        )
+        turn_result.pop("dunk_miss", None)
+        turn_result.pop("_dunk_force_miss", None)
+
     stamp_micro_telemetry(
         turn_result,
         family_id=family_id,
@@ -509,7 +740,7 @@ def select_and_stamp_shot_micro(
     )
     from BackEnd.utils.shot_ball_arc import roll_shot_arc
 
-    turn_result["uses_shot_arc"] = roll_shot_arc(family_id)
+    turn_result["uses_shot_arc"] = False if is_dunk_micro_family(family_id) else roll_shot_arc(family_id)
     return family_id
 
 
@@ -596,6 +827,7 @@ def _disruption_flourish_targets(
     shot_type: str,
     shooter_id: str,
     defender_id: Optional[str],
+    family_id: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Map player_id → flourish stamp for shot-beat disruption."""
     out: Dict[str, Dict[str, Any]] = {}
@@ -603,7 +835,9 @@ def _disruption_flourish_targets(
         out[str(shooter_id)] = {"kind": "rattle", "cycles": 3}
     elif contest_result == "offense_win" and defender_id:
         out[str(defender_id)] = {"kind": "rattle", "cycles": 3}
-    elif contest_result == "neutral" and shot_type in ("inside", "attack"):
+    elif contest_result == "neutral" and (
+        shot_type in ("inside", "attack") or is_dunk_micro_family(family_id)
+    ):
         out[str(shooter_id)] = {"kind": "rattle", "cycles": 2}
         if defender_id:
             out[str(defender_id)] = {"kind": "rattle", "cycles": 2}
@@ -680,6 +914,26 @@ def _build_family_beats(
             beats.append({"kind": "flourish", "who": "shooter", "flourish": "gather", "beat_bucket": "B"})
         beats.append({"kind": "shot", "beat_bucket": "B"})
         return beats
+    if family_id == "dunk":
+        return [
+            {
+                "kind": "move",
+                "dx": ux * MICRO_STEP_GRID * DUNK_MOVE_SPOTS_STRONG,
+                "dy": uy * MICRO_STEP_GRID * DUNK_MOVE_SPOTS_STRONG,
+                "archetype": "burst",
+            },
+            {"kind": "dunk"},
+        ]
+    if family_id == "drive_dunk":
+        return [
+            {
+                "kind": "move",
+                "dx": ux * MICRO_STEP_GRID * DUNK_MOVE_SPOTS_DRIVE,
+                "dy": uy * MICRO_STEP_GRID * DUNK_MOVE_SPOTS_DRIVE,
+                "archetype": "sprint",
+            },
+            {"kind": "dunk"},
+        ]
     return [{"kind": "shot"}]
 
 
@@ -697,6 +951,8 @@ def build_shot_micro_steps(
     shot_type: str,
     next_step: NextStep,
     apply_contest_layer: bool,
+    result_type: Optional[str] = None,
+    dunk_miss: bool = False,
 ) -> List[AnimationStep]:
     """Build micro-movement AnimationSteps replacing the terminal [shoot] beat."""
     if shooter_id not in start_coords:
@@ -734,6 +990,9 @@ def build_shot_micro_steps(
         flourish_map: Dict[str, Any] = {}
         gate_id = shooter_id
         step_t = MICRO_FLOURISH_BEAT_T
+        dunk_meta: Optional[Dict[str, Any]] = None
+        dunk_ball_end: Any = None
+        dunk_arrival_sfx: Optional[Dict[str, Any]] = None
 
         kind = beat.get("kind")
         if kind == "move":
@@ -775,10 +1034,44 @@ def build_shot_micro_steps(
             destinations[shooter_id] = None
             if contest:
                 for pid, fl in _disruption_flourish_targets(
-                    contest, shot_type, shooter_id, defender_id,
+                    contest, shot_type, shooter_id, defender_id, family_id=family_id,
                 ).items():
                     flourish_map.setdefault(pid, fl)
             step_t = max(MICRO_MOVE_STEP_T_FLOOR, MICRO_FLOURISH_BEAT_T)
+        elif kind == "dunk":
+            approach = _dunk_approach_coord(away_offense)
+            resolve = _dunk_resolve_coord(away_offense)
+            end_coords[shooter_id] = dict(approach)
+            actions[shooter_id] = "shoot"
+            archetypes[shooter_id] = "shot_motion"
+            destinations[shooter_id] = dict(approach)
+            dist = _euclid(current_coords[shooter_id], approach)
+            wall_ms = _dunk_wall_clock_ms(dist, shooter_player)
+            step_t = max(MICRO_MOVE_STEP_T_FLOOR, wall_ms / DUNK_CLOCK_MS_PER_GAME_SEC)
+            result_upper = (result_type or "").upper()
+            yield_before_slam = result_upper == "BLOCK" and not dunk_miss
+            if contest:
+                for pid, fl in _disruption_flourish_targets(
+                    contest, shot_type, shooter_id, defender_id, family_id=family_id,
+                ).items():
+                    flourish_map.setdefault(pid, fl)
+            dunk_meta = {
+                "micro_beat_kind": "dunk",
+                "approach_coord": dict(approach),
+                "resolve_coord": dict(resolve),
+                "dunk_rise_px": float(DUNK_RISE_PX),
+                "dunk_rattle_mag_px": float(DUNK_RATTLE_MAG_PX),
+                "dunk_rattle_ms": float(DUNK_RATTLE_MS),
+                "dunk_ball_raise": float(DUNK_BALL_RAISE),
+                "wall_clock_hold_ms": float(wall_ms),
+                "yield_before_slam": yield_before_slam,
+                "dunk_miss": bool(dunk_miss),
+            }
+            if result_upper == "MAKE" and not yield_before_slam and not dunk_miss:
+                dunk_ball_end = {"coords": dict(resolve)}
+                dunk_arrival_sfx = shot_result_sfx(None, "MAKE")
+            else:
+                dunk_ball_end = {"owner_player_id": str(shooter_id)}
 
         if defender_id and defender_behavior and defender_id in current_coords:
             pump_dir = None
@@ -796,7 +1089,7 @@ def build_shot_micro_steps(
                 away_offense,
                 pump_direction=pump_dir,
             )
-            actions[defender_id] = "guard_ball" if kind == "shot" else "stationary"
+            actions[defender_id] = "guard_ball" if kind in ("shot", "dunk") else "stationary"
             archetypes[defender_id] = "standard"
             destinations[defender_id] = def_end
             # Clamp the contest to what the defender can actually cover in this
@@ -824,7 +1117,12 @@ def build_shot_micro_steps(
 
         shooter_gate_coord = end_coords.get(shooter_id, current_coords[shooter_id])
         trigger = _advance_player_reaches(shooter_id, shooter_gate_coord, step_t)
+        if dunk_meta:
+            trigger["metadata"] = {**(trigger.get("metadata") or {}), **dunk_meta}
 
+        end_ball_state: Any = (
+            dunk_ball_end if dunk_ball_end is not None else {"owner_player_id": str(shooter_id)}
+        )
         step: AnimationStep = {
             "start": {
                 "coords": {pid: dict(c) for pid, c in current_coords.items()},
@@ -837,12 +1135,14 @@ def build_shot_micro_steps(
             },
             "end": {
                 "coords": end_coords,
-                "ball": {"owner_player_id": str(shooter_id)},
+                "ball": end_ball_state,
                 "time_elapsed": float(step_t),
                 "clock": clock_step_end,
                 "next": next_step if is_last else {"kind": "next_step", "index": len(steps) + 1},
             },
         }
+        if dunk_arrival_sfx:
+            step["start"]["sfx_on_ball_arrival"] = dunk_arrival_sfx
         if flourish_map:
             step["start"]["flourish"] = flourish_map
         stamp_tween_durations(
@@ -1032,6 +1332,8 @@ def apply_shot_micro_steps_to_chain(
         shot_type=str(turn_result.get("shot_type") or "outside"),
         next_step=next_step,
         apply_contest_layer=apply_contest,
+        result_type=str(result_type),
+        dunk_miss=bool(turn_result.get("dunk_miss")),
     )
     if not micro_steps:
         return
