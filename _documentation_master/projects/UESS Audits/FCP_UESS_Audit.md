@@ -35,7 +35,7 @@
 
 Regression-neutral (dynamic FCP/HCT suite is broadly flaky — MagicMock config + RNG order-dependence; no deterministic break from these changes, isolated via git-stash). Parity-verified (mirrors the SIP/HCT/OREB patterns); full-sim FCP trigger not achieved in the mock.
 
-**Group C — press-positioning divergence (design call, FCP-PRIORITY):**
+**Group C — press-positioning divergence (design call, FCP-PRIORITY) → see [Trap_Press_Positioning_Decision.md](Trap_Press_Positioning_Decision.md) (consolidated: HCT + FCP + over-and-back):**
 - **FCP-Task 3 (HIGH #1 + MED #3/#5):** the HCT-Task 7 reconciliation (engine reads the interrupted/**rendered** positions for contest + steal/foul eligibility) is **more urgent for FCP** — the press visibly never closes, yet steals/fouls fire from the snapped formation. Same design question: should the press *behave* from where it's *shown*?
 - **#6 over-and-back:** shared `_advance` rate mismatch — hand to the separate over-and-back thread; same fix family (logic reads rendered BH pos).
 
