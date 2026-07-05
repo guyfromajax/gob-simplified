@@ -712,9 +712,22 @@ def build_dynamic_hct_animation_steps(
     prior_turn = prior_turns[-1] if prior_turns else None
     prior_final_coords: Dict[str, GridCoord] = {}
     prior_final_bh_id: Optional[str] = None
+    prior_final_ball_coords: Optional[GridCoord] = None
     if isinstance(prior_turn, dict):
         prior_final_coords = prior_turn.get("final_coords") or {}
         prior_final_bh_id = prior_turn.get("final_ball_handler_id")
+        prior_final_ball_coords = prior_turn.get("final_ball_coords")
+
+    # HCT-Task 1 (HCT_UESS_Audit.md #2): backfill any active player missing from
+    # the prior turn's final_coords (build_final_coords drops None-coord players)
+    # so the walk-up carries all 10 — otherwise a dropped player is frozen/
+    # invisible the entire HCT turn + carries stale into the next turn. Mirrors
+    # the inbound seam (BIP-Task 2); the dynamic HCT/FCP callsite never had it.
+    if prior_final_coords:
+        from BackEnd.engine.skeleton_step_emitter import _backfill_missing_active_coords
+        prior_final_coords = _backfill_missing_active_coords(
+            prior_final_coords, off_lineup, def_lineup
+        )
 
     walk_up_bh_id = prior_final_bh_id or bh_id
 
@@ -776,6 +789,36 @@ def build_dynamic_hct_animation_steps(
             gate_player_ids=[walk_up_bh_id],
             metadata_reason="hct_entry_walkup",
         )
+
+        # HCT-Task 2 (HCT_UESS_Audit.md #4, SIP-Task 1 parity): fix the entry
+        # ball teleport. `build_walk_up_step` hardcodes the ball ATTACHED to the
+        # BH; on an in-flight/loose prior end (or prior_final_bh_id==None →
+        # fallback to this turn's BH) the ball's RENDERED rest (final_ball_coords)
+        # ≠ the BH's coord, so the attach teleports the ball at the entry seam.
+        # ONLY override when they actually diverge (> epsilon): seed the ball
+        # loose at its rest so it travels to and attaches to the BH by step end.
+        # In the common case (prior handed the ball to the BH) the rest == the
+        # BH's coord → keep the default attached-dribble (no visual change).
+        _bh_start = prior_final_coords.get(walk_up_bh_id)
+        if (
+            isinstance(prior_final_ball_coords, dict)
+            and prior_final_ball_coords.get("x") is not None
+            and prior_final_ball_coords.get("y") is not None
+            and isinstance(_bh_start, dict)
+            and _bh_start.get("x") is not None
+        ):
+            _bgap = (
+                (float(prior_final_ball_coords["x"]) - float(_bh_start["x"])) ** 2
+                + (float(prior_final_ball_coords["y"]) - float(_bh_start["y"])) ** 2
+            ) ** 0.5
+            if _bgap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON — only fix real divergence
+                walk_step["start"]["ball"] = {
+                    "coords": {
+                        "x": float(prior_final_ball_coords["x"]),
+                        "y": float(prior_final_ball_coords["y"]),
+                    },
+                }
+                walk_step["start"]["ball_motion_style"] = "shot"
 
         steps = [walk_step]
         step_clock_seconds = [round(float(walk_step["end"]["time_elapsed"]), 2)]

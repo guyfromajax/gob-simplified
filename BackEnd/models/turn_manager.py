@@ -1700,6 +1700,39 @@ class TurnManager:
                     anim_steps = build_dynamic_hct_animation_steps(result, self.game)
                     if anim_steps is not None:
                         result["animation_steps"] = anim_steps
+                        # HCT-Task 3 (HCT_UESS_Audit.md #5, mirrors SIP/OREB):
+                        # [UESS SEAM] entry teleport detector — HCT uses its own
+                        # emitter, so it isn't covered by the skeleton emitter's
+                        # detector. Compare the prior turn's rendered ball rest to
+                        # HCT's emitted step-0 ball. Detection-only; after Task 2
+                        # should not fire except on the fallback ball-source path.
+                        try:
+                            _hct_priors = getattr(self.game, "turns", None) or []
+                            _hct_prior = _hct_priors[-1] if _hct_priors else None
+                            _hct_pfbc = (
+                                _hct_prior.get("final_ball_coords")
+                                if isinstance(_hct_prior, dict) else None
+                            )
+                            _s0 = (anim_steps[0].get("start") or {}) if anim_steps else {}
+                            _s0b = _s0.get("ball") or {}
+                            _owner = _s0b.get("owner_player_id")
+                            _s0pos = (
+                                _s0b.get("coords") or _s0b.get("current_coords")
+                                or ((_s0.get("coords") or {}).get(str(_owner)) if _owner else None)
+                            )
+                            if isinstance(_hct_pfbc, dict) and isinstance(_s0pos, dict):
+                                _gap = (
+                                    (float(_s0pos.get("x")) - float(_hct_pfbc.get("x"))) ** 2
+                                    + (float(_s0pos.get("y")) - float(_hct_pfbc.get("y"))) ** 2
+                                ) ** 0.5
+                                if _gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                                    logging.warning(
+                                        "🎯 [UESS SEAM] HCT entry ball teleport candidate: "
+                                        "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                                        _hct_pfbc, _s0pos, _gap,
+                                    )
+                        except Exception:
+                            pass
                         # Align time_elapsed with the schema's game-clock burn
                         # for MAKE/MISS/BLOCK HCT shot turns (§7 fast break),
                         # mirroring the FCP realignment above — the legacy
