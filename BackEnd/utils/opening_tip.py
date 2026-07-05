@@ -198,8 +198,14 @@ def execute_opening_tip(game):
                 animation["entrance"] = entrance_coords
             animations.append(animation)
     
-    # Tip possession 1-5 game s; +1 for apex+pass (400ms real, pass 300/350 rounds up to 1 game s)
-    time_elapsed = random.randint(1, 5) + 1
+    # OT-Task 1 (Opening_Tip_UESS_Audit.md #1): the tip burns NO game clock (the
+    # clock contract is 480→480 / 240→240 and the ledger authority zeroes this
+    # downstream). The old `randint(1,5)+1` stamp was dead — discarded before the
+    # commit — but was read first by `_compute_real_time_elapsed_ms`, inflating it
+    # by 2-6s (FE clock could visibly tick down then snap back) and firing a
+    # spurious `[CLOCK CONTRACT] reconciliation fail` on every tip. Stamp 0 so the
+    # intermediate value matches the (correct) committed 0-burn.
+    time_elapsed = 0
     
     text = f"{winner_name} wins the tip!"
 

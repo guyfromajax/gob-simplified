@@ -155,10 +155,13 @@ def test_opening_tip_integration_time_elapsed():
     game.quarter = 1
     initial_time = game.game_state["time_remaining"]
     
-    tip_turn = execute_opening_tip(game)
-    
-    # Time elapsed should be reasonable (2-5 seconds)
-    assert 2 <= tip_turn["time_elapsed"] <= 5
+    _offense, _defense, tip_turn = execute_opening_tip(game)
+
+    # OT-Task 1 (Opening_Tip_UESS_Audit.md #1): the tip burns NO game clock
+    # (dead-ball; the ledger authority zeroes time_elapsed downstream). The old
+    # 2-5s stamp was dead — discarded before commit but inflating real_time_
+    # elapsed_ms + firing a spurious clock-reconciliation warning. Now stamped 0.
+    assert tip_turn["time_elapsed"] == 0
     assert isinstance(tip_turn["time_elapsed"], int)
 
 
