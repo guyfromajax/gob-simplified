@@ -838,15 +838,21 @@ def _oreb_putback_distance(a_coords, b_coords):
     return math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
 
 
-def _resolve_oreb_putback_defender(game, rebounder, def_lineup, basket_x):
+def _resolve_oreb_putback_defender(game, rebounder, def_lineup, basket_x, shooter_coords=None):
     """
     Resolve the shot defender for an OREB putback attempt.
 
     Putbacks now always use the nearest defender as the shot defender.
     Distance still influences the debug logs, but it no longer determines whether
     a putback has a defender at all.
+
+    ``shooter_coords`` (OREB-Task 1): the coord to measure defender distance FROM —
+    the rendered putback origin (the prior miss's bounce spot, where the rebounder
+    captures and shoots), not the rebounder's pre-capture crash coord. Falls back
+    to ``rebounder.coords`` when not provided.
     """
-    shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
+    if shooter_coords is None:
+        shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
 
     nearest_defender = None
     nearest_distance = None
@@ -986,13 +992,28 @@ def resolve_offensive_rebound(game, rebounder):
 
         is_away_offense = off_team.team_id == game.away_team.team_id
         basket_x = 9 if is_away_offense else 91
+        # OREB-Task 1 (MED-1, OREB_UESS_Audit.md): resolve the putback from the
+        # ball's landing spot — the prior miss's ball_bounce_x/y, where the
+        # rebounder captures and then shoots in the rendered [rebound_capture] →
+        # [putback_shoot] steps — NOT the rebounder's post-MISS crash coord. This
+        # keeps defender selection + dunk-location eligibility consistent with the
+        # coord the FE renders the shot from. Falls back to the rebounder's coord
+        # if the prior bounce is unavailable (e.g. a non-migrated prior turn).
+        _prior_turns = getattr(game, "turns", None) or []
+        _prior_turn = _prior_turns[-1] if _prior_turns else None
+        _bx = _prior_turn.get("ball_bounce_x") if isinstance(_prior_turn, dict) else None
+        _by = _prior_turn.get("ball_bounce_y") if isinstance(_prior_turn, dict) else None
+        if _bx is not None and _by is not None:
+            shooter_coords = {"x": float(_bx), "y": float(_by)}
+        else:
+            shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
         defender, has_shot_defender = _resolve_oreb_putback_defender(
             game,
             rebounder,
             def_lineup,
             basket_x,
+            shooter_coords=shooter_coords,
         )
-        shooter_coords = getattr(rebounder, "coords", None) or {"x": 50, "y": 25}
         shooter_x = float(shooter_coords.get("x", 50))
         shooter_y = float(shooter_coords.get("y", 25))
         defender_coords = getattr(defender, "coords", None) or {}

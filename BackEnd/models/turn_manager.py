@@ -4351,6 +4351,39 @@ class TurnManager:
                         if result_type in ("PUTBACK_MAKE", "PUTBACK_MISS"):
                             burn = max(OREB_PUTBACK_MIN_TIME_ELAPSED, burn)
                         result["time_elapsed"] = burn
+            # OREB-Task 3 (L-1): [UESS SEAM] entry-seam teleport detection. OREB
+            # uses its own emitter, so it isn't covered by the skeleton emitter's
+            # detector — replicate it here. Compare the prior turn's rendered ball
+            # rest (final_ball_coords) to this turn's emitted step-0 ball position.
+            # Detection-only; behavior-neutral. (Should never fire — OREB step 0 is
+            # BallLoose at the prior miss's bounce == prior final_ball_coords.)
+            _seam_steps = result.get("animation_steps") or []
+            _seam_priors = getattr(self.game, "turns", None) or []
+            _seam_prior = _seam_priors[-1] if _seam_priors else None
+            if _seam_steps and isinstance(_seam_prior, dict):
+                _pfbc = _seam_prior.get("final_ball_coords")
+                _s0 = _seam_steps[0].get("start") or {}
+                _s0b = _s0.get("ball") or {}
+                _s0c = _s0.get("coords") or {}
+                _owner = _s0b.get("owner_player_id")
+                _pos = (
+                    (_s0c.get(str(_owner)) or _s0c.get(_owner)) if _owner
+                    else (_s0b.get("current_coords") or _s0b.get("coords"))
+                )
+                if isinstance(_pfbc, dict) and isinstance(_pos, dict):
+                    try:
+                        _gap = (
+                            (float(_pos.get("x")) - float(_pfbc.get("x"))) ** 2
+                            + (float(_pos.get("y")) - float(_pfbc.get("y"))) ** 2
+                        ) ** 0.5
+                    except (TypeError, ValueError):
+                        _gap = 0.0
+                    if _gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                        logging.warning(
+                            "🎯 [UESS SEAM] OREB entry ball teleport candidate: prior "
+                            "final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                            _pfbc, _pos, _gap,
+                        )
         except Exception as e:
             logging.warning("build_oreb_animation_steps failed: %s", e)
         return result
@@ -5056,10 +5089,16 @@ class TurnManager:
             # blocked shot that is offensive-rebounded. A BLOCK already stops the
             # shot clock at the block, and the ensuing OREB (putback OR kickout)
             # continues from the remaining time with NO reset (Shot_Clock_System.md
-            # § Shot clock reset instances). MISS/FREE_THROW → OREB still reset.
-            if rt == "OREB":
-                return True
-            if rebound_type == "OREB" and rt in {"MISS", "FREE_THROW"}:
+            # § Shot clock reset instances). MISS/FREE_THROW/PUTBACK_MISS → OREB
+            # still reset. PUTBACK_MISS added per OREB-Task 2 (MED-2,
+            # OREB_UESS_Audit.md): a putback miss that is offensively re-rebounded
+            # (rebound_type OREB, no possession flip) is a chained offensive
+            # rebound and must renew the shot clock like a normal MISS→OREB —
+            # otherwise chained putback misses drain the clock ~2s each.
+            # (OREB-Task 3 / L-4: removed the dead ``rt == "OREB"`` branch — no
+            # turn carries result_type=="OREB"; the reset is driven by the
+            # rebound_type check below.)
+            if rebound_type == "OREB" and rt in {"MISS", "FREE_THROW", "PUTBACK_MISS"}:
                 return True
             return False
 

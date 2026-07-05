@@ -665,10 +665,11 @@ def build_oreb_animation_steps(
     steps.append(shoot_step)
     elapsed += shoot_step["end"]["time_elapsed"]
 
-    from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
-    inject_shot_micro_before_post_shot(
-        steps, turn_result, off_lineup, def_lineup, is_away_offense,
-    )
+    # OREB-Task 3 (L-2): removed the inject_shot_micro_before_post_shot call — it
+    # was a guaranteed no-op for putbacks (apply_shot_micro_steps_to_chain gates on
+    # MAKE/MISS/BLOCK, never PUTBACK_*) and only obscured the post-shot chain. If
+    # putback result types are ever normalized to MISS, re-add it deliberately AND
+    # seed the flight step from steps[-1].end (see audit L-2 latent note).
 
     # --- [ball_flight] + variant rim action -------------------------------
     # Rattle / bank variants terminate the flight at their start point
