@@ -41,8 +41,10 @@ Separate handling:
 - ✅ **#1 contest defenders** — FIXED (`_uess_sync_emitted_shot_coords`, HCO/FT/FCP). Contested-rate ~98.7%→96.7%; regression-clean.
 - ✅ **#3/#4 rebounder + near-bounce pool** — COVERED by #1 (selection runs after the sync); severity revised (attribution, not possession — 0% possession flip measured).
 - ✅ **#2 Covert Release block** (HIGH) — FIXED (`fb_geometry_contest_resolved` flag; `resolve_shot` honors CR's render-matched defender). Regression-clean.
-- ⬜ **#5 zone matchup** (MED-HIGH) — `zone_defender_assignments_by_step` built from animator coords (animator.py:1912), not `player.coords`. Separate fix (animator-side). NEXT.
-- ⬜ **#6 putback defender / OTB foul** (MED) — OREB-turn flow, own coord reads.
-- ⬜ **#7 zone defense_score** (MED) — named-spot based (turn_manager.py:3407/5585).
+- 🟡 **#5 zone matchup** (MED-HIGH) — **DEFERRED as accepted gap** (2026-07-05). Fix = rebuild `zone_defender_assignments_by_step` from render coords via `assign_all_zone_defenders`, which has load-bearing home/away orientation handling (animator.py:1910-1944) → high away-offense risk. Measured impact is second-order: zone contest ~95% stable + coarse zones → primary defender (hence `has_contest`) rarely flips; residual is double-team/attribution only. Risk/reward inverted vs the low-risk `player.coords` syncs of #1-#4.
+- 🟡 **#6 putback defender / OTB foul** (MED) — deferred with #5 (OREB-turn flow; putback "always nearest defender" so contest y/n stable, only attribution flips; OTB foul is low-freq bounded).
+- 🟡 **#7 zone defense_score** (MED) — deferred with #5 (named-spot based; margin-only effect on `defense_score`).
 
-All shift FG%/possession → land before shot-system re-tuning ([[project_shot_system_tuning]]).
+**Accepted-gaps rationale:** #5-#7 are all *attribution / second-order shot-difficulty* effects, not binary-outcome (contest/possession) flips. The four HIGH holes (#1-#4) that flip actual outcomes are closed. Revisit #5 if a zone-double-team or zone-FG% anomaly surfaces in tuning.
+
+The 4 HIGH fixes shift FG%/contest → land before shot-system re-tuning ([[project_shot_system_tuning]]).

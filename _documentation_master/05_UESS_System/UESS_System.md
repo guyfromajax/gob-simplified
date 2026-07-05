@@ -406,4 +406,19 @@ Single source of truth for the violation catalog, remediation order, and item st
 
 **Why not exact.** True 0% (`classification coord == render coord` by construction) requires **pinning** the pre-pass coord into the emitter's gate/destination logic so the late render uses the identical value — a change to the shared render path (coordinate-frame + §8.1 continuity care), deliberately deferred as higher-risk. Full analysis + the exact-fix (Option C pin): [`Shot_Classification_UESS_Fix_Scope.md`](../projects/UESS%20Audits/Shot_Classification_UESS_Fix_Scope.md).
 
-**Deeper implication.** Backend `player.coords` (via `apply_coords`) desyncs from the emitter-rendered position on ~58% of shots — the emitter is the true single coord source, and any game logic reading `player.coords` instead of the emitted step inherits this gap. Classification is the first symptom addressed; a broader §1/§8 audit of coord consumers is warranted.
+**Deeper implication.** Backend `player.coords` (via `apply_coords`) desyncs from the emitter-rendered position on ~58% of shots — the emitter is the true single coord source, and any game logic reading `player.coords` instead of the emitted step inherits this gap. Classification was the first symptom; the full coord-consumer audit is §12.2. (The classification fix was since generalized — `_uess_terminal_shoot_coord` → `_uess_sync_emitted_shot_coords`, which now syncs *all* players, not just the shooter.)
+
+### 12.2 Coord-consumer audit — `player.coords` vs render
+
+Full audit: [`Coord_Consumer_UESS_Audit.md`](../projects/UESS%20Audits/Coord_Consumer_UESS_Audit.md). Root cause = shot logic reading `player.coords` (animator row-end, all players fully-arrived) instead of the emitter's *interrupted* shoot-step render coords (§9.5: only the gate/shooter fully arrives).
+
+**Systemic question — resolved favorably:** the desync is **per-shot, not cross-turn** — `sync_lineup_coords_from_turn` writes the emitted `animation_steps[-1].end.coords` with precedence, so carry-forward into the next turn is render-synced.
+
+**Fixed (binary-outcome holes):**
+- **Contest defenders** — `_uess_sync_emitted_shot_coords` (phase_resolution.py) stamps the emitted shoot-step coords onto every `player.coords` before `resolve_shot` (HCO/FT/FCP), so the contest loop reads on-screen geometry (over-contest ~98.7%→96.7%).
+- **Covert Release block** — `fb_geometry_contest_resolved` flag makes `resolve_shot` honor CR's render-matched defender instead of stale pre-race coords (block now fires on contested CR).
+- **Rebounder / near-bounce pool** — covered by the same sync (selection runs after it). Measured: coord divergence flips *which* rebounder ~75% but **possession ~0%** (box-out/team weighting is possession-stable) — an attribution effect, not an outcome flip.
+
+**Accepted gaps (second-order, deferred):**
+- **Zone matchup / double-team** — reads `zone_defender_assignments_by_step`, built from animator coords (animator.py:1912). Rebuilding from render coords risks the function's home/away orientation handling. Impact is second-order: zone contest ~95% stable + coarse zones → primary defender rarely flips; residual is double-team/attribution. Revisit if a zone-FG% anomaly appears.
+- **OREB putback defender / over-the-back foul / zone `defense_score`** — attribution / margin-only effects. Deferred with the above.
