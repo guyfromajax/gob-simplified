@@ -1079,6 +1079,42 @@ def build_dynamic_hct_animation_steps(
             for s in steps
         ]
 
+    # FCP-Task 1 (FCP_UESS_Audit.md #2, HCT-Task 2 parity for the skip_walk_up
+    # path): FCP has no walk-up step, so step-0 is the first loop segment whose
+    # ball _build_loop_step hardcodes attached to the BH. Seed step-0's ball from
+    # the prior turn's RENDERED ball rest (final_ball_coords) — but ONLY when it
+    # diverges (> epsilon) from where the ball currently renders attached (the
+    # step-0 ball owner's coord) — so on an in-flight/loose/different-BH prior end
+    # the ball comes to the BH from its true rest instead of teleporting there.
+    # Common case (no divergence) keeps the attached dribble.
+    if skip_walk_up and steps and isinstance(prior_final_ball_coords, dict):
+        _s0_start = steps[0].get("start") or {}
+        _s0_ball = _s0_start.get("ball") or {}
+        _s0_owner = _s0_ball.get("owner_player_id")
+        _s0_coords = _s0_start.get("coords") or {}
+        _owner_coord = (
+            (_s0_coords.get(str(_s0_owner)) or _s0_coords.get(_s0_owner))
+            if _s0_owner else (_s0_ball.get("coords"))
+        )
+        if (
+            prior_final_ball_coords.get("x") is not None
+            and prior_final_ball_coords.get("y") is not None
+            and isinstance(_owner_coord, dict)
+            and _owner_coord.get("x") is not None
+        ):
+            _fcp_bgap = (
+                (float(prior_final_ball_coords["x"]) - float(_owner_coord["x"])) ** 2
+                + (float(prior_final_ball_coords["y"]) - float(_owner_coord["y"])) ** 2
+            ) ** 0.5
+            if _fcp_bgap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON — only fix real divergence
+                _s0_start["ball"] = {
+                    "coords": {
+                        "x": float(prior_final_ball_coords["x"]),
+                        "y": float(prior_final_ball_coords["y"]),
+                    },
+                }
+                _s0_start["ball_motion_style"] = "shot"
+
     # --- Update turn-level time totals (emitter owns these now) ----------
     turn_result["time_elapsed"] = round(sum(step_clock_seconds), 2)
     turn_result["step_clock_seconds"] = step_clock_seconds

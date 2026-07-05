@@ -1664,6 +1664,39 @@ class TurnManager:
                         )
                     if anim_steps is not None:
                         result["animation_steps"] = anim_steps
+                        # FCP-Task 2 (FCP_UESS_Audit.md #4, mirrors HCT-Task 3):
+                        # [UESS SEAM] entry teleport detector — the HCT detector is
+                        # HCT-branch-only, and FCP is a separate callsite. Compare
+                        # the prior turn's rendered ball rest to FCP's emitted
+                        # step-0 ball. Detection-only; after Task 1 should not fire
+                        # except on the fallback ball-source path.
+                        try:
+                            _fcp_priors = getattr(self.game, "turns", None) or []
+                            _fcp_prior = _fcp_priors[-1] if _fcp_priors else None
+                            _fcp_pfbc = (
+                                _fcp_prior.get("final_ball_coords")
+                                if isinstance(_fcp_prior, dict) else None
+                            )
+                            _fs0 = (anim_steps[0].get("start") or {}) if anim_steps else {}
+                            _fs0b = _fs0.get("ball") or {}
+                            _fowner = _fs0b.get("owner_player_id")
+                            _fs0pos = (
+                                _fs0b.get("coords") or _fs0b.get("current_coords")
+                                or ((_fs0.get("coords") or {}).get(str(_fowner)) if _fowner else None)
+                            )
+                            if isinstance(_fcp_pfbc, dict) and isinstance(_fs0pos, dict):
+                                _fgap = (
+                                    (float(_fs0pos.get("x")) - float(_fcp_pfbc.get("x"))) ** 2
+                                    + (float(_fs0pos.get("y")) - float(_fcp_pfbc.get("y"))) ** 2
+                                ) ** 0.5
+                                if _fgap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                                    logging.warning(
+                                        "🎯 [UESS SEAM] FCP entry ball teleport candidate: "
+                                        "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                                        _fcp_pfbc, _fs0pos, _fgap,
+                                    )
+                        except Exception:
+                            pass
                         fcp_result_type = (result.get("result_type") or "").upper()
                         if fcp_result_type in ("MAKE", "MISS", "BLOCK") and anim_steps:
                             first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
