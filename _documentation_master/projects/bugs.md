@@ -2,7 +2,6 @@
 1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
 
 #UESS Turn Audits
-5. SIP
 6. HCT
 7. FCP
 8. Fast Break
@@ -14,6 +13,7 @@
 2. OREB
 3. DREB
 4. BIP
+5. SIP
 
 ##Verify as Perfect
 1. EOQ Perfection
