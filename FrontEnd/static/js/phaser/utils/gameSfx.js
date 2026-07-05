@@ -19,6 +19,7 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "attack-shot-strong.wav",
   "shot-standard.wav",
   "swish.wav",
+  "dunk-sfx.wav",
   "clank.wav",
   "back-of-rim.wav",
   "rattle-leather.wav",

@@ -22,7 +22,7 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_CHARGE_DELTA` | 1 | Charge: drawer +, charging player − |
 | `MO_OREB_DELTA` | 1 | + on qualifying OREB |
 | `MO_OREB_THRESHOLD` | 3 | OREB number that starts awarding (3rd and each after) |
-| `MO_DUNK_DELTA` | 1 | **Deferred** — dunks not wired yet (hook only) |
+| `MO_DUNK_DELTA` | 1 | Made dunk (`dunk` / `drive_dunk`) → shooter + |
 | `MO_CONSECUTIVE_THRESHOLD` | 3 | Nth consecutive make/miss that starts awarding |
 | `MO_CONSECUTIVE_DELTA` | 1 | + per consecutive make / − per consecutive miss |
 | `MO_FT_MIN_ATTEMPTS` | 2 | only FT trips with >1 attempt qualify (make or miss) |
@@ -64,9 +64,9 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **Free Throws (all made)** | shooter **+1** if he attempts **>1** FT in one trip and **makes all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
 | **FT second-chance** | shooter MO shifts the miss→make threshold by **`MO × randint(1,3)`** pts (signed) — see *Free Throw Impact* | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Set Play make** | the **target_shooter** **+1** when he makes the shot in a **successful** set-play skeleton | `phase_resolution.py` `resolve_half_court_offense_logic` |
-| **Dunk** | **deferred** (constant + intent only) | — |
+| **Dunk** (made) | shooter **+1** when `micro_movement_family` is `dunk` or `drive_dunk` | `player_momentum.py` `apply_made_dunk_momentum()` — called from `shot_manager.py` `resolve_shot`, `shared.py` (OREB putback), `after_steal_fast_break.py`, `after_steal_drive_integration.py`, `dynamic_hct_shot.py` (HCT FB + AB) |
 
-Doubly-good/bad cases are intentional: a block is **−1 MO + a `False`** on the shooter's streak list; an and-1 is **+1 MO + a `True`** on the streak list.
+Doubly-good/bad cases are intentional: a block is **−1 MO + a `False`** on the shooter's streak list; an and-1 is **+1 MO + a `True`** on the streak list; a made dunk is **+1 MO (dunk) + a `True`** on the streak list (and can stack with and-1 or consecutive-make bonuses).
 
 ### Consecutive shots (`Shot_Result_List`)
 
@@ -197,10 +197,10 @@ At ±3 it's **callout-only** (no glyph, no crown); the persistent glyph/crown in
 | File | Role |
 |---|---|
 | `BackEnd/constants/momentum.py` | All tunable constants (source of truth) |
-| `BackEnd/utils/player_momentum.py` | `mo_shot_roll`, `team_momentum`, `apply_shot_clock_violation_momentum`, `apply_player_momentum_resets`, `reset_all_player_momentum` |
+| `BackEnd/utils/player_momentum.py` | `mo_shot_roll`, `apply_made_dunk_momentum`, `team_momentum`, `apply_shot_clock_violation_momentum`, `apply_player_momentum_resets`, `reset_all_player_momentum` |
 | `BackEnd/models/player.py` | `clamp_mo`, `add_momentum`, `record_shot_result`, 5th-OREB hook, `Shot_Result_List` init/reset |
-| `BackEnd/models/shot_manager.py` | Block / charge / and-1 deltas; MO-aware base shot roll |
-| `BackEnd/utils/shared.py` | Putback and-1 + MO-aware putback roll; `summarize_game_state` team momentum |
+| `BackEnd/models/shot_manager.py` | Block / charge / and-1 / dunk deltas; MO-aware base shot roll |
+| `BackEnd/utils/shared.py` | Putback and-1 / dunk MO + MO-aware putback roll; `summarize_game_state` team momentum |
 | `BackEnd/engine/phase_resolution.py` | Steal delta; Final-Shot maker flag; FT all-missed penalty (`resolve_free_throw_logic`); set-play make bonus (`resolve_half_court_offense_logic`) |
 | `BackEnd/models/game_manager.py` | `_append_turn` (shot-clock violation MO + per-turn team-momentum stamp); `call_timeout` reset |
 | `BackEnd/main.py` | `simulate_quarter` quarter/halftime reset (idempotent fallback) |

@@ -88,6 +88,7 @@ from BackEnd.constants import (
 )
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
+from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.utils.shot_split_tracker import record_shot_split
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
@@ -558,6 +559,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         stealer.record_shot_result(made)
     if made and d_foul and foul_player:
         stealer.add_momentum(MO_AND_ONE_DELTA)
+    apply_made_dunk_momentum(stealer, made=made, dunk_stamp=_dunk_stamp)
 
     # Shot diagnostics: after-steal fast break is always a 2pt attempt.
     record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="Fast Break")

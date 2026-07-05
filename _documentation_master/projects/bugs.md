@@ -1,5 +1,5 @@
 ##Player Images
-1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
+1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
 #UESS Turn Audits
 6. HCT

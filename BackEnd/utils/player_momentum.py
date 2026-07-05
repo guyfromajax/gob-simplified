@@ -12,6 +12,7 @@ from BackEnd.constants.momentum import (
     MO_HALFTIME_REDUCTION_MIN,
     MO_HALFTIME_REDUCTION_MAX,
     MO_FINAL_SHOT_BONUS,
+    MO_DUNK_DELTA,
     MO_SHOT_ROLL_BASE,
     MO_SHOT_ROLL_POSITIVE,
     MO_SHOT_ROLL_NEGATIVE,
@@ -22,6 +23,23 @@ from BackEnd.constants.momentum import (
     MO_TEAM_MIN,
     MO_TEAM_MAX,
 )
+
+
+def apply_made_dunk_momentum(player, *, made: bool, dunk_stamp=None, family_id=None) -> None:
+    """Made dunk → shooter ``+MO_DUNK_DELTA`` (Player_Momentum_System.md).
+
+    Callers pass ``dunk_stamp`` from ``prepare_dunk_stamp()`` when available,
+    or ``family_id`` / ``micro_movement_family`` after micro stamping."""
+    if player is None or not made:
+        return
+    if dunk_stamp is not None:
+        if dunk_stamp.get("dunk_miss") or dunk_stamp.get("force_miss"):
+            return
+        family_id = dunk_stamp.get("family_id")
+    from BackEnd.engine.shot_micro_movements import is_dunk_micro_family
+
+    if is_dunk_micro_family(family_id):
+        player.add_momentum(MO_DUNK_DELTA)
 
 
 def mo_shot_roll(attributes) -> int:

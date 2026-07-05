@@ -588,6 +588,19 @@ def shot_result_sfx(
     }
 
 
+def dunk_make_sfx() -> Dict[str, Any]:
+    """Primary arrival SFX for a made dunk slam (SFX_System.md § Dunk).
+
+    Stamped on the terminal dunk micro beat as ``sfx_on_ball_arrival``; the FE
+    plays it at the slam (``dunkPlayback.js``), same schema path as ``swish.wav``
+    on a clean make."""
+    return {
+        "file": "dunk-sfx.wav",
+        "volume": _SFX_DEFAULT_VOLUME,
+        "event": "shot_result_make_dunk",
+    }
+
+
 def shot_followup_timed_sfx(
     shot_variant: Optional[str],
     result_type: str,

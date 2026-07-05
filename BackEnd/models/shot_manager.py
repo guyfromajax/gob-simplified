@@ -6,7 +6,7 @@ from BackEnd.constants.momentum import (
     MO_CHARGE_DELTA,
     MO_AND_ONE_DELTA,
 )
-from BackEnd.utils.player_momentum import mo_shot_roll
+from BackEnd.utils.player_momentum import apply_made_dunk_momentum, mo_shot_roll
 from BackEnd.utils.shot_split_tracker import (
     record_shot_split,
     classify_resolve_shot_turn_type,
@@ -1462,6 +1462,7 @@ class ShotManager:
         # And-one momentum: made shot that drew a shooting foul → shooter +.
         if made and d_foul:
             shooter.add_momentum(MO_AND_ONE_DELTA)
+        apply_made_dunk_momentum(shooter, made=made, dunk_stamp=_cached_dunk_stamp)
 
         # ==================== PLAYER POSITIONING (FOR ALL SHOTS) ====================
         # Players release for fast break / get back on defense when shot is TAKEN,

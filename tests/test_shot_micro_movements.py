@@ -537,6 +537,11 @@ class TestDunkMicroMovement:
         assert dunk_step["end"]["ball"] == {"coords": dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)}
         assert dunk_step["start"]["flourish"]["s1"]["kind"] == "rattle"
         assert dunk_step["start"]["flourish"]["d2"]["kind"] == "rattle"
+        assert dunk_step["start"]["sfx_on_ball_arrival"] == {
+            "file": "dunk-sfx.wav",
+            "volume": 0.7,
+            "event": "shot_result_make_dunk",
+        }
 
     def test_dunk_block_yields_before_slam(self):
         steps = build_shot_micro_steps(
