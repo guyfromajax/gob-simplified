@@ -743,6 +743,45 @@ class TestDunkSelection:
         assert turn["micro_movement_family"] == "drive_dunk"
         assert turn["uses_shot_arc"] is False
 
+    def test_dunk_resolved_skips_second_roll(self, monkeypatch):
+        from BackEnd.engine import shot_micro_movements as smm
+        from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
+
+        calls = {"n": 0}
+        real_resolve = smm.resolve_dunk_micro_stamp
+
+        def counting_resolve(**kwargs):
+            calls["n"] += 1
+            return real_resolve(**kwargs)
+
+        monkeypatch.setattr(smm, "resolve_dunk_micro_stamp", counting_resolve)
+        turn: dict = {}
+        select_and_stamp_shot_micro(
+            turn,
+            shot_type="inside",
+            shooter_id="s1",
+            shooter_x=85.0,
+            shooter_y=25.0,
+            off_lineup={},
+            def_lineup={},
+            has_contest=True,
+            contest_result="offense_win",
+            contest_margin=120.0,
+            shot_defense_score_raw=40.0,
+            shooter_player=self._shooter(height=80),
+            shot_score_pre_defense=200.0,
+            off_team=self._team(),
+            def_team=self._team(),
+            result_type="MAKE",
+            dunk_stamp=None,
+            dunk_resolved=True,
+        )
+        assert calls["n"] == 0
+        assert "micro_movement_family" not in turn or turn["micro_movement_family"] not in (
+            "dunk",
+            "drive_dunk",
+        )
+
     def test_dunk_miss_metadata_and_post_shot_bounce(self):
         from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
 

@@ -380,11 +380,6 @@ function renderBallTransition(scene, step, sprites, ballSprite, durationMs, widt
         { event: releaseSfx.event || "ball_release" },
       );
     }
-    if (options.turnData?.flss_vo) {
-      import("../utils/gameSfx.js").then(({ playFlssVoSfx }) => {
-        playFlssVoSfx(scene, options.turnData);
-      });
-    }
   }
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);

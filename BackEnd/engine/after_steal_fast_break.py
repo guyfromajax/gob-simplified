@@ -559,7 +559,6 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         stealer.record_shot_result(made)
     if made and d_foul and foul_player:
         stealer.add_momentum(MO_AND_ONE_DELTA)
-    apply_made_dunk_momentum(stealer, made=made, dunk_stamp=_dunk_stamp)
 
     # Shot diagnostics: after-steal fast break is always a 2pt attempt.
     record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="Fast Break")
@@ -815,6 +814,12 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         def_team=def_team,
         result_type=turn_result.get("result_type"),
         dunk_stamp=_dunk_stamp,
+        dunk_resolved=shot_type in ("inside", "attack"),
+    )
+    apply_made_dunk_momentum(
+        stealer,
+        made=made,
+        family_id=turn_result.get("micro_movement_family"),
     )
 
     if d_foul and foul_player:

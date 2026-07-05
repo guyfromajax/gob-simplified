@@ -6,6 +6,7 @@ from BackEnd.engine.eoq_perfection import (
     classify_flss_zone,
     compute_flss_drive_plan,
     flss_heave_sfx_eligible,
+    resolve_flss_coach_sfx_stamp,
     strip_terminal_rebound_fields,
 )
 from BackEnd.utils import situational_logic as sl
@@ -53,6 +54,19 @@ def test_flss_heave_sfx_eligible():
     assert flss_heave_sfx_eligible(45, is_home_offense=True) is True
     assert flss_heave_sfx_eligible(55, is_home_offense=False) is True
     assert flss_heave_sfx_eligible(55, is_home_offense=True) is False
+
+
+def test_resolve_flss_coach_sfx_stamp():
+    base = resolve_flss_coach_sfx_stamp(flss_heave_sfx=False)
+    assert base["event"] == "flss_vo"
+    assert base["file"] in ("braddock-finalshot.mp3", "sammy-launch.mp3")
+    assert base["volume"] == 0.7
+    heave = resolve_flss_coach_sfx_stamp(flss_heave_sfx=True)
+    assert heave["file"] in (
+        "braddock-finalshot.mp3",
+        "sammy-launch.mp3",
+        "duke-heave.mp3",
+    )
 
 
 def test_should_run_out_clock_q4():

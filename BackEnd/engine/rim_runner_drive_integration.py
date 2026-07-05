@@ -23,6 +23,7 @@ from BackEnd.engine.after_steal_drive_integration import (
     _safe_id,
     _stamp_fb_shooting_foul_on_turn,
 )
+from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
 from BackEnd.engine.phase_resolution import (
     _record_fast_break_stats,
@@ -460,6 +461,11 @@ def resolve_attack_drive_finisher_turn(
             stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
         _stamp_fb_shooting_foul_on_turn(turn_result, shot)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
+        apply_made_dunk_momentum(
+            shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
+            made=bool(shot["made"]),
+            family_id=turn_result.get("micro_movement_family"),
+        )
         _apply_finisher_scouting(turn_result, off_team=off_team, def_team=def_team, fb_play_key=fb_play_key)
         _record_fast_break_stats(fb_roles, turn_result, game)
         apply_fast_break_cg_time(turn_result, shot_attempted=True)
@@ -568,6 +574,11 @@ def resolve_attack_drive_finisher_turn(
         "shot_variant": shot.get("shot_variant"),
     }
     select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
+    apply_made_dunk_momentum(
+        shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
+        made=bool(shot["made"]),
+        family_id=turn_result.get("micro_movement_family"),
+    )
     if shot.get("shot_variant_extras"):
         turn_result.update(shot["shot_variant_extras"])
     if rr_snap_roles:

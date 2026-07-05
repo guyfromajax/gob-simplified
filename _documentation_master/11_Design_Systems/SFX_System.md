@@ -154,7 +154,14 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - Trigger: immediately when the **Final Shot** secondary announce appears (true Final Turn shots only).
 - File: **50/50** random each show — `sammy-final-shot.mp3` or `final-shot-braddock.mp3`
 - **Once per quarter:** the stinger plays at most once per period. If it already fired on the structured Final Turn possession, a follow-up shot still shows the headline but **does not** replay the SFX (`resolveSecondaryAnnounceCourtSfxFile` in `gameSfx.js`).
-- **FLSS disengaged (2026-07-03):** the Final Shot stinger is suppressed for **all FLSS instances**. FLSS attempts (`turn.flss === true`) still show the **Final Shot** headline but pass `suppressCourtSfx` (in `turnPreparation.js`), so the stinger never fires — FLSS carries its own heave/launch coach VO instead (see **FLSS Coach VO** / `playFlssVoSfx`). `suppress_final_shot_sfx` from the backend also still suppresses repeat Final Turn stingers.
+- **FLSS disengaged (2026-07-03):** the Final Shot stinger is suppressed for **all FLSS instances**. FLSS attempts (`turn.flss === true`) still show the **Final Shot** headline but pass `suppressCourtSfx` (in `turnPreparation.js`), so the stinger never fires — FLSS carries its own coach VO instead (see **FLSS Coach VO** below). `suppress_final_shot_sfx` from the backend also still suppresses repeat Final Turn stingers.
+
+**FLSS Coach VO**
+
+- Trigger: at the **terminal shoot step** start (`sfx_on_step_start` on the emitted schema step), when `turn.flss_vo === true`.
+- Resolver: backend `resolve_flss_coach_sfx_stamp()` in `eoq_perfection.py` → stamped by `_stamp_flss_coach_vo_on_shoot_step()` in `skeleton_step_emitter.py`.
+- Files: **50/50** `braddock-finalshot.mp3` / `sammy-launch.mp3`; when `flss_heave_sfx === true`, **33/33/34** adds `duke-heave.mp3` to the pool.
+- FE playback: `animationPlayback.js` at step-processing start (same path as Dynamic HCO hot-read VO). Do **not** rely on ball detach — heave FLSS often has an instant shoot beat with no detach event.
 
 **Block Announce**
 

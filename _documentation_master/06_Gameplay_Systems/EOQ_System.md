@@ -199,7 +199,7 @@ AND state in (HCO, HCT, FCP)
 
 **Design intent:** Replace the old “chain active → always BIP → FLSS” loop with a per-entry runway check. Entry context matters: OREB kickout, BIP with runoff, DREB outlet, and press setup all change available time.
 
-**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns **and all FLSS turns** stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” announcement but skips the court stinger. (FLSS suppresses it universally because it already fires its own heave/launch VO, `playFlssVoSfx`, at ball detach — the stinger would be redundant.)
+**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns **and all FLSS turns** stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” announcement but skips the court stinger. FLSS plays coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step (not at ball detach).
 
 **Not re-evaluated on:** OREB putback turns, BIP/SIP bypass turns, discrete DREB turns, FT line. The next **half-court entry** after those paths runs this check.
 

@@ -89,6 +89,18 @@ def flss_heave_sfx_eligible(shooter_x: float, *, is_home_offense: bool) -> bool:
     return x >= (100 - FLSS_HEAVE_MAX_X_HOME)
 
 
+def resolve_flss_coach_sfx_stamp(*, flss_heave_sfx: bool) -> Dict[str, Any]:
+    """Schema ``sfx_on_step_start`` payload for FLSS coach VO at the terminal shoot step."""
+    pool = ["braddock-finalshot.mp3", "sammy-launch.mp3"]
+    if flss_heave_sfx:
+        pool.append("duke-heave.mp3")
+    return {
+        "file": random.choice(pool),
+        "event": "flss_vo",
+        "volume": 0.7,
+    }
+
+
 def _random_grid_near(anchor: Dict[str, float], radius: float = 5.0) -> Dict[str, float]:
     for _ in range(24):
         dx = random.uniform(-radius, radius)
@@ -444,7 +456,7 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     zone = classify_flss_zone(ex, is_home_offense=is_home_off)
     home_basket = _attacking_home_basket(is_home_off)
 
-    flss_vo = zone != "normal"
+    flss_vo = True  # all FLSS instances get coach VO (EOQ_Perfection_Brief)
     heave_sfx = flss_heave_sfx_eligible(ex, is_home_offense=is_home_off)
 
     log_eoq_step(
@@ -611,8 +623,8 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         pass
 
     result["flss"] = True
-    # FLSS already fires its own heave/launch VO (playFlssVoSfx) at ball detach, so
-    # suppress the redundant "Final Shot" announcement stinger on all FLSS turns.
+    # FLSS coach VO is schema-stamped on the terminal shoot step (sfx_on_step_start);
+    # suppress the redundant Final Shot announcement stinger on all FLSS turns.
     result["suppress_final_shot_sfx"] = True
     result["flss_zone"] = zone
     result["flss_vo"] = flss_vo

@@ -64,7 +64,7 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **Free Throws (all made)** | shooter **+1** if he attempts **>1** FT in one trip and **makes all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
 | **FT second-chance** | shooter MO shifts the miss→make threshold by **`MO × randint(1,3)`** pts (signed) — see *Free Throw Impact* | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Set Play make** | the **target_shooter** **+1** when he makes the shot in a **successful** set-play skeleton | `phase_resolution.py` `resolve_half_court_offense_logic` |
-| **Dunk** (made) | shooter **+1** when `micro_movement_family` is `dunk` or `drive_dunk` | `player_momentum.py` `apply_made_dunk_momentum()` — called from `shot_manager.py` `resolve_shot`, `shared.py` (OREB putback), `after_steal_fast_break.py`, `after_steal_drive_integration.py`, `dynamic_hct_shot.py` (HCT FB + AB) |
+| **Dunk** (made) | shooter **+1** when `micro_movement_family` is `dunk` or `drive_dunk` | `player_momentum.py` `apply_made_dunk_momentum()` — called **after** `select_and_stamp_shot_micro()` from every FG path (uses stamped family; `dunk_resolved=True` prevents a second dunk roll) |
 
 Doubly-good/bad cases are intentional: a block is **−1 MO + a `False`** on the shooter's streak list; an and-1 is **+1 MO + a `True`** on the streak list; a made dunk is **+1 MO (dunk) + a `True`** on the streak list (and can stack with and-1 or consecutive-make bonuses).
 

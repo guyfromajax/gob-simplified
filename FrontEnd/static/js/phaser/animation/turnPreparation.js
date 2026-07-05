@@ -204,9 +204,9 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
       (turn.final_turn || turn.flss || turn.final_shot_possession)
       && turn.result_type !== 'FINAL_HOLD';
     if (isTerminalFinalShotAttempt) {
-      // FLSS attempts carry their own heave/launch coach VO (playFlssVoSfx); the
-      // Final Shot stinger is disengaged for all FLSS instances so it only fires
-      // for true Final Turn shots.
+      // FLSS attempts carry their own coach VO (backend ``sfx_on_step_start`` on
+      // the terminal shoot step). Suppress the Final Shot stinger for FLSS and for
+      // follow-up Final Turns in the same EOQ chain (`suppress_final_shot_sfx`).
       const suppressFinalShotSfx =
         turn.suppress_final_shot_sfx === true || turn.flss === true;
       announceGameEvent('FINAL_SHOT', turn, scene, {

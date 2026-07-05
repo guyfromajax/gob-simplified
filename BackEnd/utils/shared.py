@@ -1222,10 +1222,15 @@ def resolve_offensive_rebound(game, rebounder):
             def_team=def_team,
             result_type="MAKE" if made else "MISS",
             dunk_stamp=_dunk_stamp,
+            dunk_resolved=shot_type in ("inside", "attack"),
         )
         from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 
-        apply_made_dunk_momentum(rebounder, made=made, dunk_stamp=_dunk_stamp)
+        apply_made_dunk_momentum(
+            rebounder,
+            made=made,
+            family_id=event.get("micro_movement_family"),
+        )
 
         if made:
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])

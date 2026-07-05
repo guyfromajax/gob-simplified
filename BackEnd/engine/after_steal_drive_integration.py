@@ -366,7 +366,6 @@ def _resolve_shot_attempt(
         shooter.record_shot_result(made)
     if made and d_foul and foul_player:
         shooter.add_momentum(MO_AND_ONE_DELTA)
-    apply_made_dunk_momentum(shooter, made=made, dunk_stamp=_dunk_stamp)
 
     record_shot_split(
         game, is_three=is_three, defended=contested, made=made, turn_type="Fast Break"
@@ -423,6 +422,7 @@ def _resolve_shot_attempt(
             "def_team": def_team,
             "result_type": "MAKE" if made else "MISS",
             "dunk_stamp": _dunk_stamp,
+            "dunk_resolved": shot_type in ("inside", "attack"),
         },
     }
 
@@ -1039,6 +1039,11 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                 turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
             stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
+        apply_made_dunk_momentum(
+            shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
+            made=bool(shot["made"]),
+            family_id=turn_result.get("micro_movement_family"),
+        )
         if shot["shot_variant_extras"]:
             turn_result.update(shot["shot_variant_extras"])
         _stamp_pass_ahead(turn_result, pass_chain, off_lineup)
@@ -1151,6 +1156,11 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
     _stamp_fb_shooting_foul_on_turn(turn_result, shot)
     select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
+    apply_made_dunk_momentum(
+        shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
+        made=bool(shot["made"]),
+        family_id=turn_result.get("micro_movement_family"),
+    )
     turn_result.update(shot.get("shot_variant_extras") or {})
     turn_result["shot_variant"] = shot.get("shot_variant")
     turn_result["sfx"] = {

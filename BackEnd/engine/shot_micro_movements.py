@@ -736,14 +736,17 @@ def select_and_stamp_shot_micro(
     def_team: Optional[Any] = None,
     result_type: Optional[str] = None,
     dunk_stamp: Optional[Dict[str, Any]] = None,
+    dunk_resolved: bool = False,
 ) -> str:
     shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
     if away_offense is None:
         away_offense = _infer_away_offense_from_display_coord(shooter_coord)
 
     family_id: Optional[str] = None
-    if dunk_stamp is None and (
-        shooter_player is not None
+    if (
+        not dunk_resolved
+        and dunk_stamp is None
+        and shooter_player is not None
         and shot_score_pre_defense is not None
         and result_type is not None
         and off_team is not None

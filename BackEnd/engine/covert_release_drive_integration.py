@@ -445,6 +445,13 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
         _stamp_fb_shooting_foul_on_turn(turn_result, shot)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
+        from BackEnd.utils.player_momentum import apply_made_dunk_momentum
+
+        apply_made_dunk_momentum(
+            shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
+            made=bool(shot["made"]),
+            family_id=turn_result.get("micro_movement_family"),
+        )
         return turn_result
 
     # --- NO_MEET / POS_O rim finish -----------------------------------------
@@ -550,6 +557,13 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
         "shot_variant": shot.get("shot_variant"),
     }
     select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
+    from BackEnd.utils.player_momentum import apply_made_dunk_momentum
+
+    apply_made_dunk_momentum(
+        shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
+        made=bool(shot["made"]),
+        family_id=turn_result.get("micro_movement_family"),
+    )
     if shot.get("shot_variant_extras"):
         turn_result.update(shot["shot_variant_extras"])
     return turn_result

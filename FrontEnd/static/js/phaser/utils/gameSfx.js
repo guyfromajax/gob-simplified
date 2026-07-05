@@ -522,7 +522,7 @@ function pickRandomCourtEventFile(files) {
   return files[Math.floor(Math.random() * files.length)];
 }
 
-/** FLSS coach VO — fires at ball detach when flss_vo is set on the turn. */
+/** FLSS coach VO — legacy helper; prefer backend ``sfx_on_step_start`` on the shoot step. */
 export function playFlssVoSfx(scene, turnData) {
   if (!turnData?.flss_vo) return;
   const pool = ["braddock-finalshot.mp3", "sammy-launch.mp3"];

@@ -2024,6 +2024,7 @@ def build_skeleton_animation_steps(
             clock_remaining_at_turn_start,
             shot_clock_remaining_at_turn_start,
         )
+        _stamp_flss_coach_vo_on_shoot_step(steps, turn_result)
 
     from BackEnd.engine.dead_ball_fumble import inject_dead_ball_fumble_before_turn_stop
 
@@ -2550,6 +2551,27 @@ def _resolve_shooter_shot_spot(
     if isinstance(shot_spot, dict) and shot_spot.get("x") is not None:
         return {"x": float(shot_spot["x"]), "y": float(shot_spot.get("y", 25))}
     return _resolve_turn_shooter_grid_coord(turn_result)
+
+
+def _stamp_flss_coach_vo_on_shoot_step(
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+) -> None:
+    """Stamp FLSS coach VO on the terminal shoot step (``sfx_on_step_start``).
+
+    Heave FLSS often has an instant terminal shoot beat with no reliable ball
+    detach, so FE must not depend on ``playFlssVoSfx`` at ball release.
+    """
+    if not turn_result.get("flss_vo"):
+        return
+    shoot_step = _find_terminal_shoot_step(steps)
+    if not shoot_step:
+        return
+    from BackEnd.engine.eoq_perfection import resolve_flss_coach_sfx_stamp
+
+    shoot_step.setdefault("start", {})["sfx_on_step_start"] = resolve_flss_coach_sfx_stamp(
+        flss_heave_sfx=bool(turn_result.get("flss_heave_sfx")),
+    )
 
 
 def _stamp_flss_shooter_on_step_end(
