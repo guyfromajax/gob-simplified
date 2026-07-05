@@ -806,6 +806,14 @@ class ShotManager:
                     break
         if motion_geometry:
             has_contest = geometry_has_contest
+        elif roles.get("fb_geometry_contest_resolved"):
+            # UESS: an FB drive-geometry resolver (e.g. Covert Release) already
+            # decided contest from the RENDER-matched defender ends and stamped
+            # roles["defender"]. Honor that instead of re-deriving from the coord
+            # loop — CR skips apply_coords, so def_lineup.coords are the STALE
+            # pre-race positions (defenders up-court) → the loop always says
+            # uncontested and the block path never fires. See Coord_Consumer_UESS_Audit.md #2.
+            has_contest = bool(defender or second_defender)
         else:
             has_contest = bool(defender or second_defender) if game_state.get("offensive_state") == "HCO" else geometry_has_contest
         if motion_uncontested:

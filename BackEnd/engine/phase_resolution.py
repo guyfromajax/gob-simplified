@@ -2126,6 +2126,11 @@ def resolve_fast_break_logic(game: "GameManager"):
 
                 # Override shot_spot + defender + threshold.
                 roles["shot_spot"] = dict(cr_geometry["shooter_target"])
+                # UESS: contest was decided here from the render-matched defender
+                # ends — tell resolve_shot to honor roles["defender"] instead of
+                # re-deriving from stale (pre-race) def_lineup.coords, so the block
+                # path fires on contested CR. See Coord_Consumer_UESS_Audit.md #2.
+                roles["fb_geometry_contest_resolved"] = True
                 if cr_geometry["contested"] and cr_geometry["shot_defender_id"]:
                     for _d in def_lineup.values():
                         if _d is None:
@@ -4321,22 +4326,29 @@ def _apply_attack_penalty(shot_location, is_away_offense):
     return penalty
 
 
-def _uess_terminal_shoot_coord(game, skeleton, animations, roles, turn_type="HCO"):
-    """UESS single-coord-source: return the shooter's terminal shoot-step coord
-    exactly as the step emitter renders it (display-oriented), computed from the
-    SAME ``(skeleton, animations)`` build the FE renders.
+def _uess_sync_emitted_shot_coords(game, skeleton, animations, roles, turn_type="HCO"):
+    """UESS single-coord-source: sync EVERY player's ``player.coords`` to the
+    emitter's shoot-step render coord, and return the shooter's coord (for
+    ``roles["shot_spot"]``). All coords are display-oriented — the same frame
+    ``player.coords`` already stores (``apply_coords`` is a pass-through), so no
+    re-mirror is needed.
 
-    Why: 2PT/3PT classification reads ``roles["shot_spot"]``. The rendered shoot
-    position is produced by the emitter's step-sequential positional pass (gate =
-    shooter → full destination, with §8.1 continuity + interrupts), which diverges
-    from the pre-emit named spot / animator row end. Classifying from anything but
-    this coord mis-scores ~25% of arc shots (dish/motion). See
-    ``_documentation_master/projects/UESS Audits/Shot_Classification_UESS_Fix_Scope.md``.
+    Why: shot resolution decides from ``player.coords``. `apply_coords_from_
+    animations_list` sets those to the ANIMATOR row-end (all players fully
+    arrived), but the emitter renders non-gate players INTERRUPTED mid-move
+    (§9.5) — a ~58% divergence. So the shot logic saw a different geometry than
+    the FE: it mis-scored 2PT/3PT classification (~25%, shooter) AND over-
+    contested shots (~6%, defenders fully-arrived in logic but mid-move on
+    screen). Stamping the emitted shoot-step coords onto every player makes the
+    contest loop, defender selection, and classification all read the rendered
+    geometry. See ``Coord_Consumer_UESS_Audit.md`` (hole #1).
 
-    Runs the real emitter on a throwaway turn_result to guarantee parity with the
-    later render (the emitter is side-effect-free w.r.t. game/player state;
-    ``result_type`` omitted → post-shot sub-steps are a no-op). Returns None on any
-    failure → caller falls back to ``set_shooter_coords_from_skeleton_last_step``.
+    Runs the real emitter on a throwaway turn_result to guarantee parity with
+    the later render (the emitter is side-effect-free w.r.t. game/player state;
+    ``result_type`` omitted → post-shot sub-steps are a no-op). RNG-neutral
+    (save/restore) so it never perturbs resolve_shot's make/miss or downstream
+    outcomes. Returns None on any failure → caller falls back to
+    ``set_shooter_coords_from_skeleton_last_step`` (shooter-spot only).
     """
     try:
         shooter = roles.get("shooter")
@@ -4348,8 +4360,8 @@ def _uess_terminal_shoot_coord(game, skeleton, animations, roles, turn_type="HCO
         # RNG-NEUTRAL: the emitter draws from the global random stream (shot
         # micro-movements). This is a throwaway pre-pass — save/restore the RNG
         # state so it does NOT advance the stream and perturb resolve_shot's
-        # make/miss or any downstream outcome. The fix must change classification
-        # only, never game results.
+        # make/miss or any downstream outcome. The fix changes the coords the
+        # logic reads, never game results directly.
         import random as _random
         _rng_state = _random.getstate()
         try:
@@ -4370,7 +4382,21 @@ def _uess_terminal_shoot_coord(game, skeleton, animations, roles, turn_type="HCO
         if shoot_step is None:
             shoot_step = steps[-1]
         coords = (shoot_step.get("end") or {}).get("coords") or {}
-        c = coords.get(shooter_id) or coords.get(sid)
+        if not coords:
+            return None
+        # Sync ALL active players to the emitted shoot-step coord (matches
+        # apply_coords_from_animations_list's iteration; adds only where the
+        # emitter has a coord for that player — never clobbers with None).
+        norm = {str(k): v for k, v in coords.items()}
+        for team in (game.home_team, game.away_team):
+            for player in (getattr(team, "lineup", None) or {}).values():
+                if player is None:
+                    continue
+                pid = getattr(player, "player_id", None)
+                c = coords.get(pid) or norm.get(str(pid))
+                if isinstance(c, dict) and c.get("x") is not None and c.get("y") is not None:
+                    player.coords = {"x": float(c["x"]), "y": float(c["y"])}
+        c = coords.get(shooter_id) or norm.get(sid)
         if isinstance(c, dict) and c.get("x") is not None and c.get("y") is not None:
             return {"x": float(c["x"]), "y": float(c["y"])}
         return None
@@ -4385,9 +4411,10 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     so block reconciliation uses the correct shot location. Fast Break does not
     use this.
 
-    NOTE: this is now the FALLBACK path. The primary classification coord is the
-    emitter's terminal shoot coord via ``_uess_terminal_shoot_coord`` (UESS
-    single-coord-source). This runs only when that resolver returns None.
+    NOTE: this is now the FALLBACK path (shooter-spot only). The primary path
+    syncs ALL players to the emitter's rendered shoot-step coords via
+    ``_uess_sync_emitted_shot_coords`` (UESS single-coord-source). This runs only
+    when that resolver returns None.
     """
     _ensure_skeleton_shot_role_positions(game, roles)
     if not skeleton or not roles:
@@ -6252,18 +6279,14 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 "to emitter rebuild for this turn", _ft_sync_err,
             )
             final_turn_animations = None
-        # UESS single-coord-source: classification (2PT/3PT) reads the SAME
-        # terminal shoot coord the emitter renders, not the pre-emit named spot.
-        # Falls back to the skeleton shot location if the build/resolver is
-        # unavailable. See Shot_Classification_UESS_Fix_Scope.md.
+        # UESS single-coord-source: sync ALL players to the emitter's rendered
+        # shoot-step coords (classification + contest read on-screen geometry).
+        # Falls back to the skeleton shot location if the build is unavailable.
         _ft_terminal = (
-            _uess_terminal_shoot_coord(game, skeleton, final_turn_animations, roles, "HCO")
+            _uess_sync_emitted_shot_coords(game, skeleton, final_turn_animations, roles, "HCO")
             if final_turn_animations else None
         )
         if _ft_terminal is not None:
-            _ft_sh = roles.get("shooter")
-            if _ft_sh is not None:
-                _ft_sh.coords = dict(_ft_terminal)
             roles["shot_spot"] = dict(_ft_terminal)
         else:
             set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # fallback: skeleton shot location
@@ -7341,13 +7364,11 @@ def resolve_half_court_offense_logic(game):
             add_defenders=True,
         )
     apply_coords_from_animations_list(game, animations)
-    # UESS single-coord-source: classification (2PT/3PT) must read the SAME
-    # terminal shoot coord the emitter renders, not the pre-emit named spot.
-    _terminal_shoot = _uess_terminal_shoot_coord(game, skeleton, animations, roles, "HCO")
+    # UESS single-coord-source: sync ALL players (shooter + defenders) to the
+    # emitter's rendered shoot-step coords so classification (2PT/3PT) AND the
+    # contest loop read the on-screen geometry, not the animator row-end.
+    _terminal_shoot = _uess_sync_emitted_shot_coords(game, skeleton, animations, roles, "HCO")
     if _terminal_shoot is not None:
-        _sh = roles.get("shooter")
-        if _sh is not None:
-            _sh.coords = dict(_terminal_shoot)
         roles["shot_spot"] = dict(_terminal_shoot)
     else:
         set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # fallback: skeleton shot location
@@ -7926,13 +7947,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
-        # UESS single-coord-source: classify from the emitter's terminal shoot
-        # coord, not the pre-emit named spot. See Shot_Classification_UESS_Fix_Scope.md.
-        _fcp_terminal = _uess_terminal_shoot_coord(game, skeleton, animations, shot_roles, "FCP")
+        # UESS single-coord-source: sync ALL players to the emitter's rendered
+        # shoot-step coords (classification + contest read on-screen geometry).
+        _fcp_terminal = _uess_sync_emitted_shot_coords(game, skeleton, animations, shot_roles, "FCP")
         if _fcp_terminal is not None:
-            _fcp_sh = shot_roles.get("shooter")
-            if _fcp_sh is not None:
-                _fcp_sh.coords = dict(_fcp_terminal)
             shot_roles["shot_spot"] = dict(_fcp_terminal)
         else:
             set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # fallback: skeleton shot location
