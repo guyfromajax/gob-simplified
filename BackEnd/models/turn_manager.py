@@ -1658,6 +1658,49 @@ class TurnManager:
                     if _fb_cs_start is not None and _fb_cs_end is not None:
                         _fb_schema_burn = max(0.0, float(_fb_cs_start) - float(_fb_cs_end))
                         result["time_elapsed"] = int(round(_fb_schema_burn))
+                # FB-Task 2 (Fast_Break_UESS_Audit.md #3): [UESS SEAM] entry
+                # teleport detector — FB families build their own step-0 ball, so
+                # no existing detector covers this callsite.
+                # NOTE: FB deliberately seeds step-0 from the live OWNER coord,
+                # which is CORRECT (DREB→FB is continuous; steal→FB is correctly at
+                # the stealer). We do NOT port the SIP-style "seed from
+                # final_ball_coords" — for a STEAL that field is the VICTIM's coord
+                # (the rendered rest while the interception animation is still
+                # broken), so seeding from it would teleport the ball to the victim.
+                # So this guard SKIPS the documented STEAL case (that entry teleport
+                # is the interception bug, owned separately) and only catches
+                # regressions on the DREB / other FB entries.
+                if _fb_steps:
+                    _fb_priors = getattr(self.game, "turns", None) or []
+                    _fb_prior = _fb_priors[-1] if _fb_priors else None
+                    _fb_prior_steal = isinstance(_fb_prior, dict) and (
+                        str(_fb_prior.get("result_type") or "").upper() == "STEAL"
+                        or _fb_prior.get("stealer_id")
+                    )
+                    _fb_pfbc = (
+                        _fb_prior.get("final_ball_coords")
+                        if isinstance(_fb_prior, dict) else None
+                    )
+                    if isinstance(_fb_pfbc, dict) and not _fb_prior_steal:
+                        _fb_s0 = _fb_steps[0].get("start") or {}
+                        _fb_s0b = _fb_s0.get("ball") or {}
+                        _fb_owner = _fb_s0b.get("owner_player_id")
+                        _fb_s0pos = (
+                            _fb_s0b.get("coords") or _fb_s0b.get("current_coords")
+                            or ((_fb_s0.get("coords") or {}).get(str(_fb_owner)) if _fb_owner else None)
+                        )
+                        if (isinstance(_fb_s0pos, dict) and _fb_pfbc.get("x") is not None
+                                and _fb_s0pos.get("x") is not None):
+                            _fb_gap = (
+                                (float(_fb_s0pos["x"]) - float(_fb_pfbc["x"])) ** 2
+                                + (float(_fb_s0pos["y"]) - float(_fb_pfbc["y"])) ** 2
+                            ) ** 0.5
+                            if _fb_gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                                logging.warning(
+                                    "🎯 [UESS SEAM] FB entry ball teleport candidate (non-steal): "
+                                    "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                                    _fb_pfbc, _fb_s0pos, _fb_gap,
+                                )
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
