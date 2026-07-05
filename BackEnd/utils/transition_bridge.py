@@ -1313,6 +1313,7 @@ def build_sip_animation_steps(
     pg_id: str,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
+    ball_start_coord: Optional[GridCoord] = None,
 ) -> List[AnimationStep]:
     """Side Inbound Pass (SIP) — emits three schema-compliant steps:
 
@@ -1339,11 +1340,21 @@ def build_sip_animation_steps(
     if sf_id not in setup_coords or pg_id not in setup_coords:
         return []
 
-    # Ball start coord: prior BH's position (universal rule across SIP entries —
-    # dead-ball turnover, steal, non-shooting foul). Fallback to SF's start
-    # coord if the prior BH id isn't resolvable (ball effectively appears
-    # with SF, no visible ball motion).
+    # Ball start coord. Preference (SIP-Task 1, SIP_UESS_Audit.md #1):
+    #   1. Explicit ``ball_start_coord`` = the prior turn's RENDERED ball rest
+    #      (``final_ball_coords``), passed by the caller. This is inv.4-correct:
+    #      on steal / dead-ball / in-flight prior-end states the ball's rendered
+    #      rest ≠ the BH's body coord, so seeding from the body teleports the
+    #      ball at the SIP entry seam.
+    #   2. Legacy fallback: prior BH's body position (``prior_final_coords[BH]``).
+    #   3. SF's start coord (ball appears with SF, no visible motion).
     if (
+        isinstance(ball_start_coord, dict)
+        and ball_start_coord.get("x") is not None
+        and ball_start_coord.get("y") is not None
+    ):
+        ball_start_coord = {"x": float(ball_start_coord["x"]), "y": float(ball_start_coord["y"])}
+    elif (
         prior_final_ball_handler_id
         and str(prior_final_ball_handler_id) in prior_final_coords
     ):

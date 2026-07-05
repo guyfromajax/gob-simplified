@@ -531,7 +531,13 @@ class TurnManager:
 
         if isinstance(prior_turn, dict):
             prior_fc = prior_turn.get("final_coords")
-            if isinstance(prior_fc, dict) and len(prior_fc) >= 8:
+            # SIP-Task 3 (SIP_UESS_Audit.md #4): gate on `>= 1` (any anchored
+            # coord), NOT `>= 8`. The old `>= 8` rejected a sparse seed BEFORE
+            # backfill could restore it → SIP emitted no animation_steps →
+            # player.coords never advanced to setup while oDestinations claimed
+            # setup → SIP→HCO teleport. Backfill (below, adds-only) restores the
+            # missing players from live coords, so a sparse seed is now rescued.
+            if isinstance(prior_fc, dict) and len(prior_fc) >= 1:
                 # BIP-Task 2 (MED-1, BIP_UESS_Audit.md): backfill any active player
                 # missing from the prior turn's final_coords from live player.coords
                 # so the inbound chain always covers all 10. build_final_coords
@@ -689,6 +695,22 @@ class TurnManager:
             clock_r = float(clock_state.get("time_remaining", 0) or 0)
             shot_r = float(clock_state.get("shot_clock_remaining", 0) or 0)
 
+            # SIP-Task 1 (SIP_UESS_Audit.md #1, mirrors BIP-Task 3): seed the
+            # loose ball from the prior turn's RENDERED ball rest
+            # (final_ball_coords) so the trigger→SIP seam is inv.4-correct.
+            # On steal/dead-ball/in-flight the BH's body coord ≠ the ball's rest;
+            # build_sip falls back to prior_final_coords[BH] if unavailable.
+            _prior_fbc = (
+                prior_turn.get("final_ball_coords") if isinstance(prior_turn, dict) else None
+            )
+            sip_ball_start = (
+                {"x": float(_prior_fbc["x"]), "y": float(_prior_fbc["y"])}
+                if isinstance(_prior_fbc, dict)
+                and _prior_fbc.get("x") is not None
+                and _prior_fbc.get("y") is not None
+                else None
+            )
+
             if sf_id and pg_id and prior_final_coords and setup_coords:
                 anim_steps = build_sip_animation_steps(
                     off_lineup=offense_team.lineup,
@@ -700,10 +722,35 @@ class TurnManager:
                     pg_id=pg_id,
                     clock_remaining_at_start=clock_r,
                     shot_clock_remaining_at_start=shot_r,
+                    ball_start_coord=sip_ball_start,
                 )
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
                     self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
+                    # SIP-Task 2 (SIP_UESS_Audit.md #2): [UESS SEAM] entry-seam
+                    # teleport detection. SIP uses its own bridge emitter, so it
+                    # isn't covered by the skeleton emitter's detector — replicate
+                    # it (mirrors OREB-Task 3). Compare the prior turn's rendered
+                    # ball rest (final_ball_coords) to SIP's emitted step-0 loose-
+                    # ball coord. Detection-only; behavior-neutral. After Task 1
+                    # this should not fire except on the fallback ball-source path.
+                    _s0b = (anim_steps[0].get("start") or {}).get("ball") or {}
+                    _s0pos = _s0b.get("coords") or _s0b.get("current_coords")
+                    if isinstance(_prior_fbc, dict) and isinstance(_s0pos, dict):
+                        try:
+                            _gap = (
+                                (float(_s0pos.get("x")) - float(_prior_fbc.get("x"))) ** 2
+                                + (float(_s0pos.get("y")) - float(_prior_fbc.get("y"))) ** 2
+                            ) ** 0.5
+                        except (TypeError, ValueError):
+                            _gap = 0.0
+                        if _gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                            import logging
+                            logging.warning(
+                                "🎯 [UESS SEAM] SIP entry ball teleport candidate: prior "
+                                "final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                                _prior_fbc, _s0pos, _gap,
+                            )
         except Exception as e:
             import logging
             logging.warning("build_sip_animation_steps failed: %s", e)
