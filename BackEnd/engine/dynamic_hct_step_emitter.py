@@ -321,7 +321,10 @@ def _build_loop_step(
     }
     clock_end: ClockState = {
         "clock_remaining": clock_remaining_at_start - t,
-        "shot_clock_remaining": shot_clock_remaining_at_start - t,
+        # HCT-Task 6 (HCT_UESS_Audit.md #9): floor the shot clock at 0 — a
+        # segment crossing zero rendered a negative shot clock before the
+        # top-of-loop terminal check caught it.
+        "shot_clock_remaining": max(0.0, shot_clock_remaining_at_start - t),
     }
 
     start: StepStart = {
@@ -438,7 +441,7 @@ def _build_fb_drive_step(
         "time_elapsed": t,
         "clock": {
             "clock_remaining": clock_remaining_at_start - t,
-            "shot_clock_remaining": shot_clock_remaining_at_start - t,
+            "shot_clock_remaining": max(0.0, shot_clock_remaining_at_start - t),
         },
         "next": {"kind": "next_step", "index": next_step_index},
     }
@@ -521,7 +524,7 @@ def _build_ab_shot_step(
         "time_elapsed": t,
         "clock": {
             "clock_remaining": clock_remaining_at_start - t,
-            "shot_clock_remaining": shot_clock_remaining_at_start - t,
+            "shot_clock_remaining": max(0.0, shot_clock_remaining_at_start - t),
         },
         "next": {"kind": "next_step", "index": next_step_index},
     }
@@ -613,7 +616,7 @@ def _build_ab_drive_step(
         "time_elapsed": t,
         "clock": {
             "clock_remaining": clock_remaining_at_start - t,
-            "shot_clock_remaining": shot_clock_remaining_at_start - t,
+            "shot_clock_remaining": max(0.0, shot_clock_remaining_at_start - t),
         },
         "next": {"kind": "next_step", "index": next_step_index},
     }
