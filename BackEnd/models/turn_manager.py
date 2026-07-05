@@ -5076,6 +5076,14 @@ class TurnManager:
             # Rule 1: possession change resets shot clock.
             if possession_flips and rt != "TIMEOUT":
                 return True
+            # Rule 1b (DREB-Task 1, DREB_UESS_Audit.md MED-1): a defensive rebound
+            # renews the shot clock for the securing team's ensuing possession —
+            # even on the chained PUTBACK_MISS→DREB path where possession_flips is
+            # cleared to avoid a double-flip (that guard must not also disable the
+            # reset). Gate on result_type so the OTB-foul branch (rt="FOUL") keeps
+            # its own Rule 1 / Rule 2 handling.
+            if rt == "DREB":
+                return True
             # Rule 2: non-shooting defensive foul into SIDE_INBOUND resets even without possession flip.
             if (
                 rt == "FOUL"

@@ -22,7 +22,10 @@ Algorithm:
 - T = rebounder's AG-driven traversal time at `sprint` archetype.
 - Rebounder: `cut` + `sprint` → bounce coords.
 - Rebound attemptors (`offense_rebounders` + `defense_rebounders` from the
-  prior MISS turn, minus captor): `cut` + `cruise` → bounce ± (4 x, 6 y).
+  prior MISS turn, minus captor): `cut` + `standard` → bounce ± (4 x, 6 y).
+  (DREB-Task 2 / L-3: `stamp_rebound_capture_player_motion`'s
+  `attemptor_archetype` defaults to `standard` and is not overridden here —
+  corrected from the earlier "cruise" claim.)
 - Everyone else: `stationary` at post-shot coords (get-back / release).
 - Ball: BallLoose at bounce → BallAttached(rebounder).
 - Next: implicit end for normal capture; turn_stop FOUL for over-the-back.

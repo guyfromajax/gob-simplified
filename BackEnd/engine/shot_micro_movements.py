@@ -39,6 +39,11 @@ from BackEnd.constants.shot_micro_movements_constants import (
     DUNK_MOVE_SPOTS_STRONG,
     DUNK_AG_THRESHOLD_DIST_9,
     DUNK_AG_THRESHOLD_DIST_10,
+    FOUL_RATTLE_MULT,
+    HACK_CHOPS,
+    HACK_MAG_INSIDE_PX,
+    HACK_MAG_OUTSIDE_PX,
+    SHOOTING_FOUL_SHOVE_MULT,
     DUNK_RATTLE_MAG_PX,
     DUNK_RATTLE_MS,
     DUNK_RISE_PX,
@@ -123,6 +128,53 @@ BUCKET_BEHAVIOR: Dict[str, Dict[ContestResult, str]] = {
         "defense_win": "glue",
     },
 }
+
+
+def _turn_fouler_id(turn_result: Dict[str, Any]) -> Optional[str]:
+    raw = turn_result.get("foul_player_id")
+    if raw is not None:
+        return str(raw)
+    foul_player = turn_result.get("foul_player")
+    if foul_player is not None:
+        return str(getattr(foul_player, "player_id", foul_player))
+    return None
+
+
+def is_shooting_foul_turn(turn_result: Dict[str, Any]) -> bool:
+    """True when the turn is a defensive shooting foul (incl. foul_block_contact).
+
+    Scoring ``contest_result`` may still be offense_win; animation uses
+    ``animation_branch_for_shot(..., is_shooting_foul=True)`` instead.
+    """
+    if turn_result.get("is_shooting_foul") is True:
+        return True
+    rt = (turn_result.get("result_type") or "").upper()
+    if rt in ("CHARGE", "BLOCKING_FOUL"):
+        return False
+    if str(turn_result.get("charge_result") or "") == "BLOCKING_FOUL":
+        return False
+    if str(turn_result.get("foul_team") or "") != "DEFENSE":
+        return False
+    if not _turn_fouler_id(turn_result):
+        return False
+    if turn_result.get("has_and_one"):
+        return True
+    if turn_result.get("free_throws_remaining"):
+        return True
+    if str(turn_result.get("next_play_type") or "").upper() == "FREE_THROW":
+        return True
+    return False
+
+
+def animation_branch_for_shot(
+    contest_result: Optional[ContestResult],
+    *,
+    is_shooting_foul: bool,
+) -> Optional[ContestResult]:
+    """Micro animation branch — decoupled from scoring contest_result."""
+    if is_shooting_foul:
+        return "defense_win"
+    return contest_result
 
 
 def resolve_contest(
@@ -844,6 +896,38 @@ def _disruption_flourish_targets(
     return out
 
 
+def _stamp_shooting_foul_hack_flourishes(
+    flourish_map: Dict[str, Any],
+    *,
+    shooter_id: str,
+    defender_id: str,
+    shooter_coord: GridCoord,
+    shot_type: str,
+    away_offense: bool,
+) -> None:
+    """Layer hack + boosted shooter rattle on the terminal shot/dunk beat only."""
+    ux, uy = _unit_toward_rim(shooter_coord, away_offense)
+    physical = str(shot_type or "").lower() in ("inside", "attack")
+    hack_mag = float(HACK_MAG_INSIDE_PX if physical else HACK_MAG_OUTSIDE_PX)
+    shove_mag = hack_mag * float(SHOOTING_FOUL_SHOVE_MULT)
+    flourish_map[str(defender_id)] = {
+        "kind": "hack",
+        "rim_unit_x": float(ux),
+        "rim_unit_y": float(uy),
+        "hack_mag_px": hack_mag,
+        "chops": int(HACK_CHOPS),
+        "play_whistle": True,
+    }
+    flourish_map[str(shooter_id)] = {
+        "kind": "rattle",
+        "cycles": 3,
+        "foul_rattle_mult": float(FOUL_RATTLE_MULT),
+        "shove_u_x": float(-ux),
+        "shove_u_y": float(-uy),
+        "shove_mag_px": shove_mag,
+    }
+
+
 def _build_family_beats(
     family_id: str,
     shooter_coord: GridCoord,
@@ -953,6 +1037,7 @@ def build_shot_micro_steps(
     apply_contest_layer: bool,
     result_type: Optional[str] = None,
     dunk_miss: bool = False,
+    is_shooting_foul: bool = False,
 ) -> List[AnimationStep]:
     """Build micro-movement AnimationSteps replacing the terminal [shoot] beat."""
     if shooter_id not in start_coords:
@@ -979,10 +1064,18 @@ def build_shot_micro_steps(
         is_last = beat_idx == len(beats) - 1
         beat_bucket = beat.get("beat_bucket") or bucket
         contest = contest_result if apply_contest_layer else None
+        # animation_branch decouples render from scoring contest_result.
+        # Shooting fouls force defense_win micro (glue/wall + shooter rattle)
+        # even when contest_result is offense_win — see shooting-foul brief.
+        anim_branch = (
+            animation_branch_for_shot(contest, is_shooting_foul=is_shooting_foul)
+            if apply_contest_layer
+            else None
+        )
         defender_behavior = None
-        if contest and defender_id:
+        if anim_branch and defender_id:
             defender_behavior = _resolve_defender_behavior(
-                family_id, bucket, contest, beat_bucket=beat.get("beat_bucket"),
+                family_id, bucket, anim_branch, beat_bucket=beat.get("beat_bucket"),
             )
 
         actions, archetypes, destinations = _stationary_maps(current_coords)
@@ -997,7 +1090,7 @@ def build_shot_micro_steps(
         kind = beat.get("kind")
         if kind == "move":
             dx, dy = float(beat["dx"]), float(beat["dy"])
-            if contest == "defense_win" and beat_bucket == "A":
+            if anim_branch == "defense_win" and beat_bucket == "A":
                 dx *= MUSCLE_LOSS_COMPLETION
                 dy *= MUSCLE_LOSS_COMPLETION
             dest = _offset_coord(current_coords[shooter_id], dx, dy)
@@ -1032,11 +1125,21 @@ def build_shot_micro_steps(
             actions[shooter_id] = "shoot"
             archetypes[shooter_id] = "shot_motion"
             destinations[shooter_id] = None
-            if contest:
-                for pid, fl in _disruption_flourish_targets(
-                    contest, shot_type, shooter_id, defender_id, family_id=family_id,
-                ).items():
-                    flourish_map.setdefault(pid, fl)
+            if anim_branch:
+                if is_shooting_foul and defender_id:
+                    _stamp_shooting_foul_hack_flourishes(
+                        flourish_map,
+                        shooter_id=shooter_id,
+                        defender_id=str(defender_id),
+                        shooter_coord=current_coords[shooter_id],
+                        shot_type=shot_type,
+                        away_offense=away_offense,
+                    )
+                else:
+                    for pid, fl in _disruption_flourish_targets(
+                        anim_branch, shot_type, shooter_id, defender_id, family_id=family_id,
+                    ).items():
+                        flourish_map.setdefault(pid, fl)
             step_t = max(MICRO_MOVE_STEP_T_FLOOR, MICRO_FLOURISH_BEAT_T)
         elif kind == "dunk":
             approach = _dunk_approach_coord(away_offense)
@@ -1050,11 +1153,21 @@ def build_shot_micro_steps(
             step_t = max(MICRO_MOVE_STEP_T_FLOOR, wall_ms / DUNK_CLOCK_MS_PER_GAME_SEC)
             result_upper = (result_type or "").upper()
             yield_before_slam = result_upper == "BLOCK" and not dunk_miss
-            if contest:
-                for pid, fl in _disruption_flourish_targets(
-                    contest, shot_type, shooter_id, defender_id, family_id=family_id,
-                ).items():
-                    flourish_map.setdefault(pid, fl)
+            if anim_branch:
+                if is_shooting_foul and defender_id:
+                    _stamp_shooting_foul_hack_flourishes(
+                        flourish_map,
+                        shooter_id=shooter_id,
+                        defender_id=str(defender_id),
+                        shooter_coord=current_coords[shooter_id],
+                        shot_type=shot_type,
+                        away_offense=away_offense,
+                    )
+                else:
+                    for pid, fl in _disruption_flourish_targets(
+                        anim_branch, shot_type, shooter_id, defender_id, family_id=family_id,
+                    ).items():
+                        flourish_map.setdefault(pid, fl)
             dunk_meta = {
                 "micro_beat_kind": "dunk",
                 "approach_coord": dict(approach),
@@ -1117,8 +1230,13 @@ def build_shot_micro_steps(
 
         shooter_gate_coord = end_coords.get(shooter_id, current_coords[shooter_id])
         trigger = _advance_player_reaches(shooter_id, shooter_gate_coord, step_t)
+        step_meta: Dict[str, Any] = dict(trigger.get("metadata") or {})
         if dunk_meta:
-            trigger["metadata"] = {**(trigger.get("metadata") or {}), **dunk_meta}
+            step_meta.update(dunk_meta)
+        if is_shooting_foul and kind in ("shot", "dunk"):
+            step_meta["shooting_foul"] = True
+        if step_meta:
+            trigger["metadata"] = step_meta
 
         end_ball_state: Any = (
             dunk_ball_end if dunk_ball_end is not None else {"owner_player_id": str(shooter_id)}
@@ -1318,6 +1436,13 @@ def apply_shot_micro_steps_to_chain(
 
     contest_result = turn_result.get("contest_result")
     apply_contest = bool(turn_result.get("has_contest")) and contest_result is not None
+    shooting_foul = (
+        is_shooting_foul_turn(turn_result)
+        and apply_contest
+        and defender_id is not None
+    )
+    if shooting_foul:
+        turn_result["shooting_foul_whistle_on_shot_beat"] = True
 
     micro_steps = build_shot_micro_steps(
         family_id=str(family_id),
@@ -1334,6 +1459,7 @@ def apply_shot_micro_steps_to_chain(
         apply_contest_layer=apply_contest,
         result_type=str(result_type),
         dunk_miss=bool(turn_result.get("dunk_miss")),
+        is_shooting_foul=shooting_foul,
     )
     if not micro_steps:
         return

@@ -135,6 +135,13 @@ const defaults = {
       freqHz: 6,
       durationMs: 660,
     },
+    hack: {
+      magInsidePx: 16,
+      magOutsidePx: 8,
+      chops: 2,
+      foulRattleMult: 1.5,
+      strikeFraction: 0.35,
+    },
     idleWander: {
       radiusGrid: 1.0, // Max render-space drift radius (grid units); no gameplay coord change
       durationMs: 900, // Fallback when the backend omits a per-beat duration
@@ -195,6 +202,7 @@ export const animationConfig = {
     rattle: { ...defaults.flourish.rattle, ...(overrides.flourish?.rattle || {}) },
     gather: { ...defaults.flourish.gather, ...(overrides.flourish?.gather || {}) },
     fumble: { ...defaults.flourish.fumble, ...(overrides.flourish?.fumble || {}) },
+    hack: { ...defaults.flourish.hack, ...(overrides.flourish?.hack || {}) },
     idleWander: { ...defaults.flourish.idleWander, ...(overrides.flourish?.idleWander || {}) },
   },
   dunk: { ...defaults.dunk, ...(overrides.dunk || {}) },

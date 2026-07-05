@@ -795,3 +795,107 @@ class TestDunkSelection:
         assert stamp is not None
         assert stamp["force_miss"] is True
         assert made is False
+
+
+class TestShootingFoulMicro:
+    def test_is_shooting_foul_turn_signal(self):
+        from BackEnd.engine.shot_micro_movements import is_shooting_foul_turn
+
+        assert is_shooting_foul_turn({
+            "foul_team": "DEFENSE",
+            "foul_player_id": "d1",
+            "next_play_type": "FREE_THROW",
+            "free_throws_remaining": 2,
+            "result_type": "MISS",
+        })
+        assert not is_shooting_foul_turn({
+            "foul_team": "DEFENSE",
+            "foul_player_id": "d1",
+            "result_type": "BLOCKING_FOUL",
+        })
+        assert not is_shooting_foul_turn({
+            "foul_team": "OFFENSE",
+            "foul_player_id": "o1",
+            "next_play_type": "FREE_THROW",
+        })
+
+    def test_animation_branch_forces_defense_win(self):
+        from BackEnd.engine.shot_micro_movements import animation_branch_for_shot
+
+        assert animation_branch_for_shot("offense_win", is_shooting_foul=True) == "defense_win"
+        assert animation_branch_for_shot("offense_win", is_shooting_foul=False) == "offense_win"
+
+    def test_shooting_foul_hack_on_shot_beat_not_gather(self):
+        from BackEnd.engine.shot_micro_movements import _build_family_beats, build_shot_micro_steps
+
+        beats = _build_family_beats(
+            "pump_dribble_shoot",
+            {"x": 75.0, "y": 30.0},
+            away_offense=False,
+            off_lineup={},
+            all_coords={"s1": {"x": 75.0, "y": 30.0}, "d2": {"x": 77.0, "y": 28.0}},
+            shooter_id="s1",
+        )
+        assert any(b.get("flourish") == "gather" for b in beats)
+
+        steps = build_shot_micro_steps(
+            family_id="pump_dribble_shoot",
+            contest_result="offense_win",
+            start_coords={"s1": {"x": 75.0, "y": 30.0}, "d2": {"x": 77.0, "y": 28.0}},
+            shooter_id="s1",
+            defender_id="d2",
+            off_lineup={},
+            def_lineup={},
+            away_offense=False,
+            clock_start={"clock_remaining": 10.0, "shot_clock_remaining": 8.0},
+            shot_type="inside",
+            next_step={"kind": "next_step", "index": 9},
+            apply_contest_layer=True,
+            is_shooting_foul=True,
+        )
+        shot_step = steps[-1]
+        shot_fl = shot_step["start"]["flourish"]
+        assert shot_fl["d2"]["kind"] == "hack"
+        assert shot_fl["s1"]["kind"] == "rattle"
+        assert shot_fl["s1"]["foul_rattle_mult"] == 1.5
+        assert shot_step["start"]["advance_trigger"]["metadata"]["shooting_foul"] is True
+        assert not any(
+            (s.get("start", {}).get("flourish") or {}).get("d2", {}).get("kind") == "hack"
+            for s in steps[:-1]
+        )
+
+    def test_offense_win_without_foul_keeps_separation(self):
+        from BackEnd.engine.shot_micro_movements import build_shot_micro_steps
+
+        steps = build_shot_micro_steps(
+            family_id="fade_away",
+            contest_result="offense_win",
+            start_coords={"s1": {"x": 75.0, "y": 30.0}, "d2": {"x": 77.0, "y": 28.0}},
+            shooter_id="s1",
+            defender_id="d2",
+            off_lineup={},
+            def_lineup={},
+            away_offense=False,
+            clock_start={"clock_remaining": 10.0, "shot_clock_remaining": 8.0},
+            shot_type="outside",
+            next_step={"kind": "next_step", "index": 3},
+            apply_contest_layer=True,
+            is_shooting_foul=False,
+        )
+        shot_fl = steps[-1]["start"]["flourish"]
+        assert shot_fl["d2"]["kind"] == "rattle"
+        assert "hack" not in {v.get("kind") for v in shot_fl.values()}
+
+
+def test_stamp_shooting_foul_skips_when_whistle_on_shot_beat():
+    from BackEnd.engine.skeleton_step_emitter import _stamp_shooting_foul_on_miss_end
+
+    step = {"end": {}}
+    turn = {
+        "result_type": "MISS",
+        "next_play_type": "FREE_THROW",
+        "foul_player_id": "d1",
+        "shooting_foul_whistle_on_shot_beat": True,
+    }
+    _stamp_shooting_foul_on_miss_end(step, turn)
+    assert "announcement" not in step["end"]

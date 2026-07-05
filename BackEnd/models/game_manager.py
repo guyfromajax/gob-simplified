@@ -1125,6 +1125,27 @@ class GameManager:
             "events": [],
         }
 
+        # DREB-Task 2 ([UESS SEAM] detection): the DREB entry seam. DREB step 0 is
+        # BallLoose at the prior turn's bounce (bx, by); the prior turn's rendered
+        # ball rest is its final_ball_coords. They should match — log if they
+        # diverge > epsilon so a regression is observable (DREB uses its own
+        # emitter, not covered by the skeleton/OREB detectors). Detection-only.
+        _pfbc = miss_turn.get("final_ball_coords") if isinstance(miss_turn, dict) else None
+        if isinstance(_pfbc, dict):
+            try:
+                _gap = (
+                    (float(bx) - float(_pfbc.get("x"))) ** 2
+                    + (float(by) - float(_pfbc.get("y"))) ** 2
+                ) ** 0.5
+            except (TypeError, ValueError):
+                _gap = 0.0
+            if _gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                logging.warning(
+                    "🎯 [UESS SEAM] DREB entry ball teleport candidate: prior "
+                    "final_ball_coords=%s → step0 ball @ (%.1f, %.1f) (gap=%.1f grid)",
+                    _pfbc, float(bx), float(by), _gap,
+                )
+
         return dreb_turn
 
     def _handle_foul_out_timeout(self, result):

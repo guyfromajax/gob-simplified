@@ -1070,6 +1070,7 @@ class ShotManager:
                             "text": text, "possession_flips": False, "time_elapsed": time_elapsed_ft, "events": [],
                             "foul_player_id": defender.player_id, "foul_team": "DEFENSE",
                             "next_play_type": "FREE_THROW", "free_throws_remaining": ft_remaining,
+                            "is_shooting_foul": True,
                             "offense_team_id": off_team.team_id, "defense_team_id": def_team.team_id,
                             "has_and_one": made_from_foul,
                             "one_and_one": False,
@@ -2440,6 +2441,7 @@ class ShotManager:
             },
             "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else (defender.player_id if charge_result == "BLOCKING_FOUL" and defender else None),
             "foul_team": self.game_state.get("foul_team") if (d_foul or charge_result == "BLOCKING_FOUL") else None,
+            "is_shooting_foul": bool(d_foul and foul_player),
         })
         self._stamp_shot_classification(result, shot_classification)
         if shot_variant_extras:

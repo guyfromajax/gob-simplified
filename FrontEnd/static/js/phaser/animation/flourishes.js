@@ -276,17 +276,89 @@ export function awaitReachInFlourish(scene, sprite, ballSprite, turnData = null,
   });
 }
 
-function runRattle(scene, sprite, flourish) {
+function runRattle(scene, sprite, flourish, opts = {}) {
   const cfg = animationConfig.flourish?.rattle || {};
   const resolved = resolveRenderTarget(sprite);
   if (!resolved) return;
 
-  const ampPx = Number.isFinite(flourish?.amplitude_grid)
-    ? flourish.amplitude_grid * ((scene.game?.config?.width || 800) / 100)
-    : (Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 4);
+  const mult = Number.isFinite(flourish?.foul_rattle_mult)
+    ? flourish.foul_rattle_mult
+    : 1;
+  const ampPx = (
+    Number.isFinite(flourish?.amplitude_grid)
+      ? flourish.amplitude_grid * ((scene.game?.config?.width || 800) / 100)
+      : (Number.isFinite(cfg.amplitudePx) ? cfg.amplitudePx : 4)
+  ) * mult;
   const cycles = Number.isFinite(flourish?.cycles) ? flourish.cycles : (cfg.cycles || 3);
   const cycleMs = Number.isFinite(cfg.cycleMs) ? cfg.cycleMs : 120;
   const ease = flourish?.ease || cfg.ease || "Sine.easeInOut";
+  const shoveMag = Number.isFinite(flourish?.shove_mag_px) ? flourish.shove_mag_px : 0;
+  const shoveUx = Number.isFinite(flourish?.shove_u_x) ? flourish.shove_u_x : 0;
+  const shoveUy = Number.isFinite(flourish?.shove_u_y) ? flourish.shove_u_y : 0;
+  const stepDurationMs = Number.isFinite(opts.stepDurationMs) ? opts.stepDurationMs : null;
+
+  if (shoveMag > 0 && stepDurationMs && scene?.tweens) {
+    if (sprite.__foulRattleTween && sprite.__foulRattleTween.isPlaying?.()) return;
+    let restore;
+    let applyOffset;
+    if (resolved.mode === "origin") {
+      const baseOX = Number(sprite.displayOriginX);
+      const baseOY = Number(sprite.displayOriginY);
+      applyOffset = (offsetX, offsetY) => {
+        sprite.displayOriginX = baseOX - offsetX;
+        sprite.displayOriginY = baseOY - offsetY;
+      };
+      restore = () => {
+        sprite.displayOriginX = baseOX;
+        sprite.displayOriginY = baseOY;
+        sprite.__foulRattleTween = null;
+      };
+    } else {
+      const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
+      applyOffset = (offsetX, offsetY) => {
+        for (const b of bases) {
+          b.c.x = b.x + offsetX;
+          b.c.y = b.y + offsetY;
+        }
+      };
+      restore = () => {
+        for (const b of bases) {
+          b.c.x = b.x;
+          b.c.y = b.y;
+        }
+        sprite.__foulRattleTween = null;
+      };
+    }
+
+    const strikeFrac = animationConfig.flourish?.hack?.strikeFraction ?? 0.35;
+    const tween = scene.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: Math.max(1, stepDurationMs),
+      onUpdate: (tw) => {
+        const elapsed = tw.elapsed || 0;
+        const p = elapsed / stepDurationMs;
+        const strikeWindow = strikeFrac;
+        const cEnv = p <= strikeWindow
+          ? Math.min(1, elapsed / (stepDurationMs * strikeWindow))
+          : Math.max(0, 1 - (p - strikeWindow) / Math.max(0.01, 1 - strikeWindow));
+        const rattleOsc = Math.sin(elapsed * 0.025 * cycles * Math.PI * 2);
+        applyOffset(
+          shoveUx * shoveMag * cEnv + rattleOsc * ampPx,
+          shoveUy * shoveMag * cEnv,
+        );
+      },
+      onComplete: restore,
+      onStop: restore,
+    });
+    if (tween) {
+      tween.__uessBoundaryIgnore = true;
+      sprite.__foulRattleTween = tween;
+    } else {
+      restore();
+    }
+    return;
+  }
 
   let restore;
   let tweenProps;
@@ -477,6 +549,106 @@ function runBite(scene, sprite, flourish, ballSprite) {
   runReachIn(scene, sprite, { ...flourish, kind: "reach_in", target: "ball" }, ballSprite);
 }
 
+function runHack(scene, sprite, flourish, opts = {}) {
+  const cfg = animationConfig.flourish?.hack || {};
+  const resolved = resolveRenderTarget(sprite);
+  if (!resolved || !scene?.tweens) return;
+
+  const hackMag = Number.isFinite(flourish?.hack_mag_px)
+    ? flourish.hack_mag_px
+    : (Number.isFinite(cfg.magInsidePx) ? cfg.magInsidePx : 16);
+  const ux = Number.isFinite(flourish?.rim_unit_x) ? flourish.rim_unit_x : 1;
+  const uy = Number.isFinite(flourish?.rim_unit_y) ? flourish.rim_unit_y : 0;
+  const chops = Number.isFinite(flourish?.chops) ? flourish.chops : (cfg.chops || 2);
+  const durationMs = Number.isFinite(opts.stepDurationMs)
+    ? opts.stepDurationMs
+    : (Number.isFinite(cfg.durationMs) ? cfg.durationMs : 400);
+  const strikeFrac = Number.isFinite(cfg.strikeFraction) ? cfg.strikeFraction : 0.35;
+
+  if (sprite.__hackTween && sprite.__hackTween.isPlaying?.()) return;
+
+  let restore;
+  let applyOffset;
+  if (resolved.mode === "origin") {
+    const baseOX = Number(sprite.displayOriginX);
+    const baseOY = Number(sprite.displayOriginY);
+    applyOffset = (offsetX, offsetY) => {
+      sprite.displayOriginX = baseOX - offsetX;
+      sprite.displayOriginY = baseOY - offsetY;
+    };
+    restore = () => {
+      sprite.displayOriginX = baseOX;
+      sprite.displayOriginY = baseOY;
+      sprite.__hackTween = null;
+    };
+  } else {
+    const bases = resolved.targets.map((c) => ({ c, x: c.x, y: c.y }));
+    applyOffset = (offsetX, offsetY) => {
+      for (const b of bases) {
+        b.c.x = b.x + offsetX;
+        b.c.y = b.y + offsetY;
+      }
+    };
+    restore = () => {
+      for (const b of bases) {
+        b.c.x = b.x;
+        b.c.y = b.y;
+      }
+      sprite.__hackTween = null;
+    };
+  }
+
+  let whistlePlayed = false;
+  const playWhistle = () => {
+    if (!flourish?.play_whistle || whistlePlayed) return;
+    const turnData = opts.turnData;
+    if (turnData?.__shootingFoulWhistlePlayed) return;
+    whistlePlayed = true;
+    if (turnData) turnData.__shootingFoulWhistlePlayed = true;
+    import("../utils/gameAnnouncements.js")
+      .then(({ announceGameEvent }) => {
+        const foulerId = turnData?.foul_player_id;
+        announceGameEvent(
+          "FOUL_SHOOTING",
+          turnData,
+          scene,
+          foulerId ? { foulerId } : {},
+        );
+      })
+      .catch(() => {});
+  };
+
+  const tween = scene.tweens.addCounter({
+    from: 0,
+    to: 1,
+    duration: Math.max(1, durationMs),
+    onUpdate: (tw) => {
+      const elapsed = tw.elapsed || 0;
+      const p = elapsed / durationMs;
+      const strikeWindow = strikeFrac;
+      const cEnv = p <= strikeWindow
+        ? Math.min(1, elapsed / (durationMs * strikeWindow))
+        : Math.max(0, 1 - (p - strikeWindow) / Math.max(0.01, 1 - strikeWindow));
+      const chopOsc = Math.sin(elapsed * 0.018 * chops * Math.PI * 2) * 0.12 + 1;
+      const intoX = ux * 0.7 * hackMag * 0.6 * cEnv * chopOsc;
+      const intoY = uy * 0.7 * hackMag * 0.6 * cEnv * chopOsc;
+      const downY = hackMag * 0.5 * cEnv;
+      applyOffset(intoX, intoY + downY);
+      if (cEnv >= 0.92 && p <= strikeWindow + 0.05) {
+        playWhistle();
+      }
+    },
+    onComplete: restore,
+    onStop: restore,
+  });
+  if (tween) {
+    tween.__uessBoundaryIgnore = true;
+    sprite.__hackTween = tween;
+  } else {
+    restore();
+  }
+}
+
 /**
  * Render a flourish. Dispatches by `flourish.kind`. Unknown / not-yet-rendered
  * kinds are accepted no-ops (placeholders). Visual-only — never throws.
@@ -503,7 +675,10 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
         runBite(scene, sprite, flourish, opts.ballSprite);
         return;
       case "rattle":
-        runRattle(scene, sprite, flourish);
+        runRattle(scene, sprite, flourish, opts);
+        return;
+      case "hack":
+        runHack(scene, sprite, flourish, opts);
         return;
       case "gather":
         runGather(scene, sprite, flourish);

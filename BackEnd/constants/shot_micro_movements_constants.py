@@ -104,6 +104,13 @@ DUNK_HEIGHT_SCALE_BY_INCH = {
     **{h: 30 for h in range(83, 120)},
 }
 
+# --- Shooting foul hack layer (render-space; overridable on step/flourish stamp) ---
+HACK_MAG_INSIDE_PX = 16.0
+HACK_MAG_OUTSIDE_PX = 8.0
+HACK_CHOPS = 2
+FOUL_RATTLE_MULT = 1.5
+SHOOTING_FOUL_SHOVE_MULT = 0.25  # shove_mag = hack_mag * this (opposite hack axis)
+
 # --- Shot ball-arc geometry (tunable; see Shot_Micro_Movements_System.md §7) ---
 # Apex height: apex_px = (ARC_BASE + ARC_SLOPE * dist_grid) * style_mult
 ARC_BASE = 20.0  # px floor

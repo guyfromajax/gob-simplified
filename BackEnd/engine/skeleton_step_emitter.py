@@ -2397,9 +2397,11 @@ def _build_make_hold_sub_step(
                 "playerId": str(shooter_id),
                 "foulerId": str(fouler_id),
             },
-            # AND-1 whistle carried on payload; FE plays at overlay mount.
-            "meta": {"sfx": "foul"},
         }
+        # Whistle fires at the shooting-foul hack strike on the shot beat when
+        # micro stamped shooting_foul_whistle_on_shot_beat — not again here.
+        if not turn_result.get("shooting_foul_whistle_on_shot_beat"):
+            announcement["meta"] = {"sfx": "foul"}
     else:
         announcement = {
             "text": "It's Good!",
@@ -2597,6 +2599,8 @@ def _stamp_shooting_foul_on_miss_end(
     step: AnimationStep,
     turn_result: Dict[str, Any],
 ) -> None:
+    if turn_result.get("shooting_foul_whistle_on_shot_beat"):
+        return
     ann = _shooting_foul_on_miss_announcement(turn_result)
     if ann:
         step.setdefault("end", {})["announcement"] = ann
