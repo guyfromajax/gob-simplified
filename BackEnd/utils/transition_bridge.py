@@ -1157,11 +1157,15 @@ def build_bip_animation_steps(
     - **Step 4 — Inbound pass**: SF passes to PG. Other 8 may continue
       toward setup positions during the pass (``continuing_targets``).
 
-    Clock policy: GAME clock burns through all four steps. SHOT clock is
-    PINNED across the entire turn — it doesn't start until the inbound
-    receiver receives the pass (= the moment this turn ends; the next turn
-    burns shot clock as normal). This matches the real-basketball rule
-    that the shot clock starts on receipt, not on the inbound throw.
+    Clock policy: BOTH clocks are PINNED across all four steps (BIP is a
+    dead-ball inbound after a made basket). The GAME clock is frozen through
+    the inbound; the authoritative game_state burns only the small post-make
+    runoff (0/2s) at the turn level (game_manager bypass:BIP), so the next turn
+    ticks down from there — no backward clock snap at the BIP→HCO seam (see
+    BIP-Task 1 note at the clock-policy block below). The SHOT clock likewise
+    doesn't start until the inbound receiver receives the pass (= the moment
+    this turn ends; the next turn burns shot clock as normal), matching the
+    real-basketball rule that the shot clock starts on receipt.
 
     All four steps use ``standard`` archetype for SF (per the dev brief).
     Other players keep their existing archetype (``standard``; ``sprint`` for
@@ -1272,14 +1276,28 @@ def build_bip_animation_steps(
         metadata_reason="bip_inbound_pass",
     )
 
-    # ===== Clock policy: pin SHOT clock across all 4 steps. =====
-    # GAME clock burns naturally (default build_*_step behavior).
-    # SHOT clock stays at the turn-start value until this turn ends; the
-    # next turn (HCO / etc.) starts burning shot clock on receiver pickup.
+    # ===== Clock policy: pin BOTH clocks across all 4 steps. =====
+    # BIP is a DEAD-BALL inbound after a made basket — the game clock is frozen
+    # through the inbound (mirrors SIP's build_sip_animation_steps, which pins
+    # both clocks). BIP-Task 1 (BIP_UESS_Audit.md HIGH-1): previously only the
+    # SHOT clock was pinned and the GAME clock burned the full ~4-8s
+    # walk-up+hold+pass, while ``time_elapsed`` carried only the small post-make
+    # runoff (0/2s). So the emitted animation ran the clock during a dead ball
+    # AND the next turn (which seeds from game_state = clock − runoff) opened
+    # ABOVE where BIP's animation ended (clock − ~T_total), snapping the visible
+    # clock BACKWARD ~4s at the BIP→HCO seam. Pinning the game clock freezes the
+    # emitted steps at the turn-start value; the authoritative game_state still
+    # burns the runoff at the turn level (game_manager ``bypass:BIP`` path), so
+    # the next turn ticks DOWN from there (no backward jump; no negative emitted
+    # clock at low game clock). SHOT clock likewise stays at the turn-start
+    # value; the next turn starts burning it on receiver pickup.
     pinned_shot_clock = float(shot_clock_remaining_at_start)
+    pinned_game_clock = float(clock_remaining_at_start)
     for step in (step1, step2, step3, pass_step):
         step["start"]["clock"]["shot_clock_remaining"] = pinned_shot_clock
         step["end"]["clock"]["shot_clock_remaining"] = pinned_shot_clock
+        step["start"]["clock"]["clock_remaining"] = pinned_game_clock
+        step["end"]["clock"]["clock_remaining"] = pinned_game_clock
 
     return [step1, step2, step3, pass_step]
 

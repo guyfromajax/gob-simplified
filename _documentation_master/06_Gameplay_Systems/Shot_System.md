@@ -405,7 +405,7 @@ Only when `dunk_in_play`. `roll = random.randint(1, 100)` vs `DUNK_HEIGHT_SCALE[
 | Roll | Outcome |
 |------|---------|
 | `roll == scale + 1` | **Missed dunk** — `dunk_miss: true`, forces `result_type: MISS`, full dunk animation through slam, then normal miss bounce (no hold) |
-| `roll ≤ scale` and **MAKE** | **Made dunk** — family `dunk` or `drive_dunk`, skip `[ball_flight]` → `[hold]` |
+| `roll ≤ scale` and **MAKE** | **Made dunk** — family `dunk` or `drive_dunk`, skip `[ball_flight]` → `[hold]` with **Dunk!** announce + random dunk VO (`meta.sfx: "dunk_make"`) |
 | `roll ≤ scale` and **BLOCK** | **Blocked dunk attempt** — same family, `yield_before_slam: true` (rise only), then existing block `[ball_flight]` |
 | `roll ≤ scale` and normal **MISS** | No dunk animation — fall through to normal micro pool |
 | else | No dunk — normal micro pool |

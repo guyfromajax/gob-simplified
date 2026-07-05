@@ -2372,6 +2372,8 @@ def _build_make_hold_sub_step(
     ``next_play_type == "FREE_THROW"`` and a foul player is named on the
     turn result, the announcement text is swapped.
     """
+    from BackEnd.engine.shot_micro_movements import is_dunk_micro_family
+
     fouler_id = (
         turn_result.get("foul_player_id")
         or _safe_id(turn_result.get("foul_player"))
@@ -2380,6 +2382,7 @@ def _build_make_hold_sub_step(
         str(turn_result.get("next_play_type") or "").upper() == "FREE_THROW"
         and bool(fouler_id)
     )
+    is_dunk_make = is_dunk_micro_family(turn_result.get("micro_movement_family"))
     team = "away" if away_offense else "home"
 
     coords = dict(prev_end_coords)
@@ -2389,7 +2392,7 @@ def _build_make_hold_sub_step(
 
     if is_and_one:
         announcement: Dict[str, Any] = {
-            "text": "It's Good! And 1!",
+            "text": "Dunk! And 1!" if is_dunk_make else "It's Good! And 1!",
             "team": team,
             "hold_ms": MAKE_HOLD_MS,
             "style": "and_one",
@@ -2402,6 +2405,15 @@ def _build_make_hold_sub_step(
         # micro stamped shooting_foul_whistle_on_shot_beat — not again here.
         if not turn_result.get("shooting_foul_whistle_on_shot_beat"):
             announcement["meta"] = {"sfx": "foul"}
+    elif is_dunk_make:
+        announcement = {
+            "text": "Dunk!",
+            "team": team,
+            "hold_ms": MAKE_HOLD_MS,
+            "style": "primary",
+            "player_data": {"playerId": str(shooter_id)},
+            "meta": {"sfx": "dunk_make"},
+        }
     else:
         announcement = {
             "text": "It's Good!",

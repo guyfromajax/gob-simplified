@@ -22,7 +22,18 @@ def _ensure_min_stats(game):
 @pytest.mark.integration
 class TestOrebKickout:
     """Test offensive rebound kickout flow."""
-    
+
+    def setup_method(self, method):
+        # Deterministic RNG so these tests aren't order-flaky. The MISS→OREB is
+        # forced via the shot_manager.random.random patch in each test, but the
+        # OREB putback/kickout split (random.randint in shared.py, ~75/25) reads
+        # the global stream, which made the outcome depend on prior tests' RNG
+        # consumption. Re-seeding before each test makes every run identical and
+        # lands the split on a kickout (verified across the suite). NOTE: if the
+        # RNG consumption in the OREB resolution path changes, re-pick this seed.
+        import random
+        random.seed(0)
+
     def test_oreb_kickout_turn_structure(self):
         """
         Test that OREB kickout turns have all required fields.

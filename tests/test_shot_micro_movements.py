@@ -585,7 +585,8 @@ class TestDunkMicroMovement:
         }
         _build_post_shot_sub_steps(steps, turn, {}, {}, False)
         assert len(steps) == 2
-        assert steps[1]["start"]["announcement"]["text"] == "It's Good!"
+        assert steps[1]["start"]["announcement"]["text"] == "Dunk!"
+        assert steps[1]["start"]["announcement"]["meta"] == {"sfx": "dunk_make"}
         assert shoot_step["end"]["next"] == {"kind": "next_step", "index": 1}
         assert all(
             step.get("start", {}).get("ball_motion_style") != "shot"

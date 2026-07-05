@@ -22,6 +22,7 @@ import {
   setCurrentOwner,
   clearPendingOwner,
 } from "./BallControllerAdapter.js";
+import { captureOobFcpHctTurnIfRelevant } from "../utils/oobFcpHctCapture.js";
 // ✅ TIMEOUT: Removed resetTimeoutQueue import - timeout queue persists until executed
 
 function isHcoPlaycallTurn(turn) {
@@ -457,4 +458,6 @@ export async function finalizeTurnAfterAnimation({
     scene.__stealOwnershipCheckpoint = snapshot;
     console.log("[STEAL OWNERSHIP][TURN END]", snapshot);
   }
+
+  captureOobFcpHctTurnIfRelevant(turn, scene, { turnIndex });
 }

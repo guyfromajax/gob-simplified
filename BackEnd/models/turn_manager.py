@@ -532,6 +532,19 @@ class TurnManager:
         if isinstance(prior_turn, dict):
             prior_fc = prior_turn.get("final_coords")
             if isinstance(prior_fc, dict) and len(prior_fc) >= 8:
+                # BIP-Task 2 (MED-1, BIP_UESS_Audit.md): backfill any active player
+                # missing from the prior turn's final_coords from live player.coords
+                # so the inbound chain always covers all 10. build_final_coords
+                # silently drops a player whose coords were None/invalid at snapshot
+                # time; without this, that player is absent from every BIP step
+                # (invisible/frozen through the whole inbound). Reuses the HCO
+                # Task-4 backfill (adds only; never overrides).
+                from BackEnd.engine.skeleton_step_emitter import (
+                    _backfill_missing_active_coords,
+                )
+                off_lineup = getattr(getattr(game, "offense_team", None), "lineup", {}) or {}
+                def_lineup = getattr(getattr(game, "defense_team", None), "lineup", {}) or {}
+                prior_fc = _backfill_missing_active_coords(prior_fc, off_lineup, def_lineup)
                 return prior_fc, prior_turn.get("final_ball_handler_id")
 
         if game_state.get("inbound_seam_from_triangle"):
@@ -1001,7 +1014,7 @@ class TurnManager:
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if (setup_locations and is_away_offense) else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
-            "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # for situational Force Foul (pass receiver)
+            "receiver_pos": SITUATIONAL_BIP_RECEIVER_POS,  # situational Force Foul TARGET (a scatter player, "SG" — NOT the inbound pass receiver, who is PG). BIP-Task 3 / L-4: name is a misnomer, kept for back-compat.
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
             "turn_type": "BASELINE_INBOUND",  # Back-compat marker for post-BIP pressure slicing.
             "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
@@ -1060,10 +1073,11 @@ class TurnManager:
         )
         attach_position_snapshots(payload, [bip_snap])
 
-        # Emit unified animation_steps. BIP is now a 2-step turn:
-        # Step 1 = setup walk-in (SF carries ball to baseline; everyone moves
-        # to BIP destinations). Step 2 = inbound pass (SF→PG; other 8 continue
-        # toward Step 1 destinations). See transition_bridge.build_bip_animation_steps.
+        # Emit unified animation_steps. BIP is a 4-step "rim pickup" turn
+        # (BIP-Task 3 / L-5: corrected from the stale "2-step" claim):
+        # Step 1 SF→rim (picks up the loose ball), Step 2 SF→baseline inbound
+        # spot, Step 3 passer hold, Step 4 inbound pass SF→PG. See
+        # transition_bridge.build_bip_animation_steps for the authoritative spec.
         try:
             from BackEnd.utils.transition_bridge import (
                 build_bip_animation_steps,
@@ -1107,11 +1121,31 @@ class TurnManager:
                     )
                 else:
                     # Made-shot / live-play BIP: 4-step rim pickup sequence.
-                    ball_start_coord = (
-                        dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
-                        if not is_away_offense
-                        else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+                    # BIP-Task 3 (L-1, BIP_UESS_Audit.md): seed the loose ball from
+                    # the prior turn's rendered ball rest (final_ball_coords) so the
+                    # MAKE→BIP seam is DERIVED from the prior turn, not a fixed
+                    # constant that only happens to match today's make variants
+                    # (a future variant resting off-MSSS would otherwise teleport
+                    # the ball at the seam). Fall back to the MSSS rim constant when
+                    # the prior turn didn't stamp final_ball_coords (legacy paths).
+                    _prior_fbc = (
+                        prior_turn.get("final_ball_coords")
+                        if isinstance(prior_turn, dict) else None
                     )
+                    if (
+                        isinstance(_prior_fbc, dict)
+                        and _prior_fbc.get("x") is not None
+                        and _prior_fbc.get("y") is not None
+                    ):
+                        ball_start_coord = {
+                            "x": float(_prior_fbc["x"]), "y": float(_prior_fbc["y"]),
+                        }
+                    else:
+                        ball_start_coord = (
+                            dict(MADE_SHOT_SWEET_SPOT_AWAY_RIM)
+                            if not is_away_offense
+                            else dict(MADE_SHOT_SWEET_SPOT_HOME_RIM)
+                        )
                     anim_steps = build_bip_animation_steps(
                         off_lineup=offense_team.lineup,
                         def_lineup=defense_team.lineup,

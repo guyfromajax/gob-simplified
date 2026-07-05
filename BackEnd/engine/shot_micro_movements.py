@@ -1182,7 +1182,8 @@ def build_shot_micro_steps(
             }
             if result_upper == "MAKE" and not yield_before_slam and not dunk_miss:
                 dunk_ball_end = {"coords": dict(resolve)}
-                dunk_arrival_sfx = shot_result_sfx(None, "MAKE")
+                # Made-dunk VO fires at the [hold] "Dunk!" announce (dunk_make);
+                # no swish at the slam beat.
             else:
                 dunk_ball_end = {"owner_player_id": str(shooter_id)}
 

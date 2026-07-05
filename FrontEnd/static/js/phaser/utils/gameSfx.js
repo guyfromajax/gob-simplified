@@ -47,6 +47,9 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "braddock-three.mp3",
   "duke-three.mp3",
   "sammy-three.mp3",
+  "braddock-dunk.mp3",
+  "duke-dunk.mp3",
+  "sammy-dunk.mp3",
   "block1.wav",
   "airball-emotion.wav",
   "duke-its-blocked.wav",
@@ -440,6 +443,24 @@ export function resolveThreePointerSfxFile() {
   return THREE_POINTER_SFX_FILES[THREE_POINTER_SFX_FILES.length - 1].file;
 }
 
+// One of three announcer-voice calls played at random when a made dunk's
+// "Dunk!" announcement mounts (SFX_System.md "Made Dunk Announce").
+const DUNK_MAKE_SFX_FILES = Object.freeze([
+  { file: "braddock-dunk.mp3", weight: 33 },
+  { file: "duke-dunk.mp3", weight: 33 },
+  { file: "sammy-dunk.mp3", weight: 34 },
+]);
+
+export function resolveDunkMakeSfxFile() {
+  const total = DUNK_MAKE_SFX_FILES.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of DUNK_MAKE_SFX_FILES) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.file;
+  }
+  return DUNK_MAKE_SFX_FILES[DUNK_MAKE_SFX_FILES.length - 1].file;
+}
+
 // Fires at the moment the ball attaches to the rebounder sprite. DREB → defense
 // strong; OREB → inside strong.
 export function playReboundSfx(scene, reboundType) {
@@ -625,6 +646,7 @@ export function resolveAnnounceMetaCourtSfxFile(key) {
     case "steal": return resolveStealSfxFile();
     case "interception": return resolveInterceptionSfxFile();
     case "three_make": return resolveThreePointerSfxFile();
+    case "dunk_make": return resolveDunkMakeSfxFile();
     case "block_announce": return "duke-its-blocked.wav";
     case "charge_announce": return "duke-charging.wav";
     case "fb_defensive_stop": return "duke-great-stop.wav";
@@ -721,6 +743,9 @@ export function playAnnouncementMetaCourtSfx(scene, key, headline = "") {
       return true;
     case "three_make":
       playGameSfx(scene, resolveThreePointerSfxFile(), DEFAULT_VOLUME, { event: "three_make" });
+      return true;
+    case "dunk_make":
+      playGameSfx(scene, resolveDunkMakeSfxFile(), DEFAULT_VOLUME, { event: "dunk_make" });
       return true;
     case "block_announce":
       playBlockAnnounceCourtSfx(scene);

@@ -195,6 +195,13 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - File: **33/33/34** random each show — `braddock-three.mp3` or `duke-three.mp3` or `sammy-three.mp3`
 - Resolver: `resolveThreePointerSfxFile()` (gameSfx.js). `meta.sfx` key: `"three_make"` (passed on the "It's Good!" announce payload).
 
+**Made Dunk Announce**
+
+- Trigger: immediately when the backend schema emitter builds the **Dunk!** Announce for a made dunk (`micro_movement_family` is `dunk` or `drive_dunk`). The frontend does **not** infer this from shot type; it only renders the backend-stamped `meta.sfx`.
+- Dunk and-1s use **Dunk! And 1!** with the foul whistle (`meta.sfx: "foul"`) — no dunk VO on that path. No swish SFX at the slam beat; audio is only at the hold announce.
+- File: **33/33/34** random each show — `braddock-dunk.mp3` or `duke-dunk.mp3` or `sammy-dunk.mp3`
+- Resolver: `resolveDunkMakeSfxFile()` (gameSfx.js). `meta.sfx` key: `"dunk_make"` (passed on the "Dunk!" announce payload).
+
 **Airball Announce**
 
 - Trigger: immediately when the **Airball!** Announce appears (`handleAirballAnnouncement`, gameAnnouncements.js).
