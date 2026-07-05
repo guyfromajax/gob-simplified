@@ -635,6 +635,14 @@ def build_ft_animation_steps(
     }
 
     start_coords = _prior_turn_start_coords(game)
+    # FT-Task 1 (Free_Throw_UESS_Audit.md #1): backfill ALL active players
+    # missing from the prior turn's final_coords (not just the shooter) — a
+    # dropped player (None/invalid coords at prior turn end) was otherwise
+    # absent from the setup + every step, then inserted at the default
+    # {50,25} center-court in the terminal step → teleport. Mirrors the
+    # HCO/SIP/HCT/FCP entry backfill (adds only; never overrides).
+    from BackEnd.engine.skeleton_step_emitter import _backfill_missing_active_coords
+    start_coords = _backfill_missing_active_coords(start_coords, off_lineup, def_lineup)
     if shooter_id not in start_coords:
         sc = getattr(shooter, "coords", None) or {}
         if "x" in sc and "y" in sc:
