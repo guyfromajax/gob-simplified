@@ -336,8 +336,12 @@ At AG=50, `base_rate / STANDARD` = 1, so each archetype runs at its table rate i
 ### 9.5 Destinations are intent, not guarantees
 
 - Only `gate_player_ids` are guaranteed to reach `destination` by step end.
-- Non-gate movers end at `_interrupted_coord` (`start + rate × T` toward destination).
+- Non-gate movers end at `_interrupted_coord` (`start + rate × T` toward destination). The advance trigger (the gate reaching its destination / step T elapsing) ends the step; every other player stops at wherever they've progressed to.
 - Destinations may carry across consecutive steps so a slow mover can keep progressing toward the same target (e.g., HCT defenders: BIP step 1 → BIP step 2 → HCT walk-up all share the same destination).
+
+**Logic reads the interrupted end, not the destination (§1 applied to motion).** A player's authoritative step-end position is the interrupted `end.coords[p]` the emitter renders — NOT the `destination` intent. All game logic — contest, steal, foul, rebound, over-and-back / frontcourt / shot-clock reads — MUST decide from `end.coords[p]`. Reading the `destination` (or "snapping" a player to their full target) means deciding from a position the FE never showed — a §1 single-coord-source violation, not merely a render detail.
+
+**No teleport by construction — the corollary.** Because `end.coords[p]` is always the reachable interrupted coord (bounded by `rate × T`), a player can never be *placed* where they couldn't travel: the destination may be unreachable, but the rendered end never is. Teleports therefore arise only from two failures — (a) a *decision* consuming the `destination`/a snap instead of `end.coords` (the HCT/FCP trap-collapse + over-and-back class — see [`Trap_Press_Positioning_Decision.md`](../projects/UESS%20Audits/Trap_Press_Positioning_Decision.md)), or (b) a *seam* dropping a player so a downstream default (e.g. `{50,25}`) fills in (the backfill class). The planned reachability capstone audits every logic consumer for (a).
 
 ---
 
