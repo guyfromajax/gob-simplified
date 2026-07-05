@@ -1639,6 +1639,25 @@ class TurnManager:
             self.logger.log("fb:start")
             self.game.game_state["fastBreakInProgress"] = True
             result = resolve_fast_break_logic(self.game)
+            # FB-Task 1 (Fast_Break_UESS_Audit.md #1/#5): reconcile turn-level
+            # time_elapsed with the emitted schema's game-clock burn, mirroring the
+            # FCP branch (:1665-1675). Each FB family stamps time_elapsed as an
+            # independent estimate (t_shooter+1, legacy cover-ground, t_drive+X, or
+            # a literal random) that diverges from the rendered per-step deltas by
+            # ~2-6s → a backward jump / forward skip at every FB exit seam (worst on
+            # DEFENSIVE_STOP). Recompute from the schema so the FB's last rendered
+            # step-end clock == the next turn's step-0 start. Applies to ALL FB
+            # terminals (not just shots), since DEFENSIVE_STOP is the worst offender.
+            if isinstance(result, dict):
+                _fb_steps = result.get("animation_steps") or []
+                if _fb_steps:
+                    _fb_cs = (_fb_steps[0].get("start") or {}).get("clock") or {}
+                    _fb_ce = (_fb_steps[-1].get("end") or {}).get("clock") or {}
+                    _fb_cs_start = _fb_cs.get("clock_remaining")
+                    _fb_cs_end = _fb_ce.get("clock_remaining")
+                    if _fb_cs_start is not None and _fb_cs_end is not None:
+                        _fb_schema_burn = max(0.0, float(_fb_cs_start) - float(_fb_cs_end))
+                        result["time_elapsed"] = int(round(_fb_schema_burn))
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
