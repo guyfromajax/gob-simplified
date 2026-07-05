@@ -52,7 +52,7 @@ Regression-clean (the dynamic HCT/FCP test suite has ~6 pre-existing baseline fa
 - ⬜ **HCT-Task 5 (MED-HIGH #3 + MED #8) — SCOPED (overlaps steal thread).** Two parts: **(a) shot-clock reset** — the post-steal transition (`_append_post_steal_hco_transition`, skeleton_step_emitter.py:3352-3392) hands the ball to the stealer but keeps decrementing the old possession's shot clock; it should reset to 30. **This code is SHARED with HCO steals and sits in the interception/steal path the separate thread owns** — coordinate there, don't touch here. **(b) 0.5s commit** — the post-steal step is appended *after* `time_elapsed = sum(step_clock_seconds)` is finalized (dynamic_hct_step_emitter.py ~1082), so its 0.5s isn't committed → 0.5s backward game-clock jump + stale `executed_step_count`/`resolution_step_index`. Part (b) is HCT-local and safe-ish, but the fix is cleaner done alongside (a); recommend bundling both with the steal thread.
 
 **Group C — trap positioning (needs a design call) → see [Trap_Press_Positioning_Decision.md](Trap_Press_Positioning_Decision.md) (consolidated decision doc, spans HCT + FCP + over-and-back):**
-- **HCT-Task 7 (MED #6/#7):** reconcile engine full-collapse/sprint vs emitter interrupted/standard. Options A (logic reads render) / B (render reaches logic — recommended) / C (hybrid) in the decision doc.
+- **HCT-Task 7 (MED #6/#7):** single-coord-source fix (settled) — size the trap converge/stopper beats by the slowest defender + render PF/C at sprint, so engine == emitter == render. Details in the decision doc.
 
 All shift trap/steal/clock behavior → coordinate with shot-system tuning ([[project_shot_system_tuning]]).
 

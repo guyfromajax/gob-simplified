@@ -1,9 +1,22 @@
-# Group C — Trap / Press Positioning: logic-vs-render divergence (DECISION NEEDED)
+# Group C — Trap / Press Positioning: single-coord-source fix (DECISION SETTLED, needs impl + verify)
 
-**Status: OPEN — needs a gameplay-feel decision.** Consolidates the deferred "Group C" items from [HCT_UESS_Audit.md](HCT_UESS_Audit.md) (HCT-Task 7) and [FCP_UESS_Audit.md](FCP_UESS_Audit.md) (FCP-Task 3 + #6), which are the **same root** and the likely cause of the reported **over-and-back** bug. Not a mechanical fix — it changes how the trap/press *feels*.
+**Status: framing settled (2026-07-05) — it's a correctness fix, not a gameplay-feel choice.** Consolidates the deferred "Group C" items from [HCT_UESS_Audit.md](HCT_UESS_Audit.md) (HCT-Task 7) and [FCP_UESS_Audit.md](FCP_UESS_Audit.md) (FCP-Task 3 + #6), the **same root** and the cause of the reported **over-and-back** bug.
 
-## The question (one line)
-When the game logic decides a steal / foul / contest / over-and-back from a defender or ball-handler position the **frontend never renders** (the trap collapses in logic but not on screen), do we **weaken the logic to match the render**, or **speed up the render to match the logic**?
+## Principle (user, 2026-07-05)
+Backend logic is authoritative; the FE renders backend decisions and **NEVER overrides** them (UESS §1). If the backend logic determines an over-and-back (or a steal, foul, contest), it must be **both called and rendered** — consistently, every time. So "make the logic read the render" is **rejected** — it inverts the authority.
+
+## The real root (two backend coord representations disagree)
+This is NOT the FE overriding the backend. The **engine** (decision logic) and the **emitter** (which produces the render) are *both backend*, but compute positions differently:
+- Engine **snaps** the BH/defenders to their full target (BH at AG-drive rate).
+- Emitter **interpolates** them at standard rate → renders them short/behind.
+
+So the game logic decides from one backend coord and the FE shows another. Fixing it = **single-coord-source**: one position per player per step, used by both the decision and the render.
+
+## The §8 nuance (why "just render the snap" is wrong too)
+The engine's snapped position often **isn't physically reachable in the beat's time** (defenders can't cross the court in a PG-sized window). Rendering the snap verbatim = a **teleport** (violates §8). So the single coord must also be **physically valid** — the beats must be **sized by real travel time** so the intended position *is* reachable. Then engine == emitter == render, and every decision is shown exactly as decided.
+
+## Prior mis-framing (superseded)
+Earlier this doc framed it as "weaken logic (A) vs speed up render (B) vs hybrid (C)" — a gameplay tradeoff. That was wrong: A inverts §1 authority, and B/C conflate "render faster" with the real fix. The correct fix is one thing: **unify the coord + make it physically valid.**
 
 ## The divergence (mechanism)
 The dynamic HCT/FCP engine **snaps** players to their full target in one beat; the emitter **interrupts** them at a slower rate over that beat's short duration, so on screen they fall short. The engine then reads the **full/snapped** positions for game decisions. Two shapes:
@@ -18,27 +31,20 @@ The dynamic HCT/FCP engine **snaps** players to their full target in one beat; t
 
 **Symptom already reported:** ball animated committing an over-and-back, but the violation doesn't register — the engine's BH is *ahead* of the rendered BH, so `is_over_and_back_pass` sees a frontcourt BH while the FE shows him crossing back.
 
-## Options
+## The fix (settled direction): unify the coord, make it physically valid
+One position per player per step, decided-from and rendered, physically reachable:
+- **Size every collapse / advance beat's duration by the *slowest mover* it must move** (currently the trap/press converge is sized PG-only), so the intended target *is* reachable within the beat.
+- **Use the same movement rate in the engine and the emitter** per player (PF/C + recovery = sprint in both; BH advance = AG-drive rate in both — the emitter must stop rendering these at standard rate).
+- Result: engine end coord == emitter end coord == rendered coord. Steal / foul / contest / over-and-back are decided and rendered from the identical coord → called ⇔ shown, always.
 
-| | Option A — **logic reads render** | Option B — **render reaches logic** (recommended) | Option C — hybrid |
-|---|---|---|---|
-| **Change** | Eligibility (steal/foul/contest/over-and-back) reads the emitted *interrupted* `end.coords` instead of the engine snap | Size each collapse/advance beat's **duration** by the *slowest mover* (not PG-only), and/or render at the engine's rate (sprint / AG-drive), so players actually reach the logical target on screen | Per-consumer: read-render for violations (over-and-back), render-reaches for the trap collapse |
-| **UESS** | ✅ logic == render | ✅ render == logic | ✅ both |
-| **Gameplay feel** | ⚠️ **Weaker** trap/press — steals/fouls only fire when a defender is *visibly* on the ball; fewer turnovers | ✅ **Preserves** trap/press strength; the collapse just *looks* as aggressive as it plays | ✅ preserves strength; correct violations |
-| **Visual** | unchanged | collapse/advance animations are **faster / longer** (defenders sprint to close, BH drives at full speed) | mixed |
-| **Effort / risk** | lower (read a different coord) | medium (beat-duration sizing + rate per mover); more visual change | higher (per-consumer) |
+This is **not** a balance change and **not** "render faster for looks" — it's removing a second, physically-impossible coord representation. The trap/press now closes at its *real* speed; the instant-snap was the fiction.
 
-## Recommendation
-**Option B** — make the render reach the logical positions (size beats by the slowest mover; render the BH advance at the drive rate). It's the only option that keeps the trap/press as strong as designed *and* satisfies UESS (logic == render) *and* fixes over-and-back — the cost is faster/longer collapse + drive animations, which is a visual-pacing tradeoff, not a correctness one. Fall back to **Option A** only if B's faster animations look bad.
+## Scope
+- **HCT-Task 7:** size the trap `hct_converge` + terminal-stopper beats by the slowest converging defender's travel; render PF/C (+ recovery) at sprint in the emitter.
+- **FCP-Task 3:** same for the press converge + stopper — **higher priority** (`skip_walk_up` makes the single converge beat cover the whole court).
+- **Over-and-back (`_advance`, #6):** render the BH advance at the AG-drive rate so his rendered position matches the engine's `frontcourt_established` / `is_over_and_back_pass` read → the violation is called whenever it's shown. Coordinate with the separate over-and-back thread.
+- **Verify in prototype** — HCT/FCP can't be sim-verified in the mock; watch that (a) no defender/BH teleports (beats long enough) and (b) over-and-back fires exactly when the ball is shown crossing back.
 
-Reason to *not* default to A: it silently nerfs the trap/press (a balance change disguised as a bug fix) — that should be a deliberate design choice, not a side effect.
-
-## Scope if approved (Option B)
-- **HCT-Task 7:** size the trap `hct_converge` + terminal stopper beats by the slowest defender's travel; render PF/C at sprint.
-- **FCP-Task 3:** same for the press converge + stopper (higher priority — `skip_walk_up` amplifies it).
-- **Over-and-back (`_advance`):** render the BH at the AG-drive rate (or read the rendered BH for the violation) — coordinate with the separate over-and-back thread.
-- **Verify in prototype** (HCT/FCP can't be sim-verified in the mock).
-
-## Open decision
-- [ ] **A** (weaken logic to render), **B** (render reaches logic — recommended), or **C** (hybrid)?
-- [ ] Is a faster/longer trap-collapse + BH-drive animation acceptable (Option B's cost)?
+## Remaining (not a fork — just confirmations)
+- [ ] Confirm the *real-speed* trap/press close (slightly slower than the current instant-snap) is acceptable — it's the correct physics, but it's a visible timing change.
+- [ ] Sequencing: bundle HCT-Task 7 + FCP-Task 3 + the over-and-back fix into one coordinated pass (shared `_advance` / `_position_defense` / beat-sizing), verified in prototype.
