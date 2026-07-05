@@ -1,7 +1,7 @@
 /**
  * Animation step schema — JSDoc mirror of
  * `BackEnd/utils/animation_step_schema.py`. See
- * `_documentation_master/projects/Animation_System_Updated.md` for design
+ * `_documentation_master/05_UESS_System/UESS_System.md` §3 for design
  * rationale.
  *
  * Each animation step has a start state, an advance trigger (condition +

@@ -1,4 +1,8 @@
 
+# Micro Movements — Design Wishlist (archived)
+
+> **Status:** Archived (July 2026). **Canonical spec:** [`Shot_Micro_Movements_System.md`](../../06_Gameplay_Systems/Shot_Micro_Movements_System.md). This file was early shot-animation ideation; implemented beats (pump fake, dunk, etc.) live in the system doc and `shot_micro_movements_constants.py`.
+
 
 **Shot Attempts**
 - Inside Shots
@@ -14,7 +18,7 @@
         (player sprite moves 1 x spot toward the basket then animates shot)
 - Outside Shots
     - Set Outside Shot (player shoots from his receiving location)
-    - Set Outside Shot with Pump Fake — **v1:** ball bobs **2 grid** on Y (shooter stationary); **190 ms** out + **190 ms** back (**380 ms** wall); sim step **1.05 s** game; sign: shooter grid y>25 → + pixel Y else −; defender may **bite** on contested pump (bucket D). See [`Shot_Micro_Movements_System.md`](../06_Gameplay_Systems/Shot_Micro_Movements_System.md) §6.5.
+    - Set Outside Shot with Pump Fake — **v1:** ball bobs **2 grid** on Y (shooter stationary); **190 ms** out + **190 ms** back (**380 ms** wall); sim step **1.05 s** game; sign: shooter grid y>25 → + pixel Y else −; defender may **bite** on contested pump (bucket D). See [`Shot_Micro_Movements_System.md`](../../06_Gameplay_Systems/Shot_Micro_Movements_System.md) §6.5.
     - Dribble & Shoot Outside Shot 
     - Dribble & Shoot Outside Shot with Pump Fake
     - Pump Fake & the Dribble & Shoot Outside Shot

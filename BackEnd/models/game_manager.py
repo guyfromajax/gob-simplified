@@ -926,7 +926,8 @@ class GameManager:
         turn type (parallel to OREB) so the rebound capture animates through
         the unified step-based playback engine instead of bundled inside the
         SHOT_ATTEMPT handler. See:
-        - _documentation_master/projects/Animation_System_Updated.md
+        - _documentation_master/05_UESS_System/UESS_System.md §3
+        - Rebound_System.md §DREB
         - BackEnd/engine/dreb_step_emitter.py
 
         Currently scoped to HCT, HCO, FCP, migrated FAST_BREAK MISS/BLOCK
@@ -959,7 +960,7 @@ class GameManager:
         #
         # By reading player.coords, DREB always sees what shot_manager actually
         # decided for every player post-shot. This is the single-placement-
-        # authority contract in `Rebound_System.md` / `Animation_System_Updated.md`.
+        # authority contract in `Rebound_System.md` / `UESS_System.md` §9.
         start_coords = {}
         for player in (
             list(self.offense_team.lineup.values())
@@ -1520,7 +1521,7 @@ class GameManager:
         # discrete DREB turn (parallels the OREB pattern above). Scoped to
         # turn types whose migration has landed — HCT, HCO, FCP, and
         # migrated FAST_BREAK schema paths. See
-        # _documentation_master/projects/Animation_System_Updated.md.
+        # _documentation_master/05_UESS_System/UESS_System.md §3.
         from BackEnd.constants.fast_break_play_types import FAST_BREAK_PLAY_KEYS
 
         is_migrated_fb_miss = (

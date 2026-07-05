@@ -5,7 +5,7 @@ Pure decision logic: given the current skeleton step, the ball handler + his
 defender, the read map (Phase 1), and team/aggression context, decide what the
 ball handler does this step. Returns a Decision dict describing the action —
 it does NOT emit any UESS/skeleton steps (that is Phase 3+). See
-_documentation_master/projects/Dynamic_HCO_Motion_Brief.md (Step 2).
+_documentation_master/projects/Z-Completed/Dynamic_HCO_Motion_Brief.md (Step 2).
 
 Scores use brief "form B": (raw_helper + team_modifier) * random.randint(1,6) —
 a single roll, with the raw (roll-free) helper variants from BackEnd.utils.shared

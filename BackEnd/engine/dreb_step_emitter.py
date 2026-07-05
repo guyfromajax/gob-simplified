@@ -2,7 +2,8 @@
 
 Produces a single-step `AnimationStep` payload for the DREB turn type
 introduced by the SS&S animation refactor (see
-`_documentation_master/projects/Animation_System_Updated.md`).
+`_documentation_master/05_UESS_System/UESS_System.md` §3;
+`Rebound_System.md` §DREB).
 
 Design — single-placement-authority model:
 - `shot_manager` is the sole authority for post-shot player positions. It

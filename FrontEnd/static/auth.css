@@ -3,8 +3,7 @@
    reset-password.html)
    Drop-in replacement for the legacy auth.css. Class names are UNCHANGED, so
    no HTML edits are required to adopt the new look — every auth screen inherits
-   it automatically. The two OPTIONAL additions (logo + back link) are noted
-   inline and in AUTH-HANDOFF.md.
+   it automatically. Optional polish: logo above .auth-container; ← on back link.
 
    Design family: "Front Door" surface (peer to homepage + mode-select).
    Brand tokens used:

@@ -1,7 +1,6 @@
 # Cursor Brief — Secondary Announcement Tier
 
-Companion to `_documentation_master/05_GP_Supporting_Systems/Announcement_System.md`.
-Design reference: `Secondary Announce.html` in this project (source of truth for layout, type, color, motion).
+> **Status:** Archived (July 2026). **Shipped.** **Canonical runtime doc:** [`Announcement_System.md`](../../06_Gameplay_Systems/Announcement_System.md) (secondary tier routing, payload shape, SFX rules). **Design reference:** [`Secondary Announce.html`](./Secondary%20Announce.html) in this folder.
 
 ## Goal
 Introduce a **secondary** announcement tier that displays as a top-edge ribbon under the scoreboard, so non-critical announcements no longer block sprite action in center court. The primary center-court overlay is unchanged.

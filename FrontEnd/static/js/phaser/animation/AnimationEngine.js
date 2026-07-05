@@ -580,6 +580,8 @@ export class AnimationEngine {
       const animationConfig = (await import("./animation_config.js")).default;
       const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
       await new Promise((resolve) => setTimeout(resolve, holdMs));
+      const { signalQuarterEnded } = await import("../utils/quarterEndAirhorn.js");
+      signalQuarterEnded(this.scene, turnData, { phase: "playbackComplete" });
     }
   }
 
@@ -1111,6 +1113,8 @@ export class AnimationEngine {
       const animationConfig = (await import('./animation_config.js')).default;
       const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 3000;
       await new Promise(resolve => setTimeout(resolve, holdMs));
+      const { signalQuarterEnded } = await import('../utils/quarterEndAirhorn.js');
+      signalQuarterEnded(this.scene, turnData, { phase: 'playbackComplete' });
     }
     // Note: onUpdate is already called inside runFreeThrowSequence for each FT attempt
     // Do NOT call it again here or stats will be double counted
@@ -1713,15 +1717,8 @@ export class AnimationEngine {
         shot_clock_remaining: 0,
       });
     }
-    const { playEndOfQuarterAirhorn } = await import('../utils/quarterEndAirhorn.js');
-    const clockStart = Number(
-      turnData?.clock_start ?? turnData?.clockStart ?? turnData?.time_elapsed ?? 0,
-    );
-    playEndOfQuarterAirhorn(this.scene, {
-      ...turnData,
-      clock_start: clockStart,
-      clock_end: 0,
-    });
+    const { signalQuarterEnded } = await import('../utils/quarterEndAirhorn.js');
+    signalQuarterEnded(this.scene, turnData, { phase: 'playbackComplete' });
     const animationConfig = (await import('./animation_config.js')).default;
     const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
     if (turnData.result_type === 'MAKE') {
@@ -1742,6 +1739,10 @@ export class AnimationEngine {
     const animationConfig = (await import('./animation_config.js')).default;
     const holdMs = animationConfig?.finalTurn?.holdClockOutMs ?? 1800;
     await new Promise(resolve => setTimeout(resolve, holdMs));
+    if (turnData?.quarter_ends_after) {
+      const { signalQuarterEnded } = await import('../utils/quarterEndAirhorn.js');
+      signalQuarterEnded(this.scene, turnData, { phase: 'playbackComplete' });
+    }
   }
 
   /**

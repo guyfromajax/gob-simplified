@@ -10,7 +10,7 @@ consolidation of the older emitters is a separate cleanup pass.
 Currently provides ``stamp_tween_durations`` — the per-player duration
 computation that ensures fast-finishing players don't get their tweens
 stretched across the gating player's step duration. See
-``Animation_System_Updated.md`` for the schema field this writes.
+``UESS_System.md`` §3 (``tween_durations`` / ``stamp_tween_durations``).
 """
 
 import random

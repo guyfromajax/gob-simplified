@@ -3048,7 +3048,7 @@ def defender_pressure_raw(defender, defense_call):
 
     The randomized `calculate_defender_pressure_score` wraps this. Callers that supply
     their own single random roll (e.g. Dynamic HCO Motion form-B scores) use this raw
-    value directly to avoid a double roll. See Dynamic_HCO_Motion_Brief.md.
+    value directly to avoid a double roll. See Z-Completed/Dynamic_HCO_Motion_Brief.md.
     """
     from BackEnd.utils.defense_utils import is_zone_defense
 

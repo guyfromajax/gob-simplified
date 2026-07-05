@@ -13,7 +13,7 @@ HCT has its own emitter
 not skeleton-driven.
 
 Status: parallel-build infrastructure for the SS&S animation refactor
-(see ``_documentation_master/projects/Animation_System_Updated.md``).
+(see ``_documentation_master/05_UESS_System/UESS_System.md`` §3).
 Coexists with the legacy ``animations[]`` payload until per-turn-type
 cutover.
 """

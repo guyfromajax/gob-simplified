@@ -126,7 +126,7 @@ Capture on repro **before** refresh:
 | Off-ball x=50 back-movement gate | **Implemented** | `gate_offense_backcourt_reentry` in `over_and_back.py` |
 | Rim Runner lane pass intercept | **Reference** | `_build_lane_pass_intercepted_step` |
 
-**Docs:** `FCP_System.md` (over-and-back + defensive recovery); `Dynamic_FCP_Brief.md`; `Step_By_Step_System.md`.
+**Docs:** `FCP_System.md` (over-and-back + defensive recovery); `Z-Completed/Dynamic_FCP_Brief.md`; `Step_By_Step_System.md`.
 
 ---
 

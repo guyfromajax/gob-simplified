@@ -1,7 +1,7 @@
 
 # Distant Gameplay System
 
-> **Status (Phase 6 — 2026-07-04).** Full v2 combined score + **ranked full-sim promotion** (`natl_rank ≤ 15` both teams). Integration tests in `tests/test_distant_sim_integration.py`. Constants: `BackEnd/constants/distant_sim.py`. Engine: `BackEnd/distant_sim_engine.py`. Tuning plan: [`Distant_Sim_Tuning.md`](../projects/Distant_Sim_Tuning.md).
+> **Status (Phase 6 — 2026-07-04).** Full v2 combined score + **ranked full-sim promotion** (`natl_rank ≤ 15` both teams). Integration tests in `tests/test_distant_sim_integration.py`. Constants: `BackEnd/constants/distant_sim.py`. Engine: `BackEnd/distant_sim_engine.py`. Calibration: `scripts/distant_sim_monte_carlo.py` (`--write-doc` updates §Calibration Results below). Tuning history: [`Z-Completed/Distant_Sim_Tuning.md`](../projects/Z-Completed/Distant_Sim_Tuning.md).
 
 ## Overview
 Efficient simulation for 56-60 distant games per week (all non-user-conference matchups). User's 4-8 conference games run full turn-based sim.
@@ -133,4 +133,44 @@ The player-stat distribution layer (box scores down to individual players) is do
 | Tests | `tests/test_distant_sim.py` (29) + `tests/test_distant_sim_integration.py` (6) |
 | Calibration | `scripts/distant_sim_monte_carlo.py` — distant engine: ~2.9 teams/season at 22+ wins (10k seasons, seed 42) |
 
-**Manual playtest (open):** See [`Distant_Sim_Tuning.md` § Phase 6 playtest checklist](../projects/Distant_Sim_Tuning.md) — spot-check national standings weeks 10/18/26, FTD momentum after distant games, ranked promotion for top-15 matchups.
+## Calibration targets (26-game regular season, 128 teams)
+
+| Metric | Target |
+|---|---|
+| Teams at 22+ wins | **3–5** |
+| Teams at 18–21 wins | **8–12** |
+| Median wins | **~13** |
+| Teams below 8 wins | **3–5** |
+| User-conf teams in top 5 nationally | **≤ 1–2** unless genuinely elite |
+| Preseason top-10 avg final wins | **21–25** (MC still ~14.5 — see §Calibration Results) |
+
+## Manual playtest checklist (open)
+
+Run one franchise season through week 26 and spot-check:
+
+1. **National standings (weeks 10, 18, 26):** ≤ 1–2 user-conference teams in top 5 unless genuinely elite; ~3–5 teams nationally at 22+ wins by week 26.
+2. **Momentum on FTD:** After a distant-sim week, inspect two CPU teams that played distant games — winner `momentum_score` increased, loser decreased; `distant_win_streak` / `distant_loss_streak` updated.
+3. **Ranked promotion:** Log or breakpoint when both teams `natl_rank ≤ 15` in a non-user-conference game — should route to full CPU sim, not distant.
+4. **Game docs:** Sample distant game has `simulation_engine="distant"`, plausible box scores, EOG team attrs applied.
+5. **Record distribution:** No more than ~5 teams below 8 wins; median ~13 wins league-wide.
+
+## Calibration Results
+
+> **Final MC (2026-07-04).** 10,000 seasons × 128 teams × 26 games. Team talent from **tsv**. Conference assignment: **mixed**. Seed `42`. Full-sim proxy uses `prestige + int(0.25 × attrs)` with no win-count momentum — reference target only, not live GameManager output.
+
+**Automated:** 35 tests pass (`tests/test_distant_sim.py` × 29 + `tests/test_distant_sim_integration.py` × 6).
+
+**Final MC (`--engine all`, 10,000 seasons, seed 42):**
+
+| Metric | Distant | Hybrid (user conf = 1) | Full proxy | Target |
+|---|---|---|---|---|
+| Teams at 22+ wins (mean/season) | **2.90** | **2.56** | 0.05 | 3–5 |
+| Teams at 18–21 wins (mean/season) | **13.21** | **12.62** | 5.63 | 8–12 |
+| Preseason top-10 avg final wins | **14.57** | **14.56** | 14.39 | 21–25 |
+| Elite win % (week 26) | **~56%** | **~56%** | ~55% | 78–85% |
+| Top-5 user conf share (hybrid, by wins) | — | **0.2%** | — | ≤ 40% |
+| Median wins | 13.0 | 13.0 | 13.0 | ~13 |
+
+**Verdict:** **22+ wins** target met under final constants (~2.9/season). Preseason top-10 avg wins and elite cumulative win % remain ~56% in MC — momentum runaways drive 22+ teams more than preseason talent rank. **Manual playtest** (above) remains the gate for live full-sim skew and national standings feel.
+
+Raw JSON (latest run): `scripts/distant_sim_monte_carlo_results.json`. Phase-by-phase tuning history: [`Z-Completed/Distant_Sim_Tuning.md`](../projects/Z-Completed/Distant_Sim_Tuning.md).

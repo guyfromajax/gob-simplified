@@ -9,7 +9,7 @@ tagged for the front-end rattle effect (Phase 6).
 
 This module emits the MOVEMENT only. The freelance shot loop (when the BH shoots
 vs passes/holds) and its shot-clock termination are intentionally NOT wired yet —
-that model is still open in the brief. See Dynamic_HCO_Motion_Implementation_Plan.md.
+that model is still open in the brief. See Z-Completed/Dynamic_HCO_Motion_Implementation_Plan.md.
 
 Coord-based skeleton step → existing UESS emitter stamps all required fields; the
 BH keeps the ball via his ``handle_ball`` action.

@@ -2,7 +2,7 @@
 
 Keep in sync with:
   - _documentation_master/04_Franchise_Mode_Systems/Distant_Game_Sim_System.md
-  - _documentation_master/projects/Distant_Sim_Tuning.md
+  - _documentation_master/projects/Z-Completed/Distant_Sim_Tuning.md (archived tuning history)
 
 Calibrated via scripts/distant_sim_monte_carlo.py (Phase 4, 2026-07-04, seed 42).
 """

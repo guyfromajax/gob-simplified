@@ -18,7 +18,7 @@ import { DebugFlags, animationDebugLog } from '../utils/debugFlags.js';
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
 import { ENABLE_TIMEOUT_BUTTON } from '../utils/timeoutButtonManager.js';
 import { waitMsRespectingPause, waitWhileUserPaused } from './playbackPause.js';
-import { playEndOfQuarterAirhorn } from '../utils/quarterEndAirhorn.js';
+import { signalQuarterEnded } from '../utils/quarterEndAirhorn.js';
 
 export class AnimationRouter {
   constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null, updateDebugScore = null) {
@@ -601,7 +601,9 @@ export class AnimationRouter {
       let endOfQuarterAirhornFiredThisTurn = false;
       const maybePlayEndOfQuarterAirhorn = () => {
         if (endOfQuarterAirhornFiredThisTurn || !isEndOfQuarterClockTurn) return;
-        endOfQuarterAirhornFiredThisTurn = playEndOfQuarterAirhorn(this.scene, turnData);
+        endOfQuarterAirhornFiredThisTurn = signalQuarterEnded(this.scene, turnData, {
+          phase: 'clockTween',
+        });
       };
       if (shouldRunClockTween) {
         const gameClock = this.scene.gameClock;

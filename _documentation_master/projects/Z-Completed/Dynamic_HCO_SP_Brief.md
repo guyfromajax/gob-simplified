@@ -1,3 +1,6 @@
+# Dynamic HCO Set Plays — Build Brief
+
+> **Status:** Archived (July 2026). Dynamic HCO set plays shipped (flagged: `GOB_DYNAMIC_HCO_SETPLAY`). **Canonical runtime doc:** [`Dynamic_HCO_SP_System.md`](../../06_Gameplay_Systems/Dynamic_HCO_SP_System.md). This file retains the overlay-model design decisions and staged build log.
 
 **Dynamic HCO Set Plays**
 - The offense does not look to execute subtle movements in Set Plays. They either look to exeucte the play that is called and progress skeleton steps as defined, or execute a Hot Read if the ball handler deems that one is available. 
@@ -45,6 +48,6 @@
 
 **Staged plan:**
 - **A — Flag + gating ✅:** `GOB_DYNAMIC_HCO_SETPLAY` gate + `skip_upfront_events` extended to set plays under the flag + the recovery-roll helper (`_setplay_recovery_roll`). Tested.
-- **B — Per-step walk on the variant skeleton (in progress):** a set-play dynamic resolver that REUSES motion's inner helpers (`should_shoot` + truly-open gate, `decide_step_action`/`_disruption_branch`, `build_subtle_beat`, `_execute_motion_decision`, `_resolve_freelance`) but (1) forces `offense_reads=False` and (2) after a defense-forced subtle, runs `_setplay_recovery_roll` → re-enter next defined step / freelance. Routed in the SHOT path under the flag (parallel to motion's `resolve_motion_offense_shot`).
-- **C — Per-step moment (man + zone)** on set plays — reuse `_resolve_hco_moment_walk` (already man+zone).
-- **D — Tests + prototype + doc.**
+- **B — Per-step walk on the variant skeleton ✅:** `_resolve_setplay_offense_shot_dynamic` reuses motion helpers with `offense_reads=False` and `_setplay_recovery_roll`. Tested (`test_setplay_dynamic_resolver.py`).
+- **C — Per-step moment (man + zone) ✅:** `_resolve_hco_moment_walk` on set plays. Tested.
+- **D — Tests + prototype + doc ✅**

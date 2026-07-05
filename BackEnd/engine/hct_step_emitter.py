@@ -5,7 +5,7 @@ animations + step_clock_seconds + roles) into the unified AnimationStep[]
 payload defined in `BackEnd/utils/animation_step_schema.py`.
 
 This module is parallel-build infrastructure for the SS&S animation
-refactor (see `_documentation_master/projects/Animation_System_Updated.md`).
+refactor (see `_documentation_master/05_UESS_System/UESS_System.md` §3).
 It does not replace existing HCT animation generation. Cutover happens in
 a later PR — until then, both the legacy `animations[]` payload and the
 new `steps[]` payload coexist on the HCT turn dict, with the frontend
@@ -60,7 +60,7 @@ def _archetype_for_hct_step(
     is_ball_handler: bool,
     is_pg_defender_vs_bh: bool,
 ) -> PlayerArchetype:
-    """Per `Animation_System_Updated.md` HCT scoping table:
+    """Per `Step_By_Step_System.md` §HCT:
 
     | Step | BH | Non-BH offense | PG defender vs BH | Other defenders |
     | 0 (setup)        | standard | standard | standard | standard |
@@ -481,7 +481,7 @@ def _apply_post_shot_overlay(step, turn_result):
 def _resolve_step_3_next(turn_result: Dict[str, Any]) -> NextStep:
     """Map the HCT result to step 3's `next` pointer.
 
-    See `Animation_System_Updated.md` HCT scoping → Step 3 outcome → next
+    See `Step_By_Step_System.md` §HCT — step 3 outcome → next
     pointer table. Pre-resolved branching: backend has already computed
     the result; emitter just routes.
     """

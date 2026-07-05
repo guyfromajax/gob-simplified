@@ -3,7 +3,7 @@
  * step schema. See:
  *   - Schema (Python):  BackEnd/utils/animation_step_schema.py
  *   - Schema (JSDoc):   FrontEnd/static/js/phaser/animation/animationStepSchema.js
- *   - Design rationale: _documentation_master/projects/Animation_System_Updated.md
+ *   - Design rationale: _documentation_master/05_UESS_System/UESS_System.md §3
  *
  * Backend is the source of truth — it pre-computes start coords, end coords
  * (interrupted positions when applicable), and the step duration. This engine
@@ -1380,7 +1380,7 @@ export async function dispatchTurnStop(scene, turnStop, context = {}) {
 async function runShotAttempt(scene, payload, context) {
   // Render ball arc to rim, then ball-on-rim bounce for misses. Rebound is
   // a separate turn (DREB or OREB) — this handler does NOT animate the
-  // rebound capture itself. See Animation_System_Updated.md.
+  // rebound capture itself. See Rebound_System.md §DREB.
   const { result, ball_bounce_coords, shooter_id, schema_rendered_arc } = payload || {};
 
   await waitWhileUserPaused(scene);

@@ -1416,8 +1416,8 @@ def build_covert_release_animation_steps(
     is_away_offense = bool(fb_roles.get("is_away_offense"))
 
     # All-player start coords. Per the cross-turn coord contract in
-    # `_documentation_master/projects/Animation_System_Updated.md`, step 0
-    # START reads `player.coords` (= prior turn's last step end.coords as
+    # `_documentation_master/05_UESS_System/UESS_System.md` §9 (cross-turn
+    # coord sync). Step 0 START reads `player.coords` (= prior turn's last step end.coords as
     # written by `sync_lineup_coords_from_turn`). `shot_manager` no longer
     # mutates `player.coords` mid-resolution, so live coords are trustworthy.
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
@@ -1629,8 +1629,8 @@ def _clamp_step_end_coords_to_archetype(
 def _apply_post_shot_overlay(step: AnimationStep, turn_result: Dict[str, Any]) -> None:
     """Override the outcome step's `end.coords` for players in shot_manager's
     post-shot overlay maps. See
-    `_documentation_master/projects/Animation_System_Updated.md` cross-turn
-    coord contract.
+    `_documentation_master/05_UESS_System/UESS_System.md` §9 (cross-turn
+    coord sync).
 
     Exempts the outlet passer (rebounder) from the rebounder-position overlay:
     `shot_manager.offense_rebounders` includes every non-get-back offensive

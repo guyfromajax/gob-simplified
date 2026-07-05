@@ -1483,7 +1483,7 @@ class ShotManager:
         # HCT (and Fast Break) shots skip the defense_release / Covert Release
         # mechanic — those are HCO-specific. Per the SS&S animation refactor,
         # HCT is treated the same as Fast Break here. See
-        # _documentation_master/projects/Animation_System_Updated.md.
+        # Rebound_System.md (HCT skips get-back).
         is_hct_shot = self.game_state.get("offensive_state") == "HCT"
         defense_release_list = []
         if roles.get("is_fast_break") or is_hct_shot:
@@ -1543,7 +1543,7 @@ class ShotManager:
         
         # Determine offensive players getting back on defense.
         # HCT shots skip this — treated the same as Fast Break: no get-back mechanic.
-        # See _documentation_master/projects/Animation_System_Updated.md.
+        # See Rebound_System.md (HCT skips get-back).
         if is_hct_shot:
             offense_getback_list = []
             offense_rebounders = list(off_team.lineup.keys())
@@ -1726,8 +1726,7 @@ class ShotManager:
             # emitter can write them into the final shot step's `end.coords`.
             # Do NOT mutate `player.coords` here — let `sync_lineup_coords_from_turn`
             # apply via the schema's normal channel. See
-            # `_documentation_master/projects/Animation_System_Updated.md` for
-            # the cross-turn coord contract.
+            # `UESS_System.md` §9 (cross-turn coord sync).
             offense_getback_coords = {}
             for pos in offense_getback_list:
                 getback_player = off_team.lineup.get(pos)

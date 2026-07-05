@@ -7,7 +7,7 @@
 import animationConfig from './animation_config.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { resolveOffenseTeamId } from '../utils/offenseTeamIdResolver.js';
-import { playEndOfQuarterAirhorn } from '../utils/quarterEndAirhorn.js';
+import { signalQuarterEnded } from '../utils/quarterEndAirhorn.js';
 
 const DRIFT_GRID_PER_GAME_SEC = 8;
 
@@ -97,11 +97,15 @@ export async function runOutClockSequence({ scene, playerSprites, turnData, onUp
     onUpdate({ clock: '0:00', time_remaining: 0, shot_clock_remaining: 0 });
   }
 
-  playEndOfQuarterAirhorn(scene, {
-    ...turnData,
-    clock_start: startSec || 1,
-    clock_end: 0,
-  });
+  signalQuarterEnded(
+    scene,
+    {
+      ...turnData,
+      clock_start: startSec || 1,
+      clock_end: 0,
+    },
+    { phase: 'playbackComplete' },
+  );
 
   const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
   await new Promise((r) => setTimeout(r, holdMs));

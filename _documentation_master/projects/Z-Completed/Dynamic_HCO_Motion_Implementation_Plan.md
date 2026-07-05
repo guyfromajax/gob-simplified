@@ -1,6 +1,8 @@
 # Dynamic HCO Motion — Implementation Plan
 
-Companion to `Dynamic_HCO_Motion_Brief.md` (source of truth for behavior/numbers). This plan is the *how/where/order*. Phases are independently shippable; each lands behind tests before the next.
+> **Status:** Archived (July 2026). Phases 1–5 shipped behind `GOB_DYNAMIC_HCO_MOTION`. Canonical runtime doc: [`Dynamic_HCO_System.md`](../../06_Gameplay_Systems/Dynamic_HCO_System.md).
+
+Companion to [`Dynamic_HCO_Motion_Brief.md`](./Dynamic_HCO_Motion_Brief.md) (source of truth for behavior/numbers). This plan is the *how/where/order*. Phases are independently shippable; each lands behind tests before the next.
 
 ## Architecture decisions (settled in brief discussion)
 - Step 2 **replaces** the random-step selection in `resolve_motion_offense_shot()` ([phase_resolution.py:4231](BackEnd/engine/phase_resolution.py#L4231)). Called from [phase_resolution.py:4712 & 5447](BackEnd/engine/phase_resolution.py#L4712).

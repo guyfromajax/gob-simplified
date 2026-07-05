@@ -4,7 +4,7 @@ Dynamic HCO Motion — Read Map (brief Steps 0 & 1).
 Builds the per-turn, per-offensive-player mismatch map consumed by the Motion
 offense decision engine (Step 2). Pure computation: no DB reads, no UESS,
 ephemeral (the caller attaches it to the turn context; it is NOT persisted).
-See _documentation_master/projects/Dynamic_HCO_Motion_Brief.md.
+See _documentation_master/projects/Z-Completed/Dynamic_HCO_Motion_Brief.md.
 
 For each of the five offensive players we flag whether they hold an exploitable
 edge for an inside / attack / outside shot (mismatch score > READ_THRESHOLD),

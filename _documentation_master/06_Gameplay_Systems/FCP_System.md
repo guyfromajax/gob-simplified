@@ -1,6 +1,6 @@
 ## Full Court Press (FCP) System
 
-> **Doc status (June 2026):** This file is **mid-overhaul**. The **legacy** skeleton + BSM/DST resolution flow (sections through *Overview*) still describes the old path when `USE_DYNAMIC_FCP=False`. The **dynamic** spatial loop (`USE_DYNAMIC_FCP=True`, default) is documented in [**Dynamic FCP Engine — BH Read Logic**](#dynamic-fcp-engine--bh-read-logic-current) below and in [`Dynamic_FCP_Brief.md`](../projects/Dynamic_FCP_Brief.md). A full rewrite of this document is planned once FCP migration is complete.
+> **Doc status (June 2026):** This file is **mid-overhaul**. The **legacy** skeleton + BSM/DST resolution flow (sections through *Overview*) still describes the old path when `USE_DYNAMIC_FCP=False`. The **dynamic** spatial loop (`USE_DYNAMIC_FCP=True`, default) is documented in [**Dynamic FCP Engine — BH Read Logic**](#dynamic-fcp-engine--bh-read-logic-current) below and in the archived [`Dynamic_FCP_Brief.md`](../projects/Z-Completed/Dynamic_FCP_Brief.md). A full rewrite of this document is planned once FCP migration is complete.
 
 > **Half Court Trap (HCT)** is documented separately in [`HCT_System.md`](./HCT_System.md). The live HCT path is **dynamic** (engine loop + UESS schema steps), not the skeleton/stopper system described below for legacy FCP. This file covers **FCP only** plus shared BIP/inbound conventions that apply to both pressure types.
 
@@ -262,7 +262,7 @@ When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, 
 
 #### Related docs
 
-- [`Dynamic_FCP_Brief.md`](../projects/Dynamic_FCP_Brief.md) — full dynamic FCP spec (engagement, off-ball routing, play architecture).
+- [`Dynamic_FCP_Brief.md`](../projects/Z-Completed/Dynamic_FCP_Brief.md) — archived full dynamic FCP spec (engagement, off-ball routing, play architecture).
 - [`HCT_System.md`](./HCT_System.md) — shared loop primitives; HCT keeps `READ_STRONG_HANDLER_SUM = 80`.
 
 ---
@@ -359,7 +359,7 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` — BIP + FCP setup
 
 **Related**
-- [`Dynamic_FCP_Brief.md`](../projects/Dynamic_FCP_Brief.md) — dynamic FCP overhaul (in progress)
+- [`Dynamic_FCP_Brief.md`](../projects/Z-Completed/Dynamic_FCP_Brief.md) — archived dynamic FCP design brief
 - [`HCT_System.md`](./HCT_System.md) — Half Court Trap (dynamic; separate system)
 - [`Stopper_System.md`](./Stopper_System.md) — truncation architecture (FCP + legacy HCT fallback)
 - [`BIP_System.md`](./BIP_System.md) — baseline inbound → FCP setup

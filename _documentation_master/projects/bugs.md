@@ -2,10 +2,6 @@
 1. ChatGPT API Process for plaeyr images, uniform design, and applying uniforms to players
 
 #UESS Turn Audits
-1. Final Turn (FLSS included?)
-2. OREB
-3. DREB
-4. BIP
 5. SIP
 6. HCT
 7. FCP
@@ -13,6 +9,11 @@
 9. Free Throw
 10. Opening Tip
 11. Timeout
+-----
+1. HCO
+2. OREB
+3. DREB
+4. BIP
 
 ##Verify as Perfect
 1. EOQ Perfection
@@ -28,11 +29,8 @@
 123. Downloadable game vs Live game dynamics
 124. MM: Make HCO defenders un-attached to the offender at all costs
 125. MM: Micro Movement SFX
-126. MM: Dunks!
 127. Add a new hire news story for user team
 128. Add a badass design appraoch to New Stories
-129. More overt shooting foul micro animation
-130. Alter computer sim game logic to get more strong 25-1 teams
 
 ##Full Product Perfection
 1. Training Camp News Report
@@ -83,6 +81,36 @@ Two critical issues from the animation blueprint's "Known HCO Turn Issues" list 
 
 1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. Magnitude indicates timer baseline/state contamination, not normal jitter. Mitigation applied (Option A): turn-boundary guards use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`); needs validation in live runs before closing.
 2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6` on a `DEAD BALL` batch sub-turn. Same timer-source class as #1 but a distinct enforcement site (`step pass` guard); track separately.
+
+## Animation timing pauses (merged from `animation_wonkiness.md`, July 2026)
+
+**Meta:** With dynamic HCO on, Motion/Set-Play render via backend `animation_steps[]` (`animationPlayback.js`). Pause durations are stamped in Python (`time_elapsed`, `hold_ms`); FE-only fixes miss the source. Design work applies only to optional idle-sprite drift (Bucket 1 secondary).
+
+**Recommended fix order:** Bucket 2 (turn transitions) → Bucket 1 (Motion step freezes).
+
+### Open — Bucket 1: Long pauses between HCO steps (Motion only)
+- **Symptom:** All ten players frozen 700–1400ms on many Motion steps; Set Play unaffected.
+- **Root cause:** Motion "subtle-movement" beats floor at **2–4 game-seconds** (`SUBTLE_STEP_ELAPSED_BY_TEMPO` in `motion_step_decision.py`; stamped via `skeleton_step_emitter.py`). Schema engine hard-waits full `time_elapsed` (`animationPlayback.js`). Set Play forces `offense_reads=False` → fewer subtle beats.
+- **Fix:** Decouple sim clock from visual time — keep 2–4s on game ledger, stamp small visual `time_elapsed`. Optional: off-ball drift during BH hold so 9 players don't read as frozen.
+- **Secondary:** Confirm BH hold doesn't block the other 9 from moving; consider idle organic sprite animation on truly stationary steps.
+
+### Open — Bucket 2: Pauses between turn transitions
+- **Symptom:** Dead air at DREB→HCO, DREB→FB (partial), HCT-steal→FB.
+- **Root cause:** Blocking `hold_ms: 1000` announcements — DREB `"Rebound!"` (`dreb_step_emitter.py`), steal→FB `"Fast Break!"` on step start (`after_steal_fast_break_step_emitter.py` / `FB_ANNOUNCE_HOLD_MS`). FE blocks on `waitMsRespectingPause` (`animationPlayback.js`). DREB→HCO outlet lead-in removed from `AnimationEngine.js`, leaving the hold bare.
+- **Partial fix (shipped):** `SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK=True` in `dreb_step_emitter.py` — DREB→FB only.
+- **Fix (remaining):** Conditional boundary holds on `next_play_type` (zero for live continuations), or `non_blocking` announcement flag so overlay shows while play continues. Same pattern for HCT-steal→FB.
+
+### ✅ Fixed — Bucket 3: RR/Triangle FB outlet → rim-runner pass dead air (2026-06-30)
+- RR sprint no longer in awaited `secondary` set when downstream pass re-drives RR from live position. See `Fast_Break_System.md` → "Rim-runner sprint barrier (dead-air fix)".
+
+### ✅ Fixed — Bucket 4: Defenders move before ball detaches on HCO passes (2026-07-01)
+- Backend step-placement off-by-one: defender rotation authored one beat early. Two-handler pass-step model in `animator.py`. See `05_UESS_System/Defense_Coords_System.md` → "Per-Step Timing: The Two-Handler Pass Step".
+
+## Screen capture (marketing)
+
+**✅ Shipped (manual only, staging + localhost):** `Shift+C` arms → `c` captures. Court = Phaser canvas + DOM composite (`captureCourt.js`); other pages = DOM region (`captureDom.js`). Loads via `API_CONFIG.isCaptureEnv()` → `captureBootstrap.js`. Disarmed by default; zero files unless armed.
+
+**Deferred — auto-capture moments:** Q4 curated shots (made-shot milestones, late non-makes, FB/Trap/Press ribbons, pure-action clean frames, game-over modal, Q3→Q4 lineup screen). Full moment list in [`Z-Completed/screen_capture_tool_spec.md`](Z-Completed/screen_capture_tool_spec.md) §6. Not required for manual marketing workflow.
 
 ## Fast Break animation backlog (legacy path) [CODE-CLEANUP]
 

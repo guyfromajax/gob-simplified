@@ -2,7 +2,7 @@
 FCP defensive PF/C front-court zone (Straight Pressure only).
 
 Dynamic x/y band compresses as the BH advances; offender help/denial uses
-offenders inside the zone (not the HCT ABA pool). See Dynamic_FCP_Brief §2.3.
+offenders inside the zone (not the HCT ABA pool). See Z-Completed/Dynamic_FCP_Brief §2.3.
 """
 
 from __future__ import annotations

@@ -2033,8 +2033,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # the CR emitter needs for step 0 START). Block reconciliation in
         # shot_manager reads from `roles["shot_spot"]` (line ~790) with
         # shooter.coords only as a fallback when roles is missing — which
-        # doesn't happen here. See Animation_System_Updated.md cross-turn
-        # coord contract.
+        # doesn't happen here. See UESS_System.md §9 (cross-turn coord sync).
         if fb_roles.get("_bh_final_x") is not None and fb_roles.get("_bh_final_y") is not None:
             shot_spot = {"x": fb_roles["_bh_final_x"], "y": fb_roles["_bh_final_y"]}
             roles["shot_spot"] = shot_spot
@@ -3400,7 +3399,7 @@ def resolve_hco_outcome(game, skeleton):
     # driven moment walk in resolve_half_court_offense_logic), so skip these up-front percentile
     # tables for motion when the flag is on. Set plays do the same under their OWN flag (overlay
     # model — variant selection STAYS, but events come from the per-step moment). The flag-off
-    # path keeps the up-front tables. See Dynamic_HCO_Motion_Brief.md / Dynamic_HCO_SP_Brief.md.
+    # path keeps the up-front tables. See Z-Completed/Dynamic_HCO_Motion_Brief.md / Dynamic_HCO_SP_Brief.md.
     _opt = game_state.get("offense_play_type", "")
     skip_upfront_events = (
         (_opt == "motion" and _dynamic_hco_motion_enabled())
@@ -4322,12 +4321,73 @@ def _apply_attack_penalty(shot_location, is_away_offense):
     return penalty
 
 
+def _uess_terminal_shoot_coord(game, skeleton, animations, roles, turn_type="HCO"):
+    """UESS single-coord-source: return the shooter's terminal shoot-step coord
+    exactly as the step emitter renders it (display-oriented), computed from the
+    SAME ``(skeleton, animations)`` build the FE renders.
+
+    Why: 2PT/3PT classification reads ``roles["shot_spot"]``. The rendered shoot
+    position is produced by the emitter's step-sequential positional pass (gate =
+    shooter → full destination, with §8.1 continuity + interrupts), which diverges
+    from the pre-emit named spot / animator row end. Classifying from anything but
+    this coord mis-scores ~25% of arc shots (dish/motion). See
+    ``_documentation_master/projects/UESS Audits/Shot_Classification_UESS_Fix_Scope.md``.
+
+    Runs the real emitter on a throwaway turn_result to guarantee parity with the
+    later render (the emitter is side-effect-free w.r.t. game/player state;
+    ``result_type`` omitted → post-shot sub-steps are a no-op). Returns None on any
+    failure → caller falls back to ``set_shooter_coords_from_skeleton_last_step``.
+    """
+    try:
+        shooter = roles.get("shooter")
+        shooter_id = getattr(shooter, "player_id", None) if shooter else None
+        if not shooter_id or not skeleton or not animations:
+            return None
+        from BackEnd.engine.skeleton_step_emitter import build_skeleton_animation_steps
+        probe_tr = {"skeleton": skeleton, "animations": animations, "roles": roles}
+        # RNG-NEUTRAL: the emitter draws from the global random stream (shot
+        # micro-movements). This is a throwaway pre-pass — save/restore the RNG
+        # state so it does NOT advance the stream and perturb resolve_shot's
+        # make/miss or any downstream outcome. The fix must change classification
+        # only, never game results.
+        import random as _random
+        _rng_state = _random.getstate()
+        try:
+            steps = build_skeleton_animation_steps(probe_tr, game, turn_type=turn_type)
+        finally:
+            _random.setstate(_rng_state)
+        if not steps:
+            return None
+        sid = str(shooter_id)
+        # The shoot step marks the shooter via start.action[shooter_id] == "shoot".
+        shoot_step = None
+        for st in steps:
+            act = (st.get("start") or {}).get("action") or {}
+            v = act.get(shooter_id) or act.get(sid)
+            if isinstance(v, str) and v.lower().strip() == "shoot":
+                shoot_step = st
+                break
+        if shoot_step is None:
+            shoot_step = steps[-1]
+        coords = (shoot_step.get("end") or {}).get("coords") or {}
+        c = coords.get(shooter_id) or coords.get(sid)
+        if isinstance(c, dict) and c.get("x") is not None and c.get("y") is not None:
+            return {"x": float(c["x"]), "y": float(c["y"])}
+        return None
+    except Exception:
+        return None
+
+
 def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     """
     Set roles["shooter"].coords from the last step of the skeleton when that step
     has a shoot action for the shooter. Used for HCO, FCP, HCT, and Final Turn
     so block reconciliation uses the correct shot location. Fast Break does not
     use this.
+
+    NOTE: this is now the FALLBACK path. The primary classification coord is the
+    emitter's terminal shoot coord via ``_uess_terminal_shoot_coord`` (UESS
+    single-coord-source). This runs only when that resolver returns None.
     """
     _ensure_skeleton_shot_role_positions(game, roles)
     if not skeleton or not roles:
@@ -4688,8 +4748,8 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dynamic HCO Motion (gated) — attribute-based shot selection.
-# See _documentation_master/projects/Dynamic_HCO_Motion_Brief.md and
-# Dynamic_HCO_Motion_Implementation_Plan.md. Phase 3: walk the skeleton making
+# See _documentation_master/projects/Z-Completed/Dynamic_HCO_Motion_Brief.md and
+# Z-Completed/Dynamic_HCO_Motion_Implementation_Plan.md (archived). Phase 3: walk the skeleton making
 # per-step decisions (Step 2) and hand a shot decision off to the existing shot
 # builders / attack-drive sequence. Subtle-movement / freelance EMISSION is Phase
 # 4–5 — here those decisions simply advance to the next skeleton step.
@@ -4704,13 +4764,13 @@ def _dynamic_hco_setplay_enabled():
     """Feature gate for Dynamic HCO **Set Plays** (overlay model — separate from motion). Truthy
     GOB_DYNAMIC_HCO_SETPLAY enables: variant selection stays, but the up-front event tables are
     skipped in favor of the per-step moment, and the per-step dynamic layer (hot read / defense-
-    forced subtle / freelance) overlays the chosen variant skeleton. See Dynamic_HCO_SP_Brief.md."""
+    forced subtle / freelance) overlays the chosen variant skeleton. See Z-Completed/Dynamic_HCO_SP_Brief.md."""
     import os
     return os.environ.get("GOB_DYNAMIC_HCO_SETPLAY", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _setplay_recovery_roll(game, rng=None):
-    """Set-play forced-subtle recovery (Dynamic_HCO_SP_Brief): after the defense knocks the BH off
+    """Set-play forced-subtle recovery (Z-Completed/Dynamic_HCO_SP_Brief): after the defense knocks the BH off
     the play and he chooses to hold rather than shoot/dish, he either re-enters the set-play
     skeleton or is forced into freelance. `offense_score = (team_chemistry + offensive_efficiency)
     × d6` vs `defense_score = (team_chemistry + defensive_efficiency) × d6` (each team's own
@@ -5519,7 +5579,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
 
 def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
     """
-    Dynamic HCO **Set Play** per-step resolver (Dynamic_HCO_SP_Brief, Stage B). OVERLAY model:
+    Dynamic HCO **Set Play** per-step resolver (Z-Completed/Dynamic_HCO_SP_Brief, Stage B). OVERLAY model:
     the up-front variant roll already chose this skeleton; here we walk it making per-step
     decisions, reusing motion's inner machinery. The per-step BH logic is now **identical to
     ``_resolve_motion_offense_shot_dynamic``** — same alterations/aggression turn-gate rolls,
@@ -5722,7 +5782,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
                 ), steps[i], bh_pos)
 
             # Held instead of shooting/dishing → recover into the set play or get forced into
-            # freelance (Dynamic_HCO_SP_Brief: chemistry+efficiency × d6, each team).
+            # freelance (Z-Completed/Dynamic_HCO_SP_Brief: chemistry+efficiency × d6, each team).
             if _setplay_recovery_roll(game):
                 logging.warning(f"↩️ [DYNAMIC SETPLAY] recovery WON → re-enter skeleton at step {i + 1}")
                 continue  # next iteration appends the next defined step (players pop back to spots)
@@ -6192,12 +6252,21 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
                 "to emitter rebuild for this turn", _ft_sync_err,
             )
             final_turn_animations = None
-        # SS&S / UESS: same pre-resolve shot coord sync as HCO/FCP/HCT — stamps
-        # roles["shot_spot"] from the skeleton shoot step (with away flip) so
-        # block reconciliation and ball_bounce_x/y match the schema animation.
-        # AFTER apply_coords so the shot spot uses the skeleton shot location,
-        # not the synced animation coords.
-        set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)
+        # UESS single-coord-source: classification (2PT/3PT) reads the SAME
+        # terminal shoot coord the emitter renders, not the pre-emit named spot.
+        # Falls back to the skeleton shot location if the build/resolver is
+        # unavailable. See Shot_Classification_UESS_Fix_Scope.md.
+        _ft_terminal = (
+            _uess_terminal_shoot_coord(game, skeleton, final_turn_animations, roles, "HCO")
+            if final_turn_animations else None
+        )
+        if _ft_terminal is not None:
+            _ft_sh = roles.get("shooter")
+            if _ft_sh is not None:
+                _ft_sh.coords = dict(_ft_terminal)
+            roles["shot_spot"] = dict(_ft_terminal)
+        else:
+            set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # fallback: skeleton shot location
         final_snap = build_skeleton_pre_resolve_shot_snapshot(
             game, off_lineup, def_lineup, skeleton, roles, "FINAL_TURN", "final_turn_pre_resolve_shot"
         )
@@ -6370,7 +6439,7 @@ def resolve_half_court_offense_logic(game):
     # skeleton is chosen + deep-copied, so the walk reads the actual play and the reach-in step
     # indices align with the emitted skeleton; runs BEFORE the shot-clock block so a hard outcome
     # (which clears result != "SHOT") correctly pre-empts the would-be shot. Mirrors the motion
-    # moment walk above. (variant selection unaffected — Dynamic_HCO_SP_Brief, Stage C.)
+    # moment walk above. (variant selection unaffected — Z-Completed/Dynamic_HCO_SP_Brief, Stage C.)
     if (offense_play_type in ("set", "set_play") and result == "SHOT"
             and _dynamic_hco_setplay_enabled() and final_skeleton):
         _sp_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
@@ -7272,7 +7341,16 @@ def resolve_half_court_offense_logic(game):
             add_defenders=True,
         )
     apply_coords_from_animations_list(game, animations)
-    set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # After so block spot uses shot location, not animation coords
+    # UESS single-coord-source: classification (2PT/3PT) must read the SAME
+    # terminal shoot coord the emitter renders, not the pre-emit named spot.
+    _terminal_shoot = _uess_terminal_shoot_coord(game, skeleton, animations, roles, "HCO")
+    if _terminal_shoot is not None:
+        _sh = roles.get("shooter")
+        if _sh is not None:
+            _sh.coords = dict(_terminal_shoot)
+        roles["shot_spot"] = dict(_terminal_shoot)
+    else:
+        set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # fallback: skeleton shot location
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
     shot_result = game.shot_manager.resolve_shot(roles)
     attach_position_snapshots(shot_result, [hco_snap])
@@ -7848,7 +7926,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         # Use shot manager to resolve the shot
         apply_coords_from_animations_list(game, animations)
-        set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # After so block spot uses shot location
+        # UESS single-coord-source: classify from the emitter's terminal shoot
+        # coord, not the pre-emit named spot. See Shot_Classification_UESS_Fix_Scope.md.
+        _fcp_terminal = _uess_terminal_shoot_coord(game, skeleton, animations, shot_roles, "FCP")
+        if _fcp_terminal is not None:
+            _fcp_sh = shot_roles.get("shooter")
+            if _fcp_sh is not None:
+                _fcp_sh.coords = dict(_fcp_terminal)
+            shot_roles["shot_spot"] = dict(_fcp_terminal)
+        else:
+            set_shooter_coords_from_skeleton_last_step(game, skeleton, shot_roles)  # fallback: skeleton shot location
         fcp_snap = build_skeleton_pre_resolve_shot_snapshot(
             game, off_lineup, def_lineup, skeleton, shot_roles, "FCP", "fcp_pre_resolve_shot"
         )
@@ -8955,7 +9042,7 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
 # emergent outcomes (DEAD BALL or HCO). Flip to False to revert to skeleton.
 USE_DYNAMIC_HCT = True
 
-# Dynamic FCP feature flag (Dynamic_FCP_Brief.md). Mirrors USE_DYNAMIC_HCT.
+# Dynamic FCP feature flag (Z-Completed/Dynamic_FCP_Brief.md). Mirrors USE_DYNAMIC_HCT.
 USE_DYNAMIC_FCP = True
 
 
@@ -10024,7 +10111,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         shot_result["roles"] = shot_roles
 
         # Parallel-build: emit unified AnimationStep[] alongside legacy
-        # animations[]. See _documentation_master/projects/Animation_System_Updated.md.
+        # animations[]. See _documentation_master/05_UESS_System/UESS_System.md §3.
         # Defensive: emitter failure must not block the existing payload.
         try:
             from BackEnd.engine.hct_step_emitter import build_hct_animation_steps
@@ -10348,7 +10435,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
 
     # Parallel-build: emit unified AnimationStep[] alongside legacy
-    # animations[]. See _documentation_master/projects/Animation_System_Updated.md.
+    # animations[]. See _documentation_master/05_UESS_System/UESS_System.md §3.
     # Defensive: emitter failure must not block the existing payload.
     try:
         from BackEnd.engine.hct_step_emitter import build_hct_animation_steps

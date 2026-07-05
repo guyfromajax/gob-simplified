@@ -2,7 +2,7 @@
 
 **Feature gate:** env var `GOB_DYNAMIC_HCO_MOTION` (`1`/`true`/`yes`/`on`) for motion plays; `GOB_DYNAMIC_HCO_SETPLAY` for set plays. Off → legacy HCO path (up-front outcome tables + static skeleton). This doc describes the ON path.
 
-**Scope:** half-court **offense — motion plays and set plays, man + zone defense**. (Set-play sections are a work in progress; a full sweep across motion/set-play × man/zone is pending.) The companion working brief is [projects/Dynamic_HCO_Motion_Brief.md](../projects/Dynamic_HCO_Motion_Brief.md) — this file is the authoritative system doc; the brief holds build-phase scratch + rationale.
+**Scope:** half-court **offense — motion plays and set plays, man + zone defense**. (Set-play sections are a work in progress; a full sweep across motion/set-play × man/zone is pending.) Build brief (archived): [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — rationale and phase log; this file is authoritative for runtime.
 
 ---
 
@@ -272,5 +272,5 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 ---
 
 ### Related Documentation
-- [projects/Dynamic_HCO_Motion_Brief.md](../projects/Dynamic_HCO_Motion_Brief.md) — build-phase brief (rationale, phase log, condition matrix)
+- [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — archived build brief (rationale, phase log, condition matrix)
 - [HCO_Turn_Resolution_System.md](HCO_Turn_Resolution_System.md) · [Motion_Offense_Shot_System.md](Motion_Offense_Shot_System.md) · [HCT_System.md](HCT_System.md) · [FCP_System.md](FCP_System.md) · [Stopper_System.md](Stopper_System.md) · [Steal_System.md](Steal_System.md) · [SFX_System.md](../11_Design_Systems/SFX_System.md)

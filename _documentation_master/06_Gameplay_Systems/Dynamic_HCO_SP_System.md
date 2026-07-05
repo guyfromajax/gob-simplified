@@ -1,6 +1,6 @@
 ## Dynamic HCO Set Plays System ✅ **SHIPPING (flagged)** (June 2026)
 
-**Feature gate:** env var `GOB_DYNAMIC_HCO_SETPLAY` (`1`/`true`/`yes`/`on`), independent of motion's `GOB_DYNAMIC_HCO_MOTION`. Off → legacy set-play path (up-front outcome tables + static variant skeleton). This doc describes the ON path. Companion brief: [projects/Dynamic_HCO_SP_Brief.md](../projects/Dynamic_HCO_SP_Brief.md). Sibling system: [Dynamic_HCO_System.md](Dynamic_HCO_System.md) — set plays **reuse motion's machinery**; only the differences below are new.
+**Feature gate:** env var `GOB_DYNAMIC_HCO_SETPLAY` (`1`/`true`/`yes`/`on`), independent of motion's `GOB_DYNAMIC_HCO_MOTION`. Off → legacy set-play path (up-front outcome tables + static variant skeleton). This doc describes the ON path. Archived build brief: [projects/Z-Completed/Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md). Sibling system: [Dynamic_HCO_System.md](Dynamic_HCO_System.md) — set plays **reuse motion's machinery**; only the differences below are new.
 
 ---
 

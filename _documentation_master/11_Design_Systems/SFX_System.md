@@ -112,8 +112,9 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 **End of quarter airhorn**
 
-- Trigger: game clock reaches **0:00** on the turn that ends the quarter (`clock_end === 0`, `clock_start > 0`). Primary path: `AnimationRouter.js` clock interpolation (`onUpdate` / `onComplete`). **Fallback:** Final Shot / FLSS quarter-end hold (`AnimationEngine._finishFinalTurnQuarterEnd`) also calls `playEndOfQuarterAirhorn` when schema playback finishes before the linear clock tween completes (dedupe prevents double-fire).
-- File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js`. Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`.
+- **Helper:** `signalQuarterEnded(scene, turnData, { phase })` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js` — single entry for all quarter-end paths. Eligibility: `quarter_ends_after === true` **or** (`clock_end === 0` && `clock_start > 0`). Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`. File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()`.
+- **Phase `clockTween`:** `AnimationRouter.js` clock interpolation. Plays on the clock contract unless `quarter_ends_after` is set (defer to playback so the horn aligns with rim/hold/FT finish).
+- **Phase `playbackComplete`:** after turn animation finishes — Final Turn / FLSS hold (`AnimationEngine._finishFinalTurnQuarterEnd`), schema FT quarter-end (`handleFreeThrow`, `_finishSchemaFreeThrowTurn`), `FINAL_HOLD`, and `runOutClock.js`. Plays on `quarter_ends_after` even when `clock_start === 0` (fixes terminal FT and retroactive backend stamps). Dedupe prevents double-fire when both phases would qualify.
 - Scope: live turn-by-turn court playback (Q1–Q4). Not tied to the quarter-break locker-room screen or the "Quarter X Complete!" popup.
 
 **Defense Matchup Modal**

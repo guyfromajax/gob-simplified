@@ -222,8 +222,7 @@ def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
 def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     """grid/game-sec rate for a player at a given archetype. Single AG curve
     (``rate = 9 + (AG/100) × 6``) anchored at AG=50 → 12, multiplied by the
-    archetype constant. See ``Animation_System_Updated.md`` — Cross-cutting
-    invariants — AG curve.
+    archetype constant. See ``UESS_System.md`` §9.3 (AG curve).
     """
     try:
         from BackEnd.utils.shared import ag_to_grid_per_game_sec
@@ -330,7 +329,7 @@ def _stamp_tween_durations(
     T for every player, which stretches fast-finishing players' tweens
     across the gating player's duration (the "lazy drift" anti-pattern).
     With this, each player tweens for their natural duration then idles at
-    their end coord until step T elapses. See Animation_System_Updated.md.
+    their end coord until step T elapses. See UESS_System.md §3.
     """
     start_coords = start.get("coords") or {}
     archetype = start.get("archetype") or {}

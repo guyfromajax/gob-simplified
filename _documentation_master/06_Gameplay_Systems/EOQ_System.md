@@ -85,7 +85,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 ## 4. Quarter-end authority
 
 - **`quarter_complete`** on simulate-turn when `time_remaining <= 0` after processing (including terminal FTs).
-- **Airhorn / quarter break UI:** FE expects turn contract `clock_end === 0` with `clock_start > 0` on the ending turn.
+- **Airhorn / quarter break UI:** FE uses `signalQuarterEnded` (`quarterEndAirhorn.js`). Eligible when `quarter_ends_after === true` or turn contract `clock_end === 0` with `clock_start > 0`. `clockTween` phase (router) defers when `quarter_ends_after`; `playbackComplete` phase fires after schema FT, Final Turn hold, FLSS, FINAL_HOLD, or run-out — see [`SFX_System.md`](../11_Design_Systems/SFX_System.md).
 - **EOG vs OT:** Backend `is_final` — see [`End_Of_Game_System.md`](End_Of_Game_System.md). EOQ handles **within-period** clock; EOG handles **game** finality.
 
 On quarter break, `api.py` clears EOQ flags (`clear_late_clock_eoq_chain`, drops `final_turn_shot_this_turn`, timeout fields). EOQ chain flags must **not** survive into the next quarter.
@@ -379,7 +379,7 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 | FLSS loop, never saw first Final Turn | Chain started on FT path before fix; or every entry fails §6b runway (check clock after BIP runoff) |
 | Full Final Turn after make when expecting FLSS | §6b runway check passed; `EOQ_FOLLOWUP_FINAL_TURN` in trace |
 | Final Shot stinger twice in last 30s | Missing `suppress_final_shot_sfx` on follow-up Final Turn |
-| Quarter ends at 0:01, no airhorn | Clock never drained to 0 on terminal turn |
+| Quarter ends at 0:01, no airhorn | Missing `quarter_ends_after` on terminal turn and clock contract not drained (`clock_end !== 0`); or horn deferred but no `playbackComplete` call site ran |
 | Full HCO outlet after Final Shot DREB in chain | `flss_after_dreb` not set or FE ran outlet despite `skip_dreb_outlet_lead_in` |
 | Kickout → HCO, no Final Shot | Chain already active from side door; or clock > 30 at HCO entry |
 | Resume after timeout, weird EOQ | Stale timeout anchor / chain flags — see [`Mid_Game_Resume_System.md`](../01_Data_Persistence/Mid_Game_Resume_System.md) |
@@ -393,4 +393,4 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 | 2026-06 | Runway-based follow-up routing (`can_run_final_turn_followup`, §6b); repeat Final Turn SFX suppress |
 | 2026-06 | FT last-shot routing no longer starts chain (`late_clock_ft_resolution`); first Final Shot preserved after FT/OREB paths |
 | 2026-06 | Post-DREB FLSS when chain active and clock > 2s; terminal DREB at ≤ 2s |
-| 2026-06 | Initial EOQ_System.md; OREB chain gate fix documented; trace role `EOQ_CHAIN` vs `FINAL_SHOT` |
+| 2026-07 | Unified `signalQuarterEnded` airhorn helper; `quarter_ends_after` playback path for FT / hold / FINAL_HOLD |

@@ -2,7 +2,7 @@
 Dynamic Full Court Press (FCP) turn engine.
 
 Delegates to the shared pressure loop in ``dynamic_hct`` with ``turn_mode="fcp"``.
-See ``_documentation_master/projects/Dynamic_FCP_Brief.md`` §11 Step 2.
+See ``_documentation_master/projects/Z-Completed/Dynamic_FCP_Brief.md`` §11 Step 2.
 """
 
 from __future__ import annotations

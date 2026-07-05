@@ -1,8 +1,10 @@
 # Dynamic FCP (Full Court Press) Turns
 
-> **Status:** Design brief — **PR1 decisions locked** (§1.1). **Build checklist:** §11. Ready to implement `fcp_straight_pressure`.
+> **Status:** Archived (July 2026). Dynamic FCP shipped (`USE_DYNAMIC_FCP=True`). **Canonical runtime doc:** [`FCP_System.md`](../../06_Gameplay_Systems/FCP_System.md) (dynamic engine section). This file retains the full design brief, locked decisions, and build checklist.
+
+> **Status (original):** Design brief — **PR1 decisions locked** (§1.1). **Build checklist:** §11.
 >
-> **References:** Live legacy FCP → [`FCP_HCT_System.md`](../06_Gameplay_Systems/FCP_HCT_System.md). Dynamic HCT pattern → [`HCT_System.md`](../06_Gameplay_Systems/HCT_System.md) + [`Z-Completed/Dynamic_HCT_Brief.md`](./Z-Completed/Dynamic_HCT_Brief.md). When shipped, this brief should gain a sibling operational bible (`FCP_System.md`) mirroring the HCT split.
+> **References:** Live legacy FCP → [`FCP_HCT_System.md`](../../06_Gameplay_Systems/FCP_HCT_System.md). Dynamic HCT pattern → [`HCT_System.md`](../../06_Gameplay_Systems/HCT_System.md) + [`Dynamic_HCT_Brief.md`](./Dynamic_HCT_Brief.md).
 
 ---
 
@@ -333,16 +335,16 @@ PR1 uses **the same 11** for FCP unless playtesting shows full-court spacing nee
 
 | Doc | Relevance |
 |-----|-----------|
-| [`FCP_HCT_System.md`](../06_Gameplay_Systems/FCP_HCT_System.md) | Legacy FCP outcomes, BIP ranges, stats, skeleton contract |
-| [`HCT_System.md`](../06_Gameplay_Systems/HCT_System.md) | Target architecture bible |
-| [`Z-Completed/Dynamic_HCT_Brief.md`](./Z-Completed/Dynamic_HCT_Brief.md) | Loop spec, §13 multi-play plan, question tracker format |
-| [`Stopper_System.md`](../06_Gameplay_Systems/Stopper_System.md) | What FCP dynamic replaces |
-| [`BIP_System.md`](../06_Gameplay_Systems/BIP_System.md) | BASELINE_INBOUND → FCP setup, clock start |
-| [`Shot_System.md`](../06_Gameplay_Systems/Shot_System.md) | If SHOT terminal kept |
-| [`Fast_Break_System.md`](../06_Gameplay_Systems/Fast_Break_System.md) | Steal aftermath, cutoff reuse |
-| [`Announcement_System.md`](../06_Gameplay_Systems/Announcement_System.md) | Violation / PRESS announcements |
-| [`Playcall_Center.md`](../06_Gameplay_Systems/Playcall_Center.md) | `fc_press` / press-trap override |
-| [`projects/Tutoraial_Pages_Copy/press-trap-subpage.md`](./Tutoraial_Pages_Copy/press-trap-subpage.md) | User-facing press/trap flavor (FCP copy TBD) |
+| [`FCP_HCT_System.md`](../../06_Gameplay_Systems/FCP_HCT_System.md) | Legacy FCP outcomes, BIP ranges, stats, skeleton contract |
+| [`HCT_System.md`](../../06_Gameplay_Systems/HCT_System.md) | Target architecture bible |
+| [`Dynamic_HCT_Brief.md`](./Dynamic_HCT_Brief.md) | Loop spec, §13 multi-play plan, question tracker format |
+| [`Stopper_System.md`](../../06_Gameplay_Systems/Stopper_System.md) | What FCP dynamic replaces |
+| [`BIP_System.md`](../../06_Gameplay_Systems/BIP_System.md) | BASELINE_INBOUND → FCP setup, clock start |
+| [`Shot_System.md`](../../06_Gameplay_Systems/Shot_System.md) | If SHOT terminal kept |
+| [`Fast_Break_System.md`](../../06_Gameplay_Systems/Fast_Break_System.md) | Steal aftermath, cutoff reuse |
+| [`Announcement_System.md`](../../06_Gameplay_Systems/Announcement_System.md) | Violation / PRESS announcements |
+| [`Playcall_Center.md`](../../06_Gameplay_Systems/Playcall_Center.md) | `fc_press` / press-trap override |
+| [`projects/Tutoraial_Pages_Copy/press-trap-subpage.md`](../Tutoraial_Pages_Copy/press-trap-subpage.md) | User-facing press/trap flavor (FCP copy TBD) |
 
 ### Code touchpoints (ordered)
 

@@ -451,7 +451,7 @@ This fallback is dangerous for dynamic/procedural movement because the named ske
 
 ### 2. HCO Dynamic Motion can create real shot coords that differ from skeleton spots
 
-`Dynamic_HCO_Motion_Brief.md` explicitly allows:
+`Z-Completed/Dynamic_HCO_Motion_Brief.md` explicitly allows:
 
 - Ball-handler step-backs.
 - Side dribbles.

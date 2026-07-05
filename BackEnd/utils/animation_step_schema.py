@@ -1,6 +1,6 @@
 """Animation step schema — canonical types for the unified animation system.
 
-See `_documentation_master/projects/Animation_System_Updated.md` for the
+See `_documentation_master/05_UESS_System/UESS_System.md` §3 for the
 design rationale. This module is the single source of truth for the
 backend-emitted per-step animation payload shape. FrontEnd has a JSDoc
 mirror at `FrontEnd/static/js/phaser/animation/animationStepSchema.js`;

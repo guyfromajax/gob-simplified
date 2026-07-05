@@ -1,10 +1,10 @@
 # Screen Capture Tool — Implementation Brief (C+C)
 
+> **Status:** Archived (July 2026). **Phase 1 shipped (manual only):** staging/localhost `Shift+C` to arm → `c` to capture. Modules: `FrontEnd/static/js/shared/capture{Bootstrap,Utils,Controls,Court,Dom}.js`; gate `API_CONFIG.isCaptureEnv()`; `bootGame.js` `preserveDrawingBuffer` when capture env. **Deferred:** §6 auto-capture moments (tracked in [`bugs.md`](../bugs.md) §Screen capture). Re-enable from this spec if auto-moments are wanted later.
+
 **Purpose:** A staging-only, opt-in screen capture tool for producing marketing/thumbnail source imagery from GOB. It captures two surface types — the live court (Phaser canvas + DOM overlays, composited) and pure-DOM screens (FCC, stats, etc.) — at 2× resolution, as clean PNGs. Court gameplay captures fire automatically off a curated moment list; all screens also support a manual shutter key.
 
 **Design lens:** Simple, Stable, Scalable. The tool is additive — one config flag in `bootGame.js`, everything else new modules. It must be invisible and inert in production.
-
-**Status:** Directional brief. Implementation-risk items and open seams are flagged inline for C+C to scope against live code before building.
 
 ---
 

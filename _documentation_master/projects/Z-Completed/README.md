@@ -9,8 +9,6 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | [bugs.md](./bugs.md) | Product bugs, features, animation/UESS backlog |
 | [Animation_Cleanup.md](./Animation_Cleanup.md) | FE animation consolidation (Tier 2–5, Projects A–D) |
 | [offensive_state_hardening.md](./offensive_state_hardening.md) | `offensive_state` routing hardening (open) |
-| [Dynamic_HCT_Turns.md](./Dynamic_HCT_Turns.md) | Dynamic HCT turns |
-| [secondary_announce/](./secondary_announce/) | Secondary announce briefs |
 
 ## Canonical docs (moved out of projects)
 
@@ -20,7 +18,7 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | UESS Legacy Audit | [`projects/UESS_Backlog.md`](../UESS_Backlog.md) + UESS §12 |
 | Movement Rate Refactor (shipped) | [`Z-Completed/Movement_Rate_Refactor.md`](./Z-Completed/Movement_Rate_Refactor.md) |
 | Fast Break Refactor (open legacy work) | [`Z-Completed/Fast_Break_Refactor.md`](./Z-Completed/Fast_Break_Refactor.md) + `bugs.md` |
-| `Animation_System_Updated.md` | Redirect stub → UESS / Step_By_Step (Advance_Triggers merged into Step_By_Step, June 2026) |
+| `Animation_System_Updated.md` (deleted July 2026) | [`05_UESS_System/UESS_System.md`](../05_UESS_System/UESS_System.md) + [`Step_By_Step_System.md`](../05_UESS_System/Step_By_Step_System.md) |
 
 ## Completed archive
 
@@ -33,6 +31,15 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | [Z-Completed/SFX_Manager_Implementation.md](./Z-Completed/SFX_Manager_Implementation.md) | Superseded by SFX_System |
 | [Z-Completed/SFX_Brief.md](./Z-Completed/SFX_Brief.md) | Creative brief archive |
 | [Z-Completed/Unified_State_Persistence_Work_Plan.md](./Z-Completed/Unified_State_Persistence_Work_Plan.md) | State/persistence contract implementation, phases 1–5.7 (Feb-2026 settings entry superseded by April two-stage model) |
+| [Dynamic_HCO_Motion_Implementation_Plan.md](./Dynamic_HCO_Motion_Implementation_Plan.md) | Dynamic HCO motion build plan (phases 1–5 shipped June 2026; see `Dynamic_HCO_System.md`) |
+| [Distant_Sim_Tuning.md](./Distant_Sim_Tuning.md) | Distant sim momentum/record tuning (phases 0–6 shipped July 2026; see `Distant_Game_Sim_System.md`) |
+| [Dynamic_HCO_Motion_Brief.md](./Dynamic_HCO_Motion_Brief.md) | Dynamic HCO motion build brief (shipped, flagged; see `Dynamic_HCO_System.md`) |
+| [Dynamic_HCO_SP_Brief.md](./Dynamic_HCO_SP_Brief.md) | Dynamic HCO set-play build brief (shipped, flagged; see `Dynamic_HCO_SP_System.md`) |
+| [Dynamic_FCP_Brief.md](./Dynamic_FCP_Brief.md) | Dynamic FCP build brief (shipped; see `FCP_System.md`) |
+| [Recruit_Generation_System.md](./Recruit_Generation_System.md) | Obsolete scratch — superseded by `Practice_Squad_System.md` + `Recruiting_System.md` |
+| [Micro_Movements_Brief.md](./Micro_Movements_Brief.md) | Early shot micro-movement wishlist — superseded by `Shot_Micro_Movements_System.md` |
+| [CURSOR_BRIEF_Secondary_Announce.md](./CURSOR_BRIEF_Secondary_Announce.md) + [`Secondary Announce.html`](./Secondary%20Announce.html) | Secondary announcement tier (shipped; see `Announcement_System.md`) |
+| [screen_capture_tool_spec.md](./screen_capture_tool_spec.md) | Screen capture brief — manual shutter shipped; §6 auto-moments deferred (`bugs.md`) |
 
 ## Website copy
 

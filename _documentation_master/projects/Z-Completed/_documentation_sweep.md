@@ -195,11 +195,17 @@
 
 ## projects (26) — ❌ OUT OF SCOPE (not reviewing; incl. Website_Copy, secondary_announce)
 
+- [x] `projects/screen_capture_tool_spec.md` → **Archived 2026-07-05** — manual capture shipped (`capture*.js`); auto-capture moments deferred to `bugs.md` §Screen capture.
 - [ ] `projects/Animation_Cleanup.md` →
-- [ ] `projects/Animation_System_Updated.md` →
+- [x] `projects/Animation_System_Updated.md` → **Deleted 2026-07-05** — was a redirect stub; all code comments repointed to `05_UESS_System/UESS_System.md` (schema §3, coord sync §9, AG §9.3), `Step_By_Step_System.md` §HCT, and `Rebound_System.md` §DREB.
+- [x] `projects/animation_wonkiness.md` → **Deleted 2026-07-05** — open buckets 1–2 merged into `projects/bugs.md` §Animation timing pauses; fixed buckets 3–4 summarized there.
+- [x] `projects/Distant_Sim_Tuning.md` → **Archived 2026-07-05** to `Z-Completed/` — calibration targets, playtest checklist, and live MC results merged into `04_Franchise_Mode_Systems/Distant_Game_Sim_System.md`; `distant_sim_monte_carlo.py --write-doc` repointed.
+- [x] `projects/Dynamic_FCP_Brief.md`, `Dynamic_HCO_Motion_Brief.md`, `Dynamic_HCO_SP_Brief.md` → **Archived 2026-07-05** to `Z-Completed/` (HCT brief pattern). Canonical: `FCP_System.md`, `Dynamic_HCO_System.md`, `Dynamic_HCO_SP_System.md`. Code comments repointed.
 - [ ] `projects/Dynamic_HCT_Turns.md` →
 - [ ] `projects/News_System.md` →
-- [ ] `projects/Recruit_Generation_System.md` →
+- [x] `projects/Recruit_Generation_System.md` → **Archived 2026-07-05** — obsolete scratch; superseded by `Practice_Squad_System.md` + `Recruiting_System.md`.
+- [x] `projects/Micro_Movements_Brief.md` → **Archived 2026-07-05** — superseded by `Shot_Micro_Movements_System.md`.
+- [x] `projects/secondary_announce/*` → **Archived 2026-07-05** to `Z-Completed/` (brief + HTML); shipped — see `Announcement_System.md`.
 - [ ] `projects/Resend_Project_Brief.md` →
 - [ ] `projects/Resend_Project_Work_Plan.md` →
 - [ ] `projects/Social_Activation.md` →
@@ -208,8 +214,6 @@
 - [ ] `projects/cloudflare_migration.md` →
 - [ ] `projects/offensive_state_hardening.md` →
 - [x] `projects/rebounding_logic.md` → **Deleted 2026-06-21** — superseded by `06_Gameplay_Systems/Rebound_System.md`, which now owns the implemented geo-helper, all-eligible rebound scoring, fallback, tie-breaker, and animation contracts.
-- [ ] `projects/secondary_announce/CURSOR_BRIEF_Secondary_Announce.md` →
-- [ ] `projects/secondary_announce/Secondary Announce.html` →
 - [ ] `projects/simulate_quarter_api_cleanup.md` →
 - [ ] `projects/staging_otps.md` →
 - [ ] `projects/universal_3point_helper.md` →

@@ -1,4 +1,8 @@
 
+# Recruit Generation System (obsolete scratch)
+
+> **Status:** Archived (July 2026). **Superseded by:** [`Practice_Squad_System.md`](../../04_Franchise_Mode_Systems/Practice_Squad_System.md) (walk-ons, training squad, CH progression, week-35 cuts, in-season reports) and [`Recruiting_System.md`](../../04_Franchise_Mode_Systems/Recruiting_System.md) (recruit generation, signing, walk-ons in recruiting UI). Do not use this file for runtime reference.
+
 
 **Starting Player Collection Counts**
 - Senior: 576

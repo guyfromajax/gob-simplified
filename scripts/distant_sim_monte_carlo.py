@@ -2,7 +2,7 @@
 """
 Monte Carlo baseline for distant franchise game sim win-probability tuning.
 
-Phase 0 of Distant_Sim_Tuning.md — measure record distributions under:
+Phase 0 of distant sim MC calibration — measure record distributions under:
   - distant:     current production formula (all games)
   - hybrid:      user conference = full-sim proxy, all other games = distant
   - full_proxy:  full-sim proxy for every game (target distribution reference)
@@ -34,8 +34,11 @@ REGULAR_SEASON_WEEKS = 26
 ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
 TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
 RESULTS_JSON = os.path.join(_root, "scripts", "distant_sim_monte_carlo_results.json")
-TUNING_DOC = os.path.join(
-    _root, "_documentation_master", "projects", "Distant_Sim_Tuning.md"
+CALIBRATION_DOC = os.path.join(
+    _root,
+    "_documentation_master",
+    "04_Franchise_Mode_Systems",
+    "Distant_Game_Sim_System.md",
 )
 
 
@@ -747,12 +750,12 @@ def report_to_dict(report: MonteCarloReport, team_source: str) -> dict[str, Any]
     return d
 
 
-def update_tuning_doc(results: dict[str, Any]) -> None:
-    if not os.path.exists(TUNING_DOC):
-        print(f"⚠️  Tuning doc not found: {TUNING_DOC}", file=sys.stderr)
+def update_calibration_doc(results: dict[str, Any]) -> None:
+    if not os.path.exists(CALIBRATION_DOC):
+        print(f"⚠️  Calibration doc not found: {CALIBRATION_DOC}", file=sys.stderr)
         return
 
-    with open(TUNING_DOC, encoding="utf-8") as f:
+    with open(CALIBRATION_DOC, encoding="utf-8") as f:
         content = f.read()
 
     distant = results.get("distant", {})
@@ -835,9 +838,9 @@ Raw JSON: `{RESULTS_JSON}`
     else:
         content = content.rstrip() + "\n\n" + replacement + "\n"
 
-    with open(TUNING_DOC, "w", encoding="utf-8") as f:
+    with open(CALIBRATION_DOC, "w", encoding="utf-8") as f:
         f.write(content)
-    print(f"\n✅ Updated {TUNING_DOC}")
+    print(f"\n✅ Updated {CALIBRATION_DOC}")
 
 
 def main() -> int:
@@ -857,7 +860,7 @@ def main() -> int:
         default="mixed",
         help="mixed = shuffle teams into conferences (realistic); rank_block = top 8 in conf 1",
     )
-    parser.add_argument("--write-doc", action="store_true", help="Update Distant_Sim_Tuning.md")
+    parser.add_argument("--write-doc", action="store_true", help="Update Distant_Game_Sim_System.md §Calibration Results")
     parser.add_argument("--json", type=str, default=RESULTS_JSON, help="Output JSON path")
     parser.add_argument(
         "--live-talent-proxy",
@@ -918,7 +921,7 @@ def main() -> int:
     print(f"\n✅ Wrote {args.json}")
 
     if args.write_doc:
-        update_tuning_doc(results)
+        update_calibration_doc(results)
 
     return 0
 
