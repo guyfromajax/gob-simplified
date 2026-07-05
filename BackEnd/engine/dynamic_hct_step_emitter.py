@@ -276,7 +276,17 @@ def _build_loop_step(
         # kills the off-ball "jet". Gate players (whose T == their natural
         # travel time) still reach their full target.
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, move_arch)
+        if pid == bh_id and reason == "hct_advance":
+            from BackEnd.utils.shared import ag_to_grid_per_game_sec
+
+            attrs = getattr(player, "attributes", None) or {}
+            rate = float(
+                ag_to_grid_per_game_sec(
+                    attrs.get("AG", 50) if isinstance(attrs, dict) else 50
+                )
+            )
+        else:
+            rate = _ag_grid_per_game_sec(player, move_arch)
         ec = _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
 
         moved = (

@@ -30,7 +30,11 @@ def _normalize_result_type(turn_result: Dict[str, Any]) -> str:
 
 def is_dead_ball_fumble_turn(turn_result: Dict[str, Any]) -> bool:
     """True for travel/double-dribble class dead-ball turnovers (not shot clock / steals)."""
-    if (turn_result.get("turnover_type") or "").upper() == "SHOT_CLOCK":
+    if (turn_result.get("turnover_type") or "").upper() in (
+        "SHOT_CLOCK",
+        "TEN_SECOND",
+        "OVER_BACK",
+    ):
         return False
     if turn_result.get("stealer_id"):
         return False

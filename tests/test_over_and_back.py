@@ -13,6 +13,7 @@ from BackEnd.engine.over_and_back import (
     passer_commits_over_and_back_pass,
     passer_over_and_back_threshold,
     should_hold_instead_of_backcourt_pass,
+    update_frontcourt_established,
 )
 
 _POSITIONS = ("PG", "SG", "SF", "PF", "C")
@@ -45,6 +46,23 @@ def test_weak_passer_commits_on_low_roll():
 def test_is_over_and_back_requires_frontcourt_established():
     assert not is_over_and_back_pass(False, {"x": 45, "y": 25}, False)
     assert is_over_and_back_pass(True, {"x": 45, "y": 25}, False)
+
+
+def test_frontcourt_established_on_pass_receipt_enables_over_and_back():
+    """FC can be established by catch spot (away: x<=50), not only BH dribble."""
+    fc = update_frontcourt_established(False, {"x": 75, "y": 25}, is_away_offense=True)
+    assert not fc
+    fc = update_frontcourt_established(fc, {"x": 48, "y": 25}, is_away_offense=True)
+    assert fc
+    assert is_over_and_back_pass(fc, {"x": 55, "y": 28}, is_away_offense=True)
+
+
+def test_frontcourt_established_on_pass_receipt_home_offense():
+    fc = update_frontcourt_established(False, {"x": 45, "y": 25}, is_away_offense=False)
+    assert not fc
+    fc = update_frontcourt_established(fc, {"x": 52, "y": 25}, is_away_offense=False)
+    assert fc
+    assert is_over_and_back_pass(fc, {"x": 45, "y": 25}, is_away_offense=False)
 
 
 def test_grace_beat_always_holds_backcourt_pass():

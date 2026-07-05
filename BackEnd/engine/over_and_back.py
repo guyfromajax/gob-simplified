@@ -33,6 +33,21 @@ def in_backcourt(x: float, is_away_offense: bool) -> bool:
     return not crossed_half_court(x, is_away_offense)
 
 
+def update_frontcourt_established(
+    frontcourt_established: bool,
+    xy: Dict[str, Any],
+    is_away_offense: bool,
+) -> bool:
+    """True once the ball has legally established frontcourt this possession.
+
+    Call on the live ball-handler each loop beat and on the pass **catch spot**
+    when frontcourt is established by pass receipt (not only by dribble advance).
+    """
+    if frontcourt_established:
+        return True
+    return crossed_half_court(float(xy.get("x", 50)), is_away_offense)
+
+
 def is_over_and_back_pass(
     frontcourt_established: bool,
     receiver_xy: Dict[str, Any],

@@ -115,6 +115,39 @@ Bottom → top:
 
 **Alternative layer order:** bust on bottom, full uniform PNG (including neck trim) on top with face cutout masked through — whichever matches Conf1 neck integration faster in pilot. Lock one approach on Stanley Keith, then reuse.
 
+### Uniform development (three phases)
+
+Per team, develop the jersey **before** batching faces:
+
+| Phase | What | Output |
+|-------|------|--------|
+| **1 — Design** | Build uniform on blank 3530×3412 canvas **or** over a Conf1 portrait for proportions (no final player face required) | PSD with `UNIFORM_OVERLAY` layers: body color, trim, wordmark, optional logo |
+| **2 — Fit (Stanley)** | Generate Stanley’s **white-tank** bust → drop overlay → iterate neck/collar/wordmark placement | Approved composite; **locked** overlay position + scale |
+| **3 — Batch** | Generate 11 more white-tank busts → apply **identical** overlay → export all 12 | `<uuid>.png` per roster row |
+
+**Gate:** Do not generate players 2–12 until Phase 2 passes QC at **256px** next to Conf1.
+
+### Bust framing & overlay alignment
+
+**Torsos do not need to be pixel-identical.** Shoulder width, neck thickness, and build will vary by player (guard vs center). One locked overlay still works when **framing** stays consistent — not when every bust is the same size.
+
+| Must stay consistent (via fixed prompt + Xenon style ref) | Can vary |
+|-------------------------------------------------------------|----------|
+| Crop: bust, shoulders up, centered | Shoulder width, muscular vs lean build |
+| Head scale relative to frame (neck/collar lands in same zone) | Neck thickness |
+| Pose: front-facing, neutral | Height/weight read in face and shoulders |
+| Aspect ratio: 1:1 → upscale to 3530×3412 | — |
+
+The **plain white tank** in the prompt gives a consistent neckline anchor — misaligned busts are easier to spot before compositing.
+
+**When the overlay breaks:** bust is zoomed differently, tilted, or cropped higher/lower than Stanley → **regenerate that bust** (same prompt skeleton). Do **not** resize or reposition `UNIFORM_OVERLAY` per player except rare outliers (prefer regen).
+
+**Photoshop guide layer (recommended after Stanley is approved):**
+
+1. Keep Stanley’s approved bust on a layer at **~30% opacity**, labeled `GUIDE — do not export`.
+2. Place each new white-tank bust under the locked `UNIFORM_OVERLAY` and align to the guide — head size and neck position should match within a small tolerance.
+3. If a bust doesn’t land on the guide, treat it as a bad generation, not a uniform adjustment.
+
 ### What AI generates vs what Photoshop owns
 
 | Step | Tool | Notes |

@@ -2512,9 +2512,13 @@ def compute_dynamic_hct_turn(
             ADVANCE_X_MIN, ADVANCE_X_MAX
         )
         adv_y = bh_xy["y"] + random.randint(ADVANCE_Y_MIN, ADVANCE_Y_MAX)
-        new_bh = _clamp_xy({"x": adv_x, "y": adv_y})
-        advance_seconds = max(0.3, _euclid(bh_xy, new_bh) / bh_drive_rate)
-        off_coords[bh_pos] = new_bh
+        adv_target = _clamp_xy({"x": adv_x, "y": adv_y})
+        advance_seconds = max(0.3, _euclid(bh_xy, adv_target) / bh_drive_rate)
+        # UESS §1: store the interrupted BH end (AG-drive rate × T), not a full
+        # snap — matches ``_build_loop_step`` / ``build_pass_step`` threading.
+        off_coords[bh_pos] = _clamp_xy(
+            _interrupted_coord(bh_xy, adv_target, bh_drive_rate, advance_seconds)
+        )
         bh_xy = off_coords[bh_pos]
         # D15: defenders chase at their own rate (interrupted), so a quicker BH
         # gains separation rather than the defense snapping back onto him.
@@ -2931,9 +2935,11 @@ def compute_dynamic_hct_turn(
 
     for _ in range(MAX_LOOP_ITERATIONS):
         loop_bh_pos = bh_pos
+        from BackEnd.engine.over_and_back import update_frontcourt_established
+
         was_fc_established = frontcourt_established
-        frontcourt_established = frontcourt_established or _crossed_half_court(
-            bh_xy["x"], is_away_offense
+        frontcourt_established = update_frontcourt_established(
+            frontcourt_established, bh_xy, is_away_offense
         )
         if frontcourt_established and not was_fc_established:
             frontcourt_grace_bh_pos = loop_bh_pos
@@ -3180,7 +3186,17 @@ def compute_dynamic_hct_turn(
         loop_segments.append(pass_seg)
         shot_clock -= pass_seconds
 
-        from BackEnd.engine.over_and_back import is_over_and_back_pass
+        from BackEnd.engine.over_and_back import (
+            is_over_and_back_pass,
+            update_frontcourt_established,
+        )
+
+        was_fc_before_catch = frontcourt_established
+        frontcourt_established = update_frontcourt_established(
+            frontcourt_established, off_coords[receiver_pos], is_away_offense
+        )
+        if frontcourt_established and not was_fc_before_catch:
+            frontcourt_grace_bh_pos = receiver_pos
 
         oob_violation = is_over_and_back_pass(
             frontcourt_established, off_coords[receiver_pos], is_away_offense

@@ -52,6 +52,18 @@ class TestIsDeadBallFumbleTurn:
             "turnover_type": "SHOT_CLOCK",
         })
 
+    def test_over_back_excluded(self):
+        assert not is_dead_ball_fumble_turn({
+            "result_type": "DEAD BALL",
+            "turnover_type": "OVER_BACK",
+        })
+
+    def test_ten_second_excluded(self):
+        assert not is_dead_ball_fumble_turn({
+            "result_type": "DEAD BALL",
+            "turnover_type": "TEN_SECOND",
+        })
+
     def test_steal_excluded(self):
         assert not is_dead_ball_fumble_turn({
             "result_type": "STEAL",
