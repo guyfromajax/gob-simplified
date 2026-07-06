@@ -1838,6 +1838,17 @@ def _recover_defense_targets(
     return recovered
 
 
+def _defender_move_archetype(pos: str, recovered: Any) -> str:
+    """The archetype a defender moves at on a §D15 advance/hold beat: PF/C — and
+    any mid-court-recovered defender — sprint; everyone else moves at standard.
+
+    Single-motion-spec (UESS §1, rate dimension): this is authored HERE, once,
+    and carried in the loop segment's ``move_archetype`` so the emitter renders
+    at the SAME rate the engine decided from — it must never re-derive its own.
+    """
+    return "sprint" if (pos in ("PF", "C") or pos in recovered) else "standard"
+
+
 def _move_defense(
     bh_xy: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
@@ -1847,7 +1858,7 @@ def _move_defense(
     off_coords: Optional[Dict[str, Dict[str, int]]] = None,
     play: Any = None,
     frontcourt_established: bool = False,
-) -> None:
+) -> Dict[str, str]:
     """D15: move each defender toward its §6 target at the player's rate,
     **interrupted** by the segment duration, tracking actual positions.
 
@@ -1871,8 +1882,10 @@ def _move_defense(
     recovered = _recover_defense_targets(
         targets, def_coords, off_coords, bh_xy, is_away_offense, frontcourt_established
     )
+    move_archetype: Dict[str, str] = {}
     for pos in POSITIONS:
-        arch = "sprint" if (pos in ("PF", "C") or pos in recovered) else "standard"
+        arch = _defender_move_archetype(pos, recovered)
+        move_archetype[pos] = arch
         rate = _ag_grid_per_game_sec(def_lineup.get(pos), arch)
         if rate <= 0:
             def_coords[pos] = _clamp_xy(targets[pos])
@@ -1880,6 +1893,7 @@ def _move_defense(
         def_coords[pos] = _clamp_xy(
             _interrupted_coord(def_coords[pos], targets[pos], rate, seconds)
         )
+    return move_archetype
 
 
 def _prior_final_coords(game: Any) -> Dict[str, Dict[str, Any]]:
@@ -1971,6 +1985,7 @@ def _segment(
     gate: Tuple[str, str],
     ball_owner_pos: str = "PG",
     label: str = "",
+    move_archetype: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """Snapshot a loop segment's per-player end coords + gate.
 
@@ -1978,8 +1993,14 @@ def _segment(
     arrival ends the step. ``ball_owner_pos`` is the offensive position holding
     the ball at the end of the segment (changes after a pass). ``label`` is a
     human-readable step description for the per-step coord trace log.
+
+    ``move_archetype`` (``{pos: archetype}``) is the per-defender rate the engine
+    used to interrupt this beat's coords (move beats only — advance/hold). It is
+    carried so the emitter renders at the same rate the engine decided from,
+    instead of re-deriving its own (which drifted PF/C sprint→standard). Snap
+    beats (converge/stopper) and passes omit it → emitter keeps prior behavior.
     """
-    return {
+    seg = {
         "reason": reason,
         "step_label": label or reason,
         "off_end": {p: dict(off_coords[p]) for p in POSITIONS},
@@ -1988,6 +2009,9 @@ def _segment(
         "gate": list(gate),
         "ball_owner_pos": ball_owner_pos,
     }
+    if move_archetype:
+        seg["move_archetype"] = dict(move_archetype)
+    return seg
 
 
 def _pass_segment(
@@ -2306,10 +2330,12 @@ def compute_dynamic_hct_turn(
         dest_off: Optional[Dict[str, Dict[str, int]]] = None,
         dest_def: Optional[Dict[str, Dict[str, int]]] = None,
         note: str = "",
+        move_archetype: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         _gate_offense_backcourt()
         seg = _segment(
             reason, off_coords, def_coords, seconds, gate, ball_owner, label,
+            move_archetype=move_archetype,
         )
         if fcp_tracer is not None and snap_off is not None and snap_def is not None:
             fcp_tracer.log_engine_step(
@@ -2522,7 +2548,7 @@ def compute_dynamic_hct_turn(
         bh_xy = off_coords[bh_pos]
         # D15: defenders chase at their own rate (interrupted), so a quicker BH
         # gains separation rather than the defense snapping back onto him.
-        _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established)
+        def_move_arch = _move_defense(bh_xy, def_coords, is_away_offense, advance_seconds, def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established)
         # D15b: off-ball offense — FCP press-break routes or setup hustle.
         _fcp_move_offense(bh_xy, advance_seconds)
         _append_loop_segment(
@@ -2533,6 +2559,7 @@ def compute_dynamic_hct_turn(
             label,
             snap_off=adv_snap_off,
             snap_def=adv_snap_def,
+            move_archetype=def_move_arch,
         )
 
     def _apply_off_ball_drift(seconds: float, exclude: set) -> None:
@@ -2870,7 +2897,7 @@ def compute_dynamic_hct_turn(
         nonlocal result_type, text_suffix, shot_clock
         hold_snap_off, hold_snap_def = _snap_loop_coords()
         hold_seconds = float(random.randint(HOLD_SECONDS_MIN, HOLD_SECONDS_MAX))
-        _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established)
+        def_move_arch = _move_defense(bh_xy, def_coords, is_away_offense, hold_seconds, def_lineup, off_coords, play=play, frontcourt_established=frontcourt_established)
         if turn_mode == "fcp" and fcp_offball is not None:
             fcp_offball.refresh_incremental(bh_xy, off_coords, bh_pos, force=False)
             _fcp_move_offense(bh_xy, hold_seconds)
@@ -2887,6 +2914,7 @@ def compute_dynamic_hct_turn(
             hold_label,
             snap_off=hold_snap_off,
             snap_def=hold_snap_def,
+            move_archetype=def_move_arch,
         )
         shot_clock -= hold_seconds
 

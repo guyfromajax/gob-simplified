@@ -20,6 +20,15 @@ assembles the schema. Reads ``prior_turn.final_coords`` and
 ``prior_turn.final_ball_handler_id`` to seed step 0's start coords (the same
 pattern HCO uses for its entry orchestrator).
 
+**Single-motion-spec convention (UESS §1, rate dimension):** a move beat's
+per-defender archetype is authored by the ENGINE and carried on the segment as
+``move_archetype`` (``{pos: archetype}``). ``_build_loop_step`` must READ it, not
+re-derive its own — otherwise the emitter and the engine's decision positions
+drift (e.g. PF/C move at sprint in the engine but rendered at standard, falling
+short of the coverage the engine already decided from). Snap/pass beats omit the
+field → the role-table fallback stands. New emitters must follow this: carry the
+authoring layer's archetype; never invent a parallel one.
+
 Spec context: ``_documentation_master/05_Animation_System/Step_By_Step_System.md``.
 """
 
@@ -205,6 +214,7 @@ def _build_loop_step(
     shot_clock_remaining_at_start: float,
     next_step: NextStep,
     reason: str,
+    move_archetype: Optional[Dict[str, str]] = None,
 ) -> AnimationStep:
     """Generic dynamic-HCT loop step. Movers progress toward their
     ``end_coords`` target, clamped to their archetype rate over the step
@@ -249,6 +259,19 @@ def _build_loop_step(
     archetype: Dict[str, PlayerArchetype] = {}
     step_end_coords: Dict[str, GridCoord] = {}
 
+    # UESS single-motion-spec (rate dimension): the engine authored each moving
+    # defender's archetype for this beat and carried it on the segment. Honor it
+    # instead of re-deriving — otherwise PF/C (engine sprint) render at standard
+    # and fall short of the coverage the engine already decided from. Keyed by
+    # position on the segment; resolve to player ids here. Absent for snap/pass
+    # beats → the role table below stands.
+    carried_arch_by_pid: Dict[str, str] = {}
+    if move_archetype:
+        for pos, arch in move_archetype.items():
+            did = _player_id_at_pos(def_lineup, pos)
+            if did:
+                carried_arch_by_pid[did] = arch
+
     for pid, sc in start_coords.items():
         target = end_coords.get(pid, sc)
         # Role + action, plus the archetype rate this player moves at.
@@ -268,6 +291,11 @@ def _build_loop_step(
         else:
             action = "guard_offball"
             move_arch = "standard"
+
+        # Honor the engine-authored move archetype (carried on the segment) over
+        # the re-derived role rate — the single-motion-spec fix. Defender-only;
+        # BH (hct_advance special-case) and off-ball offense are never carried.
+        move_arch = carried_arch_by_pid.get(pid, move_arch)
 
         # Universal speed clamp: no player may travel past their archetype
         # rate within the step. If the intended target is farther than the
@@ -906,6 +934,7 @@ def build_dynamic_hct_animation_steps(
                     shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
                     next_step=next_step,
                     reason=reason,
+                    move_archetype=segment.get("move_archetype"),
                 )
         else:
             step = _build_loop_step(
@@ -921,6 +950,7 @@ def build_dynamic_hct_animation_steps(
                 shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
                 next_step=next_step,
                 reason=reason,
+                move_archetype=segment.get("move_archetype"),
             )
 
         # Reach-in micro-movement: a contest moment (set by dynamic_hct's
