@@ -81,6 +81,25 @@ def _first(doc, *keys):
     return None
 
 
+def load_env_file(path=".env"):
+    """Read KEY=VALUE lines from a local .env into os.environ (no printing).
+
+    Only sets vars that aren't already in the environment, so an explicitly
+    exported value still wins. Secrets never touch the terminal.
+    """
+    if not os.path.exists(path):
+        return
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key, val = key.strip(), val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
 def normalize(doc):
     fn, ln = doc.get("first_name"), doc.get("last_name")
     name = _first(doc, "name", "full_name") or " ".join(x for x in (fn, ln) if x)
@@ -106,9 +125,11 @@ def normalize(doc):
 
 
 def main():
+    load_env_file()   # auto-load MONGO_URI from .env — never printed
     uri = os.environ.get("MONGO_URI")
     if not uri:
-        sys.exit("MONGO_URI is not set. Run this where the DB is reachable.")
+        sys.exit("MONGO_URI not set (checked environment and .env). "
+                 "Run where the DB is reachable, or set MONGO_URI.")
     try:
         from pymongo import MongoClient
     except ImportError:
