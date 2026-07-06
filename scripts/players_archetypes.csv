@@ -1,0 +1,13 @@
+_id,name,jersey,year,height_in,weight_lb,bmi,height_band,build_class,archetype,build_prompt
+86b911a5-c022-4041-aefd-175a0e1f2acf,Stanley Keith,4,sophomore,73,206,27.2,Normal,Strong,N-Strong,"strong powerful build, broad wide shoulders, thick neck"
+ac26dbe2-e590-49aa-9bde-745584e548f9,Landon Turley,10,junior,70,167,24.0,Short,Lean,S-Lean,"lean slim build, narrow shoulders, slender neck"
+f8b7f7b5-bd62-420a-a31e-08ae8c95fb93,Brice Monroe Jr,11,freshman,73,192,25.3,Normal,Normal,N-Normal,"athletic average build, medium shoulders"
+da3e79a7-5fec-46d4-b847-bdf2870e1fe8,Otis Nixon,17,junior,68,159,24.2,Short,Lean,S-Lean,"lean slim build, narrow shoulders, slender neck"
+5a27f1b1-ba4a-417e-bd83-45abd8ef5829,Nathan Randolph,25,junior,72,200,27.1,Normal,Strong,N-Strong,"strong powerful build, broad wide shoulders, thick neck"
+99f962c5-3624-4082-a420-916f7999241f,Colt Robles,27,sophomore,70,167,24.0,Short,Lean,S-Lean,"lean slim build, narrow shoulders, slender neck"
+e297fdab-a3da-45d0-af00-1742e371915d,Dale Butler,30,sophomore,68,175,26.6,Short,Normal,S-Normal,"athletic average build, medium shoulders"
+d5e6f137-86ff-4c0b-9e5b-5afd094826d5,Shorty Holmstrom,31,senior,74,205,26.3,Normal,Normal,N-Normal,"athletic average build, medium shoulders"
+d8b1e862-fbee-44f7-b8b9-160531c0b8df,Thanh Small,32,freshman,77,235,27.9,Normal,Strong,N-Strong,"strong powerful build, broad wide shoulders, thick neck"
+c642adfa-692a-4f3f-8e3a-6401543c7a45,Dayton Weber,34,sophomore,70,169,24.2,Short,Lean,S-Lean,"lean slim build, narrow shoulders, slender neck"
+eb149eb8-bb89-4d90-8779-e02f1bd6d6d5,Eugene Johnston,46,freshman,79,238,26.8,Tall,Strong,T-Strong,"strong powerful build, broad wide shoulders, thick neck"
+05f93933-514a-4a4e-805e-c76ba8c12dfa,Darren Parrish,55,senior,73,200,26.4,Normal,Normal,N-Normal,"athletic average build, medium shoulders"
