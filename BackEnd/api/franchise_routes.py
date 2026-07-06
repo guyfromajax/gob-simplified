@@ -5536,6 +5536,54 @@ def _try_finalize_franchise_week_if_complete(
     return out
 
 
+# Shot-diagnostic keys stamped onto a game summary by ``summarize_game_state``.
+# The week-aggregate roll-up needs only these four; slimming keeps the persisted
+# stash small (the full CPU summary is large).
+_SHOT_DIAG_KEYS = (
+    "shot_split_tracking",
+    "fga_by_turn_type",
+    "undefended_by_turn_type",
+    "hco_shot_tier_counts",
+)
+
+
+def _slim_shot_diag(summary: dict | None) -> dict | None:
+    """Extract just the shot-diagnostic keys from a game summary. Returns None when
+    the summary carries no usable diagnostics."""
+    if not isinstance(summary, dict):
+        return None
+    slim = {
+        k: summary[k]
+        for k in _SHOT_DIAG_KEYS
+        if isinstance(summary.get(k), dict) and summary.get(k)
+    }
+    return slim or None
+
+
+def _load_user_week_shot_diag(franchise_id_str, week, team1_id, team2_id) -> dict | None:
+    """Load this week's user game_doc from db.games and return its slim shot
+    diagnostics. The user game persists the four keys top-level (per-quarter via
+    summarize_game_state), so this works whether the user played via the
+    monolithic or phased complete-week flow. Defensive: None on any miss/error."""
+    try:
+        a, h = str(team1_id), str(team2_id)
+        query = {
+            "week": week,
+            "franchise_id": str(franchise_id_str),
+            "$or": [
+                {"team1_id": a, "team2_id": h},
+                {"team1_id": h, "team2_id": a},
+            ],
+        }
+        docs = list(db.games.find(query))
+        if not docs:
+            return None
+        return _slim_shot_diag(max(docs, key=_game_doc_richness_score))
+    except Exception as e:
+        logger.warning("[WEEK AGGREGATE] user game diag load failed: %s", e)
+        return None
+
+
 def _complete_week_finish_cpu_and_persist(
     franchise_doc: dict,
     franchise_id: ObjectId,
@@ -5943,6 +5991,11 @@ def _complete_week_finish_cpu_and_persist(
         _fj_dedup.append(job)
     full_jobs = _fj_dedup
 
+    # Shot-diagnostic summaries from this week's full-sim CPU games (distant sims
+    # carry no game_state and never reach here). Rolled up with the user's own
+    # game into a single week-aggregate report after the full-sim block.
+    _cpu_week_summaries: list[dict] = []
+
     if full_jobs:
         max_workers = min(_franchise_cpu_full_sim_max_workers(), len(full_jobs))
         logger.info(
@@ -5976,21 +6029,20 @@ def _complete_week_finish_cpu_and_persist(
             except Exception as ex:
                 sim_err[sched_idx] = ex
 
-        # Week-level aggregate shot diagnostics across all CPU full sims this week.
-        # Each summary carries the shot tallies stamped by summarize_game_state; we sum
-        # them and print one per-week report (avg FGA/FG%/3PTA/3PT% + percentage splits).
-        # Grep ``WEEK AGGREGATE``. (User game prints its own per-game report separately.)
+        # Collect each full-sim CPU game's shot-diagnostic summary (both teams
+        # combined, stamped by summarize_game_state) and stash a slim copy on the
+        # franchise doc keyed by week. In the phased flow, CPU sims run in
+        # start-cpu-sims (before the user plays), so the summaries must survive to
+        # be rolled into the end-of-week report at phase-b.
+        _cpu_week_summaries = [s for (_a, _h, s) in sim_ok.values() if isinstance(s, dict)]
         try:
-            from BackEnd.utils.shot_split_tracker import (
-                merge_shot_diagnostics, format_week_aggregate_report,
+            _slim_cpu = [d for d in (_slim_shot_diag(s) for s in _cpu_week_summaries) if d]
+            db.franchises.update_one(
+                {"_id": franchise_id},
+                {"$set": {f"week_shot_diagnostics.{week}": _slim_cpu}},
             )
-            _week_summaries = [s for (_a, _h, s) in sim_ok.values() if isinstance(s, dict)]
-            _merged, _ngames = merge_shot_diagnostics(_week_summaries)
-            if _ngames:
-                print(f"[WEEK AGGREGATE] franchise={franchise_id_str} week={week}")
-                print(format_week_aggregate_report(_merged, _ngames))
-        except Exception as _agg_e:
-            logger.warning("[WEEK AGGREGATE] shot diagnostics failed: %s", _agg_e)
+        except Exception as _stash_e:
+            logger.warning("[WEEK AGGREGATE] stash cpu diagnostics failed: %s", _stash_e)
 
         for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:
@@ -6263,6 +6315,44 @@ def _complete_week_finish_cpu_and_persist(
             "expected_matchups": finalized_job.get("expected_matchups"),
             "failed_matchups": finalized_job.get("failed_matchups"),
         }
+
+    # One macro shot-diagnostics report for the fully-completed week: the user's
+    # own game rolled up with every full-sim CPU game (distant sims carry no
+    # game_state and are excluded). This is the single end-of-week roll-up, fired
+    # once here regardless of monolithic vs phased flow. CPU diagnostics come from
+    # this call's in-memory summaries (monolithic) or the week stash written by
+    # start-cpu-sims (phased); the user game is loaded from db.games. It still
+    # prints with just the user game if the week had no CPU full sims. Grep
+    # ``WEEK AGGREGATE``. (The user game also prints its own per-game report during
+    # play; this is the weekly macro roll-up.)
+    try:
+        from BackEnd.utils.shot_split_tracker import (
+            merge_shot_diagnostics, format_week_aggregate_report,
+        )
+        _cpu_diags = [d for d in (_cpu_week_summaries or []) if isinstance(d, dict)]
+        if not _cpu_diags:
+            _fresh = db.franchises.find_one(
+                {"_id": franchise_id}, {f"week_shot_diagnostics.{week}": 1}
+            ) or {}
+            _cpu_diags = [
+                d
+                for d in ((_fresh.get("week_shot_diagnostics") or {}).get(str(week)) or [])
+                if isinstance(d, dict)
+            ]
+        _summaries = list(_cpu_diags)
+        _user_diag = _load_user_week_shot_diag(franchise_id_str, week, team1_id, team2_id)
+        if isinstance(_user_diag, dict):
+            _summaries.append(_user_diag)
+        _merged, _ngames = merge_shot_diagnostics(_summaries)
+        if _ngames:
+            print(
+                f"[WEEK AGGREGATE] franchise={franchise_id_str} week={week} "
+                f"({'user game + ' if _user_diag else ''}{len(_cpu_diags)} full-sim CPU games)"
+            )
+            print(format_week_aggregate_report(_merged, _ngames))
+    except Exception as _agg_e:
+        logger.warning("[WEEK AGGREGATE] shot diagnostics failed: %s", _agg_e)
+
     return finalized
 
 @router.post("/franchise/complete-week")
