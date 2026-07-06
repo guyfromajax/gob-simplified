@@ -1,6 +1,44 @@
 # Emitter As God — single position authority (handoff)
 
-**Purpose:** knowledge-transfer for a new thread. This is the overarching fix the whole UESS turn-audit sweep pointed at. Read this first, then the per-turn audit docs it references.
+**Purpose:** knowledge-transfer for a new thread. This is the overarching fix the whole UESS turn-audit sweep pointed at. Read §0 to get up to speed, then this doc top-to-bottom, then the audit docs it references.
+
+---
+
+## 0. Read this first (onboarding — do NOT skip)
+
+Read in tiers. **Tier 0 fully** (the contract + how the emitter/steps work — this whole effort is enforcing that contract). **Tier 1-2** for the subsystem you're touching. **Tier 3** as needed for context.
+
+**Tier 0 — the spec + the emitter/step machinery (read fully):**
+- [`05_UESS_System/UESS_System.md`](../05_UESS_System/UESS_System.md) — THE contract. §1 single-coord-source, **§9.5 destinations-are-intent + "logic reads the interrupted end"** (the rule this whole doc enforces), §12.1/§12.2 known gaps.
+- [`05_UESS_System/Step_By_Step_System.md`](../05_UESS_System/Step_By_Step_System.md) — the emitted step schema (`start`/`end`, `coords`, `gate`, `action`, `ball`) — i.e. what "read `end.coords`" means concretely.
+- [`05_UESS_System/Core_Animation_System.md`](../05_UESS_System/Core_Animation_System.md) — how the FE renders steps (the "God" side).
+- [`05_UESS_System/Animation_Routing_Reference.md`](../05_UESS_System/Animation_Routing_Reference.md) — how each turn type routes to its emitter/renderer (which turns are migrated).
+
+**Tier 1 — the position/coord machinery (where render coords come from):**
+- [`05_UESS_System/Transition_Systems.md`](../05_UESS_System/Transition_Systems.md) — `build_walk_up_step` / gate / interrupted-coord / inbound seams (the §9.5 mechanic in code).
+- [`05_UESS_System/Position_Checkpoints_and_Snapshot_Schema.md`](../05_UESS_System/Position_Checkpoints_and_Snapshot_Schema.md) — position snapshots / `final_coords` / seam handoffs.
+- [`05_UESS_System/Defense_Coords_System.md`](../05_UESS_System/Defense_Coords_System.md) — defender placement (directly relevant to the contest bug).
+- [`06_Gameplay_Systems/Shot_Micro_Movements_System.md`](../06_Gameplay_Systems/Shot_Micro_Movements_System.md) — the shot-step micro movements (part of the render coord).
+- [`10_Players_Systems/Player_Attribute_System.md`](../10_Players_Systems/Player_Attribute_System.md) — **AG → speed archetypes (sprint/standard rate)** — the crux of the FB rate divergence + the reachability model.
+
+**Tier 2 — the game logic being fixed (the re-derivers):**
+- [`06_Gameplay_Systems/Shot_System.md`](../06_Gameplay_Systems/Shot_System.md) — shot resolution + **contest** (the boolean this whole thing feeds).
+- [`06_Gameplay_Systems/Fast_Break_System.md`](../06_Gameplay_Systems/Fast_Break_System.md) — FB families + drive resolution (the **48% no-defender** bug lives here).
+- [`06_Gameplay_Systems/Rebound_System.md`](../06_Gameplay_Systems/Rebound_System.md) — rebounder selection (same divergent frame).
+- [`06_Gameplay_Systems/Motion_Offense_Shot_System.md`](../06_Gameplay_Systems/Motion_Offense_Shot_System.md) — motion/HCO shot classification (already-fixed reference case).
+- [`06_Gameplay_Systems/HCT_System.md`](../06_Gameplay_Systems/HCT_System.md) + [`FCP_System.md`](../06_Gameplay_Systems/FCP_System.md) — trap/press (positioning divergence + over-and-back).
+- [`06_Gameplay_Systems/Block_System.md`](../06_Gameplay_Systems/Block_System.md), [`Steal_System.md`](../06_Gameplay_Systems/Steal_System.md), [`Stopper_System.md`](../06_Gameplay_Systems/Stopper_System.md) — all gated by the contest/positions.
+- [`06_Gameplay_Systems/Defense_Matchups_System.md`](../06_Gameplay_Systems/Defense_Matchups_System.md) — matchup assignment (zone contest path).
+- [`06_Gameplay_Systems/HCO_Turn_Resolution_System.md`](../06_Gameplay_Systems/HCO_Turn_Resolution_System.md), [`Turn_by_Turn_System.md`](../06_Gameplay_Systems/Turn_by_Turn_System.md), [`Shot_Clock_System.md`](../06_Gameplay_Systems/Shot_Clock_System.md) — turn lifecycle + clock (§5).
+
+**Tier 3 — context as needed:**
+- Turn specifics: [`BIP_System.md`](../06_Gameplay_Systems/BIP_System.md), [`SIP_System.md`](../06_Gameplay_Systems/SIP_System.md), [`Free_Throw_System.md`](../06_Gameplay_Systems/Free_Throw_System.md), [`Timeout_System.md`](../06_Gameplay_Systems/Timeout_System.md), [`Dynamic_HCO_System.md`](../06_Gameplay_Systems/Dynamic_HCO_System.md), [`EOQ_System.md`](../06_Gameplay_Systems/EOQ_System.md).
+- Tuning (this fix shifts FG%): [`04_Franchise_Mode_Systems/Shot_Threshold_Scale_Tuning.md`](../04_Franchise_Mode_Systems/Shot_Threshold_Scale_Tuning.md), [`06_Gameplay_Systems/Aggression_System.md`](../06_Gameplay_Systems/Aggression_System.md), [`Player_Momentum_System.md`](../06_Gameplay_Systems/Player_Momentum_System.md).
+- Downstream of outcomes: [`11_Design_Systems/SFX_System.md`](../11_Design_Systems/SFX_System.md), [`06_Gameplay_Systems/Announcement_System.md`](../06_Gameplay_Systems/Announcement_System.md).
+
+**Then read the UESS Audit docs** (§9 below lists them) — they have the per-turn detail behind the inventory in §3.
+
+> ⚠️ **Docs may lag code.** These specs are the design intent; verify file:line claims against current code before acting (the working tree has a large uncommitted shot-tuning stack). When a doc and the code disagree, the code is truth — and note the drift.
 
 ---
 
