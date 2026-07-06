@@ -36,10 +36,10 @@ EXPORT = os.path.join(HERE, "players_export.json")
 SHORT_MAX = 71          # <72  -> Short
 TALL_MIN = 79           # >=79 -> Tall ; 72-78 -> Normal
 
-# --- Build (BMI) tertile cutoffs. PROVISIONAL -----------------------------
-# Replace with the real cutoffs the export script prints for the full pop.
-BUILD_LEAN_MAX = 25.0
-BUILD_STRONG_MIN = 26.8
+# --- Build (BMI) tertile cutoffs. From the real 1,536-player population -----
+# (export_players_for_portraits.py, gob-staging.players)
+BUILD_LEAN_MAX = 25.5
+BUILD_STRONG_MIN = 26.5
 
 # --- Athleticism thresholds (ST/AG/RT). From Conf1 quartiles ---------------
 # ST/AG ~ Q1 18 / Q3 65-71 ; RT ~ Q1 41 / Q3 79.
