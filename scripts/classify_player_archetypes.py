@@ -28,6 +28,7 @@ back to the bundled Chapel Hill pilot roster (no attributes -> SHAPE = n/a).
 import os
 import csv
 import json
+import hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPORT = os.path.join(HERE, "players_export.json")
@@ -64,6 +65,26 @@ SHAPE_PROMPT = {
     "Solid": "average athletic build, some muscle tone",
     "Soft":  "soft doughy out-of-shape build, carrying extra body fat, undefined muscle, rounder fuller face",
 }
+
+# Expression pool (weighted; neutral/friendly common, intense rare). Picked
+# deterministically per player from their UUID, so it's stable across runs but
+# the roster gets a natural mix.
+EXPRESSIONS = [
+    ("calm neutral expression", 3),
+    ("warm friendly smile", 3),
+    ("confident slight smirk", 2),
+    ("serious stoic expression", 2),
+    ("relaxed easygoing look", 1),
+    ("intense focused game-face", 1),
+]
+_EXPR_POOL = [phrase for phrase, w in EXPRESSIONS for _ in range(w)]
+
+
+def pick_expression(pid):
+    if not pid:
+        return _EXPR_POOL[0]
+    seed = int(hashlib.md5(str(pid).encode()).hexdigest(), 16)
+    return _EXPR_POOL[seed % len(_EXPR_POOL)]
 
 # Chapel Hill pilot roster (from brief). No attributes in the brief/backup, so
 # SHAPE is left n/a here — the real values come from the export.
@@ -122,7 +143,8 @@ def classify(p):
     body_prompt = f"{frame}, {shape}"
     return {**p, "bmi": round(bmi, 1), "height_band": hb, "build_class": bc,
             "athleticism": ath or "n/a", "archetype": code,
-            "template": _FRAME_KEY[bc], "body_prompt": body_prompt}
+            "template": _FRAME_KEY[bc], "body_prompt": body_prompt,
+            "expression": pick_expression(p.get("_id"))}
 
 
 def main():
@@ -157,7 +179,7 @@ def main():
     out = os.path.join(HERE, "players_archetypes.csv")
     cols = ["_id", "name", "jersey", "year", "height_in", "weight_lb", "bmi",
             "st", "ag", "rt", "height_band", "build_class", "athleticism",
-            "archetype", "template", "body_prompt"]
+            "archetype", "template", "expression", "body_prompt"]
     with open(out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         w.writeheader()

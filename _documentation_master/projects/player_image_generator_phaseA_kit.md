@@ -111,8 +111,10 @@ Using the attached image(s) only as a style reference for the art style, lightin
 
 **FIXED STYLE BLOCK (append to every prompt) — LOCKED:**
 ```
-Front-facing basketball player portrait, bust shoulders up, centered composition, natural realistic head-to-shoulder proportions, soft frontal studio lighting, hand-painted digital illustration in a semi-realistic sports game art style, visible soft painterly brushwork, smooth painted skin shading, matte illustrated finish, not a photograph, not photorealistic, friendly neutral expression, youthful 16-17 year old face that could pass for high school or young college, plain light background, wearing plain white basketball tank top, no logos, no text, no team colors, simple white jersey with neutral collar, no watermark
+Front-facing basketball player portrait, bust shoulders up, centered composition, natural realistic head-to-shoulder proportions, soft frontal studio lighting, hand-painted digital illustration in a semi-realistic sports game art style, visible soft painterly brushwork, smooth painted skin shading, matte illustrated finish, not a photograph, not photorealistic, youthful 16-17 year old face that could pass for high school or young college, plain light background, wearing plain white basketball tank top, no logos, no text, no team colors, simple white jersey with neutral collar, no watermark
 ```
+
+> **Expression is per-player**, not in the fixed block — insert the player's `expression` (from the classifier) into the line, e.g. `…, warm friendly smile, Front-facing…`. Expression is picked deterministically from a weighted pool (smile/neutral common, intense rare), seeded by UUID → stable per player, varied across the roster.
 
 **Player lines** = ethnicity + frame (SIZE) + shape (ATHLETICISM), from the classifier's `body_prompt`. Shape below is the **Solid default** (Chapel Hill attributes aren't in the backup yet); the export's ST/AG/RT will upgrade some players to Cut/Soft. Eugene is shown **Cut** (confirmed high RT/ST/AG).
 
