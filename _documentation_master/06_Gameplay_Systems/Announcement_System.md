@@ -243,13 +243,15 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 **Rule:** Gameplay-freezing result announcements use a **uniform 300 ms** period before the next animation. Backend schema announcements read this from `ANNOUNCEMENT_FREEZE_HOLD_MS`; the frontend schema fallback mirrors the same value in `animationPlayback.js`. Legacy frontend announcement-hold config mirrors it in `animation_config.js`.
 
-**Where the 300 ms announcement hold is used:**
+**Free throw exception:** Free throw result banners use **2x `ANNOUNCEMENT_FREEZE_HOLD_MS`** (currently **600 ms**) so the make/miss result gets a slightly longer beat. Backend FT schema emitters use `ft_step_emitter.py::FT_RESULT_ANNOUNCEMENT_HOLD_MS`; the legacy frontend FT path mirrors this with `animation_config.js::freeThrow.resultAnnouncementHoldMs`.
+
+**Where announcement result holds are used:**
 
 | Announcement / context | Location | Note |
 |------------------------|----------|------|
 | Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` / schema make-hold steps | Announcement hold uses the shared 300 ms value; generic rim holds remain separate |
 | Made shot rim hold (ballManager path) | `ballManager.js` | Holds after ball at rim; allows announcement to display |
-| Free throw make — rim hold | `FreeThrowAnimationSystem.js` | Non-final FT; ball at rim then next attempt or transition |
+| Free throw make/miss — "It's Good!" / "No Good" | `ft_step_emitter.py`; legacy `FreeThrowAnimationSystem.js` | Uses 2x the shared announcement freeze constant |
 | Fast break make — "It's Good!" | `fastBreak.js` | After FB make announcement |
 | Fast break defensive stop — "Great Stop!" | `fastBreak.js` | After "Great Stop!" before transition to HalfCourt |
 
@@ -366,7 +368,7 @@ When a steal leads to a fast break:
 - `FrontEnd/static/js/phaser/animation/AnimationEngine.js`
   - Discrete **`DREB`** + `animation_steps`: plays via **`playTurn`**. The legacy post-playback outlet hook (`_maybeRunDiscreteDrebOutletLeadIn` → `runDefensiveReboundSetup`) was **removed** — it double-executed the outlet; the helper remains in the file but is not invoked. Cross-ref: `Turn_by_Turn_System.md`, `Rebound_System.md`, `05_Animation_System/Animation_Routing_Reference.md`.
 - `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js`
-  - Free-throw make announcements; also dispatches `PRESSURE_FCP` / `PRESSURE_HCT` (secondary) when the next defensive setup applies pressure after a final FT.
+  - Legacy free-throw make/miss announcements; `"It's Good!"` and `"No Good"` hold for `2x ANNOUNCEMENT_FREEZE_HOLD_MS`. Also dispatches `PRESSURE_FCP` / `PRESSURE_HCT` (secondary) when the next defensive setup applies pressure after a final FT.
   - Final FT miss → `animateRebound` passes `turnData` so **Rebound!** uses the same idempotent flag as other paths.
 - `FrontEnd/static/js/phaser/animation/ReboundAnimationSystem.js`
   - Standalone `REBOUND` turns: after ball attach + rebound SFX, calls `announceReboundHeadlineIfNeeded` (DREB and OREB sequences).
@@ -428,7 +430,8 @@ Frontend-only calls to `showAnnouncement()` / `showSecondaryAnnouncement()` are 
 | **"Dunk! And 1!"** | 300ms | `skeleton_step_emitter.py::_build_make_hold_sub_step` | Made dunk with defensive shooting foul |
 | **"Fast Break Score!"** | 300ms | `after_steal_fast_break_step_emitter.py` overriding `skeleton_step_emitter.py::_build_make_hold_sub_step` | After-steal Fast Break make-hold step |
 | **"Fast Break Score! And 1!"** | 300ms | `after_steal_fast_break_step_emitter.py` overriding `skeleton_step_emitter.py::_build_make_hold_sub_step` | After-steal Fast Break make with defensive shooting foul |
-| **"It's Good!"** (free throw) | 300ms | `ft_step_emitter.py` | Made free throw make-hold step |
+| **"It's Good!"** (free throw) | 600ms | `ft_step_emitter.py` | Made free throw make-hold step; `2x ANNOUNCEMENT_FREEZE_HOLD_MS` |
+| **"No Good"** (free throw) | 600ms | `ft_step_emitter.py` | Missed free throw bounce step / bounce-hold step; `2x ANNOUNCEMENT_FREEZE_HOLD_MS` |
 | **"Shooting Foul!"** | 300ms | `skeleton_step_emitter.py::_stamp_shooting_foul_on_miss_end`; reused by `oreb_step_emitter.py` | Missed shot / missed putback with defensive shooting foul |
 | **"Airball!"** | 300ms | `skeleton_step_emitter.py::_airball_announcement`; `ft_step_emitter.py` | Airballed field goal, putback, fast-break shot, or free throw at ball-flight end |
 | **"Over The Back!"** | 300ms | `dreb_step_emitter.py` via `build_foul_announcement()` | DREB over-the-back rebound foul |

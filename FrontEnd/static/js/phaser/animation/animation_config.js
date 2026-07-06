@@ -63,8 +63,12 @@ const defaults = {
     useArc: false,
     arcHeight: 40,
     rimHoldMs: 300,
+    // FT result announcement hold; intentionally 2x the standard gameplay freeze.
+    resultAnnouncementHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS * 2,
     // Made FT rim hold (non-final); announcement hold
-    makeRimHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS,
+    makeRimHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS * 2,
+    // Missed FT "No Good" hold before rebound or next attempt
+    missAnnouncementHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS * 2,
   },
   fastBreak: {
     sprintSpeed: 1.5, // multiplier

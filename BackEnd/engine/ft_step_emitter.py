@@ -101,6 +101,7 @@ _FT_RATTLE_VARIANTS = frozenset({
     "HEAVY_RATTLE",
 })
 
+FT_RESULT_ANNOUNCEMENT_HOLD_MS = float(ANNOUNCEMENT_FREEZE_HOLD_MS * 2)
 _SHOOT_STEP_T = 0.35
 _BOUNCE_HOLD_GAME_SECONDS = 1000.0 / 350.0
 _POSITIONS = ("PG", "SG", "SF", "PF", "C")
@@ -763,7 +764,7 @@ def build_ft_animation_steps(
         hold_step["start"]["announcement"] = {
             "text": "It's Good!",
             "team": "away" if away_offense else "home",
-            "hold_ms": float(ANNOUNCEMENT_FREEZE_HOLD_MS),
+            "hold_ms": FT_RESULT_ANNOUNCEMENT_HOLD_MS,
             "style": "primary",
             "player_data": {"playerId": str(shooter_id)},
         }
@@ -841,7 +842,17 @@ def build_ft_animation_steps(
         steps.append(bounce_step)
         cursor_coords = dict(bounce_step["end"]["coords"])
 
-        if not is_final_attempt:
+        no_good_announcement = {
+            "text": "No Good",
+            "team": "away" if away_offense else "home",
+            "hold_ms": FT_RESULT_ANNOUNCEMENT_HOLD_MS,
+            "style": "primary",
+            "player_data": {"playerId": str(shooter_id)},
+        }
+
+        if is_final_attempt:
+            bounce_step["end"]["announcement"] = no_good_announcement
+        else:
             bounce_hold = _ft_ball_stationary_hold_step(
                 coords=cursor_coords,
                 ball_coord=dict(bounce),
@@ -850,6 +861,7 @@ def build_ft_animation_steps(
                 next_step={"kind": "next_step", "index": _next_step_index(steps)},
                 metadata_kind="bounce_hold",
             )
+            bounce_hold["start"]["announcement"] = no_good_announcement
             steps.append(bounce_hold)
             cursor_coords = dict(bounce_hold["end"]["coords"])
 

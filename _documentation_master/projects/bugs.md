@@ -1,19 +1,22 @@
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
-#UESS Turn Audits
+##bugs
+1. Airball next step
+
+#UESS Turn Audits Round 2
+- objective: ensure all steps have defined advance trigger and destinations (even if stationary) and speed archetypes for all players.
+1. HCO
+2. OREB
+3. DREB
+4. BIP
+5. SIP
 6. HCT
 7. FCP
 8. Fast Break
 9. Free Throw
 10. Opening Tip
 11. Timeout
------
-1. HCO
-2. OREB
-3. DREB
-4. BIP
-5. SIP
 
 ##Verify as Perfect
 1. EOQ Perfection
@@ -31,6 +34,7 @@
 125. MM: Micro Movement SFX
 127. Add a new hire news story for user team
 128. Add a badass design appraoch to New Stories
+129. Dunk SFX
 
 ##Full Product Perfection
 1. Training Camp News Report

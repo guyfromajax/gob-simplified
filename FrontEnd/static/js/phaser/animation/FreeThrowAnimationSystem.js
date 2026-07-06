@@ -488,7 +488,10 @@ export class FreeThrowAnimationSystem {
       ballSprite.setVisible(true);
       
       // Hold ball at rim (announcement hold from config)
-      const makeRimHoldMs = animationConfig.freeThrow?.makeRimHoldMs ?? 700;
+      const makeRimHoldMs =
+        animationConfig.freeThrow?.makeRimHoldMs ??
+        animationConfig.freeThrow?.resultAnnouncementHoldMs ??
+        600;
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
           this.scene.time.delayedCall(makeRimHoldMs, resolve);
@@ -539,6 +542,23 @@ export class FreeThrowAnimationSystem {
     // Use existing bounce system for authentic basketball feel
     const rimGridCoords = this.getRimGridCoordinates(turnData);
     const miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
+
+    const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+    announceGameEvent('FT_MISS', turnData, this.scene, {
+      shooterId: turnData.shooter_id
+    });
+
+    const missAnnouncementHoldMs =
+      animationConfig.freeThrow?.missAnnouncementHoldMs ??
+      animationConfig.freeThrow?.resultAnnouncementHoldMs ??
+      600;
+    await new Promise(resolve => {
+      if (this.scene.time?.delayedCall) {
+        this.scene.time.delayedCall(missAnnouncementHoldMs, resolve);
+      } else {
+        setTimeout(resolve, missAnnouncementHoldMs);
+      }
+    });
 
     // Check if this is the final free throw
     // ✅ FIX: Use ftContext.isFinal instead of recalculating, as it includes the free_throws_remaining safety check

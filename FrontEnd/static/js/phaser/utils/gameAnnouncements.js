@@ -74,8 +74,7 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       break;
 
     case 'FT_MISS':
-      // FT misses are silent unless it's for special cases
-      // Last FT miss is silent (rebound announcement takes priority)
+      handleFreeThrowMissAnnouncement(turnData, scene, context, offenseTeam);
       break;
 
     // ========== REBOUNDS ==========
@@ -273,6 +272,25 @@ function handleFreeThrowMakeAnnouncement(turnData, scene, context, offenseTeam) 
 
   // Show "It's Good!" for FT makes (same as regular shots)
   showAnnouncement("It's Good!", offenseTeam, playerData);
+}
+
+function handleFreeThrowMissAnnouncement(turnData, scene, context, offenseTeam) {
+  const shooterId = context?.shooterId || turnData?.shooter_id;
+  let playerData = null;
+
+  if (scene && shooterId) {
+    const shooterSprite = scene.playerSprites?.[shooterId];
+    if (shooterSprite) {
+      playerData = {
+        playerId: shooterId,
+        photo: shooterSprite.photo || null,
+        teamName: shooterSprite.team_id,
+        secondaryColor: getSecondaryColorForTeam(scene, shooterSprite.team_id)
+      };
+    }
+  }
+
+  showAnnouncement("No Good", offenseTeam, playerData);
 }
 
 function handleReboundAnnouncement(turnData, scene, context) {
