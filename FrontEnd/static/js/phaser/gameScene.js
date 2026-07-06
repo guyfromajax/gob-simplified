@@ -970,6 +970,24 @@ export function createGameScene(Phaser) {
       const isQuarterBreakEntry = this.quarter > 1 && !activeResume;
       const isTimeoutOrFoulOutResume = resumeFromTimeout;
       this.shouldShowMatchupsPopup = (isQ1Start || isQuarterBreakEntry || isTimeoutOrFoulOutResume) && this.gameId;
+      const shouldGateCourtEntryVisuals = this.animate && !isQ1Start;
+      const showCourtEntryVisualGate = (message = 'Loading game...') => {
+        if (typeof window === 'undefined') return;
+        window.__GOB_COURT_ENTRY_VISUAL_GATE__ = true;
+        if (window.PageLoadOverlay && typeof window.PageLoadOverlay.show === 'function') {
+          window.PageLoadOverlay.show(message);
+        }
+      };
+      const hideCourtEntryVisualGate = () => {
+        if (typeof window === 'undefined') return;
+        window.__GOB_COURT_ENTRY_VISUAL_GATE__ = false;
+        if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+          window.PageLoadOverlay.hide();
+        }
+      };
+      if (shouldGateCourtEntryVisuals) {
+        showCourtEntryVisualGate();
+      }
 
       // Gameplay background music start is deferred until after the Defense
       // Matchups modal flow completes (see below, right after
@@ -3024,10 +3042,19 @@ export function createGameScene(Phaser) {
               }
 
               // Show popup and wait for user to submit before starting animation
+              if (shouldGateCourtEntryVisuals) {
+                hideCourtEntryVisualGate();
+              }
               await showDefenseMatchupsPopup(this.gameId, this);
+              if (shouldGateCourtEntryVisuals) {
+                showCourtEntryVisualGate();
+              }
             } catch (error) {
               console.error('❌ DEFENSE MATCHUPS: Failed to show popup:', error);
               // Don't block gameplay if popup fails
+              if (shouldGateCourtEntryVisuals) {
+                showCourtEntryVisualGate();
+              }
             }
           }
 
@@ -3059,9 +3086,12 @@ export function createGameScene(Phaser) {
             console.error('🎬 GameScene: Failed to initialize BallController:', error);
           }
 
-          if (typeof window !== 'undefined' && window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__) {
+          if (typeof window !== 'undefined') {
+            const defenseTransitionWasActive = !!window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__;
             window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__ = false;
-            if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+            if (shouldGateCourtEntryVisuals || window.__GOB_COURT_ENTRY_VISUAL_GATE__) {
+              hideCourtEntryVisualGate();
+            } else if (defenseTransitionWasActive && window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
               window.PageLoadOverlay.hide();
             }
           }

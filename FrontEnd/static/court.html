@@ -6571,7 +6571,10 @@
     // after 5s so the user isn't permanently blocked.
     (function () {
       var dismissed = false;
-      function dismissOverlay() {
+      function dismissOverlay(options) {
+        if (window.__GOB_COURT_ENTRY_VISUAL_GATE__ && !(options && options.force)) {
+          return;
+        }
         if (dismissed) return;
         dismissed = true;
         if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
@@ -6579,7 +6582,7 @@
         }
       }
       window.addEventListener('court-ready', dismissOverlay, { once: true });
-      setTimeout(dismissOverlay, 5000);
+      setTimeout(function () { dismissOverlay({ force: true }); }, 5000);
     })();
   </script>
   <script>
