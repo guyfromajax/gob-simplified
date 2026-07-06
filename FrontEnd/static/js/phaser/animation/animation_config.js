@@ -1,4 +1,4 @@
-export const ANNOUNCEMENT_FREEZE_HOLD_MS = 700;
+export const ANNOUNCEMENT_FREEZE_HOLD_MS = 300;
 
 const defaults = {
   // Enable ball tweening by default; tests can override via global animation_config

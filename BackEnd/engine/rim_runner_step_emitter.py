@@ -1363,7 +1363,7 @@ def _build_lane_pass_batted_step(
     BH → contact → drifts to nearest OOB grid (loose at step end).
 
     ``step.end.announcement = "Out of bounds!"`` secondary neutral, no
-    headshot, 650ms hold, text scroll = "Batted out of bounds."
+    headshot, ANNOUNCEMENT_FREEZE_HOLD_MS hold, text scroll = "Batted out of bounds."
     """
     phase = fb_roles.get("rim_runner_burst_phase") or {}
     bh_id = _safe_id(phase.get("outlet_receiver_id"))
@@ -1445,7 +1445,7 @@ def _build_lane_pass_batted_step(
         "team": "neutral",
         "player_data": None,
         "meta": {"text_scroll": "Batted out of bounds."},
-        "hold_ms": 650,
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
         "style": "secondary",
     }
 
