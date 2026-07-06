@@ -1,7 +1,7 @@
 """Backend-owned foul / turnover freeze announcements for Fast Break terminal turns.
 
 UESS-compliant: the backend stamps a **blocking** ``step.end.announcement``
-(``style: "primary"``, ``hold_ms: 1000``) on the terminal Fast Break step, so the
+(``style: "primary"``, ``hold_ms: ANNOUNCEMENT_FREEZE_HOLD_MS``) on the terminal Fast Break step, so the
 frontend simply renders it and freezes play — no frontend decision-making. This
 mirrors the dead-ball-fumble pattern in ``dead_ball_fumble.py``.
 
@@ -30,7 +30,9 @@ from __future__ import annotations
 import random as _random_module
 from typing import Any, Dict, List, Optional
 
-FB_TERMINAL_ANNOUNCE_HOLD_MS = 1000
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
+
+FB_TERMINAL_ANNOUNCE_HOLD_MS = ANNOUNCEMENT_FREEZE_HOLD_MS
 _FOUL_WHISTLE_SFX = "whistle-1-lowervol.wav"
 _CHARGE_SFX = ["whistle-1-lowervol.wav", "duke-charging.wav"]
 

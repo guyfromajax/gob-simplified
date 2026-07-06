@@ -274,9 +274,11 @@ def _build_rebound_capture_step(
             "announcement": {
                 "text": "Rebound!",
                 "team": "away" if is_away_offense else "home",
-                "hold_ms": 1000,
+                "hold_ms": 700,
+                "non_blocking": True,
                 "style": "primary",
                 "player_data": {"playerId": str(rebounder_id)},
+                "meta": {"display_ms": 700},
             },
             "next": {"kind": "next_step", "index": next_step_index},
         },
@@ -789,7 +791,8 @@ def build_oreb_animation_steps(
         )
 
     if is_make:
-        # [hold] step — 1000 ms "It's Good!" beat (clocks paused). Ball is at
+        # [hold] step — ANNOUNCEMENT_FREEZE_HOLD_MS "It's Good!" beat
+        # (clocks paused). Ball is at
         # MSSS by now (settle steps moved it there for rattle / bank makes).
         hold_step = _build_make_hold_sub_step(
             prev_end_coords=dict(cursor_coords),

@@ -3220,7 +3220,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
     }
 
-    const makeHoldMs = animationConfig.fastBreak?.makeAnnouncementHoldMs ?? 1000;
+    const makeHoldMs = animationConfig.fastBreak?.makeAnnouncementHoldMs ?? 700;
     await new Promise(resolve => scene.time.delayedCall(makeHoldMs, resolve));
     
     // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to inbound pass

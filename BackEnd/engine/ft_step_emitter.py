@@ -27,6 +27,7 @@ from BackEnd.constants import (
     RATTLE_HOP_GAME_SECONDS,
     RATTLE_MAKE_SETTLE_GAME_SECONDS,
 )
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.engine.skeleton_step_emitter import (
     _airball_announcement,
     _rattle_hop_targets,
@@ -762,7 +763,7 @@ def build_ft_animation_steps(
         hold_step["start"]["announcement"] = {
             "text": "It's Good!",
             "team": "away" if away_offense else "home",
-            "hold_ms": 1000.0,
+            "hold_ms": float(ANNOUNCEMENT_FREEZE_HOLD_MS),
             "style": "primary",
             "player_data": {"playerId": str(shooter_id)},
         }

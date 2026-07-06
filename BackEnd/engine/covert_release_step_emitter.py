@@ -45,6 +45,7 @@ from BackEnd.constants import (
     HOME_RIM_COORDS,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
 )
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -1353,7 +1354,7 @@ def _build_nice_stop_announcement(
         "style": "secondary",
         # Non-blocking: show the callout without freezing the court. See
         # Announcement_System.md §Secondary-style announcements — freeze status.
-        "hold_ms": 1000,
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
         "non_blocking": True,
     }
 

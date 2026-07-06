@@ -616,7 +616,7 @@ export async function shootBall({
             });
           };
           // Keep rim hold delay for made shots (announcement hold from config)
-          const madeRimHoldMs = animationConfig.shot?.madeRimHoldMs ?? 1000;
+          const madeRimHoldMs = animationConfig.shot?.madeRimHoldMs ?? 700;
           if (scene.time?.delayedCall) {
             scene.time.delayedCall(madeRimHoldMs, finish);
           } else {

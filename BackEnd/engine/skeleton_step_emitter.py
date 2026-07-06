@@ -38,6 +38,7 @@ from BackEnd.constants import (
     RATTLE_HOP_GAME_SECONDS,
     RATTLE_MAKE_SETTLE_GAME_SECONDS,
 )
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
@@ -2342,7 +2343,7 @@ def _build_ball_motion_sub_step(
     }
 
 
-MAKE_HOLD_MS: float = 1000.0
+MAKE_HOLD_MS: float = float(ANNOUNCEMENT_FREEZE_HOLD_MS)
 
 
 def _build_make_hold_sub_step(
@@ -2363,7 +2364,8 @@ def _build_make_hold_sub_step(
       - Ball sits at the sweet spot.
       - ``start.announcement`` fires "It's Good!" or the And-1 foul card
         (``style: "and_one"``) — the FE's ``runStepAnnouncement`` pauses
-        gameClock + shotClock for ``hold_ms`` (1000ms wall-clock), then resumes.
+        gameClock + shotClock for ``hold_ms`` (currently
+        ``ANNOUNCEMENT_FREEZE_HOLD_MS`` wall-clock), then resumes.
       - Step T = 0 game-sec → no additional wall-clock wait after the
         announcement; ``snapBallToEndState`` then runs and we proceed to
         the SHOT_ATTEMPT turn_stop.
@@ -2510,7 +2512,7 @@ def _airball_announcement(
     return {
         "text": "Airball!",
         "team": "away" if away_offense else "home",
-        "hold_ms": 1000.0,
+        "hold_ms": float(ANNOUNCEMENT_FREEZE_HOLD_MS),
         "style": "primary",
         "player_data": {"playerId": str(shooter_id)},
     }
@@ -2768,7 +2770,7 @@ def _build_post_shot_sub_steps(
           - BANK_MAKE settle (bank → MSSS, 250ms)
           - BANK_MISS graze  (bank → rim-graze, 200ms)
           - AIRBALL OOB continuation (2-short → OOB resting)
-      [hold]   — make only, 1000ms "It's Good!" announcement
+      [hold]   — make only, ANNOUNCEMENT_FREEZE_HOLD_MS "It's Good!" announcement
       [bounce] — miss/block with bounce_coords (skipped for AIRBALL)
 
     All sub-steps share the same overlay-motion treatment: non-overlay
@@ -2986,10 +2988,11 @@ def _build_post_shot_sub_steps(
             flight_step["end"]["announcement"] = {
                 "text": "BLOCK!",
                 "team": "home" if away_offense else "away",
-                "hold_ms": 1000,
+                "hold_ms": 700,
+                "non_blocking": True,
                 "style": "primary",
                 "player_data": {"playerId": str(blocker_id)},
-                "meta": {"sfx": "block_announce"},
+                "meta": {"sfx": "block_announce", "display_ms": 700},
             }
     elif is_airball:
         airball_ann = _airball_announcement(turn_result, away_offense)

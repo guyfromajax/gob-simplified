@@ -16,6 +16,7 @@ stretched across the gating player's step duration. See
 import random
 from typing import Any, Dict, List, Optional, Tuple
 
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import GridCoord, PlayerAction, PlayerArchetype
 
 
@@ -743,7 +744,7 @@ def build_foul_announcement(
     team: str,
     fouler_id: Any,
     *,
-    hold_ms: int = 1000,
+    hold_ms: int = ANNOUNCEMENT_FREEZE_HOLD_MS,
     style: str = "primary",
     sfx_key: str = "foul",
     extra_meta: Optional[Dict[str, Any]] = None,
@@ -762,7 +763,8 @@ def build_foul_announcement(
         team: Announcement-team key, one of ``"home"`` / ``"away"`` /
             ``"neutral"``. Drives accent color on the overlay card.
         fouler_id: Player ID of the foul committer; coerced to str.
-        hold_ms: How long the overlay stays on screen. Default 1000ms,
+        hold_ms: How long the overlay stays on screen. Defaults to
+            ``ANNOUNCEMENT_FREEZE_HOLD_MS``.
             matches existing foul announcements.
         style: ``"primary"`` (default) or ``"shooting_foul"`` — the
             latter triggers the dual-row chrome on the frontend.

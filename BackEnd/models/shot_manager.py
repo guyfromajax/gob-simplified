@@ -35,6 +35,7 @@ from BackEnd.constants import (
     CONTEST_EUCLIDEAN_RADIUS,
 )
 from BackEnd.constants.shot_variants import (
+    SHOT_VARIANT_AIRBALL,
     select_shot_variant,
     roll_shot_variant_extras,
 )
@@ -1630,6 +1631,9 @@ class ShotManager:
         
         # ==================== END PLAYER POSITIONING ====================
 
+        _miss_shot_variant = None
+        _miss_shot_variant_extras = {}
+
         # ------------------------
         # 🎯 Shot is Made
         # ------------------------
@@ -2007,7 +2011,33 @@ class ShotManager:
                 # Regular miss → rebound logic (or block outcome using block spot from reconciliation only)
                 block_spot_used = getattr(self, "_block_spot", None)
 
-                if is_fast_break:
+                if not block_spot_used:
+                    _miss_shot_variant = select_shot_variant(
+                        shot_score=shot_score,
+                        shot_threshold=shot_threshold,
+                        shot_type=shot_type,
+                        made=False,
+                    )
+                    _miss_shot_variant_extras = roll_shot_variant_extras(
+                        _miss_shot_variant, shooter_y=sy,
+                    )
+
+                is_airball_miss = (
+                    not block_spot_used
+                    and _miss_shot_variant == SHOT_VARIANT_AIRBALL
+                )
+
+                if is_airball_miss:
+                    # Airball: no rebound attempt; defense takes ball OOB → BIP.
+                    possession_flips = True
+                    self.game_state["offensive_state"] = "HCO"
+                    self.game_state.pop("last_rebounder", None)
+                    self.game_state.pop("last_rebound", None)
+                    self.game_state.pop("_shot_dreb_fb_play_key", None)
+                    self.game_state.pop("pending_dreb_fb_play_key", None)
+                    result["next_play_type"] = "BASELINE_INBOUND"
+                    result["next_turn"] = "BASELINE_INBOUND"
+                elif is_fast_break:
                     # ==================== FAST BREAK REBOUND (x-eligibility) ====================
                     # Eligibility: home offense → x >= 50; away offense → x <= 50. Then standard rebound logic.
                     from BackEnd.utils.fb_shot_logical_coords import (
@@ -2141,7 +2171,7 @@ class ShotManager:
                 # For fast-break misses, rebound outcome is fully resolved above in the
                 # FAST_BREAK-specific block. Do not run the shared HCO rebound pipeline,
                 # or we can resolve rebound twice and emit contradictory state.
-                if not is_fast_break:
+                if not is_fast_break and not is_airball_miss:
                     is_away_offense = off_team.team_id == self.game.away_team.team_id
                     with temp_lineup_court_absolute_for_away_rebound_math(self.game, is_away_offense):
                         # Step 2: Filter lineups to only eligible rebounders (those crashing boards)
@@ -2255,7 +2285,7 @@ class ShotManager:
                 
                 # Fast-break miss paths set rebound transition in the dedicated FB branch above.
                 # Running this shared post-rebound transition block for FB can double-process state.
-                if not is_fast_break:
+                if not is_fast_break and not is_airball_miss:
                     if stat == "OREB":
                         from BackEnd.utils.eoq_clock_progression import (
                             apply_post_miss_rebound_routing,
@@ -2407,13 +2437,17 @@ class ShotManager:
         shot_variant = None
         shot_variant_extras = {}
         if not is_block_outcome:
-            shot_variant = select_shot_variant(
-                shot_score=shot_score,
-                shot_threshold=shot_threshold,
-                shot_type=shot_type,
-                made=made,
-            )
-            shot_variant_extras = roll_shot_variant_extras(shot_variant, shooter_y=sy)
+            if _miss_shot_variant is not None:
+                shot_variant = _miss_shot_variant
+                shot_variant_extras = dict(_miss_shot_variant_extras)
+            else:
+                shot_variant = select_shot_variant(
+                    shot_score=shot_score,
+                    shot_threshold=shot_threshold,
+                    shot_type=shot_type,
+                    made=made,
+                )
+                shot_variant_extras = roll_shot_variant_extras(shot_variant, shooter_y=sy)
 
         result.update({
             "result_type": "MAKE" if made else ("BLOCK" if is_block_outcome else "MISS"),

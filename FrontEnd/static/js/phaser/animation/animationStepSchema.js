@@ -109,7 +109,7 @@
  * @property {("home"|"away"|"defense"|"neutral")} team
  * @property {Object<string,*>|null} [player_data]  Optional headshot card payload.
  * @property {Object<string,*>|null} [meta]         Optional { decision_pill_text?, decision_pill_tone?, sfx? }.
- * @property {number} [hold_ms]                     Wall-clock pause duration (default 1000). Ignored when non_blocking.
+ * @property {number} [hold_ms]                     Wall-clock pause duration (default 700). Ignored when non_blocking.
  * @property {("primary"|"secondary")} [style]      Routing: "primary" (default; showAnnouncement) or "secondary" (showSecondaryAnnouncement).
  * @property {boolean} [non_blocking]               When true, the overlay shows WITHOUT freezing play (no clock pause, no hold wait) — the callout rides alongside live motion (e.g. fast-break lane pass).
  */

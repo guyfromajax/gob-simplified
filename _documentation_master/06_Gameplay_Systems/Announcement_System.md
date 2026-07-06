@@ -42,7 +42,7 @@
    - `turn._airballAnnounced` - Set when **Airball!** is shown (schema `step.end.announcement` on [ball_flight] or legacy `announceAirballIfNeeded()`) so the legacy shot paths cannot double-announce on the same turn.
 
 4. **Announcement hold time**:
-   - **1000 ms** — Uniform delay for result announcements before the next animation. In **ShotAnimationSystem** (HCO/regular makes), the rim hold and "It's Good!" / AND-1 run **in unison**: one 1000 ms period with ball at rim and announcement both visible. Other paths (ballManager made shot, FT make, FB make, "Great Stop!") use a 1000 ms hold after the announcement. Do not reduce when tuning other animation delays; see "Hold time after result announcements" below.
+   - **700 ms** — Default gameplay-freezing announcement hold. Backend schema emitters use `BackEnd/constants/announcement_constants.py::ANNOUNCEMENT_FREEZE_HOLD_MS`; legacy frontend announcement-hold config mirrors it with `animation_config.js::ANNOUNCEMENT_FREEZE_HOLD_MS`. Generic rim/bounce animation holds are separate timing knobs.
 
 5. **Tier routing (canonical list)**
 
@@ -239,21 +239,21 @@ The Announcement System provides visual feedback for game events using timing-ba
 | Great Stop! (FB defensive stop) | `duke-great-stop.wav` | `fastBreak.js::animateDefensiveStop` (legacy path); schema path via `covert_release_step_emitter.py` stamping `meta.sfx: "fb_defensive_stop"` |
 | FB Outlet Pass Denied! | `duke-denied.wav` | `fastBreak.js::animateRimRunnerOutletDeniedBeat` + backend `meta.sfx: "fb_outlet_denied_court"` |
 
-### Hold time after result announcements (1000 ms)
+### Hold time after result announcements (700 ms)
 
-**Rule:** All result announcements use a **uniform 1000 ms** period on screen before the next animation. In **ShotAnimationSystem** (HCO made shots), the rim hold and "It's Good!" / AND-1 run **in unison**: the announcement is shown immediately and the ball stays at the rim for the same 1000 ms, so there is a single 1000 ms period (not rim hold then announcement). Other paths use a 1000 ms hold after the announcement. Do not reduce below 1000 ms when tuning animation delays.
+**Rule:** Gameplay-freezing result announcements use a **uniform 700 ms** period before the next animation. Backend schema announcements read this from `ANNOUNCEMENT_FREEZE_HOLD_MS`; the frontend schema fallback mirrors the same value in `animationPlayback.js`. Legacy frontend announcement-hold config mirrors it in `animation_config.js`.
 
-**Where the 1000 ms hold is used:**
+**Where the 700 ms announcement hold is used:**
 
 | Announcement / context | Location | Note |
 |------------------------|----------|------|
-| Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` | **In unison** with rim hold: one 1000 ms period (ball at rim + announcement together) |
+| Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` / schema make-hold steps | Announcement hold uses the shared 700 ms value; generic rim holds remain separate |
 | Made shot rim hold (ballManager path) | `ballManager.js` | Holds after ball at rim; allows announcement to display |
 | Free throw make — rim hold | `FreeThrowAnimationSystem.js` | Non-final FT; ball at rim then next attempt or transition |
 | Fast break make — "It's Good!" | `fastBreak.js` | After FB make announcement |
 | Fast break defensive stop — "Great Stop!" | `fastBreak.js` | After "Great Stop!" before transition to HalfCourt |
 
-**Do not reduce** these holds below 1000 ms when tuning animation delays; see `docs/To Do/SEAMLESS_DELAY_TUNING_AND_NEXT_STEPS.md` for which delays are safe to shorten (e.g. shot rim hold, rebound attach, OREB pause) vs announcement holds.
+Tune announcement holds by changing `ANNOUNCEMENT_FREEZE_HOLD_MS`; tune rim/bounce movement holds separately.
 
 ### Idempotent Design
 
@@ -362,7 +362,7 @@ When a steal leads to a fast break:
 - `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
   - `handleMissedShot()` — emits `BLOCK` via `announceGameEvent('BLOCK', ...)` when `result_type === 'BLOCK'`, before the rebound; sets `turnData._blockAnnounced = true`. Also emits `FOUL_SHOOTING` when a shooting foul is detected on the miss.
   - `handleEmbeddedRebound()` — calls `announceReboundHeadlineIfNeeded` in the rebounder tween `onComplete` (after attach + rebound SFX) for both DREB and OREB; `handleDefensiveRebound` no longer duplicates the headline before outlet setup.
-  - HCO make path emits `"It's Good!"` / AND-1 in unison with the rim hold (single 1000ms period).
+  - HCO make path emits `"It's Good!"` / AND-1 in unison with the announcement hold; the default announcement hold is 700ms.
 - `FrontEnd/static/js/phaser/animation/AnimationEngine.js`
   - Discrete **`DREB`** + `animation_steps`: plays via **`playTurn`**. The legacy post-playback outlet hook (`_maybeRunDiscreteDrebOutletLeadIn` → `runDefensiveReboundSetup`) was **removed** — it double-executed the outlet; the helper remains in the file but is not invoked. Cross-ref: `Turn_by_Turn_System.md`, `Rebound_System.md`, `05_Animation_System/Animation_Routing_Reference.md`.
 - `FrontEnd/static/js/phaser/animation/FreeThrowAnimationSystem.js`
@@ -408,76 +408,63 @@ All Force Fouls announce "Quick Foul!"
 
 ---
 
-## Announcements That Carry a Hold (pause animation)
+## Gameplay-Freezing Announcements
 
-A banner with a `hold_ms` value freezes **all** on-court animation for that many milliseconds while it is displayed. The frontend blocks on it (`animationPlayback.js` → `runStepAnnouncement` → `await waitMsRespectingPause(scene, holdMs)`). Banners without a `hold_ms` show without pausing. This behavior is **intentional** — the list below is a reference, not a bug list.
+This section is the current code-backed reference for announcements that **pause gameplay** while the banner is displayed.
 
-| Banner text | Hold | Emitter (file:line) | Beat |
-|---|---|---|---|
-| "Rebound!" (DREB) | 1000ms — **suppressed on DREB→FAST_BREAK** | `dreb_step_emitter.py` | Defensive rebound secured |
-| "Rebound!" (OREB) | 1000ms | `oreb_step_emitter.py:277` | Offensive rebound secured |
-| "Fast Break!" (after steal) | 1000ms (`FB_ANNOUNCE_HOLD_MS`) | `after_steal_fast_break_step_emitter.py:111` | Steal → fast-break drive start |
-| "Fast Break!" (rim runner) | ~~1000ms~~ **non-blocking** | `rim_runner_step_emitter.py` | Rim-runner lane pass to RR |
-| "Fast Break!" (triangle) | ~~1000ms~~ **non-blocking** | `triangle_step_emitter.py` | Triangle lane pass to RR |
-| "It's Good!" | 1000ms (`MAKE_HOLD_MS`) | `skeleton_step_emitter.py:2158` | Made shot |
-| "It's Good! And 1!" | 1000ms (`MAKE_HOLD_MS`) | `skeleton_step_emitter.py:2145` | Made shot + foul |
-| "It's Good!" (free throw) | 1000ms | `ft_step_emitter.py:757` | Made free throw |
-| "Airball!" | 1000ms | `skeleton_step_emitter.py:2249` | Airballed shot |
-| "BLOCK!" | 1000ms | `skeleton_step_emitter.py:2645` | Blocked shot |
-| "Great Stop!" | 1000ms | `covert_release_step_emitter.py:1135` | Defensive stop |
-| "Interception!" | 1000ms | `rim_runner_step_emitter.py:1303` | Fast-break pass intercepted |
-| "No Fast Break" | 1000ms | `rim_runner_step_emitter.py:1580` | Fast break denied |
-| "FB Outlet Pass Denied!" | ~~1000ms~~ **non-blocking** | `rim_runner_step_emitter.py` | Outlet pass denied |
-| "Out of bounds!" | 650ms | `rim_runner_step_emitter.py:1443` | Ball batted OOB |
-| Turnover headline (e.g. "TURNOVER!") | 1000ms (`FUMBLE_ANNOUNCE_HOLD_MS`) | `dead_ball_fumble.py:161` | Dead-ball fumble turnover |
+**Renderer rule:** only backend schema announcements played by `animationPlayback.js::runStepAnnouncement()` can freeze gameplay. If an announcement is present on `step.start.announcement` or `step.end.announcement` and is **not** flagged `non_blocking: true`, the frontend pauses `gameClock` and `shotClock`, shows the overlay, waits `announcement.hold_ms` (defaulting to 700ms if missing or non-positive), then resumes. This applies to both `style: "primary"` and `style: "secondary"`.
 
-Constants: `FB_ANNOUNCE_HOLD_MS` = 1000.0 (`after_steal_fast_break_step_emitter.py:58`), `MAKE_HOLD_MS` = 1000.0 (`skeleton_step_emitter.py:2095`), `FUMBLE_ANNOUNCE_HOLD_MS` = 1000 (`constants/dead_ball_fumble_constants.py:9`).
+**Timing constant:** backend gameplay-freezing schema announcements use `BackEnd/constants/announcement_constants.py::ANNOUNCEMENT_FREEZE_HOLD_MS` (currently 700ms). The frontend fallback mirror is `DEFAULT_ANNOUNCEMENT_FREEZE_HOLD_MS` in `animationPlayback.js`.
 
-Note: the DREB "Rebound!" hold is the same banner whether the next turn feels clean (shot → DREB) or paused (DREB → HCO/FB); only where it lands in the sequence changes how it feels.
+Frontend-only calls to `showAnnouncement()` / `showSecondaryAnnouncement()` are fire-and-forget overlays. They may be paired with other animation waits, but they do not pause clocks through the schema announcement runner and are not listed here. Primary **"Rebound!"** and **"BLOCK!"** use a 700ms display override in `announcements.js` / `court.html`.
 
-### DREB→FAST_BREAK suppression (2026-06-30, revertible)
+### Primary Announcements That Freeze
 
-The DREB "Rebound!" banner is **suppressed** (banner + its 1000ms hold both removed) when the next play is a fast break, so the break starts with no boundary freeze. DREB→HCO and shot→DREB keep the banner. The rebound **SFX** cue is unaffected — only the visual banner/hold is dropped.
+| Banner text | Hold | Schema source | Beat |
+|---|---:|---|---|
+| **"It's Good!"** | 700ms | `skeleton_step_emitter.py::_build_make_hold_sub_step` | Made field goal make-hold step |
+| **"Dunk!"** | 700ms | `skeleton_step_emitter.py::_build_make_hold_sub_step` | Made dunk make-hold step |
+| **"It's Good! And 1!"** | 700ms | `skeleton_step_emitter.py::_build_make_hold_sub_step` | Made field goal with defensive shooting foul |
+| **"Dunk! And 1!"** | 700ms | `skeleton_step_emitter.py::_build_make_hold_sub_step` | Made dunk with defensive shooting foul |
+| **"Fast Break Score!"** | 700ms | `after_steal_fast_break_step_emitter.py` overriding `skeleton_step_emitter.py::_build_make_hold_sub_step` | After-steal Fast Break make-hold step |
+| **"Fast Break Score! And 1!"** | 700ms | `after_steal_fast_break_step_emitter.py` overriding `skeleton_step_emitter.py::_build_make_hold_sub_step` | After-steal Fast Break make with defensive shooting foul |
+| **"It's Good!"** (free throw) | 700ms | `ft_step_emitter.py` | Made free throw make-hold step |
+| **"Shooting Foul!"** | 700ms | `skeleton_step_emitter.py::_stamp_shooting_foul_on_miss_end`; reused by `oreb_step_emitter.py` | Missed shot / missed putback with defensive shooting foul |
+| **"Airball!"** | 700ms | `skeleton_step_emitter.py::_airball_announcement`; `ft_step_emitter.py` | Airballed field goal, putback, fast-break shot, or free throw at ball-flight end |
+| **"Over The Back!"** | 700ms | `dreb_step_emitter.py` via `build_foul_announcement()` | DREB over-the-back rebound foul |
+| **Dead-ball fumble turnover headline** | 700ms | `dead_ball_fumble.py` | Dead-ball fumble terminal step |
+| **"CHARGE!"** | 700ms | `fb_terminal_announce.py` | Fast Break terminal offensive charge |
+| **Fast Break terminal offensive foul language** | 700ms | `fb_terminal_announce.py` | Fast Break terminal non-shooting offensive foul, selected from weighted foul language |
+| **Fast Break terminal defensive foul language** | 700ms | `fb_terminal_announce.py` | Fast Break terminal non-shooting defensive foul, selected from weighted foul language |
+| **Fast Break terminal dead-ball turnover language** | 700ms | `fb_terminal_announce.py` | Fast Break terminal dead-ball turnover; e.g. "Travel!" / "Double Dribble!" or typed turnover text |
 
-- **Toggle:** `SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK` in `dreb_step_emitter.py` (default `True`). Flip to `False` to restore the banner on fast breaks — nothing else needs to change.
-- **Signal:** `next_is_fast_break` is passed from `game_manager._build_dreb_turn_from_miss` as `bool(game_state["pending_dreb_fb_play_key"])` (set on the miss turn in `shot_manager`, popped later in `phase_resolution` — reliably present at DREB-build time).
-- **Mechanism:** when suppressed, `dreb_step_emitter` sets `step.end.announcement = None`; the FE skips falsy announcements (`if (step.end?.announcement)`), so no banner and no `waitMsRespectingPause` hold.
+### Secondary Announcements That Freeze
 
-### Non-blocking announcements (2026-06-30)
+| Banner text | Hold | Schema source | Beat |
+|---|---:|---|---|
+| **"Out of bounds!"** | 650ms | `rim_runner_step_emitter.py` | Rim Runner fast-break ball batted out of bounds |
 
-A schema announcement flagged **`non_blocking: true`** shows its overlay **without freezing play** — no clock pause, no `hold_ms` wait. The callout rides *alongside* the step's live motion instead of gating it. This is the reusable alternative to suppression when you want to keep the banner but drop the freeze.
+### Schema Announcements That Do Not Freeze
 
-- **Mechanism:** `animationPlayback.js` → `runStepAnnouncement` early-returns after showing the overlay when `non_blocking` is set (skips the clock pause + `waitMsRespectingPause`). `hold_ms` is ignored for the freeze; the overlay's on-screen duration is owned by `court.html`.
-- **In use:** the RR + Triangle fast-break **lane-pass** "Fast Break!" callouts (`rim_runner_step_emitter.py`, `triangle_step_emitter.py`) and the **"FB Outlet Pass Denied!"** callout (`rim_runner_step_emitter.py`, 2026-07-01). These previously froze the court for a full second; now the banner shows while the beat animates. To revert, remove `non_blocking` from the announcement dict.
-- **Note:** setting `hold_ms: 0` alone does **not** remove a freeze — the FE defaults a non-positive hold to 1000ms (`animationPlayback.js`). Use `non_blocking` (show + continue) or drop the announcement (suppress) instead.
+These announcements carry `hold_ms` in the payload but also carry `non_blocking: true`, so `runStepAnnouncement()` shows the overlay and immediately returns. The overlay duration is owned by `court.html`; clocks and animation continue underneath.
 
-### Secondary-style announcements — freeze status (2026-07-01)
+| Banner text | Tier | Display | Schema source | Beat |
+|---|---|---:|---|---|
+| **"Rebound!"** (DREB) | primary | 700ms | `dreb_step_emitter.py` | Defensive rebound secured; suppressed entirely when DREB launches a fast break |
+| **"Rebound!"** (OREB) | primary | 700ms | `oreb_step_emitter.py` | Offensive rebound secured |
+| **"BLOCK!"** | primary | 700ms | `skeleton_step_emitter.py::_build_post_shot_sub_steps` | Blocked shot at ball-flight end |
+| **"Fast Break!"** (after steal) | secondary | court default | `after_steal_fast_break_step_emitter.py` | Steal fast-break drive start |
+| **"Fast Break!"** (rim runner) | secondary | court default | `rim_runner_step_emitter.py` | Lane pass to rim runner |
+| **"Fast Break!"** (triangle) | secondary | court default | `triangle_step_emitter.py` | Triangle lane pass to rim runner |
+| **"Interception!"** | secondary | court default | `rim_runner_step_emitter.py` | Rim Runner fast-break pass interception |
+| **"No Fast Break"** | secondary | court default | `rim_runner_step_emitter.py` | Rim Runner fast break denied / held up |
+| **"FB Outlet Pass Denied!"** | secondary | court default | `rim_runner_step_emitter.py` | Rim Runner outlet denied |
+| **"Great Stop!"** | secondary | court default | `covert_release_step_emitter.py` | Covert Release defensive stop |
 
-Secondary-tier **schema** announcements (`style: "secondary"`) freeze animation exactly like primary ones — a blocking `hold_ms` awaited in `runStepAnnouncement` — **unless** flagged `non_blocking`. (Separately, FE **`showSecondaryAnnouncement`** calls — e.g. the legacy fast-break callouts in `fastBreak.js` — are fire-and-forget and **never** freeze; they're not in this list.)
+### DREB To Fast Break Suppression
 
-**Secondary-style that FREEZE:**
+The DREB **"Rebound!"** banner is suppressed when the DREB immediately launches a Fast Break. The rebound SFX remains. The toggle is `SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK` in `dreb_step_emitter.py` and defaults to `True`.
 
-| Banner | Hold | Emitter | Beat |
-|---|---|---|---|
-| "Out of bounds!" | 650ms | `rim_runner_step_emitter.py` | Ball batted OOB |
+### Fast Break Terminal Freeze Scope
 
-**Secondary-style that are non-blocking (show, don't freeze):**
-
-| Banner | Emitter | Beat |
-|---|---|---|
-| "Fast Break!" (rim runner) | `rim_runner_step_emitter.py` | Lane pass to RR |
-| "Fast Break!" (triangle) | `triangle_step_emitter.py` | Lane pass to RR |
-| "FB Outlet Pass Denied!" | `rim_runner_step_emitter.py` | Outlet denied |
-| "Great Stop!" | `covert_release_step_emitter.py` | Defensive stop (2026-07-02) |
-| "Interception!" | `rim_runner_step_emitter.py` | Fast-break pass intercepted (2026-07-02) |
-| "No Fast Break" | `rim_runner_step_emitter.py` | Fast break denied (2026-07-02) |
-
-Note: the after-steal "Fast Break!" drive callout is `style: "primary"` (not secondary) — it's in the primary/master table above.
-
-### Fast Break foul / turnover freeze — backend-owned (2026-07-02)
-
-Fast Break **terminal** turns that resolve to a **non-shooting foul, charge, or dead-ball turnover** now FREEZE for **1000ms** via a **backend-stamped blocking schema announcement** — not a frontend decision. `BackEnd/engine/fb_terminal_announce.py` builds a `style: "primary"`, `hold_ms: 1000` announcement and `stamp_fb_terminal_freeze()` stamps it on the terminal step's `end.announcement` inside every FB drive-resolution emitter (`after_steal_fast_break_step_emitter`, `covert_release_step_emitter`, and the shared RR/Triangle `_build_finisher_drive_resolution_steps` in `rim_runner_step_emitter`). This mirrors the dead-ball-fumble pattern (`dead_ball_fumble.py`).
-
-- **Scope:** `CHARGE` → "CHARGE!"; `FOUL` (OFFENSE) → weighted offensive language; `FOUL` (DEFENSE) → weighted defensive language; `DEAD BALL` / `TURNOVER` (non-steal) → "Travel!" / "Double Dribble!" (50/50) or typed. **Shooting fouls / and-1 are out of scope** (they live on MAKE/MISS turns with their own announcements). **Batted-OOB is excluded** (offense retains — announced at turn start).
-- **Language ported to backend:** the weighted foul-language tables (formerly `foulAnnouncementLanguage.js`) and the random dead-ball turnover text (formerly `gameAnnouncements.js`) are now selected on the backend so the choice is authoritative and deterministic per turn.
-- **No double banner:** `stamp_fb_terminal_freeze` sets `suppress_turn_prep_turnover_announce` (turnovers) or `suppress_turn_prep_foul_announce` (fouls/charge) on the turn result; `turnPreparation.announceTurnEnd` honors both flags and skips its legacy FE callout for these turns. `team` follows the FE convention (offensive foul/charge color to the defending side; defensive foul + turnover color to the offense side).
+Fast Break terminal turns that resolve to a non-shooting foul, charge, or dead-ball turnover freeze through `fb_terminal_announce.py`. Shooting fouls and and-1s are excluded because they live on MAKE/MISS shot-result turns with their own announcement timing. Batted-OOB is excluded because offense retains possession and the secondary "Out of bounds!" schema announcement owns that beat.

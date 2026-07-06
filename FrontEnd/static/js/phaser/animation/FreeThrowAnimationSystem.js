@@ -488,7 +488,7 @@ export class FreeThrowAnimationSystem {
       ballSprite.setVisible(true);
       
       // Hold ball at rim (announcement hold from config)
-      const makeRimHoldMs = animationConfig.freeThrow?.makeRimHoldMs ?? 1000;
+      const makeRimHoldMs = animationConfig.freeThrow?.makeRimHoldMs ?? 700;
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
           this.scene.time.delayedCall(makeRimHoldMs, resolve);

@@ -1149,6 +1149,7 @@ def resolve_offensive_rebound(game, rebounder):
         # routing the entire putback through ``shot_manager.resolve_shot``
         # (lightweight reuse, avoids a larger resolve_shot refactor).
         from BackEnd.constants.shot_variants import (
+            SHOT_VARIANT_AIRBALL,
             select_shot_variant,
             roll_shot_variant_extras,
         )
@@ -1299,6 +1300,12 @@ def resolve_offensive_rebound(game, rebounder):
 
             if contested and defender:
                 defender.record_stat("DEF_S")
+
+            if _putback_variant == SHOT_VARIANT_AIRBALL:
+                event["possession_flips"] = True
+                event["next_play_type"] = "BASELINE_INBOUND"
+                event["next_turn"] = "BASELINE_INBOUND"
+                return event
 
             # Unified geography-based rebound system for putback misses
             # Putback happens at the same basket where the original shot was taken

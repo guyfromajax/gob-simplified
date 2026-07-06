@@ -58,6 +58,7 @@ from BackEnd.constants import (
     HCO_STRING_SPOTS,
     HOME_RIM_COORDS,
 )
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.engine.skeleton_step_emitter import _compute_pass_meet_point
 from BackEnd.utils.animation_step_helpers import floor_step_t_to_traversal
 from BackEnd.utils.shared import get_away_player_coords
@@ -1056,9 +1057,9 @@ def _build_lane_pass_step(
             "eventSubtitle": _fb_play_label(turn_result.get("fast_break_play")),
         },
         # Non-blocking: the "Fast Break!" callout rides ALONGSIDE the lane pass to the
-        # rim runner instead of freezing the court for a full second before it. The FE
+        # rim runner instead of freezing the court before it. The FE
         # shows the overlay without a clock pause / hold wait. See Announcement_System.md.
-        "hold_ms": 1000,
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
         "non_blocking": True,
         "style": "secondary",
     }
@@ -1222,7 +1223,7 @@ def _build_lane_pass_intercepted_step(
     ``(rr.x + 3 toward basket, rr.y)``; stealer sprint to contact grid.
 
     ``step.end.announcement = "Interception!"`` secondary defense,
-    stealer headshot, 1000ms hold, steal SFX.
+    stealer headshot, non-blocking display, steal SFX.
     """
     phase = fb_roles.get("rim_runner_burst_phase") or {}
     bh_id = _safe_id(phase.get("outlet_receiver_id"))
@@ -1303,7 +1304,7 @@ def _build_lane_pass_intercepted_step(
         "meta": {"sfx": "steal"},
         # Non-blocking: show the callout without freezing the court. See
         # Announcement_System.md §Secondary-style announcements — freeze status.
-        "hold_ms": 1000,
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
         "non_blocking": True,
         "style": "secondary",
     }
@@ -1583,7 +1584,7 @@ def _build_hold_up_step(
             "meta": {**_decision_pill_meta(turn_result), "sfx": "no_fast_break"},
             # Non-blocking: show the callout without freezing the court. See
             # Announcement_System.md §Secondary-style announcements — freeze status.
-            "hold_ms": 1000,
+            "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
             "non_blocking": True,
             "style": "secondary",
         }
@@ -1644,7 +1645,7 @@ def _build_outlet_denied_defender_step(
     the receiver instead.
 
     ``step.end.announcement = "FB Outlet Pass Denied!"`` secondary defense,
-    defender headshot, 1000ms hold, court SFX.
+    defender headshot, non-blocking display, court SFX.
     """
     phase = fb_roles.get("rim_runner_burst_phase") or {}
     passer_id = _safe_id(phase.get("outlet_passer_id"))
@@ -1714,8 +1715,8 @@ def _build_outlet_denied_defender_step(
         "player_data": _build_player_data(defender_player, fallback_id=defender_id),
         "meta": {"sfx": "fb_outlet_denied_court"},
         # Non-blocking: the callout rides alongside the denied-outlet beat instead of
-        # freezing the court for a full second. See Announcement_System.md.
-        "hold_ms": 1000,
+        # freezing the court. See Announcement_System.md.
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
         "non_blocking": True,
         "style": "secondary",
     }

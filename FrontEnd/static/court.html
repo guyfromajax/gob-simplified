@@ -6931,10 +6931,14 @@
           }
         }
 
+        var primaryDisplayMs = Number(data && data.displayMs);
+        if (!isFinite(primaryDisplayMs) || primaryDisplayMs <= 0) {
+          primaryDisplayMs = 2200;
+        }
         _annTimer = setTimeout(function() {
           overlay.classList.add('hidden');
           _annTimer = null;
-        }, 2200);
+        }, primaryDisplayMs);
       };
       window.holdPrimaryAnnouncementOverlayForTimeout = function() {
         var overlay = document.getElementById('announcement-overlay');

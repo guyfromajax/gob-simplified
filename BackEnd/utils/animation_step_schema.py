@@ -165,7 +165,7 @@ class Announcement(TypedDict, total=False):
     """Optional extras: ``{decision_pill_text?, decision_pill_tone?, sfx?}``."""
 
     hold_ms: float
-    """Wall-clock duration to keep the world paused (default 1000)."""
+    """Wall-clock duration to keep the world paused (default 700)."""
 
     style: Literal["primary", "secondary", "and_one", "shooting_foul"]
     """Optional. ``"primary"`` (default — large centered banner via

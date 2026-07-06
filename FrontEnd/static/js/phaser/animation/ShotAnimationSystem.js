@@ -1116,7 +1116,7 @@ export class ShotAnimationSystem {
       ballSprite.setVisible(true);
     }
 
-    // Show announcement and flash immediately so they run in unison with rim hold (single 1000ms period)
+    // Show announcement and flash immediately so they run in unison with the make hold.
     if (!isPutbackMake) {
       const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
@@ -1158,9 +1158,9 @@ export class ShotAnimationSystem {
       }
     }
 
-    // Single wait: rim hold and announcement in unison (use announcement hold so announcement stays 1000ms)
+    // Single wait: rim hold and announcement in unison; use the configured announcement hold.
     const holdMs = !isPutbackMake
-      ? (isTerminalQuarterEndShot ? 0 : (animationConfig.shot?.makeAnnouncementHoldMs ?? 1000))
+      ? (isTerminalQuarterEndShot ? 0 : (animationConfig.shot?.makeAnnouncementHoldMs ?? 700))
       : (isFastBreak ? (animationConfig.fastBreak?.rimHoldMs ?? 1000) : (animationConfig.shot?.rimHoldMs ?? 1000));
     try {
       await new Promise(resolve => {

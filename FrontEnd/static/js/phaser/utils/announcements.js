@@ -18,6 +18,7 @@ import {
 } from './gameSfx.js';
 
 let currentAnnouncement = null;
+const SHORT_PRIMARY_DISPLAY_MS = 700;
 
 /**
  * A "steal" that is specifically a PASS interception (vs a reach-in/strip) — it
@@ -557,6 +558,17 @@ export function showAnnouncement(text, team = 'home', playerData = null, meta = 
   const scene = resolveAnnouncementScene(meta);
   const rosterPlayer = playerData ? findRosterPlayer(playerData.playerId) : null;
   const player = rosterPlayer || playerData;
+  const normalizedText = String(text || '').trim().toUpperCase();
+  const metaDisplayMs = Number.isFinite(Number(meta?.displayMs))
+    ? Number(meta.displayMs)
+    : Number.isFinite(Number(meta?.display_ms))
+      ? Number(meta.display_ms)
+      : null;
+  const displayMsOverride = metaDisplayMs || (
+    normalizedText === 'REBOUND!' || normalizedText === 'BLOCK!'
+      ? SHORT_PRIMARY_DISPLAY_MS
+      : null
+  );
   const photoUrl = playerData && (playerData.photo || playerData.playerId)
     ? getPlayerImageUrl(playerData.photo, playerData.playerId)
     : '';
@@ -580,6 +592,9 @@ export function showAnnouncement(text, team = 'home', playerData = null, meta = 
     // `resolveAnnounceMetaCourtSfxFile`).
     sfx: resolvePrimarySfxFromMeta(meta?.sfx),
   };
+  if (displayMsOverride && displayMsOverride > 0) {
+    data.displayMs = displayMsOverride;
+  }
   if (typeof window !== 'undefined' && window.showAnnouncementOverlay) {
     window.showAnnouncementOverlay(data);
   }

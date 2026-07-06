@@ -346,6 +346,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         increment_no_defender_shot_breakdown,
     )
     from BackEnd.constants.shot_variants import (
+        SHOT_VARIANT_AIRBALL,
         select_shot_variant,
         roll_shot_variant_extras,
     )
@@ -606,69 +607,75 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         # mirror of the MAKE bug we fixed.
         possession_flips = False  # default; DREB branch flips below
         if not d_foul:
-            rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
-            basket_x = float(rim["x"])
-            bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
-
-            # Penalize the shooter by 20% distance (matches OREB putback
-            # miss pattern at shared.py:1113-1114); don't exclude anyone.
-            penalize_player_ids = {stealer_id} if stealer_id else set()
-            exclude_player_ids: set = set()
-            with _temporary_lineup_coords(game, end_coords):
-                new_rebounder, new_team, new_stat = determine_rebounder(
-                    game,
-                    bounce_spot,
-                    exclude_player_ids,
-                    penalize_player_ids,
-                    max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
-                    upper_half_distance=FAST_BREAK_REBOUND_GEO_DISTANCE * 0.5,
-                    offense_candidate_lineup=off_lineup,
-                    defense_candidate_lineup=def_lineup,
-                )
-                rebounder_pid = _safe_id(new_rebounder)
-                rebound_attemptors = collect_near_bounce_rebound_attemptors(
-                    game,
-                    bounce_spot,
-                    rebounder_pid,
-                    max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
-                    coords_already_display_oriented=True,
-                )
-            rebound_type = str(new_stat) if new_stat else "DREB"
-            rebound_ball_spot = {
-                "x": float(bounce_spot["x"]),
-                "y": float(bounce_spot["y"]),
-            }
-
-            # Stat credit on the canonical roster player (parity with OREB
-            # putback miss flow at shared.py:1126-1133).
-            if new_rebounder is not None:
-                canonical = (
-                    new_team.get_player_by_id(rebounder_pid)
-                    if rebounder_pid and new_team
-                    else None
-                )
-                (canonical or new_rebounder).record_stat(rebound_type)
-
-            if rebound_type == "OREB" and new_rebounder is not None:
-                # Set pending_oreb; game_manager's while loop picks this up
-                # and fires resolve_offensive_rebound_turn → 90/10 split
-                # between PUTBACK_ATTEMPT and OREB_KICKOUT. offensive_state
-                # is intentionally NOT overwritten (pending_oreb is the
-                # routing signal; OREB isn't a valid offensive_state).
-                game_state["pending_oreb"] = {
-                    "rebounder": new_rebounder,
-                    "rebounder_id": rebounder_pid,
-                    "from_block": False,
-                }
-                possession_flips = False
-            else:
-                # DREB: flip possession; route to HCO. Cascade DREB→FB is
-                # NOT computed here (the existing FB systems handle this
-                # via pending_dreb_fb_play_key on regular shot turns; we
-                # keep after-steal-FB-DREB conservative — straight to HCO).
-                game_state["offensive_state"] = "HCO"
-                game_state["last_rebounder"] = new_rebounder
+            if shot_variant == SHOT_VARIANT_AIRBALL:
                 possession_flips = True
+                game_state["offensive_state"] = "HCO"
+                game_state.pop("last_rebounder", None)
+                game_state.pop("last_rebound", None)
+            else:
+                rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+                basket_x = float(rim["x"])
+                bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
+
+                # Penalize the shooter by 20% distance (matches OREB putback
+                # miss pattern at shared.py:1113-1114); don't exclude anyone.
+                penalize_player_ids = {stealer_id} if stealer_id else set()
+                exclude_player_ids: set = set()
+                with _temporary_lineup_coords(game, end_coords):
+                    new_rebounder, new_team, new_stat = determine_rebounder(
+                        game,
+                        bounce_spot,
+                        exclude_player_ids,
+                        penalize_player_ids,
+                        max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
+                        upper_half_distance=FAST_BREAK_REBOUND_GEO_DISTANCE * 0.5,
+                        offense_candidate_lineup=off_lineup,
+                        defense_candidate_lineup=def_lineup,
+                    )
+                    rebounder_pid = _safe_id(new_rebounder)
+                    rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                        game,
+                        bounce_spot,
+                        rebounder_pid,
+                        max_distance=FAST_BREAK_REBOUND_GEO_DISTANCE,
+                        coords_already_display_oriented=True,
+                    )
+                rebound_type = str(new_stat) if new_stat else "DREB"
+                rebound_ball_spot = {
+                    "x": float(bounce_spot["x"]),
+                    "y": float(bounce_spot["y"]),
+                }
+
+                # Stat credit on the canonical roster player (parity with OREB
+                # putback miss flow at shared.py:1126-1133).
+                if new_rebounder is not None:
+                    canonical = (
+                        new_team.get_player_by_id(rebounder_pid)
+                        if rebounder_pid and new_team
+                        else None
+                    )
+                    (canonical or new_rebounder).record_stat(rebound_type)
+
+                if rebound_type == "OREB" and new_rebounder is not None:
+                    # Set pending_oreb; game_manager's while loop picks this up
+                    # and fires resolve_offensive_rebound_turn → 90/10 split
+                    # between PUTBACK_ATTEMPT and OREB_KICKOUT. offensive_state
+                    # is intentionally NOT overwritten (pending_oreb is the
+                    # routing signal; OREB isn't a valid offensive_state).
+                    game_state["pending_oreb"] = {
+                        "rebounder": new_rebounder,
+                        "rebounder_id": rebounder_pid,
+                        "from_block": False,
+                    }
+                    possession_flips = False
+                else:
+                    # DREB: flip possession; route to HCO. Cascade DREB→FB is
+                    # NOT computed here (the existing FB systems handle this
+                    # via pending_dreb_fb_play_key on regular shot turns; we
+                    # keep after-steal-FB-DREB conservative — straight to HCO).
+                    game_state["offensive_state"] = "HCO"
+                    game_state["last_rebounder"] = new_rebounder
+                    possession_flips = True
 
         text_outcome = (
             "but misses, fouled on the shot."
@@ -710,6 +717,8 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         next_play_type = "BASELINE_INBOUND"
     elif d_foul and free_throws_remaining > 0:
         next_play_type = "FREE_THROW"
+    elif shot_variant == SHOT_VARIANT_AIRBALL:
+        next_play_type = "BASELINE_INBOUND"
     elif rebound_type == "OREB":
         # Live ball, OREB → game_manager's pending_oreb loop picks up.
         next_play_type = "OREB"
@@ -773,24 +782,25 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
     else:
         # Use the rebound bounce spot if we computed one; else fall back
         # to rim (foul-on-miss paths don't compute a bounce since FT fires
-        # immediately).
-        if rebound_ball_spot is not None:
-            turn_result["ball_bounce_x"] = rebound_ball_spot["x"]
-            turn_result["ball_bounce_y"] = rebound_ball_spot["y"]
-        else:
-            turn_result["ball_bounce_x"] = ball_bounce_x
-            turn_result["ball_bounce_y"] = ball_bounce_y
-
-        # Rebound info on the turn so the schema emitter / downstream
-        # systems can animate the bounce and chain the next turn.
-        if rebound_type is not None:
-            turn_result["rebound_type"] = rebound_type
-            turn_result["rebounderId"] = rebounder_pid
+        # immediately). AIRBALL uses OOB continuation — no bounce coords.
+        if shot_variant != SHOT_VARIANT_AIRBALL:
             if rebound_ball_spot is not None:
-                turn_result["ballSpot"] = dict(rebound_ball_spot)
-            if rebound_attemptors is not None:
-                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
-                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+                turn_result["ball_bounce_x"] = rebound_ball_spot["x"]
+                turn_result["ball_bounce_y"] = rebound_ball_spot["y"]
+            else:
+                turn_result["ball_bounce_x"] = ball_bounce_x
+                turn_result["ball_bounce_y"] = ball_bounce_y
+
+            # Rebound info on the turn so the schema emitter / downstream
+            # systems can animate the bounce and chain the next turn.
+            if rebound_type is not None:
+                turn_result["rebound_type"] = rebound_type
+                turn_result["rebounderId"] = rebounder_pid
+                if rebound_ball_spot is not None:
+                    turn_result["ballSpot"] = dict(rebound_ball_spot)
+                if rebound_attemptors is not None:
+                    turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                    turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
 
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)

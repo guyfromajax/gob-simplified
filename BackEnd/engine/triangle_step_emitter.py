@@ -21,6 +21,7 @@ from BackEnd.constants import (
     FB_PASS_GRID_SPOTS_PER_GAME_SECOND,
     FB_PASS_MIN_GAME_SECONDS,
 )
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -269,9 +270,9 @@ def _build_triangle_setup_step(
             "eventSubtitle": _fb_play_label("triangle"),
         },
         # Non-blocking: the "Fast Break!" callout rides ALONGSIDE the lane pass to the
-        # rim runner instead of freezing the court for a full second before it. The FE
+        # rim runner instead of freezing the court before it. The FE
         # shows the overlay without a clock pause / hold wait. See Announcement_System.md.
-        "hold_ms": 1000,
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
         "non_blocking": True,
         "style": "secondary",
     }

@@ -53,6 +53,7 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _motion_end_toward_dest,
@@ -62,7 +63,7 @@ from BackEnd.utils.animation_step_helpers import (
 )
 
 
-FB_ANNOUNCE_HOLD_MS: float = 1000.0
+FB_ANNOUNCE_HOLD_MS: float = float(ANNOUNCEMENT_FREEZE_HOLD_MS)
 
 
 def _safe_id(obj: Any) -> Optional[str]:
@@ -141,7 +142,7 @@ def _fb_secondary_announcement(team: str) -> Announcement:
     """Drive step start announcement: ``Fast Break!``.
 
     Secondary ribbon + ``non_blocking`` so the callout rides ALONGSIDE the
-    drive instead of freezing the court for a full second. The FE routes on
+    drive instead of freezing the court. The FE routes on
     ``style`` (``tier`` is ignored) and only skips the clock pause / hold wait
     when ``non_blocking`` is true — matches the RR/Triangle callout. See
     ``Announcement_System.md``.

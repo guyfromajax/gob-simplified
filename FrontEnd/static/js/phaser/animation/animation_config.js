@@ -1,3 +1,5 @@
+export const ANNOUNCEMENT_FREEZE_HOLD_MS = 700;
+
 const defaults = {
   // Enable ball tweening by default; tests can override via global animation_config
   enableBallTween: true,
@@ -27,9 +29,9 @@ const defaults = {
     // Rim hold: ball at rim after make/miss (HCO normal)
     rimHoldMs: 1000,
     // After "It's Good!" / AND-1 before inbound (announcement hold)
-    makeAnnouncementHoldMs: 1000,
+    makeAnnouncementHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS,
     // Made shot rim hold in ballManager path (announcement hold)
-    madeRimHoldMs: 1000,
+    madeRimHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS,
   },
   kickout: {
     duration: 300,
@@ -62,7 +64,7 @@ const defaults = {
     arcHeight: 40,
     rimHoldMs: 300,
     // Made FT rim hold (non-final); announcement hold
-    makeRimHoldMs: 1000,
+    makeRimHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS,
   },
   fastBreak: {
     sprintSpeed: 1.5, // multiplier
@@ -74,7 +76,7 @@ const defaults = {
     // Time to hold the ball at the rim after a made fast break shot
     rimHoldMs: 1000,
     // Announcement hold after "It's Good!" (FB make)
-    makeAnnouncementHoldMs: 1000,
+    makeAnnouncementHoldMs: ANNOUNCEMENT_FREEZE_HOLD_MS,
     // Announcement hold after "Great Stop!" (FB defensive stop); 0 game time
     defensiveStopHoldMs: 500,
     // Rim Runner outlet-denied + hold-up: shared phase for BH/receiver + AG horizontal drifts.

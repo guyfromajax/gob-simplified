@@ -135,6 +135,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         increment_no_defender_shot_breakdown,
     )
     from BackEnd.constants.shot_variants import (
+        SHOT_VARIANT_AIRBALL,
         select_shot_variant,
         roll_shot_variant_extras,
     )
@@ -334,67 +335,73 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         shooter.record_stat("FGA")
         possession_flips = False
         if not d_foul:
-            # D16 parity: a clean defensive stop (miss, no shooting foul) counts
-            # as an HCT defensive success, matching the skeleton SHOT-miss path.
-            def_team.scouting_data["defense"]["HCT"]["success"] += 1
-            basket_x = float(rim["x"])
-            bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
-            penalize_player_ids = {shooter_id} if shooter_id else set()
-            exclude_player_ids: set = set()
-            shot_moment_coords = _coords_by_player_id(off_lineup, seed_off)
-            shot_moment_coords.update(_coords_by_player_id(def_lineup, seed_def))
-            shot_moment_coords[shooter_id] = {
-                "x": float(bh_target["x"]),
-                "y": float(bh_target["y"]),
-            }
-            shot_moment_coords.update(
-                {
-                    did: {"x": float(c["x"]), "y": float(c["y"])}
-                    for did, c in defender_end_coords.items()
-                }
-            )
-            with _temporary_lineup_coords(game, shot_moment_coords):
-                new_rebounder, new_team, new_stat = determine_rebounder(
-                    game,
-                    bounce_spot,
-                    exclude_player_ids,
-                    penalize_player_ids,
-                    max_distance_from_bounce=20,
-                    upper_half_distance=10,
-                    offense_candidate_lineup=off_lineup,
-                    defense_candidate_lineup=def_lineup,
-                )
-                rebounder_pid = _safe_id(new_rebounder)
-                rebound_attemptors = collect_near_bounce_rebound_attemptors(
-                    game,
-                    bounce_spot,
-                    rebounder_pid,
-                    coords_already_display_oriented=True,
-                )
-            rebound_type = str(new_stat) if new_stat else "DREB"
-            rebound_ball_spot = {
-                "x": float(bounce_spot["x"]),
-                "y": float(bounce_spot["y"]),
-            }
-            if new_rebounder is not None:
-                canonical = (
-                    new_team.get_player_by_id(rebounder_pid)
-                    if rebounder_pid and new_team
-                    else None
-                )
-                (canonical or new_rebounder).record_stat(rebound_type)
-
-            if rebound_type == "OREB" and new_rebounder is not None:
-                game_state["pending_oreb"] = {
-                    "rebounder": new_rebounder,
-                    "rebounder_id": rebounder_pid,
-                    "from_block": False,
-                }
-                possession_flips = False
-            else:
-                game_state["offensive_state"] = "HCO"
-                game_state["last_rebounder"] = new_rebounder
+            if shot_variant == SHOT_VARIANT_AIRBALL:
                 possession_flips = True
+                game_state["offensive_state"] = "HCO"
+                game_state.pop("last_rebounder", None)
+                game_state.pop("last_rebound", None)
+            else:
+                # D16 parity: a clean defensive stop (miss, no shooting foul) counts
+                # as an HCT defensive success, matching the skeleton SHOT-miss path.
+                def_team.scouting_data["defense"]["HCT"]["success"] += 1
+                basket_x = float(rim["x"])
+                bounce_spot = calculate_bounce_spot(game, basket_x=basket_x, basket_y=25)
+                penalize_player_ids = {shooter_id} if shooter_id else set()
+                exclude_player_ids: set = set()
+                shot_moment_coords = _coords_by_player_id(off_lineup, seed_off)
+                shot_moment_coords.update(_coords_by_player_id(def_lineup, seed_def))
+                shot_moment_coords[shooter_id] = {
+                    "x": float(bh_target["x"]),
+                    "y": float(bh_target["y"]),
+                }
+                shot_moment_coords.update(
+                    {
+                        did: {"x": float(c["x"]), "y": float(c["y"])}
+                        for did, c in defender_end_coords.items()
+                    }
+                )
+                with _temporary_lineup_coords(game, shot_moment_coords):
+                    new_rebounder, new_team, new_stat = determine_rebounder(
+                        game,
+                        bounce_spot,
+                        exclude_player_ids,
+                        penalize_player_ids,
+                        max_distance_from_bounce=20,
+                        upper_half_distance=10,
+                        offense_candidate_lineup=off_lineup,
+                        defense_candidate_lineup=def_lineup,
+                    )
+                    rebounder_pid = _safe_id(new_rebounder)
+                    rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                        game,
+                        bounce_spot,
+                        rebounder_pid,
+                        coords_already_display_oriented=True,
+                    )
+                rebound_type = str(new_stat) if new_stat else "DREB"
+                rebound_ball_spot = {
+                    "x": float(bounce_spot["x"]),
+                    "y": float(bounce_spot["y"]),
+                }
+                if new_rebounder is not None:
+                    canonical = (
+                        new_team.get_player_by_id(rebounder_pid)
+                        if rebounder_pid and new_team
+                        else None
+                    )
+                    (canonical or new_rebounder).record_stat(rebound_type)
+
+                if rebound_type == "OREB" and new_rebounder is not None:
+                    game_state["pending_oreb"] = {
+                        "rebounder": new_rebounder,
+                        "rebounder_id": rebounder_pid,
+                        "from_block": False,
+                    }
+                    possession_flips = False
+                else:
+                    game_state["offensive_state"] = "HCO"
+                    game_state["last_rebounder"] = new_rebounder
+                    possession_flips = True
 
         text_outcome = (
             "but misses, fouled on the shot." if d_foul else "but misses."
@@ -420,6 +427,8 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         next_play_type = "BASELINE_INBOUND"
     elif d_foul and free_throws_remaining > 0:
         next_play_type = "FREE_THROW"
+    elif shot_variant == SHOT_VARIANT_AIRBALL:
+        next_play_type = "BASELINE_INBOUND"
     elif rebound_type == "OREB":
         next_play_type = "OREB"
     else:
@@ -468,20 +477,21 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         if pressure_type is not None:
             turn_result["next_defensive_setup"] = pressure_type
     else:
-        if rebound_ball_spot is not None:
-            turn_result["ball_bounce_x"] = rebound_ball_spot["x"]
-            turn_result["ball_bounce_y"] = rebound_ball_spot["y"]
-        else:
-            turn_result["ball_bounce_x"] = float(rim["x"])
-            turn_result["ball_bounce_y"] = float(rim["y"])
-        if rebound_type is not None:
-            turn_result["rebound_type"] = rebound_type
-            turn_result["rebounderId"] = rebounder_pid
-            if rebound_attemptors is not None:
-                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
-                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+        if shot_variant != SHOT_VARIANT_AIRBALL:
             if rebound_ball_spot is not None:
-                turn_result["ballSpot"] = dict(rebound_ball_spot)
+                turn_result["ball_bounce_x"] = rebound_ball_spot["x"]
+                turn_result["ball_bounce_y"] = rebound_ball_spot["y"]
+            else:
+                turn_result["ball_bounce_x"] = float(rim["x"])
+                turn_result["ball_bounce_y"] = float(rim["y"])
+            if rebound_type is not None:
+                turn_result["rebound_type"] = rebound_type
+                turn_result["rebounderId"] = rebounder_pid
+                if rebound_attemptors is not None:
+                    turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                    turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+                if rebound_ball_spot is not None:
+                    turn_result["ballSpot"] = dict(rebound_ball_spot)
 
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)
@@ -697,6 +707,7 @@ def _finalize_ab_shot(
         get_name_safe,
     )
     from BackEnd.constants.shot_variants import (
+        SHOT_VARIANT_AIRBALL,
         select_shot_variant,
         roll_shot_variant_extras,
     )
@@ -791,65 +802,71 @@ def _finalize_ab_shot(
             shooter.record_stat("3PTA")
         possession_flips = False
         if not d_foul:
-            # D16 parity: a clean defensive stop (miss, no shooting foul) counts
-            # as an HCT defensive success, matching the skeleton SHOT-miss path.
-            def_team.scouting_data["defense"]["HCT"]["success"] += 1
-            bounce_spot = calculate_bounce_spot(
-                game, basket_x=float(rim["x"]), basket_y=25,
-            )
-            penalize_player_ids = {shooter_id} if shooter_id else set()
-            shot_moment_coords = dict(shot_moment_coords or {})
-            shot_moment_coords[shooter_id] = {
-                "x": float(shot_spot["x"]),
-                "y": float(shot_spot["y"]),
-            }
-            shot_moment_coords.update(
-                {
-                    did: {"x": float(c["x"]), "y": float(c["y"])}
-                    for did, c in (defender_end_coords or {}).items()
-                }
-            )
-            with _temporary_lineup_coords(game, shot_moment_coords):
-                new_rebounder, new_team, new_stat = determine_rebounder(
-                    game,
-                    bounce_spot,
-                    set(),
-                    penalize_player_ids,
-                    max_distance_from_bounce=20,
-                    upper_half_distance=10,
-                    offense_candidate_lineup=game.offense_team.lineup or {},
-                    defense_candidate_lineup=game.defense_team.lineup or {},
-                )
-                rebounder_pid = _safe_id(new_rebounder)
-                rebound_attemptors = collect_near_bounce_rebound_attemptors(
-                    game,
-                    bounce_spot,
-                    rebounder_pid,
-                    coords_already_display_oriented=True,
-                )
-            rebound_type = str(new_stat) if new_stat else "DREB"
-            rebound_ball_spot = {
-                "x": float(bounce_spot["x"]),
-                "y": float(bounce_spot["y"]),
-            }
-            if new_rebounder is not None:
-                canonical = (
-                    new_team.get_player_by_id(rebounder_pid)
-                    if rebounder_pid and new_team
-                    else None
-                )
-                (canonical or new_rebounder).record_stat(rebound_type)
-            if rebound_type == "OREB" and new_rebounder is not None:
-                game_state["pending_oreb"] = {
-                    "rebounder": new_rebounder,
-                    "rebounder_id": rebounder_pid,
-                    "from_block": False,
-                }
-                possession_flips = False
-            else:
-                game_state["offensive_state"] = "HCO"
-                game_state["last_rebounder"] = new_rebounder
+            if shot_variant == SHOT_VARIANT_AIRBALL:
                 possession_flips = True
+                game_state["offensive_state"] = "HCO"
+                game_state.pop("last_rebounder", None)
+                game_state.pop("last_rebound", None)
+            else:
+                # D16 parity: a clean defensive stop (miss, no shooting foul) counts
+                # as an HCT defensive success, matching the skeleton SHOT-miss path.
+                def_team.scouting_data["defense"]["HCT"]["success"] += 1
+                bounce_spot = calculate_bounce_spot(
+                    game, basket_x=float(rim["x"]), basket_y=25,
+                )
+                penalize_player_ids = {shooter_id} if shooter_id else set()
+                shot_moment_coords = dict(shot_moment_coords or {})
+                shot_moment_coords[shooter_id] = {
+                    "x": float(shot_spot["x"]),
+                    "y": float(shot_spot["y"]),
+                }
+                shot_moment_coords.update(
+                    {
+                        did: {"x": float(c["x"]), "y": float(c["y"])}
+                        for did, c in (defender_end_coords or {}).items()
+                    }
+                )
+                with _temporary_lineup_coords(game, shot_moment_coords):
+                    new_rebounder, new_team, new_stat = determine_rebounder(
+                        game,
+                        bounce_spot,
+                        set(),
+                        penalize_player_ids,
+                        max_distance_from_bounce=20,
+                        upper_half_distance=10,
+                        offense_candidate_lineup=game.offense_team.lineup or {},
+                        defense_candidate_lineup=game.defense_team.lineup or {},
+                    )
+                    rebounder_pid = _safe_id(new_rebounder)
+                    rebound_attemptors = collect_near_bounce_rebound_attemptors(
+                        game,
+                        bounce_spot,
+                        rebounder_pid,
+                        coords_already_display_oriented=True,
+                    )
+                rebound_type = str(new_stat) if new_stat else "DREB"
+                rebound_ball_spot = {
+                    "x": float(bounce_spot["x"]),
+                    "y": float(bounce_spot["y"]),
+                }
+                if new_rebounder is not None:
+                    canonical = (
+                        new_team.get_player_by_id(rebounder_pid)
+                        if rebounder_pid and new_team
+                        else None
+                    )
+                    (canonical or new_rebounder).record_stat(rebound_type)
+                if rebound_type == "OREB" and new_rebounder is not None:
+                    game_state["pending_oreb"] = {
+                        "rebounder": new_rebounder,
+                        "rebounder_id": rebounder_pid,
+                        "from_block": False,
+                    }
+                    possession_flips = False
+                else:
+                    game_state["offensive_state"] = "HCO"
+                    game_state["last_rebounder"] = new_rebounder
+                    possession_flips = True
         text_outcome = (
             "but misses, fouled on the shot." if d_foul else "but misses."
         )
@@ -871,6 +888,8 @@ def _finalize_ab_shot(
         next_play_type = "BASELINE_INBOUND"
     elif d_foul and free_throws_remaining > 0:
         next_play_type = "FREE_THROW"
+    elif shot_variant == SHOT_VARIANT_AIRBALL:
+        next_play_type = "BASELINE_INBOUND"
     elif rebound_type == "OREB":
         next_play_type = "OREB"
     else:
@@ -927,20 +946,21 @@ def _finalize_ab_shot(
         if pressure_type is not None:
             turn_result["next_defensive_setup"] = pressure_type
     else:
-        if rebound_ball_spot is not None:
-            turn_result["ball_bounce_x"] = rebound_ball_spot["x"]
-            turn_result["ball_bounce_y"] = rebound_ball_spot["y"]
-        else:
-            turn_result["ball_bounce_x"] = float(rim["x"])
-            turn_result["ball_bounce_y"] = float(rim["y"])
-        if rebound_type is not None:
-            turn_result["rebound_type"] = rebound_type
-            turn_result["rebounderId"] = rebounder_pid
-            if rebound_attemptors is not None:
-                turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
-                turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+        if shot_variant != SHOT_VARIANT_AIRBALL:
             if rebound_ball_spot is not None:
-                turn_result["ballSpot"] = dict(rebound_ball_spot)
+                turn_result["ball_bounce_x"] = rebound_ball_spot["x"]
+                turn_result["ball_bounce_y"] = rebound_ball_spot["y"]
+            else:
+                turn_result["ball_bounce_x"] = float(rim["x"])
+                turn_result["ball_bounce_y"] = float(rim["y"])
+            if rebound_type is not None:
+                turn_result["rebound_type"] = rebound_type
+                turn_result["rebounderId"] = rebounder_pid
+                if rebound_attemptors is not None:
+                    turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
+                    turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+                if rebound_ball_spot is not None:
+                    turn_result["ballSpot"] = dict(rebound_ball_spot)
 
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)

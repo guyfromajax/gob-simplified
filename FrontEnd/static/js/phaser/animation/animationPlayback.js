@@ -86,6 +86,7 @@ const SHOT_BALL_MIN_WALL_CLOCK_MS = 400;
 const SHOT_BALL_MIN_TWEEN_MS = SHOT_BALL_MIN_WALL_CLOCK_MS;
 /** Mirrors `BackEnd.constants.PASS_GRID_SPOTS_PER_GAME_SECOND`. */
 const PASS_BALL_GRID_PER_GAME_SEC = 24;
+const DEFAULT_ANNOUNCEMENT_FREEZE_HOLD_MS = 700;
 
 function shouldTracePlayback(scene = null) {
   const flag = typeof window !== "undefined" ? window.UESS_TRACE_PLAYBACK : undefined;
@@ -761,7 +762,7 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
   }
   const holdMs = Number.isFinite(announcement.hold_ms) && announcement.hold_ms > 0
     ? announcement.hold_ms
-    : 1000;
+    : DEFAULT_ANNOUNCEMENT_FREEZE_HOLD_MS;
   await waitMsRespectingPause(scene, holdMs);
   scene.gameClock?.resume?.(reason);
   scene.shotClock?.resume?.(reason);
