@@ -3781,6 +3781,9 @@ export function createGameScene(Phaser) {
               const val = source[snake] ?? source[camel];
               if (val != null && (target[snake] == null || target[snake] === undefined)) target[snake] = val;
             }
+            if (source.quarter_ends_after === true) {
+              target.quarter_ends_after = true;
+            }
           };
           mergeClockContract(turn, turnData);
           if (turn.home_score === undefined && turnData.home_score !== undefined) turn.home_score = turnData.home_score;

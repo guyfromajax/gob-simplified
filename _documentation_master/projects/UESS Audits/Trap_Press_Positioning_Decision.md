@@ -2,6 +2,10 @@
 
 **Status: framing settled (2026-07-05) — it's a correctness fix, not a gameplay-feel choice.** Consolidates the deferred "Group C" items from [HCT_UESS_Audit.md](HCT_UESS_Audit.md) (HCT-Task 7) and [FCP_UESS_Audit.md](FCP_UESS_Audit.md) (FCP-Task 3 + #6), the **same root** and the cause of the reported **over-and-back** bug.
 
+> **Implementation update (2026-07-06, code-verified):** the **BH-advance / over-and-back** half is **already implemented**. The emitter renders the BH `hct_advance` at the AG-drive rate (`dynamic_hct_step_emitter.py:279-287`, `ag_to_grid_per_game_sec(AG)`) — the *same* rate + `_interrupted_coord` as the engine's `_advance` (`dynamic_hct.py:2218`) → engine `bh_xy` == rendered BH coord, so `frontcourt_established` / 10-sec / `is_over_and_back_pass` read what's shown. The **defender-collapse** half (§ table row 1) is **still open**. Possible residual: the emitter starts the advance from the rendered chain (`prev_end_coords[bh]`) vs logic's `bh_xy`, so earlier-step clamp drift could still diverge — chase only if over-and-back is still reported live.
+
+> **Implementation update #2 (2026-07-06) — DEFENDER MOVE-BEAT archetype carry SHIPPED (branch `hct-fcp-archetype-carry`):** the **PF/C recovery** row (§ table row 2) is fixed. The engine authored PF/C (+ recovered guards) at `sprint` on advance/hold beats but the emitter re-derived `standard` and rendered them short. Now the engine carries the per-defender archetype on the segment (`move_archetype`, `dynamic_hct.py` `_move_defense`→`_segment`) and the emitter READS it (`dynamic_hct_step_emitter.py` `_build_loop_step`), so advance/hold defenders render at the rate the engine decided from. **This is the single-motion-spec convention for the rate dimension** (archetype authored once, carried, never re-derived). RNG/outcome byte-identical; +22 HCT move-steps now render a defender at sprint. **NOTE — this does NOT touch the CONVERGE/STOPPER snap** (§ table row 1): the first-contest steal/foul is credited from the `_position_defense` teleport (no archetype used), so it needs the separate beat-sizing fix (size the converge beat by the slowest mover → visible slowdown) — **still deferred, design call pending**. The archetype-carry is its foundation.
+
 ## Principle (user, 2026-07-05)
 Backend logic is authoritative; the FE renders backend decisions and **NEVER overrides** them (UESS §1). If the backend logic determines an over-and-back (or a steal, foul, contest), it must be **both called and rendered** — consistently, every time. So "make the logic read the render" is **rejected** — it inverts the authority.
 
@@ -42,9 +46,10 @@ This is **not** a balance change and **not** "render faster for looks" — it's 
 ## Scope
 - **HCT-Task 7:** size the trap `hct_converge` + terminal-stopper beats by the slowest converging defender's travel; render PF/C (+ recovery) at sprint in the emitter.
 - **FCP-Task 3:** same for the press converge + stopper — **higher priority** (`skip_walk_up` makes the single converge beat cover the whole court).
-- **Over-and-back (`_advance`, #6):** render the BH advance at the AG-drive rate so his rendered position matches the engine's `frontcourt_established` / `is_over_and_back_pass` read → the violation is called whenever it's shown. Coordinate with the separate over-and-back thread.
+- **Over-and-back (`_advance`, #6): ✅ IMPLEMENTED (2026-07-06, code-verified).** Emitter renders the BH advance at the AG-drive rate (`dynamic_hct_step_emitter.py:279-287`) matching the engine `_advance` (`dynamic_hct.py:2218`) → `frontcourt_established` / `is_over_and_back_pass` read the rendered coord. Not yet prototype-checked; possible seam-drift residual (see top note).
 - **Verify in prototype** — HCT/FCP can't be sim-verified in the mock; watch that (a) no defender/BH teleports (beats long enough) and (b) over-and-back fires exactly when the ball is shown crossing back.
 
 ## Remaining (not a fork — just confirmations)
+- [x] **Over-and-back (`_advance` BH-advance rate) — implemented in code (2026-07-06);** see Scope + top note. Defender-collapse half below still open.
 - [ ] Confirm the *real-speed* trap/press close (slightly slower than the current instant-snap) is acceptable — it's the correct physics, but it's a visible timing change.
-- [ ] Sequencing: bundle HCT-Task 7 + FCP-Task 3 + the over-and-back fix into one coordinated pass (shared `_advance` / `_position_defense` / beat-sizing), verified in prototype.
+- [ ] Sequencing: bundle HCT-Task 7 + FCP-Task 3 (**defender collapse/converge** only — over-and-back done) into one coordinated pass (shared `_position_defense` / beat-sizing), verified in prototype.

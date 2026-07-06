@@ -70,7 +70,7 @@ Logic decides from a coord the frontend never rendered. Confirmed instances (sev
 | **Fast Break contest** | logic clamps defenders at BH **sprint**-T toward `basketSpot`; render tweens at **standard**-T toward `author_transition` matchup spots | **48% of FB shots register "no defender"** (should be ~10%); also feeds rebounder + gates block/defense → **inflates FB FG%** | ⏳ SCOPED/DEFERRED | `Fast_Break_UESS_Audit.md` #2/#7/#8 |
 | **HCT trap** positioning | engine snaps all 5 defenders to full trap; render interrupts them | steal/foul fire from a defender not visibly on the ball | ⏳ DEFERRED (design settled) | `Trap_Press_Positioning_Decision.md` |
 | **FCP press** positioning | same, amplified (`skip_walk_up` → sole converge beat can't render the full close) | worse than HCT | ⏳ DEFERRED | `Trap_Press_Positioning_Decision.md` |
-| **Over-and-back / BH advance** | `_advance` jumps BH at **AG-drive** rate in logic; render tweens at **standard** → engine BH ahead of screen | over-and-back / frontcourt / 10-sec violations fire from an unrendered BH position (reported bug) | ⏳ separate thread | `Fast_Break_UESS_Audit.md` #6, `dynamic_hct.py:2511/3185` |
+| **Over-and-back / BH advance** | `_advance` jumps BH at **AG-drive** rate in logic; render tweens at **standard** → engine BH ahead of screen | over-and-back / frontcourt / 10-sec violations fire from an unrendered BH position (reported bug) | ✅ FIXED IN CODE (2026-07-06) — emitter renders BH advance at AG-drive rate (`dynamic_hct_step_emitter.py:279-287`), matches engine `_advance`; not prototype-checked (possible seam-drift residual) | `FCP_UESS_Audit.md` #6, `Trap_Press_Positioning_Decision.md`, `dynamic_hct.py:2218` |
 
 (A distinct, non-coord §1 issue: Timeout's *eligibility rule* lives in the FE — `Timeout_UESS_Audit.md` #1. Same "logic must be backend" spirit, different mechanism. Decision pending.)
 
@@ -120,6 +120,6 @@ End-of-game diagnostics: grep **`END-OF-GAME SHOT DIAGNOSTICS`** (`shot_split_tr
 ## 10. Suggested sequence for the new thread
 
 1. Start with **Fast Break contest** — it's the reported bug (48%), has a concrete before/after metric, and directly affects FG% tuning. Fix H2 (logic reads rendered defender position / matched rate); re-measure; then treat H1 as a tuning knob.
-2. **Over-and-back** (`_advance`) — same `_advance` root, small, and a reported bug.
+2. ~~**Over-and-back** (`_advance`)~~ — **✅ already fixed in code** (2026-07-06 trace): emitter renders BH advance at AG-drive rate (`dynamic_hct_step_emitter.py:279-287`) matching engine `_advance`. Only re-open if it's still reported live (then chase seam-drift: emitter start `prev_end_coords[bh]` vs logic `bh_xy`).
 3. **HCT/FCP trap/press** (`Trap_Press_Positioning_Decision.md`) — the settled design; needs prototype verification.
 4. Consider the **shared position-service** refactor (decision #2) once 1-3 confirm the pattern.

@@ -351,8 +351,6 @@ def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
     if not isinstance(result, dict):
         return
     clock_before = int(getattr(game, "game_state", {}).get("time_remaining") or 0)
-    if clock_before <= 0:
-        return
     terminal = bool(
         result.get("quarter_ends_after")
         or (
@@ -363,6 +361,15 @@ def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
         )
     )
     if not terminal:
+        return
+    if clock_before <= 0:
+        # Clock already at 0 — still stamp terminal flags so FE airhorn eligibility
+        # does not depend on a clock contract (quarter_ends_after alone is enough).
+        result["quarter_ends_after"] = True
+        result["next_play_type"] = None
+        result.pop("next_turn", None)
+        if result.get("clock_end") is None:
+            result["clock_end"] = 0
         return
     result["time_elapsed"] = clock_before
     result["clock_start"] = clock_before

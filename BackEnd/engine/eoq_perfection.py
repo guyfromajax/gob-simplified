@@ -456,7 +456,7 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     zone = classify_flss_zone(ex, is_home_offense=is_home_off)
     home_basket = _attacking_home_basket(is_home_off)
 
-    flss_vo = True  # all FLSS instances get coach VO (EOQ_Perfection_Brief)
+    flss_vo = zone != "normal"  # normal zone: no announce/VO; penalty/heave: coach VO
     heave_sfx = flss_heave_sfx_eligible(ex, is_home_offense=is_home_off)
 
     log_eoq_step(

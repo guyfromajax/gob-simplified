@@ -114,7 +114,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 - **Helper:** `signalQuarterEnded(scene, turnData, { phase })` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js` — single entry for all quarter-end paths. Eligibility: `quarter_ends_after === true` **or** (`clock_end === 0` && `clock_start > 0`). Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`. File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()`.
 - **Phase `clockTween`:** `AnimationRouter.js` clock interpolation. Plays on the clock contract unless `quarter_ends_after` is set (defer to playback so the horn aligns with rim/hold/FT finish).
-- **Phase `playbackComplete`:** after turn animation finishes — Final Turn / FLSS hold (`AnimationEngine._finishFinalTurnQuarterEnd`), schema FT quarter-end (`handleFreeThrow`, `_finishSchemaFreeThrowTurn`), `FINAL_HOLD`, and `runOutClock.js`. Plays on `quarter_ends_after` even when `clock_start === 0` (fixes terminal FT and retroactive backend stamps). Dedupe prevents double-fire when both phases would qualify.
+- **Phase `playbackComplete`:** after turn animation finishes — `AnimationRouter` calls `signalQuarterEnded` for **every** turn (universal fallback after boundary tween drain). EOQ-specific handlers (Final Turn / FLSS hold, schema FT, `FINAL_HOLD`, run-out) may fire earlier; per-turn dedupe prevents double-play. Plays on `quarter_ends_after` even when `clock_start === 0`.
 - Scope: live turn-by-turn court playback (Q1–Q4). Not tied to the quarter-break locker-room screen or the "Quarter X Complete!" popup.
 
 **Defense Matchup Modal**
@@ -154,7 +154,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - Trigger: immediately when the **Final Shot** secondary announce appears (true Final Turn shots only).
 - File: **50/50** random each show — `sammy-final-shot.mp3` or `final-shot-braddock.mp3`
 - **Once per quarter:** the stinger plays at most once per period. If it already fired on the structured Final Turn possession, a follow-up shot still shows the headline but **does not** replay the SFX (`resolveSecondaryAnnounceCourtSfxFile` in `gameSfx.js`).
-- **FLSS disengaged (2026-07-03):** the Final Shot stinger is suppressed for **all FLSS instances**. FLSS attempts (`turn.flss === true`) still show the **Final Shot** headline but pass `suppressCourtSfx` (in `turnPreparation.js`), so the stinger never fires — FLSS carries its own coach VO instead (see **FLSS Coach VO** below). `suppress_final_shot_sfx` from the backend also still suppresses repeat Final Turn stingers.
+- **FLSS disengaged:** FLSS turns do **not** show the **Final Shot** headline or stinger (`turnPreparation.js` gates on `final_turn && !flss`). Penalty/heave FLSS plays coach VO only (see **FLSS Coach VO** below). `suppress_final_shot_sfx` on follow-up full Final Turns still suppresses repeat stingers in the same EOQ chain.
 
 **FLSS Coach VO**
 

@@ -199,16 +199,14 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
       }
     }
 
-    // Final Turn / FLSS: announce "Final Shot" at start of terminal EOQ shot attempts.
-    const isTerminalFinalShotAttempt =
-      (turn.final_turn || turn.flss || turn.final_shot_possession)
+    // Final Turn only — NOT FLSS. FLSS uses coach VO at the shoot step (penalty/heave
+    // zones) or no announce (normal zone); see EOQ_Perfection_Brief + Announcement_System.md.
+    const isFinalTurnShotAttempt =
+      turn.final_turn === true
+      && turn.flss !== true
       && turn.result_type !== 'FINAL_HOLD';
-    if (isTerminalFinalShotAttempt) {
-      // FLSS attempts carry their own coach VO (backend ``sfx_on_step_start`` on
-      // the terminal shoot step). Suppress the Final Shot stinger for FLSS and for
-      // follow-up Final Turns in the same EOQ chain (`suppress_final_shot_sfx`).
-      const suppressFinalShotSfx =
-        turn.suppress_final_shot_sfx === true || turn.flss === true;
+    if (isFinalTurnShotAttempt) {
+      const suppressFinalShotSfx = turn.suppress_final_shot_sfx === true;
       announceGameEvent('FINAL_SHOT', turn, scene, {
         suppressCourtSfx: suppressFinalShotSfx,
       });

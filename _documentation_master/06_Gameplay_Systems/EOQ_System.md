@@ -75,7 +75,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `terminal_dreb_eoq` | Terminal defensive rebound (clock burn, no outlet) |
 | `flss_after_dreb` | Miss/block turn in chain: DREB → FLSS when clock > 2s |
 | `skip_dreb_outlet_lead_in` | DREB turn payload: FE skips HCO outlet lead-in before FLSS |
-| `suppress_final_shot_sfx` | Repeat full Final Turn in same EOQ sequence **or any FLSS turn**: FE skips the Final Shot stinger (announcement text may still show; FLSS plays its own heave/launch VO) |
+| `suppress_final_shot_sfx` | Repeat full Final Turn in same EOQ sequence: FE skips the Final Shot stinger on follow-up full Final Turns (headline may still show) |
 | `late_clock_ft_resolution` | Last FT at ≤ 30s resolved: tags turn for BIP runoff only; **does not** start chain |
 | `final_turn_anchor_clock` | Rolled shoot/drive anchor (seconds) |
 | `quarter_ends_after` | Period ends after this turn; no BIP/OREB follow-up |
@@ -85,7 +85,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 ## 4. Quarter-end authority
 
 - **`quarter_complete`** on simulate-turn when `time_remaining <= 0` after processing (including terminal FTs).
-- **Airhorn / quarter break UI:** FE uses `signalQuarterEnded` (`quarterEndAirhorn.js`). Eligible when `quarter_ends_after === true` or turn contract `clock_end === 0` with `clock_start > 0`. `clockTween` phase (router) defers when `quarter_ends_after`; `playbackComplete` phase fires after schema FT, Final Turn hold, FLSS, FINAL_HOLD, or run-out — see [`SFX_System.md`](../11_Design_Systems/SFX_System.md).
+- **Airhorn / quarter break UI:** FE uses `signalQuarterEnded` (`quarterEndAirhorn.js`). Eligible when `quarter_ends_after === true` or turn contract `clock_end === 0` with `clock_start > 0`. `clockTween` defers when `quarter_ends_after`; **`AnimationRouter` universal fallback** fires at end of every turn after boundary tween drain. See [`SFX_System.md`](../11_Design_Systems/SFX_System.md).
 - **EOG vs OT:** Backend `is_final` — see [`End_Of_Game_System.md`](End_Of_Game_System.md). EOQ handles **within-period** clock; EOG handles **game** finality.
 
 On quarter break, `api.py` clears EOQ flags (`clear_late_clock_eoq_chain`, drops `final_turn_shot_this_turn`, timeout fields). EOQ chain flags must **not** survive into the next quarter.
@@ -199,7 +199,7 @@ AND state in (HCO, HCT, FCP)
 
 **Design intent:** Replace the old “chain active → always BIP → FLSS” loop with a per-entry runway check. Entry context matters: OREB kickout, BIP with runoff, DREB outlet, and press setup all change available time.
 
-**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns **and all FLSS turns** stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” announcement but skips the court stinger. FLSS plays coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step (not at ball detach).
+**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” headline but skips the court stinger. FLSS never shows the headline; penalty/heave zones play coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step.
 
 **Not re-evaluated on:** OREB putback turns, BIP/SIP bypass turns, discrete DREB turns, FT line. The next **half-court entry** after those paths runs this check.
 
@@ -254,9 +254,11 @@ At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` already set, Fi
 
 ### Frontend announcement
 
-**"Final Shot"** when `turn.final_turn` (or `final_shot_possession` or `flss`) and `result_type !== 'FINAL_HOLD'`. See [`Announcement_System.md`](Announcement_System.md).
+**"Final Shot"** secondary headline **only** when `turn.final_turn === true`, `turn.flss !== true`, and `result_type !== 'FINAL_HOLD'`. See [`Announcement_System.md`](Announcement_System.md).
 
-When `turn.suppress_final_shot_sfx === true`, pass `suppressCourtSfx` to the secondary announcement so the stinger does not replay.
+**FLSS does not show the "Final Shot" headline.** Normal-zone FLSS: no announce. Penalty/heave zones: coach VO only (`sfx_on_step_start` on the terminal shoot step — `braddock-finalshot` / `sammy-launch` / `duke-heave` per EOQ_Perfection_Brief).
+
+When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCourtSfx` so the stinger does not replay on follow-up full Final Turns in the same chain.
 
 ---
 
@@ -379,7 +381,7 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 | FLSS loop, never saw first Final Turn | Chain started on FT path before fix; or every entry fails §6b runway (check clock after BIP runoff) |
 | Full Final Turn after make when expecting FLSS | §6b runway check passed; `EOQ_FOLLOWUP_FINAL_TURN` in trace |
 | Final Shot stinger twice in last 30s | Missing `suppress_final_shot_sfx` on follow-up Final Turn |
-| Quarter ends at 0:01, no airhorn | Missing `quarter_ends_after` on terminal turn and clock contract not drained (`clock_end !== 0`); or horn deferred but no `playbackComplete` call site ran |
+| Quarter ends at 0:01, no airhorn | Missing `quarter_ends_after` on terminal turn (check `ensure_quarter_end_clock_drain` when clock already 0); or turn index missing so dedupe key is empty; or `scene.skipToEnd` |
 | Full HCO outlet after Final Shot DREB in chain | `flss_after_dreb` not set or FE ran outlet despite `skip_dreb_outlet_lead_in` |
 | Kickout → HCO, no Final Shot | Chain already active from side door; or clock > 30 at HCO entry |
 | Resume after timeout, weird EOQ | Stale timeout anchor / chain flags — see [`Mid_Game_Resume_System.md`](../01_Data_Persistence/Mid_Game_Resume_System.md) |

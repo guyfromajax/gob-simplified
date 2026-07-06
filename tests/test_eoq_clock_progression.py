@@ -262,6 +262,15 @@ def test_ensure_quarter_end_clock_drain():
     assert result["clock_end"] == 0
 
 
+def test_ensure_quarter_end_clock_drain_when_clock_already_zero():
+    game = SimpleNamespace(game_state={"time_remaining": 0})
+    result = {"result_type": "MISS", "next_play_type": None}
+    ensure_quarter_end_clock_drain(game, result)
+    assert result["quarter_ends_after"] is True
+    assert result["clock_end"] == 0
+    assert "time_elapsed" not in result or result.get("time_elapsed") is None
+
+
 def test_scrub_timeout_fields_from_snapshot():
     snapshot = {
         "timeout_next_play_type": "SIDE_INBOUND",

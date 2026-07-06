@@ -830,6 +830,24 @@ export class AnimationRouter {
         // Completed (log removed)
       }
 
+      // Universal quarter-end airhorn: clockTween defers when quarter_ends_after is set,
+      // and only EOQ-named handlers used to call playbackComplete. Catch every terminal
+      // turn here (schema HCO/DREB miss, legacy handlers, etc.). Dedupe is per turn index.
+      if (turnData && typeof turnData === 'object') {
+        const resolvedIndex = turnData.index ?? turnData.turnIndex ?? turnIndex;
+        if (resolvedIndex != null && resolvedIndex !== '') {
+          turnData.index = turnData.index ?? resolvedIndex;
+        }
+        if (turnData.quarter_ends_after === true && this.onUpdate) {
+          this.onUpdate({
+            clock: '0:00',
+            time_remaining: 0,
+            shot_clock_remaining: 0,
+          });
+        }
+        signalQuarterEnded(this.scene, turnData, { phase: 'playbackComplete' });
+      }
+
       // Handle any queued turns
       await this.processQueue();
 
