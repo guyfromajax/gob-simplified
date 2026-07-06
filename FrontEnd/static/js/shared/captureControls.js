@@ -48,6 +48,9 @@
       'body.gob-capture-court-page #gob-capture-rec {',
       '  top: calc(var(--scoreboard-height, 120px) + 8px);',
       '}',
+      'body.has-auth-bar #gob-capture-rec {',
+      '  top: 68px;',
+      '}',
       '#gob-capture-rec.is-armed {',
       '  background: rgba(120, 0, 0, 0.92);',
       '  border-color: rgba(255, 59, 48, 0.65);',
@@ -63,6 +66,16 @@
       '#gob-capture-rec.is-armed .gob-capture-rec-dot {',
       '  color: #ff3b30;',
       '  animation: gob-capture-rec-pulse 1.6s ease-in-out infinite;',
+      '}',
+      '#gob-capture-rec.is-success {',
+      '  background: rgba(20, 80, 45, 0.92);',
+      '  border-color: rgba(72, 199, 116, 0.65);',
+      '  color: #fff;',
+      '}',
+      '#gob-capture-rec.is-error {',
+      '  background: rgba(120, 0, 0, 0.92);',
+      '  border-color: rgba(255, 59, 48, 0.65);',
+      '  color: #fff;',
       '}',
       '@keyframes gob-capture-rec-pulse {',
       '  0%, 100% { opacity: 1; }',
@@ -132,7 +145,11 @@
       promise = Promise.resolve(false);
     }
 
-    Promise.resolve(promise).finally(function () {
+    Promise.resolve(promise).then(function (ok) {
+      if (utils && typeof utils.flashCaptureStatus === 'function') {
+        utils.flashCaptureStatus(!!ok, renderIndicator);
+      }
+    }).finally(function () {
       capturing = false;
     });
   }

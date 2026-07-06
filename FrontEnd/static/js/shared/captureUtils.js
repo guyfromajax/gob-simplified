@@ -5,6 +5,7 @@
   'use strict';
 
   var eventTag = 'manual';
+  var statusTimer = null;
 
   function pad2(n) {
     return String(n).padStart(2, '0');
@@ -56,6 +57,28 @@
     delete el.dataset.capturePrevVisibility;
   }
 
+  function flashCaptureStatus(ok, restoreLabel) {
+    var el = getRecIndicator();
+    if (!el) return;
+    var label = el.querySelector('.gob-capture-rec-label');
+    if (!label) return;
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = null;
+    }
+    el.classList.remove('is-success', 'is-error');
+    el.classList.add(ok ? 'is-success' : 'is-error');
+    label.textContent = ok ? '✓ saved' : 'capture failed';
+    el.style.visibility = '';
+    statusTimer = setTimeout(function () {
+      el.classList.remove('is-success', 'is-error');
+      if (typeof restoreLabel === 'function') {
+        restoreLabel();
+      }
+      statusTimer = null;
+    }, 1400);
+  }
+
   function setEventTag(tag) {
     eventTag = tag || 'manual';
   }
@@ -69,6 +92,7 @@
     saveCapture: saveCapture,
     hideRecIndicator: hideRecIndicator,
     restoreRecIndicator: restoreRecIndicator,
+    flashCaptureStatus: flashCaptureStatus,
     setEventTag: setEventTag,
     getEventTag: getEventTag,
   };
