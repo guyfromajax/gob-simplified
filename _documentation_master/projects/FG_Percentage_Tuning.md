@@ -17,7 +17,7 @@ The shot logic is **mostly shared but not fully** — three turn types funnel th
 
 - Central: `made = shot_score >= shot_threshold` (`BackEnd/models/shot_manager.py:1358-1364`)
 - **Two big undefended shortcuts** (likely inflated undefended make %): unguarded rim and "motion uncontested" both hard-code **~99% make** via `random.randint(1,100) != 100` (`shot_manager.py:893-895`, `:922`)
-- Undefended **outside** shots use a bespoke bar instead of the normal threshold: `made = shot_score > 230 - CH + dist_to_rim` (`shot_manager.py:1358-1361`) — *raised from 210 → 230 to tighten undefended outside makes*
+- Undefended **outside** shots use a bespoke bar instead of the normal threshold: `made = shot_score > SHOT_THRESHOLD_MAX - CH + dist_to_rim` (`shot_manager.py:1358-1361`) — always tracks the shot-threshold scale MAX (now **250**; was hardcoded 210→230, now wired to the scale so it moves with retunes)
 
 ## Shared vs separate (matters for the regression)
 | Turn type | Contest logic | Make/miss |

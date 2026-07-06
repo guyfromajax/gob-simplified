@@ -13,6 +13,7 @@ from BackEnd.utils.shot_split_tracker import (
     resolve_hco_shot_clock_at_attempt,
 )
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
+from BackEnd.constants.shot_threshold_scale import MAX as SHOT_THRESHOLD_MAX
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
@@ -1350,14 +1351,16 @@ class ShotManager:
                         return result
 
             # Undefended OUTSIDE shots use a bespoke make rule (design): shot_score must clear
-            # 230 − shooter CH + shooter's Euclidean distance to the basket — higher chemistry /
-            # closer = easier. Undefended inside & attack shots keep their existing handling
-            # (rim-unguarded shortcut or the standard shot_threshold compare). `shot_threshold`
-            # itself is left intact for downstream variant selection; `_make_bar` is the effective
-            # bar used for the decision (and the recon log).
+            # the shot-threshold scale MAX (SHOT_THRESHOLD_MAX) − shooter CH + shooter's Euclidean
+            # distance to the basket — higher chemistry / closer = easier. The uncontested-3 bar
+            # always tracks the top of the shot_threshold range, so it moves automatically when the
+            # scale is retuned (see Shot_Threshold_Scale_Tuning.md). Undefended inside & attack shots
+            # keep their existing handling (rim-unguarded shortcut or the standard shot_threshold
+            # compare). `shot_threshold` itself is left intact for downstream variant selection;
+            # `_make_bar` is the effective bar used for the decision (and the recon log).
             if not has_contest and shot_type == "outside":
                 _undef_ch = float((getattr(shooter, "attributes", None) or {}).get("CH", 0) or 0)
-                _make_bar = 230.0 - _undef_ch + math.hypot(float(sx) - float(bx), float(sy) - float(by))
+                _make_bar = float(SHOT_THRESHOLD_MAX) - _undef_ch + math.hypot(float(sx) - float(bx), float(sy) - float(by))
                 made = shot_score > _make_bar
             else:
                 _make_bar = shot_threshold
