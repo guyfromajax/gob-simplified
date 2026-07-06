@@ -1487,12 +1487,14 @@ try:
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
         from BackEnd.utils.shot_split_tracker import (
             restore_shot_split_from_saved, restore_fga_by_turn_type_from_saved,
+            restore_undefended_by_turn_type_from_saved,
             restore_hco_shot_tier_from_saved,
         )
 
         restore_home_crowd_from_saved(gm.game_state, saved)
         restore_shot_split_from_saved(gm.game_state, saved)
         restore_fga_by_turn_type_from_saved(gm.game_state, saved)
+        restore_undefended_by_turn_type_from_saved(gm.game_state, saved)
         restore_hco_shot_tier_from_saved(gm.game_state, saved)
     
     def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
@@ -1603,12 +1605,14 @@ try:
         from BackEnd.utils.home_crowd import restore_home_crowd_from_saved
         from BackEnd.utils.shot_split_tracker import (
             restore_shot_split_from_saved, restore_fga_by_turn_type_from_saved,
+            restore_undefended_by_turn_type_from_saved,
             restore_hco_shot_tier_from_saved,
         )
 
         restore_home_crowd_from_saved(gm.game_state, saved)
         restore_shot_split_from_saved(gm.game_state, saved)
         restore_fga_by_turn_type_from_saved(gm.game_state, saved)
+        restore_undefended_by_turn_type_from_saved(gm.game_state, saved)
         restore_hco_shot_tier_from_saved(gm.game_state, saved)
         
         # ✅ CRITICAL FIX: Restore scores from saved document (overwrites stale in-memory scores)

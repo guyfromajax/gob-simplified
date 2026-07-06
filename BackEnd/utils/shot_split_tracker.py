@@ -10,6 +10,10 @@ as end-of-game charts:
    type that generated them: HCO, HCT, FCP, Fast Break, OREB. (Final Shot /
    FLSS buzzer attempts are intentionally omitted from this breakdown.)
 
+   ``undefended_by_turn_type`` — of those same per-turn-type attempts, the
+   make/miss of the ones that were undefended (``not defended``). Same buckets
+   and same Final-Shot/FLSS exclusion as ``fga_by_turn_type``.
+
 3. ``hco_shot_tier_counts`` — HCO field-goal attempts by shot-clock tier at
    attempt time. Every HCO FGA via ``record_shot_split`` increments this tally.
    Clock at attempt (in priority order):
@@ -55,6 +59,10 @@ def _empty_tracking():
 
 def _empty_fga_by_turn_type():
     return {tt: 0 for tt in _TURN_TYPES}
+
+
+def _empty_undefended_by_turn_type():
+    return {tt: {"make": 0, "miss": 0} for tt in _TURN_TYPES}
 
 
 def classify_resolve_shot_turn_type(game_state, roles):
@@ -200,6 +208,14 @@ def record_shot_split(
             state["fga_by_turn_type"] = by_turn
         by_turn[turn_type] = int(by_turn.get(turn_type, 0) or 0) + 1
 
+        if not defended:
+            undef_by_turn = state.get("undefended_by_turn_type")
+            if not isinstance(undef_by_turn, dict):
+                undef_by_turn = _empty_undefended_by_turn_type()
+                state["undefended_by_turn_type"] = undef_by_turn
+            ub = undef_by_turn.setdefault(turn_type, {"make": 0, "miss": 0})
+            ub["make" if made else "miss"] += 1
+
     if turn_type == "HCO":
         shot_clock = hco_shot_clock
         if shot_clock is None and roles is not None:
@@ -253,6 +269,26 @@ def restore_fga_by_turn_type_from_saved(game_state, saved) -> None:
     game_state["fga_by_turn_type"] = restored
 
 
+def restore_undefended_by_turn_type_from_saved(game_state, saved) -> None:
+    """Reapply cumulative per-turn-type undefended make/miss from a loaded game
+    document (quarter-by-quarter persistence; mirrors
+    ``restore_fga_by_turn_type_from_saved``)."""
+    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+        return
+    prior = saved.get("undefended_by_turn_type")
+    if not isinstance(prior, dict):
+        return
+    restored = _empty_undefended_by_turn_type()
+    for tt in _TURN_TYPES:
+        bucket = prior.get(tt)
+        if isinstance(bucket, dict):
+            restored[tt] = {
+                "make": int(bucket.get("make", 0) or 0),
+                "miss": int(bucket.get("miss", 0) or 0),
+            }
+    game_state["undefended_by_turn_type"] = restored
+
+
 def format_shot_split_summary(game) -> str:
     """Render the end-of-game shot-split chart as a printable string."""
     state = getattr(game, "game_state", None) or {}
@@ -292,6 +328,44 @@ def format_turn_type_fga_summary(game) -> str:
         lines.append(f"{tt:<12}: {fga:>4} FGA  ({share:5.1f}%)")
     lines.append(f"{'TOTAL':<12}: {total:>4} FGA")
     lines.append("==========================================================")
+    return "\n".join(lines)
+
+
+def format_undefended_by_turn_type_summary(game) -> str:
+    """Render the end-of-game undefended-FGA-by-turn-type report: for each turn
+    type, how many of its attempts were undefended and the make/miss on them.
+    Undefended share is vs that turn type's total FGA (``fga_by_turn_type``)."""
+    state = getattr(game, "game_state", None) or {}
+    undef = state.get("undefended_by_turn_type") or {}
+    by_turn = state.get("fga_by_turn_type") or {}
+
+    lines = [
+        "",
+        "========= UNDEFENDED SHOTS BY TURN TYPE =========",
+    ]
+    tot_undef = tot_make = tot_fga = 0
+    for tt in _TURN_TYPES:
+        bucket = undef.get(tt) or {"make": 0, "miss": 0}
+        make = int(bucket.get("make", 0) or 0)
+        miss = int(bucket.get("miss", 0) or 0)
+        att = make + miss
+        fga = int(by_turn.get(tt, 0) or 0)
+        share = (att / fga * 100.0) if fga else 0.0
+        pct = (make / att * 100.0) if att else 0.0
+        tot_undef += att
+        tot_make += make
+        tot_fga += fga
+        lines.append(
+            f"{tt:<12}: {att:>3} undef / {fga:<3} FGA  ({share:5.1f}%)  "
+            f"| {make:>2}-{miss:<2} make/miss ({pct:5.1f}%)"
+        )
+    all_share = (tot_undef / tot_fga * 100.0) if tot_fga else 0.0
+    all_pct = (tot_make / tot_undef * 100.0) if tot_undef else 0.0
+    lines.append(
+        f"{'TOTAL':<12}: {tot_undef:>3} undef / {tot_fga:<3} FGA  ({all_share:5.1f}%)  "
+        f"| {all_pct:5.1f}% make"
+    )
+    lines.append("=================================================")
     return "\n".join(lines)
 
 
@@ -378,6 +452,7 @@ def format_master_eog_report(game) -> str:
         "################# END-OF-GAME SHOT DIAGNOSTICS #################",
         format_shot_split_summary(game),
         format_turn_type_fga_summary(game),
+        format_undefended_by_turn_type_summary(game),
         format_hco_shot_tier_summary(game),
         "###############################################################",
         "",
@@ -398,6 +473,7 @@ def merge_shot_diagnostics(summaries):
     merged = {
         "shot_split_tracking": _empty_tracking(),
         "fga_by_turn_type": _empty_fga_by_turn_type(),
+        "undefended_by_turn_type": _empty_undefended_by_turn_type(),
         "hco_shot_tier_counts": {t: 0 for t in _HCO_TIERS},
     }
     n = 0
@@ -406,6 +482,7 @@ def merge_shot_diagnostics(summaries):
             continue
         sst = s.get("shot_split_tracking")
         fbt = s.get("fga_by_turn_type")
+        ubt = s.get("undefended_by_turn_type")
         tier = s.get("hco_shot_tier_counts")
         if not any(isinstance(x, dict) and x for x in (sst, fbt, tier)):
             continue  # no shot data on this summary — don't count it as a game
@@ -416,6 +493,9 @@ def merge_shot_diagnostics(summaries):
             merged["shot_split_tracking"][k]["miss"] += int(b.get("miss", 0) or 0)
         for tt in _TURN_TYPES:
             merged["fga_by_turn_type"][tt] += int((fbt or {}).get(tt, 0) or 0)
+            ub = (ubt or {}).get(tt) or {}
+            merged["undefended_by_turn_type"][tt]["make"] += int(ub.get("make", 0) or 0)
+            merged["undefended_by_turn_type"][tt]["miss"] += int(ub.get("miss", 0) or 0)
         for t in _HCO_TIERS:
             merged["hco_shot_tier_counts"][t] += int((tier or {}).get(t, 0) or 0)
     return merged, n
@@ -427,6 +507,7 @@ def format_week_aggregate_report(merged, num_games) -> str:
     percentage splits of every tracked dimension. Grep ``WEEK AGGREGATE``."""
     sst = (merged or {}).get("shot_split_tracking") or {}
     fbt = (merged or {}).get("fga_by_turn_type") or {}
+    ubt = (merged or {}).get("undefended_by_turn_type") or {}
     tier = (merged or {}).get("hco_shot_tier_counts") or {}
     num_teams = max(0, int(num_games)) * 2
 
@@ -470,6 +551,17 @@ def format_week_aggregate_report(merged, num_games) -> str:
     for tt in _TURN_TYPES:
         v = int(fbt.get(tt, 0) or 0)
         lines.append(f"  {tt:<12}: {_pct(v, tt_total):5.1f}%  ({v})")
+
+    lines.append("")
+    lines.append("Undefended by turn type (% of turn-type FGA  |  make%):")
+    for tt in _TURN_TYPES:
+        b = ubt.get(tt) or {}
+        att = int(b.get("make", 0) or 0) + int(b.get("miss", 0) or 0)
+        fga = int(fbt.get(tt, 0) or 0)
+        lines.append(
+            f"  {tt:<12}: {_pct(att, fga):5.1f}% undef  "
+            f"({_pct(int(b.get('make', 0) or 0), att):5.1f}% make, {att} att)"
+        )
 
     tier_total = sum(int(tier.get(t, 0) or 0) for t in _HCO_TIERS)
     lines.append("")

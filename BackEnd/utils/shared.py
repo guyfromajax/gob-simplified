@@ -2935,6 +2935,9 @@ def summarize_game_state(game, exclude_animations=True):
         "fga_by_turn_type": deepcopy(game.game_state.get("fga_by_turn_type", {}))
         if isinstance(game.game_state.get("fga_by_turn_type", {}), dict)
         else {},
+        "undefended_by_turn_type": deepcopy(game.game_state.get("undefended_by_turn_type", {}))
+        if isinstance(game.game_state.get("undefended_by_turn_type", {}), dict)
+        else {},
         "hco_shot_tier_counts": deepcopy(game.game_state.get("hco_shot_tier_counts", {}))
         if isinstance(game.game_state.get("hco_shot_tier_counts", {}), dict)
         else {},

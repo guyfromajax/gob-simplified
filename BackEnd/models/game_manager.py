@@ -228,6 +228,14 @@ class GameManager:
             "fga_by_turn_type": {
                 "HCO": 0, "HCT": 0, "FCP": 0, "Fast Break": 0, "OREB": 0,
             },
+            # Undefended make/miss by turn type (both teams combined).
+            "undefended_by_turn_type": {
+                "HCO": {"make": 0, "miss": 0},
+                "HCT": {"make": 0, "miss": 0},
+                "FCP": {"make": 0, "miss": 0},
+                "Fast Break": {"make": 0, "miss": 0},
+                "OREB": {"make": 0, "miss": 0},
+            },
             # HCO shot attempts by shot-clock tier (at-attempt clock).
             "hco_shot_tier_counts": {
                 "early": 0, "mid": 0, "late": 0, "very_late": 0, "forced": 0,
