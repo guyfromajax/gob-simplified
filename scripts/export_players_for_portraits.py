@@ -135,18 +135,38 @@ def main():
     except ImportError:
         sys.exit("pymongo not installed. Run:  pip install pymongo")
 
-    db = MongoClient(uri).get_database(DB_NAME)
-    coll = db[COLLECTION]
+    client = MongoClient(uri)
+    db = client.get_database(DB_NAME)
+    colls = db.list_collection_names()
+
+    # Pick the players collection: env override, else the configured name,
+    # else auto-detect from common candidates by which actually has docs.
+    candidates = [COLLECTION, "universal_players", "players", "universalPlayers",
+                  "player", "Players"]
+    chosen = None
+    for c in candidates:
+        if c in colls and db[c].estimated_document_count() > 0:
+            chosen = c
+            break
+    if not chosen:
+        print(f"[diag] databases on this cluster: {client.list_database_names()}")
+        print(f"[diag] collections in '{DB_NAME}': {colls}")
+        sys.exit(f"No non-empty players collection found in '{DB_NAME}'. "
+                 "Set MONGO_DB_NAME / PLAYERS_COLLECTION to one of the above.")
+
+    coll = db[chosen]
+    print(f"[collection] using {DB_NAME}.{chosen} "
+          f"({coll.estimated_document_count()} docs)")
 
     sample = coll.find_one({})
     if sample:
-        print(f"[schema] a '{COLLECTION}' doc has these top-level keys:")
-        print("         " + ", ".join(sorted(sample.keys())))
-        print()
+        print(f"[schema] top-level keys: {', '.join(sorted(sample.keys()))}\n")
 
     proj = {f: 1 for f in PROJECTION_FIELDS}
     rows = [normalize(d) for d in coll.find({}, proj)]
-    print(f"[export] {len(rows)} players from {DB_NAME}.{COLLECTION}")
+    print(f"[export] {len(rows)} players from {DB_NAME}.{chosen}")
+    if not rows:
+        sys.exit("Collection returned 0 documents — nothing to export.")
 
     json.dump(rows, open(os.path.join(OUT_DIR, "players_export.json"), "w"),
               indent=2, default=str)
