@@ -74,10 +74,14 @@ The Conf1 look is a **semi-realistic digital painting** — smooth skin gradient
 | `23df2d9a…b988291` | South-Asian, lean, curly | medium skin tone match |
 | `0add5f1e…09c0cc` | East-Asian, lean | Thanh (Asian) match |
 | `1af6348c…c99e7d` | lighter/mixed, **glasses+goatee** | only for players who should have glasses/facial hair |
+| `fa15e712…b45812` | **Trent Athens** — fair-skinned blond white, athletic, warm smile | **white skin tone match** (Turley, Randolph, Holmstrom, Johnston) |
+| `26e15606…174395` | **Roger Henrich** — 7'0"/260 light-skinned, **broad/big**, neutral | **big/Strong build match** (Small, Johnston) |
+| `beffda50…597635` | **Aaron Mingus** — white, 6'2"/205, average build | white skin tone match |
+| `1ac0782e…32ed9ed` | **Emery Landraneau** — 6'8"/244 big (brief's Alt C) | big/Strong build match |
 
-**Selection rule per generation:** always pass the **Xenon anchor**; optionally add **one skin-tone-matched ref** for the player's assigned ethnicity. Keep refs "clean" — don't use the goggles/goatee ref as a general style ref (accessories can bleed into the output).
+**Selection rule per generation:** always pass the **Xenon anchor**; optionally add **one skin-tone-matched ref** for the player's assigned ethnicity (e.g. Athens/Mingus for white players) and, for bigs, a **broad-build ref** (Henrich/Landraneau). Keep refs "clean" — don't use the goggles/goatee ref as a general style ref (accessories can bleed into the output).
 
-**⚠️ Gaps to fill before generating those players:** I have not yet confirmed a **fair-skinned/white** reference or a **broad "big"** reference in the set. Before generating the white players (Turley, Randolph, Holmstrom, Johnston) and the bigs (Small, Johnston), pull 1–2 matching masters from the folder. Ask me to scan for them, or eyeball the folder yourself.
+**✅ Reference gaps filled** (user-supplied names, resolved to UUIDs via the in-repo Mongo backup): fair-skinned/white → **Trent Athens**, **Aaron Mingus**; broad "big" → **Roger Henrich**, **Emery Landraneau**. All four confirmed present in `FrontEnd/static/images/players/`.
 
 ---
 
