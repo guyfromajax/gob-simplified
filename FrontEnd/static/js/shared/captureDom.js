@@ -6,6 +6,20 @@
 
   var lastCaptureError = '';
 
+  var CAPTURE_SAFE_CSS = [
+    '.team-tooltip-host::before, .team-tooltip-host::after {',
+    '  display: none !important;',
+    '  content: none !important;',
+    '  visibility: hidden !important;',
+    '  opacity: 0 !important;',
+    '}',
+    '#franchise-container *, #tournament-container * {',
+    '  filter: none !important;',
+    '  backdrop-filter: none !important;',
+    '  -webkit-backdrop-filter: none !important;',
+    '}',
+  ].join('\n');
+
   function utils() {
     return window.GOBCaptureUtils;
   }
@@ -39,6 +53,12 @@
     return isCrossOriginUrl(src);
   }
 
+  function getActiveCommandCenterTab() {
+    return document.querySelector(
+      '#franchise-container .tab-content.active, #tournament-container .tab-content.active'
+    );
+  }
+
   function resolveCaptureRoot() {
     var custom = document.querySelector('[data-capture-root]');
     if (custom) {
@@ -68,23 +88,48 @@
   }
 
   function resolveCaptureDetail() {
-    var activeTab = document.querySelector(
-      '#franchise-container .tab-content.active, #tournament-container .tab-content.active'
-    );
+    var activeTab = getActiveCommandCenterTab();
     if (activeTab && activeTab.id) {
       return activeTab.id.replace(/-tab$/, '');
     }
     return 'manual';
   }
 
-  function sanitizeClone(doc, removeAllImages) {
-    doc.querySelectorAll('.tab-content').forEach(function (tab) {
+  function injectCaptureSafeStyles(clonedDoc) {
+    if (!clonedDoc || !clonedDoc.head) return;
+    var style = clonedDoc.createElement('style');
+    style.setAttribute('data-gob-capture-safe', 'true');
+    style.textContent = CAPTURE_SAFE_CSS;
+    clonedDoc.head.appendChild(style);
+  }
+
+  function unwrapTooltipHosts(root) {
+    root.querySelectorAll('.team-tooltip-host').forEach(function (host) {
+      var img = host.querySelector('img');
+      var parent = host.parentNode;
+      if (!parent) return;
+      if (img) {
+        parent.replaceChild(img.cloneNode(true), host);
+      } else {
+        parent.removeChild(host);
+      }
+    });
+  }
+
+  function sanitizeClone(clonedDoc, root, options) {
+    options = options || {};
+    injectCaptureSafeStyles(clonedDoc);
+
+    root.querySelectorAll('.tab-content').forEach(function (tab) {
       if (!tab.classList.contains('active')) {
         tab.remove();
       }
     });
-    doc.querySelectorAll('img').forEach(function (img) {
-      if (removeAllImages) {
+
+    unwrapTooltipHosts(root);
+
+    root.querySelectorAll('img').forEach(function (img) {
+      if (options.removeAllImages) {
         img.remove();
         return;
       }
@@ -111,29 +156,44 @@
       logging: false,
       useCORS: !!config.useCORS,
       allowTaint: !!config.allowTaint,
+      imageTimeout: 15000,
       ignoreElements: buildIgnoreElements(!!config.stripExternalImages),
       onclone: config.sanitizeClone
-        ? function (_doc, clone) {
-          sanitizeClone(clone, !!config.removeAllImages);
+        ? function (clonedDoc, clone) {
+          sanitizeClone(clonedDoc, clone, {
+            removeAllImages: !!config.removeAllImages,
+          });
         }
         : undefined,
     });
   }
 
   function attemptCapture(el, config) {
+    var u = utils();
+    if (!u) {
+      return Promise.reject(new Error('GOBCaptureUtils unavailable'));
+    }
     return runHtml2Canvas(el, config).then(function (canvas) {
-      return utils().saveCapture(
-        canvas.toDataURL('image/png'),
-        utils().buildFilename(config.tag, config.detail)
-      );
+      if (!canvas || !canvas.width || !canvas.height) {
+        throw new Error('empty canvas (' + (canvas ? canvas.width + 'x' + canvas.height : 'null') + ')');
+      }
+      console.info('[GOBCapture] canvas', config.label, canvas.width + 'x' + canvas.height);
+      var dataUrl = canvas.toDataURL('image/png');
+      if (!dataUrl || dataUrl === 'data:,') {
+        throw new Error('empty image data');
+      }
+      var saved = u.saveCapture(dataUrl, u.buildFilename(config.tag, config.detail));
+      if (!saved) {
+        throw new Error('download failed');
+      }
+      return true;
     });
   }
 
   function captureWithFallbacks(el, options) {
-    var scale = options.scale == null ? 2 : options.scale;
     var backgroundColor = options.backgroundColor || '#08080f';
+    var activeTab = getActiveCommandCenterTab();
     var base = {
-      scale: scale,
       backgroundColor: backgroundColor,
       tag: options.tag,
       detail: options.detail,
@@ -141,35 +201,61 @@
 
     var attempts = [
       Object.assign({}, base, {
-        label: 'same-origin',
+        el: el,
+        label: 'shell-1x',
+        scale: 1,
         useCORS: false,
         allowTaint: false,
         sanitizeClone: true,
         stripExternalImages: false,
       }),
       Object.assign({}, base, {
-        label: 'cors',
-        useCORS: true,
+        el: el,
+        label: 'shell-2x',
+        scale: 2,
+        useCORS: false,
         allowTaint: false,
         sanitizeClone: true,
-        stripExternalImages: true,
+        stripExternalImages: false,
       }),
+    ];
+
+    if (activeTab && el.contains(activeTab)) {
+      attempts.push(Object.assign({}, base, {
+        el: activeTab,
+        label: 'active-tab-1x',
+        scale: 1,
+        useCORS: false,
+        allowTaint: false,
+        sanitizeClone: true,
+        stripExternalImages: false,
+      }));
+    }
+
+    attempts.push(
       Object.assign({}, base, {
-        label: 'no-images',
+        el: el,
+        label: 'no-images-1x',
+        scale: 1,
         useCORS: false,
         allowTaint: true,
         sanitizeClone: true,
         stripExternalImages: true,
         removeAllImages: true,
-      }),
-    ];
+      })
+    );
 
     function tryNext(index) {
       if (index >= attempts.length) {
         return Promise.resolve(false);
       }
       var attempt = attempts[index];
-      return attemptCapture(el, attempt).catch(function (err) {
+      return attemptCapture(attempt.el, attempt).then(function (ok) {
+        if (ok) return true;
+        lastCaptureError = '[' + attempt.label + '] returned false';
+        console.warn('[GOBCapture] DOM capture attempt returned false:', lastCaptureError);
+        return tryNext(index + 1);
+      }).catch(function (err) {
         lastCaptureError = '[' + attempt.label + '] ' + (err && err.message ? err.message : String(err));
         console.warn('[GOBCapture] DOM capture attempt failed:', lastCaptureError);
         return tryNext(index + 1);
@@ -203,8 +289,8 @@
         u.restoreRecIndicator();
         return false;
       }
+      console.info('[GOBCapture] capturing', el.id || el.className || el.tagName, resolveCaptureDetail());
       return captureWithFallbacks(el, {
-        scale: options.scale,
         backgroundColor: options.backgroundColor,
         tag: tag,
         detail: detail,
