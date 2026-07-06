@@ -147,7 +147,11 @@
 
     Promise.resolve(promise).then(function (ok) {
       if (utils && typeof utils.flashCaptureStatus === 'function') {
-        utils.flashCaptureStatus(!!ok, renderIndicator);
+        var errMsg = null;
+        if (!ok && window.GOBCaptureDom && typeof window.GOBCaptureDom.getLastCaptureError === 'function') {
+          errMsg = window.GOBCaptureDom.getLastCaptureError();
+        }
+        utils.flashCaptureStatus(!!ok, renderIndicator, errMsg);
       }
     }).finally(function () {
       capturing = false;

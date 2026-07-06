@@ -2793,12 +2793,23 @@ def _get_user_eos_phase_status(
 
 REGION_BYE_MODAL_SEEN_SEASON_FIELD = "region_bye_modal_seen_season"
 BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
+BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
 
 BRACKET_REVEAL_WEEKS = {
     27: ("conference", "Conference Tournament · Weeks 27–29", "full"),
     30: ("region", "Region Tournament · Weeks 30–31", "compact4"),
     32: ("national", "National Tournament · Weeks 32–34", "full"),
+}
+
+# FCC landing weeks after an EOS round completes (not phase-start reveal weeks).
+BRACKET_UPDATE_WEEKS = {
+    28: ("conference", "Conference Tournament · Weeks 27–29", "full"),
+    29: ("conference", "Conference Tournament · Weeks 27–29", "full"),
+    31: ("region", "Region Tournament · Weeks 30–31", "compact4"),
+    33: ("national", "National Tournament · Weeks 32–34", "full"),
+    34: ("national", "National Tournament · Weeks 32–34", "full"),
+    35: ("national", "National Tournament · Weeks 32–34", "full"),
 }
 
 
@@ -2808,6 +2819,47 @@ def _franchise_current_season(franchise_doc: dict[str, Any]) -> int:
 
 def _bracket_reveal_seen_key(tier: str, season: int) -> str:
     return f"{tier}:{season}"
+
+
+def _bracket_update_seen_key(tier: str, season: int, week: int) -> str:
+    return f"update:{tier}:{season}:{week}"
+
+
+def _user_eos_bracket_and_seeds(
+    franchise_doc: dict[str, Any],
+    team_doc: dict[str, Any],
+    tier: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """User-affiliated EOS bracket + seeds for conference / region / national."""
+    if tier == "conference":
+        conf = team_doc.get("conference")
+        if conf is None:
+            return None, {}
+        ct = (franchise_doc.get("conference_tournaments") or {}).get(str(conf)) or {}
+        return deepcopy(ct.get("bracket") or {}), dict(ct.get("seeds") or {})
+    if tier == "region":
+        region = str(team_doc.get("region") or "").upper()
+        if len(region) != 1:
+            return None, {}
+        rt = (franchise_doc.get("region_tournaments") or {}).get(region) or {}
+        bracket = {
+            "round1": deepcopy(rt.get("round1") or []),
+            "round2": [],
+            "final": deepcopy(rt.get("final") or []),
+        }
+        return bracket, dict(rt.get("seeds") or {})
+    nt = franchise_doc.get("national_tournament") or {}
+    return deepcopy(nt.get("bracket") or {}), dict(nt.get("seeds") or {})
+
+
+def _bracket_has_any_winner(bracket: dict[str, Any] | None) -> bool:
+    if not bracket:
+        return False
+    for round_key in ("round1", "round2", "final"):
+        for matchup in bracket.get(round_key) or []:
+            if isinstance(matchup, dict) and matchup.get("winner"):
+                return True
+    return False
 
 
 def _round1_not_started(bracket: dict[str, Any] | None) -> bool:
@@ -2859,40 +2911,14 @@ def _build_bracket_reveal_modal_payload(
     if seen.get(reveal_key):
         return None
 
-    bracket: dict[str, Any] | None = None
-    seeds: dict[str, Any] = {}
+    raw, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
+    if not raw or not _round1_not_started(raw):
+        return None
 
-    if tier == "conference":
-        conf = team_doc.get("conference")
-        if conf is None:
-            return None
-        ct = (franchise_doc.get("conference_tournaments") or {}).get(str(conf)) or {}
-        raw = ct.get("bracket") or {}
-        if not _round1_not_started(raw):
-            return None
-        bracket = _sanitize_bracket_for_reveal(raw)
-        seeds = ct.get("seeds") or {}
-    elif tier == "region":
-        region = str(team_doc.get("region") or "").upper()
-        if len(region) != 1:
-            return None
-        rt = (franchise_doc.get("region_tournaments") or {}).get(region) or {}
-        raw = {
-            "round1": rt.get("round1") or [],
-            "round2": [],
-            "final": rt.get("final") or [],
-        }
-        if not _round1_not_started(raw):
-            return None
+    if tier == "region":
         bracket = _sanitize_bracket_for_reveal(raw, keep_final=True)
-        seeds = rt.get("seeds") or {}
     else:
-        nt = franchise_doc.get("national_tournament") or {}
-        raw = nt.get("bracket") or {}
-        if not _round1_not_started(raw):
-            return None
         bracket = _sanitize_bracket_for_reveal(raw)
-        seeds = nt.get("seeds") or {}
 
     if not bracket or not (bracket.get("round1") or []):
         return None
@@ -2903,6 +2929,52 @@ def _build_bracket_reveal_modal_payload(
         "eyebrow": eyebrow,
         "layout": layout,
         "reveal_key": reveal_key,
+        "bracket": bracket,
+        "seeds": seeds,
+        "display_week": week_val,
+    }
+
+
+def _build_bracket_update_modal_payload(
+    franchise_doc: dict[str, Any] | None,
+    team_doc: dict[str, Any] | None,
+    week: int | None,
+) -> dict[str, Any] | None:
+    """Bracket Update modal: FCC entry after an EOS round completes (active or eliminated)."""
+    if not franchise_doc or not team_doc:
+        return None
+    week_val = int(week or 0)
+    spec = BRACKET_UPDATE_WEEKS.get(week_val)
+    if not spec:
+        return None
+
+    tier, eyebrow, layout = spec
+    if week_val == 35:
+        if not franchise_doc.get("national_tournament"):
+            return None
+    elif not franchise_doc.get("eos_tournament_active"):
+        return None
+
+    season = _franchise_current_season(franchise_doc)
+    update_key = _bracket_update_seen_key(tier, season, week_val)
+    seen = franchise_doc.get(BRACKET_UPDATE_SEEN_FIELD) or {}
+    if seen.get(update_key):
+        return None
+
+    bracket, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
+    if not bracket or not _bracket_has_any_winner(bracket):
+        return None
+    if tier in ("conference", "national") and not (bracket.get("round1") or []):
+        return None
+    if tier == "region" and not ((bracket.get("round1") or []) or (bracket.get("final") or [])):
+        return None
+
+    return {
+        "eligible": True,
+        "tier": tier,
+        "eyebrow": eyebrow,
+        "layout": layout,
+        "update_key": update_key,
         "bracket": bracket,
         "seeds": seeds,
         "display_week": week_val,
@@ -7275,6 +7347,11 @@ def command_center_data(
         )
         response["bracket_reveal_modal"] = (
             _build_bracket_reveal_modal_payload(franchise_doc, team_doc, week)
+            if franchise_doc and team_doc
+            else None
+        )
+        response["bracket_update_modal"] = (
+            _build_bracket_update_modal_payload(franchise_doc, team_doc, week)
             if franchise_doc and team_doc
             else None
         )
@@ -13307,16 +13384,20 @@ def mark_bracket_reveal_modal_seen(
     req: BracketRevealModalSeenRequest,
     user: dict = Depends(get_current_user),
 ):
-    """Persist that a bracket-reveal modal (conference/region/national) was dismissed."""
+    """Persist that a bracket-reveal or bracket-update modal was dismissed."""
     franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     reveal_key = str(req.reveal_key or "").strip()
     if not reveal_key:
         raise HTTPException(status_code=400, detail="reveal_key required")
-    seen = dict(franchise_doc.get(BRACKET_REVEAL_SEEN_FIELD) or {})
+    if reveal_key.startswith("update:"):
+        seen_field = BRACKET_UPDATE_SEEN_FIELD
+    else:
+        seen_field = BRACKET_REVEAL_SEEN_FIELD
+    seen = dict(franchise_doc.get(seen_field) or {})
     seen[reveal_key] = True
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {BRACKET_REVEAL_SEEN_FIELD: seen}},
+        {"$set": {seen_field: seen}},
     )
     return {"seen": True, "reveal_key": reveal_key}
 

@@ -23,6 +23,7 @@
     '<stop stop-color="#3a3018"/><stop offset="1" stop-color="#1a1408"/></linearGradient></defs></svg>';
 
   var presentedBracket = false;
+  var presentedBracketUpdate = false;
   var presentedRecruiting = false;
   var activeOverlay = null;
   var pendingTopData = null;
@@ -348,17 +349,7 @@
     activeOverlay.setAttribute('aria-hidden', 'false');
   }
 
-  function showBracketModal(payload, topData, maps) {
-    presentedBracket = true;
-    maps = maps || {};
-
-    var fit = document.createElement('div');
-    fit.className = 'bn-bracket-fit';
-
-    var scale = document.createElement('div');
-    scale.className = 'bn-bracket-scale';
-    fit.appendChild(scale);
-
+  function renderBracketIntoScale(scale, payload, topData, maps, revealMode) {
     if (typeof FccTournamentStyleA !== 'undefined' && FccTournamentStyleA.renderInto) {
       var tierTitles = {
         conference: 'Conference Tournament',
@@ -374,24 +365,36 @@
         teamIdMetaMap: maps.teamIdMetaMap || {},
         userTeamId: maps.userTeamId || topData.team_id,
         topData: Object.assign({}, topData, { week: payload.display_week || topData.week }),
-        revealMode: true,
+        revealMode: !!revealMode,
         tierHint: payload.tier,
       });
     } else {
       scale.innerHTML = '<p>Tournament bracket UI not loaded.</p>';
     }
+  }
+
+  function mountBracketModal(payload, topData, maps, opts) {
+    maps = maps || {};
+    opts = opts || {};
+
+    var fit = document.createElement('div');
+    fit.className = 'bn-bracket-fit';
+
+    var scale = document.createElement('div');
+    scale.className = 'bn-bracket-scale';
+    fit.appendChild(scale);
+
+    renderBracketIntoScale(scale, payload, topData, maps, opts.revealMode !== false);
 
     var shell = buildShell({
       emblemSvg: TROPHY_SVG,
       eyebrow: payload.eyebrow || '',
-      title: 'The Bracket Is Set!',
-      subtitle: 'Eight teams. One title. Here\u2019s the road ahead.',
-      ctaLabel: 'Got it',
-      confettiCount: 60,
+      title: opts.title || 'The Bracket Is Set!',
+      subtitle: opts.subtitle || 'Eight teams. One title. Here\u2019s the road ahead.',
+      ctaLabel: opts.ctaLabel || 'Got it',
+      confettiCount: typeof opts.confettiCount === 'number' ? opts.confettiCount : 60,
       bodyNode: fit,
-      onDismiss: function () {
-        return markBracketSeen(payload.reveal_key);
-      },
+      onDismiss: opts.onDismiss,
     });
 
     activeOverlay = shell.overlay;
@@ -401,8 +404,37 @@
     fitBracketToContainer(fit, scale, function () {
       var grid = scale.querySelector('.fcc-tb-classic, .fcc-tb-region');
       if (grid && typeof FccTournamentStyleA !== 'undefined' && FccTournamentStyleA.scheduleConnectorRedraw) {
-        FccTournamentStyleA.scheduleConnectorRedraw(grid, maps.userTeamId || topData.team_id, { revealMode: true });
+        FccTournamentStyleA.scheduleConnectorRedraw(
+          grid,
+          maps.userTeamId || topData.team_id,
+          { revealMode: opts.revealMode !== false }
+        );
       }
+    });
+  }
+
+  function showBracketModal(payload, topData, maps) {
+    presentedBracket = true;
+    mountBracketModal(payload, topData, maps, {
+      title: 'The Bracket Is Set!',
+      subtitle: 'Eight teams. One title. Here\u2019s the road ahead.',
+      revealMode: true,
+      onDismiss: function () {
+        return markBracketSeen(payload.reveal_key);
+      },
+    });
+  }
+
+  function showBracketUpdateModal(payload, topData, maps) {
+    presentedBracketUpdate = true;
+    mountBracketModal(payload, topData, maps, {
+      title: 'Tournament Update',
+      subtitle: 'Here\u2019s the latest bracket for your conference, region, or national path.',
+      confettiCount: 0,
+      revealMode: false,
+      onDismiss: function () {
+        return markBracketSeen(payload.update_key);
+      },
     });
   }
 
@@ -426,6 +458,12 @@
     var bracketPayload = topData.bracket_reveal_modal;
     if (!presentedBracket && bracketPayload && bracketPayload.eligible) {
       showBracketModal(bracketPayload, topData, maps);
+      return;
+    }
+
+    var bracketUpdatePayload = topData.bracket_update_modal;
+    if (!presentedBracketUpdate && bracketUpdatePayload && bracketUpdatePayload.eligible) {
+      showBracketUpdateModal(bracketUpdatePayload, topData, maps);
       return;
     }
 

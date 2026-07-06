@@ -3441,7 +3441,7 @@ function fccHasCompetingModal(topData) {
     if (!seen) return true;
   }
   if (topData?.region_bye_modal_eligible) return true;
-  if (topData?.bracket_reveal_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
+  if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;
   const me = window.__gobAuthMeData;
   if (me) {

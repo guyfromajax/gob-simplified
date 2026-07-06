@@ -4,9 +4,20 @@
 (function () {
   'use strict';
 
-  var utils = function () {
+  var lastCaptureError = '';
+
+  function utils() {
     return window.GOBCaptureUtils;
-  };
+  }
+
+  function isCrossOriginUrl(url) {
+    if (!url) return false;
+    try {
+      return new URL(url, window.location.href).origin !== window.location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
 
   function shouldIgnoreCaptureNode(node) {
     if (!node || !node.id) return false;
@@ -20,6 +31,12 @@
     return !!(node.classList
       && node.classList.contains('tab-content')
       && !node.classList.contains('active'));
+  }
+
+  function shouldIgnoreCaptureImage(node) {
+    if (!node || node.tagName !== 'IMG') return false;
+    var src = node.currentSrc || node.getAttribute('src') || node.src || '';
+    return isCrossOriginUrl(src);
   }
 
   function resolveCaptureRoot() {
@@ -60,54 +77,119 @@
     return 'manual';
   }
 
-  function prepareImagesForCapture(root) {
-    var restores = [];
-    var reloads = [];
-    var imgs = root.querySelectorAll('img');
-
-    imgs.forEach(function (img) {
-      if (!img.getAttribute('src') && !img.src) return;
-      var prevCross = img.crossOrigin;
-      restores.push({ el: img, crossOrigin: prevCross });
-      if (prevCross === 'anonymous') return;
-
-      img.crossOrigin = 'anonymous';
-      var src = img.currentSrc || img.src;
-      if (!src) return;
-
-      reloads.push(new Promise(function (resolve) {
-        function done() {
-          img.removeEventListener('load', done);
-          img.removeEventListener('error', done);
-          resolve();
-        }
-        img.addEventListener('load', done);
-        img.addEventListener('error', done);
-        if (img.complete) {
-          img.src = '';
-          img.src = src;
-        }
-      }));
+  function sanitizeClone(doc, removeAllImages) {
+    doc.querySelectorAll('.tab-content').forEach(function (tab) {
+      if (!tab.classList.contains('active')) {
+        tab.remove();
+      }
     });
-
-    return Promise.all(reloads).then(function () {
-      return function restoreImages() {
-        restores.forEach(function (entry) {
-          entry.el.crossOrigin = entry.crossOrigin;
-        });
-      };
+    doc.querySelectorAll('img').forEach(function (img) {
+      if (removeAllImages) {
+        img.remove();
+        return;
+      }
+      var src = img.currentSrc || img.getAttribute('src') || img.src || '';
+      if (!src || isCrossOriginUrl(src)) {
+        img.remove();
+      }
     });
+  }
+
+  function buildIgnoreElements(strictImages) {
+    return function (node) {
+      if (shouldIgnoreCaptureNode(node)) return true;
+      if (isHiddenCommandCenterTab(node)) return true;
+      if (strictImages && shouldIgnoreCaptureImage(node)) return true;
+      return false;
+    };
+  }
+
+  function runHtml2Canvas(el, config) {
+    return html2canvas(el, {
+      scale: config.scale,
+      backgroundColor: config.backgroundColor,
+      logging: false,
+      useCORS: !!config.useCORS,
+      allowTaint: !!config.allowTaint,
+      ignoreElements: buildIgnoreElements(!!config.stripExternalImages),
+      onclone: config.sanitizeClone
+        ? function (_doc, clone) {
+          sanitizeClone(clone, !!config.removeAllImages);
+        }
+        : undefined,
+    });
+  }
+
+  function attemptCapture(el, config) {
+    return runHtml2Canvas(el, config).then(function (canvas) {
+      return utils().saveCapture(
+        canvas.toDataURL('image/png'),
+        utils().buildFilename(config.tag, config.detail)
+      );
+    });
+  }
+
+  function captureWithFallbacks(el, options) {
+    var scale = options.scale == null ? 2 : options.scale;
+    var backgroundColor = options.backgroundColor || '#08080f';
+    var base = {
+      scale: scale,
+      backgroundColor: backgroundColor,
+      tag: options.tag,
+      detail: options.detail,
+    };
+
+    var attempts = [
+      Object.assign({}, base, {
+        label: 'same-origin',
+        useCORS: false,
+        allowTaint: false,
+        sanitizeClone: true,
+        stripExternalImages: false,
+      }),
+      Object.assign({}, base, {
+        label: 'cors',
+        useCORS: true,
+        allowTaint: false,
+        sanitizeClone: true,
+        stripExternalImages: true,
+      }),
+      Object.assign({}, base, {
+        label: 'no-images',
+        useCORS: false,
+        allowTaint: true,
+        sanitizeClone: true,
+        stripExternalImages: true,
+        removeAllImages: true,
+      }),
+    ];
+
+    function tryNext(index) {
+      if (index >= attempts.length) {
+        return Promise.resolve(false);
+      }
+      var attempt = attempts[index];
+      return attemptCapture(el, attempt).catch(function (err) {
+        lastCaptureError = '[' + attempt.label + '] ' + (err && err.message ? err.message : String(err));
+        console.warn('[GOBCapture] DOM capture attempt failed:', lastCaptureError);
+        return tryNext(index + 1);
+      });
+    }
+
+    return tryNext(0);
   }
 
   function captureDomRegion(selector, options) {
     options = options || {};
-    var scale = options.scale == null ? 2 : options.scale;
     var tag = options.tag || 'screen';
     var detail = options.detail || resolveCaptureDetail();
     var u = utils();
     if (!u || typeof html2canvas !== 'function') {
+      lastCaptureError = 'html2canvas unavailable';
       return Promise.resolve(false);
     }
+
+    lastCaptureError = '';
 
     return Promise.resolve().then(function () {
       if (document.fonts && document.fonts.ready) {
@@ -117,34 +199,21 @@
       u.hideRecIndicator();
       var el = selector ? document.querySelector(selector) : resolveCaptureRoot();
       if (!el) {
+        lastCaptureError = 'capture root not found';
         u.restoreRecIndicator();
         return false;
       }
-      return prepareImagesForCapture(el).then(function (restoreImages) {
-        return html2canvas(el, {
-          scale: scale,
-          backgroundColor: options.backgroundColor || '#08080f',
-          logging: false,
-          useCORS: true,
-          allowTaint: false,
-          ignoreElements: function (node) {
-            if (shouldIgnoreCaptureNode(node)) return true;
-            if (isHiddenCommandCenterTab(node)) return true;
-            return false;
-          },
-        }).then(function (canvas) {
-          restoreImages();
-          u.restoreRecIndicator();
-          return u.saveCapture(
-            canvas.toDataURL('image/png'),
-            u.buildFilename(tag, detail)
-          );
-        }).catch(function (err) {
-          restoreImages();
-          u.restoreRecIndicator();
-          console.warn('[GOBCapture] DOM capture failed:', err);
-          return false;
-        });
+      return captureWithFallbacks(el, {
+        scale: options.scale,
+        backgroundColor: options.backgroundColor,
+        tag: tag,
+        detail: detail,
+      }).then(function (ok) {
+        u.restoreRecIndicator();
+        if (!ok && !lastCaptureError) {
+          lastCaptureError = 'all capture attempts failed';
+        }
+        return ok;
       });
     });
   }
@@ -156,10 +225,15 @@
     return captureDomRegion(null, options);
   }
 
+  function getLastCaptureError() {
+    return lastCaptureError;
+  }
+
   window.GOBCaptureDom = {
     resolveCaptureRoot: resolveCaptureRoot,
     resolveCaptureDetail: resolveCaptureDetail,
     captureDomRegion: captureDomRegion,
     captureCurrentScreen: captureCurrentScreen,
+    getLastCaptureError: getLastCaptureError,
   };
 })();

@@ -178,6 +178,89 @@ def _contest_at_shot(
     )
 
 
+def _stamp_rendered_defender_ends(
+    payload: Dict[str, Any],
+    *,
+    off_lineup: Dict[str, Any],
+    off_starts: Dict[str, GridCoordDict],
+    def_lineup: Dict[str, Any],
+    def_starts: Dict[str, GridCoordDict],
+    bh_start: GridCoordDict,
+    bh_end: GridCoordDict,
+    is_away_offense: bool,
+) -> Dict[str, GridCoordDict]:
+    """Author the coordinated transition spread the emitter will RENDER (via the
+    shared ``author_transition_end_coords`` planner) and stamp the defender ends
+    onto ``payload["rendered_defender_end_coords"]``. RNG-isolated inside
+    ``fb_rendered_defender_ends`` (the rendered contester is deterministic) so
+    ``resolve_shot``'s make/miss is byte-identical. Non-mutating w.r.t.
+    ``payload["defender_end_coords"]`` (emitter crash budget + rebound path).
+    """
+    from BackEnd.engine.rendered_contest import fb_rendered_defender_ends
+
+    off_by_id: Dict[str, GridCoordDict] = {}
+    def_by_id: Dict[str, GridCoordDict] = {}
+    for pos in POSITIONS:
+        opid = _player_id(off_lineup.get(pos))
+        if opid and pos in off_starts:
+            off_by_id[opid] = dict(off_starts[pos])
+        dpid = _player_id(def_lineup.get(pos))
+        if dpid and pos in def_starts:
+            def_by_id[dpid] = dict(def_starts[pos])
+
+    bh_id = payload.get("bh_id")
+    if bh_id and bh_id in off_by_id:
+        off_by_id[bh_id] = dict(bh_start)  # match the emitter's bh_start override
+
+    rendered = fb_rendered_defender_ends(
+        turn_result={
+            "stop_decision_action": (payload.get("stop_decision") or {}).get("action")
+        },
+        fb_drive=payload,
+        stealer_id=bh_id,
+        off_start_by_id=off_by_id,
+        def_start_by_id=def_by_id,
+        bh_start=dict(bh_start),
+        bh_end=dict(bh_end),
+        is_away_offense=is_away_offense,
+    )
+    payload["rendered_defender_end_coords"] = rendered
+    return rendered
+
+
+def _apply_rendered_spread_contest(
+    payload: Dict[str, Any],
+    *,
+    off_lineup: Dict[str, Any],
+    off_starts: Dict[str, GridCoordDict],
+    def_lineup: Dict[str, Any],
+    def_starts: Dict[str, GridCoordDict],
+    bh_start: GridCoordDict,
+    shot_spot: GridCoordDict,
+    is_away_offense: bool,
+) -> Tuple[bool, Optional[str]]:
+    """Rim-finish contest: re-derive ``contested`` / ``shot_defender_id`` from the
+    RENDERED transition spread instead of the ``basketSpot`` sprint-clamp — the
+    UESS single-coord-source fix. ``bh_end == shot_spot`` for a rim finish.
+    """
+    rendered = _stamp_rendered_defender_ends(
+        payload,
+        off_lineup=off_lineup,
+        off_starts=off_starts,
+        def_lineup=def_lineup,
+        def_starts=def_starts,
+        bh_start=bh_start,
+        bh_end=shot_spot,  # rim finish: bh_end == shot spot
+        is_away_offense=is_away_offense,
+    )
+    contested, shot_def_id = _contest_at_shot(
+        rendered, shot_spot, is_away_offense=is_away_offense
+    )
+    payload["contested"] = contested
+    payload["shot_defender_id"] = shot_def_id
+    return contested, shot_def_id
+
+
 def _geo_corridor_participants(
     bh_start: GridCoordDict,
     shot_spot: GridCoordDict,
@@ -308,9 +391,16 @@ def resolve_fb_drive_step(
         )
         payload["defender_end_coords"] = ends
         payload["defender_archetypes"] = arch
-        contested, shot_def_id = _contest_at_shot(ends, shot_spot, is_away_offense=is_away_offense)
-        payload["contested"] = contested
-        payload["shot_defender_id"] = shot_def_id
+        _, shot_def_id = _apply_rendered_spread_contest(
+            payload,
+            off_lineup=off_lineup,
+            off_starts=off_starts,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            bh_start=bh_start,
+            shot_spot=shot_spot,
+            is_away_offense=is_away_offense,
+        )
         _stamp_geo_ids(shot_def_id)
         return payload
 
@@ -336,9 +426,16 @@ def resolve_fb_drive_step(
         )
         payload["defender_end_coords"] = ends
         payload["defender_archetypes"] = arch
-        contested, shot_def_id = _contest_at_shot(ends, shot_spot, is_away_offense=is_away_offense)
-        payload["contested"] = contested
-        payload["shot_defender_id"] = shot_def_id
+        _, shot_def_id = _apply_rendered_spread_contest(
+            payload,
+            off_lineup=off_lineup,
+            off_starts=off_starts,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            bh_start=bh_start,
+            shot_spot=shot_spot,
+            is_away_offense=is_away_offense,
+        )
         _stamp_geo_ids(shot_def_id)
         return payload
 
@@ -459,9 +556,16 @@ def resolve_fb_drive_step(
             stopper_pos=cutoff_pos,
         )
         payload["defender_end_coords"] = ends
-        contested, shot_def_id = _contest_at_shot(ends, shot_spot, is_away_offense=is_away_offense)
-        payload["contested"] = contested
-        payload["shot_defender_id"] = shot_def_id
+        _, shot_def_id = _apply_rendered_spread_contest(
+            payload,
+            off_lineup=off_lineup,
+            off_starts=off_starts,
+            def_lineup=def_lineup,
+            def_starts=def_starts,
+            bh_start=bh_start,
+            shot_spot=shot_spot,
+            is_away_offense=is_away_offense,
+        )
         _stamp_geo_ids(stopper_id, shot_def_id)
         return payload
 
@@ -495,5 +599,18 @@ def resolve_fb_drive_step(
         if payload["stop_decision"]["action"] == "shoot":
             payload["contested"] = True
             payload["shot_defender_id"] = stopper_id
+        else:
+            # pass / HCO: the integration re-selects the contester at the receiver
+            # spot — give it the RENDERED spread (BH stops at the meet) to read.
+            _stamp_rendered_defender_ends(
+                payload,
+                off_lineup=off_lineup,
+                off_starts=off_starts,
+                def_lineup=def_lineup,
+                def_starts=def_starts,
+                bh_start=bh_start,
+                bh_end=meet,
+                is_away_offense=is_away_offense,
+            )
     _stamp_geo_ids(stopper_id)
     return payload

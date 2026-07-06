@@ -57,7 +57,7 @@
     delete el.dataset.capturePrevVisibility;
   }
 
-  function flashCaptureStatus(ok, restoreLabel) {
+  function flashCaptureStatus(ok, restoreLabel, message) {
     var el = getRecIndicator();
     if (!el) return;
     var label = el.querySelector('.gob-capture-rec-label');
@@ -68,7 +68,13 @@
     }
     el.classList.remove('is-success', 'is-error');
     el.classList.add(ok ? 'is-success' : 'is-error');
-    label.textContent = ok ? '✓ saved' : 'capture failed';
+    if (ok) {
+      label.textContent = '✓ saved';
+    } else if (message) {
+      label.textContent = message.length > 28 ? message.slice(0, 28) + '…' : message;
+    } else {
+      label.textContent = 'capture failed';
+    }
     el.style.visibility = '';
     statusTimer = setTimeout(function () {
       el.classList.remove('is-success', 'is-error');
@@ -76,7 +82,7 @@
         restoreLabel();
       }
       statusTimer = null;
-    }, 1400);
+    }, ok ? 1400 : 2600);
   }
 
   function setEventTag(tag) {

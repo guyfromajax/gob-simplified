@@ -83,6 +83,47 @@ def _derive_transition_outcome_kind(
     return "rim_finish"
 
 
+def derive_transition_author_inputs(
+    *,
+    turn_result: Dict[str, Any],
+    fb_drive: Dict[str, Any],
+    stealer_id: str,
+    off_start_by_id: Dict[str, GridCoord],
+    def_start_by_id: Dict[str, GridCoord],
+    bh_start: GridCoord,
+    bh_end: GridCoord,
+    is_away_offense: bool,
+) -> Dict[str, Any]:
+    """Derive the ``author_transition_end_coords`` kwargs from a resolved
+    ``fb_drive_resolution`` payload — the SINGLE derivation shared by the emitter
+    (render) and the resolver-side contest read, so the two can never drift.
+
+    Callers supply the id-keyed offense/defense start coords and the BH's
+    ``bh_start`` / ``bh_end`` (the emitter uses the meet coord or ``bh_target``;
+    the resolver's rim-finish read uses the shot spot). Everything else — the
+    stopper matchup, ``meet``, ``outcome_kind``, ``bh_reaches_rim``, beaten
+    trailers — is read straight off the payload.
+    """
+    planner_meet = (
+        {"x": float(fb_drive["meet_x"]), "y": float(fb_drive["meet_y"])}
+        if fb_drive.get("meet_x") is not None
+        else None
+    )
+    return dict(
+        bh_id=stealer_id,
+        bh_start={"x": float(bh_start["x"]), "y": float(bh_start["y"])},
+        bh_end={"x": float(bh_end["x"]), "y": float(bh_end["y"])},
+        off_start_coords=off_start_by_id,
+        def_start_coords=def_start_by_id,
+        bh_defender_id=fb_drive.get("stopper_id"),
+        meet=planner_meet,
+        outcome_kind=_derive_transition_outcome_kind(fb_drive, turn_result),
+        bh_reaches_rim=fb_drive.get("outcome") in ("NO_MEET", "POS_O"),
+        beaten_stopper_ids=fb_drive.get("cascade_beaten_stopper_ids"),
+        is_away_offense=is_away_offense,
+    )
+
+
 def _author_offball_spread_end_coords(
     *,
     turn_result: Dict[str, Any],
@@ -99,10 +140,10 @@ def _author_offball_spread_end_coords(
 
     Slices the offense/defense start coords out of ``start_coords`` (keyed by the
     lineup player ids), derives the ball handler's finish + ``outcome_kind`` +
-    matchup inputs from the ``fb_drive_resolution`` payload, then delegates to
-    the shared planner. Returns a full ``{pid: {x, y}}`` map (start-coord
-    fallback for any uncovered id) that replaces the caller's off-ball
-    ``end_coords``.
+    matchup inputs from the ``fb_drive_resolution`` payload (via
+    ``derive_transition_author_inputs``), then delegates to the shared planner.
+    Returns a full ``{pid: {x, y}}`` map (start-coord fallback for any uncovered
+    id) that replaces the caller's off-ball ``end_coords``.
     """
     from BackEnd.engine.after_steal_transition_positioning import (
         author_transition_end_coords,
@@ -132,23 +173,17 @@ def _author_offball_spread_end_coords(
         )
         bh_end = {"x": float(raw["x"]), "y": float(raw["y"])}
 
-    planner_meet = (
-        {"x": float(fb_drive["meet_x"]), "y": float(fb_drive["meet_y"])}
-        if fb_drive.get("meet_x") is not None
-        else None
-    )
     coordinated = author_transition_end_coords(
-        bh_id=stealer_id,
-        bh_start={"x": float(bh_start["x"]), "y": float(bh_start["y"])},
-        bh_end=bh_end,
-        off_start_coords=off_start,
-        def_start_coords=def_start,
-        bh_defender_id=fb_drive.get("stopper_id"),
-        meet=planner_meet,
-        outcome_kind=_derive_transition_outcome_kind(fb_drive, turn_result),
-        bh_reaches_rim=fb_drive.get("outcome") in ("NO_MEET", "POS_O"),
-        beaten_stopper_ids=fb_drive.get("cascade_beaten_stopper_ids"),
-        is_away_offense=is_away_offense,
+        **derive_transition_author_inputs(
+            turn_result=turn_result,
+            fb_drive=fb_drive,
+            stealer_id=stealer_id,
+            off_start_by_id=off_start,
+            def_start_by_id=def_start,
+            bh_start=bh_start,
+            bh_end=bh_end,
+            is_away_offense=is_away_offense,
+        )
     )
     full: Dict[str, GridCoord] = {
         pid: {"x": float(c["x"]), "y": float(c["y"])}

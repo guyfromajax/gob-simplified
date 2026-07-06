@@ -356,8 +356,9 @@ def resolve_attack_drive_finisher_turn(
             receiver = _player_by_id(off_lineup, recv_id)
             recv_pos = stop.get("receiver_pos")
             recv_coord = _lineup_starts_by_pos(off_lineup).get(recv_pos or "", bh_end)
+            contest_ends = drive.get("rendered_defender_end_coords") or end_coords
             contested, shot_def_id = pick_nearest_contesting_defender(
-                end_coords, recv_coord, is_away_offense=is_away_offense
+                contest_ends, recv_coord, is_away_offense=is_away_offense
             )
             shot_defender = _player_by_id(def_lineup, shot_def_id)
             shot_type = "attack"

@@ -354,8 +354,9 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             recv_coord = _lineup_starts_by_pos(off_lineup).get(recv_pos or "", bh_end)
             from BackEnd.utils.fb_geo_helpers import pick_nearest_contesting_defender
 
+            contest_ends = drive.get("rendered_defender_end_coords") or end_coords
             contested, shot_def_id = pick_nearest_contesting_defender(
-                end_coords, recv_coord, is_away_offense=is_away_offense
+                contest_ends, recv_coord, is_away_offense=is_away_offense
             )
             shot_defender = _player_by_id(def_lineup, shot_def_id)
             shot_type = "attack"
