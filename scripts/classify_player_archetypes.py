@@ -112,7 +112,13 @@ def classify(p):
     ath = athleticism(p.get("st"), p.get("ag"), p.get("rt"))
     code = {"Short": "S", "Normal": "N", "Tall": "T"}[hb] + "-" + bc
     frame = FRAME_PROMPT[_FRAME_KEY[bc]]
-    shape = SHAPE_PROMPT[ath] if ath else "average athletic build, some muscle tone"
+    if ath == "Soft" and bc == "Lean":
+        # skinny + low-rated: soft/undefined, NOT carrying fat
+        shape = "skinny and soft, undefined muscle, not athletic, soft facial features"
+    elif ath:
+        shape = SHAPE_PROMPT[ath]
+    else:
+        shape = "average athletic build, some muscle tone"
     body_prompt = f"{frame}, {shape}"
     return {**p, "bmi": round(bmi, 1), "height_band": hb, "build_class": bc,
             "athleticism": ath or "n/a", "archetype": code,
