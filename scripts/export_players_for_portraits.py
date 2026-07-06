@@ -36,6 +36,7 @@ PROJECTION_FIELDS = [
     "height", "height_in", "height_inches", "heightInInches",
     "weight", "weight_lb", "weight_lbs",
     "year", "class", "class_year",
+    "attributes", "position_ratings",   # ST/AG for build, RT = max position rating
 ]
 
 
@@ -83,6 +84,9 @@ def _first(doc, *keys):
 def normalize(doc):
     fn, ln = doc.get("first_name"), doc.get("last_name")
     name = _first(doc, "name", "full_name") or " ".join(x for x in (fn, ln) if x)
+    attrs = doc.get("attributes") or {}
+    ratings = doc.get("position_ratings") or {}
+    rt = max(ratings.values()) if ratings else None   # highest position rating
     return {
         "_id": str(doc.get("_id")),
         "name": name,
@@ -95,6 +99,9 @@ def normalize(doc):
                                         "heightInInches", "height")),
         "weight_lb": _to_lb(_first(doc, "weight_lb", "weight_lbs", "weight")),
         "year": _first(doc, "year", "class_year", "class"),
+        "st": attrs.get("ST"),   # strength  -> muscle
+        "ag": attrs.get("AG"),   # agility   -> leanness
+        "rt": rt,                # overall quality -> in-shape vs out-of-shape
     }
 
 

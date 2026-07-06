@@ -6,30 +6,45 @@ archetypes, copy-paste prompts for all 12 players, the style reference set, and 
 bake-off rubric to pick the production tool.
 
 **Locked decisions feeding this kit**
-- Generator: **bake-off first** — Nano Banana (Gemini) vs gpt-image-1 vs Midjourney `--sref`. Pick after Phase A.
-- Style lock: **reference-only** for the pilot (no model training yet — revisit after bake-off).
+- Generator: **Nano Banana 2 Lite** (Google AI Studio, `gemini-3.1-flash-lite-image`) — locked after a 3-player test; no bake-off needed. Free tier / ~4¢ at API scale.
+- Style lock: **reference-only** (Xenon anchor + skin/build-matched refs); no model training.
 - Uniform: **white-tank AI bust + composite** (unchanged from brief).
-- Body variety: **9-archetype grid** (below).
+- **Age model: 16-17 aspirational** (reads HS or young college) — this is a high-school sim, so it **reverses the brief's "college-aged" language**.
+- Finish: **painterly / matte, not photoreal** — pulled back to match the 98 masters.
+- Body variety: **size grid (height × build) + attribute-driven athleticism** (§1).
+- **Locked production prompt template:** see §4 (painterly + 16-17 + proportions + concrete build + ST/AG/RT athleticism).
 
 ---
 
-## 1. Body archetype system (9-grid)
+## 1. Body archetype system (size grid + athleticism)
 
-Every player classifies by two axes from their height + weight:
+Two independent signals drive the body — because **weight tells you mass, but not whether that mass is muscle or fat.**
 
-| | **Lean** (bottom BMI third) | **Normal** (middle third) | **Strong** (top third) |
+**Axis A — SIZE** (from height + weight): a 3×3 grid.
+
+| | **Lean** (bottom BMI third) | **Normal** (middle third) | **Big** (top third) |
 |---|---|---|---|
-| **Short** (<72") | S-Lean | S-Normal | S-Strong |
-| **Normal** (72–78") | N-Lean | N-Normal | N-Strong |
-| **Tall** (≥79") | T-Lean | T-Normal | T-Strong |
+| **Short** (<72") | S-Lean | S-Normal | S-Big |
+| **Normal** (72–78") | N-Lean | N-Normal | N-Big |
+| **Tall** (≥79") | T-Lean | T-Normal | T-Big |
 
-**Build is height-adjusted (BMI), not raw weight** — otherwise a 6'10"/210 lb player reads "strong" when he's actually lean. Cutoffs are the **tertiles of the real player population** (so each build class holds ~1/3 of players). Provisional cutoffs are in `scripts/classify_player_archetypes.py`; replace them with the real numbers the export script prints.
+Build is height-adjusted (BMI), not raw weight — else a 6'10"/210 reads "big" when he's lean. Cutoffs = **population tertiles** (in `classify_player_archetypes.py`; replace provisional values with the export's real numbers).
 
-**Two layers, different granularity:**
-- **Prompt/classification layer → use all 9.** Height drives face maturity + overall scale; build drives the body descriptor. This is where the variety lives.
-- **Uniform template layer → build only 3 (the build axis) to start.** The portrait is shoulders-*up*, so height is cropped out — the jersey template keys on **shoulder width = build**. Build one parametric template each for Lean / Normal / Strong, recolored per team from the DB. Split toward more templates only if QC shows a tall torso genuinely doesn't sit right.
+**Axis B — ATHLETICISM** (from attributes `ST`, `AG`, `RT` = max position rating): muscle-vs-fat.
 
-Run `python3 scripts/classify_player_archetypes.py` to classify any roster.
+| Class | Rule | Look |
+|-------|------|------|
+| **Cut** | `RT ≥ 75` or `(ST ≥ 65 and AG ≥ 45)` | defined muscle, lean, in shape |
+| **Solid** *(default)* | everything else | average muscle tone |
+| **Soft** | `RT ≤ 45 and AG ≤ 30` | doughy, out of shape, carrying fat, fuller face |
+
+Why it matters: two 240-lb bigs — **Henrich** (ST 105 / RT 96) and **Braxton** (ST 41 / AG 13 / RT 41) — have near-identical BMI but opposite bodies (chiseled athlete vs doughy backup). Only the attributes separate them. This axis is what gives the roster its "few genuinely heavyset guys" without making every big man fat.
+
+**How the two axes are used (this is the key efficiency):**
+- **Prompt** = SIZE frame descriptor **+** ATHLETICISM shape descriptor, auto-assembled per player by the classifier (`body_prompt` column). No manual work per combo.
+- **Uniform templates** key on the **build axis only (~3: Lean/Normal/Big)** — the portrait is shoulders-up, so height is cropped out and athleticism is a paint-level modifier, not a shoulder-width change. So athleticism adds body variety **without multiplying templates.** (Add a 4th "soft/heavy" template later only if soft bodies don't composite cleanly on the Big template.)
+
+Run `python3 scripts/classify_player_archetypes.py` to classify any roster (needs the export's `st`/`ag`/`rt` for the athleticism axis; without them SHAPE falls back to Solid).
 
 ---
 
@@ -87,32 +102,37 @@ The Conf1 look is a **semi-realistic digital painting** — smooth skin gradient
 
 ## 4. Ready-to-paste prompts (all 12)
 
-**Structure:** `[player line] , [FIXED STYLE BLOCK]`. Swap only the player line; paste the fixed block verbatim every time. Team colors and the SKY wordmark are **NOT** here — they're added in the composite step.
+**Structure:** `[LEAD-IN] [player line], [FIXED STYLE BLOCK]`. Swap only the player line; paste the lead-in + fixed block verbatim every time. Team colors and the SKY wordmark are **NOT** here — they're added in the composite step.
 
-**FIXED STYLE BLOCK (append to every prompt):**
+**LEAD-IN (prepend, tells the model to copy style not face):**
 ```
-Front-facing basketball player portrait, bust shoulders up, centered composition, soft frontal lighting, illustrated semi-realistic sports game art style, smooth skin gradients, friendly neutral expression, transparent background, wearing plain white basketball tank top, no logos, no text, no team colors, simple white jersey with neutral collar, no watermark, college basketball player age appearance
+Using the attached image(s) only as a style reference for the art style, lighting, and painterly rendering, create a new different player:
 ```
 
-**Player lines** (archetype build descriptor already baked in):
+**FIXED STYLE BLOCK (append to every prompt) — LOCKED:**
+```
+Front-facing basketball player portrait, bust shoulders up, centered composition, natural realistic head-to-shoulder proportions, soft frontal studio lighting, hand-painted digital illustration in a semi-realistic sports game art style, visible soft painterly brushwork, smooth painted skin shading, matte illustrated finish, not a photograph, not photorealistic, friendly neutral expression, youthful 16-17 year old face that could pass for high school or young college, plain light background, wearing plain white basketball tank top, no logos, no text, no team colors, simple white jersey with neutral collar, no watermark
+```
+
+**Player lines** = ethnicity + frame (SIZE) + shape (ATHLETICISM), from the classifier's `body_prompt`. Shape below is the **Solid default** (Chapel Hill attributes aren't in the backup yet); the export's ST/AG/RT will upgrade some players to Cut/Soft. Eugene is shown **Cut** (confirmed high RT/ST/AG).
 
 ```
-#4  Stanley Keith  (N-Strong): college-aged Black man about 19-20, short hair, strong powerful build, broad wide shoulders, thick neck
-#10 Landon Turley  (S-Lean):   college-aged white man about 20-21, lean slim build, narrow shoulders, slender neck
-#11 Brice Monroe Jr(N-Normal): college-aged Black man about 18-19, slightly youthful face, athletic average build, medium shoulders
-#17 Otis Nixon     (S-Lean):   college-aged Black man about 20-21, lean slim guard build, narrow shoulders, slender neck
-#25 Nathan Randolph(N-Strong): college-aged white man about 20-21, strong powerful build, broad wide shoulders, thick neck
-#27 Colt Robles    (S-Lean):   college-aged Latino man about 19-20, lean slim build, narrow shoulders, slender neck
-#30 Dale Butler    (S-Normal): college-aged Black man about 19-20, athletic average build, medium shoulders
-#31 Shorty Holmstrom(N-Normal):college-aged white man with Scandinavian features about 21-22, athletic average build, medium shoulders
-#32 Thanh Small    (N-Strong): college-aged East Asian man about 18-19, youthful face, strong powerful heavy build, broad wide shoulders, thick neck
-#34 Dayton Weber   (S-Lean):   college-aged Black man about 19-20, lean slim build, narrow shoulders, slender neck
-#46 Eugene Johnston(T-Strong): college-aged white man about 18-19, youthful face, tall long frame, strong powerful build, broad wide shoulders
-#55 Darren Parrish (N-Normal): college-aged Black man about 21-22, athletic average build, medium shoulders
+#4  Stanley Keith   (N-Big):   a Black player, big powerful frame, broad shoulders, thick neck, solid athletic build with some muscle tone, short hair
+#10 Landon Turley   (S-Lean):  a white player, lean slim wiry frame, narrow athletic shoulders, some muscle tone
+#11 Brice Monroe Jr (N-Normal):a Black player, average athletic frame, medium shoulders, some muscle tone
+#17 Otis Nixon      (S-Lean):  a Black player, lean slim wiry guard frame, narrow shoulders, some muscle tone
+#25 Nathan Randolph (N-Big):   a white player, big powerful frame, broad shoulders, thick neck, solid athletic build
+#27 Colt Robles     (S-Lean):  a Latino player with tan skin, lean slim wiry frame, narrow athletic shoulders, some muscle tone
+#30 Dale Butler     (S-Normal):a Black player, average athletic frame, medium shoulders, some muscle tone
+#31 Shorty Holmstrom(N-Normal):a white player with Scandinavian features, average athletic frame, medium shoulders, some muscle tone
+#32 Thanh Small     (N-Big):   an East Asian player, big powerful frame, broad shoulders, thick neck, solid athletic build
+#34 Dayton Weber    (S-Lean):  a Black player, lean slim wiry frame, narrow athletic shoulders, some muscle tone
+#46 Eugene Johnston (T-Big/Cut):a white player with fair light skin and short blond or light brown hair, tall big athletic center frame, very broad shoulders, thick strong neck, muscular cut physique, defined muscle, lean and in shape
+#55 Darren Parrish  (N-Normal):a Black player, average athletic frame, medium shoulders, some muscle tone
 ```
 
 **Per-tool how-to:**
-- **Nano Banana** (Google AI Studio → Gemini 2.5 Flash Image): upload the Xenon anchor (+ optional skin-tone ref), paste `player line, FIXED BLOCK`. No transparent bg → run `rembg` after.
+- **Nano Banana 2 Lite** (Google AI Studio, aspect **1:1**, highest resolution): upload the Xenon anchor (+ skin-tone / big-build ref as needed), paste `LEAD-IN [player line], FIXED BLOCK`, start a **fresh chat per player** (it's an editing model — same thread morphs the previous face). No transparent bg → run `rembg` after. **Locked as the production generator.**
 - **gpt-image-1** (ChatGPT image / API): same refs + prompt. API gives a **native transparent PNG** (`background: "transparent"`) — skips the cutout step.
 - **Midjourney** (web/Discord): `/imagine [player line], [FIXED BLOCK] --sref https://assets.geekedoutgames.com/players/master/8487cb3b-887b-472a-90d9-f46caa572d46.png --sw 100 --ar 1:1`. No transparent bg → `rembg` after.
 

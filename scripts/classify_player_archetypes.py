@@ -2,20 +2,28 @@
 """
 Assign every player a body archetype for portrait generation.
 
-Reads scripts/players_export.json (produced by export_players_for_portraits.py)
-and writes scripts/players_archetypes.csv with a 9-grid archetype per player:
+Two independent signals drive the body:
 
-    height band  x  build class
-    -----------     -----------
-    Short  (<72")   Lean   (bottom BMI tertile)
-    Normal (72-78") Normal (middle BMI tertile)
-    Tall   (>=79")  Strong (top BMI tertile)
+  SIZE  (from height + weight)            -> frame: Short/Normal/Tall x Lean/Normal/Big
+  SHAPE (from attributes ST / AG / RT)    -> muscle-vs-fat: Cut / Solid / Soft
 
-Build is height-adjusted (BMI), so a tall lean player is not misread as strong.
-Run export first (or with no export, it falls back to the bundled Chapel Hill
-pilot roster so you can see the output shape immediately).
+Weight tells you mass; the attributes tell you whether that mass is muscle or
+fat. Two 240 lb bigs can be a chiseled athlete (high ST/RT) or a doughy backup
+(low ST/AG/RT) — SHAPE separates them.
+
+  height band     build (BMI)      athleticism (ST/AG/RT)
+  -----------     -----------      ----------------------
+  Short  (<72")   Lean  (BMI Q1)   Cut   (in shape, defined muscle)
+  Normal (72-78") Normal(BMI mid)  Solid (average tone)          <- default
+  Tall   (>=79")  Big   (BMI Q3)   Soft  (out of shape, carrying fat)
+
+Uniform templates key on the BUILD axis only (~3). Athleticism is a prompt-only
+modifier (it changes muscle definition / face fullness, not shoulder width), so
+it gives body-composition variety without multiplying templates.
 
     python3 scripts/classify_player_archetypes.py
+Reads scripts/players_export.json if present (needs st/ag/rt); otherwise falls
+back to the bundled Chapel Hill pilot roster (no attributes -> SHAPE = n/a).
 """
 import os
 import csv
@@ -24,24 +32,41 @@ import json
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPORT = os.path.join(HERE, "players_export.json")
 
-# Height band cutoffs (inches). Locked.
+# --- Height band cutoffs (inches). Locked. ---------------------------------
 SHORT_MAX = 71          # <72  -> Short
 TALL_MIN = 79           # >=79 -> Tall ; 72-78 -> Normal
 
-# Build (BMI) tertile cutoffs. PROVISIONAL — replace with the real cutoffs the
-# export script prints once you run it against the full population.
-BUILD_LEAN_MAX = 25.0   # BMI <  25.0        -> Lean
-BUILD_STRONG_MIN = 26.8  # BMI >= 26.8       -> Strong ; between -> Normal
+# --- Build (BMI) tertile cutoffs. PROVISIONAL -----------------------------
+# Replace with the real cutoffs the export script prints for the full pop.
+BUILD_LEAN_MAX = 25.0
+BUILD_STRONG_MIN = 26.8
 
-# Prompt fragment injected per build class (drives shoulder framing so one
-# uniform template per build class lands cleanly on every bust in that class).
-BUILD_PROMPT = {
-    "Lean":   "lean slim build, narrow shoulders, slender neck",
-    "Normal": "athletic average build, medium shoulders",
-    "Strong": "strong powerful build, broad wide shoulders, thick neck",
+# --- Athleticism thresholds (ST/AG/RT). From Conf1 quartiles ---------------
+# ST/AG ~ Q1 18 / Q3 65-71 ; RT ~ Q1 41 / Q3 79.
+def athleticism(st, ag, rt):
+    if st is None or ag is None or rt is None:
+        return None                                   # no attributes exported
+    if rt >= 75 or (st >= 65 and ag >= 45):
+        return "Cut"
+    if rt <= 45 and ag <= 30:
+        return "Soft"
+    return "Solid"
+
+# Frame descriptor per build class (drives shoulder framing -> template fit).
+FRAME_PROMPT = {
+    "Lean":   "lean slim wiry frame, narrow athletic shoulders",
+    "Normal": "average athletic frame, medium shoulders",
+    "Big":    "big powerful frame, very broad wide shoulders filling the width of the frame, thick neck",
+}
+# Shape descriptor per athleticism class (muscle vs fat).
+SHAPE_PROMPT = {
+    "Cut":   "muscular cut physique, defined muscle, lean and in shape",
+    "Solid": "average athletic build, some muscle tone",
+    "Soft":  "soft doughy out-of-shape build, carrying extra body fat, undefined muscle, rounder fuller face",
 }
 
-# Chapel Hill pilot roster (from the project brief) — fallback if no export yet.
+# Chapel Hill pilot roster (from brief). No attributes in the brief/backup, so
+# SHAPE is left n/a here — the real values come from the export.
 PILOT = [
     {"_id": "86b911a5-c022-4041-aefd-175a0e1f2acf", "name": "Stanley Keith",    "jersey": 4,  "height_in": 73, "weight_lb": 206, "year": "sophomore"},
     {"_id": "ac26dbe2-e590-49aa-9bde-745584e548f9", "name": "Landon Turley",    "jersey": 10, "height_in": 70, "weight_lb": 167, "year": "junior"},
@@ -74,16 +99,24 @@ def build_class(bmi):
     return "Normal"
 
 
+# Map internal build class -> frame key (Strong build == Big frame).
+_FRAME_KEY = {"Lean": "Lean", "Normal": "Normal", "Strong": "Big"}
+
+
 def classify(p):
     h, w = p.get("height_in"), p.get("weight_lb")
     if not h or not w:
         return None
     bmi = 703 * w / (h ** 2)
     hb, bc = height_band(h), build_class(bmi)
+    ath = athleticism(p.get("st"), p.get("ag"), p.get("rt"))
     code = {"Short": "S", "Normal": "N", "Tall": "T"}[hb] + "-" + bc
-    return {**p, "bmi": round(bmi, 1), "height_band": hb,
-            "build_class": bc, "archetype": code,
-            "build_prompt": BUILD_PROMPT[bc]}
+    frame = FRAME_PROMPT[_FRAME_KEY[bc]]
+    shape = SHAPE_PROMPT[ath] if ath else "average athletic build, some muscle tone"
+    body_prompt = f"{frame}, {shape}"
+    return {**p, "bmi": round(bmi, 1), "height_band": hb, "build_class": bc,
+            "athleticism": ath or "n/a", "archetype": code,
+            "template": _FRAME_KEY[bc], "body_prompt": body_prompt}
 
 
 def main():
@@ -92,28 +125,33 @@ def main():
         source = f"players_export.json ({len(players)})"
     else:
         players = PILOT
-        source = "bundled Chapel Hill pilot roster (no export found)"
-        print("[note] no players_export.json — using pilot roster. "
-              "Run export_players_for_portraits.py for the full population.\n")
+        source = "bundled Chapel Hill pilot roster (no attributes -> SHAPE n/a)"
+        print("[note] no players_export.json — using pilot roster. Run "
+              "export_players_for_portraits.py to get ST/AG/RT and real SHAPE.\n")
 
     rows = [r for r in (classify(p) for p in players) if r]
     print(f"[source] {source}")
-    print(f"[build cutoffs] Lean<{BUILD_LEAN_MAX} | "
-          f"Normal | Strong>={BUILD_STRONG_MIN}  (BMI)\n")
+    print(f"[build cutoffs] Lean<{BUILD_LEAN_MAX} | Strong>={BUILD_STRONG_MIN} (BMI)")
+    print(f"[shape cutoffs] Cut: RT>=75 or (ST>=65 & AG>=45) | "
+          f"Soft: RT<=45 & AG<=30 | else Solid\n")
 
     grid = {}
     for r in rows:
         grid[r["archetype"]] = grid.get(r["archetype"], 0) + 1
-    print("[9-grid counts]")
+    print("[size grid counts]")
     for hb in ("Short", "Normal", "Tall"):
-        cells = "  ".join(
+        print("  " + "  ".join(
             f"{hb[0]}-{bc}:{grid.get(hb[0]+'-'+bc, 0):>4}"
-            for bc in ("Lean", "Normal", "Strong"))
-        print("  " + cells)
+            for bc in ("Lean", "Normal", "Strong")))
+    shp = {}
+    for r in rows:
+        shp[r["athleticism"]] = shp.get(r["athleticism"], 0) + 1
+    print(f"\n[athleticism counts] {shp}")
 
     out = os.path.join(HERE, "players_archetypes.csv")
-    cols = ["_id", "name", "jersey", "year", "height_in", "weight_lb",
-            "bmi", "height_band", "build_class", "archetype", "build_prompt"]
+    cols = ["_id", "name", "jersey", "year", "height_in", "weight_lb", "bmi",
+            "st", "ag", "rt", "height_band", "build_class", "athleticism",
+            "archetype", "template", "body_prompt"]
     with open(out, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         w.writeheader()
