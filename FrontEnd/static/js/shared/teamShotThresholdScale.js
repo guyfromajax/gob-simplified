@@ -7,7 +7,7 @@
 (function (global) {
   const SPAN = 200;
   const HALF_SPAN = SPAN / 2;
-  const MIN = 50;
+  const MIN = 10;
   const MAX = MIN + SPAN;
   const MID = MIN + HALF_SPAN;
 

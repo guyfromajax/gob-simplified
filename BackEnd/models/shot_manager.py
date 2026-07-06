@@ -2698,8 +2698,10 @@ class ShotManager:
 
             # Apply primary defender's defense score
             if second_defender:
-                # Two defenders: apply both with 35% each
-                primary_defense_impact = defense_score * 0.35
+                # Two defenders: primary contests at full strength (100%), secondary
+                # adds 35% help. (Previously primary was discounted to 35% when doubled,
+                # which under-penalized contested shots — removed.)
+                primary_defense_impact = defense_score * 1.0
                 shot_defense_score_for_sfx += primary_defense_impact
                 shot_score -= primary_defense_impact
 
@@ -2741,8 +2743,9 @@ class ShotManager:
                 if second_defender:
                     second_defender.record_stat("DEF_A")
             else:
-                # Single defender: apply 60% impact
-                primary_defense_impact = defense_score * 0.6
+                # Single defender: full-strength contest (100%). (Previously 60% —
+                # removed the discount so a solo defender penalizes the shot in full.)
+                primary_defense_impact = defense_score * 1.0
                 shot_defense_score_for_sfx += primary_defense_impact
                 shot_score -= primary_defense_impact
 

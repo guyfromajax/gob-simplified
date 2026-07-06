@@ -1,11 +1,11 @@
 # Team Attribute Management System (**verified 2026-06-13**)
 
-> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise: attr `(-1,1)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 130-140; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
+> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise: attr `(-1,1)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 90-100; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
 
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: 50 to 250; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
+   - `shot_threshold` - Shot attempt threshold (range: 10 to 210; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4)
@@ -48,7 +48,7 @@ The Team Attribute Management System handles the initialization, storage, and up
 All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
-- `shot_threshold` - Shot attempt threshold (range: 50 to 250, center at 150 for pill display; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold` - Shot attempt threshold (range: 10 to 210, center at 110 for pill display; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
 - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4, center at 0.2 for pill display)
@@ -78,7 +78,7 @@ All team attributes are stored in team objects across all game modes:
 **Franchise Mode:**
 - Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(130, 140)` (slightly better than MID 150; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold`: `random.randint(90, 100)` (slightly better than MID 110; see [Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
@@ -189,21 +189,21 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 - **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry` at 3-5 points and to `discipline` / `fight` at 4-5 points.
 - **CPU teams:** When the user runs training, non-user teams use distant-training templates. Those template deltas are database-driven and can be positive or negative for any standard team attribute except `momentum_score`.
 
-### Shooting (`shot_threshold`) (range: 50 to 250)
+### Shooting (`shot_threshold`) (range: 10 to 210)
 
 This is the team's intangible mindset to convert baskets. Their overall belief in their identity as a basketball team who scores points. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-**Scale reference (50–250, MID 150):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
+**Scale reference (10–210, MID 110):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](./Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
 
 | Area | Current value |
 |------|---------------|
-| Team attribute clamp (`TEAM_ATTR_RANGES`) | **50 – 250** |
-| Franchise init | **130 – 140** (slightly better than MID 150) |
-| Tournament seeds | 1: **50–150** · 2–4: **50–200** · 5–7: **100–250** · 8: **150–250** |
-| Score balancing (one turn) | Trailing **30**, leading **230** (`MIN−20` / `MAX−20`) |
-| Rim-runner corner FB | **230 − fb_efficiency** |
-| FTE tutorial | User **50**, computer **150** |
-| UI pills | Center **150**, span **50–250** → FCC, training report, tournament, court, box score |
+| Team attribute clamp (`TEAM_ATTR_RANGES`) | **10 – 210** |
+| Franchise init | **90 – 100** (slightly better than MID 110) |
+| Tournament seeds | 1: **10–110** · 2–4: **10–160** · 5–7: **60–210** · 8: **110–210** |
+| Score balancing (one turn) | Trailing **−10**, leading **190** (`MIN−20` / `MAX−20`) |
+| Rim-runner corner FB | **190 − fb_efficiency** |
+| FTE tutorial | User **10**, computer **110** |
+| UI pills | Center **110**, span **10–210** → FCC, training report, tournament, court, box score |
 
 - Initial seed: Franchise init / missing-FTD creation (`range: 130 to 140`, random).
 - Faucet: Training System / Scrimmages.
