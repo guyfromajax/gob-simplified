@@ -382,11 +382,22 @@ def _triangle_build_turn_result(
     from BackEnd.engine.rim_runner_drive_integration import apply_triangle_unified_contest
 
     if USE_FB_DRIVE_RESOLUTION_TRIANGLE:
+        # Rendered triangle-setup-end positions for the two matchup defenders the
+        # emitter moves (they reach their targets), so the contest is judged where
+        # the defenders actually render. Non-moved defenders fall back to live
+        # coords inside the contest (render-consistent — they stay put).
+        _rendered_def: Dict[str, Any] = {}
+        for _did_key, _to_key in (("rr_defender_id", "rr_defender_to"), ("bh_defender_id", "bh_defender_to")):
+            _did = setup_payload.get(_did_key)
+            _to = setup_payload.get(_to_key)
+            if _did and isinstance(_to, dict) and "x" in _to and "y" in _to:
+                _rendered_def[str(_did)] = {"x": float(_to["x"]), "y": float(_to["y"])}
         u_defender, u_count = apply_triangle_unified_contest(
             def_lineup=def_lineup,
             shot_spot={"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
             is_away_offense=bool(setup_payload.get("is_away_offense")),
             branch=branch,
+            rendered_by_id=_rendered_def,
         )
         if u_count >= 0:
             defender = u_defender

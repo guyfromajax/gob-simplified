@@ -80,14 +80,26 @@ def _pick_unified_contest_defender(
     shot_spot: Dict[str, float],
     *,
     is_away_offense: bool,
+    rendered_by_id: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[Any], bool]:
+    # Seed the contest from the emitter's rendered triangle-setup-end defender
+    # positions (the two matchup defenders reach rr_defender_to / bh_defender_to),
+    # so "nearest defender to the shot" is judged where the defenders actually
+    # render — not their stale start-of-break player.coords. Non-moved defenders
+    # render at player.coords, so the per-player fallback is render-consistent.
+    rendered = rendered_by_id or {}
     def_ends: Dict[str, Dict[str, float]] = {}
     for defender in def_lineup.values():
         if defender is None:
             continue
         pid = _safe_id(defender)
-        if pid:
-            def_ends[pid] = _coord_of(defender)
+        if not pid:
+            continue
+        entry = rendered.get(pid) or rendered.get(str(pid))
+        if isinstance(entry, dict) and "x" in entry and "y" in entry:
+            def_ends[pid] = {"x": float(entry["x"]), "y": float(entry["y"])}
+        else:
+            def_ends[pid] = _coord_of(defender)  # coord-source-ok: per-player fallback for defenders the triangle setup does not move (they render at player.coords)
     contested, def_id = pick_nearest_contesting_defender(
         def_ends, shot_spot, is_away_offense=is_away_offense
     )
@@ -629,8 +641,13 @@ def apply_triangle_unified_contest(
     shot_spot: Dict[str, float],
     is_away_offense: bool,
     branch: str,
+    rendered_by_id: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[Any], int]:
-    """Return (defender, defender_count) using 11 + x-trail contest rules."""
+    """Return (defender, defender_count) using 11 + x-trail contest rules.
+
+    ``rendered_by_id`` supplies the emitter's rendered triangle-setup-end defender
+    positions so the contest reads where defenders actually render (single coord
+    source); omit it and it falls back to live coords per defender."""
     from BackEnd.constants import USE_FB_DRIVE_RESOLUTION_TRIANGLE
 
     if not USE_FB_DRIVE_RESOLUTION_TRIANGLE:
@@ -642,6 +659,6 @@ def apply_triangle_unified_contest(
     ):
         return None, -1
     defender, contested = _pick_unified_contest_defender(
-        def_lineup, shot_spot, is_away_offense=is_away_offense
+        def_lineup, shot_spot, is_away_offense=is_away_offense, rendered_by_id=rendered_by_id
     )
     return defender, (1 if contested and defender is not None else 0)

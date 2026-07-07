@@ -33,7 +33,7 @@ SCOPE = [
 
 # Per-scope baseline of KNOWN stale-seed call sites (drive to 0 as turns migrate).
 # Update DOWN only, never up — an increase is a regression the guard must catch.
-BASELINE = 1  # 2026-07-07: render-authoring + degenerate fallbacks annotated. Only RR:90 (triangle-three contest) left — a real drift fix. Drive to 0.
+BASELINE = 0  # 2026-07-07: COMPLETE — all FB decision seeds read emitter coords; render-authoring/fallbacks annotated. Guard holds at 0 (any new stale seed fails CI).
 
 # The concrete stale sources: both helpers read player.coords. Their CALL sites in
 # decision code are the violations (helper definitions / docstrings are exempt).
