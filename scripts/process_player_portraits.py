@@ -3,36 +3,32 @@
 Turn raw AI-generated busts into upload-ready player masters.
 
 Pipeline per image:
-  1. Remove background  -> transparent RGBA (rembg, portrait model)
-  2. Normalize framing  -> scale/center to match Conf1 (head near top,
-                            shoulders bleeding off the bottom edge)
-  3. Output             -> 3530 x 3412 RGBA PNG, named <uuid>.png
+  1. Segment the person   -> transparent RGBA (u2net human-seg via onnxruntime)
+  2. Normalize framing    -> scale/center to match Conf1 (head near top,
+                             shoulders bleeding off the bottom edge)
+  3. Output               -> 3530 x 3412 RGBA PNG, named <uuid>.png
 
-Matches the master spec in the brief:
-  Format PNG RGBA · Dimensions 3530x3412 · R2 key players/master/<uuid>.png
+Uses onnxruntime directly (NOT rembg) so there is no numba/llvmlite build step
+— installs cleanly on Python 3.13.
 
 Setup (run where you process images — your machine or a Cursor agent):
-    pip install "rembg[cpu]" pillow
+    pip install onnxruntime pillow numpy
+
+The human-segmentation model (~168 MB) auto-downloads on first run to
+~/.cache/gob-portraits/. It keeps the person (white tank included) and removes
+only the background — no holes, no neck-pockets.
 
 Usage:
-    # inputs already named <uuid>.png:
-    python3 scripts/process_player_portraits.py \
-        --in tmp/portrait-pilot/raw --out assets_staging/players
-
-    # inputs named by player (stanley.png ...) + a name->uuid map:
     python3 scripts/process_player_portraits.py \
         --in tmp/portrait-pilot/raw --out assets_staging/players \
         --map scripts/players_archetypes.csv --map-name-col name --map-id-col _id
-
-The map lets you name files "Stanley Keith.png" / "stanley_keith.png" and have
-them come out "86b911a5-...png". Basenames are matched loosely (case/space/
-underscore-insensitive). Without --map, the input basename is kept.
 """
 import os
 import re
 import csv
 import sys
 import argparse
+import urllib.request
 
 CANVAS_W, CANVAS_H = 3530, 3412
 
@@ -40,8 +36,11 @@ CANVAS_W, CANVAS_H = 3530, 3412
 TOP_MARGIN_FRAC = 0.05        # headroom above the top of the head
 SUBJECT_HEIGHT_FRAC = 1.02    # subject spans this * canvas height (>1 => shoulders bleed off bottom)
 
-# rembg models to try, best-for-people first.
-REMBG_MODELS = ["birefnet-portrait", "u2net_human_seg", "u2net"]
+# Human-segmentation model (keeps clothing, unlike generic bg removal).
+MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx"
+MODEL_PATH = os.path.expanduser("~/.cache/gob-portraits/u2net_human_seg.onnx")
+
+_SESSION = None
 
 
 def slug(s):
@@ -57,17 +56,46 @@ def load_map(path, name_col, id_col):
     return m
 
 
-def get_session():
-    from rembg import new_session
-    for name in REMBG_MODELS:
-        try:
-            s = new_session(name)
-            print(f"[rembg] using model '{name}'")
-            return s
-        except Exception:
-            continue
-    print("[rembg] falling back to default session")
-    return None
+def _get_session():
+    global _SESSION
+    if _SESSION is None:
+        import onnxruntime as ort
+        if not os.path.exists(MODEL_PATH):
+            os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+            print(f"[model] downloading u2net_human_seg (~168 MB) to {MODEL_PATH} ...")
+            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+        _SESSION = ort.InferenceSession(MODEL_PATH,
+                                        providers=["CPUExecutionProvider"])
+    return _SESSION
+
+
+def segment_alpha(img):
+    """Return a soft 0-255 alpha mask (PIL 'L') for the person in img."""
+    import numpy as np
+    from PIL import Image
+    sess = _get_session()
+    name = sess.get_inputs()[0].name
+
+    # u2net preprocessing: 320x320, scale by max, normalize (ImageNet stats).
+    im = np.array(img.convert("RGB").resize((320, 320), Image.LANCZOS)).astype(np.float32)
+    mx = im.max() or 1.0
+    im = im / mx
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    im = (im - mean) / std
+    im = im.transpose(2, 0, 1)[None].astype(np.float32)   # 1,3,320,320
+
+    pred = sess.run(None, {name: im})[0][0, 0]            # 320,320
+    mi, ma = float(pred.min()), float(pred.max())
+    pred = (pred - mi) / ((ma - mi) or 1.0)
+    return Image.fromarray((pred * 255).astype("uint8")).resize(img.size, Image.LANCZOS)
+
+
+def cutout(img):
+    from PIL import Image
+    rgba = img.convert("RGBA")
+    rgba.putalpha(segment_alpha(img))
+    return rgba
 
 
 def normalize_framing(img):
@@ -75,7 +103,7 @@ def normalize_framing(img):
     from PIL import Image
     bbox = img.getbbox()                       # bounds of non-transparent pixels
     if not bbox:
-        raise ValueError("empty image after background removal")
+        raise ValueError("empty image after segmentation")
     subj = img.crop(bbox)
     bw, bh = subj.size
 
@@ -90,18 +118,10 @@ def normalize_framing(img):
     return canvas
 
 
-def process(in_path, out_path, session, alpha_matting):
+def process(in_path, out_path):
     from PIL import Image
-    from rembg import remove
     src = Image.open(in_path).convert("RGBA")
-    kw = {}
-    if session:
-        kw["session"] = session
-    if alpha_matting:
-        kw.update(alpha_matting=True, alpha_matting_foreground_threshold=270,
-                  alpha_matting_background_threshold=10, alpha_matting_erode_size=11)
-    cut = remove(src, **kw)                      # -> RGBA, transparent bg
-    out = normalize_framing(cut)
+    out = normalize_framing(cutout(src))
     out.save(out_path, "PNG")
 
 
@@ -122,19 +142,16 @@ def main():
     ap.add_argument("--map", dest="mapfile")
     ap.add_argument("--map-name-col", default="name")
     ap.add_argument("--map-id-col", default="_id")
-    ap.add_argument("--alpha-matting", action="store_true",
-                    help="cleaner hair edges, slower")
     args = ap.parse_args()
 
     try:
-        import PIL, rembg  # noqa: F401
+        import PIL, numpy, onnxruntime  # noqa: F401
     except ImportError:
-        sys.exit('missing deps. Run:  pip install "rembg[cpu]" pillow')
+        sys.exit("missing deps. Run:  pip install onnxruntime pillow numpy")
 
     name_map = load_map(args.mapfile, args.map_name_col, args.map_id_col) \
         if args.mapfile else None
     os.makedirs(args.outdir, exist_ok=True)
-    session = get_session()
 
     exts = (".png", ".jpg", ".jpeg", ".webp")
     files = [f for f in sorted(os.listdir(args.indir))
@@ -148,8 +165,7 @@ def main():
         out_name = resolve_name(base, name_map) + ".png"
         out_path = os.path.join(args.outdir, out_name)
         try:
-            process(os.path.join(args.indir, f), out_path, session,
-                    args.alpha_matting)
+            process(os.path.join(args.indir, f), out_path)
             print(f"[ok] {f} -> {out_name}")
             ok += 1
         except Exception as e:
