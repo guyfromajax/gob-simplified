@@ -217,7 +217,7 @@ When two defenders both retreat to basket defense, the second defender's spot is
   - **Defenders:** **all five** sprint to a single target = `BH_target_x ± 2` toward basket, same y. Per-defender traversal time = `euclid(start, target) / AG-sprint-rate` (`_ag_grid_per_game_sec`); smallest time = **first arriver**. If `t_first < t_shooter`, the other defenders **freeze** at their interpolated positions (clamped no closer than `DEFENDER_FREEZE_CLAMP_GRID_SPOTS = 6` from basket, never pulled backward from start).
   - **Contested check** (at `t_shooter`): the defender whose x is closest to basket; if past the shooter's x → **CONTESTED** (that defender is the shot defender), else **UNCONTESTED**.
   - **Shot type:** **`attack`** (drive-to-the-rim finish — the stealer sprints and finishes himself). Scores with **Attack** attribute weights (`SC·5, AG·2, ST·1, IQ·1, CH·1` — agility-based rim finishing) and the **attack** defensive-foul thresholds, **not** Inside (`SC·6, ST·2, …` post weights). `is_paint` stays **True** (the finish is physically in the paint → the rim contest is ID-focused paint defense), matching `resolve_shot`'s FB attack path. *(Changed from `inside` — June 2026; a steal-and-go is a drive, not a post-up.)*
-  - **Shot resolution:** CONTESTED → `shot_manager.calculate_shot_score(apply_defense=True)`, made if `shot_score ≥ shot_threshold`; UNCONTESTED → `apply_defense=False`, **automatic MAKE** (OREB-putback uncontested rule). **Outcome is MAKE or MISS only — there is no `DEFENSIVE_STOP` on this path.**
+  - **Shot resolution:** CONTESTED → `shot_manager.calculate_shot_score(apply_defense=True)`, made if `shot_score ≥ shot_threshold`; UNCONTESTED → `apply_defense=False`, then **universal uncontested inside/attack make roll** (`BackEnd/utils/uncontested_shot.py`). **Outcome is MAKE or MISS only — there is no `DEFENSIVE_STOP` on this path.**
   - **Other 4 offensive players:** sample 4 unique spots (no collisions) from the 11-name `AFTER_STEAL_OFFENSE_SPOT_NAMES` HCO setup list (mirrored for away).
 - **UESS schema**: After-steal FB is fully migrated to the unified animation step schema. **No frontend choreography logic** — all positions, transitions, announcements, and SFX are backend-emitted. FE is a pure renderer (`runSchemaPlaybackTurn`).
 - **Emitter**: `BackEnd/engine/after_steal_fast_break_step_emitter.py::build_after_steal_fast_break_animation_steps`. Routed via `resolve_fast_break_logic` (`phase_resolution.py`) — same pattern as `covert_release` schema emission, in the same block.
@@ -926,7 +926,7 @@ The **nearest** qualifying defender is the shot defender. If none qualify →
 | Case | Shot resolution |
 |---|---|
 | Contested | `calculate_shot_score(apply_defense=True)`; normal `shot_threshold` check decides MAKE / MISS / BLOCK. |
-| Uncontested | `apply_defense=False` + `fast_break_shot_threshold_override = 1` → automatic MAKE (matches OREB-putback uncontested rule). |
+| Uncontested | `apply_defense=False`, then universal uncontested inside/attack make roll (`apply_uncontested_inside_attack_make` in `BackEnd/utils/uncontested_shot.py`). |
 
 ## Race-pool definitions per FB type
 
@@ -1018,5 +1018,4 @@ Missed FB rebound-capture detail is backend-authored: the shot turn carries the 
 - **Backward compatibility:** legacy paths in RR/CR are preserved
   in-file behind the feature flags. Set either flag to `False` to
   revert that FB type without affecting the other.
-- **Gameplay-feel impact:** uncontested = auto-make introduces a higher
-  FB scoring rate compared to legacy. Tunable via the flag.
+- **Gameplay-feel impact:** uncontested inside/attack now use a discipline/fight roll (base 99) instead of auto-make; tunable via `uncontested_shot.py` constants.

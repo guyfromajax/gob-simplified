@@ -84,9 +84,7 @@ OREB putbacks now use a proximity-qualified shot defender system instead of the 
   - use the same `inside` shot logic as a standard inside shot with no passer
   - this includes standard make/miss thresholding, defensive foul checks, and and-1 / 2 FT outcomes
 - Uncontested putback:
-  - `y = random.randint(1, 100)`
-  - if `y < 100`, shot is good
-  - else the putback is missed and rebound resolution proceeds normally
+  - Uses the **universal uncontested inside/attack make helper** (`BackEnd/utils/uncontested_shot.py`): `make_threshold = 99 + offense discipline − defense fight`; `roll = random.randint(1, 100)` → make if `roll < make_threshold` (geo-gated to distance ≤ 11 from basket; outside shots excluded). Falls back to `shot_score >= shot_threshold` when helper is ineligible.
 
 ## Rebound Stat Recording
 

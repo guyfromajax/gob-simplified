@@ -441,8 +441,7 @@ the result of these stages.)
 
 **Stage 4: Shot resolution**
 - `calculate_shot_score(shooter, ..., defender=first_arriver_or_None, apply_defense=contested)`.
-- Uncontested → `apply_defense=False`, threshold override to 1 →
-  automatic MAKE (matches OREB putback uncontested rule and Steal-FB).
+- Uncontested → `apply_defense=False`, then universal uncontested inside/attack make roll (`BackEnd/utils/uncontested_shot.py`; same helper as OREB putback and Steal-FB).
 
 ### Steal Fast Break (steal-triggered)
 - Single resolver in `after_steal_fast_break.py`.

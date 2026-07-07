@@ -649,6 +649,63 @@ class TestDunkSelection:
         )
         assert stamp is None
 
+    def test_dunk_margin_threshold_by_offense_aggression(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from BackEnd.engine.shot_micro_movements import (
+            dunk_margin_threshold,
+            resolve_dunk_micro_stamp,
+        )
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 10,
+        )
+        off_passive = SimpleNamespace(
+            strategy_calls={"aggression_call": "passive"},
+            team_attributes={"fight": 0},
+        )
+        off_aggressive = SimpleNamespace(
+            strategy_calls={"aggression_call": "aggressive"},
+            team_attributes={"fight": 0},
+        )
+        assert dunk_margin_threshold(off_passive) == 150.0
+        assert dunk_margin_threshold(off_aggressive) == 50.0
+        kwargs = dict(
+            shot_type="inside",
+            shooter_coord={"x": 85.0, "y": 25.0},
+            shooter_player=self._shooter(height=80),
+            def_team=SimpleNamespace(team_attributes={"fight": 0}),
+            shot_score_pre_defense=150.0,
+            shot_defense_score_raw=50.0,
+            result_type="MAKE",
+            away_offense=False,
+        )
+        assert resolve_dunk_micro_stamp(off_team=off_passive, **kwargs) is None
+        assert resolve_dunk_micro_stamp(off_team=off_aggressive, **kwargs) is not None
+
+    def test_uncontested_skips_margin_gate(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import resolve_dunk_micro_stamp
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.randint",
+            lambda _a, _b: 10,
+        )
+        stamp = resolve_dunk_micro_stamp(
+            shot_type="inside",
+            shooter_coord={"x": 85.0, "y": 25.0},
+            shooter_player=self._shooter(height=80),
+            off_team=self._team(),
+            def_team=self._team(),
+            shot_score_pre_defense=0.0,
+            shot_defense_score_raw=0.0,
+            result_type="MAKE",
+            away_offense=False,
+            uncontested=True,
+        )
+        assert stamp is not None
+        assert stamp["family_id"] == "dunk"
+
     def test_resolve_made_dunk_family_by_distance(self, monkeypatch):
         from BackEnd.engine.shot_micro_movements import resolve_dunk_micro_stamp
 

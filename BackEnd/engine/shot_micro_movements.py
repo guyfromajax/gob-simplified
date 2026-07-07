@@ -35,6 +35,7 @@ from BackEnd.constants.shot_micro_movements_constants import (
     DUNK_HEIGHT_SCALE_BY_INCH,
     DUNK_LOCATION_MAX_GRID,
     DUNK_MARGIN_THRESHOLD,
+    DUNK_MARGIN_THRESHOLD_BY_OFFENSE_AGGRESSION,
     DUNK_MOVE_SPOTS_DRIVE,
     DUNK_MOVE_SPOTS_STRONG,
     DUNK_AG_THRESHOLD_DIST_9,
@@ -287,6 +288,16 @@ def dunk_in_play_margin(
     )
 
 
+def dunk_margin_threshold(off_team: Any) -> float:
+    """Offense ``aggression_call`` → dunk margin gate (Shot_System.md § Dunk in play)."""
+    call = str(
+        (getattr(off_team, "strategy_calls", None) or {}).get("aggression_call", "normal")
+    ).lower()
+    return float(
+        DUNK_MARGIN_THRESHOLD_BY_OFFENSE_AGGRESSION.get(call, DUNK_MARGIN_THRESHOLD)
+    )
+
+
 def resolve_dunk_micro_stamp(
     *,
     shot_type: str,
@@ -298,10 +309,13 @@ def resolve_dunk_micro_stamp(
     shot_defense_score_raw: float,
     result_type: str,
     away_offense: Optional[bool] = None,
+    uncontested: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Return dunk stamp dict or None (caller falls back to normal micro pool).
 
     See Shot_System.md § Dunk Selection & Block Interaction.
+
+    ``uncontested=True`` skips the margin gate (location + height roll still apply).
     """
     st = str(shot_type or "").lower()
     if st not in ("inside", "attack"):
@@ -316,15 +330,17 @@ def resolve_dunk_micro_stamp(
     if not dunk_location_eligible(dist, ag):
         return None
 
-    off_fight = float(getattr(off_team, "team_attributes", {}).get("fight", 0) or 0)
-    def_fight = float(getattr(def_team, "team_attributes", {}).get("fight", 0) or 0)
-    if dunk_in_play_margin(
-        shot_score_pre_defense,
-        shot_defense_score_raw,
-        off_fight=off_fight,
-        def_fight=def_fight,
-    ) <= DUNK_MARGIN_THRESHOLD:
-        return None
+    if not uncontested:
+        off_fight = float(getattr(off_team, "team_attributes", {}).get("fight", 0) or 0)
+        def_fight = float(getattr(def_team, "team_attributes", {}).get("fight", 0) or 0)
+        margin = dunk_in_play_margin(
+            shot_score_pre_defense,
+            shot_defense_score_raw,
+            off_fight=off_fight,
+            def_fight=def_fight,
+        )
+        if margin <= dunk_margin_threshold(off_team):
+            return None
 
     height = getattr(shooter_player, "height", None) or attrs.get("height")
     scale = dunk_height_scale(height)
@@ -359,6 +375,7 @@ def prepare_dunk_stamp(
     made: bool,
     is_block: bool = False,
     away_offense: Optional[bool] = None,
+    uncontested: bool = False,
 ) -> Tuple[Optional[Dict[str, Any]], bool]:
     """Resolve dunk stamp once; apply missed-dunk override to ``made``."""
     st = str(shot_type or "").lower()
@@ -375,6 +392,7 @@ def prepare_dunk_stamp(
         shot_defense_score_raw=float(shot_defense_score_raw or 0),
         result_type=pre_rt,
         away_offense=away_offense,
+        uncontested=uncontested,
     )
     if stamp and stamp.get("force_miss"):
         return stamp, False
@@ -737,6 +755,7 @@ def select_and_stamp_shot_micro(
     result_type: Optional[str] = None,
     dunk_stamp: Optional[Dict[str, Any]] = None,
     dunk_resolved: bool = False,
+    uncontested: bool = False,
 ) -> str:
     shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
     if away_offense is None:
@@ -762,6 +781,7 @@ def select_and_stamp_shot_micro(
             shot_defense_score_raw=float(shot_defense_score_raw or 0),
             result_type=str(result_type),
             away_offense=away_offense,
+            uncontested=uncontested,
         )
     if dunk_stamp:
         family_id = str(dunk_stamp["family_id"])

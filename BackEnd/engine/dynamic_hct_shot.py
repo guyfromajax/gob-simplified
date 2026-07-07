@@ -251,7 +251,21 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         contest_result = None
         contest_margin = None
         shot_defense_score_raw = 0.0
-        made = True
+        from BackEnd.utils.uncontested_shot import apply_uncontested_inside_attack_make
+
+        rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+        made = apply_uncontested_inside_attack_make(
+            shot_type=shot_type,
+            shooter_x=float(bh_target["x"]),
+            shooter_y=float(bh_target["y"]),
+            basket_x=float(rim["x"]),
+            basket_y=float(rim["y"]),
+            off_team=off_team,
+            def_team=def_team,
+            is_three=is_three,
+            shot_score=shot_score,
+            shot_threshold=off_team.team_attributes["shot_threshold"],
+        )
         game_state["no_defender_shots"] = int(
             game_state.get("no_defender_shots", 0) or 0
         ) + 1
@@ -273,6 +287,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
             shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
             made=made,
             away_offense=is_away_offense,
+            uncontested=not contested,
         )
 
     # --- Foul book-keeping (mirrors after_steal / OREB putback) -------------
@@ -516,6 +531,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         result_type=turn_result.get("result_type"),
         dunk_stamp=_dunk_stamp,
         dunk_resolved=shot_type in ("inside", "attack"),
+        uncontested=not contested,
     )
     apply_made_dunk_momentum(
         shooter,
@@ -668,6 +684,22 @@ def _roll_ab_shot(
         apply_defense=contested,
     )
     made = shot_score >= off_team.team_attributes["shot_threshold"]
+    if not contested:
+        from BackEnd.utils.uncontested_shot import apply_uncontested_inside_attack_make
+
+        rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+        made = apply_uncontested_inside_attack_make(
+            shot_type=shot_type,
+            shooter_x=float(shot_spot["x"]),
+            shooter_y=float(shot_spot["y"]),
+            basket_x=float(rim["x"]),
+            basket_y=float(rim["y"]),
+            off_team=off_team,
+            def_team=def_team,
+            is_three=is_three,
+            shot_score=shot_score,
+            shot_threshold=off_team.team_attributes["shot_threshold"],
+        )
     return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw
 
 
@@ -739,6 +771,7 @@ def _finalize_ab_shot(
             shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
             made=made,
             away_offense=is_away_offense,
+            uncontested=not contested,
         )
 
     has_and_one = False
@@ -991,6 +1024,7 @@ def _finalize_ab_shot(
         result_type=turn_result.get("result_type"),
         dunk_stamp=_dunk_stamp,
         dunk_resolved=shot_type in ("inside", "attack"),
+        uncontested=not contested,
     )
     apply_made_dunk_momentum(
         shooter,

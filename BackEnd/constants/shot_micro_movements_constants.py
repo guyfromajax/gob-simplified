@@ -89,7 +89,14 @@ DUNK_RATTLE_MS = 280.0
 DUNK_BALL_RAISE = 0.35  # fraction of player sprite display height above head
 
 # --- Dunk selection (Shot_System.md § Dunk Selection) ---
+# Default / fallback when offense aggression_call is unknown.
 DUNK_MARGIN_THRESHOLD = 100.0
+# dunk_in_play when (margin + off_fight − def_fight) > threshold(offense aggression).
+DUNK_MARGIN_THRESHOLD_BY_OFFENSE_AGGRESSION = {
+    "passive": 150.0,
+    "normal": 100.0,
+    "aggressive": 50.0,
+}
 DUNK_LOCATION_MAX_GRID = 10.0
 DUNK_DRIVE_MAX_DIST = 8.0  # ≤ this → family "dunk"; else "drive_dunk"
 DUNK_AG_THRESHOLD_DIST_9 = 50.0

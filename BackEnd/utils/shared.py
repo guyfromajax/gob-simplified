@@ -1087,7 +1087,7 @@ def resolve_offensive_rebound(game, rebounder):
 
             shot_manager = ShotManager(game)
             (
-                _,
+                shot_score,
                 shot_score_pre_defense,
                 shot_defense_score_for_sfx,
                 _,
@@ -1109,7 +1109,22 @@ def resolve_offensive_rebound(game, rebounder):
             putback_contest_result = None
             putback_contest_margin = None
             shot_defense_score_raw = 0.0
-            made = random.randint(1, 100) < 100
+            from BackEnd.utils.uncontested_shot import apply_uncontested_inside_attack_make
+
+            shot_threshold = off_team.team_attributes["shot_threshold"]
+            shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, game)
+            made = apply_uncontested_inside_attack_make(
+                shot_type=shot_type,
+                shooter_x=shooter_x,
+                shooter_y=shooter_y,
+                basket_x=float(basket_x),
+                basket_y=25.0,
+                off_team=off_team,
+                def_team=def_team,
+                is_three=False,
+                shot_score=shot_score,
+                shot_threshold=shot_threshold,
+            )
 
         _dunk_stamp = None
         if shot_type in ("inside", "attack"):
@@ -1125,6 +1140,7 @@ def resolve_offensive_rebound(game, rebounder):
                 shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
                 made=made,
                 away_offense=off_team.team_id == game.away_team.team_id,
+                uncontested=not contested,
             )
 
         if not contested:
@@ -1224,6 +1240,7 @@ def resolve_offensive_rebound(game, rebounder):
             result_type="MAKE" if made else "MISS",
             dunk_stamp=_dunk_stamp,
             dunk_resolved=shot_type in ("inside", "attack"),
+            uncontested=not contested,
         )
         from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 

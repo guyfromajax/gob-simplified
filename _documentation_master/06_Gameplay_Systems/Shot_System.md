@@ -22,9 +22,14 @@
    - **HCO / Final Turn** (`offensive_state == "HCO"`): `has_contest = bool(defender or second_defender)` — i.e. **role-based** (whether a contesting defender role is assigned), not a geometry box.
    - **Non-HCO** (FCP, HCT, fast break): Euclidean geometry — **every** player in the defensive lineup is checked, and `has_contest` is true if any lies within **`CONTEST_EUCLIDEAN_RADIUS` (11)** grid spots of the shooter.
 4. **Rim box:** Axis-aligned box around the attacking basket: **|shooter_x − basket_x| ≤ 6** and **|shooter_y − basket_y| ≤ 6** (same margin on both axes).
-5. **Unguarded rim shortcut (99% make):** If `shot_type` is **inside** or **attack**, the attempt is **not** a three-pointer, the shooter is **in the rim box**, and **`has_contest` is false** → resolve make/miss as **make** unless `random.randint(1, 100) == 100` (1% miss). This path **does not** run `calculate_shot_score` defense, **does not** run block reconciliation, charge/blocking foul, or defensive shooting fouls.
-6. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`. **Make/miss then differs by shot type:** undefended **outside** uses the bespoke rule `shot_score > (210 − shooter.CH + euclidean(shooter, basket))` (see Step 9); undefended **inside/attack** use the standard `shot_score >= shot_threshold`.
-7. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
+5. **Uncontested inside/attack make rule (universal helper):** Implemented in `BackEnd/utils/uncontested_shot.py`. Applies when `shot_type` is **inside** or **attack**, the attempt is **not** a three-pointer, and Euclidean distance from the shooter to the attacking basket is **≤ 11** (`UNCONTESTED_INSIDE_ATTACK_MAX_DIST`, same as contest radius). **Outside shots are excluded.**
+   - `make_threshold = 99 + offense_team.discipline − defense_team.fight` (clamped to 1–100)
+   - At distance **≥ 12**: `make_threshold −= 2 × (distance − 11)` (farther = lower threshold = harder make)
+   - `roll = random.randint(1, 100)` → **make** if `roll < make_threshold`, else miss
+   - When the helper does **not** apply (outside type, three, or distance > 11): uncontested inside/attack fall back to `shot_score >= shot_threshold`
+6. **Rim box shortcut path:** If `shot_type` is **inside** or **attack**, not a three, shooter is **in the rim box** (|shooter_x − basket_x| ≤ 6 and |shooter_y − basket_y| ≤ 6), **`has_contest` is false**, and not motion-geometry contest → resolve make/miss via the **universal uncontested helper** (item 5). This path **does not** run `calculate_shot_score` defense, **does not** run block reconciliation, charge/blocking foul, or defensive shooting fouls.
+7. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`. **Make/miss then differs by shot type:** undefended **outside** uses the bespoke rule `shot_score > (210 − shooter.CH + euclidean(shooter, basket))` (see Step 9); undefended **inside/attack** use the universal uncontested helper when geo-eligible, else `shot_score >= shot_threshold`.
+8. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
 
 **Three-point classification**
 
@@ -94,7 +99,7 @@
    - Implemented in `shot_manager.py` as `_hco_zone_shot_threshold_delta()` after crowd / three-point / variant / shot-at-1 threshold lines.
 
 7. Location layer → then Calculate Shot Score (`calculate_shot_score()`)
-   - After shot threshold modifiers: compute shooter `(x,y)`, attacking basket, `has_contest`, and whether the **unguarded rim shortcut** applies (see **Location** above). Shortcut: 99% make, skip defense/foul/block/charge pipeline for that outcome.
+   - After shot threshold modifiers: compute shooter `(x,y)`, attacking basket, `has_contest`, and whether the **rim box shortcut** applies (see **Location** above). Rim shortcut: universal uncontested inside/attack roll (item 5), skip defense/foul/block/charge pipeline for that outcome.
    - Otherwise `calculate_shot_score(..., apply_defense=has_contest)`.
    a. Base Score: `sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.items()) * random.randint(1, 6)`
       - Uses shot_type (inside/attack/outside) instead of playcall for attribute weights
@@ -314,7 +319,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
-7. **Location-based contest**: HCO/Final Turn → `has_contest` is role-based (`bool(defender or second_defender)`); non-HCO → Euclidean radius around shooter (`CONTEST_EUCLIDEAN_RADIUS` = 11) vs all defenders. Motion attack drive uses the same radius. Rim box around attacking basket (±6, `RIM_BOX_HALF_SPAN`); unguarded rim shortcut (99% make); `apply_defense` only when `has_contest` (unless shortcut applies)
+7. **Location-based contest**: HCO/Final Turn → `has_contest` is role-based (`bool(defender or second_defender)`); non-HCO → Euclidean radius around shooter (`CONTEST_EUCLIDEAN_RADIUS` = 11) vs all defenders. Motion attack drive uses geometry contest at shot resolve. Rim box around attacking basket (±6, `RIM_BOX_HALF_SPAN`); rim-box shortcut uses universal uncontested inside/attack helper; `apply_defense` only when `has_contest` (unless rim shortcut applies)
 8. **Motion Attack Penalty**: Applied when Motion offense attack shot is stopped short of basket (penalty = distance to basket)
 9. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
 10. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)
@@ -342,6 +347,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 - `BackEnd/models/shot_manager.py`: `resolve_shot()`, `_build_shot_classification()`, `_stamp_shot_classification()`, `_hco_zone_shot_threshold_delta()`, `calculate_shot_score()`, `check_defensive_foul_on_shot()`, `resolve_fast_break_shot()`
 - `BackEnd/utils/shot_geometry.py`: `is_three_point_shot_from_coords()`, `classify_shot_value()`
 - `BackEnd/constants/__init__.py`: PLAYCALL_ATTRIBUTE_WEIGHTS, THREE_POINT_SPOTS, PAINT_SPOTS
+- `BackEnd/utils/uncontested_shot.py`: universal uncontested inside/attack make roll (`resolve_uncontested_inside_attack_make`, `apply_uncontested_inside_attack_make`)
 - `BackEnd/utils/shared.py`: `calculate_gravity_score()`, `calculate_screen_score()`, `calculate_bounce_spot()`, `determine_rebounder()`, OREB putback forced-two classification
 - `BackEnd/engine/dynamic_hct_shot.py`: Dynamic HCT procedural shot classification payloads
 - `BackEnd/engine/skeleton_step_emitter.py`: made-three SFX gate from `is_three_point_shot`
@@ -376,11 +382,21 @@ Distance = euclidean grid distance from shooter coord to **`basketSpot`** (home 
 Uses the same score pair as `resolve_contest()`:
 
 ```text
-margin = shot_score_pre_defense − shot_defense_score_raw
-dunk_in_play = (margin + off_fight − def_fight) > 100
+margin = shot_score_pre_defense − shot_defense_score_raw + off_fight − def_fight
+dunk_in_play = margin > threshold(offense aggression_call)
 ```
 
-Constants: `DUNK_MARGIN_THRESHOLD = 100` in `shot_micro_movements_constants.py`.
+Threshold by offense **`aggression_call`** (`strategy_calls`, same break roll as tempo/aggression bars):
+
+| Offense aggression | Margin threshold |
+|--------------------|------------------|
+| passive | 150 |
+| normal | 100 |
+| aggressive | 50 |
+
+Constants: `DUNK_MARGIN_THRESHOLD_BY_OFFENSE_AGGRESSION` in `shot_micro_movements_constants.py` (fallback `DUNK_MARGIN_THRESHOLD = 100`).
+
+**Uncontested inside/attack** (no shot defender within contest radius, or rim-unguarded / motion-attack uncontested paths): skip the margin gate — location + AG + height roll still apply. Callers pass `uncontested=True` into `resolve_dunk_micro_stamp()` / `prepare_dunk_stamp()`.
 
 ### Height feasibility roll
 

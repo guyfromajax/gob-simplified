@@ -269,6 +269,7 @@ def _resolve_shot_attempt(
     )
     shot_manager = getattr(game, "shot_manager", None) or ShotManager(game)
     is_three = False
+    is_away_offense = off_team.team_id == game.away_team.team_id
 
     if contested and shot_defender is not None:
         (
@@ -320,7 +321,21 @@ def _resolve_shot_attempt(
         contest_result = None
         contest_margin = None
         shot_defense_score_raw = 0.0
-        made = True
+        from BackEnd.utils.uncontested_shot import apply_uncontested_inside_attack_make
+
+        rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
+        made = apply_uncontested_inside_attack_make(
+            shot_type=shot_type,
+            shooter_x=float(shooter_location["x"]),
+            shooter_y=float(shooter_location["y"]),
+            basket_x=float(rim["x"]),
+            basket_y=float(rim["y"]),
+            off_team=off_team,
+            def_team=def_team,
+            is_three=is_three,
+            shot_score=shot_score,
+            shot_threshold=off_team.team_attributes["shot_threshold"],
+        )
         game_state["no_defender_shots"] = int(game_state.get("no_defender_shots", 0) or 0) + 1
         increment_no_defender_shot_breakdown(
             game_state, game_state.get("offensive_state"), "after_steal"
@@ -344,6 +359,7 @@ def _resolve_shot_attempt(
             shot_defense_score_raw=float(shot_defense_score_raw if contested else 0),
             made=made,
             away_offense=is_away_offense,
+            uncontested=not contested,
         )
 
     has_and_one = False
@@ -423,6 +439,7 @@ def _resolve_shot_attempt(
             "result_type": "MAKE" if made else "MISS",
             "dunk_stamp": _dunk_stamp,
             "dunk_resolved": shot_type in ("inside", "attack"),
+            "uncontested": not contested,
         },
     }
 

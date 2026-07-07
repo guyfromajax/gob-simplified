@@ -7,6 +7,11 @@ from BackEnd.constants.momentum import (
     MO_AND_ONE_DELTA,
 )
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum, mo_shot_roll
+from BackEnd.utils.uncontested_shot import (
+    apply_uncontested_inside_attack_make,
+    compute_uncontested_inside_attack_make_threshold,
+    resolve_uncontested_inside_attack_make,
+)
 from BackEnd.utils.shot_split_tracker import (
     record_shot_split,
     classify_resolve_shot_turn_type,
@@ -892,8 +897,20 @@ class ShotManager:
         _dunk_resolved = False
 
         if rim_unguarded_99:
-            # Unguarded attempt in rim box: 99% make; skip defense, fouls, block recon, charge.
-            made = random.randint(1, 100) != 100
+            # Unguarded attempt in rim box: universal uncontested inside/attack roll;
+            # skip defense, fouls, block recon, charge.
+            made = resolve_uncontested_inside_attack_make(
+                shot_type=shot_type,
+                shooter_x=sx,
+                shooter_y=sy,
+                basket_x=bx,
+                basket_y=by,
+                off_team=off_team,
+                def_team=def_team,
+                is_three=is_three,
+            )
+            if made is None:
+                made = True
             d_foul = False
             foul_player = None
             shot_score = 0
@@ -920,7 +937,18 @@ class ShotManager:
                 shooter_location_str,
                 apply_defense=False,
             )
-            made = random.randint(1, 100) < 100
+            made = apply_uncontested_inside_attack_make(
+                shot_type=shot_type,
+                shooter_x=sx,
+                shooter_y=sy,
+                basket_x=bx,
+                basket_y=by,
+                off_team=off_team,
+                def_team=def_team,
+                is_three=is_three,
+                shot_score=shot_score,
+                shot_threshold=shot_threshold,
+            )
             self.game_state["no_defender_shots"] = int(
                 self.game_state.get("no_defender_shots", 0) or 0
             ) + 1
@@ -1354,14 +1382,38 @@ class ShotManager:
             # the shot-threshold scale MAX (SHOT_THRESHOLD_MAX) − shooter CH + shooter's Euclidean
             # distance to the basket — higher chemistry / closer = easier. The uncontested-3 bar
             # always tracks the top of the shot_threshold range, so it moves automatically when the
-            # scale is retuned (see Shot_Threshold_Scale_Tuning.md). Undefended inside & attack shots
-            # keep their existing handling (rim-unguarded shortcut or the standard shot_threshold
-            # compare). `shot_threshold` itself is left intact for downstream variant selection;
-            # `_make_bar` is the effective bar used for the decision (and the recon log).
+            # scale is retuned (see Shot_Threshold_Scale_Tuning.md). Undefended inside/attack
+            # within geo range use the universal uncontested roll helper; farther uncontested
+            # inside/attack fall back to ``shot_score >= shot_threshold``.
             if not has_contest and shot_type == "outside":
                 _undef_ch = float((getattr(shooter, "attributes", None) or {}).get("CH", 0) or 0)
                 _make_bar = float(SHOT_THRESHOLD_MAX) - _undef_ch + math.hypot(float(sx) - float(bx), float(sy) - float(by))
                 made = shot_score > _make_bar
+            elif not has_contest:
+                _helper_threshold = compute_uncontested_inside_attack_make_threshold(
+                    shooter_x=sx,
+                    shooter_y=sy,
+                    basket_x=bx,
+                    basket_y=by,
+                    off_team=off_team,
+                    def_team=def_team,
+                )
+                _helper_make = resolve_uncontested_inside_attack_make(
+                    shot_type=shot_type,
+                    shooter_x=sx,
+                    shooter_y=sy,
+                    basket_x=bx,
+                    basket_y=by,
+                    off_team=off_team,
+                    def_team=def_team,
+                    is_three=is_three,
+                )
+                if _helper_make is not None and _helper_threshold is not None:
+                    _make_bar = _helper_threshold
+                    made = _helper_make
+                else:
+                    _make_bar = shot_threshold
+                    made = shot_score >= shot_threshold
             else:
                 _make_bar = shot_threshold
                 made = shot_score >= shot_threshold
@@ -1426,6 +1478,11 @@ class ShotManager:
             from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
 
             is_away_offense_dunk = off_team.team_id == self.game.away_team.team_id
+            _uncontested_dunk = (
+                rim_unguarded_99
+                or motion_uncontested
+                or (not has_contest and shot_type in ("inside", "attack"))
+            )
             _cached_dunk_stamp, made = prepare_dunk_stamp(
                 shot_type=shot_type,
                 shooter_coord={"x": float(sx), "y": float(sy)},
@@ -1437,6 +1494,7 @@ class ShotManager:
                 made=made,
                 is_block=bool(getattr(self, "_block_spot", None)),
                 away_offense=is_away_offense_dunk,
+                uncontested=_uncontested_dunk,
             )
             _dunk_resolved = True
             if _cached_dunk_stamp and _cached_dunk_stamp.get("force_miss"):
@@ -2424,6 +2482,11 @@ class ShotManager:
             }
             _micro_kwargs["dunk_stamp"] = _cached_dunk_stamp
             _micro_kwargs["dunk_resolved"] = _dunk_resolved
+            _micro_kwargs["uncontested"] = (
+                rim_unguarded_99
+                or motion_uncontested
+                or (not has_contest and shot_type in ("inside", "attack"))
+            )
             if self.game_state.get("final_turn"):
                 _micro_kwargs["max_pre_release_seconds"] = self.game_state.get(
                     "_final_turn_micro_budget_seconds"

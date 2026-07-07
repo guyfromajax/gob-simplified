@@ -173,7 +173,7 @@ After all drive-step movement is resolved, count defenders whose **end coords** 
 
 | Defenders at spot | Shoot / dish odds | Shot resolution |
 |-------------------|-------------------|-----------------|
-| 0 (unguarded) | Always shoot | OREB uncontested rule (`apply_defense=False`, 99% make) |
+| 0 (unguarded) | Always shoot | Universal uncontested inside/attack helper (`apply_uncontested_inside_attack_make`) |
 | 1 | 75% shoot / 25% dish | Contested `calculate_shot_score` when shooting |
 | 2+ (double team) | 25% shoot / 75% dish | If shoot: **+100 defense shot score bonus** (×0.2 impact on final score) |
 
@@ -185,7 +185,7 @@ Clearance midLane spacer can also be the driver dish target.
 
 **Dish shot type:** Inside if receiver end coord ≤ **15 euclidean** from attacking basket; else Outside. Updates `shot_type` / `playcall` returned from `resolve_motion_offense_shot()`.
 
-**Unguarded dish receiver:** OREB uncontested rule (same as unguarded driver shoot).
+**Unguarded dish receiver:** Same universal uncontested inside/attack helper as unguarded driver shoot.
 
 ---
 
@@ -196,7 +196,7 @@ Clearance midLane spacer can also be the driver dish target.
 | Flag | Purpose |
 |------|---------|
 | `motion_attack_geometry_contest` | Use euclidean ≤10 contest (not role-based HCO contest) |
-| `motion_attack_uncontested` | OREB 99% make path in `shot_manager.resolve_shot()` |
+| `motion_attack_uncontested` | Universal uncontested inside/attack make path in `shot_manager.resolve_shot()` |
 | `motion_attack_defense_bonus` | +100 defense score when double-teamed driver shoots |
 
 Contest defenders assigned by closest-in-range geometry at shot resolve time (after `apply_coords_from_animations_list`).
@@ -240,7 +240,7 @@ High-level design knobs for attack-drive logic. **Code lives in** `attack_drive_
 - When dish chosen → **75%** prefer interior target (midLane → lowPost → midPost) / **25%** random teammate
 
 **Shot resolution bonuses (at `resolve_shot`)**
-- Unguarded driver or dish receiver → **99%** make (OREB uncontested path)
+- Unguarded driver or dish receiver → universal uncontested inside/attack roll (`BackEnd/utils/uncontested_shot.py`)
 - Double-team + driver shoots → **+100** defense shot score bonus (× **0.2** applied to final shot score)
 - Charge / blocking foul on attack shots → see [`Shot_System.md`](Shot_System.md) (`CHARGE_THRESHOLD` **−240**, `BLOCKING_FOUL_THRESHOLD` **+220**)
 
@@ -348,7 +348,7 @@ High-level design knobs for attack-drive logic. **Code lives in** `attack_drive_
 **Shot Calculation:**
 - Uses `playcall` / `motion_shot_type` for attribute weights (Inside / Attack / Outside)
 - Motion attack drives with `motion_attack_geometry_contest`: contest via euclidean ≤10 at resolve time
-- Unguarded motion attack (driver or dish receiver): OREB rule — `apply_defense=False`, 99% make
+- Unguarded motion attack (driver or dish receiver): universal uncontested inside/attack helper — `apply_defense=False` for offense score, then `apply_uncontested_inside_attack_make()`
 - Double-team driver shoot: +100 defense score bonus
 - Applies attack penalty if `attack_penalty > 0`
 - No variant modifier for Motion plays (unlike Set Plays)
@@ -369,6 +369,7 @@ See also: [`Shot_System.md`](Shot_System.md) for general shot resolution; uncont
   - Constants: `ATTACK_DRIVE_CONTEST_RADIUS`, `ATTACK_DRIVE_INSIDE_RADIUS`
 - `BackEnd/engine/skeleton_step_emitter.py` — UESS step emission; `attack_drive_driver` / shooter gates
 - `BackEnd/models/shot_manager.py` — `resolve_shot()` motion attack geometry + uncontested handling
+- `BackEnd/utils/uncontested_shot.py` — universal uncontested inside/attack make roll
 - `BackEnd/utils/shared.py` — `calculate_ball_handling_score()`, `calculate_defender_pressure_score()`, `player_read()`
 - Attribute weights: `BackEnd/constants/__init__.py` → `PLAYCALL_ATTRIBUTE_WEIGHTS`
 
