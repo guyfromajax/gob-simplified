@@ -72,7 +72,7 @@ def _drive_onset_coord(
         if isinstance(bh_to, dict) and "x" in bh_to and "y" in bh_to:
             return {"x": float(bh_to["x"]), "y": float(bh_to["y"])}
 
-    return _coord_of(shooter)
+    return _coord_of(shooter)  # coord-source-ok: degenerate fallback — primary returns the rendered rr_to (rim_runner burst) / bh_to (triangle setup); only reached when neither backend datum is present
 
 
 def _pick_unified_contest_defender(

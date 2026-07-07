@@ -136,7 +136,7 @@ def _lineup_pos(lineup: Dict[str, Any], player: Any) -> str:
 
 
 def _lineup_starts_by_pos(lineup: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
-    return {pos: _coord_of(p) for pos, p in (lineup or {}).items() if p is not None}
+    return {pos: _coord_of(p) for pos, p in (lineup or {}).items() if p is not None}  # coord-source-ok: player.coords helper; after-steal decision seeds migrated to rendered coords, remaining live callers are RR/CR degenerate fallbacks (already annotated)
 
 
 def _prior_final_coords(game: Any) -> Dict[str, Any]:
@@ -200,7 +200,7 @@ def _build_offense_end_coords(
         if not pid:
             continue
         rate = _ag_grid_per_game_sec(player, "sprint")
-        end_coords[pid] = _interpolated_position(_coord_of(player), target, rate, t_elapsed)
+        end_coords[pid] = _interpolated_position(_coord_of(player), target, rate, t_elapsed)  # coord-source-ok: render-authoring — off-ball offense END coords for the emitter (interpolated toward a sampled spot), not a game decision; start base is the post-steal snapshot == the rendered drive-start
     return end_coords
 
 
@@ -215,7 +215,7 @@ def _offense_start_coords_by_id(
     for player in off_lineup.values():
         pid = _safe_id(player)
         if pid:
-            coords[pid] = _coord_of(player)
+            coords[pid] = _coord_of(player)  # coord-source-ok: render-authoring — start coords for the emitter's transition planner (author_transition_end_coords), not a game decision; the post-steal snapshot equals the rendered drive-start (after-steal divergence 0)
     if stealer_id in coords:
         coords[stealer_id] = dict(bh_start)
     return coords
@@ -228,7 +228,7 @@ def _defense_start_coords_by_id(
     for player in def_lineup.values():
         pid = _safe_id(player)
         if pid:
-            coords[pid] = _coord_of(player)
+            coords[pid] = _coord_of(player)  # coord-source-ok: render-authoring — start coords for the emitter's transition planner (author_transition_end_coords), not a game decision; the post-steal snapshot equals the rendered drive-start (after-steal divergence 0)
     return coords
 
 
@@ -771,7 +771,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
     bh_start = (
         dict(game_state["last_stealer_coords"])
         if isinstance(game_state.get("last_stealer_coords"), dict)
-        else _coord_of(stealer)
+        else _coord_of(stealer)  # coord-source-ok: degenerate fallback — primary is last_stealer_coords (the rendered steal coord)
     )
     bh_pos = _lineup_pos(off_lineup, stealer)
 
