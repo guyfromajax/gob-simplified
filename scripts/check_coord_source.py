@@ -22,25 +22,40 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Scoped decision/resolver modules (expand as more turns are migrated).
-SCOPE = [
-    "BackEnd/engine/fb_drive_resolution.py",
-    "BackEnd/engine/rim_runner_drive_integration.py",
-    "BackEnd/engine/covert_release_drive_integration.py",
-    "BackEnd/engine/after_steal_drive_integration.py",
-    "BackEnd/engine/rim_runner_fast_break.py",
-]
+# Scope: ALL engine decision/resolver modules — every *.py under BackEnd/engine
+# EXCEPT the step emitters. Emitters are the render source of truth and are
+# ALLOWED to read player.coords (they author where players are drawn); decision
+# logic must read the emitter's output instead. (2026-07-07: widened from the 5
+# FB modules to all turns once the FB decision path hit 0 — a ratchet so a new
+# stale seed in ANY turn fails CI. Discovery found the player.coords-read pattern
+# is FB-concentrated; other turns start near 0.)
+def _scope():
+    import glob
+    out = []
+    for path in sorted(glob.glob(os.path.join(REPO, "BackEnd/engine/*.py"))):
+        base = os.path.basename(path)
+        if base.endswith("_emitter.py") or "step_emitter" in base:
+            continue
+        out.append(os.path.relpath(path, REPO))
+    return out
 
-# Per-scope baseline of KNOWN stale-seed call sites (drive to 0 as turns migrate).
+
+SCOPE = _scope()
+
+# Per-scope baseline of KNOWN stale-seed sites (drive to 0 as turns migrate).
 # Update DOWN only, never up — an increase is a regression the guard must catch.
-BASELINE = 0  # 2026-07-07: COMPLETE — all FB decision seeds read emitter coords; render-authoring/fallbacks annotated. Guard holds at 0 (any new stale seed fails CI).
+BASELINE = 0  # placeholder; set from the run below
 
-# The concrete stale sources: both helpers read player.coords. Their CALL sites in
-# decision code are the violations (helper definitions / docstrings are exempt).
+# Stale sources = reading a player's MUTABLE position: the FB helpers
+# (_coord_of / _lineup_starts_by_pos, both wrap player.coords) and direct
+# ``X.coords`` attribute reads. Dict access (``["coords"]`` = emitter step data)
+# is NOT flagged. Writes (``X.coords = ...``) are excluded separately.
 PATTERNS = [
     re.compile(r"\b_lineup_starts_by_pos\s*\("),
     re.compile(r"\b_coord_of\s*\("),
+    re.compile(r"\.coords\b"),
 ]
+WRITE_PATTERN = re.compile(r"\.coords\s*=")          # X.coords = ... is a write, not a decision read
 OK_ANNOTATION = "# coord-source-ok:"
 
 
@@ -48,11 +63,21 @@ def _exempt(line: str) -> bool:
     s = line.strip()
     if s.startswith(("#", "from ", "import ", "def _lineup_starts_by_pos", "def _coord_of")):
         return True
-    if "``" in line:                      # docstring prose mentioning the helper
+    if s.startswith(('"""', "'''")):      # single-line / opening docstring prose
         return True
     if OK_ANNOTATION in line:             # explicit render-consistent/infra exemption
         return True
+    if "logging." in line or "logger." in line:   # log strings mention coords for debugging, not decisions
+        return True
     return False
+
+
+def _code_part(line: str) -> str:
+    """The line with any trailing ``# ...`` comment stripped, so ``.coords``
+    mentioned in an explanatory comment isn't matched as a read. (Naive on ``#``
+    inside string literals — acceptable; exemptions are checked on the full line
+    first.)"""
+    return line.split("#", 1)[0]
 
 
 def violations():
@@ -61,11 +86,24 @@ def violations():
         path = os.path.join(REPO, rel)
         if not os.path.exists(path):
             continue
+        in_docstring = False
         with open(path, "r", encoding="utf-8") as fh:
             for i, line in enumerate(fh, 1):
+                # Skip docstring bodies (prose that may mention .coords / helpers).
+                fences = line.count('"""') + line.count("'''")
+                if in_docstring:
+                    if fences % 2 == 1:
+                        in_docstring = False
+                    continue
+                if fences % 2 == 1:
+                    in_docstring = True
+                    continue
                 if _exempt(line):
                     continue
-                if any(p.search(line) for p in PATTERNS):
+                code = _code_part(line)
+                if WRITE_PATTERN.search(code):   # X.coords = ... is a write, not a read
+                    continue
+                if any(p.search(code) for p in PATTERNS):
                     hits.append((rel, i, line.strip()))
     return hits
 

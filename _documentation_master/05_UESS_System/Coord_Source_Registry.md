@@ -26,7 +26,9 @@ When a step is single-purpose the boundary is obvious. When a step is **multi-ph
 
 ## Enforcement
 
-**Guard:** [`scripts/check_coord_source.py`](../../scripts/check_coord_source.py) — greps the scoped decision modules for `_lineup_starts_by_pos(` / `_coord_of(` call sites and fails if the count exceeds the recorded `BASELINE` (a ratchet). Run: `python scripts/check_coord_source.py`. A legitimate render-consistent seed or infra line can be exempted inline with `# coord-source-ok: <reason>`.
+**Guard:** [`scripts/check_coord_source.py`](../../scripts/check_coord_source.py) — scans **all** `BackEnd/engine/*.py` decision modules (everything except the `*_emitter.py` render source) for player-position reads: `_lineup_starts_by_pos(` / `_coord_of(` call sites **and direct `.coords` attribute reads**. Fails if the count exceeds `BASELINE` (a ratchet). Skips docstrings, comments, log strings, and `.coords` writes. Run: `python scripts/check_coord_source.py`. A legitimate render-consistent seed / infra / dead-legacy line can be exempted inline with `# coord-source-ok: <reason>`.
+
+**Scope widened 2026-07-07 (from 5 FB modules → all 37 engine decision modules) once the FB path hit 0.** A discovery scan found the stale-`player.coords`-read pattern is **FB-concentrated** — FB uniquely skips `apply_coords`, freezing `player.coords` at start-of-break; other turns (HCO/HCT/FCP/DREB/OREB) run `apply_coords` and don't read `player.coords` for decisions. So the widened guard is a **ratchet** protecting the already-clean turns, not a backlog. Only pre-existing hits: the dead-legacy after-steal path (`_resolve_after_steal_legacy`, bypassed while `USE_FB_DRIVE_RESOLUTION_AFTER_STEAL=True`), annotated. NOTE: HCT/FCP have a *different* drift mechanism (the trap converge/stopper **snap** — a defender teleported to the trap, not a `player.coords` read) that this guard does **not** catch; that's a separate design item.
 
 **Migration:** convert each site to read the rendered coord (via the *emit-then-resolve* pattern — emit a step's movement, seed the next decision from its `end.coords`), annotate/remove the call, then **lower `BASELINE`** to lock the win.
 

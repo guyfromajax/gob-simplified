@@ -382,7 +382,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
     bh_start = (
         dict(game_state["last_stealer_coords"])
         if isinstance(game_state.get("last_stealer_coords"), dict)
-        else _coord_of(stealer)
+        else _coord_of(stealer)  # coord-source-ok: dead legacy path (_resolve_after_steal_legacy) — bypassed while USE_FB_DRIVE_RESOLUTION_AFTER_STEAL=True; live path is resolve_after_steal_with_drive_resolution (rendered-seeded)
     )
 
     # --- Universal helper: shot geometry + contested decision --------------
@@ -396,7 +396,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
     for d in defenders:
         d_id = _safe_id(d)
         if d_id:
-            defender_starts[d_id] = _coord_of(d)
+            defender_starts[d_id] = _coord_of(d)  # coord-source-ok: dead legacy path (_resolve_after_steal_legacy, bypassed while USE_FB_DRIVE_RESOLUTION_AFTER_STEAL=True)
 
     geometry = compute_fb_shot_geometry(
         shooter=stealer,
@@ -426,7 +426,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         p_id = _safe_id(player)
         if p_id is None:
             continue
-        p_start = _coord_of(player)
+        p_start = _coord_of(player)  # coord-source-ok: dead legacy path (_resolve_after_steal_legacy, bypassed while USE_FB_DRIVE_RESOLUTION_AFTER_STEAL=True)
         p_rate = _ag_grid_per_game_sec(player, "sprint")
         end_coords[p_id] = _interpolated_position(
             p_start, target_spot, p_rate, t_shooter
