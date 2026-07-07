@@ -139,6 +139,38 @@ def _lineup_starts_by_pos(lineup: Dict[str, Any]) -> Dict[str, Dict[str, float]]
     return {pos: _coord_of(p) for pos, p in (lineup or {}).items() if p is not None}
 
 
+def _prior_final_coords(game: Any) -> Dict[str, Any]:
+    """The steal turn's rendered ``final_coords`` (id → coord) — the SAME source
+    the after-steal emitter seeds its drive-start from (``prior_turn.final_coords``,
+    after_steal_fast_break_step_emitter.py). At resolution time the after-steal
+    turn is not yet appended, so ``game.turns[-1]`` is the steal turn for both the
+    resolver and the emitter → single coord source by construction."""
+    turns = getattr(game, "turns", None) or []
+    prior = turns[-1] if turns else None
+    fc = prior.get("final_coords") if isinstance(prior, dict) else None
+    return fc if isinstance(fc, dict) else {}
+
+
+def _rendered_starts_by_pos(
+    lineup: Dict[str, Any], rendered_by_id: Dict[str, Any]
+) -> Dict[str, Dict[str, float]]:
+    """Map the emitter's rendered drive-start ``{player_id: coord}`` to
+    ``{pos: coord}`` for the resolver's start-of-drive seeds — the single-coord-
+    source seat. Falls back to the player's live coord for any id the render
+    didn't cover (the emitter falls back the same way)."""
+    out: Dict[str, Dict[str, float]] = {}
+    for pos, p in (lineup or {}).items():
+        if p is None:
+            continue
+        pid = _safe_id(p)
+        entry = rendered_by_id.get(pid) or rendered_by_id.get(str(pid)) if pid else None
+        if isinstance(entry, dict) and "x" in entry and "y" in entry:
+            out[pos] = {"x": float(entry["x"]), "y": float(entry["y"])}
+        else:
+            out[pos] = _coord_of(p)  # coord-source-ok: per-player fallback when the rendered snapshot lacks this id (mirrors the emitter's fallback)
+    return out
+
+
 def _player_by_id(lineup: Dict[str, Any], player_id: Optional[str]) -> Optional[Any]:
     if not player_id:
         return None
@@ -746,6 +778,14 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
     pass_chain: List[Dict[str, Any]] = []
     drive: Dict[str, Any] = {}
     shot_spot = _compute_bh_target(is_away_offense)
+    # Emit-then-resolve: seed the cutoff/meet decision from the SAME rendered
+    # drive-start the emitter uses (the steal turn's final_coords) rather than
+    # player.coords — single coord source by construction. (player.coords already
+    # equals final_coords here, so values are unchanged; this makes it structural,
+    # not coincidental, and can't silently drift.)
+    _rendered_start = _prior_final_coords(game)
+    _off_starts = _rendered_starts_by_pos(off_lineup, _rendered_start)
+    _def_starts = _rendered_starts_by_pos(def_lineup, _rendered_start)
     for _hop in range(FB_AS_MAX_PASS_AHEAD + 1):
         shot_spot = _compute_bh_target(is_away_offense)
         drive = _resolve_drive_with_cascade(
@@ -755,9 +795,9 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                 bh_start=current_bh_start,
                 shot_spot=shot_spot,
                 off_lineup=off_lineup,
-                off_starts=_lineup_starts_by_pos(off_lineup),
+                off_starts=_off_starts,
                 def_lineup=def_lineup,
-                def_starts=_lineup_starts_by_pos(def_lineup),
+                def_starts=_def_starts,
                 off_team=off_team,
                 def_team=def_team,
                 shot_manager=shot_manager,

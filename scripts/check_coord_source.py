@@ -33,7 +33,7 @@ SCOPE = [
 
 # Per-scope baseline of KNOWN stale-seed call sites (drive to 0 as turns migrate).
 # Update DOWN only, never up — an increase is a regression the guard must catch.
-BASELINE = 14  # 2026-07-07: RR/Triangle + Covert Release drives migrated to emit-then-resolve. Drive to 0.
+BASELINE = 12  # 2026-07-07: RR/Triangle + Covert Release + After-Steal drive-start seeds migrated. Drive to 0.
 
 # The concrete stale sources: both helpers read player.coords. Their CALL sites in
 # decision code are the violations (helper definitions / docstrings are exempt).
