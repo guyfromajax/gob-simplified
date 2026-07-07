@@ -32,9 +32,10 @@ import urllib.request
 
 CANVAS_W, CANVAS_H = 3530, 3412
 
-# Framing (fractions of canvas height). Tune after eyeballing output vs Conf1.
-TOP_MARGIN_FRAC = 0.05        # headroom above the top of the head
-SUBJECT_HEIGHT_FRAC = 1.02    # subject spans this * canvas height (>1 => shoulders bleed off bottom)
+# Framing. Matched to Conf1: shoulders fill the FULL width (bleed off the
+# sides), head near the top, upper chest at the bottom edge.
+TOP_MARGIN_FRAC = 0.07        # headroom above the top of the head
+WIDTH_FILL = 1.0              # subject width = this * canvas width (1.0 => shoulders span/bleed the frame)
 
 # Human-segmentation model (keeps clothing, unlike generic bg removal).
 MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx"
@@ -107,7 +108,7 @@ def normalize_framing(img):
     subj = img.crop(bbox)
     bw, bh = subj.size
 
-    scale = (SUBJECT_HEIGHT_FRAC * CANVAS_H) / bh
+    scale = (WIDTH_FILL * CANVAS_W) / bw       # fill width -> shoulders span frame
     new_w, new_h = max(1, round(bw * scale)), max(1, round(bh * scale))
     subj = subj.resize((new_w, new_h), Image.LANCZOS)
 
