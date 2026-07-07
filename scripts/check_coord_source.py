@@ -33,7 +33,7 @@ SCOPE = [
 
 # Per-scope baseline of KNOWN stale-seed call sites (drive to 0 as turns migrate).
 # Update DOWN only, never up — an increase is a regression the guard must catch.
-BASELINE = 9  # 2026-07-07: RR/CR/AS drive-start seeds + NEUTRAL-receiver picks migrated to rendered meet-moment. Drive to 0.
+BASELINE = 7  # 2026-07-07: RR/CR/AS drive-starts + NEUTRAL-receivers + After-Steal pass-ahead migrated. Drive to 0.
 
 # The concrete stale sources: both helpers read player.coords. Their CALL sites in
 # decision code are the violations (helper definitions / docstrings are exempt).

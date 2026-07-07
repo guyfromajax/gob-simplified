@@ -596,11 +596,24 @@ def _find_open_pass_ahead(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     is_away_offense: bool,
+    rendered_by_id: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[Any], Optional[Dict[str, float]]]:
     """The teammate furthest ahead of the BH toward the basket to whom an *open*
     pass exists (no defender can attempt to intercept the lane — Q20). Returns
-    ``(receiver, receiver_coord)`` or ``(None, None)``."""
+    ``(receiver, receiver_coord)`` or ``(None, None)``.
+
+    Positions read from ``rendered_by_id`` (the emitter's rendered drive-start /
+    ball-detach snapshot) so this decision consumes the same coords the emitter
+    draws — single coord source. Per-player fallback to the live coord."""
     from BackEnd.engine.pass_contest import find_pass_contester
+
+    rendered = rendered_by_id or {}
+
+    def _pos_of(player: Any, pid: str) -> Dict[str, float]:
+        entry = rendered.get(pid) or rendered.get(str(pid))
+        if isinstance(entry, dict) and "x" in entry and "y" in entry:
+            return {"x": float(entry["x"]), "y": float(entry["y"])}
+        return _coord_of(player)  # coord-source-ok: per-player fallback when the rendered snapshot lacks this id (mirrors the emitter)
 
     bh_id = _safe_id(bh)
     bh_prog = _x_progress(bh_start["x"], is_away_offense)
@@ -614,7 +627,7 @@ def _find_open_pass_ahead(
         defenders.append(
             {
                 "id": pid,
-                "xy": _coord_of(d),
+                "xy": _pos_of(d, pid),
                 "rate": _ag_grid_per_game_sec(d, "sprint"),
                 "IQ": attrs.get("IQ", 50),
             }
@@ -627,7 +640,7 @@ def _find_open_pass_ahead(
         pid = _safe_id(p)
         if not pid or pid == bh_id:
             continue
-        rc = _coord_of(p)
+        rc = _pos_of(p, pid)
         prog = _x_progress(rc["x"], is_away_offense)
         if prog <= bh_prog:  # not ahead of the ball handler
             continue
@@ -814,7 +827,8 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         if len(pass_chain) >= FB_AS_MAX_PASS_AHEAD:
             break
         receiver, receiver_coord = _find_open_pass_ahead(
-            current_bh, current_bh_start, off_lineup, def_lineup, is_away_offense
+            current_bh, current_bh_start, off_lineup, def_lineup, is_away_offense,
+            _rendered_start,
         )
         if receiver is None or random.random() >= FB_AS_PASS_AHEAD_PROB:
             break
