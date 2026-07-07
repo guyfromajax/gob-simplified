@@ -130,6 +130,26 @@ def _apply_finisher_scouting(
         )
 
 
+def _rendered_starts_by_pos(
+    lineup: Dict[str, Any], rendered_by_id: Dict[str, Dict[str, float]]
+) -> Dict[str, Dict[str, float]]:
+    """Map the emitter's rendered ``{player_id: coord}`` to ``{pos: coord}`` for
+    the resolver's start-of-drive seeds — the single-coord-source seat. Falls back
+    to the player's live coord for any id the render didn't cover."""
+    out: Dict[str, Dict[str, float]] = {}
+    for pos, p in (lineup or {}).items():
+        if p is None:
+            continue
+        pid = _safe_id(p)
+        c = rendered_by_id.get(pid) if pid else None
+        out[pos] = (
+            {"x": float(c["x"]), "y": float(c["y"])}
+            if c
+            else _coord_of(p)  # coord-source-ok: per-player fallback when render lacks this id
+        )
+    return out
+
+
 def resolve_attack_drive_finisher_turn(
     *,
     game: Any,
@@ -172,16 +192,26 @@ def resolve_attack_drive_finisher_turn(
     bh_start = _drive_onset_coord(fb_roles, shooter)
     bh_pos = _lineup_pos(off_lineup, shooter)
     target = dict(shot_spot) if shot_spot else _compute_bh_target(is_away_offense)
-    # Seed the drive-cutoff race from defenders' LIVE positions (end-of-DREB /
-    # start-of-break, since RR/Triangle deliberately skip
-    # `apply_coords_from_animations_list`), NOT their fast-break animation `end`
-    # coords. The animation ends are get-back destinations near the rim
-    # (`between_key_and_rim()`), which teleport get-back defenders onto the
-    # drive line and credit phantom "Nice stop" cutoffs no one could physically
-    # make. This mirrors the offense seeding on the next line
-    # (`_lineup_starts_by_pos(off_lineup)`), the after-steal path, and CR's
-    # release-moment seeding.
-    def_starts = _lineup_starts_by_pos(def_lineup)
+    # UESS emit-then-resolve (single-coord-source): build the drive PREAMBLE
+    # (burst→outlet→lane-pass) first and seed the cutoff/meet/contest race from
+    # the RENDERED drive-start coords (the lane-pass end) — where the defenders
+    # actually got back to ON SCREEN — NOT stale start-of-break `player.coords`.
+    # (The prior seeding used player.coords because the LEGACY animator teleported
+    # get-back defenders near the rim; the UESS lane-pass render is honest, so we
+    # read it.) Stash the preamble in fb_roles so the emitter REUSES it — one
+    # build, one RNG draw. Falls back to player.coords only if it can't be built.
+    from BackEnd.engine.rim_runner_step_emitter import build_rr_drive_preamble
+
+    _preamble = build_rr_drive_preamble({"roles": fb_roles}, game)
+    if _preamble is not None:
+        _pre_steps, _lane_end = _preamble
+        fb_roles["rr_preamble_steps"] = _pre_steps
+        fb_roles["rr_drive_start_coords"] = _lane_end
+        def_starts = _rendered_starts_by_pos(def_lineup, _lane_end)
+        off_starts = _rendered_starts_by_pos(off_lineup, _lane_end)
+    else:
+        def_starts = _lineup_starts_by_pos(def_lineup)  # coord-source-ok: fallback when no rendered preamble
+        off_starts = _lineup_starts_by_pos(off_lineup)  # coord-source-ok: fallback when no rendered preamble
     shot_manager = getattr(game, "shot_manager", None) or ShotManager(game)
 
     drive = resolve_fb_drive_step(
@@ -190,7 +220,7 @@ def resolve_attack_drive_finisher_turn(
         bh_start=bh_start,
         shot_spot=target,
         off_lineup=off_lineup,
-        off_starts=_lineup_starts_by_pos(off_lineup),
+        off_starts=off_starts,
         def_lineup=def_lineup,
         def_starts=def_starts,
         off_team=off_team,

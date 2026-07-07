@@ -47,7 +47,7 @@ from __future__ import annotations
 import logging
 import math
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
     AWAY_RIM_COORDS,
@@ -2015,6 +2015,59 @@ def _build_finisher_drive_resolution_steps(
     )
 
 
+def _build_rr_drive_and_finalize(
+    *,
+    turn_result: Dict[str, Any],
+    game: Any,
+    steps: List[AnimationStep],
+    coords: Dict[str, GridCoord],
+    clock_at: float,
+    sc_at: float,
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+) -> Optional[List[AnimationStep]]:
+    """Build the drive-resolution steps (or shot motion) from the lane-pass end
+    coords ``coords`` and finalize. Shared by the normal lane-pass path and the
+    emit-then-resolve REUSE path (where ``steps``/``coords`` come from the
+    preamble the resolver already built)."""
+    if turn_result.get("fb_drive_resolution"):
+        dr_steps = _build_finisher_drive_resolution_steps(
+            turn_result=turn_result,
+            game=game,
+            start_coords=coords,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            clock_remaining=clock_at,
+            shot_clock_remaining=sc_at,
+            fb_roles=fb_roles,
+        )
+        if dr_steps:
+            from BackEnd.utils.animation_step_helpers import (
+                rebase_animation_step_next_indices,
+            )
+
+            rebase_animation_step_next_indices(dr_steps, len(steps))
+            steps.extend(dr_steps)
+            return _finalize_rr_steps(turn_result, game, steps)
+
+    shot_motion = _build_shot_motion_step(
+        turn_result=turn_result,
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        step_start_coords=coords,
+        clock_remaining_at_start=clock_at,
+        shot_clock_remaining_at_start=sc_at,
+    )
+    if shot_motion is not None:
+        steps.append(shot_motion)
+
+    return _finalize_rr_steps(turn_result, game, steps)
+
+
 def append_lane_pass_to_rr_resolution_steps(
     *,
     turn_result: Dict[str, Any],
@@ -2113,43 +2166,117 @@ def append_lane_pass_to_rr_resolution_steps(
     clock_at = clock_remaining - elapsed
     sc_at = shot_clock_remaining - elapsed
 
-    if turn_result.get("fb_drive_resolution"):
-        dr_steps = _build_finisher_drive_resolution_steps(
-            turn_result=turn_result,
-            game=game,
-            start_coords=coords,
+    return _build_rr_drive_and_finalize(
+        turn_result=turn_result,
+        game=game,
+        steps=steps,
+        coords=coords,
+        clock_at=clock_at,
+        sc_at=sc_at,
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        is_away_offense=is_away_offense,
+    )
+
+
+# --- Main entry point: branch dispatcher -----------------------------------
+
+
+def build_rr_drive_preamble(
+    turn_result: Dict[str, Any],
+    game: Any,
+) -> Optional[Tuple[List[AnimationStep], Dict[str, GridCoord]]]:
+    """Emit the RR/Triangle drive PREAMBLE (burst → outlet → lane pass) and
+    return ``(preamble_steps, lane_pass_end_coords)`` — everyone's RENDERED
+    positions at the START of the drive step.
+
+    Called by the RESOLVER before ``resolve_fb_drive_step`` so the drive's
+    cutoff/meet/contest decisions seed from these rendered coords instead of
+    stale ``player.coords`` (UESS §1). The resolver stashes the returned steps in
+    ``turn_result["rr_preamble_steps"]`` and the emitter REUSES them — one build,
+    one RNG draw. Returns ``None`` for a terminal lane-pass branch (interception /
+    bat-oob / hold-up / outlet-denied) or missing data → caller keeps its prior
+    seeding.
+    """
+    fb_roles = turn_result.get("roles") or {}
+    burst_phase = fb_roles.get("rim_runner_burst_phase")
+    if not burst_phase:
+        return None
+    # Terminal branches have no drive to resolve — no drive preamble.
+    if (
+        turn_result.get("rim_runner_outlet_failed")
+        or turn_result.get("rim_runner_no_lane_pass")
+        or turn_result.get("rim_runner_interception")
+        or turn_result.get("rim_runner_bat_oob")
+    ):
+        return None
+
+    off_team = getattr(game, "offense_team", None)
+    def_team = getattr(game, "defense_team", None)
+    off_lineup = getattr(off_team, "lineup", {}) if off_team else {}
+    def_lineup = getattr(def_team, "lineup", {}) if def_team else {}
+    is_away_offense = bool(
+        fb_roles.get("is_away_offense") or burst_phase.get("is_away_offense")
+    )
+    all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
+    if not all_start_coords:
+        return None
+    game_state = getattr(game, "game_state", {}) or {}
+    clock_remaining = float(game_state.get("time_remaining", 0) or 0)
+    shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
+
+    steps: List[AnimationStep] = []
+    elapsed = 0.0
+
+    burst_step = _build_burst_step(
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        all_start_coords=all_start_coords,
+        is_away_offense=is_away_offense,
+        clock_remaining_at_start=clock_remaining,
+        shot_clock_remaining_at_start=shot_clock_remaining,
+        next_step_index=1,
+    )
+    if burst_step is None:
+        return None
+    steps.append(burst_step)
+    elapsed += float(burst_step["end"]["time_elapsed"])
+    last_end_coords = dict(burst_step["end"]["coords"])
+
+    if not bool(burst_phase.get("skip_outlet_pass")):
+        outlet_step = _build_outlet_pass_step(
+            fb_roles=fb_roles,
             off_lineup=off_lineup,
             def_lineup=def_lineup,
+            step_start_coords=last_end_coords,
             is_away_offense=is_away_offense,
-            clock_remaining=clock_at,
-            shot_clock_remaining=sc_at,
-            fb_roles=fb_roles,
+            clock_remaining_at_start=clock_remaining - elapsed,
+            shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+            next_step_index=2,
         )
-        if dr_steps:
-            from BackEnd.utils.animation_step_helpers import (
-                rebase_animation_step_next_indices,
-            )
+        if outlet_step is None:
+            return None
+        steps.append(outlet_step)
+        elapsed += float(outlet_step["end"]["time_elapsed"])
+        last_end_coords = dict(outlet_step["end"]["coords"])
 
-            rebase_animation_step_next_indices(dr_steps, len(steps))
-            steps.extend(dr_steps)
-            return _finalize_rr_steps(turn_result, game, steps)
-
-    shot_motion = _build_shot_motion_step(
+    lane_pass = _build_lane_pass_step(
         turn_result=turn_result,
         fb_roles=fb_roles,
         off_lineup=off_lineup,
         def_lineup=def_lineup,
-        step_start_coords=coords,
-        clock_remaining_at_start=clock_at,
-        shot_clock_remaining_at_start=sc_at,
+        step_start_coords=last_end_coords,
+        is_away_offense=is_away_offense,
+        clock_remaining_at_start=clock_remaining - elapsed,
+        shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        next_step_index=len(steps) + 1,
     )
-    if shot_motion is not None:
-        steps.append(shot_motion)
-
-    return _finalize_rr_steps(turn_result, game, steps)
-
-
-# --- Main entry point: branch dispatcher -----------------------------------
+    if lane_pass is None:
+        return None
+    steps.append(lane_pass)
+    return steps, dict(lane_pass["end"]["coords"])
 
 
 def build_rim_runner_animation_steps(
@@ -2209,6 +2336,29 @@ def build_rim_runner_animation_steps(
     shot_clock_remaining = float(game_state.get("shot_clock_remaining", 0) or 0)
 
     outlet_failed = bool(turn_result.get("rim_runner_outlet_failed"))
+
+    # UESS emit-then-resolve: for a drive, the RESOLVER already built the preamble
+    # (burst→outlet→lane-pass) via ``build_rr_drive_preamble`` and seeded its
+    # cutoff/meet/contest decisions from those rendered coords. Reuse them verbatim
+    # (single build, single RNG draw) and build the drive from the stashed lane-pass
+    # end — do NOT rebuild. Terminal branches (no stash) fall through and build below.
+    stashed_preamble = fb_roles.get("rr_preamble_steps")
+    stashed_end = fb_roles.get("rr_drive_start_coords")
+    if stashed_preamble and stashed_end and not outlet_failed:
+        steps = [dict(s) for s in stashed_preamble]
+        elapsed = sum(float(s["end"]["time_elapsed"]) for s in steps)
+        return _build_rr_drive_and_finalize(
+            turn_result=turn_result,
+            game=game,
+            steps=steps,
+            coords=dict(stashed_end),
+            clock_at=clock_remaining - elapsed,
+            sc_at=shot_clock_remaining - elapsed,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+        )
 
     steps: List[AnimationStep] = []
     elapsed = 0.0

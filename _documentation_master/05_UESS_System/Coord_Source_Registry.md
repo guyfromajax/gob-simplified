@@ -30,6 +30,8 @@ When a step is single-purpose the boundary is obvious. When a step is **multi-ph
 
 **Migration:** convert each site to read the rendered coord (via the *emit-then-resolve* pattern — emit a step's movement, seed the next decision from its `end.coords`), annotate/remove the call, then **lower `BASELINE`** to lock the win.
 
-**Status (2026-07-07):** FB decision path baseline = **20** (pre-migration). Target 0. First turn to migrate: RR/Triangle drive (seed `off_starts`/`def_starts` from the lane-pass `end.coords` instead of `player.coords`).
+**Status (2026-07-07):** FB decision path baseline = **18**. RR/Triangle drive **migrated** (emit-then-resolve: resolver builds the burst→outlet→lane-pass preamble once, seeds `off_starts`/`def_starts` from the lane-pass `end.coords`, stashes it in `roles["rr_preamble_steps"]`; the emitter reuses the stash — single-source by construction, verified 5/5 turns + no rebuild). Cutoff now fires (~53% of RR drives get a stopper vs. the prior ~44%). Next: **Covert Release**, then **After-Steal** (`after_steal_drive_integration.py:758/760`). Target 0.
+
+**Note — no-retreat clamp stays:** `after_steal_transition_positioning._no_retreat_end` is still load-bearing (fires ~85% of calls) — it patches `def_start_coords` inside `author_defense_end_coords`, which belongs to the **After-Steal** seed path, not the RR one. Remove it only when After-Steal migrates.
 
 **Why this exists:** the whole "emitter as god" effort ([Emitter_As_God.md](../projects/Emitter_As_God.md)) is enforcing the rule above. We drifted because nothing flagged a stale `player.coords` seed. This registry + guard make the contract *explicit and checked*, per decision, so it can't silently drift again.

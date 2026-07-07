@@ -33,7 +33,7 @@ SCOPE = [
 
 # Per-scope baseline of KNOWN stale-seed call sites (drive to 0 as turns migrate).
 # Update DOWN only, never up — an increase is a regression the guard must catch.
-BASELINE = 20  # 2026-07-07: FB decision path pre-emit-then-resolve migration. Drive to 0.
+BASELINE = 18  # 2026-07-07: RR/Triangle drive migrated to emit-then-resolve (-2 sites). Drive to 0.
 
 # The concrete stale sources: both helpers read player.coords. Their CALL sites in
 # decision code are the violations (helper definitions / docstrings are exempt).

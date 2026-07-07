@@ -1,6 +1,10 @@
 # RR/Triangle Emit-Then-Resolve Migration — executable plan
 
-**Status:** designed, ready to build (turnkey). The first turn migrated to the "logic reads emitter coords" objective ([Emitter_As_God.md](Emitter_As_God.md), [Coord_Source_Registry.md](../05_UESS_System/Coord_Source_Registry.md)).
+**Status: SHIPPED 2026-07-07** (branch `fb-migration-rr`). Steps 1–3 done + verified; guard baseline 20→18. Step-4 clamp removal **deferred** (see below). The first turn migrated to the "logic reads emitter coords" objective ([Emitter_As_God.md](Emitter_As_God.md), [Coord_Source_Registry.md](../05_UESS_System/Coord_Source_Registry.md)).
+
+**Verified:** stash reaches emitter 5/5 RR drive turns; `build_rr_drive_preamble` called ~1×/drive (no rebuild) → single-source by construction; RR/Triangle cutoff now fires (~53% has-stopper vs. prior ~44%; `NO_MEET` ~47% vs. ~56%); no crash.
+
+**Step-4 clamp finding:** the `_no_retreat_end` clamp is **NOT** removable yet — it still fires ~85% of calls because it patches `def_start_coords` inside `author_defense_end_coords`, which is the **After-Steal** seed path (`after_steal_drive_integration.py:758/760`), not the RR resolver seed this migration fixed. Remove it only when After-Steal migrates.
 
 ## Context / the bug this fixes
 
