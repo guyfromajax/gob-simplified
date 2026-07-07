@@ -31,6 +31,7 @@ const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
 const communityHighlightsBody = document.querySelector('.community-highlights-body');
+const aroundTheLeagueGrid = document.getElementById('around-the-league-grid');
 const leaderboardGeekPointsToggle = document.getElementById('leaderboard-view-geek-points');
 const leaderboardTitlesToggle = document.getElementById('leaderboard-view-titles');
 
@@ -584,6 +585,326 @@ async function loadCommunityHighlights() {
   renderCommunityHighlights(data);
 }
 
+const ATL_LAST_VISIT_KEY = 'gob_atl_last_visit';
+const ATL_ANIMATE_SELF_KEY = 'gob_atl_animate_self';
+const ATL_POLL_MS = 20000;
+const ATL_SLOT_COUNT = 8;
+
+let atlSlots = [];
+let atlBoardSignature = '';
+let atlInitialLoadDone = false;
+let atlPollTimer = null;
+let atlAnimateQueue = [];
+let atlAnimating = false;
+let atlCurrentUserId = '';
+
+function atlPrefersReducedMotion() {
+  try {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch (e) {
+    return false;
+  }
+}
+
+function atlBoardSig(slots) {
+  return (slots || []).map(function (s) {
+    if (!s) return '_';
+    return String(s.user_id || '') + '@' + String(s.completed_at || '');
+  }).join('|');
+}
+
+function atlParseLastVisit() {
+  try {
+    var raw = localStorage.getItem(ATL_LAST_VISIT_KEY);
+    if (!raw) return null;
+    var t = Date.parse(raw);
+    return Number.isFinite(t) ? t : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function atlPersistLastVisit() {
+  try {
+    localStorage.setItem(ATL_LAST_VISIT_KEY, new Date().toISOString());
+  } catch (e) {}
+}
+
+function atlIsNewSinceLastVisit(completedAt) {
+  var lastVisit = atlParseLastVisit();
+  if (!lastVisit || !completedAt) return false;
+  var t = Date.parse(completedAt);
+  return Number.isFinite(t) && t > lastVisit;
+}
+
+function atlTeamAccentStyle(primary) {
+  var p = escapeHtmlMs(primary || '#27408e');
+  return '--atl-accent: color-mix(in srgb, ' + p + ' 72%, white);';
+}
+
+function atlCardHtml(entry, options) {
+  options = options || {};
+  var showNew = !!options.showNew;
+  var primary = escapeHtmlMs(entry.primary_color || '#27408e');
+  var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
+  var rankVal = entry.national_rank != null && entry.national_rank !== ''
+    ? '#' + escapeHtmlMs(entry.national_rank)
+    : '#--';
+  var last = entry.last_game || {};
+  var lastWin = !!last.won;
+  var lastClass = lastWin ? 'is-win' : 'is-loss';
+  var lastPrefix = last.is_away ? '@ ' : 'vs ';
+  var nextHtml;
+  if (entry.next_opponent && entry.next_opponent.team_name) {
+    var n = entry.next_opponent;
+    var nPrefix = n.is_away ? '@ ' : 'vs ';
+    nextHtml = '<div class="atl-next">Next: <span class="atl-next-opp">' + nPrefix + escapeHtmlMs(n.team_name) + '</span></div>';
+  } else {
+    nextHtml = '<div class="atl-next is-na">Next: <span class="atl-next-opp">N/A</span></div>';
+  }
+  var statusClass = entry.is_tournament_week ? 'atl-status is-tourney' : 'atl-status';
+  var weekText = escapeHtmlMs(entry.week_label || ('Week ' + (entry.week || '?')));
+  var badge = coachArchetypeBadge(entry, 18);
+  var newMarker = showNew ? '<span class="atl-new-marker" aria-label="New since last visit"></span>' : '';
+  return (
+    '<article class="atl-card" data-user-id="' + escapeHtmlMs(entry.user_id) + '" style="--atl-primary:' + primary + ';--atl-secondary:' + secondary + ';' + atlTeamAccentStyle(entry.primary_color) + '">' +
+    newMarker +
+    '<div class="atl-card-inner">' +
+    '<div class="atl-card-head">' +
+    '<div class="atl-user-row"><div class="atl-user">' + escapeHtmlMs(entry.username || 'Coach') + '</div>' + badge + '</div>' +
+    '<div class="atl-team">' + escapeHtmlMs(entry.team_name || '') + '</div>' +
+    '</div>' +
+    '<div class="atl-chips">' +
+    '<div class="atl-chip"><div class="atl-chip-label">Record</div><div class="atl-chip-value">' + Number(entry.wins || 0) + '-' + Number(entry.losses || 0) + '</div></div>' +
+    '<div class="atl-chip"><div class="atl-chip-label">Nat\'l Rank</div><div class="atl-chip-value">' + rankVal + '</div></div>' +
+    '</div>' +
+    '<div class="' + statusClass + '"><span class="atl-status-dot"></span><span class="atl-status-text">' + weekText + '</span></div>' +
+    nextHtml +
+    '<div class="atl-last ' + lastClass + '">' +
+    '<div class="atl-result">' + (lastWin ? 'W' : 'L') + '</div>' +
+    '<div class="atl-last-detail">' + lastPrefix + escapeHtmlMs(last.opponent || '?') + '</div>' +
+    '<div class="atl-last-score">' + Number(last.user_score || 0) + '&ndash;' + Number(last.opp_score || 0) + '</div>' +
+    '</div>' +
+    '</div>' +
+    '</article>'
+  );
+}
+
+function atlEmptyHtml() {
+  return (
+    '<div class="atl-empty">' +
+    '<div class="atl-empty-mark"><span></span></div>' +
+    '<div class="atl-empty-text">Waiting for<br>next result</div>' +
+    '</div>'
+  );
+}
+
+function atlRenderGrid(slots, options) {
+  if (!aroundTheLeagueGrid) return;
+  options = options || {};
+  var lastVisitMode = !!options.lastVisitMode;
+  var list = Array.isArray(slots) ? slots.slice(0, ATL_SLOT_COUNT) : [];
+  while (list.length < ATL_SLOT_COUNT) list.push(null);
+  var html = list.map(function (entry) {
+    if (!entry) return atlEmptyHtml();
+    return atlCardHtml(entry, {
+      showNew: lastVisitMode && atlIsNewSinceLastVisit(entry.completed_at),
+    });
+  }).join('');
+  aroundTheLeagueGrid.innerHTML = html;
+}
+
+function atlSnapshotRects() {
+  var map = new Map();
+  if (!aroundTheLeagueGrid) return map;
+  aroundTheLeagueGrid.querySelectorAll('.atl-card[data-user-id]').forEach(function (el) {
+    map.set(el.getAttribute('data-user-id'), el.getBoundingClientRect());
+  });
+  return map;
+}
+
+function atlPlayFlip(prevRects, freshUserId, done) {
+  if (!aroundTheLeagueGrid || atlPrefersReducedMotion()) {
+    if (typeof done === 'function') done();
+    return;
+  }
+  var cards = aroundTheLeagueGrid.querySelectorAll('.atl-card[data-user-id]');
+  var pending = 0;
+  function finishOne() {
+    pending -= 1;
+    if (pending <= 0 && typeof done === 'function') done();
+  }
+  if (!cards.length) {
+    if (typeof done === 'function') done();
+    return;
+  }
+  cards.forEach(function (el) {
+    var uid = el.getAttribute('data-user-id');
+    if (prevRects.has(uid)) {
+      var oldR = prevRects.get(uid);
+      var newR = el.getBoundingClientRect();
+      var dx = oldR.left - newR.left;
+      var dy = oldR.top - newR.top;
+      if (dx || dy) {
+        pending += 1;
+        el.style.transition = 'none';
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            el.style.transition = 'transform 500ms cubic-bezier(.22,.61,.36,1)';
+            el.style.transform = '';
+            window.setTimeout(finishOne, 520);
+          });
+        });
+      }
+    } else {
+      pending += 1;
+      el.classList.add('atl-card--enter');
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          el.style.transition = 'opacity 480ms ease, transform 480ms cubic-bezier(.22,.61,.36,1)';
+          el.classList.remove('atl-card--enter');
+          window.setTimeout(finishOne, 500);
+        });
+      });
+    }
+    if (freshUserId && uid === freshUserId) {
+      el.classList.add('is-fresh-pulse');
+      window.setTimeout(function () {
+        el.classList.remove('is-fresh-pulse');
+      }, 1500);
+    }
+  });
+  if (pending === 0 && typeof done === 'function') done();
+}
+
+function atlDetectFreshUserId(prevSlots, nextSlots) {
+  var prevHead = prevSlots && prevSlots[0] ? String(prevSlots[0].user_id || '') : '';
+  var nextHead = nextSlots && nextSlots[0] ? String(nextSlots[0].user_id || '') : '';
+  if (!nextHead) return '';
+  if (nextHead !== prevHead) return nextHead;
+  var prevAt = prevSlots && prevSlots[0] ? String(prevSlots[0].completed_at || '') : '';
+  var nextAt = nextSlots && nextSlots[0] ? String(nextSlots[0].completed_at || '') : '';
+  if (nextAt && nextAt !== prevAt) return nextHead;
+  return '';
+}
+
+function atlEnqueueAnimation(job) {
+  atlAnimateQueue.push(job);
+  atlDrainAnimateQueue();
+}
+
+function atlDrainAnimateQueue() {
+  if (atlAnimating || !atlAnimateQueue.length) return;
+  atlAnimating = true;
+  var job = atlAnimateQueue.shift();
+  var prevRects = job.prevRects;
+  var freshUserId = job.freshUserId || '';
+  atlRenderGrid(job.slots, { lastVisitMode: false });
+  atlPlayFlip(prevRects, freshUserId, function () {
+    atlAnimating = false;
+    atlDrainAnimateQueue();
+  });
+}
+
+function atlConsumeSelfAnimateFlag() {
+  try {
+    var v = sessionStorage.getItem(ATL_ANIMATE_SELF_KEY);
+    sessionStorage.removeItem(ATL_ANIMATE_SELF_KEY);
+    return v === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function atlApplyBoardUpdate(nextSlots, opts) {
+  opts = opts || {};
+  var prevSlots = atlSlots.slice();
+  var sig = atlBoardSig(nextSlots);
+  if (sig === atlBoardSignature && !opts.force) return;
+
+  var animate = !!opts.animate;
+  var lastVisitMode = !!opts.lastVisitMode;
+  var selfAnimate = !!opts.selfAnimate;
+
+  if (!animate || atlPrefersReducedMotion()) {
+    atlSlots = nextSlots.slice();
+    atlBoardSignature = sig;
+    atlRenderGrid(atlSlots, { lastVisitMode: lastVisitMode });
+    return;
+  }
+
+  var freshUserId = '';
+  if (selfAnimate && atlCurrentUserId) {
+    var headId = nextSlots[0] ? String(nextSlots[0].user_id || '') : '';
+    if (headId && headId === atlCurrentUserId) freshUserId = headId;
+  }
+  if (!freshUserId) freshUserId = atlDetectFreshUserId(prevSlots, nextSlots);
+
+  atlSlots = nextSlots.slice();
+  atlBoardSignature = sig;
+  atlEnqueueAnimation({
+    prevRects: atlSnapshotRects(),
+    slots: atlSlots,
+    freshUserId: freshUserId,
+  });
+}
+
+async function loadAroundTheLeague(options) {
+  if (!aroundTheLeagueGrid) return;
+  options = options || {};
+  if (!atlInitialLoadDone) {
+    aroundTheLeagueGrid.innerHTML = '<div class="around-the-league-loading">Loading…</div>';
+  }
+  var data = await safeJsonFetch(API_CONFIG.buildUrl('/api/community/around-the-league'), {
+    headers: getAuthHeaders(),
+  });
+  if (!data || !Array.isArray(data.slots)) {
+    if (!atlInitialLoadDone) {
+      aroundTheLeagueGrid.innerHTML = '<div class="around-the-league-error">Could not load Around The League.</div>';
+    }
+    return;
+  }
+  try {
+    if (window.GOBArchetype && window.GOBArchetype.ensureManifest) {
+      await window.GOBArchetype.ensureManifest();
+    }
+  } catch (e) {}
+
+  var nextSlots = data.slots.slice(0, ATL_SLOT_COUNT);
+  while (nextSlots.length < ATL_SLOT_COUNT) nextSlots.push(null);
+
+  if (!atlInitialLoadDone) {
+    atlInitialLoadDone = true;
+    var hadLastVisit = atlParseLastVisit() !== null;
+    var selfFlag = atlConsumeSelfAnimateFlag();
+    atlApplyBoardUpdate(nextSlots, {
+      animate: selfFlag,
+      selfAnimate: selfFlag,
+      lastVisitMode: hadLastVisit && !selfFlag,
+    });
+    return;
+  }
+
+  if (options.poll) {
+    atlApplyBoardUpdate(nextSlots, { animate: true });
+  }
+}
+
+function wireAroundTheLeaguePolling() {
+  if (!aroundTheLeagueGrid || atlPollTimer) return;
+  atlPollTimer = window.setInterval(function () {
+    loadAroundTheLeague({ poll: true });
+  }, ATL_POLL_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      loadAroundTheLeague({ poll: true });
+    }
+  });
+  window.addEventListener('pagehide', atlPersistLastVisit);
+  window.addEventListener('beforeunload', atlPersistLastVisit);
+}
+
 function wireLeaderboardViewToggles(currentUsername) {
   if (leaderboardGeekPointsToggle) {
     leaderboardGeekPointsToggle.addEventListener('click', function () {
@@ -1068,6 +1389,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     const meData = await meRes.json();
+    if (meData.user_id) {
+      atlCurrentUserId = String(meData.user_id);
+    }
     if (meData.username && meData.username.trim()) {
       currentUsername = meData.username;
       if (authUserEmail) authUserEmail.textContent = meData.username;
@@ -1110,6 +1434,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   wireLeaderboardViewToggles(currentUsername);
   await loadCommunityLeaderboard(currentUsername);
   await loadCommunityHighlights();
+  await loadAroundTheLeague();
+  wireAroundTheLeaguePolling();
   wireLeadersByTeamModal();
 
   if (logoutBtn) {

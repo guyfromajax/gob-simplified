@@ -39,6 +39,13 @@ export function getOrStartFranchisePhaseB(pending) {
       franchise_id: pending.franchise_id,
       week: pending.week,
     }),
+  }).then(function (response) {
+    if (response.ok) {
+      try {
+        sessionStorage.setItem('gob_atl_animate_self', '1');
+      } catch (e) {}
+    }
+    return response;
   });
 
   phaseBPromiseByKey.set(key, promise);

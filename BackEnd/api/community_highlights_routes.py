@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from BackEnd.utils.auth import get_current_user
+from BackEnd.utils.around_the_league import list_around_the_league_entries
 from BackEnd.utils.community_highlights import (
     list_community_highlight_entries,
     push_debut_entry,
@@ -17,6 +18,11 @@ router = APIRouter(prefix="/api/community", tags=["community"])
 @router.get("/highlights")
 def get_community_highlights(_user: dict = Depends(get_current_user)):
     return {"entries": list_community_highlight_entries()}
+
+
+@router.get("/around-the-league")
+def get_around_the_league(_user: dict = Depends(get_current_user)):
+    return {"slots": list_around_the_league_entries()}
 
 
 class DebutEntryRequest(BaseModel):

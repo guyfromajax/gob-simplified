@@ -798,6 +798,27 @@ def flush_community_highlight_pending_after_week(
     except Exception:
         logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to push entry")
 
+    try:
+        from BackEnd.utils.around_the_league import record_around_the_league_completion
+
+        record_around_the_league_completion(
+            owner_user_id=owner_id,
+            franchise_doc=fresh,
+            completed_week=int(completed_week),
+            pending=pending,
+            user_team_id_str=str(user_team_id_str),
+            opp_name=opp_name,
+            user_won=user_won,
+            user_score=user_score,
+            opponent_score=opponent_score,
+        )
+    except Exception:
+        logger.exception(
+            "[ATL] record after phase-B flush failed franchise=%s week=%s",
+            franchise_id,
+            completed_week,
+        )
+
     franchises_collection.update_one(
         {"_id": franchise_id},
         {"$unset": {
