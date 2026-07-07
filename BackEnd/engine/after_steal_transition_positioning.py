@@ -293,6 +293,7 @@ def author_defense_end_coords(
     offense_end_coords: Dict[str, Coord],
     is_away_offense: bool,
     beaten_stopper_ids: Optional[List[str]] = None,
+    reachable_ends: Optional[Dict[str, Coord]] = None,
     rng: Optional[Any] = None,
 ) -> Dict[str, Coord]:
     """Author end coords for all five defenders (coordinated matchups).
@@ -301,17 +302,37 @@ def author_defense_end_coords(
       1. **BH defender** = the resolver's (final) cutoff stopper
          (``bh_defender_id``), or — in the NO_MEET case — the defender closest
          to the ball handler. He ends on the meet when he stopped/contested the
-         drive, or trails ``FB_AS_NO_MEET_CHASE_X_BEHIND`` behind the finish when
-         the BH reaches the rim (a rebound spot).
+         drive, or — when the BH reaches the rim — at his **reachable** end
+         (``reachable_ends``: where his sprint from his real start actually got
+         him by the drive time), so a clean breakaway reads as uncontested and a
+         hustled-back defender as a contest. Falls back to the fixed
+         ``FB_AS_NO_MEET_CHASE_X_BEHIND`` chase spot when no reachable end given.
       1b. Any **beaten stoppers** (``beaten_stopper_ids`` — defenders the BH blew
-         past during a cutoff cascade) trail the finish, stacked behind.
+         past during a cutoff cascade) trail at their reachable end (else the
+         stacked fixed trail spot).
       2. The **remaining defenders closest to the basket** pick up the two
          leads (paired by basket-proximity), sitting ball-side of their man.
       3. The **last defenders** drop to distinct, side-biased help spots.
     """
     rng = rng or _random_module
+    reach = reachable_ends or {}
     beaten = [str(b) for b in (beaten_stopper_ids or []) if b]
     ends: Dict[str, Coord] = {}
+
+    # Rim finish (BH reaches the rim): the defense is SCRAMBLING back toward its
+    # own basket, not setting a half-court matchup. Render every defender at his
+    # REACHABLE chase end — where his sprint from his real start actually got him
+    # by the drive time (``reachable_ends`` = the resolver's ``defender_end_coords``).
+    # A clean breakaway then reads uncontested; a hustled-back defender contests —
+    # one coord for both decision and render (single-coord-source). The
+    # coordinated lead/help matchups below are for the NEUTRAL stop (half-court-
+    # like). Falls through to the fixed chase spread when no reachable ends given.
+    if bh_reaches_rim and reach:
+        return {
+            pid: _clamp(dict(reach[pid]))
+            for pid in def_start_coords
+            if pid in reach
+        }
 
     # (1) BH defender.
     if not bh_defender_id or bh_defender_id not in def_start_coords:
@@ -376,6 +397,7 @@ def author_transition_end_coords(
     bh_reaches_rim: bool,
     beaten_stopper_ids: Optional[List[str]] = None,
     is_away_offense: bool = False,
+    reachable_ends: Optional[Dict[str, Coord]] = None,
     rng: Optional[Any] = None,
 ) -> Dict[str, Coord]:
     """All-ten coordinated end coords for a FB drive resolution.
@@ -410,6 +432,7 @@ def author_transition_end_coords(
         offense_end_coords=offense,
         is_away_offense=is_away_offense,
         beaten_stopper_ids=beaten_stopper_ids,
+        reachable_ends=reachable_ends,
         rng=rng,
     )
     merged: Dict[str, Coord] = {}

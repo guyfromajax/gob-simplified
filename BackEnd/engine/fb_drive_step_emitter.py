@@ -102,7 +102,13 @@ def derive_transition_author_inputs(
     ``bh_start`` / ``bh_end`` (the emitter uses the meet coord or ``bh_target``;
     the resolver's rim-finish read uses the shot spot). Everything else — the
     stopper matchup, ``meet``, ``outcome_kind``, ``bh_reaches_rim``, beaten
-    trailers — is read straight off the payload.
+    trailers, and the reachable defender ends — is read straight off the payload.
+
+    ``reachable_ends`` (the resolver's ``defender_end_coords``, each defender
+    sprint-clamped from their real start by the drive time) is passed so the BH
+    defender / beaten stoppers render WHERE THEY ACTUALLY GET TO, not a fixed
+    chase spot behind the finish — a clean breakaway then reads as uncontested,
+    a hustled-back defender as a contest (single-coord-source, reachable).
     """
     planner_meet = (
         {"x": float(fb_drive["meet_x"]), "y": float(fb_drive["meet_y"])}
@@ -121,6 +127,7 @@ def derive_transition_author_inputs(
         bh_reaches_rim=fb_drive.get("outcome") in ("NO_MEET", "POS_O"),
         beaten_stopper_ids=fb_drive.get("cascade_beaten_stopper_ids"),
         is_away_offense=is_away_offense,
+        reachable_ends=fb_drive.get("defender_end_coords"),
     )
 
 
