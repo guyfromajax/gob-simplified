@@ -995,7 +995,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             recv_id = stop.get("receiver_id")
             receiver = _player_by_id(off_lineup, recv_id)
             recv_pos = stop.get("receiver_pos")
-            recv_coord = _lineup_starts_by_pos(off_lineup).get(recv_pos or "", bh_end)
+            recv_coord = end_coords.get(recv_id or "", bh_end)  # meet-moment: the receiver's rendered end position (same frame as the defender contest), not his stale start-of-break player.coords
             contested, shot_def_id = pick_nearest_contesting_defender(
                 end_coords, recv_coord, is_away_offense=is_away_offense
             )

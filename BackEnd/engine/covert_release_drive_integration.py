@@ -389,7 +389,7 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
             recv_id = stop.get("receiver_id")
             receiver = _player_by_id(off_lineup, recv_id)
             recv_pos = stop.get("receiver_pos")
-            recv_coord = _lineup_starts_by_pos(off_lineup).get(recv_pos or "", bh_end)
+            recv_coord = end_coords.get(recv_id or "", bh_end)  # meet-moment: the receiver's rendered end position (same frame as the defender contest), not his stale start-of-break player.coords
             from BackEnd.utils.fb_geo_helpers import pick_nearest_contesting_defender
 
             contest_ends = drive.get("rendered_defender_end_coords") or end_coords
