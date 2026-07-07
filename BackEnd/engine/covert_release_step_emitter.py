@@ -34,7 +34,7 @@ See ``_documentation_master/00_General_Systems/Step_By_Step_System.md`` —
 
 import math
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
     AWAY_RIM_COORDS,
@@ -607,6 +607,84 @@ def _build_simplified_outlet_pass_step(
     )
 
 
+def build_cr_outlet_preamble(
+    turn_result: Dict[str, Any],
+    game: Any,
+) -> Optional[Tuple[List[AnimationStep], Dict[str, GridCoord]]]:
+    """Build the CR outlet-pass preamble (setup + optional outlet step) and return
+    ``(preamble_steps, drive_start_coords)`` — the emitter's rendered player
+    positions at the START of the drive.
+
+    Called by the resolver (emit-then-resolve) so the cutoff/meet decision seeds
+    ``def_starts``/``off_starts`` from the SAME coords the emitter renders, then
+    stashes the result for the emitter to reuse. The only preamble RNG is the
+    outlet flavor drift (``random.randint(1, 6)`` per non-key cast in
+    ``_build_simplified_outlet_pass_step``); drawing it here once — and reusing
+    the stash — is what guarantees ``def_starts == rendered`` (a rebuild would
+    re-draw and drift). Returns ``None`` when there is no ball handler / start
+    coords (the resolver then keeps its getback-coord seeds)."""
+    fb_roles: Dict[str, Any] = turn_result.get("roles") or {}
+    bh_id = (
+        _safe_id(fb_roles.get("ball_handler"))
+        or _safe_id(turn_result.get("ball_handler"))
+        or _safe_id(turn_result.get("shooter_id"))
+    )
+    if not bh_id:
+        return None
+
+    off_team = getattr(game, "offense_team", None)
+    def_team = getattr(game, "defense_team", None)
+    off_lineup = getattr(off_team, "lineup", {}) if off_team else {}
+    def_lineup = getattr(def_team, "lineup", {}) if def_team else {}
+    is_away_offense = bool(fb_roles.get("is_away_offense"))
+
+    all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
+    if bh_id not in all_start_coords:
+        return None
+
+    game_state = getattr(game, "game_state", {}) or {}
+    clock_r = float(game_state.get("time_remaining", 0) or 0)
+    shot_r = float(game_state.get("shot_clock_remaining", 0) or 0)
+
+    outlet_passer_id = fb_roles.get("outlet_passer")
+    outlet_receiver_id = fb_roles.get("outlet_receiver")
+    has_outlet_pass = bool(
+        outlet_passer_id
+        and outlet_receiver_id
+        and str(outlet_passer_id) != str(outlet_receiver_id)
+    )
+
+    steps: List[AnimationStep] = []
+    start_coords: Dict[str, GridCoord] = dict(all_start_coords)
+    if has_outlet_pass:
+        passer_id = str(outlet_passer_id)
+        receiver_id = str(outlet_receiver_id)
+        passer_coord = all_start_coords.get(passer_id)
+        receiver_coord = all_start_coords.get(receiver_id)
+        if passer_coord is None or receiver_coord is None:
+            return None
+        outlet_step = _build_simplified_outlet_pass_step(
+            passer_id=passer_id,
+            receiver_id=receiver_id,
+            passer_coord=passer_coord,
+            receiver_coord=receiver_coord,
+            all_start_coords=all_start_coords,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+            clock_remaining_at_start=clock_r,
+            shot_clock_remaining_at_start=shot_r,
+            next_step_index=1,
+        )
+        if outlet_step is None:
+            return None
+        steps.append(outlet_step)
+        start_coords = dict(outlet_step["end"]["coords"])
+
+    return steps, start_coords
+
+
 def _build_cr_drive_resolution_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -686,7 +764,19 @@ def _build_cr_drive_resolution_animation_steps(
     shot_r = shot_clock_remaining
     start_coords = dict(all_start_coords)
 
-    if has_outlet_pass:
+    stashed_steps = fb_roles.get("cr_preamble_steps")
+    stashed_start = fb_roles.get("cr_drive_start_coords")
+    if stashed_steps is not None and stashed_start is not None:
+        # Emit-then-resolve: reuse the resolver-built outlet preamble so the
+        # rendered drive-start == the coords the cutoff/meet decision used (no
+        # outlet-drift re-draw). See ``build_cr_outlet_preamble``.
+        steps = [dict(s) for s in stashed_steps]
+        start_coords = dict(stashed_start)
+        for _s in steps:
+            elapsed += float(_s["end"]["time_elapsed"])
+            clock_r = float(_s["end"]["clock"]["clock_remaining"])
+            shot_r = float(_s["end"]["clock"]["shot_clock_remaining"])
+    elif has_outlet_pass:
         passer_id = str(outlet_passer_id)
         receiver_id = str(outlet_receiver_id)
         passer_coord = all_start_coords.get(passer_id)

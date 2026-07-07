@@ -38,6 +38,27 @@ from BackEnd.utils.fb_geo_helpers import stamp_fb_miss_bounce_coords
 from BackEnd.utils.shared import apply_scoring, get_name_safe
 
 
+def _rendered_starts_by_pos(
+    lineup: Dict[str, Any], rendered_by_id: Dict[str, Dict[str, float]]
+) -> Dict[str, Dict[str, float]]:
+    """Map the emitter's rendered ``{player_id: coord}`` (the outlet-preamble
+    drive-start) to ``{pos: coord}`` for the resolver's start-of-drive seeds —
+    the single-coord-source seat. Falls back to the player's live coord for any
+    id the render didn't cover."""
+    out: Dict[str, Dict[str, float]] = {}
+    for pos, p in (lineup or {}).items():
+        if p is None:
+            continue
+        pid = _safe_id(p)
+        c = rendered_by_id.get(pid) if pid else None
+        out[pos] = (
+            {"x": float(c["x"]), "y": float(c["y"])}
+            if c
+            else _coord_of(p)  # coord-source-ok: per-player fallback when render lacks this id
+        )
+    return out
+
+
 def _defender_outlet_coord(
     defender: Any,
     defender_id: Optional[str],
@@ -48,7 +69,7 @@ def _defender_outlet_coord(
         if defender_id in getback:
             c = getback[defender_id]
             return {"x": float(c["x"]), "y": float(c["y"])}
-    return _coord_of(defender)
+    return _coord_of(defender)  # coord-source-ok: initial def_starts seed, superseded by _rendered_starts_by_pos (rendered drive-start) in resolve_covert_release_fast_break when the outlet preamble builds
 
 
 def _build_cr_context(game: Any) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any], bool]:
@@ -93,8 +114,8 @@ def _build_cr_context(game: Any) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[s
                 bh_start_x = stored.get("x")
                 bh_start_y = stored.get("y")
     if bh_start_x is None or bh_start_y is None:
-        bh_start_x = _coord_of(ball_handler)["x"]
-        bh_start_y = _coord_of(ball_handler)["y"]
+        bh_start_x = _coord_of(ball_handler)["x"]  # coord-source-ok: initial bh_start seed, superseded by the rendered drive-start (bh_start override) in resolve_covert_release_fast_break when the outlet preamble builds
+        bh_start_y = _coord_of(ball_handler)["y"]  # coord-source-ok: see line above (initial bh_start seed, superseded by rendered drive-start)
 
     bh_start = {"x": float(bh_start_x), "y": float(bh_start_y)}
 
@@ -169,13 +190,30 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
     shot_spot = _compute_bh_target(is_away_offense)
     shot_manager = getattr(game, "shot_manager", None) or ShotManager(game)
 
+    # Emit-then-resolve: build the outlet preamble the emitter renders, then seed
+    # the cutoff/meet decision from the SAME drive-start coords (single source),
+    # and stash the preamble so the emitter reuses it (no outlet-drift re-draw).
+    from BackEnd.engine.covert_release_step_emitter import build_cr_outlet_preamble
+    _preamble = build_cr_outlet_preamble({"roles": fb_roles}, game)
+    if _preamble is not None:
+        _pre_steps, _drive_start = _preamble
+        fb_roles["cr_preamble_steps"] = _pre_steps
+        fb_roles["cr_drive_start_coords"] = _drive_start
+        def_starts = _rendered_starts_by_pos(def_lineup, _drive_start)
+        off_starts = _rendered_starts_by_pos(off_lineup, _drive_start)
+        _bh_rendered = _drive_start.get(bh_id)
+        if _bh_rendered:
+            bh_start = {"x": float(_bh_rendered["x"]), "y": float(_bh_rendered["y"])}
+    else:
+        off_starts = _lineup_starts_by_pos(off_lineup)  # coord-source-ok: degenerate fallback when the outlet preamble can't build (no BH/coords)
+
     drive = resolve_fb_drive_step(
         bh=ball_handler,
         bh_pos=bh_pos,
         bh_start=bh_start,
         shot_spot=shot_spot,
         off_lineup=off_lineup,
-        off_starts=_lineup_starts_by_pos(off_lineup),
+        off_starts=off_starts,
         def_lineup=def_lineup,
         def_starts=def_starts,
         off_team=off_team,
