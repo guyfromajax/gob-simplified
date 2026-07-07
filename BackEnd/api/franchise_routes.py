@@ -9754,18 +9754,22 @@ TRAINING_SQUAD_ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST"
 TRAINING_SQUAD_REPORT_WEEKS = (6, 11, 16, 21, 26)
 
 
-def _ts_progression_band(ch_value: Any) -> tuple[int, int]:
-    """CH-gated weekly attribute delta band for training-squad players."""
+def _ts_progression_delta(ch_value: Any) -> int:
+    """CH-gated weekly weighted attribute delta for training-squad players."""
     ch = int(ch_value or 0)
     if ch > 79:
-        return (-1, 4)
-    if ch > 59:
-        return (-1, 3)
-    if ch > 39:
-        return (-2, 3)
-    if ch > 19:
-        return (-2, 2)
-    return (-3, 2)
+        weights = [(-2, 10), (-1, 20), (0, 20), (1, 30), (2, 10)]
+    elif ch > 59:
+        weights = [(-2, 20), (-1, 20), (0, 30), (1, 20), (2, 10)]
+    elif ch > 39:
+        weights = [(-2, 20), (-1, 30), (0, 20), (1, 20), (2, 10)]
+    elif ch > 19:
+        weights = [(-2, 30), (-1, 20), (0, 20), (1, 20), (2, 10)]
+    else:
+        weights = [(-2, 40), (-1, 20), (0, 20), (1, 10), (2, 10)]
+    values = [value for value, _weight in weights]
+    relative_weights = [weight for _value, weight in weights]
+    return int(random.choices(values, weights=relative_weights, k=1)[0])
 
 
 def _ts_attr_snapshot(attrs: dict[str, Any]) -> dict[str, int]:
@@ -9784,7 +9788,7 @@ def _apply_training_squad_progression_and_report(
     completed_week: int,
     user_team_id_str: Any,
 ) -> list[dict[str, Any]]:
-    """Weeks 2–26: evolve every training-squad player's 13 attrs (CH-gated band) for
+    """Weeks 2–26: evolve every training-squad player's 13 attrs (CH-gated weighted delta) for
     user AND CPU teams (persisted to FPD; ratings recomputed). On report weeks
     (6/11/16/21/26) build the user's Training Squad Development report (delta vs the
     previous report) onto franchise_doc, with an inbox link. franchise_doc fields set
@@ -9833,13 +9837,13 @@ def _apply_training_squad_progression_and_report(
     weekly_gains: list[dict[str, Any]] = []
     for d in fpd_docs:
         attrs = d.get("attributes") or {}
-        band_lo, band_hi = _ts_progression_band(attrs.get("anchor_CH", attrs.get("CH")))
+        ch_for_progression = attrs.get("anchor_CH", attrs.get("CH"))
         deltas: dict[str, int] = {}
         for key in TRAINING_SQUAD_ATTR_KEYS:
             base = attrs.get("anchor_" + key, attrs.get(key))
             if base is None:
                 continue
-            new_val = max(lo_clamp, int(base) + random.randint(band_lo, band_hi))
+            new_val = max(lo_clamp, int(base) + _ts_progression_delta(ch_for_progression))
             deltas[key] = new_val - int(base)
             attrs[key] = new_val
             attrs["anchor_" + key] = new_val

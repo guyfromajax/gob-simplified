@@ -106,17 +106,17 @@ completed week from `_finalize_franchise_week_after_cpu_games` (`franchise_route
 
 **Progression (weeks 2–26, USER + ALL CPU teams; persisted to FPD):**
 - Each Training-Squad player's **13 attributes** evolve: `SC SH ID OD PS BH RB AG ST ND IQ FT CH`.
-- Per-week delta band is **CH-gated** (`_ts_progression_band`, `franchise_routes.py:8353`):
+- Per-week delta is **CH-gated** and weighted (`_ts_progression_delta`, `BackEnd/api/franchise_routes.py`):
 
-  | CH | band |
+  | CH | weekly attr delta weights |
   |---|---|
-  | >79 | `randint(-1, 4)` |
-  | >59 | `randint(-1, 3)` |
-  | >39 | `randint(-2, 3)` |
-  | >19 | `randint(-2, 2)` |
-  | else | `randint(-3, 2)` |
+  | >79 | -2: 10, -1: 20, 0: 20, 1: 30, 2: 10 |
+  | >59 | -2: 20, -1: 20, 0: 30, 1: 20, 2: 10 |
+  | >39 | -2: 20, -1: 30, 0: 20, 1: 20, 2: 10 |
+  | >19 | -2: 30, -1: 20, 0: 20, 1: 20, 2: 10 |
+  | else | -2: 40, -1: 20, 0: 20, 1: 10, 2: 10 |
 
-  Each attr rolls independently. CH itself evolves (band re-evaluated each week from current CH).
+  The implementation uses the listed values as relative weights. Each attr rolls independently. CH itself evolves, but the CH bucket is selected once per player/week from current CH before that week's 13 attr rolls.
 - Clamp `PLAYER_ATTR_CLAMP = (1, None)` (min 1, no max). Updates both `attr` and `anchor_attr`.
 - `position_ratings` recomputed after evolving (so RT reflects development; cuts/display stay accurate).
 - Starts **week 2** (TS players already evolved via Training Camp in week 1).
@@ -182,8 +182,8 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
 |---|---|
 | Walk-on generator | `BackEnd/models/franchise_manager.py:182` `generate_walk_on_profile` |
 | Season-1 walk-ons | `BackEnd/models/franchise_manager.py:380` (in `initialize_season`) |
-| Progression + report | `BackEnd/api/franchise_routes.py:8377` `_apply_training_squad_progression_and_report` |
-| CH band | `BackEnd/api/franchise_routes.py:8353` `_ts_progression_band` |
+| Progression + report | `BackEnd/api/franchise_routes.py` `_apply_training_squad_progression_and_report` |
+| CH weighted delta | `BackEnd/api/franchise_routes.py` `_ts_progression_delta` |
 | Week-completion hook | `BackEnd/api/franchise_routes.py:4087` `_finalize_franchise_week_after_cpu_games` |
 | Camp assignment (user) | `BackEnd/api/franchise_routes.py:9865` `cut_franchise_players` |
 | Camp assignment (CPU) | `BackEnd/api/franchise_routes.py:8291` `_apply_cpu_training_camp_cuts` |
