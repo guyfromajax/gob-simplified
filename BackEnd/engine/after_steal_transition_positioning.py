@@ -254,6 +254,17 @@ def _lead_defender_spot(lead_end: Coord, is_away_offense: bool) -> Coord:
     return _clamp({"x": x, "y": float(lead_end["y"])})
 
 
+def _no_retreat_end(end: Coord, start: Coord, is_away_offense: bool) -> Coord:
+    """On a rim finish the defense collapses TOWARD the rim, never away — a
+    defender must not render farther from the basket than his (fresh) start.
+    Returns ``start`` when ``end`` would retreat (e.g. a stale-coord reachable end
+    computed from a start-of-break position), else ``end``. Both clamped."""
+    if _x_progress_toward_basket(float(end["x"]), is_away_offense) < \
+            _x_progress_toward_basket(float(start["x"]), is_away_offense):
+        return _clamp(dict(start))
+    return _clamp(dict(end))
+
+
 def _assign_help_spots(
     help_ids: List[str],
     def_start_coords: Dict[str, Coord],
@@ -328,8 +339,15 @@ def author_defense_end_coords(
     # coordinated lead/help matchups below are for the NEUTRAL stop (half-court-
     # like). Falls through to the fixed chase spread when no reachable ends given.
     if bh_reaches_rim and reach:
+        # No-retreat: on a rim finish the defense collapses TOWARD the rim, never
+        # away from it. ``reachable_ends`` comes from the resolver's ``def_starts``,
+        # which for RR/Triangle are start-of-break coords that can differ from the
+        # emitter's FRESH render start (``def_start_coords``) — using them verbatim
+        # animates a near-basket defender OUT to mid-court (he abandons the basket).
+        # Clamp each end so a defender never renders farther from the basket than
+        # his fresh render start; a genuinely-far breakaway defender is unaffected.
         return {
-            pid: _clamp(dict(reach[pid]))
+            pid: _no_retreat_end(reach[pid], def_start_coords[pid], is_away_offense)
             for pid in def_start_coords
             if pid in reach
         }
@@ -381,6 +399,16 @@ def author_defense_end_coords(
 
     # (3) Help defenders.
     ends.update(_assign_help_spots(help_defs, def_start_coords, is_away_offense, rng))
+
+    # On a rim finish reached via this coordinated-spread fallback (empty
+    # reachable_ends), still forbid any defender from retreating away from the
+    # basket — the half-court lead/help matchup only applies to the NEUTRAL stop.
+    if bh_reaches_rim:
+        ends = {
+            pid: _no_retreat_end(e, def_start_coords[pid], is_away_offense)
+            if pid in def_start_coords else e
+            for pid, e in ends.items()
+        }
     return ends
 
 
