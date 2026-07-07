@@ -512,8 +512,8 @@ When the tab opens, FCC loads:
 
 The opponent summary also uses:
 
-- standings cache
-- rankings cache
+- standings cache first
+- rankings cache as the W/L fallback
 
 Current summary fields:
 
@@ -524,6 +524,7 @@ Current summary fields:
 Important note:
 
 - legacy `#scouting-report-btn` modal behavior is explicitly removed by `disableLegacyFccScoutingModal()`
+- The scouting opponent record must not rely only on `standingsDataCache`: FCC loads standings with `scope=user_region`, so national championship opponents can be outside that scoped payload. `commandCenterTopDataCache.rankings` is national and includes `W` / `L`, so it is the required fallback for opponent record display.
 
 ---
 

@@ -5110,8 +5110,8 @@ async function renderScoutingTab() {
   const opponentTeamName = opponent.name || '--';
   const standingsEntry = getStandingsTeamEntry(opponent.id);
   const rankingEntry = getTeamRankingEntry(opponent.id);
-  const wins = Number(standingsEntry?.W || 0);
-  const losses = Number(standingsEntry?.L || 0);
+  const wins = Number(standingsEntry?.W ?? rankingEntry?.W ?? 0);
+  const losses = Number(standingsEntry?.L ?? rankingEntry?.L ?? 0);
   const rank = Number(rankingEntry?.natl_rank || 0);
 
   opponentName.textContent = opponentTeamName;
