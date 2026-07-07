@@ -196,6 +196,12 @@ ADVANCE_Y_MIN, ADVANCE_Y_MAX = -6, 6
 # §5 moment detection: a defender is "in range" within this euclidean distance.
 MOMENT_RANGE = 11
 
+# Trap/pressure detection radius: how close a defender must be to the ball-handler
+# to count toward an HC trap/pressure double-team (tighter than MOMENT_RANGE so a
+# "trap" means defenders genuinely converged on the ball, matching the trap
+# formation's own BH±1-4 targets — not merely in the vicinity). See Tunable_Constants.
+TRAP_MOMENT_RANGE = 5
+
 # §6 shift triggers (on ball-handler y): y < 20 → lower; y > 30 → upper; else normal.
 SHIFT_LOWER_Y = 20
 SHIFT_UPPER_Y = 30
@@ -834,12 +840,15 @@ def _is_ahead(def_xy: Dict[str, Any], bh_xy: Dict[str, Any], is_away_offense: bo
 
 
 def _in_range_defenders(
-    bh_xy: Dict[str, Any], def_coords: Dict[str, Dict[str, int]]
+    bh_xy: Dict[str, Any],
+    def_coords: Dict[str, Dict[str, int]],
+    radius: float = MOMENT_RANGE,
 ) -> List[str]:
-    """Defender positions within ``MOMENT_RANGE`` euclidean spots of the BH,
-    sorted nearest-first."""
+    """Defender positions within ``radius`` euclidean spots of the BH, sorted
+    nearest-first. Defaults to ``MOMENT_RANGE``; the trap/pressure detect passes
+    the tighter ``TRAP_MOMENT_RANGE``."""
     in_range = [
-        pos for pos in POSITIONS if _euclid(bh_xy, def_coords[pos]) <= MOMENT_RANGE
+        pos for pos in POSITIONS if _euclid(bh_xy, def_coords[pos]) <= radius
     ]
     in_range.sort(key=lambda pos: _euclid(bh_xy, def_coords[pos]))
     return in_range
@@ -857,7 +866,7 @@ def _detect_moment(
     A trap needs ≥2 in range with ≥1 ahead of the BH; pressure needs ≥1 in
     range that is ahead.
     """
-    in_range = _in_range_defenders(bh_xy, def_coords)
+    in_range = _in_range_defenders(bh_xy, def_coords, radius=TRAP_MOMENT_RANGE)
     ahead = [p for p in in_range if _is_ahead(def_coords[p], bh_xy, is_away_offense)]
     if len(in_range) >= 2 and ahead:
         return "trap", in_range
@@ -2476,11 +2485,36 @@ def compute_dynamic_hct_turn(
     play = play.begin_possession(bh_xy, def_coords, off_coords, is_away_offense)
     conv_snap_off, conv_snap_def = _snap_loop_coords()
     pg_initial = dict(def_coords["PG"])
-    _position_defense(bh_xy, def_coords, is_away_offense, off_coords, play=play)
+    # Reachability-read trap converge (UESS §1): INTERRUPT each defender toward
+    # his trap target at his archetype rate over the PG-sized beat — do NOT snap
+    # the full formation. A second trapper who can't reach the ball within that
+    # window ends short, so ``_detect_moment`` reads "pressure" not "trap": the
+    # steal/foul is credited only when the defender actually (and visibly)
+    # arrives on the ball. Beat stays PG-sized (no slowdown); traps close less
+    # often — the correct behavior (a snapped defender was being credited a
+    # steal/foul from a spot the render never showed). Targets computed ONCE
+    # (RNG-neutral vs the old ``_position_defense`` snap) and carried as
+    # ``move_archetype`` so the emitter renders at the same rates.
+    conv_targets = (
+        play.defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+        if play is not None
+        else _defense_targets(bh_xy, def_coords, is_away_offense, off_coords)
+    )
     converge_seconds = max(
         0.4,
-        calc_ag_segment_seconds(pg_initial, def_coords["PG"], pg_def, archetype="standard"),
+        calc_ag_segment_seconds(pg_initial, conv_targets["PG"], pg_def, archetype="standard"),
     )
+    conv_move_arch: Dict[str, str] = {}
+    for pos in POSITIONS:
+        arch = _defender_move_archetype(pos, set())
+        conv_move_arch[pos] = arch
+        rate = _ag_grid_per_game_sec(def_lineup.get(pos), arch)
+        if rate <= 0:
+            def_coords[pos] = _clamp_xy(dict(conv_targets[pos]))
+            continue
+        def_coords[pos] = _clamp_xy(
+            _interrupted_coord(def_coords[pos], conv_targets[pos], rate, converge_seconds)
+        )
     # D15b: off-ball offense keep hustling toward setup during the converge beat.
     _move_offense(off_coords, off_targets, converge_seconds, off_lineup, bh_pos)
     _append_loop_segment(
@@ -2491,6 +2525,7 @@ def compute_dynamic_hct_turn(
         "converge (defense closes on the BH)",
         snap_off=conv_snap_off,
         snap_def=conv_snap_def,
+        move_archetype=conv_move_arch,
     )
     shot_clock -= converge_seconds
 
