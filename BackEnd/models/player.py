@@ -116,7 +116,7 @@ class Player:
                 pass
     
     @staticmethod
-    def randomize_game_attributes(attributes: dict) -> dict:
+    def randomize_game_attributes(attributes: dict, *, preserve_character: bool = False) -> dict:
         """
         Initialize player attributes for a new mode instance.
         Copies exact values from universal collection for most attributes,
@@ -126,12 +126,13 @@ class Player:
         
         Args:
             attributes: Player attributes dict (from universal players collection)
+            preserve_character: When True, keep an existing CH value (e.g. recruit generation).
             
         Returns:
             Modified attributes dict with:
             - Exact values copied for: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT
             - NG = 1.0
-            - CH (Character) = random.randint(1, 100)
+            - CH (Character) = random.randint(1, 100) unless preserve_character and CH set
             - MO (Momentum) = 0 (always 0 at game init)
             - EM (Emotion) = random.randint(1, 100)
         """
@@ -139,9 +140,11 @@ class Player:
         attributes["NG"] = 1.0
         attributes["anchor_NG"] = 1.0
         
-        # CH (Character) is random 1-100
-        attributes["CH"] = random.randint(1, 100)
-        attributes["anchor_CH"] = attributes["CH"]
+        if preserve_character and attributes.get("CH") is not None:
+            attributes["anchor_CH"] = attributes["CH"]
+        else:
+            attributes["CH"] = random.randint(1, 100)
+            attributes["anchor_CH"] = attributes["CH"]
         
         # MO (Momentum) is always 0 at game init for all game modes
         attributes["MO"] = 0

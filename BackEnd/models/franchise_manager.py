@@ -1021,10 +1021,11 @@ class RecruitManager:
             
             # Generate attributes, height, and weight based on archetype + year tiers
             attributes, height, weight = self._generate_recruit_profile(archetype, year)
-            
-            # Randomize EM, CH, MO for recruits
+            attributes["CH"] = self._roll_recruit_character(archetype, year)
+
+            # Init NG/MO/EM; preserve recruit CH (Intangibles floor or uniform 1-100).
             from BackEnd.models.player import Player
-            attributes = Player.randomize_game_attributes(attributes)
+            attributes = Player.randomize_game_attributes(attributes, preserve_character=True)
             
             # Calculate position ratings for the recruit
             recruit_for_ratings = {
@@ -1097,19 +1098,31 @@ class RecruitManager:
         "Junior": ((60, 95), (40, 80), (10, 60), (10, 50)),
     }
 
+    @classmethod
+    def _roll_recruit_character(cls, archetype: str, year: str) -> int:
+        """Roll CH for a recruit.
+
+        Intangibles: randint(year STRONG minimum, 100).
+        All other archetypes: randint(1, 100).
+        """
+        if archetype == "Intangibles":
+            strong, _, _, _ = cls.YEAR_TIER_RANGES.get(year, cls.YEAR_TIER_RANGES["JH"])
+            return random.randint(strong[0], 100)
+        return random.randint(1, 100)
+
     def _generate_recruit_profile(self, archetype, year="JH"):
         """Generate attributes, height, and weight for a recruit based on archetype and year."""
         STRONG, SECONDARY, STANDARD, WEAK = self.YEAR_TIER_RANGES.get(
             year, self.YEAR_TIER_RANGES["JH"]
         )
         
-        # All attributes start as STANDARD
-        ALL_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
+        # Core profile attrs (CH rolled separately in generate_recruits_list).
+        PROFILE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
         
         # Define archetype configurations: (strong_attrs, secondary_attrs, height_range)
         archetype_configs = {
-            "Five-Star": (ALL_ATTRS, [], (69, 80)),
-            "Four-Star": ([], ALL_ATTRS, (66, 78)),
+            "Five-Star": (PROFILE_ATTRS, [], (69, 80)),
+            "Four-Star": ([], PROFILE_ATTRS, (66, 78)),
             "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 75)),
             "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 75)),
             "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 72)),
@@ -1118,7 +1131,7 @@ class RecruitManager:
             "Classic PF": (["RB"], ["ST"], (70, 76)),
             "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 78)),
             "Pure Shooter": (["SH", "FT"], [], (66, 73)),
-            "Intangibles": (["IQ", "ND", "CH"], [], (66, 75)),
+            "Intangibles": (["IQ", "ND"], [], (66, 75)),
             "Athlete": (["AG", "ST", "ND"], [], (66, 75)),
             "Inside Defender": (["ST", "ID"], [], (71, 80)),
             "Outside Defender": (["AG", "OD"], [], (66, 74)),
@@ -1140,7 +1153,7 @@ class RecruitManager:
         
         # Generate attributes
         attributes = {}
-        for attr in ALL_ATTRS:
+        for attr in PROFILE_ATTRS:
             if archetype == "Below Average":
                 # All attributes are weak for Below Average
                 value = random.randint(WEAK[0], WEAK[1])

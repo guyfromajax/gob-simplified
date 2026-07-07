@@ -9,19 +9,19 @@
 
 ## Recruit Archetype Reference
 
-> Source of truth: `RecruitManager` in `BackEnd/models/franchise_manager.py` — `_select_archetype()`, `_generate_recruit_profile()`, `_generate_weight()`, `YEAR_TIER_RANGES`. Also documented in `_documentation_master/04_Franchise_Mode_Systems/Recruiting_System.md`.
+> Source of truth: `RecruitManager` in `BackEnd/models/franchise_manager.py` — `_select_archetype()`, `_generate_recruit_profile()`, `_roll_recruit_character()`, `_generate_weight()`, `YEAR_TIER_RANGES`. Also documented in `_documentation_master/04_Franchise_Mode_Systems/Recruiting_System.md`.
 
-This is the same archetype system used when generating recruits. Each archetype defines which attributes roll **Strong**, **Secondary**, or **Standard** (or **Weak** for Below Average), plus a height range. Position ratings are then derived from the rolled attributes via `compute_position_ratings()`.
+Each archetype defines which **profile** attributes roll **Strong**, **Secondary**, or **Standard** (or **Weak** for Below Average), plus a height range. Position ratings are derived from the rolled attributes via `compute_position_ratings()`.
 
-### Rolled attributes (13)
+### Profile attributes (12)
 
-`SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT, CH`
+`SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT`
 
-The core 12 used for team totals and gameplay are `SC` through `FT` (excludes `CH`). `CH` is still rolled per archetype but is overwritten during post-processing (see below).
+The core 12 used for team totals and gameplay. **`CH` is rolled separately** — not part of the archetype profile tier loop.
 
-### Attribute tiers by year
+### Recruit attribute tiers by year
 
-Every attribute rolls from one of four tiers. The recruit's **year** selects which numeric ranges apply:
+Used for recruit generation (`YEAR_TIER_RANGES` in code):
 
 | Year | STRONG | SECONDARY | STANDARD | WEAK |
 |------|--------|-----------|----------|------|
@@ -30,15 +30,36 @@ Every attribute rolls from one of four tiers. The recruit's **year** selects whi
 | Sophomore | 40–85 | 30–70 | 10–50 | 10–30 |
 | Junior | 60–95 | 40–80 | 10–60 | 10–50 |
 
-**How tiers are applied per archetype:**
+### Computer-team rewrite tiers by year
+
+Used when manually rewriting universal comp rosters (conferences 2–16). **Not used for recruit generation.**
+
+| Year | STRONG | SECONDARY | STANDARD | WEAK |
+|------|--------|-----------|----------|------|
+| Freshman | 30–80 | 20–60 | 10–40 | 10–20 |
+| Sophomore | 40–85 | 30–70 | 10–50 | 10–30 |
+| Junior + Senior | 60–104 | 40–80 | 10–60 | 10–50 |
+
+**How tiers are applied per archetype (profile attrs only):**
 
 - **Strong attrs** → roll from the year's STRONG range
 - **Secondary attrs** → roll from the year's SECONDARY range
-- **All other attrs** → roll from the year's STANDARD range
-- **Below Average** → every attr rolls from the year's WEAK range (ignores strong/secondary lists)
-- **Five-Star** → all 13 attrs roll STRONG
-- **Four-Star** → all 13 attrs roll SECONDARY
-- **Average** → all 13 attrs roll STANDARD (no strong/secondary)
+- **All other profile attrs** → roll from the year's STANDARD range
+- **Below Average** → every profile attr rolls from the year's WEAK range
+- **Five-Star** → all 12 profile attrs roll STRONG
+- **Four-Star** → all 12 profile attrs roll SECONDARY
+- **Average** → all 12 profile attrs roll STANDARD
+
+### Character (`CH`) rolling — recruits
+
+Implemented in `_roll_recruit_character()`:
+
+| Archetype | CH roll |
+|-----------|---------|
+| **Intangibles** | `random.randint(year STRONG minimum, 100)` — floor from **recruit** `YEAR_TIER_RANGES` (JH 20, FR 30, SO 40, JR 60); **max always 100** (not capped at year STRONG max e.g. 85) |
+| **All others** | `random.randint(1, 100)` — fully random, not tier-based |
+
+CH is set before `Player.randomize_game_attributes(..., preserve_character=True)`, which init's `NG`, `MO`, `EM` without overwriting recruit `CH`. Signed recruits keep `CH` through `_normalize_new_franchise_player_attributes` (same preserve flag).
 
 ### Archetype selection weights
 
@@ -58,26 +79,26 @@ Weighted random via `random.choices`:
 
 | Archetype | Strong (STRONG tier) | Secondary (SECONDARY tier) | Standard (everything else) | Height (in) |
 |-----------|----------------------|----------------------------|----------------------------|-------------|
-| **Five-Star** | All 13 attrs | — | — | 69–80 |
-| **Four-Star** | — | All 13 attrs | — | 66–78 |
-| **Defensive Wizard** | ID, OD | ST, AG | SC, SH, PS, BH, RB, ND, IQ, FT, CH | 66–75 |
-| **All-Around Scorer** | SH, SC | ST, AG | ID, OD, PS, BH, RB, ND, IQ, FT, CH | 66–75 |
-| **Classic PG** | BH, PS | OD, IQ | SC, SH, ID, RB, AG, ST, ND, FT, CH | 66–72 |
-| **Classic SG** | SH | OD | SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT, CH | 66–74 |
-| **Classic SF** | SC, OD | AG | SH, ID, PS, BH, RB, ST, ND, IQ, FT, CH | 69–75 |
-| **Classic PF** | RB | ST | SC, SH, ID, OD, PS, BH, AG, ND, IQ, FT, CH | 70–76 |
-| **Classic C** | ID, ST | RB, SC | SH, OD, PS, BH, AG, ND, IQ, FT, CH | 72–78 |
-| **Pure Shooter** | SH, FT | — | SC, ID, OD, PS, BH, RB, AG, ST, ND, IQ, CH | 66–73 |
-| **Intangibles** | IQ, ND, CH | — | SC, SH, ID, OD, PS, BH, RB, AG, ST, FT | 66–75 |
-| **Athlete** | AG, ST, ND | — | SC, SH, ID, OD, PS, BH, RB, IQ, FT, CH | 66–75 |
-| **Inside Defender** | ST, ID | — | SC, SH, OD, PS, BH, RB, AG, ND, IQ, FT, CH | 71–80 |
-| **Outside Defender** | AG, OD | — | SC, SH, ID, PS, BH, RB, ST, ND, IQ, FT, CH | 66–74 |
-| **Average** | — | — | All 13 attrs | 66–75 |
-| **Below Average** | — | — | All 13 attrs (WEAK tier) | 66–74 |
-| **Outside Dual Threat** | SH, AG | — | SC, ID, OD, PS, BH, RB, ST, ND, IQ, FT, CH | 66–75 |
-| **Driver** | SC, AG | — | SH, ID, OD, PS, BH, RB, ST, ND, IQ, FT, CH | 66–75 |
-| **Outside C** | ST, SH | — | SC, ID, OD, PS, BH, RB, AG, ND, IQ, FT, CH | 72–77 |
-| **Three & D** | SH | ID, OD | SC, PS, BH, RB, AG, ST, ND, IQ, FT, CH | 69–75 |
+| **Five-Star** | All 12 profile attrs | — | — | 69–80 |
+| **Four-Star** | — | All 12 profile attrs | — | 66–78 |
+| **Defensive Wizard** | ID, OD | ST, AG | SC, SH, PS, BH, RB, ND, IQ, FT | 66–75 |
+| **All-Around Scorer** | SH, SC | ST, AG | ID, OD, PS, BH, RB, ND, IQ, FT | 66–75 |
+| **Classic PG** | BH, PS | OD, IQ | SC, SH, ID, RB, AG, ST, ND, FT | 66–72 |
+| **Classic SG** | SH | OD | SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT | 66–74 |
+| **Classic SF** | SC, OD | AG | SH, ID, PS, BH, RB, ST, ND, IQ, FT | 69–75 |
+| **Classic PF** | RB | ST | SC, SH, ID, OD, PS, BH, AG, ND, IQ, FT | 70–76 |
+| **Classic C** | ID, ST | RB, SC | SH, OD, PS, BH, AG, ND, IQ, FT | 72–78 |
+| **Pure Shooter** | SH, FT | — | SC, ID, OD, PS, BH, RB, AG, ST, ND, IQ | 66–73 |
+| **Intangibles** | IQ, ND | — | SC, SH, ID, OD, PS, BH, RB, AG, ST, FT | 66–75 |
+| **Athlete** | AG, ST, ND | — | SC, SH, ID, OD, PS, BH, RB, IQ, FT | 66–75 |
+| **Inside Defender** | ST, ID | — | SC, SH, OD, PS, BH, RB, AG, ND, IQ, FT | 71–80 |
+| **Outside Defender** | AG, OD | — | SC, SH, ID, PS, BH, RB, ST, ND, IQ, FT | 66–74 |
+| **Average** | — | — | All 12 profile attrs | 66–75 |
+| **Below Average** | — | — | All 12 profile attrs (WEAK tier) | 66–74 |
+| **Outside Dual Threat** | SH, AG | — | SC, ID, OD, PS, BH, RB, ST, ND, IQ, FT | 66–75 |
+| **Driver** | SC, AG | — | SH, ID, OD, PS, BH, RB, ST, ND, IQ, FT | 66–75 |
+| **Outside C** | ST, SH | — | SC, ID, OD, PS, BH, RB, AG, ND, IQ, FT | 72–77 |
+| **Three & D** | SH | ID, OD | SC, PS, BH, RB, AG, ST, ND, IQ, FT | 69–75 |
 
 ### Weight by height
 
@@ -90,13 +111,14 @@ Weight is derived from rolled height (`_generate_weight`):
 | 76–80 | 195–231 |
 | > 80 | 209–260 |
 
-### Post-processing (after profile roll)
+### Post-processing (recruit generation)
 
 In `generate_recruits_list()`:
 
-1. `Player.randomize_game_attributes(attributes)` sets `NG = 1.0`, `MO = 0`, and **overwrites `CH`** with `random.randint(1, 100)` and sets `EM = random.randint(1, 100)`. This means the archetype-rolled `CH` (e.g. Intangibles STRONG CH) is discarded.
-2. `compute_position_ratings(recruit, profile="recruit")` derives PG/SG/SF/PF/C from final attributes + height.
-3. Names, year, lean list, and home region are assigned separately.
+1. `_generate_recruit_profile()` rolls 12 profile attrs + height/weight.
+2. `_roll_recruit_character()` sets `CH` (Intangibles floor by year, others 1–100).
+3. `Player.randomize_game_attributes(..., preserve_character=True)` sets `NG`, `MO`, `EM`; preserves `CH`.
+4. `compute_position_ratings(recruit, profile="recruit")` derives PG/SG/SF/PF/C.
 
 ### Quick archetype identity guide
 
@@ -112,7 +134,7 @@ In `generate_recruits_list()`:
 | Classic PF | Rebounder, strength secondary |
 | Classic C | Interior D + strength, rebound/score secondary |
 | Pure Shooter | SH + FT specialist |
-| Intangibles | IQ, durability, character (CH overwritten post-roll) |
+| Intangibles | IQ, durability; elevated CH floor by year (up to 100) |
 | Athlete | Agility, strength, durability |
 | Inside Defender | Big interior stopper |
 | Outside Defender | Perimeter lockdown |

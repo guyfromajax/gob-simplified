@@ -9449,7 +9449,7 @@ def _normalize_new_franchise_player_attributes(raw_attributes: dict[str, Any] | 
         attrs[attr] = base_val
         attrs[f"anchor_{attr}"] = base_val
 
-    return Player.randomize_game_attributes(attrs)
+    return Player.randomize_game_attributes(attrs, preserve_character=True)
 
 
 def _safe_int(value: Any, default: int = 0) -> int:

@@ -103,7 +103,7 @@ def test_generate_recruit_profile_defensive_wizard(recruit_manager, year):
     assert secondary[0] <= attributes["ST"] <= secondary[1]
     assert secondary[0] <= attributes["AG"] <= secondary[1]
 
-    for attr in ["SC", "SH", "PS", "BH", "RB", "ND", "IQ", "FT", "CH"]:
+    for attr in ["SC", "SH", "PS", "BH", "RB", "ND", "IQ", "FT"]:
         assert standard[0] <= attributes[attr] <= standard[1]
 
 
@@ -146,6 +146,48 @@ def test_generate_recruit_profile_three_and_d(recruit_manager):
     # Secondary traits: ID, OD
     assert secondary[0] <= attributes["ID"] <= secondary[1]
     assert secondary[0] <= attributes["OD"] <= secondary[1]
+
+
+def test_roll_recruit_character_intangibles_uses_year_strong_floor(recruit_manager):
+    """Intangibles CH floor matches recruit YEAR_TIER_RANGES STRONG minimum; max 100."""
+    floors = {"JH": 20, "Freshman": 30, "Sophomore": 40, "Junior": 60}
+    for year, floor in floors.items():
+        for _ in range(50):
+            ch = recruit_manager._roll_recruit_character("Intangibles", year)
+            assert floor <= ch <= 100, f"year={year} got CH={ch}"
+
+
+def test_roll_recruit_character_non_intangibles_uniform(recruit_manager):
+    """Non-Intangibles recruits roll CH uniformly 1-100."""
+    for _ in range(100):
+        ch = recruit_manager._roll_recruit_character("Classic PG", "JH")
+        assert 1 <= ch <= 100
+
+
+def test_generate_recruits_list_intangibles_ch_preserved(recruit_manager):
+    """Full pipeline keeps Intangibles CH floor; does not cap at year STRONG max."""
+    for _ in range(200):
+        recruits = recruit_manager.generate_recruits_list(count=1)
+        recruit = recruits[0]
+        if recruit["archetype"] != "Intangibles":
+            continue
+        year = recruit["year"]
+        floor = RecruitManager.YEAR_TIER_RANGES[year][0][0]
+        ch = recruit["attributes"]["CH"]
+        assert floor <= ch <= 100
+        assert recruit["attributes"]["anchor_CH"] == ch
+        return
+    pytest.skip("No Intangibles recruit in sample")
+
+
+def test_generate_recruits_list_non_intangibles_ch_uniform(recruit_manager):
+    """Full pipeline: non-Intangibles CH stays in 1-100 (not tier-capped)."""
+    recruits = recruit_manager.generate_recruits_list(count=50)
+    for recruit in recruits:
+        if recruit["archetype"] == "Intangibles":
+            continue
+        ch = recruit["attributes"]["CH"]
+        assert 1 <= ch <= 100
 
 
 def test_year_distribution_counts(recruit_manager):
