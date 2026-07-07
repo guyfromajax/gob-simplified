@@ -99,6 +99,53 @@ def cutout(img):
     return rgba
 
 
+# --- color-lock: normalize the (already colored) jersey to exact team hex ----
+# The jersey is painted in ~team color by Nano Banana; this locks every player
+# on a team to the SAME exact hex (removes generation drift), preserving the
+# fabric shading and leaving the painted wordmark (white/other) untouched.
+def _rgb2hsv(a):
+    import numpy as np
+    r, g, b = a[..., 0]/255, a[..., 1]/255, a[..., 2]/255
+    mx = a.max(2)/255; mn = a.min(2)/255; d = mx - mn; h = np.zeros_like(mx); m = d > 1e-6
+    i = (mx == r) & m; h[i] = 60*(((g-b)/np.where(d == 0, 1, d))[i] % 6)
+    i = (mx == g) & m; h[i] = 60*(((b-r)/np.where(d == 0, 1, d))[i] + 2)
+    i = (mx == b) & m; h[i] = 60*(((r-g)/np.where(d == 0, 1, d))[i] + 4)
+    s = np.where(mx > 0, d/np.where(mx == 0, 1, mx), 0)
+    return h, s, mx
+
+
+def color_lock(rgba, primary, secondary, hue_lo, hue_hi):
+    import numpy as np
+    from scipy import ndimage
+    from PIL import Image
+    arr = np.asarray(rgba.convert("RGB")).astype(np.float32)
+    alpha = np.asarray(rgba)[..., 3] > 10
+    h, s, v = _rgb2hsv(arr)
+    jersey = alpha & (h >= hue_lo) & (h <= hue_hi) & (s > 0.12)
+    jersey = ndimage.binary_closing(jersey, iterations=3)
+    jersey = ndimage.binary_opening(jersey, iterations=2)
+    lbl, n = ndimage.label(jersey)
+    if n > 1:
+        jersey = lbl == (1 + int(np.argmax(ndimage.sum(np.ones_like(lbl), lbl, range(1, n+1)))))
+    if jersey.sum() == 0:
+        return rgba
+    trim = jersey & (v < 0.42); body = jersey & ~trim
+    out = arr.copy()
+    for mask, color in ((body, primary), (trim, secondary)):
+        soft = ndimage.gaussian_filter(mask.astype(np.float32), 2.0)[..., None]
+        tone = np.clip(v[..., None]*1.05, 0.15, 1.0)
+        target = np.array(color, np.float32)[None, None, :] * tone
+        out = out*(1-soft) + target*soft
+    res = Image.fromarray(np.clip(out, 0, 255).astype("uint8")).convert("RGBA")
+    res.putalpha(Image.fromarray(np.asarray(rgba)[..., 3]))
+    return res
+
+
+def _hex2rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+
 def normalize_framing(img):
     """Scale + center the cut-out subject onto the 3530x3412 canvas."""
     from PIL import Image
@@ -119,10 +166,13 @@ def normalize_framing(img):
     return canvas
 
 
-def process(in_path, out_path):
+def process(in_path, out_path, lock=None):
     from PIL import Image
     src = Image.open(in_path).convert("RGBA")
-    out = normalize_framing(cutout(src))
+    cut = cutout(src)
+    if lock:                       # (primary_rgb, secondary_rgb, hue_lo, hue_hi)
+        cut = color_lock(cut, *lock)
+    out = normalize_framing(cut)
     out.save(out_path, "PNG")
 
 
@@ -143,12 +193,20 @@ def main():
     ap.add_argument("--map", dest="mapfile")
     ap.add_argument("--map-name-col", default="name")
     ap.add_argument("--map-id-col", default="_id")
+    ap.add_argument("--primary", help="lock jersey body to this hex (e.g. 87b5e6)")
+    ap.add_argument("--secondary", help="lock jersey trim to this hex (e.g. 1e2f5b)")
+    ap.add_argument("--hue-lo", type=float, default=185)
+    ap.add_argument("--hue-hi", type=float, default=265)
     args = ap.parse_args()
 
     try:
         import PIL, numpy, onnxruntime  # noqa: F401
     except ImportError:
-        sys.exit("missing deps. Run:  pip install onnxruntime pillow numpy")
+        sys.exit("missing deps. Run:  pip install onnxruntime pillow numpy scipy")
+    lock = None
+    if args.primary and args.secondary:
+        lock = (_hex2rgb(args.primary), _hex2rgb(args.secondary),
+                args.hue_lo, args.hue_hi)
 
     name_map = load_map(args.mapfile, args.map_name_col, args.map_id_col) \
         if args.mapfile else None
@@ -166,7 +224,7 @@ def main():
         out_name = resolve_name(base, name_map) + ".png"
         out_path = os.path.join(args.outdir, out_name)
         try:
-            process(os.path.join(args.indir, f), out_path)
+            process(os.path.join(args.indir, f), out_path, lock=lock)
             print(f"[ok] {f} -> {out_name}")
             ok += 1
         except Exception as e:

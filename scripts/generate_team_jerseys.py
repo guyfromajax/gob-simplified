@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""
+Paint team jerseys onto approved busts via Nano Banana (Gemini image API).
+
+For each player on a team, it edits the approved white-tank bust into the
+team's jersey (colors + trim + wordmark), using the team's BANNER as the
+branding reference — so the design matches real team branding. Output feeds
+process_player_portraits.py (cutout -> color-lock -> crop).
+
+Setup (run where you have the paid Gemini key + open network — your machine):
+    pip install google-genai pillow
+    # In AI Studio: "Get API key", then add to .env:  GEMINI_API_KEY=...
+    # (.env is auto-loaded; the key is never printed)
+
+    # ALWAYS test one player first to confirm the API call works:
+    python3 scripts/generate_team_jerseys.py --team "Chapel Hill" --only "Stanley Keith"
+    # then the whole team:
+    python3 scripts/generate_team_jerseys.py --team "Chapel Hill"
+
+Inputs (all in-repo):
+  busts    tmp/portrait-pilot/raw/<Player Name>.<png|jpg>
+  banner   FrontEnd/static/images/teams/<team_id>/<team_id>_banner_primary.jpg
+  team     teams/128_teams.txt  (mascot -> wordmark, team_id -> banner folder)
+Output:
+  tmp/portrait-pilot/designed/<Player Name>.png
+"""
+import os
+import re
+import sys
+import glob
+import argparse
+
+MODEL = "gemini-3.1-flash-lite-image"   # Nano Banana 2 Lite
+
+PROMPT = (
+    "Two images are attached. The FIRST is a basketball player portrait. "
+    "The SECOND is the team's branding banner, showing the team's wordmark and "
+    "colors. Redesign the player's jersey in the FIRST image as a basketball "
+    "tank in the team's primary color with trim in the team's secondary color, "
+    "matching the banner. Paint the team wordmark \"{wordmark}\" across the "
+    "chest in the same font and style as shown in the banner, screen-printed "
+    "onto the fabric so it follows the folds and wrinkles. Do not add any "
+    "number. Keep the player's face, skin tone, hair, body, and expression "
+    "exactly the same. Plain light background."
+)
+
+
+def load_env(path=".env"):
+    if os.path.exists(path):
+        for line in open(path):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+def slug(s):
+    return re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+
+def team_info(team_name):
+    """Return (mascot, team_id) for a team from 128_teams.txt."""
+    want = slug(team_name)
+    for line in open("teams/128_teams.txt"):
+        parts = [p for p in re.split(r"\t+|\s{2,}", line.strip()) if p]
+        if len(parts) < 4 or parts[1].lower() == "team":
+            continue
+        # columns: id, team, mascot, team_id, primary, secondary, ...
+        name = parts[1]
+        if slug(name) == want:
+            mascot = parts[2]
+            team_id = next((p for p in parts if re.match(r"[A-Z][A-Z_]+$", p)), None)
+            return mascot, team_id
+    return None, None
+
+
+def team_players(team_name):
+    import json
+    data = json.load(open("scripts/players_export.json"))
+    return [p for p in data if slug(p.get("team", "")) == slug(team_name)]
+
+
+def find_bust(name, raw_dir):
+    for f in glob.glob(os.path.join(raw_dir, "*")):
+        if slug(os.path.splitext(os.path.basename(f))[0]) == slug(name):
+            return f
+    return None
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--team", required=True)
+    ap.add_argument("--only", help="one player name, to test the API call first")
+    ap.add_argument("--raw", default="tmp/portrait-pilot/raw")
+    ap.add_argument("--out", default="tmp/portrait-pilot/designed")
+    args = ap.parse_args()
+
+    load_env()
+    if not os.environ.get("GEMINI_API_KEY"):
+        sys.exit("GEMINI_API_KEY not set (checked env and .env). "
+                 "Get one in AI Studio -> Get API key, add to .env.")
+    try:
+        from google import genai
+        from PIL import Image
+    except ImportError:
+        sys.exit("missing deps. Run:  pip install google-genai pillow")
+
+    mascot, team_id = team_info(args.team)
+    if not team_id:
+        sys.exit(f"team '{args.team}' not found in teams/128_teams.txt")
+    wordmark = (mascot or args.team).upper()
+    banner = f"FrontEnd/static/images/teams/{team_id.lower()}/{team_id.lower()}_banner_primary.jpg"
+    if not os.path.exists(banner):
+        sys.exit(f"banner not found: {banner}")
+    print(f"[team] {args.team}  wordmark={wordmark}  banner={banner}")
+
+    players = team_players(args.team)
+    if args.only:
+        players = [p for p in players if slug(p["name"]) == slug(args.only)]
+    if not players:
+        sys.exit("no matching players found")
+
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    os.makedirs(args.out, exist_ok=True)
+    banner_img = Image.open(banner)
+    prompt = PROMPT.format(wordmark=wordmark)
+
+    ok = 0
+    for p in players:
+        name = p["name"]
+        bust = find_bust(name, args.raw)
+        if not bust:
+            print(f"[skip] {name}: no bust in {args.raw}")
+            continue
+        try:
+            resp = client.models.generate_content(
+                model=MODEL, contents=[prompt, Image.open(bust), banner_img])
+            saved = False
+            for part in resp.candidates[0].content.parts:
+                if getattr(part, "inline_data", None) and part.inline_data.data:
+                    out = os.path.join(args.out, f"{name}.png")
+                    with open(out, "wb") as fh:
+                        fh.write(part.inline_data.data)
+                    print(f"[ok] {name} -> {out}")
+                    saved = True
+                    ok += 1
+                    break
+            if not saved:
+                print(f"[fail] {name}: no image in response")
+        except Exception as e:
+            print(f"[fail] {name}: {type(e).__name__}: {str(e)[:200]}")
+    print(f"\n[done] {ok}/{len(players)} designed -> {args.out}")
+
+
+if __name__ == "__main__":
+    main()
