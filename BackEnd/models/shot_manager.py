@@ -718,7 +718,7 @@ class ShotManager:
         
         # ✅ BALANCING SYSTEM: Check for balancing override first
         # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
-        # Trailing team gets -10 (easier shots), leading team gets 190 (harder shots)
+        # Trailing team gets -10 (easier shots), leading team gets 230 (harder shots)
         if "balancing_shot_threshold_override" in game_state:
             shot_threshold = game_state["balancing_shot_threshold_override"]
             # Clear override after use (one-time per turn)

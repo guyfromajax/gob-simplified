@@ -3705,16 +3705,16 @@ def apply_balancing_system(game, game_state, off_team, def_team):
     # Base thresholds by quarter - separate for trailing and leading teams
     trailing_thresholds = {
         1: 6,
-        2: 9,
-        3: 12,
-        4: 15
+        2: 6,
+        3: 8,
+        4: 10,
     }
-    
+
     leading_thresholds = {
-        1: 9,
-        2: 12,
-        3: 15,
-        4: 18
+        1: 6,
+        2: 6,
+        3: 8,
+        4: 10,
     }
     
     # Get team attributes
@@ -3735,11 +3735,11 @@ def apply_balancing_system(game, game_state, off_team, def_team):
     # Calculate adjusted threshold based on whether trailing or leading
     if is_trailing:
         # Trailing: use trailing thresholds, subtract fight from threshold
-        base_threshold = trailing_thresholds.get(quarter, 15)  # Default to Q4 for OT
+        base_threshold = trailing_thresholds.get(quarter, 10)  # Default to Q4 for OT
         adjusted_threshold = base_threshold - fight
     elif is_leading:
         # Leading: use leading thresholds, add discipline to threshold
-        base_threshold = leading_thresholds.get(quarter, 18)  # Default to Q4 for OT
+        base_threshold = leading_thresholds.get(quarter, 10)  # Default to Q4 for OT
         adjusted_threshold = base_threshold + discipline
     else:
         # Tied game, no balancing needed

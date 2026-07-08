@@ -76,7 +76,9 @@
    - Check for `game_state["balancing_shot_threshold_override"]` (one-time override)
      - Triggered when score difference exceeds threshold based on quarter and team attributes (fight/discipline)
      - Trailing team: -10 (easier shots)
-     - Leading team: 190 (harder shots)
+     - Leading team: 230 (harder shots)
+     - Base margin trigger tiers before attributes: Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams
+     - Trailing trigger subtracts offense fight; leading trigger adds offense discipline; minimum trigger is clamped to 1
    - Otherwise use `off_team.team_attributes["shot_threshold"]`
 
 4. Apply Three-Point Modifier
@@ -224,7 +226,9 @@ Shot resolution uses the following base constants:
 
 #### Step 3: Get Shot Threshold
 - **Balancing Override**: `game_state["balancing_shot_threshold_override"]` (if score diff exceeds quarter-based threshold)
-  - Trailing: -10, Leading: 190
+  - Trailing: -10, Leading: 230
+  - Base margin trigger tiers before attributes: Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams
+  - Trailing trigger subtracts offense fight; leading trigger adds offense discipline; minimum trigger is clamped to 1
 - **Otherwise**: `off_team.team_attributes["shot_threshold"]`
 
 #### Step 4: Apply Three-Point Modifier
@@ -323,7 +327,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 8. **Motion Attack Penalty**: Applied when Motion offense attack shot is stopped short of basket (penalty = distance to basket)
 9. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
 10. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)
-11. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes
+11. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes. Base trigger tiers are Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams; trailing subtracts offense fight, leading adds offense discipline, and the minimum trigger is clamped to 1. The one-turn shot-threshold overrides are trailing = -10 and leading = 230.
 12. **Zone shot-type threshold**: 2-3 and 3-2 zone defenses adjust `shot_threshold` by `shot_type` on HCO and Final Turn shots only (`_hco_zone_shot_threshold_delta` in `shot_manager.py`).
 
 ### Status

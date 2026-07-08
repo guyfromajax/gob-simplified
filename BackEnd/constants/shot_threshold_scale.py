@@ -15,10 +15,10 @@ MIN = 10
 MAX = MIN + SPAN  # 210
 MID = MIN + HALF_SPAN  # 110
 
-# Score-balancing one-turn overrides sit 20 below min / 20 below max.
+# Score-balancing one-turn overrides. Lower = easier, higher = harder.
 BALANCING_MARGIN = 20
 BALANCING_TRAILING = MIN - BALANCING_MARGIN  # -10
-BALANCING_LEADING = MAX - BALANCING_MARGIN  # 190
+BALANCING_LEADING = MAX + BALANCING_MARGIN  # 230
 
 # Franchise new-team init: slightly better than league average (10–20 below MID).
 FRANCHISE_INIT_LO = MID - 20  # 90
