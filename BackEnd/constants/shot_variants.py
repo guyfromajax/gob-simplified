@@ -10,6 +10,12 @@ the outcome threshold, not absolute score.
 """
 import random
 
+from BackEnd.constants import (
+    FLSS_HEAVE_MISS_BACKBOARD_MAX,
+    FLSS_HEAVE_MISS_RATTLE_MAX,
+    FLSS_HEAVE_MISS_RIM_BOUNCE_MAX,
+)
+
 
 SHOT_VARIANT_SWISH = "SWISH"
 SHOT_VARIANT_CLANK = "CLANK"
@@ -328,3 +334,25 @@ def select_ft_shot_variant(
         pairs = _FT_MISS_FAR
 
     return _weighted_choice(pairs, rng)
+
+
+def select_flss_heave_miss_variant(miss_margin, rng=None):
+    """Pick rim-action variant for a missed FLSS heave from roll proximity.
+
+    ``miss_margin = roll - shot_score`` where ``made`` requires
+    ``shot_score > roll``. Bands mirror ``FLSS_HEAVE_MISS_*`` constants in
+    ``BackEnd.constants``.
+    """
+    rng = rng or random
+    margin = float(miss_margin)
+    if margin <= FLSS_HEAVE_MISS_RATTLE_MAX:
+        return rng.choice([
+            SHOT_VARIANT_LITTLE_RATTLE,
+            SHOT_VARIANT_NORMAL_RATTLE,
+            SHOT_VARIANT_HEAVY_RATTLE,
+        ])
+    if margin <= FLSS_HEAVE_MISS_RIM_BOUNCE_MAX:
+        return SHOT_VARIANT_BACK_OF_RIM
+    if margin <= FLSS_HEAVE_MISS_BACKBOARD_MAX:
+        return SHOT_VARIANT_BANK_MISS
+    return SHOT_VARIANT_AIRBALL

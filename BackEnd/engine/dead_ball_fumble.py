@@ -103,6 +103,17 @@ def _find_dead_ball_turn_stop_step_index(steps: List[AnimationStep]) -> Optional
     return None
 
 
+def _has_fumble_flourish_step(steps: List[AnimationStep]) -> bool:
+    for step in steps:
+        flourish = (step.get("start") or {}).get("flourish") or {}
+        if not isinstance(flourish, dict):
+            continue
+        for payload in flourish.values():
+            if isinstance(payload, dict) and payload.get("kind") == "fumble":
+                return True
+    return False
+
+
 def build_dead_ball_fumble_step(
     *,
     start_coords: Dict[str, GridCoord],
@@ -181,6 +192,8 @@ def inject_dead_ball_fumble_before_turn_stop(
     """Insert fumble beat immediately before terminal DEAD_BALL_TURNOVER turn_stop."""
     if not steps or not is_dead_ball_fumble_turn(turn_result):
         return
+    if _has_fumble_flourish_step(steps):
+        return
 
     anchor_idx = _find_dead_ball_turn_stop_step_index(steps)
     if anchor_idx is None:
@@ -219,6 +232,35 @@ def inject_dead_ball_fumble_before_turn_stop(
         turn_stop_next=turn_stop_next,
     )
     steps.append(fumble_step)
+
+
+def finalize_dead_ball_fumble_for_turn(
+    turn_result: Dict[str, Any],
+    game: Any,
+) -> None:
+    """Universal finalization pass for schema-rendered dead-ball turnovers.
+
+    Emitters may still call ``inject_dead_ball_fumble_before_turn_stop`` locally.
+    This pass is idempotent and catches any qualifying turn that attached
+    ``animation_steps`` outside those emitter-specific call sites.
+    """
+    if not isinstance(turn_result, dict):
+        return
+    steps = turn_result.get("animation_steps")
+    if not isinstance(steps, list) or not steps:
+        return
+    off_team = getattr(game, "offense_team", None)
+    away_team = getattr(game, "away_team", None)
+    away_offense = bool(
+        off_team is not None
+        and getattr(off_team, "team_id", None)
+        == getattr(away_team, "team_id", None)
+    )
+    inject_dead_ball_fumble_before_turn_stop(
+        steps,
+        turn_result,
+        away_offense=away_offense,
+    )
 
 
 def propagate_fumble_turn_flags(

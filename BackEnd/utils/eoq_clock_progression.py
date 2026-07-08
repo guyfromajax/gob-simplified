@@ -127,6 +127,43 @@ def should_route_post_dreb_flss(time_remaining: Optional[int]) -> bool:
     return int(time_remaining) > POST_DREB_FLSS_MIN_CLOCK
 
 
+# States whose own resolvers never consume the armed Final-Turn / FLSS flags
+# (those are only read in the HCO ``else`` branch of ``run_micro_turn``). Without
+# an explicit interception these possessions run a full trap/press/fast-break at
+# end of quarter instead of a forced last-second shot. See EOQ_System.md.
+FLSS_FORCE_STATES = ("HCT", "FCP", "FAST_BREAK")
+
+
+def should_force_eoq_last_shot(
+    game: Any, time_remaining: Optional[int], state: Optional[str]
+) -> bool:
+    """True when a non-HCO clock-enforced possession must force a terminal FLSS.
+
+    Applies to ``HCT`` / ``FCP`` / ``FAST_BREAK`` possessions that *start* with too
+    little runway for a normal possession (``0 < clock <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK``).
+    HCO is excluded (it owns full Final Turn vs. FLSS routing via
+    ``resolve_final_turn_shot``); ``clock <= 0`` is excluded (Path A / run-out
+    handles it). Mirrors the HCO Final-Shot gate: Q1-3 always attempt a last shot;
+    Q4/OT only when ``would_take_final_shot`` (not run-out / force-foul / quick-shot).
+    """
+    if state not in FLSS_FORCE_STATES:
+        return False
+    tr = int(time_remaining or 0)
+    if tr <= 0 or tr > FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK:
+        return False
+    gs = getattr(game, "game_state", None) or {}
+    # A scheduled FLSS whose possession landed on a pressure/transition state
+    # (rather than HCO) would otherwise never be consumed — fire it here.
+    if gs.get("flss_possession_pending"):
+        return True
+    quarter = getattr(game, "quarter", None)
+    if quarter is not None and int(quarter) >= 4:
+        from BackEnd.utils.situational_logic import would_take_final_shot
+
+        return bool(would_take_final_shot(game, tr))
+    return True
+
+
 def should_route_eoq_rebound(game: Any, result: Dict[str, Any]) -> bool:
     """True when late-clock EOQ rules govern the rebound (not normal HCO promotion)."""
     time_remaining = int(game.game_state.get("time_remaining") or 0)

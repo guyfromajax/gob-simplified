@@ -378,7 +378,9 @@ def _flss_defender_coords(shooter_coords: Dict[str, float], *, is_home_offense: 
     return {"x": round(max(1, sx - 3), 2), "y": sy}
 
 
-def _resolve_flss_heave(shooter, shooter_x: float, *, is_home_offense: bool) -> Tuple[bool, int]:
+def _resolve_flss_heave(
+    shooter, shooter_x: float, *, is_home_offense: bool
+) -> Tuple[bool, int, float, int]:
     basket_x = 91 if is_home_offense else 9
     ch = float((getattr(shooter, "attributes", None) or {}).get("CH", 0))
     distance = abs(float(shooter_x) - basket_x)
@@ -387,7 +389,7 @@ def _resolve_flss_heave(shooter, shooter_x: float, *, is_home_offense: bool) -> 
     shot_score = (ch - distance) / divisor
     made = shot_score > roll
     points = 3 if distance > 40 else 2
-    return made, points
+    return made, points, shot_score, roll
 
 
 def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
@@ -511,8 +513,13 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
                 defender.coords = dict(d_coords)
 
     if zone == "heave":
+        from BackEnd.constants.shot_variants import (
+            roll_shot_variant_extras,
+            select_flss_heave_miss_variant,
+        )
+
         log_eoq_step(game, "FLSS", "heave_resolve", "START", shooter=shooter, shooter_pos=shooter_pos)
-        made, points = _resolve_flss_heave(shooter, ex, is_home_offense=is_home_off)
+        made, points, shot_score, roll = _resolve_flss_heave(shooter, ex, is_home_offense=is_home_off)
         result_type = "MAKE" if made else "MISS"
         result: Dict[str, Any] = {
             "result_type": result_type,
@@ -549,11 +556,12 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             shooter.record_stat("FGA")
             if points == 3:
                 shooter.record_stat("3PTA")
-            from BackEnd.utils.shared import calculate_bounce_spot
-
-            bounce_spot = calculate_bounce_spot(game, shooter_coords=shooter_coords)
-            result["ball_bounce_x"] = bounce_spot["x"]
-            result["ball_bounce_y"] = bounce_spot["y"]
+            miss_margin = float(roll) - float(shot_score)
+            shot_variant = select_flss_heave_miss_variant(miss_margin)
+            shot_variant_extras = roll_shot_variant_extras(shot_variant, shooter_y=ey)
+            result["shot_variant"] = shot_variant
+            result["flss_heave_miss_margin"] = miss_margin
+            result.update(shot_variant_extras)
             result["text"] = f"{get_name_safe(shooter)} misses the desperation heave."
         strip_terminal_rebound_fields(result)
         log_eoq_step(
@@ -563,7 +571,13 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             "END",
             shooter=shooter,
             shooter_pos=shooter_pos,
-            extra={"result_type": result_type, "points": points, "made": made},
+            extra={
+                "result_type": result_type,
+                "points": points,
+                "made": made,
+                "shot_variant": result.get("shot_variant"),
+                "flss_heave_miss_margin": result.get("flss_heave_miss_margin"),
+            },
         )
         return result
 

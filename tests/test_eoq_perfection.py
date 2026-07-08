@@ -1,6 +1,17 @@
 """Tests for EOQ perfection helpers (run-out clock, FLSS zones, inside paint)."""
 
+import random
+
 from BackEnd.constants import is_inside_paint_grid
+from BackEnd.constants.shot_variants import (
+    SHOT_VARIANT_AIRBALL,
+    SHOT_VARIANT_BACK_OF_RIM,
+    SHOT_VARIANT_BANK_MISS,
+    SHOT_VARIANT_HEAVY_RATTLE,
+    SHOT_VARIANT_LITTLE_RATTLE,
+    SHOT_VARIANT_NORMAL_RATTLE,
+    select_flss_heave_miss_variant,
+)
 from BackEnd.engine.eoq_perfection import (
     build_flss_skeleton_steps,
     classify_flss_zone,
@@ -137,3 +148,14 @@ def test_build_flss_skeleton_steps_includes_drive_and_shoot():
     assert steps[0]["pos_actions"]["PG"]["archetype"] == "sprint"
     assert steps[1]["pos_actions"]["PG"]["action"] == "shoot"
     assert steps[1]["_step_t_floor_game_seconds"] == 1.0
+
+
+def test_select_flss_heave_miss_variant_bands():
+    rattle = {SHOT_VARIANT_LITTLE_RATTLE, SHOT_VARIANT_NORMAL_RATTLE, SHOT_VARIANT_HEAVY_RATTLE}
+    assert select_flss_heave_miss_variant(3, rng=random.Random(0)) in rattle
+    assert select_flss_heave_miss_variant(5, rng=random.Random(1)) in rattle
+    assert select_flss_heave_miss_variant(6, rng=random.Random(0)) == SHOT_VARIANT_BACK_OF_RIM
+    assert select_flss_heave_miss_variant(15, rng=random.Random(0)) == SHOT_VARIANT_BACK_OF_RIM
+    assert select_flss_heave_miss_variant(16, rng=random.Random(0)) == SHOT_VARIANT_BANK_MISS
+    assert select_flss_heave_miss_variant(30, rng=random.Random(0)) == SHOT_VARIANT_BANK_MISS
+    assert select_flss_heave_miss_variant(31, rng=random.Random(0)) == SHOT_VARIANT_AIRBALL

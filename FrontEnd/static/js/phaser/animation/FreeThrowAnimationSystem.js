@@ -552,13 +552,16 @@ export class FreeThrowAnimationSystem {
       animationConfig.freeThrow?.missAnnouncementHoldMs ??
       animationConfig.freeThrow?.resultAnnouncementHoldMs ??
       600;
-    await new Promise(resolve => {
-      if (this.scene.time?.delayedCall) {
-        this.scene.time.delayedCall(missAnnouncementHoldMs, resolve);
-      } else {
-        setTimeout(resolve, missAnnouncementHoldMs);
-      }
-    });
+    // Non-final misses keep the announcement hold; final miss flows straight to rebound.
+    if (!ftContext.isFinal) {
+      await new Promise(resolve => {
+        if (this.scene.time?.delayedCall) {
+          this.scene.time.delayedCall(missAnnouncementHoldMs, resolve);
+        } else {
+          setTimeout(resolve, missAnnouncementHoldMs);
+        }
+      });
+    }
 
     // Check if this is the final free throw
     // ✅ FIX: Use ftContext.isFinal instead of recalculating, as it includes the free_throws_remaining safety check

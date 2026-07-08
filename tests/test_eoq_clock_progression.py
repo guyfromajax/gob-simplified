@@ -17,6 +17,7 @@ from BackEnd.utils.eoq_clock_progression import (
     schedule_flss_after_dreb,
     schedule_flss_after_inbound,
     scrub_timeout_fields_from_snapshot,
+    should_force_eoq_last_shot,
     should_force_oreb_putback,
     should_route_eoq_rebound,
     should_route_final_turn_to_flss,
@@ -37,6 +38,32 @@ def test_should_route_post_dreb_flss():
     assert should_route_post_dreb_flss(3) is True
     assert should_route_post_dreb_flss(2) is False
     assert should_route_post_dreb_flss(1) is False
+
+
+def test_should_force_eoq_last_shot_state_and_clock_gates():
+    game = SimpleNamespace(game_state={}, quarter=2)
+    # Only HCT / FCP / FAST_BREAK are forced (HCO owns its own routing).
+    assert should_force_eoq_last_shot(game, 5, "HCO") is False
+    assert should_force_eoq_last_shot(game, 5, "FREE_THROW") is False
+    # Clock bounds: <=0 is Path A's job; >8 has runway for a normal possession.
+    assert should_force_eoq_last_shot(game, 0, "HCT") is False
+    assert should_force_eoq_last_shot(game, 9, "HCT") is False
+    # Q1-3: always attempt a last shot inside the runway window.
+    assert should_force_eoq_last_shot(game, 5, "HCT") is True
+    assert should_force_eoq_last_shot(game, 8, "FCP") is True
+    assert should_force_eoq_last_shot(game, 1, "FAST_BREAK") is True
+
+
+def test_should_force_eoq_last_shot_pending_flss_any_quarter():
+    game = SimpleNamespace(game_state={"flss_possession_pending": True}, quarter=4)
+    # A scheduled FLSS that landed on a pressure/transition state still fires.
+    assert should_force_eoq_last_shot(game, 4, "FCP") is True
+
+
+def test_should_force_eoq_last_shot_q4_uses_final_shot_gate():
+    # Q4 with an armed final-shot flag → would_take_final_shot True → force FLSS.
+    armed = SimpleNamespace(game_state={"final_shot_possession_active": True}, quarter=4)
+    assert should_force_eoq_last_shot(armed, 5, "HCT") is True
 
 
 def test_late_clock_dreb_routes_terminal_at_low_clock():

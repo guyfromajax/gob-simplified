@@ -98,10 +98,6 @@ const defaults = {
     alignment: { ease: 'Linear' },
     moveDelayMs: 0, // Optional delay before BH/shooter movement (e.g. 1500 for "3–5 seconds remaining" feel)
   },
-  quickFoul: {
-    sprintSpeedMultiplier: 1.5,
-    maxGridRadius: 2,
-  },
   heartbeat: {
     enabled: true,
     amplitudePx: 1.4, // Render-space drift in pixels (does not touch gameplay x/y)

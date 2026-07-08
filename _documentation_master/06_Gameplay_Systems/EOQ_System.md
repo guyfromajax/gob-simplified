@@ -250,7 +250,9 @@ If preflight cannot meet the anchor:
 - **`time_remaining > 8`:** Best-effort Final Turn still emitted (walk-up consumes clock per design).
 - **`time_remaining ≤ 8`:** Route to `resolve_flss_shot_logic()` (`route_flss` / `FINAL_SHOT_BUDGET_FLSS`).
 
-At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` already set, Final Turn wins over FLSS; else FLSS or FINAL_HOLD per `turn_manager` low-clock branch.
+At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` already set **and `state == "HCO"`**, Final Turn wins over FLSS (HCO runs the full Final Turn); else FLSS or FINAL_HOLD per `turn_manager` low-clock branch. Non-HCO states (HCT/FCP/FAST_BREAK) never run the full Final Turn, so a stray armed flag no longer suppresses their FLSS.
+
+**Non-HCO forced FLSS (low positive clock):** HCT / FCP / FAST_BREAK possessions that *start* at `0 < time_remaining ≤ 8` route to `resolve_flss_shot_logic(state)` via `should_force_eoq_last_shot()` (branch `LOW_CLOCK_FLSS`), **before** their normal resolvers run. Rationale: these resolvers never consume the armed Final-Turn / `flss_possession_pending` flags (only the HCO `else` branch does), so without this they would play a full trap/press/fast-break at the buzzer. Gate mirrors the HCO Final-Shot gate — Q1-3 always attempt a last shot; Q4/OT only when `would_take_final_shot` (skips run-out / force-foul / quick-shot). Above 8s there is runway for the normal possession (no override); the universal `ensure_quarter_end_clock_drain` still ends the quarter if the clock hits 0 without a forced shot. **OREB is intentionally excluded** — the putback *is* the terminal shot.
 
 ### Frontend announcement
 
@@ -272,7 +274,8 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 | `flss_possession_pending` after late-clock BIP/SIP make in chain | `schedule_flss_after_inbound()` — may be cleared at entry if follow-up runway favors Final Turn |
 | Final Turn preflight budget fail at ≤ 8s | `resolve_final_turn_shot()` |
 | Post-DREB when chain active and clock > 2s | `schedule_flss_after_dreb()` |
-| Game clock ≤ 0, eligible, Final Turn not already flagged | `turn_manager` low-clock branch |
+| Game clock ≤ 0, eligible, Final Turn not already flagged (or state ≠ HCO) | `turn_manager` low-clock branch |
+| **HCT / FCP / FAST_BREAK** possession starts at `0 < clock ≤ 8` | `should_force_eoq_last_shot()` → `LOW_CLOCK_FLSS` branch (see §7) |
 
 **What:** Ball handler sprints for `time_remaining − 1` game seconds, shoots with ~1s on clock. No full alignment / entry-pass graph.
 

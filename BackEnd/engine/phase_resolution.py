@@ -588,39 +588,30 @@ def pick_force_foul_defender_spot(
     foul_player,
     def_lineup,
     defender_coords_by_pos=None,
-    max_radius=2.0,
+    max_radius=None,
+    rng=None,
 ):
     """
-    Grid spot for a force-foul defender: within ``max_radius`` Euclidean units of
-    the victim, biased toward the fouler's current/planned position.
+    Grid spot for a force-foul defender: a random spot within ``max_radius``
+    Euclidean units of the victim (uniform in the disk, so the foul setup does
+    not look mechanical). Defaults to ``QUICK_FOUL_APPROACH_RADIUS_GRID`` (4).
+
+    ``foul_player``/``defender_coords_by_pos`` are accepted for signature
+    back-compat; the spot no longer biases toward the fouler (the sprint/converge
+    step at HCO-start carries him in from wherever he is).
     """
     import math
+    import random as _random
+    from BackEnd.constants import QUICK_FOUL_APPROACH_RADIUS_GRID
 
+    r_rng = rng or _random
+    radius = float(QUICK_FOUL_APPROACH_RADIUS_GRID if max_radius is None else max_radius)
     vx = float(victim_coords.get("x", 50))
     vy = float(victim_coords.get("y", 25))
-    fouler_pos = None
-    for pos, player in (def_lineup or {}).items():
-        if player is foul_player:
-            fouler_pos = pos
-            break
-    d_coords = None
-    if fouler_pos and defender_coords_by_pos and fouler_pos in defender_coords_by_pos:
-        d_coords = defender_coords_by_pos[fouler_pos]
-    elif foul_player is not None:
-        d_coords = grid_coords_from_player(foul_player)
-    else:
-        d_coords = {"x": vx + 2, "y": vy}
-    dx = float(d_coords.get("x", vx + 2)) - vx
-    dy = float(d_coords.get("y", vy)) - vy
-    dist = math.hypot(dx, dy)
-    if dist < 0.01:
-        dx, dy, dist = 1.0, 0.0, 1.0
-    if dist <= max_radius:
-        r = max(0.5, dist * 0.85)
-    else:
-        r = min(max_radius * 0.875, max(0.5, max_radius - 0.01))
-    x = max(0.0, min(100.0, vx + (dx / dist) * r))
-    y = max(0.0, min(50.0, vy + (dy / dist) * r))
+    r = radius * math.sqrt(r_rng.random())
+    theta = r_rng.random() * 2.0 * math.pi
+    x = max(1.0, min(99.0, vx + r * math.cos(theta)))
+    y = max(1.0, min(49.0, vy + r * math.sin(theta)))
     return {"x": round(x, 2), "y": round(y, 2)}
 
 

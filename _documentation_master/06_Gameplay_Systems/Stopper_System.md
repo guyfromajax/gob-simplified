@@ -243,7 +243,7 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 
 ### Dead-ball turnover fumble beat (UESS, 2026-06)
 
-For travel / double-dribble class dead-ball turnovers (not shot clock, steals, or batted OOB), emitters insert a **fumble schema step** immediately before the terminal `turn_stop: DEAD_BALL_TURNOVER`:
+For travel / double-dribble class dead-ball turnovers (not shot clock, ten-second, over-and-back, steals, or batted OOB), the backend inserts a **fumble schema step** immediately before the terminal `turn_stop: DEAD_BALL_TURNOVER`:
 
 1. **Stumble** — stationary step, `flourish[fumble]` on the ball handler, `wall_clock_hold_ms` (660 ms), zero game/shot clock burn.
 2. **Whistle headline** — `step.end.announcement` with backend 50/50 `"Travel!"` / `"Double Dribble!"` + `whistle-1-lowervol.wav`.
@@ -258,13 +258,13 @@ For travel / double-dribble class dead-ball turnovers (not shot clock, steals, o
 - `turnPreparation.js` → `finalizeTurnAfterAnimation` → `announceGameEvent('TURNOVER', …)`
 - `announcements.js` → `announceFromTurnData` (legacy non-router path)
 
-**Wired emitters:** `skeleton_step_emitter`, `dynamic_hct_step_emitter`, `hct_step_emitter`, `covert_release_step_emitter`; dynamic FCP via `build_dynamic_fcp_animation_steps` → `build_dynamic_hct_animation_steps`.
+**Universal finalization:** `TurnManager.run_micro_turn()` calls `finalize_dead_ball_fumble_for_turn()` after schema emission and before player-object serialization. This makes the fumble beat apply to any turn type that has `animation_steps[]` ending in `turn_stop: DEAD_BALL_TURNOVER`. Existing emitter-local calls (`skeleton_step_emitter`, `dynamic_hct_step_emitter`, `hct_step_emitter`, `covert_release_step_emitter`; dynamic FCP via `build_dynamic_fcp_animation_steps` → `build_dynamic_hct_animation_steps`) remain valid because the injector is idempotent and will not append a second fumble step.
 
 **Dynamic FCP copy contract:** `build_dynamic_fcp_animation_steps` shallow-copies the turn dict before calling the HCT emitter (FCP alias keys). Fumble inject mutates that **copy**. `propagate_fumble_turn_flags(payload, turn_result)` merges `suppress_turn_prep_turnover_announce` and `turnover_type` back onto the canonical turn so the FE does not double-fire (in-step announce + turn-prep announce).
 
-**Excluded:** `turnover_type == "SHOT_CLOCK"`, steals, batted OOB (`bat_oob`, `rim_runner_bat_oob`).
+**Excluded:** `turnover_type == "SHOT_CLOCK"`, `TEN_SECOND`, `OVER_BACK`; steals; batted OOB (`bat_oob`, `rim_runner_bat_oob`).
 
-**Key files:** `BackEnd/engine/dead_ball_fumble.py`, `BackEnd/constants/dead_ball_fumble_constants.py`, `BackEnd/engine/dynamic_fcp_step_emitter.py`, `FrontEnd/static/js/phaser/animation/flourishes.js`, `tests/test_dead_ball_fumble.py`.
+**Key files:** `BackEnd/engine/dead_ball_fumble.py`, `BackEnd/constants/dead_ball_fumble_constants.py`, `BackEnd/models/turn_manager.py`, `BackEnd/engine/dynamic_fcp_step_emitter.py`, `FrontEnd/static/js/phaser/animation/flourishes.js`, `tests/test_dead_ball_fumble.py`.
 
 ### Key Implementation Details
 
@@ -370,4 +370,3 @@ _(Line numbers approximate, verified 2026-06-13; `phase_resolution.py` shifts fr
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` (**legacy fallback renderer**)
   - `playTurnAnimation()` - Handles truncated skeleton animation
   - `runSetupTween()` - Positions players at step 0 before animation
-

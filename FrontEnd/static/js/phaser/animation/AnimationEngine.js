@@ -2101,34 +2101,10 @@ export class AnimationEngine {
   }
 
   async handleDefault(turnData, context) {
-    // ✅ Force Foul: animation (reach-in + announce) was already done during BIP/SIP turn
-    if (turnData.result_type === 'FOUL' && turnData._quickFoulAnimatedDuringInbound) {
-      return;
-    }
-
-    // ✅ Quick Foul after DREB or Final Turn: sprint → reach_in → announce (clock runs via turn contract)
-    if (
-      turnData.result_type === 'FOUL'
-      && turnData.quick_foul
-      && (turnData.force_foul_after_dreb || turnData.force_foul_final_turn)
-    ) {
-      const victimId = turnData.victim_id ?? turnData.ball_handler ?? turnData.shooter;
-      const foulPlayerId = turnData.foul_player_id;
-      const victimSprite = context.playerSprites?.[victimId];
-      const defenderSprite = context.playerSprites?.[foulPlayerId];
-      if (victimSprite && defenderSprite) {
-        const { runQuickFoulSprintSequence } = await import('./quickFoulAnimation.js');
-        await runQuickFoulSprintSequence(this.scene, {
-          defenderSprite,
-          victimSprite,
-          ballSprite: context.ballSprite,
-          turnData,
-          clockBudgetMs: this.scene._clockInterpolationDurationMs,
-        });
-      }
-      return;
-    }
-
+    // Quick Foul (situational Force Foul) is now a pure UESS turn: the backend
+    // emits the converge (sprint) + reach-in + "Quick Foul" announcement as
+    // animation_steps, so it renders through the standard schema playback path
+    // below — no bespoke frontend sprint/reach-in logic (FE is a pure renderer).
     if (await this.runSchemaPlaybackTurn(turnData, context)) {
       return;
     }

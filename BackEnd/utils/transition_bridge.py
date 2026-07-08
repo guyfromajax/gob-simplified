@@ -1135,6 +1135,7 @@ def build_bip_animation_steps(
     fcp_setup: bool = False,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
+    receiver_id: Optional[str] = None,
 ) -> List[AnimationStep]:
     """Baseline Inbound Pass (BIP) — emits the 4-step "rim pickup" sequence
     that runs after every made-shot transition (HCO / FB / OREB Putback /
@@ -1182,6 +1183,13 @@ def build_bip_animation_steps(
         return []
     if not isinstance(ball_start_coord, dict) or "x" not in ball_start_coord or "y" not in ball_start_coord:
         return []
+
+    # Inbound-pass receiver. Defaults to PG (normal BIP); quick-foul BIP passes
+    # the dynamically-chosen candidate receiver so the following HCO turn's ball
+    # handler is the intended foul victim.
+    recv_id = str(receiver_id) if receiver_id else str(pg_id)
+    if recv_id not in setup_coords:
+        recv_id = str(pg_id)
 
     rim_coord: GridCoord = {
         "x": float(ball_start_coord["x"]),
@@ -1240,7 +1248,7 @@ def build_bip_animation_steps(
         next_step_index=2,
         bh_archetype="standard",
         other_archetype=other_arch,
-        gate_player_ids=None if fcp_setup else [str(sf_id), str(pg_id)],
+        gate_player_ids=None if fcp_setup else [str(sf_id), recv_id],
         gate_offense_required_count=4 if fcp_setup else None,
         gate_mandatory_player_ids=[str(sf_id)] if fcp_setup else None,
         metadata_reason="bip_fcp_setup" if fcp_setup else "bip_sf_to_inbound",
@@ -1266,7 +1274,7 @@ def build_bip_animation_steps(
         def_lineup=def_lineup,
         start_coords=step3["end"]["coords"],
         passer_id=str(sf_id),
-        receiver_id=str(pg_id),
+        receiver_id=recv_id,
         continuing_targets=setup_coords,
         continuing_archetype=other_arch,
         clock_remaining_at_start=step3["end"]["clock"]["clock_remaining"],
@@ -1314,6 +1322,7 @@ def build_sip_animation_steps(
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     ball_start_coord: Optional[GridCoord] = None,
+    receiver_id: Optional[str] = None,
 ) -> List[AnimationStep]:
     """Side Inbound Pass (SIP) — emits three schema-compliant steps:
 
@@ -1339,6 +1348,13 @@ def build_sip_animation_steps(
         return []
     if sf_id not in setup_coords or pg_id not in setup_coords:
         return []
+
+    # Inbound-pass receiver. Defaults to PG (normal SIP); quick-foul SIP passes
+    # the dynamically-chosen candidate receiver so the following HCO turn's ball
+    # handler is the intended foul victim.
+    recv_id = str(receiver_id) if receiver_id else str(pg_id)
+    if recv_id not in setup_coords:
+        recv_id = str(pg_id)
 
     # Ball start coord. Preference (SIP-Task 1, SIP_UESS_Audit.md #1):
     #   1. Explicit ``ball_start_coord`` = the prior turn's RENDERED ball rest
@@ -1408,7 +1424,7 @@ def build_sip_animation_steps(
         def_lineup=def_lineup,
         start_coords=hold_step["end"]["coords"],
         passer_id=str(sf_id),
-        receiver_id=str(pg_id),
+        receiver_id=recv_id,
         # No continuing_targets → other 8 stationary at their step 2 end coords.
         continuing_targets=None,
         clock_remaining_at_start=clock_remaining_at_start,

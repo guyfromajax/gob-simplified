@@ -562,7 +562,6 @@ def simulate_quarter(
             next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
             _prepare_break_inbound_seam(gm)
             bip_turn = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
-            gm._maybe_set_force_foul_pending_after_inbound(bip_turn, "BASELINE_INBOUND")
             gm.turn_manager._attach_clock_contract(
                 bip_turn,
                 clock_start=int(gm.game_state.get("time_remaining", 0)),

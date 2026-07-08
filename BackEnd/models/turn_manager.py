@@ -562,6 +562,129 @@ class TurnManager:
 
         return {}, None
 
+    def _execute_quick_foul_at_hco_start(self):
+        """Execute the situational Force Foul at the start of an HCO possession.
+
+        Fouls the current ball handler (resolved from the prior turn's rendered
+        seam → its ``final_ball_handler_id``, falling back to PG). The fouling
+        defender is the one closest to the victim. Emits the UESS quick-foul
+        sequence (converge sprint → reach-in; clock stops at reach-in) and
+        resolves the non-shooting foul with ``time_elapsed`` = the converge burn.
+
+        Returns the foul turn result (short-circuits HCO routing), or ``None`` if
+        participants can't be resolved (falls through to normal HCO play).
+        """
+        from BackEnd.engine.phase_resolution import (
+            resolve_non_shooting_foul,
+            select_defender_closest_to_victim,
+            grid_coords_from_player,
+        )
+        from BackEnd.utils.quick_foul import build_quick_foul_animation_steps
+        from BackEnd.utils.animation_step_helpers import build_foul_announcement
+        from BackEnd.constants import QUICK_FOUL_TIME_ELAPSED_FLOOR
+
+        game = self.game
+        game_state = getattr(game, "game_state", {}) or {}
+        off_lineup = game.offense_team.lineup
+        def_lineup = game.defense_team.lineup
+        if not off_lineup or not def_lineup:
+            return None
+
+        prior_turns = getattr(game, "turns", None) or []
+        prior_turn = prior_turns[-1] if prior_turns else None
+        prior_final_coords, victim_id = self._resolve_inbound_prior_seam(prior_turn)
+        prior_final_coords = dict(prior_final_coords or {})
+
+        # Resolve the victim (current ball handler); fall back to PG.
+        victim = None
+        if victim_id:
+            for p in off_lineup.values():
+                if p and str(getattr(p, "player_id", None)) == str(victim_id):
+                    victim = p
+                    break
+        if victim is None:
+            victim = off_lineup.get("PG")
+        if victim is None:
+            return None
+        victim_id = str(getattr(victim, "player_id", "") or "")
+
+        # Backfill any missing coords from live player positions.
+        for p in list(off_lineup.values()) + list(def_lineup.values()):
+            pid = getattr(p, "player_id", None)
+            if pid is not None:
+                prior_final_coords.setdefault(str(pid), grid_coords_from_player(p))
+        victim_coords = prior_final_coords.get(victim_id) or grid_coords_from_player(victim)
+
+        d_dest = {}
+        for pos, defender in def_lineup.items():
+            did = getattr(defender, "player_id", None)
+            if did is not None:
+                d_dest[pos] = prior_final_coords.get(str(did)) or grid_coords_from_player(defender)
+        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
+        if not foul_player:
+            return None
+        fouler_id = str(getattr(foul_player, "player_id", "") or "")
+
+        clock_r = float(game_state.get("time_remaining", 0) or 0)
+        shot_r = float(game_state.get("shot_clock_remaining", 0) or 0)
+
+        # Announcement rides the reach-in step (fires when the foul lands, not at
+        # converge start) and is non-blocking (overlay only, no gameplay freeze).
+        # Accent = the fouled (offense) team, matching the legacy "Quick Foul!" card.
+        ann_team = "home" if getattr(game.offense_team, "team_id", None) == getattr(
+            getattr(game, "home_team", None), "team_id", None
+        ) else "away"
+        announcement = build_foul_announcement("Quick Foul!", ann_team, fouler_id, sfx_key="foul")
+        announcement["non_blocking"] = True  # keep announcement, no gameplay freeze (item 10)
+
+        steps, converge_t = build_quick_foul_animation_steps(
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            prior_final_coords=prior_final_coords,
+            victim_id=victim_id,
+            fouler_id=fouler_id,
+            clock_remaining_at_start=clock_r,
+            shot_clock_remaining_at_start=shot_r,
+            announcement=announcement,
+        )
+        time_elapsed = max(float(QUICK_FOUL_TIME_ELAPSED_FLOOR), float(converge_t))
+
+        roles = {
+            "ball_handler": victim,
+            "defender": foul_player,
+            "foul_player": foul_player,
+            "shooter": victim,
+            "screener": None,
+            "passer": None,
+        }
+        game_state["foul_team"] = "DEFENSE"
+        sl.log_force_foul_debug(
+            game,
+            "HCO_START_EXECUTE",
+            time_remaining=clock_r,
+            fouler=foul_player,
+            victim=victim,
+            note="universal quick-foul HCO-start hook",
+        )
+        result = resolve_non_shooting_foul(roles, game, time_elapsed_override=time_elapsed)
+        result["offense_team_id"] = game.offense_team.team_id
+        result["current_turn"] = "HCO"
+        result["quick_foul"] = True
+        result["victim_id"] = victim_id
+        if steps:
+            result["animation_steps"] = steps
+            # The "Quick Foul!" announcement is emitted on the reach-in schema
+            # step; suppress the turn-prep legacy foul announcement so it doesn't
+            # double-fire (turnPreparation.js gates on _quickFoulAnnounceDone).
+            result["_quickFoulAnnounceDone"] = True
+        # Flatten Player objects → ids for the JSON response (mirror DREB path).
+        result["ball_handler"] = victim_id
+        result["shooter"] = victim_id
+        result["defender"] = fouler_id
+        result["screener"] = None
+        result["passer"] = None
+        return result
+
     def _stamp_inbound_hco_handoff(self, payload: Dict[str, Any], sf_id: str, pg_id: str) -> None:
         """Stamp fields the HCO entry orchestrator reads on the following turn."""
         next_route = payload.get("next_play_type") or payload.get("next_turn") or "HCO"
@@ -591,6 +714,25 @@ class TurnManager:
         is_away_offense = offense_team.team_id == game.away_team.team_id
 
         self.logger.log("sideInbound:start")
+
+        # Situational Force Foul (quick foul): override the normal SIP formation
+        # with the bespoke quick-foul setup (SF inbounds to one of two candidate
+        # receivers; paired fouler within 4 grid; tallest defender guards the
+        # inbound 3 grid below the top sideline). Foul executes at HCO-start.
+        from BackEnd.utils.quick_foul import quick_foul_in_play, build_quick_foul_inbound_setup
+        quick_foul_receiver_id = None
+        qf_active = quick_foul_in_play(self.game)
+        qf_out = None
+        if qf_active:
+            qf_out = build_quick_foul_inbound_setup(
+                game=self.game,
+                off_lineup=offense_team.lineup,
+                def_lineup=defense_team.lineup,
+                inbounder_coord={"x": 47, "y": 48},
+                basket_coord=dict(HOME_RIM_COORDS),
+                guard_offset=(0.0, -3.0),  # 3 grid below the top sideline, toward court
+            )
+            qf_active = bool(qf_out)
 
         # Sideline spot for the inbounder (SF). These coordinates assume the
         # home team is on offense. They will be mirrored if the away team has
@@ -636,6 +778,17 @@ class TurnManager:
         # Flip defensive coordinates if away team is defending (home team has ball)
         d_dest = getAwayTeamCoords(d_dest_home.copy()) if is_away_offense else d_dest_home
         self.logger.log("defenseUpdate:end")
+
+        # Quick foul overrides the normal SIP formation computed above.
+        if qf_active:
+            o_dest_home = qf_out["o_dest"]
+            d_dest_home = qf_out["d_dest"]
+            inbound_spot_home = dict(o_dest_home["SF"])
+            o_dest = getAwayTeamCoords(dict(o_dest_home)) if is_away_offense else dict(o_dest_home)
+            d_dest = getAwayTeamCoords(dict(d_dest_home)) if is_away_offense else dict(d_dest_home)
+            bh_coords = o_dest["PG"]
+            quick_foul_receiver_id = qf_out["receiver_id"]
+            self.logger.log("quickFoulSetup:SIP")
 
         from BackEnd.constants import SITUATIONAL_SIP_RECEIVER_POS
         receiver_pos = SITUATIONAL_SIP_RECEIVER_POS
@@ -723,10 +876,12 @@ class TurnManager:
                     clock_remaining_at_start=clock_r,
                     shot_clock_remaining_at_start=shot_r,
                     ball_start_coord=sip_ball_start,
+                    receiver_id=quick_foul_receiver_id,
                 )
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
-                    self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
+                    handoff_receiver = str(quick_foul_receiver_id) if quick_foul_receiver_id else pg_id
+                    self._stamp_inbound_hco_handoff(payload, sf_id, handoff_receiver)
                     # SIP-Task 2 (SIP_UESS_Audit.md #2): [UESS SEAM] entry-seam
                     # teleport detection. SIP uses its own bridge emitter, so it
                     # isn't covered by the skeleton emitter's detector — replicate
@@ -754,6 +909,9 @@ class TurnManager:
         except Exception as e:
             import logging
             logging.warning("build_sip_animation_steps failed: %s", e)
+
+        if qf_active:
+            payload["quick_foul_setup"] = True
 
         return payload
 
@@ -889,6 +1047,36 @@ class TurnManager:
 
         self.logger.log("baselineInbound:start")
 
+        # Situational Force Foul (quick foul): a trailing/close defense fouls
+        # immediately. When active, override any FCP/HCT pressure with the
+        # bespoke quick-foul BIP formation (SF inbounds to one of two candidate
+        # receivers; the paired fouler sets up within 4 grid of his man). The
+        # foul itself executes at the start of the following HCO turn (universal
+        # hook in run_micro_turn). See Situational_Logic_System.md §Force Foul.
+        from BackEnd.utils.quick_foul import quick_foul_in_play, build_quick_foul_inbound_setup
+        quick_foul_receiver_id = None
+        qf_active = quick_foul_in_play(self.game)
+        qf_out = None
+        if qf_active:
+            next_defensive_setup = None  # quick foul overrides FCP/HCT pressure (item 14)
+            _off_attrs = offense_team.team_attributes or {}
+            _off_chem = int(_off_attrs.get("team_chemistry", 15) or 15)
+            _cur_pg = offense_team.lineup.get("PG")
+            _cur_pg_y = int(getattr(_cur_pg, "coords", {}).get("y", 25) or 25) if getattr(_cur_pg, "coords", None) else 25
+            if _off_chem > 15:
+                _sf_y_range = (25, 35) if _cur_pg_y > 24 else (15, 25)
+            else:
+                _sf_y_range = (15, 35)
+            qf_out = build_quick_foul_inbound_setup(
+                game=self.game,
+                off_lineup=offense_team.lineup,
+                def_lineup=defense_team.lineup,
+                inbounder_coord={"x": 3, "y": random.randint(*_sf_y_range)},
+                basket_coord=dict(HOME_RIM_COORDS),
+                guard_offset=(3.0, 0.0),  # toward court from the left baseline
+            )
+            qf_active = bool(qf_out)
+
         # Define ball spot for inbounder (used in payload regardless of pressure type)
         # ✅ FIX: Inbound spot should be at edge of baseline, not center court
         # Home orientation uses left baseline (x=3), away uses right baseline (x=97 after flip)
@@ -936,6 +1124,20 @@ class TurnManager:
 
             # Flip offensive coordinates if the away team has possession.
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+        elif qf_active:
+            # Quick-foul BIP formation (computed home-orientation above; flip for away).
+            o_dest_home = qf_out["o_dest"]
+            d_dest_home = qf_out["d_dest"]
+            inbound_spot_home = dict(o_dest_home["SF"])
+            if is_away_offense:
+                o_dest = getAwayTeamCoords(dict(o_dest_home))
+                d_dest = getAwayTeamCoords(dict(d_dest_home))
+                inbound_spot_home = getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"]
+            else:
+                o_dest = dict(o_dest_home)
+                d_dest = dict(d_dest_home)
+            quick_foul_receiver_id = qf_out["receiver_id"]
+            self.logger.log("quickFoulSetup:BIP")
         else:
             # HCO-only baseline inbound setup uses explicit BIP targets.
             offense_attrs = offense_team.team_attributes or {}
@@ -1205,13 +1407,20 @@ class TurnManager:
                         fcp_setup=next_defensive_setup == "FCP",
                         clock_remaining_at_start=clock_r,
                         shot_clock_remaining_at_start=shot_r,
+                        receiver_id=quick_foul_receiver_id,
                     )
                 if anim_steps:
                     payload["animation_steps"] = anim_steps
-                    self._stamp_inbound_hco_handoff(payload, sf_id, pg_id)
+                    # Quick foul: hand off to the dynamically-chosen receiver so
+                    # the following HCO turn's ball handler is the foul victim.
+                    handoff_receiver = str(quick_foul_receiver_id) if quick_foul_receiver_id else pg_id
+                    self._stamp_inbound_hco_handoff(payload, sf_id, handoff_receiver)
         except Exception as e:
             import logging
             logging.warning("build_bip_animation_steps failed: %s", e)
+
+        if qf_active:
+            payload["quick_foul_setup"] = True
 
         return payload
 
@@ -1348,6 +1557,7 @@ class TurnManager:
             activate_late_clock_eoq_chain,
             clear_late_clock_eoq_chain,
             is_late_clock_eoq_chain_active,
+            should_force_eoq_last_shot,
         )
         from BackEnd.engine.eoq_debug_log import (
             begin_eoq_trace_sequence,
@@ -1494,69 +1704,16 @@ class TurnManager:
                     },
                 )
 
-        # ✅ Situational Logic: Force Foul after BIP/SIP — execute first so it runs regardless of next step (HCO, HCT, FCP)
-        from BackEnd.engine.phase_resolution import (
-            resolve_non_shooting_foul,
-            select_defender_closest_to_victim,
-        )
-        pending_foul = self.game.game_state.pop("situational_force_foul_pending", None)
-        if pending_foul:
-            victim_id = pending_foul.get("victim_id")
-            victim_coords = pending_foul.get("victim_coords") or {"x": 50, "y": 25}
-            off_lineup = self.game.offense_team.lineup
-            def_lineup = self.game.defense_team.lineup
-            victim = None
-            for p in off_lineup.values():
-                if p and getattr(p, "player_id", None) == victim_id:
-                    victim = p
-                    break
-            if victim and def_lineup:
-                d_dest = pending_foul.get("defender_coords_by_pos")
-                foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
-                if foul_player:
-                    sl.log_force_foul_debug(
-                        self.game,
-                        "INBOUND_PENDING_EXECUTE",
-                        time_remaining=game_state.get("time_remaining"),
-                        fouler=foul_player,
-                        victim=victim,
-                        note="situational_force_foul_pending popped",
-                    )
-                    roles = {
-                        "ball_handler": victim,
-                        "defender": foul_player,
-                        "foul_player": foul_player,
-                        "shooter": victim,
-                        "screener": None,
-                        "passer": None,
-                    }
-                    self.game.game_state["foul_team"] = "DEFENSE"
-                    result = resolve_non_shooting_foul(
-                        roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
-                    )
-                    result["offense_team_id"] = self.game.offense_team.team_id
-                    result["current_turn"] = "HCO"
-                    result["quick_foul"] = True  # Situational Force Foul → frontend announces "Quick Foul"
-                    if isinstance(victim_coords, dict):
-                        victim.coords = {
-                            "x": float(victim_coords.get("x", 50)),
-                            "y": float(victim_coords.get("y", 25)),
-                        }
-                    attach_position_snapshots(
-                        result,
-                        [
-                            build_phase_post_stopper_snapshot(
-                                self.game,
-                                off_lineup,
-                                def_lineup,
-                                None,
-                                roles,
-                                "HCO",
-                                "non_shooting_foul",
-                                "hco_situational_force_foul_inbound",
-                            )
-                        ],
-                    )
+        # ✅ Situational Logic: Force Foul (quick foul) — universal HCO-start hook.
+        # Executes the intentional foul at the START of the offense's HCO
+        # possession, on the current ball handler, covering every entry point
+        # (BIP/SIP receiver, DREB rebounder, OREB-kickout target, Final Turn PG)
+        # with one code path. The fouler converges (sprint archetype, clock runs)
+        # then reaches in (clock stops) — pure UESS schema animation. Runs before
+        # state routing; setting ``result`` short-circuits the HCO/HCT/FCP paths.
+        from BackEnd.utils.quick_foul import quick_foul_in_play
+        if result is None and state == "HCO" and quick_foul_in_play(self.game):
+            result = self._execute_quick_foul_at_hco_start()
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
 
@@ -1570,13 +1727,19 @@ class TurnManager:
 
                 result = build_run_out_clock_result(self.game, max(game_clock_remaining, 0))
                 low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
-            elif game_state.get("final_turn_shot_this_turn"):
-                # Final Turn wins over FLSS when both would trigger at 0:00.
+            elif state == "HCO" and game_state.get("final_turn_shot_this_turn"):
+                # Final Turn wins over FLSS when both would trigger at 0:00 — but
+                # only HCO runs the full Final Turn (via ``resolve_final_turn_shot``
+                # in the HCO ``else`` branch). Non-HCO states (HCT/FCP/FAST_BREAK)
+                # can't consume the flag there, so let them fall through to FLSS.
                 pass
             elif sl.would_take_final_shot(self.game, game_clock_remaining):
                 from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
                 from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
 
+                # Consume any armed Final-Turn flag so it can't leak into a later
+                # HCO possession (non-HCO states never popped it themselves).
+                game_state.pop("final_turn_shot_this_turn", None)
                 log_eoq_routing_decision(
                     self.game,
                     branch="GAME_CLOCK_LE_0_FLSS",
@@ -1624,6 +1787,42 @@ class TurnManager:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
             low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
+        elif should_force_eoq_last_shot(self.game, game_clock_remaining, state):
+            # HCT / FCP / FAST_BREAK possessions that START at low-but-positive
+            # clock (0 < t <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK) have too little
+            # runway for a normal trap/press/fast-break AND their resolvers never
+            # consume the armed Final-Turn/FLSS flags. Force a true FLSS (sprint +
+            # heave/forced shot) here — the same resolver HCO falls back to — so
+            # these states get a last-second shot instead of a full possession.
+            # (Path A handles t <= 0; HCO owns its own final-shot routing.)
+            from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
+            from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
+
+            # Consume any armed flags so they can't leak into a later possession.
+            game_state.pop("final_turn_shot_this_turn", None)
+            game_state.pop("flss_possession_pending", None)
+            activate_late_clock_eoq_chain(game_state)
+            log_eoq_routing_decision(
+                self.game,
+                branch="LOW_CLOCK_FLSS",
+                game_clock_remaining=game_clock_remaining,
+                would_final_shot=True,
+                extra={"state": state},
+            )
+            log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state, "from": "low_clock"})
+            result = resolve_flss_shot_logic(self.game, state)
+            log_eoq_step(
+                self.game,
+                "FLSS",
+                "resolve_flss",
+                "END",
+                extra={
+                    "result_type": result.get("result_type") if isinstance(result, dict) else None,
+                    "flss_zone": result.get("flss_zone") if isinstance(result, dict) else None,
+                    "shooter_id": result.get("shooter_id") if isinstance(result, dict) else None,
+                },
+            )
+            low_clock_branch = "LOW_CLOCK_FLSS"
         elif state == "FREE_THROW":
             result = self.resolve_free_throw()
             if isinstance(result, dict):
@@ -2181,6 +2380,16 @@ class TurnManager:
                     )
                 else:
                     result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
+
+        # Universal schema finalization: any qualifying dead-ball turnover with
+        # animation_steps gets the same fumble beat before the terminal turn_stop.
+        # Emitter-local calls remain valid; the helper is idempotent.
+        try:
+            from BackEnd.engine.dead_ball_fumble import finalize_dead_ball_fumble_for_turn
+
+            finalize_dead_ball_fumble_for_turn(result, self.game)
+        except Exception as e:
+            logging.warning("finalize_dead_ball_fumble_for_turn failed: %s", e)
         # ✅ REMOVED: possession_team_id is now set BEFORE update_clock_and_possession (line 373)
         # This ensures it represents the team on offense DURING the turn, not after any flips
 

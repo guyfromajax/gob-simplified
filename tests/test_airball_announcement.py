@@ -42,3 +42,16 @@ def test_airball_announcement_skips_non_airball_and_makes():
         {"shot_variant": "AIRBALL", "result_type": "MISS"},
         away_offense=False,
     ) is None
+
+
+def test_airball_announcement_skips_flss_heave():
+    assert _airball_announcement(
+        {
+            "shot_variant": "AIRBALL",
+            "result_type": "MISS",
+            "shooter_id": "x",
+            "flss": True,
+            "flss_zone": "heave",
+        },
+        away_offense=False,
+    ) is None

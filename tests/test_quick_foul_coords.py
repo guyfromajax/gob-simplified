@@ -33,9 +33,17 @@ def test_select_defender_closest_uses_live_defender_coords():
 
 
 def test_pick_force_foul_defender_spot_within_radius():
+    import random
+
+    from BackEnd.constants import QUICK_FOUL_APPROACH_RADIUS_GRID
+
     victim = {"x": 50, "y": 25}
     foul_player = SimpleNamespace(player_id="d1", coords={"x": 80, "y": 25})
     def_lineup = {"PG": foul_player}
-    spot = pick_force_foul_defender_spot(victim, foul_player, def_lineup, {"PG": {"x": 80, "y": 25}})
-    dist = ((spot["x"] - 50) ** 2 + (spot["y"] - 25) ** 2) ** 0.5
-    assert dist <= 2.01
+    # Default radius is now QUICK_FOUL_APPROACH_RADIUS_GRID (4); sample many.
+    for seed in range(50):
+        spot = pick_force_foul_defender_spot(
+            victim, foul_player, def_lineup, {"PG": {"x": 80, "y": 25}}, rng=random.Random(seed)
+        )
+        dist = ((spot["x"] - 50) ** 2 + (spot["y"] - 25) ** 2) ** 0.5
+        assert dist <= QUICK_FOUL_APPROACH_RADIUS_GRID + 0.01

@@ -492,6 +492,9 @@ def _append_ft_variant_post_shot_chain(
     if is_airball and not is_make:
         airball_ann = _airball_announcement(turn_result, away_offense)
         if airball_ann:
+            if int(turn_result.get("free_throws_remaining", 0) or 0) <= 0:
+                airball_ann = dict(airball_ann)
+                airball_ann["non_blocking"] = True
             flight_step["end"]["announcement"] = airball_ann
 
     cursor_ball: GridCoord = dict(ball_flight_end)
@@ -849,6 +852,9 @@ def build_ft_animation_steps(
             "style": "primary",
             "player_data": {"playerId": str(shooter_id)},
         }
+        if is_final_attempt:
+            # Final missed FT: show banner but do not freeze clocks (rebound flows immediately).
+            no_good_announcement["non_blocking"] = True
 
         if is_final_attempt:
             bounce_step["end"]["announcement"] = no_good_announcement

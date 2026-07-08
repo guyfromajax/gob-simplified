@@ -17,6 +17,13 @@ If they lose a game because their palyers made a mistke, their player missed a k
 - When clock **= 0**: no BIP, OREB, or DREB follow-up; frontend holds at rim/bounce (`holdFinalShotMs`, 2s) then quarter-end modal.
 - See [`EOQ_System.md`](../06_Gameplay_Systems/EOQ_System.md) and [`Situational_Logic_System.md`](../06_Gameplay_Systems/Situational_Logic_System.md) §Final Turn and `BackEnd/utils/eoq_clock_progression.py`.
 
+**All turn types covered by FLSS / EOG Perfection** — ✅ **Added (2026-07)**
+- **HCO:** full Final Turn arming + `resolve_final_turn_shot` → internal FLSS fallback (preflight ≤ 8s). Fully wired.
+- **DREB:** miss in chain → `flss_after_dreb` (clock > 2s) → `schedule_flss_after_dreb` forces `offensive_state=HCO` → FLSS consumed in HCO branch; `terminal_dreb_eoq` (≤ 2s) / `quarter_ends_after` (≤ 0) → clock drain. Verified.
+- **OREB:** putback **is** the terminal shot (shot-clock-gated ≤ 2s → turnover; clock ≤ 0 → `quarter_ends_after`). No sprint-FLSS by design (rebounder already at rim). Verified.
+- **HCT / FCP / FAST_BREAK:** these resolvers never consume the armed Final-Turn / `flss_possession_pending` flags (only the HCO `else` branch does). New `should_force_eoq_last_shot()` gate + `LOW_CLOCK_FLSS` branch in `run_micro_turn` force a true FLSS when a possession **starts** at `0 < time_remaining ≤ 8` (Q1-3 always; Q4/OT per `would_take_final_shot`). Above 8s the normal possession runs; `ensure_quarter_end_clock_drain` still ends the quarter if the clock hits 0 without a forced shot. Also fixed: the `clock ≤ 0` "Final Turn wins" `pass` now only applies to HCO, so a stray armed flag no longer blocks FLSS on non-HCO states.
+- Backend: `BackEnd/utils/eoq_clock_progression.py` (`should_force_eoq_last_shot`), `BackEnd/models/turn_manager.py` (`LOW_CLOCK_FLSS` branch).
+
 **Block Bugs on Final** (need to verify these still exist and if so, need to fix them)
 - When a block occurs, we get a double announce of the block in some instances
 - In some block instances, the ball was bouncing, incorrectly, to the oppositte end of teh court (these may be a legacy FE coord flipping issue, or it may be faulty logic in our back end bounce spot coords calculation)

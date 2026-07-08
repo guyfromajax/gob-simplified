@@ -10,10 +10,6 @@ import {
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { playGameplayTrack } from "../../musicController.js";
 import { runPass, tweenPlayerTo } from "./ballTween.js";
-import {
-  commitQuickFoulReachInAndAnnounce,
-  resolveQuickFoulInboundPair,
-} from "./quickFoulAnimation.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext } from "./outletUtils.js";
@@ -1108,12 +1104,9 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
     // ✅ TIMEOUT: Removed markInboundPassStarted - button is always live now
     
     if (!scene.stateMachine?.is(States.FastBreak)) {
-      const quickFoulPair = resolveQuickFoulInboundPair(
-        turnData,
-        context?.nextTurn,
-        playerSprites,
-        passInfo,
-      );
+      // Quick foul (situational Force Foul) no longer animates during the
+      // inbound — it is a separate UESS HCO turn (converge + reach-in + announce
+      // as animation_steps). The inbound just delivers the pass to the receiver.
       const passPromise = passInfo
         ? handlePassAnimation({ scene, passInfo, playerSprites, enablePassSfx: true })
         : pgSprite
@@ -1127,25 +1120,6 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData,
 
       await passPromise;
 
-      if (quickFoulPair) {
-        const announceTurn = quickFoulPair.foulTurnData ?? {
-          quick_foul: true,
-          foul_player_id: quickFoulPair.foulerId,
-          foul_team: 'DEFENSE',
-          result_type: 'FOUL',
-        };
-        await commitQuickFoulReachInAndAnnounce(scene, {
-          defenderSprite: quickFoulPair.defenderSprite,
-          victimSprite: quickFoulPair.victimSprite,
-          ballSprite,
-          turnDataForAnnounce: announceTurn,
-          markTurnDone: turnData,
-        });
-        if (quickFoulPair.foulTurnData) {
-          quickFoulPair.foulTurnData._quickFoulAnimatedDuringInbound = true;
-          quickFoulPair.foulTurnData._quickFoulAnnounceDone = true;
-        }
-      }
       sideInboundPassDelivered = true;
     }
 
@@ -3028,12 +3002,9 @@ async function runInboundSetup({
     }
   }
   
-  const quickFoulPair = resolveQuickFoulInboundPair(
-    turnData,
-    context?.nextTurn,
-    playerSprites,
-    passInfo,
-  );
+  // Quick foul (situational Force Foul) no longer animates during the inbound —
+  // it is a separate UESS HCO turn (converge + reach-in + announce as
+  // animation_steps). The baseline inbound just delivers the pass to the receiver.
   const baselineInboundPassStartMs = Date.now();
   const passPromise = passInfo
     ? (console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo),
@@ -3048,25 +3019,6 @@ async function runInboundSetup({
 
   await passPromise;
 
-  if (quickFoulPair) {
-    const announceTurn = quickFoulPair.foulTurnData ?? {
-      quick_foul: true,
-      foul_player_id: quickFoulPair.foulerId,
-      foul_team: 'DEFENSE',
-      result_type: 'FOUL',
-    };
-    await commitQuickFoulReachInAndAnnounce(scene, {
-      defenderSprite: quickFoulPair.defenderSprite,
-      victimSprite: quickFoulPair.victimSprite,
-      ballSprite,
-      turnDataForAnnounce: announceTurn,
-      markTurnDone: turnData,
-    });
-    if (quickFoulPair.foulTurnData) {
-      quickFoulPair.foulTurnData._quickFoulAnimatedDuringInbound = true;
-      quickFoulPair.foulTurnData._quickFoulAnnounceDone = true;
-    }
-  }
   validateInboundUnitCompletionContract({
     scene,
     turnData,
@@ -5786,7 +5738,6 @@ export async function runFinalTurnAlignment({ scene, playerSprites, ballSprite, 
 }
 
 export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration };
-export { animateQuickFoulDefenderToReceiver } from './quickFoulAnimation.js';
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY, opts = {}) {
   return getPlayerMovementDurationMs(sprite, targetX, targetY, {

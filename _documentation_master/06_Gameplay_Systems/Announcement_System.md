@@ -243,7 +243,9 @@ The Announcement System provides visual feedback for game events using timing-ba
 
 **Rule:** Gameplay-freezing result announcements use a **uniform 300 ms** period before the next animation. Backend schema announcements read this from `ANNOUNCEMENT_FREEZE_HOLD_MS`; the frontend schema fallback mirrors the same value in `animationPlayback.js`. Legacy frontend announcement-hold config mirrors it in `animation_config.js`.
 
-**Free throw exception:** Free throw result banners use **2x `ANNOUNCEMENT_FREEZE_HOLD_MS`** (currently **600 ms**) so the make/miss result gets a slightly longer beat. Backend FT schema emitters use `ft_step_emitter.py::FT_RESULT_ANNOUNCEMENT_HOLD_MS`; the legacy frontend FT path mirrors this with `animation_config.js::freeThrow.resultAnnouncementHoldMs`.
+**Free throw exception:** Free throw **makes** and **non-final misses** use **2x `ANNOUNCEMENT_FREEZE_HOLD_MS`** (currently **600 ms**) so the result gets a slightly longer beat. Backend FT schema emitters use `ft_step_emitter.py::FT_RESULT_ANNOUNCEMENT_HOLD_MS`; the legacy frontend FT path mirrors this with `animation_config.js::freeThrow.resultAnnouncementHoldMs`.
+
+**Final missed FT:** The last attempt of a trip (e.g. 2 of 2 when `free_throws_remaining == 0`) shows **"No Good"** (or **"Airball!"** on an airball miss) but does **not** freeze gameplay — schema announcements carry `non_blocking: true` so rebound motion starts immediately. Intermediate misses (e.g. 1 of 2) keep the 600 ms freeze.
 
 **Where announcement result holds are used:**
 
@@ -251,7 +253,9 @@ The Announcement System provides visual feedback for game events using timing-ba
 |------------------------|----------|------|
 | Shot make — "It's Good!" / AND-1 | `ShotAnimationSystem.js` / schema make-hold steps | Announcement hold uses the shared 300 ms value; generic rim holds remain separate |
 | Made shot rim hold (ballManager path) | `ballManager.js` | Holds after ball at rim; allows announcement to display |
-| Free throw make/miss — "It's Good!" / "No Good" | `ft_step_emitter.py`; legacy `FreeThrowAnimationSystem.js` | Uses 2x the shared announcement freeze constant |
+| Free throw make — "It's Good!" | `ft_step_emitter.py`; legacy `FreeThrowAnimationSystem.js` | Uses 2x the shared announcement freeze constant |
+| Free throw miss (not final) — "No Good" | `ft_step_emitter.py`; legacy `FreeThrowAnimationSystem.js` | Uses 2x the shared announcement freeze constant |
+| Free throw miss (final) — "No Good" / "Airball!" | `ft_step_emitter.py` | `non_blocking: true` — banner only, no clock freeze |
 | Fast break make — "It's Good!" | `fastBreak.js` | After FB make announcement |
 | Fast break defensive stop — "Great Stop!" | `fastBreak.js` | After "Great Stop!" before transition to HalfCourt |
 
@@ -406,7 +410,7 @@ Language Guidance For Offensive Fouls in Announcement System (non lane players /
 
 Lane locations = lower and upper lowPost, midPost, highPost, basketSpot, midLane, topLane
 
-All Force Fouls announce "Quick Foul!"
+All Force Fouls announce **"Quick Foul!"** via the reach-in schema step (`quick_foul.py` → `build_quick_foul_animation_steps`), flagged `non_blocking: true` (banner only; clock already stopped at reach-in start).
 
 ---
 
@@ -431,9 +435,10 @@ Frontend-only calls to `showAnnouncement()` / `showSecondaryAnnouncement()` are 
 | **"Fast Break Score!"** | 300ms | `after_steal_fast_break_step_emitter.py` overriding `skeleton_step_emitter.py::_build_make_hold_sub_step` | After-steal Fast Break make-hold step |
 | **"Fast Break Score! And 1!"** | 300ms | `after_steal_fast_break_step_emitter.py` overriding `skeleton_step_emitter.py::_build_make_hold_sub_step` | After-steal Fast Break make with defensive shooting foul |
 | **"It's Good!"** (free throw) | 600ms | `ft_step_emitter.py` | Made free throw make-hold step; `2x ANNOUNCEMENT_FREEZE_HOLD_MS` |
-| **"No Good"** (free throw) | 600ms | `ft_step_emitter.py` | Missed free throw bounce step / bounce-hold step; `2x ANNOUNCEMENT_FREEZE_HOLD_MS` |
+| **"No Good"** (free throw, not final) | 600ms | `ft_step_emitter.py` | Missed free throw bounce-hold step; `2x ANNOUNCEMENT_FREEZE_HOLD_MS` |
+| **"Airball!"** (free throw, not final) | 300ms | `ft_step_emitter.py` | Airballed free throw at ball-flight end |
+| **"Airball!"** (field goal / putback / FB) | 300ms | `skeleton_step_emitter.py::_airball_announcement` | Airballed field goal, putback, or fast-break shot at ball-flight end |
 | **"Shooting Foul!"** | 300ms | `skeleton_step_emitter.py::_stamp_shooting_foul_on_miss_end`; reused by `oreb_step_emitter.py` | Missed shot / missed putback with defensive shooting foul |
-| **"Airball!"** | 300ms | `skeleton_step_emitter.py::_airball_announcement`; `ft_step_emitter.py` | Airballed field goal, putback, fast-break shot, or free throw at ball-flight end |
 | **"Over The Back!"** | 300ms | `dreb_step_emitter.py` via `build_foul_announcement()` | DREB over-the-back rebound foul |
 | **Dead-ball fumble turnover headline** | 300ms | `dead_ball_fumble.py` | Dead-ball fumble terminal step |
 | **"CHARGE!"** | 300ms | `fb_terminal_announce.py` | Fast Break terminal offensive charge |
@@ -456,6 +461,8 @@ These announcements carry `hold_ms` in the payload but also carry `non_blocking:
 | **"Rebound!"** (DREB) | primary | 700ms | `dreb_step_emitter.py` | Defensive rebound secured; suppressed entirely when DREB launches a fast break |
 | **"Rebound!"** (OREB) | primary | 700ms | `oreb_step_emitter.py` | Offensive rebound secured |
 | **"BLOCK!"** | primary | 700ms | `skeleton_step_emitter.py::_build_post_shot_sub_steps` | Blocked shot at ball-flight end |
+| **"No Good"** (free throw, final) | primary | court default | `ft_step_emitter.py` | Final missed free throw; rebound flows immediately |
+| **"Airball!"** (free throw, final) | primary | court default | `ft_step_emitter.py` | Final airballed free throw |
 | **"Fast Break!"** (after steal) | secondary | court default | `after_steal_fast_break_step_emitter.py` | Steal fast-break drive start |
 | **"Fast Break!"** (rim runner) | secondary | court default | `rim_runner_step_emitter.py` | Lane pass to rim runner |
 | **"Fast Break!"** (triangle) | secondary | court default | `triangle_step_emitter.py` | Triangle lane pass to rim runner |
@@ -463,6 +470,7 @@ These announcements carry `hold_ms` in the payload but also carry `non_blocking:
 | **"No Fast Break"** | secondary | court default | `rim_runner_step_emitter.py` | Rim Runner fast break denied / held up |
 | **"FB Outlet Pass Denied!"** | secondary | court default | `rim_runner_step_emitter.py` | Rim Runner outlet denied |
 | **"Great Stop!"** | secondary | court default | `covert_release_step_emitter.py` | Covert Release defensive stop |
+| **"Quick Foul!"** | primary | court default | `quick_foul.py` → reach-in step | Situational Force Foul at HCO start; clock pinned at reach-in |
 
 ### DREB To Fast Break Suppression
 

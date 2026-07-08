@@ -92,6 +92,12 @@ FLSS_DEEP_KEY_X_HOME = 57
 FLSS_NORMAL_SHOT_MIN_X_HOME = 64
 FLSS_HEAVE_MAX_X_HOME = 50
 
+# FLSS heave miss rim-action bands — ``miss_margin = roll - shot_score`` on a miss
+# (made when ``shot_score > roll``). Drives ``select_flss_heave_miss_variant``.
+FLSS_HEAVE_MISS_RATTLE_MAX = 5       # margin ≤ this → random LITTLE/NORMAL/HEAVY rattle
+FLSS_HEAVE_MISS_RIM_BOUNCE_MAX = 15  # margin 6–15 → BACK_OF_RIM (rim bounce miss)
+FLSS_HEAVE_MISS_BACKBOARD_MAX = 30   # margin 16–30 → BANK_MISS; above → AIRBALL (no headline)
+
 
 def is_inside_paint_grid(x, y, *, home_basket: bool = True) -> bool:
     """True when display grid (x, y) lies inside INSIDE_PAINT_RECT_HOME (mirrored for away)."""
@@ -240,6 +246,41 @@ SITUATIONAL_FORCE_FOUL_TIME_ELAPSED_MAX = 3
 # Inbound pass receiver position for Force Foul (BIP/SIP)
 SITUATIONAL_BIP_RECEIVER_POS = "SG"
 SITUATIONAL_SIP_RECEIVER_POS = "SG"
+
+# ---- Quick Foul (situational Force Foul) setup + execution -----------------
+# See _documentation_master/06_Gameplay_Systems/Situational_Logic_System.md
+# §Force Foul Execution. Distances are Euclidean grid spots.
+QUICK_FOUL_APPROACH_RADIUS_GRID = 4        # fouling defender sets up within this of his man
+QUICK_FOUL_RECEIVER_MAX_DIST_GRID = 15     # inbound candidate receivers within this of the inbounder
+QUICK_FOUL_RECEIVER_MIN_SEPARATION_GRID = 10  # the two candidate receivers at least this far apart
+QUICK_FOUL_INBOUND_GUARD_OFFSET_GRID = 3   # inbound-guard defender this far off the inbounder (toward court)
+QUICK_FOUL_SCATTER_OFFSET_GRID = 2         # scatter collision offset (toward basket) when a bird/apex spot is shared
+QUICK_FOUL_TIME_ELAPSED_FLOOR = 1.0        # min game-seconds the foul (converge) burns
+QUICK_FOUL_REACHIN_GAME_SECONDS = 450.0 / 350.0  # reach-in micro step duration (wall only; clock pinned)
+# Team chemistry roll bounds (chemistry itself ranges 7..25).
+QUICK_FOUL_CHEMISTRY_ROLL_MIN = 1
+QUICK_FOUL_CHEMISTRY_ROLL_MAX = 25
+# Scatter spots (HCO_STRING_SPOTS keys) for the two non-participant players on
+# each side. Home orientation; flipped for away offense at the call site.
+QUICK_FOUL_OFFENSE_SCATTER_SPOTS = (
+    "key",
+    "upper apex", "lower apex",
+    "upper bird", "lower bird",
+    "upper corner", "lower corner",
+    "upper midCorner", "lower midCorner",
+)
+QUICK_FOUL_DEFENSE_SCATTER_SPOTS = (
+    "midLane", "topLane",
+    "upper midPost", "lower midPost",
+    "upper highPost", "lower highPost",
+    "upper bird", "lower bird",
+    "upper apex", "lower apex",
+)
+# Defense scatter spots that must offset toward the basket if an offender
+# already occupies them (bird/apex are shared between the two lists).
+QUICK_FOUL_DEFENSE_SHARED_SPOTS = (
+    "upper bird", "lower bird", "upper apex", "lower apex",
+)
 
 # Movement rates. Per-archetype absolute rates at AG=50; the AG curve scales
 # them proportionally for other AG values via

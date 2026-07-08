@@ -1310,66 +1310,6 @@ class GameManager:
                 self.game_id,
             )
 
-    def _maybe_set_force_foul_pending_after_inbound(self, inbound_payload, inbound_type):
-        """
-        Situational Logic (Q4/OT): If Slow It Down + Force Foul, set pending so the next
-        API turn returns a defensive foul on the inbound pass receiver (after frontend animates the pass).
-        Also stamps the inbound payload so the frontend can position the fouler near the receiver during setup.
-        """
-        from BackEnd.utils import situational_logic as sl
-        from BackEnd.engine.phase_resolution import (
-            pick_force_foul_defender_spot,
-            select_defender_closest_to_victim,
-        )
-        time_remaining = self.game_state.get("time_remaining")
-        if not (
-            sl.is_situational_active(self.quarter)
-            and sl.is_slow_it_down(self, time_remaining)
-            and sl.should_force_foul(self, time_remaining)
-        ):
-            return
-        receiver_pos = inbound_payload.get("receiver_pos", "SG")
-        off_lineup = self.offense_team.lineup
-        def_lineup = self.defense_team.lineup
-        if receiver_pos not in off_lineup or not off_lineup[receiver_pos]:
-            return
-        victim_coords = inbound_payload.get("oDestinations", {}).get(
-            receiver_pos, {"x": 50, "y": 25}
-        )
-        d_dest = dict(inbound_payload.get("dDestinations") or {})
-        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
-        if not foul_player:
-            return
-        fouler_pos = None
-        for pos, player in (def_lineup or {}).items():
-            if player is foul_player:
-                fouler_pos = pos
-                break
-        if fouler_pos:
-            d_dest[fouler_pos] = pick_force_foul_defender_spot(
-                victim_coords, foul_player, def_lineup, d_dest
-            )
-            inbound_payload["dDestinations"] = d_dest
-        receiver = off_lineup[receiver_pos]
-        inbound_payload["force_foul_pending"] = True
-        inbound_payload["force_foul_fouler_id"] = getattr(foul_player, "player_id", None)
-        inbound_payload["force_foul_receiver_id"] = getattr(receiver, "player_id", None)
-        inbound_payload["force_foul_receiver_pos"] = receiver_pos
-        self.game_state["situational_force_foul_pending"] = {
-            "victim_id": getattr(receiver, "player_id", None),
-            "victim_coords": victim_coords,
-            "defender_coords_by_pos": d_dest,
-            "foul_player_id": getattr(foul_player, "player_id", None),
-        }
-        sl.log_force_foul_debug(
-            self,
-            "INBOUND_PENDING_SET",
-            time_remaining=time_remaining,
-            fouler=foul_player,
-            victim=receiver,
-            note=f"inbound_type={inbound_type} pending_stored=True",
-        )
-
     def simulate_macro_turn(self): #run_simulation
         import time as _time
         # ⏱️ Coarse timers for full_sim (logged on sample turns)
@@ -1750,97 +1690,12 @@ class GameManager:
             if prev_positions:
                 self.game_state["_prev_offense_positions_for_hco"] = prev_positions
 
-        # ✅ Situational Logic: Force Foul after DREB — inject FOUL turn and forgo outlet/FB/HCO
-        if result.get("force_foul_after_dreb"):
-            from BackEnd.utils import situational_logic as sl
-            from BackEnd.engine.phase_resolution import (
-                defender_coords_by_pos_from_lineup,
-                grid_coords_from_player,
-                resolve_non_shooting_foul,
-                select_defender_closest_to_victim,
-            )
-            victim = self.game_state.get("last_rebounder")
-            def_lineup = self.defense_team.lineup  # After DREB flip, rebounder's team is offense; fouling team is defense
-            rebounder_id = getattr(victim, "player_id", None)
-            rebounder_coords_fallback = None
-            if rebounder_id is not None:
-                dreb_coords = (result.get("defense_rebounder_coords") or {}).get(str(rebounder_id))
-                if isinstance(dreb_coords, dict):
-                    rebounder_coords_fallback = dreb_coords
-            if rebounder_coords_fallback is None and result.get("ball_bounce_x") is not None:
-                rebounder_coords_fallback = {
-                    "x": result.get("ball_bounce_x"),
-                    "y": result.get("ball_bounce_y", 25),
-                }
-            victim_coords = grid_coords_from_player(victim, rebounder_coords_fallback)
-            d_dest = defender_coords_by_pos_from_lineup(def_lineup)
-            foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
-            if victim and foul_player:
-                sl.log_force_foul_debug(
-                    self,
-                    "DREB_EXECUTE",
-                    time_remaining=self.game_state.get("time_remaining"),
-                    fouler=foul_player,
-                    victim=victim,
-                    note="post-possession-flip; offense=rebounder team",
-                )
-                self.game_state["foul_team"] = "DEFENSE"
-                roles = {
-                    "ball_handler": victim,
-                    "defender": foul_player,
-                    "foul_player": foul_player,
-                    "shooter": victim,
-                    "screener": None,
-                    "passer": None,
-                }
-                foul_result = resolve_non_shooting_foul(
-                    roles, self, time_elapsed_override=sl.force_foul_time_elapsed()
-                )
-                # `resolve_non_shooting_foul` returns the result with raw Player
-                # objects in ball_handler / defender / shooter / screener / passer.
-                # This payload is returned directly via JSONResponse, so the
-                # Player objects must be flattened to player_ids before the API
-                # response renders. Mirrors the OREB OTB pattern in
-                # `turn_manager.resolve_offensive_rebound_turn`.
-                foul_result["ball_handler"] = getattr(victim, "player_id", None)
-                foul_result["shooter"] = getattr(victim, "player_id", None)
-                foul_result["defender"] = getattr(foul_player, "player_id", None)
-                foul_result["screener"] = None
-                foul_result["passer"] = None
-                victim.coords = {
-                    "x": float(victim_coords.get("x", 50)),
-                    "y": float(victim_coords.get("y", 25)),
-                }
-                attach_position_snapshots(
-                    foul_result,
-                    [
-                        build_phase_post_stopper_snapshot(
-                            self,
-                            self.offense_team.lineup,
-                            self.defense_team.lineup,
-                            None,
-                            roles,
-                            "HCO",
-                            "non_shooting_foul",
-                            "hco_force_foul_after_dreb",
-                        )
-                    ],
-                )
-                foul_result["offense_team_id"] = self.offense_team.team_id
-                foul_result["current_turn"] = "HCO"
-                foul_result["quick_foul"] = True
-                foul_result["force_foul_after_dreb"] = True  # Frontend: animate defender→rebounder, no outlet
-                foul_result["victim_id"] = getattr(victim, "player_id", None)  # Rebounder (fouled player) for animation
-                foul_result["next_turn"] = foul_result.get("next_play_type") or "SIDE_INBOUND"
-                self.turn_manager._attach_clock_contract(
-                    foul_result,
-                    clock_start=int(self.game_state.get("time_remaining", 0)),
-                    shot_clock_start=int(self.game_state.get("shot_clock_remaining", 30)),
-                    game_state=self.game_state,
-                    source="bypass:FOUL_AFTER_DREB",
-                )
-                self._append_turn(foul_result)
-                result = foul_result  # So FOUL/SIP block below runs
+        # ✅ Situational Logic: Force Foul after DREB. The foul is NO LONGER
+        # injected here — ``force_foul_after_dreb`` (set in shot_manager) only
+        # routes the possession straight to HCO (no outlet/FB). The intentional
+        # foul on the rebounder now executes at the START of that HCO turn via
+        # the universal quick-foul hook (turn_manager._execute_quick_foul_at_hco_start),
+        # so BIP/SIP/DREB/OREB-kickout/Final-Turn all share one UESS-animated path.
 
         # (Foul-out check and timeout creation now run inside _append_turn for the main result)
 
@@ -1946,8 +1801,9 @@ class GameManager:
                     # Don't append SIP turn - timeout will replace it on next API call
                     return
             else:
-                # ✅ Situational Logic: Force Foul after SIP — set pending so next turn is the foul
-                self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "SIDE_INBOUND")
+                # Situational Force Foul after SIP is handled by the quick-foul
+                # setup (setup_side_inbound) + universal HCO-start hook — no
+                # pending flag needed here.
                 from BackEnd.utils.eoq_clock_progression import schedule_flss_after_inbound
 
                 schedule_flss_after_inbound(self, sip_gate_result)
@@ -2074,8 +1930,9 @@ class GameManager:
                     # Don't append BIP turn - timeout will replace it on next API call
                     return
             else:
-                # ✅ Situational Logic: Force Foul after BIP — set pending so next turn is the foul
-                self._maybe_set_force_foul_pending_after_inbound(inbound_payload, "BASELINE_INBOUND")
+                # Situational Force Foul after BIP is handled by the quick-foul
+                # setup (setup_baseline_inbound) + universal HCO-start hook — no
+                # pending flag needed here.
                 from BackEnd.utils.eoq_clock_progression import schedule_flss_after_inbound
 
                 schedule_flss_after_inbound(self, last_turn)

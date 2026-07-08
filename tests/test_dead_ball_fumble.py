@@ -4,6 +4,7 @@ import pytest
 
 from BackEnd.engine.dead_ball_fumble import (
     build_dead_ball_fumble_step,
+    finalize_dead_ball_fumble_for_turn,
     inject_dead_ball_fumble_before_turn_stop,
     is_dead_ball_fumble_turn,
     propagate_fumble_turn_flags,
@@ -126,6 +127,51 @@ class TestInjectDeadBallFumble:
         turn = {"result_type": "DEAD BALL", "victim_id": "bh1"}
         inject_dead_ball_fumble_before_turn_stop(steps, turn, away_offense=False)
         assert len(steps) == 1
+
+    def test_idempotent_when_fumble_already_inserted(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.dead_ball_fumble.roll_dead_ball_fumble_label",
+            lambda: "TRAVEL",
+        )
+        steps = [_anchor_step()]
+        turn = {"result_type": "DEAD BALL", "victim_id": "bh1"}
+        inject_dead_ball_fumble_before_turn_stop(steps, turn, away_offense=False)
+        inject_dead_ball_fumble_before_turn_stop(steps, turn, away_offense=False)
+        assert len(steps) == 2
+        fumble_steps = [
+            step for step in steps
+            if ((step.get("start") or {}).get("flourish") or {}).get("bh1", {}).get("kind") == "fumble"
+        ]
+        assert len(fumble_steps) == 1
+
+
+class TestFinalizeDeadBallFumbleForTurn:
+    def test_stamps_schema_turn_from_game_orientation(self, monkeypatch):
+        monkeypatch.setattr(
+            "BackEnd.engine.dead_ball_fumble.roll_dead_ball_fumble_label",
+            lambda: "DOUBLE_DRIBBLE",
+        )
+
+        class Team:
+            def __init__(self, team_id):
+                self.team_id = team_id
+
+        class Game:
+            offense_team = Team("away")
+            away_team = Team("away")
+
+        turn = {
+            "result_type": "DEAD_BALL_TURNOVER",
+            "victim_id": "bh1",
+            "animation_steps": [_anchor_step()],
+        }
+        finalize_dead_ball_fumble_for_turn(turn, Game())
+
+        assert len(turn["animation_steps"]) == 2
+        assert turn["turnover_type"] == "DOUBLE_DRIBBLE"
+        assert turn["suppress_turn_prep_turnover_announce"] is True
+        fumble = turn["animation_steps"][1]
+        assert fumble["end"]["announcement"]["team"] == "away"
 
 
 class TestPropagateFumbleTurnFlags:

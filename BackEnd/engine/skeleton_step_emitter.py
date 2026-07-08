@@ -2506,6 +2506,9 @@ def _airball_announcement(
         return None
     if (turn_result.get("result_type") or "").upper() == "MAKE":
         return None
+    # FLSS heave airballs play ``airball.wav`` at ball-flight end only — no headline.
+    if turn_result.get("flss") and turn_result.get("flss_zone") == "heave":
+        return None
     shooter_id = turn_result.get("shooter_id") or _safe_id(turn_result.get("shooter"))
     if not shooter_id:
         return None
