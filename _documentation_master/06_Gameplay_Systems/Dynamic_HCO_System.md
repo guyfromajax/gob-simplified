@@ -24,19 +24,19 @@ Shared by the random-% grid and the SM-precedence grid.
 ### Optimal-look bar (`_shoot_threshold`)
 A look's 0–100 mismatch quality must clear the bar to be **optimal**. Continuous:
 `bar = clock × OPTIMAL_BAR_STEEPNESS × OPTIMAL_BAR_TEMPO_MULT[tempo]`
-- `OPTIMAL_BAR_STEEPNESS = 1.6` — self-shot and hot-read dish share it.
+- `OPTIMAL_BAR_STEEPNESS = 2.0` — self-shot and hot-read dish share it.
 - `OPTIMAL_BAR_TEMPO_MULT = {slow: 1.2, normal: 1.0, fast: 0.8}`
 
-Higher bar = fewer/later shots; slow tempo demands a better look (work the ball), fast shoots sooner. Self stays slightly favored over the dish via the self-only openness bonus + self-wins-ties tiebreaker (not the bar). Illustrative values (normal tempo): 30s → 48, 22s → 35, 15s → 24, 8s → 13.
+Higher bar = fewer/later shots; slow tempo demands a better look (work the ball), fast shoots sooner. Self stays slightly favored over the dish via the self-only openness bonus + self-wins-ties tiebreaker (not the bar). Illustrative values (normal tempo): 30s → 60, 22s → 44, 15s → 30, 8s → 16.
 
 ### Random-tier shoot % (`RANDOM_TIER_SHOOT_PCT`)
 Non-strategic ("random") read tier: `randint(1,100) ≤ %` → shoot (self only). Low early, high late.
 
 | Tier | slow | normal | fast |
 |---|---|---|---|
-| Early | 5 | 15 | 25 |
-| Mid | 25 | 35 | 45 |
-| Late | 48 | 58 | 68 |
+| Early | 30 | 40 | 50 |
+| Mid | 45 | 60 | 75 |
+| Late | 95 | 95 | 95 |
 | Very late | 95 | 95 | 95 |
 
 ### Subtle-movement precedence (`SM_PRECEDENCE_TEMPOS`)
@@ -50,7 +50,7 @@ When the turn's `offense_reads` (alterations) roll is on, these tempos make **su
 | Very late | ✗ | ✗ | ✗ |
 
 ### Read tiers (`_shoot_read_tier`)
-`(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT (200)` → right (take the best optimal look, self or dish); `> SHOOT_READ_SAFE (125)` → safe (always progress); else random (use the % grid above). SM-precedence is evaluated **before** this — when it fires, the read tier is bypassed for that step.
+`(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT (300)` → right (take the best optimal look, self or dish); `> SHOOT_READ_SAFE (100)` → safe (always progress); else random (use the % grid above). SM-precedence is evaluated **before** this — when it fires, the read tier is bypassed for that step.
 
 ---
 
@@ -141,13 +141,13 @@ The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it
 
 | Shot-clock bucket | slow | normal | fast |
 |---|---|---|---|
-| Early (23–30s) | 5% | 15% | 25% |
-| Mid (12–22s) | 25% | 35% | 45% |
-| Late (4–11s) | 48% | 58% | 68% |
+| Early (23–30s) | 30% | 40% | 50% |
+| Mid (15–22s) | 45% | 60% | 75% |
+| Late (6–14s) | 95% | 95% | 95% |
 | Very late (1–3s) | 95% | 95% | 95% |
 | Forced (<1s) | 100% (existing `<1s` forced-shot backstop) |
 
-Tempo shifts ±10 in Early/Mid/Late; Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
+Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
 
 ---
 
@@ -205,7 +205,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | Constant | File | Default | Effect |
 |---|---|---|---|
 | `MOTION_READ_THRESHOLD` | motion_step_decision.py | `110` | Per-teammate read bar `(player_read_raw + off_eff) × d6` to relocate on a subtle beat. ↑ = fewer teammates move. Also the defender-follow bar. |
-| `SUBTLE_STEP_ELAPSED_BY_TEMPO` | motion_step_decision.py | `{slow:(3,4), normal:(2,4), fast:(2,3)}` | Steps elapsed before a subtle beat can pause (tempo floors). |
+| `SUBTLE_STEP_ELAPSED_BY_TEMPO` | motion_step_decision.py | `{slow:(2,4), normal:(2,3), fast:(1,3)}` | Steps elapsed before a subtle beat can pause (tempo floors). |
 | `SUBTLE_FORCED_SHOT_PENALTY` | motion_step_decision.py | `50` | Shot-score penalty when the clock forces a shot off a subtle hold. |
 | `SUBTLE_ARCHETYPE` | motion_subtle.py | `"cruise"` | Movement speed archetype for subtle movers + BH dribble. |
 | `BH_SUBTLE_MOVES` | motion_subtle.py | `("in_place","back","in")` | BH radial move menu (+`"side"` when at a perimeter spot with a free neighbor). |

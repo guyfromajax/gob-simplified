@@ -38,7 +38,7 @@ KICKOUT_MAX_DIST = 10                # euclidean grid spots for the 25% desperat
 TEMPO_MOD = {"slow": -25, "normal": 0, "fast": 25}
 # Subtle-movement step elapsed (game seconds) by offense tempo — a FLOOR the emitter honors
 # (brief: Updated Subtle Movement Logic). The slowest mover's natural travel can exceed it.
-SUBTLE_STEP_ELAPSED_BY_TEMPO = {"slow": (3, 4), "normal": (2, 4), "fast": (2, 3)}
+SUBTLE_STEP_ELAPSED_BY_TEMPO = {"slow": (2, 4), "normal": (2, 3), "fast": (1, 3)}
 # Hard penalty applied to shot_score when the BH is forced to shoot because a subtle step
 # ran the shot clock to expiry (brief: force a shot with 1s left, -50 to shot score).
 SUBTLE_FORCED_SHOT_PENALTY = 50
@@ -218,9 +218,9 @@ OPTIMAL_BAR_TEMPO_MULT = {"slow": 1.2, "normal": 1.0, "fast": 0.8}
 # possessions stop dumping early shots. Very-late is a flat 95% (clock pressure
 # dominates); <1s is the forced-shot backstop upstream.
 RANDOM_TIER_SHOOT_PCT = {
-    "early":     {"slow": 5,  "normal": 15, "fast": 25},
-    "mid":       {"slow": 25, "normal": 35, "fast": 45},
-    "late":      {"slow": 48, "normal": 58, "fast": 68},
+    "early":     {"slow": 30, "normal": 40, "fast": 50},
+    "mid":       {"slow": 45, "normal": 60, "fast": 75},
+    "late":      {"slow": 95, "normal": 95, "fast": 95},
     "very_late": {"slow": 95, "normal": 95, "fast": 95},
 }
 
