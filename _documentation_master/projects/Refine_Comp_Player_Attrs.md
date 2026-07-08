@@ -9,9 +9,9 @@
 
 ## Recruit Archetype Reference
 
-> Source of truth: `RecruitManager` in `BackEnd/models/franchise_manager.py` — `_select_archetype()`, `_generate_recruit_profile()`, `_roll_recruit_character()`, `_generate_weight()`, `YEAR_TIER_RANGES`. Also documented in `_documentation_master/04_Franchise_Mode_Systems/Recruiting_System.md`.
+> Recruit-generation reference only (`RecruitManager` in `BackEnd/models/franchise_manager.py`). Comp rewrites use the **trait mappings** below; they do **not** roll height or weight.
 
-Each archetype defines which **profile** attributes roll **Strong**, **Secondary**, or **Standard** (or **Weak** for Below Average), plus a height range. Position ratings are derived from the rolled attributes via `compute_position_ratings()`.
+Each archetype defines which **profile** attributes roll **Strong**, **Secondary**, or **Standard** (or **Weak** for Below Average). Position ratings use existing height + rolled attributes via `compute_position_ratings()`.
 
 ### Profile attributes (12)
 
@@ -75,55 +75,44 @@ Weighted random via `random.choices`:
 
 **All 20 archetypes:** Five-Star, Four-Star, Defensive Wizard, All-Around Scorer, Classic PG, Classic SG, Classic SF, Classic PF, Classic C, Pure Shooter, Intangibles, Athlete, Inside Defender, Outside Defender, Average, Below Average, Outside Dual Threat, Driver, Outside C, Three & D.
 
-### Archetype trait & height configs
+### Archetype trait configs
 
-| Archetype | Strong (STRONG tier) | Secondary (SECONDARY tier) | Standard (everything else) | Height (in) |
-|-----------|----------------------|----------------------------|----------------------------|-------------|
-| **Five-Star** | All 12 profile attrs | — | — | 69–80 |
-| **Four-Star** | — | All 12 profile attrs | — | 66–78 |
-| **Defensive Wizard** | ID, OD | ST, AG | SC, SH, PS, BH, RB, ND, IQ, FT | 66–75 |
-| **All-Around Scorer** | SH, SC | ST, AG | ID, OD, PS, BH, RB, ND, IQ, FT | 66–75 |
-| **Classic PG** | BH, PS | OD, IQ | SC, SH, ID, RB, AG, ST, ND, FT | 66–72 |
-| **Classic SG** | SH | OD | SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT | 66–74 |
-| **Classic SF** | SC, OD | AG | SH, ID, PS, BH, RB, ST, ND, IQ, FT | 69–75 |
-| **Classic PF** | RB | ST | SC, SH, ID, OD, PS, BH, AG, ND, IQ, FT | 70–76 |
-| **Classic C** | ID, ST | RB, SC | SH, OD, PS, BH, AG, ND, IQ, FT | 72–78 |
-| **Pure Shooter** | SH, FT | — | SC, ID, OD, PS, BH, RB, AG, ST, ND, IQ | 66–73 |
-| **Intangibles** | IQ, ND, CH | — | SC, SH, ID, OD, PS, BH, RB, AG, ST, FT | 66–75 |
-| **Athlete** | AG, ST, ND | — | SC, SH, ID, OD, PS, BH, RB, IQ, FT | 66–75 |
-| **Inside Defender** | ST, ID | — | SC, SH, OD, PS, BH, RB, AG, ND, IQ, FT | 71–80 |
-| **Outside Defender** | AG, OD | — | SC, SH, ID, PS, BH, RB, ST, ND, IQ, FT | 66–74 |
-| **Average** | — | — | All 12 profile attrs | 66–75 |
-| **Below Average** | — | — | All 12 profile attrs (WEAK tier) | 66–74 |
-| **Outside Dual Threat** | SH, AG | — | SC, ID, OD, PS, BH, RB, ST, ND, IQ, FT | 66–75 |
-| **Driver** | SC, AG | — | SH, ID, OD, PS, BH, RB, ST, ND, IQ, FT | 66–75 |
-| **Outside C** | ST, SH | — | SC, ID, OD, PS, BH, RB, AG, ND, IQ, FT | 72–77 |
-| **Three & D** | SH | ID, OD | SC, PS, BH, RB, AG, ST, ND, IQ, FT | 69–75 |
-| **Athletic Shooter** | SH, AG | -- | OD, SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT | 66–74 |
-| **Inside Scorer** | SC, ST | RB, ID | SH, OD, PS, BH, AG, ND, IQ, FT | 72–78 |
-| **Outlet Passer** | PS, ST | RB, ID | SH, OD, SC, BH, AG, ND, IQ, FT | 72–78 |
-| **Scoring PF** | RB, SC | ST | SH, ID, OD, PS, BH, AG, ND, IQ, FT | 70–76 |
-| **Defensive PF** | RB, ID | ST | SC, SH, OD, PS, BH, AG, ND, IQ, FT | 70–76 |
-| **All-Around Wing** | AG | SC, SH, OD, ID | PS, BH, RB, ST, ND, IQ, FT | 69–75 |
-| **Scoring PG** | BH, PS | SC, SH | IQ, OD, ID, RB, AG, ST, ND, FT | 66–72 |
+| Archetype | Strong (STRONG tier) | Secondary (SECONDARY tier) | Standard (everything else) |
+|-----------|----------------------|----------------------------|----------------------------|
+| **Five-Star** | All 12 profile attrs | — | — |
+| **Four-Star** | — | All 12 profile attrs | — |
+| **Defensive Wizard** | ID, OD | ST, AG | SC, SH, PS, BH, RB, ND, IQ, FT |
+| **All-Around Scorer** | SH, SC | ST, AG | ID, OD, PS, BH, RB, ND, IQ, FT |
+| **Classic PG** | BH, PS | OD, IQ | SC, SH, ID, RB, AG, ST, ND, FT |
+| **Classic SG** | SH | OD | SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT |
+| **Classic SF** | SC, OD | AG | SH, ID, PS, BH, RB, ST, ND, IQ, FT |
+| **Classic PF** | RB | ST | SC, SH, ID, OD, PS, BH, AG, ND, IQ, FT |
+| **Classic C** | ID, ST | RB, SC | SH, OD, PS, BH, AG, ND, IQ, FT |
+| **Pure Shooter** | SH, FT | — | SC, ID, OD, PS, BH, RB, AG, ST, ND, IQ |
+| **Intangibles** | IQ, ND | — | SC, SH, ID, OD, PS, BH, RB, AG, ST, FT |
+| **Athlete** | AG, ST, ND | — | SC, SH, ID, OD, PS, BH, RB, IQ, FT |
+| **Inside Defender** | ST, ID | — | SC, SH, OD, PS, BH, RB, AG, ND, IQ, FT |
+| **Outside Defender** | AG, OD | — | SC, SH, ID, PS, BH, RB, ST, ND, IQ, FT |
+| **Average** | — | — | All 12 profile attrs |
+| **Below Average** | — | — | All 12 profile attrs (WEAK tier) |
+| **Outside Dual Threat** | SH, AG | — | SC, ID, OD, PS, BH, RB, ST, ND, IQ, FT |
+| **Driver** | SC, AG | — | SH, ID, OD, PS, BH, RB, ST, ND, IQ, FT |
+| **Outside C** | ST, SH | — | SC, ID, OD, PS, BH, RB, AG, ND, IQ, FT |
+| **Three & D** | SH | ID, OD | SC, PS, BH, RB, AG, ST, ND, IQ, FT |
+| **Athletic Shooter** | SH, AG | -- | OD, SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT |
+| **Inside Scorer** | SC, ST | RB, ID | SH, OD, PS, BH, AG, ND, IQ, FT |
+| **Outlet Passer** | PS, ST | RB, ID | SH, OD, SC, BH, AG, ND, IQ, FT |
+| **Scoring PF** | RB, SC | ST | SH, ID, OD, PS, BH, AG, ND, IQ, FT |
+| **Defensive PF** | RB, ID | ST | SC, SH, OD, PS, BH, AG, ND, IQ, FT |
+| **All-Around Wing** | AG | SC, SH, OD, ID | PS, BH, RB, ST, ND, IQ, FT |
+| **Scoring PG** | BH, PS | SC, SH | IQ, OD, ID, RB, AG, ST, ND, FT |
 
 
-### Weight by height
+### Post-processing (recruit generation only)
 
-Weight is derived from rolled height (`_generate_weight`):
+In `generate_recruits_list()` — **not used for comp rewrites**:
 
-| Height (in) | Weight (lbs) |
-|-------------|--------------|
-| < 72 | 150–181 |
-| 72–75 | 170–194 |
-| 76–80 | 195–231 |
-| > 80 | 209–260 |
-
-### Post-processing (recruit generation)
-
-In `generate_recruits_list()`:
-
-1. `_generate_recruit_profile()` rolls 12 profile attrs + height/weight.
+1. `_generate_recruit_profile()` rolls 12 profile attrs (recruits also roll height/weight in code).
 2. `_roll_recruit_character()` sets `CH` (Intangibles floor by year, others 1–100).
 3. `Player.randomize_game_attributes(..., preserve_character=True)` sets `NG`, `MO`, `EM`; preserves `CH`.
 4. `compute_position_ratings(recruit, profile="recruit")` derives PG/SG/SF/PF/C.
@@ -132,7 +121,7 @@ In `generate_recruits_list()`:
 
 | Archetype | Player identity |
 |-----------|-----------------|
-| Five-Star | Elite across the board; tallest range |
+| Five-Star | Elite across the board |
 | Four-Star | Well-rounded, no standout tier |
 | Defensive Wizard | Perimeter + interior D, athletic secondary |
 | All-Around Scorer | SH/SC focused, athletic secondary |
@@ -157,7 +146,7 @@ In `generate_recruits_list()`:
 
 ## Comp rewrite algorithm (draft)
 
-Goal: reshape **conferences 2–16** players so attrs reflect a **basketball archetype**, while each player's **core-12 sum is unchanged**. Height, weight, and year stay as-is. **CH is re-rolled** per comp rules below (not preserved from pre-rewrite values).
+Goal: reshape **conferences 2–16** players so attrs reflect a **basketball archetype**, while each player's **core-12 sum is unchanged**. **Existing height, weight, and year are preserved** (never re-rolled). **CH is re-rolled** per comp rules below.
 
 ### Inputs (per player)
 
@@ -230,22 +219,9 @@ CH is **outside** the core-12 `target_sum` (not reconciled against it). Set afte
 
 | Archetype | CH roll |
 |-----------|---------|
-| **Intangibles** | `random.randint(band STRONG minimum, 100)` — floor from the player's **band** tier table (same STRONG low as profile attrs); max **100** |
-| **All others** | `random.randint(1, 100)` — fully random |
+| **All players** | `random.randint(1, 100)` |
 
-Also set `anchor_CH = CH`. Do not use year-based floors for comp rewrites — use **band** STRONG minimum only.
-
-**Intangibles band CH floors (STRONG low from tier table):**
-
-| Band | CH floor |
-|------|--------:|
-| Top 20% | 65 |
-| 61–80 | 48 |
-| 41–60 | 40 |
-| 21–40 | 31 |
-| Bottom 20% | 17 |
-
-Intangibles profile strong attrs remain **IQ, ND** only (CH handled here, same pattern as recruit generation).
+Also set `anchor_CH = CH`. Intangibles strong tier is **IQ, ND** only — CH is not archetype-weighted on comp rewrites.
 
 ### Step 2 — Reconcile to `target_sum`
 
@@ -294,14 +270,14 @@ Wildcard adds variety without extreme outliers — adjacent band STANDARD ranges
 | # | Decision |
 |---|----------|
 | 1 | **Archetype assignment** — user-authored logic (separate doc / WIP). New archetypes coming; hang tight before implementation. |
-| 2 | **CH** — Intangibles: band STRONG floor → 100. All others: `randint(1, 100)`. |
-| 3 | **Archetype pool** — use all existing archetypes on comp rosters **plus** new ones (TBD). |
+| 2 | **CH** — `randint(1, 100)` for every player (not part of core-12 reconcile). |
+| 3 | **Archetype pool** — all existing archetypes **plus** new ones (Athletic Shooter, Inside Scorer, etc.). |
 | 4 | **Conference 1** — excluded entirely (no rewrite). |
 
 ### Pending (user)
 
 - [ ] Archetype assignment rules
-- [ ] New archetype definitions (strong / secondary / standard attrs + height range)
+- [ ] New archetype definitions (strong / secondary / standard attrs)
 - [ ] Team-level targets (RT distribution, superstar counts, etc.)
 
 ### Implementation sketch (future script)
@@ -314,9 +290,10 @@ for player in conf_2_16_players:
     mode = "wildcard" if random.random() < 0.25 else "strict"
     attrs = roll_archetype_attrs(archetype, band, mode)   # SC..FT only
     attrs = reconcile(attrs, target_sum, archetype)
-    attrs["CH"] = roll_comp_character(archetype, band)
+    attrs["CH"] = random.randint(1, 100)
     attrs["anchor_CH"] = attrs["CH"]
-    write attrs + anchor_* to gob-staging
+    # height, weight, year unchanged on player doc
+    recompute position_ratings(existing height, new attrs)
 ```
 
 ---
