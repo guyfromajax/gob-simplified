@@ -11,6 +11,7 @@ sectioned by conference (1-16).
 from __future__ import annotations
 
 import os
+import statistics
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -110,6 +111,82 @@ def _load_team_sort_order() -> dict[str, int]:
     return mapping
 
 
+def _split_quintiles(values: list[int]) -> list[list[int]]:
+    """Split sorted-by-rank values into five equal-count groups (bottom → top)."""
+    ordered = sorted(values)
+    n = len(ordered)
+    groups: list[list[int]] = []
+    for i in range(5):
+        start = i * n // 5
+        end = (i + 1) * n // 5
+        groups.append(ordered[start:end])
+    return groups
+
+
+def _format_player_sum_distribution(player_sums: list[int]) -> list[str]:
+    n = len(player_sums)
+    if not n:
+        return ["## Player Core-12 Sum Distribution", "", "_No players found._", ""]
+
+    mean = statistics.mean(player_sums)
+    median = statistics.median(player_sums)
+    std_dev = statistics.pstdev(player_sums)
+    mad = statistics.median(abs(v - median) for v in player_sums)
+    q1, _, q3 = statistics.quantiles(player_sums, n=4)
+    minimum = min(player_sums)
+    maximum = max(player_sums)
+
+    quintiles = _split_quintiles(player_sums)
+    quintile_specs = [
+        ("Top 20% (81–100 percentile)", quintiles[4]),
+        ("61–80 percentile", quintiles[3]),
+        ("41–60 percentile", quintiles[2]),
+        ("21–40 percentile", quintiles[1]),
+        ("Bottom 20% (1–20 percentile)", quintiles[0]),
+    ]
+
+    lines = [
+        "## Player Core-12 Sum Distribution",
+        "",
+        "Per-player value = sum of SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT.",
+        f"Population: **{n:,}** players.",
+        "",
+        "### Summary statistics",
+        "",
+        "| Measure | Value | Notes |",
+        "|---------|------:|-------|",
+        f"| Mean (average) | {mean:,.2f} | |",
+        f"| Median | {median:,.1f} | 50th percentile |",
+        f"| Std dev (σ) | {std_dev:,.2f} | **From the mean**, not the median |",
+        f"| MAD | {mad:,.2f} | Median absolute deviation — spread around the median |",
+        f"| Min | {minimum:,} | |",
+        f"| Max | {maximum:,} | |",
+        f"| Q1 (25th percentile) | {q1:,.1f} | |",
+        f"| Q3 (75th percentile) | {q3:,.1f} | |",
+        f"| IQR (Q3 − Q1) | {q3 - q1:,.1f} | Middle 50% spread |",
+        f"| Total (all players) | {sum(player_sums):,} | Sum of all {n:,} per-player totals |",
+        "",
+        "**Note:** Standard deviation (σ) measures typical distance from the **mean**. For spread around the **median**, use MAD or the quintile ranges below.",
+        "",
+        "### Quintile ranges (equal player counts, ~20% each)",
+        "",
+        "Players sorted by per-player core-12 sum (low → high), split into five groups.",
+        "",
+        "| Band | Players | Lowest in band | Highest in band | Average in band |",
+        "|------|--------:|---------------:|----------------:|----------------:|",
+    ]
+    for label, group in quintile_specs:
+        if not group:
+            lines.append(f"| {label} | 0 | — | — | — |")
+            continue
+        avg = statistics.mean(group)
+        lines.append(
+            f"| {label} | {len(group)} | {min(group):,} | {max(group):,} | {avg:,.1f} |"
+        )
+    lines.append("")
+    return lines
+
+
 def main() -> int:
     uri = os.environ.get("MONGO_URI")
     if not uri:
@@ -141,14 +218,17 @@ def main() -> int:
     )
 
     player_count = 0
+    player_attr_sums: list[int] = []
     for doc in players_coll.find({}, {"team": 1, "height": 1, "attributes": 1}):
         team = (doc.get("team") or "").strip()
         if not team:
             continue
         player_count += 1
+        attr_sum = _player_attr_sum(doc.get("attributes") or {})
+        player_attr_sums.append(attr_sum)
         stats = team_stats[team]
         stats["player_count"] += 1
-        stats["attr_total"] += _player_attr_sum(doc.get("attributes") or {})
+        stats["attr_total"] += attr_sum
 
         rt = _best_rt(doc)
         for label, pred in RT_BUCKETS:
@@ -253,6 +333,8 @@ def main() -> int:
             f"| {rank} | {team_name} | {conf} | {stats['attr_total']:,} | {rt_summary} |"
         )
     lines.append("")
+
+    lines.extend(_format_player_sum_distribution(player_attr_sums))
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

@@ -2603,3 +2603,37 @@ RT = highest position rating (computed via `compute_position_ratings`, profile=`
 | 126 | Rancho Estrada | 15 | 4,069 | 80+: 0, 60-79: 2, 40-59: 4, 20-39: 6, 0-19: 0 |
 | 127 | Hana Road | 16 | 3,824 | 80+: 0, 60-79: 2, 40-59: 2, 20-39: 8, 0-19: 0 |
 | 128 | Mynsk | 5 | 3,561 | 80+: 0, 60-79: 1, 40-59: 4, 20-39: 6, 0-19: 1 |
+
+## Player Core-12 Sum Distribution
+
+Per-player value = sum of SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT.
+Population: **1,536** players.
+
+### Summary statistics
+
+| Measure | Value | Notes |
+|---------|------:|-------|
+| Mean (average) | 459.86 | |
+| Median | 455.5 | 50th percentile |
+| Std dev (σ) | 193.69 | **From the mean**, not the median |
+| MAD | 128.50 | Median absolute deviation — spread around the median |
+| Min | 24 | |
+| Max | 1,034 | |
+| Q1 (25th percentile) | 323.5 | |
+| Q3 (75th percentile) | 581.8 | |
+| IQR (Q3 − Q1) | 258.2 | Middle 50% spread |
+| Total (all players) | 706,346 | Sum of all 1,536 per-player totals |
+
+**Note:** Standard deviation (σ) measures typical distance from the **mean**. For spread around the **median**, use MAD or the quintile ranges below.
+
+### Quintile ranges (equal player counts, ~20% each)
+
+Players sorted by per-player core-12 sum (low → high), split into five groups.
+
+| Band | Players | Lowest in band | Highest in band | Average in band |
+|------|--------:|---------------:|----------------:|----------------:|
+| Top 20% (81–100 percentile) | 308 | 617 | 1,034 | 741.9 |
+| 61–80 percentile | 307 | 498 | 616 | 552.8 |
+| 41–60 percentile | 307 | 412 | 497 | 454.9 |
+| 21–40 percentile | 307 | 290 | 412 | 353.3 |
+| Bottom 20% (1–20 percentile) | 307 | 24 | 289 | 195.6 |
