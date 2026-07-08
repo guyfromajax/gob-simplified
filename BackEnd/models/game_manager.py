@@ -1512,6 +1512,10 @@ class GameManager:
             and result.get("rebound_type") == "DREB"
             and (
                 result.get("next_play_type") in ("HCO", "FAST_BREAK")
+                or (
+                    is_ft_final_miss_dreb
+                    and result.get("next_play_type") == "DREB"
+                )
                 or result.get("terminal_dreb_eoq")
                 or result.get("flss_after_dreb")
             )
@@ -1535,6 +1539,13 @@ class GameManager:
                 # MISS turn now leads to DREB; DREB carries forward the
                 # original next_play_type (HCO or FAST_BREAK), unless terminal EOQ.
                 original_next = result["next_play_type"]
+                if original_next == "DREB":
+                    # Final-FT EOQ routing rewrites the FT row to DREB so the
+                    # discrete DREB turn can exist. The actual post-DREB route
+                    # remains in offensive_state from resolve_free_throw_logic.
+                    original_next = self.game_state.get("offensive_state", "HCO")
+                    if original_next not in ("HCO", "FAST_BREAK", "HCT", "FCP"):
+                        original_next = "HCO"
                 result["next_play_type"] = "DREB"
                 result["next_turn"] = "DREB"
                 if dreb_turn.get("result_type") != "FOUL":

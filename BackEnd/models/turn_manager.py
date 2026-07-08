@@ -581,6 +581,7 @@ class TurnManager:
         )
         from BackEnd.utils.quick_foul import build_quick_foul_animation_steps
         from BackEnd.utils.animation_step_helpers import build_foul_announcement
+        from BackEnd.utils import situational_logic as sl
         from BackEnd.constants import QUICK_FOUL_TIME_ELAPSED_FLOOR
 
         game = self.game

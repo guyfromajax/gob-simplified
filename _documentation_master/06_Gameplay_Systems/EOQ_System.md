@@ -140,7 +140,7 @@ flowchart TD
 
 **Do not** call `activate_late_clock_eoq_chain()` on every OREB. Early-quarter OREBs (e.g. at 5:00) used to permanently block Final Shot because the gate requires `not late_clock_eoq_chain_active`. OREB routing still sets `pending_oreb` for putbacks; chain activation is gated in `apply_post_miss_rebound_routing()`.
 
-**Do not** start the chain on the last FT of a trip (`apply_eoq_final_free_throw_routing`). That path tags `late_clock_ft_resolution` on the turn for BIP runoff only. Terminal DREB / post-DREB FLSS on FT miss applies **only when the chain was already active** (e.g. shooting foul during Final Shot). Otherwise FT miss → OREB/DREB → next HCO entry can still arm the **first** Final Shot.
+**Do not** start the chain on the last FT of a trip (`apply_eoq_final_free_throw_routing`). That path tags `late_clock_ft_resolution` on the turn for BIP runoff only. Terminal DREB / post-DREB FLSS on FT miss applies **only when the chain was already active** (e.g. shooting foul during Final Shot). Otherwise FT miss → OREB/DREB → next HCO entry can still arm the **first** Final Shot. When late-clock FT routing rewrites a final missed FT to `next_play_type="DREB"`, `game_manager` still promotes it into a discrete `DREB` row; the DREB row routes to the post-rebound state already stored in `game_state["offensive_state"]` (`HCO` or `FAST_BREAK`).
 
 ---
 
