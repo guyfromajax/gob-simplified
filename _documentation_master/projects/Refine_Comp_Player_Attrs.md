@@ -99,7 +99,7 @@ Weighted random via `random.choices`:
 | **Driver** | SC, AG | — | SH, ID, OD, PS, BH, RB, ST, ND, IQ, FT |
 | **Outside C** | ST, SH | — | SC, ID, OD, PS, BH, RB, AG, ND, IQ, FT |
 | **Three & D** | SH | ID, OD | SC, PS, BH, RB, AG, ST, ND, IQ, FT |
-| **Athletic Shooter** | SH, AG | -- | OD, SC, ID, PS, BH, RB, AG, ST, ND, IQ, FT |
+| **Athletic Shooter** | SH, AG | -- | OD, SC, ID, PS, BH, RB, ST, ND, IQ, FT |
 | **Inside Scorer** | SC, ST | RB, ID | SH, OD, PS, BH, AG, ND, IQ, FT |
 | **Outlet Passer** | PS, ST | RB, ID | SH, OD, SC, BH, AG, ND, IQ, FT |
 | **Scoring PF** | RB, SC | ST | SH, ID, OD, PS, BH, AG, ND, IQ, FT |
@@ -116,31 +116,6 @@ In `generate_recruits_list()` — **not used for comp rewrites**:
 2. `_roll_recruit_character()` sets `CH` (Intangibles floor by year, others 1–100).
 3. `Player.randomize_game_attributes(..., preserve_character=True)` sets `NG`, `MO`, `EM`; preserves `CH`.
 4. `compute_position_ratings(recruit, profile="recruit")` derives PG/SG/SF/PF/C.
-
-### Quick archetype identity guide
-
-| Archetype | Player identity |
-|-----------|-----------------|
-| Five-Star | Elite across the board |
-| Four-Star | Well-rounded, no standout tier |
-| Defensive Wizard | Perimeter + interior D, athletic secondary |
-| All-Around Scorer | SH/SC focused, athletic secondary |
-| Classic PG | Ball handler / passer |
-| Classic SG | Shooter with perimeter D secondary |
-| Classic SF | Scorer + perimeter D, agile secondary |
-| Classic PF | Rebounder, strength secondary |
-| Classic C | Interior D + strength, rebound/score secondary |
-| Pure Shooter | SH + FT specialist |
-| Intangibles | IQ, durability; elevated CH floor by year (up to 100) |
-| Athlete | Agility, strength, durability |
-| Inside Defender | Big interior stopper |
-| Outside Defender | Perimeter lockdown |
-| Average | Generic middling profile |
-| Below Average | Weak across the board |
-| Outside Dual Threat | Shooter + athlete |
-| Driver | Slasher / finisher |
-| Outside C | Stretch big (ST + SH) |
-| Three & D | Shooter with D secondary |
 
 ---
 
@@ -163,11 +138,11 @@ Goal: reshape **conferences 2–16** players so attrs reflect a **basketball arc
 
 | Band | Avg total | Avg ÷ 12 | Low | High |
 |------|----------:|---------:|----:|-----:|
-| Top 20% (81–100) | 741.9 | 61.8 | 617 | 1,034 |
-| 61–80 | 552.8 | 46.1 | 498 | 616 |
-| 41–60 | 454.9 | 37.9 | 412 | 497 |
-| 21–40 | 353.3 | 29.4 | 290 | 412 |
-| Bottom 20% (1–20) | 195.6 | 16.3 | 24 | 289 |
+| Tier 1: Top 20% (81–100) | 741.9 | 61.8 | 617 | 1,034 |
+| Tier 2: 61–80 | 552.8 | 46.1 | 498 | 616 |
+| Tier 3: 41–60 | 454.9 | 37.9 | 412 | 497 |
+| Tier 4: 21–40 | 353.3 | 29.4 | 290 | 412 |
+| Tier 5: Bottom 20% (1–20) | 195.6 | 16.3 | 24 | 289 |
 
 Population reference: mean total **459.9**, median **455.5** (~**38.3** per attr if flat).
 
@@ -182,21 +157,13 @@ hi = band_high_total / 12        # ceiling implied by band
 
 STRONG:     [round(μ × 1.05), min(100, round(hi × 1.05))]
 SECONDARY:  [round(μ × 0.85),  min(100, round(μ × 1.25))]
-STANDARD:   [max(1, round(lo × 0.75)), round(μ × 1.05)]
-WEAK:       [1, max(1, round(lo × 0.85))]
+STANDARD:   [1, round(μ × 1.05)]       # floor always 1 — only Below Average uses WEAK
+WEAK:       [1, max(1, round(lo × 0.85))]   # Below Average archetype only
 ```
 
-**Computed tier table (after clamp):**
+**Authoritative tier table:** see **4-Step Process → Step 3a** (per-band STRONG / SECONDARY / STANDARD / WEAK ranges).
 
-| Band | STRONG | SECONDARY | STANDARD | WEAK |
-|------|--------|-----------|----------|------|
-| Top 20% | 65–90 | 53–77 | 39–65 | 1–44 |
-| 61–80 | 48–54 | 39–58 | 31–48 | 1–35 |
-| 41–60 | 40–43 | 32–47 | 26–40 | 1–29 |
-| 21–40 | 31–36 | 25–37 | 18–31 | 1–21 |
-| Bottom 20% | 17–25 | 14–20 | 2–17 | 1–2 |
-
-Ranges are intentionally tight for mid bands — they are **roll hints**, not caps. Reconciliation pushes strong attrs toward 100 when `target_sum` requires it.
+Ranges are **roll hints**, not caps. Reconciliation pushes attrs toward `target_sum` when rolls miss (including toward 100 when needed).
 
 > **Why band not year:** Year tiers assume development over time. Comp rewrites already have a talent level baked into `target_sum`. Band encodes that talent level using observed roster data.
 
@@ -209,7 +176,7 @@ Archetype pool for comp rewrites: **all existing recruit archetypes** (Five-Star
 **Example — Classic PG, 41–60 band, `target_sum` = 470:**
 - BH, PS → STRONG (40–43)
 - OD, IQ → SECONDARY (32–47)
-- Everything else → STANDARD (26–40)
+- Everything else → STANDARD (1–40)
 
 Sum the 12 rolls → `draft_sum`.
 
@@ -301,3 +268,153 @@ for player in conf_2_16_players:
 ## Brief (TBD)
 
 Team-level refinement targets (RT distribution, superstar counts, etc.) — to be added after archetype assignment + new archetype defs land.
+
+## 4-Step Process
+
+**Step 1: Get player sum total**
+- Sum SC…FT → lock as `target_sum`.
+- Assign quintile **band** from population rank of that total (see band table above).
+
+**Step 2: Assign archetype**
+- Your assignment logic picks archetype (existing + new).
+- No randomness in this step — wildcard is rolled in Step 3 only.
+
+**Step 3: Roll attribute values**
+
+**3a — Core roll (every player)**
+- Look up **band tier ranges** below for the player's band.
+- For each of the 12 attrs, `randint(lo, hi)` from the tier its archetype slot uses (STRONG / SECONDARY / STANDARD / WEAK).
+- Sum rolls → `draft_sum`.
+
+**Per-band roll ranges (STRONG / SECONDARY / STANDARD / WEAK)**
+
+Derived from quintile stats in `Player_Attr_Analysis.md`, manually calibrated. Each cell is `randint(lo, hi)` inclusive.
+
+| Band | STRONG | SECONDARY | STANDARD | WEAK |
+|------|--------|-----------|----------|------|
+| Top 20% (81–100) | 65–90 | 45–79 | 1–65 | 1–44 |
+| 61–80 | 45–70 | 35–55 | 1–45 | 1–35 |
+| 41–60 | 40–60 | 32–47 | 1–40 | 1–29 |
+| 21–40 | 31–50 | 25–37 | 1–31 | 1–21 |
+| Bottom 20% (1–20) | 20–40 | 14–30 | 1–17 | 1–2 |
+
+*Only **Below Average** uses WEAK (all 12 attrs). **Five-Star** → STRONG all 12. **Four-Star** → SECONDARY all 12. **Average** → STANDARD all 12. STANDARD floor is **1** in every band so filler attrs can roll low while identity attrs stay on STRONG/SECONDARY tiers.*
+
+**3b — Wildcard (~25%, Step 3 only)**
+- `randint(1, 4) == 1` → wildcard in play; else skip.
+- If in play:
+  - Pick **2 standard-tier attrs** at random (never strong or secondary).
+  - Re-roll each from the **band-scaled wildcard range** (wider than STANDARD, capped by band ceiling):
+
+| Band | Wildcard range |
+|------|----------------|
+| Top 20% | 45–90 |
+| 61–80 | 35–70 |
+| 41–60 | 32–60 |
+| 21–40 | 25–50 |
+| Bottom 20% | 14–40 |
+
+- Re-sum → `draft_sum`.
+
+**Step 4: Reconcile to `target_sum`**
+
+- `delta = target_sum - draft_sum`
+- If `delta == 0`, skip to post-steps.
+
+**4a — Split delta across archetype pools (random weights)**
+
+Partition `|delta|` into three random pool budgets that sum to `|delta|`:
+- **Strong pool** (archetype strong attrs)
+- **Secondary pool**
+- **Standard pool**
+
+Random weight draw (then scale to `|delta|`):
+- If **adding** (`delta > 0`): strong 45–70%, secondary 20–35%, standard = remainder.
+- If **removing** (`delta < 0`): standard 45–70%, secondary 20–35%, strong = remainder (protect identity).
+
+**4b — Apply within each pool (+1 / −1 at a time)**
+
+For each pool with a budget > 0:
+- Randomly pick an attr in that pool.
+- Apply +1 (if adding) or −1 (if removing).
+- Respect cap **100** and floor **1**; if blocked, pick another attr in the pool.
+- Repeat until pool budget exhausted.
+
+**4c — Spillover**
+
+If a pool can't absorb its full budget (all attrs capped/floored):
+- Spill remaining to the next pool in priority order:
+  - Adding: strong → secondary → standard
+  - Removing: standard → secondary → strong
+- Same +1/−1 random pick rules until `delta` fully applied.
+
+**Post-steps**
+- `CH = randint(1, 100)`, set `anchor_CH`
+- Recompute `position_ratings` (existing height + new attrs)
+- Write to DB (conf 2–16 teams, `gob-staging.players` only)
+
+
+## Archetype Assingment System
+
+Tier 1:
+- top 1% (14 total players) will be assigned Five-Star Archetype
+- choose 58 other players at random from Tier 1 to be Four-Star Archetype
+- all remaining players go into standard process
+
+Tiers 2 & 3:
+- all players go into standard process
+
+Tier 4:
+- the bottom 6% (bottom 30% of this tier) are assigned Average Archetype
+- all remaining players go into standard process
+
+Tier 5:
+- the top 7% (top 35% of this tier) are assigned Average Archetype
+- all remaining players are assigne below aveage
+
+Standard Process
+- identify the players top RT position from the sister doc in the players_backup collection. If there's a tie, choose one position at random
+- choose one of the archeypes below, at random, based on the percentages defined udner the lead RT position
+
+**PG**
+- Classic PG (50%)
+- All Around Scorer (10%)
+- Intangibles (10%)
+- Outside Defender (15%)
+- Scoring PG (15%)
+
+**SG**
+- Classic SG (40%)
+- Defensive Wizard (5%)
+- All Around Scorer (10%)
+- Pure Shooter (15%)
+- Intangibles (5%)
+- Outside Defender (15%)
+- Outside Dual Threat (10%)
+
+**SF**
+- Classic SF (30%)
+- Defensive Wizard (10%)
+- All Around Scorer (10%)
+- Intangibles (5%)
+- Athlete (10%)
+- Outside Dual Threat (10%)
+- Driver (10%)
+- Three & D (10%)
+- All Around Wing (5%)
+
+**PF**
+- Classic PF (40%)
+- Intangibles (5%)
+- Inside Defender (10%)
+- Three & D (5%)
+- Inside Scorer (10%)
+- Scoring PF (15%)
+- Defensive PF (15%)
+
+**C**
+- Classic C (40%)
+- Inside Defender (20%)
+- Outside C (15%)
+- Inside Scorer (20%)
+- Outlet Passer (5%)
