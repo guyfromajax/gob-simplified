@@ -4782,18 +4782,21 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
 # 4–5 — here those decisions simply advance to the next skeleton step.
 # ─────────────────────────────────────────────────────────────────────────────
 def _dynamic_hco_motion_enabled():
-    """Feature gate. Truthy GOB_DYNAMIC_HCO_MOTION env var enables the dynamic path."""
+    """Dynamic HCO Motion is ON by default — the up-front team-attribute event tables are sunset in
+    favor of the per-step attribute-driven moment walk. Kill switch: set GOB_DYNAMIC_HCO_MOTION to a
+    falsy value (``0``/``false``/``off``) to fall back to the legacy up-front tables."""
     import os
-    return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "").strip().lower() in ("1", "true", "yes", "on")
+    return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _dynamic_hco_setplay_enabled():
-    """Feature gate for Dynamic HCO **Set Plays** (overlay model — separate from motion). Truthy
-    GOB_DYNAMIC_HCO_SETPLAY enables: variant selection stays, but the up-front event tables are
-    skipped in favor of the per-step moment, and the per-step dynamic layer (hot read / defense-
-    forced subtle / freelance) overlays the chosen variant skeleton. See Z-Completed/Dynamic_HCO_SP_Brief.md."""
+    """Dynamic HCO **Set Plays** ON by default (overlay model — separate from motion). Variant
+    selection stays, but the up-front event tables are skipped in favor of the per-step moment, and
+    the per-step dynamic layer (hot read / defense-forced subtle / freelance) overlays the chosen
+    variant skeleton. Kill switch: set GOB_DYNAMIC_HCO_SETPLAY to a falsy value (``0``/``false``/
+    ``off``). See Z-Completed/Dynamic_HCO_SP_Brief.md."""
     import os
-    return os.environ.get("GOB_DYNAMIC_HCO_SETPLAY", "").strip().lower() in ("1", "true", "yes", "on")
+    return os.environ.get("GOB_DYNAMIC_HCO_SETPLAY", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _setplay_recovery_roll(game, rng=None):
