@@ -828,6 +828,19 @@ def _clamp_xy(xy: Dict[str, Any]) -> Dict[str, int]:
     return {"x": int(round(clamped["x"])), "y": int(round(clamped["y"]))}
 
 
+def _hct_reachable_trap_enabled() -> bool:
+    """Reachable terminal trap-close (HCT-Task 7b). OFF by default — set
+    GOB_HCT_REACHABLE_TRAP to a truthy value (1/true/yes/on) to enable. When on,
+    the terminal stopper beat is sized by the SLOWEST converging defender so the
+    trap forms honestly on screen (no fast-snap of far defenders) instead of over
+    a fixed 0.5s. Gates render TIMING only — the end coords are identical and the
+    steal/foul credit is resolved BEFORE this beat, so the flag never changes
+    outcomes (flag-off is byte-identical to today). Per-family kill switch (see
+    Trap_Press_Positioning_Decision.md); FCP has its own gate."""
+    import os
+    return os.environ.get("GOB_HCT_REACHABLE_TRAP", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _converge_xy(bh_xy: Dict[str, Any], is_away_offense: bool) -> Dict[str, int]:
     """A defender's spot when engaging the BH: between BH and the basket."""
     offset = -STEP_2_DEFENDER_X_OFFSET if is_away_offense else STEP_2_DEFENDER_X_OFFSET
@@ -2815,8 +2828,26 @@ def compute_dynamic_hct_turn(
         """D8 — terminal whistle/steal beat: the defense collapses onto the BH
         for a short hold. Mutates ``def_coords`` and appends the segment."""
         stop_snap_off, stop_snap_def = _snap_loop_coords()
+        pre_stop_def = {pos: dict(def_coords[pos]) for pos in POSITIONS}
         _position_defense(bh_xy, def_coords, is_away_offense, play=play)
         secs = 0.5
+        stop_move_arch: Optional[Dict[str, str]] = None
+        if _hct_reachable_trap_enabled():
+            # HCT-Task 7b: size the terminal collapse by the SLOWEST mover so far
+            # defenders don't fast-snap into the trap. End coords are UNCHANGED
+            # (still the full trap _position_defense set); only the beat DURATION
+            # grows and per-defender rates are carried for the emitter. This runs
+            # AFTER the moment is credited, so it never changes outcomes.
+            stop_move_arch = {}
+            for pos in POSITIONS:
+                arch = _defender_move_archetype(pos, set())
+                stop_move_arch[pos] = arch
+                secs = max(
+                    secs,
+                    calc_ag_segment_seconds(
+                        pre_stop_def[pos], def_coords[pos], def_lineup.get(pos), archetype=arch
+                    ),
+                )
         _append_loop_segment(
             reason,
             secs,
@@ -2825,6 +2856,7 @@ def compute_dynamic_hct_turn(
             label or reason,
             snap_off=stop_snap_off,
             snap_def=stop_snap_def,
+            move_archetype=stop_move_arch,
         )
         return secs
 
