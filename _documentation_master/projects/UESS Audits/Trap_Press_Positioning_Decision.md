@@ -51,5 +51,14 @@ This is **not** a balance change and **not** "render faster for looks" — it's 
 
 ## Remaining (not a fork — just confirmations)
 - [x] **Over-and-back (`_advance` BH-advance rate) — implemented in code (2026-07-06);** see Scope + top note. Defender-collapse half below still open.
-- [ ] Confirm the *real-speed* trap/press close (slightly slower than the current instant-snap) is acceptable — it's the correct physics, but it's a visible timing change.
+- [x] Confirm the *real-speed* trap/press close (slightly slower than the current instant-snap) is acceptable — **user approved 2026-07-07/08**, conditioned on a documented revert (below): it's correct physics but a visible timing change, so ship it behind a kill switch and be ready to flip HCT back if the feel is wrong.
 - [ ] Sequencing: bundle HCT-Task 7 + FCP-Task 3 (**defender collapse/converge** only — over-and-back done) into one coordinated pass (shared `_position_defense` / beat-sizing), verified in prototype.
+
+## Rollback plan (revert the HCT/FCP trap-close feel if disliked) — build this in from the start
+Ship the fix behind a kill switch from day one, mirroring the `GOB_DYNAMIC_HCO_*` pattern (env gate) the HCO sunset used. HCT/FCP have **no feature flag today**, so this introduces the first. Design requirements:
+
+- **Per-family flags so HCT reverts INDEPENDENTLY of FCP** (user's explicit ask — revert HCT in particular): e.g. `GOB_HCT_REACHABLE_TRAP` and `GOB_FCP_REACHABLE_PRESS`. Flag OFF → the current instant-snap converge (today's behavior) runs **byte-identical**; ON → the reachable slowest-mover beat + matched engine/emitter rates. So the trap feel can be reverted for HCT alone without touching FCP.
+- **Rollout: default OFF (opt-in).** Unlike the HCO sunset (default-on), this is a *feel*-sensitive animation change the user is unsure about — so nothing changes until the flag is enabled. Turn it on in staging to test; if the trap-close feel is wrong, set `GOB_HCT_REACHABLE_TRAP` off (or remove) → instant revert to the snap. No code change, no redeploy needed if the flag is read at runtime.
+- **Gate POSITION/TIMING only, never the engine decision.** The flag wraps exactly the beat-sizing + the emitter's PF/C-sprint render (the coord/timing). The trap decision itself (who traps, the steal/foul roll) stays OUTSIDE the flag. Consequence: flipping the flag changes the *look/feel* but **not outcomes or stats** — a revert is purely cosmetic-timing, never a gameplay swing. Verify: with the flag OFF, a seeded mock is outcome-identical to today.
+- **Partial dial (like the direction, want it faster):** the "slowness" is the beat duration = slowest-mover travel time. If the close feels right in kind but too slow, shorten it via the converge-rate / beat-size knob rather than fully reverting — the flag is all-or-nothing, the rate constant is a fine dial.
+- **Nuclear:** `git revert` the impl commit(s); the flag makes this unnecessary in practice.
