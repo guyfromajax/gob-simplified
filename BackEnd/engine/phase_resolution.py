@@ -4800,11 +4800,12 @@ def _dynamic_hco_motion_enabled():
 
 
 def _dynamic_hco_defense_enabled():
-    """Dynamic HCO Defense (Dynamic_MM_Brief) — OFF by default (in development). Enable with
-    GOB_DYNAMIC_HCO_DEFENSE set to a truthy value (``1``/``true``/``yes``/``on``). Gates the per-turn
-    defender posture (tight/normal/loose) + the two-gate intercept model."""
+    """Dynamic HCO Defense (Dynamic_MM_Brief) — ON by default. Gates the per-turn defender posture
+    (tight/normal/loose) + the two-gate intercept model. Kill switch: set GOB_DYNAMIC_HCO_DEFENSE to
+    a falsy value (``0``/``false``/``off``) to fall back to legacy defender placement.
+    NOTE: in-development (P1 = man-defense posture placement only); enabled in prod per owner request."""
     import os
-    return os.environ.get("GOB_DYNAMIC_HCO_DEFENSE", "0").strip().lower() in ("1", "true", "yes", "on")
+    return os.environ.get("GOB_DYNAMIC_HCO_DEFENSE", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
 # Interim posture pick — a team-wide loose/normal/tight per turn (Dynamic_MM_Brief §5A). Later
