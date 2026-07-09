@@ -65,11 +65,14 @@ FRAMES = {
               "sides, normal neck.",
     "Normal": "Build: an average high-school athlete — medium shoulders about "
               "twice the width of the head, roughly reaching the side edges.",
-    "Broad":  "Build: a broad-shouldered basketball forward — wide shoulders "
-              "clearly wider than the head that reach or slightly pass the side "
-              "edges, giving a noticeably bigger upper body than an average "
-              "player. Lean, athletic muscle ONLY — not heavily muscled, not "
-              "bulky, no bodybuilder mass or huge traps. Broad but lean.",
+    "Broad":  "Build: a big-FRAMED basketball forward — broad shoulders about "
+              "two and a half times the width of the head, extending all the "
+              "way out to the left and right edges of the frame, giving a "
+              "clearly wider, bigger upper body than an average player. The "
+              "width comes from SKELETAL frame and wide shoulder bones, NOT from "
+              "muscle: keep the muscle tone normal and average (NOT cut, NOT "
+              "defined, NOT bulky, no bodybuilder mass). Wide-framed but not "
+              "muscular.",
     "Doughy": "Build: a chubby basketball player carrying noticeable extra "
               "weight — a soft, round, fuller face, a thicker soft neck, and a "
               "fuller heavier torso with rounded soft shoulders. Clearly heavier "
