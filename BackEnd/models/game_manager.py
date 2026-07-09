@@ -296,6 +296,49 @@ class GameManager:
             team.strategy_calls["aggression_roll"] = roll
             logging.info(f"🎲 [AGGRESSION ROLL] {team.name}: slider={slider} → aggression_roll={roll}")
 
+    def _user_timeout_eligible(self, calling_team):
+        """Backend mirror of the FE ``checkTimeoutEligibility`` rule (TO-Task 1,
+        UESS §1 — the one genuine FE-owns-a-game-rule violation from the audit).
+
+        A USER timeout is eligible only:
+          1. on an inbound turn (``SIDE_INBOUND`` / ``BASELINE_INBOUND``), either
+             team; or
+          2. on an ``HCO`` turn immediately following the calling team's OWN
+             defensive rebound (prev turn = ``MISS`` + ``rebound_type=="DREB"`` +
+             ``next_play_type=="HCO"``) with the calling team on offense.
+        The ``MISS``/``BLOCK`` + DREB turn itself is NOT eligible (wait for the HCO).
+
+        Returns ``(eligible: bool, reason: str)``. Read-only. Evaluated against the
+        backend's own turn history (``self.turns[-1]`` = current, ``[-2]`` = prev) —
+        the same dicts the FE sees as ``turnData`` / ``previousTurnData``. Used by
+        the SOFT MIRROR in ``call_timeout`` (logs a violation, does not yet reject).
+        """
+        turns = getattr(self, "turns", None) or []
+        current = turns[-1] if turns else None
+        if not current:
+            return False, "no current turn"
+        ct = current.get("current_turn") or current.get("result_type")
+        # 1) Inbound turns are always eligible (either team).
+        if ct in ("SIDE_INBOUND", "BASELINE_INBOUND"):
+            return True, "inbound"
+        # 2) The MISS/BLOCK + DREB turn itself is NOT eligible (wait for the HCO).
+        if current.get("result_type") in ("MISS", "BLOCK") and current.get("rebound_type") == "DREB":
+            return False, "DREB turn itself (wait for HCO)"
+        # 3) HCO right after the calling team's own DREB, calling team on offense.
+        if ct == "HCO" or current.get("result_type") == "HCO":
+            prev = turns[-2] if len(turns) >= 2 else None
+            if (
+                prev
+                and prev.get("result_type") == "MISS"
+                and prev.get("rebound_type") == "DREB"
+                and prev.get("next_play_type") == "HCO"
+            ):
+                off_id = current.get("offense_team_id") or current.get("possession_team_id")
+                call_id = getattr(calling_team, "team_id", None)
+                if off_id is not None and call_id is not None and str(off_id) == str(call_id):
+                    return True, "HCO-after-own-DREB"
+        return False, "not an eligible turn type"
+
     def call_timeout(
         self,
         calling_team,
@@ -330,7 +373,24 @@ class GameManager:
             if not self.turn_manager.can_call_timeout(calling_team):
                 logging.warning(f"⏸️ TIMEOUT: {calling_team.name} cannot call timeout (no timeouts remaining)")
                 return None
-        
+
+        # TO-Task 1 (UESS §1): the timeout-eligibility rule historically lived ONLY
+        # in the FE (checkTimeoutEligibility). Mirror it backend-side so the rule is
+        # backend-authoritative. SOFT MIRROR for now — compute the rule and LOG when a
+        # USER timeout arrives for a turn the backend rule says is ineligible, but
+        # still ALLOW it (no reject), because the FE and backend can briefly disagree
+        # on the current turn (see the timeout-skew guard in api.py). Flip to a hard
+        # reject (return None) once these logs confirm the two layers always agree.
+        if timeout_reason == "USER":
+            _eligible, _why = self._user_timeout_eligible(calling_team)
+            if not _eligible:
+                logging.warning(
+                    "🟠 [TIMEOUT ELIGIBILITY] USER timeout by %s ALLOWED but backend rule says "
+                    "INELIGIBLE (%s) — soft-mirror (TO-Task 1); calibrate FE/backend turn "
+                    "agreement before hard-enforcing.",
+                    getattr(calling_team, "name", "?"), _why,
+                )
+
         # Create timeout turn
         timeout_turn = self.turn_manager.setup_timeout_turn(
             timeout_reason=timeout_reason,
