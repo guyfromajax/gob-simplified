@@ -129,3 +129,39 @@ End-of-game diagnostics: grep **`END-OF-GAME SHOT DIAGNOSTICS`** (`shot_split_tr
 2. ~~**Over-and-back** (`_advance`)~~ — **✅ already fixed in code** (2026-07-06 trace): emitter renders BH advance at AG-drive rate (`dynamic_hct_step_emitter.py:279-287`) matching engine `_advance`. Only re-open if it's still reported live (then chase seam-drift: emitter start `prev_end_coords[bh]` vs logic `bh_xy`).
 3. **← NEXT: HCT/FCP trap/press** (`Trap_Press_Positioning_Decision.md`) — the last position-authority gap. Engine snaps all 5 defenders to the full trap; render interrupts them → steal/foul fires from a defender not visibly on the ball (a *teleport*, not a `player.coords` read — the guard can't see it). Fix (§6 #4, design settled): size the collapse/converge beat by the **slowest mover** so the trap is reachable, matched engine/emitter rates → `end.coords` == logic == render. **STATUS: HCT-Task 7b DONE + STANDARD (2026-07-08).** The trace found the CONVERGE was already reachability-fixed; only the TERMINAL stopper snapped. Fix shipped behind `GOB_HCT_REACHABLE_TRAP` (b662aa2a5), then the flag was **removed and the reachable terminal stopper made unconditional** (user: "it's what we need to do anyway"). NOTE — corrected framing: this is **not** cosmetic; the honest longer close consumes real game clock → an **aggregate-neutral** reshuffle (measured: steals 0%, turns +0.1%, points −3.2% noise, unbiased — same as the FB RNG reorder), credit unchanged. Still **prototype-verify the feel** (not sim-checkable); revert is now a `git revert`. **FCP-Task 3 (press): SNAP GOAL DONE, no code (traced 2026-07-08).** FCP delegates to the shared `dynamic_hct` loop, so its terminal stopper shares `_emit_stopper` (already reachable via 7b) and its engagement beat is already interrupt-based — no snap remains. **The ONLY remaining position-authority item is HCT/FCP-Task 7a** — sizing the SHARED `hct_converge` beat by the slowest mover (→ fuller traps AND presses + slower close), a real BALANCE change, deferred; higher-impact for FCP (`skip_walk_up`). Note: the HCT moment engine is shared by the now-default Dynamic HCO system, so this work is adjacent.
 4. Consider the **shared position-service** refactor (decision #2) once 1-3 confirm the pattern. (FB proved the *emit-then-resolve* variant of this; #2 is the universal "one position service the emitter + all logic read" version.)
+
+## 11. Session log — 2026-07-07/08 workstream (what shipped)
+
+The workstream that carried this capstone from "FB is the next item" to "compliance objective met." Commits are on `develop` unless noted. **The core goal — no game decision reads a coordinate the frontend never rendered — is now MET** across FB, HCT/FCP stopper, shot classification/contest, CR block, and over-and-back.
+
+- **FB coord-source sweep (emit-then-resolve).** Every FB drive decision now seeds from the emitter's rendered `end.coords`: RR/Triangle drive-start (`7488ab5c4`), Covert Release drive-start (`f472f37d1`), After-Steal drive-start (`8e35d1160`), NEUTRAL kick-out receiver ×3 (`147c16bc0`), After-Steal pass-ahead (`513a98dda`), render-authoring/fallback annotations (`e1bfaaf26`), triangle-three contest (`206f5ade6`). **Coord-source guard driven 20→0.**
+- **Guard widened to a CI ratchet** over ALL engine decision modules (not just FB) + now catches direct `.coords` reads (`8d21badc6`). Discovery: the stale-`player.coords` drift is FB-specific; other turns run `apply_coords` and were already clean.
+- **Dynamic HCO made the default** (legacy team-attribute steal/foul/turnover tables sunset). The "sunset" had been built but env-gated OFF in prod; flipped both gates default-ON with a kill switch (`3580b3d34`). Verified aggregate-neutral + no crash.
+- **HCT-Task 7b — reachable terminal trap-close.** Shipped behind `GOB_HCT_REACHABLE_TRAP` (`b662aa2a5`), then flag removed and made unconditional (`68e3ae9dc`). Aggregate-neutral game-clock reshuffle; feel is prototype-only.
+- **FCP-Task 3 — traced, snap goal already met** (FCP shares `dynamic_hct._emit_stopper` + interrupt-based engagement). No code (`948d1f4ba`, doc only).
+- **Timeout eligibility → backend (TO-Task 1), soft mirror.** `GameManager._user_timeout_eligible` mirrors the FE rule; `call_timeout` logs `🟠 [TIMEOUT ELIGIBILITY]` on violation but still allows (`161647c38`).
+- **Opening Tip dead clock stamp** — already fixed by the user (`dee119861`, 2026-07-05); audit row marked done (`43427c0b9`).
+
+## 12. Remaining / To-Do (for a future thread) — none are open compliance bugs
+
+**A. Follow-ups on shipped work (verify / finish):**
+1. **Timeout hard-reject** — flip the soft `🟠 [TIMEOUT ELIGIBILITY]` log in `GameManager.call_timeout` to a hard `return None` once real-play logs confirm the FE and backend never disagree on a *valid* timeout. (Deferred deliberately to avoid false-rejecting on FE/backend turn skew.)
+2. **HCT reachable trap-close — prototype feel-check.** Not sim-verifiable. Watch a trap resolve: defenders should slide onto the ball smoothly (no teleport); the slightly-slower close is expected/correct. Revert if wrong = `git revert 68e3ae9dc b662aa2a5`.
+3. **Dynamic HCO (now default) — verify in staging/live** over a larger sample: aggregate neutrality + feel for motion AND set plays. Kill switch: `GOB_DYNAMIC_HCO_MOTION` / `GOB_DYNAMIC_HCO_SETPLAY = 0`.
+4. **Over-and-back — opportunistic watch.** Confirm the 10-second / over-and-back / frontcourt-established call fires exactly as the ball is *shown* crossing half-court. Rate is aligned in code; the only residual is a small seam-drift (emitter start `prev_end_coords[bh]` vs logic `bh_xy`). Low priority; user called it verified.
+
+**B. Deferred balance lever (a design choice, NOT a compliance bug):**
+5. **HCT/FCP-Task 7a — converge beat-sizing.** Size the SHARED `hct_converge` beat (`dynamic_hct.py:2486`, currently PG-sized) by the slowest mover → traps AND presses fully form + a slower close → **more trap/press-grade pressure (a balance shift)**. Higher-impact for FCP (`skip_walk_up` → whole-court converge leaves far defenders short so the press under-forms). Gate by `turn_mode` if you want FCP-only. Decide with turnover-rate data, not blind. (`Trap_Press_Positioning_Decision.md`)
+
+**C. Optional polish / refactor (nice-to-have, not needed):**
+6. **Shot classification/contest ~2% residual.** The shipped pre-pass (A) is ~98% accurate; option (B) "pin the coord into the emitter" gives 0% residual but touches the shared render path — deferred as higher-risk. (`Shot_Classification_UESS_Fix_Scope.md`)
+7. **Shared "position service" refactor** (§10 #4 / §6 #2). One helper the emitter + all logic call for "player positions at step N," eliminating re-derivation everywhere. Big refactor; the coord-source guard already prevents regressions cheaply, so this is aspirational.
+
+**D. Accepted gaps (documented, not really open):**
+8. **Opening Tip + Timeout are UNMIGRATED** — the only turns emitting no UESS schema `animation_steps`; explicitly `uess_ownership_contract applicable:false`. Inherently non-animated / legacy-rendered dead-ball events; excluded from UESS by design.
+
+**E. Latent cleanup (from the FB work):**
+9. **No-retreat clamp** (`after_steal_transition_positioning._no_retreat_end`) — still load-bearing (~85% fire). It patches `def_start_coords` inside `author_defense_end_coords` (the After-Steal END-authoring seed), a distinct path from the drive-start seeds the FB sweep fixed. Removable only when After-Steal END-authoring is migrated to rendered-consistent seeds. Not urgent.
+
+**Adjacent (surfaced this workstream, NOT Emitter-as-God):**
+- **HCO steals aren't proximity-gated** — the dynamic HCO moment is attribute-driven and credits the man-matchup / zone defender, not "who's nearest the ball." A *design* decision if you ever want distance-gated steals; not a bug.
