@@ -83,15 +83,21 @@ DEFINITION_PROMPT = {
     "Soft":  "soft and undefined, carrying some extra body fat, fuller face",
 }
 
-# Expression pool (weighted; neutral/friendly common, intense rare). Picked
-# deterministically per player from their UUID -> stable across runs, natural mix.
+# Expression pool (weighted; neutral/friendly common, extremes rare). Distilled
+# from a 29-face Conf1 reference set — 10 distinct expressions from a big
+# beaming grin all the way to a menacing glare. Picked deterministically per
+# player from their UUID -> stable across runs, natural roster-wide mix.
 EXPRESSIONS = [
-    ("calm neutral expression", 3),
-    ("warm friendly smile", 3),
-    ("confident slight smirk", 2),
-    ("serious stoic expression", 2),
-    ("relaxed easygoing look", 1),
-    ("intense focused game-face", 1),
+    ("a calm neutral expression, relaxed", 4),
+    ("a warm friendly smile, slight teeth, relaxed eyes", 3),
+    ("a subtle pleasant closed-mouth smile", 3),
+    ("a cheerful open smile with teeth, bright happy eyes", 2),
+    ("a confident one-sided smirk, self-assured", 2),
+    ("a composed stoic expression, mouth closed, no smile", 2),
+    ("a big beaming open-mouth grin, teeth showing, joyful", 1),
+    ("a stern hard expression, slight scowl, intense", 1),
+    ("an intense focused game-face, locked-in wide eyes", 1),
+    ("a menacing hostile glare, furrowed brow, cold hard stare", 1),
 ]
 _EXPR_POOL = [phrase for phrase, w in EXPRESSIONS for _ in range(w)]
 
