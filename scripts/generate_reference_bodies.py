@@ -65,16 +65,16 @@ FRAMES = {
               "sides, normal neck.",
     "Normal": "Build: an average high-school athlete — medium shoulders about "
               "twice the width of the head, roughly reaching the side edges.",
-    "Broad":  "Build: a solidly-built basketball player with broad shoulders "
-              "noticeably wider than the head — a strong wing/forward frame that "
-              "reaches or slightly passes the side edges. Lean athletic muscle, "
-              "NOT a bodybuilder and NOT bulky or heavily-muscled; a normal "
-              "athletic neck. Broader than average, but still clearly a "
-              "basketball player, not a weightlifter.",
-    "Doughy": "Build: slightly heavyset and soft — carrying some extra weight "
-              "with a fuller, rounder face, a softer neck and a fuller torso, "
-              "but still an athletic high-school basketball player (NOT obese, "
-              "NOT very fat); rounded sloping shoulders of about average width.",
+    "Broad":  "Build: a broad-shouldered basketball forward — wide shoulders "
+              "clearly wider than the head that reach or slightly pass the side "
+              "edges, giving a noticeably bigger upper body than an average "
+              "player. Lean, athletic muscle ONLY — not heavily muscled, not "
+              "bulky, no bodybuilder mass or huge traps. Broad but lean.",
+    "Doughy": "Build: a chubby basketball player carrying noticeable extra "
+              "weight — a soft, round, fuller face, a thicker soft neck, and a "
+              "fuller heavier torso with rounded soft shoulders. Clearly heavier "
+              "and softer than the other players, but still a mobile athlete, "
+              "NOT morbidly obese.",
 }
 
 
@@ -90,6 +90,9 @@ def load_env(path=".env"):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="generate just one frame (e.g. Broad)")
+    ap.add_argument("--variants", type=int, default=1,
+                    help="generate N candidates per frame as <Frame>_1.png.. "
+                         "(NB is random; pick the best, copy it to <Frame>.png)")
     ap.add_argument("--anchor", default=ANCHOR)
     ap.add_argument("--out", default="tmp/portrait-pilot/reference_bodies")
     ap.add_argument("--print-prompts", action="store_true",
@@ -125,26 +128,32 @@ def main():
     os.makedirs(args.out, exist_ok=True)
 
     ok = 0
-    for name, frame in frames.items():
+    jobs = [(name, frame, i) for name, frame in frames.items()
+            for i in range(1, args.variants + 1)]
+    for name, frame, i in jobs:
         prompt = BASE.format(frame=frame)
+        label = name if args.variants == 1 else f"{name}_{i}"
         try:
             resp = client.models.generate_content(
                 model=MODEL, contents=[prompt, anchor_img])
             saved = False
             for part in resp.candidates[0].content.parts:
                 if getattr(part, "inline_data", None) and part.inline_data.data:
-                    out = os.path.join(args.out, f"{name}.png")
+                    out = os.path.join(args.out, f"{label}.png")
                     with open(out, "wb") as fh:
                         fh.write(part.inline_data.data)
-                    print(f"[ok] {name} -> {out}")
+                    print(f"[ok] {label} -> {out}")
                     saved = True
                     ok += 1
                     break
             if not saved:
-                print(f"[fail] {name}: no image in response")
+                print(f"[fail] {label}: no image in response")
         except Exception as e:
-            print(f"[fail] {name}: {type(e).__name__}: {str(e)[:200]}")
-    print(f"\n[done] {ok}/{len(frames)} reference bodies -> {args.out}")
+            print(f"[fail] {label}: {type(e).__name__}: {str(e)[:200]}")
+    print(f"\n[done] {ok}/{len(jobs)} images -> {args.out}")
+    if args.variants > 1:
+        print("[pick] choose the best of each frame, then copy it to "
+              "<Frame>.png (e.g.  cp Broad_3.png Broad.png)")
 
 
 if __name__ == "__main__":
