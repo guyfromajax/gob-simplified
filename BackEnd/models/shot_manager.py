@@ -735,7 +735,10 @@ class ShotManager:
         # rounded to nearest int. Fallback when shooter coords are unavailable.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
         if is_three:
-            spot_data = self._resolve_shooter_spot_data(shooter, roles)
+            spot_data = shot_classification.get("classification_coord")
+            if not isinstance(spot_data, dict):
+                sx, sy = _shooter_xy_from_roles(roles, shooter)
+                spot_data = {"x": sx, "y": sy}
             if spot_data is not None:
                 rim_x, rim_y = _attacking_basket_xy(off_team, self.game)
                 dist = math.hypot(
