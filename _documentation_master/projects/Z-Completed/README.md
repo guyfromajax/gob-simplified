@@ -34,7 +34,7 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | [Dynamic_HCO_Motion_Implementation_Plan.md](./Dynamic_HCO_Motion_Implementation_Plan.md) | Dynamic HCO motion build plan (phases 1–5 shipped June 2026; see `Dynamic_HCO_System.md`) |
 | [Distant_Sim_Tuning.md](./Distant_Sim_Tuning.md) | Distant sim momentum/record tuning (phases 0–6 shipped July 2026; see `Distant_Game_Sim_System.md`) |
 | [Dynamic_HCO_Motion_Brief.md](./Dynamic_HCO_Motion_Brief.md) | Dynamic HCO motion build brief (shipped, flagged; see `Dynamic_HCO_System.md`) |
-| [Dynamic_HCO_SP_Brief.md](./Dynamic_HCO_SP_Brief.md) | Dynamic HCO set-play build brief (shipped, flagged; see `Dynamic_HCO_SP_System.md`) |
+| [Dynamic_HCO_SP_Brief.md](./Dynamic_HCO_SP_Brief.md) | Dynamic HCO set-play build brief (shipped, flagged; see `Dynamic_HCO_System.md` § Set plays) |
 | [Dynamic_FCP_Brief.md](./Dynamic_FCP_Brief.md) | Dynamic FCP build brief (shipped; see `FCP_System.md`) |
 | [Recruit_Generation_System.md](./Recruit_Generation_System.md) | Obsolete scratch — superseded by `Practice_Squad_System.md` + `Recruiting_System.md` |
 | [Micro_Movements_Brief.md](./Micro_Movements_Brief.md) | Early shot micro-movement wishlist — superseded by `Shot_Micro_Movements_System.md` |

@@ -32,7 +32,7 @@ from BackEnd.constants import (
     BLOCK_FIGHT_RANGE_MAX,
     BLOCK_PLAYER_ROLL_MIN,
     BLOCK_PLAYER_ROLL_MAX,
-    THREE_POINT_SHOT_THRESHOLD_INCREASE,
+    THREE_POINT_SHOT_THRESHOLD_FALLBACK,
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
@@ -718,7 +718,7 @@ class ShotManager:
         
         # ✅ BALANCING SYSTEM: Check for balancing override first
         # Balancing override is set when score difference exceeds threshold based on quarter and team attributes
-        # Trailing team gets -10 (easier shots), leading team gets 230 (harder shots)
+        # Trailing team gets BALANCING_TRAILING (easier shots), leading team gets BALANCING_LEADING (harder shots)
         if "balancing_shot_threshold_override" in game_state:
             shot_threshold = game_state["balancing_shot_threshold_override"]
             # Clear override after use (one-time per turn)
@@ -730,11 +730,21 @@ class ShotManager:
             shot_threshold = off_team.team_attributes["shot_threshold"]
 
         shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
-        
-        # Three-point shots get the base threshold increase (harder than 2s).
-        skip_three_point_threshold = bool(game_state.pop("fast_break_force_threshold_no_three_bonus", False))
-        if is_three and not skip_three_point_threshold:
-            shot_threshold += THREE_POINT_SHOT_THRESHOLD_INCREASE
+
+        # Three-point shots: threshold += Euclidean distance (shooter → attacking rim),
+        # rounded to nearest int. Fallback when shooter coords are unavailable.
+        # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
+        if is_three:
+            spot_data = self._resolve_shooter_spot_data(shooter, roles)
+            if spot_data is not None:
+                rim_x, rim_y = _attacking_basket_xy(off_team, self.game)
+                dist = math.hypot(
+                    float(spot_data["x"]) - rim_x,
+                    float(spot_data["y"]) - rim_y,
+                )
+                shot_threshold += int(round(dist))
+            else:
+                shot_threshold += int(THREE_POINT_SHOT_THRESHOLD_FALLBACK)
         if playcall == "Set":
             playcall = "Attack"
 

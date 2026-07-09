@@ -1,8 +1,12 @@
 ## Dynamic HCO System ✅ **SHIPPING (flagged)** (June 2026)
 
-**Feature gate:** env var `GOB_DYNAMIC_HCO_MOTION` (`1`/`true`/`yes`/`on`) for motion plays; `GOB_DYNAMIC_HCO_SETPLAY` for set plays. Off → legacy HCO path (up-front outcome tables + static skeleton). This doc describes the ON path.
+**Feature gates (independent):**
+- `GOB_DYNAMIC_HCO_MOTION` (`1`/`true`/`yes`/`on`) — motion plays
+- `GOB_DYNAMIC_HCO_SETPLAY` — set plays (overlay on the variant skeleton; see **§ Set plays**)
 
-**Scope:** half-court **offense — motion plays and set plays, man + zone defense**. (Set-play sections are a work in progress; a full sweep across motion/set-play × man/zone is pending.) Build brief (archived): [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — rationale and phase log; this file is authoritative for runtime.
+Off → legacy HCO path (up-front outcome tables + static skeleton). This doc describes the ON path for **both**.
+
+**Scope:** half-court **offense — motion plays and set plays, man + zone defense**. Set plays **reuse motion's machinery**; only the deltas in **§ Set plays** are new. Archived build briefs: [Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md), [Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md). This file is authoritative for runtime.
 
 ---
 
@@ -151,6 +155,65 @@ Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and
 
 ---
 
+### Set plays (overlay)
+
+**Gate:** `GOB_DYNAMIC_HCO_SETPLAY` (independent of motion). Off → legacy set-play path (up-front outcome tables + static variant skeleton).
+
+#### Model: OVERLAY
+
+The up-front **variant roll** (`successful` / `mid_play_change` / `contested` / `broken`) **still** selects the skeleton. The dynamic per-step layer overlays on the chosen variant skeleton. `get_hco_skeleton` runs `_apply_set_play_runtime_position_mapping`, so the variant skeleton arrives **position-keyed** (PG/SG/…) just like motion's `base_loop` — the motion helpers walk it directly, no slot mapping.
+
+**Scope:** half-court offense, set plays, **man + zone** defense.
+
+#### Where it hooks in
+
+```
+resolve_hco_outcome(game, skeleton)              # set_play + flag → skips up-front event tables; variant STILL chosen
+  ↓ result == "SHOT"
+final_skeleton = get_hco_skeleton(variant)       # executed variant skeleton, then deepcopy
+_resolve_hco_moment_walk(final_skeleton, …)      # per-step steal/foul/TO (man+zone); hard outcome → overrides result
+  ↓ result still "SHOT"
+_resolve_setplay_offense_shot_dynamic(…)         # per-step offense walk (shared motion block routing)
+  ↓ result != "SHOT": existing non-shot resolution + apply_stopper_system_to_skeleton
+skeleton_step_emitter.build_skeleton_animation_steps(…)
+```
+
+The moment walk runs **after** the variant skeleton is chosen + deep-copied (so it reads the actual play and reach-in indices align) and **before** the shot-clock block (so a hard outcome correctly pre-empts the would-be shot). Routing reuses the motion roles-update block: the set-play result has the same contract (`roles["shooter"/"motion_shot_type"/"motion_playcall"]` + passer re-derivation + dish-interception finalize).
+
+#### The three differences from motion
+
+| | Motion | Set play |
+|---|---|---|
+| **offense_reads** | rolled per turn from `alterations` | **forced `False`** — offense never proactively subtle-moves; only the defense can force one |
+| **post-forced-subtle** | resume skeleton silently | BH reads shoot / hot-read pass / **hold** → `_setplay_recovery_roll` |
+| **events** | per-step moment (§2) | same per-step moment, replacing the set-play up-front tables |
+
+With `offense_reads=False`, `decide_step_action` only acts under defense pressure (Condition 3, ball-handling battle): defense wins → `_disruption_branch` (subtle / freelance / advance); else advance. The **universal `should_shoot`** hot read still runs every step (not only after a subtle).
+
+**Forced-subtle progression:** defense forces a subtle → `build_subtle_beat` (BH + non-BH reads) → shot-clock-expiry backstop → post-subtle `should_shoot` (shoot **or** hot-read dish). If no shot, the BH holds and rolls recovery:
+
+```
+offense_score = (team_chemistry + offensive_efficiency) × randint(1,6)   # offense team
+defense_score = (team_chemistry + defensive_efficiency) × randint(1,6)   # defense team
+offense_score > defense_score → re-enter skeleton at next defined step (players pop back to spots)
+                         else → forced freelance (_resolve_freelance)
+```
+
+A direct `FREELANCE_FORCED` from the disruption branch (no subtle) goes straight to freelance.
+
+#### Reused from motion (no rebuild)
+
+`should_shoot` + truly-open gate (`_hco_blocked_dish_targets`) + dish interception · `decide_step_action`/`_disruption_branch` · `build_subtle_beat` · `_execute_motion_decision` · `_resolve_freelance` · `_resolve_hco_moment_walk` (man + zone). New code is only `_resolve_setplay_offense_shot_dynamic`, `_setplay_recovery_roll`, the flag gate, and the routing branches.
+
+#### Set-play tests + prototype
+
+- `tests/test_setplay_dynamic_gate.py` — flag gate + recovery-roll formula
+- `tests/test_setplay_dynamic_resolver.py` — walk: offense_reads forced False, universal hot read, forced-subtle → re-enter vs freelance, FREELANCE_FORCED, shot-clock backstop
+- `dynamic_setplay_prototype.py` — seeded Monte-Carlo recovery-roll grid + walk path distribution. Run: `MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_setplay_prototype.py`
+- Unit tests: `MONGO_URI="" MONGO_DB_NAME="gob-test" python3 -m pytest tests/test_setplay_dynamic_*.py -q -o addopts=""`
+
+---
+
 ### 4. Passing lanes & hot-read openness (SPEC — building)
 
 A defender sitting in a passing lane can disrupt an HCO **hot-read dish or kickout** (skeleton motion/reversal passes are NOT contested). Reuses the shared HCT pass model `resolve_pass_contest` (spatial lane gate → skill/anticipation → `complete` / `BAT_OOB` / `INTERCEPT`). **Hybrid** design:
@@ -239,7 +302,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | **Zone contest reweighting** | Deferred — v1 reuses man's D8 steal/dead-ball/charge weights. Zones realistically strip less and force more deflections/help; revisit `HCT_D8_*` weights (or a zone-specific set) + `HCO_ZONE_MOMENT_SCALAR` after live observation. |
 | **Passing lanes & hot-read openness** | ✅ Shipped — needs prototype tuning (see §4). Decision gate ("truly open") + interception contest, **man + zone**, hot-read/kickout dishes only. Gate clears the 0.1–0.9 lane band, so the contest's net-new interceptions are the **receiver's man jumping the entry pass** (t→1.0), gated by passer skill — frequency tunable via `HCO_PASS_LANE_DIST_*` / `PASS_SAFETY_BASE`. Intercept → STEAL (`is_interception`) via `_finalize_hco_pass_interception` (resolve_turnover_logic + stopper). |
 | **FCP pass contests @ 8** | 🔨 Planned (§4 stage 3). FCP has **no** pass-disruption today — needs a pass-beat audit (inbound / press-break / advance) before wiring `resolve_pass_contest` with `FCP_PASS_LANE_DIST = 8.0`. (NB: interceptions seen on "FCP" today are the post-steal **rim-runner fast break** mechanic, labeled `FAST_BREAK`, not FCP.) |
-| **Set-play moments** | Deferred — motion only for now. |
+| **Set-play overlay** | ✅ Shipped — `GOB_DYNAMIC_HCO_SETPLAY`; variant skeleton + motion helpers; recovery roll after forced subtle (see **§ Set plays**). |
 | **True per-step shoot↔moment interleaving** | The moment walk currently runs fully **before** the shot resolver, so a moment pre-empts the would-be shot. True interleaving needs the late shot resolver (after shot-clock truncation). |
 | **Pass interceptions** | HCT's `pass_contest` not yet ported to HCO. |
 | **Reach-in option A** | We ship **B** (every contested step). A (defender-wins-only: terminal + `NEUTRAL`, skip `POS_O` blow-bys) is the documented alternative if B reads too busy. |
@@ -250,7 +313,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 
 | File | Role |
 |---|---|
-| BackEnd/engine/phase_resolution.py | `_dynamic_hco_motion_enabled` (gate), `resolve_hco_outcome` (skip up-front tables), `_resolve_hco_moment_walk` + `_resolve_hco_moment` + `HCO_MOMENT_SCALAR`, `_resolve_motion_offense_shot_dynamic` (offense walk), `_execute_motion_decision`, `_roll_subtle_defender_reads`, reach-in tag application |
+| BackEnd/engine/phase_resolution.py | `_dynamic_hco_motion_enabled` / `_dynamic_hco_setplay_enabled` (gates), `resolve_hco_outcome` (skip up-front tables), `_resolve_hco_moment_walk` + `_resolve_hco_moment` + `HCO_MOMENT_SCALAR`, `_resolve_motion_offense_shot_dynamic` / `_resolve_setplay_offense_shot_dynamic` / `_setplay_recovery_roll`, `_execute_motion_decision`, `_roll_subtle_defender_reads`, reach-in tag application |
 | BackEnd/engine/motion_step_decision.py | `decide_step_action`, `should_shoot`, shoot/read/tempo constants |
 | BackEnd/engine/motion_subtle.py | `build_subtle_beat` + subtle constants |
 | BackEnd/engine/motion_read_map.py | `build_motion_read_map`, `read_flag`, `READ_THRESHOLD` |
@@ -258,19 +321,31 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | BackEnd/engine/skeleton_step_emitter.py | UESS render; `reach_in_def_id` → `reach_in` flourish stamping |
 | BackEnd/models/animator.py | `_subtle_defender_should_freeze` (defender freeze geometry) |
 | FrontEnd/static/js/phaser/animation/flourishes.js | `runReachIn` + steal SFX (FE render) |
-| tests/test_motion_*.py | moment walk, subtle, defender freeze, should_shoot, read map, shot-spot classification |
+| tests/test_motion_*.py | motion: moment walk, subtle, defender freeze, should_shoot, read map |
+| tests/test_setplay_dynamic_*.py | set-play: flag gate, recovery roll, walk |
+| dynamic_hco_prototype.py / dynamic_setplay_prototype.py | Seeded Monte-Carlo prototypes (standalone; no Mongo) |
 
 ---
 
 ### How to test / tune
 
-1. Set `GOB_DYNAMIC_HCO_MOTION=1`. Run man-defense motion possessions.
-2. Watch logs: `🎲 [DYNAMIC MOTION] turn gate ...`, `🔹 ... SUBTLE_MOVEMENT`, `🎯 ... SHOOT ...`, `⚔️ [HCO MOMENT] <TYPE> at step N`.
+1. Set `GOB_DYNAMIC_HCO_MOTION=1` and/or `GOB_DYNAMIC_HCO_SETPLAY=1`. Run man-defense possessions of each type.
+2. Watch logs: `🎲 [DYNAMIC MOTION] turn gate ...`, `🔹 ... SUBTLE_MOVEMENT`, `🎯 ... SHOOT ...`, `⚔️ [HCO MOMENT] <TYPE> at step N` (set-play: recovery re-enter vs freelance after forced subtle).
 3. To see more moments/reach-ins, raise the defense `aggression` setting (engagement) and/or `HCO_MOMENT_SCALAR` (event prob). Revert after.
-4. Unit tests: `MONGO_URI="" MONGO_DB_NAME="gob-test" python3 -m pytest tests/test_motion_*.py -q -o addopts=""`.
+4. Unit tests + prototypes:
+
+```bash
+MONGO_URI="" MONGO_DB_NAME="gob-test" python3 -m pytest \
+  tests/test_motion_*.py tests/test_setplay_dynamic_*.py -q -o addopts=""
+MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_hco_prototype.py
+MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_setplay_prototype.py
+```
 
 ---
 
 ### Related Documentation
-- [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — archived build brief (rationale, phase log, condition matrix)
+- [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — archived motion build brief
+- [projects/Z-Completed/Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md) — archived set-play build brief
+- [ENV_VARIABLES.md](../ENV_VARIABLES.md) — `GOB_DYNAMIC_HCO_MOTION` / `GOB_DYNAMIC_HCO_SETPLAY`
+- [Shot_Micro_Movements_System.md](Shot_Micro_Movements_System.md) — shot-time micros (pump fake, dunk, etc.) — separate from mid-HCO subtle movement
 - [HCO_Turn_Resolution_System.md](HCO_Turn_Resolution_System.md) · [Motion_Offense_Shot_System.md](Motion_Offense_Shot_System.md) · [HCT_System.md](HCT_System.md) · [FCP_System.md](FCP_System.md) · [Stopper_System.md](Stopper_System.md) · [Steal_System.md](Steal_System.md) · [SFX_System.md](../11_Design_Systems/SFX_System.md)

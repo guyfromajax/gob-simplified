@@ -75,15 +75,16 @@
 3. Get Shot Threshold
    - Check for `game_state["balancing_shot_threshold_override"]` (one-time override)
      - Triggered when score difference exceeds threshold based on quarter and team attributes (fight/discipline)
-     - Trailing team: -10 (easier shots)
-     - Leading team: 230 (harder shots)
+     - Trailing team: -20 (easier shots)
+     - Leading team: 180 (harder shots)
      - Base margin trigger tiers before attributes: Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams
      - Trailing trigger subtracts offense fight; leading trigger adds offense discipline; minimum trigger is clamped to 1
    - Otherwise use `off_team.team_attributes["shot_threshold"]`
 
-4. Apply Three-Point Modifier
-   - if is_three: shot_threshold += (40 - (random.randint(1, 5) * momentum))
-     - Higher momentum = easier three-pointers (lower threshold modifier)
+4. Apply Three-Point Modifier (standard `resolve_shot` only; not FLSS CH-vs-1–100 heaves)
+   - if is_three: `shot_threshold += round(Euclidean distance from shooter shot coords → attacking rim)`
+     - Home offense rim: `HOME_RIM_COORDS` (91, 25); away offense rim: `AWAY_RIM_COORDS` (9, 25) — absolute coords, no home-flip
+     - If shooter coords unavailable: `shot_threshold += THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25)
 
 5. Apply Variant Modifier
    - Get variant from `skeleton.get("_variant")`
@@ -226,14 +227,16 @@ Shot resolution uses the following base constants:
 
 #### Step 3: Get Shot Threshold
 - **Balancing Override**: `game_state["balancing_shot_threshold_override"]` (if score diff exceeds quarter-based threshold)
-  - Trailing: -10, Leading: 230
+  - Trailing: -20, Leading: 180
   - Base margin trigger tiers before attributes: Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams
   - Trailing trigger subtracts offense fight; leading trigger adds offense discipline; minimum trigger is clamped to 1
 - **Otherwise**: `off_team.team_attributes["shot_threshold"]`
 
 #### Step 4: Apply Three-Point Modifier
-- If `is_three`: `shot_threshold += (THREE_POINT_SHOT_THRESHOLD_INCREASE - (random.randint(1, 5) * momentum))`, where `THREE_POINT_SHOT_THRESHOLD_INCREASE = 55`
-- Higher momentum = easier three-pointers
+- Scope: standard `resolve_shot()` only. FLSS heaves (CH vs roll 1–100) do not use this path.
+- If `is_three`: `shot_threshold += round(hypot(shooter_x − rim_x, shooter_y − rim_y))` where rim is the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS` by offense side; absolute coords).
+- If shooter shot coords are unavailable: `shot_threshold += THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25).
+- Typical perimeter spots (key / midWing / wing / midCorner / corner) land ~19–27 vs rim (~20–23 common).
 
 #### Step 5: Apply Variant Modifier
 - From `skeleton.get("_variant")`: successful=-50, mid_play_change=0, contested=+25, broken=+100
@@ -319,7 +322,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Motion offense**: Determines `shot_type` during shot resolution (checks possibilities, builds weighted list, selects)
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
-3. **Three-Point Momentum**: Three-point threshold modifier uses momentum: `55 - (random(1-5) * momentum)` (`THREE_POINT_SHOT_THRESHOLD_INCREASE = 55`; higher momentum = easier threes)
+3. **Three-Point Distance Modifier**: On standard `resolve_shot` threes, threshold += rounded Euclidean distance from shooter shot coords to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`). Fallback when coords missing: `THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25). FLSS CH heaves excluded.
 4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)
@@ -327,7 +330,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 8. **Motion Attack Penalty**: Applied when Motion offense attack shot is stopped short of basket (penalty = distance to basket)
 9. **Foul Calibration**: Shooting fouls don't guarantee made shots (40% miss chance on 3pt, 20% on 2pt)
 10. **Player Positioning**: Happens at shot attempt, not outcome (players don't know if shot will be made)
-11. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes. Base trigger tiers are Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams; trailing subtracts offense fight, leading adds offense discipline, and the minimum trigger is clamped to 1. The one-turn shot-threshold overrides are trailing = -10 and leading = 230.
+11. **Balancing Override**: Triggered when score difference exceeds quarter-based thresholds adjusted by team attributes. Base trigger tiers are Q1/Q2 = 6, Q3 = 8, Q4/OT = 10 for both trailing and leading teams; trailing subtracts offense fight, leading adds offense discipline, and the minimum trigger is clamped to 1. The one-turn shot-threshold overrides are trailing = -20 and leading = 180 (`shot_threshold_scale.BALANCING_*`).
 12. **Zone shot-type threshold**: 2-3 and 3-2 zone defenses adjust `shot_threshold` by `shot_type` on HCO and Final Turn shots only (`_hco_zone_shot_threshold_delta` in `shot_manager.py`).
 
 ### Status

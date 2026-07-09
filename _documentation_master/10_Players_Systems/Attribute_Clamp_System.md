@@ -25,8 +25,8 @@ Applies to all trainable player attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, 
 
 | Clamp | Value |
 |-------|--------|
-| **Min** | 10 |
-| **Max** | 210 |
+| **Min** | 0 |
+| **Max** | 200 |
 
 Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES`. Tuning: [Shot_Threshold_Scale_Tuning.md](../04_Franchise_Mode_Systems/Shot_Threshold_Scale_Tuning.md).
 

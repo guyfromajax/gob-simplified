@@ -436,7 +436,6 @@ def _triangle_build_turn_result(
         game_state["fast_break_shot_threshold_override"] = FAST_BREAK_CORNER_THRESHOLD_BASE - int(
             off_team.team_attributes.get("fb_efficiency", 0) or 0
         )
-        game_state["fast_break_force_threshold_no_three_bonus"] = True
     elif branch in {"triangle_rr_post", "triangle_drive_rr_feed"} and defender_count == 0:
         game_state["fast_break_shot_threshold_override"] = 1
 
@@ -472,7 +471,6 @@ def _triangle_build_turn_result(
         )
         if drive_turn is not None:
             game_state.pop("fast_break_shot_threshold_override", None)
-            game_state.pop("fast_break_force_threshold_no_three_bonus", None)
             attach_position_snapshots(drive_turn, [rr_snap])
             drive_turn["triangle_branch"] = branch
             return drive_turn
@@ -480,7 +478,6 @@ def _triangle_build_turn_result(
     attach_fb_shot_overlay_context(shot_roles, fb_roles, off_lineup, def_lineup)
     turn_result = game.shot_manager.resolve_shot(shot_roles)
     game_state.pop("fast_break_shot_threshold_override", None)
-    game_state.pop("fast_break_force_threshold_no_three_bonus", None)
     attach_position_snapshots(turn_result, [rr_snap])
     turn_result["animations"] = fb_animations
     turn_result["roles"] = fb_roles

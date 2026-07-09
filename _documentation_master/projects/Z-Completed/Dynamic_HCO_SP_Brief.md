@@ -1,6 +1,6 @@
 # Dynamic HCO Set Plays — Build Brief
 
-> **Status:** Archived (July 2026). Dynamic HCO set plays shipped (flagged: `GOB_DYNAMIC_HCO_SETPLAY`). **Canonical runtime doc:** [`Dynamic_HCO_SP_System.md`](../../06_Gameplay_Systems/Dynamic_HCO_SP_System.md). This file retains the overlay-model design decisions and staged build log.
+> **Status:** Archived (July 2026). Dynamic HCO set plays shipped (flagged: `GOB_DYNAMIC_HCO_SETPLAY`). **Canonical runtime doc:** [`Dynamic_HCO_System.md`](../../06_Gameplay_Systems/Dynamic_HCO_System.md) (§ Set plays). This file retains the overlay-model design decisions and staged build log.
 
 **Dynamic HCO Set Plays**
 - The offense does not look to execute subtle movements in Set Plays. They either look to exeucte the play that is called and progress skeleton steps as defined, or execute a Hot Read if the ball handler deems that one is available. 

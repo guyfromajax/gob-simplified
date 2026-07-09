@@ -200,7 +200,8 @@
 - [x] `projects/Animation_System_Updated.md` → **Deleted 2026-07-05** — was a redirect stub; all code comments repointed to `05_UESS_System/UESS_System.md` (schema §3, coord sync §9, AG §9.3), `Step_By_Step_System.md` §HCT, and `Rebound_System.md` §DREB.
 - [x] `projects/animation_wonkiness.md` → **Deleted 2026-07-05** — open buckets 1–2 merged into `projects/bugs.md` §Animation timing pauses; fixed buckets 3–4 summarized there.
 - [x] `projects/Distant_Sim_Tuning.md` → **Archived 2026-07-05** to `Z-Completed/` — calibration targets, playtest checklist, and live MC results merged into `04_Franchise_Mode_Systems/Distant_Game_Sim_System.md`; `distant_sim_monte_carlo.py --write-doc` repointed.
-- [x] `projects/Dynamic_FCP_Brief.md`, `Dynamic_HCO_Motion_Brief.md`, `Dynamic_HCO_SP_Brief.md` → **Archived 2026-07-05** to `Z-Completed/` (HCT brief pattern). Canonical: `FCP_System.md`, `Dynamic_HCO_System.md`, `Dynamic_HCO_SP_System.md`. Code comments repointed.
+- [x] `projects/Dynamic_FCP_Brief.md`, `Dynamic_HCO_Motion_Brief.md`, `Dynamic_HCO_SP_Brief.md` → **Archived 2026-07-05** to `Z-Completed/` (HCT brief pattern). Canonical: `FCP_System.md`, `Dynamic_HCO_System.md` (motion + set plays merged). Code comments repointed.
+- [x] `Dynamic_HCO_SP_System.md` merged into `Dynamic_HCO_System.md` (§ Set plays) — July 2026.
 - [ ] `projects/Dynamic_HCT_Turns.md` →
 - [ ] `projects/News_System.md` →
 - [x] `projects/Recruit_Generation_System.md` → **Archived 2026-07-05** — obsolete scratch; superseded by `Practice_Squad_System.md` + `Recruiting_System.md`.
