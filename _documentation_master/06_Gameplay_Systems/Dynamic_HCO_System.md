@@ -190,7 +190,7 @@ Each HCO turn rolls a team-wide **posture** (`_roll_defense_posture`, phase_reso
 
 | Phase | Item |
 |---|---|
-| **P2** | Two-gate intercept — Gate 1 geometry (defender in a pass lane) → Gate 2 `aggression_call` (aggressive 50 / normal 25 / passive 0) → Gate 3 `resolve_pass_contest`. Posture gates *viability by distance*: tight can jump his man's pass, loose can't (only help lanes). |
+| **P2** | Two-gate intercept — Gate 1 geometry (defender in a pass lane, reusing the posture-shaded reconstruction) → Gate 2 `aggression_call` (aggressive 50 / normal 25 / passive 0) → Gate 3 `resolve_pass_contest`. Posture gates *viability by distance*: tight can jump his man's pass, loose can't (only help lanes). **Interceptable passes:** hot-read dishes + kickouts (P2a) and **freelance passes** (both reuse `_hco_resolve_dish_contest`; an intercept → STEAL via `pass_intercepted`). **P2b:** skeleton motion/reversal passes (the last uncovered type — needed for loose "help-lane" picks). |
 | **P3** | Reactive resolution + graded openness (generalize the SM freeze to every step type). |
 | **P4–P5** | Offense reads the commitment → `attack` / relocate / step-in / new `backdoor`; dish-receiver agency on the catch. |
 | **P6** | Real tight/loose **playcall variants** replace the interim random pick. |

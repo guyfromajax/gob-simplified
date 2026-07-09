@@ -5057,6 +5057,12 @@ MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION = {0: 5, 1: 20, 2: 35, 3: 50, 4: 75}
 # once per game (randint 5-6) and cached in game_state (stable all game; no per-pass roll).
 HCO_PASS_LANE_DIST_BY_AGGRESSION = {"passive": 6.0, "aggressive": 5.0}
 
+# Dynamic HCO Defense — Gate 2 (Dynamic_MM_Brief §5C). When a defender is geometrically in a pass
+# lane (Gate 1), his chance to ATTEMPT the interception is set by defense aggression_call. Applied
+# only when the dynamic-defense flag is on (posture set); passive never gambles. Gate 3 (the
+# attribute contest in resolve_pass_contest) then decides if an attempt actually picks it.
+INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 50, "normal": 25, "passive": 0}
+
 
 def _hco_pass_lane_dist(game):
     """HCO hot-read/kickout passing-lane distance: passive→6, aggressive→5, normal→randint(5,6)
@@ -5075,11 +5081,15 @@ def _hco_pass_lane_dist(game):
 
 
 def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
-                     is_away_offense, def_aggr, zone, defense_playcall):
+                     is_away_offense, def_aggr, zone, defense_playcall, posture=None):
     """Reconstruct on-court defender coords for a step (def_pos → {x,y}) the same way the animator
     renders them, plus readers + a point transform for lane geometry. MAN → get_defender_coords
     (returns input orientation → display); ZONE → assign_all_zone_defenders (always HOME), so the
-    transform flips offensive points to home to match. Returns (def_xy, _coord, _loc, _pt)."""
+    transform flips offensive points to home to match. Returns (def_xy, _coord, _loc, _pt).
+
+    ``posture`` (Dynamic HCO Defense) shades the MAN reconstruction to MATCH the animator's rendered
+    placement (emitter-as-god) — so the intercept geometry sees deny defenders in the lane and loose
+    defenders out of it. None → legacy placement. (Zone posture is a future zone-parity item.)"""
     from BackEnd.engine.attack_drive_clearance import _spot_display_coords
     pos_actions = step.get("pos_actions") or {}
 
@@ -5123,6 +5133,7 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
             def_xy[dpos] = get_defender_coords(
                 _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
                 ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
+                posture=posture,
             )
 
         def _pt(xy):
@@ -5132,18 +5143,22 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
 
 
 def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
-                              is_away_offense, def_aggr, lane_dist, zone=False, defense_playcall=None):
+                              is_away_offense, def_aggr, lane_dist, zone=False, defense_playcall=None,
+                              posture=None):
     """Hot-read "truly open" gate (§4): positions whose BH→teammate passing lane is covered by a
     help defender — excluded as dish candidates so the offense won't dish into a covered lane.
     Each non-BH lane is tested with defenders_in_lane; the t-band (0.1–0.9) excludes the BH's and
-    receiver's own covering defenders, so only a true lane-sitting help defender blocks."""
+    receiver's own covering defenders, so only a true lane-sitting help defender blocks.
+    ``posture`` shades the defender reconstruction (Dynamic HCO Defense) so the offense's read
+    matches the rendered placement."""
     from BackEnd.engine.pass_contest import defenders_in_lane
 
     pos_actions = step.get("pos_actions") or {}
     if bh_pos not in pos_actions:
         return set()
     def_xy, _coord, _loc, _pt = _hco_step_def_xy(
-        step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone, defense_playcall)
+        step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone,
+        defense_playcall, posture=posture)
     bh_pt = _pt(_coord(bh_pos))
 
     blocked = set()
@@ -5157,7 +5172,8 @@ def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
 
 
 def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, off_to_def,
-                              is_away_offense, def_aggr, lane_dist, zone, defense_playcall, off_team, rng):
+                              is_away_offense, def_aggr, lane_dist, zone, defense_playcall, off_team, rng,
+                              posture=None):
     """Stage 2 (§4): resolve a THROWN hot-read dish / kickout through the passing lane. Reuses the
     shared HCT pass model (resolve_pass_contest) with the tighter HCO ``lane_dist``. Eligible
     interceptors = lane-sitting help defenders + the receiver's own man (t-band 0.1..1.0; the
@@ -5171,12 +5187,19 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     from BackEnd.utils.shared import ag_to_grid_per_game_sec
 
     def_xy, _coord, _loc, _pt = _hco_step_def_xy(
-        step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone, defense_playcall)
+        step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone,
+        defense_playcall, posture=posture)
     passer_xy = _pt(_coord(bh_pos))
     receiver_xy = _pt(_coord(recv_pos))
-    # Eligible interceptors: in-lane (perp <= lane_dist) with projection past the passer (t > 0.1),
-    # including the receiver end (<= 1.0). The passer's on-ball man (t≈0) is dropped.
+    # Gate 1 — eligible interceptors: in-lane (perp <= lane_dist) with projection past the passer
+    # (t > 0.1), including the receiver end (<= 1.0). The passer's on-ball man (t≈0) is dropped.
     eligible = defenders_in_lane(passer_xy, receiver_xy, def_xy, lane_dist, t_min=0.1, t_max=1.0)
+    # Gate 2 — Dynamic HCO Defense (posture set): each in-lane defender only ATTEMPTS the pick per
+    # defense aggression_call (aggressive 50 / normal 25 / passive 0). Non-attempters drop out;
+    # if none commit, the pass completes. Legacy path (posture None) contests every eligible.
+    if posture:
+        pct = INTERCEPT_ATTEMPT_PCT_BY_CALL.get(def_aggr, 25)
+        eligible = [dpos for dpos in eligible if rng.randint(1, 100) <= pct]
     if not eligible:
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
 
@@ -5204,7 +5227,10 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
     drives the FE's INTERCEPTION! headline + SFX. Reuses resolve_turnover_logic + the shared stopper
     system (same tools as the per-step Moment / FCP / rim-runner) so the turnover contract matches."""
     interceptor = def_lineup.get(motion_shot_info.get("interceptor_pos"))
-    ball_handler = roles.get("ball_handler")
+    # The victim = the actual passer. For a freelance pass the ball may have changed hands mid-cycle,
+    # so prefer the result's passer_pos; dishes fall back to the turn's ball handler.
+    _passer_pos = motion_shot_info.get("passer_pos")
+    ball_handler = off_lineup.get(_passer_pos) if _passer_pos else roles.get("ball_handler")
     skel = apply_stopper_system_to_skeleton(motion_shot_info.get("skeleton") or {}, "STEAL", game_state)
     to_roles = dict(roles)
     to_roles["ball_handler"] = ball_handler
@@ -5270,7 +5296,8 @@ def _track_hco_pass_lanes(result, game):
             continue
         try:
             def_xy, _coord, _loc, _pt = _hco_step_def_xy(
-                step, passer_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone, defense_playcall)
+                step, passer_pos, off_lineup, def_lineup, off_to_def, is_away_offense, def_aggr, zone,
+                defense_playcall, posture=game_state.get("_hco_defense_posture"))
             passer_xy, receiver_xy = _pt(_coord(passer_pos)), _pt(_coord(receiver_pos))
             mid = min_perp_in_lane(passer_xy, receiver_xy, def_xy, 0.1, 0.9)
             full = min_perp_in_lane(passer_xy, receiver_xy, def_xy, 0.1, 1.0)
@@ -5501,7 +5528,8 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             return result
         contest = _hco_resolve_dish_contest(
             step, passer_pos, recv, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random)
+            _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random,
+            posture=game_state.get("_hco_defense_posture"))
         if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
             result["pass_intercepted"] = True
             result["interceptor_pos"] = contest.get("deflector")
@@ -5527,7 +5555,8 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         blocked_dish = _hco_blocked_dish_targets(
             steps[i], bh_pos, off_lineup, def_lineup, off_to_def,
             is_away_offense, _def_aggr_call, _hco_lane_dist,
-            zone=zone, defense_playcall=game_state.get("defense_playcall"))
+            zone=zone, defense_playcall=game_state.get("defense_playcall"),
+            posture=game_state.get("_hco_defense_posture"))
         # SM-precedence: when the offense is reading this turn (offense_reads — the
         # per-turn alterations roll, reused, NOT a second roll) and the shot-clock
         # tier/tempo says "work the ball", subtle movement takes precedence over the
@@ -5730,7 +5759,8 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
             return result
         contest = _hco_resolve_dish_contest(
             step, passer_pos, recv, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random)
+            _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random,
+            posture=game_state.get("_hco_defense_posture"))
         if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
             result["pass_intercepted"] = True
             result["interceptor_pos"] = contest.get("deflector")
@@ -5760,7 +5790,8 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
         blocked_dish = _hco_blocked_dish_targets(
             steps[i], bh_pos, off_lineup, def_lineup, off_to_def,
             is_away_offense, _def_aggr_call, _hco_lane_dist,
-            zone=zone, defense_playcall=game_state.get("defense_playcall"))
+            zone=zone, defense_playcall=game_state.get("defense_playcall"),
+            posture=game_state.get("_hco_defense_posture"))
         if not sm_precede:
             shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
                                  shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
@@ -5990,6 +6021,8 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
         FREELANCE_MAX_CYCLES, FREELANCE_PASS_PROB, FREELANCE_PASS_RADIUS,
     )
     from BackEnd.engine.motion_step_decision import _choose_attack_or_outside, TEMPO_MOD
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
     off_team = game.offense_team
     game_state = game.game_state
@@ -5998,6 +6031,19 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
     shot_clock = game_state.get("shot_clock_remaining", 30)
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
     tempo_mod = TEMPO_MOD.get(tempo, 0)
+
+    # Dynamic HCO Defense (P2): freelance passes are interceptable when the flag is on (posture set).
+    # Derive the two-gate contest context once; the freelance beat carries full coords so the
+    # dish-contest pipeline (_hco_resolve_dish_contest) works directly on it.
+    posture = game_state.get("_hco_defense_posture")
+    defense_playcall = game_state.get("defense_playcall")
+    zone = is_zone_defense(defense_playcall)
+    def_aggr = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
+    fl_off_to_def = {}
+    if not zone:
+        _mu = get_matchups_for_defending_team(game_state, getattr(game.defense_team, "is_user_team", False))
+        fl_off_to_def = {o: d for d, o in _mu.items()}
+    fl_lane_dist = _hco_pass_lane_dist(game)
 
     output = list(base_steps)
     cur_bh = bh_pos
@@ -6039,6 +6085,28 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
             ]
             if teammates and rng.random() < FREELANCE_PASS_PROB:
                 rp, rc = rng.choice(teammates)
+                # Dynamic HCO Defense (P2): contest the freelance pass (two gates + posture). On an
+                # INTERCEPT/BAT_OOB, show the pass being thrown then return a STEAL turnover (routed
+                # by the outer resolver's pass_intercepted check, same path as a dish).
+                if posture:
+                    contest = _hco_resolve_dish_contest(
+                        beat, cur_bh, rp, off_lineup, def_lineup, fl_off_to_def, is_away_offense,
+                        def_aggr, fl_lane_dist, zone, defense_playcall, off_team, rng, posture=posture)
+                    if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
+                        output.append(freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300))
+                        skeleton["steps"] = output
+                        logging.warning(
+                            f"🪡 [HCO PASS] {contest['outcome']} on FREELANCE pass {cur_bh}→{rp} "
+                            f"by {contest.get('deflector')}")
+                        return {
+                            "skeleton": skeleton,
+                            "pass_intercepted": True,
+                            "interceptor_pos": contest.get("deflector"),
+                            "pass_bat_oob": contest["outcome"] == "BAT_OOB",
+                            "passer_pos": cur_bh,
+                            "shooter": off_lineup[cur_bh],
+                            "shooter_pos": cur_bh,
+                        }
                 output.append(freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300))
                 last_ts += 300
                 cur_bh = rp

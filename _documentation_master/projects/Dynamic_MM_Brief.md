@@ -118,7 +118,15 @@ Three separate signals drive the defense, each from a different source:
 
 > **Distance gates viability by posture (owner intent, 2026-07-09).** Because Gate 1 is pure geometry (defender must be inside the pass lane), posture determines whether an interception of *his own man's* pass is even possible: **tight** = dead in the lane → **definitely viable**; **normal** = usually in range → **most likely viable**; **loose** = sagged out of his man's lane → **not viable on his man** (only help-side lanes). Loose isn't disabled — it just can't jump its own assignment. Distance should also scale *effectiveness* (contest success), not just viability, in P2 tuning. The pre-existing steal/turnover mechanics (per-step moment + hot-read/kickout pass contest) carry over unchanged.
 
-> **Scope expansion to confirm:** this makes **every** pass interceptable when a defender is in its lane — including skeleton ball-movement / reversal passes (today only hot-read dishes + kickouts are contested; see Dynamic_HCO_System.md §4). That expansion is *required* for loose/help defenders to intercept "other players' passes." **← confirm we contest skeleton passes too.**
+> **Which passes are interceptable (decided 2026-07-09).** The two-gate contest runs on:
+> | Pass type | Interceptable? | Where |
+> |---|---|---|
+> | Hot-read dish | ✅ (P2a) | `_apply_dish_contest` → `_hco_resolve_dish_contest` |
+> | Kickout | ✅ (P2a) | same |
+> | **Freelance pass** | ✅ (added) | `_resolve_freelance` reuses `_hco_resolve_dish_contest` on the freelance beat → STEAL via `pass_intercepted`/`_finalize_hco_pass_interception` (passer credited via `passer_pos`) |
+> | Skeleton motion / reversal pass | ❌ **P2b** (pending) | needs a new walk hook |
+>
+> All gated behind `GOB_DYNAMIC_HCO_DEFENSE` (posture set) + Gate 2 aggression. **Skeleton passes remain the last uncovered type** — they're what loose/help defenders would pick in "other lanes," so P2b is still required for full loose viability.
 
 **D. `freeze` = failed reactive read (ability).** Not a chosen action — the outcome when a defender is beaten or misreads. Generalizes today's SM freeze to every step type; driven by the defender's `player_read_raw + def_eff` roll.
 
