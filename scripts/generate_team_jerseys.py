@@ -97,6 +97,18 @@ def team_info(team_name):
     return None, None, None, None
 
 
+def load_body_overrides(path="scripts/jersey_body_overrides.txt"):
+    """team_ids whose jersey BODY should be the secondary color (not primary)."""
+    if not os.path.exists(path):
+        return set()
+    out = set()
+    for line in open(path):
+        line = line.split("#", 1)[0].strip()
+        if line:
+            out.add(line.upper())
+    return out
+
+
 def team_players(team_name):
     import json
     data = json.load(open("scripts/players_export.json"))
@@ -116,6 +128,8 @@ def main():
     ap.add_argument("--only", help="one player name, to test the API call first")
     ap.add_argument("--raw", default="tmp/portrait-pilot/raw")
     ap.add_argument("--out", default="tmp/portrait-pilot/designed")
+    ap.add_argument("--swap-colors", action="store_true",
+                    help="use the team's SECONDARY color as the jersey body")
     args = ap.parse_args()
 
     load_env()
@@ -132,6 +146,11 @@ def main():
     if not team_id:
         sys.exit(f"team '{args.team}' not found in teams/128_teams.txt")
     wordmark = (mascot or args.team).upper()
+    # Body defaults to the team primary; swap to secondary via --swap-colors
+    # or by listing the team_id in scripts/jersey_body_overrides.txt.
+    if args.swap_colors or team_id.upper() in load_body_overrides():
+        primary_hex, secondary_hex = secondary_hex, primary_hex
+        print("[note] jersey body = team SECONDARY color (override)")
     primary_name = color_name(primary_hex)
     secondary_name = color_name(secondary_hex)
     banner = f"FrontEnd/static/images/teams/{team_id.lower()}/{team_id.lower()}_banner_primary.jpg"
