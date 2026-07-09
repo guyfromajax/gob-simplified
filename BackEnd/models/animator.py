@@ -2066,8 +2066,11 @@ class Animator:
         if not ball_handler_pos:
             # Fallback: assume PG is ball handler
             ball_handler_pos = "PG"
-        
-        
+
+        # Dynamic HCO Defense (P1): the turn's team posture (tight/normal/loose), or None when the
+        # GOB_DYNAMIC_HCO_DEFENSE flag is off → get_defender_coords falls back to legacy placement.
+        posture = (self.game.game_state or {}).get("_hco_defense_posture")
+
         # Create defensive animations for each position
         for def_pos in ['PG', 'SG', 'SF', 'PF', 'C']:
             def_player = def_lineup.get(def_pos)
@@ -2116,7 +2119,8 @@ class Animator:
                         aggression,
                         bh_spot,
                         None,
-                        is_ball_handler=True
+                        is_ball_handler=True,
+                        posture=posture,
                     )
                 else:
                     # Non-ball handler defender
@@ -2140,9 +2144,10 @@ class Animator:
                         o_spot,
                         bh_coords,
                         is_ball_handler=False,
-                        ball_spot=bh_spot  # Pass ball handler's spot for non-BH defender logic
+                        ball_spot=bh_spot,  # Pass ball handler's spot for non-BH defender logic
+                        posture=posture,
                     )
-                
+
                 # get_defender_coords returns coords in same orientation as input
                 # No need to flip - wrapper handles orientation automatically
                 
@@ -2200,7 +2205,8 @@ class Animator:
                             aggression,
                             bh_spot,
                             None,
-                            is_ball_handler=True
+                            is_ball_handler=True,
+                            posture=posture,
                         )
                     else:
                         # Non-ball handler defender - need CURRENT ball handler position for this step
@@ -2224,7 +2230,8 @@ class Animator:
                             o_spot,
                             bh_coords,
                             is_ball_handler=False,
-                            ball_spot=bh_spot  # Pass ball handler's spot for non-BH defender logic
+                            ball_spot=bh_spot,  # Pass ball handler's spot for non-BH defender logic
+                            posture=posture,
                         )
                     # For BH defenders, get_defender_coords already returns correct orientation
 

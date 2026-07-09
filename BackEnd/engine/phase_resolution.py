@@ -4799,6 +4799,36 @@ def _dynamic_hco_motion_enabled():
     return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _dynamic_hco_defense_enabled():
+    """Dynamic HCO Defense (Dynamic_MM_Brief) — OFF by default (in development). Enable with
+    GOB_DYNAMIC_HCO_DEFENSE set to a truthy value (``1``/``true``/``yes``/``on``). Gates the per-turn
+    defender posture (tight/normal/loose) + the two-gate intercept model."""
+    import os
+    return os.environ.get("GOB_DYNAMIC_HCO_DEFENSE", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+# Interim posture pick — a team-wide loose/normal/tight per turn (Dynamic_MM_Brief §5A). Later
+# replaced by the chosen tight/loose playcall variant (P6).
+_HCO_DEFENSE_POSTURES = ("loose", "normal", "tight")
+
+
+def _roll_defense_posture(game, rng=None):
+    """Pick this HCO turn's team defense posture and stash it on game_state for the animator
+    (render) + the future intercept read. None when the flag is off → legacy placement. Rolled
+    fresh each HCO turn so it never goes stale across possessions. See Dynamic_MM_Brief §5A."""
+    import random as _r
+    game_state = getattr(game, "game_state", {})
+    if game_state is None:
+        return None
+    if not _dynamic_hco_defense_enabled():
+        game_state["_hco_defense_posture"] = None
+        return None
+    posture = (rng or _r).choice(_HCO_DEFENSE_POSTURES)
+    game_state["_hco_defense_posture"] = posture
+    logging.warning(f"🛡️ [DYNAMIC DEFENSE] turn posture = {posture}")
+    return posture
+
+
 def _dynamic_hco_setplay_enabled():
     """Dynamic HCO **Set Plays** ON by default (overlay model — separate from motion). Variant
     selection stays, but the up-front event tables are skipped in favor of the per-step moment, and
@@ -6364,6 +6394,11 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
 
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    # Dynamic HCO Defense (P1): roll this turn's team defense posture (tight/normal/loose) and
+    # stash it on game_state; the animator reads it to shade defender placement. No-op (None) when
+    # the GOB_DYNAMIC_HCO_DEFENSE flag is off. Rolled fresh each turn → never stale.
+    _roll_defense_posture(game)
 
     # ✅ BALANCING SYSTEM: Apply balancing system at start of HCO turn
     apply_balancing_system(game, game_state, off_team, def_team)
