@@ -2832,7 +2832,11 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         result["next_play_type"] = next_play_type
         result["next_turn"] = next_play_type  # ✅ SS&S: Explicit next turn
 
-    if stealer_id:
+    # Only actual steals should expose stealer_id. Dead-ball turnovers may have
+    # a pressure defender in roles["defender"], but stamping that defender as a
+    # stealer makes downstream systems classify the turn as steal-like and skip
+    # dead-ball fumble animation.
+    if turnover_type == "STEAL" and stealer_id:
         result["stealer_id"] = stealer_id
         result["stealer_name"] = stealer_name
     if turnover_type == "SHOT_CLOCK":
