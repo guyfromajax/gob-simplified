@@ -98,6 +98,11 @@ FLSS_HEAVE_MISS_RATTLE_MAX = 5       # margin ≤ this → random LITTLE/NORMAL/
 FLSS_HEAVE_MISS_RIM_BOUNCE_MAX = 15  # margin 6–15 → BACK_OF_RIM (rim bounce miss)
 FLSS_HEAVE_MISS_BACKBOARD_MAX = 30   # margin 16–30 → BANK_MISS; above → AIRBALL (no headline)
 
+# FLSS AIRBALL animation — random short landing before OOB continuation (not FG default 2-short MSSS).
+FLSS_AIRBALL_LAND_X_OFFSET_MIN = 2   # min grid distance from attacking basket x toward midcourt
+FLSS_AIRBALL_LAND_X_OFFSET_MAX = 5   # max grid distance from attacking basket x toward midcourt
+FLSS_AIRBALL_LAND_Y_VARIANCE = 5     # landing y = basket_y ± this (clamped 0–50)
+
 
 def is_inside_paint_grid(x, y, *, home_basket: bool = True) -> bool:
     """True when display grid (x, y) lies inside INSIDE_PAINT_RECT_HOME (mirrored for away)."""

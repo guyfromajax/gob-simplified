@@ -2211,9 +2211,15 @@ class TurnManager:
 
         if isinstance(result, dict) and result.get("flss") and result.get("skeleton"):
             from BackEnd.engine.eoq_debug_log import log_eoq_step, log_eoq_turn
+            from BackEnd.engine.eoq_perfection import (
+                ensure_flss_miss_bounce_coords,
+                stamp_flss_airball_animation_coords,
+            )
             from BackEnd.utils.eoq_clock_progression import finalize_flss_post_emit
 
             log_eoq_step(self.game, "FLSS", "post_process_emit_steps", "START")
+            ensure_flss_miss_bounce_coords(self.game, result)
+            stamp_flss_airball_animation_coords(self.game, result)
             if not (
                 isinstance(result.get("animation_steps"), list)
                 and result.get("animation_steps")
@@ -5280,9 +5286,21 @@ class TurnManager:
                             apply_post_miss_rebound_routing(
                                 self.game, result, new_rebounder, "DREB"
                             )
+                        elif new_rebounder:
+                            from BackEnd.engine.dreb_fast_break_arming import (
+                                SOURCE_OREB_PUTBACK,
+                                arm_dreb_fast_break,
+                            )
+
+                            arm_dreb_fast_break(
+                                self.game,
+                                source=SOURCE_OREB_PUTBACK,
+                                rebounder=new_rebounder,
+                                rebounding_team=def_team,
+                                result=result,
+                            )
                         else:
-                            next_play_type = game_state.get("offensive_state", "HCO")
-                            result["next_play_type"] = next_play_type
+                            result["next_play_type"] = game_state.get("offensive_state", "HCO")
                 
                 # Compute stat deltas (same as run_micro_turn)
                 # Exclude REB from deltas since it's automatically calculated from OREB + DREB

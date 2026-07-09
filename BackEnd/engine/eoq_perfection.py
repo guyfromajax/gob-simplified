@@ -563,6 +563,10 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
             result["flss_heave_miss_margin"] = miss_margin
             result.update(shot_variant_extras)
             result["text"] = f"{get_name_safe(shooter)} misses the desperation heave."
+            ensure_flss_miss_bounce_coords(
+                game, result, shooter_coords=shooter_coords
+            )
+            stamp_flss_airball_animation_coords(game, result)
         strip_terminal_rebound_fields(result)
         log_eoq_step(
             game,
@@ -653,13 +657,8 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     result["forced_shot_reason"] = "FLSS"
     result["current_turn"] = current_state
     result["shooter_coords"] = dict(shooter_coords)
-    if str(result.get("result_type") or "").upper() == "MISS":
-        if result.get("ball_bounce_x") is None or result.get("ball_bounce_y") is None:
-            from BackEnd.utils.shared import calculate_bounce_spot
-
-            bounce_spot = calculate_bounce_spot(game, shooter_coords=shooter_coords)
-            result["ball_bounce_x"] = bounce_spot["x"]
-            result["ball_bounce_y"] = bounce_spot["y"]
+    ensure_flss_miss_bounce_coords(game, result, shooter_coords=shooter_coords)
+    stamp_flss_airball_animation_coords(game, result)
     log_eoq_step(
         game,
         "FLSS",
@@ -674,6 +673,101 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
         },
     )
     return result
+
+
+def ensure_flss_miss_bounce_coords(
+    game,
+    result: Dict[str, Any],
+    *,
+    shooter_coords: Optional[Dict[str, float]] = None,
+) -> None:
+    """Stamp ``ball_bounce_x/y`` for FLSS misses that need a schema ``[bounce]`` step.
+
+    Rim-action variants (rattle, BACK_OF_RIM, BANK_MISS) require backend bounce
+    coords so ``_build_post_shot_sub_steps`` can append ``[bounce]`` after the
+    variant sub-steps. AIRBALL uses the OOB continuation path — no bounce.
+    """
+    if not result.get("flss"):
+        return
+    if str(result.get("result_type") or "").upper() != "MISS":
+        return
+    if str(result.get("shot_variant") or "").upper() == "AIRBALL":
+        return
+    if result.get("ball_bounce_x") is not None and result.get("ball_bounce_y") is not None:
+        return
+    from BackEnd.utils.shared import calculate_bounce_spot
+
+    coords = shooter_coords or result.get("shooter_coords")
+    if isinstance(coords, dict) and coords.get("x") is not None:
+        bounce_spot = calculate_bounce_spot(game, shooter_coords=coords)
+    else:
+        bounce_spot = calculate_bounce_spot(game)
+    result["ball_bounce_x"] = bounce_spot["x"]
+    result["ball_bounce_y"] = bounce_spot["y"]
+
+
+def roll_flss_airball_animation_coords(
+    *,
+    away_offense: bool,
+    rng=None,
+) -> Dict[str, float]:
+    """Roll FLSS-only AIRBALL flight-end landing + matching OOB resting coords.
+
+    Landing is ``2–5`` grid x-units out from the attacking basket (toward
+    midcourt) with y ``basket_y ± FLSS_AIRBALL_LAND_Y_VARIANCE``. OOB
+    continuation uses the standard sideline x (``AIRBALL_OOB_*``) at the
+    same y as the landing point.
+    """
+    rng = rng or random
+    from BackEnd.constants import (
+        AIRBALL_OOB_AWAY_COORDS,
+        AIRBALL_OOB_HOME_COORDS,
+        FLSS_AIRBALL_LAND_X_OFFSET_MAX,
+        FLSS_AIRBALL_LAND_X_OFFSET_MIN,
+        FLSS_AIRBALL_LAND_Y_VARIANCE,
+    )
+
+    basket_x = _flss_basket_x(is_home_offense=not away_offense)
+    basket_y = 25.0
+    x_offset = rng.randint(FLSS_AIRBALL_LAND_X_OFFSET_MIN, FLSS_AIRBALL_LAND_X_OFFSET_MAX)
+    if away_offense:
+        land_x = basket_x + float(x_offset)
+        oob_x = float(AIRBALL_OOB_AWAY_COORDS["x"])
+    else:
+        land_x = basket_x - float(x_offset)
+        oob_x = float(AIRBALL_OOB_HOME_COORDS["x"])
+    land_y = float(
+        max(
+            0.0,
+            min(
+                50.0,
+                basket_y + rng.randint(-FLSS_AIRBALL_LAND_Y_VARIANCE, FLSS_AIRBALL_LAND_Y_VARIANCE),
+            ),
+        )
+    )
+    return {
+        "flss_airball_land_x": round(land_x, 2),
+        "flss_airball_land_y": round(land_y, 2),
+        "flss_airball_oob_x": round(oob_x, 2),
+        "flss_airball_oob_y": round(land_y, 2),
+    }
+
+
+def stamp_flss_airball_animation_coords(
+    game,
+    result: Dict[str, Any],
+) -> None:
+    """Stamp rolled FLSS AIRBALL landing/OOB coords when missing (replay-safe)."""
+    if not result.get("flss"):
+        return
+    if str(result.get("result_type") or "").upper() != "MISS":
+        return
+    if str(result.get("shot_variant") or "").upper() != "AIRBALL":
+        return
+    if result.get("flss_airball_land_x") is not None and result.get("flss_airball_land_y") is not None:
+        return
+    away_offense = game.offense_team.team_id == game.away_team.team_id
+    result.update(roll_flss_airball_animation_coords(away_offense=away_offense))
 
 
 def strip_terminal_rebound_fields(result: dict) -> None:

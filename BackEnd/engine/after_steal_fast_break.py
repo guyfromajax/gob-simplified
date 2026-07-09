@@ -684,12 +684,24 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
                     }
                     possession_flips = False
                 else:
-                    # DREB: flip possession; route to HCO. Cascade DREB→FB is
-                    # NOT computed here (the existing FB systems handle this
-                    # via pending_dreb_fb_play_key on regular shot turns; we
-                    # keep after-steal-FB-DREB conservative — straight to HCO).
-                    game_state["offensive_state"] = "HCO"
-                    game_state["last_rebounder"] = new_rebounder
+                    # DREB after after-steal FB miss — arm chained FAST_BREAK (or HCO).
+                    from BackEnd.engine.dreb_fast_break_arming import (
+                        SOURCE_FB_MISS,
+                        arm_dreb_fast_break,
+                    )
+
+                    arm_stamp: Dict[str, Any] = {}
+                    arm_dreb_fast_break(
+                        game,
+                        source=SOURCE_FB_MISS,
+                        rebounder=new_rebounder,
+                        rebounding_team=def_team,
+                        result=arm_stamp,
+                        shooting_lineup=off_lineup,
+                        rebounding_lineup=def_lineup,
+                        is_away_shooting=is_away_offense,
+                    )
+                    game_state["_fb_miss_dreb_fb_arm_stamp"] = arm_stamp
                     possession_flips = True
 
         text_outcome = (
@@ -738,8 +750,8 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         # Live ball, OREB → game_manager's pending_oreb loop picks up.
         next_play_type = "OREB"
     elif rebound_type == "DREB":
-        # DREB → new offense brings up; offensive_state="HCO" already set.
-        next_play_type = "HCO"
+        # Arm already ran in the miss block; consume stamp onto turn_result after build.
+        next_play_type = game_state.get("offensive_state") or "HCO"
     else:
         # Defensive fallback (shouldn't reach here in normal flow).
         next_play_type = "HCO"
@@ -816,6 +828,15 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
                 if rebound_attemptors is not None:
                     turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
                     turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
+            if rebound_type == "DREB":
+                from BackEnd.engine.dreb_fast_break_arming import consume_fb_miss_dreb_arm_stamp
+
+                consume_fb_miss_dreb_arm_stamp(
+                    game, turn_result, rebound_type=rebound_type
+                )
+                next_play_type = turn_result.get("next_play_type") or next_play_type
+                turn_result["next_play_type"] = next_play_type
+                turn_result["next_turn"] = next_play_type
 
     if shot_variant_extras:
         turn_result.update(shot_variant_extras)

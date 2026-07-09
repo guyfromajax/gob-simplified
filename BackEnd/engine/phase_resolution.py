@@ -69,9 +69,6 @@ from BackEnd.utils.defense_utils import (
     random_defender_fallback_position,
 )
 
-# TEMPORARY (Mar 2026): When False, missed FT → DREB always continues as HCO (no fast-break roll).
-# Set True to restore `fast_break_probability_from_slider` after FT miss rebounds.
-_FT_MISS_DREB_FAST_BREAK_ENABLED = False
 _CANONICAL_SET_PLAY_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 _SET_PLAY_EVENT_POSITION_FIELDS = ("by", "for", "from", "to")
 
@@ -327,22 +324,27 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team, *, perform_rem
 
 def _find_most_recent_shot_turn(game, max_turns=10):
     """
-    Find the most recent MISS or MAKE turn.
-    
+    Find the most recent shot-like turn that may carry Covert Release
+    ``offense_getback`` / ``defense_release`` stamps (HCO MISS/MAKE/BLOCK,
+    FT final miss, putback miss, FB miss).
+
     Args:
         game: Game object with turns list
         max_turns: Maximum number of turns to check (default: 10)
-    
+
     Returns:
-        dict: Most recent MISS/MAKE turn, or None if not found
+        dict: Most recent matching turn, or None if not found
     """
     if not game.turns or len(game.turns) == 0:
         return None
-    
+
+    # FREE_THROW / PUTBACK_MISS are DREB→FB arming sources that stamp CR fields
+    # the same way HCO MISS does (see dreb_fast_break_arming.py).
+    _SHOT_LIKE = ("MISS", "MAKE", "BLOCK", "FREE_THROW", "PUTBACK_MISS")
     for turn in reversed(game.turns[-max_turns:]):
-        if turn.get("result_type") in ["MISS", "MAKE", "BLOCK"]:
+        if turn.get("result_type") in _SHOT_LIKE:
             return turn
-    
+
     return None
 
 def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
@@ -2570,17 +2572,23 @@ def resolve_free_throw_logic(game):
                 if rebound_team == def_team:
                     possession_flips = True
                     text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
-                    if _FT_MISS_DREB_FAST_BREAK_ENABLED:
-                        p_dreb = fast_break_probability_from_slider(
-                            slow_it_down_defense_setting(
-                                game_state, def_team, "fast_breaks",
-                                def_team.strategy_settings.get("fast_breaks", 2),
-                            )
-                        )
-                        next_play_type = "FAST_BREAK" if random.random() < p_dreb else "HCO"
-                    else:
-                        next_play_type = "HCO"
-                    game_state["offensive_state"] = next_play_type
+                    from BackEnd.engine.dreb_fast_break_arming import (
+                        SOURCE_FT,
+                        arm_dreb_fast_break,
+                    )
+
+                    # Arm onto a temp dict; fields are copied onto ``result`` below.
+                    _ft_arm_stamp: dict = {}
+                    arm_dreb_fast_break(
+                        game,
+                        source=SOURCE_FT,
+                        rebounder=rebounder,
+                        rebounding_team=def_team,
+                        result=_ft_arm_stamp,
+                        ft_offense_lineup=off_lineup,
+                        ft_defense_lineup=def_lineup,
+                    )
+                    game_state["_ft_dreb_fb_arm_stamp"] = _ft_arm_stamp
                 else:
                     # Offensive rebound - store for separate turn processing
                     game_state["pending_oreb"] = {
@@ -2632,7 +2640,14 @@ def resolve_free_throw_logic(game):
             result["rebound_type"] = game_state.get("last_rebound", "")
             # Add next play type for defensive rebounds
             if game_state.get("last_rebound") == "DREB":
-                result["next_play_type"] = game_state.get("offensive_state", "HCO")
+                arm_stamp = game_state.pop("_ft_dreb_fb_arm_stamp", None) or {}
+                for k, v in arm_stamp.items():
+                    result[k] = v
+                result["next_play_type"] = game_state.get(
+                    "offensive_state", result.get("next_play_type", "HCO")
+                )
+            else:
+                game_state.pop("_ft_dreb_fb_arm_stamp", None)
 
     # Non-final miss: visual bounce only (``calculate_bounce_spot``); no rebound.
     if (

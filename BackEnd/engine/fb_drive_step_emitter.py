@@ -371,8 +371,19 @@ def build_fb_drive_resolution_steps(
         )
         if meet_step["start"].get("advance_trigger"):
             meet_step["start"]["advance_trigger"]["metadata"]["kind"] = f"{kind_prefix}_meet"
-        if result_type == "DEFENSIVE_STOP" or is_terminal:
+        if result_type == "DEFENSIVE_STOP":
             meet_step["end"]["next"] = {"kind": "end_of_turn"}
+        elif is_terminal:
+            if result_type in ("DEAD BALL", "TURNOVER"):
+                meet_step["end"]["next"] = {
+                    "kind": "turn_stop",
+                    "event": "DEAD_BALL_TURNOVER",
+                    "payload": {
+                        "victim_id": turn_result.get("victim_id") or stealer_id,
+                    },
+                }
+            else:
+                meet_step["end"]["next"] = {"kind": "end_of_turn"}
         steps.append(meet_step)
         clock_r -= t_meet
         shot_r -= t_meet

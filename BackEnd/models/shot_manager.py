@@ -2202,10 +2202,23 @@ class ShotManager:
                                     self.game, result, rebounder, stat
                                 )
                             else:
+                                from BackEnd.engine.dreb_fast_break_arming import (
+                                    SOURCE_FB_MISS,
+                                    arm_dreb_fast_break,
+                                )
+
                                 possession_flips = True
-                                self.game_state["offensive_state"] = "HCO"
                                 self.game_state["last_rebounder"] = rebounder
-                                result["next_play_type"] = "HCO"
+                                arm_dreb_fast_break(
+                                    self.game,
+                                    source=SOURCE_FB_MISS,
+                                    rebounder=rebounder,
+                                    rebounding_team=def_team,
+                                    result=result,
+                                    shooting_lineup=off_lineup,
+                                    rebounding_lineup=def_lineup,
+                                    is_away_shooting=is_away_offense,
+                                )
 
                     # Display orientation: home shoots at HOME_RIM (x=91), away shoots at AWAY_RIM (x=9).
                     # Both off and def rebounders cluster near the basket where the shot was taken.
@@ -3159,16 +3172,28 @@ class ShotManager:
                             self.game, result, rebounder, stat
                         )
                     else:
+                        from BackEnd.engine.dreb_fast_break_arming import (
+                            SOURCE_FB_MISS,
+                            arm_dreb_fast_break,
+                        )
+
                         rebounder.record_stat("DREB")
                         text += f"{shooter} misses the layup -- {get_name_safe(rebounder)} grabs the defensive rebound."
                         result["rebounderId"] = getattr(rebounder, "player_id", None)
                         result["rebound_type"] = "DREB"
                         possession_flips = True
-                        text += " -- entering half court."
-                        self.game_state["offensive_state"] = "HCO"
                         self.game_state["last_rebounder"] = rebounder
                         self.game_state["last_rebound"] = "DREB"
-                        result["next_play_type"] = "HCO"
+                        arm_dreb_fast_break(
+                            self.game,
+                            source=SOURCE_FB_MISS,
+                            rebounder=rebounder,
+                            rebounding_team=def_team,
+                            result=result,
+                            shooting_lineup=off_lineup,
+                            rebounding_lineup=def_lineup,
+                            is_away_shooting=(off_team.team_id == self.game.away_team.team_id),
+                        )
             else:
                 # 1+ defenders: Find closest defender to bounce spot
                 # Build lineup from defenders present
@@ -3203,12 +3228,23 @@ class ShotManager:
                 result["rebounderId"] = getattr(rebounder, "player_id", None)
                 result["rebound_type"] = "DREB"
                 possession_flips = True
-                # Force HCO after defensive rebound from missed fast break shot
-                text += " -- entering half court."
-                self.game_state["offensive_state"] = "HCO"
-                result["next_play_type"] = "HCO"  # ✅ FIX: Set next_play_type so game_manager can detect DREB→HCO transition
                 self.game_state["last_rebounder"] = rebounder
                 self.game_state["last_rebound"] = "DREB"
+                from BackEnd.engine.dreb_fast_break_arming import (
+                    SOURCE_FB_MISS,
+                    arm_dreb_fast_break,
+                )
+
+                arm_dreb_fast_break(
+                    self.game,
+                    source=SOURCE_FB_MISS,
+                    rebounder=rebounder,
+                    rebounding_team=def_team,
+                    result=result,
+                    shooting_lineup=off_lineup,
+                    rebounding_lineup=def_lineup,
+                    is_away_shooting=(off_team.team_id == self.game.away_team.team_id),
+                )
             
             # Store bounce spot for animation
             result["ball_bounce_x"] = bounce_spot["x"]

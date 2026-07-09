@@ -2701,6 +2701,11 @@ def _variant_flight_end(
         return {"x": float(msss["x"]) + x_sign * 3.0,
                 "y": float(msss["y"]) + y_off}
     if variant == "AIRBALL":
+        if turn_result.get("flss"):
+            lx = turn_result.get("flss_airball_land_x")
+            ly = turn_result.get("flss_airball_land_y")
+            if lx is not None and ly is not None:
+                return {"x": float(lx), "y": float(ly)}
         # 2 grid units short of MSSS toward midcourt. Home (90,25) → (88,25);
         # away (10,25) → (12,25).
         x_sign = +1.0 if away_offense else -1.0
@@ -3105,10 +3110,17 @@ def _build_post_shot_sub_steps(
             trigger_kind="bank_graze",
         )
     elif is_airball:
-        # AIRBALL: ball continues from 2-short past the rim to the OOB
-        # sideline. No rebound bounce.
-        oob_target = (dict(AIRBALL_OOB_AWAY_COORDS) if away_offense
-                      else dict(AIRBALL_OOB_HOME_COORDS))
+        # AIRBALL: ball continues from flight-end landing to the OOB sideline.
+        # FLSS rolls a random short landing (see ``roll_flss_airball_animation_coords``)
+        # and OOB y matches landing y; FG/FT use fixed ``AIRBALL_OOB_*`` resting points.
+        if turn_result.get("flss") and turn_result.get("flss_airball_oob_x") is not None:
+            oob_target = {
+                "x": float(turn_result["flss_airball_oob_x"]),
+                "y": float(turn_result.get("flss_airball_oob_y") or turn_result.get("flss_airball_land_y") or 25),
+            }
+        else:
+            oob_target = (dict(AIRBALL_OOB_AWAY_COORDS) if away_offense
+                          else dict(AIRBALL_OOB_HOME_COORDS))
         _append_motion(
             ball_end=oob_target,
             step_t=float(AIRBALL_OOB_GAME_SECONDS),

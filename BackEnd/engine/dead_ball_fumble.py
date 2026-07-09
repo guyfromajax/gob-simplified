@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import AWAY_RIM_COORDS, HOME_RIM_COORDS
@@ -190,26 +191,81 @@ def inject_dead_ball_fumble_before_turn_stop(
     away_offense: bool,
 ) -> None:
     """Insert fumble beat immediately before terminal DEAD_BALL_TURNOVER turn_stop."""
-    if not steps or not is_dead_ball_fumble_turn(turn_result):
+    if not is_dead_ball_fumble_turn(turn_result):
+        return
+    if not steps:
+        logging.warning(
+            "[DEAD-BALL-FUMBLE] skip=no_steps current_turn=%s result_type=%s "
+            "turnover_type=%s text=%s",
+            turn_result.get("current_turn"),
+            turn_result.get("result_type"),
+            turn_result.get("turnover_type"),
+            turn_result.get("text"),
+        )
         return
     if _has_fumble_flourish_step(steps):
+        logging.warning(
+            "[DEAD-BALL-FUMBLE] skip=already_injected current_turn=%s result_type=%s "
+            "steps=%s",
+            turn_result.get("current_turn"),
+            turn_result.get("result_type"),
+            len(steps),
+        )
         return
 
     anchor_idx = _find_dead_ball_turn_stop_step_index(steps)
     if anchor_idx is None:
+        terminal_next = (steps[-1].get("end") or {}).get("next") if steps else None
+        logging.warning(
+            "[DEAD-BALL-FUMBLE] skip=no_dead_ball_turn_stop current_turn=%s "
+            "result_type=%s turnover_type=%s steps=%s terminal_next=%s",
+            turn_result.get("current_turn"),
+            turn_result.get("result_type"),
+            turn_result.get("turnover_type"),
+            len(steps),
+            terminal_next,
+        )
         return
 
     anchor = steps[anchor_idx]
     turn_stop_next = (anchor.get("end") or {}).get("next")
     if not isinstance(turn_stop_next, dict):
+        logging.warning(
+            "[DEAD-BALL-FUMBLE] skip=bad_turn_stop_next current_turn=%s "
+            "result_type=%s anchor_idx=%s next=%s",
+            turn_result.get("current_turn"),
+            turn_result.get("result_type"),
+            anchor_idx,
+            turn_stop_next,
+        )
         return
 
     end_coords = (anchor.get("end") or {}).get("coords") or {}
     if not end_coords:
+        logging.warning(
+            "[DEAD-BALL-FUMBLE] skip=no_end_coords current_turn=%s result_type=%s "
+            "anchor_idx=%s",
+            turn_result.get("current_turn"),
+            turn_result.get("result_type"),
+            anchor_idx,
+        )
         return
 
     bh_id = _resolve_ball_handler_id(turn_result, end_coords)
     if not bh_id or bh_id not in end_coords:
+        logging.warning(
+            "[DEAD-BALL-FUMBLE] skip=no_handler_coord current_turn=%s result_type=%s "
+            "anchor_idx=%s resolved_bh_id=%s victim_id=%s shooter_id=%s "
+            "ball_handler_id=%s coords_count=%s",
+            turn_result.get("current_turn"),
+            turn_result.get("result_type"),
+            anchor_idx,
+            bh_id,
+            turn_result.get("victim_id"),
+            turn_result.get("shooter_id"),
+            turn_result.get("ball_handler_id"),
+            len(end_coords),
+        )
         return
 
     clock = dict((anchor.get("end") or {}).get("clock") or {"clock_remaining": 0.0, "shot_clock_remaining": 0.0})
@@ -232,6 +288,17 @@ def inject_dead_ball_fumble_before_turn_stop(
         turn_stop_next=turn_stop_next,
     )
     steps.append(fumble_step)
+    logging.warning(
+        "[DEAD-BALL-FUMBLE] injected current_turn=%s result_type=%s label=%s "
+        "handler_id=%s anchor_idx=%s fumble_idx=%s steps=%s",
+        turn_result.get("current_turn"),
+        turn_result.get("result_type"),
+        label,
+        bh_id,
+        anchor_idx,
+        fumble_idx,
+        len(steps),
+    )
 
 
 def finalize_dead_ball_fumble_for_turn(
@@ -248,6 +315,15 @@ def finalize_dead_ball_fumble_for_turn(
         return
     steps = turn_result.get("animation_steps")
     if not isinstance(steps, list) or not steps:
+        if is_dead_ball_fumble_turn(turn_result):
+            logging.warning(
+                "[DEAD-BALL-FUMBLE] finalize_skip=no_animation_steps current_turn=%s "
+                "result_type=%s turnover_type=%s text=%s",
+                turn_result.get("current_turn"),
+                turn_result.get("result_type"),
+                turn_result.get("turnover_type"),
+                turn_result.get("text"),
+            )
         return
     off_team = getattr(game, "offense_team", None)
     away_team = getattr(game, "away_team", None)

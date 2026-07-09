@@ -287,6 +287,8 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 
 **Micro-movements:** FLSS does **not** use shot micro-movements — no family selection, no `inject_shot_micro_before_post_shot` (see [`Shot_Micro_Movements_System.md`](Shot_Micro_Movements_System.md)).
 
+**FLSS AIRBALL animation:** On `shot_variant === "AIRBALL"`, backend rolls a random short landing (`2–5` grid x-units out from the attacking basket, y `basket_y ± 5`) via `roll_flss_airball_animation_coords()` — stamped as `flss_airball_land_*` / `flss_airball_oob_*` on the turn. Schema `[ball_flight]` ends at the landing; OOB continuation tweens to the sideline at the **same y** (`airball_oob` trigger, `airball.wav` unchanged). No **Airball!** headline on heave-zone FLSS. FG/FT AIRBALL paths are unchanged. See [`Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) § FLSS.
+
 ---
 
 ## 9. Post-shot progression (clock > 0)

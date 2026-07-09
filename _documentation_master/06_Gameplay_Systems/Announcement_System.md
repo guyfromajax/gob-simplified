@@ -446,6 +446,11 @@ Frontend-only calls to `showAnnouncement()` / `showSecondaryAnnouncement()` are 
 | **Fast Break terminal defensive foul language** | 300ms | `fb_terminal_announce.py` | Fast Break terminal non-shooting defensive foul, selected from weighted foul language |
 | **Fast Break terminal dead-ball turnover language** | 300ms | `fb_terminal_announce.py` | Fast Break terminal dead-ball turnover; e.g. "Travel!" / "Double Dribble!" or typed turnover text |
 
+Dead-ball fumble notes:
+- `dead_ball_fumble.py` inserts the fumble micro-animation only when a qualifying dead-ball turnover has schema `animation_steps` with a terminal `next: {"kind": "turn_stop", "event": "DEAD_BALL_TURNOVER"}` anchor.
+- RR/Triangle Fast Break cutoff-drive dead balls use that same anchor in `fb_drive_step_emitter.py`; batted-OOB is intentionally excluded because offense retains possession.
+- Backend diagnostic marker: search logs for `[DEAD-BALL-FUMBLE]` to see `injected` or the exact skip reason (`no_animation_steps`, `no_dead_ball_turn_stop`, `no_handler_coord`, etc.).
+
 ### Secondary Announcements That Freeze
 
 | Banner text | Hold | Schema source | Beat |

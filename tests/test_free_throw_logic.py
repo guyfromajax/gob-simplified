@@ -161,13 +161,15 @@ def test_technical_free_throw_retains_possession():
     assert game.offense_team == game.home_team
 
 
-def test_missed_final_ft_dreb_no_fast_break_while_flag_disabled(monkeypatch):
-    """TEMP: _FT_MISS_DREB_FAST_BREAK_ENABLED False → DREB after last FT miss sets HCO, not FAST_BREAK."""
-    assert phase_resolution_module._FT_MISS_DREB_FAST_BREAK_ENABLED is False
+def test_missed_final_ft_dreb_can_arm_fast_break(monkeypatch):
+    """Final FT miss → DREB uses shared arming (slider 4 + roll hit → FAST_BREAK)."""
+    import random as _rnd
+
     game, shooter = _setup_game(one_and_one=False)
     shooter.attributes["FT"] = 1
     shooter.attributes["CH"] = 1
     shooter.attributes["MO"] = 0
+    game.defense_team.strategy_settings["fast_breaks"] = 4
     dreb_c = game.defense_team.lineup["C"]
 
     def fake_determine_rebounder(
@@ -179,14 +181,19 @@ def test_missed_final_ft_dreb_no_fast_break_while_flag_disabled(monkeypatch):
         "BackEnd.engine.phase_resolution.random.randint",
         lambda a, b: 100 if (a, b) == (1, 100) else 1,
     )
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
+    monkeypatch.setattr(_rnd, "random", lambda: 0.0)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.determine_rebounder", fake_determine_rebounder)
+    monkeypatch.setattr(
+        "BackEnd.engine.dreb_fast_break_arming.play_key_for_fast_break_entry",
+        lambda *a, **k: "rim_runner",
+    )
     with patch.object(Animator, "capture_free_throw_animation", return_value=[]):
         result = resolve_free_throw_logic(game)
 
     assert result.get("rebound_type") == "DREB"
-    assert result.get("next_play_type") == "HCO"
-    assert game.game_state["offensive_state"] == "HCO"
+    assert result.get("next_play_type") == "FAST_BREAK"
+    assert game.game_state["offensive_state"] == "FAST_BREAK"
+    assert game.game_state.get("pending_dreb_fb_play_key") == "rim_runner"
 
 
 def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):

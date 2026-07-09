@@ -16,8 +16,11 @@ from BackEnd.engine.eoq_perfection import (
     build_flss_skeleton_steps,
     classify_flss_zone,
     compute_flss_drive_plan,
+    ensure_flss_miss_bounce_coords,
     flss_heave_sfx_eligible,
     resolve_flss_coach_sfx_stamp,
+    roll_flss_airball_animation_coords,
+    stamp_flss_airball_animation_coords,
     strip_terminal_rebound_fields,
 )
 from BackEnd.utils import situational_logic as sl
@@ -159,3 +162,54 @@ def test_select_flss_heave_miss_variant_bands():
     assert select_flss_heave_miss_variant(16, rng=random.Random(0)) == SHOT_VARIANT_BANK_MISS
     assert select_flss_heave_miss_variant(30, rng=random.Random(0)) == SHOT_VARIANT_BANK_MISS
     assert select_flss_heave_miss_variant(31, rng=random.Random(0)) == SHOT_VARIANT_AIRBALL
+
+
+def test_ensure_flss_miss_bounce_coords_stamps_non_airball():
+    game = _Game(4, 70, 68)
+    result = {
+        "flss": True,
+        "result_type": "MISS",
+        "shot_variant": "BACK_OF_RIM",
+    }
+    ensure_flss_miss_bounce_coords(
+        game, result, shooter_coords={"x": 40, "y": 25}
+    )
+    assert result.get("ball_bounce_x") is not None
+    assert result.get("ball_bounce_y") is not None
+
+
+def test_ensure_flss_miss_bounce_coords_skips_airball():
+    game = _Game(4, 70, 68)
+    result = {
+        "flss": True,
+        "result_type": "MISS",
+        "shot_variant": "AIRBALL",
+    }
+    ensure_flss_miss_bounce_coords(
+        game, result, shooter_coords={"x": 40, "y": 25}
+    )
+    assert "ball_bounce_x" not in result
+    assert "ball_bounce_y" not in result
+
+
+def test_roll_flss_airball_animation_coords_home():
+    coords = roll_flss_airball_animation_coords(away_offense=False, rng=random.Random(0))
+    assert 86 <= coords["flss_airball_land_x"] <= 89
+    assert 20 <= coords["flss_airball_land_y"] <= 30
+    assert coords["flss_airball_oob_x"] == 97.0
+    assert coords["flss_airball_oob_y"] == coords["flss_airball_land_y"]
+
+
+def test_roll_flss_airball_animation_coords_away():
+    coords = roll_flss_airball_animation_coords(away_offense=True, rng=random.Random(1))
+    assert 11 <= coords["flss_airball_land_x"] <= 14
+    assert coords["flss_airball_oob_x"] == 3.0
+    assert coords["flss_airball_oob_y"] == coords["flss_airball_land_y"]
+
+
+def test_stamp_flss_airball_animation_coords():
+    game = _Game(4, 70, 68)
+    result = {"flss": True, "result_type": "MISS", "shot_variant": "AIRBALL"}
+    stamp_flss_airball_animation_coords(game, result)
+    assert result.get("flss_airball_land_x") is not None
+    assert result.get("flss_airball_oob_y") == result.get("flss_airball_land_y")

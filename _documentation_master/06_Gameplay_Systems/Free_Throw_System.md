@@ -189,7 +189,7 @@ if game_state.get("one_and_one", False):
 - Uses unified geography-based rebound system (same as HCO, Fast Break, Putback):
   - Calculate `bounce_spot` via `calculate_bounce_spot()` from the basket being attacked.
   - Use `determine_rebounder()` to find closest player to bounce spot.
-- **Defensive Rebound (DREB)**: possession flips → next play = FAST_BREAK (if FB chance) or HCO. A discrete DREB schema turn is built via `_build_dreb_turn_from_miss`.
+- **Defensive Rebound (DREB)**: possession flips → next play = FAST_BREAK (if FB chance via shared `arm_dreb_fast_break`, Covert uses FT-lane geo) or HCO. A discrete DREB schema turn is built via `_build_dreb_turn_from_miss`. See [Fast_Break_System.md](Fast_Break_System.md) initiation table.
 - **Offensive Rebound (OREB)**: stored in `game_state["pending_oreb"]` → separate OREB turn fires next.
 
 **Non-final FT misses** do not run authoritative rebound logic — the ball returns to the shooter for the next attempt (see Animation Sequence below).

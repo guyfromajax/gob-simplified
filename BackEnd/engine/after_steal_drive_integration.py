@@ -571,9 +571,23 @@ def _resolve_rebound_on_miss(
             "rebounder_id": rebounder_pid,
             "from_block": False,
         }
+        game_state.pop("_fb_miss_dreb_fb_arm_stamp", None)
     else:
-        game_state["offensive_state"] = "HCO"
-        game_state["last_rebounder"] = new_rebounder
+        # DREB after FB miss — arm chained FAST_BREAK (or HCO) via shared helper.
+        from BackEnd.engine.dreb_fast_break_arming import SOURCE_FB_MISS, arm_dreb_fast_break
+
+        arm_stamp: Dict[str, Any] = {}
+        arm_dreb_fast_break(
+            game,
+            source=SOURCE_FB_MISS,
+            rebounder=new_rebounder,
+            rebounding_team=def_team,
+            result=arm_stamp,
+            shooting_lineup=off_lineup,
+            rebounding_lineup=def_lineup,
+            is_away_shooting=is_away_offense,
+        )
+        game_state["_fb_miss_dreb_fb_arm_stamp"] = arm_stamp
         possession_flips = True
 
     return possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid
@@ -1109,6 +1123,9 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                 turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
                 turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
             stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, shooter_loc)
+            from BackEnd.engine.dreb_fast_break_arming import consume_fb_miss_dreb_arm_stamp
+
+            consume_fb_miss_dreb_arm_stamp(game, turn_result, rebound_type=rebound_type)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         apply_made_dunk_momentum(
             shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],
@@ -1224,7 +1241,9 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             turn_result["offense_rebounders"] = rebound_attemptors["offense_rebounders"]
             turn_result["defense_rebounders"] = rebound_attemptors["defense_rebounders"]
         stamp_fb_miss_bounce_coords(turn_result, rebound_ball_spot, bh_target)
-        turn_result["next_play_type"] = "OREB" if rebound_type == "OREB" else "HCO"
+        from BackEnd.engine.dreb_fast_break_arming import consume_fb_miss_dreb_arm_stamp
+
+        consume_fb_miss_dreb_arm_stamp(game, turn_result, rebound_type=rebound_type)
     _stamp_fb_shooting_foul_on_turn(turn_result, shot)
     select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
     apply_made_dunk_momentum(
