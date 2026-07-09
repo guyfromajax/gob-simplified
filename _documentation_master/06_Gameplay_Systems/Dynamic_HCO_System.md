@@ -3,6 +3,7 @@
 **Feature gates (independent):**
 - `GOB_DYNAMIC_HCO_MOTION` (`1`/`true`/`yes`/`on`) — motion plays
 - `GOB_DYNAMIC_HCO_SETPLAY` — set plays (overlay on the variant skeleton; see **§ Set plays**)
+- `GOB_DYNAMIC_HCO_DEFENSE` — **ON by default**; per-turn defender posture placement + (planned) two-gate intercept. In development — see **§ Dynamic Defense**.
 
 Off → legacy HCO path (up-front outcome tables + static skeleton). This doc describes the ON path for **both**.
 
@@ -152,6 +153,48 @@ The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it
 | Forced (<1s) | 100% (existing `<1s` forced-shot backstop) |
 
 Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
+
+---
+
+### Dynamic Defense 🚧 **IN DEVELOPMENT** (ON by default, July 2026)
+
+**Gate:** `GOB_DYNAMIC_HCO_DEFENSE` (independent; **default ON**, kill switch = falsy). Off → legacy glued-to-man defender placement. Design/working doc: [Dynamic_MM_Brief.md](../projects/Dynamic_MM_Brief.md). Phased build (P1–P7); this section documents what is **live**.
+
+**Goal:** make HCO defenders dynamic instead of pinned to their man — a per-turn team **posture** shifts placement, and (planned) an interception model reads pass lanes. Legacy steal/turnover mechanics (per-step moment + hot-read/kickout pass contest) are **unchanged** and run alongside.
+
+#### Live now — P1: posture placement (man defense)
+
+Each HCO turn rolls a team-wide **posture** (`_roll_defense_posture`, phase_resolution.py) — interim `random(loose/normal/tight)`; later the chosen tight/loose **playcall variant** (P6). It is stashed on `game_state["_hco_defense_posture"]`; the animator (`_position_standard_defenders`) reads it and passes it to `get_defender_coords`, which shades the baseline man position (`_apply_defender_posture`, shared_defense.py). **Purely positional** — no new steals yet.
+
+| Posture | On-ball (BH) defender | Off-ball defender |
+|---|---|---|
+| **tight** | 1 grid tighter (toward the man) | **deny** — hugs the man on the ball side, in his passing lane (`POSTURE_DENY_DISTANCE` off the man) |
+| **normal** | baseline (`get_spacing`) | baseline man position |
+| **loose** | 2 grid more cushion (sag) | **help** — sags toward mid-floor (fraction `POSTURE_HELP_SHADE` toward the ball→basket line) |
+
+- **Inside-man lock:** a defender guarding an **inside** man (lowPost/midPost/midLane/basketSpot) always plays **normal** post D, regardless of posture.
+- **Scope:** **man defense render only** (zone placement not yet shaded). Read-side / offense reaction not wired.
+- **Orientation-safe:** posture shade runs in the caller's orientation (verified home + away); `posture=None`/`"normal"` is a strict no-op, so every non-HCO caller (fast break, HCT, quarter-start, attack-drives) is untouched. Coords flow through the shared reconstruction (render + future read agree — emitter-as-god façade).
+
+#### Tunable Constants (P1)
+
+| Constant | File | Default | Effect |
+|---|---|---|---|
+| `POSTURE_ONBALL_CUSHION_DELTA` | shared_defense.py | `{tight:-1, loose:+2}` | On-ball cushion shift along man→basket (+ = more cushion/sag). |
+| `POSTURE_DENY_DISTANCE` | shared_defense.py | `2.0` | Off-ball tight: grid off the man, ball-side (in his passing lane). |
+| `POSTURE_HELP_ANCHOR_FRAC` | shared_defense.py | `0.5` | Help anchor = this far along the ball→basket line (mid-floor). |
+| `POSTURE_HELP_SHADE` | shared_defense.py | `{loose:0.55}` | Off-ball loose: fraction from baseline toward the help anchor. |
+| `_HCO_DEFENSE_POSTURES` | phase_resolution.py | `(loose,normal,tight)` | Interim random posture pool (→ playcall variants in P6). |
+
+#### Roadmap (planned)
+
+| Phase | Item |
+|---|---|
+| **P2** | Two-gate intercept — Gate 1 geometry (defender in a pass lane) → Gate 2 `aggression_call` (aggressive 50 / normal 25 / passive 0) → Gate 3 `resolve_pass_contest`. Posture gates *viability by distance*: tight can jump his man's pass, loose can't (only help lanes). |
+| **P3** | Reactive resolution + graded openness (generalize the SM freeze to every step type). |
+| **P4–P5** | Offense reads the commitment → `attack` / relocate / step-in / new `backdoor`; dish-receiver agency on the catch. |
+| **P6** | Real tight/loose **playcall variants** replace the interim random pick. |
+| **P7** | Zone-defense posture parity; tuning; tests. |
 
 ---
 
