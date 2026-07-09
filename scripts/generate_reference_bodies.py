@@ -65,9 +65,12 @@ FRAMES = {
               "sides, normal neck.",
     "Normal": "Build: an average high-school athlete — medium shoulders about "
               "twice the width of the head, roughly reaching the side edges.",
-    "Broad":  "Build: a big powerful athlete — very broad shoulders much wider "
-              "than the head that extend PAST the side edges of the frame "
-              "(bleeding off both sides), thick muscular neck.",
+    "Broad":  "Build: an exceptionally big, powerful, heavily-muscled athlete — "
+              "enormous broad shoulders and thick traps roughly THREE times the "
+              "width of the head, so wide they are CROPPED by the left and right "
+              "edges of the image and clearly bleed off both sides; a thick "
+              "muscular neck as wide as the jaw; a heavy powerful upper body. "
+              "The shoulders must NOT fit inside the frame.",
     "Doughy": "Build: heavyset and soft — wide rounded sloping shoulders "
               "reaching the edges, a thick soft neck, a fuller rounder face and "
               "a heavier fuller torso.",
