@@ -34,15 +34,35 @@ MODEL = "gemini-3.1-flash-lite-image"   # Nano Banana 2 Lite
 
 PROMPT = (
     "Two images are attached. The FIRST is a basketball player portrait. "
-    "The SECOND is the team's branding banner, showing the team's wordmark and "
-    "colors. Redesign the player's jersey in the FIRST image as a basketball "
-    "tank in the team's primary color with trim in the team's secondary color, "
-    "matching the banner. Paint the team wordmark \"{wordmark}\" across the "
-    "chest in the same font and style as shown in the banner, screen-printed "
-    "onto the fabric so it follows the folds and wrinkles. Do not add any "
-    "number. Keep the player's face, skin tone, hair, body, and expression "
-    "exactly the same. Plain light background."
+    "The SECOND is the team's branding banner (colors and wordmark reference). "
+    "Redesign the player's jersey in the FIRST image so the MAIN JERSEY BODY is "
+    "{primary_name}, with {secondary_name} trim around the neckline and "
+    "armholes. Paint the team wordmark \"{wordmark}\" across the chest in "
+    "{secondary_name}, in the same font and style as shown in the banner, "
+    "screen-printed onto the fabric so it follows the folds and wrinkles. Do "
+    "not add any number. Keep the player's face, skin tone, hair, body, and "
+    "expression exactly the same. Plain light background."
 )
+
+
+def hex2rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+
+def color_name(hexstr):
+    """A plain-English color name NB can act on (image models ignore hex)."""
+    import colorsys
+    r, g, b = hex2rgb(hexstr)
+    h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
+    hue = h * 360
+    if s < 0.15:
+        return "white" if v > 0.8 else "black" if v < 0.3 else "gray"
+    fam = ("red" if hue < 15 or hue >= 345 else "orange" if hue < 45 else
+           "gold" if hue < 70 else "green" if hue < 170 else "teal" if hue < 200
+           else "blue" if hue < 255 else "purple" if hue < 290 else "magenta")
+    mod = "light " if (v > 0.7 and s < 0.65) else "dark " if v < 0.45 else ""
+    return f"{mod}{fam}"
 
 
 def load_env(path=".env"):
@@ -70,8 +90,11 @@ def team_info(team_name):
         if slug(name) == want:
             mascot = parts[2]
             team_id = next((p for p in parts if re.match(r"[A-Z][A-Z_]+$", p)), None)
-            return mascot, team_id
-    return None, None
+            hexes = [p for p in parts if re.match(r"#?[0-9a-fA-F]{6}$", p)]
+            primary = hexes[0] if hexes else None
+            secondary = hexes[1] if len(hexes) > 1 else None
+            return mascot, team_id, primary, secondary
+    return None, None, None, None
 
 
 def team_players(team_name):
@@ -105,14 +128,17 @@ def main():
     except ImportError:
         sys.exit("missing deps. Run:  pip install google-genai pillow")
 
-    mascot, team_id = team_info(args.team)
+    mascot, team_id, primary_hex, secondary_hex = team_info(args.team)
     if not team_id:
         sys.exit(f"team '{args.team}' not found in teams/128_teams.txt")
     wordmark = (mascot or args.team).upper()
+    primary_name = color_name(primary_hex)
+    secondary_name = color_name(secondary_hex)
     banner = f"FrontEnd/static/images/teams/{team_id.lower()}/{team_id.lower()}_banner_primary.jpg"
     if not os.path.exists(banner):
         sys.exit(f"banner not found: {banner}")
-    print(f"[team] {args.team}  wordmark={wordmark}  banner={banner}")
+    print(f"[team] {args.team}  wordmark={wordmark}  "
+          f"body={primary_name} ({primary_hex})  trim={secondary_name} ({secondary_hex})")
 
     players = team_players(args.team)
     if args.only:
@@ -123,7 +149,8 @@ def main():
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     os.makedirs(args.out, exist_ok=True)
     banner_img = Image.open(banner)
-    prompt = PROMPT.format(wordmark=wordmark)
+    prompt = PROMPT.format(wordmark=wordmark, primary_name=primary_name,
+                           secondary_name=secondary_name)
 
     ok = 0
     for p in players:
