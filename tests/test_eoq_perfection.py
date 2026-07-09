@@ -71,16 +71,27 @@ def test_flss_heave_sfx_eligible():
 
 
 def test_resolve_flss_coach_sfx_stamp():
+    from BackEnd.constants.flss_sfx import (
+        FINAL_SHOT_SFX_FILES,
+        FLSS_COACH_VO_HEAVE_FILE,
+        FLSS_COACH_VO_LAUNCH_FILE,
+        flss_coach_vo_pool,
+    )
+
+    assert flss_coach_vo_pool(flss_heave_sfx=False) == (FLSS_COACH_VO_LAUNCH_FILE,)
+    assert flss_coach_vo_pool(flss_heave_sfx=True) == (
+        FLSS_COACH_VO_LAUNCH_FILE,
+        FLSS_COACH_VO_HEAVE_FILE,
+    )
+
     base = resolve_flss_coach_sfx_stamp(flss_heave_sfx=False)
     assert base["event"] == "flss_vo"
-    assert base["file"] in ("braddock-finalshot.mp3", "sammy-launch.mp3")
+    assert base["file"] == FLSS_COACH_VO_LAUNCH_FILE
+    assert base["file"] not in FINAL_SHOT_SFX_FILES
     assert base["volume"] == 0.7
     heave = resolve_flss_coach_sfx_stamp(flss_heave_sfx=True)
-    assert heave["file"] in (
-        "braddock-finalshot.mp3",
-        "sammy-launch.mp3",
-        "duke-heave.mp3",
-    )
+    assert heave["file"] in (FLSS_COACH_VO_LAUNCH_FILE, FLSS_COACH_VO_HEAVE_FILE)
+    assert heave["file"] not in FINAL_SHOT_SFX_FILES
 
 
 def test_should_run_out_clock_q4():

@@ -449,6 +449,7 @@ Frontend-only calls to `showAnnouncement()` / `showSecondaryAnnouncement()` are 
 Dead-ball fumble notes:
 - `dead_ball_fumble.py` inserts the fumble micro-animation only when a qualifying dead-ball turnover has schema `animation_steps` with a terminal `next: {"kind": "turn_stop", "event": "DEAD_BALL_TURNOVER"}` anchor.
 - RR/Triangle Fast Break cutoff-drive dead balls use that same anchor in `fb_drive_step_emitter.py`; batted-OOB is intentionally excluded because offense retains possession.
+- Fast Break drive-resolution dead balls run fumble injection before `fb_terminal_announce.py`; if the fumble step is inserted, it owns the Travel/Double Dribble headline and the generic FB terminal turnover announcement no-ops.
 - HCO dead-ball turnovers must not stamp `stealer_id`; pressure defenders can force the travel/double-dribble, but `stealer_id` is reserved for actual steal turns and the fumble helper excludes steal-like payloads.
 - Backend diagnostic marker: search logs for `[DEAD-BALL-FUMBLE]` to see `injected` or the exact skip reason (`no_animation_steps`, `no_dead_ball_turn_stop`, `no_handler_coord`, etc.).
 

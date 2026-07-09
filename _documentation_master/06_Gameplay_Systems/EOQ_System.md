@@ -258,7 +258,7 @@ At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` already set **a
 
 **"Final Shot"** secondary headline **only** when `turn.final_turn === true`, `turn.flss !== true`, and `result_type !== 'FINAL_HOLD'`. See [`Announcement_System.md`](Announcement_System.md).
 
-**FLSS does not show the "Final Shot" headline.** Normal-zone FLSS: no announce. Penalty/heave zones: coach VO only (`sfx_on_step_start` on the terminal shoot step — `braddock-finalshot` / `sammy-launch` / `duke-heave` per EOQ_Perfection_Brief).
+**FLSS does not show the "Final Shot" headline.** Normal-zone FLSS: no announce. Penalty/heave zones: coach VO only (`sfx_on_step_start` on the terminal shoot step — `sammy-launch` / `duke-heave` only; Final Shot SFX explicitly excluded via `BackEnd/constants/flss_sfx.py`).
 
 When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCourtSfx` so the stinger does not replay on follow-up full Final Turns in the same chain.
 

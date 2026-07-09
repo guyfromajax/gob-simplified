@@ -64,8 +64,8 @@ If they lose a game because their palyers made a mistke, their player missed a k
 - FLSS Shot animation
     - if x >= deep key x, animate ball as normal, no announce
     - else: animate ball as normal, and play the LFSS SFX files noted below.
-    - LFSS SFX files
-        - braddock-finalshot and sammy-launch are available for random choice in all LFSS instances
-        - duke-heave is also availaible if x <= 50 (or >= 50 if away offense)
+    - LFSS SFX files (launch/heave only — Final Shot SFX excluded; see `BackEnd/constants/flss_sfx.py`)
+        - sammy-launch on all penalty/heave FLSS instances
+        - duke-heave also available when x <= 50 (or >= 50 if away offense)
 
     

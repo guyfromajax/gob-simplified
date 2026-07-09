@@ -820,7 +820,10 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       scene,
       stepStartSfx.file,
       typeof stepStartSfx.volume === "number" ? stepStartSfx.volume : 0.7,
-      { event: stepStartSfx.event || "step_start" },
+      {
+        event: stepStartSfx.event || "step_start",
+        turnData: options.turnData,
+      },
     );
   }
 

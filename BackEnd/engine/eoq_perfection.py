@@ -91,14 +91,9 @@ def flss_heave_sfx_eligible(shooter_x: float, *, is_home_offense: bool) -> bool:
 
 def resolve_flss_coach_sfx_stamp(*, flss_heave_sfx: bool) -> Dict[str, Any]:
     """Schema ``sfx_on_step_start`` payload for FLSS coach VO at the terminal shoot step."""
-    pool = ["braddock-finalshot.mp3", "sammy-launch.mp3"]
-    if flss_heave_sfx:
-        pool.append("duke-heave.mp3")
-    return {
-        "file": random.choice(pool),
-        "event": "flss_vo",
-        "volume": 0.7,
-    }
+    from BackEnd.constants.flss_sfx import resolve_flss_coach_sfx_stamp as _stamp
+
+    return _stamp(flss_heave_sfx=flss_heave_sfx)
 
 
 def _random_grid_near(anchor: Dict[str, float], radius: float = 5.0) -> Dict[str, float]:

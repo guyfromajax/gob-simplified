@@ -260,6 +260,7 @@ def build_fb_drive_resolution_steps(
         _suppress_fast_break_stinger,
     )
     from BackEnd.engine.covert_release_step_emitter import _build_nice_stop_announcement
+    from BackEnd.engine.dead_ball_fumble import inject_dead_ball_fumble_before_turn_stop
     from BackEnd.engine.fb_terminal_announce import stamp_fb_terminal_freeze
     from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
     from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
@@ -561,6 +562,13 @@ def build_fb_drive_resolution_steps(
         if result_type == "MAKE":
             _override_fb_make_announcement(steps)
 
+    # Dead-ball fumble owns the terminal Travel/Double Dribble announcement
+    # when it can inject. Run it before fb_terminal_announce so the terminal
+    # freeze helper sees the fumble announcement on the final step and no-ops,
+    # avoiding duplicate dead-ball headlines. Foul/charge freezes are unchanged.
+    inject_dead_ball_fumble_before_turn_stop(
+        steps, turn_result, away_offense=is_away_offense,
+    )
     stamp_fb_terminal_freeze(turn_result, steps, is_away_offense=is_away_offense)
     if suppress_stinger:
         _suppress_fast_break_stinger(steps)

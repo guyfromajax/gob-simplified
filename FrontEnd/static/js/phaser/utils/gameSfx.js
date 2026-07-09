@@ -1,3 +1,8 @@
+import {
+  coerceFlssSfxFilename,
+  resolveFlssCoachVoFile,
+} from '../constants/flssSfx.js';
+
 const DEFAULT_VOLUME = 0.7;
 const DEFAULT_POOL_SIZE = 4;
 const PRELOAD_TIMEOUT_MS = 2500;
@@ -201,6 +206,7 @@ export function getGameSfxDebugState() {
 }
 
 export function playGameSfx(scene, filename, volume = DEFAULT_VOLUME, meta = {}) {
+  filename = coerceFlssSfxFilename(filename, meta);
   if (!filename) {
     console.warn("[SFX] playGameSfx called with no filename", meta);
     return;
@@ -525,14 +531,10 @@ function pickRandomCourtEventFile(files) {
 /** FLSS coach VO — legacy helper; prefer backend ``sfx_on_step_start`` on the shoot step. */
 export function playFlssVoSfx(scene, turnData) {
   if (!turnData?.flss_vo) return;
-  const pool = ["braddock-finalshot.mp3", "sammy-launch.mp3"];
-  if (turnData.flss_heave_sfx) {
-    pool.push("duke-heave.mp3");
-  }
-  const file = pickRandomCourtEventFile(pool);
-  if (file) {
-    playGameSfx(scene, file, DEFAULT_VOLUME, { event: "flss_vo" });
-  }
+  const file = resolveFlssCoachVoFile({
+    flssHeaveSfx: Boolean(turnData.flss_heave_sfx),
+  });
+  playGameSfx(scene, file, DEFAULT_VOLUME, { event: "flss_vo", turnData });
 }
 
 const ONCE_PER_TURN_SECONDARY_HEADLINES = new Set(["Press!", "Trap!", "Fast Break!"]);

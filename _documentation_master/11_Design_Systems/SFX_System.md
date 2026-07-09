@@ -160,7 +160,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 
 - Trigger: at the **terminal shoot step** start (`sfx_on_step_start` on the emitted schema step), when `turn.flss_vo === true`.
 - Resolver: backend `resolve_flss_coach_sfx_stamp()` in `eoq_perfection.py` → stamped by `_stamp_flss_coach_vo_on_shoot_step()` in `skeleton_step_emitter.py`.
-- Files: **50/50** `braddock-finalshot.mp3` / `sammy-launch.mp3`; when `flss_heave_sfx === true`, **33/33/34** adds `duke-heave.mp3` to the pool.
+- Files: `sammy-launch.mp3` always; when `flss_heave_sfx === true`, random choice between `sammy-launch.mp3` and `duke-heave.mp3`. **Final Shot SFX is excluded** — see `BackEnd/constants/flss_sfx.py` / `FrontEnd/static/js/phaser/constants/flssSfx.js` (`FINAL_SHOT_SFX_FILES`; `playGameSfx` redirects if a stale stamp slips through).
 - FE playback: `animationPlayback.js` at step-processing start (same path as Dynamic HCO hot-read VO). Do **not** rely on ball detach — heave FLSS often has an instant shoot beat with no detach event.
 
 **Block Announce**
