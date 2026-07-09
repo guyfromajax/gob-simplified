@@ -48,6 +48,10 @@ SHORT_MAX = 69           # <=69" (<=5'9") + lean/normal build -> Slight
 BUILD_LEAN_MAX = 25.5    # BMI tertiles from the 1,536-player population
 BUILD_BROAD_MIN = 26.5
 DOUGHY_STRENGTH_MAX = 55  # heavy+soft below this ST reads fat (not powerful)
+# Mass override: BMI under-rates very tall players (a 7'0" 260 lb monster reads
+# Normal by BMI). Force Broad for anyone genuinely huge + strong, regardless.
+BROAD_WEIGHT_MIN = 235   # lb
+BROAD_STRENGTH_MIN = 65
 
 
 # --- DEFINITION axis (muscle vs fat), from ST/AG/RT ------------------------
@@ -125,9 +129,14 @@ def build_class(bmi):
     return "Normal"
 
 
-def frame_of(height, bmi, defi, st):
+def frame_of(height, weight, bmi, defi, st):
     """Resolve the FRAME (reference body) from size + definition."""
     base = build_class(bmi)
+    # Mass override: genuinely huge + strong players are Broad even if their
+    # BMI reads low (tall players get under-rated by BMI). Catches 7-footers.
+    if weight is not None and st is not None \
+            and weight >= BROAD_WEIGHT_MIN and st >= BROAD_STRENGTH_MIN:
+        return "Broad"
     # Doughy: heavy + soft + not strong reads as fat, not powerful.
     if defi == "Soft" and bmi >= BUILD_BROAD_MIN and (st is not None and st < DOUGHY_STRENGTH_MAX):
         return "Doughy"
@@ -143,7 +152,7 @@ def classify(p):
         return None
     bmi = 703 * w / (h ** 2)
     defi = definition(p.get("st"), p.get("ag"), p.get("rt"))
-    frame = frame_of(h, bmi, defi, p.get("st"))
+    frame = frame_of(h, w, bmi, defi, p.get("st"))
     # Doughy is a terminal type: pinned to Soft regardless of the raw axis.
     if frame == "Doughy":
         defi = "Soft"
