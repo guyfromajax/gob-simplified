@@ -28,9 +28,11 @@ import os
 import re
 import sys
 import glob
+import hashlib
 import argparse
 
 MODEL = "gemini-3.1-flash-lite-image"   # Nano Banana 2 Lite
+INVERT_PCT = 10   # % of teams that render body=secondary for variety (seeded)
 
 PROMPT = (
     "Two images are attached. The FIRST is a basketball player portrait. "
@@ -98,15 +100,35 @@ def team_info(team_name):
 
 
 def load_body_overrides(path="scripts/jersey_body_overrides.txt"):
-    """team_ids whose jersey BODY should be the secondary color (not primary)."""
+    """Return (force_swap, force_noswap) team_id sets.
+       'TEAM_ID' forces body=secondary; '!TEAM_ID' forces body=primary."""
+    force_swap, force_no = set(), set()
     if not os.path.exists(path):
-        return set()
-    out = set()
+        return force_swap, force_no
     for line in open(path):
         line = line.split("#", 1)[0].strip()
-        if line:
-            out.add(line.upper())
-    return out
+        if not line:
+            continue
+        if line.startswith("!"):
+            force_no.add(line[1:].strip().upper())
+        else:
+            force_swap.add(line.upper())
+    return force_swap, force_no
+
+
+def should_swap(team_id, cli_swap):
+    """Decide if a team's jersey body uses the SECONDARY color.
+       Order: explicit overrides > CLI flag > deterministic INVERT_PCT roll."""
+    tid = team_id.upper()
+    force_swap, force_no = load_body_overrides()
+    if tid in force_no:
+        return False, "override:primary"
+    if tid in force_swap:
+        return True, "override:secondary"
+    if cli_swap:
+        return True, "--swap-colors"
+    roll = int(hashlib.md5(tid.encode()).hexdigest(), 16) % 100
+    return (roll < INVERT_PCT), f"seeded {roll}<{INVERT_PCT}"
 
 
 def team_players(team_name):
@@ -146,11 +168,10 @@ def main():
     if not team_id:
         sys.exit(f"team '{args.team}' not found in teams/128_teams.txt")
     wordmark = (mascot or args.team).upper()
-    # Body defaults to the team primary; swap to secondary via --swap-colors
-    # or by listing the team_id in scripts/jersey_body_overrides.txt.
-    if args.swap_colors or team_id.upper() in load_body_overrides():
+    swap, why = should_swap(team_id, args.swap_colors)
+    if swap:
         primary_hex, secondary_hex = secondary_hex, primary_hex
-        print("[note] jersey body = team SECONDARY color (override)")
+        print(f"[note] jersey body = team SECONDARY color ({why})")
     primary_name = color_name(primary_hex)
     secondary_name = color_name(secondary_hex)
     banner = f"FrontEnd/static/images/teams/{team_id.lower()}/{team_id.lower()}_banner_primary.jpg"
