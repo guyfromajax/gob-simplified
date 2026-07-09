@@ -496,10 +496,20 @@ def _fb_shot_next_play_type(
 def _stamp_fb_shooting_foul_on_turn(
     turn_result: Dict[str, Any], shot: Dict[str, Any]
 ) -> None:
-    """Stamp FT transition fields when ``_resolve_shot_attempt`` recorded a foul."""
+    """Stamp shooting-foul fields when ``_resolve_shot_attempt`` recorded one.
+
+    The schema announcement helpers key off the fouler fields, not just the FT
+    transition, so keep this as the single Steal FB bridge from shot resolution
+    into animation/announcement payloads.
+    """
     if not shot.get("d_foul"):
         return
     turn_result["next_play_type"] = "FREE_THROW"
+    turn_result["foul_team"] = "DEFENSE"
+    turn_result["is_shooting_foul"] = True
+    foul_player_id = _safe_id(shot.get("foul_player"))
+    if foul_player_id:
+        turn_result["foul_player_id"] = foul_player_id
     ft_rem = shot.get("free_throws_remaining")
     if ft_rem:
         turn_result["free_throws_remaining"] = ft_rem
@@ -1126,6 +1136,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
             from BackEnd.engine.dreb_fast_break_arming import consume_fb_miss_dreb_arm_stamp
 
             consume_fb_miss_dreb_arm_stamp(game, turn_result, rebound_type=rebound_type)
+        _stamp_fb_shooting_foul_on_turn(turn_result, shot)
         select_and_stamp_shot_micro(turn_result, **shot["select_and_stamp_shot_micro_kwargs"])
         apply_made_dunk_momentum(
             shot["select_and_stamp_shot_micro_kwargs"]["shooter_player"],

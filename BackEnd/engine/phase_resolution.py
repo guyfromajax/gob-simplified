@@ -5192,8 +5192,12 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     passer_xy = _pt(_coord(bh_pos))
     receiver_xy = _pt(_coord(recv_pos))
     # Gate 1 — eligible interceptors: in-lane (perp <= lane_dist) with projection past the passer
-    # (t > 0.1), including the receiver end (<= 1.0). The passer's on-ball man (t≈0) is dropped.
-    eligible = defenders_in_lane(passer_xy, receiver_xy, def_xy, lane_dist, t_min=0.1, t_max=1.0)
+    # (t > 0.1), including the receiver end (<= 1.0). The passer's OWN defender is never eligible —
+    # exclude him by POSITION (not just t≈0) so posture sag can't drift him into the outgoing lane
+    # and "pick" his own man's pass. (Zone has no single passer-defender → rely on the t-band.)
+    _passer_def = set() if zone else {off_to_def.get(bh_pos, bh_pos)}
+    eligible = defenders_in_lane(passer_xy, receiver_xy, def_xy, lane_dist, t_min=0.1, t_max=1.0,
+                                 exclude=_passer_def)
     # Gate 2 — Dynamic HCO Defense (posture set): each in-lane defender only ATTEMPTS the pick per
     # defense aggression_call (aggressive 50 / normal 25 / passive 0). Non-attempters drop out;
     # if none commit, the pass completes. Legacy path (posture None) contests every eligible.
