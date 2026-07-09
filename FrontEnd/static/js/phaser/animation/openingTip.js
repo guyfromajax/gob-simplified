@@ -276,11 +276,7 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
                 // Handoff / Kickout / Walk Up) on the next turn handles the
                 // BH→PG transition based on `prior_turn.final_ball_handler_id`
                 // (= tip winner). Running both produced a double-pass to PG.
-                // Brief settle delay preserves the original beat between tip
-                // attach and HCO turn start.
-                scene.time.delayedCall(300, () => {
-                    if (onComplete) onComplete();
-                });
+                if (onComplete) onComplete();
             } else {
                 console.warn("⚠️ Could not find tip winner to attach ball to");
                 // Wait a moment before continuing

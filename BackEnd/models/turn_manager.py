@@ -4014,6 +4014,16 @@ class TurnManager:
                 build_skeleton_animation_steps,
             )
             anim_steps = build_skeleton_animation_steps(result, self.game)
+            if result.get("is_interception"):
+                import logging as _il
+                _skel = (result.get("skeleton") or {}).get("steps") or []
+                _il.warning(
+                    "🔎 [INTERCEPTION RENDER] result_type=%s steps=%d anim_steps=%s "
+                    "stealer_id=%s current_turn=%s",
+                    result.get("result_type"), len(_skel),
+                    "None" if anim_steps is None else len(anim_steps),
+                    result.get("stealer_id"), result.get("current_turn"),
+                )
             if anim_steps is None:
                 return
             result["animation_steps"] = anim_steps
