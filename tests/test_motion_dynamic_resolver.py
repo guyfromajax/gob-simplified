@@ -56,9 +56,10 @@ def _lineup(**by_pos):
 
 # ---------------------------------------------------------------- gate
 
-def test_gate_off_by_default(monkeypatch):
+def test_gate_on_by_default(monkeypatch):
+    # Ships ON by default (kill switch: GOB_DYNAMIC_HCO_MOTION=0).
     monkeypatch.delenv("GOB_DYNAMIC_HCO_MOTION", raising=False)
-    assert _dynamic_hco_motion_enabled() is False
+    assert _dynamic_hco_motion_enabled() is True
 
 
 def test_gate_on_when_env_truthy(monkeypatch):

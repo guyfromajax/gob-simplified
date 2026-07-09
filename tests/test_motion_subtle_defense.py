@@ -81,7 +81,7 @@ def test_def_eff_lifts_defender_read():
 # --------------------------------------------------------- constants / forced-shot plumbing
 
 def test_tempo_elapsed_ranges():
-    assert SUBTLE_STEP_ELAPSED_BY_TEMPO == {"slow": (3, 4), "normal": (2, 4), "fast": (2, 3)}
+    assert SUBTLE_STEP_ELAPSED_BY_TEMPO == {"slow": (2, 4), "normal": (2, 3), "fast": (1, 3)}
     assert MOTION_READ_THRESHOLD == 110
     assert SUBTLE_FORCED_SHOT_PENALTY == 50
 

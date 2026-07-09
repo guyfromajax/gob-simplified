@@ -12,9 +12,10 @@ def _set_env(monkeypatch, **kv):
             monkeypatch.setenv(k, v)
 
 
-def test_setplay_gate_off_by_default(monkeypatch):
+def test_setplay_gate_on_by_default(monkeypatch):
+    # Ships ON by default (kill switch: GOB_DYNAMIC_HCO_SETPLAY=0).
     monkeypatch.delenv("GOB_DYNAMIC_HCO_SETPLAY", raising=False)
-    assert PR._dynamic_hco_setplay_enabled() is False
+    assert PR._dynamic_hco_setplay_enabled() is True
 
 
 def test_setplay_gate_on(monkeypatch):
@@ -24,9 +25,9 @@ def test_setplay_gate_on(monkeypatch):
 
 
 def test_setplay_gate_independent_of_motion(monkeypatch):
-    # The two flags are independent — motion ON must not enable set plays.
+    # The two flags are independent — both default ON, but each can be disabled on its own.
     monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", "1")
-    monkeypatch.delenv("GOB_DYNAMIC_HCO_SETPLAY", raising=False)
+    monkeypatch.setenv("GOB_DYNAMIC_HCO_SETPLAY", "0")
     assert PR._dynamic_hco_motion_enabled() is True
     assert PR._dynamic_hco_setplay_enabled() is False
 
