@@ -5222,6 +5222,40 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
         offense_modifier=offense_modifier, lane_dist=lane_dist, rng=rng)
 
 
+def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lineup, off_to_def,
+                               is_away_offense, def_aggr, lane_dist, zone, game_state, off_team, rng):
+    """Dynamic HCO Defense (P2b): contest a SKELETON ball-movement / reversal pass via the two-gate
+    model (reuses `_hco_resolve_dish_contest` — skeleton steps carry named locations, so the posture
+    reconstruction is accurate). Returns a STEAL turnover result (``pass_intercepted``) if the pass is
+    picked, else None (pass proceeds). Flag-gated: no-op unless a defense posture is set."""
+    posture = game_state.get("_hco_defense_posture")
+    if not posture:
+        return None
+    pa = step.get("pos_actions") or {}
+    passer = next((p for p, a in pa.items() if ((a or {}).get("action") or "").lower() == "pass"), None)
+    receiver = next((p for p, a in pa.items() if ((a or {}).get("action") or "").lower() == "receive"), None)
+    if not passer or not receiver or not off_lineup.get(passer):
+        return None
+    contest = _hco_resolve_dish_contest(
+        step, passer, receiver, off_lineup, def_lineup, off_to_def, is_away_offense,
+        def_aggr, lane_dist, zone, game_state.get("defense_playcall"), off_team, rng, posture=posture)
+    if contest.get("outcome") not in ("INTERCEPT", "BAT_OOB"):
+        return None
+    logging.warning(
+        f"🪡 [HCO PASS] {contest['outcome']} on SKELETON pass {passer}→{receiver} "
+        f"by {contest.get('deflector')}")
+    skeleton["steps"] = list(output_steps)
+    return {
+        "skeleton": skeleton,
+        "pass_intercepted": True,
+        "interceptor_pos": contest.get("deflector"),
+        "pass_bat_oob": contest["outcome"] == "BAT_OOB",
+        "passer_pos": passer,
+        "shooter": off_lineup[passer],
+        "shooter_pos": passer,
+    }
+
+
 def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, def_lineup, game_state):
     """§4 Stage 2: convert an intercepted HCO dish/kickout into a STEAL turnover. ``is_interception``
     drives the FE's INTERCEPTION! headline + SFX. Reuses resolve_turnover_logic + the shared stopper
@@ -5544,6 +5578,13 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
         game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
         output_steps.append(steps[i])  # players arrive at skeleton step i
+        # P2b: a skeleton ball-movement / reversal pass is interceptable (two-gate contest). A pick
+        # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
+        _skel_pass_to = _hco_contest_skeleton_pass(
+            steps[i], output_steps, skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
+            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random)
+        if _skel_pass_to is not None:
+            return _skel_pass_to
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
             continue
@@ -5775,6 +5816,13 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
         game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
         output_steps.append(steps[i])  # players arrive at skeleton step i
+        # P2b: a skeleton ball-movement / reversal pass is interceptable (two-gate contest). A pick
+        # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
+        _skel_pass_to = _hco_contest_skeleton_pass(
+            steps[i], output_steps, skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
+            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random)
+        if _skel_pass_to is not None:
+            return _skel_pass_to
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
             continue

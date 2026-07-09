@@ -123,10 +123,10 @@ Three separate signals drive the defense, each from a different source:
 > |---|---|---|
 > | Hot-read dish | ✅ (P2a) | `_apply_dish_contest` → `_hco_resolve_dish_contest` |
 > | Kickout | ✅ (P2a) | same |
-> | **Freelance pass** | ✅ (added) | `_resolve_freelance` reuses `_hco_resolve_dish_contest` on the freelance beat → STEAL via `pass_intercepted`/`_finalize_hco_pass_interception` (passer credited via `passer_pos`) |
-> | Skeleton motion / reversal pass | ❌ **P2b** (pending) | needs a new walk hook |
+> | **Freelance pass** | ✅ | `_resolve_freelance` reuses `_hco_resolve_dish_contest` on the freelance beat → STEAL via `pass_intercepted`/`_finalize_hco_pass_interception` (passer credited via `passer_pos`) |
+> | **Skeleton motion / reversal pass** | ✅ (P2b) | walk hook `_hco_contest_skeleton_pass` (both motion + set-play walks) → same contest → STEAL |
 >
-> All gated behind `GOB_DYNAMIC_HCO_DEFENSE` (posture set) + Gate 2 aggression. **Skeleton passes remain the last uncovered type** — they're what loose/help defenders would pick in "other lanes," so P2b is still required for full loose viability.
+> **All pass types now interceptable.** Gated behind `GOB_DYNAMIC_HCO_DEFENSE` (posture set) + Gate 2 aggression. Loose/help defenders now pick swing passes in "other lanes" (their real interception role). Smoke-tested rates on a tight swing lane: aggressive ~16% / normal ~8% / passive 0% per pass.
 
 **D. `freeze` = failed reactive read (ability).** Not a chosen action — the outcome when a defender is beaten or misreads. Generalizes today's SM freeze to every step type; driven by the defender's `player_read_raw + def_eff` roll.
 
