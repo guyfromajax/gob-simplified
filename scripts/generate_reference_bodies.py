@@ -34,31 +34,43 @@ import argparse
 MODEL = "gemini-3.1-flash-lite-image"   # Nano Banana 2 Lite
 ANCHOR = "tmp/portrait-pilot/raw/Colt Robles.png"
 
-# Shared spec — identical across all 5 so the family stays consistent.
+# Shared spec — HEAD-ANCHORED. The head is the same size in every frame; only
+# the shoulders (and face fullness) change, so the head-to-shoulder proportion
+# is what makes each build read. Do NOT let NB zoom to fill the frame — that
+# normalizes shoulder width away and every build looks identical.
 BASE = (
-    "Using the attached image ONLY as a reference for the ART STYLE, pose, "
-    "camera framing/zoom, plain white sleeveless tank top with a simple crew "
-    "neckline, and plain light neutral background, generate a front-facing "
+    "Using the attached image ONLY as a reference for the ART STYLE, the plain "
+    "white sleeveless tank top with a simple crew neckline, the plain light "
+    "neutral background, and the HEAD SIZE, generate a front-facing "
     "head-and-shoulders bust portrait of a 16-17 year old male high-school "
     "basketball player, looking straight at the camera with a calm neutral "
     "expression, even soft studio lighting, semi-realistic illustrated art "
-    "style. Keep the pose, framing, zoom, white tank, neckline, and background "
-    "IDENTICAL to the reference. Change ONLY the body build to: {frame}. "
-    "Full shoulders visible, upper chest at the bottom edge."
+    "style. CRITICAL FRAMING RULE: keep the HEAD the exact same size and "
+    "position as the reference and do NOT zoom in to fill the frame — the "
+    "shoulders must be drawn at their TRUE width for the build so the "
+    "head-to-shoulder proportion clearly shows the body type. {frame} "
+    "Leave the plain background visible on both sides wherever the shoulders do "
+    "not reach the edge."
 )
 
-# The 5 frames — the ONLY thing that varies between the reference bodies.
+# The 5 frames — each states head-to-shoulder proportion + where the shoulders
+# land relative to the frame edges, which is the cue that actually separates
+# builds in a bust crop.
 FRAMES = {
-    "Slight": "a small slight teenage frame — narrow shoulders, thin neck, "
-              "lean youthful build, head slightly large for the body",
-    "Lean":   "a lean slim wiry frame with narrow athletic shoulders and a "
-              "normal neck",
-    "Normal": "an average athletic frame with medium shoulders, a typical "
-              "high-school athlete build",
-    "Broad":  "a big powerful frame with very broad wide shoulders that fill "
-              "the width of the frame and a thick neck",
-    "Doughy": "a soft heavyset frame — rounded sloping shoulders, a full "
-              "torso, a thick soft neck, and a fuller rounder face",
+    "Slight": "Build: a small slight teenager — narrow shoulders only a little "
+              "wider than the head and clearly NOT reaching the side edges "
+              "(visible background on both sides), thin neck, youthful face.",
+    "Lean":   "Build: lean and slim — narrow athletic shoulders, a bit wider "
+              "than the head, with a little background still visible at the "
+              "sides, normal neck.",
+    "Normal": "Build: an average high-school athlete — medium shoulders about "
+              "twice the width of the head, roughly reaching the side edges.",
+    "Broad":  "Build: a big powerful athlete — very broad shoulders much wider "
+              "than the head that extend PAST the side edges of the frame "
+              "(bleeding off both sides), thick muscular neck.",
+    "Doughy": "Build: heavyset and soft — wide rounded sloping shoulders "
+              "reaching the edges, a thick soft neck, a fuller rounder face and "
+              "a heavier fuller torso.",
 }
 
 
