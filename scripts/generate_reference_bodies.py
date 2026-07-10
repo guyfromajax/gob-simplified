@@ -49,16 +49,19 @@ FRAME_ANCHORS = {
 FRAME_FULL_PROMPT = {
     "Broad":
         "Two reference images are attached. IMAGE 1 is for BODY BUILD ONLY: "
-        "copy its broad, wide shoulders and large frame — shoulders much wider "
-        "than the head, reaching and bleeding off the left and right edges. "
-        "IMAGE 2 is for EVERYTHING ELSE: match its youthful 16-17 year old face "
-        "and age, short simple hair, semi-realistic illustrated art style, plain "
-        "light neutral background, white sleeveless tank, head size and framing. "
-        "Generate a front-facing head-and-shoulders bust of a 16-17 year old "
-        "high-school basketball player with the BROAD wide-shouldered frame of "
-        "image 1 but the young illustrated look of image 2, calm neutral "
-        "expression, plain average muscle tone (not cut, not bulky). Do NOT copy "
-        "image 1's face, hair, age, skin tone, or background — only its build.",
+        "copy its big, imposing frame — broad shoulders that bleed off the left "
+        "and right edges of the frame, and an overall large-and-physical read. "
+        "He should look like a BIG kid: a slightly larger head and heavier "
+        "overall proportions, cropped tight so the body fills and slightly "
+        "overflows the frame. IMAGE 2 is for STYLE ONLY: match its youthful "
+        "16-17 year old face and age, short simple hair, semi-realistic "
+        "illustrated art style, plain light neutral background, and white "
+        "sleeveless tank. Generate a front-facing head-and-shoulders bust of a "
+        "16-17 year old high-school basketball player who reads as a big, "
+        "broad-framed kid (from image 1) drawn in the young illustrated look of "
+        "image 2, calm neutral expression, plain average muscle tone (not cut, "
+        "not bulky). Do NOT copy image 1's face, hair, skin tone, or "
+        "background — only its big build and proportions.",
 }
 
 # Shared spec — HEAD-ANCHORED. The head is the same size in every frame; only
