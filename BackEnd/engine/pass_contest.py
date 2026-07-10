@@ -260,27 +260,29 @@ def resolve_pass_contest(
     """
     passer_xy = passer.get("xy") if isinstance(passer, dict) else None
     if not isinstance(passer_xy, dict):
-        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "no_passer_xy"}
 
     contester = find_pass_contester(passer_xy, receiver_xy, ball_speed, defenders, lane_dist=lane_dist)
     if contester is None:
-        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "no_contester"}
 
-    # Passer safety gate — a good passer evades the lurking defender entirely.
+    # Passer safety gate (3a) — a good passer evades the lurking defender entirely.
     if _pass_score(passer, rng) > (PASS_SAFETY_BASE - offense_modifier):
-        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "passer_safe"}
 
+    # Interceptor skill band (3b).
     defender = contester["defender"]
     score = _intercept_score(defender, rng)
     if score > PASS_INTERCEPT_TIER_HI:
-        outcome = INTERCEPT
+        outcome, stage = INTERCEPT, "intercept"
     elif score > PASS_INTERCEPT_TIER_MID:
-        outcome = BAT_OOB
+        outcome, stage = BAT_OOB, "bat_oob"
     else:
-        return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "band_complete"}
 
     return {
         "outcome": outcome,
         "deflector": defender.get("id"),
         "contact_point": contester["contact_point"],
+        "stage": stage,
     }
