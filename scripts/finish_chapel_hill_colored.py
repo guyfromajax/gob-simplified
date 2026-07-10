@@ -178,14 +178,25 @@ def main():
     from scipy import ndimage
     from PIL import Image, ImageDraw, ImageFont
 
+    import csv
     ap = argparse.ArgumentParser()
     ap.add_argument("--only")
+    ap.add_argument("--uuid", action="store_true",
+                    help="also write UUID-named masters to assets_staging/players "
+                         "(upload-ready); default only writes name-QC copies")
+    ap.add_argument("--out", default="assets_staging/players",
+                    help="UUID output dir (with --uuid)")
     args = ap.parse_args()
 
     _, _, prim, sec = team_info("Chapel Hill")
     primary, secondary = hex2rgb(prim), hex2rgb(sec)
     os.makedirs(FINAL_DIR, exist_ok=True)
     os.makedirs(QC, exist_ok=True)
+    name2uuid = {r["name"]: r["_id"]
+                 for r in csv.DictReader(open("scripts/players_archetypes.csv"))
+                 if r["team"] == "Chapel Hill"}
+    if args.uuid:
+        os.makedirs(args.out, exist_ok=True)
 
     files = sorted(f for f in glob.glob(os.path.join(SRC_DIR, "*"))
                    if f.lower().endswith((".png", ".jpg", ".jpeg")))
@@ -199,8 +210,14 @@ def main():
             uni = apply_sky_colored(rf, np, ndimage, primary, secondary)
             fin = finish(uni, np, ndimage)
             fin.save(os.path.join(FINAL_DIR, name + ".png"))
+            if args.uuid:
+                uid = name2uuid.get(name)
+                if not uid:
+                    print(f"[warn] {name}: no UUID in archetypes csv; skipped uuid copy")
+                else:
+                    fin.save(os.path.join(args.out, uid + ".png"))
             results.append((name, fin))
-            print(f"[ok] {name}")
+            print(f"[ok] {name}" + (f" -> {name2uuid.get(name)}.png" if args.uuid else ""))
         except Exception as e:
             print(f"[fail] {name}: {type(e).__name__}: {str(e)[:120]}")
 

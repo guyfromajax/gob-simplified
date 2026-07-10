@@ -80,14 +80,33 @@ def _grabcut(src, np):
     return (mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)
 
 
+def _u2net(src, np):
+    """Try the pipeline's u2net human-seg (clean cutouts, no color confusion).
+    Returns a bool person mask, or None if the model isn't available (e.g. the
+    sandbox, where the download is egress-blocked)."""
+    try:
+        import process_player_portraits as fin
+        a = np.asarray(fin.segment_alpha(src))
+        return a > 128 if a.size else None
+    except Exception:
+        return None
+
+
 def segment_person(src, np, ndimage):
-    """Person cutout = flood-fill UNION GrabCut. The two methods fail on
+    """Person cutout. Prefers u2net human-seg (what the rest of the pipeline
+    uses -- clean on the user's machine). Falls back to flood-fill UNION GrabCut
+    where u2net is unavailable (the sandbox): the two classical methods fail on
     different regions (flood-fill eats blended tank/arms; GrabCut clips narrow
-    busts), so their union is robust across the bespoke set. GrabCut sometimes
-    also pulls in background-colored haze (e.g. a gray halo around dark hair);
-    that haze is dropped by removing GrabCut-only pixels that match the corner
-    background color. On the user's machine the pipeline uses u2net; this is the
-    sandbox-safe equivalent."""
+    busts), so their union is robust, with a background-colored-haze cleanup for
+    GrabCut's gray halo around dark hair."""
+    u = _u2net(src, np)
+    if u is not None and u.mean() > 0.02:
+        u = ndimage.binary_fill_holes(u)
+        lbl, n = ndimage.label(u)
+        if n > 1:
+            u = lbl == (1 + int(np.argmax(
+                ndimage.sum(np.ones_like(lbl), lbl, range(1, n + 1)))))
+        return u
     ff = _floodfill(src, np, ndimage)
     gc = _grabcut(src, np)
     a = np.asarray(src.convert("RGB")).astype(np.float32)
