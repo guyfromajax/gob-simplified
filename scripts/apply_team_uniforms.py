@@ -35,7 +35,7 @@ OUT_DIR = "tmp/portrait-pilot/uniformed"
 #  - finish scales this 1024px bust to 3530 wide and keeps the top 3412 rows, i.e.
 #    it keeps the top ~96.6% of the height. That crop line is the final bottom edge.
 CROP_KEEP_FRAC = 0.966         # fraction of bust height the finish crop keeps
-WM_VISIBLE_FRAC = 0.30         # fraction of wordmark letter-height shown above it
+WM_VISIBLE_FRAC = 0.50         # fraction of wordmark letter-height shown above it
 WM_WIDTH_FRAC = 0.72           # wordmark width as a fraction of tank width
 
 
