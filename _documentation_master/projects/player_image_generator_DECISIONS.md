@@ -234,6 +234,28 @@ keeping body/frame/pose/tank/framing/art-style identical. Output:
 
 ---
 
+## Finishing stage — `scripts/finish_portraits.py` (stage 3)
+
+Turns uniformed busts into upload-ready masters. **Uniform scale to fill the
+canvas width + top-align (head near top) + alpha edge cleanup** → 3530×3412 RGBA.
+Deliberately does NOT re-detect/re-anchor per face (that broke the already-
+consistent framing); every image gets the identical transform, so the framing
+the generation stage produced is preserved, just resized.
+
+## Wordmark placement (decided)
+
+- Drawn in the **uniform stage** (where the reliable white-tank mask lives — robust
+  for any team color; color-detecting the jersey in the final frame failed because
+  gold ≈ skin and navy ≈ dark-skin-shadow).
+- Placed **low**, anchored to the finish crop line, so only its **top 50%** shows
+  at the final image's bottom edge (no gap; reads as continuing below). Same for
+  every player → pixel-consistent across a team. Knobs: `WM_VISIBLE_FRAC=0.50`,
+  `WM_WIDTH_FRAC=0.72`, in `apply_team_uniforms.py`.
+- Rendering: Bebas Neue Pro, secondary color, mild arc + fabric fold-shading +
+  soft screen-print edges, strictly clipped to the fabric.
+- **Wordmark stays script-drawn, NOT NB** — NB can't keep it consistent across a
+  team, and once cropped to a top-slice the script version is plenty organic.
+
 ## Open items / deferred
 
 - [ ] `normal`/`broad` frame separation (base zoom-out fix).
