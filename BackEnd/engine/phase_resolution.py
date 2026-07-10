@@ -5277,6 +5277,19 @@ def _hco_last_pass_step_index(steps):
     return None
 
 
+def _hco_uncatch_receiver_on_pass(steps, pass_idx):
+    """On an INTERCEPTED / batted pass the ball must NEVER complete to the offensive receiver — it's
+    picked off in flight. Downgrade the receiver's ``receive`` to ``cut`` at the pass step so the
+    ball-owner walk keeps the ball with the passer (the steal / OOB step then routes it directly to
+    the interceptor). Without this the ball briefly attaches to the receiver, then jumps to the
+    defender — the "attached to the receiver first" bug."""
+    if pass_idx is None or not (0 <= pass_idx < len(steps)):
+        return
+    for info in ((steps[pass_idx] or {}).get("pos_actions") or {}).values():
+        if ((info or {}).get("action") or "").lower() == "receive":
+            info["action"] = "cut"
+
+
 def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, def_lineup, game_state):
     """§4 Stage 2: convert an intercepted HCO dish/kickout into a STEAL turnover. ``is_interception``
     drives the FE's INTERCEPTION! headline + SFX. Reuses resolve_turnover_logic + the shared stopper
@@ -5288,9 +5301,11 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
     ball_handler = off_lineup.get(_passer_pos) if _passer_pos else roles.get("ball_handler")
     # Pin the steal to the ACTUAL pass step (where the ball was picked), not a random mid step.
     _src = motion_shot_info.get("skeleton") or {}
-    _pi = _hco_last_pass_step_index((_src or {}).get("steps") or [])
+    _steps = (_src or {}).get("steps") or []
+    _pi = _hco_last_pass_step_index(_steps)
     if _pi is not None:
         game_state["_hco_pass_intercept_stop_index"] = _pi
+        _hco_uncatch_receiver_on_pass(_steps, _pi)  # ball goes passer→interceptor, never the receiver
     try:
         skel = apply_stopper_system_to_skeleton(_src, "STEAL", game_state)
     finally:
@@ -5345,9 +5360,11 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
     off_team = game.offense_team
     # Stop the skeleton at the actual pass step (offense retains — dead ball, not a steal).
     _src = motion_shot_info.get("skeleton") or {}
-    _pi = _hco_last_pass_step_index((_src or {}).get("steps") or [])
+    _steps = (_src or {}).get("steps") or []
+    _pi = _hco_last_pass_step_index(_steps)
     if _pi is not None:
         game_state["_hco_pass_intercept_stop_index"] = _pi
+        _hco_uncatch_receiver_on_pass(_steps, _pi)  # ball is batted away, never completes to receiver
     try:
         skel = apply_stopper_system_to_skeleton(_src, "DEAD_BALL_TURNOVER", game_state)
     finally:
