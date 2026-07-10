@@ -2738,14 +2738,6 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
 
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
-        try:
-            _stl_now = ((getattr(defender, "stats", {}) or {}).get("game", {}) or {}).get("STL")
-            logging.warning(
-                "🔢 [STEAL RECORDED] pid=%s STL_now=%s victim=%s from_resolution=%s",
-                getattr(defender, "player_id", None), _stl_now,
-                getattr(ball_handler, "player_id", None), from_resolution_system)
-        except Exception:
-            pass
         # Momentum: stealer +, victim −.
         defender.add_momentum(MO_STEAL_DELTA)
         if ball_handler:
@@ -3836,9 +3828,15 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         # If skeleton has 7 steps (0-6), choose from steps 1-5
         stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
     elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
+        # Dynamic HCO pass interception: pin the stop to the ACTUAL pass step (set by the finalizer)
+        # so the steal lands at the interception, not a random mid step. Falls through to the legacy
+        # random blast-radius when no pin is present (all other steals unchanged).
+        _pin = game_state.get("_hco_pass_intercept_stop_index")
+        if isinstance(_pin, int) and 1 <= _pin <= len(steps) - 1:
+            stop_step_index = _pin
         # Middle step with blast radius (±2 steps from middle)
         # Calculate middle of steps 1 through len(steps)-1 (excluding step 0 and final step)
-        if len(steps) > 2:
+        elif len(steps) > 2:
             # Calculate middle step
             middle_step = 1 + (len(steps) - 2 - 1) // 2
             
@@ -5262,10 +5260,21 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
         "pass_intercepted": True,
         "interceptor_pos": contest.get("deflector"),
         "pass_bat_oob": contest["outcome"] == "BAT_OOB",
+        "pass_contact_point": contest.get("contact_point"),
         "passer_pos": passer,
         "shooter": off_lineup[passer],
         "shooter_pos": passer,
     }
+
+
+def _hco_last_pass_step_index(steps):
+    """Index of the last skeleton step carrying a ``pass`` action (the interception point). None if
+    no pass step is found. Used to pin the steal/bat-OOB stopper to the actual pass, not a mid step."""
+    for i in range(len(steps) - 1, -1, -1):
+        pa = (steps[i] or {}).get("pos_actions") or {}
+        if any(((a or {}).get("action") or "").lower() == "pass" for a in pa.values()):
+            return i
+    return None
 
 
 def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, def_lineup, game_state):
@@ -5277,7 +5286,28 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
     # so prefer the result's passer_pos; dishes fall back to the turn's ball handler.
     _passer_pos = motion_shot_info.get("passer_pos")
     ball_handler = off_lineup.get(_passer_pos) if _passer_pos else roles.get("ball_handler")
-    skel = apply_stopper_system_to_skeleton(motion_shot_info.get("skeleton") or {}, "STEAL", game_state)
+    # Pin the steal to the ACTUAL pass step (where the ball was picked), not a random mid step.
+    _src = motion_shot_info.get("skeleton") or {}
+    _pi = _hco_last_pass_step_index((_src or {}).get("steps") or [])
+    if _pi is not None:
+        game_state["_hco_pass_intercept_stop_index"] = _pi
+    try:
+        skel = apply_stopper_system_to_skeleton(_src, "STEAL", game_state)
+    finally:
+        game_state.pop("_hco_pass_intercept_stop_index", None)
+    # B1 — make the pick READ as an interception (all backend, UESS): the deflector STEPS to the
+    # contact point on the stop step (per-step defender override — the animator tweens him there from
+    # his posture spot), and the ball ATTACHES to him there by seeding last_stealer_coords (the steal
+    # path renders the ball moving to the stealer's coords). Man defense only; falls back gracefully.
+    _contact = motion_shot_info.get("pass_contact_point")
+    _dpos = motion_shot_info.get("interceptor_pos")
+    if _contact and _dpos and isinstance(skel, dict) and skel.get("steps"):
+        _cc = {"x": float(_contact["x"]), "y": float(_contact["y"])}
+        game_state["last_stealer_coords"] = _cc
+        _stop = skel["steps"][-1]
+        _stop.setdefault("_attack_drive", {}).setdefault("defender_overrides", {})[_dpos] = {
+            "coords": _cc, "action": "steal_reach",
+        }
     to_roles = dict(roles)
     to_roles["ball_handler"] = ball_handler
     to_roles["defender"] = interceptor
@@ -5300,6 +5330,66 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
     logging.warning(
         f"🪡 [HCO INTERCEPTION] {getattr(ball_handler, 'player_id', None)} dish picked off by "
         f"{getattr(interceptor, 'player_id', None)} → STEAL")
+    return turn_result
+
+
+def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_lineup, game_state):
+    """§14 (HCO) — a batted-out-of-bounds pass is NOT a turnover: the defender is the last to touch,
+    so the OFFENSE RETAINS. Transition to a side inbound (SIP; clocks pinned → no shot-clock reset),
+    with NO steal/TO stats and no secondary announce. Deflector + contact carried for the (Layer B)
+    UESS batted-OOB animation. Distinct from _finalize_hco_pass_interception (INTERCEPT → STEAL)."""
+    deflector = def_lineup.get(motion_shot_info.get("interceptor_pos"))
+    _passer_pos = motion_shot_info.get("passer_pos")
+    ball_handler = off_lineup.get(_passer_pos) if _passer_pos else roles.get("ball_handler")
+    off_team = game.offense_team
+    # Stop the skeleton at the actual pass step (offense retains — dead ball, not a steal).
+    _src = motion_shot_info.get("skeleton") or {}
+    _pi = _hco_last_pass_step_index((_src or {}).get("steps") or [])
+    if _pi is not None:
+        game_state["_hco_pass_intercept_stop_index"] = _pi
+    try:
+        skel = apply_stopper_system_to_skeleton(_src, "DEAD_BALL_TURNOVER", game_state)
+    finally:
+        game_state.pop("_hco_pass_intercept_stop_index", None)
+    to_roles = dict(roles)
+    to_roles["ball_handler"] = ball_handler
+    to_roles["defender"] = deflector
+    game_state["offensive_state"] = "HCO"  # resume in HCO after the side inbound
+    turn_result = {
+        "result_type": "DEAD BALL",
+        "turnover_type": "",               # NOT a turnover
+        "current_turn": "HCO",
+        "text": "The pass is batted out of bounds — offense keeps it.",
+        "possession_flips": False,         # offense retains (defender last to touch)
+        "next_play_type": "SIDE_INBOUND",
+        "next_turn": "SIDE_INBOUND",
+        "offense_team_id": off_team.team_id,
+        # Layer A ships the correct OUTCOME only. bat_oob stays False so the existing (broken-timing,
+        # non-UESS) FE ball-send + secondary announce do NOT fire. Layer B flips this on and emits the
+        # UESS batted-OOB animation. Contact + deflector are carried now so Layer B can use them.
+        "bat_oob": False,
+        "bat_oob_contact": motion_shot_info.get("pass_contact_point"),
+        "bat_oob_deflector_id": getattr(deflector, "player_id", None),
+        "victim_id": None,                 # no TO credited
+        "defender_id": getattr(deflector, "player_id", None),
+        "is_interception": False,
+        "events": [],
+        "roles": to_roles,
+        "skeleton": skel or {},
+    }
+    steps = (skel or {}).get("steps") or []
+    if steps:
+        timing = calc_skeleton_step_timing_contract(
+            steps, resolution_step_index=max(0, len(steps) - 1),
+            include_hco_step1_bringup=True, phase_type="HCO", off_lineup=off_team.lineup,
+        )
+        turn_result["time_elapsed"] = timing["time_elapsed"]
+        turn_result["step_clock_seconds"] = timing["step_clock_seconds"]
+        turn_result["resolution_step_index"] = timing["resolution_step_index"]
+        turn_result["executed_step_count"] = timing["executed_step_count"]
+    logging.warning(
+        f"🪣 [HCO BAT-OOB] pass by {getattr(ball_handler, 'player_id', None)} batted OOB by "
+        f"{getattr(deflector, 'player_id', None)} → offense retains (side inbound, no reset, no stats)")
     return turn_result
 
 
@@ -5580,6 +5670,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             result["pass_intercepted"] = True
             result["interceptor_pos"] = contest.get("deflector")
             result["pass_bat_oob"] = contest["outcome"] == "BAT_OOB"
+            result["pass_contact_point"] = contest.get("contact_point")
             logging.warning(
                 f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
                 f"by {contest.get('deflector')}")
@@ -5818,6 +5909,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
             result["pass_intercepted"] = True
             result["interceptor_pos"] = contest.get("deflector")
             result["pass_bat_oob"] = contest["outcome"] == "BAT_OOB"
+            result["pass_contact_point"] = contest.get("contact_point")
             logging.warning(
                 f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
                 f"by {contest.get('deflector')}")
@@ -6163,6 +6255,7 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
                             "pass_intercepted": True,
                             "interceptor_pos": contest.get("deflector"),
                             "pass_bat_oob": contest["outcome"] == "BAT_OOB",
+                            "pass_contact_point": contest.get("contact_point"),
                             "passer_pos": cur_bh,
                             "shooter": off_lineup[cur_bh],
                             "shooter_pos": cur_bh,
@@ -7472,6 +7565,10 @@ def resolve_half_court_offense_logic(game):
 
         # §4 Stage 2: a dish/kickout picked off in the lane → STEAL (interception), not a shot.
         if motion_shot_info and motion_shot_info.get("pass_intercepted"):
+            # BAT_OOB → offense retains (side inbound, no stats); INTERCEPT → STEAL turnover.
+            if motion_shot_info.get("pass_bat_oob"):
+                return _finalize_hco_pass_bat_oob(
+                    motion_shot_info, game, roles, off_lineup, def_lineup, game_state)
             return _finalize_hco_pass_interception(
                 motion_shot_info, game, roles, off_lineup, def_lineup, game_state)
 

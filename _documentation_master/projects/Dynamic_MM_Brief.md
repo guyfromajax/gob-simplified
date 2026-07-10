@@ -129,6 +129,20 @@ Three separate signals drive the defense, each from a different source:
 >
 > **All pass types now interceptable.** Gated behind `GOB_DYNAMIC_HCO_DEFENSE` (posture set) + Gate 2 aggression. Loose/help defenders now pick swing passes in "other lanes" (their real interception role). Smoke-tested rates on a tight swing lane: aggressive ~16% / normal ~8% / passive 0% per pass.
 
+> **Pass-contest ANIMATION — unified INTERCEPT + BAT_OOB (design 2026-07-10, UESS-compliant, building).**
+> Both outcomes share one animation up to contact, then diverge. **Shared:** the ball detaches from
+> the passer; the deflector makes a **minimal** step from his posture spot into the ball's lane path
+> at the **contact point** (per-step defender override, `defender_overrides[def_pos]={coords,action}`),
+> timed to the pass (concurrent by construction — fixes the FCP/HCT "defender too early" bug). Then:
+> | | INTERCEPT | BAT_OOB |
+> |---|---|---|
+> | ball | **attaches** to interceptor at contact | flies **OOB** (`ball_end`=backend OOB target, airball pattern) |
+> | stats | STEAL + TO | none |
+> | announce | "Interception" (`is_interception`) | none |
+> | transition | standard steal (fast-break chance → else HCO) | **SIP, offense retains, clocks pinned** (`next_play_type=SIDE_INBOUND`, `bat_oob=True`, no flip) |
+>
+> **Fixes the random-step bug:** interception no longer routes through `apply_stopper_system_to_skeleton("STEAL")` (which picks a RANDOM mid step) — it builds a **contact-linked** skeleton so the steal lands at the actual pass. **All backend-emitted; FE renders only** (no imperative `_runHctBatOobBallSend`). BAT_OOB is NOT a turnover (defender last to touch → offense keeps it). Same batted-OOB SFX as FCP/HCT; **no secondary announce** for HCO bat_oob.
+
 **D. `freeze` = failed reactive read (ability).** Not a chosen action — the outcome when a defender is beaten or misreads. Generalizes today's SM freeze to every step type; driven by the defender's `player_read_raw + def_eff` roll.
 
 **Net per-turn / per-step flow:**
