@@ -2738,6 +2738,14 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
 
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
+        try:
+            _stl_now = ((getattr(defender, "stats", {}) or {}).get("game", {}) or {}).get("STL")
+            logging.warning(
+                "🔢 [STEAL RECORDED] pid=%s STL_now=%s victim=%s from_resolution=%s",
+                getattr(defender, "player_id", None), _stl_now,
+                getattr(ball_handler, "player_id", None), from_resolution_system)
+        except Exception:
+            pass
         # Momentum: stealer +, victim −.
         defender.add_momentum(MO_STEAL_DELTA)
         if ball_handler:
