@@ -47,7 +47,8 @@ ASIAN_SUR = {
     "xu", "sun", "ma", "zhu", "hu", "guo", "lin", "he", "gao", "luo", "zheng",
     "xie", "tang", "deng", "feng", "cao", "peng", "wong", "chan", "cheng",
     "chiang", "chin", "chow", "chu", "kwan", "kwok", "lam", "lau", "leung", "ng",
-    "tam", "tsang", "yip", "yuen",
+    "tam", "tsang", "yip", "yuen", "chang", "chung", "tsai", "hsu", "hsieh",
+    "kwong", "sung", "chao", "bae", "yeung", "cheung",
     # Korean
     "kim", "park", "choi", "jung", "kang", "cho", "yoon", "jang", "lim", "han",
     "shin", "kwon", "hwang", "ahn", "song", "ryu", "seo",
@@ -92,7 +93,8 @@ BLACK_GIVEN = {
     "marquise", "rashad", "rashawn", "tyrell", "tyrese", "tyrone", "terrell",
     "darnell", "davon", "devonte", "devonta", "donte", "lamar", "lavar",
     "lamont", "jermaine", "trayvon", "tremaine", "shaquille", "jaheim",
-    "keshawn", "daquan", "cordell", "jalen",
+    "keshawn", "daquan", "cordell", "jalen", "jamarion", "jamari", "jamir",
+    "tyshawn", "keontae", "deonta", "darius", "jaquon",
 }
 # Distinctly Nordic surnames -> white AND bias to pale (not anglicized -son).
 SCANDINAVIAN_SUR = {
@@ -174,6 +176,8 @@ def name_signal(first, last):
         return "white", "pale", f"surname:{l}"
     if l in EURO_SUR:
         return "white", None, f"surname:{l}"
+    if l.endswith("ski") or l.endswith("wski") or l.endswith("czyk"):
+        return "white", None, f"surname-suffix:{l}"   # Polish -> white
     if f in ANGLO_GIVEN:
         return "white", None, f"given:{f}"
     return None, None, None
