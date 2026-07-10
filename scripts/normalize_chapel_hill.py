@@ -46,10 +46,10 @@ FACE_CY_FRAC = 0.393       # face-center vertical position (Durham median)
 FACE_CX_FRAC = 0.50        # face-center horizontal position (centered)
 
 
-def segment_person(src, np, ndimage):
-    """Flood-fill background remover for busts on a clean neutral background."""
+def _floodfill(src, np, ndimage):
+    """Border-connected background removal. Fast, but eats person regions that
+    blend into a light/gradient background (white tank, arms)."""
     a = np.asarray(src.convert("RGB")).astype(np.float32)
-    H, W, _ = a.shape
     c = 40
     cor = np.concatenate([a[:c, :c].reshape(-1, 3), a[:c, -c:].reshape(-1, 3),
                           a[-c:, :c].reshape(-1, 3), a[-c:, -c:].reshape(-1, 3)])
@@ -60,8 +60,49 @@ def segment_person(src, np, ndimage):
         | set(np.unique(lbl[:, 0])) | set(np.unique(lbl[:, -1]))
     border.discard(0)
     background = np.isin(lbl, list(border)) if border else np.zeros_like(bgsim)
-    person = ndimage.binary_fill_holes(~background)
-    # drop stray specks, keep the largest component
+    return ndimage.binary_fill_holes(~background)
+
+
+def _grabcut(src, np):
+    """GrabCut with a near-full-frame rect. Recovers blended body/arm regions
+    flood-fill drops, but can miss when its rect clips (e.g. narrow busts)."""
+    import cv2
+    im = np.asarray(src.convert("RGB"))
+    H, W, _ = im.shape
+    mask = np.zeros((H, W), np.uint8)
+    rect = (int(0.04 * W), int(0.01 * H), int(0.92 * W), int(0.99 * H))
+    try:
+        cv2.grabCut(cv2.cvtColor(im, cv2.COLOR_RGB2BGR), mask, rect,
+                    np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64),
+                    5, cv2.GC_INIT_WITH_RECT)
+    except Exception:
+        return np.zeros((H, W), bool)
+    return (mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)
+
+
+def segment_person(src, np, ndimage):
+    """Person cutout = flood-fill UNION GrabCut. The two methods fail on
+    different regions (flood-fill eats blended tank/arms; GrabCut clips narrow
+    busts), so their union is robust across the bespoke set. GrabCut sometimes
+    also pulls in background-colored haze (e.g. a gray halo around dark hair);
+    that haze is dropped by removing GrabCut-only pixels that match the corner
+    background color. On the user's machine the pipeline uses u2net; this is the
+    sandbox-safe equivalent."""
+    ff = _floodfill(src, np, ndimage)
+    gc = _grabcut(src, np)
+    a = np.asarray(src.convert("RGB")).astype(np.float32)
+    c = 40
+    cor = np.concatenate([a[:c, :c].reshape(-1, 3), a[:c, -c:].reshape(-1, 3),
+                          a[-c:, :c].reshape(-1, 3), a[-c:, -c:].reshape(-1, 3)])
+    bg = np.median(cor, 0)
+    H = a.shape[0]
+    bg_colored = np.sqrt(((a - bg) ** 2).sum(2)) < 45
+    halo = gc & ~ff & bg_colored            # GrabCut-added, but background-colored
+    halo[int(0.60 * H):] = False            # only in the hair zone; keep body/tank
+    person = (ff | gc) & ~halo
+    person = ndimage.binary_opening(person, iterations=1)
+    person = ndimage.binary_closing(person, iterations=3)
+    person = ndimage.binary_fill_holes(person)
     lbl, n = ndimage.label(person)
     if n > 1:
         person = lbl == (1 + int(np.argmax(
