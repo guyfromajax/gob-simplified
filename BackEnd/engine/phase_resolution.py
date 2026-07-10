@@ -5329,7 +5329,8 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
         turn_result["executed_step_count"] = timing["executed_step_count"]
     logging.warning(
         f"🪡 [HCO INTERCEPTION] {getattr(ball_handler, 'player_id', None)} dish picked off by "
-        f"{getattr(interceptor, 'player_id', None)} → STEAL")
+        f"{getattr(interceptor, 'player_id', None)} → STEAL "
+        f"[game={game_state.get('game_id')} is_full_sim={game_state.get('_is_full_simulation')}]")
     return turn_result
 
 
