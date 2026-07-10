@@ -1429,14 +1429,24 @@ class TurnManager:
         # Increment micro turn counter
         self.game.micro_turn_count += 1
 
+        def _safe_key(k):
+            """JSON dict keys must be str/int/float/bool/None. Coerce anything else (e.g. a Player
+            used as a key in action_timeline/touch_counts) to a stable string so JSONResponse can't
+            crash on it."""
+            if isinstance(k, (str, int, float, bool)) or k is None:
+                return k
+            if isinstance(k, Player):
+                return getattr(k, "player_id", None) or str(k)
+            return str(k)
+
         def convert_players(obj):
-            """Recursively replace Player objects with serializable dicts."""
+            """Recursively replace Player objects with serializable dicts (values AND dict keys)."""
             if isinstance(obj, Player):
                 return player_to_dict(obj)
             if isinstance(obj, list):
                 return [convert_players(x) for x in obj]
             if isinstance(obj, dict):
-                return {k: convert_players(v) for k, v in obj.items()}
+                return {_safe_key(k): convert_players(v) for k, v in obj.items()}
             return obj
 
         # Snapshot player stats to compute deltas after the turn

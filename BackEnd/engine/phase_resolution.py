@@ -5518,6 +5518,11 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
     to_roles = dict(roles)
     to_roles["ball_handler"] = ball_handler
     to_roles["defender"] = deflector
+    # `action_timeline` / `touch_counts` are internal tallies keyed by Player OBJECTS. convert_players
+    # only converts dict VALUES, not keys, so these survive to JSONResponse and crash it ("keys must
+    # be str… not Player"). The FE needs the serializable role/step fields, not these — strip them.
+    to_roles.pop("action_timeline", None)
+    to_roles.pop("touch_counts", None)
     game_state["offensive_state"] = "HCO"  # resume in HCO after the side inbound
     turn_result = {
         "result_type": "DEAD BALL",
