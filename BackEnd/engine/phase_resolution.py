@@ -5177,44 +5177,54 @@ def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
     return blocked
 
 
-def _track_hco_intercept_gates(game_state, in_lane, attempted, stage):
+def _track_hco_intercept_gates(game_state, in_lane, attempted, stage, pass_type="?"):
     """Diagnostic: accumulate the interception FUNNEL and log running per-game rates so we can see
     where passes are filtered — Gate 1 (defender in lane) → Gate 2 (aggression attempt) → Gate 3a
-    (passer-safety evade) → Gate 3b (interceptor band: INTERCEPT / BAT_OOB / miss). Pure
-    observability; wrapped so a tracking error can never break a turn."""
+    (passer-safety evade) → Gate 3b (interceptor band: INTERCEPT / BAT_OOB / miss). Also breaks the
+    funnel down by ``pass_type`` (motion / setplay / hot_read / dish / freelance) so we can spot
+    per-type patterns. Pure observability; wrapped so a tracking error can never break a turn."""
     if game_state is None:
         return
     try:
-        g = game_state.setdefault("_hco_intercept_gates", {
-            "passes": 0, "g1": 0, "g2": 0, "g3a_safe": 0,
-            "g3b_int": 0, "g3b_bat": 0, "g3b_miss": 0})
-        g["passes"] += 1
-        if in_lane:
-            g["g1"] += 1
-        if attempted:
-            g["g2"] += 1
-        if stage == "passer_safe":
-            g["g3a_safe"] += 1
-        elif stage == "intercept":
-            g["g3b_int"] += 1
-        elif stage == "bat_oob":
-            g["g3b_bat"] += 1
-        elif stage in ("band_complete", "no_contester"):
-            g["g3b_miss"] += 1
+        def _bump(d):
+            d["passes"] += 1
+            if in_lane:
+                d["g1"] += 1
+            if attempted:
+                d["g2"] += 1
+            if stage == "passer_safe":
+                d["g3a_safe"] += 1
+            elif stage == "intercept":
+                d["g3b_int"] += 1
+            elif stage == "bat_oob":
+                d["g3b_bat"] += 1
+            elif stage in ("band_complete", "no_contester"):
+                d["g3b_miss"] += 1
+        _new = lambda: {"passes": 0, "g1": 0, "g2": 0, "g3a_safe": 0,
+                        "g3b_int": 0, "g3b_bat": 0, "g3b_miss": 0}
+        g = game_state.setdefault("_hco_intercept_gates", _new())
+        by_type = game_state.setdefault("_hco_intercept_gates_by_type", {})
+        _bump(g)
+        _bump(by_type.setdefault(pass_type, _new()))
         n, g1, g2 = g["passes"], g["g1"], g["g2"]
         _r = lambda a, b: f"{100.0 * a / b:.0f}%" if b else "—"
+        # compact per-type tail: type=passes·g1·g2·INT·BAT
+        types_s = " ".join(
+            f"{k}={d['passes']}·{d['g1']}·{d['g2']}·{d['g3b_int']}·{d['g3b_bat']}"
+            for k, d in sorted(by_type.items()))
         logging.warning(
             "🚪 [INTERCEPT GATES] passes=%d | G1 in-lane %d (%s) | G2 attempt %d (%s of in-lane) | "
-            "G3a passer-safe %d (%s of attempts) | G3b: INT=%d BAT=%d miss=%d [is_full_sim=%s]",
+            "G3a passer-safe %d (%s of attempts) | G3b: INT=%d BAT=%d miss=%d | "
+            "by-type[p·g1·g2·INT·BAT]: %s [is_full_sim=%s]",
             n, g1, _r(g1, n), g2, _r(g2, g1), g["g3a_safe"], _r(g["g3a_safe"], g2),
-            g["g3b_int"], g["g3b_bat"], g["g3b_miss"], game_state.get("_is_full_simulation"))
+            g["g3b_int"], g["g3b_bat"], g["g3b_miss"], types_s, game_state.get("_is_full_simulation"))
     except Exception:
         pass
 
 
 def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, off_to_def,
                               is_away_offense, def_aggr, lane_dist, zone, defense_playcall, off_team, rng,
-                              posture=None, game_state=None):
+                              posture=None, game_state=None, pass_type="?"):
     """Stage 2 (§4): resolve a THROWN hot-read dish / kickout through the passing lane. Reuses the
     shared HCT pass model (resolve_pass_contest) with the tighter HCO ``lane_dist``. Eligible
     interceptors = lane-sitting help defenders + the receiver's own man (t-band 0.1..1.0; the
@@ -5247,7 +5257,7 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
         pct = INTERCEPT_ATTEMPT_PCT_BY_CALL.get(def_aggr, 25)
         eligible = [dpos for dpos in eligible_g1 if rng.randint(1, 100) <= pct]
     if not eligible:
-        _track_hco_intercept_gates(game_state, bool(eligible_g1), False, None)
+        _track_hco_intercept_gates(game_state, bool(eligible_g1), False, None, pass_type)
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None}
 
     defenders = []
@@ -5267,12 +5277,13 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     result = resolve_pass_contest(
         passer_desc, receiver_xy, PASS_GRID_PER_GAME_SEC, defenders,
         offense_modifier=offense_modifier, lane_dist=lane_dist, rng=rng)
-    _track_hco_intercept_gates(game_state, True, True, result.get("stage"))
+    _track_hco_intercept_gates(game_state, True, True, result.get("stage"), pass_type)
     return result
 
 
 def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lineup, off_to_def,
-                               is_away_offense, def_aggr, lane_dist, zone, game_state, off_team, rng):
+                               is_away_offense, def_aggr, lane_dist, zone, game_state, off_team, rng,
+                               pass_type="motion"):
     """Dynamic HCO Defense (P2b): contest a SKELETON ball-movement / reversal pass via the two-gate
     model (reuses `_hco_resolve_dish_contest` — skeleton steps carry named locations, so the posture
     reconstruction is accurate). Returns a STEAL turnover result (``pass_intercepted``) if the pass is
@@ -5288,7 +5299,7 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
     contest = _hco_resolve_dish_contest(
         step, passer, receiver, off_lineup, def_lineup, off_to_def, is_away_offense,
         def_aggr, lane_dist, zone, game_state.get("defense_playcall"), off_team, rng,
-        posture=posture, game_state=game_state)
+        posture=posture, game_state=game_state, pass_type=pass_type)
     if contest.get("outcome") not in ("INTERCEPT", "BAT_OOB"):
         return None
     logging.warning(
@@ -5449,6 +5460,46 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
         f"🪣 [HCO BAT-OOB] pass by {getattr(ball_handler, 'player_id', None)} batted OOB by "
         f"{getattr(deflector, 'player_id', None)} → offense retains (side inbound, no reset, no stats)")
     return turn_result
+
+
+def _track_hco_pass_census(result, game):
+    """Diagnostic: census of EVERY HCO turn's passes vs how many were contestable, to explain the
+    gap between total HCO passes and the `🚪 [INTERCEPT GATES]` funnel. Runs for ALL HCO turns
+    (motion / set / iso / non-shot), unlike `📏` (motion-only). Per turn counts pass steps in the
+    FINAL result skeleton, splits them into `same` (pass+receive in ONE step → the contest hook can
+    see it) vs `split` (pass action but no same-step receive → hook skips), and tags the play type +
+    whether a dynamic walk even ran (event=SHOT, posture set). Accumulates a running game total, tags
+    is_full_sim. Pure observability; wrapped by the caller so it can never break a turn."""
+    gs = game.game_state
+    steps = ((result or {}).get("skeleton") or {}).get("steps") or []
+    play_type = (gs.get("offense_play_type") or "?").lower()
+    event_type = (result or {}).get("event_type") or (result or {}).get("result") or "?"
+    posture = gs.get("_hco_defense_posture")
+    same = split = 0
+    for step in steps:
+        pa = step.get("pos_actions") or {}
+        has_pass = any(((a or {}).get("action") or "").lower() == "pass" for a in pa.values())
+        if not has_pass:
+            continue
+        has_recv = any(((a or {}).get("action") or "").lower() == "receive" for a in pa.values())
+        if has_recv:
+            same += 1
+        else:
+            split += 1
+    c = gs.setdefault("_hco_pass_census",
+                      {"turns": 0, "passes": 0, "same": 0, "split": 0, "by_type": {}})
+    c["turns"] += 1
+    c["passes"] += same + split
+    c["same"] += same
+    c["split"] += split
+    bt = c["by_type"]
+    bt[play_type] = bt.get(play_type, 0) + same + split
+    by_type_s = " ".join(f"{k}={v}" for k, v in sorted(bt.items()))
+    logging.warning(
+        "🧮 [HCO PASS CENSUS] game: turns=%d passes=%d (same=%d split=%d) | by-type: %s | "
+        "this-turn: type=%s passes=%d event=%s posture=%s [is_full_sim=%s]",
+        c["turns"], c["passes"], c["same"], c["split"], by_type_s,
+        play_type, same + split, event_type, posture, gs.get("_is_full_simulation"))
 
 
 def _track_hco_pass_lanes(result, game):
@@ -5721,10 +5772,11 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         recv = decision.get("shooter_pos")
         if not recv or recv == passer_pos:
             return result
+        _ptype = "hot_read" if decision.get("hot_read") else "dish"
         contest = _hco_resolve_dish_contest(
             step, passer_pos, recv, off_lineup, def_lineup, off_to_def, is_away_offense,
             _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random,
-            posture=game_state.get("_hco_defense_posture"), game_state=game_state)
+            posture=game_state.get("_hco_defense_posture"), game_state=game_state, pass_type=_ptype)
         if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
             result["pass_intercepted"] = True
             result["interceptor_pos"] = contest.get("deflector")
@@ -5735,6 +5787,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                 f"by {contest.get('deflector')}")
         return result
 
+    _skel_pass_type = "setplay" if (game_state.get("offense_play_type") or "") == "set_play" else "motion"
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
@@ -5744,7 +5797,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
         _skel_pass_to = _hco_contest_skeleton_pass(
             steps[i], output_steps, skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random)
+            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random, pass_type=_skel_pass_type)
         if _skel_pass_to is not None:
             return _skel_pass_to
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
@@ -5960,10 +6013,11 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
         recv = decision.get("shooter_pos")
         if not recv or recv == passer_pos:
             return result
+        _ptype = "hot_read" if decision.get("hot_read") else "dish"
         contest = _hco_resolve_dish_contest(
             step, passer_pos, recv, off_lineup, def_lineup, off_to_def, is_away_offense,
             _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random,
-            posture=game_state.get("_hco_defense_posture"), game_state=game_state)
+            posture=game_state.get("_hco_defense_posture"), game_state=game_state, pass_type=_ptype)
         if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
             result["pass_intercepted"] = True
             result["interceptor_pos"] = contest.get("deflector")
@@ -5974,6 +6028,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
                 f"by {contest.get('deflector')}")
         return result
 
+    _skel_pass_type = "setplay" if (game_state.get("offense_play_type") or "") == "set_play" else "motion"
     output_steps = [steps[0]]  # always start at the skeleton's step 0
     for i in range(1, len(steps)):
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
@@ -5983,7 +6038,7 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
         # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
         _skel_pass_to = _hco_contest_skeleton_pass(
             steps[i], output_steps, skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random)
+            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random, pass_type=_skel_pass_type)
         if _skel_pass_to is not None:
             return _skel_pass_to
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
@@ -6303,7 +6358,7 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
                     contest = _hco_resolve_dish_contest(
                         beat, cur_bh, rp, off_lineup, def_lineup, fl_off_to_def, is_away_offense,
                         def_aggr, fl_lane_dist, zone, defense_playcall, off_team, rng,
-                        posture=posture, game_state=game_state)
+                        posture=posture, game_state=game_state, pass_type="freelance")
                     if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
                         output.append(freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300))
                         skeleton["steps"] = output

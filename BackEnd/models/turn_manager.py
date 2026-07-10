@@ -3981,8 +3981,9 @@ class TurnManager:
         # Diagnostic (§4 calibration): log closest-defender pass-lane distances. Pure observability;
         # wrapped so a tracking error can never break the turn.
         try:
-            from BackEnd.engine.phase_resolution import _track_hco_pass_lanes
+            from BackEnd.engine.phase_resolution import _track_hco_pass_lanes, _track_hco_pass_census
             _track_hco_pass_lanes(result, self.game)
+            _track_hco_pass_census(result, self.game)
         except Exception:
             pass
         self._emit_hco_animation_steps(result)
