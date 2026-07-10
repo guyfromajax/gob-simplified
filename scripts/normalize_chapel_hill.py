@@ -107,6 +107,13 @@ def segment_person(src, np, ndimage):
     if n > 1:
         person = lbl == (1 + int(np.argmax(
             ndimage.sum(np.ones_like(lbl), lbl, range(1, n + 1)))))
+    # decontaminate: shave THIN background-colored slivers (grey fringe off dark
+    # hair/shoulders) while preserving the solid tank. Opening removes thin bits;
+    # keep every non-bg-colored pixel (skin/hair) untouched.
+    bgc = person & bg_colored
+    bgc_solid = ndimage.binary_opening(bgc, iterations=3)     # solid fabric survives
+    person = (person & ~bg_colored) | bgc_solid
+    person = ndimage.binary_fill_holes(person)
     return person
 
 
