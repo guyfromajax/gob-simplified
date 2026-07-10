@@ -51,8 +51,12 @@ def detect_face(rgb, cv2, np):
 
 
 def finish(in_path, out_path, face_frac=FACE_H_FRAC, cy_frac=FACE_CY_FRAC):
+    """Preserve the input's (already-consistent) framing: uniformly scale it to
+    fill the canvas width, crop the small vertical excess from the bottom (head
+    stays near the top), and clean the alpha edge. NO per-face re-anchoring —
+    every image gets the identical transform, so the framing you already have is
+    kept, just re-sized to 3530x3412."""
     import numpy as np
-    import cv2
     from scipy import ndimage
     from PIL import Image
 
@@ -60,37 +64,21 @@ def finish(in_path, out_path, face_frac=FACE_H_FRAC, cy_frac=FACE_CY_FRAC):
     arr = np.asarray(im)
     rgb = arr[..., :3].copy()
     alpha = arr[..., 3]
-
-    # --- locate the head ---
-    face = detect_face(rgb, cv2, np)
-    ys, xs = np.where(alpha > 20)
-    if ys.size == 0:
+    if (alpha > 20).sum() == 0:
         raise ValueError("empty image")
-    if face is None:                                  # fallback: use alpha head-top
-        top = ys.min()
-        cx = (xs.min() + xs.max()) / 2.0
-        head_h = (ys.max() - top) * 0.32              # approx face height
-        fcx, fcy, fh = cx, top + head_h * 0.55, head_h
-    else:
-        fcx, fcy, fh = face
 
-    scale = (face_frac * CANVAS_H) / fh
-
-    # --- edge cleanup: erode + feather to remove the white halo ---
-    a = (alpha > 20).astype(np.float32)
-    a = ndimage.binary_erosion(a > 0.5, iterations=2).astype(np.float32)
+    # edge cleanup: erode + feather to kill the white halo
+    a = ndimage.binary_erosion(alpha > 20, iterations=2).astype(np.float32)
     a = ndimage.gaussian_filter(a, 1.5)
     alpha = np.clip(a * 255, 0, 255).astype(np.uint8)
 
     src = Image.fromarray(np.dstack([rgb, alpha]), "RGBA")
-    new_w, new_h = max(1, round(src.width * scale)), max(1, round(src.height * scale))
+    scale = CANVAS_W / src.width                        # fill width uniformly
+    new_w, new_h = CANVAS_W, max(1, round(src.height * scale))
     src = src.resize((new_w, new_h), Image.LANCZOS)
 
-    # place the face at its target spot on the canvas
-    px = round(FACE_CX_FRAC * CANVAS_W - fcx * scale)
-    py = round(cy_frac * CANVAS_H - fcy * scale)
     canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
-    canvas.alpha_composite(src, (px, py))
+    canvas.alpha_composite(src, (0, 0))                 # top-aligned (head near top)
     canvas.save(out_path, "PNG")
 
 
