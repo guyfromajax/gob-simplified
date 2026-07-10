@@ -35,27 +35,30 @@ MODEL = "gemini-3.1-flash-lite-image"   # Nano Banana 2 Lite
 ANCHOR = "tmp/portrait-pilot/raw/Colt Robles.png"
 
 # Per-frame anchor override. NB would not widen the frame off Colt's narrow
-# body no matter the wording, so Broad copies its build from a genuinely
-# broad-shouldered Conf1 player (Cedric Buckles). Others use the shared anchor.
+# body no matter the wording, so Broad takes TWO references: a genuinely
+# broad-shouldered Conf1 player (Cedric Buckles) for the BODY WIDTH, and the
+# shared Colt anchor for the young face / hair / illustrated style / background
+# (copying Buckles alone dragged in his adult face, dreads, and photo-real look).
+# Values may be a single path or a list (image 1, image 2, ...).
+_BUCKLES = "FrontEnd/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png"
 FRAME_ANCHORS = {
-    "Broad": "FrontEnd/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png",
+    "Broad": [_BUCKLES, ANCHOR],
 }
 
-# Full-prompt override for frames whose anchor already HAS the target build
-# (so we copy the build rather than change it). Broad copies Buckles' broad
-# shoulders but is redrawn in a white tank with neutral (not cut) muscle tone.
+# Full-prompt override for frames whose anchor already HAS the target build.
 FRAME_FULL_PROMPT = {
     "Broad":
-        "Use the attached image as the reference for the BODY BUILD: copy its "
-        "broad, wide shoulders and large frame — shoulders much wider than the "
-        "head, reaching and bleeding off the left and right edges of the frame. "
-        "Redraw this as a front-facing head-and-shoulders bust portrait of a "
-        "16-17 year old male high-school basketball player wearing a plain white "
-        "sleeveless tank top with a simple crew neckline, on a plain light "
-        "neutral background, semi-realistic illustrated art style, calm neutral "
-        "expression, even soft studio lighting. Keep the broad wide-shouldered "
-        "frame, but give him PLAIN AVERAGE muscle tone — not cut, not defined, "
-        "not bulky. Head-and-shoulders framing, upper chest at the bottom edge.",
+        "Two reference images are attached. IMAGE 1 is for BODY BUILD ONLY: "
+        "copy its broad, wide shoulders and large frame — shoulders much wider "
+        "than the head, reaching and bleeding off the left and right edges. "
+        "IMAGE 2 is for EVERYTHING ELSE: match its youthful 16-17 year old face "
+        "and age, short simple hair, semi-realistic illustrated art style, plain "
+        "light neutral background, white sleeveless tank, head size and framing. "
+        "Generate a front-facing head-and-shoulders bust of a 16-17 year old "
+        "high-school basketball player with the BROAD wide-shouldered frame of "
+        "image 1 but the young illustrated look of image 2, calm neutral "
+        "expression, plain average muscle tone (not cut, not bulky). Do NOT copy "
+        "image 1's face, hair, age, skin tone, or background — only its build.",
 }
 
 # Shared spec — HEAD-ANCHORED. The head is the same size in every frame; only
@@ -152,12 +155,17 @@ def main():
     _anchor_cache = {}
 
     def anchor_for(name):
-        path = FRAME_ANCHORS.get(name, args.anchor)
-        if path not in _anchor_cache:
-            if not os.path.exists(path):
-                sys.exit(f"anchor image not found: {path}")
-            _anchor_cache[path] = Image.open(path)
-        return _anchor_cache[path]
+        paths = FRAME_ANCHORS.get(name, args.anchor)
+        if isinstance(paths, str):
+            paths = [paths]
+        imgs = []
+        for path in paths:
+            if path not in _anchor_cache:
+                if not os.path.exists(path):
+                    sys.exit(f"anchor image not found: {path}")
+                _anchor_cache[path] = Image.open(path)
+            imgs.append(_anchor_cache[path])
+        return imgs
 
     ok = 0
     jobs = [(name, frame, i) for name, frame in frames.items()
@@ -167,7 +175,7 @@ def main():
         label = name if args.variants == 1 else f"{name}_{i}"
         try:
             resp = client.models.generate_content(
-                model=MODEL, contents=[prompt, anchor_for(name)])
+                model=MODEL, contents=[prompt, *anchor_for(name)])
             saved = False
             for part in resp.candidates[0].content.parts:
                 if getattr(part, "inline_data", None) and part.inline_data.data:
