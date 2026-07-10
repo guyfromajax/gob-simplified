@@ -863,6 +863,12 @@ class Animator:
                         rebounder = owner or rebounder
                         if owner:
                             break
+                    elif event.get("type") == "steal" and event.get("stealer_id"):
+                        # A stealer (defender) named on the step owns the ball there → the ball
+                        # tweens to him (HCO interception ball-attach; defenders are in players_by_id).
+                        owner = players_by_id.get(event.get("stealer_id"))
+                        if owner:
+                            break
             ball_owner_by_step.append(owner)
 
         # Extend ball ownership to cover any additional timeline steps

@@ -5325,6 +5325,7 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
         pass
     if not passer or not receiver or not off_lineup.get(passer):
         return None
+    step["_hco_contested"] = True  # tag so the final-skeleton coverage pass skips this step
     contest = _hco_resolve_dish_contest(
         step, passer, receiver, off_lineup, def_lineup, off_to_def, is_away_offense,
         def_aggr, lane_dist, zone, game_state.get("defense_playcall"), off_team, rng,
@@ -5345,6 +5346,56 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
         "shooter": off_lineup[passer],
         "shooter_pos": passer,
     }
+
+
+def _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, game_state):
+    """Coverage (Dynamic HCO Defense): contest every pass step in the FINAL resolved skeleton that the
+    per-step resolver DIDN'T already contest (untagged) — catching passes built outside the walk
+    (legacy resolver, shot-clock recalibration, intra-resolution expansion). Reuses the same two-gate
+    contest via `_hco_contest_skeleton_pass`; on the FIRST pick (step order) it mutates
+    ``motion_shot_info`` with the interception flags + truncated skeleton so the caller's existing
+    ``pass_intercepted`` routing finalizes it identically to a walk pick. Flag-gated; no-op if the
+    possession was already intercepted or has no posture set."""
+    if not _dynamic_hco_defense_enabled():
+        return
+    if not motion_shot_info or motion_shot_info.get("pass_intercepted"):
+        return
+    posture = game_state.get("_hco_defense_posture")
+    if not posture:
+        return
+    skeleton = motion_shot_info.get("skeleton") or {}
+    steps = skeleton.get("steps") or []
+    if not steps:
+        return
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+    import random as _rng
+    off_team = game.offense_team
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    zone = is_zone_defense(game_state.get("defense_playcall"))
+    def_aggr = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
+    lane_dist = _hco_pass_lane_dist(game)
+    off_to_def = {}
+    if not zone:
+        matchups = get_matchups_for_defending_team(
+            game_state, getattr(game.defense_team, "is_user_team", False))
+        off_to_def = {o: d for d, o in matchups.items()}
+    ptype = "setplay" if (game_state.get("offense_play_type") or "") == "set_play" else "motion"
+    # Snapshot the step list — a pick truncates skeleton["steps"], so iterate a stable copy.
+    for i, step in enumerate(list(steps)):
+        if step.get("_hco_contested"):
+            continue
+        pick = _hco_contest_skeleton_pass(
+            step, steps[:i + 1], skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
+            def_aggr, lane_dist, zone, game_state, off_team, _rng, pass_type=ptype)
+        if pick is not None:
+            motion_shot_info["pass_intercepted"] = True
+            motion_shot_info["interceptor_pos"] = pick["interceptor_pos"]
+            motion_shot_info["pass_bat_oob"] = pick["pass_bat_oob"]
+            motion_shot_info["pass_contact_point"] = pick["pass_contact_point"]
+            motion_shot_info["passer_pos"] = pick["passer_pos"]
+            motion_shot_info["skeleton"] = pick["skeleton"]
+            return
 
 
 def _hco_last_pass_step_index(steps):
@@ -5403,6 +5454,21 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
         _stop.setdefault("_attack_drive", {}).setdefault("defender_overrides", {})[_dpos] = {
             "coords": _cc, "action": "steal_reach",
         }
+        # Ball animation: make the interceptor OWN the ball on the stop step so it TWEENS from the
+        # passer to the contact point (was teleporting — the ball stayed with the offense the whole
+        # skeleton and only jumped to the stealer at the next possession via last_stealer_coords).
+        # The passer gives it up ("pass", not the stopper's "handle_ball") so the animator's
+        # ball-owner walk falls through to the steal event, which now carries the stealer's id.
+        if _passer_pos and _passer_pos in (_stop.get("pos_actions") or {}):
+            _stop["pos_actions"][_passer_pos]["action"] = "pass"
+        _iid = getattr(interceptor, "player_id", None)
+        if _iid:
+            _evs = _stop.setdefault("events", [])
+            _steal_ev = next((_ev for _ev in _evs if _ev.get("type") == "steal"), None)
+            if _steal_ev is None:
+                _steal_ev = {"type": "steal"}
+                _evs.append(_steal_ev)
+            _steal_ev["stealer_id"] = _iid
     to_roles = dict(roles)
     to_roles["ball_handler"] = ball_handler
     to_roles["defender"] = interceptor
@@ -5817,6 +5883,11 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             logging.warning(
                 f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
                 f"by {contest.get('deflector')}")
+        # Tag the appended dish pass step so the final-skeleton coverage pass skips it.
+        for _st in reversed((result.get("skeleton") or {}).get("steps") or []):
+            if (((_st.get("pos_actions") or {}).get(passer_pos) or {}).get("action") or "").lower() == "pass":
+                _st["_hco_contested"] = True
+                break
         return result
 
     _skel_pass_type = "setplay" if (game_state.get("offense_play_type") or "") == "set_play" else "motion"
@@ -6058,6 +6129,11 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
             logging.warning(
                 f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
                 f"by {contest.get('deflector')}")
+        # Tag the appended dish pass step so the final-skeleton coverage pass skips it.
+        for _st in reversed((result.get("skeleton") or {}).get("steps") or []):
+            if (((_st.get("pos_actions") or {}).get(passer_pos) or {}).get("action") or "").lower() == "pass":
+                _st["_hco_contested"] = True
+                break
         return result
 
     _skel_pass_type = "setplay" if (game_state.get("offense_play_type") or "") == "set_play" else "motion"
@@ -6407,7 +6483,10 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
                             "shooter": off_lineup[cur_bh],
                             "shooter_pos": cur_bh,
                         }
-                output.append(freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300))
+                _fp = freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300)
+                if posture:
+                    _fp["_hco_contested"] = True  # contested above (survived) → coverage pass skips it
+                output.append(_fp)
                 last_ts += 300
                 cur_bh = rp
                 continue
@@ -7715,6 +7794,11 @@ def resolve_half_court_offense_logic(game):
             motion_shot_info = game_state.pop("_motion_shot_recalibrated", None)
             if not motion_shot_info:
                 motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
+
+        # Coverage: contest any pass in the FINAL skeleton the per-step resolver didn't already
+        # contest (legacy resolve / recalibration / expansion). Mutates motion_shot_info in place →
+        # routes through the same interception finalize below.
+        _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, game_state)
 
         # §4 Stage 2: a dish/kickout picked off in the lane → STEAL (interception), not a shot.
         if motion_shot_info and motion_shot_info.get("pass_intercepted"):
