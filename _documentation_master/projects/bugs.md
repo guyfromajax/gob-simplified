@@ -1,22 +1,5 @@
-##Player Images
-1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
-
-##bugs
-1. Airball next step
-
-#UESS Turn Audits Round 2
-- objective: ensure all steps have defined advance trigger and destinations (even if stationary) and speed archetypes for all players.
-1. HCO
-2. OREB
-3. DREB
-4. BIP
-5. SIP
-6. HCT
-7. FCP
-8. Fast Break
-9. Free Throw
-10. Opening Tip
-11. Timeout
+##Bugs
+1. Teleported an HCO entry step, result was a DB turnover
 
 ##Verify as Perfect
 1. EOQ Perfection
@@ -30,11 +13,9 @@
 120. PvP live
 121. Tunable Constants file
 123. Downloadable game vs Live game dynamics
-124. MM: Make HCO defenders un-attached to the offender at all costs
 125. MM: Micro Movement SFX
 127. Add a new hire news story for user team
 128. Add a badass design appraoch to New Stories
-129. Dunk SFX
 
 ##Full Product Perfection
 1. Training Camp News Report
@@ -49,15 +30,15 @@
 117. More action on Signing Day
 118. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
-128. Account for micro shot movements in Final Shot
 129: Loose Balls!
-130. Include all turn types (HCT, FCP, Fast Break, etc) in FLSS / EOG Perfection
 131. Centralized Turn Transition Helper / System
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
 2. Advanced Topics tutorials
-3. Dynamic FCP Turns
+
+##Player Images
+1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
 
 
