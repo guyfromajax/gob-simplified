@@ -30,6 +30,14 @@ FONT = "FrontEnd/static/fonts/BebasNeuePro-Bold.otf"
 IN_DIR = "tmp/portrait-pilot/generated"
 OUT_DIR = "tmp/portrait-pilot/uniformed"
 
+# Wordmark placement, anchored to the FINISH crop so only the TOP slice shows at
+# the final image's bottom edge (rest reads as continuing below).
+#  - finish scales this 1024px bust to 3530 wide and keeps the top 3412 rows, i.e.
+#    it keeps the top ~96.6% of the height. That crop line is the final bottom edge.
+CROP_KEEP_FRAC = 0.966         # fraction of bust height the finish crop keeps
+WM_VISIBLE_FRAC = 0.30         # fraction of wordmark letter-height shown above it
+WM_WIDTH_FRAC = 0.72           # wordmark width as a fraction of tank width
+
 
 def slug(s):
     return re.sub(r"[^a-z0-9]", "", str(s).lower())
@@ -152,10 +160,33 @@ def apply_uniform(in_path, out_path, wordmark, primary, secondary):
     rimS = ndimage.gaussian_filter(rim.astype(np.float32), 0.6)[..., None]
     out = out * (1 - rimS) + (S[None, None, :] * tone) * rimS
 
-    # NOTE: the WORDMARK is intentionally NOT drawn here. It's applied in the
-    # finishing stage (finish_portraits.py), placed relative to the final crop so
-    # only its top slice shows at the bottom edge. This stage does colors + trim
-    # only, which keeps the jersey clean for that placement.
+    # WORDMARK — placed LOW so the finish crop shows only its top slice at the
+    # bottom edge. Same rendering you approved (arc + fabric-shade + soft edges),
+    # strictly clipped to the fabric.
+    txt = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(txt)
+    tank_w = xs.max() - xs.min()
+    font, b = fit_font(d, wordmark, ImageFont, int(tank_w * WM_WIDTH_FRAC))
+    wm_h = b[3] - b[1]
+    tx = cx - (b[2] - b[0]) // 2 - b[0]
+    # top-of-letters lands WM_VISIBLE_FRAC above the crop line; rest falls below
+    ty = int(CROP_KEEP_FRAC * H - WM_VISIBLE_FRAC * wm_h) - b[1]
+    d.text((tx, ty), wordmark, fill=255, font=font)
+    tmask = np.asarray(txt).astype(np.float32) / 255.0
+
+    # very mild arc so the visible slice reads as a natural chest print
+    amp = max(2, int(0.018 * (bot - top)))
+    half = max(1.0, 0.5 * tank_w)
+    shift = np.clip((amp * ((np.arange(W) - cx) / half) ** 2), 0, amp).astype(int)
+    arced = np.zeros_like(tmask)
+    for x in range(W):
+        s = int(shift[x])
+        arced[s:, x] = tmask[:H - s, x] if s else tmask[:, x]
+    arced = ndimage.gaussian_filter(arced, 0.7)               # screen-print softness
+
+    tm = (arced * ndimage.binary_erosion(tank, iterations=1))[..., None]  # clip to cloth
+    ink = S[None, None, :] * np.clip(tone * 1.15, 0.42, 1.18)  # secondary, fold-shaded
+    out = out * (1 - 0.92 * tm) + ink * (0.92 * tm)
 
     # Output RGBA: recolored person on a transparent background (cutout done —
     # only cropping remains). Alpha is the u2net person mask.
