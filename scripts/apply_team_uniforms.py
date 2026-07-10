@@ -170,13 +170,27 @@ def apply_uniform(in_path, out_path, wordmark, primary, secondary):
     for x in range(W):
         s = int(shift[x])
         arced[s:, x] = tmask[:H - s, x] if s else tmask[:, x]
+
+    # FOLD-DISPLACEMENT: warp the letters along the jersey's actual wrinkles so
+    # they bend with the cloth. Heightmap = smoothed fabric luminance; sample the
+    # text from a position pushed by that height's gradient.
+    heights = ndimage.gaussian_filter(_lum(a), 7.0)
+    gy, gx = np.gradient(heights)
+    k = 1.6
+    yy, xx = np.mgrid[0:H, 0:W]
+    sx = np.clip(xx + k * gx, 0, W - 1)
+    sy = np.clip(yy + k * gy, 0, H - 1)
+    arced = ndimage.map_coordinates(arced, [sy, sx], order=1, mode="constant")
     arced = ndimage.gaussian_filter(arced, 0.7)              # screen-print softness
-    tm = arced[..., None]
+
+    # STRICT CLIP: the wordmark may only ever appear on the fabric, never on skin
+    fabric = ndimage.binary_erosion(tank, iterations=1).astype(np.float32)
+    tm = (arced * fabric)[..., None]
 
     # ink takes the jersey's own fold shading so it sits IN the cloth
     ink_tone = np.clip(tone * 1.15, 0.42, 1.18)
     ink = S[None, None, :] * ink_tone
-    out = out * (1 - 0.92 * tm) + ink * (0.92 * tm)          # slight fabric bleed-through
+    out = out * (1 - 0.9 * tm) + ink * (0.9 * tm)           # slight fabric bleed-through
 
     # Output RGBA: recolored person on a transparent background (cutout done —
     # only cropping remains). Alpha is the u2net person mask.
