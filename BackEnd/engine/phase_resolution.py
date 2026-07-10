@@ -5516,7 +5516,8 @@ def _track_hco_pass_lanes(result, game):
     full_s = f"{t['full_sum'] / t['full_n']:.2f}" if t["full_n"] else "n/a"
     logging.warning(
         f"📏 [HCO PASS LANES] this turn (mid/full)={turn_samples} | GAME: passes={t['count']} "
-        f"mid_avg={mid_s} (n={t['mid_n']}) full_avg={full_s} (n={t['full_n']})")
+        f"mid_avg={mid_s} (n={t['mid_n']}) full_avg={full_s} (n={t['full_n']}) "
+        f"[is_full_sim={game_state.get('_is_full_simulation')}]")
 
 
 def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
