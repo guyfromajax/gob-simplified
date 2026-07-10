@@ -39,6 +39,10 @@ import os
 import csv
 import json
 import hashlib
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from player_ethnicity import assign_ethnicity   # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPORT = os.path.join(HERE, "players_export.json")
@@ -166,10 +170,14 @@ def classify(p):
     if defi and frame != "Doughy":
         body_prompt = f"{body_prompt}, {DEFINITION_PROMPT[defi]}"
     archetype = frame if frame == "Doughy" else f"{frame}-{defi or 'Toned'}"
+    # Race / skin tone (name-override + weighted random; names drive the mix).
+    eth = assign_ethnicity(p.get("first_name"), p.get("last_name"), p.get("_id"))
     return {**p, "bmi": round(bmi, 1), "frame": frame,
             "definition": defi or "n/a", "archetype": archetype,
             "template": frame, "body_prompt": body_prompt,
-            "expression": pick_expression(p.get("_id"))}
+            "expression": pick_expression(p.get("_id")),
+            "race": eth["race"], "skin": eth["skin"],
+            "ethnicity": eth["ethnicity_label"], "skin_prompt": eth["skin_prompt"]}
 
 
 def main():
@@ -213,7 +221,7 @@ def main():
     out = os.path.join(HERE, "players_archetypes.csv")
     cols = ["_id", "name", "jersey", "year", "height_in", "weight_lb", "bmi",
             "st", "ag", "rt", "frame", "definition", "archetype", "template",
-            "expression", "body_prompt"]
+            "race", "skin", "ethnicity", "expression", "body_prompt", "skin_prompt"]
     with open(out, "w", newline="") as f:
         wr = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         wr.writeheader()

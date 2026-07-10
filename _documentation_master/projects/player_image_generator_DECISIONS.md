@@ -152,6 +152,28 @@ template needed; works on any body/archetype.
 
 ---
 
+## Race / ethnicity / skin tone
+
+Models real men's D1 basketball demographics for authenticity.
+`scripts/player_ethnicity.py`, wired into the classifier (columns `race`, `skin`,
+`ethnicity`, `skin_prompt`).
+
+- **Base split:** black 55% · white 35% · other 10%.
+- **Sub-tones:** black → normal 50 / light 35 / dark 15 · white → normal 60 /
+  tan-olive 30 / pale-Scandinavian 10 · other → asian 50 / hispanic 25 / ambiguous 25.
+- **Name override:** obvious ethnic names lock the race (Asian/Hispanic surnames,
+  distinctive Black given names, European surnames / Anglo givens; Scandinavian
+  surnames also bias to pale). ~17% of the roster name-matches; the rest is
+  UUID-seeded weighted random (independent of the expression seed).
+- **DECISION — names override the macro percentages (no forced rebalance).** The
+  generated roster's names skew Hispanic-heavy (106 Hispanic surnames/givens) and
+  Asian-light, so honoring names shifts the actual split to **~48% black / 36%
+  white / 16% other** (asian ~82, hispanic ~138, ambiguous ~28). User chose to
+  accept this organic mix rather than force 55/35/10 — obvious names win, and the
+  variety (esp. ~82 Asian) is healthy. `compute_random_weights()` exists to
+  quota-fill toward 55/35/10 if we ever want strict targeting, but it's **not**
+  used by default.
+
 ## Character details (sparingly)
 
 Afro, dreads, goggles, headband, earrings, etc. — sprinkled at low rates,
