@@ -98,6 +98,11 @@ conflated definition with *frame width* (that's Broad's job). Definition describ
 only muscle-vs-fat; width belongs to the frame axis. A "big powerful thick" guy is
 **Broad + Soft/Toned**, not a definition value.
 
+**Muscle-tone re-roll (variety):** the stat-derived tone gets a UUID-seeded
+**10% nudge** for a little randomness — Cut↔Toned swap, Soft→Toned. Single
+seeded check (not a literal double roll). Doughy is exempt (its Soft is body,
+not modifier). Net after re-roll ≈ Cut 18% / Toned 55% / Soft 27%.
+
 ### Routing (classifier: `scripts/classify_player_archetypes.py`)
 - DEFINITION: `Cut` if RT≥75 or (ST≥65 & AG≥45); `Soft` if RT≤45 & AG≤30; else `Toned`.
 - FRAME base from BMI tertiles (Lean<25.5 / Broad≥26.5 / Normal between), then:

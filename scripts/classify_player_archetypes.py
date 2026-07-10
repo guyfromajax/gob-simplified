@@ -69,6 +69,22 @@ def definition(st, ag, rt):
     return "Toned"
 
 
+# Muscle-tone "re-roll": mostly stat-driven, but a UUID-seeded 10% nudges it for
+# variety. Single seeded check (not an actual double roll). Cut<->Toned swap;
+# Soft eases to Toned. Doughy is exempt (its Soft is part of the body, pinned).
+DEF_REROLL = {"Cut": "Toned", "Toned": "Cut", "Soft": "Toned"}
+DEF_REROLL_PCT = 10
+
+
+def reroll_definition(defi, pid):
+    if not defi:
+        return defi
+    seed = int(hashlib.md5(f"{pid}|muscle".encode()).hexdigest(), 16)
+    if seed % 100 < DEF_REROLL_PCT:
+        return DEF_REROLL[defi]
+    return defi
+
+
 # FRAME descriptor -> drives the reference body silhouette.
 FRAME_PROMPT = {
     "Slight": "small slight frame, narrow shoulders, thin neck, youthful build, "
@@ -224,8 +240,11 @@ def classify(p):
     defi = definition(p.get("st"), p.get("ag"), p.get("rt"))
     frame = frame_of(h, w, bmi, defi, p.get("st"))
     # Doughy is a terminal type: pinned to Soft regardless of the raw axis.
+    # (Its Soft is part of the body, so it's exempt from the re-roll.)
     if frame == "Doughy":
         defi = "Soft"
+    else:
+        defi = reroll_definition(defi, p.get("_id"))
     body_prompt = FRAME_PROMPT[frame]
     if defi and frame != "Doughy":
         body_prompt = f"{body_prompt}, {DEFINITION_PROMPT[defi]}"
