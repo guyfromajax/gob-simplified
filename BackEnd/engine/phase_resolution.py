@@ -5069,6 +5069,17 @@ HCO_PASS_LANE_DIST_BY_AGGRESSION = {"passive": 6.0, "aggressive": 5.0}
 # attribute contest in resolve_pass_contest) then decides if an attempt actually picks it.
 INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 50, "normal": 25, "passive": 0}
 
+# Dynamic HCO Defense — HCO-specific pass-contest calibration (owner spec 2026-07-10). Shared
+# resolve_pass_contest defaults (HCT/FCP) are BASE=200 / HI=250 / MID=200, left untouched. HCO folds
+# team efficiency into BOTH the composite and the bar/tiers (efficiency_in_composite=True):
+#   3a pass_score  = ((PS·0.6 + CH·0.2 + IQ·0.2) + offensive_efficiency) × rand(1,6)
+#      bar         = HCO_PASS_SAFETY_BASE − offensive_efficiency
+#   3b intercept   = ((OD·0.6 + CH·0.2 + IQ·0.2) + defensive_efficiency) × rand(1,6)
+#      tier_hi/mid = (HCO_PASS_INTERCEPT_TIER_HI/MID) − defensive_efficiency
+HCO_PASS_SAFETY_BASE = 175.0
+HCO_PASS_INTERCEPT_TIER_HI = 200.0
+HCO_PASS_INTERCEPT_TIER_MID = 170.0
+
 
 def _hco_pass_lane_dist(game):
     """HCO hot-read/kickout passing-lane distance: passive→6, aggressive→5, normal→randint(5,6)
@@ -5274,9 +5285,15 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     pa = getattr(passer, "attributes", None) or {}
     passer_desc = {"xy": passer_xy, "PS": pa.get("PS", 50), "CH": pa.get("CH", 50), "IQ": pa.get("IQ", 50)}
     offense_modifier = resolve_offense_pass_modifier("HCO", getattr(off_team, "team_attributes", None))
+    # Defense modifier = defending team's defensive_efficiency (stashed at HCO entry). Folded into
+    # the interceptor composite AND subtracted from the tiers (see HCO_PASS_* constants).
+    defense_modifier = float((game_state or {}).get("_hco_def_efficiency", 0.0) or 0.0)
     result = resolve_pass_contest(
         passer_desc, receiver_xy, PASS_GRID_PER_GAME_SEC, defenders,
-        offense_modifier=offense_modifier, lane_dist=lane_dist, rng=rng)
+        offense_modifier=offense_modifier, defense_modifier=defense_modifier,
+        lane_dist=lane_dist, rng=rng, safety_base=HCO_PASS_SAFETY_BASE,
+        tier_hi=HCO_PASS_INTERCEPT_TIER_HI, tier_mid=HCO_PASS_INTERCEPT_TIER_MID,
+        efficiency_in_composite=True)
     _track_hco_intercept_gates(game_state, True, True, result.get("stage"), pass_type)
     return result
 
@@ -5294,6 +5311,18 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
     pa = step.get("pos_actions") or {}
     passer = next((p for p, a in pa.items() if ((a or {}).get("action") or "").lower() == "pass"), None)
     receiver = next((p for p, a in pa.items() if ((a or {}).get("action") or "").lower() == "receive"), None)
+    # Walk census (diagnostic): does the walk even SEE this pass step? Distinguishes "passes not in
+    # the walked steps" (pass_same ≪ census passes → added downstream) from "split encoding at walk
+    # time" (pass_seen ≫ pass_same). Pure observability.
+    try:
+        w = game_state.setdefault("_hco_walk_census", {"steps": 0, "pass_seen": 0, "pass_same": 0})
+        w["steps"] += 1
+        if passer:
+            w["pass_seen"] += 1
+            if receiver:
+                w["pass_same"] += 1
+    except Exception:
+        pass
     if not passer or not receiver or not off_lineup.get(passer):
         return None
     contest = _hco_resolve_dish_contest(
@@ -5495,10 +5524,13 @@ def _track_hco_pass_census(result, game):
     bt = c["by_type"]
     bt[play_type] = bt.get(play_type, 0) + same + split
     by_type_s = " ".join(f"{k}={v}" for k, v in sorted(bt.items()))
+    w = gs.get("_hco_walk_census") or {}
     logging.warning(
         "🧮 [HCO PASS CENSUS] game: turns=%d passes=%d (same=%d split=%d) | by-type: %s | "
+        "walk-saw: steps=%d pass_seen=%d pass_same=%d | "
         "this-turn: type=%s passes=%d event=%s posture=%s [is_full_sim=%s]",
         c["turns"], c["passes"], c["same"], c["split"], by_type_s,
+        w.get("steps", 0), w.get("pass_seen", 0), w.get("pass_same", 0),
         play_type, same + split, event_type, posture, gs.get("_is_full_simulation"))
 
 
@@ -6736,6 +6768,12 @@ def resolve_half_court_offense_logic(game):
     # stash it on game_state; the animator reads it to shade defender placement. No-op (None) when
     # the GOB_DYNAMIC_HCO_DEFENSE flag is off. Rolled fresh each turn → never stale.
     _roll_defense_posture(game)
+
+    # Stash the defending team's defensive_efficiency for the pass-contest Gate 3b modifier
+    # (read in _hco_resolve_dish_contest → resolve_pass_contest). Offense uses offensive_efficiency
+    # via resolve_offense_pass_modifier at contest time.
+    game_state["_hco_def_efficiency"] = float(
+        (getattr(def_team, "team_attributes", None) or {}).get("defensive_efficiency", 0) or 0)
 
     # ✅ BALANCING SYSTEM: Apply balancing system at start of HCO turn
     apply_balancing_system(game, game_state, off_team, def_team)

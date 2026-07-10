@@ -157,7 +157,7 @@ def _earliest_contact(
     return None
 
 
-def _intercept_score(defender: Dict[str, Any], rng: Any) -> float:
+def _intercept_score(defender: Dict[str, Any], rng: Any, add: float = 0.0) -> float:
     od = float(defender.get("OD", 0) or 0)
     ch = float(defender.get("CH", 0) or 0)
     iq = float(defender.get("IQ", 0) or 0)
@@ -165,11 +165,12 @@ def _intercept_score(defender: Dict[str, Any], rng: Any) -> float:
         od * PASS_INTERCEPT_OD_WEIGHT
         + ch * PASS_INTERCEPT_CH_WEIGHT
         + iq * PASS_INTERCEPT_IQ_WEIGHT
+        + add  # team-level modifier (e.g. defensive_efficiency) added before the roll
     )
     return composite * rng.randint(PASS_INTERCEPT_ROLL_MIN, PASS_INTERCEPT_ROLL_MAX)
 
 
-def _pass_score(passer: Dict[str, Any], rng: Any) -> float:
+def _pass_score(passer: Dict[str, Any], rng: Any, add: float = 0.0) -> float:
     """The passer's 'safe pass' score (offense counter to the contest)."""
     ps = float(passer.get("PS", 0) or 0)
     ch = float(passer.get("CH", 0) or 0)
@@ -178,6 +179,7 @@ def _pass_score(passer: Dict[str, Any], rng: Any) -> float:
         ps * PASS_SAFETY_PS_WEIGHT
         + ch * PASS_SAFETY_CH_WEIGHT
         + iq * PASS_SAFETY_IQ_WEIGHT
+        + add  # team-level modifier (e.g. offensive_efficiency) added before the roll
     )
     return composite * rng.randint(PASS_INTERCEPT_ROLL_MIN, PASS_INTERCEPT_ROLL_MAX)
 
@@ -238,8 +240,13 @@ def resolve_pass_contest(
     defenders: Iterable[Dict[str, Any]],
     *,
     offense_modifier: float = 0.0,
+    defense_modifier: float = 0.0,
     lane_dist: float = PASS_LANE_DIST,
     rng: Any = random,
+    safety_base: float = None,
+    tier_hi: float = None,
+    tier_mid: float = None,
+    efficiency_in_composite: bool = False,
 ) -> Dict[str, Any]:
     """Resolve a pass contest (§14). Returns
     ``{"outcome", "deflector", "contact_point"}`` where ``outcome`` is one of
@@ -266,16 +273,25 @@ def resolve_pass_contest(
     if contester is None:
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "no_contester"}
 
+    # Per-call tier overrides (HCO passes tighter tiers; HCT/FCP use the shared defaults).
+    _base = PASS_SAFETY_BASE if safety_base is None else safety_base
+    _hi = PASS_INTERCEPT_TIER_HI if tier_hi is None else tier_hi
+    _mid = PASS_INTERCEPT_TIER_MID if tier_mid is None else tier_mid
+    # When efficiency_in_composite (HCO): team efficiency is added to the composite AND subtracted
+    # from the bar/tiers (doubly favors the stronger team). HCT/FCP leave it off → old behavior.
+    _pass_add = offense_modifier if efficiency_in_composite else 0.0
+    _int_add = defense_modifier if efficiency_in_composite else 0.0
+
     # Passer safety gate (3a) — a good passer evades the lurking defender entirely.
-    if _pass_score(passer, rng) > (PASS_SAFETY_BASE - offense_modifier):
+    if _pass_score(passer, rng, add=_pass_add) > (_base - offense_modifier):
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "passer_safe"}
 
     # Interceptor skill band (3b).
     defender = contester["defender"]
-    score = _intercept_score(defender, rng)
-    if score > PASS_INTERCEPT_TIER_HI:
+    score = _intercept_score(defender, rng, add=_int_add)
+    if score > (_hi - _int_add):
         outcome, stage = INTERCEPT, "intercept"
-    elif score > PASS_INTERCEPT_TIER_MID:
+    elif score > (_mid - _int_add):
         outcome, stage = BAT_OOB, "bat_oob"
     else:
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "band_complete"}
