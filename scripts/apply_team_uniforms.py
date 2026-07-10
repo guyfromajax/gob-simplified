@@ -87,11 +87,16 @@ def person_alpha(src, np, ndimage):
 
 
 def _tank(a, person, np, ndimage):
-    """White tank = the largest bright, low-saturation region inside the person,
-    below the neck."""
+    """White tank = the largest bright, NEUTRAL region inside the person, below
+    the neck. Neutral-hue + not-warm excludes pale skin (which is bright/low-sat
+    but warm), so the recolor can't spill onto light-skinned players. The mask
+    is eroded slightly so the paint never bleeds past the fabric onto skin."""
     H = a.shape[0]
-    bright = (a.min(2) > 168) & (a.max(2) - a.min(2) < 46)
-    tank = bright & person
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    bright = a.min(2) > 172
+    neutral = (a.max(2) - a.min(2)) < 22          # white fabric is neutral gray
+    warm = (r - b) > 14                            # skin (even pale) is warmer
+    tank = bright & neutral & (~warm) & person
     tank[:int(0.42 * H)] = False
     tank = ndimage.binary_opening(tank, iterations=2)
     tank = ndimage.binary_closing(tank, iterations=5)        # bridge fold shadows
@@ -99,7 +104,8 @@ def _tank(a, person, np, ndimage):
     if n >= 1:
         tank = lbl == (1 + int(np.argmax(
             ndimage.sum(np.ones_like(lbl), lbl, range(1, n + 1)))))
-    return ndimage.binary_fill_holes(tank)
+    tank = ndimage.binary_fill_holes(tank)
+    return ndimage.binary_erosion(tank, iterations=2)        # stay off the skin
 
 
 def _lum(a):
@@ -146,16 +152,31 @@ def apply_uniform(in_path, out_path, wordmark, primary, secondary):
     rimS = ndimage.gaussian_filter(rim.astype(np.float32), 0.6)[..., None]
     out = out * (1 - rimS) + (S[None, None, :] * tone) * rimS
 
-    # wordmark across the chest, secondary color, tone-modulated onto fabric
+    # wordmark: arced to follow the chest, fabric-shaded, soft screen-print edges
     txt = Image.new("L", (W, H), 0)
     d = ImageDraw.Draw(txt)
     tank_w = xs.max() - xs.min()
-    font, b = fit_font(d, wordmark, ImageFont, int(tank_w * 0.78))
+    font, b = fit_font(d, wordmark, ImageFont, int(tank_w * 0.72))
     tx = cx - (b[2] - b[0]) // 2 - b[0]
-    ty = top + int(0.34 * (bot - top)) - b[1]
+    ty = top + int(0.36 * (bot - top)) - b[1]
     d.text((tx, ty), wordmark, fill=255, font=font)
-    tm = (np.asarray(txt).astype(np.float32) / 255.0)[..., None]
-    out = out * (1 - tm) + (S[None, None, :] * np.clip(tone * 1.05, 0.5, 1.15)) * tm
+    tmask = np.asarray(txt).astype(np.float32) / 255.0
+
+    # gentle downward arc at the sides (letters dip to follow the chest curve)
+    amp = max(4, int(0.05 * (bot - top)))
+    half = max(1.0, 0.5 * tank_w)
+    shift = np.clip((amp * ((np.arange(W) - cx) / half) ** 2), 0, amp).astype(int)
+    arced = np.zeros_like(tmask)
+    for x in range(W):
+        s = int(shift[x])
+        arced[s:, x] = tmask[:H - s, x] if s else tmask[:, x]
+    arced = ndimage.gaussian_filter(arced, 0.7)              # screen-print softness
+    tm = arced[..., None]
+
+    # ink takes the jersey's own fold shading so it sits IN the cloth
+    ink_tone = np.clip(tone * 1.15, 0.42, 1.18)
+    ink = S[None, None, :] * ink_tone
+    out = out * (1 - 0.92 * tm) + ink * (0.92 * tm)          # slight fabric bleed-through
 
     # Output RGBA: recolored person on a transparent background (cutout done —
     # only cropping remains). Alpha is the u2net person mask.
