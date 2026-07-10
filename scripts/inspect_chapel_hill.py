@@ -78,11 +78,9 @@ def main():
     args = ap.parse_args()
 
     try:
-        import boto3
-        from botocore.exceptions import ClientError
         from PIL import Image  # noqa: F401
     except ImportError:
-        raise SystemExit("missing deps. Run:  pip install boto3 pillow")
+        raise SystemExit("missing deps. Run:  pip install pillow boto3")
 
     rows = [r for r in csv.DictReader(open("scripts/players_archetypes.csv"))
             if r["team"] == args.team]
@@ -90,6 +88,28 @@ def main():
     if not rows:
         raise SystemExit(f"no players found for team '{args.team}'")
 
+    def staging_get(uid):
+        from PIL import Image
+        p = os.path.join(STAGING, f"{uid}.png")
+        return Image.open(p) if os.path.exists(p) else None
+
+    print(f"Checking {len(rows)} {args.team} players...\n")
+
+    # 1) local staging sheet — always (no creds needed)
+    n_st = build_sheet(rows, staging_get, "local staging", "chapel_hill_staging.png")
+
+    # 2) R2 sheet — only if credentials are present
+    if not os.path.exists(ENV_FILE):
+        print(f"\n[skip] R2 check: {ENV_FILE} not found (no R2 creds configured).")
+        print(f"       staging has {n_st}/{len(rows)}. To also check live R2, create")
+        print(f"       {ENV_FILE} with R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY /")
+        print(f"       R2_ENDPOINT / R2_BUCKET, then re-run.")
+        return
+    try:
+        import boto3
+        from botocore.exceptions import ClientError
+    except ImportError:
+        raise SystemExit("R2 creds found but boto3 missing. Run:  pip install boto3")
     env = load_env(ENV_FILE)
     s3 = boto3.client("s3", endpoint_url=env["R2_ENDPOINT"],
                       aws_access_key_id=env["R2_ACCESS_KEY_ID"],
@@ -105,14 +125,7 @@ def main():
         except ClientError:
             return None
 
-    def staging_get(uid):
-        from PIL import Image
-        p = os.path.join(STAGING, f"{uid}.png")
-        return Image.open(p) if os.path.exists(p) else None
-
-    print(f"Checking {len(rows)} {args.team} players...\n")
     n_r2 = build_sheet(rows, r2_get, "R2 live", "chapel_hill_R2.png")
-    n_st = build_sheet(rows, staging_get, "local staging", "chapel_hill_staging.png")
     print(f"\nR2 has {n_r2}/{len(rows)} ; staging has {n_st}/{len(rows)}.")
     print("Open the two sheets above (or push them) to compare.")
 
