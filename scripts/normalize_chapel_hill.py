@@ -316,10 +316,13 @@ def main():
     hdr = 24
     sheet = Image.new("RGB", (C * cols, (C + hdr) * rows), (238, 238, 240))
     dr = ImageDraw.Draw(sheet)
-    try:
-        fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
-    except Exception:
-        fnt = ImageFont.load_default()
+    fnt = ImageFont.load_default()
+    for _p in ("FrontEnd/static/fonts/LiberationSans-Bold.ttf",
+               "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+               "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+        if os.path.exists(_p):
+            fnt = ImageFont.truetype(_p, 16)
+            break
 
     def cell(img, x, y, label):
         thumb = img.copy(); thumb.thumbnail((C, C))

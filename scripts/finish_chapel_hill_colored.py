@@ -70,8 +70,32 @@ def jersey_masks(a, person, np, ndimage):
     return jersey, body, navy, wordmark
 
 
+# Wordmark font -- bundled in the repo so it renders identically on any OS.
+WM_FONT_CANDIDATES = [
+    "FrontEnd/static/fonts/LiberationSans-Bold.ttf",              # bundled (canonical)
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",         # macOS (metric-compatible)
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",  # linux
+]
+
+
+def _find_font(candidates):
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return candidates[0]
+
+
+def _qc_font(size):
+    from PIL import ImageFont
+    for p in ("FrontEnd/static/fonts/LiberationSans-Bold.ttf",
+              "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+        if os.path.exists(p):
+            return ImageFont.truetype(p, size)
+    return ImageFont.load_default()
+
+
 def apply_sky_colored(reframed, np, ndimage, primary, secondary):
-    import cv2
     from PIL import Image, ImageDraw, ImageFont
     arr = np.asarray(reframed)
     rgb = arr[..., :3].astype(np.float32)
@@ -132,7 +156,7 @@ def apply_sky_colored(reframed, np, ndimage, primary, secondary):
     #    with a white keyline, so it reads as designed jersey typography rather
     #    than plain copy. 50%-visible at the finish crop line, arced onto the
     #    fabric, clipped to the jersey.
-    LIB_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+    LIB_BOLD = _find_font(WM_FONT_CANDIDATES)
     WHITE = (238, 242, 250)
     top, bot = ys.min(), ys.max()
     cx = int((xs.min() + xs.max()) / 2)
@@ -226,7 +250,7 @@ def main():
     hdr = 24
     sheet = Image.new("RGB", (C * cols, (C + hdr) * rows), (238, 238, 240))
     dr = ImageDraw.Draw(sheet)
-    fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    fnt = _qc_font(16)
 
     def cell(img, x, y, label, col=(135, 181, 230)):
         thumb = img.copy(); thumb.thumbnail((C, C))
