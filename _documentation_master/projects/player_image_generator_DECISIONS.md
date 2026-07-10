@@ -174,11 +174,32 @@ Models real men's D1 basketball demographics for authenticity.
   quota-fill toward 55/35/10 if we ever want strict targeting, but it's **not**
   used by default.
 
-## Character details (sparingly)
+## Hair & character details (UUID-seeded)
 
-Afro, dreads, goggles, headband, earrings, etc. — sprinkled at low rates,
-UUID-seeded. At scale: ~40% wordmark-only jerseys, ~50% wordmark+number, ~10%
-unique layouts. (Accessories are a separate axis from expression.)
+- **Hair** (`pick_hair`): race-correlated pools (e.g. Black → fades, afros,
+  dreads, twists, cornrows; White → brown/blonde/auburn crops & waves; Asian →
+  straight black styles; etc.). Pale/Scandinavian players lean blonde/fair.
+- **Accessories** (`pick_accessories`): each rolled independently at low rates —
+  headband 7%, stud earring 6%, sports glasses 4%; plus light facial hair
+  (stubble/thin mustache) 15% for juniors/seniors only. ~24% of players get at
+  least one. Kept sparse on purpose (don't put every detail on every team).
+- Jersey-layout mix (later, at uniform stage): ~40% wordmark-only, ~50%
+  wordmark+number, ~10% unique.
+
+## Generation driver — `scripts/generate_player_portraits.py` (stage 1)
+
+Produces the raw white-tank busts. Per player: **body-lock onto
+`reference_bodies/final/<frame>.png`** and have NB swap in the face per the
+player's spec (skin_prompt + hair + expression + accessories + definition),
+keeping body/frame/pose/tank/framing/art-style identical. Output:
+`tmp/portrait-pilot/generated/<Name>.png`.
+
+- **Idempotent/resumable:** skips any player who already has a finished master
+  (`FrontEnd/static/images/players/<uuid>.png` — protects all of Conf1) and,
+  unless `--force`, any raw bust already generated.
+- CLI: `--only "<name>"` (single test) · `--team "<team>"` · `--all` · `--limit`.
+- Definition (Cut/Toned/Soft) is applied as a muscle-tone clause on top of the
+  frame's neutral mold.
 
 ---
 

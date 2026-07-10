@@ -113,6 +113,66 @@ def pick_expression(pid):
     return _EXPR_POOL[seed % len(_EXPR_POOL)]
 
 
+# --- HAIR (race-correlated, UUID-seeded) -----------------------------------
+HAIR = {
+    "black": [("a short black fade", 4), ("a short buzz cut", 2),
+              ("a short afro", 3), ("a rounded medium afro", 1),
+              ("short dreadlocks", 2), ("shoulder-length dreadlocks", 1),
+              ("cornrows", 1), ("short twists", 1), ("a high-top fade", 1),
+              ("a clean-shaved bald head", 1)],
+    "white": [("short brown hair", 3), ("a short buzz cut", 1),
+              ("wavy brown hair", 2), ("curly brown hair", 1),
+              ("messy medium brown hair", 2), ("short blonde hair", 1),
+              ("wavy blonde hair", 1), ("spiky brown hair", 1),
+              ("slicked-back dark hair", 1), ("short auburn hair", 1)],
+    "asian": [("short straight black hair", 3), ("a black undercut", 1),
+              ("spiky black hair", 1), ("medium straight black hair", 1),
+              ("a neat black bowl cut", 1)],
+    "hispanic": [("a short black fade", 3), ("a short black crop", 2),
+                 ("wavy black hair", 1), ("curly black hair", 1),
+                 ("slicked-back black hair", 1)],
+    "ambiguous": [("a short fade", 2), ("short curly brown hair", 1),
+                  ("wavy dark hair", 1), ("a short crop", 1)],
+}
+# pale/Scandinavian players lean blonde/fair.
+HAIR_PALE = [("short blonde hair", 3), ("wavy blonde hair", 2),
+             ("short light-brown hair", 2), ("short red hair", 1),
+             ("a short buzz cut", 1)]
+
+
+def _weighted(pool, seed):
+    flat = [x for x, w in pool for _ in range(w)]
+    return flat[seed % len(flat)]
+
+
+def pick_hair(pid, race, skin):
+    seed = int(hashlib.md5(f"{pid}|hair".encode()).hexdigest(), 16)
+    if skin == "white-pale":
+        return _weighted(HAIR_PALE, seed)
+    if race == "other":
+        return _weighted(HAIR[skin], seed)          # asian / hispanic / ambiguous
+    return _weighted(HAIR[race], seed)              # black / white
+
+
+# --- ACCESSORIES (sparse, each rolled independently) -----------------------
+ACCESSORIES = [("wearing a headband", 7), ("with a small stud earring", 6),
+               ("wearing sports glasses", 4)]
+
+
+def pick_accessories(pid, year):
+    out = []
+    for phrase, pct in ACCESSORIES:
+        seed = int(hashlib.md5(f"{pid}|{phrase}".encode()).hexdigest(), 16)
+        if seed % 100 < pct:
+            out.append(phrase)
+    # light facial hair only for older players (juniors/seniors)
+    if str(year).lower() in ("junior", "senior"):
+        seed = int(hashlib.md5(f"{pid}|facialhair".encode()).hexdigest(), 16)
+        if seed % 100 < 15:
+            out.append(_weighted([("light stubble", 3), ("a thin mustache", 1)], seed))
+    return ", ".join(out)
+
+
 # Chapel Hill pilot roster (from brief). No attributes here -> DEFINITION n/a;
 # the real values come from the export.
 PILOT = [
@@ -177,7 +237,9 @@ def classify(p):
             "template": frame, "body_prompt": body_prompt,
             "expression": pick_expression(p.get("_id")),
             "race": eth["race"], "skin": eth["skin"],
-            "ethnicity": eth["ethnicity_label"], "skin_prompt": eth["skin_prompt"]}
+            "ethnicity": eth["ethnicity_label"], "skin_prompt": eth["skin_prompt"],
+            "hair": pick_hair(p.get("_id"), eth["race"], eth["skin"]),
+            "accessories": pick_accessories(p.get("_id"), p.get("year"))}
 
 
 def main():
@@ -219,9 +281,10 @@ def main():
         print(f"  {fr:<8}{cells['Cut']:>6}{cells['Toned']:>7}{cells['Soft']:>6}")
 
     out = os.path.join(HERE, "players_archetypes.csv")
-    cols = ["_id", "name", "jersey", "year", "height_in", "weight_lb", "bmi",
+    cols = ["_id", "name", "team", "jersey", "year", "height_in", "weight_lb", "bmi",
             "st", "ag", "rt", "frame", "definition", "archetype", "template",
-            "race", "skin", "ethnicity", "expression", "body_prompt", "skin_prompt"]
+            "race", "skin", "ethnicity", "expression", "hair", "accessories",
+            "body_prompt", "skin_prompt"]
     with open(out, "w", newline="") as f:
         wr = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         wr.writeheader()
