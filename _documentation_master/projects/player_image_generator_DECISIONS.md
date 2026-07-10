@@ -155,6 +155,22 @@ template needed; works on any body/archetype.
   were inconsistent across a team).
 - All 12 players on a team share the **exact same** jersey hex (color-locked).
 
+### Uniform stage — `scripts/apply_team_uniforms.py` (stage 2)
+Does **u2net cutout + recolor in one pass**, outputs a **transparent-background
+RGBA** (cutout done; only cropping remains).
+
+- **Segmentation lesson (important):** the raw NB busts have a *light-gray*
+  background nearly the same brightness as the white tank, and sometimes faint
+  rectangular bg artifacts. Classical white-vs-light separation (brightness
+  threshold, border-removal, flood-fill, GrabCut) is **not reliable** — it
+  over-captures the bg rectangle or drops the tank. **You must segment the
+  PERSON semantically first (u2net human-seg), then the tank is the only bright
+  region left inside the person.** Recolor operates within that clean mask.
+- Recolor preserves fabric folds via per-pixel luminance tone; trim = a navy/
+  secondary ring around collar + armholes; wordmark auto-fits to tank width.
+- CLI: `--only` · `--team` · `--all`. Needs `onnxruntime` (u2net) on the run
+  machine; falls back to flood-fill only if u2net can't load.
+
 ---
 
 ## Race / ethnicity / skin tone
