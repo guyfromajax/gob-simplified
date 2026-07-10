@@ -94,10 +94,14 @@ def apply_sky_colored(reframed, np, ndimage, primary, secondary):
     jtop, jbot = ys.min(), ys.max()
     jcx, jw = (xs.min() + xs.max()) / 2.0, xs.max() - xs.min()
     YY, XX = np.mgrid[0:H, 0:W]
-    # zone starts just below the collar (0.15 into the jersey) so it covers the
-    # WHOLE wordmark on these bust crops, where the fabric band is short and the
-    # word sits high; central 0.46 of the width catches wide marks.
-    zone = interior & (YY > jtop + 0.04 * (jbot - jtop)) \
+    # `interior` erodes the hem too, which would leave the old wordmark's bottom
+    # slivers un-erased right at the crop line. The hem is the crop edge, not
+    # trim, so extend the erase to the full jersey there.
+    near_hem = jersey & (YY > jbot - 0.12 * (jbot - jtop))
+    # zone starts just below the collar so it covers the WHOLE wordmark on these
+    # bust crops, where the fabric band is short and the word sits high; central
+    # 0.46 of the width catches wide marks; reaches the hem so nothing survives.
+    zone = (interior | near_hem) & (YY > jtop + 0.04 * (jbot - jtop)) \
         & (np.abs(XX - jcx) < 0.46 * jw)
     bodypx = rgb[body & interior]
     if zone.sum() > 20 and len(bodypx) > 50:
@@ -124,30 +128,47 @@ def apply_sky_colored(reframed, np, ndimage, primary, secondary):
     tone_navy = np.clip(_lum(rgb) / 90.0, 0.7, 1.2)[..., None]
     out = out * (1 - trimsoft) + (S[None, None, :] * tone_navy) * trimsoft
 
-    # 3) stamp ONE identical SKY, 50%-visible at the finish crop line
+    # 3) stamp ONE identical SKY -- bold block wordmark (Liberation Sans Bold)
+    #    with a white keyline, so it reads as designed jersey typography rather
+    #    than plain copy. 50%-visible at the finish crop line, arced onto the
+    #    fabric, clipped to the jersey.
+    LIB_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+    WHITE = (238, 242, 250)
     top, bot = ys.min(), ys.max()
     cx = int((xs.min() + xs.max()) / 2)
     tank_w = xs.max() - xs.min()
-    txt = Image.new("L", (W, H), 0)
-    d = ImageDraw.Draw(txt)
-    font, bb = fit_font(d, "SKY", ImageFont, int(tank_w * WM_WIDTH_FRAC))
+    target = int(tank_w * WM_WIDTH_FRAC)
+    probe = ImageDraw.Draw(Image.new("L", (10, 10)))
+    font, ow, bb = None, 4, (0, 0, 0, 0)
+    for sz in range(420, 60, -8):
+        f = ImageFont.truetype(LIB_BOLD, sz)
+        ow = max(4, round(sz * 0.055))
+        bb = probe.textbbox((0, 0), "SKY", font=f, stroke_width=ow)
+        if bb[2] - bb[0] <= target:
+            font = f
+            break
+    if font is None:
+        font = ImageFont.truetype(LIB_BOLD, 68)
     wm_h = bb[3] - bb[1]
     tx = cx - (bb[2] - bb[0]) // 2 - bb[0]
     ty = int(CROP_KEEP_FRAC * H - WM_VISIBLE_FRAC * wm_h) - bb[1]
-    d.text((tx, ty), "SKY", fill=255, font=font)
-    tmask = np.asarray(txt).astype(np.float32) / 255.0
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).text((tx, ty), "SKY", font=font, fill=tuple(S.astype(int)) + (255,),
+                               stroke_width=ow, stroke_fill=WHITE + (255,))
+    lay = np.asarray(layer).astype(np.float32)
+    # arc the whole layer onto the chest
     amp = max(2, int(0.018 * (bot - top)))
     half = max(1.0, 0.5 * tank_w)
     shift = np.clip((amp * ((np.arange(W) - cx) / half) ** 2), 0, amp).astype(int)
-    arced = np.zeros_like(tmask)
+    arced = np.zeros_like(lay)
     for x in range(W):
         sh = int(shift[x])
-        arced[sh:, x] = tmask[:H - sh, x] if sh else tmask[:, x]
-    arced = ndimage.gaussian_filter(arced, 0.7)
-    body_now = jersey & ~trim
-    tm = (arced * ndimage.binary_erosion(body_now, iterations=1))[..., None]
-    ink = S[None, None, :] * np.clip(tone * 1.1, 0.5, 1.15)
-    out = out * (1 - 0.94 * tm) + ink * (0.94 * tm)
+        arced[sh:, x] = lay[:H - sh, x] if sh else lay[:, x]
+    la = ndimage.gaussian_filter(arced[..., 3] / 255.0, 0.6)        # screen-print softness
+    la = la * ndimage.binary_erosion(jersey & ~trim, iterations=1)   # clip to fabric
+    a = la[..., None]
+    ink = arced[..., :3]
+    out = out * (1 - 0.96 * a) + ink * (0.96 * a)
 
     return np.dstack([np.clip(out, 0, 255), alpha]).astype("uint8")
 
