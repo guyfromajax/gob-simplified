@@ -34,6 +34,30 @@ import argparse
 MODEL = "gemini-3.1-flash-lite-image"   # Nano Banana 2 Lite
 ANCHOR = "tmp/portrait-pilot/raw/Colt Robles.png"
 
+# Per-frame anchor override. NB would not widen the frame off Colt's narrow
+# body no matter the wording, so Broad copies its build from a genuinely
+# broad-shouldered Conf1 player (Cedric Buckles). Others use the shared anchor.
+FRAME_ANCHORS = {
+    "Broad": "FrontEnd/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png",
+}
+
+# Full-prompt override for frames whose anchor already HAS the target build
+# (so we copy the build rather than change it). Broad copies Buckles' broad
+# shoulders but is redrawn in a white tank with neutral (not cut) muscle tone.
+FRAME_FULL_PROMPT = {
+    "Broad":
+        "Use the attached image as the reference for the BODY BUILD: copy its "
+        "broad, wide shoulders and large frame — shoulders much wider than the "
+        "head, reaching and bleeding off the left and right edges of the frame. "
+        "Redraw this as a front-facing head-and-shoulders bust portrait of a "
+        "16-17 year old male high-school basketball player wearing a plain white "
+        "sleeveless tank top with a simple crew neckline, on a plain light "
+        "neutral background, semi-realistic illustrated art style, calm neutral "
+        "expression, even soft studio lighting. Keep the broad wide-shouldered "
+        "frame, but give him PLAIN AVERAGE muscle tone — not cut, not defined, "
+        "not bulky. Head-and-shoulders framing, upper chest at the bottom edge.",
+}
+
 # Shared spec — HEAD-ANCHORED. The head is the same size in every frame; only
 # the shoulders (and face fullness) change, so the head-to-shoulder proportion
 # is what makes each build read. Do NOT let NB zoom to fill the frame — that
@@ -107,10 +131,10 @@ def main():
         sys.exit(f"unknown frame '{args.only}'. Choose from: {', '.join(FRAMES)}")
 
     if args.print_prompts:
-        print(f"# Attach the anchor image ({args.anchor}) with each prompt.\n")
         for name, frame in frames.items():
-            print(f"===== {name} =====")
-            print(BASE.format(frame=frame))
+            anchor = FRAME_ANCHORS.get(name, args.anchor)
+            print(f"===== {name}  (attach: {anchor}) =====")
+            print(FRAME_FULL_PROMPT.get(name) or BASE.format(frame=frame))
             print()
         return
 
@@ -123,22 +147,27 @@ def main():
         from PIL import Image
     except ImportError:
         sys.exit("missing deps. Run:  pip install google-genai pillow")
-    if not os.path.exists(args.anchor):
-        sys.exit(f"anchor image not found: {args.anchor}")
-
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    anchor_img = Image.open(args.anchor)
     os.makedirs(args.out, exist_ok=True)
+    _anchor_cache = {}
+
+    def anchor_for(name):
+        path = FRAME_ANCHORS.get(name, args.anchor)
+        if path not in _anchor_cache:
+            if not os.path.exists(path):
+                sys.exit(f"anchor image not found: {path}")
+            _anchor_cache[path] = Image.open(path)
+        return _anchor_cache[path]
 
     ok = 0
     jobs = [(name, frame, i) for name, frame in frames.items()
             for i in range(1, args.variants + 1)]
     for name, frame, i in jobs:
-        prompt = BASE.format(frame=frame)
+        prompt = FRAME_FULL_PROMPT.get(name) or BASE.format(frame=frame)
         label = name if args.variants == 1 else f"{name}_{i}"
         try:
             resp = client.models.generate_content(
-                model=MODEL, contents=[prompt, anchor_img])
+                model=MODEL, contents=[prompt, anchor_for(name)])
             saved = False
             for part in resp.candidates[0].content.parts:
                 if getattr(part, "inline_data", None) and part.inline_data.data:
