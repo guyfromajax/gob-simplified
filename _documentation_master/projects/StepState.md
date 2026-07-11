@@ -85,6 +85,13 @@ Enumerated the full emitted `AnimationStep` (2026-07-11). **Headline: the emitte
 
 **Cosmetic strictness — DECIDED (pragmatic):** SFX file/tier stays in the emitter (reads player attrs, as today — zero work). This is the **single named carve-out** to "emitter's only input is StepState": SFX tier/file selection is the *only* value the emitter may derive from game state, and only because it is provably outcome-inert. Everything else must come from StepState.
 
+### One canonical coordinate frame (hard requirement)
+Every coord in `StepState` (defender grid, ball trajectory incl. `contact_point`, all positions) is in **ONE frame — display orientation — flipped for away offense exactly once, at the source.** No consumer re-flips.
+
+**Motivating bug (2026-07-11 — zone interception, away offense):** `pass_contact_point` is computed in **HOME** frame (zone contest: `assign_all_zone_defenders` always returns HOME + `_pt = get_away_player_coords` flips offense to home), but the render is in the **away-display** frame. That contact point is used verbatim as both the `steal_reach` override coord *and* `ball_arrival_coord`, so it lands **mirrored across half-court** → the pass animates to the opposite side, then the possession-boundary transition snaps it back ("teleport"). MAN / home offense are unaffected (contest already in display frame). The animator compounds it by using override coords **verbatim** — skipping the away-flip normal zone defenders get (`animator.py:1912` vs `:1949`).
+
+**StepState fix (folded in — not spot-patched):** the defender grid + ball trajectory are stamped in the single display frame at build time; contest and render read the **same value**, so this mirror-bug class is impossible by construction. *Interim:* until this lands, zone + away-offense interceptions render mis-sided (a pre-existing frame bug the teleport fix now makes the ball follow rather than hide behind an instant snap).
+
 ---
 
 ## The engine — step by step
