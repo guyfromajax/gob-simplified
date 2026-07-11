@@ -224,13 +224,10 @@ def pick_hair(pid, race, skin):
 # more likely but not guaranteed, so real within-group variation survives. We
 # emit ~5 strong descriptors (NB averages away over-specification), which is what
 # pushes each player into a DIFFERENT face rather than a per-attribute clone.
-# FACE_SHAPE & JAW flattened to uniform weights (Conf 12+): every shape equally
-# likely so the formerly-rare ones (diamond face, slightly-weak jaw) appear as
-# often as oval/strong-jaw — more roster variety, no options added or removed.
-FACE_SHAPE = [("an oval", 1), ("a round", 1), ("a square", 1), ("a long oval", 1),
-              ("a rectangular", 1), ("a heart-shaped", 1), ("a diamond-shaped", 1)]
-JAW = [("a strong wide jaw", 1), ("a soft rounded jaw", 1), ("a narrow tapered jaw", 1),
-       ("a sharp angular jaw", 1), ("a broad square jaw", 1), ("a slightly weak jaw", 1)]
+FACE_SHAPE = [("an oval", 4), ("a round", 3), ("a square", 3), ("a long oval", 3),
+              ("a rectangular", 2), ("a heart-shaped", 2), ("a diamond-shaped", 1)]
+JAW = [("a strong wide jaw", 3), ("a soft rounded jaw", 3), ("a narrow tapered jaw", 3),
+       ("a sharp angular jaw", 3), ("a broad square jaw", 2), ("a slightly weak jaw", 1)]
 CHEEKS = [("high prominent cheekbones", 3), ("flat cheeks", 3), ("full round cheeks", 3),
           ("wide cheekbones", 2), ("hollow cheeks", 2)]
 
