@@ -22,7 +22,7 @@ independent of the expression seed).
 import re
 import hashlib
 
-RACE_WEIGHTS = [("black", 55), ("white", 35), ("other", 10)]
+RACE_WEIGHTS = [("black", 60), ("white", 30), ("other", 10)]
 BLACK_SUB = [("normal", 50), ("light", 35), ("dark", 15)]
 WHITE_SUB = [("normal", 60), ("tan", 30), ("pale", 10)]
 OTHER_SUB = [("asian", 50), ("hispanic", 25), ("ambiguous", 25)]
