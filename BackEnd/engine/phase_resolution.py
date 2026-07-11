@@ -5122,7 +5122,24 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
     bh_xy = _coord(bh_pos)
     bh_location = _loc(bh_pos)
 
+    # Stage 1 (man) + Stage 2 (zone): prefer the render's ACTUAL defender placement, stamped on the
+    # step pre-contest (compute_defender_grid = the animator's code). It's in the DISPLAY frame for
+    # BOTH man and zone, and the offense coords (`_coord`) are already display frame, so the point
+    # transform is identity — one unified frame, no HOME flip. This is what fixes the zone+away
+    # contact_point mirror (the contest used to emit HOME-frame points that the render drew flipped).
+    # Falls back to the legacy per-mode reconstruction (with its native frame) when no grid is stamped
+    # (walk-time contest, or dynamic HCO disabled).
+    stamped = ((step.get("_step_state") or {}).get("defense")) or {}
+    stamped_xy = {dp: {"x": float(v["x"]), "y": float(v["y"])}
+                  for dp, v in stamped.items()
+                  if isinstance(v, dict) and "x" in v and def_lineup.get(dp)}
+    if stamped_xy:
+        def _pt(xy):
+            return xy
+        return stamped_xy, _coord, _loc, _pt
+
     if zone:
+        # Legacy fallback: assign_all_zone_defenders returns HOME frame → flip offense to HOME.
         from BackEnd.utils.shared_defense import assign_all_zone_defenders
         from BackEnd.utils.shared import get_away_player_coords
         from BackEnd.engine.attack_drive_clearance import _zone_boundaries_for_spot
@@ -5139,27 +5156,20 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
         def _pt(xy):
             return get_away_player_coords(xy) if is_away_offense else xy
     else:
-        # Stage 1 (man): prefer the render's ACTUAL defender grid, stamped on the step pre-contest
-        # (compute_defender_grid = the animator's code). Same display frame as the legacy man path, so
-        # the point transform stays identity. Falls back to the per-step reconstruction when no grid
-        # is stamped (walk-time contest, or dynamic HCO disabled).
-        stamped = ((step.get("_step_state") or {}).get("defense")) or {}
-        def_xy = {dp: {"x": float(v["x"]), "y": float(v["y"])}
-                  for dp, v in stamped.items()
-                  if isinstance(v, dict) and "x" in v and def_lineup.get(dp)}
-        if not def_xy:
-            from BackEnd.utils.shared_defense import get_defender_coords
-            for off_pos in off_lineup:
-                if off_pos not in pos_actions:
-                    continue
-                dpos = off_to_def.get(off_pos, off_pos)
-                if not def_lineup.get(dpos):
-                    continue
-                def_xy[dpos] = get_defender_coords(
-                    _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
-                    ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
-                    posture=posture,
-                )
+        # Legacy fallback: per-step man reconstruction (display frame → identity transform).
+        from BackEnd.utils.shared_defense import get_defender_coords
+        def_xy = {}
+        for off_pos in off_lineup:
+            if off_pos not in pos_actions:
+                continue
+            dpos = off_to_def.get(off_pos, off_pos)
+            if not def_lineup.get(dpos):
+                continue
+            def_xy[dpos] = get_defender_coords(
+                _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
+                ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
+                posture=posture,
+            )
 
         def _pt(xy):
             return xy
