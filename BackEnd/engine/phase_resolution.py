@@ -5379,6 +5379,30 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
     }
 
 
+def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
+    """Stamp the render's ACTUAL defender placement (``compute_defender_grid`` = the animator's code)
+    on each skeleton step as ``step["_step_state"]["defense"]``, so the interception contest
+    (`_hco_step_def_xy`) judges against what gets DRAWN — man and zone — instead of the drifting
+    per-step hand reconstruction. Pure + sim-safe, so it runs pre-emit (the emit's exact stash isn't
+    available yet — the contest still truncates the skeleton the emit draws; ~2px RNG from the literal
+    draw, immaterial against the lane band). Idempotent (re-stamping refreshes). Called BEFORE the
+    offense walk (so the walk-time contest reads it too) AND before the coverage pass (final skeleton,
+    which may carry recalibrated/expanded steps the pre-walk stamp didn't cover). Wrapped so a stamping
+    error can never break a turn."""
+    try:
+        steps = (skeleton or {}).get("steps") or []
+        if not steps:
+            return
+        from BackEnd.models.animator import Animator
+        grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        for i, step in enumerate(steps):
+            ss = step.get("_step_state") or {"index": i}
+            ss["defense"] = grid.get(i) or {}
+            step["_step_state"] = ss
+    except Exception:
+        pass
+
+
 def _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, game_state):
     """Coverage (Dynamic HCO Defense): contest every pass step in the FINAL resolved skeleton that the
     per-step resolver DIDN'T already contest (untagged) — catching passes built outside the walk
@@ -5398,21 +5422,7 @@ def _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, 
     steps = skeleton.get("steps") or []
     if not steps:
         return
-    # Stage 1 (man): stamp the render's ACTUAL defender placement on each step so the interception
-    # contest judges against what gets drawn (compute_defender_grid = the animator's code) instead of
-    # the drifting per-step hand reconstruction. compute_defender_grid is pure + sim-safe, so it runs
-    # here PRE-emit (the emit's exact stash isn't available yet — the contest still truncates the
-    # skeleton the emit draws). ~2px RNG from the literal draw, immaterial against the lane band. The
-    # MAN branch of _hco_step_def_xy reads this; zone stays on reconstruction until Step 2.
-    try:
-        from BackEnd.models.animator import Animator
-        _contest_grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
-        for _i, _step in enumerate(steps):
-            _ss = _step.get("_step_state") or {"index": _i}
-            _ss["defense"] = _contest_grid.get(_i) or {}
-            _step["_step_state"] = _ss
-    except Exception:
-        pass
+    _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup)
     from BackEnd.utils.defense_utils import is_zone_defense
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
     import random as _rng
@@ -5882,6 +5892,11 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     if len(steps) < 2:
         return None
 
+    # Option B: stamp the render's defender grid BEFORE the walk so the walk-time interception contest
+    # (`_hco_contest_skeleton_pass` below) reads the SAME grid the coverage pass does — no reconstruction
+    # seam. Coverage re-stamps the final skeleton afterward (idempotent).
+    _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup)
+
     read_map = build_motion_read_map(game, off_lineup, def_lineup)
 
     # Ball-handler defender: man → matchup defender; zone → None (no 1:1 assignment — the zone
@@ -6131,6 +6146,11 @@ def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup
     steps = skeleton.get("steps", [])
     if len(steps) < 2:
         return None
+
+    # Option B: stamp the render's defender grid BEFORE the walk so the walk-time interception contest
+    # (`_hco_contest_skeleton_pass` below) reads the SAME grid the coverage pass does — no reconstruction
+    # seam. Coverage re-stamps the final skeleton afterward (idempotent).
+    _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup)
 
     read_map = build_motion_read_map(game, off_lineup, def_lineup)
 
