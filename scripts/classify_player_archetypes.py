@@ -54,6 +54,8 @@ MANUAL_OVERRIDES = {
     # Collin Alexander (Wash U Prep): "ambiguous" prompt rendered a muddy tint on
     # every roll — pin to a concrete tan/olive tone so NB anchors cleanly
     "92307139-b938-4f7f-9d16-c9d6ed4e99e2": {"race": "white", "skin": "white-tan"},
+    # Melvin Ferguson (Houston Jesuit): make him Black
+    "8d2b7cb8-7157-44f6-8efe-8c1492142271": {"race": "black", "skin": "black-normal"},
 }
 
 HERE = os.path.dirname(os.path.abspath(__file__))
