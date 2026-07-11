@@ -30,6 +30,22 @@ FONT = "FrontEnd/static/fonts/BebasNeuePro-Bold.otf"
 IN_DIR = "tmp/portrait-pilot/generated"
 OUT_DIR = "tmp/portrait-pilot/uniformed"
 
+# Designed wordmark font (bold block + white keyline) — bundled so it renders
+# identically on any OS. This is the league default; authentic per-team banner
+# wordmarks get swapped in later via re-stamp.
+WM_FONT_CANDIDATES = [
+    "FrontEnd/static/fonts/LiberationSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+]
+
+
+def _find_wm_font():
+    for p in WM_FONT_CANDIDATES:
+        if os.path.exists(p):
+            return p
+    return WM_FONT_CANDIDATES[0]
+
 # Wordmark placement, anchored to the FINISH crop so only the TOP slice shows at
 # the final image's bottom edge (rest reads as continuing below).
 #  - finish scales this 1024px bust to 3530 wide and keeps the top 3412 rows, i.e.
@@ -160,33 +176,50 @@ def apply_uniform(in_path, out_path, wordmark, primary, secondary):
     rimS = ndimage.gaussian_filter(rim.astype(np.float32), 0.6)[..., None]
     out = out * (1 - rimS) + (S[None, None, :] * tone) * rimS
 
-    # WORDMARK — placed LOW so the finish crop shows only its top slice at the
-    # bottom edge. Same rendering you approved (arc + fabric-shade + soft edges),
-    # strictly clipped to the fabric.
-    txt = Image.new("L", (W, H), 0)
-    d = ImageDraw.Draw(txt)
+    # WORDMARK — designed jersey typography: bold block (Liberation) with a
+    # keyline, placed LOW so the finish crop shows only its top slice. Fill =
+    # secondary; keyline is white for dark secondaries, dark for light ones, so
+    # the letters always read against the jersey. Arced + clipped to the fabric.
     tank_w = xs.max() - xs.min()
-    font, b = fit_font(d, wordmark, ImageFont, int(tank_w * WM_WIDTH_FRAC))
+    s_lum = 0.299 * secondary[0] + 0.587 * secondary[1] + 0.114 * secondary[2]
+    # white keyline for dark/mid fills (navy, gold, red...); dark keyline only when
+    # the fill is itself near-white (else a white outline would vanish into it)
+    keyline = (26, 28, 46) if s_lum > 200 else (238, 242, 250)
+    fill = tuple(int(v) for v in secondary)
+    wm_font = _find_wm_font()
+    target = int(tank_w * WM_WIDTH_FRAC)
+    probe = ImageDraw.Draw(Image.new("L", (10, 10)))
+    font, ow, b = None, 4, (0, 0, 0, 0)
+    for sz in range(420, 60, -8):
+        f = ImageFont.truetype(wm_font, sz)
+        ow = max(4, round(sz * 0.055))
+        b = probe.textbbox((0, 0), wordmark, font=f, stroke_width=ow)
+        if b[2] - b[0] <= target:
+            font = f
+            break
+    if font is None:
+        font = ImageFont.truetype(wm_font, 68)
     wm_h = b[3] - b[1]
     tx = cx - (b[2] - b[0]) // 2 - b[0]
-    # top-of-letters lands WM_VISIBLE_FRAC above the crop line; rest falls below
     ty = int(CROP_KEEP_FRAC * H - WM_VISIBLE_FRAC * wm_h) - b[1]
-    d.text((tx, ty), wordmark, fill=255, font=font)
-    tmask = np.asarray(txt).astype(np.float32) / 255.0
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).text((tx, ty), wordmark, font=font, fill=fill + (255,),
+                               stroke_width=ow, stroke_fill=keyline + (255,))
+    lay = np.asarray(layer).astype(np.float32)
 
     # very mild arc so the visible slice reads as a natural chest print
     amp = max(2, int(0.018 * (bot - top)))
     half = max(1.0, 0.5 * tank_w)
     shift = np.clip((amp * ((np.arange(W) - cx) / half) ** 2), 0, amp).astype(int)
-    arced = np.zeros_like(tmask)
+    arced = np.zeros_like(lay)
     for x in range(W):
         s = int(shift[x])
-        arced[s:, x] = tmask[:H - s, x] if s else tmask[:, x]
-    arced = ndimage.gaussian_filter(arced, 0.7)               # screen-print softness
+        arced[s:, x] = lay[:H - s, x] if s else lay[:, x]
 
-    tm = (arced * ndimage.binary_erosion(tank, iterations=1))[..., None]  # clip to cloth
-    ink = S[None, None, :] * np.clip(tone * 1.15, 0.42, 1.18)  # secondary, fold-shaded
-    out = out * (1 - 0.92 * tm) + ink * (0.92 * tm)
+    la = ndimage.gaussian_filter(arced[..., 3] / 255.0, 0.6)       # screen-print softness
+    la = la * ndimage.binary_erosion(tank, iterations=1)           # clip to cloth
+    a = la[..., None]
+    out = out * (1 - 0.96 * a) + arced[..., :3] * (0.96 * a)
 
     # Output RGBA: recolored person on a transparent background (cutout done —
     # only cropping remains). Alpha is the u2net person mask.
