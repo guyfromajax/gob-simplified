@@ -3997,6 +3997,13 @@ class TurnManager:
         except Exception:
             pass
         self._emit_hco_animation_steps(result)
+        # StepState (Stage 0, additive): compute + stamp the per-step state (defense grid). No
+        # consumer reads it yet — zero behavior change. Wrapped so it can never break a turn.
+        try:
+            from BackEnd.engine.step_state import build_step_states
+            build_step_states(result, self.game)
+        except Exception:
+            pass
         return result
 
     def _emit_hco_animation_steps(self, result):
