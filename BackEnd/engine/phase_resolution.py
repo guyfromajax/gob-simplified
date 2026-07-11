@@ -5067,7 +5067,7 @@ HCO_PASS_LANE_DIST_BY_AGGRESSION = {"passive": 6.0, "aggressive": 5.0}
 # lane (Gate 1), his chance to ATTEMPT the interception is set by defense aggression_call. Applied
 # only when the dynamic-defense flag is on (posture set); passive never gambles. Gate 3 (the
 # attribute contest in resolve_pass_contest) then decides if an attempt actually picks it.
-INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 50, "normal": 25, "passive": 0}
+INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 80, "normal": 40, "passive": 0}
 
 # Dynamic HCO Defense — HCO-specific pass-contest calibration (owner spec 2026-07-10). Shared
 # resolve_pass_contest defaults (HCT/FCP) are BASE=200 / HI=250 / MID=200, left untouched. HCO folds
@@ -5261,11 +5261,11 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     eligible_g1 = defenders_in_lane(passer_xy, receiver_xy, def_xy, lane_dist, t_min=0.1, t_max=1.0,
                                     exclude=_passer_def)
     # Gate 2 — Dynamic HCO Defense (posture set): each in-lane defender only ATTEMPTS the pick per
-    # defense aggression_call (aggressive 50 / normal 25 / passive 0). Non-attempters drop out;
+    # defense aggression_call (aggressive 80 / normal 40 / passive 0). Non-attempters drop out;
     # if none commit, the pass completes. Legacy path (posture None) contests every eligible.
     eligible = eligible_g1
     if posture:
-        pct = INTERCEPT_ATTEMPT_PCT_BY_CALL.get(def_aggr, 25)
+        pct = INTERCEPT_ATTEMPT_PCT_BY_CALL.get(def_aggr, 40)
         eligible = [dpos for dpos in eligible_g1 if rng.randint(1, 100) <= pct]
     if not eligible:
         _track_hco_intercept_gates(game_state, bool(eligible_g1), False, None, pass_type)

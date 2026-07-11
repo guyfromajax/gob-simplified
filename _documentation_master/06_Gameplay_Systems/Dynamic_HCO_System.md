@@ -190,7 +190,7 @@ Each HCO turn rolls a team-wide **posture** (`_roll_defense_posture`, phase_reso
 
 | Phase | Item |
 |---|---|
-| **P2** | Two-gate intercept — Gate 1 geometry (defender in a pass lane, reusing the posture-shaded reconstruction) → Gate 2 `aggression_call` (aggressive 50 / normal 25 / passive 0) → Gate 3 `resolve_pass_contest`. Posture gates *viability by distance*: tight can jump his man's pass, loose can't (only help lanes). **Interceptable passes (all types):** hot-read dishes + kickouts (P2a), **freelance passes**, and **skeleton motion/reversal passes** (P2b — walk hook `_hco_contest_skeleton_pass`, both walks). All reuse `_hco_resolve_dish_contest`; an intercept → STEAL via `pass_intercepted`. Loose/help defenders pick swing passes in help lanes. |
+| **P2** | Two-gate intercept — Gate 1 geometry (defender in a pass lane, reusing the posture-shaded reconstruction) → Gate 2 `aggression_call` (aggressive 80 / normal 40 / passive 0) → Gate 3 `resolve_pass_contest`. Posture gates *viability by distance*: tight can jump his man's pass, loose can't (only help lanes). **Interceptable passes (all types):** hot-read dishes + kickouts (P2a), **freelance passes**, and **skeleton motion/reversal passes** (P2b — walk hook `_hco_contest_skeleton_pass`, both walks). All reuse `_hco_resolve_dish_contest`; an intercept → STEAL via `pass_intercepted`. Loose/help defenders pick swing passes in help lanes. |
 | **P3** | Reactive resolution + graded openness (generalize the SM freeze to every step type). |
 | **P4–P5** | Offense reads the commitment → `attack` / relocate / step-in / new `backdoor`; dish-receiver agency on the catch. |
 | **P6** | Real tight/loose **playcall variants** replace the interim random pick. |
@@ -296,6 +296,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 | `HCO_ZONE_MOMENT_SCALAR` | phase_resolution.py | `0.5` | **HCO zone-defense** dial (defaults equal to man). Tune zone independently — zones strip less, deflect/help more. |
 | `MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION` | phase_resolution.py | `{0:5, 1:20, 2:35, 3:50, 4:75}` | Per-turn % of possessions the defense attempts **any** moment, by aggression (man + zone). The frequency knob *before* conversion. ↓ = fewer possessions with a steal/foul/TO at every aggression level. |
 | `HCO_PASS_LANE_DIST_BY_AGGRESSION` | phase_resolution.py | `{passive:6.0, aggressive:5.0}` (normal = `randint(5,6)`/game) | Perpendicular lane distance for HCO hot-read/kickout pass disruption. ↑ = defenders contest from farther = more interceptions. Tighter than HCT/FCP (8.0). |
+| `INTERCEPT_ATTEMPT_PCT_BY_CALL` | phase_resolution.py | `{aggressive:80, normal:40, passive:0}` | **Gate 2** — % chance an in-lane defender (Gate 1) actually *attempts* the pick, by `aggression_call`. The volume throttle *before* the Gate 3 attribute contest. ↑ = more attempts feed the contest = more interceptions. Passive never gambles. |
 | `PASS_LANE_DIST` | pass_contest.py | `8.0` | HCT lane distance (and the param default). Shared pure model. |
 | `FCP_PASS_LANE_DIST` | *(planned)* | `8.0` | FCP lane distance once FCP pass contests are wired (Roadmap). |
 | `HCT_D8_GLOBAL_SCALAR` | dynamic_hct.py | `1.0` | Global per-moment frequency (affects HCT/FCP/HCO). |
