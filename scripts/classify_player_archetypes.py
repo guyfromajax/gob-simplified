@@ -143,7 +143,7 @@ HAIR = {
               ("a temple fade with short curls", 1),
               ("a big voluminous curly top", 2),
               ("a tall boxy hi-top fade", 1),
-              ("a high skin fade shaved to the base with a thick block of hair on top", 2)],
+              ("a high skin fade shaved to the base with a thick block of hair on top", 1)],
     "white": [("short brown hair", 3), ("a short buzz cut", 1),
               ("wavy brown hair", 2), ("curly brown hair", 2),
               ("messy medium brown hair", 2), ("short blonde hair", 1),
@@ -160,15 +160,14 @@ HAIR = {
               ("a brown mullet, short on top and long in the back", 1),
               ("a blond mullet, short on top and long in the back", 1),
               ("a modern mullet with faded sides", 1),
-              ("a clean-shaved bald head", 1),
-              ("a high skin fade with a thick block of hair on top", 1)],
+              ("a clean-shaved bald head", 1)],
     "asian": [("short straight black hair", 3), ("a black undercut", 2),
               ("spiky black hair", 1), ("medium straight black hair", 1),
               ("a neat black bowl cut", 1), ("a textured fringe crop", 2),
               ("a two-block cut", 2), ("a middle-part curtain cut", 1),
               ("a short black crew cut", 1), ("a soft-perm short cut", 1),
               ("a slicked-back undercut", 1),
-              ("a high skin fade shaved to the base with a thick block of hair on top", 2),
+              ("a high skin fade shaved to the base with a thick block of hair on top", 1),
               ("a clean-shaved bald head", 1)],
     "hispanic": [("a short black fade", 3), ("a short black crop", 2),
                  ("wavy black hair", 2), ("curly black hair", 2),
@@ -176,14 +175,12 @@ HAIR = {
                  ("a mid fade with curls on top", 2), ("a taper fade with a line-up", 1),
                  ("short wavy dark-brown hair", 1), ("a comb-over fade", 1),
                  ("a clean-shaved bald head", 1),
-                 ("a high skin fade with a thick block of hair on top", 1),
                  ("a side-swept dark quiff with tapered sides", 1)],
     "ambiguous": [("a short fade", 2), ("short curly brown hair", 2),
                   ("wavy dark hair", 2), ("a short crop", 1),
                   ("a textured crop with fringe", 1), ("a taper fade", 1),
                   ("medium curly dark hair", 1), ("a short afro-textured cut", 1),
-                  ("a big voluminous curly top", 1), ("a clean-shaved bald head", 1),
-                  ("a high skin fade with a thick block of hair on top", 1)],
+                  ("a big voluminous curly top", 1), ("a clean-shaved bald head", 1)],
 }
 # pale/Scandinavian players lean blonde/fair.
 HAIR_PALE = [("short blonde hair", 3), ("wavy blonde hair", 2),
@@ -300,6 +297,16 @@ EYEWEAR = [("clear sports goggles", 3), ("black-framed sports goggles", 2),
            ("clear-framed glasses", 1)]
 EARRING = [("a small diamond stud earring", 3), ("a large diamond stud earring", 1),
            ("a small hoop earring", 2)]
+SLEEVE_TATTOO = [
+    ("a black-and-gray tattoo sleeve on one arm", 3),
+    ("a bold-line traditional tattoo sleeve on one arm", 2),
+    ("a tribal tattoo sleeve on one arm", 2),
+    ("a geometric tattoo sleeve on one arm", 2),
+    ("a script-and-symbols tattoo sleeve on one arm", 2),
+    ("a floral tattoo sleeve on one arm", 1),
+    ("a half-sleeve tattoo on one forearm", 2),
+    ("a shoulder-and-upper-arm tattoo", 2),
+]
 ACC_RATES = {"headband": 10, "eyewear": 8, "earring": 3,
              "tattoo_sleeve": 3, "tattoo_neck": 0.3}
 
@@ -342,7 +349,7 @@ def pick_accessories(pid, year, primary_hex=None, secondary_hex=None):
     if roll("earring", ACC_RATES["earring"]):
         out.append(_weighted(EARRING, int(hashlib.md5(f"{pid}|earring".encode()).hexdigest(), 16)))
     if roll("tattoo_sleeve", ACC_RATES["tattoo_sleeve"]):
-        out.append("a tattoo sleeve on one arm")
+        out.append(_weighted(SLEEVE_TATTOO, int(hashlib.md5(f"{pid}|tatstyle".encode()).hexdigest(), 16)))
     if roll("tattoo_neck", ACC_RATES["tattoo_neck"]):
         out.append("a small neck tattoo")
     # light facial hair only for older players (juniors/seniors); no face piercings
