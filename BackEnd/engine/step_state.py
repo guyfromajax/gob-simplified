@@ -89,28 +89,32 @@ def _compute_man_defender_grid(skeleton_steps, off_lineup, def_lineup, matchups,
     return grid
 
 
-def _render_defender_grid(skeleton, game, off_lineup, def_lineup):
-    """The actual RENDERED per-step defender grid (`skeleton_to_animations`) — ground truth for
-    animated games; ``{}`` for sims (they don't render). Used only to VERIFY the pure primitive."""
+def _render_grids(skeleton, game, off_lineup, def_lineup):
+    """Actual RENDERED per-step grids (`skeleton_to_animations`) — returns (def_grid, off_grid),
+    each ``{step_idx: {pos: {x,y}}}``. Ground truth for animated games; ``({}, {})`` for sims.
+    Used only to VERIFY the pure primitive."""
     from BackEnd.models.animator import Animator
     anims = Animator(game).skeleton_to_animations(
         skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False)
     move_by_pid = {a.get("playerId"): (a.get("movement") or [])
                    for a in (anims or []) if a.get("playerId")}
-    pid_by_dpos = {dp: getattr(p, "player_id", None) for dp, p in def_lineup.items()}
     steps = (skeleton or {}).get("steps") or []
-    grid = {}
-    for i in range(len(steps)):
-        row = {}
-        for dpos, pid in pid_by_dpos.items():
-            if not pid:
-                continue
-            mv = move_by_pid.get(pid) or []
-            c = (mv[i] or {}).get("coords") if i < len(mv) else None
-            if isinstance(c, dict) and "x" in c and "y" in c:
-                row[dpos] = {"x": float(c["x"]), "y": float(c["y"])}
-        grid[i] = row
-    return grid
+
+    def _grid(lineup):
+        pid_by_pos = {p: getattr(pl, "player_id", None) for p, pl in lineup.items()}
+        g = {}
+        for i in range(len(steps)):
+            row = {}
+            for pos, pid in pid_by_pos.items():
+                if not pid:
+                    continue
+                mv = move_by_pid.get(pid) or []
+                c = (mv[i] or {}).get("coords") if i < len(mv) else None
+                if isinstance(c, dict) and "x" in c and "y" in c:
+                    row[pos] = {"x": float(c["x"]), "y": float(c["y"])}
+            g[i] = row
+        return g
+    return _grid(def_lineup), _grid(off_lineup)
 
 
 def build_step_states(result, game):
@@ -143,7 +147,7 @@ def build_step_states(result, game):
     grid_by_step = {}
     try:
         if zone:
-            grid_by_step = _render_defender_grid(skeleton, game, off_lineup, def_lineup)
+            grid_by_step = _render_grids(skeleton, game, off_lineup, def_lineup)[0]
         else:
             man = _compute_man_defender_grid(steps, off_lineup, def_lineup, matchups,
                                              is_away_offense, aggression, posture)
@@ -218,22 +222,43 @@ def _diagnose(step_states, steps, game, off_lineup, def_lineup, matchups, zone, 
 
     canonical = {i: (ss.get("defense") or {}) for i, ss in enumerate(step_states)}
 
-    # (1) fidelity vs render
+    is_away = game.offense_team.team_id == game.away_team.team_id
+    def_to_off = {d: o for o, d in matchups.items()}
+
+    # (1) fidelity vs render — plus whether the guarded OFFENSE player's coord also diverges
+    # (pos_actions vs the render's animation coord) → tells us offense-coord source vs defender-logic.
     try:
-        render = _render_defender_grid({"steps": steps}, game, off_lineup, def_lineup)
+        render_def, render_off = _render_grids({"steps": steps}, game, off_lineup, def_lineup)
     except Exception:
-        render = {}
-    if render:
-        dv, sm, mx, w, bk = _grid_diff(canonical, render, step_states, steps)
+        render_def, render_off = {}, {}
+    if render_def:
+        dv, sm, mx, w, bk = _grid_diff(canonical, render_def, step_states, steps)
+        off_also = 0
+        for i, ss in enumerate(step_states):
+            can = ss.get("defense") or {}
+            rnd = render_def.get(i) or {}
+            roff = render_off.get(i) or {}
+            for dpos, cv in can.items():
+                rv = rnd.get(dpos)
+                if not isinstance(rv, dict) or "x" not in rv:
+                    continue
+                if ((cv["x"] - rv["x"]) ** 2 + (cv["y"] - rv["y"]) ** 2) ** 0.5 <= 1.5:
+                    continue
+                op = def_to_off.get(dpos, dpos)
+                mine = _off_coord(steps[i], op, is_away) if op in (steps[i].get("pos_actions") or {}) else None
+                rendv = roff.get(op)
+                if isinstance(mine, dict) and isinstance(rendv, dict) and \
+                        ((mine["x"] - rendv["x"]) ** 2 + (mine["y"] - rendv["y"]) ** 2) ** 0.5 > 1.5:
+                    off_also += 1
         if sm:
             _w = f" | worst step {w[0]} {w[1]}({w[2]}) pure={w[3]} render={w[4]}" if w else ""
             logging.warning(
-                "🔬 [STEPSTATE FIDELITY] pure-vs-render: %d/%d divergent (%.0f%%) max=%.1f zone=%s%s "
-                "[is_full_sim=%s]", dv, sm, 100.0 * dv / sm, mx, zone, _w,
+                "🔬 [STEPSTATE FIDELITY] pure-vs-render: %d/%d divergent (%.0f%%) max=%.1f zone=%s | "
+                "off-coord-also-diverged: %d/%d%s [is_full_sim=%s]",
+                dv, sm, 100.0 * dv / sm, mx, zone, off_also, dv, _w,
                 game.game_state.get("_is_full_simulation"))
 
     # (2) gap vs old contest reconstruction
-    is_away = game.offense_team.team_id == game.away_team.team_id
     def_aggr = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
     playcall = game.game_state.get("defense_playcall")
     off_to_def = {o: d for d, o in matchups.items()} if not zone else {}
