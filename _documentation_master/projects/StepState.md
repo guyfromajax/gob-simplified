@@ -27,6 +27,19 @@
 
 ---
 
+## ✅ Decisions locked (feed the eventual Dynamic HCO System doc overhaul)
+Stable *contracts* settled with the human during this refactor — they won't change based on how we implement. Captured here as we go; the Dynamic HCO System doc gets ONE comprehensive overhaul at the end (mid-flight rewrites would describe a half-migrated state → "wires crossed"). Each entry: the rule + when locked.
+
+1. **Per-step event order (single-walk model), locked 2026-07-11.** At each step, run in order and STOP at the first terminal (possession-ending) event — **first terminal in step order wins**:
+   1. **Offense acts** — ball handler holds/moves, drives, passes (dish/kickout), or shoots.
+   2. **If he passed → interception check** (pass lane vs. the rendered defender grid). Pick/bat → STEAL/turnover ends the possession here.
+   3. **If he didn't pass → on-ball defender moment** — the ball-handler's man rolls strip/steal/foul on the live ball.
+   4. **If he shot → resolve the shot** (make/miss/foul).
+   5. **No terminal → advance to the next step.**
+   - Consequences vs. today: (a) the defender moment becomes **step-local** — it can only pre-empt a shot at the **same or a later** step, not an earlier one (today's moment walk runs entirely pre-shot and can pre-empt an earlier shot); (b) per step, interception and moment are **mutually exclusive** (2 *or* 3) — you either picked the pass or tried to strip the handler. Supersedes the implicit "moment always pre-empts the shot" precedence.
+
+---
+
 ## Governing law — where game logic lives
 **Resolve once → freeze into `StepState` → project to the emitter → draw.** All game logic lives in the resolution engine, *upstream of both* StepState and the emitter.
 
