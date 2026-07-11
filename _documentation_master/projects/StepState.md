@@ -144,5 +144,8 @@ Result: the emitted skeleton is **fully self-describing**. The animator becomes 
 
 ---
 
+## Bug family subsumed by Stage 1 — "ball snap-back on a non-shot outcome"
+Any non-shot terminal (moment steal / **dead-ball turnover** / foul) that lands at/after a pass step makes the ball complete to the receiver, then teleport back to the stopper's ball-handler for the micro-animation + announce. Root: the outcome isn't **pinned to its actual step** (only interceptions/bat-OOB pin today), so `apply_stopper` truncates at a random blast-radius step. Stage 1 kills the whole family: one walk, every terminal pinned to its step, first-class ball trajectory (turnover mid-pass = truncated trajectory, ball never completes to the receiver). *Confirmed instances: interception teleport (fixed tactically), DB-turnover-after-pass teleport (2026-07-11, still live).*
+
 ## Convergence note
 This isn't a side-refactor — it's the capstone of three tracked threads: **emitter-as-god** (one position source), **Dynamic-MM P2–P5** (offense-acts→defense-reacts step loop), and **UESS no-teleport** (one authoritative per-step position record).
