@@ -1226,7 +1226,14 @@ class Animator:
         
         if not skeleton or "steps" not in skeleton:
             return []
-        
+        return self._build_all_animations(
+            skeleton, off_lineup, def_lineup, add_defenders=add_defenders, is_fcp=is_fcp, is_hct=is_hct)
+
+    def _build_all_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False):
+        """Core of ``skeleton_to_animations`` (offense build + defender placement), factored out so
+        the contest's defender grid can reuse the EXACT same computation without the full-sim
+        early-return. Behavior-preserving — ``skeleton_to_animations`` delegates here after its
+        early-returns; ``compute_defender_grid`` calls it directly (sim-safe)."""
         animations = []
         steps = skeleton["steps"]
         
@@ -1432,6 +1439,39 @@ class Animator:
         
         return animations
     
+    def compute_defender_grid(self, skeleton, off_lineup, def_lineup, is_fcp=False, is_hct=False):
+        """PURE, sim-safe per-step defender grid — runs the SAME offense-build + defender-placement
+        as the render (via ``_build_all_animations``) but WITHOUT the full-sim early-return, so the
+        interception contest and the render compute defender positions from ONE identical
+        computation. Returns ``{step_idx: {def_pos: {x, y}}}``.
+
+        An interception is an OUTCOME, so its defender geometry must be identical for animated and
+        sim'd games — hence this bypasses the ``_is_full_simulation`` skip. (Perf: it builds the full
+        animation to reuse the exact code; a grid-only fast path can follow if it ever matters.)"""
+        if not skeleton or "steps" not in skeleton:
+            return {}
+        try:
+            anims = self._build_all_animations(
+                skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=is_fcp, is_hct=is_hct)
+        except Exception:
+            return {}
+        move_by_pid = {a.get("playerId"): (a.get("movement") or [])
+                       for a in (anims or []) if a.get("playerId")}
+        pid_by_dpos = {dp: getattr(p, "player_id", None) for dp, p in (def_lineup or {}).items()}
+        steps = skeleton.get("steps") or []
+        grid = {}
+        for i in range(len(steps)):
+            row = {}
+            for dpos, pid in pid_by_dpos.items():
+                if not pid:
+                    continue
+                mv = move_by_pid.get(pid) or []
+                c = (mv[i] or {}).get("coords") if i < len(mv) else None
+                if isinstance(c, dict) and "x" in c and "y" in c:
+                    row[dpos] = {"x": float(c["x"]), "y": float(c["y"])}
+            grid[i] = row
+        return grid
+
     def _position_fcp_defenders(self, offensive_animations, def_lineup, skeleton_steps):
         """
         Position defensive players for Full Court Press scenarios.
