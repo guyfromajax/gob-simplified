@@ -1610,6 +1610,22 @@ def build_skeleton_animation_steps(
                 if not step0_has_transfer:
                     owner_id_end = prepended_owner
 
+        # Dynamic HCO interception: the resolver stamps a ``steal_reach`` defender override on the
+        # stop step (the interceptor steps into the passing lane; the animator already places him at
+        # the contact point via the same override). Attach the ball to him as the step-end owner so
+        # it TWEENS passer→pick (owner transfer → ``is_pass_step`` → pass-rate ball motion) instead
+        # of staying with the passer, which reads as a teleport when the next possession seeds the
+        # stealer. ``_steal_contact`` (the pick coord) overrides the normal receiver meet-point below.
+        _steal_contact = None
+        _sk_i = skeleton_steps[i] if i < len(skeleton_steps) else {}
+        for _dpos, _ov in ((_sk_i.get("_attack_drive") or {}).get("defender_overrides") or {}).items():
+            if (_ov or {}).get("action") == "steal_reach":
+                _iid = _player_id_at_pos(def_lineup, _dpos)
+                if _iid and owner_id_start:
+                    owner_id_end = _iid
+                    _steal_contact = (_ov or {}).get("coords")
+                break
+
         ball_handler_role = roles.get("ball_handler")
         bh_id_fallback = _safe_id(ball_handler_role) or ""
 
@@ -1919,7 +1935,11 @@ def build_skeleton_animation_steps(
                 receiver_player = _player_lookup_by_id(
                     off_lineup, def_lineup, receiver_id_mp,
                 )
-                if (passer_start_coord and receiver_start_coord
+                if _steal_contact:
+                    # Interception: the ball arrives at the pick point (interceptor's contact
+                    # coord), not a receiver meet-point.
+                    step["start"]["ball_arrival_coord"] = _steal_contact
+                elif (passer_start_coord and receiver_start_coord
                     and receiver_end_coord):
                     receiver_archetype = archetype.get(receiver_id_mp, "standard")
                     receiver_rate = _ag_grid_per_game_sec(
