@@ -61,9 +61,9 @@ def master_exists(uid):
             or os.path.exists(os.path.join(LIVE_MASTERS, uid + ".png")))
 
 
-def run(script, team):
+def run(script, team, extra=None):
     """Shell one pipeline stage for one team; stream its output."""
-    cmd = [PY, os.path.join("scripts", script), "--team", team]
+    cmd = [PY, os.path.join("scripts", script), "--team", team] + (extra or [])
     print(f"    $ {' '.join(cmd)}")
     r = subprocess.run(cmd, cwd=os.getcwd())
     return r.returncode == 0
@@ -132,7 +132,9 @@ def process_team(team, conf, args):
 
     if not args.qc_only:
         if not args.no_generate:
-            if not run("generate_player_portraits.py", team):
+            # --force regenerates existing busts (e.g. to apply new prompt genes)
+            gen_extra = ["--force"] if args.force else None
+            if not run("generate_player_portraits.py", team, gen_extra):
                 print("    [warn] generate stage returned nonzero")
         bad = bad_frames(team)
         if bad:

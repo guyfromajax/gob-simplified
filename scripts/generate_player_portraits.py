@@ -46,12 +46,15 @@ PROMPT = (
     "shoulder width, pose, plain white sleeveless tank top, camera framing and "
     "zoom, plain light neutral background, and semi-realistic illustrated art "
     "style, generate a DIFFERENT 16-17 year old male high-school basketball "
-    "player. He is {skin}. Give him {hair} and {expression}. {acc}"
+    "player with a distinctive, unique face. He is {skin}. {face} Give him "
+    "{hair} and {expression}. {acc}"
     "Render his skin tone consistently across his face, neck, shoulders and "
     "arms. Give him {definition}. Keep the body frame, shoulder width, pose, "
     "white tank, neckline, framing, background, and illustrated art style "
     "IDENTICAL to the reference — change ONLY the face, skin tone, hair, and "
-    "muscle definition. Front-facing head-and-shoulders bust portrait."
+    "muscle definition, and follow the specified facial features closely so he "
+    "is clearly a different individual. Front-facing head-and-shoulders bust "
+    "portrait."
 )
 
 
@@ -70,9 +73,10 @@ def slug(s):
 
 def build_prompt(row):
     acc = row.get("accessories", "").strip()
-    acc = f"He is {acc}. " if acc else ""
+    acc = f"He has {acc}. " if acc else ""
     return PROMPT.format(
-        skin=row["skin_prompt"], hair=row["hair"], expression=row["expression"],
+        skin=row["skin_prompt"], face=row.get("face_prompt", ""),
+        hair=row["hair"], expression=row["expression"],
         acc=acc, definition=DEF_CLAUSE.get(row["definition"], DEF_CLAUSE["Toned"]))
 
 
