@@ -381,7 +381,8 @@ Standard Process
 - All Around Scorer (10%)
 - Intangibles (10%)
 - Outside Defender (15%)
-- Scoring PG (15%)
+- Scoring PG (10%)
+- Intangibles (5%)
 
 **SG**
 - Classic SG (40%)
@@ -389,8 +390,9 @@ Standard Process
 - All Around Scorer (10%)
 - Pure Shooter (15%)
 - Intangibles (5%)
-- Outside Defender (15%)
+- Outside Defender (10%)
 - Outside Dual Threat (10%)
+- Athletic Shooter (5%)
 
 **SF**
 - Classic SF (30%)
@@ -407,10 +409,10 @@ Standard Process
 - Classic PF (40%)
 - Intangibles (5%)
 - Inside Defender (10%)
-- Three & D (5%)
 - Inside Scorer (10%)
 - Scoring PF (15%)
 - Defensive PF (15%)
+- Intangibles (5%)
 
 **C**
 - Classic C (40%)
