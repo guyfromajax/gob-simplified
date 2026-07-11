@@ -11,27 +11,38 @@ Reusable per conference later:  --team A --team B ...
 """
 import os
 import csv
+import json
 import shutil
 import argparse
 
 SRC = "assets_staging/players"
 OUT = "assets_staging/_r2_batch"
+MANIFEST = "tmp/team-logo-pipeline/team-logo-manifest.json"
+
+
+def teams_for_conference(n):
+    mani = json.load(open(MANIFEST))
+    return [m["team"] for m in mani if str(m.get("conference")) == str(n)]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--team", action="append", required=True,
-                    help="team name (repeatable)")
+    g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument("--team", action="append", help="team name (repeatable)")
+    g.add_argument("--conference", type=int, help="stage all teams in a conference")
     ap.add_argument("--src", default=SRC)
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--clean", action="store_true",
-                    help="empty the out dir first")
+                    help="empty the out dir first (recommended per conference)")
     args = ap.parse_args()
 
+    want = set(args.team) if args.team else set(teams_for_conference(args.conference))
+    if not want:
+        raise SystemExit("no teams selected")
     rows = [r for r in csv.DictReader(open("scripts/players_archetypes.csv"))
-            if r["team"] in set(args.team)]
+            if r["team"] in want]
     if not rows:
-        raise SystemExit(f"no players found for teams {args.team}")
+        raise SystemExit(f"no players found for teams {sorted(want)}")
 
     if args.clean and os.path.isdir(args.out):
         shutil.rmtree(args.out)
