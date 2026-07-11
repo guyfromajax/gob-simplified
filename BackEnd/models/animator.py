@@ -1447,12 +1447,18 @@ class Animator:
 
         An interception is an OUTCOME, so its defender geometry must be identical for animated and
         sim'd games — hence this bypasses the ``_is_full_simulation`` skip. (Perf: it builds the full
-        animation to reuse the exact code; a grid-only fast path can follow if it ever matters.)"""
+        animation to reuse the exact code; a grid-only fast path can follow if it ever matters.)
+
+        PURE: ``_build_all_animations`` mutates the skeleton in place (ball-handler coord nudging,
+        coord-flip), so we build on a deep copy — the shared skeleton the emitter/render also draw
+        from is left untouched. Without this, calling the render code twice on one object is not
+        idempotent and the two draws diverge."""
+        import copy as _copy
         if not skeleton or "steps" not in skeleton:
             return {}
         try:
             anims = self._build_all_animations(
-                skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=is_fcp, is_hct=is_hct)
+                _copy.deepcopy(skeleton), off_lineup, def_lineup, add_defenders=True, is_fcp=is_fcp, is_hct=is_hct)
         except Exception:
             return {}
         move_by_pid = {a.get("playerId"): (a.get("movement") or [])

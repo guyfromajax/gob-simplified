@@ -74,9 +74,13 @@ def _render_grids(skeleton, game, off_lineup, def_lineup):
     """Actual RENDERED per-step grids (`skeleton_to_animations`) — returns (def_grid, off_grid),
     each ``{step_idx: {pos: {x,y}}}``. Ground truth for animated games; ``({}, {})`` for sims. Used
     only to VERIFY `compute_defender_grid` (should be identical — same code, different entry)."""
+    import copy
     from BackEnd.models.animator import Animator
+    # deep-copy: skeleton_to_animations mutates the skeleton in place (BH coord nudge, coord-flip);
+    # the shared object was already drawn by compute_defender_grid + the emitter, so draw on a copy
+    # to compare like-for-like (else the second draw sees the first's mutations and falsely diverges).
     anims = Animator(game).skeleton_to_animations(
-        skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False)
+        copy.deepcopy(skeleton), off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False)
     move_by_pid = {a.get("playerId"): (a.get("movement") or [])
                    for a in (anims or []) if a.get("playerId")}
     steps = (skeleton or {}).get("steps") or []
