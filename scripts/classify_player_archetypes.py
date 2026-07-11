@@ -297,16 +297,15 @@ EYEWEAR = [("clear sports goggles", 3), ("black-framed sports goggles", 2),
            ("clear-framed glasses", 1)]
 EARRING = [("a small diamond stud earring", 3), ("a large diamond stud earring", 1),
            ("a small hoop earring", 2)]
-SLEEVE_TATTOO = [
-    ("a black-and-gray tattoo sleeve on one arm", 3),
-    ("a bold-line traditional tattoo sleeve on one arm", 2),
-    ("a tribal tattoo sleeve on one arm", 2),
-    ("a geometric tattoo sleeve on one arm", 2),
-    ("a script-and-symbols tattoo sleeve on one arm", 2),
-    ("a floral tattoo sleeve on one arm", 1),
-    ("a half-sleeve tattoo on one forearm", 2),
-    ("a shoulder-and-upper-arm tattoo", 2),
+# tattoo = a design (adjective) placed on which arm(s): 40% both / 30% L / 30% R
+TATTOO_DESIGN = [
+    ("black-and-gray", 3), ("bold-line traditional", 2), ("tribal", 2),
+    ("geometric", 2), ("script-and-symbols", 2), ("realistic black-and-gray", 1),
+    ("Polynesian tribal", 1), ("floral", 1),
 ]
+TATTOO_ARM = [("both", 40), ("left", 30), ("right", 30)]
+# earring ear placement: 60% left / 39% both / 1% right
+EAR_PLACEMENT = [("left", 60), ("both", 39), ("right", 1)]
 ACC_RATES = {"headband": 10, "eyewear": 8, "earring": 3,
              "tattoo_sleeve": 3, "tattoo_neck": 0.3}
 
@@ -347,9 +346,20 @@ def pick_accessories(pid, year, primary_hex=None, secondary_hex=None):
     if roll("eyewear", ACC_RATES["eyewear"]):
         out.append(_weighted(EYEWEAR, int(hashlib.md5(f"{pid}|eyewear".encode()).hexdigest(), 16)))
     if roll("earring", ACC_RATES["earring"]):
-        out.append(_weighted(EARRING, int(hashlib.md5(f"{pid}|earring".encode()).hexdigest(), 16)))
+        etype = _weighted(EARRING, int(hashlib.md5(f"{pid}|earring".encode()).hexdigest(), 16))
+        ear = _weighted(EAR_PLACEMENT, int(hashlib.md5(f"{pid}|earplace".encode()).hexdigest(), 16))
+        if ear == "both":
+            plural = etype.replace("a small ", "small ").replace("a large ", "large ").replace(" earring", " earrings")
+            out.append(f"{plural} in both ears")
+        else:
+            out.append(f"{etype} in his {ear} ear")
     if roll("tattoo_sleeve", ACC_RATES["tattoo_sleeve"]):
-        out.append(_weighted(SLEEVE_TATTOO, int(hashlib.md5(f"{pid}|tatstyle".encode()).hexdigest(), 16)))
+        design = _weighted(TATTOO_DESIGN, int(hashlib.md5(f"{pid}|tatstyle".encode()).hexdigest(), 16))
+        arm = _weighted(TATTOO_ARM, int(hashlib.md5(f"{pid}|tatarm".encode()).hexdigest(), 16))
+        if arm == "both":
+            out.append(f"{design} tattoo sleeves on both arms")
+        else:
+            out.append(f"a {design} tattoo sleeve on his {arm} arm")
     if roll("tattoo_neck", ACC_RATES["tattoo_neck"]):
         out.append("a small neck tattoo")
     # light facial hair only for older players (juniors/seniors); no face piercings
