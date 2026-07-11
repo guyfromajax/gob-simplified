@@ -224,10 +224,13 @@ def pick_hair(pid, race, skin):
 # more likely but not guaranteed, so real within-group variation survives. We
 # emit ~5 strong descriptors (NB averages away over-specification), which is what
 # pushes each player into a DIFFERENT face rather than a per-attribute clone.
-FACE_SHAPE = [("an oval", 4), ("a round", 3), ("a square", 3), ("a long oval", 3),
-              ("a rectangular", 2), ("a heart-shaped", 2), ("a diamond-shaped", 1)]
-JAW = [("a strong wide jaw", 3), ("a soft rounded jaw", 3), ("a narrow tapered jaw", 3),
-       ("a sharp angular jaw", 3), ("a broad square jaw", 2), ("a slightly weak jaw", 1)]
+# FACE_SHAPE & JAW flattened to uniform weights (Conf 12+): every shape equally
+# likely so the formerly-rare ones (diamond face, slightly-weak jaw) appear as
+# often as oval/strong-jaw — more roster variety, no options added or removed.
+FACE_SHAPE = [("an oval", 1), ("a round", 1), ("a square", 1), ("a long oval", 1),
+              ("a rectangular", 1), ("a heart-shaped", 1), ("a diamond-shaped", 1)]
+JAW = [("a strong wide jaw", 1), ("a soft rounded jaw", 1), ("a narrow tapered jaw", 1),
+       ("a sharp angular jaw", 1), ("a broad square jaw", 1), ("a slightly weak jaw", 1)]
 CHEEKS = [("high prominent cheekbones", 3), ("flat cheeks", 3), ("full round cheeks", 3),
           ("wide cheekbones", 2), ("hollow cheeks", 2)]
 
@@ -263,13 +266,15 @@ LIPS = {
     "hispanic": [("full lips", 2), ("medium lips", 2), ("well-defined lips", 1)],
     "ambiguous": [("medium lips", 2), ("full lips", 1), ("thin lips", 1)],
 }
-# distinctive marks — always-visible imperfections, ~1 in 3 players gets one
-MARKS = [("a light spray of freckles across the nose and cheeks", 3),
-         ("a small mole on one cheek", 2), ("a faint scar through one eyebrow", 2),
-         ("slightly protruding ears", 2), ("a subtly crooked nose", 2),
-         ("a strong prominent brow", 2), ("faint under-eye shadows", 1),
+# distinctive marks — always-visible imperfections. Weights flattened to uniform
+# (Conf 12+) so the formerly-invisible marks (under-eye shadows, facial asymmetry,
+# beauty mark) appear as often as freckles, and MARK_PCT raised so more faces carry one.
+MARKS = [("a light spray of freckles across the nose and cheeks", 1),
+         ("a small mole on one cheek", 1), ("a faint scar through one eyebrow", 1),
+         ("slightly protruding ears", 1), ("a subtly crooked nose", 1),
+         ("a strong prominent brow", 1), ("faint under-eye shadows", 1),
          ("mild facial asymmetry", 1), ("a small beauty mark near the lip", 1)]
-MARK_PCT = 33
+MARK_PCT = 45
 
 
 def _race_key(race, skin):
