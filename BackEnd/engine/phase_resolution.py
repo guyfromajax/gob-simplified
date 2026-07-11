@@ -5139,19 +5139,27 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
         def _pt(xy):
             return get_away_player_coords(xy) if is_away_offense else xy
     else:
-        from BackEnd.utils.shared_defense import get_defender_coords
-        def_xy = {}
-        for off_pos in off_lineup:
-            if off_pos not in pos_actions:
-                continue
-            dpos = off_to_def.get(off_pos, off_pos)
-            if not def_lineup.get(dpos):
-                continue
-            def_xy[dpos] = get_defender_coords(
-                _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
-                ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
-                posture=posture,
-            )
+        # Stage 1 (man): prefer the render's ACTUAL defender grid, stamped on the step pre-contest
+        # (compute_defender_grid = the animator's code). Same display frame as the legacy man path, so
+        # the point transform stays identity. Falls back to the per-step reconstruction when no grid
+        # is stamped (walk-time contest, or dynamic HCO disabled).
+        stamped = ((step.get("_step_state") or {}).get("defense")) or {}
+        def_xy = {dp: {"x": float(v["x"]), "y": float(v["y"])}
+                  for dp, v in stamped.items()
+                  if isinstance(v, dict) and "x" in v and def_lineup.get(dp)}
+        if not def_xy:
+            from BackEnd.utils.shared_defense import get_defender_coords
+            for off_pos in off_lineup:
+                if off_pos not in pos_actions:
+                    continue
+                dpos = off_to_def.get(off_pos, off_pos)
+                if not def_lineup.get(dpos):
+                    continue
+                def_xy[dpos] = get_defender_coords(
+                    _coord(off_pos), is_away_offense, def_aggr, _loc(off_pos),
+                    ball_handler_coords=bh_xy, is_ball_handler=(off_pos == bh_pos), ball_spot=bh_location,
+                    posture=posture,
+                )
 
         def _pt(xy):
             return xy
@@ -5367,6 +5375,21 @@ def _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, 
     steps = skeleton.get("steps") or []
     if not steps:
         return
+    # Stage 1 (man): stamp the render's ACTUAL defender placement on each step so the interception
+    # contest judges against what gets drawn (compute_defender_grid = the animator's code) instead of
+    # the drifting per-step hand reconstruction. compute_defender_grid is pure + sim-safe, so it runs
+    # here PRE-emit (the emit's exact stash isn't available yet — the contest still truncates the
+    # skeleton the emit draws). ~2px RNG from the literal draw, immaterial against the lane band. The
+    # MAN branch of _hco_step_def_xy reads this; zone stays on reconstruction until Step 2.
+    try:
+        from BackEnd.models.animator import Animator
+        _contest_grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        for _i, _step in enumerate(steps):
+            _ss = _step.get("_step_state") or {"index": _i}
+            _ss["defense"] = _contest_grid.get(_i) or {}
+            _step["_step_state"] = _ss
+    except Exception:
+        pass
     from BackEnd.utils.defense_utils import is_zone_defense
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
     import random as _rng
