@@ -139,8 +139,11 @@ HAIR = {
               ("a high-top fade", 1), ("a taper fade with a line-up", 2),
               ("a curly sponge top", 1), ("waves with a low fade", 2),
               ("an afro with a fade", 1), ("flat twists", 1),
-              ("a mini afro puff top", 1), ("a clean-shaved bald head", 1),
-              ("a temple fade with short curls", 1)],
+              ("a mini afro puff top", 1), ("a clean-shaved bald head", 2),
+              ("a temple fade with short curls", 1),
+              ("a big voluminous curly top", 2),
+              ("a tall boxy hi-top fade", 1),
+              ("a high skin fade shaved to the base with a thick block of hair on top", 2)],
     "white": [("short brown hair", 3), ("a short buzz cut", 1),
               ("wavy brown hair", 2), ("curly brown hair", 2),
               ("messy medium brown hair", 2), ("short blonde hair", 1),
@@ -149,29 +152,48 @@ HAIR = {
               ("a textured crop with fringe", 2), ("a modern undercut", 2),
               ("a mid-length wavy mop", 1), ("tousled sandy-blond hair", 1),
               ("a side-part with short sides", 1), ("a crew cut", 1),
-              ("shaggy light-brown hair", 1), ("short ginger hair", 1)],
+              ("shaggy light-brown hair", 1), ("short ginger hair", 1),
+              ("a side-swept blond quiff with tapered sides", 2),
+              ("a side-swept dark-brown quiff with tapered sides", 2),
+              ("a side-swept ginger quiff with tapered sides", 1),
+              ("short neatly side-parted dark-brown hair", 2),
+              ("a brown mullet, short on top and long in the back", 1),
+              ("a blond mullet, short on top and long in the back", 1),
+              ("a modern mullet with faded sides", 1),
+              ("a clean-shaved bald head", 1),
+              ("a high skin fade with a thick block of hair on top", 1)],
     "asian": [("short straight black hair", 3), ("a black undercut", 2),
               ("spiky black hair", 1), ("medium straight black hair", 1),
               ("a neat black bowl cut", 1), ("a textured fringe crop", 2),
               ("a two-block cut", 2), ("a middle-part curtain cut", 1),
               ("a short black crew cut", 1), ("a soft-perm short cut", 1),
-              ("a slicked-back undercut", 1)],
+              ("a slicked-back undercut", 1),
+              ("a high skin fade shaved to the base with a thick block of hair on top", 2),
+              ("a clean-shaved bald head", 1)],
     "hispanic": [("a short black fade", 3), ("a short black crop", 2),
                  ("wavy black hair", 2), ("curly black hair", 2),
                  ("slicked-back black hair", 1), ("a textured crop with fringe", 2),
                  ("a mid fade with curls on top", 2), ("a taper fade with a line-up", 1),
-                 ("short wavy dark-brown hair", 1), ("a comb-over fade", 1)],
+                 ("short wavy dark-brown hair", 1), ("a comb-over fade", 1),
+                 ("a clean-shaved bald head", 1),
+                 ("a high skin fade with a thick block of hair on top", 1),
+                 ("a side-swept dark quiff with tapered sides", 1)],
     "ambiguous": [("a short fade", 2), ("short curly brown hair", 2),
                   ("wavy dark hair", 2), ("a short crop", 1),
                   ("a textured crop with fringe", 1), ("a taper fade", 1),
-                  ("medium curly dark hair", 1), ("a short afro-textured cut", 1)],
+                  ("medium curly dark hair", 1), ("a short afro-textured cut", 1),
+                  ("a big voluminous curly top", 1), ("a clean-shaved bald head", 1),
+                  ("a high skin fade with a thick block of hair on top", 1)],
 }
 # pale/Scandinavian players lean blonde/fair.
 HAIR_PALE = [("short blonde hair", 3), ("wavy blonde hair", 2),
              ("short light-brown hair", 2), ("short red hair", 1),
              ("a short buzz cut", 1), ("a tousled blond crop", 2),
              ("a blond undercut", 1), ("strawberry-blond waves", 1),
-             ("a blond side-part", 1)]
+             ("a blond side-part", 1),
+             ("a side-swept blond quiff with tapered sides", 2),
+             ("a blond mullet, short on top and long in the back", 1),
+             ("a clean-shaved bald head", 1)]
 
 
 def _weighted(pool, seed):
@@ -426,13 +448,17 @@ def classify(p):
     # Race / skin tone (name-override + weighted random; names drive the mix).
     eth = assign_ethnicity(p.get("first_name"), p.get("last_name"), p.get("_id"))
     prim, sec = team_colors(p.get("team"))
+    hair = pick_hair(p.get("_id"), eth["race"], eth["skin"])
+    # very rare (0.1%): hair dyed the team's primary color (e.g. Antoine Ellington)
+    if int(hashlib.md5(f"{p.get('_id')}|hairdye".encode()).hexdigest(), 16) % 1000 < 1:
+        hair = f"{hair}, dyed {_hex_to_name(prim)}"
     return {**p, "bmi": round(bmi, 1), "frame": frame,
             "definition": defi or "n/a", "archetype": archetype,
             "template": frame, "body_prompt": body_prompt,
             "expression": pick_expression(p.get("_id")),
             "race": eth["race"], "skin": eth["skin"],
             "ethnicity": eth["ethnicity_label"], "skin_prompt": eth["skin_prompt"],
-            "hair": pick_hair(p.get("_id"), eth["race"], eth["skin"]),
+            "hair": hair,
             "face_prompt": pick_face(p.get("_id"), eth["race"], eth["skin"]),
             "accessories": pick_accessories(p.get("_id"), p.get("year"), prim, sec)}
 
