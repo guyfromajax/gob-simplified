@@ -4,25 +4,23 @@
 
 ---
 
-## ▶ RESUME HERE (checkpoint 2026-07-11)
+## ▶ RESUME HERE (checkpoint 2026-07-11b)
 
-**Shipped + pushed (develop):** interception teleport fix (`skeleton_step_emitter`); Stage 0 diagnostics; Stage 1a (canonical grid concept); Stage 1b (`step_state.py` — pure man primitive + `🔬 STEPSTATE FIDELITY`/`GAP` diagnostics). All **inert** — nothing reads `StepState.defense` yet, zero behavior change.
+**✅ Stage 1 COMPLETE + verified on live turns (develop).** The interception contest now judges against the render's ACTUAL defender positions for BOTH man and zone, in one unified display frame. `🔬 STEPSTATE GAP` (canonical vs contest) measured **0% for man AND zone** on live play (was man 22–64%, zone up to 100%/96px mirror). The zone+away contact_point mirror is fixed.
 
-**Proven (the whole point):** contest (`_hco_step_def_xy`) vs render (`skeleton_to_animations`) disagree — **man ~30–57%** (Δ up to 20), **zone+away 100%** (half-court mirror, Δ up to 98). So interceptions are judged against defender positions the player doesn't see. Rock-solid, measured many times.
-
-**Where we stopped:** the pure man primitive (`_compute_man_defender_grid`) is a **hand-replication** of the render's defender math and stays ~40% off (Y-dominant, pass steps). `off-coord-also-diverged` is LOW → it's a defender-*logic* mismatch, not offense coords. Root: `skeleton_to_animations`' movement/`hasBallAtStep` arrays **skip steps that omit a player** → misalign when read by skeleton-step index; plus BH tie-break quirks. Hand-copying that ~350-line intertwined function exactly is the trap.
-
-**Decision:** STOP hand-replicating. **Extract** the render's actual offense-position + defender-placement computation out of `skeleton_to_animations` into a **pure function callable for sims** (no full-animation cost, no `_is_full_simulation` early-return dependency). Then fidelity = 0 by construction (same code, not a lookalike).
+**Shipped + pushed (develop) — commit chain:**
+- `compute_defender_grid` **extracted** from `skeleton_to_animations` (split into `_build_all_animations` + thin wrapper); pure + sim-safe (bypasses the `_is_full_simulation` early-return). Made **pure** (deep-copies skeleton — the build mutates BH coords in place).
+- **RNG discovery (load-bearing):** defender placement uses `random` (~2px shade; proven deterministic-under-fixed-seed). So contest and render as *two separate draws* can NEVER agree → recomputation is *incorrect*, not just wasteful. This is the concrete reason for "resolve once → freeze → draw."
+- **Option A (share the one draw):** the HCO emit stashes its exact per-player `animations` on the game (`game._hco_render_animations`, transient, NOT in payload); `build_step_states` extracts `StepState.defense` from those via `Animator.defender_grid_from_animations`. Contest == render by construction. Sims fall back to `compute_defender_grid`'s own single draw (no render to match).
+- **Stage 1 Step 1 (man):** `_hco_contest_final_skeleton` stamps `compute_defender_grid` on each step pre-contest (the emit's exact stash isn't available yet — contest runs pre-emit + truncates the skeleton the emit draws → circular; compute_defender_grid is the same code, ~2px RNG, immaterial vs the lane band). `_hco_step_def_xy` MAN branch reads the stamp.
+- **Stage 1 Step 2 (zone):** hoisted the stamped-read above the man/zone split — when stamped, BOTH modes use the grid with **identity `_pt`** (one display frame). Kills the zone HOME-frame path (`assign_all_zone_defenders` + HOME-flipping `_pt`) that produced the mirrored contact_point. Legacy per-mode fallback preserved for the unstamped path.
 
 **Next concrete steps:**
-1. **Extract** `skeleton_to_animations`' core (offense build + `_position_standard/zone_defenders`) into a shared, sim-safe `compute_defender_grid(skeleton, off_lineup, def_lineup, …)`. Render calls it (behavior-preserving); it returns just the grid for the contest.
-2. Point `StepState.defense` at it; confirm `🔬 STEPSTATE FIDELITY ≈ 0` and `🔬 STEPSTATE GAP` = the man/zone divergence.
-3. **Stage 1:** route the interception contest to read `StepState.defense` (run post-resolution against the canonical grid — extend `_hco_contest_final_skeleton`). Retire the walk-time `_hco_step_def_xy` hooks.
-4. **Stage 2:** render adopts the same function (already does, via the extract). Then contest == render == one computation, animated or sim'd.
+1. **(low priority) Consolidate the walk-time contest** — `_hco_contest_skeleton_pass` (called at ~5906/6152 during the walk) runs *before* the pre-coverage stamp, so those picks still use reconstruction (graceful fallback). Coverage (`_hco_contest_final_skeleton`) catches most passes with the real grid. Retire the walk-time hooks / move all contesting to the stamped stage if the mixing shows in numbers or a visual.
+2. **Stage 2 (render adopts):** render itself reads the shared grid (it already computes the same thing via the extract; this is the final "one computation" unification — mostly done, verify no redundant draw remains).
+3. **DB-turnover-after-pass teleport** (same "ball snap-back on non-shot outcome" family — see below) — still live; the pinning fix is separate from the defender-grid work.
 
-**Hard constraint:** the canonical grid must be a **pure resolution-time computation** — an interception is an OUTCOME and must be identical for animated and sim'd games (sims return `[]` from `skeleton_to_animations`). This is *why* the extract (not "read the render output") is required.
-
-**Also open (folded into this refactor):** DB-turnover-after-pass teleport (same "ball snap-back on non-shot outcome" family — see below); zone extract (man first); the zone/away frame mirror (dies when the contest reads the canonical grid).
+**Hard constraint (still true):** the contest's grid must be a pure resolution-time computation (interception = OUTCOME, identical animated/sim'd). Satisfied: `compute_defender_grid` runs pre-emit for the contest; the emit's exact stash feeds `StepState.defense` for rendered turns.
 
 ---
 
