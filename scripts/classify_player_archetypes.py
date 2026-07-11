@@ -51,6 +51,9 @@ from player_ethnicity import assign_ethnicity, SKIN_PROMPT   # noqa: E402
 MANUAL_OVERRIDES = {
     # Ernest Jefferson (Templeton-Wesley): make him Black
     "78487beb-c30e-47bc-ab8a-7efb65019faf": {"race": "black", "skin": "black-normal"},
+    # Collin Alexander (Wash U Prep): "ambiguous" prompt rendered a muddy tint on
+    # every roll — pin to a concrete tan/olive tone so NB anchors cleanly
+    "92307139-b938-4f7f-9d16-c9d6ed4e99e2": {"race": "white", "skin": "white-tan"},
 }
 
 HERE = os.path.dirname(os.path.abspath(__file__))
