@@ -3817,6 +3817,14 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton has {len(steps)} steps (need at least 2)")
         return skeleton
     
+    # Moment-walk pin: the per-step HCO moment (foul/steal/turnover) fired at a KNOWN step and stashed
+    # it here. Pin the stopper there so the outcome lands where it happened instead of a random
+    # blast-radius step (the "ball snap-back on a non-shot outcome" teleport). Consumed once (pop) so
+    # it can never leak into a later turn's stopper.
+    _moment_pin = game_state.pop("_hco_moment_stop_index", None)
+    if not (isinstance(_moment_pin, int) and 1 <= _moment_pin <= len(steps) - 1):
+        _moment_pin = None
+
     # Determine which step to stop at based on result type
     if result == "SHOT_CLOCK_VIOLATION":
         # Use precomputed step where shot clock hits 0 (set by HCO shot-clock check)
@@ -3824,16 +3832,21 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         if stop_step_index is None or stop_step_index < 0 or stop_step_index >= len(steps) - 1:
             stop_step_index = max(1, len(steps) - 2)
     elif result in ["O_FOUL", "D_FOUL"]:
-        # Random step before final (exclude step 0 and final step)
-        # If skeleton has 7 steps (0-6), choose from steps 1-5
-        stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
+        # Pin to the moment step when a moment fired the foul; else a random step before final
+        # (exclude step 0 and final step). If skeleton has 7 steps (0-6), choose from steps 1-5.
+        if _moment_pin is not None:
+            stop_step_index = _moment_pin
+        else:
+            stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
     elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
         # Dynamic HCO pass interception: pin the stop to the ACTUAL pass step (set by the finalizer)
-        # so the steal lands at the interception, not a random mid step. Falls through to the legacy
-        # random blast-radius when no pin is present (all other steals unchanged).
+        # so the steal lands at the interception, not a random mid step. Then the moment pin (per-step
+        # steal/turnover). Falls through to the legacy random blast-radius when neither is present.
         _pin = game_state.get("_hco_pass_intercept_stop_index")
         if isinstance(_pin, int) and 1 <= _pin <= len(steps) - 1:
             stop_step_index = _pin
+        elif _moment_pin is not None:
+            stop_step_index = _moment_pin
         # Middle step with blast radius (±2 steps from middle)
         # Calculate middle of steps 1 through len(steps)-1 (excluding step 0 and final step)
         elif len(steps) > 2:
@@ -5780,6 +5793,10 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
     game_state = game.game_state
+    # Clear any stale moment-stop pin from a prior turn before we (maybe) set a fresh one below.
+    # The pin tells apply_stopper WHICH step this moment fired at, so the foul/steal/turnover renders
+    # where it happened instead of a random blast-radius step (the "ball snap-back" teleport).
+    game_state.pop("_hco_moment_stop_index", None)
     steps = (skeleton or {}).get("steps") or []
     if len(steps) < 2:
         return None
@@ -5820,6 +5837,10 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
                 f"⚔️ [HCO MOMENT] {result_type} at step {i} ({bh_pos}, {'zone' if zone else 'man'})")
             # Stash the contesting defender so the non-shot block credits / lunges the actual one.
             game_state["_hco_moment_defender_id"] = getattr(_credited or bh_defender, "player_id", None)
+            # Pin the stopper to THIS step so the outcome lands where the moment fired (not a random
+            # blast-radius step). Mirrors the interception finalizer's _hco_pass_intercept_stop_index;
+            # apply_stopper consumes it once. Covers steal/turnover AND foul moments.
+            game_state["_hco_moment_stop_index"] = i
             return result_type
         # Option B: no hard outcome (NEUTRAL near-miss / POS_O blow-by), but the on-ball defender
         # still lunged — record him so the caller stamps a render-space reach_in flourish here.
