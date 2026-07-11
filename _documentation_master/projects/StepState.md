@@ -6,19 +6,22 @@
 
 ## ▶ RESUME HERE (checkpoint 2026-07-11b)
 
-**✅ Stage 1 COMPLETE + verified on live turns (develop).** The interception contest now judges against the render's ACTUAL defender positions for BOTH man and zone, in one unified display frame. `🔬 STEPSTATE GAP` (canonical vs contest) measured **0% for man AND zone** on live play (was man 22–64%, zone up to 100%/96px mirror). The zone+away contact_point mirror is fixed.
+> **Numbering:** this block uses the formal "Staged plan" scheme below (Stage 0–3). What shipped is that plan's **Stage 2** (defender-grid sharing — "the correctness fix", Open Decision #1), rolled out as **Step A (man)** then **Step B (zone)**. Earlier notes called this "Stage 1 man/zone" — that was a local mislabel; it is **Stage 2**. The formal **Stage 1 (walk unification)** and **Stage 3 (bypass removal)** remain OPEN.
 
-**Shipped + pushed (develop) — commit chain:**
+**✅ Stage 2 (defender-grid sharing) COMPLETE + verified on live turns (develop).** The interception contest now judges against the render's ACTUAL defender positions for BOTH man and zone, in one unified display frame. `🔬 STEPSTATE GAP` (canonical vs contest) measured **0% for man AND zone** on live play (was man 22–64%, zone up to 100%/96px mirror). The zone+away contact_point mirror is fixed.
+
+**Shipped + pushed (develop) — commit chain `c3929ef4b`→`14befe175`:**
 - `compute_defender_grid` **extracted** from `skeleton_to_animations` (split into `_build_all_animations` + thin wrapper); pure + sim-safe (bypasses the `_is_full_simulation` early-return). Made **pure** (deep-copies skeleton — the build mutates BH coords in place).
 - **RNG discovery (load-bearing):** defender placement uses `random` (~2px shade; proven deterministic-under-fixed-seed). So contest and render as *two separate draws* can NEVER agree → recomputation is *incorrect*, not just wasteful. This is the concrete reason for "resolve once → freeze → draw."
 - **Option A (share the one draw):** the HCO emit stashes its exact per-player `animations` on the game (`game._hco_render_animations`, transient, NOT in payload); `build_step_states` extracts `StepState.defense` from those via `Animator.defender_grid_from_animations`. Contest == render by construction. Sims fall back to `compute_defender_grid`'s own single draw (no render to match).
-- **Stage 1 Step 1 (man):** `_hco_contest_final_skeleton` stamps `compute_defender_grid` on each step pre-contest (the emit's exact stash isn't available yet — contest runs pre-emit + truncates the skeleton the emit draws → circular; compute_defender_grid is the same code, ~2px RNG, immaterial vs the lane band). `_hco_step_def_xy` MAN branch reads the stamp.
-- **Stage 1 Step 2 (zone):** hoisted the stamped-read above the man/zone split — when stamped, BOTH modes use the grid with **identity `_pt`** (one display frame). Kills the zone HOME-frame path (`assign_all_zone_defenders` + HOME-flipping `_pt`) that produced the mirrored contact_point. Legacy per-mode fallback preserved for the unstamped path.
+- **Stage 2 Step A (man):** `_hco_contest_final_skeleton` stamps `compute_defender_grid` on each step pre-contest (the emit's exact stash isn't available yet — contest runs pre-emit + truncates the skeleton the emit draws → circular; compute_defender_grid is the same code, ~2px RNG, immaterial vs the lane band). `_hco_step_def_xy` MAN branch reads the stamp.
+- **Stage 2 Step B (zone):** hoisted the stamped-read above the man/zone split — when stamped, BOTH modes use the grid with **identity `_pt`** (one display frame). Kills the zone HOME-frame path (`assign_all_zone_defenders` + HOME-flipping `_pt`) that produced the mirrored contact_point. Legacy per-mode fallback preserved for the unstamped path.
 
-**Next concrete steps:**
-1. **(low priority) Consolidate the walk-time contest** — `_hco_contest_skeleton_pass` (called at ~5906/6152 during the walk) runs *before* the pre-coverage stamp, so those picks still use reconstruction (graceful fallback). Coverage (`_hco_contest_final_skeleton`) catches most passes with the real grid. Retire the walk-time hooks / move all contesting to the stamped stage if the mixing shows in numbers or a visual.
-2. **Stage 2 (render adopts):** render itself reads the shared grid (it already computes the same thing via the extract; this is the final "one computation" unification — mostly done, verify no redundant draw remains).
-3. **DB-turnover-after-pass teleport** (same "ball snap-back on non-shot outcome" family — see below) — still live; the pinning fix is separate from the defender-grid work.
+**Next concrete steps (in the formal scheme):**
+1. **Stage 2 residual — (low priority) consolidate the walk-time contest.** `_hco_contest_skeleton_pass` (called at ~5906/6152 during the walk) runs *before* the pre-coverage stamp, so those picks still use reconstruction (graceful fallback). Coverage (`_hco_contest_final_skeleton`) catches most passes with the real grid. Retire the walk-time hooks / move all contesting to the stamped stage if the mixing shows in numbers or a visual.
+2. **Stage 2 residual — verify render adoption.** The render already computes the same grid via the extract, so contest+render share one value today; confirm no redundant/second draw remains. (This is the last bookkeeping bit of Stage 2, NOT a new stage.)
+3. **Stage 1 (walk unification) — still OPEN.** Unify moment + interception + offense onto one `StepState` walk; delete the moment walk + coverage patch. This is what subsumes the **"ball snap-back on a non-shot outcome"** family (see below), incl. the **DB-turnover-after-pass teleport (2026-07-11, still live)** — NOT fixed by the Stage 2 defender-grid work.
+4. **Stage 3 — still OPEN.** Remove the legacy + recalibration bypass paths.
 
 **Hard constraint (still true):** the contest's grid must be a pure resolution-time computation (interception = OUTCOME, identical animated/sim'd). Satisfied: `compute_defender_grid` runs pre-emit for the contest; the emit's exact stash feeds `StepState.defense` for rendered turns.
 
@@ -146,17 +149,17 @@ Result: the emitted skeleton is **fully self-describing**. The animator becomes 
 ---
 
 ## Staged plan (each flag-guarded + parity-gated)
-- **Stage 0** — define `StepState` + the single per-step reconstruction; stamp positions / BH / owner / timing. **No behavior change** — centralize what's already computed. (De-risks everything after it.)
-- **Stage 1** — unify the walks onto `StepState` (moment + interception + offense in one loop); delete moment walk + coverage patch.
-- **Stage 2** — **smaller than first thought.** HCO already renders off the emitter (`skeleton_step_emitter`), which builds coords internally via `skeleton_to_animations` → `get_defender_coords`. The gap: that render-side defender reconstruction is *independent* from the contest's (`_hco_step_def_xy` → `get_defender_coords`) — **same formula, separate computation, confirmed divergence points** (subtle-freeze, orientation flip seams, BH detection). Stage 2 = make the engine **stamp the defender grid** so both the emitter and the contest read one value (emitter-as-god), instead of the animator re-deriving it. Not a renderer rewrite.
-- **Stage 3** — remove the legacy + recalibration bypass paths.
+- **Stage 0** — define `StepState` + the single per-step reconstruction; stamp positions / BH / owner / timing. **No behavior change** — centralize what's already computed. (De-risks everything after it.) *Status: partially done — `StepState.defense` is stamped/consumed; BH / owner / timing not yet centralized.*
+- **Stage 1 — ⬜ OPEN** — unify the walks onto `StepState` (moment + interception + offense in one loop); delete moment walk + coverage patch. *Subsumes the "ball snap-back on a non-shot outcome" family (below), incl. the still-live DB-turnover-after-pass teleport.*
+- **Stage 2 — ✅ COMPLETE (2026-07-11, develop)** — **smaller than first thought.** HCO already renders off the emitter (`skeleton_step_emitter`), which builds coords internally via `skeleton_to_animations` → `get_defender_coords`. The gap: that render-side defender reconstruction was *independent* from the contest's (`_hco_step_def_xy` → `get_defender_coords`) — same formula, separate computation, confirmed divergence (man 22–64%, zone+away 100% mirror). Stage 2 = the engine **stamps the defender grid** so both the emitter and the contest read one value (emitter-as-god), instead of the animator re-deriving it. Not a renderer rewrite. **Shipped** via `compute_defender_grid` extract + Option A (share the emit's one draw) + Step A (man) / Step B (zone) contest routing; live GAP = 0% man+zone. *Residual (low pri): consolidate the walk-time contest; verify no redundant render draw. See RESUME HERE.*
+- **Stage 3 — ⬜ OPEN** — remove the legacy + recalibration bypass paths.
 
 **Parity gate each stage:** moment / shot / foul / interception rates unchanged; `walk-saw == census` (coverage closed).
 
 ---
 
 ## Open decisions (need human ✅/❌)
-1. Renderer collapse (Stage 2) is **in scope** — *agent: yes, it's the correctness fix. Confirmed smaller than feared: HCO already renders off the emitter; Stage 2 = stamp the defender grid so contest + render share one value, not a renderer rewrite.* [ ]
+1. Renderer collapse (Stage 2) is **in scope** — *agent: yes, it's the correctness fix. Confirmed smaller than feared: HCO already renders off the emitter; Stage 2 = stamp the defender grid so contest + render share one value, not a renderer rewrite.* **[✅ DONE 2026-07-11 — shipped, live GAP=0 man+zone]**
 2. **Scripted skeleton stays** (engine overlays, doesn't generate) — *agent: yes.* [ ]
 3. **Kill the legacy + recalibration bypasses** entirely — *agent: yes.* [ ]
 4. **One timing system** (drop the running estimate) — *agent: yes.* [ ]
