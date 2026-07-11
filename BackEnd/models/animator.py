@@ -1461,12 +1461,19 @@ class Animator:
                 _copy.deepcopy(skeleton), off_lineup, def_lineup, add_defenders=True, is_fcp=is_fcp, is_hct=is_hct)
         except Exception:
             return {}
+        return self.defender_grid_from_animations(anims, def_lineup, len((skeleton.get("steps") or [])))
+
+    @staticmethod
+    def defender_grid_from_animations(anims, def_lineup, num_steps):
+        """Extract ``{step_idx: {def_pos: {x, y}}}`` from a per-player ``animations`` list (the
+        movement[i].coords of each defender). Shared by ``compute_defender_grid`` (its own draw) and
+        ``build_step_states`` (the emitter's actual draw, Option A) so both read the grid identically.
+        """
         move_by_pid = {a.get("playerId"): (a.get("movement") or [])
                        for a in (anims or []) if a.get("playerId")}
         pid_by_dpos = {dp: getattr(p, "player_id", None) for dp, p in (def_lineup or {}).items()}
-        steps = skeleton.get("steps") or []
         grid = {}
-        for i in range(len(steps)):
+        for i in range(num_steps):
             row = {}
             for dpos, pid in pid_by_dpos.items():
                 if not pid:

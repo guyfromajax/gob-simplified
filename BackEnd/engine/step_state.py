@@ -3,16 +3,17 @@
 Governing law (see _documentation_master/projects/StepState.md):
     resolve once → freeze into StepState → project to the emitter → draw.
 
-**Stage 1 — the extracted shared primitive.** `StepState.defense` is computed by
-`Animator.compute_defender_grid` — the render's *exact* offense-build + defender-placement code
-(`_build_all_animations`), run WITHOUT the full-sim early-return so it is identical for animated and
-sim'd games (an interception is an OUTCOME; it must not depend on whether a game is drawn). No
-replication → fidelity vs the render is 0 by construction. Both the contest and the render will read
-this one computation.
+**Option A — share the emitter's one draw.** Defender placement uses RNG (a ~2px shade), so two
+*separate* draws never agree. `StepState.defense` therefore comes from the ONE draw that reached the
+screen: the HCO emit stashes its exact per-player `animations` on the game, and this module extracts
+the defender grid from those (`Animator.defender_grid_from_animations`). Contest == render by
+construction — not by faithful re-computation. Sims never stash (no render) → fall back to
+`Animator.compute_defender_grid`'s own single draw (nothing to match; just self-consistent).
 
 Still **additive**: no consumer reads `StepState.defense` yet (zero behavior change). Two
-diagnostics: FIDELITY (canonical vs the actual render — must be ~0) and GAP (canonical vs the OLD
-`_hco_step_def_xy` contest — the divergence Stage 1 closes). Wrapped so it can never break a turn.
+diagnostics: REDRAW-SPREAD (canonical vs a fresh redraw — the RNG disagreement Option A eliminates,
+should be small) and GAP (canonical vs the OLD `_hco_step_def_xy` contest — the divergence Stage 1
+closes). Wrapped so it can never break a turn.
 """
 
 import logging
@@ -39,8 +40,22 @@ def build_step_states(result, game):
     zone = is_zone_defense(game_state.get("defense_playcall"))
     posture = game_state.get("_hco_defense_posture")
 
+    # Option A: prefer the emitter's ACTUAL draw. build_step_states runs right after the HCO emit,
+    # which stashed the exact per-player ``animations`` it drew from on the game. Extract the grid
+    # from THOSE so the contest judges against what reached the screen (defender placement is RNG, so
+    # a separate draw would disagree by ~2px). Sims never stash (no render) → fall back to
+    # compute_defender_grid's own single draw. The stash is transient; clear it after reading.
+    render_anims = getattr(game, "_hco_render_animations", None)
     try:
-        grid_by_step = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        setattr(game, "_hco_render_animations", None)
+    except Exception:
+        pass
+    anim_source = "emitter-draw" if render_anims else "compute_grid-fallback"
+    try:
+        if render_anims:
+            grid_by_step = Animator.defender_grid_from_animations(render_anims, def_lineup, len(steps))
+        else:
+            grid_by_step = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
     except Exception:
         grid_by_step = {}
 
@@ -55,8 +70,8 @@ def build_step_states(result, game):
         step_states.append(step_state)
 
     logging.warning(
-        "🔬 [STEPSTATE] stamped defense grid on %d/%d steps (posture=%s zone=%s) [is_full_sim=%s]",
-        stamped, len(steps), posture, zone, game_state.get("_is_full_simulation"))
+        "🔬 [STEPSTATE] stamped defense grid on %d/%d steps (posture=%s zone=%s src=%s) [is_full_sim=%s]",
+        stamped, len(steps), posture, zone, anim_source, game_state.get("_is_full_simulation"))
 
     if not game_state.get("_is_full_simulation"):
         matchups = {}
@@ -145,7 +160,11 @@ def _diagnose(step_states, steps, game, off_lineup, def_lineup, matchups, zone, 
 
     canonical = {i: (ss.get("defense") or {}) for i, ss in enumerate(step_states)}
 
-    # (1) fidelity vs render
+    # (1) REDRAW-SPREAD — Option A makes ``canonical`` the emitter's ACTUAL draw, so it equals the
+    # render by construction. This compares it against a FRESH redraw of the same code: because
+    # defender placement is RNG (a ~2px shade), any nonzero here is exactly the disagreement Option A
+    # eliminates by sharing one draw. It should be SMALL (RNG jitter), and it's the reason the contest
+    # must NOT recompute. (Not a fidelity defect.)
     try:
         render_def, _off = _render_grids({"steps": steps}, game, off_lineup, def_lineup)
     except Exception:
@@ -153,10 +172,11 @@ def _diagnose(step_states, steps, game, off_lineup, def_lineup, matchups, zone, 
     if render_def:
         dv, sm, mx, w, _bk = _grid_diff(canonical, render_def, step_states, steps)
         if sm:
-            _w = f" | worst step {w[0]} {w[1]}({w[2]}) canonical={w[3]} render={w[4]}" if w else ""
+            _w = f" | worst step {w[0]} {w[1]}({w[2]}) canonical={w[3]} redraw={w[4]}" if w else ""
             logging.warning(
-                "🔬 [STEPSTATE FIDELITY] canonical-vs-render: %d/%d divergent (%.0f%%) max=%.1f zone=%s%s "
-                "[is_full_sim=%s]", dv, sm, 100.0 * dv / sm, mx, zone, _w,
+                "🔬 [STEPSTATE REDRAW-SPREAD] canonical-vs-fresh-redraw (RNG, eliminated by Option A): "
+                "%d/%d divergent (%.0f%%) max=%.1f zone=%s%s [is_full_sim=%s]",
+                dv, sm, 100.0 * dv / sm, mx, zone, _w,
                 game.game_state.get("_is_full_simulation"))
 
     # (2) gap vs old contest reconstruction

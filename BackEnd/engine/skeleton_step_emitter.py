@@ -1044,6 +1044,20 @@ def build_skeleton_animation_steps(
     if not skeleton_steps or not animations:
         return None
 
+    # [StepState / Option A] Stash the exact per-player ``animations`` this emit
+    # drew from, on the game (transient — NOT written to the payload; HCO drops
+    # animations[] deliberately). ``build_step_states`` runs immediately after
+    # this emit and extracts StepState.defense from THESE objects, so the
+    # interception contest judges against the one draw that reached the screen.
+    # Defender placement uses RNG (a ~2px shade), so a *separate* draw would not
+    # match; sharing this one draw makes contest == render by construction.
+    # Sims never reach here (animations == [] above) → StepState falls back to
+    # compute_defender_grid's own single draw (no render to match).
+    try:
+        setattr(game, "_hco_render_animations", animations)
+    except Exception:
+        pass
+
     # Walk one step per skeleton step. Phase 3 of HCO UESS migration: step T
     # is computed from the gate player's natural travel time inside the loop
     # below, not from the legacy ``step_clock_seconds`` timing contract.
