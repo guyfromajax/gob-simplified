@@ -85,18 +85,36 @@ def build_step_states(result, game):
     # known zone/away frame flip. Pure observability; wrapped so it can never break a turn.
     if not game_state.get("_is_full_simulation"):
         try:
-            _stepstate_defense_parity(step_states, result, game, zone)
+            _stepstate_defense_parity(step_states, result, game, zone, off_to_def)
         except Exception:
             pass
     return step_states
 
 
-def _stepstate_defense_parity(step_states, result, game, zone):
+def _step_kind(step):
+    """Bucket a skeleton step for divergence attribution."""
+    if (step or {}).get("_subtle_movement"):
+        return "subtle"
+    if (step or {}).get("_attack_drive"):
+        return "drive"
+    pa = (step or {}).get("pos_actions") or {}
+    if any(((a or {}).get("action") or "").lower() in ("pass", "receive") for a in pa.values()):
+        return "pass"
+    return "plain"
+
+
+def _stepstate_defense_parity(step_states, result, game, zone, off_to_def):
     """Diff the engine defender grid (``StepState.defense`` via ``_hco_step_def_xy``) against the
     RENDER grid (``skeleton_to_animations`` → the coords the emitter serializes), per step + per
     defender. Defenders get a coord every step, so ``movement[i]`` aligns with skeleton step ``i``.
-    Logs divergences beyond EPS. Zone/away turns are expected to diverge by the HOME-vs-display
-    frame flip (StepState.md §canonical-frame) — that's the signal, not noise."""
+
+    ATTRIBUTION (to separate real posture-drift from probe-timing / upstream offense-coord drift):
+    each divergent sample is bucketed by step kind (subtle / drive / pass / plain), and we check
+    whether the defender's GUARDED offense player *also* diverged between contest and render — if so
+    the gap is upstream (offense moved differently), not in defender placement itself.
+
+    Zone/away turns diverge by the HOME-vs-display frame flip (StepState.md §canonical-frame) — that's
+    signal, not noise."""
     from BackEnd.models.animator import Animator
 
     skeleton = (result or {}).get("skeleton") or {}
@@ -105,6 +123,7 @@ def _stepstate_defense_parity(step_states, result, game, zone):
         return
     off_lineup = game.offense_team.lineup
     def_lineup = game.defense_team.lineup
+    def_to_off = {d: o for o, d in (off_to_def or {}).items()}
     anims = Animator(game).skeleton_to_animations(
         skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False)
     move_by_pid = {
@@ -112,34 +131,48 @@ def _stepstate_defense_parity(step_states, result, game, zone):
         for a in (anims or []) if a.get("playerId")
     }
 
+    def _render_coord(pid, i):
+        mv = move_by_pid.get(pid) or []
+        return (mv[i] or {}).get("coords") if i < len(mv) else None
+
+    def _delta(a, b):
+        return ((float(a["x"]) - float(b["x"])) ** 2 + (float(a["y"]) - float(b["y"])) ** 2) ** 0.5
+
     EPS = 1.5  # grid units
-    samples = divergent = 0
+    samples = divergent = off_also = 0
     max_delta = 0.0
     worst = None
+    by_kind = {"subtle": 0, "drive": 0, "pass": 0, "plain": 0}
     for i, ss in enumerate(step_states):
+        step = steps[i] if i < len(steps) else {}
+        kind = _step_kind(step)
         for dpos, eng in (ss.get("defense") or {}).items():
             pid = getattr(def_lineup.get(dpos), "player_id", None)
-            if not pid:
-                continue
-            mv = move_by_pid.get(pid) or []
-            if i >= len(mv):
-                continue
-            rnd = (mv[i] or {}).get("coords")
+            rnd = _render_coord(pid, i) if pid else None
             if not isinstance(rnd, dict) or "x" not in rnd:
                 continue
             samples += 1
-            d = ((float(eng["x"]) - float(rnd["x"])) ** 2
-                 + (float(eng["y"]) - float(rnd["y"])) ** 2) ** 0.5
-            if d > EPS:
-                divergent += 1
-                if d > max_delta:
-                    max_delta, worst = d, (i, dpos, eng, rnd)
+            d = _delta(eng, rnd)
+            if d <= EPS:
+                continue
+            divergent += 1
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+            # did the guarded offense player also diverge (contest skeleton coord vs render coord)?
+            off_pos = def_to_off.get(dpos, dpos)
+            off_pid = getattr(off_lineup.get(off_pos), "player_id", None)
+            sk_off = ((step.get("pos_actions") or {}).get(off_pos) or {}).get("coords")
+            rnd_off = _render_coord(off_pid, i) if off_pid else None
+            if isinstance(sk_off, dict) and isinstance(rnd_off, dict) and _delta(sk_off, rnd_off) > EPS:
+                off_also += 1
+            if d > max_delta:
+                max_delta, worst = d, (i, dpos, kind, eng, rnd)
     if not samples:
         return
-    _w = (f" | worst: step {worst[0]} {worst[1]} eng={worst[2]} rnd={worst[3]}"
+    _w = (f" | worst: step {worst[0]} {worst[1]}({worst[2]}) eng={worst[3]} rnd={worst[4]}"
           if worst else "")
+    _bk = " ".join(f"{k}={v}" for k, v in by_kind.items() if v)
     logging.warning(
-        "🔬 [STEPSTATE PARITY] defense: %d/%d samples divergent (%.0f%%) max_delta=%.1f zone=%s%s "
-        "[is_full_sim=%s]",
-        divergent, samples, 100.0 * divergent / samples, max_delta, zone, _w,
-        game.game_state.get("_is_full_simulation"))
+        "🔬 [STEPSTATE PARITY] defense: %d/%d divergent (%.0f%%) max_delta=%.1f zone=%s | "
+        "by-kind: %s | off-coord-also-diverged: %d/%d%s [is_full_sim=%s]",
+        divergent, samples, 100.0 * divergent / samples, max_delta, zone, _bk or "-",
+        off_also, divergent, _w, game.game_state.get("_is_full_simulation"))
