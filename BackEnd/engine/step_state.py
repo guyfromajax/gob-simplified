@@ -1,34 +1,56 @@
-"""StepState (Stage 0) — Dynamic HCO turn engine, per-step state producer.
+"""StepState — Dynamic HCO turn engine, per-step state producer.
 
 Governing law (see _documentation_master/projects/StepState.md):
     resolve once → freeze into StepState → project to the emitter → draw.
 
-Stage 0 is **additive only**: it computes the per-step ``StepState`` and stamps it on the resolved
-skeleton steps as ``step["_step_state"]``, but **no consumer reads it yet** (zero behavior change).
-It currently populates the DEFENDER GRID (``defense``) — the highest divergence-risk field, since
-today the contest (``_hco_step_def_xy``) and the render (``skeleton_to_animations`` →
-``get_defender_coords``) reconstruct defender positions *independently* and can disagree.
+**Stage 1 (extract, not replicate):** `StepState.defense` is the **rendered** defender grid — the
+exact coords `skeleton_to_animations` produces and the emitter serializes (ground truth = what the
+player sees). We *extract* that value rather than reconstructing it, so there is no lookalike to
+drift from it. The contest will be routed to read this (replacing `_hco_step_def_xy`), making
+contest == render by construction.
 
-Later Stage 0 increments extend the shape (ball trajectory, timing, advance-gate) and add the
-contest-vs-render parity diff; Stage 1/2 rewire consumers to READ this instead of re-deriving.
-Must never mutate a game outcome — the caller wraps it defensively.
+Still **additive** here: no consumer reads `StepState.defense` yet (zero behavior change). A
+diagnostic logs the OLD contest reconstruction (`_hco_step_def_xy`) vs this canonical grid — the
+per-step, per-defender gap that routing the contest to StepState will close. Wrapped so it can never
+break a turn.
 """
 
 import logging
 
 
-def build_step_states(result, game):
-    """Compute + stamp per-step ``StepState`` for a resolved HCO turn.
+def _render_defender_grid(skeleton, game, off_lineup, def_lineup):
+    """Extract the RENDERED per-step defender grid (the coords the emitter serializes). Returns
+    ``{step_index: {def_pos: {x, y}}}``. Defenders get a coord every step, so ``movement[i]`` aligns
+    with skeleton step ``i``. This is the canonical grid — the render is ground truth."""
+    from BackEnd.models.animator import Animator
 
-    Returns the list of StepState dicts (also stamped on each skeleton step as ``_step_state``).
-    Stage 0: ``defense`` grid only, computed ONCE via the engine-side reconstruction
-    (``_hco_step_def_xy``). Additive — no behavior change.
-    """
-    from BackEnd.engine.phase_resolution import (
-        _dynamic_hco_defense_enabled,
-        _hco_step_def_xy,
-        _motion_bh_at_step,
-    )
+    anims = Animator(game).skeleton_to_animations(
+        skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False)
+    move_by_pid = {
+        a.get("playerId"): (a.get("movement") or [])
+        for a in (anims or []) if a.get("playerId")
+    }
+    pid_by_dpos = {dp: getattr(p, "player_id", None) for dp, p in def_lineup.items()}
+
+    steps = (skeleton or {}).get("steps") or []
+    grid = {}
+    for i in range(len(steps)):
+        row = {}
+        for dpos, pid in pid_by_dpos.items():
+            if not pid:
+                continue
+            mv = move_by_pid.get(pid) or []
+            c = (mv[i] or {}).get("coords") if i < len(mv) else None
+            if isinstance(c, dict) and "x" in c and "y" in c:
+                row[dpos] = {"x": float(c["x"]), "y": float(c["y"])}
+        grid[i] = row
+    return grid
+
+
+def build_step_states(result, game):
+    """Compute + stamp per-step ``StepState`` for a resolved HCO turn. Stage 1: ``defense`` = the
+    rendered defender grid (canonical). Additive — no behavior change."""
+    from BackEnd.engine.phase_resolution import _dynamic_hco_defense_enabled
     from BackEnd.utils.defense_utils import is_zone_defense
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
@@ -44,34 +66,25 @@ def build_step_states(result, game):
     def_team = game.defense_team
     off_lineup = off_team.lineup
     def_lineup = def_team.lineup
-    is_away_offense = off_team.team_id == game.away_team.team_id
     zone = is_zone_defense(game_state.get("defense_playcall"))
-    def_aggr = (getattr(def_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
     posture = game_state.get("_hco_defense_posture")
-    defense_playcall = game_state.get("defense_playcall")
     off_to_def = {}
     if not zone:
         matchups = get_matchups_for_defending_team(
             game_state, getattr(def_team, "is_user_team", False))
         off_to_def = {o: d for d, o in matchups.items()}
 
+    try:
+        render_grid = _render_defender_grid(skeleton, game, off_lineup, def_lineup)
+    except Exception:
+        render_grid = {}
+
     step_states = []
     stamped = 0
     for i, step in enumerate(steps):
-        try:
-            bh_pos, _bh_loc = _motion_bh_at_step(step)
-            def_xy, _coord, _loc, _pt = _hco_step_def_xy(
-                step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
-                def_aggr, zone, defense_playcall, posture=posture)
-            defense = {
-                dpos: {"x": float(xy["x"]), "y": float(xy["y"])}
-                for dpos, xy in (def_xy or {}).items()
-                if isinstance(xy, dict) and "x" in xy and "y" in xy
-            }
-            if defense:
-                stamped += 1
-        except Exception:
-            defense = {}
+        defense = render_grid.get(i) or {}
+        if defense:
+            stamped += 1
         step_state = {"index": i, "defense": defense}
         step["_step_state"] = step_state
         step_states.append(step_state)
@@ -80,19 +93,20 @@ def build_step_states(result, game):
         "🔬 [STEPSTATE] stamped defense grid on %d/%d steps (posture=%s zone=%s) [is_full_sim=%s]",
         stamped, len(steps), posture, zone, game_state.get("_is_full_simulation"))
 
-    # Parity diff vs the render grid — live game only (skeleton_to_animations is heavy; skip
-    # background sims). Measures the contest-vs-render defender-position disagreement, incl. the
-    # known zone/away frame flip. Pure observability; wrapped so it can never break a turn.
+    # Diagnostic — OLD contest reconstruction (`_hco_step_def_xy`) vs the canonical (render) grid:
+    # the per-step gap that routing the contest to StepState will close. Live game only (the contest
+    # reconstruction is cheap, but keep noise down). Wrapped.
     if not game_state.get("_is_full_simulation"):
         try:
-            _stepstate_defense_parity(step_states, result, game, zone, off_to_def)
+            _diagnose_contest_gap(step_states, steps, game, off_lineup, def_lineup,
+                                  off_to_def, zone, posture)
         except Exception:
             pass
     return step_states
 
 
 def _step_kind(step):
-    """Bucket a skeleton step for divergence attribution."""
+    """Bucket a skeleton step for gap attribution."""
     if (step or {}).get("_subtle_movement"):
         return "subtle"
     if (step or {}).get("_attack_drive"):
@@ -103,76 +117,54 @@ def _step_kind(step):
     return "plain"
 
 
-def _stepstate_defense_parity(step_states, result, game, zone, off_to_def):
-    """Diff the engine defender grid (``StepState.defense`` via ``_hco_step_def_xy``) against the
-    RENDER grid (``skeleton_to_animations`` → the coords the emitter serializes), per step + per
-    defender. Defenders get a coord every step, so ``movement[i]`` aligns with skeleton step ``i``.
+def _diagnose_contest_gap(step_states, steps, game, off_lineup, def_lineup, off_to_def, zone, posture):
+    """Diff the OLD contest reconstruction (`_hco_step_def_xy`) against the canonical StepState.defense
+    (the rendered grid), per step + per defender — the gap Stage 1 closes. Bucketed by step kind.
+    Pure observability."""
+    from BackEnd.engine.phase_resolution import _hco_step_def_xy, _motion_bh_at_step
 
-    ATTRIBUTION (to separate real posture-drift from probe-timing / upstream offense-coord drift):
-    each divergent sample is bucketed by step kind (subtle / drive / pass / plain), and we check
-    whether the defender's GUARDED offense player *also* diverged between contest and render — if so
-    the gap is upstream (offense moved differently), not in defender placement itself.
-
-    Zone/away turns diverge by the HOME-vs-display frame flip (StepState.md §canonical-frame) — that's
-    signal, not noise."""
-    from BackEnd.models.animator import Animator
-
-    skeleton = (result or {}).get("skeleton") or {}
-    steps = skeleton.get("steps") or []
-    if not steps or not step_states:
-        return
-    off_lineup = game.offense_team.lineup
-    def_lineup = game.defense_team.lineup
-    def_to_off = {d: o for o, d in (off_to_def or {}).items()}
-    anims = Animator(game).skeleton_to_animations(
-        skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False)
-    move_by_pid = {
-        a.get("playerId"): (a.get("movement") or [])
-        for a in (anims or []) if a.get("playerId")
-    }
-
-    def _render_coord(pid, i):
-        mv = move_by_pid.get(pid) or []
-        return (mv[i] or {}).get("coords") if i < len(mv) else None
-
-    def _delta(a, b):
-        return ((float(a["x"]) - float(b["x"])) ** 2 + (float(a["y"]) - float(b["y"])) ** 2) ** 0.5
-
+    game_state = game.game_state
+    is_away_offense = game.offense_team.team_id == game.away_team.team_id
+    def_aggr = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
+    defense_playcall = game_state.get("defense_playcall")
     EPS = 1.5  # grid units
-    samples = divergent = off_also = 0
+
+    samples = divergent = 0
     max_delta = 0.0
     worst = None
     by_kind = {"subtle": 0, "drive": 0, "pass": 0, "plain": 0}
     for i, ss in enumerate(step_states):
-        step = steps[i] if i < len(steps) else {}
+        canonical = ss.get("defense") or {}
+        if not canonical:
+            continue
+        step = steps[i]
         kind = _step_kind(step)
-        for dpos, eng in (ss.get("defense") or {}).items():
-            pid = getattr(def_lineup.get(dpos), "player_id", None)
-            rnd = _render_coord(pid, i) if pid else None
-            if not isinstance(rnd, dict) or "x" not in rnd:
+        try:
+            bh_pos, _ = _motion_bh_at_step(step)
+            def_xy, _c, _l, _pt = _hco_step_def_xy(
+                step, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
+                def_aggr, zone, defense_playcall, posture=posture)
+        except Exception:
+            continue
+        for dpos, can in canonical.items():
+            cont = (def_xy or {}).get(dpos)
+            if not isinstance(cont, dict) or "x" not in cont:
                 continue
             samples += 1
-            d = _delta(eng, rnd)
-            if d <= EPS:
-                continue
-            divergent += 1
-            by_kind[kind] = by_kind.get(kind, 0) + 1
-            # did the guarded offense player also diverge (contest skeleton coord vs render coord)?
-            off_pos = def_to_off.get(dpos, dpos)
-            off_pid = getattr(off_lineup.get(off_pos), "player_id", None)
-            sk_off = ((step.get("pos_actions") or {}).get(off_pos) or {}).get("coords")
-            rnd_off = _render_coord(off_pid, i) if off_pid else None
-            if isinstance(sk_off, dict) and isinstance(rnd_off, dict) and _delta(sk_off, rnd_off) > EPS:
-                off_also += 1
-            if d > max_delta:
-                max_delta, worst = d, (i, dpos, kind, eng, rnd)
+            d = ((float(cont["x"]) - float(can["x"])) ** 2
+                 + (float(cont["y"]) - float(can["y"])) ** 2) ** 0.5
+            if d > EPS:
+                divergent += 1
+                by_kind[kind] = by_kind.get(kind, 0) + 1
+                if d > max_delta:
+                    max_delta, worst = d, (i, dpos, kind, cont, can)
     if not samples:
         return
-    _w = (f" | worst: step {worst[0]} {worst[1]}({worst[2]}) eng={worst[3]} rnd={worst[4]}"
+    _w = (f" | worst: step {worst[0]} {worst[1]}({worst[2]}) contest={worst[3]} canonical={worst[4]}"
           if worst else "")
     _bk = " ".join(f"{k}={v}" for k, v in by_kind.items() if v)
     logging.warning(
-        "🔬 [STEPSTATE PARITY] defense: %d/%d divergent (%.0f%%) max_delta=%.1f zone=%s | "
-        "by-kind: %s | off-coord-also-diverged: %d/%d%s [is_full_sim=%s]",
-        divergent, samples, 100.0 * divergent / samples, max_delta, zone, _bk or "-",
-        off_also, divergent, _w, game.game_state.get("_is_full_simulation"))
+        "🔬 [STEPSTATE GAP] contest-vs-canonical: %d/%d divergent (%.0f%%) max_delta=%.1f zone=%s | "
+        "by-kind: %s%s [is_full_sim=%s]",
+        divergent, samples, 100.0 * divergent / samples, max_delta, zone, _bk or "-", _w,
+        game_state.get("_is_full_simulation"))
