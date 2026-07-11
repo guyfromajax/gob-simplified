@@ -43,7 +43,15 @@ import hashlib
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from player_ethnicity import assign_ethnicity   # noqa: E402
+from player_ethnicity import assign_ethnicity, SKIN_PROMPT   # noqa: E402
+
+# Manual per-player attribute overrides from QC (keyed by UUID). Persists across
+# classifier re-runs. Currently supports race/skin; re-derives skin_prompt,
+# hair, and face automatically. Add an entry, re-run the classifier, re-roll.
+MANUAL_OVERRIDES = {
+    # Ernest Jefferson (Templeton-Wesley): make him Black
+    "78487beb-c30e-47bc-ab8a-7efb65019faf": {"race": "black", "skin": "black-normal"},
+}
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPORT = os.path.join(HERE, "players_export.json")
@@ -464,6 +472,14 @@ def classify(p):
     archetype = frame if frame == "Doughy" else f"{frame}-{defi or 'Toned'}"
     # Race / skin tone (name-override + weighted random; names drive the mix).
     eth = assign_ethnicity(p.get("first_name"), p.get("last_name"), p.get("_id"))
+    ov = MANUAL_OVERRIDES.get(p.get("_id"))
+    if ov:
+        eth = dict(eth)
+        eth["race"] = ov.get("race", eth["race"])
+        if "skin" in ov:
+            eth["skin"] = ov["skin"]
+            eth["skin_prompt"] = SKIN_PROMPT.get(ov["skin"], eth["skin_prompt"])
+        eth["ethnicity_label"] = f"{eth['race']}/{eth['skin'].split('-')[-1]}"
     prim, sec = team_colors(p.get("team"))
     hair = pick_hair(p.get("_id"), eth["race"], eth["skin"])
     # very rare (0.1%): hair dyed the team's primary color (e.g. Antoine Ellington)
