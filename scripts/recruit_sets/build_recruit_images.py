@@ -95,6 +95,8 @@ def main():
     ap.add_argument("--set", required=True, help="path to a set_<id>.json (its .manifest.json sits beside it)")
     ap.add_argument("--limit", type=int, help="only build the first N (cheap proof run)")
     ap.add_argument("--force", action="store_true", help="rebuild even if the white master exists")
+    ap.add_argument("--model", default=gen.MODEL,
+                    help="NB image model (try gemini-3.1-flash-image to test if it skips the sparkle)")
     ap.add_argument("--strip-watermark", action="store_true",
                     help="erase the Gemini corner sparkle (off by default)")
     ap.add_argument("--wm-cx", type=float, default=0.94, help="sparkle center x (frac of W)")
@@ -151,7 +153,7 @@ def main():
 
         try:
             # 1. generate raw white-tank bust
-            resp = client.models.generate_content(model=gen.MODEL, contents=[prompt, ref_body(frame)])
+            resp = client.models.generate_content(model=args.model, contents=[prompt, ref_body(frame)])
             raw = None
             for part in resp.candidates[0].content.parts:
                 if getattr(part, "inline_data", None) and part.inline_data.data:
