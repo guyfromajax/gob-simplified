@@ -4615,7 +4615,7 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
     if forced_shot_step_index is None and _dynamic_hco_motion_enabled():
         logging.warning("🟢 [DYNAMIC MOTION] flag ON — running dynamic resolver for this Motion shot")
         try:
-            dynamic_result = _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
+            dynamic_result = _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False)
             if dynamic_result is not None:
                 return dynamic_result
             logging.info("ℹ️ [DYNAMIC MOTION] Resolver returned None; using legacy random selection")
@@ -5861,19 +5861,21 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     return None
 
 
-def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
-    """
-    Brief Steps 1–2: build the read map, then walk the skeleton making per-step decisions.
+def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False):
+    """Dynamic HCO per-step offense resolver — ONE implementation for Motion AND Set Play (unified
+    2026-07-11; the two were ~255-line near-duplicates differing in a single behavioral fork).
 
-    Accumulate-while-walking: we build an output step stream = the original skeleton steps
-    woven with any inserted subtle-movement beats. "Our place in the skeleton" is the index
-    i; the original skeleton is never mutated. A shot decision (SHOOT / KICKOUT_SHOOT /
-    HOT_READ_SHOOT) terminates and appends its shot steps to the accumulated stream; non-shot
-    decisions advance to the next skeleton step (a SUBTLE_MOVEMENT inserts a beat first, after
-    which the next step pulls players back to their defined spots). If no shot fires by the end,
-    force one at the last step. Returns the same result contract as resolve_motion_offense_shot,
-    or None to defer to the legacy path.
-    """
+    Walk the skeleton making per-step decisions: build the read map, then at each step run the
+    universal ``should_shoot`` (shoot / hot-read dish), SM-precedence (defer the shot to work the
+    ball), and the movement matrix (subtle / disruption / freelance). A shot decision terminates and
+    appends its shot steps; non-shot decisions advance to the next skeleton step. If no shot fires by
+    the end, force one at the last step. Same result contract as ``resolve_motion_offense_shot``, or
+    ``None`` to defer to the legacy path.
+
+    ``is_setplay`` gates the ONE behavioral difference: after a forced subtle where the BH then
+    doesn't shoot/dish, a set play runs ``_setplay_recovery_roll`` (WON → resume the skeleton; LOST →
+    forced ``_resolve_freelance``), modeling a broken-down set. Motion always resumes. Log labels use
+    ``_kind`` accordingly."""
     import random
     from BackEnd.engine.motion_read_map import build_motion_read_map
     from BackEnd.engine.motion_step_decision import (
@@ -5888,6 +5890,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     game_state = game.game_state
     off_team = game.offense_team
     is_away_offense = off_team.team_id == game.away_team.team_id
+    _kind = "SETPLAY" if is_setplay else "MOTION"  # log labels only
     steps = skeleton.get("steps", [])
     if len(steps) < 2:
         return None
@@ -5931,7 +5934,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     offense_reads = random.randint(0, 4) <= alterations
     defense_pressure = random.randint(0, 4) <= aggression
     logging.warning(
-        f"🎲 [DYNAMIC MOTION] turn gate: offense_reads={offense_reads} "
+        f"🎲 [DYNAMIC {_kind}] turn gate: offense_reads={offense_reads} "
         f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
     )
 
@@ -6003,7 +6006,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                                  blocked_dish_targets=blocked_dish)
             if shoot:
                 logging.warning(
-                    f"🎯 [DYNAMIC MOTION] step {i}: SHOOT {shoot['shooter_pos']} "
+                    f"🎯 [DYNAMIC {_kind}] step {i}: SHOOT {shoot['shooter_pos']} "
                     f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
                 )
                 _dec = {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]}
@@ -6017,7 +6020,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
         # the matrix runs only when the offense alters and/or the defense pressures;
         # neither engaged → static skeleton: just progress to the next step.
         if sm_precede:
-            logging.warning(f"🟡 [DYNAMIC MOTION] step {i}: SM-precedence → subtle movement")
+            logging.warning(f"🟡 [DYNAMIC {_kind}] step {i}: SM-precedence → subtle movement")
             decision = {"action": SUBTLE_MOVEMENT}
         elif not offense_reads and not defense_pressure:
             continue
@@ -6026,7 +6029,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
             decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
                                           offense_reads=offense_reads, defense_pressure=defense_pressure)
         action = decision.get("action")
-        logging.warning(f"🔹 [DYNAMIC MOTION] step {i} ({bh_pos}@{bh_location}): {action}")
+        logging.warning(f"🔹 [DYNAMIC {_kind}] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
             return _apply_dish_contest(decision, _execute_motion_decision(
                 skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
@@ -6056,7 +6059,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                 shot_type = "inside" if _is_inside_location(bh_location) else "outside"
                 forced = {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": shot_type}
                 logging.warning(
-                    f"⏱️ [SUBTLE FORCED SHOT] shot clock expiring → {bh_pos} forced {shot_type} "
+                    f"⏱️ [{_kind} SUBTLE FORCED SHOT] shot clock expiring → {bh_pos} forced {shot_type} "
                     f"shot (-{SUBTLE_FORCED_SHOT_PENALTY})"
                 )
                 return _execute_motion_decision(
@@ -6081,7 +6084,7 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                                       blocked_dish_targets=blocked_dish)
             if post_shoot:
                 logging.warning(
-                    f"🎯 [DYNAMIC MOTION] post-subtle SHOOT {post_shoot['shooter_pos']} "
+                    f"🎯 [DYNAMIC {_kind}] post-subtle SHOOT {post_shoot['shooter_pos']} "
                     f"{post_shoot['shot_type']} (froze={froze})"
                 )
                 _pdec = {"action": SHOOT, "shooter_pos": post_shoot["shooter_pos"], "shot_type": post_shoot["shot_type"]}
@@ -6089,6 +6092,19 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
                     skeleton, output_steps, steps[i], bh_pos, bh_location, _pdec,
                     game, off_lineup, def_lineup, is_away_offense,
                 ), steps[i], bh_pos)
+            if is_setplay:
+                # SET PLAY ONLY (the sole motion/setplay behavioral fork): held instead of
+                # shooting/dishing after a forced subtle → recover into the play or get forced into
+                # freelance (Z-Completed/Dynamic_HCO_SP_Brief: chemistry+efficiency × d6, each team).
+                # Motion always resumes the skeleton (falls through to the next step).
+                if _setplay_recovery_roll(game):
+                    logging.warning(f"↩️ [DYNAMIC {_kind}] recovery WON → re-enter skeleton at step {i + 1}")
+                    continue  # next iteration appends the next defined step (players pop back to spots)
+                logging.warning(f"🌀 [DYNAMIC {_kind}] recovery LOST → forced freelance")
+                return _resolve_freelance(
+                    skeleton, output_steps, steps[i], bh_pos,
+                    game, off_lineup, def_lineup, is_away_offense, random,
+                )
         elif action == FREELANCE_FORCED:
             # Leave the skeleton and run the freelance progression to a shot.
             return _resolve_freelance(
@@ -6110,261 +6126,15 @@ def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
     )
 
 
+# Backward-compatible named entry points → the unified resolver. The two play types were unified
+# 2026-07-11 (they differed only in the set-play recovery roll); these thin delegates keep the
+# named API stable for callers/tests. ONE implementation lives in _resolve_hco_offense_shot_dynamic.
+def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
+    return _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False)
+
+
 def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
-    """
-    Dynamic HCO **Set Play** per-step resolver (Z-Completed/Dynamic_HCO_SP_Brief, Stage B). OVERLAY model:
-    the up-front variant roll already chose this skeleton; here we walk it making per-step
-    decisions, reusing motion's inner machinery. The per-step BH logic is now **identical to
-    ``_resolve_motion_offense_shot_dynamic``** — same alterations/aggression turn-gate rolls,
-    same SM-precedence, same universal ``should_shoot`` every step — so a set play no longer
-    executes perfectly crisp every time: when the offense's alterations roll clears, the BH can
-    work the ball / subtle-move (or, in an SM-precedence tier, defer the shot), modeling imperfect
-    execution. High-alterations teams still run cleanly; low-alterations teams break down more.
-
-    One set-play-specific addition over motion: after a forced subtle (defense-disrupted or
-    SM-precedence) with no post-subtle shot/dish, the BH runs ``_setplay_recovery_roll(game)``:
-    True → re-enter the skeleton at the next defined step (resume the play); False → forced
-    freelance (``_resolve_freelance``).
-
-    Returns the same result contract as ``resolve_motion_offense_shot``, or ``None`` to defer to
-    the standard set-play shot path.
-    """
-    import random
-    from BackEnd.engine.motion_read_map import build_motion_read_map
-    from BackEnd.engine.motion_step_decision import (
-        decide_step_action, should_shoot, _choose_attack_or_outside, _step_locations,
-        SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT, SUBTLE_MOVEMENT, FREELANCE_FORCED,
-        SUBTLE_STEP_ELAPSED_BY_TEMPO, SUBTLE_FORCED_SHOT_PENALTY, sm_takes_precedence,
-    )
-    from BackEnd.engine.motion_subtle import build_subtle_beat
-    from BackEnd.utils.defense_utils import is_zone_defense
-    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
-
-    game_state = game.game_state
-    off_team = game.offense_team
-    is_away_offense = off_team.team_id == game.away_team.team_id
-    steps = skeleton.get("steps", [])
-    if len(steps) < 2:
-        return None
-
-    # Option B: stamp the render's defender grid BEFORE the walk so the walk-time interception contest
-    # (`_hco_contest_skeleton_pass` below) reads the SAME grid the coverage pass does — no reconstruction
-    # seam. Coverage re-stamps the final skeleton afterward (idempotent).
-    _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup)
-
-    read_map = build_motion_read_map(game, off_lineup, def_lineup)
-
-    # Ball-handler defender: man → matchup defender; zone → None (no 1:1 assignment). Same as motion.
-    zone = is_zone_defense(game_state.get("defense_playcall"))
-    off_to_def = {}
-    if not zone:
-        defending_is_user = getattr(game.defense_team, "is_user_team", False)
-        matchups = get_matchups_for_defending_team(game_state, defending_is_user)
-        off_to_def = {off_pos: def_pos for def_pos, off_pos in matchups.items()}
-
-    shot_actions = {SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT}
-
-    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
-    def_team = game.defense_team
-    def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
-    tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
-    shot_clock_est = float(game_state.get("shot_clock_remaining", 30) or 30)
-    _hco_lane_dist = _hco_pass_lane_dist(game)
-    _def_aggr_call = (getattr(def_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
-
-    # Turn-level gate — SAME rolls as motion now: the offense reads (works the ball / subtle-moves
-    # to keep the play alive) when its alterations roll clears, and the defense pressures when its
-    # aggression roll clears. Set plays no longer execute perfectly crisp every time — a high-
-    # alterations team still runs cleanly, a low-alterations team breaks down more. The universal
-    # shoot decision (should_shoot) still runs every step (unless SM-precedence defers it).
-    alterations = (getattr(off_team, "strategy_settings", {}) or {}).get("alterations", 2)
-    aggression = (getattr(def_team, "strategy_settings", {}) or {}).get("aggression", 2)
-    offense_reads = random.randint(0, 4) <= alterations
-    defense_pressure = random.randint(0, 4) <= aggression
-    logging.warning(
-        f"🎲 [DYNAMIC SETPLAY] turn gate: offense_reads={offense_reads} "
-        f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
-    )
-
-    def _apply_dish_contest(decision, result, step, passer_pos):
-        """§4 Stage 2: if the executed decision threw a pass, contest it; flag intercepts so the
-        caller converts them to a STEAL. Self-shots (shooter == passer) are a no-op. (Verbatim
-        from the motion resolver.)"""
-        if not isinstance(result, dict):
-            return result
-        recv = decision.get("shooter_pos")
-        if not recv or recv == passer_pos:
-            return result
-        _ptype = "hot_read" if decision.get("hot_read") else "dish"
-        contest = _hco_resolve_dish_contest(
-            step, passer_pos, recv, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state.get("defense_playcall"), off_team, random,
-            posture=game_state.get("_hco_defense_posture"), game_state=game_state, pass_type=_ptype)
-        if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
-            result["pass_intercepted"] = True
-            result["interceptor_pos"] = contest.get("deflector")
-            result["pass_bat_oob"] = contest["outcome"] == "BAT_OOB"
-            result["pass_contact_point"] = contest.get("contact_point")
-            logging.warning(
-                f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
-                f"by {contest.get('deflector')}")
-        # Tag the appended dish pass step so the final-skeleton coverage pass skips it.
-        for _st in reversed((result.get("skeleton") or {}).get("steps") or []):
-            if (((_st.get("pos_actions") or {}).get(passer_pos) or {}).get("action") or "").lower() == "pass":
-                _st["_hco_contested"] = True
-                break
-        return result
-
-    _skel_pass_type = "setplay" if (game_state.get("offense_play_type") or "") == "set_play" else "motion"
-    output_steps = [steps[0]]  # always start at the skeleton's step 0
-    for i in range(1, len(steps)):
-        shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
-        game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
-        output_steps.append(steps[i])  # players arrive at skeleton step i
-        # P2b: a skeleton ball-movement / reversal pass is interceptable (two-gate contest). A pick
-        # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
-        _skel_pass_to = _hco_contest_skeleton_pass(
-            steps[i], output_steps, skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random, pass_type=_skel_pass_type)
-        if _skel_pass_to is not None:
-            return _skel_pass_to
-        bh_pos, bh_location = _motion_bh_at_step(steps[i])
-        if not bh_pos or not off_lineup.get(bh_pos):
-            continue
-
-        # SM-precedence (same as motion): when the offense is reading this turn and the shot-clock
-        # tier/tempo says "work the ball", subtle movement takes precedence over the shoot decision
-        # — the BH keeps the set play alive instead of shooting. Reuses the per-turn offense_reads.
-        sm_precede = offense_reads and sm_takes_precedence(shot_clock_est, tempo)
-
-        # 1. Universal shoot decision — runs every step (unless SM-precedence defers it), BEFORE the
-        # movement matrix. shoot/dish → execute (terminate); else fall through to the matrix.
-        locations = _step_locations(steps[i])
-        blocked_dish = _hco_blocked_dish_targets(
-            steps[i], bh_pos, off_lineup, def_lineup, off_to_def,
-            is_away_offense, _def_aggr_call, _hco_lane_dist,
-            zone=zone, defense_playcall=game_state.get("defense_playcall"),
-            posture=game_state.get("_hco_defense_posture"))
-        if not sm_precede:
-            shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
-                                 shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
-                                 blocked_dish_targets=blocked_dish)
-            if shoot:
-                logging.warning(
-                    f"🎯 [DYNAMIC SETPLAY] step {i}: SHOOT {shoot['shooter_pos']} "
-                    f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
-                )
-                _dec = {"action": SHOOT, "shooter_pos": shoot["shooter_pos"], "shot_type": shoot["shot_type"]}
-                return _apply_dish_contest(_dec, _execute_motion_decision(
-                    skeleton, output_steps, steps[i], bh_pos, bh_location, _dec,
-                    game, off_lineup, def_lineup, is_away_offense,
-                ), steps[i], bh_pos)
-
-        # 2. Movement matrix. Under SM-precedence we force a subtle-movement beat (reusing the
-        # branch below, incl. the set-play recovery roll). Otherwise it engages when the offense
-        # reads and/or the defense pressures; neither → static skeleton: progress to the next step.
-        if sm_precede:
-            logging.warning(f"🟡 [DYNAMIC SETPLAY] step {i}: SM-precedence → subtle movement")
-            decision = {"action": SUBTLE_MOVEMENT}
-        elif not offense_reads and not defense_pressure:
-            continue
-        else:
-            bh_defender = None if zone else def_lineup.get(off_to_def.get(bh_pos, bh_pos))
-            decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
-                                          offense_reads=offense_reads, defense_pressure=defense_pressure)
-        action = decision.get("action")
-        logging.warning(f"🔹 [DYNAMIC SETPLAY] step {i} ({bh_pos}@{bh_location}): {action}")
-        if action in shot_actions:
-            return _apply_dish_contest(decision, _execute_motion_decision(
-                skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
-                game, off_lineup, def_lineup, is_away_offense,
-            ), steps[i], bh_pos)
-        if action == SUBTLE_MOVEMENT:
-            # Defense knocked the BH into a forced subtle. Non-BH teammates make their reads to
-            # relocate for a hot-read reception (build_subtle_beat handles both, as in motion).
-            beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random, off_eff)
-            if beat is None:
-                continue
-            beat["_subtle_movement"]["defender_reads"] = _roll_subtle_defender_reads(
-                def_lineup, def_eff, random
-            )
-            # Cosmetic render-space idle motion (role-based; fills the frozen tail; UESS-safe).
-            beat["_subtle_movement"]["idle_motion"] = _roll_subtle_idle_motion(
-                beat, off_lineup, def_lineup, bh_pos, bh_location,
-                off_to_def, locations, is_away_offense, random,
-            )
-            lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
-            elapsed = float(random.randint(lo, hi))
-            # Shot-clock expiry backstop (same as motion): finishing the beat would leave < 1s →
-            # the BH is forced to shoot at the 1-second mark with a hard shot_score penalty.
-            if shot_clock_est - elapsed < 1.0:
-                beat["_step_t_floor_game_seconds"] = max(0.0, shot_clock_est - 1.0)
-                output_steps.append(beat)
-                shot_type = "inside" if _is_inside_location(bh_location) else "outside"
-                forced = {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": shot_type}
-                logging.warning(
-                    f"⏱️ [SETPLAY SUBTLE FORCED SHOT] shot clock expiring → {bh_pos} forced "
-                    f"{shot_type} shot (-{SUBTLE_FORCED_SHOT_PENALTY})"
-                )
-                return _execute_motion_decision(
-                    skeleton, output_steps, steps[i], bh_pos, bh_location, forced,
-                    game, off_lineup, def_lineup, is_away_offense,
-                    forced_shot_penalty=SUBTLE_FORCED_SHOT_PENALTY,
-                )
-            beat["_step_t_floor_game_seconds"] = elapsed
-            shot_clock_est -= elapsed
-            game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock (post-subtle)
-            output_steps.append(beat)
-
-            # Post-subtle the BH reads shoot / hot-read pass / hold. should_shoot covers shoot
-            # (self) and the hot-read dish; a frozen man defender lifts his openness (man only).
-            bh_def_pos = off_to_def.get(bh_pos) if not zone else None
-            froze = (bh_def_pos is not None
-                     and beat["_subtle_movement"].get("defender_reads", {}).get(bh_def_pos) is False)
-            post_shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
-                                      shot_clock_est, tempo, random,
-                                      openness=(20.0 if froze else 0.0), allow_dish=True,
-                                      blocked_dish_targets=blocked_dish)
-            if post_shoot:
-                logging.warning(
-                    f"🎯 [DYNAMIC SETPLAY] post-subtle SHOOT {post_shoot['shooter_pos']} "
-                    f"{post_shoot['shot_type']} (froze={froze})"
-                )
-                _pdec = {"action": SHOOT, "shooter_pos": post_shoot["shooter_pos"], "shot_type": post_shoot["shot_type"]}
-                return _apply_dish_contest(_pdec, _execute_motion_decision(
-                    skeleton, output_steps, steps[i], bh_pos, bh_location, _pdec,
-                    game, off_lineup, def_lineup, is_away_offense,
-                ), steps[i], bh_pos)
-
-            # Held instead of shooting/dishing → recover into the set play or get forced into
-            # freelance (Z-Completed/Dynamic_HCO_SP_Brief: chemistry+efficiency × d6, each team).
-            if _setplay_recovery_roll(game):
-                logging.warning(f"↩️ [DYNAMIC SETPLAY] recovery WON → re-enter skeleton at step {i + 1}")
-                continue  # next iteration appends the next defined step (players pop back to spots)
-            logging.warning("🌀 [DYNAMIC SETPLAY] recovery LOST → forced freelance")
-            return _resolve_freelance(
-                skeleton, output_steps, steps[i], bh_pos,
-                game, off_lineup, def_lineup, is_away_offense, random,
-            )
-        elif action == FREELANCE_FORCED:
-            # Defense knocked the BH straight out of the play (no subtle) → freelance.
-            return _resolve_freelance(
-                skeleton, output_steps, steps[i], bh_pos,
-                game, off_lineup, def_lineup, is_away_offense, random,
-            )
-        # ADVANCE advances to the next skeleton step.
-
-    # No shot across the walk → force one at the last step, weaving with what we accumulated.
-    bh_pos, bh_location = _motion_bh_at_step(steps[-1])
-    if not bh_pos or not off_lineup.get(bh_pos):
-        return None  # malformed skeleton → defer to the standard set-play path
-    bh = off_lineup[bh_pos]
-    shot_type = "inside" if _is_inside_location(bh_location) else _choose_attack_or_outside(bh, random)
-    decision = {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": shot_type}
-    return _execute_motion_decision(
-        skeleton, output_steps, steps[-1], bh_pos, bh_location, decision,
-        game, off_lineup, def_lineup, is_away_offense,
-    )
+    return _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
 
 
 def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_location, decision,
@@ -7862,7 +7632,7 @@ def resolve_half_court_offense_logic(game):
         if is_setplay_dynamic:
             logging.warning("🟢 [DYNAMIC SETPLAY] flag ON — running dynamic resolver for this Set Play shot")
             try:
-                motion_shot_info = _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup)
+                motion_shot_info = _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
                 if motion_shot_info is None:
                     logging.info("ℹ️ [DYNAMIC SETPLAY] Resolver returned None; using standard set-play shot path")
             except Exception as e:
