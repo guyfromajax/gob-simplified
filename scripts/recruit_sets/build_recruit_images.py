@@ -46,6 +46,27 @@ OUT_WHITE = "assets_staging/recruits/white"
 OUT_KIT = "assets_staging/recruits/kit"
 
 
+def strip_watermark(a, alpha, frac=0.16):
+    """Erase the Gemini/Nano-Banana corner sparkle by reflecting adjacent content
+    into the bottom-right corner box, only over person pixels (alpha>0). `a` = RGB
+    float array (modified in place), `alpha` = 0-255 person mask. `frac` = corner
+    box size as a fraction of each dimension — tune if it clips a shoulder or
+    misses the mark. Google's invisible SynthID is untouched; only the visible
+    sparkle is removed."""
+    import numpy as np
+    H, W, _ = a.shape
+    bw = max(1, int(W * frac))
+    bh = max(1, int(H * frac))
+    x0, y0 = W - bw, H - bh
+    if x0 - bw < 0:
+        return a
+    src = a[y0:H, x0 - bw:x0][:, ::-1, :]          # reflect the strip just left of the box
+    box = a[y0:H, x0:W]
+    m = (alpha[y0:H, x0:W] > 0)[..., None]          # only overwrite the person, not background
+    box[:] = np.where(m, src[:box.shape[0], :box.shape[1], :], box)
+    return a
+
+
 def gene_row(record, manifest_entry):
     """Assemble a generate_player_portraits-compatible 'row' from recruit genes."""
     import player_ethnicity as pe
@@ -75,6 +96,9 @@ def main():
     ap.add_argument("--set", required=True, help="path to a set_<id>.json (its .manifest.json sits beside it)")
     ap.add_argument("--limit", type=int, help="only build the first N (cheap proof run)")
     ap.add_argument("--force", action="store_true", help="rebuild even if the white master exists")
+    ap.add_argument("--keep-watermark", action="store_true", help="do NOT strip the Gemini corner sparkle")
+    ap.add_argument("--wm-frac", type=float, default=0.16,
+                    help="corner-box size (fraction of each dim) for watermark removal")
     ap.add_argument("--out-white", default=OUT_WHITE)
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()
@@ -154,6 +178,10 @@ def main():
                 continue
             bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
             center = int((xs.min() + xs.max()) / 2)
+
+            # erase the Gemini corner watermark before saving (kit + white both clean)
+            if not args.keep_watermark:
+                strip_watermark(a, alpha, frac=args.wm_frac)
 
             # kit: pre-finish white RGBA bust (recolor input) + tank mask + geometry
             rgba = np.dstack([a, alpha]).astype("uint8")
