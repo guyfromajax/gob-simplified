@@ -229,11 +229,14 @@ def pick_hair(pid, race, skin):
 # emit ~5 strong descriptors (NB averages away over-specification), which is what
 # pushes each player into a DIFFERENT face rather than a per-attribute clone.
 FACE_SHAPE = [("an oval", 4), ("a round", 3), ("a square", 3), ("a long oval", 3),
-              ("a rectangular", 2), ("a heart-shaped", 2), ("a diamond-shaped", 1)]
+              ("a rectangular", 2), ("a heart-shaped", 2), ("a diamond-shaped", 1),
+              ("a triangular", 1), ("an oblong", 1)]
 JAW = [("a strong wide jaw", 3), ("a soft rounded jaw", 3), ("a narrow tapered jaw", 3),
-       ("a sharp angular jaw", 3), ("a broad square jaw", 2), ("a slightly weak jaw", 1)]
+       ("a sharp angular jaw", 3), ("a broad square jaw", 2), ("a slightly weak jaw", 1),
+       ("a chiseled defined jaw", 2), ("a rounded fleshy jaw", 1)]
 CHEEKS = [("high prominent cheekbones", 3), ("flat cheeks", 3), ("full round cheeks", 3),
-          ("wide cheekbones", 2), ("hollow cheeks", 2)]
+          ("wide cheekbones", 2), ("hollow cheeks", 2), ("chiseled cheekbones", 2),
+          ("soft baby-faced cheeks", 1), ("sunken cheeks", 1)]
 
 # race-weighted (probabilistic, not absolute)
 EYES = {
@@ -274,7 +277,10 @@ MARKS = [("a light spray of freckles across the nose and cheeks", 1),
          ("a small mole on one cheek", 1), ("a faint scar through one eyebrow", 1),
          ("slightly protruding ears", 1), ("a subtly crooked nose", 1),
          ("a strong prominent brow", 1), ("faint under-eye shadows", 1),
-         ("mild facial asymmetry", 1), ("a small beauty mark near the lip", 1)]
+         ("mild facial asymmetry", 1), ("a small beauty mark near the lip", 1),
+         ("a small chin scar", 1), ("a birthmark on one cheek", 1),
+         ("thick expressive eyebrows", 1), ("a cleft chin", 1),
+         ("a slightly broken nose", 1), ("deep-set piercing eyes", 1)]
 MARK_PCT = 45
 
 
@@ -308,12 +314,22 @@ def pick_face(pid, race, skin):
 # Eyewear is a single either/or slot; headband / earring / tattoo roll
 # independently and can stack. Headband color can key off team colors, so the
 # classifier resolves the team's hex to a color name (below).
-HEADBAND = [("black", 3), ("white", 3), ("team-primary", 2), ("team-secondary", 2)]
+HEADBAND = [("black", 3), ("white", 3), ("red", 1), ("navy", 1), ("gray", 1),
+            ("thin black", 1), ("thick white terry-cloth", 1),
+            ("team-primary", 2), ("team-secondary", 2)]
 EYEWEAR = [("clear sports goggles", 3), ("black-framed sports goggles", 2),
-           ("smoke-tinted sports goggles", 1), ("thin black-framed glasses", 2),
-           ("clear-framed glasses", 1)]
+           ("smoke-tinted sports goggles", 1), ("amber-tinted sports goggles", 1),
+           ("blue-tinted sports goggles", 1), ("strap-back rec-specs sports goggles", 2),
+           ("thin black-framed glasses", 2), ("clear-framed glasses", 1),
+           ("thick black-framed glasses", 1), ("wire-framed glasses", 1),
+           ("tortoiseshell-framed glasses", 1)]
 EARRING = [("a small diamond stud earring", 3), ("a large diamond stud earring", 1),
-           ("a small hoop earring", 2)]
+           ("a small hoop earring", 2), ("a small gold hoop earring", 2),
+           ("a small silver hoop earring", 1), ("a gold stud earring", 1),
+           ("a small black stud earring", 1), ("a small cross earring", 1)]
+# thin neck chains — a common, bust-visible accessory
+CHAIN = [("a thin silver chain necklace", 3), ("a thin gold chain necklace", 3),
+         ("a gold rope chain", 1), ("a thin beaded necklace", 1)]
 # tattoo = a design (adjective) placed on which arm(s): 40% both / 30% L / 30% R
 TATTOO_DESIGN = [
     ("black-and-gray", 3), ("bold-line traditional", 2), ("tribal", 2),
@@ -323,7 +339,7 @@ TATTOO_DESIGN = [
 TATTOO_ARM = [("both", 40), ("left", 30), ("right", 30)]
 # earring ear placement: 60% left / 39% both / 1% right
 EAR_PLACEMENT = [("left", 60), ("both", 39), ("right", 1)]
-ACC_RATES = {"headband": 10, "eyewear": 8, "earring": 3,
+ACC_RATES = {"headband": 10, "eyewear": 8, "earring": 3, "chain": 5,
              "tattoo_sleeve": 3, "tattoo_neck": 0.3}
 
 _NAMED_COLORS = [
@@ -366,10 +382,12 @@ def pick_accessories(pid, year, primary_hex=None, secondary_hex=None):
         etype = _weighted(EARRING, int(hashlib.md5(f"{pid}|earring".encode()).hexdigest(), 16))
         ear = _weighted(EAR_PLACEMENT, int(hashlib.md5(f"{pid}|earplace".encode()).hexdigest(), 16))
         if ear == "both":
-            plural = etype.replace("a small ", "small ").replace("a large ", "large ").replace(" earring", " earrings")
+            plural = re.sub(r"^an? ", "", etype).replace(" earring", " earrings")
             out.append(f"{plural} in both ears")
         else:
             out.append(f"{etype} in his {ear} ear")
+    if roll("chain", ACC_RATES["chain"]):
+        out.append(_weighted(CHAIN, int(hashlib.md5(f"{pid}|chain".encode()).hexdigest(), 16)))
     if roll("tattoo_sleeve", ACC_RATES["tattoo_sleeve"]):
         design = _weighted(TATTOO_DESIGN, int(hashlib.md5(f"{pid}|tatstyle".encode()).hexdigest(), 16))
         arm = _weighted(TATTOO_ARM, int(hashlib.md5(f"{pid}|tatarm".encode()).hexdigest(), 16))
