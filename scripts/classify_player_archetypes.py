@@ -283,6 +283,23 @@ MARKS = [("a light spray of freckles across the nose and cheeks", 1),
          ("a slightly broken nose", 1), ("deep-set piercing eyes", 1)]
 MARK_PCT = 45
 
+# Under-used-by-us axes the Conf1 artist leaned on for distinctness:
+# apparent age (baby-faced vs mature), eyebrow shape, and a skin-tone continuum
+# (undertone/texture) so two players in the same skin bucket still read different.
+EYEBROWS = [("thick eyebrows", 3), ("medium eyebrows", 3), ("thin eyebrows", 1),
+            ("bushy eyebrows", 2), ("straight flat eyebrows", 2),
+            ("high-arched eyebrows", 1), ("slightly unibrow-connected eyebrows", 1)]
+APPARENT_AGE = [
+    ("He looks about his age, with a typical late-teen face.", 4),
+    ("He looks young for his age, with soft boyish baby-faced features.", 3),
+    ("He looks older and more mature than his age, with a defined adult face.", 3),
+]
+# race-neutral so it composes with any skin bucket
+SKIN_DETAIL = [("a smooth clear complexion", 4), ("an uneven skin texture", 2),
+               ("a few teenage blemishes", 2), ("light freckling", 1),
+               ("a warm undertone", 2), ("a cool undertone", 2),
+               ("a matte complexion", 1), ("a slight oily sheen", 1)]
+
 
 def _race_key(race, skin):
     if race == "other":
@@ -300,10 +317,14 @@ def pick_face(pid, race, skin):
     shape = g(FACE_SHAPE, "faceshape")
     jaw = g(JAW, "jaw")
     cheeks = g(CHEEKS, "cheeks")
+    brows = g(EYEBROWS, "eyebrows")
     eyes = g(EYES[rk], "eyes")
     nose = g(NOSE[rk], "nose")
     lips = g(LIPS[rk], "lips")
-    face = (f"He has {shape} face with {jaw}, {cheeks}, {nose}, {eyes}, and {lips}.")
+    detail = g(SKIN_DETAIL, "skindetail")
+    age = g(APPARENT_AGE, "age")
+    face = (f"He has {shape} face with {jaw}, {cheeks}, {brows}, {nose}, {eyes}, "
+            f"and {lips}. He has {detail}. {age}")
     mseed = int(hashlib.md5(f"{pid}|mark".encode()).hexdigest(), 16)
     if mseed % 100 < MARK_PCT:
         face += f" He has {g(MARKS, 'markpick')}."
