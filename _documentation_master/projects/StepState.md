@@ -6,7 +6,7 @@
 
 ## ▶ RESUME HERE (checkpoint 2026-07-12b)
 
-> **Numbering:** formal "Staged plan" (Stage 0–3) below. Stage 2 shipped+verified. Stage 3 (MOTION) shipped. Stage 1's **moment fusion** remains the DEFERRED capstone — but the spine is now simpler (see below), so a re-scope is warranted. NEXT = re-scope the fusion.
+> **Numbering:** formal "Staged plan" (Stage 0–3) below. Stage 2 shipped+verified. **Stage 3 DONE (motion + set play)** — motion & set play now run through the ONE resolver with symmetric orchestration (dynamic-always, no legacy, no flags). Stage 1's **moment fusion** remains the DEFERRED capstone (path-A re-scoped below). NEXT = the fusion (A vs B), or the trivial flag/wrapper cleanup first.
 
 ### Shipped since the 07-11b checkpoint (all on develop)
 - **Moment-teleport pin (`eb0408de6`)** — moment fired foul/steal/turnover at a known step `i` but discarded it → `apply_stopper` used a random blast-radius step (ball snap-back). Now stashes `_hco_moment_stop_index=i`; apply_stopper consumes it. Fixes the DB-turnover-after-pass teleport.
@@ -44,7 +44,7 @@ Goal: fold the on-ball moment into the unified per-step walk per Decision #1 (mo
 
 **Gaps vs the plan:** setplay legacy + flag → **Stage 3 (setplay)** [in plan]. Moment dup → **the fusion** collapses BOTH call sites at once [in plan]. **NOT in plan:** (a) the wrapper cleanup (3 names → 1), (b) explicitly scoping `resolve_hco_outcome` + the "standard set-play path" under Stage 3 setplay.
 
-**⚖️ ORDER QUESTION (open, decide next session):** the plan sequences *fusion → Stage 3 setplay*. But **Stage 3 setplay is the piece that makes set play SYMMETRIC with motion** — the direct completion of the stated objective, and lower-risk. The fusion improves *correctness* (moment step-order) more than *structural symmetry*. Defensible to swap: **Stage 3 setplay FIRST** (finish the symmetry), **then** the fusion (correctness capstone). Human to decide.
+**⚖️ ORDER QUESTION — RESOLVED 2026-07-12b:** did **Stage 3 setplay FIRST** (`6e04d15df`) — it was the direct completion of the symmetry objective and low-risk. ✅ Symmetry achieved. **Remaining:** the moment fusion (correctness capstone) + trivial flag/wrapper cleanup.
 
 > **Also open:** trivial — delete the neutered `_dynamic_hco_motion_enabled` + prune its gate tests; collapse the 3 resolver wrapper names.
 > **Historical note:** earlier this block called Stage-2 work "Stage 1 man/zone" — a mislabel; it is **Stage 2**. Formal **Stage 1** = the moment fusion (resolvers unified ✅; moment-into-loop deferred).
@@ -210,7 +210,7 @@ Result: the emitted skeleton is **fully self-describing**. The animator becomes 
 - **Stage 0** — define `StepState` + the single per-step reconstruction; stamp positions / BH / owner / timing. **No behavior change** — centralize what's already computed. (De-risks everything after it.) *Status: partially done — `StepState.defense` is stamped/consumed; BH / owner / timing not yet centralized.*
 - **Stage 1 — ⬜ OPEN** — unify the walks onto `StepState` (moment + interception + offense in one loop); delete moment walk + coverage patch. *Subsumes the "ball snap-back on a non-shot outcome" family (below), incl. the still-live DB-turnover-after-pass teleport.*
 - **Stage 2 — ✅ COMPLETE (2026-07-11, develop)** — **smaller than first thought.** HCO already renders off the emitter (`skeleton_step_emitter`), which builds coords internally via `skeleton_to_animations` → `get_defender_coords`. The gap: that render-side defender reconstruction was *independent* from the contest's (`_hco_step_def_xy` → `get_defender_coords`) — same formula, separate computation, confirmed divergence (man 22–64%, zone+away 100% mirror). Stage 2 = the engine **stamps the defender grid** so both the emitter and the contest read one value (emitter-as-god), instead of the animator re-deriving it. Not a renderer rewrite. **Shipped** via `compute_defender_grid` extract + Option A (share the emit's one draw) + Step A (man) / Step B (zone) contest routing; live GAP = 0% man+zone. *Residual (low pri): consolidate the walk-time contest; verify no redundant render draw. See RESUME HERE.*
-- **Stage 3 — MOTION DONE (`5c5aad53c`), setplay open** — remove the legacy + recalibration bypass paths. Motion: 219-line legacy body deleted, recalibration migrated to the dynamic resolver's `forced_shot_step_index` mode, motion flag retired. Setplay's "standard path" legacy + flag remain (follow-up).
+- **Stage 3 — ✅ DONE (motion `5c5aad53c` + setplay `6e04d15df`)** — legacy + bypass paths removed. Motion: 219-line legacy body deleted, recalibration migrated to the dynamic resolver's `forced_shot_step_index` mode, motion flag retired. Set play: flag retired, gates always-dynamic (no separate legacy body — its "standard path" was just the shared `resolve_shot`, kept as a 1-line try/except safety net; variant selection kept). Both flags neutered to always-True (delete when gate tests pruned).
 
 **Parity gate each stage:** moment / shot / foul / interception rates unchanged; `walk-saw == census` (coverage closed).
 
