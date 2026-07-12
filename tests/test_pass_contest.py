@@ -89,17 +89,21 @@ def _lane_defender(**kw):
     return _defender("d1", 50, 26, rate=40.0, **kw)
 
 
-def test_high_roll_intercepts():
-    # composite = 50*0.6+50*0.2+50*0.2 = 50; ×6 = 300 > tier_hi (250).
+def test_deflect_then_skill_roll_intercepts():
+    # composite = 50*0.6+50*0.2+50*0.2 = 50; ×6 = 300 > tier_mid (200) → DEFLECTED. Split roll (also
+    # 6 via FixedRng) < CH+IQ (100) → clean INTERCEPT.
     res = resolve_pass_contest(_passer(), RECEIVER, BALL_SPEED, [_lane_defender()], rng=FixedRng(6))
     assert res["outcome"] == INTERCEPT
     assert res["deflector"] == "d1"
     assert res["contact_point"] is not None
 
 
-def test_mid_roll_bats_out_of_bounds():
-    # 50 × 5 = 250 → not > 250 but > 200 → BAT_OOB.
-    res = resolve_pass_contest(_passer(), RECEIVER, BALL_SPEED, [_lane_defender()], rng=FixedRng(5))
+def test_deflect_with_poor_hands_bats_out_of_bounds():
+    # New split: a strong-OD but poor-hands defender. composite = 70*0.6 = 42; ×5 = 210 > tier_mid
+    # (200) → DEFLECTED. But the split roll (5) is NOT < CH+IQ (0) → the pass is knocked away, not
+    # cleanly picked → BAT_OOB. (rand(1,200) < CH+IQ → INTERCEPT, else BAT_OOB.)
+    d = _defender("d1", 50, 26, rate=40.0, OD=70, CH=0, IQ=0)
+    res = resolve_pass_contest(_passer(), RECEIVER, BALL_SPEED, [d], rng=FixedRng(5))
     assert res["outcome"] == BAT_OOB
     assert res["deflector"] == "d1"
 

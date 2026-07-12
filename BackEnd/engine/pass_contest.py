@@ -49,7 +49,8 @@ PASS_INTERCEPT_ROLL_MAX = 6
 # Passer safety gate base: if the passer's pass_score > (BASE − offense_modifier),
 # no interception is in play (a good passer evades the lurking defender).
 PASS_SAFETY_BASE = 200.0
-# Interception outcome thresholds: > hi → INTERCEPT, > mid → BAT_OOB.
+# Deflection threshold: intercept_score > tier_mid → the pass is deflected (then a CH+IQ vs d200
+# roll splits INTERCEPT vs BAT_OOB). TIER_HI is retained for back-compat callers but no longer used.
 PASS_INTERCEPT_TIER_HI = 250.0
 PASS_INTERCEPT_TIER_MID = 200.0
 
@@ -260,10 +261,13 @@ def resolve_pass_contest(
          (COMPLETE, no interception in play). A higher ``offense_modifier`` (the
          turn-type offense rating — see ``resolve_offense_pass_modifier``) lowers the
          bar, so good offenses complete more passes.
-      3. Interception band — ``intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``
-         vs the fixed tiers (> hi → INTERCEPT, > mid → BAT_OOB, else COMPLETE).
+      3. Interception band — ``intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``.
+         ``score ≤ tier_mid`` → COMPLETE. Over it → the pass is DEFLECTED, and the defender's
+         ball skill splits the kind: ``rand(1,200) < (CH + IQ)`` → INTERCEPT, else BAT_OOB.
+         (Replaced the old hi/mid two-tier split, whose narrow band the quantized score skipped →
+         BAT_OOB was unreachable. ``tier_hi`` is now unused.)
 
-    ``rng`` is injectable for tests (called once for the gate, once for the band).
+    ``rng`` is injectable for tests (gate roll, then the band roll, then the split roll on a deflect).
     """
     passer_xy = passer.get("xy") if isinstance(passer, dict) else None
     if not isinstance(passer_xy, dict):
@@ -273,9 +277,9 @@ def resolve_pass_contest(
     if contester is None:
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "no_contester"}
 
-    # Per-call tier overrides (HCO passes tighter tiers; HCT/FCP use the shared defaults).
+    # Per-call tier overrides (HCO passes a tighter mid; HCT/FCP use the shared default). Only
+    # tier_mid is the deflection threshold now; tier_hi is accepted for back-compat but unused.
     _base = PASS_SAFETY_BASE if safety_base is None else safety_base
-    _hi = PASS_INTERCEPT_TIER_HI if tier_hi is None else tier_hi
     _mid = PASS_INTERCEPT_TIER_MID if tier_mid is None else tier_mid
     # When efficiency_in_composite (HCO): team efficiency is added to the composite AND subtracted
     # from the bar/tiers (doubly favors the stronger team). HCT/FCP leave it off → old behavior.
@@ -286,15 +290,22 @@ def resolve_pass_contest(
     if _pass_score(passer, rng, add=_pass_add) > (_base - offense_modifier):
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "passer_safe"}
 
-    # Interceptor skill band (3b).
+    # Interceptor skill band (3b). A SINGLE deflection threshold (tier_mid, efficiency-adjusted):
+    # score at/under it → COMPLETE. Over it → the pass is DEFLECTED, and the defender's ball skill
+    # decides the kind: roll d200 vs (CH + IQ) — under → clean INTERCEPT, else BAT_OOB. This replaces
+    # the old hi/mid two-tier split: the (mid, hi] BAT_OOB band was narrower than the score's
+    # quantization step (composite × randint(1,6), step ≈ composite ≈ 50-100+), so consecutive scores
+    # straddled it → BAT_OOB was effectively unreachable. tier_hi is no longer used.
     defender = contester["defender"]
     score = _intercept_score(defender, rng, add=_int_add)
-    if score > (_hi - _int_add):
-        outcome, stage = INTERCEPT, "intercept"
-    elif score > (_mid - _int_add):
-        outcome, stage = BAT_OOB, "bat_oob"
-    else:
+    if score <= (_mid - _int_add):
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "band_complete"}
+    ch = float(defender.get("CH", 0) or 0)
+    iq = float(defender.get("IQ", 0) or 0)
+    if rng.randint(1, 200) < (ch + iq):
+        outcome, stage = INTERCEPT, "intercept"
+    else:
+        outcome, stage = BAT_OOB, "bat_oob"
 
     return {
         "outcome": outcome,
