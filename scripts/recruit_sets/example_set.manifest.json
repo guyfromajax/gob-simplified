@@ -1,0 +1,27 @@
+{
+  "set_id": "set_0001",
+  "entries": [
+    {
+      "recruit_id": "550e8400-e29b-41d4-a716-446655440000",
+      "projected": { "height": 77, "weight": 212, "ST": 105, "AG": 109, "RT": 68 },
+      "build": { "frame": "Broad", "definition": "Cut" },
+      "portrait": {
+        "race": "black", "skin": "black-normal",
+        "hair": "a short crop",
+        "face_prompt": "He has an oval face with a strong wide jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and full lips.",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "projected": { "height": 78, "weight": 228, "ST": 82, "AG": 48, "RT": 74 },
+      "build": { "frame": "Broad", "definition": "Toned" },
+      "portrait": {
+        "race": "white", "skin": "white-normal",
+        "hair": "a short crop",
+        "face_prompt": "He has a square face with a broad square jaw, flat cheeks, a straight narrow nose, deep-set eyes, and medium lips.",
+        "accessories": ""
+      }
+    }
+  ]
+}
