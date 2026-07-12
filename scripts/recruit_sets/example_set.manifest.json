@@ -7,8 +7,10 @@
       "build": { "frame": "Broad", "definition": "Cut" },
       "portrait": {
         "race": "black", "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
         "hair": "a short crop",
         "face_prompt": "He has an oval face with a strong wide jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and full lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
         "accessories": ""
       }
     },
@@ -18,8 +20,10 @@
       "build": { "frame": "Broad", "definition": "Toned" },
       "portrait": {
         "race": "white", "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
         "hair": "a short crop",
         "face_prompt": "He has a square face with a broad square jaw, flat cheeks, a straight narrow nose, deep-set eyes, and medium lips.",
+        "expression": "a calm neutral expression",
         "accessories": ""
       }
     }
