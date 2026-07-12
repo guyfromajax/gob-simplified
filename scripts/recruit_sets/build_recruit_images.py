@@ -46,23 +46,23 @@ OUT_WHITE = "assets_staging/recruits/white"
 OUT_KIT = "assets_staging/recruits/kit"
 
 
-def strip_watermark(a, alpha, cx=0.94, cy=0.95, r=0.06):
-    """Dissolve the Gemini bottom-right sparkle by fading ALPHA to transparent with
-    a soft radial falloff centered on the mark — no hard edges, so no seam/rectangle
-    is possible. That corner is mostly transparent background, so this removes the
-    sparkle and only softly feathers the arm's extreme corner (which bleeds off-frame
-    anyway). `alpha` = 0-255 mask (modified in place); `a` (RGB) is left as-is.
-    cx/cy = sparkle center, r = radius, all fractions of W/H. SynthID is untouched."""
+def strip_watermark(a, alpha, cx=0.95, cy=0.95, r=0.055):
+    """Remove the Gemini bottom-right sparkle by CONTENT-AWARE INPAINTING: mask a
+    small disk over the sparkle and fill it from the surrounding pixels (cv2 Telea).
+    A sparkle-on-skin fills with skin — no seam, no hole. ALPHA is left untouched,
+    so the arm silhouette and transparent background are preserved. `a` = RGB float
+    array (modified in place). cx/cy/r = sparkle center + radius as fractions of the
+    larger dimension. Google's invisible SynthID is untouched."""
     import numpy as np
-    H, W = alpha.shape[:2]
-    cxp, cyp, rxp, ryp = cx * W, cy * H, max(1.0, r * W), max(1.0, r * H)
-    x0, x1 = max(0, int(cxp - rxp)), min(W, int(cxp + rxp) + 1)
-    y0, y1 = max(0, int(cyp - ryp)), min(H, int(cyp + ryp) + 1)
-    if x1 <= x0 or y1 <= y0:
-        return a
-    yy, xx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
-    dist = np.sqrt(((xx - cxp) / rxp) ** 2 + ((yy - cyp) / ryp) ** 2)
-    alpha[y0:y1, x0:x1] *= np.clip(dist, 0.0, 1.0)   # 0 at center -> fully transparent
+    try:
+        import cv2
+    except ImportError:
+        raise SystemExit("watermark strip needs OpenCV: pip install opencv-python-headless")
+    H, W = a.shape[:2]
+    mask = np.zeros((H, W), np.uint8)
+    cv2.circle(mask, (int(cx * W), int(cy * H)), max(1, int(r * max(H, W))), 255, -1)
+    rgb = np.clip(a[..., :3], 0, 255).astype(np.uint8)
+    a[..., :3] = cv2.inpaint(rgb, mask, 10, cv2.INPAINT_TELEA).astype(a.dtype)
     return a
 
 
@@ -99,7 +99,7 @@ def main():
                     help="erase the Gemini corner sparkle (off by default)")
     ap.add_argument("--wm-cx", type=float, default=0.94, help="sparkle center x (frac of W)")
     ap.add_argument("--wm-cy", type=float, default=0.95, help="sparkle center y (frac of H)")
-    ap.add_argument("--wm-r", type=float, default=0.06, help="sparkle fade radius (frac)")
+    ap.add_argument("--wm-r", type=float, default=0.055, help="sparkle inpaint radius (frac)")
     ap.add_argument("--out-white", default=OUT_WHITE)
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()

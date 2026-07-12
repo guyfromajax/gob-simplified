@@ -40,7 +40,7 @@ def main():
     ap.add_argument("--recruit-id", help="one recruit uuid (default: all)")
     ap.add_argument("--cx", type=float, default=0.94, help="sparkle center x (frac of W)")
     ap.add_argument("--cy", type=float, default=0.95, help="sparkle center y (frac of H)")
-    ap.add_argument("--r", type=float, default=0.06, help="sparkle fade radius (frac)")
+    ap.add_argument("--r", type=float, default=0.055, help="sparkle inpaint radius (frac)")
     ap.add_argument("--suffix", default="", help="write to <id><suffix>.png instead of in place (e.g. _clean)")
     args = ap.parse_args()
 
