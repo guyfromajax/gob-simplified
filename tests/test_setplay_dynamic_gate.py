@@ -13,23 +13,20 @@ def _set_env(monkeypatch, **kv):
 
 
 def test_setplay_gate_on_by_default(monkeypatch):
-    # Ships ON by default (kill switch: GOB_DYNAMIC_HCO_SETPLAY=0).
+    # Stage 3 (2026-07-12): flag RETIRED — always on (legacy removed, nothing to fall back to).
     monkeypatch.delenv("GOB_DYNAMIC_HCO_SETPLAY", raising=False)
     assert PR._dynamic_hco_setplay_enabled() is True
 
 
-def test_setplay_gate_on(monkeypatch):
-    for v in ("1", "true", "YES", "on"):
+def test_flags_retired_always_on(monkeypatch):
+    # Stage 3: BOTH dynamic-HCO flags are retired — the legacy up-front tables + legacy resolver were
+    # removed, so the GOB_DYNAMIC_HCO_* kill switches have nothing to fall back to. Both always return
+    # True regardless of the env var (the neutered functions are kept only as stable symbols).
+    for v in ("1", "true", "YES", "on", "0", "false", "off", ""):
+        monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", v)
         monkeypatch.setenv("GOB_DYNAMIC_HCO_SETPLAY", v)
+        assert PR._dynamic_hco_motion_enabled() is True
         assert PR._dynamic_hco_setplay_enabled() is True
-
-
-def test_setplay_gate_independent_of_motion(monkeypatch):
-    # The two flags are independent — both default ON, but each can be disabled on its own.
-    monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", "1")
-    monkeypatch.setenv("GOB_DYNAMIC_HCO_SETPLAY", "0")
-    assert PR._dynamic_hco_motion_enabled() is True
-    assert PR._dynamic_hco_setplay_enabled() is False
 
 
 # --------------------------------------------------------- recovery roll (re-enter vs freelance)

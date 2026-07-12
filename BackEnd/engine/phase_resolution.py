@@ -3416,10 +3416,8 @@ def resolve_hco_outcome(game, skeleton):
     # model — variant selection STAYS, but events come from the per-step moment). The flag-off
     # path keeps the up-front tables. See Z-Completed/Dynamic_HCO_Motion_Brief.md / Dynamic_HCO_SP_Brief.md.
     _opt = game_state.get("offense_play_type", "")
-    skip_upfront_events = (
-        (_opt == "motion")  # Stage 3: dynamic motion is always on (legacy resolver removed)
-        or (_opt in ("set", "set_play") and _dynamic_hco_setplay_enabled())
-    )
+    # Stage 3: dynamic motion AND set play are always on (legacy up-front tables sunset for both).
+    skip_upfront_events = _opt in ("motion", "set", "set_play")
 
     # Execute checks in randomized order
     for check_name, check_func in ([] if skip_upfront_events else check_functions):
@@ -4640,13 +4638,12 @@ def _roll_defense_posture(game, rng=None):
 
 
 def _dynamic_hco_setplay_enabled():
-    """Dynamic HCO **Set Plays** ON by default (overlay model — separate from motion). Variant
-    selection stays, but the up-front event tables are skipped in favor of the per-step moment, and
-    the per-step dynamic layer (hot read / defense-forced subtle / freelance) overlays the chosen
-    variant skeleton. Kill switch: set GOB_DYNAMIC_HCO_SETPLAY to a falsy value (``0``/``false``/
-    ``off``). See Z-Completed/Dynamic_HCO_SP_Brief.md."""
-    import os
-    return os.environ.get("GOB_DYNAMIC_HCO_SETPLAY", "1").strip().lower() in ("1", "true", "yes", "on")
+    """Dynamic HCO **Set Plays** is ALWAYS on (Stage 3, 2026-07-12): the up-front event tables are
+    sunset and set-play SHOTs always run the per-step dynamic overlay on the chosen variant skeleton
+    (variant selection stays). The GOB_DYNAMIC_HCO_SETPLAY kill switch has nothing to fall back to.
+    Always returns True; production no longer calls it (all gates simplified). Kept only as a stable
+    symbol for the gate tests; safe to delete once those are pruned."""
+    return True
 
 
 def _setplay_recovery_roll(game, rng=None):
@@ -6651,8 +6648,7 @@ def resolve_half_court_offense_logic(game):
     # indices align with the emitted skeleton; runs BEFORE the shot-clock block so a hard outcome
     # (which clears result != "SHOT") correctly pre-empts the would-be shot. Mirrors the motion
     # moment walk above. (variant selection unaffected — Z-Completed/Dynamic_HCO_SP_Brief, Stage C.)
-    if (offense_play_type in ("set", "set_play") and result == "SHOT"
-            and _dynamic_hco_setplay_enabled() and final_skeleton):
+    if (offense_play_type in ("set", "set_play") and result == "SHOT" and final_skeleton):
         _sp_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
         _sp_moment_result = _resolve_hco_moment_walk(
             final_skeleton, game, off_lineup, def_lineup, reach_in_tags=_sp_reach_in_tags,
@@ -7458,11 +7454,12 @@ def resolve_half_court_offense_logic(game):
     # overlay produces the SAME shot-info contract as a Motion shot, so it reuses the roles-update
     # path below verbatim. Off by default; on None/error it falls through to the standard set-play
     # shot path (no behavior change).
+    # Stage 3: set-play SHOTs always run the dynamic per-step overlay (flag retired). The try/except
+    # around the resolver below still degrades gracefully to the standard resolve_shot on None/error.
     is_setplay_dynamic = (
         not is_motion_play
         and offense_play_type == "set_play"
         and event_type == "SHOT"
-        and _dynamic_hco_setplay_enabled()
     )
 
     if (is_motion_play or is_setplay_dynamic) and event_type == "SHOT":
