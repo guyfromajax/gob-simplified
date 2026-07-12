@@ -38,8 +38,9 @@ def main():
     ap = argparse.ArgumentParser(description="Strip Gemini watermark from finished white masters.")
     ap.add_argument("--white-dir", default=WHITE_DIR)
     ap.add_argument("--recruit-id", help="one recruit uuid (default: all)")
-    ap.add_argument("--x-frac", type=float, default=0.88, help="box left edge (frac of W)")
-    ap.add_argument("--y-frac", type=float, default=0.90, help="box top edge (frac of H)")
+    ap.add_argument("--cx", type=float, default=0.94, help="sparkle center x (frac of W)")
+    ap.add_argument("--cy", type=float, default=0.95, help="sparkle center y (frac of H)")
+    ap.add_argument("--r", type=float, default=0.06, help="sparkle fade radius (frac)")
     ap.add_argument("--suffix", default="", help="write to <id><suffix>.png instead of in place (e.g. _clean)")
     args = ap.parse_args()
 
@@ -58,7 +59,7 @@ def main():
         try:
             arr = np.asarray(Image.open(p).convert("RGBA")).astype(np.float32)
             a, alpha = arr[..., :3].copy(), arr[..., 3].copy()
-            bri.strip_watermark(a, alpha, x_frac=args.x_frac, y_frac=args.y_frac)
+            bri.strip_watermark(a, alpha, cx=args.cx, cy=args.cy, r=args.r)
             out = np.dstack([np.clip(a, 0, 255), alpha]).astype("uint8")
             base, ext = os.path.splitext(p)
             outp = f"{base}{args.suffix}{ext}"
@@ -68,7 +69,7 @@ def main():
         except Exception as e:
             print(f"[fail] {os.path.basename(p)}: {type(e).__name__}: {str(e)[:120]}")
             fail += 1
-    print(f"\n[done] {ok} cleaned, {fail} failed (box x>={args.x_frac} y>={args.y_frac})")
+    print(f"\n[done] {ok} cleaned, {fail} failed (fade @ {args.cx},{args.cy} r={args.r})")
 
 
 if __name__ == "__main__":

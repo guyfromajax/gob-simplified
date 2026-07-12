@@ -46,20 +46,23 @@ OUT_WHITE = "assets_staging/recruits/white"
 OUT_KIT = "assets_staging/recruits/kit"
 
 
-def strip_watermark(a, alpha, x_frac=0.88, y_frac=0.90):
-    """Erase the Gemini bottom-right sparkle by extending the content directly
-    ABOVE the corner box downward — copies both RGB and alpha. Arm stays arm,
-    transparent background stays transparent; it can never pull the side
-    background in, so no white block. `a` = RGB float array (modified in place),
-    `alpha` = 0-255 mask (modified in place). x_frac/y_frac = top-left of the
-    bottom-right box, as fractions of W/H. Google's invisible SynthID is untouched."""
-    H, W = a.shape[:2]
-    x0, y0 = int(W * x_frac), int(H * y_frac)
-    bh = H - y0
-    if bh <= 0 or y0 - bh < 0:
+def strip_watermark(a, alpha, cx=0.94, cy=0.95, r=0.06):
+    """Dissolve the Gemini bottom-right sparkle by fading ALPHA to transparent with
+    a soft radial falloff centered on the mark — no hard edges, so no seam/rectangle
+    is possible. That corner is mostly transparent background, so this removes the
+    sparkle and only softly feathers the arm's extreme corner (which bleeds off-frame
+    anyway). `alpha` = 0-255 mask (modified in place); `a` (RGB) is left as-is.
+    cx/cy = sparkle center, r = radius, all fractions of W/H. SynthID is untouched."""
+    import numpy as np
+    H, W = alpha.shape[:2]
+    cxp, cyp, rxp, ryp = cx * W, cy * H, max(1.0, r * W), max(1.0, r * H)
+    x0, x1 = max(0, int(cxp - rxp)), min(W, int(cxp + rxp) + 1)
+    y0, y1 = max(0, int(cyp - ryp)), min(H, int(cyp + ryp) + 1)
+    if x1 <= x0 or y1 <= y0:
         return a
-    a[y0:H, x0:W] = a[y0 - bh:y0, x0:W]             # copy the block directly above, down
-    alpha[y0:H, x0:W] = alpha[y0 - bh:y0, x0:W]
+    yy, xx = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+    dist = np.sqrt(((xx - cxp) / rxp) ** 2 + ((yy - cyp) / ryp) ** 2)
+    alpha[y0:y1, x0:x1] *= np.clip(dist, 0.0, 1.0)   # 0 at center -> fully transparent
     return a
 
 
@@ -94,8 +97,9 @@ def main():
     ap.add_argument("--force", action="store_true", help="rebuild even if the white master exists")
     ap.add_argument("--strip-watermark", action="store_true",
                     help="erase the Gemini corner sparkle (off by default)")
-    ap.add_argument("--wm-x-frac", type=float, default=0.88, help="watermark box left edge (frac of W)")
-    ap.add_argument("--wm-y-frac", type=float, default=0.90, help="watermark box top edge (frac of H)")
+    ap.add_argument("--wm-cx", type=float, default=0.94, help="sparkle center x (frac of W)")
+    ap.add_argument("--wm-cy", type=float, default=0.95, help="sparkle center y (frac of H)")
+    ap.add_argument("--wm-r", type=float, default=0.06, help="sparkle fade radius (frac)")
     ap.add_argument("--out-white", default=OUT_WHITE)
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()
@@ -178,7 +182,7 @@ def main():
 
             # erase the Gemini corner watermark before saving (kit + white both clean)
             if args.strip_watermark:
-                strip_watermark(a, alpha, x_frac=args.wm_x_frac, y_frac=args.wm_y_frac)
+                strip_watermark(a, alpha, cx=args.wm_cx, cy=args.wm_cy, r=args.wm_r)
 
             # kit: pre-finish white RGBA bust (recolor input) + tank mask + geometry
             rgba = np.dstack([a, alpha]).astype("uint8")
