@@ -5089,9 +5089,13 @@ INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 80, "normal": 40, "passive": 0}
 #      bar         = HCO_PASS_SAFETY_BASE − offensive_efficiency
 #   3b intercept   = ((OD·0.6 + CH·0.2 + IQ·0.2) + defensive_efficiency) × rand(1,6)
 #      tier_hi/mid = (HCO_PASS_INTERCEPT_TIER_HI/MID) − defensive_efficiency
-HCO_PASS_SAFETY_BASE = 175.0
+# ⚠️ TEMPORARY TEST OVERRIDES (revert before commit) — force every reached HCO pass to deflect:
+#   SAFETY_BASE 175 → 600  : passer can never clear the 3a gate → all passes stay in play
+#   TIER_MID    170 → 0    : any 3b contest score > 0 → always steal/bat (guaranteed deflection)
+# Original values: SAFETY_BASE=175.0, TIER_HI=200.0, TIER_MID=170.0
+HCO_PASS_SAFETY_BASE = 600.0   # TEMP (was 175.0)
 HCO_PASS_INTERCEPT_TIER_HI = 200.0
-HCO_PASS_INTERCEPT_TIER_MID = 170.0
+HCO_PASS_INTERCEPT_TIER_MID = 0.0   # TEMP (was 170.0)
 
 
 def _hco_pass_lane_dist(game):
