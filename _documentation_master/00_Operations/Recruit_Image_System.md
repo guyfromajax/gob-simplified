@@ -247,13 +247,75 @@ small and self-contained — the only real work the offline version adds.
 
 ---
 
-## Body-type & library coverage requirement
+## Recruit build projection & body-type assignment (planned)
 
-The recolor handles all frames for free, **but** the pre-generated white library must be
-**stocked across all five frames** (`Slight, Lean, Normal, Broad, Doughy`) so a recruit is
-assigned a face matching his generated build (a 7-ft Broad center must not draw a Slight
-body). Frame is derived from the recruit's height/weight/archetype via the same classifier
-logic as the league players. **Requirement:** bake the library with good per-frame coverage.
+A recruit's portrait is baked once and persists into his whole playing career, so it must
+reflect his **projected mature build**, not his young recruit-day stats. The build is assigned
+by the **same classifier as the 127 teams** — but fed a **forward-projected, mature-equivalent
+record**, because recruit ratings/size are on a younger scale.
+
+### How the classifier makes a build (unchanged, shared with the league pipeline)
+
+- **DEFINITION** (muscle tone): `Cut` if `rt≥75 or (st≥65 & ag≥45)`; `Soft` if `rt≤45 & ag≤30`;
+  else `Toned`. → driven by **RT, ST, AG**.
+- **FRAME** (silhouette): height + BMI (`Lean <25.5`, `Broad ≥26.5`, `≤69" → Slight`, `Doughy`
+  if soft+heavy+`st<55`). → driven by **height/weight**, with **ST** gating Broad (`st≥65`) vs
+  Doughy.
+
+So ST/AG/RT must be on the **player scale** and height/weight must be **projected**, or a young
+recruit renders wrong (e.g. a strong JH prospect reads Soft/undefined; a big JH falls to Doughy).
+
+### Projection 1 — attribute maturity scaling (ST, AG, RT)
+
+Young recruits' attributes are generated on lower bands (`YEAR_TIER_RANGES` in
+`franchise_manager.py`); the classifier thresholds are player-scale. Scale each recruit's
+**ST, AG, RT up** into a mature-equivalent record by dividing by a per-year factor, then run the
+unchanged classifier. (Scaling *up* — rather than cutting thresholds — is mathematically
+identical but handles the Cut branch, the Soft branch, and the FRAME ST-override in one step,
+and leaves the shared classifier untouched.)
+
+| Recruit year | Factor | Basis |
+|---|---|---|
+| **JH** | **0.55** | `YEAR_TIER_RANGES` JH→Junior midpoint ratio avg = 0.54; matches the "JH ~doubles over career" rule of thumb |
+| **Freshman** | **0.65** | band ratio 0.65 |
+| **Sophomore** | **0.80** | band ratio 0.79 |
+| **Junior** | **1.00** | already ~mature — no scaling |
+
+- Consistent with the **RT color buckets** (`rtBucket.js`): JH RT uses a compressed scale
+  (blue 50+, vs player 81+); FR/SO/JR already use the player scale. RT's own JH bucket factor is
+  ~0.62 (slightly gentler than ST/AG) — start with the single per-year factor for all three, and
+  swap RT to its exact bucket map only if RT-driven builds look off.
+- **Not** related to `NG` (Natural Growth) — that's a gameplay-only combat-energy stat governing
+  in-game attribute erosion, not evergreen progression; excluded here.
+
+### Projection 2 — height/weight growth
+
+Height/weight are **not** year-scaled at generation, so project them forward using the game's
+**own** training-camp growth model (`training_execution_v2.py`), accounting for the year advancing
+one step at signing:
+
+| Recruit year | Grows through (post-signing) | Approx. projection |
+|---|---|---|
+| **JH** | Freshman + Sophomore camps | **~+2.5" / +20 lb** |
+| **Freshman** | Sophomore camp | **~+0.5–1" / +8 lb** |
+| **Sophomore / Junior** | none | **none** (current ≈ mature) |
+
+Camp deltas (per camp): Freshman avg ≈ +2" height / +5–30 lb; Sophomore ≈ +0.5" / +0–10 lb.
+Use **expected/median** deltas (deterministic) — the portrait is shared across franchises, so it
+can't match any single franchise's random roll.
+
+### Assembly
+
+```
+projected_record = recruit
+  .scale(ST, AG, RT  /= year_factor)          # Projection 1  -> DEFINITION
+  .add(height, weight += year_growth)          # Projection 2  -> FRAME
+classify(projected_record) -> frame (Slight/Lean/Normal/Broad/Doughy) + definition (Cut/Toned/Soft)
+```
+
+Then the same downstream pipeline as the 127 teams (reference body → NB face-swap → white master
+→ kit). **Library coverage requirement:** each set's 300 must span all five frames so builds
+match faces.
 
 ---
 
@@ -290,9 +352,11 @@ exactly. Decision: **use the templated system for their recruits anyway.**
 
 1. **Set schema** — lock the frozen `recruit_sets` record shape + stable-id scheme (the contract
    the baker and the loader share).
-2. **One set, end-to-end** — build a single set of 300: records + white masters + kits. For the
-   **first proof set, reuse existing generated faces** (zero NB cost) to validate the whole
-   path before spending NB on fresh faces.
+2. **One set, end-to-end** — build a single set of 300: reuse the existing
+   `generate_recruits_list()` for stats → **project to mature build** (attribute maturity
+   scaling ST/AG/RT + height/weight growth, see *Recruit build projection*) → classify → records
+   + white masters + kits. For the **first proof set, reuse existing generated faces** (zero NB
+   cost) to validate the whole path before spending NB on fresh faces.
 3. **Recolor refactor** — factor `apply_uniform()` out of `apply_team_uniforms.py`, u2net-free.
 4. **Manifest** — generate `teams_uniforms.json` from `128_teams.txt` (variant-shaped,
    `base: primary` for all 128).
@@ -317,6 +381,9 @@ exactly. Decision: **use the templated system for their recruits anyway.**
   dynamic generation when exhausted.
 - **`player_id = recruit_id`** through signing — one image lineage; walk-ons excepted.
 - **First proof set reuses existing faces** (free); fresh NB for real sets.
+- **Portrait = projected mature build.** Attribute maturity scaling (ST/AG/RT) by per-year
+  factor **JH 0.55 / FR 0.65 / SO 0.80 / JR 1.00**, plus height/weight growth projection; then
+  the unchanged classifier. Tunable after eyeballing the first set.
 
 ## Open items / decisions still needed
 
