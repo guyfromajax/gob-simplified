@@ -30,7 +30,23 @@ Goal: fold the on-ball moment into the unified per-step walk per Decision #1 (mo
 
 **Verdict:** Stage 3 helped (ONE shot path now, not two) so the reorder is cleaner than when deferred — but it's still a genuine spine restructuring (resolver + shot-clock + stopper + non-shot machinery re-keyed on the resolver's output). Highest-blast-radius change of the project. **Path B** (a standalone multi-outcome moment finalizer, mirroring `_finalize_hco_pass_interception`) is the alternative but re-implements the foul/turnover finalize for 4 types. **START HERE next session:** decide A vs B, then for A do the reorder in behavior-preserving steps (e.g. first thread the resolver's output into a unified `result`, then move `[2]`–`[4]` after `[5]`).
 
-> **Also open:** Stage 3 (SETPLAY) — set plays' "standard path" legacy + its flag, symmetric to motion (do after the fusion, not required by it). Trivial: delete the neutered `_dynamic_hco_motion_enabled` + prune its gate tests.
+### 🔎 Objective audit (2026-07-12b) — "one resolver for motion + set play; simplify execution"
+**Core objective ✅ MET:** one shot resolver `_resolve_hco_offense_shot_dynamic(…, is_setplay)` serves both; the ~255-line dup is gone. **Full "simplify execution" 🟡 PARTIAL** — the orchestration around the resolver is still branchy + ASYMMETRIC between motion and set play:
+
+| Concern | Motion | Set play | Unified? |
+|---|---|---|---|
+| Shot resolver | dynamic via `resolve_motion_offense_shot` wrapper | dynamic, called direct (7472) | ✅ same resolver, **2 invocation styles** |
+| Legacy fallback | removed (Stage 3) | **"standard set-play shot path" STILL LIVE** (7474/7476 when dynamic → None/error/flag-off) | ❌ |
+| Flag | retired | `_dynamic_hco_setplay_enabled()` still gates | ❌ |
+| Moment walk | called 6581 (on `skeleton`) | called AGAIN 6654 (on `final_skeleton`, flag-gated) + duplicated reach-in stamping | ❌ shared fn, **dup call sites** |
+| Skeleton | base_loop | variant-selected (`get_hco_skeleton(lean_score)`) | inherent to set plays (variants are real, keep) |
+| Up-front event tables | skipped (unconditional) | `resolve_hco_outcome` still the setplay/flag-off legacy | ❌ |
+
+**Gaps vs the plan:** setplay legacy + flag → **Stage 3 (setplay)** [in plan]. Moment dup → **the fusion** collapses BOTH call sites at once [in plan]. **NOT in plan:** (a) the wrapper cleanup (3 names → 1), (b) explicitly scoping `resolve_hco_outcome` + the "standard set-play path" under Stage 3 setplay.
+
+**⚖️ ORDER QUESTION (open, decide next session):** the plan sequences *fusion → Stage 3 setplay*. But **Stage 3 setplay is the piece that makes set play SYMMETRIC with motion** — the direct completion of the stated objective, and lower-risk. The fusion improves *correctness* (moment step-order) more than *structural symmetry*. Defensible to swap: **Stage 3 setplay FIRST** (finish the symmetry), **then** the fusion (correctness capstone). Human to decide.
+
+> **Also open:** trivial — delete the neutered `_dynamic_hco_motion_enabled` + prune its gate tests; collapse the 3 resolver wrapper names.
 > **Historical note:** earlier this block called Stage-2 work "Stage 1 man/zone" — a mislabel; it is **Stage 2**. Formal **Stage 1** = the moment fusion (resolvers unified ✅; moment-into-loop deferred).
 
 **✅ Stage 2 (defender-grid sharing) COMPLETE + verified on live turns (develop).** The interception contest now judges against the render's ACTUAL defender positions for BOTH man and zone, in one unified display frame. `🔬 STEPSTATE GAP` (canonical vs contest) measured **0% for man AND zone** on live play (was man 22–64%, zone up to 100%/96px mirror). The zone+away contact_point mirror is fixed.
