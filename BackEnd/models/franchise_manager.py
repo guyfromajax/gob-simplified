@@ -434,7 +434,10 @@ class FranchiseManager:
 
         _t0 = time.time()
         # Generate initial recruits for the franchise
-        recruits = self.recruit_manager.generate_recruits_list(count=300)
+        from BackEnd.models.recruit_sets import load_unused_set_or_generate
+        # Draw a pre-built image-backed set if any are loaded; else generate dynamically.
+        recruits, used_recruit_set_id = load_unused_set_or_generate(
+            self.db, self.recruit_manager, [], count=300)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
@@ -442,6 +445,8 @@ class FranchiseManager:
         extra_state = {
             "players": {},  # FPD holds player data; empty here for legacy safety
             "recruits": [],  # FRD holds recruit data; empty here for legacy safety
+            # recruit sets consumed by this franchise (never reused); empty if generated dynamically
+            "used_recruit_set_ids": [used_recruit_set_id] if used_recruit_set_id else [],
             "season_inbox": [],
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
@@ -519,7 +524,8 @@ class FranchiseManager:
         frd_docs = [
             {
                 "franchise_id": str(self.franchise_id),
-                "recruit_id": str(uuid.uuid4()),
+                # stable id from the pre-built set (keys the portrait); uuid4 for dynamic recruits
+                "recruit_id": recruit.get("recruit_id") or str(uuid.uuid4()),
                 "name": recruit["name"],
                 "attributes": recruit["attributes"],
                 "position_ratings": recruit["position_ratings"],
@@ -529,7 +535,7 @@ class FranchiseManager:
                 "year": recruit["year"],
                 "Home Region": home_region,
                 "Lean": self._build_recruit_lean(home_region, region_team_ids),
-                "created_at": recruit["created_at"],
+                "created_at": recruit.get("created_at") or datetime.utcnow(),
             }
             for recruit in recruits
             for home_region in [random.choice(list(region_team_ids.keys()))]
