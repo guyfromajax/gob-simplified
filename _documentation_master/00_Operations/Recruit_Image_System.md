@@ -45,7 +45,7 @@ Consequences that shape the whole system:
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Recruit faces | **Pre-generated white library / sellable pack** | ~$0 marginal per season, instant, and *is* the monetizable 300-pack. (Alt: fresh NB per franchise ≈ $18/season — rejected.) |
+| Recruit faces | **Fixed pre-built sets of 300** (loaded whole, never reused within a franchise) | ~$0 marginal per season, instant, and *is* the monetizable 300-pack. (Alt: fresh NB per franchise ≈ $18/season — rejected.) See *Recruit sets & season-init integration*. |
 | Offline uniforming | **Online-first; keep apply portable, defer offline port** | Ship server path now; the recolor is dependency-light so it drops into the download later with no rework. |
 | Uniform storage | **Tiny `teams_uniforms.json` recipe manifest** | No rendered uniforms on R2 — a jersey is data, not an image. |
 | Manifest shape | **Variant-based** (`base`, `zones`, `variants[]`) | Future jersey DLC (black / white / color-rush) slots in with no schema change. |
@@ -58,23 +58,28 @@ Consequences that shape the whole system:
 ## Asset lifecycle
 
 ```
-GENERATION (season start / pack build — server-side, full pipeline)
-  recruit gets a UUID (_id)         <-- critical: recruits have no _id today
-  -> assign a white portrait from the pre-generated library (by frame/geometry, UUID-seeded)
-  -> finished white master     ->  recruits/white/<uuid>.png     (shown weeks 1-34)
-  -> baked uniform "kit"       ->  recruits/kit/<uuid>.*         (mask + tank bbox; recolor input)
+SET BUILD (offline, one-time — server-side, full pipeline)
+  bake a fixed set of 300 recruits, each with a STABLE recruit_id (uuid)
+  -> per recruit: white master  ->  recruits/white/<recruit_id>.png   (shown weeks 1-34)
+  -> per recruit: uniform "kit"  ->  recruits/kit/<recruit_id>.*       (mask + bbox; recolor input)
+  -> store the 300 records in the recruit_sets collection (see below)
+
+SEASON START / ROLLOVER (per franchise, per season)
+  pick a random UNUSED set -> load its 300 recruits into FRD with their stable ids
+  (no unused set left -> fall back to dynamic generate_recruits_list, no images)
 
 SEASON (weeks 1-34)
-  game shows recruits/white/<uuid>.png  — no compute
+  game shows recruits/white/<recruit_id>.png  — no compute
 
 SIGNED (week 35)
+  player_id = recruit_id  (identity carries through — see integration below)
   look up new team's recipe in teams_uniforms.json
   apply_uniform(kit, primary, trim, wordmark) -> finish
-  -> uniformed master          ->  players/master/<uuid>.png     (same path the game already resolves)
+  -> uniformed master          ->  players/master/<recruit_id>.png    (same path the game already resolves)
   online: backend writes to R2   |   offline: same fn writes to local asset store
 
 FOREVER AFTER
-  game shows players/master/<uuid>.png
+  game shows players/master/<recruit_id>.png   (one UUID, one image lineage)
 ```
 
 The **kit** is the one genuinely new artifact: a precomputed shirt-mask + tank geometry baked
@@ -94,6 +99,102 @@ makes the apply step portable (server *or* the customer's machine).
 Same bucket (`gob-player-images`), same domain, same `<uuid>.png` convention as the
 [Player Image System](./Player_Image_System.md). In the **downloadable** build the white
 masters + kits + `teams_uniforms.json` ship **inside the pack** instead of living on R2.
+
+---
+
+## Recruit sets & season-init integration (planned)
+
+Today recruits are **generated dynamically** every season and given an **ephemeral** UUID at
+DB-insert time — nothing an image can be pre-attached to. The new model loads **fixed,
+pre-built sets of 300** whose recruits carry **stable** ids that match pre-baked images.
+
+### How recruits work today (verified against code)
+
+- Generated at **two** sites: season-1 init (`franchise_manager.py:437`) and every
+  finish-season rollover (`franchise_routes.py:14079`), both `generate_recruits_list(count=300)`.
+- `generate_recruits_list()` returns **id-less** profile dicts.
+- Stored in the **`franchise_recruits_data` (FRD)** collection; a `recruit_id` = `str(uuid.uuid4())`
+  is minted **at insert** (`franchise_manager.py:522`, `franchise_routes.py:14086`) and
+  `delete_many`'d + regenerated fresh each season — not image-stable.
+- At week-35 signing, `_week_35_result_entry_from_recruit` (`franchise_routes.py:10344`) mints a
+  **third, unrelated** `player_id`; `recruit_id` is kept only as a back-reference (`:10345`).
+- FPD player uniqueness is per-franchise: compound unique index `(franchise_id, player_id)`
+  (`db.py:170`).
+
+### `recruit_sets` collection (shared, read-only pool)
+
+Each doc is one **self-contained** set (≈1 MB, well under Mongo's 16 MB limit); embedding the
+full 300 records makes a set a portable unit == one downloadable pack file:
+
+```jsonc
+{
+  "set_id": "set_0007",             // stable identifier
+  "version": 1,
+  "recruits": [                     // 300 frozen records
+    { "recruit_id": "<uuid>", "name": "...", "attributes": {...},
+      "position_ratings": {...}, "height": ..., "weight": ...,
+      "archetype": "...", "year": "..." }
+    // image lives in R2 at recruits/white/<recruit_id>.png ; kit at recruits/kit/<recruit_id>.*
+  ]
+}
+```
+
+### Per-franchise usage (never reuse a set within a franchise)
+
+"Used" is a property of **(franchise × set)**, not of the set — sets are shared across
+franchises. Track consumed sets on the franchise season-state (small, grows by one per season):
+
+```
+used_recruit_set_ids: ["set_0007", "set_0002", ...]
+```
+
+### Selection + graceful fallback (identical online & offline)
+
+At each recruit-generation site:
+
+```python
+available = all_set_ids - franchise.used_recruit_set_ids
+if available:
+    set = random.choice(available)          # random unused set, per season
+    recruits = load_set(set).recruits        # stable ids + pre-baked images
+    franchise.used_recruit_set_ids.append(set)
+else:
+    recruits = generate_recruits_list(300)   # EXISTING path — no images, generic headshots
+```
+
+The current dynamic generator is **kept as the fallback**: a franchise that outlives the set
+inventory just gets imageless recruits (today's behavior) — never a repeat, never a crash.
+
+### Downloadable parity
+
+Mechanically identical; only storage differs:
+
+| | Online | Downloadable |
+|---|---|---|
+| Sets | `recruit_sets` collection (Mongo) | pack files shipped in the download |
+| Used-list | `used_recruit_set_ids` on franchise doc | same array in the local save file |
+| Exhausted | fall back to dynamic generation | fall back to dynamic generation |
+
+### Code touch points (small, contained)
+
+1. **Season-1 init** — `franchise_manager.py:437` (+ FRD insert `:522`): load an unused set;
+   use its stable ids.
+2. **Finish-season rollover** — `franchise_routes.py:14079` (+ FRD insert `:14086`): same swap.
+3. **Signing** — `franchise_routes.py:10344`: `player_id = recruit_doc.get("recruit_id") or str(uuid.uuid4())`
+   (real recruits keep their id → image lineage survives; walk-ons — `recruit_id: None`,
+   `franchise_manager.py:224` — still get a fresh id and fall back to the generic headshot).
+
+Two properties this buys for free:
+
+- **No within-franchise identity collision** — a set is consumed once and signed recruits keep
+  their id, so no later season can introduce a recruit whose id/face collides with a player
+  already on the roster.
+- **Cross-franchise face reuse is fine** — two different franchises may use the same set;
+  images are shared/global by `recruit_id` (normal for a sports sim).
+
+> **Inventory note:** the number of sets = seasons of *imaged* recruits per franchise (10 sets →
+> 10 seasons, then the imageless fallback kicks in). Grow the online `recruit_sets` pool over
+> time; the design supports it with no migration.
 
 ---
 
@@ -187,33 +288,48 @@ exactly. Decision: **use the templated system for their recruits anyway.**
 
 ## Build phases (online-first)
 
-1. **Manifest** — generate `teams_uniforms.json` from `128_teams.txt` (variant-shaped,
+1. **Set schema** — lock the frozen `recruit_sets` record shape + stable-id scheme (the contract
+   the baker and the loader share).
+2. **One set, end-to-end** — build a single set of 300: records + white masters + kits. For the
+   **first proof set, reuse existing generated faces** (zero NB cost) to validate the whole
+   path before spending NB on fresh faces.
+3. **Recolor refactor** — factor `apply_uniform()` out of `apply_team_uniforms.py`, u2net-free.
+4. **Manifest** — generate `teams_uniforms.json` from `128_teams.txt` (variant-shaped,
    `base: primary` for all 128).
-2. **Recruit identity** — mint a UUID (`_id`) for each recruit in
-   [`generate_recruits_list()`](../../BackEnd/models/franchise_manager.py) (they have none today).
-3. **White library + kit baker** — pre-generate the white-portrait pool (all five frames) and
-   bake each one's uniform kit (mask + bbox). Upload `recruits/white/` + `recruits/kit/`.
-4. **Recolor refactor** — factor `apply_uniform()` out of `apply_team_uniforms.py`,
-   u2net-free.
-5. **Signing hook** — on week-35 recruit signing, run apply_uniform → finish → write
-   `players/master/<uuid>.png`.
-6. **Frontend wiring** — resolve `recruits/white/<uuid>.png` pre-signing (a `getRecruitImageUrl`
-   or a fallback in `getPlayerImageUrl`); post-signing the existing player resolver just works.
-7. **Offline (later)** — port `apply_uniform()` into the downloadable build; ship white
+5. **Loader + 3 touch points** — swap season-1 init (`:437`) and rollover (`:14079`) to load an
+   unused set; unify `player_id = recruit_id` at signing (`:10344`); add `used_recruit_set_ids`.
+6. **Signing hook** — on week-35 signing, run apply_uniform → finish → write
+   `players/master/<recruit_id>.png`.
+7. **Frontend wiring** — resolve `recruits/white/<recruit_id>.png` pre-signing (a
+   `getRecruitImageUrl` or a fallback in `getPlayerImageUrl`); post-signing the existing player
+   resolver just works.
+8. **Prove online** — start a franchise, sign a few, confirm white → uniformed images follow the
+   id through signing. **Then batch the remaining 9 sets.**
+9. **Offline (later)** — port `apply_uniform()` into the downloadable build; ship sets + white
    masters + kits + manifest in the pack.
 
 ---
 
+## Decisions locked (this section — resolved during design)
+
+- **Fixed sets** of 300 (not a face library); a franchise loads a whole set per season.
+- **Never reuse a set within a franchise**; random pick from unused; graceful fallback to
+  dynamic generation when exhausted.
+- **`player_id = recruit_id`** through signing — one image lineage; walk-ons excepted.
+- **First proof set reuses existing faces** (free); fresh NB for real sets.
+
 ## Open items / decisions still needed
 
 - **Downloadable stack** (Electron/JS, Unity/C#, Godot, native) — determines whether the
-  offline recolor is a client reimplementation or a bundled helper. Needed before Phase 7.
+  offline recolor is a client reimplementation or a bundled helper. Needed before Phase 9.
 - **Kit format** — sidecar mask PNG vs baked alpha channel vs geometry-only. Lean: sidecar
   mask PNG (lossless, simplest).
-- **Library size / uniqueness policy** — how many white portraits in the shared online pool,
-  and whether packs are exactly-300 unique or drawn from a larger library.
+- **Online set inventory target** — how many `recruit_sets` to maintain (= seasons of imaged
+  recruits per franchise); start at 10, grow over time.
+- **Frame coverage per set** — each set's 300 must span all five frames so recruit builds match
+  their assigned face.
 - **Zone catalog** — which jersey zones (sleeves / side-panel / yoke / collar) to bake now, to
-  future-proof patterned-jersey DLC without re-baking the library.
+  future-proof patterned-jersey DLC without re-baking sets.
 
 ---
 
