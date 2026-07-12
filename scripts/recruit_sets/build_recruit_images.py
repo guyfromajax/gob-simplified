@@ -96,7 +96,8 @@ def main():
     ap.add_argument("--set", required=True, help="path to a set_<id>.json (its .manifest.json sits beside it)")
     ap.add_argument("--limit", type=int, help="only build the first N (cheap proof run)")
     ap.add_argument("--force", action="store_true", help="rebuild even if the white master exists")
-    ap.add_argument("--keep-watermark", action="store_true", help="do NOT strip the Gemini corner sparkle")
+    ap.add_argument("--strip-watermark", action="store_true",
+                    help="(EXPERIMENTAL) erase the Gemini corner sparkle — off by default")
     ap.add_argument("--wm-frac", type=float, default=0.16,
                     help="corner-box size (fraction of each dim) for watermark removal")
     ap.add_argument("--out-white", default=OUT_WHITE)
@@ -180,7 +181,7 @@ def main():
             center = int((xs.min() + xs.max()) / 2)
 
             # erase the Gemini corner watermark before saving (kit + white both clean)
-            if not args.keep_watermark:
+            if args.strip_watermark:
                 strip_watermark(a, alpha, frac=args.wm_frac)
 
             # kit: pre-finish white RGBA bust (recolor input) + tank mask + geometry
