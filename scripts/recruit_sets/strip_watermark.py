@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-Strip the Gemini corner watermark from already-generated recruit kits — no NB re-spend.
+Strip the Gemini bottom-right sparkle from finished recruit WHITE masters, in place.
 
-Loads each recruit kit bust (assets_staging/recruits/kit/<id>.png, pre-finish
-RGBA), erases the bottom-right sparkle (reflect adjacent content over person
-pixels), saves the cleaned kit back, and re-derives the finished white display
-master. The SIGNED uniform master is regenerated when you next run
-apply_recruit_uniform (it reads the now-clean kit), so nothing else is needed.
+Non-destructive method: extends the content directly ABOVE the corner box downward
+(RGB + alpha), so the arm stays arm and transparent background stays transparent —
+it can never pull the side background in (no white block). Operates on the finished
+masters (the coordinate system we measured the sparkle in), so what you verify is
+exactly what ships.
 
-    # clean every kit + white master
+    # clean all white masters
     python3 scripts/recruit_sets/strip_watermark.py
-    # tune the corner-box size if it clips a shoulder or misses the sparkle
-    python3 scripts/recruit_sets/strip_watermark.py --wm-frac 0.20
-    # one recruit
+    # one file
     python3 scripts/recruit_sets/strip_watermark.py --recruit-id <uuid>
+    # nudge the box if it misses/over-covers (fractions of W/H, top-left of the box)
+    python3 scripts/recruit_sets/strip_watermark.py --x-frac 0.87 --y-frac 0.88
 
-The removal logic is shared with build_recruit_images.strip_watermark, so future
-generation and this cleanup pass stay identical.
+Shares the removal logic with build_recruit_images.strip_watermark. Once verified,
+the same box is applied at generation time (build_recruit_images --strip-watermark),
+and re-run apply_recruit_uniform to refresh signed masters.
 """
 import os
 import sys
@@ -28,54 +29,46 @@ SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 sys.path.insert(0, HERE)
 
-import finish_portraits as fin              # noqa: E402  (finish -> crop to canvas)
 import build_recruit_images as bri          # noqa: E402  (shared strip_watermark)
 
-KIT_DIR = "assets_staging/recruits/kit"
 WHITE_DIR = "assets_staging/recruits/white"
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Strip Gemini watermark from existing recruit kits.")
-    ap.add_argument("--kit-dir", default=KIT_DIR)
+    ap = argparse.ArgumentParser(description="Strip Gemini watermark from finished white masters.")
     ap.add_argument("--white-dir", default=WHITE_DIR)
-    ap.add_argument("--recruit-id", help="one recruit uuid (default: all kits)")
-    ap.add_argument("--wm-frac", type=float, default=0.16)
+    ap.add_argument("--recruit-id", help="one recruit uuid (default: all)")
+    ap.add_argument("--x-frac", type=float, default=0.88, help="box left edge (frac of W)")
+    ap.add_argument("--y-frac", type=float, default=0.90, help="box top edge (frac of H)")
+    ap.add_argument("--suffix", default="", help="write to <id><suffix>.png instead of in place (e.g. _clean)")
     args = ap.parse_args()
 
     import numpy as np
     from PIL import Image
 
     if args.recruit_id:
-        ids = [args.recruit_id]
+        paths = [os.path.join(args.white_dir, f"{args.recruit_id}.png")]
     else:
-        ids = [os.path.basename(p)[:-4] for p in glob.glob(os.path.join(args.kit_dir, "*.png"))
-               if not p.endswith(".mask.png")]
-    os.makedirs(args.white_dir, exist_ok=True)
-
+        paths = sorted(glob.glob(os.path.join(args.white_dir, "*.png")))
     ok = fail = 0
-    for rid in ids:
-        kit_p = os.path.join(args.kit_dir, f"{rid}.png")
-        if not os.path.exists(kit_p):
-            print(f"[skip] {rid}: kit not found")
+    for p in paths:
+        if not os.path.exists(p):
+            print(f"[skip] not found: {p}")
             continue
         try:
-            arr = np.asarray(Image.open(kit_p).convert("RGBA")).astype(np.float32)
-            a, alpha = arr[..., :3].copy(), arr[..., 3]
-            bri.strip_watermark(a, alpha, frac=args.wm_frac)
-            rgba = np.dstack([a, alpha]).astype("uint8")
-            Image.fromarray(rgba, "RGBA").save(kit_p)                    # cleaned kit
-            tmp = kit_p + ".prefinish.png"
-            Image.fromarray(rgba, "RGBA").save(tmp)
-            fin.finish(tmp, os.path.join(args.white_dir, f"{rid}.png"))  # re-finished white master
-            os.remove(tmp)
-            print(f"[ok] {rid}")
+            arr = np.asarray(Image.open(p).convert("RGBA")).astype(np.float32)
+            a, alpha = arr[..., :3].copy(), arr[..., 3].copy()
+            bri.strip_watermark(a, alpha, x_frac=args.x_frac, y_frac=args.y_frac)
+            out = np.dstack([np.clip(a, 0, 255), alpha]).astype("uint8")
+            base, ext = os.path.splitext(p)
+            outp = f"{base}{args.suffix}{ext}"
+            Image.fromarray(out, "RGBA").save(outp)
+            print(f"[ok] {os.path.basename(outp)}")
             ok += 1
         except Exception as e:
-            print(f"[fail] {rid}: {type(e).__name__}: {str(e)[:120]}")
+            print(f"[fail] {os.path.basename(p)}: {type(e).__name__}: {str(e)[:120]}")
             fail += 1
-
-    print(f"\n[done] {ok} cleaned, {fail} failed. Re-run apply_recruit_uniform to refresh signed masters.")
+    print(f"\n[done] {ok} cleaned, {fail} failed (box x>={args.x_frac} y>={args.y_frac})")
 
 
 if __name__ == "__main__":

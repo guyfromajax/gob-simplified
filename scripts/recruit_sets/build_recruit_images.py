@@ -46,24 +46,20 @@ OUT_WHITE = "assets_staging/recruits/white"
 OUT_KIT = "assets_staging/recruits/kit"
 
 
-def strip_watermark(a, alpha, frac=0.16):
-    """Erase the Gemini/Nano-Banana corner sparkle by reflecting adjacent content
-    into the bottom-right corner box, only over person pixels (alpha>0). `a` = RGB
-    float array (modified in place), `alpha` = 0-255 person mask. `frac` = corner
-    box size as a fraction of each dimension — tune if it clips a shoulder or
-    misses the mark. Google's invisible SynthID is untouched; only the visible
-    sparkle is removed."""
-    import numpy as np
-    H, W, _ = a.shape
-    bw = max(1, int(W * frac))
-    bh = max(1, int(H * frac))
-    x0, y0 = W - bw, H - bh
-    if x0 - bw < 0:
+def strip_watermark(a, alpha, x_frac=0.88, y_frac=0.90):
+    """Erase the Gemini bottom-right sparkle by extending the content directly
+    ABOVE the corner box downward — copies both RGB and alpha. Arm stays arm,
+    transparent background stays transparent; it can never pull the side
+    background in, so no white block. `a` = RGB float array (modified in place),
+    `alpha` = 0-255 mask (modified in place). x_frac/y_frac = top-left of the
+    bottom-right box, as fractions of W/H. Google's invisible SynthID is untouched."""
+    H, W = a.shape[:2]
+    x0, y0 = int(W * x_frac), int(H * y_frac)
+    bh = H - y0
+    if bh <= 0 or y0 - bh < 0:
         return a
-    src = a[y0:H, x0 - bw:x0][:, ::-1, :]          # reflect the strip just left of the box
-    box = a[y0:H, x0:W]
-    m = (alpha[y0:H, x0:W] > 0)[..., None]          # only overwrite the person, not background
-    box[:] = np.where(m, src[:box.shape[0], :box.shape[1], :], box)
+    a[y0:H, x0:W] = a[y0 - bh:y0, x0:W]             # copy the block directly above, down
+    alpha[y0:H, x0:W] = alpha[y0 - bh:y0, x0:W]
     return a
 
 
@@ -97,9 +93,9 @@ def main():
     ap.add_argument("--limit", type=int, help="only build the first N (cheap proof run)")
     ap.add_argument("--force", action="store_true", help="rebuild even if the white master exists")
     ap.add_argument("--strip-watermark", action="store_true",
-                    help="(EXPERIMENTAL) erase the Gemini corner sparkle — off by default")
-    ap.add_argument("--wm-frac", type=float, default=0.16,
-                    help="corner-box size (fraction of each dim) for watermark removal")
+                    help="erase the Gemini corner sparkle (off by default)")
+    ap.add_argument("--wm-x-frac", type=float, default=0.88, help="watermark box left edge (frac of W)")
+    ap.add_argument("--wm-y-frac", type=float, default=0.90, help="watermark box top edge (frac of H)")
     ap.add_argument("--out-white", default=OUT_WHITE)
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()
@@ -182,7 +178,7 @@ def main():
 
             # erase the Gemini corner watermark before saving (kit + white both clean)
             if args.strip_watermark:
-                strip_watermark(a, alpha, frac=args.wm_frac)
+                strip_watermark(a, alpha, x_frac=args.wm_x_frac, y_frac=args.wm_y_frac)
 
             # kit: pre-finish white RGBA bust (recolor input) + tank mask + geometry
             rgba = np.dstack([a, alpha]).astype("uint8")
