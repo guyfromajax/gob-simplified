@@ -147,16 +147,31 @@ def fit_font(draw, text, ImageFont, max_w, start=170):
 
 
 def apply_uniform(in_path, out_path, wordmark, primary, secondary):
+    """League path: segment (u2net) then recolor+stamp. Recruits use the
+    precomputed-kit path (apply_recruit_uniform) which skips segmentation."""
+    import numpy as np
+    from scipy import ndimage
+    from PIL import Image
+
+    src = Image.open(in_path).convert("RGB")
+    a = np.asarray(src).astype(np.float32)
+    alpha = person_alpha(src, np, ndimage)                    # 0-255 person mask
+    tank = _tank(a, alpha > 128, np, ndimage)
+    rgba = recolor_and_stamp(a, alpha, tank, primary, secondary, wordmark)
+    Image.fromarray(rgba, "RGBA").save(out_path)
+
+
+def recolor_and_stamp(a, alpha, tank, primary, secondary, wordmark):
+    """Paint the tank `primary`, trim `secondary`, stamp the wordmark; return the
+    recolored RGBA (person on transparent bg). a=RGB float array, alpha=0-255
+    person mask, tank=bool tank mask. NO segmentation here — callers supply the
+    masks (u2net at league-gen time, or a precomputed kit at sign time). This is
+    the portable core the downloadable build reimplements."""
     import numpy as np
     from scipy import ndimage
     from PIL import Image, ImageDraw, ImageFont
 
-    src = Image.open(in_path).convert("RGB")
-    a = np.asarray(src).astype(np.float32)
     H, W, _ = a.shape
-    alpha = person_alpha(src, np, ndimage)                    # 0-255 person mask
-    person = alpha > 128
-    tank = _tank(a, person, np, ndimage)
     ys, xs = np.where(tank)
     if len(ys) == 0:
         raise ValueError("no tank found")
@@ -221,10 +236,9 @@ def apply_uniform(in_path, out_path, wordmark, primary, secondary):
     a = la[..., None]
     out = out * (1 - 0.96 * a) + arced[..., :3] * (0.96 * a)
 
-    # Output RGBA: recolored person on a transparent background (cutout done —
-    # only cropping remains). Alpha is the u2net person mask.
-    rgba = np.dstack([np.clip(out, 0, 255), alpha]).astype("uint8")
-    Image.fromarray(rgba, "RGBA").save(out_path)
+    # recolored person on a transparent background (cutout done — cropping is the
+    # finish stage). Alpha is the supplied person mask.
+    return np.dstack([np.clip(out, 0, 255), alpha]).astype("uint8")
 
 
 def main():
