@@ -30,13 +30,17 @@
 ## ✅ Decisions locked (feed the eventual Dynamic HCO System doc overhaul)
 Stable *contracts* settled with the human during this refactor — they won't change based on how we implement. Captured here as we go; the Dynamic HCO System doc gets ONE comprehensive overhaul at the end (mid-flight rewrites would describe a half-migrated state → "wires crossed"). Each entry: the rule + when locked.
 
-1. **Per-step event order (single-walk model), locked 2026-07-11.** At each step, run in order and STOP at the first terminal (possession-ending) event — **first terminal in step order wins**:
-   1. **Offense acts** — ball handler holds/moves, drives, passes (dish/kickout), or shoots.
-   2. **If he passed → interception check** (pass lane vs. the rendered defender grid). Pick/bat → STEAL/turnover ends the possession here.
-   3. **If he didn't pass → on-ball defender moment** — the ball-handler's man rolls strip/steal/foul on the live ball.
-   4. **If he shot → resolve the shot** (make/miss/foul).
+1. **Per-step event order (single-walk model), locked 2026-07-11.** At each step, run in order and STOP at the first terminal (possession-ending) event; **the first terminal in STEP order wins across the walk**. (Walk runs step 1..N; step 0 is starting positions, no decision.)
+   1. **Offense decides its action** — a mini-sequence, in this order:
+      - **1a. Scripted pass?** — a ball-reversal baked into the skeleton at this step.
+      - **1b. SM-precedence** — "work the ball instead of shooting?" → *the **FIRST** subtle-movement read*; runs BEFORE the shoot decision and can pre-empt it (`sm_takes_precedence`, gated by clock/tempo + `offense_reads`).
+      - **1c. Shoot decision** (`should_shoot`) — shoot, or dish to an open man → *the **HOT READ** lives here* (a dish; `_hco_blocked_dish_targets` first drops covered lanes).
+      - **1d. Movement matrix** (`decide_step_action`) — if no shot/dish, pick a move; subtle can also be chosen here (the 2nd subtle read).
+   2. **On-ball moment — EVERY step (incl. pass & shot steps).** The ball-handler's defender rolls strip/steal/foul. Fires → possession ends here, pinned to this step. **Moment-FIRST**: it gets its crack at the handler BEFORE the pass/shot he chose resolves.
+   3. **If the action was a pass** (and ② didn't fire) → interception check in the lane (vs. the rendered defender grid). Pick/bat → STEAL/turnover ends the possession here.
+   4. **If the action was a shot** (and ② didn't fire) → resolve the shot (make/miss/foul).
    5. **No terminal → advance to the next step.**
-   - Consequences vs. today: (a) the defender moment becomes **step-local** — it can only pre-empt a shot at the **same or a later** step, not an earlier one (today's moment walk runs entirely pre-shot and can pre-empt an earlier shot); (b) per step, interception and moment are **mutually exclusive** (2 *or* 3) — you either picked the pass or tried to strip the handler. Supersedes the implicit "moment always pre-empts the shot" precedence.
+   - Notes: moments fire on ALL steps and are NOT mutually exclusive with the pass/shot — the moment simply gets first crack, and the offense's chosen pass/shot resolves only if the handler survived it. Supersedes the old model where the moment ran as a SEPARATE full pass before shot resolution (and could pre-empt an earlier-step shot). **②'s placement (moment-first) is the human's current choice and may be revisited** — if flipped to offense-first, ② moves below ③/④.
 
 ---
 
