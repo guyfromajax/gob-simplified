@@ -5089,13 +5089,9 @@ INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 80, "normal": 40, "passive": 0}
 #      bar         = HCO_PASS_SAFETY_BASE − offensive_efficiency
 #   3b intercept   = ((OD·0.6 + CH·0.2 + IQ·0.2) + defensive_efficiency) × rand(1,6)
 #      tier_hi/mid = (HCO_PASS_INTERCEPT_TIER_HI/MID) − defensive_efficiency
-# ⚠️ TEMPORARY TEST OVERRIDES (revert before commit) — force every reached HCO pass to deflect:
-#   SAFETY_BASE 175 → 600  : passer can never clear the 3a gate → all passes stay in play
-#   TIER_MID    170 → 0    : any 3b contest score > 0 → always steal/bat (guaranteed deflection)
-# Original values: SAFETY_BASE=175.0, TIER_HI=200.0, TIER_MID=170.0
-HCO_PASS_SAFETY_BASE = 600.0   # TEMP (was 175.0)
+HCO_PASS_SAFETY_BASE = 175.0
 HCO_PASS_INTERCEPT_TIER_HI = 200.0
-HCO_PASS_INTERCEPT_TIER_MID = 0.0   # TEMP (was 170.0)
+HCO_PASS_INTERCEPT_TIER_MID = 170.0
 
 
 def _hco_pass_lane_dist(game):
@@ -5581,6 +5577,31 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
         skel = apply_stopper_system_to_skeleton(_src, "DEAD_BALL_TURNOVER", game_state)
     finally:
         game_state.pop("_hco_pass_intercept_stop_index", None)
+    # UESS batted-OOB animation (Layer B — mirrors the interception's steal_reach block): the deflector
+    # LUNGES to the contact point on the stop step, and the ball leaves the passer and is knocked to
+    # the nearest boundary. UNLIKE a steal, the ball does NOT attach to the defender — it exits OOB
+    # (no end owner) → side inbound. `bat_reach` + the bat_oob event's `oob_target` drive the emitter's
+    # passer→contact→OOB ball trajectory. Frame: contact is in the render/display frame already.
+    from BackEnd.engine.pass_contest import nearest_oob_point
+    _contact = motion_shot_info.get("pass_contact_point")
+    _oob_target = None
+    if _contact and isinstance(skel, dict) and skel.get("steps"):
+        _cc = {"x": float(_contact["x"]), "y": float(_contact["y"])}
+        _oob_target = nearest_oob_point(_cc)
+        _stop = skel["steps"][-1]
+        if motion_shot_info.get("interceptor_pos"):
+            _stop.setdefault("_attack_drive", {}).setdefault("defender_overrides", {})[
+                motion_shot_info["interceptor_pos"]] = {"coords": _cc, "action": "bat_reach"}
+        if _passer_pos and _passer_pos in (_stop.get("pos_actions") or {}):
+            _stop["pos_actions"][_passer_pos]["action"] = "pass"  # ball leaves the passer, batted away
+        _evs = _stop.setdefault("events", [])
+        _bat_ev = next((_ev for _ev in _evs if _ev.get("type") == "bat_oob"), None)
+        if _bat_ev is None:
+            _bat_ev = {"type": "bat_oob"}
+            _evs.append(_bat_ev)
+        _bat_ev["deflector_id"] = getattr(deflector, "player_id", None)
+        _bat_ev["contact"] = _cc
+        _bat_ev["oob_target"] = _oob_target
     to_roles = dict(roles)
     to_roles["ball_handler"] = ball_handler
     to_roles["defender"] = deflector
@@ -5599,12 +5620,12 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
         "next_play_type": "SIDE_INBOUND",
         "next_turn": "SIDE_INBOUND",
         "offense_team_id": off_team.team_id,
-        # Layer A ships the correct OUTCOME only. bat_oob stays False so the existing (broken-timing,
-        # non-UESS) FE ball-send + secondary announce do NOT fire. Layer B flips this on and emits the
-        # UESS batted-OOB animation. Contact + deflector are carried now so Layer B can use them.
-        "bat_oob": False,
+        # Layer B: the UESS batted-OOB animation is now wired (bat_reach override + bat_oob event with
+        # the OOB target, consumed by skeleton_step_emitter). bat_oob=True drives the FE announce/SFX.
+        "bat_oob": True,
         "bat_oob_contact": motion_shot_info.get("pass_contact_point"),
         "bat_oob_deflector_id": getattr(deflector, "player_id", None),
+        "bat_oob_target": _oob_target,
         "victim_id": None,                 # no TO credited
         "defender_id": getattr(deflector, "player_id", None),
         "is_interception": False,

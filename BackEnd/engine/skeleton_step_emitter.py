@@ -1631,14 +1631,29 @@ def build_skeleton_animation_steps(
         # of staying with the passer, which reads as a teleport when the next possession seeds the
         # stealer. ``_steal_contact`` (the pick coord) overrides the normal receiver meet-point below.
         _steal_contact = None
+        # Batted-OOB (UESS Layer B): a ``bat_reach`` override mirrors ``steal_reach`` (defender lunges
+        # to the contact point), but the ball is knocked OUT — it does NOT attach to him. ``_bat_contact``
+        # is the deflection point; ``_bat_oob_target`` (from the step's ``bat_oob`` event) is where the
+        # ball exits. Distinct from a steal: no end owner → ball_end is a COORD, not a player.
+        _bat_contact = None
+        _bat_oob_target = None
         _sk_i = skeleton_steps[i] if i < len(skeleton_steps) else {}
         for _dpos, _ov in ((_sk_i.get("_attack_drive") or {}).get("defender_overrides") or {}).items():
-            if (_ov or {}).get("action") == "steal_reach":
+            _ov_action = (_ov or {}).get("action")
+            if _ov_action == "steal_reach":
                 _iid = _player_id_at_pos(def_lineup, _dpos)
                 if _iid and owner_id_start:
                     owner_id_end = _iid
                     _steal_contact = (_ov or {}).get("coords")
                 break
+            if _ov_action == "bat_reach":
+                _bat_contact = (_ov or {}).get("coords")
+                break
+        if _bat_contact:
+            for _ev in (_sk_i.get("events") or []):
+                if _ev.get("type") == "bat_oob":
+                    _bat_oob_target = _ev.get("oob_target")
+                    break
 
         ball_handler_role = roles.get("ball_handler")
         bh_id_fallback = _safe_id(ball_handler_role) or ""
@@ -1651,6 +1666,9 @@ def build_skeleton_animation_steps(
             {"owner_player_id": owner_id_end} if owner_id_end
             else {"owner_player_id": bh_id_fallback}
         )
+        # Batted OOB: ball exits at the boundary with NO owner (coord end), overriding the owner form.
+        if _bat_contact and _bat_oob_target:
+            ball_end = {"coords": {"x": float(_bat_oob_target["x"]), "y": float(_bat_oob_target["y"])}}
 
         # Final Turn step 0 (alignment): the ball is on the SKELETON BH. In handoff /
         # best-effort modes the handoff-first prepend already delivered it to the PG
@@ -1971,6 +1989,17 @@ def build_skeleton_animation_steps(
                 # Backend resolves the tier from attributes; FE just plays.
                 step["start"]["sfx_on_ball_release"] = pass_release_sfx(passer_player)
                 step["start"]["sfx_on_ball_arrival"] = pass_arrival_sfx(receiver_player)
+        # Batted OOB trajectory: the ball tweens passer → contact (deflection) → OOB boundary at pass
+        # rate. is_pass_step is False here (no owner→owner transfer; ball_end is a coord), so stamp the
+        # motion explicitly. ball_arrival_coord = the contact/deflection point (intermediate); ball_end
+        # (set above) = the OOB rest coord. The deflector already lunges to the contact via bat_reach.
+        if _bat_contact and _bat_oob_target:
+            step["start"]["ball_motion_style"] = "pass"
+            step["start"]["ball_arrival_coord"] = {
+                "x": float(_bat_contact["x"]), "y": float(_bat_contact["y"])}
+            _passer_for_sfx = _player_lookup_by_id(off_lineup, def_lineup, owner_id_start)
+            if _passer_for_sfx is not None:
+                step["start"]["sfx_on_ball_release"] = pass_release_sfx(_passer_for_sfx)
         # Dynamic HCO Motion hot-read VO: the resolver flags the initiation skeleton step with
         # ``_hot_read_sfx``. Fire it at step-processing start (not ball motion) so it doesn't
         # collide with the shot/pass launch sound. See SFX_System.md.

@@ -69,6 +69,27 @@ COMPLETE = "COMPLETE"
 INTERCEPT = "INTERCEPT"
 BAT_OOB = "BAT_OOB"
 
+# Court boundaries (grid space): sidelines y=0/50, baselines x=0/100.
+COURT_X_MIN, COURT_X_MAX = 0.0, 100.0
+COURT_Y_MIN, COURT_Y_MAX = 0.0, 50.0
+
+
+def nearest_oob_point(xy):
+    """Universal (HCO/HCT/FCP): the nearest court boundary point — sideline OR baseline — to ``xy``,
+    where a batted-out-of-bounds ball exits. Returns ``{"x", "y"}`` on the closest of the four edges
+    (keeps the other coordinate, so the ball flies straight out the near edge)."""
+    x = float(xy.get("x", 0.0)); y = float(xy.get("y", 0.0))
+    d_left, d_right = x - COURT_X_MIN, COURT_X_MAX - x
+    d_bottom, d_top = y - COURT_Y_MIN, COURT_Y_MAX - y
+    m = min(d_left, d_right, d_bottom, d_top)
+    if m == d_top:
+        return {"x": x, "y": COURT_Y_MAX}
+    if m == d_bottom:
+        return {"x": x, "y": COURT_Y_MIN}
+    if m == d_right:
+        return {"x": COURT_X_MAX, "y": y}
+    return {"x": COURT_X_MIN, "y": y}
+
 
 def _euclid(a: Dict[str, Any], b: Dict[str, Any]) -> float:
     return math.hypot(float(b["x"]) - float(a["x"]), float(b["y"]) - float(a["y"]))
