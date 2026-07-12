@@ -39,7 +39,10 @@ import finish_portraits as fin          # noqa: E402  (finish -> crop to canvas)
 
 RECIPES = os.path.join(ROOT, "teams", "teams_uniforms.json")
 KIT_DIR = "assets_staging/recruits/kit"
-OUT_DIR = "assets_staging/players"       # players/master/<recruit_id>.png -> upload target
+# Dedicated recruit-signed staging folder (kept separate from the crowded league
+# `players` folder). At upload these are pushed to the R2 key players/master/<id>.png
+# — the object key the game resolves — but locally they live on their own.
+OUT_DIR = "assets_staging/recruits/signed"
 
 
 def _recipes():
