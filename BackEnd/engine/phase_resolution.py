@@ -5287,8 +5287,14 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     # Gate 1 — eligible interceptors: in-lane (perp <= lane_dist) with projection past the passer
     # (t > 0.1), including the receiver end (<= 1.0). The passer's OWN defender is never eligible —
     # exclude him by POSITION (not just t≈0) so posture sag can't drift him into the outgoing lane
-    # and "pick" his own man's pass. (Zone has no single passer-defender → rely on the t-band.)
-    _passer_def = set() if zone else {off_to_def.get(bh_pos, bh_pos)}
+    # and "pick"/bat his own man's pass. MAN → the matchup defender. ZONE → the on-ball zone defender
+    # (`_zone_bh_defender`: whose zone polygon covers the passer's spot), mapped back to its lineup key.
+    if zone:
+        _zbd = _zone_bh_defender(defense_playcall, _loc(bh_pos), is_away_offense, def_lineup, bh_pos)
+        _zbd_pos = next((dp for dp, p in def_lineup.items() if p is _zbd), None)
+        _passer_def = {_zbd_pos} if _zbd_pos else set()
+    else:
+        _passer_def = {off_to_def.get(bh_pos, bh_pos)}
     eligible_g1 = defenders_in_lane(passer_xy, receiver_xy, def_xy, lane_dist, t_min=0.1, t_max=1.0,
                                     exclude=_passer_def)
     # Gate 2 — Dynamic HCO Defense (posture set): each in-lane defender only ATTEMPTS the pick per
