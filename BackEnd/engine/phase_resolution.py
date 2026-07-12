@@ -3417,7 +3417,7 @@ def resolve_hco_outcome(game, skeleton):
     # path keeps the up-front tables. See Z-Completed/Dynamic_HCO_Motion_Brief.md / Dynamic_HCO_SP_Brief.md.
     _opt = game_state.get("offense_play_type", "")
     skip_upfront_events = (
-        (_opt == "motion" and _dynamic_hco_motion_enabled())
+        (_opt == "motion")  # Stage 3: dynamic motion is always on (legacy resolver removed)
         or (_opt in ("set", "set_play") and _dynamic_hco_setplay_enabled())
     )
 
@@ -4591,231 +4591,21 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_s
             "attack_penalty": float (0 if not attack or no penalty)
         }
     """
-    import copy
-    from BackEnd.constants import HCO_STRING_SPOTS
-    from BackEnd.utils.shared import get_away_player_coords
-    
-    game_state = game.game_state
-    off_team = game.offense_team
-    is_away_offense = off_team.team_id == game.away_team.team_id
-    
-    # Deep copy skeleton to avoid mutating original
-    skeleton = copy.deepcopy(skeleton)
-    steps = skeleton.get("steps", [])
-    
-    if len(steps) < 2:
-        logging.warning(f"⚠️ [MOTION SHOT] Skeleton has insufficient steps ({len(steps)}), cannot select shot step")
-        return None
 
-    # ── Dynamic HCO Motion (gated, experimental) ──────────────────────────────
-    # Attribute-based per-step decision loop (brief Steps 1–2) replaces the random
-    # step + random shot-type selection below. Off by default; enable with the
-    # GOB_DYNAMIC_HCO_MOTION env var. Recalibration (forced_shot_step_index) and any
-    # error fall back to the legacy path so live games are never broken.
-    if forced_shot_step_index is None and _dynamic_hco_motion_enabled():
-        logging.warning("🟢 [DYNAMIC MOTION] flag ON — running dynamic resolver for this Motion shot")
-        try:
-            dynamic_result = _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False)
-            if dynamic_result is not None:
-                return dynamic_result
-            logging.info("ℹ️ [DYNAMIC MOTION] Resolver returned None; using legacy random selection")
-        except Exception as e:
-            logging.warning(f"⚠️ [DYNAMIC MOTION] Error in dynamic resolver, falling back to legacy: {e}")
-
-    # Phase 1: Select step (forced for recalibration, else random excluding step 0)
-    if forced_shot_step_index is not None:
-        shot_step_index = max(1, min(forced_shot_step_index, len(steps) - 1))
-    else:
-        shot_step_index = random.randint(1, len(steps) - 1)
-    selected_step = steps[shot_step_index]
-    
-    # Truncate skeleton at selected step
-    truncated_steps = steps[:shot_step_index + 1]
-    last_timestamp = truncated_steps[-1].get("timestamp", 0)
-    
-    # Phase 2: Identify ball handler at selected step
-    ball_handler_pos = None
-    ball_handler_location = "key"
-    pos_actions = selected_step.get("pos_actions", {})
-    
-    for pos, action_info in pos_actions.items():
-        action = action_info.get("action", "").lower()
-        if action in ["handle_ball", "receive", "pass"]:
-            ball_handler_pos = pos
-            ball_handler_location = action_info.get("location", "key")
-            break
-    
-    if not ball_handler_pos:
-        logging.warning(f"⚠️ [MOTION SHOT] No ball handler found at selected step {shot_step_index}")
-        return None
-    
-    ball_handler = off_lineup.get(ball_handler_pos)
-    if not ball_handler:
-        logging.warning(f"⚠️ [MOTION SHOT] Ball handler position {ball_handler_pos} not found in lineup")
-        return None
-    
-    # Phase 3: Check shot possibilities
-    inside_possible, inside_receivers = _check_inside_shot_possibility(selected_step, ball_handler_location, off_lineup)
-    attack_possible = _check_attack_shot_possibility(ball_handler_location)
-    outside_possible, outside_players = _check_outside_shot_possibility(selected_step, off_lineup)
-    
-    ball_handler_at_inside = _is_inside_location(ball_handler_location)
-    
-    # 🔍 DEBUG: Log shot possibilities
-    logging.debug(f"🎯 [MOTION SHOT] Step {shot_step_index}, Ball handler: {ball_handler_pos} at {ball_handler_location}")
-    logging.debug(f"🎯 [MOTION SHOT] Inside possible: {inside_possible}, Receivers: {len(inside_receivers)}")
-    if inside_receivers:
-        logging.debug(f"🎯 [MOTION SHOT] Inside receivers: {[(r['position'], r['location']) for r in inside_receivers]}")
-    logging.debug(f"🎯 [MOTION SHOT] Attack possible: {attack_possible}, Outside possible: {outside_possible}")
-    logging.debug(f"🎯 [MOTION SHOT] Ball handler at inside: {ball_handler_at_inside}")
-    
-    # Phase 4: Get strategy settings and build weighted list
-    strategy_settings = off_team.strategy_settings
-    weighted_list = _build_shot_type_weighted_list(
-        strategy_settings, inside_possible, attack_possible, outside_possible, ball_handler_at_inside
-    )
-    
-    logging.debug(f"🎯 [MOTION SHOT] Weighted list: {weighted_list} (inside_weight={strategy_settings.get('inside', 2)}, attack_weight={strategy_settings.get('attack', 2)}, outside_weight={strategy_settings.get('outside', 2)})")
-    
-    # Phase 5: Select shot type
-    selected_shot_type = random.choice(weighted_list)
-    logging.debug(f"🎯 [MOTION SHOT] Selected shot type: {selected_shot_type}")
-    
-    # Phase 6: Execute shot - build additional steps
-    new_steps = []
-    shooter = ball_handler
-    shooter_pos = ball_handler_pos
-    shooter_location = ball_handler_location
-    attack_penalty = 0.0
-    
-    if selected_shot_type == "inside":
-        if ball_handler_at_inside:
-            # Ball handler shoots from current location
-            shoot_step = _create_shoot_step(ball_handler_pos, ball_handler_location, last_timestamp + 300)
-            new_steps.append(shoot_step)
-        else:
-            # Pass to inside receiver
-            receiver = _find_closest_receiver(ball_handler_location, inside_receivers, off_lineup)
-            receiver_pos = receiver["position"]
-            receiver_location = receiver["location"]
-            
-            # Step 1: Pass and receive
-            pass_step = _create_pass_receive_step(
-                ball_handler_pos, receiver_pos, ball_handler_location, receiver_location, last_timestamp + 300
-            )
-            new_steps.append(pass_step)
-            
-            # Step 2: Receiver shoots
-            shoot_step = _create_shoot_step(receiver_pos, receiver_location, last_timestamp + 600)
-            new_steps.append(shoot_step)
-            
-            shooter = receiver["player"]
-            shooter_pos = receiver_pos
-            shooter_location = receiver_location
-    
-    elif selected_shot_type == "outside":
-        if _is_outside_location(ball_handler_location):
-            # Ball handler shoots from current location
-            shoot_step = _create_shoot_step(ball_handler_pos, ball_handler_location, last_timestamp + 300)
-            new_steps.append(shoot_step)
-        else:
-            # Pass to outside receiver
-            receiver = _find_closest_receiver(ball_handler_location, outside_players, off_lineup)
-            receiver_pos = receiver["position"]
-            receiver_location = receiver["location"]
-            
-            # Step 1: Pass and receive
-            pass_step = _create_pass_receive_step(
-                ball_handler_pos, receiver_pos, ball_handler_location, receiver_location, last_timestamp + 300
-            )
-            new_steps.append(pass_step)
-            
-            # Step 2: Receiver shoots
-            shoot_step = _create_shoot_step(receiver_pos, receiver_location, last_timestamp + 600)
-            new_steps.append(shoot_step)
-            
-            shooter = receiver["player"]
-            shooter_pos = receiver_pos
-            shooter_location = receiver_location
-    
-    elif selected_shot_type == "attack":
-        # Determine drive destination
-        valid_destinations = _determine_attack_drive_destination(ball_handler_location)
-        destination = random.choice(valid_destinations)
-        
-        drive_result = _create_attack_drive_shoot_steps(
-            ball_handler_pos,
-            ball_handler_location,
-            destination,
-            last_timestamp + 300,
-            is_away_offense,
-            selected_step=selected_step,
-            off_lineup=off_lineup,
-            def_lineup=def_lineup,
-            game=game,
-        )
-        new_steps.extend(drive_result["steps"])
-        
-        shooter = drive_result.get("shooter") or ball_handler
-        shooter_pos = drive_result.get("shooter_pos") or ball_handler_pos
-        shooter_location = drive_result.get("shooter_location") or destination
-        selected_shot_type = drive_result.get("resolved_shot_type") or "attack"
-        playcall_override = drive_result.get("playcall")
-        
-        attack_penalty = _apply_attack_penalty(shooter_location, is_away_offense)
-        _playcall_map = {"inside": "Inside", "outside": "Outside", "attack": "Attack"}
-        skeleton["steps"] = truncated_steps + new_steps
-        
-        return {
-            "skeleton": skeleton,
-            "shooter": shooter,
-            "shooter_pos": shooter_pos,
-            "shooter_location": shooter_location,
-            "shot_type": selected_shot_type,
-            "playcall": playcall_override or _playcall_map.get(selected_shot_type, "Attack"),
-            "attack_penalty": attack_penalty,
-            "motion_attack_uncontested": drive_result.get("motion_attack_uncontested", False),
-            "motion_attack_geometry_contest": drive_result.get("motion_attack_geometry_contest", False),
-            "motion_attack_defense_bonus": drive_result.get("motion_attack_defense_bonus", 0),
-            "motion_attack_driver_shoots": drive_result.get("motion_attack_driver_shoots"),
-        }
-    
-    # Phase 7: Append new steps to truncated skeleton
-    skeleton["steps"] = truncated_steps + new_steps
-    
-    # Phase 8: Map shot type to playcall for shot calculation
-    playcall_map = {
-        "inside": "Inside",
-        "outside": "Outside",
-        "attack": "Attack"
-    }
-    playcall = playcall_map.get(selected_shot_type, "Inside")
-    
-    return {
-        "skeleton": skeleton,
-        "shooter": shooter,
-        "shooter_pos": shooter_pos,
-        "shooter_location": shooter_location,
-        "shot_type": selected_shot_type,
-        "playcall": playcall,
-        "attack_penalty": attack_penalty
-    }
+    # Stage 3 (2026-07-12): the legacy random-step resolver was REMOVED. All motion + set-play shot
+    # resolution — including recalibration's forced_shot_step_index — now runs through the unified
+    # dynamic resolver. Kept as a named entry point for existing callers.
+    return _resolve_hco_offense_shot_dynamic(
+        skeleton, game, off_lineup, def_lineup, is_setplay=False,
+        forced_shot_step_index=forced_shot_step_index)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Dynamic HCO Motion (gated) — attribute-based shot selection.
-# See _documentation_master/projects/Z-Completed/Dynamic_HCO_Motion_Brief.md and
-# Z-Completed/Dynamic_HCO_Motion_Implementation_Plan.md (archived). Phase 3: walk the skeleton making
-# per-step decisions (Step 2) and hand a shot decision off to the existing shot
-# builders / attack-drive sequence. Subtle-movement / freelance EMISSION is Phase
-# 4–5 — here those decisions simply advance to the next skeleton step.
-# ─────────────────────────────────────────────────────────────────────────────
 def _dynamic_hco_motion_enabled():
-    """Dynamic HCO Motion is ON by default — the up-front team-attribute event tables are sunset in
-    favor of the per-step attribute-driven moment walk. Kill switch: set GOB_DYNAMIC_HCO_MOTION to a
-    falsy value (``0``/``false``/``off``) to fall back to the legacy up-front tables."""
-    import os
-    return os.environ.get("GOB_DYNAMIC_HCO_MOTION", "1").strip().lower() in ("1", "true", "yes", "on")
+    """Dynamic HCO Motion is ALWAYS on (Stage 3, 2026-07-12): the legacy up-front tables + random-step
+    resolver were removed, so the GOB_DYNAMIC_HCO_MOTION kill switch has nothing to fall back to. This
+    always returns True; production no longer calls it (all gates simplified). Kept only as a stable
+    symbol for the existing gate tests; safe to delete once those are pruned."""
+    return True
 
 
 def _dynamic_hco_defense_enabled():
@@ -5698,9 +5488,7 @@ def _track_hco_pass_lanes(result, game):
     the "truly open" gate band) AND **full-eligible** (t 0.1–1.0, the contest band incl. the
     receiver's man). Accumulates in game_state and logs the running GAME totals each turn, so the
     last HCO turn's line is the game summary (total passes + overall averages). Pure observability;
-    behind GOB_DYNAMIC_HCO_MOTION; wrapped by the caller so it can never break a turn."""
-    if not _dynamic_hco_motion_enabled():
-        return
+    wrapped by the caller so it can never break a turn."""
     game_state = game.game_state
     if (game_state.get("offense_play_type") or "") != "motion":
         return
@@ -5892,7 +5680,8 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     return None
 
 
-def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False):
+def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False,
+                                      forced_shot_step_index=None):
     """Dynamic HCO per-step offense resolver — ONE implementation for Motion AND Set Play (unified
     2026-07-11; the two were ~255-line near-duplicates differing in a single behavioral fork).
 
@@ -5925,6 +5714,23 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     steps = skeleton.get("steps", [])
     if len(steps) < 2:
         return None
+
+    # Recalibration (Second Chance, Stage 3): force a shot at a SPECIFIC step, skipping the walk.
+    # Migrated here from the legacy resolver's forced_shot_step_index path so recalibration no longer
+    # depends on legacy. Truncates at the forced step and executes a shot via the same builders as the
+    # end-of-walk force-shot below. No interception contest (it's a forced shot, not a walked pass).
+    if forced_shot_step_index is not None:
+        _fidx = max(1, min(int(forced_shot_step_index), len(steps) - 1))
+        _fbh_pos, _fbh_loc = _motion_bh_at_step(steps[_fidx])
+        if not _fbh_pos or not off_lineup.get(_fbh_pos):
+            return None
+        _fbh = off_lineup[_fbh_pos]
+        _fshot = "inside" if _is_inside_location(_fbh_loc) else _choose_attack_or_outside(_fbh, random)
+        _fdec = {"action": SHOOT, "shooter_pos": _fbh_pos, "shot_type": _fshot}
+        return _execute_motion_decision(
+            skeleton, steps[:_fidx + 1], steps[_fidx], _fbh_pos, _fbh_loc, _fdec,
+            game, off_lineup, def_lineup, is_away_offense,
+        )
 
     # Option B: stamp the render's defender grid BEFORE the walk so the walk-time interception contest
     # (`_hco_contest_skeleton_pass` below) reads the SAME grid the coverage pass does — no reconstruction
@@ -6772,7 +6578,7 @@ def resolve_half_court_offense_logic(game):
     # steps with the attribute-driven moment; a hard outcome overrides `result` and routes through
     # the EXISTING non-shot resolution + stopper system below. (v1: man defense, pre-shot.)
     _hco_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
-    if is_motion_play and result == "SHOT" and _dynamic_hco_motion_enabled():
+    if is_motion_play and result == "SHOT":
         _moment_result = _resolve_hco_moment_walk(
             skeleton, game, off_lineup, def_lineup, reach_in_tags=_hco_reach_in_tags,
         )
