@@ -40,6 +40,7 @@ sys.path.insert(0, SCRIPTS)                     # for classify_player_archetypes
 sys.path.insert(0, ROOT)                        # for BackEnd.models.franchise_manager
 
 import classify_player_archetypes as clf        # noqa: E402  (pure functions reused)
+import player_ethnicity as pe                    # noqa: E402  (race mix balancing)
 
 # --- projection: recruit -> mature-equivalent build ------------------------
 # Attribute maturity scaling. Divide raw ST/AG/RT by the year factor to lift the
@@ -92,8 +93,54 @@ NEUTRAL_PRIMARY = "#141414"
 NEUTRAL_SECONDARY = "#e8e8e8"
 
 
-def build_one(recruit):
-    """One recruit -> (set record, manifest entry). recruit is a generate_recruits_list dict."""
+def _name_of(recruit):
+    first, _, last = recruit["name"].partition(" ")
+    return first, last
+
+
+def bounded_race_weights(recruits, seed, cap_pp=8):
+    """Roll a per-set race target within +/-cap_pp of the league base (60/30/10),
+    then return residual weights for the RANDOM (unmatched) pool so the set lands
+    near that rolled target. Name-signalled recruits (a 'Garcia' -> Hispanic)
+    count toward the target and are never overridden — so a race can't be rolled
+    BELOW its name-locked floor (else the impossible deficit would spill onto
+    another race and blow the cap). Gives organic set-to-set variation with the
+    drift bounded, instead of a rigid exact 60/30/10. Returns (weights, target_pct)."""
+    rng = random.Random(f"ethmix|{seed}")
+    base = dict(pe.RACE_WEIGHTS)                       # {"black":60,"white":30,"other":10}
+    n = len(recruits)
+
+    matched = {"black": 0, "white": 0, "other": 0}
+    for r in recruits:
+        race, _, _ = pe.name_signal(*_name_of(r))
+        if race:
+            matched[race] += 1
+    floor = {k: 100.0 * matched[k] / n for k in matched}      # name-locked minimum share
+
+    # Per-race feasible band: within +/-cap of base, but never below the name floor.
+    # Shrink the ROLL band by `headroom` so residual sampling noise (~2-3pp over the
+    # ~230 unmatched recruits) keeps the ACTUAL result inside the +/-cap band.
+    headroom = min(2.0, cap_pp / 3.0)
+    lo = {k: min(max(base[k] - cap_pp + headroom, floor[k]), base[k] + cap_pp) for k in base}
+    hi = {k: max(base[k] + cap_pp - headroom, lo[k]) for k in base}
+
+    # Roll 'other' in its band, then 'white' in the sub-band that also keeps 'black'
+    # in its band; 'black' is the remainder. Deterministic, always feasible.
+    to = rng.uniform(lo["other"], hi["other"])
+    w_lo = max(lo["white"], (100.0 - to) - hi["black"])
+    w_hi = min(hi["white"], (100.0 - to) - lo["black"])
+    tw = rng.uniform(w_lo, w_hi) if w_lo <= w_hi else base["white"]
+    tb = 100.0 - to - tw
+    target = {"black": tb, "white": tw, "other": to}
+
+    residual = {k: max(0.0, target[k] / 100.0 * n - matched[k]) for k in target}
+    weights = [(k, max(0, round(residual[k]))) for k in ("black", "white", "other")]
+    return weights, target
+
+
+def build_one(recruit, random_weights=None):
+    """One recruit -> (set record, manifest entry). recruit is a generate_recruits_list dict.
+    random_weights balances the pool's race mix to the league target (compute_random_weights)."""
     rid = str(uuid.uuid4())
     name = recruit["name"]
     year = recruit.get("year", "JH")
@@ -119,7 +166,7 @@ def build_one(recruit):
 
     # --- portrait genes (seeded by recruit_id, exactly like league players)
     first, _, last = name.partition(" ")
-    eth = clf.assign_ethnicity(first, last, rid)
+    eth = clf.assign_ethnicity(first, last, rid, random_weights=random_weights)
     portrait = {
         "race": eth["race"],
         "skin": eth["skin"],
@@ -195,7 +242,7 @@ def validate(set_doc):
         assert all(c in r["attributes"] for c in _ATTR_CODES), "missing core attributes"
 
 
-def print_summary(records, manifests, is_selftest):
+def print_summary(records, manifests, is_selftest, eth_target=None):
     n = len(records)
     yr = Counter(r["year"] for r in records)
     fr = Counter(m["build"]["frame"] for m in manifests)
@@ -213,6 +260,9 @@ def print_summary(records, manifests, is_selftest):
     line("frame", fr, order_fr)
     line("definition", de, ["Cut", "Toned", "Soft"])
     line("race", ra, ["black", "white", "other"])
+    if eth_target:
+        print("  " + " " * 12 + " target rolled: "
+              + " | ".join(f"{k} {eth_target[k]:.0f}%" for k in ("black", "white", "other")))
     missing = [f for f in order_fr if not fr.get(f)]
     if missing:
         print(f"  [warn] frames with zero coverage: {', '.join(missing)} "
@@ -225,6 +275,8 @@ def main():
     ap.add_argument("--count", type=int, default=300)
     ap.add_argument("--seed", type=int, help="seed generation for a reproducible set")
     ap.add_argument("--out-dir", default=HERE)
+    ap.add_argument("--eth-cap-pp", type=float, default=8.0,
+                    help="max drift (percentage points) of each race from the 60/30/10 base")
     ap.add_argument("--selftest", action="store_true",
                     help="build from synthetic recruits (validates proj/classify, writes nothing)")
     args = ap.parse_args()
@@ -234,9 +286,14 @@ def main():
     else:
         recruits = generate_recruits(args.count, args.seed)
 
+    # Balance the race mix toward a per-set target rolled within +/-cap of the
+    # league base (60/30/10), so sets vary organically without extreme drift.
+    eth_seed = args.seed if args.seed is not None else args.set_id
+    random_weights, eth_target = bounded_race_weights(recruits, eth_seed, args.eth_cap_pp)
+
     records, manifests = [], []
     for rc in recruits:
-        rec, man = build_one(rc)
+        rec, man = build_one(rc, random_weights=random_weights)
         records.append(rec)
         manifests.append(man)
 
@@ -254,7 +311,7 @@ def main():
         print(f"[ok] wrote {set_path}")
         print(f"[ok] wrote {man_path}")
 
-    print_summary(records, manifests, args.selftest)
+    print_summary(records, manifests, args.selftest, eth_target)
 
 
 if __name__ == "__main__":
