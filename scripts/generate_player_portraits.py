@@ -74,6 +74,13 @@ def slug(s):
 def build_prompt(row):
     acc = row.get("accessories", "").strip()
     acc = f"He has {acc}. " if acc else ""
+    # A prompted tattoo sleeve can bleed onto the tank fabric (NB paints the ink
+    # over the shoulder/upper arm the tank covers). Only when a tattoo is present,
+    # pin the layering so the tank always reads in front of the ink.
+    if "tattoo" in acc.lower():
+        acc += ("The white tank top always covers his shoulders and upper arms; any "
+                "tattoos are visible ONLY on the exposed skin below the tank (forearms "
+                "and lower arms) and are never printed on top of the tank fabric. ")
     return PROMPT.format(
         skin=row["skin_prompt"], face=row.get("face_prompt", ""),
         hair=row["hair"], expression=row["expression"],
