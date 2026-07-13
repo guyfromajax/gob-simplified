@@ -12,8 +12,8 @@ Chain:
       -> emit  <set_id>.json           (game-facing set doc; loads into FRD)
                <set_id>.manifest.json   (sidecar: projected build + portrait genes)
 
-Images (white masters + uniform kits) are a SEPARATE follow-up that consumes the
-manifest and reuses the existing portrait pipeline. This script writes DATA only.
+Images (uniform kits) are a SEPARATE follow-up that consumes the manifest and
+reuses the existing portrait pipeline. This script writes DATA only.
 
 Run on your machine (no DB, no GEMINI key needed for this step):
     python3 scripts/recruit_sets/build_recruit_set.py --set-id set_0001
@@ -88,7 +88,7 @@ def project_attr(value, year):
 
 
 # Recruits have no team, so accessories get neutral (black/white) colors rather
-# than team colors. The white master is pre-uniform; team recolor happens at sign.
+# than team colors. The kit bust is pre-uniform; team recolor happens at sign.
 NEUTRAL_PRIMARY = "#141414"
 NEUTRAL_SECONDARY = "#e8e8e8"
 

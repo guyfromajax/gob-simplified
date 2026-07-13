@@ -6,7 +6,7 @@ for the full architecture; this file is the exact field-level spec the **baker**
 **loader** reads.
 
 A "set" is 300 pre-built recruits shipped as a unit. Each recruit carries a **stable
-`recruit_id`** that keys its pre-generated images in R2 (`recruits/white/<recruit_id>.png`) and
+`recruit_id`** that keys its pre-generated uniform kit in R2 (`recruits/kit/<recruit_id>.png`) and
 survives all the way to the rostered player (`player_id = recruit_id` at signing).
 
 There are **two artifacts**:
@@ -47,7 +47,7 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
 ### Field notes
 
 - **`recruit_id`** — UUIDv4 string, minted once at bake time and never changed. The join key
-  across the whole image lineage (`recruits/white/…`, `recruits/kit/…`, `players/master/…`).
+  across the whole image lineage (`recruits/kit/…` → `players/master/…`).
 - **`height` / `weight`** — the **as-generated** values, unchanged from `generate_recruits_list()`.
   The mature-build **projection is baking-time only** (Artifact B) and does **not** overwrite
   these — gameplay still starts the recruit at his real generated size and grows him via the
@@ -73,7 +73,7 @@ that draws it.
 ## B. Baking manifest — sidecar (build-time only)
 
 One entry per `recruit_id`. The recruit analog of `players_archetypes.csv`: it records the
-projected mature build and the portrait genes used to generate the white master. **Never loaded
+projected mature build and the portrait genes used to generate the kit. **Never loaded
 into the game** — it exists for the baker and for QC/reproducibility.
 
 ```jsonc
@@ -110,8 +110,7 @@ and `portrait` drive the reference-body pick + NB face-swap, exactly like the 12
 |---|---|
 | `set_id` | `set_NNNN` zero-padded, human-readable, unique (`set_0001`, `set_0002`, …) |
 | `recruit_id` | UUIDv4 string |
-| White master (R2) | `recruits/white/<recruit_id>.png` |
-| Uniform kit (R2) | `recruits/kit/<recruit_id>.png` (+ sidecar meta) |
+| Uniform kit (R2) | `recruits/kit/<recruit_id>.png` (+ `.mask.png`, `.json` sidecars) |
 | Uniformed master (post-sign, R2) | `players/master/<recruit_id>.png` |
 | Set file (offline pack) | `set_NNNN.json` (Artifact A) |
 | Baking manifest (repo/build) | `set_NNNN.manifest.json` (Artifact B) |
@@ -122,6 +121,6 @@ and `portrait` drive the reference-body pick + NB face-swap, exactly like the 12
 
 1. `recruits` length == `recruit_count` == 300.
 2. All `recruit_id`s unique **within the set** (and, for online, globally across `recruit_sets`).
-3. Every recruit has a white master + kit at its R2 keys before the set is published.
+3. Every recruit has a kit (bust + mask + geometry) at its R2 keys before the set is published.
 4. Frames span all five (`Slight, Lean, Normal, Broad, Doughy`) so builds match faces.
 5. `year` ∈ the four-value enum; `attributes` contains the core 13 codes.

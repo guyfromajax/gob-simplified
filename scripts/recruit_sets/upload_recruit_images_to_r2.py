@@ -2,20 +2,23 @@
 """
 Upload recruit assets to Cloudflare R2 (bucket: gob-player-images) — Phase 2c.
 
-Three local staging folders map to three R2 key prefixes:
+Two local staging folders map to two R2 key prefixes:
 
-    assets_staging/recruits/white/   -> recruits/white/<id>.png     (weeks 1-34 display)
     assets_staging/recruits/kit/     -> recruits/kit/<id>.{png,json} (sign-time recolor input)
     assets_staging/recruits/signed/  -> players/master/<id>.png      (post-sign; game resolves this)
+
+There is no display master for un-signed recruits: the recruiting board is a
+stats table and un-signed recruits sunset at week 35, so only the kit (recolor
+input) and the post-sign master are ever uploaded.
 
 Reuses the league uploader's helpers (credentials, sha256 idempotency, dry-run),
 so behavior + conventions match exactly. Idempotent: re-running only pushes
 new/changed objects.
 
 Typical use:
-    # at set bake time — push white masters + kits:
-    python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage white kit --dry-run
-    python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage white kit
+    # at set bake time — push kits:
+    python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage kit --dry-run
+    python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage kit
     # at signing — push the uniformed masters:
     python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage signed
 
@@ -35,7 +38,6 @@ import upload_player_images_to_r2 as up   # noqa: E402  (load_env, sha256_of, re
 
 # stage -> (local dir, R2 key prefix)
 STAGES = {
-    "white":  ("assets_staging/recruits/white",  "recruits/white/"),
     "kit":    ("assets_staging/recruits/kit",    "recruits/kit/"),
     "signed": ("assets_staging/recruits/signed", "players/master/"),
 }

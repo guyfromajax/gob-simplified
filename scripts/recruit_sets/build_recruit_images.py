@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build recruit WHITE MASTERS + uniform KITS from a set manifest — Phase 2b.
+Build recruit uniform KITS from a set manifest — Phase 2b.
 
 For each recruit in a set's manifest, this:
   1. GENERATES a fresh white-tank bust via Nano Banana using the recruit's
@@ -10,10 +10,15 @@ For each recruit in a set's manifest, this:
   2. CUTS OUT the person (u2net / fallback) and precomputes the TANK MASK + bbox,
      so the future sign-time recolor needs no segmentation (portable / offline).
   3. Writes:
-       assets_staging/recruits/white/<recruit_id>.png   finished display master (weeks 1-34)
        assets_staging/recruits/kit/<recruit_id>.png      pre-finish white RGBA bust (recolor input)
        assets_staging/recruits/kit/<recruit_id>.mask.png tank mask (which pixels the recolor paints)
        assets_staging/recruits/kit/<recruit_id>.json     bbox/center for wordmark placement
+
+The kit is the ONLY pre-sign asset: nothing in the game ever displays an
+un-signed recruit's portrait (the recruiting board is a stats table, and
+un-signed recruits sunset at week 35). A finished display master is produced
+only at signing, by the recolor step (apply_recruit_uniform / sign_recruits),
+which reads the kit and writes players/master/<recruit_id>.png.
 
 Reuses the proven functions from generate_player_portraits / apply_team_uniforms
 / finish_portraits — this script is orchestration only.
@@ -24,8 +29,8 @@ Run on your machine (needs GEMINI_API_KEY + u2net, same as the league pipeline):
     # then the whole set:
     python3 scripts/recruit_sets/build_recruit_images.py --set scripts/recruit_sets/set_0001.json
 
-Idempotent: skips recruits whose white master already exists (unless --force).
-Upload (recruits/white + recruits/kit -> R2) is the next step.
+Idempotent: skips recruits whose kit already exists (unless --force).
+Upload (recruits/kit -> R2) is the next step.
 """
 import os
 import sys
@@ -39,10 +44,9 @@ sys.path.insert(0, SCRIPTS)
 
 import generate_player_portraits as gen         # noqa: E402  (PROMPT, build_prompt, load_env, MODEL)
 import apply_team_uniforms as uni               # noqa: E402  (person_alpha, _tank)
-import finish_portraits as fin                  # noqa: E402  (finish -> crop to canvas)
+import finish_portraits as fin                  # noqa: E402  (CANVAS_W/H for kit geometry)
 
 REF_DIR = gen.REF_DIR                            # tmp/portrait-pilot/reference_bodies/final/<frame>.png
-OUT_WHITE = "assets_staging/recruits/white"
 OUT_KIT = "assets_staging/recruits/kit"
 
 
@@ -91,10 +95,10 @@ def load_manifest(set_path):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generate recruit white masters + uniform kits.")
+    ap = argparse.ArgumentParser(description="Generate recruit uniform kits.")
     ap.add_argument("--set", required=True, help="path to a set_<id>.json (its .manifest.json sits beside it)")
     ap.add_argument("--limit", type=int, help="only build the first N (cheap proof run)")
-    ap.add_argument("--force", action="store_true", help="rebuild even if the white master exists")
+    ap.add_argument("--force", action="store_true", help="rebuild even if the kit exists")
     ap.add_argument("--model", default=gen.MODEL,
                     help="NB image model (try gemini-3.1-flash-image to test if it skips the sparkle)")
     ap.add_argument("--strip-watermark", action="store_true",
@@ -102,7 +106,6 @@ def main():
     ap.add_argument("--wm-cx", type=float, default=0.94, help="sparkle center x (frac of W)")
     ap.add_argument("--wm-cy", type=float, default=0.95, help="sparkle center y (frac of H)")
     ap.add_argument("--wm-r", type=float, default=0.055, help="sparkle inpaint radius (frac)")
-    ap.add_argument("--out-white", default=OUT_WHITE)
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()
 
@@ -122,7 +125,6 @@ def main():
     if args.limit:
         recruits = recruits[:args.limit]
 
-    os.makedirs(args.out_white, exist_ok=True)
     os.makedirs(args.out_kit, exist_ok=True)
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     _ref_cache = {}
@@ -139,8 +141,8 @@ def main():
     ok = skipped = failed = 0
     for rec in recruits:
         rid = rec["recruit_id"]
-        white_path = os.path.join(args.out_white, f"{rid}.png")
-        if os.path.exists(white_path) and not args.force:
+        kit_path = os.path.join(args.out_kit, f"{rid}.png")
+        if os.path.exists(kit_path) and not args.force:
             skipped += 1
             continue
         man = entries.get(rid)
@@ -182,26 +184,20 @@ def main():
             bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
             center = int((xs.min() + xs.max()) / 2)
 
-            # erase the Gemini corner watermark before saving (kit + white both clean)
+            # erase the Gemini corner watermark before saving the kit
             if args.strip_watermark:
                 strip_watermark(a, alpha, cx=args.wm_cx, cy=args.wm_cy, r=args.wm_r)
 
             # kit: pre-finish white RGBA bust (recolor input) + tank mask + geometry
             rgba = np.dstack([a, alpha]).astype("uint8")
-            Image.fromarray(rgba, "RGBA").save(os.path.join(args.out_kit, f"{rid}.png"))
+            Image.fromarray(rgba, "RGBA").save(kit_path)
             Image.fromarray((tank * 255).astype("uint8"), "L").save(
                 os.path.join(args.out_kit, f"{rid}.mask.png"))
             json.dump({"bbox": bbox, "center_x": center, "frame": frame,
                        "canvas": [fin.CANVAS_W, fin.CANVAS_H]},
                       open(os.path.join(args.out_kit, f"{rid}.json"), "w"))
 
-            # 3. finished white display master (crop to canvas) from the cutout
-            cut_tmp = os.path.join(args.out_kit, f"{rid}.cut.png")
-            Image.fromarray(rgba, "RGBA").save(cut_tmp)
-            fin.finish(cut_tmp, white_path)
-
             os.remove(raw_tmp)
-            os.remove(cut_tmp)
             print(f"[ok] {rec['name']:22} ({frame}/{man['build']['definition']}, "
                   f"{man['portrait']['race']}) -> {rid}.png")
             ok += 1
@@ -210,10 +206,9 @@ def main():
             failed += 1
 
     print(f"\n[done] {ok} built, {skipped} skipped, {failed} failed")
-    print(f"  white masters -> {args.out_white}")
-    print(f"  kits          -> {args.out_kit}")
+    print(f"  kits -> {args.out_kit}")
     if ok:
-        print("Eyeball a few white masters, then upload recruits/white + recruits/kit to R2.")
+        print("Spot-check a few kits, then upload recruits/kit to R2 and recolor a proof team.")
 
 
 if __name__ == "__main__":
