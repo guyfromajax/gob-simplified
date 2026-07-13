@@ -1,6 +1,10 @@
 # StepState — Dynamic HCO Turn Engine (working doc)
 
-**Status:** aligning (agent ↔ human). This is a shared scratchpad to agree on the architecture before building — **not** finished documentation. Keep it terse.
+**Status: ✅ COMPLETE / HISTORICAL RECORD (2026-07-13).** The refactor shipped; the **authoritative
+runtime doc is now [Dynamic_HCO_System.md](../06_Gameplay_Systems/Dynamic_HCO_System.md)** (comprehensively
+overhauled to the shipped architecture — one walk, fused moment, shared grid, coverage patch, bat-OOB).
+Remaining full-UESS gaps live in [stepState_gaps.md](stepState_gaps.md). This file is kept as the
+blow-by-blow decision/checkpoint log of *how* it was built — not the reference for *what* runs today.
 
 ---
 
