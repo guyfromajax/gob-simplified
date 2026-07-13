@@ -6963,7 +6963,7 @@ def command_center_data(
                     team_ids = [d["team_id"] for d in ftd_rank_docs if d.get("team_id") is not None]
                     teams_docs = {str(t["_id"]): t for t in db.teams.find(
                         {"_id": {"$in": team_ids}},
-                        {"name": 1, "primary_color": 1, "conference": 1}
+                        {"name": 1, "primary_color": 1, "conference": 1, "region": 1, "mascot": 1}
                     )}
                     natl_rank_by_team_id = {
                         str(d["team_id"]): int(d.get("natl_rank", 999) or 999)
@@ -7013,6 +7013,9 @@ def command_center_data(
                                 "matchup_label": "vs" if str(next_game.get("home_team_id")) == str(team_id) else "@",
                                 "opponent_team_id": opponent_id,
                                 "opponent_team_name": teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
+                                "opponent_team_mascot": teams_docs.get(opponent_id, {}).get("mascot", ""),
+                                "opponent_team_region": teams_docs.get(opponent_id, {}).get("region", ""),
+                                "opponent_team_conference": teams_docs.get(opponent_id, {}).get("conference"),
                                 "record": {
                                     "wins": int(opponent_standings.get("W", 0) or 0),
                                     "losses": int(opponent_standings.get("L", 0) or 0),

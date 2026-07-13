@@ -227,7 +227,7 @@ It renders an eight-card summary grid:
 - shows:
   - matchup label (`vs` / `@`)
   - opponent banner
-  - opponent team name + mascot
+  - opponent team name + mascot + region/conference (`opponent_team_name` + `opponent_team_mascot` + `opponent_team_region/opponent_team_conference`, e.g. `Providence Freeze (B3)`)
   - opponent record and rank on one meta row (`Record: W-L`, `Rank: #`)
   - top scorer
   - top rebounder

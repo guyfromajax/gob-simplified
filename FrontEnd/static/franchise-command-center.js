@@ -991,6 +991,16 @@ function renderHomeMatchupCard(bodyId, summary, options = {}) {
     return;
   }
   const opponentName = summary.opponent_team_name || 'Opponent';
+  const opponentMascot = String(summary.opponent_team_mascot || '').trim();
+  const opponentRegion = String(summary.opponent_team_region || '').trim().toUpperCase();
+  const opponentConference = summary.opponent_team_conference;
+  const opponentRegionConference = opponentRegion && opponentConference != null && opponentConference !== ''
+    ? `${opponentRegion}${opponentConference}`
+    : '';
+  const opponentBaseDisplayName = opponentMascot ? `${opponentName} ${opponentMascot}` : opponentName;
+  const opponentDisplayName = opponentRegionConference
+    ? `${opponentBaseDisplayName} (${opponentRegionConference})`
+    : opponentBaseDisplayName;
   const matchupLabel = summary.matchup_label || '';
   const logoSrc = typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(opponentName, 'banner_primary')
@@ -1007,7 +1017,7 @@ function renderHomeMatchupCard(bodyId, summary, options = {}) {
           </span>
         </div>
         <div class="fcc-home-matchup-bottom">
-          <div class="fcc-home-opponent-name">${escapeHomeHtml(opponentName)}</div>
+          <div class="fcc-home-opponent-name">${escapeHomeHtml(opponentDisplayName)}</div>
           <div class="fcc-home-detail-line fcc-home-meta-row">
             <span>Record: ${escapeHomeHtml(`${summary.record?.wins || 0}-${summary.record?.losses || 0}`)}</span>
             <span>Rank: ${escapeHomeHtml(summary.rank || 'N/A')}</span>
