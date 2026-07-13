@@ -5364,31 +5364,19 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
         skel = apply_stopper_system_to_skeleton(_src, "DEAD_BALL_TURNOVER", game_state)
     finally:
         game_state.pop("_hco_pass_intercept_stop_index", None)
-    # UESS batted-OOB animation (Layer B — mirrors the interception's steal_reach block): the deflector
-    # LUNGES to the contact point on the stop step, and the ball leaves the passer and is knocked to
-    # the nearest boundary. UNLIKE a steal, the ball does NOT attach to the defender — it exits OOB
-    # (no end owner) → side inbound. `bat_reach` + the bat_oob event's `oob_target` drive the emitter's
-    # passer→contact→OOB ball trajectory. Frame: contact is in the render/display frame already.
+    # UESS batted-OOB animation: the FE flies the ball passer→contact→nearest boundary IMPERATIVELY
+    # after the schema steps settle (`AnimationEngine._runHctBatOobBallSend`) — the SAME single path HCT
+    # uses — driven by the backend-resolved `bat_oob_contact` + `bat_oob_target` + deflector on the
+    # turn_result below (the FE reads `bat_oob_target`; it does NOT recompute the exit). We deliberately
+    # do NOT bake a step-based ball trajectory here: it double-fired with the imperative (ball → OOB, then
+    # → defender → OOB again), and the step path snaps contact→OOB with no bounce SFX. The ball stays with
+    # the passer through the stop step (the receiver was un-caught above), so the imperative flies it from
+    # the passer; the deflector slide + block1.wav bounce SFX are the imperative's. `nearest_oob_point`
+    # (engine) is authoritative for the exit point. Contact is already in the render/display frame.
     from BackEnd.engine.pass_contest import nearest_oob_point
     _contact = motion_shot_info.get("pass_contact_point")
-    _oob_target = None
-    if _contact and isinstance(skel, dict) and skel.get("steps"):
-        _cc = {"x": float(_contact["x"]), "y": float(_contact["y"])}
-        _oob_target = nearest_oob_point(_cc)
-        _stop = skel["steps"][-1]
-        if motion_shot_info.get("interceptor_pos"):
-            _stop.setdefault("_attack_drive", {}).setdefault("defender_overrides", {})[
-                motion_shot_info["interceptor_pos"]] = {"coords": _cc, "action": "bat_reach"}
-        if _passer_pos and _passer_pos in (_stop.get("pos_actions") or {}):
-            _stop["pos_actions"][_passer_pos]["action"] = "pass"  # ball leaves the passer, batted away
-        _evs = _stop.setdefault("events", [])
-        _bat_ev = next((_ev for _ev in _evs if _ev.get("type") == "bat_oob"), None)
-        if _bat_ev is None:
-            _bat_ev = {"type": "bat_oob"}
-            _evs.append(_bat_ev)
-        _bat_ev["deflector_id"] = getattr(deflector, "player_id", None)
-        _bat_ev["contact"] = _cc
-        _bat_ev["oob_target"] = _oob_target
+    _oob_target = nearest_oob_point(
+        {"x": float(_contact["x"]), "y": float(_contact["y"])}) if _contact else None
     to_roles = dict(roles)
     to_roles["ball_handler"] = ball_handler
     to_roles["defender"] = deflector
@@ -5407,8 +5395,9 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
         "next_play_type": "SIDE_INBOUND",
         "next_turn": "SIDE_INBOUND",
         "offense_team_id": off_team.team_id,
-        # Layer B: the UESS batted-OOB animation is now wired (bat_reach override + bat_oob event with
-        # the OOB target, consumed by skeleton_step_emitter). bat_oob=True drives the FE announce/SFX.
+        # bat_oob=True drives the FE announce/SFX AND the imperative ball-send
+        # (`_runHctBatOobBallSend`); bat_oob_contact/target/deflector feed that send (FE reads the
+        # backend target, does not recompute). No step-based trajectory — see the note above.
         "bat_oob": True,
         "bat_oob_contact": motion_shot_info.get("pass_contact_point"),
         "bat_oob_deflector_id": getattr(deflector, "player_id", None),

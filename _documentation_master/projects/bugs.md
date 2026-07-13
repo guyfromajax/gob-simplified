@@ -1,5 +1,7 @@
 ##Bugs
 1. Teleported an HCO entry step, result was a DB turnover
+2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
+3. HCO entry pass on offense side teleported
 
 ##Verify as Perfect
 1. EOQ Perfection
@@ -90,6 +92,14 @@ Two critical issues from the animation blueprint's "Known HCO Turn Issues" list 
 
 ### ✅ Fixed — Bucket 4: Defenders move before ball detaches on HCO passes (2026-07-01)
 - Backend step-placement off-by-one: defender rotation authored one beat early. Two-handler pass-step model in `animator.py`. See `05_UESS_System/Defense_Coords_System.md` → "Per-Step Timing: The Two-Handler Pass Step".
+
+### ✅ Fixed — HCO batted-OOB: ball went OOB *then* bounced off the defender (double send) (2026-07-12)
+- **Symptom:** HCO bat-OOB only — ball detached from passer → flew OOB → then animated back to the defender, bounced, and went OOB again. HCT/FCP were clean (pass→defender→OOB, one motion).
+- **Root cause:** HCO fired **two** OOB ball trajectories. (1) `_finalize_hco_pass_bat_oob` baked a step-based trajectory (`bat_reach` override + `bat_oob` step event → `skeleton_step_emitter` ball motion). (2) The turn_result also set `bat_oob: True`, which triggers the FE's HCT-era imperative send `AnimationEngine._runHctBatOobBallSend` (runs after the steps settle). HCT never bakes a step trajectory, so it fired only (2); HCO fired both. The step path also *snapped* contact→OOB (no bounce) and lacked the `block1.wav` bounce SFX — the imperative had the good animation.
+- **Fix (imperative-only, UESS-compliant):** removed the step-based trajectory from `_finalize_hco_pass_bat_oob` (no `bat_reach`/`bat_oob` step event, ball stays with the passer — receiver already un-caught — so the imperative flies it), kept the turn_result `bat_oob` + contact/target/deflector fields. Made the FE imperative read the backend's authoritative exit point: `oobGrid = turnData.bat_oob_target ?? resolveNearestOutOfBoundsGrid(contact)` (`AnimationEngine.js`) instead of always recomputing — so the OOB position is engine-owned, FE only draws.
+- **Open follow-ups [CODE-CLEANUP]:**
+  - `skeleton_step_emitter.py` `bat_reach`/step-`bat_oob` handling (~1634–1671, ~1992–1999) is now **inert dead code** (no writer remains) — safe but should be removed.
+  - **HCT UESS gap:** HCT's imperative exit point is still FE-derived — its backend sends `bat_oob_contact` but no target. Send a `nearest_oob_point` target from `dynamic_hct.py` so the new FE fallback reads it (FCP already passes `meta.oob_coords`, so it's fine).
 
 ## Screen capture (marketing)
 

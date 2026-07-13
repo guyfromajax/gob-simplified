@@ -520,7 +520,10 @@ export class AnimationEngine {
       }
     }
 
-    const oobGrid = resolveNearestOutOfBoundsGrid(contact);
+    // UESS: the exit point is a game-relevant position → it must come from the engine, not be
+    // re-derived here. Prefer the backend-resolved target (HCO sends `bat_oob_target` from
+    // `nearest_oob_point`); fall back to the FE compute only for turns that don't send one (HCT).
+    const oobGrid = turnData?.bat_oob_target ?? resolveNearestOutOfBoundsGrid(contact);
     const { animateBattedBallOutOfBounds } = await import("./batOobAnimation.js");
 
     await animateBattedBallOutOfBounds(scene, {
