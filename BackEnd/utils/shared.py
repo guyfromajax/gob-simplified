@@ -3064,14 +3064,15 @@ def calculate_defender_pressure_score(defender, defense_call):
     """
     Calculate defensive pressure score for a defender.
     Used for turnover and steal attempt calculations.
-    
+
     Formula: (OD * 0.3 + AG * 0.3 + IQ * 0.2 + CH * 0.2) * random(1, 6)
-    Zone defense modifier: pressure *= 0.9
-    
+    (The old zone ×0.9 modifier was removed 2026-07-13 — see `defender_pressure_raw`. Zone's effect
+    on offense is the intentional shot-threshold matrix, not a flat pressure penalty.)
+
     Args:
         defender: Defender player object with attributes
-        defense_call: Defense playcall / canonical slug (e.g., "man", "2-3-zone"; legacy display names still accepted)
-    
+        defense_call: Defense playcall / canonical slug (retained for API stability; currently unused)
+
     Returns:
         int: Defender pressure score
     """
@@ -3079,24 +3080,25 @@ def calculate_defender_pressure_score(defender, defense_call):
 
 
 def defender_pressure_raw(defender, defense_call):
-    """Roll-free defender pressure score: (OD*0.3 + AG*0.3 + IQ*0.2 + CH*0.2)[* 0.9 if zone].
+    """Roll-free defender pressure score: (OD*0.3 + AG*0.3 + IQ*0.2 + CH*0.2).
 
     The randomized `calculate_defender_pressure_score` wraps this. Callers that supply
     their own single random roll (e.g. Dynamic HCO Motion form-B scores) use this raw
     value directly to avoid a double roll. See Z-Completed/Dynamic_HCO_Motion_Brief.md.
-    """
-    from BackEnd.utils.defense_utils import is_zone_defense
 
+    NOTE (2026-07-13): the old zone ×0.9 modifier was REMOVED here — a zone defender is not
+    inherently worse at contesting a drive / forcing a turnover / trapping. Zone's effect on OFFENSE
+    now lives solely in the intentional per-shell shot-threshold tradeoff matrix
+    (`_hco_zone_shot_threshold_delta`), not a flat pressure penalty. `defense_call` is retained in the
+    signature (callers pass it; currently unused) for API stability.
+    """
     def_attrs = defender.attributes
-    pressure = (
+    return (
         def_attrs["OD"] * 0.3 +
         def_attrs["AG"] * 0.3 +
         def_attrs["IQ"] * 0.2 +
         def_attrs["CH"] * 0.2
     )
-    if is_zone_defense(defense_call):
-        pressure *= 0.9
-    return pressure
 
 
 def inside_defender_raw(defender):

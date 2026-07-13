@@ -150,6 +150,32 @@ def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
 
 
+# Dynamic HCO Defense — S1 Part C (Dynamic_MM_Brief §7). Graded contest by the primary defender's
+# Euclidean distance to the shot spot — the openness primitive (a beaten/lagged defender is farther)
+# turned into make probability. Replaces the old boolean "within CONTEST_EUCLIDEAN_RADIUS → full
+# contest" with a ramp: ≤ NEAR = full defensive weight (1.0), linear down to OPEN_FLOOR at OPEN_DIST,
+# flat FLOOR from there to the radius bound (9–11 = "not open, low impact"). HCO + dynamic-defense
+# only; every other caller passes factor 1.0 (byte-identical). Owner spec: ≤3 major advantage … ≥9
+# ~wide open. Tunable at the S1 Monte-Carlo checkpoint.
+PROXIMITY_CONTEST_NEAR_DIST = 3.0    # ≤ this grid → full contest (factor 1.0)
+PROXIMITY_CONTEST_OPEN_DIST = 9.0    # ≥ this grid → wide-open floor
+PROXIMITY_CONTEST_OPEN_FLOOR = 0.15  # residual defensive weight from OPEN_DIST out to the radius
+
+
+def _proximity_contest_factor(dist):
+    """S1 Part C: primary-defender proximity → defensive weight in [OPEN_FLOOR, 1.0]. ≤3 grid full,
+    linear ramp down to the floor at 9, flat floor beyond. None → 1.0 (no scaling)."""
+    if dist is None:
+        return 1.0
+    d = float(dist)
+    if d <= PROXIMITY_CONTEST_NEAR_DIST:
+        return 1.0
+    if d >= PROXIMITY_CONTEST_OPEN_DIST:
+        return PROXIMITY_CONTEST_OPEN_FLOOR
+    frac = (d - PROXIMITY_CONTEST_NEAR_DIST) / (PROXIMITY_CONTEST_OPEN_DIST - PROXIMITY_CONTEST_NEAR_DIST)
+    return 1.0 - (1.0 - PROXIMITY_CONTEST_OPEN_FLOOR) * frac
+
+
 def _resolve_hco_shot_defenders(game, def_lineup, shooter, shooter_pos, shot_step_index):
     if game.game_state.get("offensive_state") != "HCO":
         return None, None
@@ -869,6 +895,18 @@ class ShotManager:
             has_contest = bool(defender or second_defender) if game_state.get("offensive_state") == "HCO" else geometry_has_contest
         if motion_uncontested:
             has_contest = False
+        # Dynamic HCO Defense — S1 Part C: scale the primary defender's contest by his Euclidean
+        # distance to the shot spot (openness primitive → make probability). Dynamic-defense only
+        # (posture set); flag-off / non-HCO keep factor 1.0 (unchanged). A matchup defender beyond the
+        # contest radius no longer contests — parity with the motion-geometry path (already ≤ radius).
+        proximity_factor = 1.0
+        if has_contest and game_state.get("_hco_defense_posture") and hasattr(defender, "coords"):
+            _dfx, _dfy = _player_xy(defender)
+            _pdist = math.hypot(_dfx - sx, _dfy - sy)
+            if not motion_geometry and _pdist > CONTEST_EUCLIDEAN_RADIUS:
+                has_contest = False
+            else:
+                proximity_factor = _proximity_contest_factor(_pdist)
         rim_unguarded_99 = (
             _shot_in_rim_box(sx, sy, bx, by)
             and not has_contest
@@ -1021,6 +1059,7 @@ class ShotManager:
                 second_defender,
                 shooter_location_str,
                 apply_defense=has_contest,
+                proximity_factor=proximity_factor,
             )
             if has_contest:
                 contest_result, contest_margin = resolve_contest(
@@ -2758,6 +2797,7 @@ class ShotManager:
         shooter_location=None,
         *,
         apply_defense=True,
+        proximity_factor=1.0,
     ):
         """
         Calculate shot score based on attributes, shot_type (inside/attack/outside), defense, gravity, etc.
@@ -2826,6 +2866,12 @@ class ShotManager:
                     defense_attrs["IQ"] * 0.1 +
                     defense_attrs["CH"] * 0.1
                 ) * random.randint(1, 6)
+
+            # Dynamic HCO Defense — S1 Part C: graded proximity scales the primary defender's impact
+            # by his distance to the shot (1.0 = tight ≤3 grid, floor = far/open). Applied at the
+            # source so it flows into shot_defense_score_raw (contest classification), the shot_score
+            # penalty (make probability), AND the shooting-foul check. 1.0 for every non-HCO caller.
+            defense_score *= proximity_factor
 
             # Track defense score for statistics
             self.defense_scores.append(defense_score)

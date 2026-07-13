@@ -66,6 +66,34 @@ def _subtle_defender_should_freeze(skeleton_step, def_pos, anchor_off_pos):
     return (not anchor_moved) or (not read_follows)
 
 
+# Dynamic HCO Defense — S1 Part B (Dynamic_MM_Brief §7). A beaten defender LAGS instead of tracking:
+# he ends a fraction of the way from his prior spot toward his tracked (man-following) spot, opening
+# the gap to his man — the openness primitive the shot contest + dish gate read. Lag scales with how
+# badly he lost the read (|margin|; owner-locked option a). A beaten score ≤ MOTION_READ_THRESHOLD, so
+# the beat margin ∈ [−110, 0] → |margin| ∈ [0, 110]: a full beat lags OPENNESS_LAG_MAX toward-freeze,
+# a marginal miss barely lags. A defender whose man DIDN'T move never lags (no space to open).
+OPENNESS_LAG_MAX = 0.8              # worst beat → defender tracks only (1 − 0.8) = 20% toward his man
+OPENNESS_LAG_MARGIN_SCALE = 110.0  # |margin| at which lag saturates (= MOTION_READ_THRESHOLD)
+OPENNESS_ANCHOR_MOVE_EPS = 1.0     # guarded man must travel > this many grid for a beat to open space
+
+
+def _defender_lag_fraction(skeleton_step, def_pos, anchor_off_pos, anchor_moved):
+    """S1 Part B: how much this defender TRACKS his man this step, in [0,1]. 1.0 = full track;
+    lower = lagged (beaten → space opens). Reads the GRADED per-step reads Part A stamps on
+    ``step["_defender_reads"]`` (``{def_pos: {follows, margin}}``): a beaten defender whose man moved
+    lags by |margin|. When no graded reads exist on the step (SM beats carry bool reads on
+    ``_subtle_movement``; non-dynamic turns carry none) it delegates to the legacy
+    ``_subtle_defender_should_freeze`` → binary full-freeze / track, so those paths are UNCHANGED."""
+    reads = (skeleton_step or {}).get("_defender_reads") or {}
+    r = reads.get(def_pos)
+    if isinstance(r, dict):
+        if r.get("follows", True) or not anchor_moved:
+            return 1.0
+        beat = min(1.0, abs(float(r.get("margin", 0.0))) / OPENNESS_LAG_MARGIN_SCALE)
+        return max(0.0, 1.0 - OPENNESS_LAG_MAX * beat)
+    return 0.0 if _subtle_defender_should_freeze(skeleton_step, def_pos, anchor_off_pos) else 1.0
+
+
 class Animator:
     def __init__(self, game):
         self.game = game
@@ -2294,13 +2322,26 @@ class Animator:
                         )
                     # For BH defenders, get_defender_coords already returns correct orientation
 
-                    # Dynamic HCO subtle beat: a defender who didn't make the read (or whose man
-                    # held) freezes at his prior coords instead of tracking — this is what opens
-                    # the space the offense is testing for.
-                    if def_movement and _subtle_defender_should_freeze(
-                        skeleton_step, def_pos, off_pos_to_guard
-                    ):
-                        def_coords = dict(def_movement[-1]["coords"])
+                    # Dynamic HCO Defense — S1 Part B: a beaten defender LAGS toward his man instead
+                    # of fully tracking, opening the gap the offense reads (the openness primitive).
+                    # Lag is graded by how badly he lost his read (_defender_reads margin, Part A);
+                    # legacy SM beats + flag-off keep EXACT behavior via _defender_lag_fraction's
+                    # fallback. Skipped on attack-drive-override steps (drive beats are S2; S1 is
+                    # positional-only) and when his man didn't move (nothing to open).
+                    _drive_override = bool(override and override.get("coords"))
+                    if def_movement and not _drive_override:
+                        _prior = def_movement[-1]["coords"]
+                        _man_prev = off_coords_list[step_idx - 1] if step_idx >= 1 else off_coords
+                        _moved = (
+                            (float(off_coords["x"]) - float(_man_prev["x"])) ** 2
+                            + (float(off_coords["y"]) - float(_man_prev["y"])) ** 2
+                        ) ** 0.5 > OPENNESS_ANCHOR_MOVE_EPS
+                        _frac = _defender_lag_fraction(skeleton_step, def_pos, off_pos_to_guard, _moved)
+                        if _frac < 1.0:
+                            def_coords = {
+                                "x": int(round(float(_prior["x"]) + (float(def_coords["x"]) - float(_prior["x"])) * _frac)),
+                                "y": int(round(float(_prior["y"]) + (float(def_coords["y"]) - float(_prior["y"])) * _frac)),
+                            }
 
                     # Two-handler pass step (animation-only): hold the defender at his pre-pass
                     # (passer-owned) coord for the pass step's start so his rotation renders

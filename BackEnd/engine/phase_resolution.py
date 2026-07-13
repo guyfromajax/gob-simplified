@@ -4682,6 +4682,26 @@ def _roll_subtle_defender_reads(def_lineup, def_eff, rng):
     return reads
 
 
+def _roll_defender_reads_graded(def_lineup, def_eff, rng):
+    """Dynamic HCO Defense — S1 Part A (Dynamic_MM_Brief §7). The general form of
+    ``_roll_subtle_defender_reads``: the same per-defender reactive read
+    ``(player_read_raw + def_eff) × d6``, but rolled on EVERY reached step (not just SM beats) and
+    returning the read MARGIN, not just a bool. ``{def_pos: {"follows": bool, "margin": float}}``
+    where ``margin = score − MOTION_READ_THRESHOLD`` (negative = beaten; |margin| = how badly).
+    Part B grades the beaten defender's lag by |margin| (owner-locked option a). The geometric
+    "did my man actually move?" gate is applied at draw time (Part B), not here."""
+    from BackEnd.utils.shared import player_read_raw
+    from BackEnd.engine.motion_step_decision import MOTION_READ_THRESHOLD
+    reads = {}
+    for def_pos, defender in (def_lineup or {}).items():
+        if not defender:
+            continue
+        score = (player_read_raw(defender) + def_eff) * rng.randint(1, 6)
+        margin = float(score - MOTION_READ_THRESHOLD)
+        reads[def_pos] = {"follows": margin > 0, "margin": margin}
+    return reads
+
+
 def _roll_subtle_idle_motion(
     beat, off_lineup, def_lineup, bh_pos, bh_location, off_to_def, locations, is_away_offense, rng
 ):
@@ -5784,6 +5804,13 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
         game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
         output_steps.append(steps[i])  # players arrive at skeleton step i
+        # Dynamic HCO Defense — S1 Part A: stamp per-defender reactive reads on this reached step so
+        # the render (Part B) can grade each beaten defender's lag → open his man on the frozen grid.
+        # Rides on a dedicated top-level field (NOT _step_state, which build_step_states overwrites).
+        # Flag-gated on posture: no roll (byte-identical RNG) when dynamic defense is off. Additive —
+        # no consumer until Part B lands. Generalizes the SM-only _subtle_movement.defender_reads.
+        if game_state.get("_hco_defense_posture"):
+            steps[i]["_defender_reads"] = _roll_defender_reads_graded(def_lineup, def_eff, random)
         # ② On-ball MOMENT — moment-FIRST (Decision #1): the BH's defender gets his crack at THIS
         # reached step BEFORE the offense's scripted-pass / shot / dish resolves. A hard outcome
         # terminates the walk here (truncated to the reached steps); a near-miss records a reach-in.
