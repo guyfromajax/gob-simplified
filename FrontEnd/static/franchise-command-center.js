@@ -1007,8 +1007,11 @@ function renderHomeMatchupCard(bodyId, summary, options = {}) {
           </span>
         </div>
         <div class="fcc-home-matchup-bottom">
-          <div class="fcc-home-detail-line">Record: ${escapeHomeHtml(`${summary.record?.wins || 0}-${summary.record?.losses || 0}`)}</div>
-          <div class="fcc-home-detail-line">Rank: ${escapeHomeHtml(summary.rank || 'N/A')}</div>
+          <div class="fcc-home-opponent-name">${escapeHomeHtml(opponentName)}</div>
+          <div class="fcc-home-detail-line fcc-home-meta-row">
+            <span>Record: ${escapeHomeHtml(`${summary.record?.wins || 0}-${summary.record?.losses || 0}`)}</span>
+            <span>Rank: ${escapeHomeHtml(summary.rank || 'N/A')}</span>
+          </div>
           <div class="fcc-home-detail-line">Top Scorer: ${escapeHomeHtml(summary.top_scorer ? `${summary.top_scorer.name}, ${Number(summary.top_scorer.average || 0).toFixed(1)}` : 'N/A')}</div>
           <div class="fcc-home-detail-line">Top Rebounder: ${escapeHomeHtml(summary.top_rebounder ? `${summary.top_rebounder.name}, ${Number(summary.top_rebounder.average || 0).toFixed(1)}` : 'N/A')}</div>
         </div>

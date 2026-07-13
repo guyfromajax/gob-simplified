@@ -643,26 +643,9 @@ class ShotManager:
         defense_call = self.game_state["defense_playcall"]
         
         is_fast_break = roles.get("is_fast_break", False)
-        if is_fast_break:
-            # Most FB finishes are at-rim 2s. Explicit outside FB branches
-            # (Triangle corner/wing/kick) can classify from backend shot_spot.
-            shot_type_hint = roles.get("shot_type") or roles.get("motion_shot_type")
-            shot_classification = self._build_shot_classification(
-                shooter,
-                roles,
-                allow_three=(shot_type_hint == "outside"),
-            )
-            is_three = bool(shot_classification["is_three_point_shot"])
-            is_paint = not is_three and shot_type_hint in (None, "inside", "attack")
-        else:
-            shot_classification = self._build_shot_classification(shooter, roles)
-            is_three = bool(shot_classification["is_three_point_shot"])
-            # Determine if shot is from the paint (PIP)
-            is_paint = self.is_paint_shot(shooter, roles)
-
         forced_shot = bool(roles.get("forced_shot", False))
 
-        # Determine shot_type (inside/attack/outside) for shot score calculation
+        # Determine shot_type before micro plan / classification (pool + paint rules).
         # Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
         # Set plays: infer from skeleton (location + handle_ball/drive detection)
         if forced_shot:
@@ -711,6 +694,53 @@ class ShotManager:
                         shot_type = "attack"
                     else:
                         shot_type = "outside"
+            # PIP location is pre-micro skeleton geometry (not arc classification).
+            if not is_fast_break:
+                is_paint = self.is_paint_shot(shooter, roles)
+
+        # Plan micro footwork before 2/3 classification so value matches release coord.
+        pre_micro_sx, pre_micro_sy = _shooter_xy_from_roles(roles, shooter)
+        _micro_plan = None
+        if not roles.get("flss"):
+            from BackEnd.engine.shot_micro_movements import plan_non_dunk_shot_micro
+
+            _micro_plan_kwargs = {
+                "shot_type": shot_type,
+                "shooter_id": str(shooter.player_id),
+                "shooter_x": float(pre_micro_sx),
+                "shooter_y": float(pre_micro_sy),
+                "off_lineup": off_lineup,
+                "def_lineup": def_lineup,
+                "away_offense": off_team.team_id == self.game.away_team.team_id,
+                "shooter_player": shooter,
+            }
+            if self.game_state.get("final_turn"):
+                _micro_plan_kwargs["max_pre_release_seconds"] = self.game_state.get(
+                    "_final_turn_micro_budget_seconds"
+                )
+            _micro_plan = plan_non_dunk_shot_micro(**_micro_plan_kwargs)
+            release = _micro_plan.get("micro_release_coord")
+            if isinstance(release, dict) and release.get("x") is not None:
+                roles["shot_spot"] = {
+                    "x": float(release["x"]),
+                    "y": float(release.get("y", pre_micro_sy)),
+                }
+
+        if is_fast_break:
+            # Most FB finishes are at-rim 2s. Explicit outside FB branches
+            # (Triangle corner/wing/kick) can classify from backend shot_spot.
+            shot_type_hint = roles.get("shot_type") or roles.get("motion_shot_type") or shot_type
+            shot_classification = self._build_shot_classification(
+                shooter,
+                roles,
+                allow_three=(shot_type_hint == "outside"),
+            )
+            is_three = bool(shot_classification["is_three_point_shot"])
+            if not forced_shot:
+                is_paint = not is_three and shot_type_hint in (None, "inside", "attack")
+        else:
+            shot_classification = self._build_shot_classification(shooter, roles)
+            is_three = bool(shot_classification["is_three_point_shot"])
         
         # PIP (Points in Paint): credit paint-location makes only; fast break uses FB_PTS, not PIP
         # (is_paint stays True for FB in shot math; pip_stat_eligible gates the stat only)
@@ -778,7 +808,8 @@ class ShotManager:
             if _zdelta:
                 shot_threshold += _zdelta
 
-        sx, sy = _shooter_xy_from_roles(roles, shooter)
+        # Contest geometry uses pre-micro shoot spot; classification uses release.
+        sx, sy = float(pre_micro_sx), float(pre_micro_sy)
         bx, by = _attacking_basket_xy(off_team, self.game)
         geometry_has_contest = False
         motion_geometry = bool(roles.get("motion_attack_geometry_contest"))
@@ -1513,6 +1544,14 @@ class ShotManager:
             if _cached_dunk_stamp and _cached_dunk_stamp.get("force_miss"):
                 if hasattr(self, "_block_spot"):
                     del self._block_spot
+            if _cached_dunk_stamp:
+                # Dunks are at-rim finishes — never arc-classify as a three.
+                shot_classification = classify_shot_value(
+                    None,
+                    is_away_offense=is_away_offense_dunk,
+                    forced_points=2,
+                )
+                is_three = False
 
         # Stat tracking (attempts)
         if not defense_applied_defenders:
@@ -2513,6 +2552,10 @@ class ShotManager:
                 or motion_uncontested
                 or (not has_contest and shot_type in ("inside", "attack"))
             )
+            if _micro_plan:
+                _micro_kwargs["family_id"] = _micro_plan.get("family_id")
+                _micro_kwargs["micro_move_to_coord"] = _micro_plan.get("micro_move_to_coord")
+                _micro_kwargs["micro_release_coord"] = _micro_plan.get("micro_release_coord")
             if self.game_state.get("final_turn"):
                 _micro_kwargs["max_pre_release_seconds"] = self.game_state.get(
                     "_final_turn_micro_budget_seconds"
@@ -2525,6 +2568,12 @@ class ShotManager:
             )
             if _micro_scratch.get("dunk_miss"):
                 result["dunk_miss"] = True
+            if _micro_scratch.get("micro_release_coord") is not None:
+                result["micro_release_coord"] = _micro_scratch.get("micro_release_coord")
+            if _micro_scratch.get("micro_move_to_coord") is not None:
+                result["micro_move_to_coord"] = _micro_scratch.get("micro_move_to_coord")
+            elif "micro_move_to_coord" in _micro_scratch:
+                result["micro_move_to_coord"] = None
 
         shot_variant = None
         shot_variant_extras = {}

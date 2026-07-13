@@ -1001,3 +1001,86 @@ def test_stamp_shooting_foul_skips_when_whistle_on_shot_beat():
     }
     _stamp_shooting_foul_on_miss_end(step, turn)
     assert "announcement" not in step["end"]
+
+
+class TestMicroReleaseClassification:
+    """2/3 value must follow the micro release grid, not the pre-micro shoot spot."""
+
+    def test_fade_away_release_can_cross_into_three(self):
+        from BackEnd.engine.shot_micro_movements import compute_micro_release_coord
+        from BackEnd.utils.shot_geometry import classify_shot_value
+
+        start = {"x": 66.0, "y": 25.0}
+        release = compute_micro_release_coord(
+            "fade_away",
+            shooter_coord=start,
+            off_lineup={},
+            all_coords={"s1": start},
+            shooter_id="s1",
+            away_offense=False,
+        )
+        assert classify_shot_value(start, is_away_offense=False)["is_three_point_shot"] is False
+        assert classify_shot_value(release, is_away_offense=False)["is_three_point_shot"] is True
+
+    def test_strong_inside_release_can_cross_into_two(self):
+        from BackEnd.engine.shot_micro_movements import compute_micro_release_coord
+        from BackEnd.utils.shot_geometry import classify_shot_value
+
+        start = {"x": 64.0, "y": 25.0}
+        release = compute_micro_release_coord(
+            "strong_inside",
+            shooter_coord=start,
+            off_lineup={},
+            all_coords={"s1": start},
+            shooter_id="s1",
+            away_offense=False,
+        )
+        assert classify_shot_value(start, is_away_offense=False)["is_three_point_shot"] is True
+        assert classify_shot_value(release, is_away_offense=False)["is_three_point_shot"] is False
+
+    def test_pinned_move_to_is_used_by_family_beats(self):
+        from BackEnd.engine.shot_micro_movements import _build_family_beats
+
+        pinned = {"x": 68.0, "y": 14.0}
+        beats = _build_family_beats(
+            "dribble_shoot",
+            {"x": 72.0, "y": 25.0},
+            False,
+            {},
+            {"s1": {"x": 72.0, "y": 25.0}},
+            "s1",
+            pinned_move_to=pinned,
+        )
+        move = next(b for b in beats if b.get("kind") == "move_to")
+        assert move["coord"] == pinned
+
+    def test_plan_stamps_release_matching_compute(self, monkeypatch):
+        from BackEnd.engine.shot_micro_movements import (
+            compute_micro_release_coord,
+            plan_non_dunk_shot_micro,
+        )
+
+        monkeypatch.setattr(
+            "BackEnd.engine.shot_micro_movements.random.choice",
+            lambda pool: "fade_away",
+        )
+        start = {"x": 66.0, "y": 25.0}
+        plan = plan_non_dunk_shot_micro(
+            shot_type="inside",
+            shooter_id="s1",
+            shooter_x=start["x"],
+            shooter_y=start["y"],
+            off_lineup={},
+            def_lineup={},
+            away_offense=False,
+        )
+        expected = compute_micro_release_coord(
+            "fade_away",
+            shooter_coord=start,
+            off_lineup={},
+            all_coords={"s1": start},
+            shooter_id="s1",
+            away_offense=False,
+        )
+        assert plan["family_id"] == "fade_away"
+        assert plan["micro_release_coord"] == expected

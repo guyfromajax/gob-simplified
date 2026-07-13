@@ -549,6 +549,99 @@ def _estimate_beat_game_seconds(
     return MICRO_FLOURISH_BEAT_T
 
 
+def compute_micro_release_coord(
+    family_id: str,
+    *,
+    shooter_coord: GridCoord,
+    off_lineup: Dict[str, Any],
+    all_coords: Dict[str, GridCoord],
+    shooter_id: str,
+    away_offense: Optional[bool] = None,
+    pinned_move_to: Optional[GridCoord] = None,
+) -> GridCoord:
+    """Shooter grid at the terminal release beat (after pre-shot micro footwork)."""
+    if away_offense is None:
+        away_offense = _infer_away_offense_from_display_coord(shooter_coord)
+    beats = _build_family_beats(
+        family_id,
+        shooter_coord,
+        away_offense,
+        off_lineup,
+        all_coords,
+        shooter_id,
+        pinned_move_to=pinned_move_to,
+    )
+    current = {"x": float(shooter_coord["x"]), "y": float(shooter_coord["y"])}
+    for beat in beats:
+        kind = beat.get("kind")
+        if kind in ("shot", "dunk"):
+            break
+        if kind == "move":
+            current = _offset_coord(current, float(beat["dx"]), float(beat["dy"]))
+        elif kind == "move_to":
+            current = {
+                "x": float(beat["coord"]["x"]),
+                "y": float(beat["coord"]["y"]),
+            }
+    return current
+
+
+def plan_non_dunk_shot_micro(
+    *,
+    shot_type: str,
+    shooter_id: str,
+    shooter_x: float,
+    shooter_y: float,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    away_offense: Optional[bool] = None,
+    max_pre_release_seconds: Optional[float] = None,
+    shooter_player: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Select footwork + pin destinations before shot-value classification.
+
+    Returns ``family_id``, optional ``micro_move_to_coord``, and
+    ``micro_release_coord`` (the classify/score/emit release grid).
+    """
+    shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
+    if away_offense is None:
+        away_offense = _infer_away_offense_from_display_coord(shooter_coord)
+    all_coords = build_micro_coords_snapshot(
+        off_lineup, def_lineup, shooter_id, shooter_x, shooter_y,
+    )
+    family_id = select_micro_movement(
+        shot_type,
+        shooter_coord=shooter_coord,
+        shooter_id=str(shooter_id),
+        off_lineup=off_lineup,
+        all_coords=all_coords,
+        away_offense=away_offense,
+        max_pre_release_seconds=max_pre_release_seconds,
+        shooter_player=shooter_player,
+    )
+    pinned_move_to: Optional[GridCoord] = None
+    if family_id in OUTSIDE_MOVING_FAMILIES:
+        teammates = _teammate_coords_at_shot(str(shooter_id), all_coords, off_lineup)
+        pinned_move_to = _pick_outside_dribble_target(
+            shooter_coord, teammates, away_offense,
+        )
+    release = compute_micro_release_coord(
+        family_id,
+        shooter_coord=shooter_coord,
+        off_lineup=off_lineup,
+        all_coords=all_coords,
+        shooter_id=str(shooter_id),
+        away_offense=away_offense,
+        pinned_move_to=pinned_move_to,
+    )
+    return {
+        "family_id": family_id,
+        "micro_move_to_coord": dict(pinned_move_to) if pinned_move_to else None,
+        "micro_release_coord": dict(release),
+        "away_offense": bool(away_offense),
+    }
+
+
 def estimate_micro_pre_release_seconds(
     family_id: str,
     *,
@@ -558,6 +651,7 @@ def estimate_micro_pre_release_seconds(
     all_coords: Dict[str, GridCoord],
     shooter_id: str,
     away_offense: Optional[bool] = None,
+    pinned_move_to: Optional[GridCoord] = None,
 ) -> float:
     """Seconds of game clock burned on micro beats before the terminal release."""
     if away_offense is None:
@@ -569,6 +663,7 @@ def estimate_micro_pre_release_seconds(
         off_lineup,
         all_coords,
         shooter_id,
+        pinned_move_to=pinned_move_to,
     )
     if not beats or (len(beats) == 1 and beats[0].get("kind") == "shot"):
         return 0.0
@@ -756,12 +851,29 @@ def select_and_stamp_shot_micro(
     dunk_stamp: Optional[Dict[str, Any]] = None,
     dunk_resolved: bool = False,
     uncontested: bool = False,
+    family_id: Optional[str] = None,
+    micro_move_to_coord: Optional[GridCoord] = None,
+    micro_release_coord: Optional[GridCoord] = None,
 ) -> str:
     shooter_coord = {"x": float(shooter_x), "y": float(shooter_y)}
     if away_offense is None:
         away_offense = _infer_away_offense_from_display_coord(shooter_coord)
 
-    family_id: Optional[str] = None
+    planned_family = family_id
+    pinned_move_to = (
+        dict(micro_move_to_coord)
+        if isinstance(micro_move_to_coord, dict)
+        and micro_move_to_coord.get("x") is not None
+        else None
+    )
+    release_coord = (
+        dict(micro_release_coord)
+        if isinstance(micro_release_coord, dict)
+        and micro_release_coord.get("x") is not None
+        else None
+    )
+
+    family_id = None
     if (
         not dunk_resolved
         and dunk_stamp is None
@@ -788,23 +900,43 @@ def select_and_stamp_shot_micro(
         turn_result["dunk_miss"] = bool(dunk_stamp.get("dunk_miss"))
         if dunk_stamp.get("force_miss"):
             turn_result["_dunk_force_miss"] = True
+        pinned_move_to = None
+        release_coord = _dunk_approach_coord(bool(away_offense))
 
     if family_id is None:
+        if planned_family:
+            family_id = str(planned_family)
+        else:
+            plan = plan_non_dunk_shot_micro(
+                shot_type=shot_type,
+                shooter_id=str(shooter_id),
+                shooter_x=float(shooter_x),
+                shooter_y=float(shooter_y),
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                away_offense=away_offense,
+                max_pre_release_seconds=max_pre_release_seconds,
+                shooter_player=shooter_player,
+            )
+            family_id = str(plan["family_id"])
+            pinned_move_to = plan.get("micro_move_to_coord")
+            release_coord = plan.get("micro_release_coord")
+        turn_result.pop("dunk_miss", None)
+        turn_result.pop("_dunk_force_miss", None)
+
+    if release_coord is None:
         all_coords = build_micro_coords_snapshot(
             off_lineup, def_lineup, shooter_id, shooter_x, shooter_y,
         )
-        family_id = select_micro_movement(
-            shot_type,
+        release_coord = compute_micro_release_coord(
+            family_id,
             shooter_coord=shooter_coord,
-            shooter_id=str(shooter_id),
             off_lineup=off_lineup,
             all_coords=all_coords,
+            shooter_id=str(shooter_id),
             away_offense=away_offense,
-            max_pre_release_seconds=max_pre_release_seconds,
-            shooter_player=shooter_player,
+            pinned_move_to=pinned_move_to,
         )
-        turn_result.pop("dunk_miss", None)
-        turn_result.pop("_dunk_force_miss", None)
 
     stamp_micro_telemetry(
         turn_result,
@@ -814,6 +946,10 @@ def select_and_stamp_shot_micro(
         shot_defense_score_raw=shot_defense_score_raw if has_contest else None,
         has_contest=has_contest,
     )
+    turn_result["micro_move_to_coord"] = (
+        dict(pinned_move_to) if isinstance(pinned_move_to, dict) else None
+    )
+    turn_result["micro_release_coord"] = dict(release_coord)
     from BackEnd.utils.shot_ball_arc import roll_shot_arc
 
     turn_result["uses_shot_arc"] = False if is_dunk_micro_family(family_id) else roll_shot_arc(family_id)
@@ -952,6 +1088,20 @@ def _stamp_shooting_foul_hack_flourishes(
     }
 
 
+def _resolve_outside_dribble_target(
+    shooter_coord: GridCoord,
+    teammates: List[GridCoord],
+    away_offense: bool,
+    pinned_move_to: Optional[GridCoord],
+) -> Optional[GridCoord]:
+    if isinstance(pinned_move_to, dict) and pinned_move_to.get("x") is not None:
+        return {
+            "x": float(pinned_move_to["x"]),
+            "y": float(pinned_move_to.get("y", shooter_coord.get("y", 25))),
+        }
+    return _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
+
+
 def _build_family_beats(
     family_id: str,
     shooter_coord: GridCoord,
@@ -959,6 +1109,7 @@ def _build_family_beats(
     off_lineup: Dict[str, Any],
     all_coords: Dict[str, GridCoord],
     shooter_id: str,
+    pinned_move_to: Optional[GridCoord] = None,
 ) -> List[Dict[str, Any]]:
     """Declarative beat list for a movement family."""
     ux, uy = _unit_toward_rim(shooter_coord, away_offense)
@@ -993,7 +1144,9 @@ def _build_family_beats(
         return [{"kind": "flourish", "who": "shooter", "flourish": "pump_fake"}, {"kind": "shot"}]
     if family_id == "dribble_shoot":
         teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-        target = _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
+        target = _resolve_outside_dribble_target(
+            shooter_coord, teammates, away_offense, pinned_move_to,
+        )
         if target:
             return [
                 {"kind": "move_to", "coord": target, "archetype": "cruise"},
@@ -1003,7 +1156,9 @@ def _build_family_beats(
         return [{"kind": "shot"}]
     if family_id == "dribble_pump_shoot":
         teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-        target = _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
+        target = _resolve_outside_dribble_target(
+            shooter_coord, teammates, away_offense, pinned_move_to,
+        )
         if target:
             return [
                 {"kind": "move_to", "coord": target, "archetype": "cruise", "beat_bucket": "B"},
@@ -1013,7 +1168,9 @@ def _build_family_beats(
         return [{"kind": "flourish", "who": "shooter", "flourish": "pump_fake"}, {"kind": "shot"}]
     if family_id == "pump_dribble_shoot":
         teammates = _teammate_coords_at_shot(shooter_id, all_coords, off_lineup)
-        target = _pick_outside_dribble_target(shooter_coord, teammates, away_offense)
+        target = _resolve_outside_dribble_target(
+            shooter_coord, teammates, away_offense, pinned_move_to,
+        )
         beats: List[Dict[str, Any]] = [
             {"kind": "flourish", "who": "shooter", "flourish": "pump_fake", "beat_bucket": "D"},
         ]
@@ -1062,6 +1219,7 @@ def build_shot_micro_steps(
     result_type: Optional[str] = None,
     dunk_miss: bool = False,
     is_shooting_foul: bool = False,
+    pinned_move_to: Optional[GridCoord] = None,
 ) -> List[AnimationStep]:
     """Build micro-movement AnimationSteps replacing the terminal [shoot] beat."""
     if shooter_id not in start_coords:
@@ -1070,7 +1228,13 @@ def build_shot_micro_steps(
     shooter_coord = dict(start_coords[shooter_id])
     bucket = FAMILY_BUCKET.get(family_id, "C")
     beats = _build_family_beats(
-        family_id, shooter_coord, away_offense, off_lineup, start_coords, shooter_id,
+        family_id,
+        shooter_coord,
+        away_offense,
+        off_lineup,
+        start_coords,
+        shooter_id,
+        pinned_move_to=pinned_move_to,
     )
 
     steps: List[AnimationStep] = []
@@ -1484,6 +1648,7 @@ def apply_shot_micro_steps_to_chain(
         result_type=str(result_type),
         dunk_miss=bool(turn_result.get("dunk_miss")),
         is_shooting_foul=shooting_foul,
+        pinned_move_to=turn_result.get("micro_move_to_coord"),
     )
     if not micro_steps:
         return

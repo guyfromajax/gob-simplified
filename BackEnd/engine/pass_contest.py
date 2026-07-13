@@ -49,10 +49,16 @@ PASS_INTERCEPT_ROLL_MAX = 6
 # Passer safety gate base: if the passer's pass_score > (BASE − offense_modifier),
 # no interception is in play (a good passer evades the lurking defender).
 PASS_SAFETY_BASE = 200.0
-# Deflection threshold: intercept_score > tier_mid → the pass is deflected (then a CH+IQ vs d200
-# roll splits INTERCEPT vs BAT_OOB). TIER_HI is retained for back-compat callers but no longer used.
+# Deflection threshold: intercept_score > tier_mid → the pass is deflected (then the split roll below
+# decides INTERCEPT vs BAT_OOB). TIER_HI is retained for back-compat callers but no longer used.
 PASS_INTERCEPT_TIER_HI = 250.0
 PASS_INTERCEPT_TIER_MID = 200.0
+# INTERCEPT-vs-BAT_OOB split (shared HCO/HCT/FCP). On a deflection the defender's ball skill decides
+# the KIND: roll rand(1, PASS_DEFLECT_KIND_D); under (CH + IQ) → clean INTERCEPT (steal), else BAT_OOB
+# (knocked out, offense retains). This is the dial for the INTERCEPT/BAT_OOB RATIO, independent of how
+# OFTEN passes are deflected (that's the safety base + tier_mid). ↑ D = a smaller CH+IQ share clears
+# the roll = MORE BAT_OOB; ↓ D = MORE clean INTERCEPTs. Good defenders (high CH+IQ) skew toward INTERCEPT.
+PASS_DEFLECT_KIND_D = 200
 
 # Turn-type → offense team_attributes key feeding the passer safety gate's
 # ``offense_modifier`` (a higher offense rating lowers the bar the passer must clear,
@@ -284,7 +290,7 @@ def resolve_pass_contest(
          bar, so good offenses complete more passes.
       3. Interception band — ``intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``.
          ``score ≤ tier_mid`` → COMPLETE. Over it → the pass is DEFLECTED, and the defender's
-         ball skill splits the kind: ``rand(1,200) < (CH + IQ)`` → INTERCEPT, else BAT_OOB.
+         ball skill splits the kind: ``rand(1, PASS_DEFLECT_KIND_D) < (CH + IQ)`` → INTERCEPT, else BAT_OOB.
          (Replaced the old hi/mid two-tier split, whose narrow band the quantized score skipped →
          BAT_OOB was unreachable. ``tier_hi`` is now unused.)
 
@@ -323,7 +329,7 @@ def resolve_pass_contest(
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "band_complete"}
     ch = float(defender.get("CH", 0) or 0)
     iq = float(defender.get("IQ", 0) or 0)
-    if rng.randint(1, 200) < (ch + iq):
+    if rng.randint(1, PASS_DEFLECT_KIND_D) < (ch + iq):
         outcome, stage = INTERCEPT, "intercept"
     else:
         outcome, stage = BAT_OOB, "bat_oob"

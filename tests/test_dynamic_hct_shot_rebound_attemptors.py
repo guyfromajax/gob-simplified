@@ -35,7 +35,7 @@ def _force_clean_miss(monkeypatch):
         apply_defense=True,
         **kwargs,
     ):
-        return -100, -100, 0, False, None
+        return -100, -100, 0, False, None, 0
 
     monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
 
@@ -200,11 +200,11 @@ def test_hct_attack_basket_outside_shot_classifies_from_coords(monkeypatch):
     ):
         captured["is_three"] = is_three
         captured["is_paint"] = is_paint
-        return 200, 200, 0, False, None
+        return 200, 200, 0, False, None, 0
 
     monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calculate)
 
-    *_, is_three = _roll_ab_shot(
+    *_, is_three, _classification, _raw, _micro_plan = _roll_ab_shot(
         game,
         game.offense_team,
         game.game_state,

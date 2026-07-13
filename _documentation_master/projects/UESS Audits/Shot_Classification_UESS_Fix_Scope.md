@@ -78,7 +78,7 @@ One chokepoint fix → all four turn types.
 The emitter is deterministic from the same `(skeleton, animations)`, so it already reproduces the resolved coord. Add a **debug assertion** (behind a flag) that `resolve_terminal_shoot_coord(...) == emitted shoot-step end.coords[shooter]` to lock the contract and catch future drift.
 
 ## 5. Caveats / boundaries
-- **Dunk / at-rim micro is outcome-dependent** (`resolve_dunk_micro_stamp` reads MAKE/MISS/BLOCK) — but those are rim finishes (forced-2, not arc-classified), so they never affect classification. Classify from the **pre-micro positional** shoot coord.
+- **Dunk / at-rim micro is outcome-dependent** (`resolve_dunk_micro_stamp` reads MAKE/MISS/BLOCK) — rim finishes stay forced-2. For jump-shot micros that displace the shooter, classify from **`micro_release_coord`** (post-footwork), planned before shot math so emit and scoring share one pinned destination.
 - **Forced-value paths unchanged:** OREB putback (forced-2), FT (forced-1), Steal/RR/CR rim (forced-2). Option C only governs arc-classified jump shots.
 - **Motion synthetic shoot step** often omits the shooter from the animator destinations → resolver must use the carried-forward start coord (same as emitter's `dest is None` branch, [:778](../../../BackEnd/engine/skeleton_step_emitter.py#L778)).
 

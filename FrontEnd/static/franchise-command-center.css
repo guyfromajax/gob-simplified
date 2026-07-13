@@ -1000,6 +1000,20 @@ body.has-auth-bar #franchise-container {
   color: rgba(255, 255, 255, 0.88);
 }
 
+.fcc-home-opponent-name {
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.fcc-home-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
 .fcc-home-potg-line {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.72);

@@ -656,6 +656,7 @@ def _roll_ab_shot(
     """Resolve the shot score (defended iff contested) and make/miss. No
     auto-make — half-court shots are rolled vs. the team shot threshold."""
     from BackEnd.models.shot_manager import ShotManager
+    from BackEnd.engine.shot_micro_movements import plan_non_dunk_shot_micro
 
     shot_manager = getattr(game, "shot_manager", None) or ShotManager(game)
     defense_playcall = (
@@ -664,10 +665,22 @@ def _roll_ab_shot(
         or "man"
     )
     is_away_offense = bool(off_team.team_id == game.away_team.team_id)
+    def_team = game.defense_team
+    micro_plan = plan_non_dunk_shot_micro(
+        shot_type=shot_type,
+        shooter_id=str(getattr(shooter, "player_id", "") or ""),
+        shooter_x=float(shot_spot["x"]),
+        shooter_y=float(shot_spot["y"]),
+        off_lineup=off_team.lineup or {},
+        def_lineup=def_team.lineup or {},
+        away_offense=is_away_offense,
+        shooter_player=shooter,
+    )
+    classify_spot = micro_plan.get("micro_release_coord") or shot_spot
     shot_classification = classify_shot_value(
-        shot_spot,
+        classify_spot,
         is_away_offense=is_away_offense,
-        classification_source="dynamic_hct_shot_spot",
+        classification_source="dynamic_hct_micro_release",
     )
     is_three = bool(shot_classification["is_three_point_shot"])
     is_paint = not is_three and shot_type in ("inside", "attack")
@@ -680,7 +693,7 @@ def _roll_ab_shot(
         shot_defense_score_raw,
     ) = shot_manager.calculate_shot_score(
         shooter, None, None, shot_defender if contested else None, shot_type,
-        defense_playcall, is_three, is_paint, None, shot_spot,
+        defense_playcall, is_three, is_paint, None, classify_spot,
         apply_defense=contested,
     )
     made = shot_score >= off_team.team_attributes["shot_threshold"]
@@ -690,8 +703,8 @@ def _roll_ab_shot(
         rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
         made = apply_uncontested_inside_attack_make(
             shot_type=shot_type,
-            shooter_x=float(shot_spot["x"]),
-            shooter_y=float(shot_spot["y"]),
+            shooter_x=float(classify_spot["x"]),
+            shooter_y=float(classify_spot["y"]),
             basket_x=float(rim["x"]),
             basket_y=float(rim["y"]),
             off_team=off_team,
@@ -700,7 +713,18 @@ def _roll_ab_shot(
             shot_score=shot_score,
             shot_threshold=off_team.team_attributes["shot_threshold"],
         )
-    return made, shot_score, shot_score_pre_defense, shot_defense_score_for_sfx, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw
+    return (
+        made,
+        shot_score,
+        shot_score_pre_defense,
+        shot_defense_score_for_sfx,
+        d_foul,
+        foul_player,
+        is_three,
+        shot_classification,
+        shot_defense_score_raw,
+        micro_plan,
+    )
 
 
 def _finalize_ab_shot(
@@ -727,6 +751,7 @@ def _finalize_ab_shot(
     extra_seed: Optional[Dict[str, Any]] = None,
     text_prefix: str = " they go to work in the paint",
     shot_defense_score_raw: float = 0.0,
+    micro_plan: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Shared make/miss → turn_result tail for the §7 in-Attack-Basket shots
     (foul FTs, variant, scoring, rebound, pressure-type, next_play_type, plus
@@ -748,11 +773,16 @@ def _finalize_ab_shot(
     off_team = game.offense_team
     def_team = game.defense_team
     is_away_offense = bool(off_team.team_id == game.away_team.team_id)
+    release_spot = (
+        (micro_plan or {}).get("micro_release_coord")
+        if isinstance((micro_plan or {}).get("micro_release_coord"), dict)
+        else None
+    ) or shot_spot
     if shot_classification is None:
         shot_classification = classify_shot_value(
-            shot_spot,
+            release_spot,
             is_away_offense=is_away_offense,
-            classification_source="dynamic_hct_shot_spot",
+            classification_source="dynamic_hct_micro_release",
         )
     is_three = bool(shot_classification.get("is_three_point_shot"))
     rim = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
@@ -773,6 +803,14 @@ def _finalize_ab_shot(
             away_offense=is_away_offense,
             uncontested=not contested,
         )
+        if _dunk_stamp:
+            shot_classification = classify_shot_value(
+                None,
+                is_away_offense=is_away_offense,
+                forced_points=2,
+            )
+            is_three = False
+            release_spot = shot_spot
 
     has_and_one = False
     free_throws_remaining = 0
@@ -850,8 +888,8 @@ def _finalize_ab_shot(
                 penalize_player_ids = {shooter_id} if shooter_id else set()
                 shot_moment_coords = dict(shot_moment_coords or {})
                 shot_moment_coords[shooter_id] = {
-                    "x": float(shot_spot["x"]),
-                    "y": float(shot_spot["y"]),
+                    "x": float(release_spot["x"]),
+                    "y": float(release_spot["y"]),
                 }
                 shot_moment_coords.update(
                     {
@@ -947,8 +985,8 @@ def _finalize_ab_shot(
         "shot_type": shot_type,
         "is_three_point_shot": bool(is_three),
         "shot_value": int(shot_classification.get("shot_value") or 2),
-        "shot_spot": dict(shot_classification["classification_coord"]) if isinstance(shot_classification.get("classification_coord"), dict) else {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
-        "shot_classification_coord": dict(shot_classification["classification_coord"]) if isinstance(shot_classification.get("classification_coord"), dict) else {"x": float(shot_spot["x"]), "y": float(shot_spot["y"])},
+        "shot_spot": dict(shot_classification["classification_coord"]) if isinstance(shot_classification.get("classification_coord"), dict) else {"x": float(release_spot["x"]), "y": float(release_spot["y"])},
+        "shot_classification_coord": dict(shot_classification["classification_coord"]) if isinstance(shot_classification.get("classification_coord"), dict) else {"x": float(release_spot["x"]), "y": float(release_spot["y"])},
         "shot_classification": dict(shot_classification),
         "shot_classification_source": shot_classification.get("classification_source"),
         "shot_score": shot_score,
@@ -1025,6 +1063,9 @@ def _finalize_ab_shot(
         dunk_stamp=_dunk_stamp,
         dunk_resolved=shot_type in ("inside", "attack"),
         uncontested=not contested,
+        family_id=(micro_plan or {}).get("family_id"),
+        micro_move_to_coord=(micro_plan or {}).get("micro_move_to_coord"),
+        micro_release_coord=(micro_plan or {}).get("micro_release_coord"),
     )
     apply_made_dunk_momentum(
         shooter,
@@ -1093,7 +1134,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
     shot_type = (
         "inside" if _euclid(shot_spot, basket) <= AB_INSIDE_SHOT_MAX_DIST else "outside"
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw, micro_plan = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -1109,6 +1150,7 @@ def resolve_hct_attack_basket_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, 
         shot_moment_coords=_coords_by_player_id(off_lineup, seed_off),
         text_prefix=" they go to work in the paint",
         shot_defense_score_raw=shot_defense_score_raw,
+        micro_plan=micro_plan,
     )
 
 
@@ -1209,7 +1251,7 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
             def_lineup, seed_def, shot_spot, is_away_offense, collapse_t,
         )
     )
-    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw = _roll_ab_shot(
+    made, shot_score, pre, sfx_score, d_foul, foul_player, is_three, shot_classification, shot_defense_score_raw, micro_plan = _roll_ab_shot(
         game, off_team, game.game_state, shooter, shot_defender, contested,
         shot_type, shot_spot,
     )
@@ -1258,4 +1300,5 @@ def resolve_hct_attack_basket_drive(game: Any, dyn: Dict[str, Any]) -> Dict[str,
         shot_moment_coords=shot_moment_coords,
         extra_seed=extra_seed, text_prefix=" they attack the rim",
         shot_defense_score_raw=shot_defense_score_raw,
+        micro_plan=micro_plan,
     )

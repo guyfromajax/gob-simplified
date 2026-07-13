@@ -37,11 +37,12 @@
 - Canonical classification wrapper: `BackEnd.utils.shot_geometry.classify_shot_value()`.
 - Backend classification is the source of truth. The frontend/UESS renderer does not infer whether a shot is worth 1, 2, or 3.
 - `classify_shot_value()` returns a self-describing payload including `points`, `shot_value`, `is_three_point_shot`, `classification_coord`, `normalized_coord`, `boundary_x`, `classification_source`, and `allow_three`.
-- `ShotManager.resolve_shot()` builds this payload before shot math and stamps shot results with `is_three_point_shot`, `shot_value`, `shot_spot`, `shot_classification_coord`, `shot_classification`, and `shot_classification_source`.
+- `ShotManager.resolve_shot()` plans micro footwork (`plan_non_dunk_shot_micro`), classifies from **`micro_release_coord`** (post-footwork release), then runs shot math and stamps `is_three_point_shot`, `shot_value`, `shot_spot`, `shot_classification_coord`, `shot_classification`, and `shot_classification_source`.
 - Coordinate priority for field goals:
-  1. Explicit backend `roles["shot_spot"]` coords.
+  1. Explicit backend `roles["shot_spot"]` coords (set to the micro release coord when micro runs).
   2. Shooter model `coords`.
   3. Legacy skeleton shoot-location name and `THREE_POINT_SPOTS` fallback only if usable coords are missing.
+- Contest / defender proximity still uses the **pre-micro** shoot spot. Dunk stamps force 2-point value.
 - The coordinate arc uses the home-offense HCO spot model (`key`, wings, midCorners, corners) and linearly interpolates the boundary x-value by shooter y. Away-offense shots mirror x with `100 - x` before testing. The helper expects display-oriented coords.
 - Fast Break shots remain 2-point by default. Only explicit outside Fast Break branches with `shot_type == "outside"` and a backend `shot_spot` can classify as 3s. This covers Triangle corner/wing/kick branches without changing Steal FB, RR rim attacks, or CR rim attacks.
 - Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same classification wrapper before `calculate_shot_score()` and carry `is_three_point_shot` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
@@ -57,10 +58,14 @@
      - current_playcall: Used for Set plays (from game state)
    - Get defense_call from `game_state["defense_playcall"]`
 
-2. Determine Shot Type
+2. Determine Shot Type + Classify at Micro Release
+   - Resolve `shot_type` (motion / skeleton / playcall)
+   - `plan_non_dunk_shot_micro(...)` → `micro_release_coord` (and pinned `micro_move_to_coord` when needed)
+   - `roles["shot_spot"]` updated to release coord
    - `shot_classification = classify_shot_value(...)` via `ShotManager._build_shot_classification()`
    - `is_three = shot_classification["is_three_point_shot"]`
-   - is_paint = `is_paint_shot(shooter, roles)` (checks shooter spot against PAINT_SPOTS)
+   - is_paint = `is_paint_shot(shooter, roles)` (pre-micro skeleton paint check; FB derives from classification)
+   - Dunk stamp later forces 2PT if selected
    - shot_type = `roles.get("shot_type")` or `roles.get("motion_shot_type")` (Motion uses motion_shot_type) OR skeleton analysis (Set plays)
      - Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
      - Set plays: shot_type determined from location + attack detection (see Attack detection below)

@@ -227,8 +227,8 @@ It renders an eight-card summary grid:
 - shows:
   - matchup label (`vs` / `@`)
   - opponent banner
-  - opponent record
-  - opponent rank
+  - opponent team name + mascot
+  - opponent record and rank on one meta row (`Record: W-L`, `Rank: #`)
   - top scorer
   - top rebounder
 

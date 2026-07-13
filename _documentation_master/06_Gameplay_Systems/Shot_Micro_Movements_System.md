@@ -28,7 +28,9 @@ The frontend renders gameplay coords from the schema and dispatches **flourishes
 | Backend decides, FE renders | Contest outcome, family selection, defender displacement, and flourish stamps are backend-owned. FE never infers contest logic. |
 | One hook per emitter | Emitters call `inject_shot_micro_before_post_shot()` — no per-family logic in emitters. |
 | Extend, don’t fork | Reuses `AnimationStep` schema, `stamp_tween_durations`, existing post-shot sub-steps, and `flourishes.js`. |
-| At-spot footwork | Micro chain plays **where the skeleton already placed the shooter**. Attack **drive** travel is upstream (`attack_drive_clearance`); micro only adds footwork at the release spot. |
+| At-spot footwork | Micro chain starts **where the skeleton placed the shooter**, then may displace before release. Attack **drive** travel is upstream (`attack_drive_clearance`). |
+| Classify at release | 2PT/3PT value uses `micro_release_coord` (post-footwork), not the pre-micro shoot spot. Dunks stay forced-2. |
+| Pinned destinations | Outside `move_to` targets are chosen once at resolve and stamped as `micro_move_to_coord` so emit cannot re-roll a different spot. |
 | Primary defender only (v1) | Contest reactions use `roles["defender"]` / `turn_result["defender"]` only. |
 
 ---
@@ -37,16 +39,19 @@ The frontend renders gameplay coords from the schema and dispatches **flourishes
 
 ```
 Shot resolution (rules)
-  ├─ calculate_shot_score → shot_score_pre_defense, shot_defense_score_raw, shot_defense_score_for_sfx
+  ├─ resolve shot_type
+  ├─ plan_non_dunk_shot_micro(start_coord) → family, micro_move_to_coord, micro_release_coord
+  ├─ classify_shot_value(micro_release_coord) → is_three / shot_value
+  ├─ calculate_shot_score → shot_score_pre_defense, shot_defense_score_raw, …
   ├─ resolve_contest(pre_defense, raw) → contest_result, contest_margin   [contested only]
-  ├─ select_micro_movement(shot_type, coords) → micro_movement_family
-  └─ stamp telemetry on turn_result
+  ├─ prepare_dunk_stamp (inside/attack) → may override family; forces 2PT
+  └─ select_and_stamp_shot_micro(plan + dunk) → telemetry on turn_result
 
 Skeleton / HCT / FB / OREB emitter
   ├─ … upstream steps (pass, cut, drive, etc.)
   ├─ terminal [shoot] step — in-place (HCO) OR travel+shoot (FB drive)
   ├─ inject_shot_micro_before_post_shot()
-  │     ├─ in-place: replace [shoot] with micro chain
+  │     ├─ in-place: replace [shoot] with micro chain (uses pinned micro_move_to_coord)
   │     └─ travel+shoot (≥ TRAVEL_SHOOT_MIN_GRID): keep sprint, insert micro after
   └─ _build_post_shot_sub_steps()          ← ball flight, variant, hold/bounce
 
@@ -334,15 +339,19 @@ Stamped on `turn_result` for eligible shot turns:
 | Field | Type | When present |
 |-------|------|--------------|
 | `micro_movement_family` | string | Always on FG MAKE/MISS/BLOCK paths |
+| `micro_release_coord` | `{x,y}` | Shooter grid at the terminal release beat (classification source) |
+| `micro_move_to_coord` | `{x,y}` \| null | Pinned outside dribble destination when family uses `move_to` |
 | `contest_result` | `offense_win` \| `neutral` \| `defense_win` | Contested only |
 | `contest_margin` | float | Contested only |
 | `shot_defense_score_raw` | float | Contested only |
 | `has_contest` | bool | Always |
 | `uses_shot_arc` | bool | When family is in `SHOT_ARC_PROBABILITY` map |
 
-Self-contained shot paths (`dynamic_hct_shot`, `after_steal_fast_break`, OREB putback in `shared.py`) call `select_and_stamp_shot_micro()` directly on the turn dict because they bypass `ShotManager.resolve_shot()`.
+**Classification contract:** `ShotManager.resolve_shot` and HCT attack-basket rolls call `plan_non_dunk_shot_micro` **before** `classify_shot_value`. `roles["shot_spot"]` / classification use `micro_release_coord`. Contest geometry still uses the pre-micro shoot spot. If a dunk stamp wins later, value is forced to 2.
 
-**HCO / FCP / Final turns** go through `ShotManager.resolve_shot()`, which stamps micro telemetry via a scratch dict then merges onto the turn. Both `micro_movement_family` **and** `uses_shot_arc` must be copied — `[ball_flight]` arc metadata is gated on `uses_shot_arc` at emit time (`stamp_shot_ball_arc_metadata`).
+Self-contained shot paths (`dynamic_hct_shot`, `after_steal_fast_break`, OREB putback in `shared.py`) call `select_and_stamp_shot_micro()` directly on the turn dict because they bypass `ShotManager.resolve_shot()` (HCT AB plans first; other forced-2 paths stamp release for emit parity).
+
+**HCO / FCP / Final turns** go through `ShotManager.resolve_shot()`, which stamps micro telemetry via a scratch dict then merges onto the turn. Both `micro_movement_family` **and** `uses_shot_arc` must be copied — `[ball_flight]` arc metadata is gated on `uses_shot_arc` at emit time (`stamp_shot_ball_arc_metadata`). Also copy `micro_release_coord` / `micro_move_to_coord` when present so emit does not re-roll outside dribble targets.
 
 **Final Turn clock budget (2026-07-04):** Preflight in `final_turn_pacing.py` reserves `worst_case_final_turn_micro_reserve()` (+ attack drive reserve) when checking anchor fit. At `resolve_shot`, `_final_turn_micro_budget_seconds` (≈ anchor clock at pass/receive for Outside; anchor minus drive for Attack) caps family selection via `max_pre_release_seconds` — families that would burn past 0:00 are excluded; instant-release fallbacks (`set`, `pullup_attack`, `straight_inside`) remain.
 
