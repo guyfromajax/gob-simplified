@@ -7,7 +7,7 @@ server:
   1. Recovery roll (_setplay_recovery_roll) — re-enter-the-skeleton vs forced-freelance rate across
      a grid of offense (chem+off_eff) vs defense (chem+def_eff) strength. Validates the locked
      formula `(chem+eff) × d6` behaves monotonically (stronger offense → recovers more).
-  2. Walk path distribution (_resolve_setplay_offense_shot_dynamic) — over N possessions with a
+  2. Walk path distribution (_resolve_hco_offense_shot_dynamic, is_setplay=True) — over N possessions with a
      plausible random decision stream, tally how possessions terminate: per-step hot read, forced
      subtle → re-enter, forced subtle → freelance, or end-of-walk forced shot. Validates that the
      offense NEVER self-initiates a subtle (offense_reads is forced False) and that the
@@ -145,12 +145,15 @@ def walk_distribution():
 def _resolve_setplay_dynamic_seeded(game, rng):
     # The resolver uses the global `random`; seed it per-call for reproducibility.
     random.seed(rng.random())
-    return _resolve_setplay_offense_shot_dynamic(_skel(), game,
-                                                 {"PG": _Player("o_pg")}, {"PG": _Player("d_pg")})
+    # cleanup 2026-07-13: the `_resolve_setplay_offense_shot_dynamic` delegate was removed → call the
+    # unified resolver with is_setplay=True.
+    return _resolve_hco_offense_shot_dynamic(_skel(), game,
+                                             {"PG": _Player("o_pg")}, {"PG": _Player("d_pg")},
+                                             is_setplay=True)
 
 
 # import after the helper defs so the name is bound at module load
-from BackEnd.engine.phase_resolution import _resolve_setplay_offense_shot_dynamic  # noqa: E402
+from BackEnd.engine.phase_resolution import _resolve_hco_offense_shot_dynamic  # noqa: E402
 
 
 if __name__ == "__main__":

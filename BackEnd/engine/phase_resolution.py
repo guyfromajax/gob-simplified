@@ -4561,49 +4561,11 @@ def _ensure_skeleton_shot_role_positions(game, roles):
     return roles
 
 
-def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup, forced_shot_step_index=None):
-    """
-    Resolve Motion offense shot attempt.
-    
-    This function:
-    1. Selects a random step (excluding step 0) for shot attempt, or uses forced_shot_step_index if provided
-    2. Determines shot type (inside/outside/attack) based on possibilities and strategy
-    3. Truncates skeleton at selected step
-    4. Appends necessary steps (pass/receive, drive, shoot)
-    5. Returns modified skeleton and shot information
-    
-    Args:
-        skeleton: Motion play skeleton with base_loop steps
-        game: GameManager instance
-        off_lineup: Offensive lineup dict
-        def_lineup: Defensive lineup dict
-        forced_shot_step_index: Optional int. If provided, use this step index instead of random (for recalibration).
-    
-    Returns:
-        dict: {
-            "skeleton": modified skeleton with shot steps appended,
-            "shooter": Player object,
-            "shooter_location": location string,
-            "shot_type": "inside" | "outside" | "attack",
-            "playcall": "Inside" | "Outside" | "Attack",
-            "attack_penalty": float (0 if not attack or no penalty)
-        }
-    """
-
-    # Stage 3 (2026-07-12): the legacy random-step resolver was REMOVED. All motion + set-play shot
-    # resolution — including recalibration's forced_shot_step_index — now runs through the unified
-    # dynamic resolver. Kept as a named entry point for existing callers.
-    return _resolve_hco_offense_shot_dynamic(
-        skeleton, game, off_lineup, def_lineup, is_setplay=False,
-        forced_shot_step_index=forced_shot_step_index)
-
-
-def _dynamic_hco_motion_enabled():
-    """Dynamic HCO Motion is ALWAYS on (Stage 3, 2026-07-12): the legacy up-front tables + random-step
-    resolver were removed, so the GOB_DYNAMIC_HCO_MOTION kill switch has nothing to fall back to. This
-    always returns True; production no longer calls it (all gates simplified). Kept only as a stable
-    symbol for the existing gate tests; safe to delete once those are pruned."""
-    return True
+# NOTE (cleanup 2026-07-13): `resolve_motion_offense_shot`, `_resolve_motion_offense_shot_dynamic`,
+# `_resolve_setplay_offense_shot_dynamic`, and the neutered `_dynamic_hco_motion_enabled` /
+# `_dynamic_hco_setplay_enabled` flag helpers were removed — all HCO shot resolution now calls the ONE
+# unified `_resolve_hco_offense_shot_dynamic(..., is_setplay=, forced_shot_step_index=)` directly
+# (Stage 3 retired both legacy kill switches; nothing to fall back to).
 
 
 def _dynamic_hco_defense_enabled():
@@ -4635,15 +4597,6 @@ def _roll_defense_posture(game, rng=None):
     game_state["_hco_defense_posture"] = posture
     logging.warning(f"🛡️ [DYNAMIC DEFENSE] turn posture = {posture}")
     return posture
-
-
-def _dynamic_hco_setplay_enabled():
-    """Dynamic HCO **Set Plays** is ALWAYS on (Stage 3, 2026-07-12): the up-front event tables are
-    sunset and set-play SHOTs always run the per-step dynamic overlay on the chosen variant skeleton
-    (variant selection stays). The GOB_DYNAMIC_HCO_SETPLAY kill switch has nothing to fall back to.
-    Always returns True; production no longer calls it (all gates simplified). Kept only as a stable
-    symbol for the gate tests; safe to delete once those are pruned."""
-    return True
 
 
 def _setplay_recovery_roll(game, rng=None):
@@ -5683,8 +5636,8 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     universal ``should_shoot`` (shoot / hot-read dish), SM-precedence (defer the shot to work the
     ball), and the movement matrix (subtle / disruption / freelance). A shot decision terminates and
     appends its shot steps; non-shot decisions advance to the next skeleton step. If no shot fires by
-    the end, force one at the last step. Same result contract as ``resolve_motion_offense_shot``, or
-    ``None`` to defer to the legacy path.
+    the end, force one at the last step. Returns the shot-info result contract (``skeleton`` +
+    ``shooter*`` + ``shot_type`` …), a moment dict (``moment_result`` …), or ``None`` on a malformed skeleton.
 
     ``is_setplay`` gates the ONE behavioral difference: after a forced subtle where the BH then
     doesn't shoot/dish, a set play runs ``_setplay_recovery_roll`` (WON → resume the skeleton; LOST →
@@ -5785,7 +5738,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     # defender. The moment itself is rolled per REACHED step inside the loop (moment-first). Recalibration
     # (forced_shot_step_index) returned above → never reaches here, so forced shots skip the moment.
     # roll_moment gates the moment to the ONE authoritative up-front walk (the spine passes True). All
-    # other callers — the resolve_motion_offense_shot wrapper, recalibration, and the [5] fallback
+    # other callers — recalibration (forced_shot_step_index) and the [5] fallback
     # re-walks — pass False, so a fallback re-walk can never fire a moment dict the shot path can't
     # route (and [4] already ran). The moment is resolved exactly once per turn.
     _moment_aggr = int((getattr(def_team, "strategy_settings", {}) or {}).get("aggression", 2))
@@ -6014,17 +5967,6 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     )
 
 
-# Backward-compatible named entry points → the unified resolver. The two play types were unified
-# 2026-07-11 (they differed only in the set-play recovery roll); these thin delegates keep the
-# named API stable for callers/tests. ONE implementation lives in _resolve_hco_offense_shot_dynamic.
-def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
-    return _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False)
-
-
-def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
-    return _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
-
-
 def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_location, decision,
                              game, off_lineup, def_lineup, is_away_offense,
                              forced_shot_penalty=0.0):
@@ -6124,7 +6066,7 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
         (roll = randint(1,100)+tempo > 4*shot_clock/cycle);
       - else 80% pass to a teammate within 20 grid (receiver becomes BH, continue) / 20% hold;
       - no teammate within 20 → shoot.
-    Returns the resolve_motion_offense_shot result contract.
+    Returns the _resolve_hco_offense_shot_dynamic shot-info result contract.
     """
     from BackEnd.engine.motion_freelance import (
         build_freelance_beat, freelance_shoot_step, freelance_pass_step,
@@ -6744,9 +6686,9 @@ def resolve_half_court_offense_logic(game):
                         die_roll = random.randint(1, 100)
                         if die_roll < recalibration_score:
                             chosen_step = random.randint(2, i - 1)
-                            motion_shot_info = resolve_motion_offense_shot(
+                            motion_shot_info = _resolve_hco_offense_shot_dynamic(
                                 final_skeleton, game, off_lineup, def_lineup,
-                                forced_shot_step_index=chosen_step,
+                                is_setplay=False, forced_shot_step_index=chosen_step,
                             )
                             if motion_shot_info:
                                 final_skeleton = motion_shot_info["skeleton"]
@@ -7538,7 +7480,8 @@ def resolve_half_court_offense_logic(game):
                 or _hco_precomputed_shot_info
             )
             if not motion_shot_info:
-                motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
+                motion_shot_info = _resolve_hco_offense_shot_dynamic(
+                    skeleton, game, off_lineup, def_lineup, is_setplay=False)
 
         # Coverage: contest any pass in the FINAL skeleton the per-step resolver didn't already
         # contest (legacy resolve / recalibration / expansion). Mutates motion_shot_info in place →

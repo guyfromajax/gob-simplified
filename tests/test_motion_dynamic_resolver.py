@@ -2,10 +2,16 @@
 import random
 import BackEnd.engine.phase_resolution as PR
 from BackEnd.engine.phase_resolution import (
-    _dynamic_hco_motion_enabled,
-    _resolve_motion_offense_shot_dynamic,
+    _resolve_hco_offense_shot_dynamic,
     _execute_motion_decision,
 )
+
+
+# The `_resolve_motion_offense_shot_dynamic` thin delegate was removed (cleanup 2026-07-13) — all HCO
+# shot resolution calls the unified `_resolve_hco_offense_shot_dynamic` directly. Local shim keeps the
+# motion-specific tests below unchanged (is_setplay=False).
+def _resolve_motion_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
+    return _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False)
 
 _ATTR_KEYS = ["SC", "ST", "AG", "SH", "ID", "OD", "IQ", "CH"]
 
@@ -54,18 +60,8 @@ def _lineup(**by_pos):
     return by_pos
 
 
-# ---------------------------------------------------------------- gate
-
-def test_gate_on_by_default(monkeypatch):
-    # Ships ON by default (kill switch: GOB_DYNAMIC_HCO_MOTION=0).
-    monkeypatch.delenv("GOB_DYNAMIC_HCO_MOTION", raising=False)
-    assert _dynamic_hco_motion_enabled() is True
-
-
-def test_gate_on_when_env_truthy(monkeypatch):
-    for v in ("1", "true", "on", "YES"):
-        monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", v)
-        assert _dynamic_hco_motion_enabled() is True
+# Gate tests removed (cleanup 2026-07-13): the GOB_DYNAMIC_HCO_MOTION flag + neutered
+# `_dynamic_hco_motion_enabled()` were retired in Stage 3 (dynamic is always-on, no legacy fallback).
 
 
 def test_turn_gate_both_off_still_resolves(monkeypatch):

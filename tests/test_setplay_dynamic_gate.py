@@ -1,32 +1,10 @@
-"""Dynamic HCO Set Plays — Stage A: feature gate + up-front-event skip wiring."""
-import os
-import importlib
+"""Dynamic HCO Set Plays — the set-play forced-subtle recovery roll.
+
+Gate tests removed (cleanup 2026-07-13): the GOB_DYNAMIC_HCO_MOTION / GOB_DYNAMIC_HCO_SETPLAY kill
+switches + their neutered `_dynamic_hco_*_enabled()` helpers were retired in Stage 3 (dynamic is
+always-on, no legacy fallback), so there is nothing left to gate.
+"""
 import BackEnd.engine.phase_resolution as PR
-
-
-def _set_env(monkeypatch, **kv):
-    for k, v in kv.items():
-        if v is None:
-            monkeypatch.delenv(k, raising=False)
-        else:
-            monkeypatch.setenv(k, v)
-
-
-def test_setplay_gate_on_by_default(monkeypatch):
-    # Stage 3 (2026-07-12): flag RETIRED — always on (legacy removed, nothing to fall back to).
-    monkeypatch.delenv("GOB_DYNAMIC_HCO_SETPLAY", raising=False)
-    assert PR._dynamic_hco_setplay_enabled() is True
-
-
-def test_flags_retired_always_on(monkeypatch):
-    # Stage 3: BOTH dynamic-HCO flags are retired — the legacy up-front tables + legacy resolver were
-    # removed, so the GOB_DYNAMIC_HCO_* kill switches have nothing to fall back to. Both always return
-    # True regardless of the env var (the neutered functions are kept only as stable symbols).
-    for v in ("1", "true", "YES", "on", "0", "false", "off", ""):
-        monkeypatch.setenv("GOB_DYNAMIC_HCO_MOTION", v)
-        monkeypatch.setenv("GOB_DYNAMIC_HCO_SETPLAY", v)
-        assert PR._dynamic_hco_motion_enabled() is True
-        assert PR._dynamic_hco_setplay_enabled() is True
 
 
 # --------------------------------------------------------- recovery roll (re-enter vs freelance)

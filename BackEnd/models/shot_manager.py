@@ -646,7 +646,7 @@ class ShotManager:
         forced_shot = bool(roles.get("forced_shot", False))
 
         # Determine shot_type before micro plan / classification (pool + paint rules).
-        # Motion offense: use randomly chosen type from resolve_motion_offense_shot (motion_shot_type)
+        # Motion offense: use the type chosen by _resolve_hco_offense_shot_dynamic (motion_shot_type)
         # Set plays: infer from skeleton (location + handle_ball/drive detection)
         if forced_shot:
             shot_type, is_paint, _ = self._resolve_forced_shot_type(shooter, roles)

@@ -10,7 +10,14 @@ monkeypatched so these test the WALK + the forced-subtle progression, not the co
 """
 import random
 import BackEnd.engine.phase_resolution as PR
-from BackEnd.engine.phase_resolution import _resolve_setplay_offense_shot_dynamic
+from BackEnd.engine.phase_resolution import _resolve_hco_offense_shot_dynamic
+
+
+# The `_resolve_setplay_offense_shot_dynamic` thin delegate was removed (cleanup 2026-07-13) — all HCO
+# shot resolution calls the unified `_resolve_hco_offense_shot_dynamic` directly. Local shim keeps the
+# set-play tests below unchanged (is_setplay=True).
+def _resolve_setplay_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup):
+    return _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
 
 _ATTR_KEYS = ["SC", "ST", "AG", "SH", "ID", "OD", "IQ", "CH"]
 
