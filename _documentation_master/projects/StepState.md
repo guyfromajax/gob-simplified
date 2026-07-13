@@ -4,9 +4,19 @@
 
 ---
 
-## ▶ RESUME HERE (checkpoint 2026-07-12b)
+## ▶ RESUME HERE (checkpoint 2026-07-12c)
 
-> **Numbering:** formal "Staged plan" (Stage 0–3) below. Stage 2 shipped+verified. **Stage 3 DONE (motion + set play)** — motion & set play now run through the ONE resolver with symmetric orchestration (dynamic-always, no legacy, no flags). Stage 1's **moment fusion** remains the DEFERRED capstone (path-A re-scoped below). NEXT = the fusion (A vs B), or the trivial flag/wrapper cleanup first.
+> **Numbering:** formal "Staged plan" (Stage 0–3) below. Stage 2 shipped+verified. **Stage 3 DONE.** **Stage 1 MOMENT FUSION DONE (Path A, this session)** — the on-ball moment now rolls INSIDE the one resolver (moment-first, reached steps only); the two separate `_resolve_hco_moment_walk` passes are gone. NEXT = commit (uncommitted in the working tree) + the trivial flag/wrapper cleanup, then Stage-2 residuals.
+
+### ✅ Moment fusion — DONE (Path A, 2026-07-12c, UNCOMMITTED on develop)
+Chose **Path A** (invert spine, reuse the existing `[4]` non-shot machinery — B would have duplicated ~300 lines of turnover+foul finalize). Executed the low-risk **hoist+cache** variant (didn't physically relocate `[2]`–`[4]`):
+- **Moment fused into `_resolve_hco_offense_shot_dynamic`** — per-turn engagement rolled ONCE; per REACHED step it rolls the on-ball moment moment-FIRST (before the scripted-pass/shot/dish resolves). A hard outcome returns a `{"moment_result", "skeleton"(reached), "moment_stop_index", "moment_defender_id"}` dict; near-misses append reach-in tags. Gated by a new `roll_moment` param (default False) so ONLY the authoritative up-front walk rolls it.
+- **Spine**: the resolver runs ONCE up front (both motion + set play), after `final_skeleton` is chosen. Moment → set `result` + truncate `final_skeleton` → existing stopper/`[4]` finalize it (unchanged). Shot → cache `_hco_precomputed_shot_info`; the reached walk drives the shot-clock check `[2]`. `[5]` consumes the cache instead of re-walking (a 2nd RNG walk would desync moment↔shot). Both `_resolve_hco_moment_walk` call sites + the post-hoc reach-in stamping removed.
+- **`roll_moment` fix**: the `[5]` fallback re-walks (setplay try + motion fresh) must NOT fire a moment (the shot path can't route a moment dict, and `[4]` already ran). `roll_moment=False` on all callers except the up-front spine call. (First run KeyError:'shooter' → this.)
+- **`_resolve_hco_moment_walk` kept but RETIRED from the spine** — still the unit-tested reference spec (`tests/test_motion_moment.py`, couldn't run: pytest blocked on gob-staging). Keep it in sync with the fused copy, or repoint the tests + delete later.
+- **Baseline-10 verified (20 games):** distribution shifted **as predicted** — Shot 69.0%→**77.0%** (+7.9pp); moment-outcomes 31.0%→23.0% (O_FOUL 2.3→1.1, D_FOUL 8.9→5.7, DBTO 11.4→9.2, STEAL 8.4→7.0). No crash, no new outcome types. The −7.9pp is exactly the moments that used to pre-empt shots on unreached steps.
+
+**NEXT:** commit this; then trivial cleanup (delete neutered `_dynamic_hco_motion_enabled`, collapse the 3 resolver wrapper names, prune gate tests); then Stage-2 residuals (walk-time contest consolidation, render-adoption verify).
 
 ### Shipped since the 07-11b checkpoint (all on develop)
 - **Moment-teleport pin (`eb0408de6`)** — moment fired foul/steal/turnover at a known step `i` but discarded it → `apply_stopper` used a random blast-radius step (ball snap-back). Now stashes `_hco_moment_stop_index=i`; apply_stopper consumes it. Fixes the DB-turnover-after-pass teleport.
@@ -15,8 +25,8 @@
 - **BAT_OOB reachable + zone exclusion + Batted-OOB UESS Layer B (`8d86c6abd`, side-quest off the pass-contest thread):** the old INTERCEPT/BAT_OOB two-tier band was narrower than the score's quantization step → BAT_OOB never fired. Replaced with a single deflect threshold (tier_mid) + `rand(1,200)<CH+IQ` INTERCEPT-vs-BAT split (all callers). Zone now excludes the on-ball zone defender (`_zone_bh_defender`) from picking his own passer's pass. HCO batted-OOB now emits a proper UESS animation (`bat_reach` override + `bat_oob` event → ball passer→contact→OOB via new universal `nearest_oob_point`). Live-confirmed getting both.
 - **✅ Stage 3 (MOTION) — legacy removed (`5c5aad53c`):** the 219-line legacy random-step body of `resolve_motion_offense_shot` was still LIVE via recalibration (Second Chance `forced_shot_step_index` skipped the dynamic resolver) + the `GOB_DYNAMIC_HCO_MOTION` kill switch. Removed: (1) `_resolve_hco_offense_shot_dynamic` gained a `forced_shot_step_index` mode; (2) `resolve_motion_offense_shot` is now a thin wrapper → dynamic (recalibration passes through); (3) legacy body deleted; (4) motion flag retired (gates unconditional, `_dynamic_hco_motion_enabled()` neutered to always-True). Baseline-10 holds. **Simplifies the spine ahead of the fusion.**
 
-### ⏸ Moment fusion — the DEFERRED CAPSTONE (formal Stage 1). Path-A re-scope DONE 2026-07-12b:
-Goal: fold the on-ball moment into the unified per-step walk per Decision #1 (moment EVERY step, moment-first, first-terminal-in-step-order wins) → the moment stops pre-empting a shot on a step the offense never reached.
+### ✅ Moment fusion — DONE 2026-07-12c (formal Stage 1). See the DONE block up top. Design record kept below:
+Goal (ACHIEVED): fold the on-ball moment into the unified per-step walk per Decision #1 (moment EVERY step, moment-first, first-terminal-in-step-order wins) → the moment stops pre-empting a shot on a step the offense never reached. **Executed as Path A (hoist+cache), verified +7.9pp shot shift.**
 
 **The spine order today (`resolve_half_court_offense_logic`, ~1300 lines):**
 ```
@@ -61,8 +71,8 @@ Goal: fold the on-ball moment into the unified per-step walk per Decision #1 (mo
 **Next concrete steps (in the formal scheme):**
 1. **Stage 2 residual — (low priority) consolidate the walk-time contest.** `_hco_contest_skeleton_pass` (called at ~5906/6152 during the walk) runs *before* the pre-coverage stamp, so those picks still use reconstruction (graceful fallback). Coverage (`_hco_contest_final_skeleton`) catches most passes with the real grid. Retire the walk-time hooks / move all contesting to the stamped stage if the mixing shows in numbers or a visual.
 2. **Stage 2 residual — verify render adoption.** The render already computes the same grid via the extract, so contest+render share one value today; confirm no redundant/second draw remains. (This is the last bookkeeping bit of Stage 2, NOT a new stage.)
-3. **Stage 1 (walk unification) — still OPEN.** Unify moment + interception + offense onto one `StepState` walk; delete the moment walk + coverage patch. This is what subsumes the **"ball snap-back on a non-shot outcome"** family (see below), incl. the **DB-turnover-after-pass teleport (2026-07-11, still live)** — NOT fixed by the Stage 2 defender-grid work.
-4. **Stage 3 — still OPEN.** Remove the legacy + recalibration bypass paths.
+3. **Stage 1 (walk unification) — ✅ moment fusion DONE (2026-07-12c).** Moment + offense now walk in ONE resolver loop (moment-first, reached steps only); both `_resolve_hco_moment_walk` call sites removed. Interception already runs inside the resolver. *Residual: the coverage patch (`_hco_contest_final_skeleton`) still exists for passes the walk-time contest missed — retire once the walk-time contest is consolidated (Stage-2 residual).* The DB-turnover-after-pass teleport was already pinned tactically (`eb0408de6`); the fusion makes the pin structural.
+4. **Stage 3 — ✅ DONE (motion `5c5aad53c` + setplay `6e04d15df`).** Legacy + recalibration bypass paths removed.
 
 **Hard constraint (still true):** the contest's grid must be a pure resolution-time computation (interception = OUTCOME, identical animated/sim'd). Satisfied: `compute_defender_grid` runs pre-emit for the contest; the emit's exact stash feeds `StepState.defense` for rendered turns.
 
@@ -208,7 +218,7 @@ Result: the emitted skeleton is **fully self-describing**. The animator becomes 
 
 ## Staged plan (each flag-guarded + parity-gated)
 - **Stage 0** — define `StepState` + the single per-step reconstruction; stamp positions / BH / owner / timing. **No behavior change** — centralize what's already computed. (De-risks everything after it.) *Status: partially done — `StepState.defense` is stamped/consumed; BH / owner / timing not yet centralized.*
-- **Stage 1 — ⬜ OPEN** — unify the walks onto `StepState` (moment + interception + offense in one loop); delete moment walk + coverage patch. *Subsumes the "ball snap-back on a non-shot outcome" family (below), incl. the still-live DB-turnover-after-pass teleport.*
+- **Stage 1 — ✅ moment fusion DONE (2026-07-12c, Path A hoist+cache)** — moment + offense in one resolver loop (moment-first, reached steps only); both `_resolve_hco_moment_walk` call sites removed; interception already in-loop. Baseline-10: shot 69→77% (+7.9pp), moments 31→23%. *Residual: coverage patch still present (retire with the walk-time-contest consolidation).*
 - **Stage 2 — ✅ COMPLETE (2026-07-11, develop)** — **smaller than first thought.** HCO already renders off the emitter (`skeleton_step_emitter`), which builds coords internally via `skeleton_to_animations` → `get_defender_coords`. The gap: that render-side defender reconstruction was *independent* from the contest's (`_hco_step_def_xy` → `get_defender_coords`) — same formula, separate computation, confirmed divergence (man 22–64%, zone+away 100% mirror). Stage 2 = the engine **stamps the defender grid** so both the emitter and the contest read one value (emitter-as-god), instead of the animator re-deriving it. Not a renderer rewrite. **Shipped** via `compute_defender_grid` extract + Option A (share the emit's one draw) + Step A (man) / Step B (zone) contest routing; live GAP = 0% man+zone. *Residual (low pri): consolidate the walk-time contest; verify no redundant render draw. See RESUME HERE.*
 - **Stage 3 — ✅ DONE (motion `5c5aad53c` + setplay `6e04d15df`)** — legacy + bypass paths removed. Motion: 219-line legacy body deleted, recalibration migrated to the dynamic resolver's `forced_shot_step_index` mode, motion flag retired. Set play: flag retired, gates always-dynamic (no separate legacy body — its "standard path" was just the shared `resolve_shot`, kept as a 1-line try/except safety net; variant selection kept). Both flags neutered to always-True (delete when gate tests pruned).
 

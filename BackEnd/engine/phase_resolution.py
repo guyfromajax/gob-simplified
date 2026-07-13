@@ -5593,7 +5593,14 @@ def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup
 
 
 def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_tags=None):
-    """Dynamic HCO per-step foul / steal / turnover moment — the HCT step-by-step moment migrated
+    """RETIRED FROM THE SPINE (moment fusion, 2026-07-12): the on-ball moment now rolls INSIDE
+    ``_resolve_hco_offense_shot_dynamic``'s per-step walk (moment-first, reached steps only) instead of
+    this separate full-skeleton pass — so it can no longer fire on a step the offense never reached.
+    Kept as the unit-tested reference spec of the moment semantics (engagement gate + rt_map + reach-in
+    tagging + zone/man defender selection); the fused copy in the resolver mirrors this logic. Not called
+    in production — keep the two in sync if the moment rules change.
+
+    Dynamic HCO per-step foul / steal / turnover moment — the HCT step-by-step moment migrated
     to HCO. Rolls the defense's per-turn moment engagement (aggression 0-4 → % via
     MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION), then walks the skeleton steps firing the attribute-driven moment (`_resolve_hco_moment`) for
     the ball handler vs his MAN defender. Returns the HCO ``result_type`` of the FIRST hard
@@ -5678,7 +5685,8 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
 
 
 def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=False,
-                                      forced_shot_step_index=None):
+                                      forced_shot_step_index=None, reach_in_tags=None,
+                                      roll_moment=False):
     """Dynamic HCO per-step offense resolver — ONE implementation for Motion AND Set Play (unified
     2026-07-11; the two were ~255-line near-duplicates differing in a single behavioral fork).
 
@@ -5692,7 +5700,18 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     ``is_setplay`` gates the ONE behavioral difference: after a forced subtle where the BH then
     doesn't shoot/dish, a set play runs ``_setplay_recovery_roll`` (WON → resume the skeleton; LOST →
     forced ``_resolve_freelance``), modeling a broken-down set. Motion always resumes. Log labels use
-    ``_kind`` accordingly."""
+    ``_kind`` accordingly.
+
+    FUSED ON-BALL MOMENT (formal Stage 1, 2026-07-12): the per-step foul/steal/turnover moment now
+    rolls INSIDE this walk — moment-FIRST each step (Decision #1), only on steps the offense actually
+    REACHES (before it shoots/dishes). Previously a separate ``_resolve_hco_moment_walk`` pass over
+    the FULL skeleton could fire a moment on a step the offense never got to (it had already shot
+    earlier), pre-empting a shot that should have stood. On a hard moment this returns a distinct
+    ``{"moment_result": <HCO result type>, "skeleton": {reached steps}, "moment_stop_index": i,
+    "moment_defender_id": id}`` dict (NO shot keys) — the caller sets ``result`` to it and lets the
+    existing non-shot / stopper machinery finalize. Non-terminal contests append ``(step_index,
+    defender_id)`` to ``reach_in_tags`` (when passed) for the caller's render-space reach-in flourish
+    (indices are in the RETURNED skeleton's step space). Per-turn moment engagement is rolled ONCE."""
     import random
     from BackEnd.engine.motion_read_map import build_motion_read_map
     from BackEnd.engine.motion_step_decision import (
@@ -5772,6 +5791,22 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
         f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
     )
 
+    # Fused on-ball MOMENT setup (formal Stage 1). Per-turn engagement rolled ONCE (aggression 0-4 →
+    # % via MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION). Man → BH's matchup defender; zone → the on-ball zone
+    # defender. The moment itself is rolled per REACHED step inside the loop (moment-first). Recalibration
+    # (forced_shot_step_index) returned above → never reaches here, so forced shots skip the moment.
+    # roll_moment gates the moment to the ONE authoritative up-front walk (the spine passes True). All
+    # other callers — the resolve_motion_offense_shot wrapper, recalibration, and the [5] fallback
+    # re-walks — pass False, so a fallback re-walk can never fire a moment dict the shot path can't
+    # route (and [4] already ran). The moment is resolved exactly once per turn.
+    _moment_aggr = int((getattr(def_team, "strategy_settings", {}) or {}).get("aggression", 2))
+    _moment_engaged = roll_moment and (
+        random.randint(1, 100) <= MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION.get(_moment_aggr, 35))
+    _moment_scalar = HCO_ZONE_MOMENT_SCALAR if zone else HCO_MOMENT_SCALAR
+    _moment_rt_map = {"STEAL": "STEAL", "DEAD BALL": "DEAD_BALL_TURNOVER",
+                      "O_FOUL": "O_FOUL", "D_FOUL": "D_FOUL"}
+    game_state.pop("_hco_moment_stop_index", None)  # clear any stale pin from a prior turn
+
     def _apply_dish_contest(decision, result, step, passer_pos):
         """§4 Stage 2: if the executed decision threw a pass (dish/kickout), contest it. On an
         INTERCEPT/BAT_OOB flag the result so the caller converts it to a STEAL turnover. Self-shots
@@ -5807,6 +5842,36 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
         shot_clock_est -= _estimate_step_game_seconds(steps[i - 1], steps[i], off_lineup, is_away_offense)
         game_state["_hco_shot_clock_est"] = shot_clock_est  # at-attempt clock for the HCO shot-tier tally
         output_steps.append(steps[i])  # players arrive at skeleton step i
+        # ② On-ball MOMENT — moment-FIRST (Decision #1): the BH's defender gets his crack at THIS
+        # reached step BEFORE the offense's scripted-pass / shot / dish resolves. A hard outcome
+        # terminates the walk here (truncated to the reached steps); a near-miss records a reach-in.
+        if _moment_engaged:
+            _m_bh, _m_loc = _motion_bh_at_step(steps[i])
+            if _m_bh and off_lineup.get(_m_bh):
+                if zone:
+                    _m_def = _zone_bh_defender(
+                        game_state.get("defense_playcall"), _m_loc, is_away_offense, def_lineup, _m_bh)
+                else:
+                    _m_def = def_lineup.get(off_to_def.get(_m_bh, _m_bh))
+                if _m_def is not None:
+                    _m_out, _m_ratio, _m_cred = _resolve_hco_moment(
+                        game, off_lineup[_m_bh], _m_def, event_scalar=_moment_scalar)
+                    _m_rt = _moment_rt_map.get(_m_out)
+                    if _m_rt:
+                        _stop_idx = len(output_steps) - 1  # steps[i] in the reached (output) step space
+                        _cred_id = getattr(_m_cred or _m_def, "player_id", None)
+                        game_state["_hco_moment_defender_id"] = _cred_id
+                        game_state["_hco_moment_stop_index"] = _stop_idx
+                        logging.warning(
+                            f"⚔️ [DYNAMIC {_kind}] MOMENT {_m_rt} at step {i} "
+                            f"({_m_bh}, {'zone' if zone else 'man'})")
+                        skeleton["steps"] = list(output_steps)
+                        return {"moment_result": _m_rt, "skeleton": skeleton,
+                                "moment_stop_index": _stop_idx, "moment_defender_id": _cred_id}
+                    if reach_in_tags is not None:
+                        _rid = getattr(_m_def, "player_id", None)
+                        if _rid:
+                            reach_in_tags.append((len(output_steps) - 1, _rid))
         # P2b: a skeleton ball-movement / reversal pass is interceptable (two-gate contest). A pick
         # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
         _skel_pass_to = _hco_contest_skeleton_pass(
@@ -6570,17 +6635,13 @@ def resolve_half_court_offense_logic(game):
     # ✅ NEW RESOLUTION SYSTEM: Use new sequential resolution system
     result, variant_result, execution_score = resolve_hco_outcome(game, skeleton)
 
-    # Dynamic HCO migration: per-step foul/steal/turnover MOMENT (from HCT). When the up-front
-    # tables are skipped for motion (resolve_hco_outcome → SHOT) and the flag is on, walk the
-    # steps with the attribute-driven moment; a hard outcome overrides `result` and routes through
-    # the EXISTING non-shot resolution + stopper system below. (v1: man defense, pre-shot.)
-    _hco_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
-    if is_motion_play and result == "SHOT":
-        _moment_result = _resolve_hco_moment_walk(
-            skeleton, game, off_lineup, def_lineup, reach_in_tags=_hco_reach_in_tags,
-        )
-        if _moment_result:
-            result = _moment_result
+    # Formal Stage 1 — MOMENT FUSION (2026-07-12): the per-step foul/steal/turnover moment used to run
+    # here as a SEPARATE full-skeleton pass (_resolve_hco_moment_walk), which could fire on a step the
+    # offense never reached (it had already shot earlier), pre-empting a shot that should have stood. It
+    # now rolls INSIDE the unified per-step resolver (moment-first, reached steps only) — run ONCE below,
+    # after final_skeleton is chosen. That resolver output is authoritative for BOTH the moment outcome
+    # AND the shot; _hco_precomputed_shot_info carries the shot case to the resolution block [5].
+    _hco_precomputed_shot_info = None
 
     # ✅ REMOVED: Old generate_logic() call and lean_score storage
     # Store variant_result for skeleton selection (replaces lean_score)
@@ -6609,18 +6670,9 @@ def resolve_half_court_offense_logic(game):
     # For Motion plays, use base_loop (no variants)
     # For Set Plays, use variant_result from resolution system
     if is_motion_play:
-        # Motion plays use base_loop skeleton (already retrieved)
+        # Motion plays use base_loop skeleton (already retrieved). Reach-in stamping now happens after
+        # the unified resolver runs below (indices align with the reached-walk skeleton it returns).
         final_skeleton = skeleton
-        # Dynamic HCO option B: stamp the (failed) steal-attempt reach-in on every non-terminal
-        # contested step of an engaged moment-walk turn (terminal outcomes get theirs via the
-        # stopper step). Applied here, post-deepcopy, so the cached skeleton is never mutated;
-        # step indices align with the walked skeleton. The emitter turns reach_in_def_id into a
-        # render-space reach_in flourish (FE lunge + click-steal SFX) — UESS-safe, no coord change.
-        if _hco_reach_in_tags and final_skeleton and final_skeleton.get("steps"):
-            _fsteps = final_skeleton["steps"]
-            for _idx, _rid in _hco_reach_in_tags:
-                if 0 <= _idx < len(_fsteps):
-                    _fsteps[_idx]["reach_in_def_id"] = _rid
     else:
         # Set Plays: Get skeleton with correct variant based on resolution result
         if variant_result:
@@ -6641,26 +6693,37 @@ def resolve_half_court_offense_logic(game):
     if final_skeleton:
         final_skeleton = copy.deepcopy(final_skeleton)
 
-    # Dynamic HCO Set Plays (Stage C): per-step foul/steal/turnover MOMENT on the EXECUTED variant
-    # skeleton, replacing the up-front event tables (already skipped via skip_upfront_events under
-    # the flag). Man + zone — _resolve_hco_moment_walk handles both. Runs here, AFTER the variant
-    # skeleton is chosen + deep-copied, so the walk reads the actual play and the reach-in step
-    # indices align with the emitted skeleton; runs BEFORE the shot-clock block so a hard outcome
-    # (which clears result != "SHOT") correctly pre-empts the would-be shot. Mirrors the motion
-    # moment walk above. (variant selection unaffected — Z-Completed/Dynamic_HCO_SP_Brief, Stage C.)
-    if (offense_play_type in ("set", "set_play") and result == "SHOT" and final_skeleton):
-        _sp_reach_in_tags = []  # option B: (step_index, defender_id) per non-terminal contest
-        _sp_moment_result = _resolve_hco_moment_walk(
-            final_skeleton, game, off_lineup, def_lineup, reach_in_tags=_sp_reach_in_tags,
+    # Formal Stage 1 — MOMENT FUSION: run the unified per-step resolver ONCE here (moment fused into its
+    # loop), for BOTH motion and set play, on the EXECUTED skeleton (motion base_loop / set-play variant),
+    # AFTER it is chosen + deep-copied. The resolver rolls the on-ball moment moment-first on each REACHED
+    # step; its output is authoritative:
+    #   • hard moment → set `result` + truncate final_skeleton to where it fired → the existing non-shot /
+    #     stopper machinery below finalizes it (exactly as the old moment walk did — no new path);
+    #   • otherwise → cache the shot-info for the resolution block [5] to consume. We deliberately do NOT
+    #     re-walk at [5]: the walk is RNG, so a second walk would desync the moment roll from the shot it
+    #     guards (they are one walk now). The reached walk also drives the shot-clock check below (the
+    #     offense's ACTUAL shot step), replacing the old full-skeleton timing.
+    # Replaces the two separate _resolve_hco_moment_walk passes + the post-hoc reach-in stamping. Set-play
+    # recovery + variant selection are unchanged (they live in the resolver / were resolved above).
+    if result == "SHOT" and final_skeleton and (is_motion_play or offense_play_type == "set_play"):
+        _reach_in_tags = []  # (step_index, defender_id) per non-terminal contest
+        _walk = _resolve_hco_offense_shot_dynamic(
+            final_skeleton, game, off_lineup, def_lineup,
+            is_setplay=not is_motion_play, reach_in_tags=_reach_in_tags, roll_moment=True,
         )
-        if _sp_moment_result:
-            result = _sp_moment_result
-        # Stamp the (failed) steal-attempt reach-in on every non-terminal contested step (terminal
-        # outcomes get theirs via the stopper step). final_skeleton is already deep-copied, so the
-        # cached skeleton is never mutated and indices align with the walked skeleton.
-        if _sp_reach_in_tags and final_skeleton.get("steps"):
+        if isinstance(_walk, dict) and _walk.get("moment_result"):
+            result = _walk["moment_result"]
+            final_skeleton = _walk["skeleton"]
+        elif _walk is not None:
+            _hco_precomputed_shot_info = _walk
+            if isinstance(_walk.get("skeleton"), dict):
+                final_skeleton = _walk["skeleton"]  # reached walk drives the shot-clock check below
+        # Reach-in flourishes on the reached-walk skeleton (terminal outcomes get theirs via the stopper
+        # step). Indices are in the returned skeleton's step space. UESS-safe (no coord change). The
+        # emitter turns reach_in_def_id into a render-space lunge + click-steal SFX.
+        if _reach_in_tags and final_skeleton and final_skeleton.get("steps"):
             _fsteps = final_skeleton["steps"]
-            for _idx, _rid in _sp_reach_in_tags:
+            for _idx, _rid in _reach_in_tags:
                 if 0 <= _idx < len(_fsteps):
                     _fsteps[_idx]["reach_in_def_id"] = _rid
 
@@ -7463,18 +7526,28 @@ def resolve_half_court_offense_logic(game):
     )
 
     if (is_motion_play or is_setplay_dynamic) and event_type == "SHOT":
+        # Moment fusion: the unified resolver already ran ONCE up front (its walk fused the on-ball
+        # moment); consume that precomputed shot-info instead of re-walking (a second RNG walk would
+        # desync the moment roll from the shot it guarded). Recalibration (shot-clock Second Chance)
+        # still takes precedence for motion. Fall back to a fresh walk only if neither was cached
+        # (malformed skeleton / non-dynamic path).
         if is_setplay_dynamic:
-            logging.warning("🟢 [DYNAMIC SETPLAY] flag ON — running dynamic resolver for this Set Play shot")
-            try:
-                motion_shot_info = _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
-                if motion_shot_info is None:
-                    logging.info("ℹ️ [DYNAMIC SETPLAY] Resolver returned None; using standard set-play shot path")
-            except Exception as e:
-                logging.warning(f"⚠️ [DYNAMIC SETPLAY] Error in dynamic resolver, falling back to standard path: {e}")
-                motion_shot_info = None
+            motion_shot_info = _hco_precomputed_shot_info
+            if motion_shot_info is None:
+                logging.warning("🟢 [DYNAMIC SETPLAY] no precomputed walk — running dynamic resolver now")
+                try:
+                    motion_shot_info = _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
+                    if motion_shot_info is None:
+                        logging.info("ℹ️ [DYNAMIC SETPLAY] Resolver returned None; using standard set-play shot path")
+                except Exception as e:
+                    logging.warning(f"⚠️ [DYNAMIC SETPLAY] Error in dynamic resolver, falling back to standard path: {e}")
+                    motion_shot_info = None
         else:
-            # Motion play shot resolution (or use precomputed recalibration from shot-clock path)
-            motion_shot_info = game_state.pop("_motion_shot_recalibrated", None)
+            # Motion: recalibration (shot-clock) → precomputed fusion walk → fresh walk (fallback).
+            motion_shot_info = (
+                game_state.pop("_motion_shot_recalibrated", None)
+                or _hco_precomputed_shot_info
+            )
             if not motion_shot_info:
                 motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
 
