@@ -4,11 +4,16 @@
 
 ---
 
-## ▶ RESUME HERE (checkpoint 2026-07-12c)
+## ▶ RESUME HERE (checkpoint 2026-07-13)
 
-> **Numbering:** formal "Staged plan" (Stage 0–3) below. Stage 2 shipped+verified. **Stage 3 DONE.** **Stage 1 MOMENT FUSION DONE (Path A, this session)** — the on-ball moment now rolls INSIDE the one resolver (moment-first, reached steps only); the two separate `_resolve_hco_moment_walk` passes are gone. NEXT = commit (uncommitted in the working tree) + the trivial flag/wrapper cleanup, then Stage-2 residuals.
+> **Numbering:** formal "Staged plan" (Stage 0–3) below. **Stages 1, 2, 3 ALL DONE + committed on develop.** The core refactor (one resolver, one walk, moment fused, grid shared, legacy gone) is complete. What remains is **residuals + cleanup**, not new stages — see NEXT.
 
-### ✅ Moment fusion — DONE (Path A, 2026-07-12c, UNCOMMITTED on develop)
+### ✅ Committed since 07-12c
+- **Moment fusion** (`b729eab34` "streamlined spine of HCO steps") — Path A, details below.
+- **HCO batted-OOB double-send fix** (`8ccedff56` "fiixed OOB animation bug")** — the bat-OOB fired TWO ball trajectories (step-based emitter trajectory + the HCT-era FE imperative `_runHctBatOobBallSend`), so the ball went OOB then flew back to the defender and OOB again. Fix: **imperative-only** (matches HCT/FCP) — removed the step-based `bat_reach` override + `bat_oob` step event from `_finalize_hco_pass_bat_oob` (ball stays with the passer, imperative flies it), and made the FE read the backend's `bat_oob_target` instead of recomputing (`oobGrid = turnData.bat_oob_target ?? resolveNearestOutOfBoundsGrid(...)`). Live-confirmed single clean animation. UESS-compliant (exit point engine-owned).
+- **Pass-contest tunable** — promoted the inline INTERCEPT-vs-BAT_OOB split literal to a named constant `PASS_DEFLECT_KIND_D=200` (`pass_contest.py`); corrected the stale `TIER_HI` (retired) rows + added the split to `Tunable_Constants.md` + `Dynamic_HCO_System.md`. (Uncommitted as of this checkpoint.) Sim: BAT_OOB ≈ 46% of deflections — not rare; ratio is CH+IQ-driven.
+
+### ✅ Moment fusion — DONE (Path A, 2026-07-12c, committed `b729eab34`)
 Chose **Path A** (invert spine, reuse the existing `[4]` non-shot machinery — B would have duplicated ~300 lines of turnover+foul finalize). Executed the low-risk **hoist+cache** variant (didn't physically relocate `[2]`–`[4]`):
 - **Moment fused into `_resolve_hco_offense_shot_dynamic`** — per-turn engagement rolled ONCE; per REACHED step it rolls the on-ball moment moment-FIRST (before the scripted-pass/shot/dish resolves). A hard outcome returns a `{"moment_result", "skeleton"(reached), "moment_stop_index", "moment_defender_id"}` dict; near-misses append reach-in tags. Gated by a new `roll_moment` param (default False) so ONLY the authoritative up-front walk rolls it.
 - **Spine**: the resolver runs ONCE up front (both motion + set play), after `final_skeleton` is chosen. Moment → set `result` + truncate `final_skeleton` → existing stopper/`[4]` finalize it (unchanged). Shot → cache `_hco_precomputed_shot_info`; the reached walk drives the shot-clock check `[2]`. `[5]` consumes the cache instead of re-walking (a 2nd RNG walk would desync moment↔shot). Both `_resolve_hco_moment_walk` call sites + the post-hoc reach-in stamping removed.
@@ -16,19 +21,24 @@ Chose **Path A** (invert spine, reuse the existing `[4]` non-shot machinery — 
 - **`_resolve_hco_moment_walk` kept but RETIRED from the spine** — still the unit-tested reference spec (`tests/test_motion_moment.py`, couldn't run: pytest blocked on gob-staging). Keep it in sync with the fused copy, or repoint the tests + delete later.
 - **Baseline-10 verified (20 games):** distribution shifted **as predicted** — Shot 69.0%→**77.0%** (+7.9pp); moment-outcomes 31.0%→23.0% (O_FOUL 2.3→1.1, D_FOUL 8.9→5.7, DBTO 11.4→9.2, STEAL 8.4→7.0). No crash, no new outcome types. The −7.9pp is exactly the moments that used to pre-empt shots on unreached steps.
 
-**NEXT:** commit this; then trivial cleanup (delete neutered `_dynamic_hco_motion_enabled`, collapse the 3 resolver wrapper names, prune gate tests); then Stage-2 residuals (walk-time contest consolidation, render-adoption verify).
+**NEXT (all that remains — residuals + cleanup, no new stages):**
+1. **Stage-2 residual — consolidate the walk-time contest (the one meaty item).** `_hco_contest_skeleton_pass` runs during the walk, *before* the pre-coverage grid stamp → those picks still use reconstruction (graceful fallback). Move all interception contesting onto the stamped grid, then **retire the coverage patch `_hco_contest_final_skeleton`** — which also closes the last Stage-1 residual (the fusion left the coverage patch in place). This is the final "resolve-once-freeze-draw" architectural bit.
+2. **Trivial cleanup** (low-risk housekeeping): delete the neutered `_dynamic_hco_motion_enabled`; collapse the 3 resolver wrapper names (`resolve_motion_offense_shot` / `_resolve_motion_offense_shot_dynamic` / `_resolve_setplay_offense_shot_dynamic`) → 1; prune the retired flag's gate tests.
+3. **Bat-OOB follow-ups** (from `8ccedff56`, recorded in bugs.md): remove the now-**inert** `bat_reach`/step-`bat_oob` handling in `skeleton_step_emitter.py` (~1634–1671, ~1992–1999) — no writer remains; and close the **HCT UESS gap** (HCT's exit point is still FE-derived — send a `nearest_oob_point` target from `dynamic_hct.py`).
+4. **Stage-2 residual — verify render adoption** (bookkeeping): confirm no redundant/second defender-grid draw remains.
+5. **Commit** the `PASS_DEFLECT_KIND_D` tunable + doc corrections (currently uncommitted).
 
 ### Shipped since the 07-11b checkpoint (all on develop)
 - **Moment-teleport pin (`eb0408de6`)** — moment fired foul/steal/turnover at a known step `i` but discarded it → `apply_stopper` used a random blast-radius step (ball snap-back). Now stashes `_hco_moment_stop_index=i`; apply_stopper consumes it. Fixes the DB-turnover-after-pass teleport.
 - **Walk-time interception seam / Option B (`b83f1ec51`)** — extracted `_stamp_contest_defender_grid`, now called BEFORE the offense walk too. ALL HCO interception contesting (skeleton passes, dishes, hot-reads, coverage) reads the render grid, man+zone. No residual.
 - **Resolver unification (`7b578cb36`)** — motion+setplay dynamic resolvers were ~255-line near-duplicates (one diff: setplay `_setplay_recovery_roll`). Merged into `_resolve_hco_offense_shot_dynamic(..., is_setplay=False)`. Deleted the 257-line dup; kept thin delegates.
-- **BAT_OOB reachable + zone exclusion + Batted-OOB UESS Layer B (`8d86c6abd`, side-quest off the pass-contest thread):** the old INTERCEPT/BAT_OOB two-tier band was narrower than the score's quantization step → BAT_OOB never fired. Replaced with a single deflect threshold (tier_mid) + `rand(1,200)<CH+IQ` INTERCEPT-vs-BAT split (all callers). Zone now excludes the on-ball zone defender (`_zone_bh_defender`) from picking his own passer's pass. HCO batted-OOB now emits a proper UESS animation (`bat_reach` override + `bat_oob` event → ball passer→contact→OOB via new universal `nearest_oob_point`). Live-confirmed getting both.
+- **BAT_OOB reachable + zone exclusion + Batted-OOB UESS Layer B (`8d86c6abd`, side-quest off the pass-contest thread):** the old INTERCEPT/BAT_OOB two-tier band was narrower than the score's quantization step → BAT_OOB never fired. Replaced with a single deflect threshold (tier_mid) + `rand(1,200)<CH+IQ` INTERCEPT-vs-BAT split (all callers). Zone now excludes the on-ball zone defender (`_zone_bh_defender`) from picking his own passer's pass. HCO batted-OOB now emits a proper UESS animation via `nearest_oob_point`. Live-confirmed getting both. **⚠️ SUPERSEDED (`8ccedff56`, 07-13):** the step-based `bat_reach`/`bat_oob`-event trajectory this shipped was later removed — it double-fired with the FE imperative send. Now imperative-only (see the 07-13 committed list up top).
 - **✅ Stage 3 (MOTION) — legacy removed (`5c5aad53c`):** the 219-line legacy random-step body of `resolve_motion_offense_shot` was still LIVE via recalibration (Second Chance `forced_shot_step_index` skipped the dynamic resolver) + the `GOB_DYNAMIC_HCO_MOTION` kill switch. Removed: (1) `_resolve_hco_offense_shot_dynamic` gained a `forced_shot_step_index` mode; (2) `resolve_motion_offense_shot` is now a thin wrapper → dynamic (recalibration passes through); (3) legacy body deleted; (4) motion flag retired (gates unconditional, `_dynamic_hco_motion_enabled()` neutered to always-True). Baseline-10 holds. **Simplifies the spine ahead of the fusion.**
 
 ### ✅ Moment fusion — DONE 2026-07-12c (formal Stage 1). See the DONE block up top. Design record kept below:
 Goal (ACHIEVED): fold the on-ball moment into the unified per-step walk per Decision #1 (moment EVERY step, moment-first, first-terminal-in-step-order wins) → the moment stops pre-empting a shot on a step the offense never reached. **Executed as Path A (hoist+cache), verified +7.9pp shot shift.**
 
-**The spine order today (`resolve_half_court_offense_logic`, ~1300 lines):**
+**The spine order BEFORE the fusion (historical — this is the problem Path A solved; the moment walk `[1]` and the two `_resolve_hco_moment_walk` call sites no longer exist):**
 ```
 [1] moment walk (motion ~6583 + setplay ~6849)  → sets result = STEAL/DBTO/O_FOUL/D_FOUL if it fires
 [2] shot-clock check + recalibration (~6867)     → may set result = SHOT_CLOCK_VIOLATION
