@@ -16,4 +16,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
       - name: Run tests
+        # conftest.py aborts if the resolved DB name is on the safety block-list
+        # ({gob, gob-staging}). With no MONGO_URI, db.py defaults to 'gob', which
+        # blocked the suite from ever running in CI. Pin a throwaway name so the
+        # guard passes; tests run against mongomock (no real MONGO_URI is set).
+        env:
+          MONGO_DB_NAME: gob-test
         run: pytest
