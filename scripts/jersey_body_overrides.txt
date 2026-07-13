@@ -1,0 +1,7 @@
+# Teams whose jersey BODY should be the team's SECONDARY color (not primary).
+# Default is body = primary color. List a team_id here (one per line) to flip it.
+# Populate during QC when a team's jersey reads better in its secondary color.
+# Lines starting with # are ignored.
+#
+# Example (Xavien's real jersey is gray=secondary body, green=primary trim):
+# XAVIEN

@@ -1,0 +1,1666 @@
+{
+  "BENTLEY_TRUMAN": {
+    "team": "Bentley-Truman",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#4066b2",
+        "trim": "#ffffff",
+        "wordmark": "STERLING KNIGHTS"
+      }
+    ]
+  },
+  "OCEAN_CITY": {
+    "team": "Ocean City",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#00a89d",
+        "trim": "#2a2168",
+        "wordmark": "ADMIRALS"
+      }
+    ]
+  },
+  "LANCASTER": {
+    "team": "Lancaster",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#d24a1b",
+        "trim": "#000000",
+        "wordmark": "JOHNNIES"
+      }
+    ]
+  },
+  "FOUR_CORNERS": {
+    "team": "Four Corners",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#c0976a",
+        "trim": "#00954b",
+        "wordmark": "HARVEST"
+      }
+    ]
+  },
+  "MORRISTOWN": {
+    "team": "Morristown",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ec1d28",
+        "trim": "#cccccc",
+        "wordmark": "PIRATES"
+      }
+    ]
+  },
+  "XAVIEN": {
+    "team": "Xavien",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#016837",
+        "trim": "#999999",
+        "wordmark": "ELM TREES"
+      }
+    ]
+  },
+  "LITTLE_YORK": {
+    "team": "Little York",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#65308e",
+        "trim": "#f6af38",
+        "wordmark": "MINUTEMEN"
+      }
+    ]
+  },
+  "SOUTH_LANCASTER": {
+    "team": "South Lancaster",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#e39649",
+        "wordmark": "BULLDOGS"
+      }
+    ]
+  },
+  "CRICKSTOWN": {
+    "team": "Crickstown",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6a1f2b",
+        "trim": "#f3e6d0",
+        "wordmark": "CARIBOU"
+      }
+    ]
+  },
+  "CAGERS_WORLD": {
+    "team": "Cagers World",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#5a3a1b",
+        "trim": "#c5c5c5",
+        "wordmark": "MUSTANGS"
+      }
+    ]
+  },
+  "NICKEL_BEACH": {
+    "team": "Nickel Beach",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#008b8f",
+        "trim": "#2a2a2a",
+        "wordmark": "SEA TURTLES"
+      }
+    ]
+  },
+  "CHAPEL_HILL": {
+    "team": "Chapel Hill",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#87b5e6",
+        "trim": "#1e2f5b",
+        "wordmark": "SKY"
+      }
+    ]
+  },
+  "APPALACHIA": {
+    "team": "Appalachia",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0f3d2e",
+        "trim": "#c5a642",
+        "wordmark": "RAMS"
+      }
+    ]
+  },
+  "CASINO_ROW": {
+    "team": "Casino Row",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#111111",
+        "trim": "#d4af37",
+        "wordmark": "BLACKJACKS"
+      }
+    ]
+  },
+  "IDA": {
+    "team": "IDA",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#f2f2f2",
+        "trim": "#1f4fb2",
+        "wordmark": "ACADEMY"
+      }
+    ]
+  },
+  "DURHAM": {
+    "team": "Durham",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1c2a44",
+        "trim": "#c8a951",
+        "wordmark": "GENERALS"
+      }
+    ]
+  },
+  "MONTPEILER": {
+    "team": "Montpeiler",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "MAPLES"
+      }
+    ]
+  },
+  "QUEENS_GUARD": {
+    "team": "Queen's Guard",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#111111",
+        "trim": "#d4af37",
+        "wordmark": "SENTINELS"
+      }
+    ]
+  },
+  "INDEPENDENCE": {
+    "team": "Independence",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3b3b3b",
+        "trim": "#c0976a",
+        "wordmark": "SPARTANS"
+      }
+    ]
+  },
+  "CONCORD": {
+    "team": "Concord",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ec1d28",
+        "trim": "#cccccc",
+        "wordmark": "RAMS"
+      }
+    ]
+  },
+  "GARDEN_ELITES": {
+    "team": "Garden Elites",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0b1f3a",
+        "trim": "#a9c6e8",
+        "wordmark": "LEGION"
+      }
+    ]
+  },
+  "D1_INSTITUTE": {
+    "team": "D1 Institute",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#008b8f",
+        "trim": "#2a2a2a",
+        "wordmark": "ORIOLES"
+      }
+    ]
+  },
+  "PROVIDENCE": {
+    "team": "Providence",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "CHILL"
+      }
+    ]
+  },
+  "IVY_PREP": {
+    "team": "Ivy Prep",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "REGENTS"
+      }
+    ]
+  },
+  "AMARIABI_INTERNATIONAL": {
+    "team": "Amariabi International",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#65308e",
+        "trim": "#f2d045",
+        "wordmark": "COLLECTIVE"
+      }
+    ]
+  },
+  "FALLS_ACADEMY": {
+    "team": "Falls Academy",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#8d99ae",
+        "trim": "#2b2d42",
+        "wordmark": "SAILORS"
+      }
+    ]
+  },
+  "UPSTATE": {
+    "team": "Upstate",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#006847",
+        "trim": "#c0c0c0",
+        "wordmark": "WOLVERINES"
+      }
+    ]
+  },
+  "ST_PETERS": {
+    "team": "St Peters",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3d348b",
+        "trim": "#f7b801",
+        "wordmark": "TITANS"
+      }
+    ]
+  },
+  "EMPIRE_CITY": {
+    "team": "Empire City",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#f1c40f",
+        "wordmark": "HAWKS"
+      }
+    ]
+  },
+  "SYRACUSE": {
+    "team": "Syracuse",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2e3a46",
+        "trim": "#4fd1c5",
+        "wordmark": "TIGERS"
+      }
+    ]
+  },
+  "TORONTO_LIMITED": {
+    "team": "Toronto Limited",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3b3b3b",
+        "trim": "#c0976a",
+        "wordmark": "LIONS"
+      }
+    ]
+  },
+  "LONG_ISLAND_METHODIST": {
+    "team": "Long Island Methodist",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#005f73",
+        "trim": "#e9d8a6",
+        "wordmark": "COMETS"
+      }
+    ]
+  },
+  "HARDING_CENTRAL": {
+    "team": "Harding Central",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#111111",
+        "trim": "#d4af37",
+        "wordmark": "SPARTANS"
+      }
+    ]
+  },
+  "UPPER_PENINSULA": {
+    "team": "Upper Peninsula",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6a1f2b",
+        "trim": "#f3e6d0",
+        "wordmark": "HUSKIES"
+      }
+    ]
+  },
+  "MYNSK": {
+    "team": "Mynsk",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0b1f3a",
+        "trim": "#a9c6e8",
+        "wordmark": "COUGARS"
+      }
+    ]
+  },
+  "ANN_ARBOR": {
+    "team": "Ann Arbor",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#4066b2",
+        "trim": "#ffffff",
+        "wordmark": "COYOTES"
+      }
+    ]
+  },
+  "HARDWOOD_FIELDS": {
+    "team": "Hardwood Fields",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1c2a44",
+        "trim": "#c8a951",
+        "wordmark": "RAMS"
+      }
+    ]
+  },
+  "COLUMBUS": {
+    "team": "Columbus",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "BEAVERS"
+      }
+    ]
+  },
+  "NORTH_COLUMBUS": {
+    "team": "North Columbus",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#008b8f",
+        "trim": "#2a2a2a",
+        "wordmark": "FALCONS"
+      }
+    ]
+  },
+  "CLEVELAND_CARLYSLE": {
+    "team": "Cleveland-Carlysle",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0f3d2e",
+        "trim": "#c5a642",
+        "wordmark": "BOBCATS"
+      }
+    ]
+  },
+  "BURROUGHS": {
+    "team": "Burroughs",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3d348b",
+        "trim": "#f7b801",
+        "wordmark": "BEARS"
+      }
+    ]
+  },
+  "WACKER_WEST": {
+    "team": "Wacker West",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#9b1b30",
+        "trim": "#f2f2f2",
+        "wordmark": "HITMEN"
+      }
+    ]
+  },
+  "ARCHBISHOP_MCCLELLAN": {
+    "team": "Archbishop McClellan",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "HAWKS"
+      }
+    ]
+  },
+  "SACRED_HEART": {
+    "team": "Sacred Heart",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2e3a46",
+        "trim": "#4fd1c5",
+        "wordmark": "LEOPARDS"
+      }
+    ]
+  },
+  "TEMPLETON_WESLEY": {
+    "team": "Templeton-Wesley",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#f1c40f",
+        "wordmark": "WOLVERINES"
+      }
+    ]
+  },
+  "DILLINGER": {
+    "team": "Dillinger",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0b1f3a",
+        "trim": "#a9c6e8",
+        "wordmark": "WOLVES"
+      }
+    ]
+  },
+  "QUIGLEY_CATHOLIC": {
+    "team": "Quigley Catholic",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "KNIGHTS"
+      }
+    ]
+  },
+  "EVANSTON": {
+    "team": "Evanston",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6d6e71",
+        "trim": "#ffffff",
+        "wordmark": "WILDCATS"
+      }
+    ]
+  },
+  "CRIMSON_COUNTY": {
+    "team": "Crimson County",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1c2a44",
+        "trim": "#c8a951",
+        "wordmark": "COWBOYS"
+      }
+    ]
+  },
+  "MYRTLE_PRIVATE": {
+    "team": "Myrtle Private",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#111111",
+        "trim": "#d4af37",
+        "wordmark": "CARRIERS"
+      }
+    ]
+  },
+  "WASHINGTON_CARVER": {
+    "team": "Washington Carver",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#f1c40f",
+        "wordmark": "COUGARS"
+      }
+    ]
+  },
+  "KNOXVILLE": {
+    "team": "Knoxville",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6a1f2b",
+        "trim": "#f3e6d0",
+        "wordmark": "NINJAS"
+      }
+    ]
+  },
+  "BILOXI": {
+    "team": "Biloxi",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#f4c300",
+        "trim": "#111111",
+        "wordmark": "DIESEL"
+      }
+    ]
+  },
+  "MOBILE": {
+    "team": "Mobile",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#9b1b30",
+        "trim": "#f2f2f2",
+        "wordmark": "RED WAVE"
+      }
+    ]
+  },
+  "MONROE_HAYES": {
+    "team": "Monroe-Hayes",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "HAWKS"
+      }
+    ]
+  },
+  "LEXINGTON": {
+    "team": "Lexington",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#8d99ae",
+        "trim": "#2b2d42",
+        "wordmark": "THUNDER"
+      }
+    ]
+  },
+  "KEYS_HIGH": {
+    "team": "Keys High",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1f4fb2",
+        "trim": "#f2f2f2",
+        "wordmark": "DOLPHINS"
+      }
+    ]
+  },
+  "GAINESVILLE": {
+    "team": "Gainesville",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#8d99ae",
+        "trim": "#2b2d42",
+        "wordmark": "SWAMP CREATURES"
+      }
+    ]
+  },
+  "VALDOSTA_VALLEY": {
+    "team": "Valdosta Valley",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#f1c40f",
+        "wordmark": "FALCONS"
+      }
+    ]
+  },
+  "DELAND": {
+    "team": "DeLand",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2e3a46",
+        "trim": "#4fd1c5",
+        "wordmark": "LIONS"
+      }
+    ]
+  },
+  "GRAYSON_RANCH": {
+    "team": "Grayson Ranch",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "WARRIORS"
+      }
+    ]
+  },
+  "REARDON_MAYES": {
+    "team": "Reardon-Mayes",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#f4c300",
+        "trim": "#111111",
+        "wordmark": "GOLDEN EAGLES"
+      }
+    ]
+  },
+  "DADE_ACADEMY": {
+    "team": "Dade Academy",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6d6e71",
+        "trim": "#ffffff",
+        "wordmark": "CAPTAINS"
+      }
+    ]
+  },
+  "TALLAHASSEE": {
+    "team": "Tallahassee",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#006847",
+        "trim": "#c0c0c0",
+        "wordmark": "RATSNAKES"
+      }
+    ]
+  },
+  "HYDE_METHODIST": {
+    "team": "Hyde Methodist",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#f4c300",
+        "trim": "#111111",
+        "wordmark": "RAIDERS"
+      }
+    ]
+  },
+  "WASH_U_PREP": {
+    "team": "Wash U Prep",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "KNIGHTS"
+      }
+    ]
+  },
+  "LAWRENCE": {
+    "team": "Lawrence",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6a1f2b",
+        "trim": "#f3e6d0",
+        "wordmark": "EAGLES"
+      }
+    ]
+  },
+  "OZARK_CENTRE": {
+    "team": "Ozark Centre",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6d6e71",
+        "trim": "#ffffff",
+        "wordmark": "DEVILS"
+      }
+    ]
+  },
+  "FIELDING": {
+    "team": "Fielding",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#006847",
+        "trim": "#c0c0c0",
+        "wordmark": "FORCE"
+      }
+    ]
+  },
+  "IOWA_ACADEMY": {
+    "team": "Iowa Academy",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1f4fb2",
+        "trim": "#f2f2f2",
+        "wordmark": "CAPITALS"
+      }
+    ]
+  },
+  "GRUPENBERG": {
+    "team": "Grupenberg",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#4066b2",
+        "trim": "#ffffff",
+        "wordmark": "GENERALS"
+      }
+    ]
+  },
+  "TRI_CITIES_PREP": {
+    "team": "Tri-Cities Prep",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#f1c40f",
+        "wordmark": "SORCERERS"
+      }
+    ]
+  },
+  "HA_RUSHMORE": {
+    "team": "HA Rushmore",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "SALOON"
+      }
+    ]
+  },
+  "RODEO_CIRCUIT": {
+    "team": "Rodeo Circuit",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#d24a1b",
+        "trim": "#000000",
+        "wordmark": "CLOWNS"
+      }
+    ]
+  },
+  "MT_SIMMONS": {
+    "team": "Mt Simmons",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1c2a44",
+        "trim": "#c8a951",
+        "wordmark": "COBRAS"
+      }
+    ]
+  },
+  "LEWIS_CATHOLIC": {
+    "team": "Lewis Catholic",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0f3d2e",
+        "trim": "#c5a642",
+        "wordmark": "SAINTS"
+      }
+    ]
+  },
+  "CROFTON": {
+    "team": "Crofton",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6d6e71",
+        "trim": "#ffffff",
+        "wordmark": "CARDINALS"
+      }
+    ]
+  },
+  "MINOT": {
+    "team": "Minot",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ec1d28",
+        "trim": "#cccccc",
+        "wordmark": "ENGINEERS"
+      }
+    ]
+  },
+  "TOWER_ACADEMY": {
+    "team": "Tower Academy",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1f4fb2",
+        "trim": "#f2f2f2",
+        "wordmark": "ROYALS"
+      }
+    ]
+  },
+  "TWO_RIVERS": {
+    "team": "Two Rivers",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#4066b2",
+        "trim": "#ffffff",
+        "wordmark": "POINTERS"
+      }
+    ]
+  },
+  "NORMAN": {
+    "team": "Norman",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#005f73",
+        "trim": "#e9d8a6",
+        "wordmark": "TORNADOS"
+      }
+    ]
+  },
+  "RIVERS_EDGE": {
+    "team": "River's Edge",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1c2a44",
+        "trim": "#c8a951",
+        "wordmark": "CATFISH"
+      }
+    ]
+  },
+  "AMARILLO_TECH": {
+    "team": "Amarillo Tech",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6a1f2b",
+        "trim": "#f3e6d0",
+        "wordmark": "ARMADILLOS"
+      }
+    ]
+  },
+  "PAN_HANDLE_LIMITED": {
+    "team": "Pan Handle Limited",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3b3b3b",
+        "trim": "#c0976a",
+        "wordmark": "STEEDS"
+      }
+    ]
+  },
+  "ADA": {
+    "team": "Ada",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "FALCONS"
+      }
+    ]
+  },
+  "KENTON": {
+    "team": "Kenton",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3d348b",
+        "trim": "#f7b801",
+        "wordmark": "EAGLES"
+      }
+    ]
+  },
+  "REYES_SANTIAGO": {
+    "team": "Reyes-Santiago",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#4066b2",
+        "trim": "#ffffff",
+        "wordmark": "CACTI"
+      }
+    ]
+  },
+  "STORMWOOD": {
+    "team": "Stormwood",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#65308e",
+        "trim": "#f2d045",
+        "wordmark": "TIGERS"
+      }
+    ]
+  },
+  "HOUSTON_JESUIT": {
+    "team": "Houston Jesuit",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#7c2b24",
+        "trim": "#f1c40f",
+        "wordmark": "COWBOYS"
+      }
+    ]
+  },
+  "AUSTIN": {
+    "team": "Austin",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6d6e71",
+        "trim": "#ffffff",
+        "wordmark": "WOLVES"
+      }
+    ]
+  },
+  "GP_PREP_SCHOOL": {
+    "team": "GP Prep School",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2e3a46",
+        "trim": "#4fd1c5",
+        "wordmark": "ELITES"
+      }
+    ]
+  },
+  "MIDDLETEX": {
+    "team": "MiddleTEX",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "BUCKING BRONCOS"
+      }
+    ]
+  },
+  "ABILENE": {
+    "team": "Abilene",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0f3d2e",
+        "trim": "#c5a642",
+        "wordmark": "SCORPIONS"
+      }
+    ]
+  },
+  "CHAMBLESS_GLOBAL": {
+    "team": "Chambless Global",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#65308e",
+        "trim": "#f2d045",
+        "wordmark": "RAIDERS"
+      }
+    ]
+  },
+  "AUSTIN_WEST": {
+    "team": "Austin West",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "DEFENDERS"
+      }
+    ]
+  },
+  "BAYOU_DISTRICT": {
+    "team": "Bayou District",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0b1f3a",
+        "trim": "#a9c6e8",
+        "wordmark": "AIRBOATS"
+      }
+    ]
+  },
+  "PIKES_PREP": {
+    "team": "Pike's Prep",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#006847",
+        "trim": "#c0c0c0",
+        "wordmark": "CLIMBERS"
+      }
+    ]
+  },
+  "DESERT_REGIONAL": {
+    "team": "Desert Regional",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#f4c300",
+        "trim": "#111111",
+        "wordmark": "MESAS"
+      }
+    ]
+  },
+  "EAST_ROCKIES": {
+    "team": "East Rockies",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "MOUNTAIN LIONS"
+      }
+    ]
+  },
+  "CIRCUS_CIRCUS": {
+    "team": "Circus Circus",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "RINGMASTERS"
+      }
+    ]
+  },
+  "TUCSON": {
+    "team": "Tucson",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#d24a1b",
+        "trim": "#000000",
+        "wordmark": "RATTLESNAKES"
+      }
+    ]
+  },
+  "BARTON_LUTHERAN": {
+    "team": "Barton Lutheran",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ec1d28",
+        "trim": "#cccccc",
+        "wordmark": "PANTHERS"
+      }
+    ]
+  },
+  "BORDER_ACADEMY": {
+    "team": "Border Academy",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "SWORDSMEN"
+      }
+    ]
+  },
+  "SOUTHWEST_MINER": {
+    "team": "Southwest Miner",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1f4fb2",
+        "trim": "#f2f2f2",
+        "wordmark": "COWBOYS"
+      }
+    ]
+  },
+  "RAINIER_CENTRAL": {
+    "team": "Rainier Central",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#9b1b30",
+        "trim": "#f2f2f2",
+        "wordmark": "PATROL"
+      }
+    ]
+  },
+  "SALEM": {
+    "team": "Salem",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1c2a44",
+        "trim": "#c8a951",
+        "wordmark": "WOODCHUCKS"
+      }
+    ]
+  },
+  "SWOOSH": {
+    "team": "Swoosh",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#005f73",
+        "trim": "#e9d8a6",
+        "wordmark": "KNIGHTS"
+      }
+    ]
+  },
+  "SEATTLE_AAA": {
+    "team": "Seattle AAA",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#006847",
+        "trim": "#c0c0c0",
+        "wordmark": "SOUND"
+      }
+    ]
+  },
+  "VANCOUVER": {
+    "team": "Vancouver",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#d24a1b",
+        "trim": "#000000",
+        "wordmark": "BEARS"
+      }
+    ]
+  },
+  "CARDINAL_CONOR": {
+    "team": "Cardinal Conor",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3b3b3b",
+        "trim": "#c0976a",
+        "wordmark": "MONARCHS"
+      }
+    ]
+  },
+  "COUER_D_ALENE": {
+    "team": "Couer d'Alene",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#f4c300",
+        "trim": "#111111",
+        "wordmark": "GRIZZLIES"
+      }
+    ]
+  },
+  "BOISE": {
+    "team": "Boise",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "MOUNTAINEERS"
+      }
+    ]
+  },
+  "VALLEY_HIGH": {
+    "team": "Valley High",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ec1d28",
+        "trim": "#cccccc",
+        "wordmark": "ORCAS"
+      }
+    ]
+  },
+  "SAN_JOSE": {
+    "team": "San Jose",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#264653",
+        "trim": "#e76f51",
+        "wordmark": "KINGS"
+      }
+    ]
+  },
+  "RANCHO_ESTRADA": {
+    "team": "Rancho Estrada",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#006847",
+        "trim": "#c0c0c0",
+        "wordmark": "MINERS"
+      }
+    ]
+  },
+  "BERKLEY": {
+    "team": "Berkley",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#8d99ae",
+        "trim": "#2b2d42",
+        "wordmark": "WASPS"
+      }
+    ]
+  },
+  "HOLLYWOOD_PREP": {
+    "team": "Hollywood Prep",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#6d6e71",
+        "trim": "#ffffff",
+        "wordmark": "CAVALRY"
+      }
+    ]
+  },
+  "DECATUR_DEI": {
+    "team": "DeCatur Dei",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#1f4fb2",
+        "trim": "#f2f2f2",
+        "wordmark": "PELICANS"
+      }
+    ]
+  },
+  "WEST_OCEAN_CITY": {
+    "team": "West Ocean City",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "MARINERS"
+      }
+    ]
+  },
+  "HUNTINGTON_CANYON": {
+    "team": "Huntington Canyon",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#3d348b",
+        "trim": "#f7b801",
+        "wordmark": "RANGERS"
+      }
+    ]
+  },
+  "MAHALA_ALOU": {
+    "team": "Mahala Alou",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ec1d28",
+        "trim": "#cccccc",
+        "wordmark": "SHARKS"
+      }
+    ]
+  },
+  "PACIFIC_ALL_STARS": {
+    "team": "Pacific All-Stars",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#ff6f61",
+        "trim": "#1c1c1e",
+        "wordmark": "SQUAD"
+      }
+    ]
+  },
+  "JUNEAU_NOME": {
+    "team": "Juneau-Nome",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2a2168",
+        "trim": "#f2d045",
+        "wordmark": "FISHERMEN"
+      }
+    ]
+  },
+  "REDWOOD_HIGH": {
+    "team": "Redwood High",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#d24a1b",
+        "trim": "#000000",
+        "wordmark": "OWLS"
+      }
+    ]
+  },
+  "GRIZZLY_ACADEMY": {
+    "team": "Grizzly Academy",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#2e3a46",
+        "trim": "#4fd1c5",
+        "wordmark": "PATRIOTS"
+      }
+    ]
+  },
+  "HANA_ROAD": {
+    "team": "Hana Road",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#9b1b30",
+        "trim": "#f2f2f2",
+        "wordmark": "WATERFALLS"
+      }
+    ]
+  },
+  "CUPERTINO": {
+    "team": "Cupertino",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#0b1f3a",
+        "trim": "#a9c6e8",
+        "wordmark": "DIAMONDBACKS"
+      }
+    ]
+  },
+  "MELBOURNE_AMERICAS": {
+    "team": "Melbourne Americas",
+    "base": "primary",
+    "zones": [],
+    "variants": [
+      {
+        "id": "home",
+        "body": "#005f73",
+        "trim": "#e9d8a6",
+        "wordmark": "BREAKERS"
+      }
+    ]
+  }
+}

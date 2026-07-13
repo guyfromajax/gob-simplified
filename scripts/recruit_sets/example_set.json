@@ -1,0 +1,35 @@
+{
+  "set_id": "set_0001",
+  "version": 1,
+  "recruit_count": 2,
+  "recruits": [
+    {
+      "recruit_id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Marcus Ellison",
+      "year": "JH",
+      "archetype": "Athlete",
+      "height": 74,
+      "weight": 190,
+      "attributes": {
+        "SC": 55, "SH": 48, "ID": 40, "OD": 52, "PS": 45, "BH": 50,
+        "RB": 42, "AG": 60, "ST": 58, "ND": 47, "IQ": 44, "FT": 50,
+        "CH": 63, "anchor_CH": 63, "NG": 100, "MO": 50, "EM": 50
+      },
+      "position_ratings": { "PG": 41, "SG": 44, "SF": 47, "PF": 39, "C": 30 }
+    },
+    {
+      "recruit_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Devin Brooks",
+      "year": "Junior",
+      "archetype": "Classic C",
+      "height": 78,
+      "weight": 228,
+      "attributes": {
+        "SC": 62, "SH": 40, "ID": 80, "OD": 55, "PS": 44, "BH": 38,
+        "RB": 78, "AG": 48, "ST": 82, "ND": 60, "IQ": 58, "FT": 52,
+        "CH": 71, "anchor_CH": 71, "NG": 100, "MO": 50, "EM": 50
+      },
+      "position_ratings": { "PG": 20, "SG": 24, "SF": 33, "PF": 61, "C": 74 }
+    }
+  ]
+}

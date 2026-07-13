@@ -39,3 +39,7 @@ scripts/.r2.env
 # Player image upload staging (never commit bulk images)
 assets_staging/
 .env.staging
+
+# Portrait pipeline scratch output (reference bodies, QC sheets, sample
+# uniformed portraits, watermark extracts) — generated artifacts, never commit
+tmp/
