@@ -10344,7 +10344,9 @@ def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str
 def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: dict[str, Any], scholarship: bool, playing_time: bool, walk_on: bool = False) -> dict[str, Any]:
     best_pos = _best_position(recruit_doc.get("position_ratings") or {})
     return {
-        "player_id": str(uuid.uuid4()),
+        # keep the recruit's stable id so its pre-generated portrait follows him onto the
+        # roster (players/master/<id>.png). Walk-ons have no recruit_id -> fresh uuid.
+        "player_id": recruit_doc.get("recruit_id") or str(uuid.uuid4()),
         "recruit_id": recruit_doc.get("recruit_id"),
         "team_id": str(team_doc["_id"]),
         "team_name": team_doc.get("name", ""),
@@ -14079,14 +14081,19 @@ def finish_season(req: FinishSeasonRequest):
     fm = FranchiseManager(db)
     fm.franchise_id = franchise_id
     schedule = fm.schedule_manager.generate_schedule()
-    recruits = fm.recruit_manager.generate_recruits_list(count=300)
+    from BackEnd.models.recruit_sets import load_unused_set_or_generate
+    _prev_used = (db.franchises.find_one({"_id": franchise_id}, {"used_recruit_set_ids": 1})
+                  or {}).get("used_recruit_set_ids") or []
+    recruits, used_recruit_set_id = load_unused_set_or_generate(
+        db, fm.recruit_manager, _prev_used, count=300)
     region_team_ids = fm._build_region_team_map()
 
     franchise_recruits_data_collection.delete_many({"franchise_id": str(franchise_id)})
     frd_docs = [
         {
             "franchise_id": str(franchise_id),
-            "recruit_id": str(uuid.uuid4()),
+            # stable id from the pre-built set (keys the portrait); uuid4 for dynamic recruits
+            "recruit_id": recruit.get("recruit_id") or str(uuid.uuid4()),
             "name": recruit["name"],
             "attributes": recruit["attributes"],
             "position_ratings": recruit["position_ratings"],
@@ -14096,7 +14103,7 @@ def finish_season(req: FinishSeasonRequest):
             "year": recruit["year"],
             "Home Region": home_region,
             "Lean": fm._build_recruit_lean(home_region, region_team_ids),
-            "created_at": recruit["created_at"],
+            "created_at": recruit.get("created_at") or datetime.utcnow(),
         }
         for recruit in recruits
         for home_region in [random.choice(list(region_team_ids.keys()))]
@@ -14114,6 +14121,8 @@ def finish_season(req: FinishSeasonRequest):
         {"$set": {
             "current_season": next_season,
             "week": 1,
+            # append the set consumed this rollover (never reused within the franchise)
+            "used_recruit_set_ids": _prev_used + ([used_recruit_set_id] if used_recruit_set_id else []),
             "results": {},
             "season_inbox": [],
             "season_news": [],
