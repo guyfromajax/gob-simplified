@@ -75,6 +75,7 @@ from BackEnd.utils.transition_bridge import _interrupted_coord
 from BackEnd.engine.pass_contest import (
     BAT_OOB,
     INTERCEPT,
+    nearest_oob_point,
     resolve_offense_pass_modifier,
     resolve_pass_contest,
 )
@@ -2410,6 +2411,9 @@ def compute_dynamic_hct_turn(
     # of the pickoff point + the deflecting defender position.
     bat_oob_contact: Dict[str, Any] = {}
     bat_oob_deflector_pos: Any = None
+    # UESS: the engine owns the exit point too — nearest_oob_point(contact), so the FE reads it instead
+    # of recomputing (`AnimationEngine._runHctBatOobBallSend` prefers turnData.bat_oob_target). Grid coords.
+    bat_oob_target: Any = None
     # Reach-in micro-movement (render-space only): the on-ball defender position
     # of the contest moment currently being resolved. Set by ``_resolve_attack``;
     # consumed by ``_stamp_reach_in`` to tag the moment's emitted segment so the
@@ -3200,6 +3204,9 @@ def compute_dynamic_hct_turn(
             bat_oob_contact = _clamp_xy(
                 dict(contest["contact_point"] or off_coords[receiver_pos])
             )
+            # UESS: resolve the exit point on the backend (was FE-derived) so the imperative ball-send
+            # reads it. nearest_oob_point takes/returns grid coords — same frame as bat_oob_contact.
+            bat_oob_target = nearest_oob_point(bat_oob_contact)
             bat_oob_deflector_pos = deflector_pos
             sec = _emit_stopper(
                 "hct_bat_oob",
@@ -3354,6 +3361,7 @@ def compute_dynamic_hct_turn(
         "reach_in_foul": reach_in_foul,
         "bat_oob": bat_oob,
         "bat_oob_contact": bat_oob_contact,
+        "bat_oob_target": bat_oob_target,
         "bat_oob_deflector_pos": bat_oob_deflector_pos,
         "ball_handler": ball_handler,
         "defender": defender,
