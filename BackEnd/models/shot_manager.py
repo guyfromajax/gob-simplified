@@ -32,7 +32,6 @@ from BackEnd.constants import (
     BLOCK_FIGHT_RANGE_MAX,
     BLOCK_PLAYER_ROLL_MIN,
     BLOCK_PLAYER_ROLL_MAX,
-    THREE_POINT_SHOT_THRESHOLD_FALLBACK,
     AGGRESSION_FOUL_MULTIPLIER,
     HARD_SHOOTING_FOUL_THRESHOLD,
     SOFT_SHOOTING_FOUL_THRESHOLD,
@@ -787,23 +786,21 @@ class ShotManager:
 
         shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
 
-        # Three-point shots: threshold += Euclidean distance (shooter → attacking rim),
-        # rounded to nearest int. Fallback when shooter coords are unavailable.
+        # Shot difficulty scales with distance: threshold += Euclidean distance (shooter → attacking
+        # rim), rounded. Applies to ALL shots (2026-07-13; previously three-pointers only) — at-rim
+        # finishes get ~0, longer 2s and 3s get progressively more, so the model is physically
+        # consistent across shot types. Coords: the classification coord, else the shooter's shot spot.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
-        if is_three:
-            spot_data = shot_classification.get("classification_coord")
-            if not isinstance(spot_data, dict):
-                sx, sy = _shooter_xy_from_roles(roles, shooter)
-                spot_data = {"x": sx, "y": sy}
-            if spot_data is not None:
-                rim_x, rim_y = _attacking_basket_xy(off_team, self.game)
-                dist = math.hypot(
-                    float(spot_data["x"]) - rim_x,
-                    float(spot_data["y"]) - rim_y,
-                )
-                shot_threshold += int(round(dist))
-            else:
-                shot_threshold += int(THREE_POINT_SHOT_THRESHOLD_FALLBACK)
+        spot_data = shot_classification.get("classification_coord")
+        if not isinstance(spot_data, dict):
+            sx, sy = _shooter_xy_from_roles(roles, shooter)
+            spot_data = {"x": sx, "y": sy}
+        rim_x, rim_y = _attacking_basket_xy(off_team, self.game)
+        dist = math.hypot(
+            float(spot_data["x"]) - rim_x,
+            float(spot_data["y"]) - rim_y,
+        )
+        shot_threshold += int(round(dist))
         if playcall == "Set":
             playcall = "Attack"
 
