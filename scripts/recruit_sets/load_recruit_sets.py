@@ -61,11 +61,14 @@ def main():
                     help="proceed even without MONGO_URI (writes to ephemeral mongomock — for testing only)")
     args = ap.parse_args()
 
-    if not os.environ.get("MONGO_URI") and not args.allow_mock and not args.dry_run:
-        sys.exit("MONGO_URI not set — refusing to write to ephemeral mongomock. "
-                 "Set MONGO_URI, or pass --allow-mock / --dry-run.")
-
-    from BackEnd.db import db  # noqa: E402
+    # Import db FIRST — that is what loads .env/.env.local and sets MONGO_URI.
+    # Then decide real-vs-mock from the actual client type, not a raw env read
+    # (the env var isn't populated until this import runs).
+    from BackEnd.db import db, client  # noqa: E402
+    is_mock = "mongomock" in type(client).__module__
+    if is_mock and not args.allow_mock and not args.dry_run:
+        sys.exit("Not connected to a real MongoDB (got mongomock) — refusing to write. "
+                 "Ensure MONGO_URI / .env.local is set, or pass --allow-mock / --dry-run.")
     coll = db[COLL]
 
     if args.list:
