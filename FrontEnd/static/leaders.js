@@ -36,7 +36,10 @@
   function formatLeaderValue(category, value) {
     if (value == null || value === '') return '--';
     const numeric = Number(value);
-    if (category === 'FG%' || category === 'DEF%') {
+    if (category === 'DEF%') {
+      return `${Number.isFinite(numeric) ? Math.round(numeric) : 0}%`;
+    }
+    if (category === 'FG%') {
       return `${Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0'}%`;
     }
     return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, '') : String(value);

@@ -23,6 +23,10 @@
   }
   console.log('🔍 [DEBUG TeamStatsTable.renderTeamStatsTable] Found tbody element');
   tbody.innerHTML = '';
+
+  function formatWholeDefPercent(successes, attempts) {
+    return attempts > 0 ? Math.round(((successes || 0) / attempts) * 100) + '%' : '0%';
+  }
   
   // Calculate totals for all teams
   const totals = {
@@ -63,7 +67,7 @@
     const fgPct = s.FGA > 0 ? ((s.FGM || 0) / s.FGA * 100).toFixed(1) : '0.0';
     const threePct = s["3PTA"] > 0 ? ((s["3PTM"] || 0) / s["3PTA"] * 100).toFixed(1) : '0.0';
     const ftPct = s.FTA > 0 ? ((s.FTM || 0) / s.FTA * 100).toFixed(1) : '0.0';
-    const defPct = s.DEF_A > 0 ? ((s.DEF_S || 0) / s.DEF_A * 100).toFixed(1) : '0.0';
+    const defPct = formatWholeDefPercent(s.DEF_S, s.DEF_A);
     const scrPct = s.SCR_A > 0 ? ((s.SCR_S || 0) / s.SCR_A * 100).toFixed(1) : '0.0';
     
     tr.innerHTML = `
@@ -90,7 +94,7 @@
       <td>${s.F || 0}</td>
       <td>${s.TO || 0}</td>
       <td>${s.DEF_A || 0}</td>
-      <td>${defPct}%</td>
+      <td>${defPct}</td>
       <td>${s.SCR_A || 0}</td>
       <td>${scrPct}%</td>
     `;
@@ -107,7 +111,7 @@
   const totalFgPct = totals.FGA > 0 ? (totals.FGM / totals.FGA * 100).toFixed(1) : '0.0';
   const totalThreePct = totals["3PTA"] > 0 ? (totals["3PTM"] / totals["3PTA"] * 100).toFixed(1) : '0.0';
   const totalFtPct = totals.FTA > 0 ? (totals.FTM / totals.FTA * 100).toFixed(1) : '0.0';
-  const totalDefPct = totals.DEF_A > 0 ? (totals.DEF_S / totals.DEF_A * 100).toFixed(1) : '0.0';
+  const totalDefPct = formatWholeDefPercent(totals.DEF_S, totals.DEF_A);
   const totalScrPct = totals.SCR_A > 0 ? (totals.SCR_S / totals.SCR_A * 100).toFixed(1) : '0.0';
   
   totalsTr.innerHTML = `
@@ -134,7 +138,7 @@
     <td>${totals.F}</td>
     <td>${totals.TO}</td>
     <td>${totals.DEF_A}</td>
-    <td>${totalDefPct}%</td>
+    <td>${totalDefPct}</td>
     <td>${totals.SCR_A}</td>
     <td>${totalScrPct}%</td>
   `;
@@ -237,4 +241,3 @@
     window.TeamStatsTable = { renderTeamStatsTable, sortTeamStats };
   }
 })(typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : this);
-

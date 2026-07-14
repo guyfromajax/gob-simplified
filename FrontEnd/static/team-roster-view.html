@@ -10,11 +10,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Team Roster</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/command-center-team-styles.css">
   <link rel="stylesheet" href="/set-lineup.css">
+  <link rel="stylesheet" href="/scouting-report.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
   <style>
     :root {
@@ -157,6 +158,29 @@
 
     .team-roster-section {
       margin-top: 22px;
+    }
+
+    #starting-five-section .fcc-scouting-card-head.p5-head {
+      display: flex;
+      justify-content: flex-start;
+      align-items: baseline;
+      gap: 13px;
+      margin: 0;
+      padding: 0 0 12px;
+    }
+
+    #starting-five-section .fcc-scouting-card-head.p5-head h3 {
+      margin: 0;
+      color: #ffffff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 34px;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    #starting-five-section .fcc-scouting-p5-body {
+      padding: 14px;
     }
 
     .scroll-x {
@@ -346,6 +370,18 @@
       <img id="team-banner" src="/images/teams/general/general_banner_primary.jpg" alt="Team banner">
     </div>
 
+    <!-- Starting 5 (projected) — franchise / base / practice_squad; omitted for tournament -->
+    <div id="starting-five-section" class="team-roster-section" style="display:none;">
+      <div class="fcc-scouting-card-head p5-head">
+        <h3>Starting 5</h3>
+      </div>
+      <div class="fcc-data-card">
+        <div class="fcc-data-card-body fcc-scouting-p5-body">
+          <div id="roster-starting-five" class="scouting-projected-lineup-wrap"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Roster Grid -->
     <div id="roster-table-container" class="team-roster-section">
       <div class="roster-section-header">
@@ -511,6 +547,7 @@
   <script src="/js/shared/playerYear.js"></script>
   <script src="/js/shared/attributeTooltips.js"></script>
   <script src="/js/shared/rtBucket.js"></script>
+  <script src="/js/shared/scoutingReport.js"></script>
   <script src="/team-roster-view.js"></script>
   <script type="module">
     import { resumeFranchiseTrack } from '/js/musicController.js';

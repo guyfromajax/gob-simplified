@@ -1793,7 +1793,14 @@ def build_skeleton_animation_steps(
         if is_pass_step and owner_id_start and owner_id_end:
             passer_start = start_coords.get(owner_id_start)
             receiver_start = start_coords.get(owner_id_end)
-            receiver_end = end_coords.get(owner_id_end)
+            # A dish / catch-and-shoot receiver is STATIONARY, so his end coord (next step) may not
+            # resolve — e.g. a drive-dish shoot step whose receiver coord isn't in the animation.
+            # That left ball_pass_t=0 → the pass step fell to the 0.50s HCO floor = a dead hold before
+            # the pass (the "driver arrives, holds, then passes" bug). Fall back to his catch spot
+            # (receiver_start): a stationary receiver can't be led, so the pass target IS his current
+            # spot → correct flight time. Only affects the previously-broken (recv_end=None) case;
+            # steps that already resolve receiver_end are unchanged.
+            receiver_end = end_coords.get(owner_id_end) or receiver_start
             if passer_start and receiver_start and receiver_end:
                 receiver_player = _player_lookup_by_id(
                     off_lineup, def_lineup, owner_id_end,
@@ -1987,7 +1994,11 @@ def build_skeleton_animation_steps(
             if passer_id_mp and receiver_id_mp:
                 passer_start_coord = start_coords.get(passer_id_mp)
                 receiver_start_coord = start_coords.get(receiver_id_mp)
-                receiver_end_coord = end_coords.get(receiver_id_mp)
+                # Same stationary-receiver fallback as the ball_pass_t block above: a dish receiver's
+                # end coord may not resolve (drive-dish shoot step), which would leave the ball's
+                # arrival point unstamped → the FE has no landing target for the pass. Fall back to his
+                # catch spot so ball_arrival_coord is always set for a stationary catch-and-shoot.
+                receiver_end_coord = end_coords.get(receiver_id_mp) or receiver_start_coord
                 passer_player = _player_lookup_by_id(
                     off_lineup, def_lineup, passer_id_mp,
                 )

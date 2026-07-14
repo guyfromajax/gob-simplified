@@ -53,7 +53,7 @@ All surfaces call these. Do not build `/images/players/...` paths inline.
 
 **Fallback chain (per surface):** resolver URL → on `onerror`, the local **`generic_headshot.png`** (kept deployed) → placeholder/initials. Every `<img>` surface keeps an `onerror` handler.
 
-**Surfaces wired (14):** `roster.js`, `player-detail.js`, `box-score.js` (POTG), `training-report.js`, `set-lineup.js` (×2), `js/shared/potg.js`, `js/phaser/gameScene.js` (tooltip), `js/phaser/bootGame.js` (made-shot), `js/phaser/utils/announcements.js`, `foulOutPopup.js`, `defenseMatchupsPopup.js`, `gameCompletionPopup.js`, and the WebGL texture preload `js/phaser/setup/preloadPlayerHeadshots.js`.
+**Surfaces wired (14+):** `roster.js`, `player-detail.js`, `box-score.js` (POTG), `training-report.js`, `set-lineup.js` (×2), `js/shared/potg.js`, `js/phaser/gameScene.js` (tooltip), `js/phaser/bootGame.js` (made-shot), `js/phaser/utils/announcements.js`, `foulOutPopup.js`, `defenseMatchupsPopup.js`, `gameCompletionPopup.js`, WebGL texture preload `js/phaser/setup/preloadPlayerHeadshots.js`, plus FCC / team-roster **Starting 5** cards via `js/shared/scoutingReport.js` → `getPlayerImageUrl` / `getGenericHeadshotUrl`.
 
 **Phaser/WebGL:** on-court headshot markers are WebGL textures (`preloadPlayerHeadshots.js` → `scene.load.image`). These require cross-origin loading (`scene.load.crossOrigin='anonymous'`, already set) **and** the CORS response header (below). If CORS is missing, markers gracefully fall back to initials.
 

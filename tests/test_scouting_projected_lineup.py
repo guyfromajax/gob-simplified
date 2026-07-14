@@ -115,3 +115,25 @@ def test_enrich_projected_five_zero_gp_and_def():
     assert rows[0]["rpg"] == 0.0
     assert rows[0]["apg"] == 0.0
     assert rows[0]["def_pct"] == 0
+
+
+def test_build_enriched_projected_starting_five():
+    from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
+
+    players = [
+        _p("1", {"PG": 99}),
+        _p("2", {"SG": 98}),
+        _p("3", {"SF": 97}),
+        _p("4", {"PF": 96}),
+        _p("5", {"C": 95}),
+    ]
+    stats = {
+        "1": {"GP": 2, "PTS": 20, "AST": 4, "TREB": 2, "DEF_S": 1, "DEF_A": 2},
+    }
+    rows = build_enriched_projected_starting_five(players, stats)
+    assert len(rows) == 5
+    by_pos = {r["position"]: r for r in rows}
+    assert by_pos["PG"]["player_id"] == "1"
+    assert by_pos["PG"]["ppg"] == 10.0
+    assert by_pos["PG"]["def_pct"] == 50
+    assert by_pos["SG"]["ppg"] == 0.0

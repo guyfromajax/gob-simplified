@@ -307,6 +307,20 @@ def enrich_projected_starting_five_season_avgs(
     return rows
 
 
+def build_enriched_projected_starting_five(
+    players: List[Dict[str, Any]],
+    player_season_stats: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Shared projected-five builder for FCC scouting + team roster pages.
+
+    ``players`` must include ``position_ratings`` and ``_id`` or ``player_id``.
+    Optional ``player_season_stats`` is keyed by player_id (FPD season or PS season).
+    """
+    rows = compute_projected_starting_five(players or [])
+    return enrich_projected_starting_five_season_avgs(rows, player_season_stats or {})
+
+
 def load_tournament_roster_for_scouting(
     tournament_doc: Dict[str, Any], team_doc: Dict[str, Any]
 ) -> List[Dict[str, Any]]:

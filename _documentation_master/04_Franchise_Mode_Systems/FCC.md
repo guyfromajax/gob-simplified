@@ -527,10 +527,11 @@ Current summary fields:
 
 Visual source: `projects/Scouting - Projected Five (Images).html`.
 
-- Lazy-rendered on tab open via `renderScoutingTab()` → `renderFccScoutingProjectedLineup()` → `renderFccProjectedStartingFiveCards()` in `js/shared/scoutingReport.js`. Does **not** touch FCC initial load / page-load overlay.
+- Lazy-rendered on tab open via `renderScoutingTab()` → `renderFccScoutingProjectedLineup()` → `renderProjectedStartingFiveCards()` in `js/shared/scoutingReport.js`. Does **not** touch FCC initial load / page-load overlay.
 - Cards ordered PG → SG → SF → PF → C.
 - Each card: square headshot (`API_CONFIG.getPlayerImageUrl(player_id, { size: 'card' })`, `loading="lazy"`, explicit 240×240, `onerror` → generic headshot), white position badge, RT badge colored with `getRtBucketClass` / `rt-buckets.css`, name + `#jersey`, year · height · weight, boxed PPG / RPG / APG / DEF%.
-- Per-game stats and DEF% are **server-enriched** on each `projected_starting_five` row (`ppg`, `rpg`, `apg`, `def_pct`) by `enrich_projected_starting_five_season_avgs()` using FPD `season` totals (`PTS`, `TREB`/`OREB`+`DREB`, `AST`, `GP`, `DEF_S`/`DEF_A`). DEF% is a whole percent (`round(DEF_S/DEF_A*100)` when `DEF_A > 0`, else `0`).
+- Per-game stats and DEF% are **server-enriched** on each `projected_starting_five` row (`ppg`, `rpg`, `apg`, `def_pct`) via shared `build_enriched_projected_starting_five()` (`scouting_utils.py`) using FPD `season` totals (`PTS`, `TREB`/`OREB`+`DREB`, `AST`, `GP`, `DEF_S`/`DEF_A`). DEF% is a whole percent (`round(DEF_S/DEF_A*100)` when `DEF_A > 0`, else `0`).
+- The same card renderer and enrichment helper power **team roster Starting 5** (`team-roster-view.html`) from `GET /roster/...` / Practice Squad team payloads (header label **Starting 5**; FCC keeps **Projected Starting Five**).
 - Core attribute columns are **not** shown in this section anymore (team attributes remain under Team Measures / team page).
 
 Important note:
@@ -630,6 +631,10 @@ Columns include:
 - DREB / OREB / TREB
 - AST / F / TO / SCRA / SCR%
 - STL / BLK / DEFA / DEF%
+
+Formatting:
+
+- DEF% is displayed as a whole-number percent everywhere in FCC (`round(DEF_S/DEF_A*100)`), including leaders, player stats, team stats, POTG summaries, and projected-starting-five cards.
 
 Data source:
 

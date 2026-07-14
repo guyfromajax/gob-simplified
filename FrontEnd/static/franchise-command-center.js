@@ -1451,6 +1451,10 @@ function formatTeamStatsPercent(numerator, denominator) {
   return denominator > 0 ? (((numerator || 0) / denominator) * 100).toFixed(1) + '%' : '0.0%';
 }
 
+function formatWholeDefPercent(numerator, denominator) {
+  return denominator > 0 ? Math.round(((numerator || 0) / denominator) * 100) + '%' : '0%';
+}
+
 const FCC_LEADER_CATEGORY_ORDER = ['PTS', '3PTM', 'AST', 'BLK', 'FG%', 'REB', 'STL', 'DEF%'];
 const FCC_LEADER_CATEGORY_LABELS = {
   PTS: 'Points',
@@ -1465,7 +1469,11 @@ const FCC_LEADER_CATEGORY_LABELS = {
 
 function formatLeaderValue(category, value) {
   if (value == null || value === '') return '--';
-  if (category === 'FG%' || category === 'DEF%') {
+  if (category === 'DEF%') {
+    const numeric = Number(value);
+    return `${Number.isFinite(numeric) ? Math.round(numeric) : 0}%`;
+  }
+  if (category === 'FG%') {
     const numeric = Number(value);
     return `${Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0'}%`;
   }
@@ -1593,7 +1601,7 @@ async function renderFccTeamStatsSummary() {
         <td class="col-group-start">${escapeHomeHtml(stats.STL ?? 0)}</td>
         <td>${escapeHomeHtml(stats.BLK ?? 0)}</td>
         <td>${escapeHomeHtml(stats.DEF_A ?? 0)}</td>
-        <td>${escapeHomeHtml(formatTeamStatsPercent(stats.DEF_S, stats.DEF_A))}</td>
+        <td>${escapeHomeHtml(formatWholeDefPercent(stats.DEF_S, stats.DEF_A))}</td>
       </tr>
     `;
   }).join('');
@@ -2482,7 +2490,7 @@ function renderPracticeSquad(data) {
         addCell(stats.F || 0);
         addCell(stats.TO || 0);
         addCell(defa);
-        addCell(defa > 0 ? ((defs / defa) * 100).toFixed(1) : '0.0');
+        addCell(defa > 0 ? `${Math.round((defs / defa) * 100)}%` : '0%');
         addCell(scra);
         addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
         statsBody.appendChild(tr);
@@ -2690,7 +2698,7 @@ function renderPlayerStatsTable(players) {
       const scrA = stats.SCR_A || 0;
       const scrPct = scrA > 0 ? (((stats.SCR_S || 0) / scrA) * 100).toFixed(1) : '0.0';
       const defA = stats.DEF_A || 0;
-      const defPct = defA > 0 ? (((stats.DEF_S || 0) / defA) * 100).toFixed(1) : '0.0';
+      const defPct = defA > 0 ? String(Math.round(((stats.DEF_S || 0) / defA) * 100)) : '0';
 
       const tr = document.createElement('tr');
       tr.innerHTML =
@@ -5079,8 +5087,8 @@ function updateScoutingButton(data) {
 
 function renderFccScoutingProjectedLineup() {
   if (!scoutingTabDataCache) return;
-  if (typeof renderFccProjectedStartingFiveCards === 'function') {
-    renderFccProjectedStartingFiveCards(scoutingTabDataCache.projected_starting_five || [], {
+  if (typeof renderProjectedStartingFiveCards === 'function') {
+    renderProjectedStartingFiveCards(scoutingTabDataCache.projected_starting_five || [], {
       containerId: 'fcc-scouting-projected-lineup',
       emptyClass: 'scouting-projected-empty',
     });

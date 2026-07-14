@@ -126,12 +126,12 @@ function scoutingFormatWholeDefPct(value) {
 }
 
 /**
- * FCC Scouting Report: projected five as image cards (not the attribute table).
- * Expects rows already enriched with ppg/rpg/apg/def_pct from /franchise/scouting-report.
+ * Shared projected-five image cards (FCC Scouting + team roster Starting 5).
+ * Expects rows enriched with ppg/rpg/apg/def_pct from the server.
  * @param {Array} rows
  * @param {{containerId?: string, emptyClass?: string}} [opts]
  */
-function renderFccProjectedStartingFiveCards(rows, opts) {
+function renderProjectedStartingFiveCards(rows, opts) {
   const containerId = (opts && opts.containerId) || 'fcc-scouting-projected-lineup';
   const emptyClass = (opts && opts.emptyClass) || 'scouting-projected-empty';
   const el = document.getElementById(containerId);
@@ -202,6 +202,11 @@ function renderFccProjectedStartingFiveCards(rows, opts) {
     row.appendChild(article);
   });
   el.appendChild(row);
+}
+
+/** @deprecated Alias — prefer renderProjectedStartingFiveCards */
+function renderFccProjectedStartingFiveCards(rows, opts) {
+  return renderProjectedStartingFiveCards(rows, opts);
 }
 
 function formatScoutingSeasonStat(stats, col) {

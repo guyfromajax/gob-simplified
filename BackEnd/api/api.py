@@ -6501,6 +6501,35 @@ try:
             except Exception:
                 practice_squad_recruits = []
 
+        # Projected starting five (franchise + base/tutorial). Skip tournament —
+        # that mode is sunset and must not show Starting 5 on team-roster-view.
+        projected_starting_five: list = []
+        if not tournament_id:
+            season_map: dict = {}
+            if franchise_id:
+                try:
+                    pids = [str(p.get("_id") or "") for p in players if p.get("_id")]
+                    pids = [pid for pid in pids if pid]
+                    if pids:
+                        for fpd in franchise_players_data_collection.find(
+                            {
+                                "franchise_id": str(franchise_id),
+                                "player_id": {"$in": pids},
+                            },
+                            {"player_id": 1, "season": 1},
+                        ):
+                            pid = str(fpd.get("player_id") or "")
+                            season_raw = fpd.get("season") or {}
+                            if pid and isinstance(season_raw, dict):
+                                season_map[pid] = dict(season_raw)
+                except Exception:
+                    season_map = {}
+            from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
+
+            projected_starting_five = build_enriched_projected_starting_five(
+                players, season_map
+            )
+
         response_data = {
             "team": team.get("name", match if match else team_identifier),
             "team_name": team.get("name", match if match else team_identifier),
@@ -6511,6 +6540,7 @@ try:
             "training_squad": training_squad,
             "practice_squad_recruits": practice_squad_recruits,
             "practice_squad_recruiting_done": practice_squad_recruiting_done,
+            "projected_starting_five": projected_starting_five,
         }
         
         # ✅ DEBUG: Log response details for box score debugging

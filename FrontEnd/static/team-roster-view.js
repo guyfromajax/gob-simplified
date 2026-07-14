@@ -14,6 +14,7 @@ const returnUrl = urlParams.get('return_url'); // Full return URL
 let rosterData = [];
 let trainingSquadData = [];
 let statsData = [];
+let projectedStartingFive = [];
 let rosterSortColumn = 'RT';
 let rosterSortDirection = 'desc';
 let statsSortColumn = 'PTS';
@@ -207,6 +208,10 @@ async function loadRoster() {
       rosterData.sort((a, b) => (b.highestRT ?? -Infinity) - (a.highestRT ?? -Infinity));
       trainingSquadData = [];
       document.getElementById('training-squad-section')?.style.setProperty('display', 'none');
+      projectedStartingFive = Array.isArray(data.projected_starting_five)
+        ? data.projected_starting_five
+        : [];
+      renderStartingFive();
       renderRoster();
       return;
     }
@@ -318,6 +323,10 @@ async function loadRoster() {
     trainingSquadData = psPlayers.concat(psRecruits);
     practiceSquadRecruitingDone = !!data.practice_squad_recruiting_done;
 
+    projectedStartingFive = (mode === 'tournament')
+      ? []
+      : (Array.isArray(data.projected_starting_five) ? data.projected_starting_five : []);
+    renderStartingFive();
     renderRoster();
     renderTrainingSquadView();
   } catch (error) {
@@ -521,6 +530,25 @@ function setupAttrDisplayToggle() {
   fullBtn.addEventListener('click', () => setMode('full'));
 }
 
+function renderStartingFive() {
+  const section = document.getElementById('starting-five-section');
+  if (!section) return;
+  if (mode === 'tournament') {
+    section.style.display = 'none';
+    return;
+  }
+  const rows = projectedStartingFive || [];
+  if (!rows.length || typeof renderProjectedStartingFiveCards !== 'function') {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  renderProjectedStartingFiveCards(rows, {
+    containerId: 'roster-starting-five',
+    emptyClass: 'scouting-projected-empty',
+  });
+}
+
 function renderRoster() {
   renderRosterInto(rosterData, 'roster-body');
 }
@@ -604,7 +632,7 @@ function renderPracticeSquadStats() {
     addCell(stats.F || 0);
     addCell(stats.TO || 0);
     addCell(defa);
-    addCell(defa > 0 ? ((defs / defa) * 100).toFixed(1) : '0.0');
+    addCell(defa > 0 ? `${Math.round((defs / defa) * 100)}%` : '0%');
     addCell(scra);
     addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
 
@@ -775,7 +803,7 @@ function renderStats() {
     addCell(stats.F || 0);
     addCell(stats.TO || 0);
     addCell(defa);
-    addCell(defa > 0 ? ((defs / defa) * 100).toFixed(1) : '0.0');
+    addCell(defa > 0 ? `${Math.round((defs / defa) * 100)}%` : '0%');
     addCell(scra);
     addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
     

@@ -11,6 +11,7 @@
    - **PTS**: `(2 * FGM) + 3PTM + FTM` (auto-calculated)
    - **REB**: `OREB + DREB` (auto-calculated)
    - **Outlet_Score**: Average of `Outlet_Score_List` (auto-calculated)
+   - **DEF% Display**: Derived from `DEF_S / DEF_A * 100`; all UI surfaces display it as a **whole-number percent** (e.g. `70%`, not `70.1%`). Sorting/scoring may continue to use the raw ratio internally.
 
 3. **Stat Initialization**:
    - All stats initialized to `0` at game start (except `Outlet_Score_List` which is initialized as empty array `[]`)

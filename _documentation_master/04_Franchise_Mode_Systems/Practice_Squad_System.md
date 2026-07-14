@@ -166,14 +166,21 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
 
 ## 9. Display
 
-- **`/roster` endpoint** (`BackEnd/api/api.py:5304`) returns a separate **`training_squad`**
-  array (attrs, no season stats) alongside the 12 active `players` (`api.py:5530`).
-- **FCC Roster tab** — `renderTrainingSquad` (`franchise-command-center.js:2247`) renders a
+- **`/roster` endpoint** (`BackEnd/api/api.py`) returns a separate **`training_squad`**
+  array (attrs, no season stats) alongside the 12 active `players`, plus enriched
+  **`projected_starting_five`** (same greedy RT five + PPG/RPG/APG/DEF% helper as FCC
+  scouting; omitted when `tournament_id` is present).
+- **FCC Roster tab** — `renderTrainingSquad` (`franchise-command-center.js`) renders a
   "Training Squad" section below the active roster (hidden when empty).
-- **Team roster page** (`team-roster-view.html` / `.js`) — same "Training Squad" section below the roster.
+- **Team roster page** (`team-roster-view.html` / `.js`) — **Starting 5** image cards at the
+  top (shared `renderProjectedStartingFiveCards`; franchise, base/tutorial, and Practice
+  Squad team pages; not tournament). Same "Training Squad" section below the roster.
+- **Practice Squad team pages** (`GET /franchise/practice-squad/team`) also return
+  `projected_starting_five` enriched from `ps_season_stats` (images fall back to
+  `generic_headshot.png` until recruit portraits exist).
 - **Walk-on tag** — a transient "(walk on)" name tag shows on the roster only in the new
-  season's week-1 preseason (pre-camp) for first-year walk-ons; gated server-side at
-  `api.py:5491`. See it drop after Training Camp. (The underlying `meta.archetype="Walk On"`
+  season's week-1 preseason (pre-camp) for first-year walk-ons; gated server-side.
+  See it drop after Training Camp. (The underlying `meta.archetype="Walk On"`
   persists regardless.)
 
 ## 10. Key files

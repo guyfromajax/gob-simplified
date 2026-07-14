@@ -17,6 +17,11 @@
     table.className = 'roster-table recruiting-results-table';
     table.innerHTML = '<thead><tr><th>Player</th><th>Team</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>DEF%</th></tr></thead><tbody></tbody>';
     var tbody = table.querySelector('tbody');
+    var formatDefPct = function (value) {
+      if (value == null || value === '') return '--';
+      var numeric = Number(value);
+      return Number.isFinite(numeric) ? Math.round(numeric) + '%' : String(value);
+    };
 
     (players || []).forEach(function (player) {
       var tr = document.createElement('tr');
@@ -29,7 +34,7 @@
         '<td>' + (stats.AST != null ? stats.AST : '--') + '</td>',
         '<td>' + (stats.STL != null ? stats.STL : '--') + '</td>',
         '<td>' + (stats.BLK != null ? stats.BLK : '--') + '</td>',
-        '<td>' + (stats['DEF%'] != null ? stats['DEF%'] : '--') + '</td>'
+        '<td>' + formatDefPct(stats['DEF%']) + '</td>'
       ].join('');
       tbody.appendChild(tr);
     });

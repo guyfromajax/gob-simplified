@@ -250,6 +250,7 @@
     const defA = Number(stats.DEF_A || 0);
     const defS = Number(stats.DEF_S || 0);
     const formatPct = (made, attempts) => attempts > 0 ? `${((made / attempts) * 100).toFixed(1)}%` : '0.0%';
+    const formatWholeDefPct = (made, attempts) => attempts > 0 ? `${Math.round((made / attempts) * 100)}%` : '0%';
 
     const tr = document.createElement('tr');
     tr.className = 'pd-current-season';
@@ -276,7 +277,7 @@
       <td class="pd-career-num">${scrA}</td>
       <td class="pd-career-num">${formatPct(scrS, scrA)}</td>
       <td class="pd-career-num">${defA}</td>
-      <td class="pd-career-num">${formatPct(defS, defA)}</td>
+      <td class="pd-career-num">${formatWholeDefPct(defS, defA)}</td>
     `;
     body.appendChild(tr);
   }

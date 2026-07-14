@@ -49,6 +49,10 @@
     return Number(stats[STAT_MAP[statKey] || statKey] || 0);
   }
 
+  function formatWholeDefPercent(successes, attempts) {
+    return attempts > 0 ? Math.round(((successes || 0) / attempts) * 100) + '%' : '0%';
+  }
+
   function sortTeams(teams, statKey, direction) {
     return cloneTeams(teams).sort((a, b) => {
       if (statKey === 'team') {
@@ -88,7 +92,7 @@
         if (key === 'FG%') value = stats.FGA > 0 ? (((stats.FGM || 0) / stats.FGA) * 100).toFixed(1) + '%' : '0.0%';
         else if (key === '3PT%') value = stats['3PTA'] > 0 ? (((stats['3PTM'] || 0) / stats['3PTA']) * 100).toFixed(1) + '%' : '0.0%';
         else if (key === 'FT%') value = stats.FTA > 0 ? (((stats.FTM || 0) / stats.FTA) * 100).toFixed(1) + '%' : '0.0%';
-        else if (key === 'DEF%') value = stats.DEF_A > 0 ? (((stats.DEF_S || 0) / stats.DEF_A) * 100).toFixed(1) + '%' : '0.0%';
+        else if (key === 'DEF%') value = formatWholeDefPercent(stats.DEF_S, stats.DEF_A);
         else if (key === 'SCR%') value = stats.SCR_A > 0 ? (((stats.SCR_S || 0) / stats.SCR_A) * 100).toFixed(1) + '%' : '0.0%';
         else value = stats[key] ?? 0;
         if (key in totals) totals[key] += Number(stats[key] || 0);
@@ -130,7 +134,7 @@
       '<td class="col-group-start">' + totals.STL + '</td>' +
       '<td>' + totals.BLK + '</td>' +
       '<td>' + totals.DEF_A + '</td>' +
-      '<td>' + (totals.DEF_A > 0 ? ((totals.DEF_S / totals.DEF_A) * 100).toFixed(1) : '0.0') + '%</td>';
+      '<td>' + formatWholeDefPercent(totals.DEF_S, totals.DEF_A) + '</td>';
     tbody.appendChild(totalsTr);
   }
 

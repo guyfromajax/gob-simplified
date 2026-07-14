@@ -72,7 +72,7 @@
 |---|---|
 | Standings + schedule accordion | `/practice-squad-standings.html` |
 | Tournament brackets | `/practice-squad-bracket.html` |
-| PS team roster + player stats | `/team-roster-view.html?mode=practice_squad&ps_team_id=…` |
+| PS team roster + player stats | `/team-roster-view.html?mode=practice_squad&ps_team_id=…` (includes **Starting 5** cards from `projected_starting_five` on `/franchise/practice-squad/team`) |
 | Box score | `/box-score.html?mode=practice_squad&game_id=…` |
 | FCC Recruits tab link | **Practice Squad Season** → standings |
 

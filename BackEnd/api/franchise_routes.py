@@ -7889,13 +7889,18 @@ def get_leaders(
     results: list[dict[str, Any]] = []
     for p in agg:
         meta = p.get("meta", {})
+        value = p.get("value", 0)
+        if stat == "FG%":
+            value = round(float(value or 0), 1)
+        elif stat == "DEF%":
+            value = int(round(float(value or 0)))
         results.append(
             {
                 "player_id": p.get("player_id"),
                 "first_name": meta.get("first_name", ""),
                 "last_name": meta.get("last_name", ""),
                 "team": meta.get("team", meta.get("team_id", "")),
-                "value": round(float(p.get("value", 0) or 0), 1) if stat in {"FG%", "DEF%"} else p.get("value", 0),
+                "value": value,
             }
         )
     total_time = time.time() - start_time
@@ -10989,9 +10994,19 @@ def get_practice_squad_team(
                 "stats": doc.get("ps_season_stats") or {},
             })
 
+    season_map = {
+        str(p.get("player_id") or ""): dict(p.get("stats") or {})
+        for p in players
+        if p.get("player_id")
+    }
+    from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
+
+    projected_starting_five = build_enriched_projected_starting_five(players, season_map)
+
     return {
         "team": team,
         "players": players,
+        "projected_starting_five": projected_starting_five,
     }
 
 
@@ -11767,13 +11782,9 @@ def get_scouting_report(franchise_id: str, team_name: str):
     )
 
     from BackEnd.utils.roster_loader import load_roster
-    from BackEnd.utils.scouting_utils import (
-        compute_projected_starting_five,
-        enrich_projected_starting_five_season_avgs,
-    )
+    from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
 
     _, scout_players = load_roster(team_name, franchise_id=str(franchise_id))
-    projected_starting_five = compute_projected_starting_five(scout_players)
 
     team_oid_str = str(team_object_id)
     player_season_stats: dict[str, dict] = {}
@@ -11794,7 +11805,9 @@ def get_scouting_report(franchise_id: str, team_name: str):
         if isinstance(season_raw, dict):
             player_season_stats[pid] = dict(season_raw)
 
-    enrich_projected_starting_five_season_avgs(projected_starting_five, player_season_stats)
+    projected_starting_five = build_enriched_projected_starting_five(
+        scout_players, player_season_stats
+    )
 
     # Play Usage gate: the opponent's prior-game Play Usage is only revealed once
     # the USER runs that week's training with Film Study > 0. Until then (and if
