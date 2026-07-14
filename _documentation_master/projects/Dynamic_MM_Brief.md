@@ -257,7 +257,9 @@ Net-new offense action to build: **`backdoor`** (one new emitter/beat). `attack`
 
 **S2c (help cutoff) = the shared geometry.** On `POS_O` (A), run `best_cutoff_on_drive` over HELP defenders (posture-shaded coords + `stop_attempt_prob` by aggression); if one reaches the path (`cutoff_meet_point`), resolve THAT collision via a second `resolve_cutoff_contest`. Loose posture → sits in help lanes → more cutoffs, organically.
 
-**Net (system-level):** ONE contest (`_resolve_moment`), ONE geometry (`cutoff_meet_point`/`best_cutoff_on_drive`), ONE shot path (`resolve_shot`) — all FB/HCT-shared. Net-new HCO code = the outcome→tier/stop mapping + `map_cutoff_outcome_to_hco` + the shot-reclassification wiring. The ONLY shared-resolver change is the opt-in `D_STOP` band + generalized `score_ratio`.
+**Net (system-level):** ONE contest (`_resolve_moment`), ONE geometry (`cutoff_meet_point`/`best_cutoff_on_drive`), ONE shot path (`resolve_shot`) — all FB/HCT-shared. Net-new HCO code = the outcome→tier/stop mapping + `map_cutoff_outcome_to_hco` + the shot-reclassification wiring. Shared-resolver changes are all **opt-in params** (FB/HCT byte-identical): `clean_stop`→`D_STOP` band, and **`neutral_band`** (win/lose gate width).
+
+> **`neutral_band` — the neutral-tier fix (2026-07-14).** `_resolve_moment`'s default win/lose gate is the **chem+eff margin** (a few pts) → B (neutral) is vanishingly rare (near-binary contest). HCO passes **`neutral_band=DRIVE_NEUTRAL_BAND=100`** (± each way, in score points) → B becomes meaningful: at even matchups B is the **plurality** (contested drive → pull-up/dish); lopsided matchups still resolve decisively. FB/HCT keep the chem+eff default (`neutral_band=None`). Tunable at S2f.
 
 **Sub-plan (reordered):** **S2-spine** (wire `resolve_cutoff_contest` + `D_STOP` + retire S2a bespoke) → **S2d** path-stop (score_ratio) → **S2b** contact routing (`map_cutoff_outcome_to_hco`) → **S2c** help cutoff → **S2e** return-to-walk → **S2f** zone parity + MC tune.
 

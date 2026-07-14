@@ -17,6 +17,7 @@ import {
   matchupsFromUserOrder,
   saveManDefenseMatchups,
   wireUserColumnDrag,
+  playMatchupsUiSfx,
 } from "./matchupsUiShared.js";
 
 const SKIP_INTRO_KEY_PREFIX = "pregameSkipIntro_";
@@ -408,6 +409,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
   function toTipoff(resolve) {
     clearTimers();
     root.dataset.phase = "tipoff";
+    playMatchupsUiSfx("confirm-1-lowervol.wav");
     if (dontShow?.checked && gameId && typeof sessionStorage !== "undefined") {
       sessionStorage.setItem(DONT_SHOW_KEY_PREFIX + gameId, "1");
     }
@@ -445,6 +447,10 @@ export function showPreGameExperience(gameId, scene, normalized) {
         sessionStorage.setItem(SKIP_INTRO_KEY_PREFIX + gameId, "1");
       }
       toMatchups();
+    });
+
+    dontShow?.addEventListener("change", () => {
+      playMatchupsUiSfx("click-tiny.wav");
     });
 
     cta.addEventListener("click", () => {

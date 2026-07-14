@@ -210,6 +210,13 @@ export function normalizeMatchupsPayload(data) {
   };
 }
 
+/** Court UI SFX via window.playSound (same path as the rest of court.html). */
+export function playMatchupsUiSfx(filename) {
+  if (typeof window !== "undefined" && typeof window.playSound === "function") {
+    window.playSound(filename);
+  }
+}
+
 /**
  * Wire HTML5 drag-reorder on user-column tiles inside a root element.
  * @param {HTMLElement} root
@@ -243,6 +250,7 @@ export function wireUserColumnDrag(root, getOrder, setOrderAndRender) {
       order[dragSlot] = order[to];
       order[to] = tmp;
       dragSlot = null;
+      playMatchupsUiSfx("click-tiny.wav");
       setOrderAndRender(order);
     });
   });

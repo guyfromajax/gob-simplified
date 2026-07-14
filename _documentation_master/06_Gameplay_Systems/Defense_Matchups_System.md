@@ -130,6 +130,7 @@ Engine uses the matchup dict for **whoever is on defense** (`defending_team_is_u
 ### Other Suppression / SFX
 - **FTE v2 tutorial:** UI skipped
 - **In-game modal announce:** `defense-sammy.mp3` first open per game (`defenseMatchupsAnnouncePlayed_<gameId>`)
+- **UI clicks:** drop reorder → `click-tiny.wav`; Submit → `confirm-1-lowervol.wav`; Don't show checkbox → `click-tiny.wav` (see Sound Design System)
 - **Franchise Q1:** pregame bed + reveal click-beeps (see Pre-Game XP); not used for mid-game modal
 - Gameplay BG music remains deferred until the matchups await completes (Q1 tip music still follows tip-winner path)
 

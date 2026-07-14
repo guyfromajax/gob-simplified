@@ -20,6 +20,7 @@ import {
   wireUserColumnDrag,
   normalizeMatchupsPayload,
   hexToRgb,
+  playMatchupsUiSfx,
 } from "./matchupsUiShared.js";
 
 const SESSION_STORAGE_KEY_PREFIX = "defenseMatchupsDontShow_";
@@ -290,8 +291,13 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
     markDefenseMatchupAnnouncePlayed(gameId);
   }
 
+  popup.querySelector("#dont-show-again-checkbox")?.addEventListener("change", () => {
+    playMatchupsUiSfx("click-tiny.wav");
+  });
+
   popup.querySelector(".dm-m-submit").addEventListener("click", async () => {
     const checkbox = popup.querySelector("#dont-show-again-checkbox");
+    playMatchupsUiSfx("confirm-1-lowervol.wav");
     try {
       await saveManDefenseMatchups(gameId, matchupsFromUserOrder(userOrder));
       if (checkbox?.checked && gameId && typeof sessionStorage !== "undefined") {

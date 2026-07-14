@@ -148,9 +148,9 @@
 
 | Trigger | Sound | Asset | Location |
 |--------|--------|-------|----------|
-| Drag & drop players | click-soft | `click-soft.mp3` | `FrontEnd/static/js/phaser/utils/defenseMatchupsPopup.js` — drop handler |
-| Submit Defense Matchups | confirm-1 | `confirm-1-lowervol.wav` | `defenseMatchupsPopup.js` — `.submit-matchups-button` click |
-| Don't show again this game checkbox | click-tiny | `click-tiny.wav` | `defenseMatchupsPopup.js` — `#dont-show-again-checkbox` change |
+| Drag & drop players (resolved to new row) | click-tiny | `click-tiny.wav` | `matchupsUiShared.js` — `wireUserColumnDrag` drop handler (in-game modal + pre-game) |
+| Submit Defense Matchups / Submit & Tip Off | confirm-1 | `confirm-1-lowervol.wav` | `defenseMatchupsPopup.js` / `preGameExperience.js` — submit CTA |
+| Don't show again this game checkbox | click-tiny | `click-tiny.wav` | checkbox `change` on modal + pre-game |
 
 ---
 

@@ -678,6 +678,7 @@ def _resolve_moment(
     off_mod=None,
     event_scalar: float = 1.0,
     clean_stop: bool = False,
+    neutral_band: Optional[float] = None,
 ) -> Tuple[str, float, Any]:
     """§5 Pressure / Trap banded outcome (D8 attribute-driven).
 
@@ -721,8 +722,15 @@ def _resolve_moment(
     bh = getattr(ball_handler, "attributes", {}) or {}
     ref = HCT_D8_REF
 
+    # Win/lose gate width. Default (FB/HCT): the chem+efficiency margin. Callers can override with a
+    # fixed symmetric `neutral_band` — HCO drives pass ~100 for a meaningfully WIDE neutral tier (the
+    # chem+eff margin is only a few points → a near-binary contest). Team quality still lives in the
+    # scores (off_eff/def_eff × d6), just not as an extra threshold bonus.
+    _def_gate = neutral_band if neutral_band is not None else (off_chem + pt_opp)
+    _off_gate = neutral_band if neutral_band is not None else (def_chem + pt_eff)
+
     # --- Defense wins the moment → STEAL / DEAD BALL / O_FOUL / no-event -----
-    if d_score > o_score + (off_chem + pt_opp):
+    if d_score > o_score + _def_gate:
         m = d_score - o_score
         m_norm = _clampf(m / HCT_D8_M_REF, 0.0, 1.0)
         # OFFENSE fight resists ALL D-wins events (same scale as discipline on D_FOUL).
@@ -776,7 +784,7 @@ def _resolve_moment(
         return "DEAD BALL", random.uniform(0.2, 0.8), None
 
     # --- Offense wins the moment → POS_O, with a small D_FOUL on the blow-by --
-    if o_score >= d_score + (def_chem + pt_eff):
+    if o_score >= d_score + _off_gate:
         beaten_norm = _clampf((o_score - d_score) / HCT_D8_M_REF, 0.0, 1.0)
         ag_gap = _clampf(bh.get("AG", 0) - (getattr(bh_defender, "attributes", {}) or {}).get("AG", 0), 0.0, ref)
         p_dfoul = _clampf(
