@@ -32,6 +32,15 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 - **Timing:** plays at the **start of the hot-read initiation step** (the dish / drive / shot break) via `sfx_on_step_start` — fires before any tween, so it lands as the break begins and does **not** collide with the shot/pass launch sound.
 - **Path:** resolver flags the initiation skeleton step with `_hot_read_sfx` → `skeleton_step_emitter` stamps `step.start.sfx_on_step_start` → FE `playAnimationStep` plays it. **No ribbon / announcement** (an earlier version used a "Hot Read!" secondary announce; removed because the ribbon's wall-time lifetime bled into the following turn).
 
+## Dynamic HCO Defense — Drive-Start VO
+
+- **Status:** ✅ live (2026-07-14). Always-on for HCO drives (not gated by `GOB_DYNAMIC_HCO_DEFENSE`).
+- **Trigger:** the ball-handler starts a drive to the rim (the emitter's drive step, `gate_kind == "attack_drive_driver"`) — covers both drive-to-shoot and drive-and-dish.
+- **Files:** one of `sammy-drive.wav` / `braddock-drive.mp3` (`HCO_DRIVE_SFX_FILES`, vol `HCO_DRIVE_SFX_VOLUME = 0.8`). Picked by a **local seeded RNG** (crc32 of `driver_id | step_index | timestamp`) — SS&S-reproducible and it **never draws from the global stream**, so a cosmetic cue can never perturb shot outcomes.
+- **Timing:** `sfx_on_step_start` on the drive step — fires the instant the drive begins. Doesn't clobber an already-set step-start SFX on the same step.
+- **Path:** `skeleton_step_emitter` (render-only) stamps `step.start.sfx_on_step_start` → FE plays it.
+- **Planned companion (S2d):** `duke-great-stop.wav` on a **Tier-C** stop (defender wins, BH walled off 0–5 grid), fired at the driver-tween end (`sfx_on_ball_arrival`) so it lands on the actual wall-off, sequenced *after* the drive-start cue — held until S2d makes the visual stop real.
+
 ## Backend Terms
 
 - `shot_score_pre_defense`: Existing `resolve_shot()` local variable. This is returned from `calculate_shot_score()` as `pre_defense_shot_score` and represents the shooter/offense value before defensive shot impact is applied.

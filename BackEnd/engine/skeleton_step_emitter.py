@@ -66,6 +66,14 @@ from BackEnd.utils.animation_step_schema import (
 )
 
 
+# HCO drive-start VO (SFX_System.md): an announcer "he's driving!" cue fired the instant a
+# ball-handler starts a drive to the rim (both drive-to-shoot and drive-and-dish). One variant is
+# picked per drive by a LOCAL seeded RNG (stable per-drive key) so it is SS&S-reproducible WITHOUT
+# drawing from the global stream — cosmetic, never perturbs shot outcomes. Files in FrontEnd/static/sounds/.
+HCO_DRIVE_SFX_FILES = ("sammy-drive.wav", "braddock-drive.mp3")
+HCO_DRIVE_SFX_VOLUME = 0.8
+
+
 # --- Vocabulary mapping ----------------------------------------------------
 
 # Skeleton actions → schema action vocab. ``get_open`` collapses into ``cut``
@@ -2016,6 +2024,19 @@ def build_skeleton_animation_steps(
             if hot_read_clip:
                 step.setdefault("start", {})["sfx_on_step_start"] = {
                     "file": hot_read_clip, "event": "hot_read", "volume": 0.7,
+                }
+            # HCO drive-start VO: fire an announcer "drive!" cue the instant the ball-handler starts
+            # driving to the rim (gate_kind == "attack_drive_driver" tags the drive step). Local seeded
+            # pick → SS&S-reproducible, never touches the global RNG (cosmetic). Doesn't clobber an
+            # already-set step-start SFX (e.g. a hot-read on the same step).
+            if (gate_kind == "attack_drive_driver" and HCO_DRIVE_SFX_FILES
+                    and "sfx_on_step_start" not in step.get("start", {})):
+                import zlib as _zlib
+                _seed = _zlib.crc32(
+                    f"{gate_id}|{i}|{(skeleton_steps[i] or {}).get('timestamp', 0)}".encode())
+                step.setdefault("start", {})["sfx_on_step_start"] = {
+                    "file": HCO_DRIVE_SFX_FILES[_seed % len(HCO_DRIVE_SFX_FILES)],
+                    "event": "hco_drive", "volume": HCO_DRIVE_SFX_VOLUME,
                 }
             # Dynamic HCO steal / reach-in: the resolver tags the stopper step with the on-ball
             # defender (``reach_in_def_id``). Stamp a render-space ``reach_in`` flourish so the FE
