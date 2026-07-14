@@ -440,7 +440,7 @@ def _compute_drive_scores(
     off_team: Any,
     def_team: Any,
     defense_playcall: str,
-) -> Tuple[float, float, bool]:
+) -> Tuple[float, float, bool, float]:
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
     off_eff = int(off_attrs.get("offensive_efficiency") or 0)
@@ -452,8 +452,38 @@ def _compute_drive_scores(
     def_score = float(calculate_defender_pressure_score(defender, defense_playcall))
     def_score += def_eff * random.randint(1, 3)
     def_bonus = DRIVE_CONTEST_DEF_BONUS_MULTIPLIER * (def_chem + def_eff)
-    offense_wins = off_score > def_score + def_bonus
-    return off_score, def_score, offense_wins
+    margin = off_score - (def_score + def_bonus)
+    offense_wins = margin > 0
+    return off_score, def_score, offense_wins, margin
+
+
+# Dynamic HCO Defense — S2a: 3-tier primary drive contest (Dynamic_MM_Brief §7). The on-ball contest
+# margin (off_score − (def_score + def_bonus)) is banded into 3 outcomes instead of a binary win,
+# mirroring resolve_contest's ±band structure:
+#   A blow-by : margin >  +BAND   → BH beats his man, drives on (help cutoff may still apply, S2c)
+#   B neutral : |margin| <= BAND  → stopped 35–65% to the rim by lean, then pull-up / dish (S2d/e)
+#   C stopped : margin <  −BAND   → walled off 0–5 grid short (S2d), returns to the walk (S2e)
+# `stop_fraction` = drive progress [0,1] at the stop (1.0 = reaches the rim). Flag-gated; flag-off
+# keeps today's binary. Band + fractions are first-cut — MC-tuned in S2f.
+DRIVE_TIER_NEUTRAL_BAND = 75.0        # ± margin band for the neutral tier
+DRIVE_NEUTRAL_STOP_MIN = 0.35         # Tier B: defense-lean stop (fraction to the rim)
+DRIVE_NEUTRAL_STOP_MAX = 0.65         # Tier B: offense-lean stop
+DRIVE_STOPPED_MAX_FRACTION = 0.15     # Tier C: BH advances at most this fraction (S2d clamps to ≤5 grid)
+
+
+def _classify_drive_tier(margin: float, band: float = DRIVE_TIER_NEUTRAL_BAND) -> Tuple[str, float]:
+    """S2a: map the drive contest margin → (tier, stop_fraction). tier ∈ {'A','B','C'}; stop_fraction
+    is the drive progress [0,1] at which the BH is stopped (1.0 = reaches the rim). See §7."""
+    if margin > band:
+        return "A", 1.0
+    if margin < -band:
+        # Tier C: walled off early; advance scales mildly with how close it was (0 by margin ≈ −2·band).
+        frac = DRIVE_STOPPED_MAX_FRACTION * max(0.0, 1.0 + margin / (2.0 * band))
+        return "C", max(0.0, min(DRIVE_STOPPED_MAX_FRACTION, frac))
+    # Tier B: neutral — lean from margin within [−band, +band] → [MIN, MAX].
+    lean = 0.5 + 0.5 * (margin / band)  # 0 at −band, 1 at +band
+    frac = DRIVE_NEUTRAL_STOP_MIN + (DRIVE_NEUTRAL_STOP_MAX - DRIVE_NEUTRAL_STOP_MIN) * lean
+    return "B", max(DRIVE_NEUTRAL_STOP_MIN, min(DRIVE_NEUTRAL_STOP_MAX, frac))
 
 
 def _guardians_within_radius(
@@ -688,6 +718,13 @@ def build_attack_drive_sequence(
     double_team = False
     help_read_success = False
     drive_offense_wins = False
+    # S2a — 3-tier drive contest (Dynamic_MM_Brief §7). Flag-gated on the turn's defense posture;
+    # flag-off keeps the binary win/lose. `drive_tier` / `drive_stop_fraction` ride on the meta for
+    # S2b (contact), S2c (help cutoff), S2d (path-stop), S2e (return-to-walk).
+    _game_state = getattr(game, "game_state", {}) or {}
+    _three_tier = bool(_game_state.get("_hco_defense_posture"))
+    drive_tier = "A"
+    drive_stop_fraction = 1.0
     bh_defender_pos: Optional[str] = None
     off_to_def: Dict[str, str] = {}
     def_positions: Dict[str, Dict[str, float]] = {}
@@ -741,9 +778,17 @@ def build_attack_drive_sequence(
         driver = off_lineup.get(ball_handler_pos)
         primary_def = def_lineup.get(bh_defender_pos) if bh_defender_pos else None
         if driver and primary_def:
-            _, _, drive_offense_wins = _compute_drive_scores(
+            _, _, drive_offense_wins, _margin = _compute_drive_scores(
                 driver, primary_def, off_team, def_team, defense_playcall,
             )
+            # S2a is ADDITIVE: classify the tier + stop_fraction for downstream phases, but leave the
+            # binary `drive_offense_wins` (and today's defender override) UNTOUCHED until S2b–e/S2d
+            # consume the tier. So flag-on and flag-off behavior are both unchanged at this stage.
+            if _three_tier:
+                drive_tier, drive_stop_fraction = _classify_drive_tier(_margin)
+            else:
+                drive_tier = "A" if drive_offense_wins else "C"
+                drive_stop_fraction = 1.0 if drive_offense_wins else DRIVE_STOPPED_MAX_FRACTION
 
         if bh_defender_pos and bh_defender_pos in def_lineup:
             if drive_offense_wins:
@@ -876,9 +921,17 @@ def build_attack_drive_sequence(
         driver = off_lineup.get(ball_handler_pos)
         primary_def = def_lineup.get(bh_defender_pos) if bh_defender_pos else None
         if driver and primary_def:
-            _, _, drive_offense_wins = _compute_drive_scores(
+            _, _, drive_offense_wins, _margin = _compute_drive_scores(
                 driver, primary_def, off_team, def_team, defense_playcall,
             )
+            # S2a is ADDITIVE: classify the tier + stop_fraction for downstream phases, but leave the
+            # binary `drive_offense_wins` (and today's defender override) UNTOUCHED until S2b–e/S2d
+            # consume the tier. So flag-on and flag-off behavior are both unchanged at this stage.
+            if _three_tier:
+                drive_tier, drive_stop_fraction = _classify_drive_tier(_margin)
+            else:
+                drive_tier = "A" if drive_offense_wins else "C"
+                drive_stop_fraction = 1.0 if drive_offense_wins else DRIVE_STOPPED_MAX_FRACTION
 
         if bh_defender_pos and bh_defender_pos in def_lineup:
             if drive_offense_wins:
@@ -1039,6 +1092,10 @@ def build_attack_drive_sequence(
         "defender_count": defender_count,
         "driver_shoots": driver_shoots,
         "dish_target_pos": dish_target_pos,
+        # S2a — 3-tier drive contest (consumed by S2b contact / S2c help-cutoff / S2d path-stop /
+        # S2e return-to-walk). 'A' blow-by (stop 1.0) · 'B' neutral (0.35–0.65) · 'C' stopped (≤0.15).
+        "drive_tier": drive_tier,
+        "drive_stop_fraction": drive_stop_fraction,
     }
 
     logging.debug(
@@ -1052,6 +1109,12 @@ def build_attack_drive_sequence(
         driver_shoots,
         dish_target_pos,
     )
+    # S2a observability — the 3-tier outcome (only meaningful when 3-tier is on).
+    if _three_tier:
+        logging.warning(
+            "🚗 [DRIVE TIER] %s stop_fraction=%.2f (margin-banded, BAND=%.0f) drive_win=%s dest=%s",
+            drive_tier, drive_stop_fraction, DRIVE_TIER_NEUTRAL_BAND, drive_offense_wins,
+            destination_location)
 
     if legacy_pos_actions_only:
         shoot_pos_actions = _stationary_pos_actions(drive_end_by_pos)

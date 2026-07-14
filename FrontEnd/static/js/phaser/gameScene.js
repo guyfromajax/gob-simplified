@@ -2655,10 +2655,19 @@ export function createGameScene(Phaser) {
         const sdSb = sd && Object.keys(mergedTsm).length ? { ...sd, team_scoreboard_meta: mergedTsm } : sd;
         const rowHome = resolveTeamRowForScoreboard(sdSb, 'home');
         const rowAway = resolveTeamRowForScoreboard(sdSb, 'away');
-        if (awayRankEl) awayRankEl.textContent = formatSbRank(rowAway);
-        if (awayRecEl) awayRecEl.textContent = formatSbRecord(rowAway);
-        if (homeRankEl) homeRankEl.textContent = formatSbRank(rowHome);
-        if (homeRecEl) homeRecEl.textContent = formatSbRecord(rowHome);
+        const hasRank = (row) => {
+          const r = Number(row?.natl_rank);
+          return Number.isInteger(r) && r >= 1;
+        };
+        const hasRecord = (row) => {
+          const w = row?.wins ?? row?.team_wins;
+          const l = row?.losses ?? row?.team_losses;
+          return w != null && l != null && Number.isFinite(Number(w)) && Number.isFinite(Number(l));
+        };
+        if (awayRankEl && hasRank(rowAway)) awayRankEl.textContent = formatSbRank(rowAway);
+        if (awayRecEl && hasRecord(rowAway)) awayRecEl.textContent = formatSbRecord(rowAway);
+        if (homeRankEl && hasRank(rowHome)) homeRankEl.textContent = formatSbRank(rowHome);
+        if (homeRecEl && hasRecord(rowHome)) homeRecEl.textContent = formatSbRecord(rowHome);
 
         if (isCourtDebugScoreboard()) {
           const sig = `${formatSbRank(rowAway)}|${formatSbRecord(rowAway)}|${formatSbRank(rowHome)}|${formatSbRecord(rowHome)}`;
