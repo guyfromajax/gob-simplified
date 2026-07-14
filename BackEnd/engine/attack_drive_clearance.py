@@ -478,6 +478,65 @@ DRIVE_NEUTRAL_STOP_FRACTION = 0.5   # Tier B (contested NEUTRAL): BH pulls up ~m
 # Tunable (S2f). Passed to `_resolve_moment(neutral_band=...)`; FB/HCT keep the chem+eff default.
 DRIVE_NEUTRAL_BAND = 100.0
 
+# S2c help-cutoff tuning. On a Tier-A blow-by a HELP defender may rotate to cut off the drive. HCO
+# drives are half-court (standard AG rate, like HCT — not FB's outlet sprint), so the corridor + slack
+# stay tight. Aggression gates whether a given help defender even attempts the rotation (mirrors FB's
+# stop_attempt_prob → loose/aggressive defenses sit deeper in help lanes and cut off more). Tunable (S2f).
+HCO_CUTOFF_PATH_CORRIDOR = 11.0          # help defender must be within 11 grid of the drive line to rotate
+HCO_CUTOFF_DEFENDER_TIME_SLACK = 1.0     # no arrival-time credit (a clean blow-by outruns late help)
+HCO_CUTOFF_STOP_ATTEMPT_PROB = {"passive": 0.0, "normal": 0.5, "aggressive": 1.0}
+
+
+def _resolve_hco_help_cutoff(
+    bh_start, drive_end, driver, primary_def_pos, def_coords, def_lineup,
+    off_team, def_team, aggression,
+):
+    """S2c: on a Tier-A blow-by, a HELP defender (NOT the beaten primary) may rotate to cut off the
+    drive. Reuses the shared FB/HCT cutoff geometry (`best_cutoff_on_drive` → meet point) + contest
+    (`resolve_cutoff_contest` → `_resolve_moment`). Returns ``(cutoff_pos, tier, stop_fraction, contact,
+    meet)``; ``cutoff_pos`` is None when no help defender reaches the path (or the BH beats the help
+    too → stays a blow-by). The outcome maps to the SAME tier vocabulary as the primary contest, so
+    S2d/S2b/S2e consume the demotion unchanged. See Dynamic_MM_Brief §S2c."""
+    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+    from BackEnd.engine.cutoff_resolution import best_cutoff_on_drive, resolve_cutoff_contest
+
+    # Race only the OTHER defenders — the beaten primary is behind the play.
+    race_coords = {p: c for p, c in def_coords.items() if p != primary_def_pos and c}
+    if not race_coords:
+        return None, "A", 1.0, None, None
+    bh_rate = _ag_grid_per_game_sec(driver, "standard")
+    stop_prob = HCO_CUTOFF_STOP_ATTEMPT_PROB.get(aggression, 0.5)
+    cutoff_pos, meet = best_cutoff_on_drive(
+        bh_start, drive_end, bh_rate, race_coords, def_lineup,
+        get_defender_rate=lambda d: _ag_grid_per_game_sec(d, "standard"),
+        path_corridor=HCO_CUTOFF_PATH_CORRIDOR,
+        defender_time_slack=HCO_CUTOFF_DEFENDER_TIME_SLACK,
+        stop_attempt_prob=stop_prob,
+        rng=random,
+    )
+    cutoff_def = def_lineup.get(cutoff_pos) if cutoff_pos else None
+    if not cutoff_pos or meet is None or cutoff_def is None:
+        return None, "A", 1.0, None, None
+
+    outcome, ratio, _credited = resolve_cutoff_contest(
+        off_team, def_team, driver, cutoff_def, exclude_steal=True)
+    # Meet progress along driver_start→drive_end = the stop fraction for a demotion (S2d re-derives the
+    # stop coord from it, landing back on the meet point since best_cutoff walks that exact segment).
+    _path = _euclid(bh_start, drive_end)
+    frac = (_euclid(bh_start, meet) / _path) if _path > 0 else float(ratio)
+    if outcome == "POS_O":
+        # BH beats the help too → still a clean blow-by (no demotion, primary stays the beaten man).
+        return None, "A", 1.0, None, None
+    if outcome == "D_FOUL":
+        # Shooting foul drawn on the help defender → A + foul (and-1 / FTs via S2b), like the primary.
+        return cutoff_pos, "A", 1.0, "D_FOUL", meet
+    if outcome == "NEUTRAL":
+        return cutoff_pos, "B", frac, None, meet
+    if outcome == "D_STOP":
+        return cutoff_pos, "C", frac, None, meet
+    # O_FOUL (charge) / DEAD BALL (lost handle) — terminal contact at the meet.
+    return cutoff_pos, "C", frac, outcome, meet
+
 
 def _resolve_hco_drive_contest(driver, primary_def, off_team, def_team):
     """S2 spine: the HCO primary drive contest via the shared `_resolve_moment` (FB/HCT model). ONE
@@ -752,6 +811,7 @@ def build_attack_drive_sequence(
     off_to_def: Dict[str, str] = {}
     def_positions: Dict[str, Dict[str, float]] = {}
     zone_boundaries: Dict[str, Any] = {}
+    _help_race_coords: Dict[str, Dict[str, float]] = {}  # pre-drive defender coords → S2c help-cutoff race
 
     final_off_for_defense = {
         pos: {
@@ -881,6 +941,8 @@ def build_attack_drive_sequence(
                 ball_spot=destination_location,
             )
 
+        _help_race_coords = zone_def_positions  # S2c: race the zone help defenders to the drive path
+
         help_def = _closest_defender_to_point(
             zone_def_positions,
             midlane_end if clearance_dish_pos else drive_end,
@@ -920,6 +982,7 @@ def build_attack_drive_sequence(
             aggression,
         )
         bh_defender_pos = off_to_def.get(ball_handler_pos, ball_handler_pos)
+        _help_race_coords = def_positions  # S2c: race the man help defenders to the drive path
 
         for off_pos in perimeter_moved:
             def_pos = off_to_def.get(off_pos)
@@ -1023,6 +1086,25 @@ def build_attack_drive_sequence(
                     "action": "guard_offball",
                 }
 
+    # S2c — help cutoff on a Tier-A blow-by. The BH beat his primary; now a HELP defender may rotate to
+    # cut off the drive path. Reuses the shared FB/HCT cutoff geometry + contest (`_resolve_hco_help_cutoff`
+    # → `best_cutoff_on_drive` + `resolve_cutoff_contest`). A successful cutoff DEMOTES the blow-by: the
+    # cutoff defender becomes the contact/guard defender (`bh_defender_pos`) and the drive re-resolves to
+    # B/C (or a foul/charge/TO) — the downstream S2d/S2b/S2e machinery then consumes the demoted tier with
+    # NO special-casing. Loose/aggressive postures sit deeper in help lanes → more cutoffs, organically.
+    # Tier B/C (primary already stopped him) and flag-off skip this. See Dynamic_MM_Brief §S2c.
+    if _three_tier and drive_tier == "A" and driver and bh_defender_pos and _help_race_coords:
+        _cut_pos, _cut_tier, _cut_frac, _cut_contact, _cut_meet = _resolve_hco_help_cutoff(
+            driver_start, drive_end, driver, bh_defender_pos,
+            _help_race_coords, def_lineup, off_team, def_team, aggression)
+        if _cut_pos:
+            drive_tier, drive_stop_fraction, drive_contact = _cut_tier, _cut_frac, _cut_contact
+            bh_defender_pos = _cut_pos  # cutoff defender now walls the ball (S2d) / credits contact (S2b)
+            drive_offense_wins = drive_tier == "A"
+            logging.warning(
+                "🚧 [HELP CUTOFF] %s cuts off blow-by → tier %s stop=%.2f contact=%s meet=%s",
+                _cut_pos, drive_tier, drive_stop_fraction, _cut_contact, _cut_meet)
+
     # S2d — path-stop: on a contested (B) or defense-win (C) drive, the BH is halted SHORT of the rim
     # at the contest's stop point instead of driving all the way in. Move his drive-end + shoot coord
     # to the stop, reclassify the shot from the stop distance (pull-up vs layup — the coord-based shot
@@ -1102,7 +1184,38 @@ def build_attack_drive_sequence(
     else:
         shoot_prob = 0.75
 
+    # S2e — a STOPPED BH (Tier B/C) re-decides dish-vs-pull-up as an OPENNESS read (reuse the walk's
+    # native `should_shoot` dish read), not the blind `shoot_prob` coin flip: dish to a teammate whose
+    # look beats the contested pull-up, else take the pull-up. HCO-native (the stopped BH re-enters the
+    # half-court read). Wrapped so a read error can never break the drive. (Full reset/freelance = a
+    # follow-up.) See Dynamic_MM_Brief §S2 / attack_contest_unification.md.
+    _s2e_dish_pos = None
+    if _three_tier and drive_tier in ("B", "C"):
+        try:
+            from BackEnd.engine.motion_read_map import build_motion_read_map
+            from BackEnd.engine.motion_step_decision import should_shoot
+            _s2e_read = build_motion_read_map(game, off_lineup, def_lineup)
+            _s2e_locs = {p: (drive_end_by_pos.get(p) or {}).get("location", "key") for p in off_lineup}
+            _s2e_gs = getattr(game, "game_state", {}) or {}
+            _s2e_sc = float(_s2e_gs.get("_hco_shot_clock_est",
+                                        _s2e_gs.get("shot_clock_remaining", 30)) or 30)
+            _s2e_tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
+            _s2e_dec = should_shoot(ball_handler_pos, off_lineup, _s2e_locs, _s2e_read, off_team,
+                                    _s2e_sc, _s2e_tempo, random, openness=0.0, allow_dish=True)
+            if _s2e_dec and _s2e_dec.get("shooter_pos") and _s2e_dec["shooter_pos"] != ball_handler_pos:
+                _s2e_dish_pos = _s2e_dec["shooter_pos"]
+        except Exception:
+            _s2e_dish_pos = None
+
     driver_shoots = random.random() < shoot_prob
+    if _three_tier and drive_tier in ("B", "C"):
+        # Stopped BH: dish if should_shoot found an open teammate, else the contested pull-up.
+        driver_shoots = _s2e_dish_pos is None
+        logging.warning(
+            "🧭 [DRIVE STOP READ] tier %s bh=%s → %s",
+            drive_tier, ball_handler_pos,
+            ("DISH→" + _s2e_dish_pos) if _s2e_dish_pos else "PULL-UP",
+        )
     dish_target_pos: Optional[str] = None
     # S2d: a stopped drive (B/C) is a pull-up from the stop, not a layup — reclassify the driver's shot
     # from the stop coord (falls back to "attack" for a full drive / Tier A / flag-off).
@@ -1117,8 +1230,10 @@ def build_attack_drive_sequence(
     passer_pos: Optional[str] = None
 
     if not driver_shoots:
+        # S2e: on a B/C stop, dish to should_shoot's chosen open teammate; otherwise fall back to the
+        # legacy interior/random dish selection (full drive, double-team kick-out, flag-off).
         prefer_interior = random.random() < 0.75
-        dish_target_pos = _resolve_dish_target(
+        dish_target_pos = _s2e_dish_pos or _resolve_dish_target(
             drive_end_by_pos, ball_handler_pos, prefer_interior,
         )
         if dish_target_pos:

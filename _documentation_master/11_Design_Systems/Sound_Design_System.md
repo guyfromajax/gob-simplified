@@ -154,6 +154,23 @@
 
 ---
 
+## Pre-Game Experience bed (franchise Q1 only)
+
+Resolved by `resolvePregameBedFilename` in `gameSfx.js` (FTD `natl_rank`, 1 = best; RS = weeks 1–26):
+
+| Priority | Condition | Asset |
+|----------|-----------|--------|
+| 1 | Weeks 32–34 (national) | `pregame-national-tourney.mp3` |
+| 2 | Weeks 30–31 (region) | `pregame-region-tourney.mp3` |
+| 3 | Weeks 27–29 (conference) | `pregame-conf-tourney.mp3` |
+| 4 | RS weeks 25–26, user rank ≤ 3 | `pregame-region-tourney.mp3` |
+| 5 | RS weeks 8–26, user rank > 10, opponent rank ≤ 10 | `pregame-conf-tourney.mp3` |
+| 6 | Default | `pregame-regular-season.mp3` |
+
+Reveal row lands still layer `click-beep.wav`. Bed stops at tip-off dissolve; never used for mid-game matchups modal.
+
+---
+
 ## Playcall Center (court.html)
 
 | Trigger | Sound | Asset | Location |

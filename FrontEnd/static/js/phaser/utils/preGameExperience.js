@@ -261,13 +261,14 @@ export function showPreGameExperience(gameId, scene, normalized) {
   const existing = document.querySelector(".pgxp-root");
   if (existing) existing.remove();
 
-  const { userTeamSide, homeTeam, awayTeam, currentMatchups, isTournamentContext } = normalized;
+  const { userTeamSide, homeTeam, awayTeam, currentMatchups, franchiseWeek } = normalized;
   const homePrimary = homeTeam.primary_color || "#1F8A5B";
   const awayPrimary = awayTeam.primary_color || "#9E1B32";
   const homeName = homeTeam.team_name || "Home";
   const awayName = awayTeam.team_name || "Away";
   const userIsHome = userTeamSide === "home";
-
+  const userNatlRank = userIsHome ? homeTeam.natl_rank : awayTeam.natl_rank;
+  const opponentNatlRank = userIsHome ? awayTeam.natl_rank : homeTeam.natl_rank;
   let userOrder = userOrderFromMatchups(currentMatchups);
   const timers = [];
   const clearTimers = () => {
@@ -473,7 +474,11 @@ export function showPreGameExperience(gameId, scene, normalized) {
   }
 
   return new Promise((resolve) => {
-    startPregameBed(scene, { tournament: !!isTournamentContext });
+    startPregameBed(scene, {
+      week: franchiseWeek ?? normalized.franchiseWeek ?? 1,
+      userNatlRank,
+      opponentNatlRank,
+    });
     renderBoard();
 
     const skipPersisted =

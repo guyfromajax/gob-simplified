@@ -89,12 +89,21 @@ RT badge background uses Attribute Bar Scale (≤40 red, 41–60 yellow, 61–80
 
 ## Audio
 
-| Asset | When |
-|-------|------|
-| `pregame-regular-season.mp3` | Franchise Q1 pre-game bed (regular season) |
-| `pregame-conf-tourney.mp3` | Franchise Q1 pre-game bed when `is_tournament_context` (week ≥ 27 / EOS tournaments) |
-| `click-beep.wav` | Each reveal row land (×5) |
-| `defense-sammy.mp3` | In-game modal open only (first time per game); **not** during pre-game |
+Regular season = franchise weeks **1–26**. Bed selection (`resolvePregameBedFilename` in `gameSfx.js`), evaluated in order:
+
+| Priority | Condition | Asset |
+|----------|-----------|--------|
+| 1 | Weeks **32–34** (national tourney) | `pregame-national-tourney.mp3` |
+| 2 | Weeks **30–31** (region tourney) | `pregame-region-tourney.mp3` |
+| 3 | Weeks **27–29** (conference tourney) | `pregame-conf-tourney.mp3` |
+| 4 | RS weeks **25–26** and user FTD `natl_rank` ≤ 3 (1 = best) | `pregame-region-tourney.mp3` |
+| 5 | RS weeks **8–26**, user `natl_rank` > 10, opponent `natl_rank` ≤ 10 | `pregame-conf-tourney.mp3` |
+| 6 | All other RS / default | `pregame-regular-season.mp3` |
+
+| Layered SFX | Asset | When |
+|-------------|--------|------|
+| Reveal clicks | `click-beep.wav` | Each reveal row land (×5) |
+| In-game modal open | `defense-sammy.mp3` | In-game modal only (first time per game); **not** during pre-game |
 
 Bed starts with the cinematic and **stops** when the Tip Off veil dissolves. It must not play during mid-game modals.
 

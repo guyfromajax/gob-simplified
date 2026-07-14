@@ -716,12 +716,61 @@ export function playDefenseMatchupModalCourtSfx(scene) {
 }
 
 /**
+ * Resolve franchise Q1 pre-game bed from week + FTD natl_rank (1 = best).
+ *
+ * Regular season = weeks 1–26. Evaluation order:
+ * 1. Weeks 32–34 → national tourney
+ * 2. Weeks 30–31 → region tourney
+ * 3. Weeks 27–29 → conference tourney
+ * 4. RS weeks 25–26 + user rank ≤ 3 → region tourney
+ * 5. RS weeks 8–26 + user rank > 10 + opponent rank ≤ 10 → conference tourney
+ * 6. Else → regular season
+ */
+export function resolvePregameBedFilename({
+  week = 1,
+  userNatlRank = null,
+  opponentNatlRank = null,
+} = {}) {
+  const w = Number(week) || 1;
+  const userRank = Number(userNatlRank);
+  const oppRank = Number(opponentNatlRank);
+  const userRankOk = Number.isFinite(userRank);
+  const oppRankOk = Number.isFinite(oppRank);
+
+  if (w >= 32 && w <= 34) return "pregame-national-tourney.mp3";
+  if (w >= 30 && w <= 31) return "pregame-region-tourney.mp3";
+  if (w >= 27 && w <= 29) return "pregame-conf-tourney.mp3";
+
+  // Regular season (1–26) specials
+  if (w >= 1 && w <= 26) {
+    if (w >= 25 && userRankOk && userRank <= 3) {
+      return "pregame-region-tourney.mp3";
+    }
+    if (w >= 8 && userRankOk && oppRankOk && userRank > 10 && oppRank <= 10) {
+      return "pregame-conf-tourney.mp3";
+    }
+  }
+
+  return "pregame-regular-season.mp3";
+}
+
+/**
  * Franchise Q1 pre-game bed. Plays across reveal → matchups → tip-off veil.
  * Does not play for in-game defense-matchups modals.
+ *
+ * Pass either `{ filename }` or `{ week, userNatlRank, opponentNatlRank }`
+ * (see resolvePregameBedFilename). Legacy `{ tournament: true }` maps to conf bed.
  */
-export function startPregameBed(scene, { tournament = false } = {}) {
+export function startPregameBed(scene, options = {}) {
   stopPregameBed();
-  const filename = tournament ? "pregame-conf-tourney.mp3" : "pregame-regular-season.mp3";
+  let filename = options.filename;
+  if (!filename) {
+    if (options.tournament === true && options.week == null) {
+      filename = "pregame-conf-tourney.mp3";
+    } else {
+      filename = resolvePregameBedFilename(options);
+    }
+  }
   try {
     const audio = createAudio(filename);
     audio.loop = false;
@@ -735,7 +784,13 @@ export function startPregameBed(scene, { tournament = false } = {}) {
     audio.addEventListener("ended", release, { once: true });
     audio.addEventListener("error", release, { once: true });
     const playPromise = audio.play();
-    debugSfx("play", { filename, event: "pregame_bed", tournament: !!tournament });
+    debugSfx("play", {
+      filename,
+      event: "pregame_bed",
+      week: options.week,
+      userNatlRank: options.userNatlRank,
+      opponentNatlRank: options.opponentNatlRank,
+    });
     if (playPromise?.catch) {
       playPromise.catch((err) => {
         debugSfx("play_rejected", { filename, reason: err?.message || String(err), event: "pregame_bed" });

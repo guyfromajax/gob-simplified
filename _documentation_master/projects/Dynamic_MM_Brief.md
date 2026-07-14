@@ -271,6 +271,17 @@ Net-new offense action to build: **`backdoor`** (one new emitter/beat). `attack`
 
 **Tier C "defense wins" — stop is NOT terminal (S2, locked 2026-07-13):** if `resolve_drive_contact` yields no terminal event (charge / o-foul / db-TO / shooting foul), the stopped BH (0–5 grid short) **returns to the walk's per-step decision at his new coords** — reuses the existing machinery, NO new offense vocabulary. Options, in order: **dish/kick-out** (`should_shoot(allow_dish=True)` → `KICKOUT_SHOOT`; the drive drew the D so the openness signal finds the open man), **contested pull-up** (low-clock forced-shot backstop), **reset** (retreat/back-out → SM or skeleton resume), **freelance** (`FREELANCE_FORCED` — knocked off the play with clock pressure). **No new chance to drive again** (one drive per touch; a reset/SM must precede any re-drive — prevents infinite drive loops). Mirrors `_setplay_recovery_roll` (broken action → resume/freelance). Tier B (neutral, 35–65% pull-up) favors the shot/dish; Tier C favors reset/kick-out (pull-up only as the low-clock backstop).
 
+**S2 sub-plan status (traced 2026-07-14):**
+
+| Step | Status | Notes |
+|---|---|---|
+| S2-spine | ✅ built (uncommitted) | `_resolve_hco_drive_contest` → `_resolve_moment(clean_stop, neutral_band=100)`; outcome→tier (A/B/C); retired `_compute_drive_scores`/`_classify_drive_tier`. |
+| S2d path-stop | ✅ built (uncommitted) | `_drive_stop_coord` lerp; B/C truncate at `score_ratio`, wall defender, reclassify shot via `_shot_type_for_coords`. |
+| S2b contact routing | ✅ committed | non-terminal → walk; `D_FOUL`/`O_FOUL`/`DEAD BALL` route via existing turnover/foul machinery; `stamp_foul_contact_rattle` on both sprites. |
+| S2e return-to-walk | ✅ **core built (uncommitted 2026-07-14)** | On a B/C stop the stopped BH re-decides **dish-vs-pull-up via the walk's own `should_shoot(allow_dish=True)`** (openness read), replacing the blind `shoot_prob` coin flip: dish to an open teammate if his look beats the contested pull-up, else pull up. HCO-native, flag+B/C-gated, wrapped so a read error → pull-up. Log `🧭 [DRIVE STOP READ]`. **Follow-up:** full reset/freelance re-entry (currently a `should_shoot`-None → contested pull-up, not yet a reset). |
+| S2c help cutoff | ✅ **built (uncommitted 2026-07-14)** | On a Tier-A blow-by, `_resolve_hco_help_cutoff` races the HELP defenders (beaten primary excluded) to the drive line via the shared `best_cutoff_on_drive` (corridor `HCO_CUTOFF_PATH_CORRIDOR=11`, aggression-gated `HCO_CUTOFF_STOP_ATTEMPT_PROB`) + `resolve_cutoff_contest`→`_resolve_moment`. A successful cutoff **demotes** the blow-by: the cutoff defender becomes `bh_defender_pos` (walls the ball / credits contact) and the tier re-resolves to B/C or a foul/charge/TO — **S2d/S2b/S2e consume the demotion unchanged** (no special-casing). `POS_O` (BH beats the help too) → stays a blow-by. Runs after both man/zone branches (`_help_race_coords` = the pre-drive defender formation). Log `🚧 [HELP CUTOFF]`. Flag-off/Tier-B/C skip. |
+| S2f zone parity + MC tune | ❌ not started | |
+
 ### S1 implementation scope (traced 2026-07-13) — 3 parts, mechanism already proven
 
 The existing SM freeze already opens defender spacing *and* rides into the frozen grid (it lives in `_position_standard/zone_defenders`, both inside `compute_defender_grid`'s draw → contest + dish gate + render all read it). S1 = fire it on **every** step + make it **graded**. Build order A → B → C.

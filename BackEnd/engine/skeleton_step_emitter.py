@@ -72,6 +72,11 @@ from BackEnd.utils.animation_step_schema import (
 # drawing from the global stream — cosmetic, never perturbs shot outcomes. Files in FrontEnd/static/sounds/.
 HCO_DRIVE_SFX_FILES = ("sammy-drive.wav", "braddock-drive.mp3")
 HCO_DRIVE_SFX_VOLUME = 0.8
+# HCO "great stop" VO — fired when a defender cleanly walls off a drive (S2 Tier C clean stop, no
+# foul/TO). Lands at the driver_gate step start = the instant the BH is stopped short (S2d moved him
+# to the stop). Contact outcomes (foul/charge/TO) get their own cues; this is the clean stuff only.
+HCO_GREAT_STOP_SFX = "duke-great-stop.wav"
+HCO_GREAT_STOP_VOLUME = 0.85
 
 
 # --- Vocabulary mapping ----------------------------------------------------
@@ -2056,6 +2061,17 @@ def build_skeleton_animation_steps(
                 step.setdefault("start", {})["sfx_on_step_start"] = {
                     "file": HCO_DRIVE_SFX_FILES[_seed % len(HCO_DRIVE_SFX_FILES)],
                     "event": "hco_drive", "volume": HCO_DRIVE_SFX_VOLUME,
+                }
+            # HCO "great stop" VO: on a Tier-C CLEAN stop (defender walls off the drive; no foul/charge/
+            # TO), fire the cue at the driver_gate step START — the instant the BH arrives walled-off at
+            # his stop (S2d put him there). Skip contact outcomes (they have their own cues). Doesn't
+            # clobber the drive-start cue (that's on the PRIOR step) or a hot-read on this step.
+            _cur_drive_meta = (skeleton_steps[i].get("_attack_drive") or {})
+            if (_cur_drive_meta.get("driver_gate") and _cur_drive_meta.get("drive_tier") == "C"
+                    and not _cur_drive_meta.get("drive_contact")
+                    and "sfx_on_step_start" not in step.get("start", {})):
+                step.setdefault("start", {})["sfx_on_step_start"] = {
+                    "file": HCO_GREAT_STOP_SFX, "event": "great_stop", "volume": HCO_GREAT_STOP_VOLUME,
                 }
             # Dynamic HCO steal / reach-in: the resolver tags the stopper step with the on-ball
             # defender (``reach_in_def_id``). Stamp a render-space ``reach_in`` flourish so the FE
