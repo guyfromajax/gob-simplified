@@ -1834,6 +1834,24 @@ def build_skeleton_animation_steps(
         else:
             t = max(HCO_STEP_T_FLOOR_GAME_SECONDS, natural_t, ball_pass_t)
 
+        # DIAGNOSTIC (2026-07-13): the "pause before a drive shot/dish" symptom = a step whose
+        # duration is PADDED by a floor beyond the natural travel + ball-flight time (the step just
+        # holds before the next one fires). Log which step, its gate kind, and which floor padded it
+        # (explicit `_step_t_floor` = intentional subtle-beat pace; else the generic HCO floor). Only
+        # fires on genuinely padded steps → low noise.
+        _pad = t - max(natural_t, ball_pass_t)
+        _pa = (skeleton_steps[i].get("pos_actions") if i < len(skeleton_steps) else {}) or {}
+        _acts = {((a or {}).get("action") or "").lower() for a in _pa.values()} - {""}
+        _drive = bool((skeleton_steps[i] or {}).get("_attack_drive")) if i < len(skeleton_steps) else False
+        # Only flag padded DRIVE / pass / shot steps (the reported symptom) — not every stationary HCO
+        # step — to keep the diagnostic low-noise.
+        if _pad > 0.05 and (_drive or is_pass_step or (_acts & {"shoot", "pass", "receive"})):
+            logging.warning(
+                "🕐 [HCO STEP PAUSE] step %d gate=%s pass=%s drive=%s actions=[%s] t=%.2fs "
+                "padded +%.2fs over natural=%.2f ball_pass=%.2f (explicit_floor=%s HCO_floor=%.2f)",
+                i, gate_kind, is_pass_step, _drive, ",".join(sorted(_acts)), t, _pad, natural_t,
+                ball_pass_t, step_floor, HCO_STEP_T_FLOOR_GAME_SECONDS)
+
         # UESS §9.5: only the gate player is guaranteed to reach skeleton
         # destination; defenders and other non-gate movers freeze at
         # interrupted coords when step T elapses before they arrive.

@@ -5161,10 +5161,24 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
             return
         from BackEnd.models.animator import Animator
         grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        _empty_pass_drive = []
         for i, step in enumerate(steps):
             ss = step.get("_step_state") or {"index": i}
-            ss["defense"] = grid.get(i) or {}
+            _dfn = grid.get(i) or {}
+            ss["defense"] = _dfn
             step["_step_state"] = ss
+            # DIAGNOSTIC (2026-07-13): an EMPTY stamped grid for a PASS/DRIVE step makes _hco_step_def_xy
+            # fall back to LEGACY reconstruction — which for zone+away emits HOME-frame coords → the
+            # batted-OOB / steal contact mirror (ball + deflector fly to the wrong court end). Flag it.
+            if not _dfn:
+                _acts = {((a or {}).get("action") or "").lower() for a in (step.get("pos_actions") or {}).values()}
+                if step.get("_attack_drive") or (_acts & {"pass", "receive"}):
+                    _empty_pass_drive.append((i, "drive" if step.get("_attack_drive") else "pass"))
+        if _empty_pass_drive:
+            logging.warning(
+                "🗺️ [STAMP GAP] no stamped defender grid for pass/drive steps %s (whole_grid_empty=%s) → "
+                "these fall back to LEGACY reconstruction (zone+away = the bat-OOB/steal contact mirror). "
+                "game=%s", _empty_pass_drive, not grid, game.game_state.get("game_id"))
     except Exception:
         pass
 
@@ -5310,10 +5324,26 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
         turn_result["step_clock_seconds"] = timing["step_clock_seconds"]
         turn_result["resolution_step_index"] = timing["resolution_step_index"]
         turn_result["executed_step_count"] = timing["executed_step_count"]
+    # TRIPWIRE (2026-07-13): a clean STEAL must NOT leave a shot event in the rendered skeleton —
+    # otherwise the FE plays the INTERCEPTION SFX *and* animates/scores the shot (the exact reported
+    # symptom). apply_stopper_system_to_skeleton should truncate at the pass pin; if a downstream shoot
+    # step survives, log LOUDLY so the next occurrence pinpoints the truncation gap.
+    _steal_steps = (turn_result.get("skeleton") or {}).get("steps") or []
+    _surviving_shot = [i for i, s in enumerate(_steal_steps)
+                       if any((e or {}).get("type") == "shot" for e in (s.get("events") or []))]
+    if _surviving_shot:
+        logging.error(
+            "🚨 [INTERCEPTION+SHOT ANOMALY] STEAL skeleton still carries shot event(s) at steps %s "
+            "(pass_pin=%s interceptor=%s passer=%s shooter_was=%s) → FE will play interception SFX AND "
+            "the shot. game=%s is_full_sim=%s",
+            _surviving_shot, _pi, motion_shot_info.get("interceptor_pos"), _passer_pos,
+            motion_shot_info.get("shooter_pos"), game_state.get("game_id"),
+            game_state.get("_is_full_simulation"))
     logging.warning(
         f"🪡 [HCO INTERCEPTION] {getattr(ball_handler, 'player_id', None)} dish picked off by "
         f"{getattr(interceptor, 'player_id', None)} → STEAL "
-        f"[game={game_state.get('game_id')} is_full_sim={game_state.get('_is_full_simulation')}]")
+        f"[pass_pin={_pi} surviving_shot_steps={_surviving_shot} "
+        f"game={game_state.get('game_id')} is_full_sim={game_state.get('_is_full_simulation')}]")
     return turn_result
 
 
@@ -5392,9 +5422,29 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
         turn_result["step_clock_seconds"] = timing["step_clock_seconds"]
         turn_result["resolution_step_index"] = timing["resolution_step_index"]
         turn_result["executed_step_count"] = timing["executed_step_count"]
+    # DIAGNOSTIC (2026-07-13): confirm the batted-OOB orientation bug (away offense → ball flew to the
+    # HOME end). The contact_point MUST be display-frame. For AWAY offense the HCO set is on the low-x
+    # (x≈9) end; a contact on the high-x (home, x≈91) end means a HOME-frame point leaked through — the
+    # known zone+away mirror, which happens when the pass step wasn't stamped (→ legacy zone recon).
+    from BackEnd.utils.defense_utils import is_zone_defense as _is_zone
+    _is_away = off_team.team_id == game.away_team.team_id
+    _zone = _is_zone(game_state.get("defense_playcall"))
+    _stamped = bool(((_steps[_pi] if (_pi is not None and 0 <= _pi < len(_steps)) else {}) or {})
+                    .get("_step_state", {}).get("defense")) if _steps else False
+    _cx = float(_contact["x"]) if _contact else None
+    _wrong_side = _cx is not None and ((_is_away and _cx > 60) or (not _is_away and _cx < 40))
+    if _wrong_side:
+        logging.error(
+            "🚨 [BAT-OOB ORIENTATION] contact x=%.1f on WRONG court end for %s offense → ball flies to "
+            "the wrong end. zone=%s pass_step_stamped=%s (False → legacy recon = the mirror source) "
+            "pass_pin=%s deflector=%s oob_target=%s game=%s",
+            _cx, "away" if _is_away else "home", _zone, _stamped, _pi,
+            motion_shot_info.get("interceptor_pos"), _oob_target, game_state.get("game_id"))
     logging.warning(
         f"🪣 [HCO BAT-OOB] pass by {getattr(ball_handler, 'player_id', None)} batted OOB by "
-        f"{getattr(deflector, 'player_id', None)} → offense retains (side inbound, no reset, no stats)")
+        f"{getattr(deflector, 'player_id', None)} → offense retains (side inbound, no reset, no stats) "
+        f"[away={_is_away} zone={_zone} contact={_contact} oob_target={_oob_target} "
+        f"pass_step_stamped={_stamped}]")
     return turn_result
 
 
@@ -7527,7 +7577,27 @@ def resolve_half_court_offense_logic(game):
         if motion_shot_info:
             # Update skeleton with Motion shot modifications
             skeleton = motion_shot_info["skeleton"]
-            
+
+            # TRIPWIRE (2026-07-13): we did NOT intercept (passed the check above) and are about to
+            # resolve a SHOT — the skeleton must NOT carry any steal / interception signal, or the FE
+            # plays the INTERCEPTION SFX on a made shot (the reported symptom). Scan for stray steal
+            # events / steal_reach overrides on the shot skeleton.
+            _stray_steal = []
+            for _si, _ss in enumerate(skeleton.get("steps") or []):
+                if any((e or {}).get("type") == "steal" for e in (_ss.get("events") or [])):
+                    _stray_steal.append((_si, "steal_event"))
+                _ov = (_ss.get("_attack_drive") or {}).get("defender_overrides") or {}
+                if any((o or {}).get("action") == "steal_reach" for o in _ov.values()):
+                    _stray_steal.append((_si, "steal_reach"))
+            if _stray_steal:
+                logging.error(
+                    "🚨 [INTERCEPTION+SHOT ANOMALY] resolving a SHOT but the skeleton carries steal "
+                    "signals %s (shooter=%s driver_shoots=%s) → FE may play the interception SFX on a "
+                    "made shot. game=%s is_full_sim=%s",
+                    _stray_steal, motion_shot_info.get("shooter_pos"),
+                    motion_shot_info.get("motion_attack_driver_shoots"),
+                    game_state.get("game_id"), game_state.get("_is_full_simulation"))
+
             # ✅ FIX 1: Update roles["steps"] with modified skeleton steps for 3-point detection
             # The shot detection logic looks in roles["steps"], so we need to update it
             if "steps" in skeleton:
