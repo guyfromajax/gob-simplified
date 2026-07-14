@@ -3872,23 +3872,27 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     ball_handler_location = "key"  # Default location
     ball_handler_action_info = None  # Store full action_info to preserve opp, coords, etc.
     
-    # Find ball handler in the stop step (include "shoot" so violation-on-shot credits the shooter, not PG fallback)
+    # Find ball handler in the stop step (include "shoot" so violation-on-shot credits the shooter, not
+    # PG fallback; include "drive" so a stop AT a drive step — HCO S2b foul/charge/TO, shot-clock
+    # violation after a drive, or a moment on a drive — keeps the BH at his DRIVE position. Without
+    # "drive" the detection fell through to the pre-drive step and the stopper snapped the BH back to
+    # his starting spot before the whistle. See Dynamic_MM_Brief §S2 / bugs.md.)
     pos_actions = stop_step.get("pos_actions", {})
     for pos, action_info in pos_actions.items():
         action = action_info.get("action", "").lower()
-        if action in ["handle_ball", "receive", "pass", "shoot"]:
+        if action in ["handle_ball", "receive", "pass", "shoot", "drive"]:
             ball_handler_pos = pos
             ball_handler_location = action_info.get("location", "key")
             ball_handler_action_info = action_info  # Store full action_info
             break
-    
+
     # If no ball handler found in stop step, check previous step
     if not ball_handler_pos and len(truncated_steps) > 1:
         prev_step = truncated_steps[-2]
         prev_pos_actions = prev_step.get("pos_actions", {})
         for pos, action_info in prev_pos_actions.items():
             action = action_info.get("action", "").lower()
-            if action in ["handle_ball", "receive", "shoot"]:
+            if action in ["handle_ball", "receive", "shoot", "drive"]:
                 ball_handler_pos = pos
                 ball_handler_location = action_info.get("location", "key")
                 ball_handler_action_info = action_info  # Store full action_info
