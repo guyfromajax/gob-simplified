@@ -50,14 +50,14 @@ def _five_distinct_payload() -> list[dict]:
         (26, [1, 1, 1, 1, 2]),  # >25 clamped
         (21, [1, 1, 1, 1, 2]),
         (20.5, [1, 1, 1, 1, 2]),
-        (20, [1, 1, 1, 1, 3]),
-        (16, [1, 1, 1, 1, 3]),
-        (15, [1, 1, 1, 2, 3]),
-        (11, [1, 1, 1, 2, 3]),
-        (10, [1, 1, 1, 3, 3]),
-        (7, [1, 1, 1, 3, 3]),
-        (6, [1, 1, 1, 3, 3]),
-        (0, [1, 1, 1, 3, 3]),
+        (16, [1, 1, 1, 1, 2]),
+        (15.1, [1, 1, 1, 1, 2]),
+        (15, [1, 1, 1, 1, 3]),
+        (11, [1, 1, 1, 1, 3]),
+        (10, [1, 1, 1, 1, 3]),
+        (7, [1, 1, 1, 1, 3]),
+        (6, [1, 1, 1, 1, 3]),
+        (0, [1, 1, 1, 1, 3]),
     ],
 )
 def test_team_chemistry_pool_sizes_bands(tc, expected):
@@ -65,7 +65,7 @@ def test_team_chemistry_pool_sizes_bands(tc, expected):
 
 
 def test_team_chemistry_pool_sizes_invalid_uses_default_mid_band():
-    assert _team_chemistry_pool_sizes("bogus") == [1, 1, 1, 2, 3]
+    assert _team_chemistry_pool_sizes("bogus") == [1, 1, 1, 1, 3]
 
 
 def test_autoset_payload_assigns_five_deterministic_with_patched_random():

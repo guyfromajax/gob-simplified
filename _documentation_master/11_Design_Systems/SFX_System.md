@@ -35,9 +35,9 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 ## Dynamic HCO Defense — Drive-Start VO
 
 - **Status:** ✅ live (2026-07-14). Always-on for HCO drives (not gated by `GOB_DYNAMIC_HCO_DEFENSE`).
-- **Trigger:** the ball-handler starts a drive to the rim (the emitter's drive step, `gate_kind == "attack_drive_driver"`) — covers both drive-to-shoot and drive-and-dish.
+- **Trigger:** the ball-handler starts a drive to the rim — covers both drive-to-shoot and drive-and-dish.
 - **Files:** one of `sammy-drive.wav` / `braddock-drive.mp3` (`HCO_DRIVE_SFX_FILES`, vol `HCO_DRIVE_SFX_VOLUME = 0.8`). Picked by a **local seeded RNG** (crc32 of `driver_id | step_index | timestamp`) — SS&S-reproducible and it **never draws from the global stream**, so a cosmetic cue can never perturb shot outcomes.
-- **Timing:** `sfx_on_step_start` on the drive step — fires the instant the drive begins. Doesn't clobber an already-set step-start SFX on the same step.
+- **Timing:** `sfx_on_step_start` on the **drive-MOTION step** — i.e. the step whose *next* step is the `driver_gate` step (`_attack_drive.driver_gate`). The `driver_gate` step itself holds the driver already **arrived** at the rim (its coords are the destination; the drive motion is the tween *into* it, rendered on the prior step), so stamping the gate step fired the cue on arrival. Stamping the prior (motion) step fires it as the drive **begins**. Doesn't clobber an already-set step-start SFX.
 - **Path:** `skeleton_step_emitter` (render-only) stamps `step.start.sfx_on_step_start` → FE plays it.
 - **Planned companion (S2d):** `duke-great-stop.wav` on a **Tier-C** stop (defender wins, BH walled off 0–5 grid), fired at the driver-tween end (`sfx_on_ball_arrival`) so it lands on the actual wall-off, sequenced *after* the drive-start cue — held until S2d makes the visual stop real.
 

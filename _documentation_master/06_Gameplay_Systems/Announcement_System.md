@@ -15,7 +15,7 @@
    - **Variants:**
      - **Standard** — Single player portrait (left), caption bar (#jersey lastName + position), and event text (right). Used for all single-player result events (made shot, rebound, block, steal, fouls, turnovers, etc.).
      - **Foul (AND-1)** — Shooter portrait (left), center panel ("It's Good!" + "+ Free Throw" + "And one"), fouler portrait (right). Used only for made shot with shooting foul.
-   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **DOUBLE TEAM!** and other rare neutral cases. (Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot/**Batted Ball Out Of Bounds!** now route to the secondary tier — see below.)
+   - **No-player announcements:** When the payload has no `photoUrl` and no `lastName`, the portrait zone is hidden and the event text is centered. This applies to: **DOUBLE TEAM!** and other rare neutral cases. (Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot now route to the secondary tier — see below.)
    - **Data shapes:** Standard `{ type: 'standard', eventText, photoUrl, jersey, lastName, position }`. Foul `{ type: 'foul', foulEventText, shooterPhotoUrl, shooterJersey, shooterLastName, foulerPhotoUrl, foulerJersey, foulerLastName }`.
 
    **Secondary — Top-Edge Ribbon** (`#announcement-overlay-secondary`):
@@ -59,9 +59,10 @@
    | **Slow It Down** | offense | no | `gameAnnouncements.js` → `SLOW_IT_DOWN` |
    | **Quick Shot** | offense | no | `gameAnnouncements.js` → `QUICK_SHOT` |
    | **Final Shot** | offense | no | `gameAnnouncements.js` → `FINAL_SHOT` |
-   | **Batted Ball Out Of Bounds!** | offense (retains) | no | `gameAnnouncements.js` → `BATTED_OOB` / `RIM_RUNNER_BATTED_OOB`; `announcements.js` `announceFromTurnData` bat_oob path |
 
    Everything else stays on the **primary** center-court overlay. **AND-1 and the foul card stay primary.**
+
+   **Batted-OOB silence rule:** Ball-batted-out-of-bounds events no longer show primary or secondary announcement banners. The event still animates, retains possession for the offense, suppresses generic turnover announcements, writes text-scroll copy where applicable, and keeps the contact SFX from `batOobAnimation.js`.
 
    The Good Read / Bad Read decision pill (gold/red) ships on the secondary tier for the Fast Break! / No Fast Break RR decision. It uses the same visual vocabulary as the existing primary `.ann-decision-pill` and is anchored to the lower-right corner of the secondary ribbon.
 
@@ -297,7 +298,7 @@ When a steal leads to a fast break:
 - **Foul card (AND-1):** Shooter portrait (left, same dimensions), center panel with foul event text + `+ Free Throw` + `And one`, fouler portrait (right, **100×130px** with red border). Caption bars show jersey + last name; fouler caption uses red tint.
 
 **No-player announcements (primary):**
-- When `photoUrl` and `lastName` are both empty, the portrait zone is hidden (`.ann-card.standard-card.no-player .ann-portrait-zone { display: none }`) and the event text is centered. After the secondary-tier migration, this state is reached only for rare neutral / team-level events such as `DOUBLE TEAM!`. Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot/`Batted Ball Out Of Bounds!` now render in the secondary tier instead.
+- When `photoUrl` and `lastName` are both empty, the portrait zone is hidden (`.ann-card.standard-card.no-player .ann-portrait-zone { display: none }`) and the event text is centered. After the secondary-tier migration, this state is reached only for rare neutral / team-level events such as `DOUBLE TEAM!`. Press/Trap/Fast Break/Slow It Down/Quick Shot/Final Shot now render in the secondary tier instead. Batted-OOB is intentionally silent.
 
 #### Secondary — Top-Edge Ribbon
 
@@ -356,9 +357,9 @@ When a steal leads to a fast break:
   - `buildHeadshotInitialsInfo(player, teamSide)` — Low-level color/name descriptor from an already-resolved side + `gameStore.getColors()`.
   - `playAnnouncementSfx(kind)` — Plays `whistle-3.mp3` for `'shot_clock_violation'`, otherwise `whistle-1-lowervol.wav` at volume 0.7.
 - `FrontEnd/static/js/phaser/utils/gameAnnouncements.js`
-  - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `AIRBALL`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
+  - `announceGameEvent(eventType, turnData, scene, context)` — Central event router. Cases: `SHOT_MAKE`, `SHOT_MAKE_AND_ONE`, `FT_MAKE`, `FT_MISS`, `REBOUND` (delegates to `announceReboundHeadlineIfNeeded`, respects `_reboundHeadlineShown`), `FOUL_SHOOTING`, `FOUL_OFFENSIVE`, `FOUL_DEFENSIVE`, `CHARGE`, `BLOCKING_FOUL`, `BLOCK`, `AIRBALL`, `STEAL`, `TURNOVER`, `PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `RIM_RUNNER_BATTED_OOB`, `BATTED_OOB`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `DOUBLE_TEAM`.
   - `announceAirballIfNeeded(turnData, scene, context)` — Legacy shot-path helper; schema playback uses backend-stamped `[ball_flight]` announcements instead.
-  - Secondary-tier cases (`PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`, `BATTED_OOB`, `RIM_RUNNER_BATTED_OOB`) call `showSecondaryAnnouncement()`; everything else calls `showAnnouncement()` / `showAndOneAnnouncement()`. The `announceFromTurnData` bat_oob fallback path also routes through `showSecondaryAnnouncement()`.
+  - Secondary-tier cases (`PRESSURE_FCP`, `PRESSURE_HCT`, `FAST_BREAK`, `SLOW_IT_DOWN`, `QUICK_SHOT`, `FINAL_SHOT`, `DEFENSIVE_STOP`) call `showSecondaryAnnouncement()`; everything else calls `showAnnouncement()` / `showAndOneAnnouncement()`. `BATTED_OOB` and `RIM_RUNNER_BATTED_OOB` are intentional no-op announcement cases; the `announceFromTurnData` bat_oob fallback returns before generic turnover announcements but shows no banner.
 - `FrontEnd/static/js/phaser/animation/ballManager.js`
   - Shot make announcements (`"It's Good!"`, `"It's Good! And 1!"`) emitted when the ball reaches the rim.
   - `animateRebound` — calls `announceReboundHeadlineIfNeeded` when the rebounder tween completes (pass `turnData` from the MISS/BLOCK/rebound turn for idempotency).

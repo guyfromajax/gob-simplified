@@ -1786,8 +1786,8 @@ async function animateRimRunnerBatOob(
   });
 
   appendToTextScroll("Batted out of bounds.");
-  const { showAnnouncement } = await import("../utils/announcements.js");
-  showAnnouncement("Out of bounds!", "neutral", null);
+  // No visual announcement for batted-OOB; contact SFX remains in
+  // animateBattedBallOutOfBounds and the existing pacing delay is preserved.
   await new Promise((resolve) => {
     if (scene.time?.delayedCall) scene.time.delayedCall(650, resolve);
     else setTimeout(resolve, 650);

@@ -2025,15 +2025,23 @@ def build_skeleton_animation_steps(
                 step.setdefault("start", {})["sfx_on_step_start"] = {
                     "file": hot_read_clip, "event": "hot_read", "volume": 0.7,
                 }
-            # HCO drive-start VO: fire an announcer "drive!" cue the instant the ball-handler starts
-            # driving to the rim (gate_kind == "attack_drive_driver" tags the drive step). Local seeded
-            # pick → SS&S-reproducible, never touches the global RNG (cosmetic). Doesn't clobber an
-            # already-set step-start SFX (e.g. a hot-read on the same step).
-            if (gate_kind == "attack_drive_driver" and HCO_DRIVE_SFX_FILES
+            # HCO drive-start VO: fire an announcer "drive!" cue the instant the ball-handler STARTS
+            # driving. The driver_gate step holds the driver ALREADY at the destination — the drive
+            # MOTION is the tween INTO it, which renders on THIS step when the NEXT skeleton step is the
+            # driver_gate step. So stamp here (not on the gate step) → sfx_on_step_start fires as the
+            # drive begins, not on arrival. Local seeded pick → SS&S-reproducible, never touches the
+            # global RNG (cosmetic). Doesn't clobber an already-set step-start SFX.
+            _next_drive_meta = (
+                (skeleton_steps[i + 1].get("_attack_drive") or {})
+                if i + 1 < len(skeleton_steps) else {}
+            )
+            if (_next_drive_meta.get("driver_gate") and HCO_DRIVE_SFX_FILES
                     and "sfx_on_step_start" not in step.get("start", {})):
                 import zlib as _zlib
+                _driver_pos = _next_drive_meta.get("gate_driver_pos")
+                _driver_id = _player_id_at_pos(off_lineup, _driver_pos) if _driver_pos else gate_id
                 _seed = _zlib.crc32(
-                    f"{gate_id}|{i}|{(skeleton_steps[i] or {}).get('timestamp', 0)}".encode())
+                    f"{_driver_id}|{i}|{(skeleton_steps[i] or {}).get('timestamp', 0)}".encode())
                 step.setdefault("start", {})["sfx_on_step_start"] = {
                     "file": HCO_DRIVE_SFX_FILES[_seed % len(HCO_DRIVE_SFX_FILES)],
                     "event": "hco_drive", "volume": HCO_DRIVE_SFX_VOLUME,

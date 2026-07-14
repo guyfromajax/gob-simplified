@@ -143,14 +143,16 @@ export function announceGameEvent(eventType, turnData, scene, context = {}) {
       break;
 
     case 'RIM_RUNNER_BATTED_OOB':
-      showSecondaryAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
+      // Batted-OOB still animates and plays contact SFX, but no longer shows
+      // a secondary announcement.
       break;
 
     // Generic batted-ball-out-of-bounds (HCT §14 pass contest, etc.). Offense
     // retains; this is NOT a turnover, so the turnover announce is suppressed
     // (see finalizeTurnAfterAnimation / announceFromTurnData bat_oob guards).
     case 'BATTED_OOB':
-      showSecondaryAnnouncement("Batted Ball Out Of Bounds!", offenseTeam);
+      // Batted-OOB still animates and plays contact SFX, but no longer shows
+      // a secondary announcement.
       break;
 
     // ========== SITUATIONAL LOGIC (Q4/OT) — secondary tier ==========

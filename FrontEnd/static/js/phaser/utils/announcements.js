@@ -773,8 +773,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // and skip the turnover path (mirrors finalizeTurnAfterAnimation).
     if ((turnData.bat_oob || turnData.rim_runner_bat_oob) &&
         (turnData.result_type === 'DEAD BALL' || turnData.result_type === 'TURNOVER')) {
-      const offenseTeam = (turnData.offense_team_id === scene?.homeTeamId) ? 'home' : 'away';
-      showSecondaryAnnouncement("Batted Ball Out Of Bounds!", offenseTeam, null, scene ? { scene } : {});
+      // Keep suppressing generic turnover announcements, but intentionally
+      // show no batted-OOB banner. Contact SFX remains owned by batOobAnimation.
       return;
     }
 

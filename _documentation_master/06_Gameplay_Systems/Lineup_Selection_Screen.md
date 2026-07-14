@@ -112,10 +112,8 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
    | Chemistry | Pos 1 | Pos 2 | Pos 3 | Pos 4 | Pos 5 |
    |-----------|-------|-------|-------|-------|-------|
-   | > 20      | 1     | 1     | 1     | 1     | 2     |
-   | 16–20     | 1     | 1     | 1     | 1     | 3     |
-   | 11–15     | 1     | 1     | 1     | 2     | 3     |
-   | ≤ 10      | 1     | 1     | 1     | 3     | 3     |
+   | > 15      | 1     | 1     | 1     | 1     | 2     |
+   | ≤ 15      | 1     | 1     | 1     | 1     | 3     |
 
    TC is capped at 25; unparseable TC defaults to 12.
 
