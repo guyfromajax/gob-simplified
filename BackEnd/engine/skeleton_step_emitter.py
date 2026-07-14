@@ -1800,6 +1800,21 @@ def build_skeleton_animation_steps(
                     / float(PASS_GRID_SPOTS_PER_GAME_SECOND)
                 )
 
+        # DIAGNOSTIC (2026-07-13): a pass step with ball_pass_t == 0 falls to the 0.50s HCO floor →
+        # a dead hold (the "pause before the dish/shot"). Pin the sub-cause: missing owner ids/coords
+        # (block skipped) vs passer≈receiver (distance 0 → real flight time 0).
+        if is_pass_step and ball_pass_t <= 0.0:
+            _ps = start_coords.get(owner_id_start) if owner_id_start else None
+            _rs = start_coords.get(owner_id_end) if owner_id_end else None
+            _re = end_coords.get(owner_id_end) if owner_id_end else None
+            _resolved = bool(owner_id_start and owner_id_end and _ps and _rs and _re)
+            logging.warning(
+                "🎈 [PASS BALL_T=0] owner_start=%s owner_end=%s passer_coord=%s recv_start=%s recv_end=%s "
+                "→ ball-flight time 0 (%s) → step falls to the %.2fs floor (the pause)",
+                owner_id_start, owner_id_end, _ps, _rs, _re,
+                "passer≈receiver (dist 0)" if _resolved else "SKIPPED: missing owner id(s)/coord(s)",
+                HCO_STEP_T_FLOOR_GAME_SECONDS)
+
         # Shot steps should release as soon as the shooter reaches the shot
         # spot. Applying the generic HCO floor here creates visible dead-air
         # between the shooter settling and the [ball_flight] sub-step.
