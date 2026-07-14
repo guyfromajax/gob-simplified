@@ -498,7 +498,7 @@ def _resolve_hco_help_cutoff(
     too → stays a blow-by). The outcome maps to the SAME tier vocabulary as the primary contest, so
     S2d/S2b/S2e consume the demotion unchanged. See Dynamic_MM_Brief §S2c."""
     from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
-    from BackEnd.engine.cutoff_resolution import best_cutoff_on_drive, resolve_cutoff_contest
+    from BackEnd.engine.cutoff_resolution import best_cutoff_on_drive
 
     # Race only the OTHER defenders — the beaten primary is behind the play.
     race_coords = {p: c for p, c in def_coords.items() if p != primary_def_pos and c}
@@ -518,24 +518,23 @@ def _resolve_hco_help_cutoff(
     if not cutoff_pos or meet is None or cutoff_def is None:
         return None, "A", 1.0, None, None
 
-    outcome, ratio, _credited = resolve_cutoff_contest(
-        off_team, def_team, driver, cutoff_def, exclude_steal=True)
+    # Resolve the help collision through the SAME HCO drive contest as the primary (`clean_stop` + tuned
+    # `neutral_band` + team-eff mods) — a help cutoff IS just another BH-vs-defender drive collision, so it
+    # yields the identical tier vocabulary (incl. a `C` clean stop → great-stop SFX), not the narrower
+    # FB/HCT default. `best_cutoff_on_drive` stays the shared geometric reuse; only WHERE (the meet) is HCO.
+    tier, ratio, contact = _resolve_hco_drive_contest(driver, cutoff_def, off_team, def_team)
+    if tier == "A" and not contact:
+        # BH beats the help defender too → stays a clean blow-by (no demotion; primary stays the beaten man).
+        return None, "A", 1.0, None, None
     # Meet progress along driver_start→drive_end = the stop fraction for a demotion (S2d re-derives the
     # stop coord from it, landing back on the meet point since best_cutoff walks that exact segment).
     _path = _euclid(bh_start, drive_end)
     frac = (_euclid(bh_start, meet) / _path) if _path > 0 else float(ratio)
-    if outcome == "POS_O":
-        # BH beats the help too → still a clean blow-by (no demotion, primary stays the beaten man).
-        return None, "A", 1.0, None, None
-    if outcome == "D_FOUL":
-        # Shooting foul drawn on the help defender → A + foul (and-1 / FTs via S2b), like the primary.
-        return cutoff_pos, "A", 1.0, "D_FOUL", meet
-    if outcome == "NEUTRAL":
-        return cutoff_pos, "B", frac, None, meet
-    if outcome == "D_STOP":
-        return cutoff_pos, "C", frac, None, meet
-    # O_FOUL (charge) / DEAD BALL (lost handle) — terminal contact at the meet.
-    return cutoff_pos, "C", frac, outcome, meet
+    if tier == "A":
+        # D_FOUL on the help defender → blow-by that draws a shooting foul (and-1 / FTs via S2b), to the rim.
+        return cutoff_pos, "A", 1.0, contact, meet
+    # B (contested pull-up) / C (clean stop, or O_FOUL/DEAD BALL contact) → stop at the meet point.
+    return cutoff_pos, tier, frac, contact, meet
 
 
 def _resolve_hco_drive_contest(driver, primary_def, off_team, def_team):
@@ -941,7 +940,20 @@ def build_attack_drive_sequence(
                 ball_spot=destination_location,
             )
 
-        _help_race_coords = zone_def_positions  # S2c: race the zone help defenders to the drive path
+        # S2c: race the zone help defenders to the drive path. The matched-only `zone_def_positions`
+        # OMITS any zone defender whose area holds no offensive player — notably the rim protector on a
+        # cleared-paint drive (basketSpot is uncovered in the 2-3 shell), i.e. the exact help defender a
+        # rim blow-by should meet. Under the flag, fill those gaps with a rim-help coord so the race sees
+        # every defender. Flag-off + the legacy `help_def` path keep the original matched-only map
+        # (byte-identical); precise zone-anchor placement is S4 zone posture.
+        _help_race_coords = dict(zone_def_positions)
+        if _three_tier:
+            for _zpos in _OFFENSE_POSITIONS:
+                if def_lineup.get(_zpos) and _zpos not in _help_race_coords:
+                    _help_race_coords[_zpos] = get_defender_coords(
+                        drive_end, is_away_offense, aggression, destination_location, drive_end,
+                        is_ball_handler=False, ball_spot=destination_location,
+                    )
 
         help_def = _closest_defender_to_point(
             zone_def_positions,
@@ -1167,6 +1179,13 @@ def build_attack_drive_sequence(
                 drive_end,
                 is_ball_handler=(matched_off == ball_handler_pos),
                 ball_spot=destination_location,
+            )
+        elif is_zone_defense(defense_playcall) and _three_tier:
+            # Flag-on zone: an unmatched zone defender (rim protector on a cleared-paint drive) guards his
+            # AREA at the rim — count him as a rim guardian via the S2c-completed map, not center court.
+            # Flag-off keeps the legacy center-court default below (pre-existing; parity → S4 zone posture).
+            defender_end_coords[def_pos] = _help_race_coords.get(
+                def_pos, {"x": 50.0, "y": 25.0},
             )
         else:
             defender_end_coords[def_pos] = def_positions.get(

@@ -21,7 +21,6 @@ import {
   escapeHtml,
 } from "./matchupsUiShared.js";
 
-const SKIP_INTRO_KEY_PREFIX = "pregameSkipIntro_";
 const DONT_SHOW_KEY_PREFIX = "defenseMatchupsDontShow_";
 
 function ensureStyles() {
@@ -58,7 +57,6 @@ function ensureStyles() {
       opacity: 0; transition: opacity .45s ease .08s;
     }
     .pgxp-root[data-phase] .pgxp-records { opacity: 1; }
-    .pgxp-root[data-phase="matchups"] .pgxp-records { display: none; }
     .pgxp-rec {
       display: inline-flex; align-items: baseline; gap: 8px; padding: 0 18px;
       font-variant-numeric: tabular-nums;
@@ -177,9 +175,14 @@ function ensureStyles() {
     .dm-draghint svg { width: 15px; height: 15px; }
     .pgxp-foot {
       position: relative; z-index: 4; flex-shrink: 0;
-      display: flex; flex-direction: column-reverse; align-items: center; gap: 12px;
-      padding: 14px 22px 22px; min-height: 74px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 14px 22px 22px; min-height: 110px;
     }
+    .pgxp-instruction {
+      display: none; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: rgba(255,255,255,0.48);
+    }
+    .pgxp-root[data-phase="matchups"] .pgxp-instruction { display: block; }
     .pgxp-cta {
       font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 22px; letter-spacing: .06em; line-height: 1;
       height: 50px; padding: 0 34px; border-radius: 10px; border: none;
@@ -202,17 +205,6 @@ function ensureStyles() {
     }
     .pgxp-dontshow input:checked { background: #F79420; border-color: #F79420; }
     .pgxp-dontshow input:checked::after { content: '✓'; color: #15181f; font-size: 11px; font-weight: 900; }
-    .pgxp-skip {
-      position: absolute; right: 20px; bottom: 18px; z-index: 6;
-      display: inline-flex; align-items: center; gap: 7px;
-      font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-      color: rgba(255,255,255,0.40); background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 13px; cursor: pointer;
-    }
-    .pgxp-skip:hover { color: rgba(255,255,255,0.90); border-color: rgba(255,255,255,0.28); }
-    .pgxp-skip svg { width: 14px; height: 14px; }
-    .pgxp-root[data-phase="matchups"] .pgxp-skip,
-    .pgxp-root[data-phase="tipoff"] .pgxp-skip { display: none; }
     .pgxp-tipoff {
       position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center;
       background: radial-gradient(60% 60% at 50% 50%, rgba(52,236,39,0.14), rgba(5,6,10,0.96));
@@ -285,12 +277,10 @@ export function showPreGameExperience(gameId, scene, normalized) {
     </div>
     <div class="pgxp-board"></div>
     <div class="pgxp-foot">
+      <div class="pgxp-instruction">Drag your defenders to set matchups</div>
+      <button type="button" class="pgxp-cta">Submit & Tip Off</button>
       <label class="pgxp-dontshow"><input type="checkbox" id="pgxp-dont-show"> Don't show this pop up again this game</label>
-      <button type="button" class="pgxp-cta">Continue</button>
     </div>
-    <button type="button" class="pgxp-skip">Skip Intro
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l7 7-7 7M13 5l7 7-7 7"></path></svg>
-    </button>
     <div class="pgxp-tipoff"><div class="to">TIP OFF</div></div>
   `;
   document.body.appendChild(root);
@@ -324,7 +314,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
 
   function paintSlots() {
     const matchups = isMatchupsPhase();
-    const statsMode = matchups ? "game" : "season";
+    const statsMode = "season";
     const rtMode = "edge";
 
     root.querySelectorAll(".pgxp-pair").forEach((row, i) => {
@@ -400,7 +390,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
     root.dataset.phase = "reveal";
     title.textContent = `${String(awayName).toUpperCase()}  @  ${String(homeName).toUpperCase()}`;
     cta.classList.remove("show");
-    cta.textContent = "Set Defense Matchups";
+    cta.textContent = "Submit & Tip Off";
     board.classList.add("revealing");
     const pairs = [...root.querySelectorAll(".pgxp-pair")];
     pairs.forEach((p) => p.classList.remove("in", "spot"));
@@ -430,7 +420,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
       p.classList.add("in");
       p.classList.remove("spot");
     });
-    timers.push(setTimeout(() => cta.classList.add("show"), 350));
+    timers.push(setTimeout(toMatchups, 600));
   }
 
   function toMatchups() {
@@ -438,7 +428,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
     root.dataset.phase = "matchups";
     root.querySelectorAll(".pgxp-pair").forEach((p) => p.classList.add("in"));
     board.classList.remove("revealing");
-    title.textContent = "DEFENSE MATCHUPS";
+    title.textContent = `${String(awayName).toUpperCase()}  @  ${String(homeName).toUpperCase()}`;
     cta.textContent = "Submit & Tip Off";
     cta.classList.add("show");
     paintSlots();
@@ -480,21 +470,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
       opponentNatlRank,
     });
     renderBoard();
-
-    const skipPersisted =
-      typeof sessionStorage !== "undefined" &&
-      gameId &&
-      sessionStorage.getItem(SKIP_INTRO_KEY_PREFIX + gameId) === "1";
-
-    if (skipPersisted) toMatchups();
-    else toReveal();
-
-    root.querySelector(".pgxp-skip").addEventListener("click", () => {
-      if (gameId && typeof sessionStorage !== "undefined") {
-        sessionStorage.setItem(SKIP_INTRO_KEY_PREFIX + gameId, "1");
-      }
-      toMatchups();
-    });
+    toReveal();
 
     dontShow?.addEventListener("change", () => {
       playMatchupsUiSfx("click-tiny.wav");
@@ -502,7 +478,6 @@ export function showPreGameExperience(gameId, scene, normalized) {
 
     cta.addEventListener("click", () => {
       if (root.dataset.phase === "matchups") toTipoff(resolve);
-      else toMatchups();
     });
   });
 }

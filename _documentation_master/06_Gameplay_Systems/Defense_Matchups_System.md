@@ -44,7 +44,7 @@ Tutorial mode (`?mode=tutorial`) skips the UI entirely.
 Each tile:
 - Headshot (`getPlayerImageUrl(..., { size: 'card' })`)
 - Name (`#jersey`) · HT · WT (no class year)
-- Stat strip: **reveal** = season PPG/RPG/APG/DEF%; **matchups surfaces** = game PTS/REB/AST/DEF%
+- Stat strip: **franchise Q1 full-screen pre-game** = season PPG/RPG/APG/DEF%; **in-game modal** = game PTS/REB/AST/DEF%
 - RT: fixed outer gutter on all surfaces (Attribute Bar Scale; tabular-nums; sized for 3 digits) — no headshot badge
 ---
 

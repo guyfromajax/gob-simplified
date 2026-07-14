@@ -29,7 +29,7 @@ Sim Quarter / Sim Full Game never open matchups UI (unchanged gate: `shouldShowM
 3. Franchise Q1 → `showPreGameExperience(...)` (full-screen overlay)
 4. Phases:
    - **Reveal** — “Tale of the Tape”; rows land PG→C (~820ms apart) with `click-beep`
-   - **Matchups** — drag user defenders; CTA becomes **Submit & Tip Off**
+   - **Matchups** — reveal automatically settles into the interactive board; drag user defenders; CTA is **Submit & Tip Off**
    - **Tip Off** — veil ~1.9s, then dissolve; pregame bed stops; promise resolves → tip-off / Q1 animation
 5. Later Play Quarter entries use the **in-game modal** only (same cards, game stats, Strategic Modal box)
 
@@ -44,7 +44,9 @@ Sim Quarter / Sim Full Game never open matchups UI (unchanged gate: `shouldShowM
 
 **Reveal (lineup announce):** title `AWAY @ HOME`; records strip `#Rank W-L` away then home (FTD `natl_rank` + standings W-L); RT in fixed outer gutter (same as matchups — no headshot badge); center position label colored to favorability; season stats; no eyebrow / no rolling subline.
 
-**Matchups (pre-game step + in-game modal):** RT in the same fixed outer gutter (Attribute Bar Scale color, tabular-nums, 3-digit-safe); arrows only in center; **game** PTS/REB/AST/DEF%; drag keeps each player's own-position RT.
+**Pre-game matchups step:** header persists as `AWAY @ HOME`; records strip persists; center labels fade to arrows-only; RT remains in the same fixed outer gutter (Attribute Bar Scale color, tabular-nums, 3-digit-safe); **season** PPG/RPG/APG/DEF%; drag keeps each player's own-position RT.
+
+**In-game modal:** same card DNA, but contained in the Strategic Modal footprint and uses **game** PTS/REB/AST/DEF%.
 
 **RT gutter:** Home rows are `[RT][info+headshot]` (RT left-aligned); away rows are `[info+headshot][RT]` (RT right-aligned). Gutter width is fixed so every row’s RT shares the same x.
 Favorability: RT diff ≥ 3 → bold 4px border + arrow toward the stronger player in that team’s primary; within 2 → both white 2px borders + neutral silver double arrow.
@@ -66,7 +68,8 @@ Returns:
 | Surface | Stat strip | RT treatment |
 |---------|------------|--------------|
 | Pre-game **reveal** | **Season** PPG/RPG/APG/DEF% (FPD) | Fixed outer gutter (tall number) |
-| Pre-game **matchups** + in-game modal | **This game** PTS/REB/AST/DEF% | Fixed outer gutter (tall number) |
+| Pre-game **matchups** | **Season** PPG/RPG/APG/DEF% (FPD) | Fixed outer gutter (tall number) |
+| In-game modal | **This game** PTS/REB/AST/DEF% | Fixed outer gutter (tall number) |
 
 Team blocks also include `natl_rank`, `wins`, `losses` for the reveal records strip.
 
@@ -76,14 +79,13 @@ RT badge background uses Attribute Bar Scale (≤40 red, 41–60 yellow, 61–80
 
 ---
 
-## Suppression Flags (independent)
+## Suppression Flag
 
 | Key | Behavior |
 |-----|----------|
-| `pregameSkipIntro_<gameId>` | Skip Intro jumps to matchups; persists for this game so resume doesn’t replay the reveal |
 | `defenseMatchupsDontShow_<gameId>` | Suppresses **all** matchups UI for the rest of the game (Q1 + mid-game), same as before |
 
-`resetDontShowAgainFlag(gameId)` on a truly new game clears both of the above plus the announce-played key.
+`resetDontShowAgainFlag(gameId)` on a truly new game clears this plus the announce-played key. There is no separate Skip Intro path; the reveal always auto-settles into the matchups step.
 
 ---
 
@@ -126,7 +128,8 @@ Sounds live under `FrontEnd/static/sounds/` (gitignored; track via Git LFS when 
 - Franchise Q1 Play Quarter shows cinematic, not the old attribute-strip popup
 - Home left / away right; only user column drags; save still maps user pos → guarded opp pos
 - Pre-game season stats from FPD; in-game modal uses live game stats
-- Skip Intro and Don’t Show Again use the sessionStorage keys above
+- Reveal auto-settles into the matchups board; there is no Skip Intro button or second “set matchups” click
+- Don’t Show Again uses the sessionStorage key above
 - Pregame bed + click-beep on franchise Q1 only; bed stops at tip-off
 - Tutorial skips; single-game never gets the cinematic
 - Mid-game modal matches Defense Matchups in-game mock footprint (~1000px Strategic Modal)

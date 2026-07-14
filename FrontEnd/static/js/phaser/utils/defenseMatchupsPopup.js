@@ -24,7 +24,6 @@ import {
 
 const SESSION_STORAGE_KEY_PREFIX = "defenseMatchupsDontShow_";
 const ANNOUNCE_SESSION_KEY_PREFIX = "defenseMatchupsAnnouncePlayed_";
-const SKIP_INTRO_KEY_PREFIX = "pregameSkipIntro_";
 
 let dontShowAgainThisGame = false;
 
@@ -414,14 +413,12 @@ export async function showDefenseMatchupsPopup(gameId, scene, options = {}) {
 
 /**
  * Reset "don't show again" for a new game so the popup can show at Q1 start.
- * Also clears Skip Intro so a brand-new game can play the cinematic again.
  */
 export function resetDontShowAgainFlag(gameId) {
   dontShowAgainThisGame = false;
   if (typeof sessionStorage !== "undefined" && gameId) {
     sessionStorage.removeItem(SESSION_STORAGE_KEY_PREFIX + gameId);
     sessionStorage.removeItem(ANNOUNCE_SESSION_KEY_PREFIX + gameId);
-    sessionStorage.removeItem(SKIP_INTRO_KEY_PREFIX + gameId);
   }
 }
 
