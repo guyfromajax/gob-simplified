@@ -6023,67 +6023,147 @@ try:
     @app.get("/api/game/{game_id}/lineup-for-matchups")
     def get_lineup_for_matchups(game_id: str):
         """
-        Get lineup data for both teams with player stats and attributes for the matchups popup.
-        
-        Returns:
-            Dict with user_team and computer_team lineups, each containing:
-            - players: List of players with position, name, headshot, attributes, stats
-            - team_name: Team name
+        Get lineup data for both teams with player stats and attributes for the matchups popup
+        and franchise Q1 pre-game experience.
+
+        Returns home_team / away_team (display order) plus user_team_side, current_matchups,
+        and per-player jersey, RT, game PTS/REB/AST/DEF%, and season PPG/RPG/APG/DEF% when FPD exists.
         """
         from BackEnd.utils.game_id_utils import normalize_game_id
-        
+        from BackEnd.utils.shared import format_height
+        from BackEnd.utils.scouting_utils import _season_total_rebounds, _season_def_pct_whole
+
         game_id = normalize_game_id(game_id) if game_id else None
         if not game_id:
             raise HTTPException(status_code=400, detail="game_id is required")
-        
-        # Get game from memory or database
+
         gm = ongoing_games.get(game_id)
         if gm is None:
             raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
-        
-        # Determine user team side
+
         user_team_side = gm.game_state.get("user_team_side")
         if not user_team_side:
             raise HTTPException(status_code=400, detail="Cannot determine user team side")
-        
-        user_team = gm.home_team if user_team_side == "home" else gm.away_team
-        computer_team = gm.away_team if user_team_side == "home" else gm.home_team
-        
-        # Get current matchups (defaults if not set)
+
+        home_team = gm.home_team
+        away_team = gm.away_team
+        user_team = home_team if user_team_side == "home" else away_team
+        computer_team = away_team if user_team_side == "home" else home_team
+
         matchups = gm.game_state.get("man_defense_matchups", {
             "PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF", "C": "C"
         })
-        
-        def build_player_data(team, position):
-            """Build player data for a specific position"""
+
+        franchise_id = (
+            gm.game_state.get("franchise_id")
+            or getattr(gm.home_team, "franchise_id", None)
+            or getattr(gm.away_team, "franchise_id", None)
+            or None
+        )
+        if franchise_id is not None:
+            franchise_id = str(franchise_id)
+
+        franchise_week = None
+        season_by_pid: dict[str, dict] = {}
+        if franchise_id:
+            try:
+                fr = franchises_collection.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {"week": 1},
+                )
+                if fr:
+                    franchise_week = int(fr.get("week") or 1)
+            except Exception:
+                franchise_week = None
+            try:
+                pids = []
+                for team in (home_team, away_team):
+                    for pos in ("PG", "SG", "SF", "PF", "C"):
+                        pl = (team.lineup or {}).get(pos)
+                        if pl and getattr(pl, "player_id", None):
+                            pids.append(str(pl.player_id))
+                if pids:
+                    # FPD player_id is usually a string; tolerate ObjectId-shaped values.
+                    pid_query = list({*pids})
+                    for fpd in franchise_players_data_collection.find(
+                        {"franchise_id": franchise_id, "player_id": {"$in": pid_query}},
+                        {"player_id": 1, "season": 1},
+                    ):
+                        pid = str(fpd.get("player_id") or "")
+                        season_raw = fpd.get("season") or {}
+                        if pid and isinstance(season_raw, dict):
+                            season_by_pid[pid] = dict(season_raw)
+            except Exception:
+                season_by_pid = {}
+
+        def _rt_at_position(player, position: str) -> float:
+            # GameManager refreshes player.ratings in-memory; position_ratings is the load-time copy.
+            pr = getattr(player, "ratings", None) or getattr(player, "position_ratings", None) or {}
+            raw = pr.get(position) if isinstance(pr, dict) else None
+            try:
+                return round(float(raw), 1) if raw is not None else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+
+        def _game_rebounds(stats: dict) -> int:
+            if stats.get("REB") is not None and stats.get("REB") != "":
+                try:
+                    return int(stats.get("REB") or 0)
+                except (TypeError, ValueError):
+                    pass
+            try:
+                return int(stats.get("OREB") or 0) + int(stats.get("DREB") or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def build_player_data(team, position: str):
             player = team.lineup.get(position)
             if not player:
                 return None
-            
-            # Get attributes
+
             attrs = player.attributes
-            # Get game stats
-            stats = player.stats.get("game", {})
-            
-            # Calculate DEF% (defensive win percentage)
-            def_a = stats.get("DEF_A", 0)
-            def_s = stats.get("DEF_S", 0)
-            def_pct = round((def_s / def_a * 100)) if def_a > 0 else 0
-            
-            # Get NG as percentage (always use current NG, not anchor)
+            stats = player.stats.get("game", {}) or {}
+            def_a = int(stats.get("DEF_A", 0) or 0)
+            def_s = int(stats.get("DEF_S", 0) or 0)
+            def_pct = int(round((def_s / def_a * 100))) if def_a > 0 else 0
             ng = attrs.get("NG", 1.0)
-            ng_percent = round(ng * 100)
-            
-            # ✅ ANCHOR VALUES: Use anchor_ prefixed attributes (base values, independent of NG effects)
-            # Fallback to current values if anchor not available
-            from BackEnd.utils.shared import format_height
+            try:
+                ng_percent = round(float(ng) * 100)
+            except (TypeError, ValueError):
+                ng_percent = 100
+
+            pid = str(player.player_id)
+            season = season_by_pid.get(pid) or {}
+            try:
+                gp = int(season.get("GP") or 0)
+            except (TypeError, ValueError):
+                gp = 0
+            try:
+                season_pts = float(season.get("PTS") or 0)
+            except (TypeError, ValueError):
+                season_pts = 0.0
+            try:
+                season_ast = float(season.get("AST") or 0)
+            except (TypeError, ValueError):
+                season_ast = 0.0
+            season_reb = _season_total_rebounds(season) if season else 0.0
+            if gp > 0:
+                ppg = round(season_pts / gp, 1)
+                rpg = round(season_reb / gp, 1)
+                apg = round(season_ast / gp, 1)
+            else:
+                ppg = rpg = apg = 0.0
+            season_def_pct = _season_def_pct_whole(season) if season else 0
+
             return {
-                "player_id": player.player_id,
+                "player_id": pid,
                 "position": position,
                 "name": player.name,
+                "jersey": getattr(player, "jersey", None),
                 "height": format_height(getattr(player, "height", None)),
                 "weight": getattr(player, "weight", None) or "--",
-                "headshot_url": f"/images/players/{player.player_id}.png",
+                "rt": _rt_at_position(player, position),
+                "headshot_url": f"/images/players/{pid}.png",
                 "attributes": {
                     "ID": attrs.get("anchor_ID", attrs.get("ID", 0)),
                     "OD": attrs.get("anchor_OD", attrs.get("OD", 0)),
@@ -6091,58 +6171,75 @@ try:
                     "ST": attrs.get("anchor_ST", attrs.get("ST", 0)),
                     "ND": attrs.get("anchor_ND", attrs.get("ND", 0)),
                     "IQ": attrs.get("anchor_IQ", attrs.get("IQ", 0)),
-                    "NG": ng_percent,  # NG is always current (energy level)
-                    "DEF%": def_pct  # User team only
+                    "NG": ng_percent,
+                    "DEF%": def_pct,
                 },
+                "game_stats": {
+                    "PTS": int(stats.get("PTS", 0) or 0),
+                    "REB": _game_rebounds(stats),
+                    "AST": int(stats.get("AST", 0) or 0),
+                    "DEF%": def_pct,
+                },
+                "season_stats": {
+                    "PPG": ppg,
+                    "RPG": rpg,
+                    "APG": apg,
+                    "DEF%": season_def_pct,
+                    "GP": gp,
+                },
+                # Legacy keys kept for any older clients during rollout
                 "stats": {
-                    "SC": attrs.get("anchor_SC", attrs.get("SC", 0)),  # Computer team only
-                    "SH": attrs.get("anchor_SH", attrs.get("SH", 0)),  # Computer team only
+                    "SC": attrs.get("anchor_SC", attrs.get("SC", 0)),
+                    "SH": attrs.get("anchor_SH", attrs.get("SH", 0)),
                     "AG": attrs.get("anchor_AG", attrs.get("AG", 0)),
                     "ST": attrs.get("anchor_ST", attrs.get("ST", 0)),
                     "ND": attrs.get("anchor_ND", attrs.get("ND", 0)),
                     "IQ": attrs.get("anchor_IQ", attrs.get("IQ", 0)),
-                    "NG": ng_percent,  # NG is always current (energy level)
-                    "PTS": stats.get("PTS", 0)  # Computer team only
-                }
+                    "NG": ng_percent,
+                    "PTS": int(stats.get("PTS", 0) or 0),
+                },
             }
-        
-        # Build user team lineup
-        user_players = []
-        for pos in ["PG", "SG", "SF", "PF", "C"]:
-            player_data = build_player_data(user_team, pos)
-            if player_data:
-                user_players.append(player_data)
-        
-        # Build computer team lineup
-        computer_players = []
-        for pos in ["PG", "SG", "SF", "PF", "C"]:
-            player_data = build_player_data(computer_team, pos)
-            if player_data:
-                # Determine which user position is guarding this computer position
-                # Reverse lookup: find user_pos where matchups[user_pos] == computer_pos
-                guarding_user_pos = None
-                for user_pos, guarded_pos in matchups.items():
-                    if guarded_pos == pos:
-                        guarding_user_pos = user_pos
-                        break
-                
-                player_data["guarding_user_position"] = guarding_user_pos or pos  # Fallback to same position
-                computer_players.append(player_data)
-        
+
+        def build_team_block(team):
+            players = []
+            for pos in ("PG", "SG", "SF", "PF", "C"):
+                player_data = build_player_data(team, pos)
+                if player_data:
+                    players.append(player_data)
+            return {
+                "team_name": team.name,
+                "team_id": getattr(team, "team_id", None),
+                "players": players,
+                "primary_color": getattr(team, "primary_color", "#000000"),
+                "secondary_color": getattr(team, "secondary_color", "#ffffff"),
+            }
+
+        home_block = build_team_block(home_team)
+        away_block = build_team_block(away_team)
+        user_block = home_block if user_team_side == "home" else away_block
+        computer_block = away_block if user_team_side == "home" else home_block
+
+        # Annotate computer players with which user position currently guards them
+        for player_data in computer_block["players"]:
+            pos = player_data["position"]
+            guarding_user_pos = None
+            for user_pos, guarded_pos in matchups.items():
+                if guarded_pos == pos:
+                    guarding_user_pos = user_pos
+                    break
+            player_data["guarding_user_position"] = guarding_user_pos or pos
+
         return {
-            "user_team": {
-                "team_name": user_team.name,
-                "players": user_players,
-                "primary_color": getattr(user_team, "primary_color", "#000000"),
-                "secondary_color": getattr(user_team, "secondary_color", "#ffffff")
-            },
-            "computer_team": {
-                "team_name": computer_team.name,
-                "players": computer_players,
-                "primary_color": getattr(computer_team, "primary_color", "#000000"),
-                "secondary_color": getattr(computer_team, "secondary_color", "#ffffff")
-            },
-            "current_matchups": matchups
+            "user_team_side": user_team_side,
+            "home_team": home_block,
+            "away_team": away_block,
+            "user_team": user_block,
+            "computer_team": computer_block,
+            "current_matchups": matchups,
+            "franchise_id": franchise_id,
+            "franchise_week": franchise_week,
+            "is_franchise": bool(franchise_id),
+            "is_tournament_context": bool(franchise_week and franchise_week >= 27),
         }
     
     

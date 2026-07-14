@@ -3054,7 +3054,7 @@ export function createGameScene(Phaser) {
               if (shouldGateCourtEntryVisuals) {
                 hideCourtEntryVisualGate();
               }
-              await showDefenseMatchupsPopup(this.gameId, this);
+              await showDefenseMatchupsPopup(this.gameId, this, { isQ1Start });
               if (shouldGateCourtEntryVisuals) {
                 showCourtEntryVisualGate();
               }

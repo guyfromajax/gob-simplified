@@ -677,6 +677,7 @@ def _resolve_moment(
     def_mod=None,
     off_mod=None,
     event_scalar: float = 1.0,
+    clean_stop: bool = False,
 ) -> Tuple[str, float, Any]:
     """§5 Pressure / Trap banded outcome (D8 attribute-driven).
 
@@ -731,7 +732,14 @@ def _resolve_moment(
             0.0, HCT_D8_P_EVENT_MAX,
         )
         if random.random() >= p_event:
-            # No-event: BH retains; fall through to the normal advance/re-read.
+            # No-event: the defender WON the matchup but forced no TO/foul. For an HCO drive
+            # (`clean_stop=True`) this is a clean defensive STOP — distinct from the middle-band
+            # contested NEUTRAL below (:785) — graded by how decisively he won (`m_norm`, already
+            # computed → no new roll). `score_ratio` = the drive-path fraction the BH reached before
+            # the wall-off (lower = stopped earlier). FB/HCT (default `clean_stop=False`) keep the
+            # original `NEUTRAL, 1.0` → byte-identical. See projects/attack_contest_unification.md.
+            if clean_stop:
+                return "D_STOP", _clampf(1.0 - m_norm, 0.0, 1.0), None
             return "NEUTRAL", 1.0, None
 
         credited = _steal_credit_defender(bh_defender, trapper)

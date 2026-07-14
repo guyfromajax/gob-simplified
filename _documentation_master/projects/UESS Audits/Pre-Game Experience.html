@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-Game Experience — GOB</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #0b0d14;
+    --hair:    rgba(255,255,255,0.08);
+    --card-border: rgba(255,255,255,0.10);
+    --green:   #34EC27;
+    --orange:  #F79420;
+    --w90: rgba(255,255,255,0.90);
+    --w70: rgba(255,255,255,0.70);
+    --w55: rgba(255,255,255,0.55);
+    --w40: rgba(255,255,255,0.40);
+    /* GOB position color map (styleguide + defenseMatchupsPopup) */
+    --pos-PG: #4A90D9;
+    --pos-SG: #7B5EA7;
+    --pos-SF: #3A8C4A;
+    --pos-PF: #C0392B;
+    --pos-C:  #D4A017;
+    --bebas: 'Bebas Neue', sans-serif;
+    --inter: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--inter); background: #05060a; color: var(--w90); -webkit-font-smoothing: antialiased; }
+
+  /* mock chrome (not part of the experience) */
+  .mock-note {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 11.5px; letter-spacing: .04em; color: var(--w55);
+    padding: 10px 16px; background: #0b0d14; border-bottom: 1px solid var(--hair);
+  }
+  .mock-note .tag { color: var(--orange); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; font-size: 10.5px; }
+  .mock-note b { color: var(--w90); font-weight: 700; }
+  .mock-note .replay { margin-left: auto; font-family: var(--bebas); font-size: 15px; letter-spacing: .06em;
+    color: var(--w70); border: 1px solid var(--card-border); background: rgba(255,255,255,0.05);
+    padding: 5px 14px 3px; border-radius: 8px; cursor: pointer; }
+  .mock-note .replay:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+
+  /* ── the stage (court.html is a full-bleed dark page, no shell) ── */
+  .stage {
+    position: relative;
+    height: calc(100vh - 42px);
+    min-height: 640px;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 50% 42%, rgba(39,64,142,0.12), transparent 62%),
+      radial-gradient(90% 60% at 50% 120%, rgba(247,148,32,0.05), transparent 60%),
+      var(--bg);
+    display: flex; flex-direction: column;
+    isolation: isolate;
+  }
+  /* faint court arc lines — architectural, not drawn imagery */
+  .stage::before {
+    content: ''; position: absolute; left: 50%; bottom: -46%;
+    width: 92%; aspect-ratio: 1/1; transform: translateX(-50%);
+    border-radius: 50%; border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+    pointer-events: none;
+  }
+
+  /* header band */
+  .pg-head {
+    position: relative; z-index: 3;
+    text-align: center; padding: 26px 20px 6px;
+    flex-shrink: 0;
+  }
+  .pg-eyebrow {
+    font-size: 11.5px; font-weight: 800; letter-spacing: .34em; text-transform: uppercase;
+    color: var(--w40); opacity: 0; transform: translateY(-6px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .pg-title {
+    font-family: var(--bebas); font-size: clamp(34px, 5vw, 60px); line-height: .92;
+    letter-spacing: .02em; color: #fff; margin-top: 4px;
+    opacity: 0; transform: translateY(-8px);
+    transition: opacity .5s ease .06s, transform .5s ease .06s;
+  }
+  .stage[data-phase] .pg-eyebrow,
+  .stage[data-phase] .pg-title { opacity: 1; transform: none; }
+  .pg-matchup-sub {
+    margin-top: 8px; font-size: 12.5px; color: var(--w55); letter-spacing: .02em;
+    min-height: 16px;
+  }
+  .pg-matchup-sub b { color: var(--w90); font-weight: 700; }
+
+  /* board = 5 face-off rows */
+  .board {
+    position: relative; z-index: 2;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 14px; padding: 4px clamp(14px, 4vw, 54px) 8px;
+    max-width: 1200px; width: 100%; margin: 0 auto;
+  }
+
+  .pair {
+    display: grid; grid-template-columns: 1fr 68px 1fr;
+    align-items: center; gap: 0;
+    position: relative;
+    opacity: 0;
+    transition: opacity .45s ease, filter .45s ease;
+  }
+  .pair:not(:last-child)::after { content:''; position:absolute; left:7%; right:7%; bottom:-8px; height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.13) 22%, rgba(255,255,255,0.13) 78%, transparent); }
+  /* entrance: sides slide toward center */
+  .pair .side-mine  { transform: translateX(-40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); }
+  .pair .side-opp   { transform: translateX(40px);  transition: transform .55s cubic-bezier(.2,.7,.2,1); }
+  .pair .vs         { transform: scale(.4); opacity: 0; transition: transform .4s cubic-bezier(.2,.9,.3,1.3) .1s, opacity .4s ease .1s; }
+  .pair.in { opacity: 1; }
+  .pair.in .side-mine, .pair.in .side-opp { transform: none; }
+  .pair.in .vs { transform: none; opacity: 1; }
+  /* spotlight: the just-arrived pair pops, prior pairs recede a touch */
+  .pair.spot { filter: none; }
+  .board.revealing .pair.in:not(.spot) { filter: brightness(.62) saturate(.85); }
+  .pair.spot .side-mine, .pair.spot .side-opp { animation: pairPop .5s cubic-bezier(.2,.8,.3,1.2); }
+  @keyframes pairPop { 0%{ transform: scale(1);} 40%{ transform: scale(1.035);} 100%{ transform: scale(1);} }
+  /* resting pulse on the bold (higher-rated) border */
+  .ph.bold { animation: borderPulse 1.9s ease-in-out infinite; }
+  @keyframes borderPulse {
+    0%,100% { box-shadow: 0 8px 20px rgba(0,0,0,0.4), 0 0 6px 1px var(--glow, transparent); }
+    50%     { box-shadow: 0 8px 20px rgba(0,0,0,0.4), 0 0 15px 4px var(--glow, transparent); }
+  }
+  @media (prefers-reduced-motion: reduce) { .ph.bold { animation: none; } }
+
+  /* player tile (reuses scouting card DNA, oriented for a face-off) */
+  .ptile { display: flex; align-items: center; gap: 13px; }
+  .side-mine .ptile { flex-direction: row-reverse; justify-content: flex-start; text-align: right; }
+  .side-opp  .ptile { flex-direction: row; justify-content: flex-start; text-align: left; }
+
+  .ph {
+    position: relative; flex-shrink: 0;
+    width: clamp(64px, 7vw, 88px); aspect-ratio: 1/1; border-radius: 14px;
+    overflow: hidden; background: linear-gradient(180deg, #1b2130, #10141d);
+    border: 2px solid var(--pc, rgba(255,255,255,0.16));
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  }
+  .ph img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+  .ph .sil { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
+  .ph .sil svg { width: 78%; height: 88%; opacity: .8; }
+  .ph .posbadge {
+    position: absolute; top: 5px; left: 5px;
+    font-family: var(--bebas); font-size: 13px; line-height: 1; letter-spacing: .04em;
+    padding: 3px 6px 1px; border-radius: 5px; color: #0b0d14; background: var(--pc, #fff);
+  }
+
+  .pinfo { min-width: 0; }
+  .pinfo .nm { font-size: clamp(13px, 1.5vw, 16px); font-weight: 700; color: #fff; line-height: 1.1; white-space: nowrap; }
+  .pinfo .nm .jn { color: var(--w55); font-weight: 600; font-size: .85em; }
+  .pinfo .nm .meta { color: var(--w55); font-weight: 600; font-size: 11.5px; }
+  .pinfo .statline {
+    margin-top: 6px; display: flex; gap: 12px; justify-content: flex-end;
+    font-variant-numeric: tabular-nums;
+  }
+  .pinfo .st { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .side-opp .pinfo .statline { justify-content: flex-start; }
+  .pinfo .st .sv { font-size: 12.5px; font-weight: 700; color: var(--w90); }
+  .pinfo .st .sl { font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--w40); }
+  .pinfo .rt { font-family: var(--bebas); font-size: clamp(24px, 3vw, 34px); line-height: .8; }
+
+  /* center vs cell */
+  .vs { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .vs .poslabel {
+    font-family: var(--bebas); font-size: 15px; line-height: 1; letter-spacing: .06em;
+    padding: 4px 9px 2px; border-radius: 7px; color: #0b0d14; background: var(--pc, #fff);
+  }
+  .vs .vstext { font-family: var(--bebas); font-size: 20px; line-height: 1; letter-spacing: .06em; color: var(--pc, var(--w40)); }
+  .rowpos { font-family: var(--bebas); font-size: clamp(18px,2.2vw,26px); line-height: 1; letter-spacing: .04em; color: var(--pc,#fff); text-align: center; }
+  .favarrow { display: flex; }
+  .favarrow svg { width: 32px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── matchups mode overlays the board ── */
+  .stage[data-phase="matchups"] .vs .vstext { display: none; }
+  .connector svg { width: 20px; height: 20px; color: var(--pc, var(--w40)); }
+  .stage[data-phase="matchups"] .pair { grid-template-columns: 1fr 68px 1fr; }
+
+  /* opponent tiles get a guarded-by border in matchups mode */
+  .stage[data-phase="matchups"] .side-opp .ptile { position: relative; }
+
+  /* my defenders become draggable in matchups mode */
+  .stage[data-phase="matchups"] .side-mine .ptile {
+    cursor: grab; border-radius: 14px; padding: 6px 8px; margin: -6px -8px;
+    transition: background .15s, box-shadow .15s;
+  }
+  .stage[data-phase="matchups"] .side-mine .ptile:hover { background: rgba(255,255,255,0.04); }
+  .side-mine .ptile.dragging { opacity: .45; cursor: grabbing; }
+  .side-mine .ptile.dropcue { background: rgba(255,255,255,0.09); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); }
+  .draghint {
+    display: none; position: absolute; top: 50%; left: -30px; transform: translateY(-50%);
+    color: var(--w40);
+  }
+  .stage[data-phase="matchups"] .side-mine .ptile .draghint { display: block; }
+  .draghint svg { width: 15px; height: 15px; }
+
+  /* ── footer action row ── */
+  .pg-foot {
+    position: relative; z-index: 4; flex-shrink: 0;
+    display: flex; flex-direction: column-reverse; align-items: center; justify-content: center; gap: 12px;
+    padding: 14px 22px 22px; min-height: 74px;
+  }
+  .pg-cta {
+    font-family: var(--bebas); font-size: 22px; letter-spacing: .06em; line-height: 1;
+    height: 50px; padding: 0 34px; border-radius: 10px; border: none;
+    background: var(--green); color: #0a1f06; cursor: pointer;
+    box-shadow: 0 10px 26px rgba(52,236,39,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+    opacity: 0; transform: translateY(10px) scale(.98); pointer-events: none;
+    transition: opacity .4s ease, transform .4s ease, filter .15s;
+  }
+  .pg-cta.show { opacity: 1; transform: none; pointer-events: auto; }
+  .pg-cta:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  .pg-cta:active { transform: translateY(1px); }
+
+  .dontshow {
+    display: none; align-items: center; gap: 8px; font-size: 12px; color: var(--w55); cursor: pointer;
+    user-select: none;
+  }
+  .stage[data-phase="matchups"] .dontshow { display: inline-flex; }
+  .dontshow input { appearance: none; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--w40); display: grid; place-items: center; cursor: pointer; }
+  .dontshow input:checked { background: var(--orange); border-color: var(--orange); }
+  .dontshow input:checked::after { content: '✓'; color: #15181f; font-size: 11px; font-weight: 900; }
+
+  /* discreet skip, bottom-right */
+  .skip {
+    position: absolute; right: 20px; bottom: 18px; z-index: 6;
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--w40); background: rgba(255,255,255,0.04);
+    border: 1px solid var(--hair); border-radius: 8px; padding: 8px 13px; cursor: pointer;
+    transition: color .15s, border-color .15s, opacity .3s;
+  }
+  .skip:hover { color: var(--w90); border-color: rgba(255,255,255,0.28); }
+  .skip svg { width: 14px; height: 14px; }
+  .stage[data-phase="matchups"] .skip,
+  .stage[data-phase="tipoff"] .skip { display: none; }
+
+  /* tip-off flash */
+  .tipoff-veil {
+    position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(60% 60% at 50% 50%, rgba(52,236,39,0.14), rgba(5,6,10,0.96));
+    opacity: 0; pointer-events: none; transition: opacity .4s ease;
+  }
+  .stage[data-phase="tipoff"] .tipoff-veil { opacity: 1; }
+  .tipoff-veil .to {
+    font-family: var(--bebas); font-size: clamp(48px, 9vw, 120px); letter-spacing: .04em; color: #fff;
+    text-shadow: 0 0 40px rgba(52,236,39,0.4);
+    transform: scale(.8); transition: transform .5s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .stage[data-phase="tipoff"] .tipoff-veil .to { transform: none; }
+  .stage.dissolved .tipoff-veil { opacity: 0; }
+
+  /* audio cue markers (design annotation only — no audio in mock) */
+  .cue { position: absolute; z-index: 7; font-size: 9.5px; font-family: ui-monospace, Menlo, monospace;
+    color: rgba(247,148,32,0.75); letter-spacing: .02em; pointer-events: none; opacity: 0; transition: opacity .3s; }
+  body.show-cues .cue.on { opacity: 1; }
+  .cue-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  /* handoff notes below the stage */
+  .notes { background: #0b0d14; border-top: 1px solid var(--hair); padding: 22px clamp(16px,4vw,48px) 40px; }
+  .notes h3 { font-family: var(--bebas); font-size: 22px; letter-spacing: .04em; color: #fff; margin-bottom: 12px; }
+  .notes .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .notes .n { border: 1px solid var(--card-border); border-radius: 12px; padding: 14px 16px; background: rgba(255,255,255,0.02); }
+  .notes .n .k { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--orange); margin-bottom: 7px; }
+  .notes .n p { font-size: 12.5px; line-height: 1.55; color: var(--w70); }
+  .notes .n p + p { margin-top: 7px; }
+  .notes code { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--w90); background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; }
+  .notes b { color: var(--w90); font-weight: 700; }
+
+  @media (max-width: 720px) {
+    .pinfo .statline { gap: 7px; }
+    .pinfo .st .sv { font-size: 11px; }
+    .pair { grid-template-columns: 1fr 50px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="mock-note">
+    <span class="tag">Prototype</span>
+    <span><b>Pre-Game Experience</b> — inserted between Set Lineup and tip-off. Tale-of-the-tape reveal → defense matchups → Submit &amp; Tip Off.</span>
+    <label class="cue-toggle" style="margin-left:auto"><input type="checkbox" id="cueToggle"> <span style="font-size:11px;color:var(--w55)">show audio cue markers</span></label>
+    <button class="replay" id="replayBtn">↻ Replay</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="pg-head">
+      <div class="pg-eyebrow" id="eyebrow">Tale of the Tape</div>
+      <div class="pg-title" id="title">STARTING FIVES</div>
+      <div class="pg-matchup-sub" id="sub"></div>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <div class="pg-foot">
+      <label class="dontshow"><input type="checkbox" id="dontShow"> Don't show this pop up again this game</label>
+      <button class="pg-cta" id="cta">Continue</button>
+    </div>
+
+    <div class="skip" id="skip">Skip Intro
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l7 7-7 7M13 5l7 7-7 7"></path></svg>
+    </div>
+
+    <!-- audio cue annotations -->
+    <div class="cue on" id="cue-intro" style="top:80px;left:50%;transform:translateX(-50%)">♪ intro sting + crowd swell</div>
+    <div class="cue" id="cue-reveal" style="top:120px;right:24px">♪ click-beep as each matchup lands (×5, PG→C)</div>
+    <div class="cue" id="cue-matchups" style="top:80px;left:24px">♪ announcer: "DEFENSE MATCHUPS"</div>
+    <div class="cue" id="cue-tipoff" style="bottom:90px;left:50%;transform:translateX(-50%)">♪ tip-off horn → gameplay music starts</div>
+
+    <div class="tipoff-veil"><div class="to">TIP OFF</div></div>
+  </div>
+
+  <div class="notes">
+    <h3>Build &amp; Handoff Notes</h3>
+    <div class="grid">
+      <div class="n">
+        <div class="k">Where it lives</div>
+        <p>This is the <b>Q1-start instance</b> of the defense matchups flow, expanded into a cinematic. It runs on <code>court.html</code> after Set Lineup hands off, before tip-off — replacing (not adding to) the current Q1 popup.</p>
+        <p>Reuses <code>GET /api/game/{id}/lineup-for-matchups</code> and <code>POST /api/save-man-defense-matchups</code>. No new endpoints.</p>
+      </div>
+      <div class="n">
+        <div class="k">Suppression contract</div>
+        <p><b>Skip Intro</b> jumps past the reveal to the matchups step — submit is still required. Skip state stored per game (<code>pregameSkipIntro_&lt;gameId&gt;</code>) so a mid-game resume doesn't replay it.</p>
+        <p>The <b>"Don't show again this game"</b> checkbox is the existing one (<code>defenseMatchupsDontShow_&lt;gameId&gt;</code>). Checking it here suppresses the in-game modal at later breaks/timeouts/foul-outs, exactly as today.</p>
+      </div>
+      <div class="n">
+        <div class="k">Matchups behavior (unchanged)</div>
+        <p>Drag within your own column to reorder defenders; your defender in slot <em>i</em> guards the opponent at position <em>i</em>. Opponent tile border + connector recolor to the assigned defender's position color.</p>
+        <p>Matchups still reset to defaults at each subsequent break — this screen only owns Q1.</p>
+      </div>
+      <div class="n">
+        <div class="k">Audio (your assets)</div>
+        <p><b>pregame-regular-season.mp3</b> plays across the <b>entire</b> pre-game experience — the lineup reveal, the defense-matchups step, and the Tip Off card — then stops as gameplay begins. It must <b>not</b> play during in-game defense-matchups modals.</p>
+        <p>Cue markers (toggle above) show SFX layered on top of the track: a <b>click-beep</b> as each of the 5 matchups lands. Gameplay BG music starts when the Tip Off card auto-dissolves.</p>
+      </div>
+      <div class="n">
+        <div class="k">Cards &amp; tokens</div>
+        <p>Player tiles reuse the Scouting card DNA: headshot, position badge, name (#jersey), HT·WT·YR, RT, and PPG/RPG/APG/DEF%. RT color follows the canonical <b>Attribute Bar Scale</b> (81+ blue, 61–80 green, 41–60 yellow, ≤40 red). Class year is always the 2-letter form.</p>
+        <p>Images via <code>getPlayerImageUrl(player_id, {size:'card'})</code>; both teams have images. Placeholders shown here.</p>
+        <p><b>Stat source differs by context:</b> the pre-game overlay shows <b>season</b> stats (PPG/RPG/APG/DEF%). Every <b>in-game</b> defense-matchups instance (quarter breaks, timeouts, foul-outs) must wire these same fields to <b>current-game</b> stats instead.</p>
+      </div>
+      <div class="n">
+        <div class="k">Accessibility / perf</div>
+        <p><code>prefers-reduced-motion</code> skips straight to the settled board (no reveal animation). All images lazy + explicitly sized. Runs entirely on data already fetched for the matchups popup — no added load.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const SIL = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="34" r="19" fill="rgba(255,255,255,0.16)"/><path d="M12 100c0-22 17-36 38-36s38 14 38 36" fill="rgba(255,255,255,0.16)"/></svg>`;
+
+  const POS = ['PG','SG','SF','PF','C'];
+
+  // Your team (Four Corners) + opponent (Ann Arbor). Placeholder per-game stats.
+  const MINE = [
+    { pos:'PG', name:'Marcus Reed',    jersey:4,  yr:'JR', ht:`6'1"`,  wt:185, rt:78, ppg:14.2, rpg:3.1, apg:6.8, def:48, id:'m-pg' },
+    { pos:'SG', name:'Devon Pratt',    jersey:22, yr:'SO', ht:`6'4"`,  wt:200, rt:71, ppg:16.5, rpg:3.8, apg:2.4, def:45, id:'m-sg' },
+    { pos:'SF', name:'Isaiah Frank',   jersey:31, yr:'SR', ht:`6'7"`,  wt:215, rt:88, ppg:18.1, rpg:6.2, apg:3.0, def:61, id:'m-sf' },
+    { pos:'PF', name:'Terrence Wu',    jersey:45, yr:'JR', ht:`6'9"`,  wt:245, rt:82, ppg:12.4, rpg:9.1, apg:1.6, def:64, id:'m-pf' },
+    { pos:'C',  name:'Mike Soto',      jersey:55, yr:'SR', ht:`6'11"`, wt:265, rt:91, ppg:11.8, rpg:10.4,apg:1.2, def:70, id:'m-c' },
+  ];
+  const OPP = [
+    { pos:'PG', name:'Matthias Whitney',jersey:38, yr:'JR', ht:`6'3"`,  wt:219, rt:54, ppg:8.4,  rpg:2.1, apg:5.6, def:41, id:'o-pg' },
+    { pos:'SG', name:'Eddie Terrell',   jersey:13, yr:'SR', ht:`5'10"`, wt:182, rt:71, ppg:12.7, rpg:3.0, apg:3.2, def:44, id:'o-sg' },
+    { pos:'SF', name:'Cortez Conway',   jersey:53, yr:'SR', ht:`6'6"`,  wt:229, rt:85, ppg:16.1, rpg:6.4, apg:2.8, def:58, id:'o-sf' },
+    { pos:'PF', name:`Anton O'Brien`,   jersey:42, yr:'SR', ht:`6'11"`, wt:290, rt:97, ppg:19.5, rpg:11.2,apg:1.9, def:67, id:'o-pf' },
+    { pos:'C',  name:'Landon Gordon',   jersey:66, yr:'JR', ht:`6'10"`, wt:248, rt:73, ppg:10.3, rpg:8.7, apg:1.4, def:55, id:'o-c' },
+  ];
+  const MY_TEAM = 'Four Corners', OPP_TEAM = 'Ann Arbor';
+  const MY_PRIMARY = '#1F8A5B', OPP_PRIMARY = '#9E1B32'; // real build: each team's primary_color
+
+  const favColor = (a,b) => (a-b>=3) ? MY_PRIMARY : (a-b<=-3) ? OPP_PRIMARY : '#c8ccd6';
+
+  // matchup favorability arrow: RT diff >= 3 points to the stronger player in his team's color; within 2 = neutral double arrow
+  function favArrowSVG(a, b) {
+    const d = a - b;
+    if (d >= 3)  return `<svg viewBox="0 0 28 24" style="color:${MY_PRIMARY}"><path d="M23 12H5 M12 5l-7 7 7 7"/></svg>`;
+    if (d <= -3) return `<svg viewBox="0 0 28 24" style="color:${OPP_PRIMARY}"><path d="M5 12h18 M16 5l7 7-7 7"/></svg>`;
+    return `<svg viewBox="0 0 28 24" style="color:#c8ccd6"><path d="M9 5l-6 7 6 7 M19 5l6 7-6 7 M5 12h18"/></svg>`;
+  }
+
+  // canonical Attribute Bar Scale
+  const rtColor = (rt) => rt <= 40 ? '#ff6d6d' : rt <= 60 ? '#FFD700' : rt <= 80 ? '#34EC27' : '#4A90D9';
+  const lastName = (n) => n.split(' ').slice(-1)[0];
+
+  const tile = (p, side) => {
+    const teamColor = side === 'mine' ? MY_PRIMARY : OPP_PRIMARY;
+    return `
+    <div class="ptile" ${side==='mine'?`draggable="false" data-slot=""`:''} style="--pc:${teamColor}">
+      ${side==='mine'?`<span class="draghint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg></span>`:''}
+      <div class="ph">
+        <span class="posbadge" style="background:${rtColor(p.rt)}">${p.rt}</span>
+        <!-- real: <img loading="lazy" width="176" height="176" src="\${getPlayerImageUrl('${p.id}')}" alt="${p.name}"> -->
+        <div class="sil">${SIL}</div>
+      </div>
+      <div class="pinfo">
+        <div class="nm">${p.name} <span class="jn">(#${p.jersey})</span> <span class="meta">· ${p.ht} · ${p.wt} lb</span></div>
+        <div class="statline">
+          <div class="st"><span class="sv">${p.ppg.toFixed(1)}</span><span class="sl">PPG</span></div>
+          <div class="st"><span class="sv">${p.rpg.toFixed(1)}</span><span class="sl">RPG</span></div>
+          <div class="st"><span class="sv">${p.apg.toFixed(1)}</span><span class="sl">APG</span></div>
+          <div class="st"><span class="sv">${p.def}%</span><span class="sl">DEF</span></div>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const board = document.getElementById('board');
+  const stage = document.getElementById('stage');
+  const cta = document.getElementById('cta');
+  const sub = document.getElementById('sub');
+  const eyebrow = document.getElementById('eyebrow');
+  const title = document.getElementById('title');
+
+  // defender order: slot i is guarded-by MINE[order[i]]. default identity.
+  let order = [0,1,2,3,4];
+
+  function buildBoard() {
+    board.innerHTML = POS.map((pos,i) => `
+      <div class="pair" data-slot="${i}" style="--pc:var(--pos-${pos})">
+        <div class="side-mine"></div>
+        <div class="vs">
+          <span class="favarrow">${favArrowSVG(MINE[i].rt, OPP[i].rt)}</span>
+          <span class="vstext" style="color:${favColor(MINE[i].rt, OPP[i].rt)}">${pos}</span>
+        </div>
+        <div class="side-opp">${tile(OPP[i],'opp')}</div>
+      </div>`).join('');
+    renderMine();
+  }
+
+  // render my defenders into slots per current order; recolor opp guard + connector
+  function renderMine() {
+    document.querySelectorAll('.pair').forEach((row,i) => {
+      const defender = MINE[order[i]];
+      const opp = OPP[i];
+      row.querySelector('.side-mine').innerHTML = tile(defender,'mine');
+      // borders: higher-rated player = bold 4px team color; lower-rated = no border; neutral (within 2) = both non-bold white
+      const mineEl = row.querySelector('.side-mine .ph');
+      const oppEl  = row.querySelector('.side-opp .ph');
+      const setBorder = (el, w, c) => {
+        el.style.borderWidth = w; el.style.borderColor = c; el.style.borderStyle = (w === '0') ? 'none' : 'solid';
+        const bold = w === '4px';
+        el.classList.toggle('bold', bold);
+        if (bold) el.style.setProperty('--glow', c); else el.style.removeProperty('--glow');
+      };
+      const diff = defender.rt - opp.rt;
+      if (Math.abs(diff) <= 2) { setBorder(mineEl, '2px', '#ffffff'); setBorder(oppEl, '2px', '#ffffff'); }
+      else if (diff >= 3)      { setBorder(mineEl, '4px', MY_PRIMARY); setBorder(oppEl, '0', 'transparent'); }
+      else                     { setBorder(mineEl, '0', 'transparent'); setBorder(oppEl, '4px', OPP_PRIMARY); }
+      // arrow + position-label color recompute from the current matchup (defender keeps his own-position RT)
+      row.querySelector('.favarrow').innerHTML = favArrowSVG(defender.rt, opp.rt);
+      row.querySelector('.vstext').style.color = favColor(defender.rt, opp.rt);
+      const t = row.querySelector('.side-mine .ptile');
+      t.dataset.slot = i;
+      wireDrag(t);
+    });
+  }
+
+  // ── drag to reorder defenders (swap) ──
+  let dragSlot = null;
+  function wireDrag(t) {
+    t.setAttribute('draggable', stage.dataset.phase === 'matchups' ? 'true' : 'false');
+    t.addEventListener('dragstart', e => { dragSlot = +t.dataset.slot; t.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    t.addEventListener('dragend', () => { t.classList.remove('dragging'); document.querySelectorAll('.dropcue').forEach(x=>x.classList.remove('dropcue')); });
+    t.addEventListener('dragover', e => { e.preventDefault(); t.classList.add('dropcue'); });
+    t.addEventListener('dragleave', () => t.classList.remove('dropcue'));
+    t.addEventListener('drop', e => {
+      e.preventDefault();
+      const to = +t.dataset.slot;
+      if (dragSlot!=null && dragSlot!==to) { [order[dragSlot], order[to]] = [order[to], order[dragSlot]]; renderMine(); }
+    });
+  }
+
+  // ── phase control ──
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timers = [];
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+  const setCue = (id) => { document.querySelectorAll('.cue').forEach(c=>c.classList.remove('on')); if(id) document.getElementById(id).classList.add('on'); };
+
+  function toReveal() {
+    clearTimers();
+    stage.classList.remove('dissolved');
+    stage.dataset.phase = 'reveal';
+    eyebrow.textContent = 'Tale of the Tape';
+    title.textContent = `${OPP_TEAM.toUpperCase()}  @  ${MY_TEAM.toUpperCase()}`;
+    sub.innerHTML = '';
+    cta.classList.remove('show'); cta.textContent = 'Set Defense Matchups';
+    board.classList.add('revealing');
+    const pairs = [...document.querySelectorAll('.pair')];
+    pairs.forEach(p => { p.classList.remove('in','spot'); });
+    setCue('cue-intro');
+
+    if (prefersReduced) { pairs.forEach(p=>p.classList.add('in')); settle(); return; }
+
+    pairs.forEach((p,i) => {
+      timers.push(setTimeout(() => {
+        pairs.forEach(x=>x.classList.remove('spot'));
+        p.classList.add('in','spot');
+        sub.innerHTML = `<b>${MINE[i].name}</b> guards the ${POS[i]} · <b>${OPP[i].name}</b>`;
+        setCue('cue-reveal');
+      }, 700 + i*820));
+    });
+    timers.push(setTimeout(settle, 700 + 5*820 + 200));
+  }
+
+  function settle() {
+    board.classList.remove('revealing');
+    document.querySelectorAll('.pair').forEach(p=>{ p.classList.add('in'); p.classList.remove('spot'); });
+    eyebrow.textContent = '';
+    title.textContent = `${OPP_TEAM.toUpperCase()}  @  ${MY_TEAM.toUpperCase()}`;
+    sub.innerHTML = '';
+    setCue(null);
+    timers.push(setTimeout(()=>cta.classList.add('show'), 350));
+  }
+
+  function toMatchups() {
+    clearTimers();
+    stage.dataset.phase = 'matchups';
+    document.querySelectorAll('.pair').forEach(p=>p.classList.add('in'));
+    board.classList.remove('revealing');
+    eyebrow.textContent = '';
+    title.textContent = 'DEFENSE MATCHUPS';
+    sub.innerHTML = `Drag your defenders to change who guards whom. Slot order = who guards each opponent.`;
+    cta.textContent = 'Submit & Tip Off'; cta.classList.add('show');
+    setCue('cue-matchups');
+    renderMine(); // re-enables draggable
+  }
+
+  function toTipoff() {
+    clearTimers();
+    // real build: POST /api/save-man-defense-matchups with current order
+    stage.dataset.phase = 'tipoff';
+    setCue('cue-tipoff');
+    // Tip Off card auto-dissolves (~1.9s) into gameplay — no extra button press.
+    timers.push(setTimeout(() => stage.classList.add('dissolved'), 1900));
+    // real build: on dissolve, stop pregame track → start gameplay BG music → begin Q1
+  }
+
+  // controls
+  document.getElementById('skip').addEventListener('click', () => {
+    // Skip Intro → jump to matchups (submit still required). Persist per game.
+    try { sessionStorage.setItem('pregameSkipIntro_demo', '1'); } catch(e){}
+    toMatchups();
+  });
+  cta.addEventListener('click', () => {
+    if (stage.dataset.phase === 'matchups') toTipoff();
+    else toMatchups();
+  });
+  document.getElementById('replayBtn').addEventListener('click', () => { buildBoard(); toReveal(); });
+  document.getElementById('cueToggle').addEventListener('change', e => document.body.classList.toggle('show-cues', e.target.checked));
+  document.getElementById('dontShow').addEventListener('change', e => {
+    // real: sessionStorage defenseMatchupsDontShow_<gameId>
+    try { sessionStorage.setItem('defenseMatchupsDontShow_demo', e.target.checked ? '1':'0'); } catch(err){}
+  });
+
+  buildBoard();
+  toReveal();
+</script>
+</body>
+</html>

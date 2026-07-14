@@ -1,87 +1,89 @@
 # Defense Matchups System
 
-> **Last Updated:** June 2026  
+> **Last Updated:** July 2026  
 > **Purpose:** Custom man-to-man defensive matchups for the **user team** when the user is on defense; computer team matchups are separate and default (position-on-position) for now.
+
+**Related:** [Pre-Game Experience System](./Pre_Game_XP_System.md) (franchise Q1 cinematic)
 
 ---
 
 ## Overview
 
-The Defense Matchups System allows users to set custom man-to-man defensive assignments for **their team only** (e.g., user PG guards computer SG) via a drag-and-drop popup. When the **user** is on defense, the engine uses the user's matchups; when the **computer** is on defense, the engine uses a separate matchup dict (`man_defense_matchups_computer`), which is position-on-position by default. Future logic may set computer matchups. Both dicts reset to defaults at the start of each break (timeout, quarter break, foul out).
+The Defense Matchups System allows users to set custom man-to-man defensive assignments for **their team only** (e.g., user PG guards computer SG) via a drag-and-drop UI. When the **user** is on defense, the engine uses the user's matchups; when the **computer** is on defense, the engine uses a separate matchup dict (`man_defense_matchups_computer`), which is position-on-position by default. Future logic may set computer matchups. Both dicts reset to defaults at the start of each break (timeout, quarter break, foul out).
+
+**UI surfaces:**
+
+1. **Franchise Q1** — full-screen [Pre-Game Experience](./Pre_Game_XP_System.md) (reveal → matchups → tip-off)
+2. **All other Play Quarter gates** (and single-game Q1) — restyled **Strategic Modal** (home left / away right, card DNA shared with pre-game)
 
 ---
 
 ## When Popup Appears
 
-The Defense Matchups popup appears **after** the Gameplay Buttons popup (Play Quarter, Sim Quarter, Sim Full Game) and **only** when:
+The Defense Matchups UI appears **after** the Gameplay Buttons popup (Play Quarter, Sim Quarter, Sim Full Game) and **only** when:
 - User presses **"Play Quarter"** (not for "Sim Quarter" or "Sim Full Game")
 - At the start of Q1
 - After quarter breaks
 - After timeouts
 - After a player fouls out
 
+Tutorial mode (`?mode=tutorial`) skips the UI entirely.
+
 ---
 
 ## User Interface
 
-### Layout
-- **Title:** "DEFENSE MATCHUPS"
-- **Two columns:** Left = User team lineup, Right = Computer team lineup
-- **Five rows per side:** PG, SG, SF, PF, C
-- **Default assignments:** Position-on-position (PG→PG, SG→SG, etc.)
+### Layout (current)
+- **Columns:** Home team **left**, away team **right**
+- **Draggable:** Only the **user** team column (left if user is home, right if user is away)
+- **Five slots:** Opponent positions PG → C down the board; user defender in slot *i* guards that opponent position
+- **Default assignments:** Position-on-position (PG→PG, etc.)
 
-### Row Content
-Each row includes:
-- **Position square:** Colored fill (user team = position color, computer team = guarding user position color)
-- **Player headshot**
-- **Player name:** Formatted as "F. Lastname"; height and weight in smaller grey text below
-- **Stat strip:** 
-  - User team: ID, OD, AG, ST, ND, IQ, NG, DEF%
-  - Computer team: SC, SH, AG, ST, ND, IQ, NG, PTS
+### Card Content
+Each tile:
+- Headshot (`getPlayerImageUrl(..., { size: 'card' })`) with RT badge (Attribute Bar Scale)
+- Name (`#jersey`) · HT · WT
+- Stat strip:
+  - **Pre-game:** season PPG / RPG / APG / DEF% (FPD)
+  - **In-game modal:** this-game PTS / REB / AST / DEF%
 
-### Team Headers
-- **Background:** Team's primary color at 0.2 alpha
-- **Border:** Team's primary color at 0.6 alpha
-- **Text:** White
+### Team Headers (in-game modal)
+- Background: team primary at 0.2 alpha; border at 0.6 alpha; white text
 
 ---
 
 ## Drag-and-Drop Functionality
 
 ### Interaction Model
-- **Drag within user team column only:** User drags and drops players within their own team's column
-- **Position swap:** When user drags PG to SG slot, PG and SG swap positions
-- **Matchup calculation:** After swap, user position in slot X guards computer position X
-  - Example: If user PG is in SG slot (index 1), user PG guards computer SG
+- Drag within the **user** column only; drop swaps two slots
+- After swap, user position in slot X guards opponent position X
+- Example: If user PG is in the SG slot (index 1), user PG guards opponent SG
 
 ### Implementation Pattern
-Uses **data + re-render pattern** (like Lineup Screen):
-1. Track user team order in data structure (array of positions)
-2. On swap, update data structure (swap positions in array)
-3. Re-render user team rows based on new order
-4. Recalculate matchups from new order
-5. Update visual display (computer team colors)
+Uses **data + re-render** (`userOrder` array of user positions → `matchupsFromUserOrder`):
+1. Track user team order (array of positions)
+2. On swap, update order and re-render
+3. On submit, POST `{ userPos: guardedOppPos }`
 
 ### Visual Feedback
-- **Dragging:** Row opacity set to 0.5
-- **Drop target:** Highlighted with white overlay
-- **Color matching:** Computer team row borders and position squares match the color of the user defender assigned to that player
+- Dragging opacity ~0.45; drop target inset highlight
+- Favorability borders / center arrow from RT comparison (team primary colors)
 
 ---
 
 ## Data Flow
 
 ### Frontend (Local Memory)
-- **During drag-and-drop:** Updates stored in popup's `dataset.userTeamOrder` (local memory only)
-- **On Submit:** Sends matchups to backend via `/api/save-man-defense-matchups`
+- During drag-and-drop: order lives in JS memory for the open UI
+- On Submit: `POST /api/save-man-defense-matchups`
 
 ### Backend Storage
 - **Two keys (SS&S):**
-  - **`man_defense_matchups`** — Used when the **user team** is on defense. Set by the popup; persisted to DB.
-  - **`man_defense_matchups_computer`** — Used when the **computer team** is on defense. Not set by the popup; default position-on-position for now. Future logic may set this. Persisted to DB; on load from old saves, defaults if missing.
+  - **`man_defense_matchups`** — Used when the **user team** is on defense. Set by the UI; persisted to DB.
+  - **`man_defense_matchups_computer`** — Used when the **computer team** is on defense. Not set by the UI; default position-on-position for now.
 - **In-memory:** Both keys live in `game_state`.
 - **Database:** Both keys saved via `summarize_game_state()` in `BackEnd/utils/shared.py`.
-- **Structure:** Each dict maps defensive position → offensive position (same format for both):
+- **Structure:**
   ```python
   {
       "PG": "PG",  # Defensive PG guards offensive PG
@@ -93,90 +95,65 @@ Uses **data + re-render pattern** (like Lineup Screen):
   ```
 
 ### Reset Logic
-**Both** user and computer matchup dicts reset to defaults (position-on-position) via `reset_matchups_to_defaults()` at:
-- Every timeout — the unified timeout-creation method in `BackEnd/models/game_manager.py` (covers USER, COMPUTER, and FOUL_OUT timeouts)
-- Quarter breaks — `simulate_quarter_endpoint` in `BackEnd/api/api.py` when advancing the quarter (alongside the Playcall Center override reset)
+**Both** user and computer matchup dicts reset to defaults via `reset_matchups_to_defaults()` at:
+- Every timeout — unified timeout-creation in `BackEnd/models/game_manager.py`
+- Quarter breaks — `simulate_quarter_endpoint` when advancing the quarter
 
 ---
 
 ## Backend Integration
 
 ### Key Files
-- **`BackEnd/utils/man_defense_matchups.py`:** Utility functions for matchups
-  - `get_default_matchups()`: Returns default position-on-position matchups
-  - `reset_matchups_to_defaults(game_state)`: Resets **both** user and computer matchup dicts in game_state
-  - `validate_man_defense_matchups(matchups)`: Validates 1-to-1 mapping
-  - `get_matchups_for_defending_team(game_state, defending_team_is_user)`: Returns the matchup dict for the given defending team (user or computer).
-  - `get_defender_position_for_man_defense(offensive_pos, game_state, fallback_to_default, defending_team_is_user)`: Returns defensive position that should guard offensive position. **`defending_team_is_user`** selects which dict to use (no new variable; derived from `game.defense_team.is_user_team` at call sites).
-
-### API Endpoints
-- **`GET /api/game/{game_id}/lineup-for-matchups`:** Fetches lineup data and **user** matchups only (for popup). Returns `current_matchups` from `man_defense_matchups`.
-- **`POST /api/save-man-defense-matchups`:** Saves **user** matchups only to `game_state["man_defense_matchups"]` and database.
+- **`BackEnd/utils/man_defense_matchups.py`:** Defaults, reset, validate, lookup helpers
+- **`GET /api/game/{game_id}/lineup-for-matchups`:** Lineups + matchups + jersey/RT/game+season stats (see Pre-Game XP doc)
+- **`POST /api/save-man-defense-matchups`:** Saves user matchups only
 
 ### Usage in Game Logic
-At each call site, the engine uses the matchup dict for **whoever is on defense** (derived from existing `game.defense_team` / `is_user_team`; no new variable):
-1. **`BackEnd/engine/phase_resolution.py`:** Steal attempts, turnovers, HCO resolution — passes `defending_team_is_user=game.defense_team.is_user_team` into `get_defender_position_for_man_defense`.
-2. **`BackEnd/models/turn_manager.py`:** Shooter assignment for man defense — same.
-3. **`BackEnd/models/shot_manager.py`:** Contesting-defender lookup for shot resolution — same.
-4. **`BackEnd/models/animator.py`:** Defensive sprite positioning — uses `get_matchups_for_defending_team(game_state, defense_team.is_user_team)` to get the correct dict for defender→offensive position.
+Engine uses the matchup dict for **whoever is on defense** (`defending_team_is_user`):
+1. `BackEnd/engine/phase_resolution.py`
+2. `BackEnd/models/turn_manager.py`
+3. `BackEnd/models/shot_manager.py`
+4. `BackEnd/models/animator.py`
 
 ---
 
 ## Persistence
 
 ### Game-Scoped
-- Both `man_defense_matchups` and `man_defense_matchups_computer` are saved to the specific game document (not the master franchise/tournament document).
-- Persist across game saves/loads via `summarize_game_state()` in `BackEnd/utils/shared.py`.
-- On load from DB (and in `apply_timeout_resume_state_to_gm`), both keys are restored; if `man_defense_matchups_computer` is missing (old saves), it is set to default position-on-position.
+- Both matchup dicts saved on the game document; restored on load / timeout resume
 
 ### "Don't Show Again" Option
-- Checkbox: "Don't show this pop up again this game"
-- If checked, popup is suppressed for the remainder of the current game
-- Default matchups (position-on-position) are used for man defense for the rest of the game
-- Suppression persists across page reloads via `sessionStorage` (`defenseMatchupsDontShow_<gameId>`)
-- Flag resets via `resetDontShowAgainFlag()` only for a **truly new game** (new `game_id` at Q1 start), not on every Q1 entry
+- Checkbox on pre-game matchups step and in-game modal
+- `sessionStorage` key: `defenseMatchupsDontShow_<gameId>`
+- Resets via `resetDontShowAgainFlag()` only for a **truly new game** (new `game_id` at Q1)
 
 ### Other Suppression / SFX
-- **FTE v2 tutorial** (`?mode=tutorial`): popup is skipped entirely — behaves as if "Don't show again" was checked (tutorial friction reduction, per Coach feedback Q2)
-- **Court announcement SFX:** a modal-open announcement plays the **first time** the popup renders per game, tracked via `sessionStorage` (`defenseMatchupsAnnouncePlayed_<gameId>`)
-- Gameplay background music start is deferred until the matchups modal flow completes (whether or not the modal actually rendered)
+- **FTE v2 tutorial:** UI skipped
+- **In-game modal announce:** `defense-sammy.mp3` first open per game (`defenseMatchupsAnnouncePlayed_<gameId>`)
+- **Franchise Q1:** pregame bed + reveal click-beeps (see Pre-Game XP); not used for mid-game modal
+- Gameplay BG music remains deferred until the matchups await completes (Q1 tip music still follows tip-winner path)
 
 ---
 
 ## Technical Details
 
 ### Frontend Files
-- **`FrontEnd/static/js/phaser/utils/defenseMatchupsPopup.js`:** Main popup implementation
-  - `showDefenseMatchupsPopup(gameId, scene)`: Main entry point
-  - `createPopupElement()`: Creates popup DOM structure
-  - `initializeDragAndDrop()`: Sets up drag-and-drop with data + re-render pattern
-  - `renderUserTeamRows()`: Re-renders user team rows based on order
-  - `calculateMatchupsFromOrder()`: Calculates matchups from user team order
+- `FrontEnd/static/js/phaser/utils/defenseMatchupsPopup.js` — entry + in-game modal
+- `FrontEnd/static/js/phaser/utils/preGameExperience.js` — franchise Q1 cinematic
+- `FrontEnd/static/js/phaser/utils/matchupsUiShared.js` — shared tiles / order / save
 
-### Position Colors
-(`POSITION_COLORS` in `defenseMatchupsPopup.js`)
-- **PG:** Blue (`#4065AF`)
-- **SG:** Purple (`#7B5EA7`)
-- **SF:** Green (`#3A8C4A`)
-- **PF:** Gold (`#D4A017`)
-- **C:** Red (`#C0392B`)
-
-Computer-team rows with no assigned guard fall back to grey (`#c0c0c0`).
+### Position Colors (face-off / legacy accents)
+- **PG:** `#4A90D9` · **SG:** `#7B5EA7` · **SF:** `#3A8C4A` · **PF:** `#C0392B` · **C:** `#D4A017`
 
 ---
 
 ## Acceptance Criteria
 
-✅ Popup appears at specified moments (Q1 start, quarter breaks, timeouts, foul outs)  
-✅ Popup only appears after "Play Quarter" is pressed (not for "Sim Quarter" or "Sim Full Game")  
+✅ UI appears at specified moments after Play Quarter only  
+✅ Franchise Q1 uses pre-game cinematic; other gates use Strategic Modal  
+✅ Home left / away right; only user column drags  
 ✅ Default matchups are position-on-position  
-✅ Drag-and-drop within user team column swaps positions  
-✅ Matchups recalculate automatically after each swap  
-✅ Computer team colors reflect which user position is guarding them  
-✅ Position squares show correct colors for both teams  
-✅ "Submit Defense Matchups" saves to backend and database  
-✅ "Don't show again this game" suppresses popup for remainder of game  
-✅ Matchups reset to defaults at start of each break (both user and computer dicts)  
-✅ Matchups persist across game saves/loads  
-✅ User custom matchups apply only when user team is on defense; computer uses its own dict (default position-on-position)  
-
+✅ Submit saves via `/api/save-man-defense-matchups`  
+✅ Don't show again suppresses for remainder of game  
+✅ Matchups reset at each break; persist across saves/loads  
+✅ User custom matchups apply only when user is on defense  

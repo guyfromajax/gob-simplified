@@ -69,7 +69,11 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "braddock-finalshot.mp3",
   "sammy-launch.mp3",
   "duke-heave.mp3",
+  "click-beep.wav",
 ]);
+
+/** Long-form pre-game bed (not pooled — one instance, stopped at tip-off). */
+let pregameBedAudio = null;
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
 // overlapping plays without truncating earlier ones.
@@ -709,6 +713,57 @@ export function playSecondaryAnnounceCourtSfx(scene, headline) {
 /** Defense Matchups modal open stinger (modal open only). */
 export function playDefenseMatchupModalCourtSfx(scene) {
   playGameSfx(scene, "defense-sammy.mp3", DEFAULT_VOLUME, { event: "defense_matchup_modal_open" });
+}
+
+/**
+ * Franchise Q1 pre-game bed. Plays across reveal → matchups → tip-off veil.
+ * Does not play for in-game defense-matchups modals.
+ */
+export function startPregameBed(scene, { tournament = false } = {}) {
+  stopPregameBed();
+  const filename = tournament ? "pregame-conf-tourney.mp3" : "pregame-regular-season.mp3";
+  try {
+    const audio = createAudio(filename);
+    audio.loop = false;
+    audio.volume = DEFAULT_VOLUME;
+    pregameBedAudio = audio;
+    const releaseSceneRef = retainActiveSfx(scene, audio);
+    const release = () => {
+      releaseSceneRef();
+      if (pregameBedAudio === audio) pregameBedAudio = null;
+    };
+    audio.addEventListener("ended", release, { once: true });
+    audio.addEventListener("error", release, { once: true });
+    const playPromise = audio.play();
+    debugSfx("play", { filename, event: "pregame_bed", tournament: !!tournament });
+    if (playPromise?.catch) {
+      playPromise.catch((err) => {
+        debugSfx("play_rejected", { filename, reason: err?.message || String(err), event: "pregame_bed" });
+        release();
+      });
+    }
+    return audio;
+  } catch (_err) {
+    debugSfx("play_error", { filename, event: "pregame_bed" });
+    return null;
+  }
+}
+
+/** Stop the franchise pre-game bed (tip-off / dissolve). */
+export function stopPregameBed() {
+  if (!pregameBedAudio) return;
+  try {
+    pregameBedAudio.pause();
+    pregameBedAudio.currentTime = 0;
+  } catch (_err) {
+    // ignore
+  }
+  pregameBedAudio = null;
+}
+
+/** Click as each starting-five reveal row lands (franchise Q1 cinematic). */
+export function playPregameRevealClick(scene) {
+  playGameSfx(scene, "click-beep.wav", DEFAULT_VOLUME, { event: "pregame_reveal_click" });
 }
 
 /** Primary BLOCK! announcement stinger (normal block card only). */
