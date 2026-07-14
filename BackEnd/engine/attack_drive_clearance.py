@@ -1153,10 +1153,14 @@ def build_attack_drive_sequence(
         "dish_target_pos": dish_target_pos,
         # S2 — 3-tier drive contest from the shared `_resolve_moment` (consumed by S2d path-stop /
         # S2b contact / S2c help-cutoff / S2e return-to-walk). 'A' blow-by (1.0) · 'B' neutral (~0.5,
-        # pull-up/dish) · 'C' clean stop / contact (ratio). `drive_contact` routes the foul/charge/TO.
+        # pull-up/dish) · 'C' clean stop / contact (ratio). `drive_contact` routes the foul/charge/TO;
+        # `drive_contact_defender_id` credits the foul / draws the charge (S2b).
         "drive_tier": drive_tier,
         "drive_stop_fraction": drive_stop_fraction,
         "drive_contact": drive_contact,
+        "drive_contact_defender_id": (
+            getattr(def_lineup.get(bh_defender_pos), "player_id", None)
+            if (drive_contact and bh_defender_pos) else None),
     }
 
     logging.debug(

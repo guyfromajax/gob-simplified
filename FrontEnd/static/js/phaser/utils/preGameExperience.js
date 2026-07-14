@@ -109,9 +109,29 @@ function ensureStyles() {
       .pgxp-pair.spot .pgxp-side-left, .pgxp-pair.spot .pgxp-side-right { animation: none; }
     }
 
-    .dm-ptile { display: flex; align-items: center; gap: 13px; position: relative; }
-    .pgxp-side-left .dm-ptile { flex-direction: row-reverse; text-align: right; justify-content: flex-start; }
-    .pgxp-side-right .dm-ptile { flex-direction: row; text-align: left; justify-content: flex-start; }
+    .dm-ptile {
+      display: grid; align-items: center; gap: 10px; position: relative;
+      --dm-rt-gutter: 3.4em;
+    }
+    .dm-ptile[data-side="left"] {
+      grid-template-columns: var(--dm-rt-gutter) minmax(0, 1fr);
+      text-align: right;
+    }
+    .dm-ptile[data-side="right"] {
+      grid-template-columns: minmax(0, 1fr) var(--dm-rt-gutter);
+      text-align: left;
+    }
+    .dm-ptile[data-side="right"] .dm-rtgutter { order: 2; }
+    .dm-ptile[data-side="right"] .dm-pbody { order: 1; }
+    .dm-rtgutter {
+      display: flex; align-items: center; width: var(--dm-rt-gutter);
+      flex-shrink: 0; min-height: 100%;
+    }
+    .dm-ptile[data-side="left"] .dm-rtgutter { justify-content: flex-start; }
+    .dm-ptile[data-side="right"] .dm-rtgutter { justify-content: flex-end; }
+    .dm-pbody { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .dm-ptile[data-side="left"] .dm-pbody { flex-direction: row-reverse; justify-content: flex-start; }
+    .dm-ptile[data-side="right"] .dm-pbody { flex-direction: row; justify-content: flex-start; }
     .dm-ph {
       position: relative; flex-shrink: 0; width: clamp(64px, 7vw, 88px); aspect-ratio: 1/1; border-radius: 14px;
       overflow: hidden; background: linear-gradient(180deg, #1b2130, #10141d);
@@ -120,18 +140,14 @@ function ensureStyles() {
     .dm-ph img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
     .dm-sil { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
     .dm-sil svg { width: 78%; height: 88%; opacity: .8; }
-    .dm-rtbadge {
-      position: absolute; top: 5px; left: 5px; z-index: 2;
-      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 13px; line-height: 1; letter-spacing: .04em;
-      padding: 3px 6px 1px; border-radius: 5px; color: #0b0d14;
-    }
     .dm-rtedge {
-      flex-shrink: 0; font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif;
       font-size: clamp(28px, 4.2vw, 44px); line-height: 1; letter-spacing: .02em;
-      align-self: center; min-width: 1.15em; text-align: center;
+      font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+      width: 100%;
     }
-    .pgxp-root[data-phase="reveal"] .dm-rtedge { display: none; }
-    .pgxp-root[data-phase="matchups"] .dm-rtbadge { display: none; }
+    .dm-ptile[data-side="left"] .dm-rtedge { text-align: left; }
+    .dm-ptile[data-side="right"] .dm-rtedge { text-align: right; }
     .dm-pinfo { min-width: 0; }
     .dm-nm { font-size: clamp(13px, 1.5vw, 16px); font-weight: 700; color: #fff; line-height: 1.1; white-space: nowrap; }
     .dm-jn { color: rgba(255,255,255,0.55); font-weight: 600; font-size: .85em; }
@@ -214,6 +230,7 @@ function ensureStyles() {
       .dm-statline { gap: 7px; }
       .dm-sv { font-size: 11px; }
       .pgxp-pair { grid-template-columns: 1fr 50px 1fr; }
+      .dm-ptile { --dm-rt-gutter: 2.8em; }
       .dm-rtedge { font-size: 24px; }
     }
   `;
@@ -307,7 +324,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
   function paintSlots() {
     const matchups = isMatchupsPhase();
     const statsMode = matchups ? "game" : "season";
-    const rtMode = matchups ? "edge" : "badge";
+    const rtMode = "edge";
 
     root.querySelectorAll(".pgxp-pair").forEach((row, i) => {
       const oppPos = POSITIONS[i];

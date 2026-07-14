@@ -110,9 +110,29 @@ function ensureInGameStyles() {
     }
     .dm-side-left { justify-self: end; width: 100%; max-width: 440px; }
     .dm-side-right { justify-self: start; width: 100%; max-width: 440px; }
-    .dm-ptile { display: flex; align-items: center; gap: 11px; position: relative; }
-    .dm-side-left .dm-ptile { flex-direction: row-reverse; text-align: right; }
-    .dm-side-right .dm-ptile { flex-direction: row; text-align: left; }
+    .dm-ptile {
+      display: grid; align-items: center; gap: 8px; position: relative;
+      --dm-rt-gutter: 2.75em;
+    }
+    .dm-ptile[data-side="left"] {
+      grid-template-columns: var(--dm-rt-gutter) minmax(0, 1fr);
+      text-align: right;
+    }
+    .dm-ptile[data-side="right"] {
+      grid-template-columns: minmax(0, 1fr) var(--dm-rt-gutter);
+      text-align: left;
+    }
+    .dm-ptile[data-side="right"] .dm-rtgutter { order: 2; }
+    .dm-ptile[data-side="right"] .dm-pbody { order: 1; }
+    .dm-rtgutter {
+      display: flex; align-items: center; width: var(--dm-rt-gutter);
+      flex-shrink: 0; min-height: 100%;
+    }
+    .dm-ptile[data-side="left"] .dm-rtgutter { justify-content: flex-start; }
+    .dm-ptile[data-side="right"] .dm-rtgutter { justify-content: flex-end; }
+    .dm-pbody { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .dm-ptile[data-side="left"] .dm-pbody { flex-direction: row-reverse; }
+    .dm-ptile[data-side="right"] .dm-pbody { flex-direction: row; }
     .dm-user-col .dm-ptile {
       cursor: grab; border-radius: 12px; padding: 5px 7px; margin: -5px -7px;
       transition: background .15s, box-shadow .15s;
@@ -130,12 +150,14 @@ function ensureInGameStyles() {
     .dm-ph img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
     .dm-sil { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
     .dm-sil svg { width: 78%; height: 88%; opacity: .8; }
-    .dm-rtbadge { display: none; }
     .dm-rtedge {
-      flex-shrink: 0; font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif;
       font-size: clamp(22px, 3.2vw, 30px); line-height: 1; letter-spacing: .02em;
-      align-self: center; min-width: 1.1em; text-align: center;
+      font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+      width: 100%;
     }
+    .dm-ptile[data-side="left"] .dm-rtedge { text-align: left; }
+    .dm-ptile[data-side="right"] .dm-rtedge { text-align: right; }
     .dm-ph.dm-bold { animation: dmPulse 1.9s ease-in-out infinite; }
     @keyframes dmPulse {
       0%,100% { box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 5px 1px var(--glow, transparent); }
@@ -180,6 +202,7 @@ function ensureInGameStyles() {
       .dm-statline { gap: 7px; }
       .dm-sv { font-size: 11px; }
       .dm-pair, .dm-m-heads { grid-template-columns: 1fr 44px 1fr; }
+      .dm-ptile { --dm-rt-gutter: 2.4em; }
       .dm-rtedge { font-size: 20px; }
     }
   `;

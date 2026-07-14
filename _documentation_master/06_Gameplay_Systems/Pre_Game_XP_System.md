@@ -42,10 +42,11 @@ Sim Quarter / Sim Full Game never open matchups UI (unchanged gate: `shouldShowM
 - **Assignment:** defender in slot *i* guards opponent position `POSITIONS[i]` (`PG`…`C`)
 - **Save shape (unchanged):** `{ userPos: guardedOppPos }` via `POST /api/save-man-defense-matchups`
 
-**Reveal (lineup announce):** title `AWAY @ HOME`; records strip `#Rank W-L` away then home (FTD `natl_rank` + standings W-L); RT as headshot badge; center position label colored to favorability; season stats; no eyebrow / no rolling subline.
+**Reveal (lineup announce):** title `AWAY @ HOME`; records strip `#Rank W-L` away then home (FTD `natl_rank` + standings W-L); RT in fixed outer gutter (same as matchups — no headshot badge); center position label colored to favorability; season stats; no eyebrow / no rolling subline.
 
-**Matchups (pre-game step + in-game modal):** RT as tall outer-edge number (Attribute Bar Scale color); arrows only in center; **game** PTS/REB/AST/DEF%; drag keeps each player's own-position RT.
+**Matchups (pre-game step + in-game modal):** RT in the same fixed outer gutter (Attribute Bar Scale color, tabular-nums, 3-digit-safe); arrows only in center; **game** PTS/REB/AST/DEF%; drag keeps each player's own-position RT.
 
+**RT gutter:** Home rows are `[RT][info+headshot]` (RT left-aligned); away rows are `[info+headshot][RT]` (RT right-aligned). Gutter width is fixed so every row’s RT shares the same x.
 Favorability: RT diff ≥ 3 → bold 4px border + arrow toward the stronger player in that team’s primary; within 2 → both white 2px borders + neutral silver double arrow.
 
 ---
@@ -64,8 +65,8 @@ Returns:
 
 | Surface | Stat strip | RT treatment |
 |---------|------------|--------------|
-| Pre-game **reveal** | **Season** PPG/RPG/APG/DEF% (FPD) | Badge on headshot |
-| Pre-game **matchups** + in-game modal | **This game** PTS/REB/AST/DEF% | Tall edge number (no badge) |
+| Pre-game **reveal** | **Season** PPG/RPG/APG/DEF% (FPD) | Fixed outer gutter (tall number) |
+| Pre-game **matchups** + in-game modal | **This game** PTS/REB/AST/DEF% | Fixed outer gutter (tall number) |
 
 Team blocks also include `natl_rank`, `wins`, `losses` for the reveal records strip.
 

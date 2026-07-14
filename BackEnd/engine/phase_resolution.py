@@ -6064,6 +6064,10 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
     attack_penalty = 0.0
     drive_result = None
     playcall_override = None
+    # S2b — a drive that ended in a foul/charge/TO (D_FOUL/O_FOUL/DEAD BALL from the shared contest).
+    _drive_contact = None
+    _drive_contact_def_id = None
+    _drive_contact_step_index = None
 
     if not via_pass:
         # Ball handler shoots himself. Attack → full drive (existing machinery); else shoot in place.
@@ -6075,6 +6079,12 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
                 def_lineup=def_lineup, game=game,
             )
             new_steps.extend(drive_result["steps"])
+            _dmeta = drive_result.get("attack_drive_meta") or {}
+            _drive_contact = _dmeta.get("drive_contact")
+            _drive_contact_def_id = _dmeta.get("drive_contact_defender_id")
+            # Contact is on the DRIVE step (first appended step); the possession ends there on a
+            # foul/charge/TO (the stopper pin drops the shot/dish steps after it).
+            _drive_contact_step_index = len(base_steps) if _drive_contact else None
             shooter_pos = drive_result.get("shooter_pos") or bh_pos
             shooter = drive_result.get("shooter") or off_lineup[bh_pos]
             shooter_location = drive_result.get("shooter_location") or destination
@@ -6107,6 +6117,10 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
         "playcall": playcall_override or _playcall_map.get(shot_type, "Inside"),
         "attack_penalty": attack_penalty,
         "forced_shot_penalty": float(forced_shot_penalty or 0.0),
+        # S2b — surface the drive-contact so the caller routes it to a foul/charge/TO instead of a shot.
+        "drive_contact": _drive_contact,
+        "drive_contact_defender_id": _drive_contact_def_id,
+        "drive_contact_step_index": _drive_contact_step_index,
     }
     if drive_result is not None:
         result.update({
@@ -6722,6 +6736,33 @@ def resolve_half_court_offense_logic(game):
         if isinstance(_walk, dict) and _walk.get("moment_result"):
             result = _walk["moment_result"]
             final_skeleton = _walk["skeleton"]
+        elif isinstance(_walk, dict) and _walk.get("drive_contact"):
+            # S2b: a drive that ended in a foul / charge / TO (shared `_resolve_moment` contact) — route
+            # it through the SAME finalization as a per-step moment (map cutoff outcome → HCO result
+            # type, pin the stop at the drive step, credit the defender). No shot fires. Both the driver
+            # + fouling defender RATTLE on the contact step (universal foul-rattle tool).
+            result = {"D_FOUL": "D_FOUL", "O_FOUL": "O_FOUL",
+                      "DEAD BALL": "DEAD_BALL_TURNOVER"}.get(_walk["drive_contact"], "SHOT")
+            final_skeleton = _walk["skeleton"]
+            _dc_pin = _walk.get("drive_contact_step_index")
+            _dsteps = (final_skeleton or {}).get("steps") or []
+            if result != "SHOT" and _dc_pin is not None and 0 <= _dc_pin < len(_dsteps):
+                game_state["_hco_moment_stop_index"] = _dc_pin
+                game_state["_hco_moment_defender_id"] = _walk.get("drive_contact_defender_id")
+                from BackEnd.utils.animation_step_helpers import stamp_foul_contact_rattle
+                _dpa = (_dsteps[_dc_pin].get("pos_actions") or {})
+                _drv_pos = next((p for p, a in _dpa.items()
+                                 if ((a or {}).get("action") or "").lower() == "drive"), None)
+                _drv_id = getattr(off_lineup.get(_drv_pos), "player_id", None) if _drv_pos else None
+                stamp_foul_contact_rattle(
+                    _dsteps[_dc_pin], [_walk.get("drive_contact_defender_id"), _drv_id])
+                logging.warning("💥 [DRIVE CONTACT] %s → %s (pin=%s def=%s driver=%s)",
+                                _walk["drive_contact"], result, _dc_pin,
+                                _walk.get("drive_contact_defender_id"), _drv_id)
+            else:
+                # Unmappable / no pin → fall back to the shot path (don't drop the possession).
+                _hco_precomputed_shot_info = _walk
+                result = "SHOT"
         elif _walk is not None:
             _hco_precomputed_shot_info = _walk
             if isinstance(_walk.get("skeleton"), dict):

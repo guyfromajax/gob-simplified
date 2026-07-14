@@ -77,8 +77,9 @@ export function formatStatLine(player, statsMode) {
 }
 
 /**
- * @param {'badge'|'edge'|'none'} rtMode
- *   badge = lineup announce (on headshot); edge = matchups standalone RT; none = omit
+ * Build a player tile.
+ * RT always lives in a fixed outer gutter (home left / away right) so columns align.
+ * @param {'edge'|'none'} rtMode
  */
 export function buildPlayerTileHtml(player, {
   side,
@@ -103,28 +104,22 @@ export function buildPlayerTileHtml(player, {
     ? `<img loading="lazy" width="176" height="176" src="${escapeHtml(img)}" alt="${name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="dm-sil" style="display:none">${SILHOUETTE}</div>`
     : `<div class="dm-sil">${SILHOUETTE}</div>`;
 
-  const badgeHtml =
-    rtMode === "badge"
-      ? `<span class="dm-rtbadge" style="background:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</span>`
-      : "";
-
-  const edgeHtml =
+  const gutterHtml =
     rtMode === "edge"
-      ? `<div class="dm-rtedge" style="color:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</div>`
-      : "";
+      ? `<div class="dm-rtgutter" aria-hidden="true"><div class="dm-rtedge" style="color:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</div></div>`
+      : `<div class="dm-rtgutter" aria-hidden="true"></div>`;
 
   return `
     <div class="dm-ptile" data-side="${side}" ${isUserColumn ? `data-slot="${slotIndex ?? ""}"` : ""} style="--pc:${escapeHtml(teamColor || "#ffffff")}">
-      ${isUserColumn ? DRAG_HINT : ""}
-      <div class="dm-ph">
-        ${badgeHtml}
-        ${imgHtml}
+      ${gutterHtml}
+      <div class="dm-pbody">
+        ${isUserColumn ? DRAG_HINT : ""}
+        <div class="dm-ph">${imgHtml}</div>
+        <div class="dm-pinfo">
+          <div class="dm-nm">${name} <span class="dm-jn">(#${escapeHtml(jersey)})</span> <span class="dm-meta">· ${escapeHtml(height)} · ${escapeHtml(weight)}</span></div>
+          <div class="dm-statline">${stats}</div>
+        </div>
       </div>
-      <div class="dm-pinfo">
-        <div class="dm-nm">${name} <span class="dm-jn">(#${escapeHtml(jersey)})</span> <span class="dm-meta">· ${escapeHtml(height)} · ${escapeHtml(weight)}</span></div>
-        <div class="dm-statline">${stats}</div>
-      </div>
-      ${edgeHtml}
     </div>`;
 }
 
