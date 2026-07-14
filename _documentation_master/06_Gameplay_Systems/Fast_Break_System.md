@@ -714,10 +714,18 @@ The outlet passer tracks:
 ##Step 1 Branches
   -Step 1: Outlet Pass (see below for Step 2 branches)
     -Step 1: Outlet pass
-      -AT: ball_reaches_destination (BRD)
+      -AT: ball_reaches_player (receiver)
+      -Movement:
+        -RR continues toward `basketSpot`
+        -Outlet contest defender holds / finishes `outlet_defender_to` (rim sprint starts next step)
+        -Get-back defenders continue toward burst destinations
+        -Non-getback defenders sprint toward offense `basketSpot`
+        -Offense other_players continue toward burst destinations
+        -Outlet passer / receiver: stationary
       -Movement Speeds:
-        -RR, Get Back Defenders, Other: sprint
-        -Outlet Passer / Receiver: stationary
+        -RR: same `burst` / `sprint` from Step 0 (Triangle forces `sprint`)
+        -Non-getback defenders: sprint
+        -Outlet contest defender / get-backs / offense others: standard (RR uses burst/sprint)
   -Step 1: Outlet Denied
     -Step 1: Defender Close Out
     -Step 2: Paralle Movement
@@ -728,20 +736,22 @@ The outlet passer tracks:
   -Lane Pass Branches (Shot, Interception, or OOB)
     -Step 2: Lane Pass
       -Movement:
-        -RR continues toward `basketSpot` from his carried-forward coord
-        -If Primary Defender & (Interceopt or Batted Ball): contact_grid spot
-        -All other players: stationary
-      -Movmeent Speeds: RR uses the same `burst` / `sprint` archetype selected in Step 0; primary defender uses `sprint`
+        -RR continues toward catch / `basketSpot` from his carried-forward coord
+        -If Primary Defender & (Intercept or Batted Ball): contact_grid spot
+        -Get-backs: lane-pass getback targets (basket / same-half midPost)
+        -All other players (incl. outlet contest defender): sprint toward offense `basketSpot`
+      -Movement Speeds: RR post-burst `sprint` (or stationary on sloppy catch); helpers `sprint`
       -AT: ball_reaches_player
         -Shot: RR
         -Steal or Batted Ball OOB: Primary Defender
     -Step 3: Shot Motion
       -Movement:
         -RR: Shot Spot
-        -Shot Defender: guard ball
-      -Movmeent Speeds: 
-        -RR & Shot Defender: sprint
-        -All other moving players: drive
+        -Shot Defender / cutoff: contest coords
+        -Off-ball cast (incl. non-getback D): sprint toward offense `basketSpot`
+      -Movement Speeds:
+        -RR & contest defenders: sprint / finisher pace
+        -Off-ball crash cast: sprint
       -AT: PRD, RR reaches Shot Spot
 
   -Hold Up Branch

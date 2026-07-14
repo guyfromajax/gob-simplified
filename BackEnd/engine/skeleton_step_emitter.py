@@ -72,6 +72,9 @@ from BackEnd.utils.animation_step_schema import (
 # drawing from the global stream — cosmetic, never perturbs shot outcomes. Files in FrontEnd/static/sounds/.
 HCO_DRIVE_SFX_FILES = ("sammy-drive.wav", "braddock-drive.mp3")
 HCO_DRIVE_SFX_VOLUME = 0.8
+# Only ~half of drives get a VO cue (the rest drive silently) — a seeded per-drive coin keeps it
+# SS&S-reproducible and independent of the braddock/sammy variant pick. Tunable.
+HCO_DRIVE_SFX_FIRE_PROB = 0.5
 # HCO "great stop" VO — fired when a defender cleanly walls off a drive (S2 Tier C clean stop, no
 # foul/TO). Lands at the driver_gate step start = the instant the BH is stopped short (S2d moved him
 # to the stop). Contact outcomes (foul/charge/TO) get their own cues; this is the clean stuff only.
@@ -2056,12 +2059,16 @@ def build_skeleton_animation_steps(
                 import zlib as _zlib
                 _driver_pos = _next_drive_meta.get("gate_driver_pos")
                 _driver_id = _player_id_at_pos(off_lineup, _driver_pos) if _driver_pos else gate_id
-                _seed = _zlib.crc32(
-                    f"{_driver_id}|{i}|{(skeleton_steps[i] or {}).get('timestamp', 0)}".encode())
-                step.setdefault("start", {})["sfx_on_step_start"] = {
-                    "file": HCO_DRIVE_SFX_FILES[_seed % len(HCO_DRIVE_SFX_FILES)],
-                    "event": "hco_drive", "volume": HCO_DRIVE_SFX_VOLUME,
-                }
+                _base = f"{_driver_id}|{i}|{(skeleton_steps[i] or {}).get('timestamp', 0)}"
+                # Seeded 50% coin (separate salt → uncorrelated with the variant pick): only ~half of
+                # drives get a cue. Below the fire threshold → drive silently.
+                _fire = (_zlib.crc32(f"{_base}|drive_sfx_fire".encode()) % 1000) / 1000.0
+                if _fire < HCO_DRIVE_SFX_FIRE_PROB:
+                    _seed = _zlib.crc32(_base.encode())
+                    step.setdefault("start", {})["sfx_on_step_start"] = {
+                        "file": HCO_DRIVE_SFX_FILES[_seed % len(HCO_DRIVE_SFX_FILES)],
+                        "event": "hco_drive", "volume": HCO_DRIVE_SFX_VOLUME,
+                    }
             # HCO "great stop" VO: on a Tier-C CLEAN stop (defender walls off the drive; no foul/charge/
             # TO), fire the cue at the driver_gate step START — the instant the BH arrives walled-off at
             # his stop (S2d put him there). Skip contact outcomes (they have their own cues). Doesn't

@@ -240,7 +240,7 @@ Step 0: Burst
 - Get-back defenders: defender 1 targets 2 x spots ahead of RR's burst-end position (same y as RR); defender 2 (if present) targets the same-side `lowPost` near the basket (`upper lowPost` if RR's burst-end y > 24, else `lower`; coords from `HCO_STRING_SPOTS`)
 - Other O (2 non-RR, non-receiver) and other D (non-getback): drift forward 1–4 x spots toward the offense's attacking basket; y unchanged
 
-Step 1 (outlet pass success): Outlet pass — AT: `ball_reaches_player` (receiver); T = passer→receiver distance ÷ FB pass rate. Passer stationary, releases ball at step start; receiver stationary at `receiver_to`; RR continues toward `basketSpot` using the same `burst` / `sprint` archetype chosen in Step 0 (**Triangle exception**: the RR is forced to `sprint` in this step regardless of the Step-0 roll — see Triangle in [Fast_Break_System.md](../06_Gameplay_Systems/Fast_Break_System.md)); other movers' tweens keep running through step 1 by default (the opt-in `UESS_FB_CRITICAL_EVENT_PATTERN` flag in `fastBreak.js` would freeze them at the step 0 boundary instead).
+Step 1 (outlet pass success): Outlet pass — AT: `ball_reaches_player` (receiver); T = passer→receiver distance ÷ FB pass rate. Passer stationary, releases ball at step start; receiver stationary at `receiver_to`; RR continues toward `basketSpot` using the same `burst` / `sprint` archetype chosen in Step 0 (**Triangle exception**: the RR is forced to `sprint` in this step regardless of the Step-0 roll — see Triangle in [Fast_Break_System.md](../06_Gameplay_Systems/Fast_Break_System.md)); outlet contest defender holds / finishes `outlet_defender_to` (rim sprint starts on the next step); get-back defenders continue toward their burst destinations; all other non-getback defenders sprint toward offense `basketSpot`; offense `other_players` continue toward burst destinations.
 
 Step 1: Branch keyed off outlet contest outcome
 
@@ -266,7 +266,7 @@ Step 2: Branch keyed off RR read result (after successful outlet)
 
 ATs: lane pass = `ball_reaches_player` (RR for shot; primary defender for steal/bat OOB). Shoot motion = `player_reaches_position` (RR reaches shot spot). Shot motion is the terminal step — there is no separate "shot resolution" step; the playback engine's `runShotAttempt` handler renders the release after the shooter snaps to the shot spot at step end.
 
-Lane-pass step per-role movement (shot branch): RR moves toward the pass catch target while the ball flies from the outlet receiver/BH; outlet receiver/BH stationary, releases lane pass; everyone else stationary at the prior step endpoints. The "Fast Break!" announcement plays on `step.start` (secondary style, offense side, passer headshot, decision-pill payload from the FB play label).
+Lane-pass step per-role movement (shot branch): RR moves toward the pass catch target while the ball flies from the outlet receiver/BH; outlet receiver/BH stationary, releases lane pass; get-back defenders keep their lane-pass getback targets (basket / same-half `midPost`); all other players (including the outlet contest defender) sprint toward offense `basketSpot`. The "Fast Break!" announcement plays on `step.start` (secondary style, offense side, passer headshot, decision-pill payload from the FB play label).
 
 Interception branch: RR tweens to a partial position (`rr_to.x + 3` toward basket, same y — not the full catch spot); stealer tweens to the interception contact grid at `sprint`; "Interception!" `step.end` announcement (defense side, stealer headshot, `meta.sfx: "steal"`, 1000ms hold).
 

@@ -197,6 +197,75 @@ def test_rim_runner_outlet_pass_carries_forward_burst_archetype():
     assert step["start"]["destination"]["rr"] == {"x": 87.0, "y": 25.0}
 
 
+def test_rim_runner_outlet_pass_non_getback_defenders_sprint_to_rim():
+    """Non-getback D sprint to basketSpot; outlet contest D holds; getbacks keep burst dest."""
+    off_lineup = {
+        "PG": _player("bh", 45, 15),
+        "PF": _player("rr", 45, 25),
+        "C": _player("passer", 35, 25),
+        "SG": _player("o_sg", 40, 20),
+    }
+    def_lineup = {
+        "PG": _player("od", 37, 25),
+        "SG": _player("gb", 55, 20),
+        "SF": _player("crash", 60, 30),
+    }
+    start_coords = {
+        "bh": {"x": 45.0, "y": 15.0},
+        "rr": {"x": 45.0, "y": 25.0},
+        "passer": {"x": 35.0, "y": 25.0},
+        "o_sg": {"x": 42.0, "y": 20.0},
+        "od": {"x": 37.0, "y": 25.0},
+        "gb": {"x": 58.0, "y": 22.0},
+        "crash": {"x": 62.0, "y": 30.0},
+    }
+    outlet_defender_to = {"x": 37.0, "y": 25.0}
+    getback_burst_to = {"x": 70.0, "y": 24.0}
+    offense_burst_to = {"x": 44.0, "y": 20.0}
+    crash_burst_to = {"x": 64.0, "y": 30.0}
+    fb_roles = {
+        "outlet_score": 999,
+        "getback_player_ids": ["gb"],
+        "rim_runner_burst_phase": {
+            "rr_id": "rr",
+            "outlet_receiver_id": "bh",
+            "outlet_passer_id": "passer",
+            "outlet_defender_id": "od",
+            "outlet_defender_to": outlet_defender_to,
+            "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "sprint"},
+            "receiver_to": {"x": 45.0, "y": 15.0},
+            "other_players": [
+                {"player_id": "o_sg", "to_x": offense_burst_to["x"], "to_y": offense_burst_to["y"]},
+                {"player_id": "gb", "to_x": getback_burst_to["x"], "to_y": getback_burst_to["y"]},
+                {"player_id": "crash", "to_x": crash_burst_to["x"], "to_y": crash_burst_to["y"]},
+            ],
+        },
+    }
+
+    step = _build_outlet_pass_step(
+        fb_roles=fb_roles,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        step_start_coords=start_coords,
+        is_away_offense=False,
+        clock_remaining_at_start=300,
+        shot_clock_remaining_at_start=20,
+        next_step_index=2,
+    )
+
+    assert step is not None
+    dest = step["start"]["destination"]
+    arch = step["start"]["archetype"]
+    assert dest["od"] == outlet_defender_to
+    assert arch["od"] == "standard"
+    assert dest["gb"] == getback_burst_to
+    assert arch["gb"] == "standard"
+    assert dest["crash"] == {"x": 87.0, "y": 25.0}  # basketSpot home
+    assert arch["crash"] == "sprint"
+    assert dest["o_sg"] == offense_burst_to
+    assert arch["o_sg"] == "standard"
+
+
 def _full_lineups():
     off = {
         "PG": _player("bh", 45, 15),

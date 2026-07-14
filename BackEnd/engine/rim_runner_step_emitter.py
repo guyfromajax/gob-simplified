@@ -660,8 +660,11 @@ def _build_outlet_pass_step(
 
     Per-player movement: passer / receiver stationary at their current
     carried-forward coords; RR continues toward the basket target using the
-    same archetype chosen in step 0; all other movers continue toward their
-    step 0 burst destinations.
+    same archetype chosen in step 0; outlet contest defender holds /
+    finishes ``outlet_defender_to`` (does not crash the rim until the next
+    step); get-back defenders keep continuing toward their burst destinations;
+    all other non-getback defenders sprint toward offense ``basketSpot``.
+    Offense ``other_players`` continue toward their burst destinations.
 
     ``rr_archetype_override`` forces the RR's movement archetype for this step
     only (Triangle passes ``"sprint"`` so the RR settles out of the burst once
@@ -697,12 +700,18 @@ def _build_outlet_pass_step(
     outlet_score = fb_roles.get("outlet_score")
 
     # Flavor: RR/Triangle movers are resolver-authored off the burst phase —
-    # RR sprints to ``rr_to``, the outlet defender guards to ``outlet_defender_to``,
-    # and ``other_players`` cut / guard-offball to their explicit spots. (Ball
-    # continuity + interrupted-coord math + tween stamping live in the shared
-    # ``build_fb_outlet_pass_step`` core.)
+    # RR continues to ``rr_to``; outlet defender holds ``outlet_defender_to``;
+    # get-backs keep burst destinations; non-getback defenders sprint to
+    # offense ``basketSpot``. (Ball continuity + interrupted-coord math +
+    # tween stamping live in the shared ``build_fb_outlet_pass_step`` core.)
     rr_id = _safe_id(phase.get("rr_id"))
     defender_id = _safe_id(phase.get("outlet_defender_id"))
+    getback_ids = {
+        str(pid)
+        for pid in (fb_roles.get("getback_player_ids") or [])
+        if pid is not None
+    }
+    basket_spot = _fb_spot_coords("basketSpot", is_away_offense)
     mover_targets: Dict[str, MoverTarget] = {}
     if rr_id and isinstance(phase.get("rr_to"), dict) and rr_id in step_start_coords:
         rr_arch: PlayerArchetype = rr_archetype_override or _rr_payload_archetype(phase)
@@ -716,6 +725,8 @@ def _build_outlet_pass_step(
         and isinstance(phase.get("outlet_defender_to"), dict)
         and defender_id in step_start_coords
     ):
+        # Option B: hold contest spot through the outlet pass; rim sprint
+        # begins on the next step (lane pass / hold-up / denied settle).
         mover_targets[defender_id] = (
             {
                 "x": float(phase["outlet_defender_to"]["x"]),
@@ -728,13 +739,15 @@ def _build_outlet_pass_step(
         pid = _safe_id(row.get("player_id"))
         if not pid or pid in (passer_id, receiver_id) or pid not in step_start_coords:
             continue
+        is_offense = _is_offense_player(pid, off_lineup)
+        if not is_offense and pid not in getback_ids:
+            mover_targets[pid] = (dict(basket_spot), "sprint", "guard_offball")
+            continue
         target: GridCoord = {
             "x": float(row.get("to_x", step_start_coords.get(pid, {}).get("x", 50))),
             "y": float(row.get("to_y", step_start_coords.get(pid, {}).get("y", 25))),
         }
-        action: PlayerAction = (
-            "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
-        )
+        action: PlayerAction = "cut" if is_offense else "guard_offball"
         mover_targets[pid] = (target, "standard", action)
 
     return build_fb_outlet_pass_step(
@@ -911,8 +924,10 @@ def _build_lane_pass_step(
     to RR's step-start coords at sloppy rate (30).
 
     Non-passer/non-receiver players sprint toward ``basketSpot`` (get-backs
-    split basket vs same-half ``midPost`` when two or more). All help
-    defenders/offense freeze at interrupted coords when the ball reaches RR.
+    keep their split basket vs same-half ``midPost`` targets when two or
+    more; non-getback defenders — including the outlet contest defender —
+    crash the rim). All help defenders/offense freeze at interrupted coords
+    when the ball reaches RR.
 
     Step ``T`` = ball flight time only (``ball_reaches_player``). RR may still
     be en route to ``catch_grid``; ``end.coords[rr]`` = pass meet point, not
