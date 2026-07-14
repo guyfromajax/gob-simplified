@@ -40,15 +40,15 @@ POSITION_WEIGHTS: Dict[str, Dict[str, float]] = {
         "RB": 0.00,
     },
     "PF": {
-        "RB": 0.25,
+        "RB": 0.30,
         "ST": 0.25,
         "IQ": 0.05,
         "SC": 0.05,
         "ID": 0.15,
-        "height": 0.20,
+        "height": 0.10,
         "FT": 0.05,
         "PS": 0.00,
-        "SH": 0.00,
+        "SH": 0.05,
     },
     "C": {
         "SC": 0.15,
@@ -150,6 +150,40 @@ def _height_to_rating(height: float) -> float:
     return 1 + (h - 60) * (99 / 24)
 
 
+def _pf_height_to_rating(height: float) -> float:
+    """Convert height for PF-specific position-rating math."""
+
+    try:
+        h = float(height)
+    except (TypeError, ValueError):
+        h = 0
+
+    if h < 72:
+        return 0.0
+    if h <= 75:
+        return 25.0
+    return 75.0
+
+
+def _c_height_to_rating(height: float) -> float:
+    """Convert height for C-specific position-rating math."""
+
+    try:
+        h = float(height)
+    except (TypeError, ValueError):
+        h = 0
+
+    if h < 76:
+        return 0.0
+    if h == 76:
+        return 25.0
+    if h == 77:
+        return 50.0
+    if h == 78:
+        return 75.0
+    return 100.0
+
+
 def _recruit_height_inches(player: dict) -> float:
     try:
         return float(_get_attr(player, "height"))
@@ -194,14 +228,19 @@ def compute_position_ratings(player: dict, profile: PositionRatingProfile = "pla
     """
 
     ratings: Dict[str, int] = {}
-    height_rating = _height_to_rating(_get_attr(player, "height"))
+    raw_height = _get_attr(player, "height")
     position_weights = _position_weights_table(player, profile)
 
     for pos, weights in position_weights.items():
         total = 0.0
         for attr, weight in weights.items():
             if attr == "height":
-                val = height_rating
+                if pos == "PF":
+                    val = _pf_height_to_rating(raw_height)
+                elif pos == "C":
+                    val = _c_height_to_rating(raw_height)
+                else:
+                    val = _height_to_rating(raw_height)
             else:
                 val = _get_attr(player, attr)
             total += val * weight

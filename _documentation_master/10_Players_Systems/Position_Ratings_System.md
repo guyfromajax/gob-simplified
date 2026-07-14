@@ -1,6 +1,6 @@
-# Position Ratings System (**verified 2026-06-13**)
+# Position Ratings System (**verified 2026-07-14**)
 
-> Verified vs `BackEnd/utils/position_ratings.py` — **every weight table matches exactly**: PG/SG/SF/PF/C (`POSITION_WEIGHTS`), recruit PF/C (`RECRUIT_POSITION_WEIGHTS`, RB/ST/SC/ID 30 + height 10), short-height recruit tables (`RECRUIT_PF_WEIGHTS_SHORT`/`RECRUIT_C_WEIGHTS_SHORT`, RB/ST or SC/ID 35 + height 0), `RECRUIT_SHORT_HEIGHT_THRESHOLD_IN = 71.0`, height map `1 + (h-60)*(99/24)` clamped 60→1 / 84→100. Persisted DB field is `position_ratings` (`game_manager.py` `_update_position_ratings` L105). **One correction:** the result is `_clamp(total, lower=1, upper=None)` — floored at 1 with **no hard upper cap** (the ~100 ceiling is implicit because attributes are 0–100), not an explicit 1–100 clamp.
+> Verified vs `BackEnd/utils/position_ratings.py` — **every weight table matches exactly**: PG/SG/SF/PF/C (`POSITION_WEIGHTS`), recruit PF/C (`RECRUIT_POSITION_WEIGHTS`, RB/ST/SC/ID 30 + height 10), short-height recruit tables (`RECRUIT_PF_WEIGHTS_SHORT`/`RECRUIT_C_WEIGHTS_SHORT`, RB/ST or SC/ID 35 + height 0), `RECRUIT_SHORT_HEIGHT_THRESHOLD_IN = 71.0`, PF height map (`<72 -> 0`, `72-75 -> 25`, `76+ -> 75`), and C height map (`<76 -> 0`, `76 -> 25`, `77 -> 50`, `78 -> 75`, `79+ -> 100`). Persisted DB field is `position_ratings` (`game_manager.py` `_update_position_ratings` L105). **One correction:** the result is `_clamp(total, lower=1, upper=None)` — floored at 1 with **no hard upper cap** (the ~100 ceiling is implicit because attributes and position height ratings are themselves 0–100), not an explicit 1–100 clamp.
 
 ## Overview
 
@@ -22,14 +22,26 @@ Rating = Clamp(Sum(attribute_value × weight) + height_rating (if applicable))
 
 ## Height Conversion
 
-Height (in inches) is converted to a 1–100 rating using a linear scale:
+Height is converted with position-specific helper functions for **PF** and **C**. The old linear helper remains in code for non-PF/C future use, but PF/C rating math uses the tables below.
 
-- **60 inches** (5'0") = 1
+<!-- - **60 inches** (5'0") = 1
 - **84 inches** (7'0") = 100
 - Formula: `1 + (height - 60) × (99 / 24)`
-- Values below 60 clamp to 1, values above 84 clamp to 100
+- Values below 60 clamp to 1, values above 84 clamp to 100 -->
 
-Height is used as a direct factor in **PF** and **C** position calculations (weights differ for recruits vs roster players; see PF/C sections). For **recruits** under **71 inches**, PF/C use alternate tables that move weight off **height** into **RB/ST** (PF) or **SC/ID** (C).
+Height is used as a direct factor in **PF** and **C** position calculations (weights differ for recruits vs roster players; see PF/C sections). For **recruits** under **71 inches**, PF/C use alternate weight tables that move weight off **height** into **RB/ST** (PF) or **SC/ID** (C); the PF/C height conversion still exists, but its weight is `0%` for those short-recruit PF/C rows.
+
+**PF Height Conversion**
+If height (in inches) ==:
+a. < 72: 0
+b. 72 - 75: 25
+c. 76+: 75
+
+**C Height Conversion**
+If height (in inches) ==:
+a. < 76: 0
+b. 76: 25, 77: 50, 78: 75
+c. 79+: 100
 
 ## Position Weights
 
@@ -74,15 +86,15 @@ SH, OD, (AG, SC), (IQ, PS)
 ### Power Forward (PF)
 RB, ST, ID, (IQ, SC)
 
-- **RB** (Rebounding): 25% (Recruits 30%) (if recruit's height < 71, 35%)
+- **RB** (Rebounding): 30% (Recruits 30%) (if recruit's height < 71, 35%)
 - **ST** (Strength): 25% (Recruits 30%) (if recruit's height < 71, 35%)
 - **IQ** (Basketball IQ): 5%
 - **SC** (Scoring): 5%
 - **ID** (Inside Defense): 15%
-- **height**: 20% (Recruits 10%) (if recruit's height < 71, 0%)
+- **height**: 10% (Recruits 10%) (if recruit's height < 71, 0%)
 - **FT** (Free Throw): 5%
 - **PS** (Passing): 0%
-- **SH** (Shooting): 0%
+- **SH** (Shooting): 5% (Recruits 0%)
 
 ### Center (C)
 (SC, ID, height), (ST, RB)
@@ -135,7 +147,9 @@ Position ratings are used for:
 The calculation logic is implemented in `BackEnd/utils/position_ratings.py`:
 
 - `compute_position_ratings(player: dict, profile: PositionRatingProfile = "player") -> Dict[str, int]`: Main calculation function; recruit profile applies `RECRUIT_POSITION_WEIGHTS`, and when recruit **height is under 71 inches** replaces **PF** and **C** rows with `RECRUIT_PF_WEIGHTS_SHORT` / `RECRUIT_C_WEIGHTS_SHORT` (via `_position_weights_table`). Calls `_clamp(total, lower=1, upper=None)`.
-- `_height_to_rating(height: float) -> float`: Height conversion function
+- `_pf_height_to_rating(height: float) -> float`: PF-specific height conversion (`<72 -> 0`, `72-75 -> 25`, `76+ -> 75`)
+- `_c_height_to_rating(height: float) -> float`: C-specific height conversion (`<76 -> 0`, `76 -> 25`, `77 -> 50`, `78 -> 75`, `79+ -> 100`)
+- `_height_to_rating(height: float) -> float`: Legacy linear height conversion helper; PF/C do not use it
 - `_clamp(value: float, lower: int = 1, upper: int | None = 100) -> int`: Result clamping — but `compute_position_ratings` passes `upper=None`, so ratings are only floored at 1
 - `add_position_ratings(player)` writes results under the in-memory key `ratings`; the canonical persisted DB field is `position_ratings` (written by `game_manager._update_position_ratings`).
 
