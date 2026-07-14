@@ -491,7 +491,7 @@ The `Scouting Report` tab replaces the old modal-style scouting flow with an emb
 It renders:
 
 1. upcoming opponent summary
-2. projected starting five
+2. projected starting five (**image cards**, not the old attribute table)
 3. opponent Team Measures
 4. opponent Play Usage (Last Game)
 
@@ -502,6 +502,8 @@ FCC resolves the upcoming opponent by:
 1. reading top data / EOS state
 2. calling `/franchise/play-next-game`
 3. comparing the returned matchup to the user team
+
+Scouting remains available in **regular season and EOS tournament weeks 27–34** (while the user team is still alive). The same FCC tab + `/franchise/scouting-report` path is used; there is no separate tournament scouting surface for franchise EOS.
 
 ### Opponent data fetches
 
@@ -520,6 +522,16 @@ Current summary fields:
 - opponent name
 - opponent record
 - opponent national rank
+
+### Projected Starting Five (image cards)
+
+Visual source: `projects/Scouting - Projected Five (Images).html`.
+
+- Lazy-rendered on tab open via `renderScoutingTab()` → `renderFccScoutingProjectedLineup()` → `renderFccProjectedStartingFiveCards()` in `js/shared/scoutingReport.js`. Does **not** touch FCC initial load / page-load overlay.
+- Cards ordered PG → SG → SF → PF → C.
+- Each card: square headshot (`API_CONFIG.getPlayerImageUrl(player_id, { size: 'card' })`, `loading="lazy"`, explicit 240×240, `onerror` → generic headshot), white position badge, RT badge colored with `getRtBucketClass` / `rt-buckets.css`, name + `#jersey`, year · height · weight, boxed PPG / RPG / APG / DEF%.
+- Per-game stats and DEF% are **server-enriched** on each `projected_starting_five` row (`ppg`, `rpg`, `apg`, `def_pct`) by `enrich_projected_starting_five_season_avgs()` using FPD `season` totals (`PTS`, `TREB`/`OREB`+`DREB`, `AST`, `GP`, `DEF_S`/`DEF_A`). DEF% is a whole percent (`round(DEF_S/DEF_A*100)` when `DEF_A > 0`, else `0`).
+- Core attribute columns are **not** shown in this section anymore (team attributes remain under Team Measures / team page).
 
 Important note:
 

@@ -241,6 +241,72 @@ def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[
     return rows
 
 
+def _season_total_rebounds(season: Dict[str, Any]) -> float:
+    """TREB if present, else OREB + DREB (same as FCC leader / awards paths)."""
+    if season.get("TREB") is not None and season.get("TREB") != "":
+        try:
+            return float(season.get("TREB") or 0)
+        except (TypeError, ValueError):
+            pass
+    try:
+        return float(season.get("OREB") or 0) + float(season.get("DREB") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _season_def_pct_whole(season: Dict[str, Any]) -> int:
+    """DEF% = round(DEF_S / DEF_A * 100) when DEF_A > 0, else 0 (whole number)."""
+    try:
+        def_a = int(season.get("DEF_A") or 0)
+        def_s = int(season.get("DEF_S") or 0)
+    except (TypeError, ValueError):
+        return 0
+    if def_a <= 0:
+        return 0
+    return int(round((def_s / def_a) * 100))
+
+
+def enrich_projected_starting_five_season_avgs(
+    rows: List[Dict[str, Any]],
+    player_season_stats: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Attach PPG / RPG / APG / DEF% onto each projected-five row for FCC cards.
+
+    Uses FPD/tournament season totals keyed by player_id. GP is the games-played
+    field already stored on season blocks (`stat_updater` increments ``season.GP``).
+    """
+    stats_by_id = player_season_stats if isinstance(player_season_stats, dict) else {}
+    for row in rows or []:
+        pid = str(row.get("player_id") or "")
+        season = stats_by_id.get(pid) or {}
+        if not isinstance(season, dict):
+            season = {}
+        try:
+            gp = int(season.get("GP") or 0)
+        except (TypeError, ValueError):
+            gp = 0
+        try:
+            pts = float(season.get("PTS") or 0)
+        except (TypeError, ValueError):
+            pts = 0.0
+        try:
+            ast = float(season.get("AST") or 0)
+        except (TypeError, ValueError):
+            ast = 0.0
+        reb = _season_total_rebounds(season)
+        if gp > 0:
+            row["ppg"] = round(pts / gp, 1)
+            row["rpg"] = round(reb / gp, 1)
+            row["apg"] = round(ast / gp, 1)
+        else:
+            row["ppg"] = 0.0
+            row["rpg"] = 0.0
+            row["apg"] = 0.0
+        row["def_pct"] = _season_def_pct_whole(season)
+    return rows
+
+
 def load_tournament_roster_for_scouting(
     tournament_doc: Dict[str, Any], team_doc: Dict[str, Any]
 ) -> List[Dict[str, Any]]:

@@ -2371,6 +2371,14 @@ body.has-auth-bar #franchise-container {
   padding: 12px 14px 0;
 }
 
+#franchise-container .fcc-scouting-card-head.p5-head {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 13px;
+  margin: 0;
+  padding: 18px 14px 0;
+}
+
 #franchise-container .fcc-scouting-card-head h3 {
   margin: 0;
   color: #ffffff;
@@ -2378,6 +2386,25 @@ body.has-auth-bar #franchise-container {
   font-size: 30px;
   letter-spacing: 0.03em;
   line-height: 1;
+}
+
+#franchise-container .fcc-scouting-card-head.p5-head h3 {
+  font-size: 34px;
+  letter-spacing: 0.02em;
+}
+
+#franchise-container .fcc-scouting-card-head .p5-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.40);
+  letter-spacing: 0.02em;
+}
+
+#franchise-container .fcc-scouting-p5-body {
+  padding: 14px;
+}
+
+#franchise-container #coaches-tab .scouting-projected-lineup-wrap {
+  min-width: 0;
 }
 
 #franchise-container .fcc-scouting-team-body {

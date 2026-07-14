@@ -70,3 +70,48 @@ def test_attributes_floor_ten_in_output():
     assert len(row) == 1
     assert row[0]["attributes"]["SC"] == 8
     assert row[0]["attributes"]["SH"] == 7
+
+
+def test_enrich_projected_five_season_avgs():
+    from BackEnd.utils.scouting_utils import enrich_projected_starting_five_season_avgs
+
+    rows = [
+        {
+            "position": "PG",
+            "player_id": "p1",
+            "name": "Test Player",
+            "jersey": 1,
+            "year": "junior",
+            "height": 74,
+            "weight": 190,
+            "rt": 55.0,
+            "attributes": {},
+        }
+    ]
+    stats = {
+        "p1": {
+            "GP": 10,
+            "PTS": 124,
+            "AST": 37,
+            "OREB": 5,
+            "DREB": 25,
+            "DEF_S": 40,
+            "DEF_A": 80,
+        }
+    }
+    enrich_projected_starting_five_season_avgs(rows, stats)
+    assert rows[0]["ppg"] == 12.4
+    assert rows[0]["rpg"] == 3.0
+    assert rows[0]["apg"] == 3.7
+    assert rows[0]["def_pct"] == 50
+
+
+def test_enrich_projected_five_zero_gp_and_def():
+    from BackEnd.utils.scouting_utils import enrich_projected_starting_five_season_avgs
+
+    rows = [{"player_id": "p2", "ppg": 9}]
+    enrich_projected_starting_five_season_avgs(rows, {"p2": {"PTS": 50, "GP": 0, "DEF_A": 0}})
+    assert rows[0]["ppg"] == 0.0
+    assert rows[0]["rpg"] == 0.0
+    assert rows[0]["apg"] == 0.0
+    assert rows[0]["def_pct"] == 0

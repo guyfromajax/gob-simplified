@@ -11767,7 +11767,10 @@ def get_scouting_report(franchise_id: str, team_name: str):
     )
 
     from BackEnd.utils.roster_loader import load_roster
-    from BackEnd.utils.scouting_utils import compute_projected_starting_five
+    from BackEnd.utils.scouting_utils import (
+        compute_projected_starting_five,
+        enrich_projected_starting_five_season_avgs,
+    )
 
     _, scout_players = load_roster(team_name, franchise_id=str(franchise_id))
     projected_starting_five = compute_projected_starting_five(scout_players)
@@ -11790,6 +11793,8 @@ def get_scouting_report(franchise_id: str, team_name: str):
         season_raw = fpd.get("season") or {}
         if isinstance(season_raw, dict):
             player_season_stats[pid] = dict(season_raw)
+
+    enrich_projected_starting_five_season_avgs(projected_starting_five, player_season_stats)
 
     # Play Usage gate: the opponent's prior-game Play Usage is only revealed once
     # the USER runs that week's training with Film Study > 0. Until then (and if

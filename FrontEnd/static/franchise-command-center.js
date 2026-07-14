@@ -5079,10 +5079,9 @@ function updateScoutingButton(data) {
 
 function renderFccScoutingProjectedLineup() {
   if (!scoutingTabDataCache) return;
-  if (typeof renderProjectedStartingFive === 'function') {
-    renderProjectedStartingFive(scoutingTabDataCache.projected_starting_five || [], {
+  if (typeof renderFccProjectedStartingFiveCards === 'function') {
+    renderFccProjectedStartingFiveCards(scoutingTabDataCache.projected_starting_five || [], {
       containerId: 'fcc-scouting-projected-lineup',
-      tableClass: 'scouting-projected-table',
       emptyClass: 'scouting-projected-empty',
     });
   }

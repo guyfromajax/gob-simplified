@@ -98,6 +98,112 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
   el.appendChild(table);
 }
 
+function scoutingEscapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function scoutingFormatYearLabel(year) {
+  if (typeof GOB_PlayerYear !== 'undefined') return GOB_PlayerYear.formatDisplay(year);
+  if (typeof yearMap !== 'undefined' && year) {
+    return yearMap[String(year).toLowerCase()] || String(year).toUpperCase();
+  }
+  return year != null && year !== '' ? String(year) : '—';
+}
+
+function scoutingFormatOneDecimal(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(1) : '0.0';
+}
+
+function scoutingFormatWholeDefPct(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0%';
+  return `${Math.round(n)}%`;
+}
+
+/**
+ * FCC Scouting Report: projected five as image cards (not the attribute table).
+ * Expects rows already enriched with ppg/rpg/apg/def_pct from /franchise/scouting-report.
+ * @param {Array} rows
+ * @param {{containerId?: string, emptyClass?: string}} [opts]
+ */
+function renderFccProjectedStartingFiveCards(rows, opts) {
+  const containerId = (opts && opts.containerId) || 'fcc-scouting-projected-lineup';
+  const emptyClass = (opts && opts.emptyClass) || 'scouting-projected-empty';
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rows || rows.length === 0) {
+    el.innerHTML =
+      '<p class="' + emptyClass + '">No projected lineup (missing position ratings or roster data).</p>';
+    return;
+  }
+
+  const genericUrl =
+    window.API_CONFIG && typeof window.API_CONFIG.getGenericHeadshotUrl === 'function'
+      ? window.API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
+      : '/static/images/players/generic_headshot.png';
+
+  const row = document.createElement('div');
+  row.className = 'p5-row';
+  rows.forEach((r) => {
+    const pid = r.player_id != null ? String(r.player_id) : '';
+    const name = r.name || '—';
+    const imgSrc =
+      pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
+        ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
+        : genericUrl;
+    const rt = r.rt != null ? r.rt : '—';
+    const rtClass =
+      typeof getRtBucketClass === 'function' ? getRtBucketClass(r.rt) : 'rt-unknown';
+    const jersey =
+      r.jersey != null && r.jersey !== '' ? `#${r.jersey}` : '#—';
+    const bio = [
+      scoutingFormatYearLabel(r.year),
+      scoutingFormatHeight(r.height),
+      r.weight != null && r.weight !== '' ? `${r.weight} lb` : '—',
+    ].join(' · ');
+
+    const article = document.createElement('article');
+    article.className = 'p5-card';
+    article.innerHTML = `
+      <div class="p5-photo">
+        <span class="p5-pos">${scoutingEscapeHtml(r.position || '—')}</span>
+        <span class="p5-rt-badge ${scoutingEscapeHtml(rtClass)}">${scoutingEscapeHtml(rt)}</span>
+        <img loading="lazy" width="240" height="240" src="${scoutingEscapeHtml(imgSrc)}" alt="${scoutingEscapeHtml(name)}">
+      </div>
+      <div class="p5-body">
+        <div class="p5-namerow">
+          <div class="p5-ident">
+            <div class="p5-name">${scoutingEscapeHtml(name)}</div>
+            <div class="p5-bio">${scoutingEscapeHtml(bio)}</div>
+          </div>
+          <span class="p5-jersey">${scoutingEscapeHtml(jersey)}</span>
+        </div>
+        <div class="p5-stats">
+          <div class="p5-stat"><span class="sv">${scoutingEscapeHtml(scoutingFormatOneDecimal(r.ppg))}</span><span class="sl">PPG</span></div>
+          <div class="p5-stat"><span class="sv">${scoutingEscapeHtml(scoutingFormatOneDecimal(r.rpg))}</span><span class="sl">RPG</span></div>
+          <div class="p5-stat"><span class="sv">${scoutingEscapeHtml(scoutingFormatOneDecimal(r.apg))}</span><span class="sl">APG</span></div>
+          <div class="p5-stat"><span class="sv">${scoutingEscapeHtml(scoutingFormatWholeDefPct(r.def_pct))}</span><span class="sl">DEF</span></div>
+        </div>
+      </div>
+    `;
+    const img = article.querySelector('img');
+    if (img) {
+      img.addEventListener('error', function onImgError() {
+        img.removeEventListener('error', onImgError);
+        img.src = genericUrl;
+      });
+    }
+    row.appendChild(article);
+  });
+  el.appendChild(row);
+}
+
 function formatScoutingSeasonStat(stats, col) {
   const s = stats || {};
   const num = (x) => {

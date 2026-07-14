@@ -242,3 +242,164 @@ input[type="reset"] {
 .play-usage-table tr:hover {
   background: #f9f9f9;
 }
+
+/* ── FCC Scouting: Projected Starting Five image cards ─────────────────────
+ * Visual source: _documentation_master/projects/Scouting - Projected Five (Images).html
+ * RT text color via /css/rt-buckets.css + getRtBucketClass (not mock inline thresholds).
+ */
+.p5-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.p5-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015) 30%, transparent);
+  overflow: hidden;
+  transition: transform 0.16s, border-color 0.16s, box-shadow 0.16s;
+}
+.p5-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.38);
+}
+.p5-photo {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.09), transparent 60%),
+    linear-gradient(180deg, #1b2130, #10141d);
+  overflow: hidden;
+}
+.p5-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.p5-photo::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46%;
+  background: linear-gradient(180deg, transparent, rgba(11, 13, 20, 0.82));
+  pointer-events: none;
+}
+.p5-pos {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 5px 9px 3px;
+  border-radius: 7px;
+  color: #0b0d14;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.p5-rt-badge {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  z-index: 2;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  padding: 3px 8px 1px;
+  border-radius: 7px;
+  background: rgba(11, 13, 20, 0.55);
+  backdrop-filter: blur(2px);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+.p5-body {
+  padding: 12px 13px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.p5-namerow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.p5-ident {
+  min-width: 0;
+}
+.p5-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.15;
+  min-height: 34px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.p5-bio {
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.p5-jersey {
+  flex-shrink: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  line-height: 0.82;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.p5-stats {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 11px 6px;
+  gap: 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.p5-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.p5-stat .sv {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.90);
+  font-variant-numeric: tabular-nums;
+}
+.p5-stat .sl {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.40);
+}
+
+@media (max-width: 900px) {
+  .p5-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .p5-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
