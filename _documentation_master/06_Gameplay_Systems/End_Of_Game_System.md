@@ -77,7 +77,7 @@ The backend is the only authority for whether a completed period enters End of G
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System. For a side-by-side comparison with Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
 - Values will be capped to normal ranges:
-  - `shot_threshold`: 0 to 200
+  - `shot_threshold`: 20 to 220
   - `rebound_modifier`: 0 to 0.4
   - `team_chemistry`: 7 to 25
   - all others: -10 to 10

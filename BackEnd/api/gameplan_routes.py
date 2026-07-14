@@ -30,6 +30,7 @@ from BackEnd.utils.playbook_settings_utils import (
     normalize_slot_assignments_to_play_ids,
 )
 from BackEnd.utils.team_play_utils import iter_team_plays
+from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
 from BackEnd.utils.playbook_weights_utils import (
     compute_position_shot_weights,
     weights_cache_is_stale,
@@ -1157,7 +1158,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
             return {team_id: {
                 "team_chemistry": ftd_doc.get("team_attributes", {}).get("team_chemistry", 0),
                 "offensive_efficiency": ftd_doc.get("team_attributes", {}).get("offensive_efficiency", 0),
-                "shot_threshold": ftd_doc.get("team_attributes", {}).get("shot_threshold", 100),
+                "shot_threshold": ftd_doc.get("team_attributes", {}).get("shot_threshold", SHOT_THRESHOLD_MID),
                 "discipline": ftd_doc.get("team_attributes", {}).get("discipline", 0),
                 "fight": ftd_doc.get("team_attributes", {}).get("fight", 0),
                 "rebound_modifier": ftd_doc.get("team_attributes", {}).get("rebound_modifier", 1.0),

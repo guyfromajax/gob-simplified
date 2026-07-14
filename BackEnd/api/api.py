@@ -736,7 +736,7 @@ try:
                         attrs = ftd_doc.get("team_attributes", {})
                         # Ensure all expected keys exist (with defaults if missing)
                         expected_keys = {
-                            "shot_threshold": 90,
+                            "shot_threshold": 110,
                             "discipline": 0,
                             "fight": 0,
                             "rebound_modifier": 1.0,

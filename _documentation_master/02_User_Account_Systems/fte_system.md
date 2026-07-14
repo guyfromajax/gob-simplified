@@ -149,8 +149,8 @@ Central orchestrator. Key constants:
 
 | Name | Value | Notes |
 |---|---|---|
-| `USER_SHOT_THRESHOLD` | `0` | User team forced-make threshold (`shot_threshold_scale.MIN`) |
-| `COMPUTER_SHOT_THRESHOLD` | `100` | Opponent at scale midpoint (`shot_threshold_scale.MID`) |
+| `USER_SHOT_THRESHOLD` | `20` | User team forced-make-side threshold (`shot_threshold_scale.MIN`) |
+| `COMPUTER_SHOT_THRESHOLD` | `120` | Opponent at scale midpoint (`shot_threshold_scale.MID`) |
 | `TUTORIAL_STRATEGY_SETTINGS` | `{offense:2, inside:2, attack:2, outside:2, aggression:2, fast_breaks:2, defense:2, rebounding:2, hc_trap:1, fc_press:1, tempo:2}` | All keys default 2; HCT + FCP = 1 |
 | `TUTORIAL_FAST_BREAKS_PCT` | distribution map | Per-key % for `fast_breaks` setting |
 | `TUTORIAL_ZONE_DEFENSE_PCT` / `TUTORIAL_MAN_DEFENSE_PCT` | distribution maps | Defensive playcall mix |
@@ -185,7 +185,7 @@ Mutates both `GameManager` and the `summary` dict. Injected state:
 | `playbook_settings` | the 8 user offense plays above |
 | `timeout_next_play_type` | `SIDE_INBOUND` |
 | `game_stats_initialized` | `True` (critical — engine zeroes stats otherwise) |
-| `shot_threshold` overrides | user `0`, opponent `100` |
+| `shot_threshold` overrides | user `20`, opponent `120` |
 
 ### Opponent derivation
 
@@ -386,4 +386,3 @@ For commit-level history, `git log --grep "FTE v2"`. High-level milestones:
 | Canonical button / modal / coach-mark CSS | `css/gob-buttons.css`, `resource-pages.css` (`gob-modal-*`), `css/coach-mark.css`, `css/tutorial-tipoff.css`, `css/username-modal.css` |
 | Action color rules / Attribute Bar Scale | `_documentation_master/00_General_Systems/Styleguide.md` |
 | Visual reference / design notes | Live implementation is the reference: `js/shared/attributeTour.js`, `css/attribute-tour.css`, `tutorial-situation.js` (the original `FTE Onboarding Redesign.html` mockup was removed) |
-

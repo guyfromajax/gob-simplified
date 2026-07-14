@@ -24,6 +24,7 @@ from BackEnd.constants.fast_break_constants import (
 )
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
+from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
 from BackEnd.engine.phase_resolution import apply_fb_meet_non_shooting_defensive_foul
@@ -419,7 +420,7 @@ def _resolve_shot_attempt(
         game, is_three=is_three, defended=contested, made=made, turn_type="Fast Break"
     )
 
-    shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", 100)
+    shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", SHOT_THRESHOLD_MID)
     try:
         shot_variant = select_shot_variant(
             shot_score=shot_score_pre_defense,

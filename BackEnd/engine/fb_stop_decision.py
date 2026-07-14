@@ -9,6 +9,7 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, Optional, Tuple
 
+from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
 from BackEnd.engine.attack_drive_clearance import ATTACK_DRIVE_INSIDE_RADIUS
 from BackEnd.engine.dynamic_hct import (
     ABA_READ_MID_THRESHOLD,
@@ -119,7 +120,7 @@ def _compute_optimal_action(
         meet,
         apply_defense=True,
     )
-    shot_threshold = float((off_team.team_attributes or {}).get("shot_threshold", 100))
+    shot_threshold = float((off_team.team_attributes or {}).get("shot_threshold", SHOT_THRESHOLD_MID))
     if shot_score >= shot_threshold:
         return "shoot", None, None, shot_type, float(shot_score), shot_threshold
     return "HCO", None, None, None, float(shot_score), shot_threshold
@@ -176,7 +177,7 @@ def _random_geo_valid_action(
         meet,
         apply_defense=True,
     )
-    shot_threshold = float((off_team.team_attributes or {}).get("shot_threshold", 100))
+    shot_threshold = float((off_team.team_attributes or {}).get("shot_threshold", SHOT_THRESHOLD_MID))
     return "shoot", None, None, shot_type, float(shot_score), shot_threshold
 
 

@@ -27,6 +27,7 @@ HOT_READ_SHOOT = "HOT_READ_SHOOT"    # hot read executed → shooter shoots (sel
 SUBTLE_MOVEMENT = "SUBTLE_MOVEMENT"
 FREELANCE_FORCED = "FREELANCE_FORCED"
 PASS_IMMEDIATE = "PASS_IMMEDIATE"
+BACKDOOR = "BACKDOOR"                 # S3c (Goal 2): off-ball man cuts behind a denying defender → BH feeds him at the rim
 
 # --- tunables (brief) ---
 # Single shared read threshold (brief: "one constant"): a `(read_raw + team_eff) * d6` read
@@ -301,7 +302,7 @@ def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_ca
 
 def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
                  shot_clock, tempo_call, rng, openness=0.0, allow_dish=True,
-                 blocked_dish_targets=None):
+                 blocked_dish_targets=None, openness_map=None):
     """Universal shoot decision. Returns a SHOOT Decision
     ``{action, shooter_pos, shot_type, via_pass, hot_read}`` or ``None`` (progress).
 
@@ -312,6 +313,12 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     ``hot_read`` flag tags a shot that came off a genuine mismatch (label only). Receptions pass
     ``allow_dish=False`` (no re-dish).
 
+    ``openness_map`` (S3b / Goal 2, ``{pos: openness}``) supplies a PER-PLAYER openness so both the
+    shooter AND every dish candidate are judged by his own space (from the S1 cushion). When given it
+    overrides the scalar ``openness`` per position (missing pos → the scalar for the shooter, 0.0 for a
+    teammate — i.e. legacy). This is what lets an open off-ball man become the best look (step-in / the
+    open-man dish); without it teammate openness was hardcoded 0.0, so a beaten defender never surfaced.
+
     ``blocked_dish_targets`` (a set of positions) are teammates whose passing lane is covered —
     the hot-read "truly open" gate (see Dynamic_HCO_System.md §4). They're excluded as
     dish candidates: the offense won't dish into a covered lane."""
@@ -319,8 +326,13 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     if shooter is None:
         return None
     blocked_dish_targets = blocked_dish_targets or set()
+
+    def _openness_for(pos, default):
+        return openness_map.get(pos, default) if openness_map else default
+
     s_type, s_quality, s_optimal, s_mismatch = _evaluate_shot(
-        shooter, locations.get(shooter_pos, "key"), read_scores, off_team, shot_clock, tempo_call, openness, rng)
+        shooter, locations.get(shooter_pos, "key"), read_scores, off_team, shot_clock, tempo_call,
+        _openness_for(shooter_pos, openness), rng)
     best = {"pos": shooter_pos, "type": s_type, "quality": s_quality,
             "optimal": s_optimal, "mismatch": s_mismatch, "via_pass": False}
     if allow_dish:
@@ -330,7 +342,7 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
             if pos in blocked_dish_targets:
                 continue  # covered passing lane → not "truly open" → not a dish candidate
             t, q, opt, mm = _evaluate_shot(p, locations[pos], read_scores, off_team,
-                                           shot_clock, tempo_call, 0.0, rng)
+                                           shot_clock, tempo_call, _openness_for(pos, 0.0), rng)
             if opt and q > best["quality"]:
                 best = {"pos": pos, "type": t, "quality": q, "optimal": opt, "mismatch": mm, "via_pass": True}
 

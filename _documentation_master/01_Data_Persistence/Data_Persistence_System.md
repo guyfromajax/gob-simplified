@@ -98,7 +98,7 @@ This system documents data persistence across all three game modes when users ar
 **Team Attributes** (mode-specific, randomized on init, updated by training):
 - `team_chemistry`: 7-10 (franchise mode range)
 - `offensive_efficiency`: -1 to +1
-- `shot_threshold`: -10 to 190 (randomized, center at 90 for pill display)
+- `shot_threshold`: 100 to 110 in franchise init (center 120 for pill display)
 - `discipline`: -1 to +1 (formerly `turnover_modifier`)
 - `fight`: -1 to +1 (formerly `foul_modifier`)
 - `rebound_modifier`: 0.2 (fixed center value for Franchise mode)
@@ -211,7 +211,7 @@ This system documents data persistence across all three game modes when users ar
 **Team Attributes** (mode-specific, randomized on init, updated by training):
 - `team_chemistry`: 7-25 (tournament mode range)
 - `offensive_efficiency`: -10 to +10
-- `shot_threshold`: -10 to 190 (randomized, center at 90 for pill display)
+- `shot_threshold`: 20 to 220 (randomized, center at 120 for pill display)
 - `discipline`: -10 to +10 (formerly `turnover_modifier`)
 - `fight`: -10 to +10 (formerly `foul_modifier`)
 - `rebound_modifier`: 0.0-0.4 (random in 0.01 increments)
@@ -287,7 +287,7 @@ This system documents data persistence across all three game modes when users ar
 **Team Attributes** (mode-specific, randomized on init, NOT updated by training):
 - `team_chemistry`: 7-25 (single game mode range)
 - `offensive_efficiency`: -10 to +10
-- `shot_threshold`: -10 to 190 (randomized, center at 90 for pill display)
+- `shot_threshold`: 20 to 220 (randomized, center at 120 for pill display)
 - `discipline`: -10 to +10 (formerly `turnover_modifier`)
 - `fight`: -10 to +10 (formerly `foul_modifier`)
 - `rebound_modifier`: 0.0-0.4 (random in 0.01 increments)

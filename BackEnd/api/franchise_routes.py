@@ -13115,7 +13115,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Get current team attributes (after training)
             team_attrs = {
-                "shot_threshold": team_data.get("shot_threshold", 0),
+                "shot_threshold": team_data.get("shot_threshold", 120),
                 "rebound_modifier": team_data.get("rebound_modifier", 0.2),
                 "offensive_efficiency": team_data.get("offensive_efficiency", 0),
                 "defensive_efficiency": team_data.get("defensive_efficiency", 0),
@@ -13261,7 +13261,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Get current team attributes from tournament teams (matches Franchise pattern)
             team_attrs = {
-                "shot_threshold": team_data.get("shot_threshold", 0),
+                "shot_threshold": team_data.get("shot_threshold", 120),
                 "rebound_modifier": team_data.get("rebound_modifier", 0.2),
                 "offensive_efficiency": team_data.get("offensive_efficiency", 0),
                 "defensive_efficiency": team_data.get("defensive_efficiency", 0),

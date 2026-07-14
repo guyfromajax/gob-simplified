@@ -88,6 +88,7 @@ from BackEnd.constants.fast_break_play_types import (
 
 # Location-based contest / rim shortcuts (see Shot_System.md)
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
+THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER = 1.5
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
@@ -788,8 +789,9 @@ class ShotManager:
 
         # Shot difficulty scales with distance: threshold += Euclidean distance (shooter → attacking
         # rim), rounded. Applies to ALL shots (2026-07-13; previously three-pointers only) — at-rim
-        # finishes get ~0, longer 2s and 3s get progressively more, so the model is physically
-        # consistent across shot types. Coords: the classification coord, else the shooter's shot spot.
+        # finishes get ~0, longer 2s and 3s get progressively more. Three-point attempts use a
+        # larger distance multiplier to tune 3PT% separately from long twos.
+        # Coords: the classification coord, else the shooter's shot spot.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
         spot_data = shot_classification.get("classification_coord")
         if not isinstance(spot_data, dict):
@@ -800,7 +802,8 @@ class ShotManager:
             float(spot_data["x"]) - rim_x,
             float(spot_data["y"]) - rim_y,
         )
-        shot_threshold += int(round(dist))
+        distance_multiplier = THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER if is_three else 1.0
+        shot_threshold += int(round(dist * distance_multiplier))
         if playcall == "Set":
             playcall = "Attack"
 

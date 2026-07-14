@@ -88,6 +88,7 @@ from BackEnd.constants import (
 )
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
+from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.utils.shot_split_tracker import record_shot_split
 from BackEnd.utils.animation_step_helpers import (
@@ -580,7 +581,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
     record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="Fast Break")
 
     # Variant + extras for the rim animation (RATTLE / BANK / SWISH / etc.).
-    shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", 100)
+    shot_threshold_for_variant = off_team.team_attributes.get("shot_threshold", SHOT_THRESHOLD_MID)
     try:
         shot_variant = select_shot_variant(
             shot_score=shot_score_pre_defense,

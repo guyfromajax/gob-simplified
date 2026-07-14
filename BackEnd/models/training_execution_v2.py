@@ -1431,8 +1431,8 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     - 4 points: -= random.randint(10, 20)
     - 5+ points: -= random.randint(15, 20)
     """
-    current_val = team.get("shot_threshold", 0)
     lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
+    current_val = team.get("shot_threshold", lower)
 
     if points == 0:
         increase = random.randint(5, 10)

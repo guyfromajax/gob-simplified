@@ -2,7 +2,7 @@
 
 > **Canonical scale module:** `BackEnd/constants/shot_threshold_scale.py`  
 > **Frontend mirror:** `FrontEnd/static/js/shared/teamShotThresholdScale.js`  
-> **Current values:** MIN **0**, MAX **200**, MID **100** (span always 200; MID = MIN + 100)
+> **Current values:** MIN **20**, MAX **220**, MID **120** (span always 200; MID = MIN + 100)
 
 ## What this attribute is
 
@@ -31,7 +31,7 @@ made = shot_score >= shot_threshold
 
 **Yes — you can just tell an agent in chat and point them at this doc.** Example prompt:
 
-> Change team shot_threshold scale to MIN **60** (MAX/MID derive automatically). Follow `_documentation_master/04_Franchise_Mode_Systems/Shot_Threshold_Scale_Tuning.md`. Run parity tests. Do not change runtime modifiers unless I ask.
+> Change team shot_threshold scale to MIN **60** (MAX/MID derive automatically). Follow `_documentation_master/00_Operations/Shot_Threshold_Scale_Tuning.md`. Run parity tests. Do not change runtime modifiers unless I ask.
 
 **What the agent should do:**
 
@@ -49,30 +49,30 @@ made = shot_score >= shot_threshold
 
 **Span rule:** delta between lower and upper is always **200**; MID is always **MIN + 100** (= MAX − 100).
 
-## Wired consumers (current scale: 0–200, MID 100)
+## Wired consumers (current scale: 20–220, MID 120)
 
 When **`MIN`** changes, these values re-derive from `BackEnd/constants/shot_threshold_scale.py` (except items in the manual checklist below).
 
 | Area | Current value | Code / notes |
 |------|---------------|--------------|
-| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **0 – 200** | Init, training, EOG clamp |
-| **Franchise init** | **80 – 90** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — 10–20 below MID |
-| **Single-game init** | **0 – 200** | Full clamp range, uniform random |
+| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **20 – 220** | Init, training, EOG clamp |
+| **Franchise init** | **100 – 110** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — 10–20 below MID |
+| **Single-game init** | **20 – 220** | Full clamp range, uniform random |
 | **Tournament seeds** | See table below | `TOURNAMENT_SEED_ST_RANGES` |
-| **Score balancing** | Trailing **−20**, leading **180** | `MIN − 20` / `MAX − 20` |
-| **Rim-runner corner FB** | **180 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
-| **Uncontested-3 make bar** | **200 − CH + dist** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
-| **FTE tutorial** | User **0**, computer **100** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
-| **UI pills** | Center **100**, span **0–200** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
+| **Score balancing** | Trailing **0**, leading **200** | `MIN − 20` / `MAX − 20` |
+| **Rim-runner corner FB** | **200 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
+| **Uncontested-3 make bar** | **220 − CH + dist** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
+| **FTE tutorial** | User **20**, computer **120** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
+| **UI pills** | Center **120**, span **20–220** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
 
 **Tournament seed shot_threshold ranges:**
 
 | Seed | Range | Notes |
 |------|-------|-------|
-| 1 | 0 – 100 | Best shooters |
-| 2 – 4 | 0 – 150 | |
-| 5 – 7 | 50 – 200 | |
-| 8 | 100 – 200 | Worst shooters |
+| 1 | 20 – 120 | Best shooters |
+| 2 – 4 | 20 – 170 | |
+| 5 – 7 | 70 – 220 | |
+| 8 | 120 – 220 | Worst shooters |
 
 ## Frontend files (import shared scale — do not hardcode MID)
 
@@ -95,7 +95,7 @@ When retuning feel beyond moving the storage window, grep and revisit:
 | `balancing_shot_threshold_override` | Uses derived `BALANCING_*` if wired through scale module |
 | `shot_threshold += 100` (broken variant) | Runtime modifier in `shot_manager.py` — not part of attribute scale |
 | Zone threshold deltas (+25/−25 etc.) | `shot_manager._hco_zone_shot_threshold_delta` |
-| Three-point rim-distance bump | `resolve_shot`: `round(Euclid(shooter → attacking rim))`; fallback `THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25) |
+| Distance threshold bump | `resolve_shot`: twos add `round(Euclid(shooter → attacking rim))`; threes add `round(Euclid × 1.5)` via `THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER` |
 | Home crowd shot deltas | `home_crowd.py` |
 | EOG / training **delta magnitudes** (+5, −10, etc.) | Same numeric delta = different feel if MID moved |
 | SFX tiers **101 / 210** on `shot_score_pre_defense` | **Not** team attribute scale — `gameSfx.js`, `ShotAnimationSystem.js` |
