@@ -12,7 +12,7 @@ export const POSITION_COLORS = Object.freeze({
   C: "#D4A017",
 });
 
-/** Attribute Bar Scale backgrounds for RT badges (matches rt-buckets.css). */
+/** Attribute Bar Scale for RT (badge bg / edge text). */
 export function rtBadgeBg(rt) {
   const v = Number(rt);
   if (!Number.isFinite(v)) return "#c8ccd6";
@@ -60,15 +60,11 @@ const DRAG_HINT = `<span class="dm-draghint" aria-hidden="true"><svg viewBox="0 
 export function formatStatLine(player, statsMode) {
   if (statsMode === "season") {
     const s = player?.season_stats || {};
-    const ppg = Number(s.PPG ?? 0);
-    const rpg = Number(s.RPG ?? 0);
-    const apg = Number(s.APG ?? 0);
-    const defPct = Number(s["DEF%"] ?? 0);
     return [
-      { v: ppg.toFixed(1), l: "PPG" },
-      { v: rpg.toFixed(1), l: "RPG" },
-      { v: apg.toFixed(1), l: "APG" },
-      { v: `${defPct}%`, l: "DEF" },
+      { v: Number(s.PPG ?? 0).toFixed(1), l: "PPG" },
+      { v: Number(s.RPG ?? 0).toFixed(1), l: "RPG" },
+      { v: Number(s.APG ?? 0).toFixed(1), l: "APG" },
+      { v: `${Number(s["DEF%"] ?? 0)}%`, l: "DEF" },
     ];
   }
   const g = player?.game_stats || {};
@@ -81,16 +77,19 @@ export function formatStatLine(player, statsMode) {
 }
 
 /**
- * Build a player tile. side 'left' | 'right'. User column gets drag affordance.
+ * @param {'badge'|'edge'|'none'} rtMode
+ *   badge = lineup announce (on headshot); edge = matchups standalone RT; none = omit
  */
 export function buildPlayerTileHtml(player, {
   side,
   teamColor,
   isUserColumn = false,
   statsMode = "game",
+  rtMode = "edge",
   slotIndex = null,
 } = {}) {
   const rt = Number(player?.rt ?? 0);
+  const rtRounded = Math.round(rt);
   const jersey = player?.jersey != null && player.jersey !== "" ? String(player.jersey) : "—";
   const height = player?.height || "—";
   const weight = player?.weight != null && player.weight !== "" ? `${player.weight} lb` : "—";
@@ -104,17 +103,28 @@ export function buildPlayerTileHtml(player, {
     ? `<img loading="lazy" width="176" height="176" src="${escapeHtml(img)}" alt="${name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="dm-sil" style="display:none">${SILHOUETTE}</div>`
     : `<div class="dm-sil">${SILHOUETTE}</div>`;
 
+  const badgeHtml =
+    rtMode === "badge"
+      ? `<span class="dm-rtbadge" style="background:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</span>`
+      : "";
+
+  const edgeHtml =
+    rtMode === "edge"
+      ? `<div class="dm-rtedge" style="color:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</div>`
+      : "";
+
   return `
     <div class="dm-ptile" data-side="${side}" ${isUserColumn ? `data-slot="${slotIndex ?? ""}"` : ""} style="--pc:${escapeHtml(teamColor || "#ffffff")}">
       ${isUserColumn ? DRAG_HINT : ""}
       <div class="dm-ph">
-        <span class="dm-rtbadge" style="background:${rtBadgeBg(rt)}">${escapeHtml(String(Math.round(rt)))}</span>
+        ${badgeHtml}
         ${imgHtml}
       </div>
       <div class="dm-pinfo">
         <div class="dm-nm">${name} <span class="dm-jn">(#${escapeHtml(jersey)})</span> <span class="dm-meta">· ${escapeHtml(height)} · ${escapeHtml(weight)}</span></div>
         <div class="dm-statline">${stats}</div>
       </div>
+      ${edgeHtml}
     </div>`;
 }
 
@@ -127,6 +137,13 @@ export function favArrowSvg(leftRt, rightRt, leftPrimary, rightPrimary) {
     return `<svg viewBox="0 0 28 24" style="color:${escapeHtml(rightPrimary)}"><path d="M5 12h18 M16 5l7 7-7 7"/></svg>`;
   }
   return `<svg viewBox="0 0 28 24" style="color:#c8ccd6"><path d="M9 5l-6 7 6 7 M19 5l6 7-6 7 M5 12h18"/></svg>`;
+}
+
+export function favAccentColor(leftRt, rightRt, leftPrimary, rightPrimary) {
+  const d = Number(leftRt) - Number(rightRt);
+  if (d >= 3) return leftPrimary;
+  if (d <= -3) return rightPrimary;
+  return "#c8ccd6";
 }
 
 export function applyFavorBorders(leftPh, rightPh, leftRt, rightRt, leftPrimary, rightPrimary) {
@@ -153,7 +170,6 @@ export function applyFavorBorders(leftPh, rightPh, leftRt, rightRt, leftPrimary,
   }
 }
 
-/** Slot order of user positions from matchup map (user_pos → guarded opp pos). */
 export function userOrderFromMatchups(matchups) {
   const m = matchups && typeof matchups === "object" ? matchups : {};
   return POSITIONS.map((oppPos) => {
@@ -162,7 +178,6 @@ export function userOrderFromMatchups(matchups) {
   });
 }
 
-/** Build matchup map: user defender in slot i guards opponent POSITIONS[i]. */
 export function matchupsFromUserOrder(userOrder) {
   const matchups = {};
   (userOrder || POSITIONS).forEach((userPos, i) => {
@@ -201,8 +216,8 @@ export function normalizeMatchupsPayload(data) {
   const away = data?.away_team || (userTeamSide === "away" ? data?.user_team : data?.computer_team);
   return {
     userTeamSide,
-    homeTeam: home || { team_name: "Home", players: [], primary_color: "#1F8A5B" },
-    awayTeam: away || { team_name: "Away", players: [], primary_color: "#9E1B32" },
+    homeTeam: home || { team_name: "Home", players: [], primary_color: "#1F8A5B", natl_rank: 0, wins: 0, losses: 0 },
+    awayTeam: away || { team_name: "Away", players: [], primary_color: "#9E1B32", natl_rank: 0, wins: 0, losses: 0 },
     currentMatchups: data?.current_matchups || matchupsFromUserOrder(POSITIONS),
     isFranchise: !!(data?.is_franchise || data?.franchise_id),
     isTournamentContext: !!data?.is_tournament_context,
@@ -210,19 +225,12 @@ export function normalizeMatchupsPayload(data) {
   };
 }
 
-/** Court UI SFX via window.playSound (same path as the rest of court.html). */
 export function playMatchupsUiSfx(filename) {
   if (typeof window !== "undefined" && typeof window.playSound === "function") {
     window.playSound(filename);
   }
 }
 
-/**
- * Wire HTML5 drag-reorder on user-column tiles inside a root element.
- * @param {HTMLElement} root
- * @param {() => string[]} getOrder
- * @param {(next: string[]) => void} setOrderAndRender
- */
 export function wireUserColumnDrag(root, getOrder, setOrderAndRender) {
   let dragSlot = null;
   root.querySelectorAll(".dm-ptile[data-slot]").forEach((tile) => {

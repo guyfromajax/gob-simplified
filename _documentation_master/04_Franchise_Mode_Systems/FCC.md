@@ -505,6 +505,11 @@ FCC resolves the upcoming opponent by:
 
 Scouting remains available in **regular season and EOS tournament weeks 27–34** (while the user team is still alive). The same FCC tab + `/franchise/scouting-report` path is used; there is no separate tournament scouting surface for franchise EOS.
 
+**Film Study gating:**
+
+- Regular-season weeks: opponent Play Usage is gated by the user's current-week **Film Study** training allocation. HCO play usage unlocks at Film Study `> 0`; Fast Break and Half-Court Trap usage unlock at Film Study `> 1`.
+- EOS tournament weeks **27–34**: training does not run, so the Scouting Report bypasses Film Study gating and shows all available Play Usage panels.
+
 ### Opponent data fetches
 
 When the tab opens, FCC loads:

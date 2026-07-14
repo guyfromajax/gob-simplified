@@ -19,7 +19,6 @@ import {
   saveManDefenseMatchups,
   wireUserColumnDrag,
   normalizeMatchupsPayload,
-  hexToRgb,
   playMatchupsUiSfx,
 } from "./matchupsUiShared.js";
 
@@ -92,21 +91,25 @@ function ensureInGameStyles() {
     }
     @keyframes dmRise { from { transform: scale(.97); opacity: .6; } to { transform: none; opacity: 1; } }
     .dm-m-heads {
-      display: grid; grid-template-columns: 1fr 60px 1fr; gap: 0; margin: 0 0 10px;
+      display: grid; grid-template-columns: 1fr 60px 1fr; gap: 0; margin: 0 0 6px;
     }
     .dm-m-head {
-      font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: .06em; color: #fff;
-      text-align: center; padding: 6px 10px 8px; justify-self: stretch; border-radius: 8px 8px 0 0;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px; letter-spacing: .06em; color: #fff;
+      text-align: center; padding: 2px 10px 8px; justify-self: stretch;
+      background: transparent; border: none; border-bottom: 2px solid var(--head-underline, rgba(255,255,255,0.35));
+      border-radius: 0;
     }
     .dm-rows { display: flex; flex-direction: column; }
     .dm-pair {
       display: grid; grid-template-columns: 1fr 60px 1fr; align-items: center;
-      position: relative; padding: 12px 0;
+      position: relative; padding: 14px 0;
     }
     .dm-pair:not(:last-child)::after {
-      content: ''; position: absolute; left: 7%; right: 7%; bottom: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.13) 22%, rgba(255,255,255,0.13) 78%, transparent);
+      content: ''; position: absolute; left: 10%; right: 10%; bottom: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 28%, rgba(255,255,255,0.12) 72%, transparent);
     }
+    .dm-side-left { justify-self: end; width: 100%; max-width: 440px; }
+    .dm-side-right { justify-self: start; width: 100%; max-width: 440px; }
     .dm-ptile { display: flex; align-items: center; gap: 11px; position: relative; }
     .dm-side-left .dm-ptile { flex-direction: row-reverse; text-align: right; }
     .dm-side-right .dm-ptile { flex-direction: row; text-align: left; }
@@ -127,10 +130,11 @@ function ensureInGameStyles() {
     .dm-ph img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
     .dm-sil { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
     .dm-sil svg { width: 78%; height: 88%; opacity: .8; }
-    .dm-rtbadge {
-      position: absolute; top: 4px; left: 4px; z-index: 2;
-      font-family: 'Bebas Neue', sans-serif; font-size: 13px; line-height: 1; letter-spacing: .02em;
-      padding: 2px 5px 0; border-radius: 4px; color: #0b0d14;
+    .dm-rtbadge { display: none; }
+    .dm-rtedge {
+      flex-shrink: 0; font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif;
+      font-size: clamp(22px, 3.2vw, 30px); line-height: 1; letter-spacing: .02em;
+      align-self: center; min-width: 1.1em; text-align: center;
     }
     .dm-ph.dm-bold { animation: dmPulse 1.9s ease-in-out infinite; }
     @keyframes dmPulse {
@@ -151,11 +155,11 @@ function ensureInGameStyles() {
     .dm-vs { display: flex; align-items: center; justify-content: center; }
     .dm-favarrow svg { width: 28px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
     .dm-m-foot {
-      margin-top: 18px; display: flex; flex-direction: column-reverse; align-items: center; gap: 11px;
+      margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 11px;
     }
     .dm-m-submit {
-      width: auto; min-width: 280px; padding: 0 40px; height: 46px; border: none; border-radius: 10px;
-      background: #34EC27; color: #0a1f06; font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+      width: auto; padding: 0 40px; height: 46px; border: none; border-radius: 10px;
+      background: #34EC27; color: #0a1f06; font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px;
       letter-spacing: .06em; cursor: pointer;
       box-shadow: 0 8px 22px rgba(52,236,39,0.26), inset 0 1px 0 rgba(255,255,255,0.35);
       transition: filter .15s, transform .1s;
@@ -176,6 +180,7 @@ function ensureInGameStyles() {
       .dm-statline { gap: 7px; }
       .dm-sv { font-size: 11px; }
       .dm-pair, .dm-m-heads { grid-template-columns: 1fr 44px 1fr; }
+      .dm-rtedge { font-size: 20px; }
     }
   `;
   document.head.appendChild(style);
@@ -197,14 +202,14 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   popup.innerHTML = `
     <div class="defense-matchups-content" role="dialog" aria-label="Defense Matchups">
       <div class="dm-m-heads">
-        <div class="dm-m-head" style="background: rgba(${hexToRgb(homePrimary)}, 0.2); border: 1px solid rgba(${hexToRgb(homePrimary)}, 0.6);">${homeTeam.team_name || "Home"}</div>
+        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeTeam.team_name || "Home"}</div>
         <div></div>
-        <div class="dm-m-head" style="background: rgba(${hexToRgb(awayPrimary)}, 0.2); border: 1px solid rgba(${hexToRgb(awayPrimary)}, 0.6);">${awayTeam.team_name || "Away"}</div>
+        <div class="dm-m-head" style="--head-underline:${awayPrimary}">${awayTeam.team_name || "Away"}</div>
       </div>
       <div class="dm-rows"></div>
       <div class="dm-m-foot">
-        <label class="dm-dontshow"><input type="checkbox" id="dont-show-again-checkbox"> Don't show this pop up again this game</label>
         <button type="button" class="dm-m-submit">Submit Defense Matchups</button>
+        <label class="dm-dontshow"><input type="checkbox" id="dont-show-again-checkbox"> Don't show this pop up again this game</label>
       </div>
     </div>
   `;
@@ -243,6 +248,7 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
             teamColor: homePrimary,
             isUserColumn: userIsHome,
             statsMode: "game",
+            rtMode: "edge",
             slotIndex: userIsHome ? i : null,
           })
         : "";
@@ -252,6 +258,7 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
             teamColor: awayPrimary,
             isUserColumn: !userIsHome,
             statsMode: "game",
+            rtMode: "edge",
             slotIndex: userIsHome ? null : i,
           })
         : "";
@@ -311,8 +318,6 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
       alert(`Failed to save matchups: ${error.message}`);
     }
   });
-
-  // Backdrop does not dismiss (no click-outside handler).
 }
 
 /**

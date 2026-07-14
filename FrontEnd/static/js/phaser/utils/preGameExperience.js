@@ -1,6 +1,5 @@
 /**
  * Franchise Q1 pre-game experience: starting-five reveal → defense matchups → tip-off.
- * Replaces the Q1 defense-matchups popup for franchise mode only.
  */
 
 import {
@@ -12,12 +11,14 @@ import {
   POSITIONS,
   buildPlayerTileHtml,
   favArrowSvg,
+  favAccentColor,
   applyFavorBorders,
   userOrderFromMatchups,
   matchupsFromUserOrder,
   saveManDefenseMatchups,
   wireUserColumnDrag,
   playMatchupsUiSfx,
+  escapeHtml,
 } from "./matchupsUiShared.js";
 
 const SKIP_INTRO_KEY_PREFIX = "pregameSkipIntro_";
@@ -44,26 +45,38 @@ function ensureStyles() {
       border-radius: 50%; border: 1px solid rgba(255,255,255,0.05);
       box-shadow: 0 0 0 1px rgba(255,255,255,0.02); pointer-events: none;
     }
-    .pgxp-head { position: relative; z-index: 3; text-align: center; padding: 26px 20px 6px; flex-shrink: 0; }
-    .pgxp-eyebrow {
-      font-size: 11.5px; font-weight: 800; letter-spacing: .34em; text-transform: uppercase;
-      color: rgba(255,255,255,0.40); opacity: 0; transform: translateY(-6px);
+    .pgxp-head { position: relative; z-index: 3; text-align: center; padding: 26px 20px 4px; flex-shrink: 0; }
+    .pgxp-title {
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: .92;
+      letter-spacing: .02em; color: #fff;
+      opacity: 0; transform: translateY(-8px);
       transition: opacity .5s ease, transform .5s ease;
     }
-    .pgxp-title {
-      font-family: 'Bebas Neue', sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: .92;
-      letter-spacing: .02em; color: #fff; margin-top: 4px;
-      opacity: 0; transform: translateY(-8px);
-      transition: opacity .5s ease .06s, transform .5s ease .06s;
-    }
-    .pgxp-root[data-phase] .pgxp-eyebrow,
     .pgxp-root[data-phase] .pgxp-title { opacity: 1; transform: none; }
-    .pgxp-sub { margin-top: 8px; font-size: 12.5px; color: rgba(255,255,255,0.55); letter-spacing: .02em; min-height: 16px; }
-    .pgxp-sub b { color: rgba(255,255,255,0.90); font-weight: 700; }
+    .pgxp-records {
+      margin-top: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 0;
+      opacity: 0; transition: opacity .45s ease .08s;
+    }
+    .pgxp-root[data-phase] .pgxp-records { opacity: 1; }
+    .pgxp-root[data-phase="matchups"] .pgxp-records { display: none; }
+    .pgxp-rec {
+      display: inline-flex; align-items: baseline; gap: 8px; padding: 0 18px;
+      font-variant-numeric: tabular-nums;
+    }
+    .pgxp-rec .rk {
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(22px, 2.8vw, 30px);
+      line-height: 1; letter-spacing: .02em; color: #fff;
+    }
+    .pgxp-rec .wl {
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: .02em;
+    }
+    .pgxp-rec-div {
+      width: 1px; height: 22px; background: rgba(255,255,255,0.18); flex-shrink: 0;
+    }
     .pgxp-board {
       position: relative; z-index: 2; flex: 1; min-height: 0;
       display: flex; flex-direction: column; justify-content: center;
-      gap: 14px; padding: 4px clamp(14px, 4vw, 54px) 8px;
+      gap: 18px; padding: 8px clamp(14px, 4vw, 54px) 8px;
       max-width: 1200px; width: 100%; margin: 0 auto;
     }
     .pgxp-pair {
@@ -72,11 +85,11 @@ function ensureStyles() {
       transition: opacity .45s ease, filter .45s ease;
     }
     .pgxp-pair:not(:last-child)::after {
-      content: ''; position: absolute; left: 7%; right: 7%; bottom: -8px; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.13) 22%, rgba(255,255,255,0.13) 78%, transparent);
+      content: ''; position: absolute; left: 12%; right: 12%; bottom: -9px; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.12) 70%, transparent);
     }
-    .pgxp-pair .pgxp-side-left { transform: translateX(-40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); }
-    .pgxp-pair .pgxp-side-right { transform: translateX(40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); }
+    .pgxp-pair .pgxp-side-left { transform: translateX(-40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); justify-self: end; width: 100%; max-width: 520px; }
+    .pgxp-pair .pgxp-side-right { transform: translateX(40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); justify-self: start; width: 100%; max-width: 520px; }
     .pgxp-pair .pgxp-vs { transform: scale(.4); opacity: 0; transition: transform .4s cubic-bezier(.2,.9,.3,1.3) .1s, opacity .4s ease .1s; }
     .pgxp-pair.in { opacity: 1; }
     .pgxp-pair.in .pgxp-side-left, .pgxp-pair.in .pgxp-side-right { transform: none; }
@@ -91,11 +104,14 @@ function ensureStyles() {
       0%,100% { box-shadow: 0 8px 20px rgba(0,0,0,0.4), 0 0 6px 1px var(--glow, transparent); }
       50% { box-shadow: 0 8px 20px rgba(0,0,0,0.4), 0 0 15px 4px var(--glow, transparent); }
     }
-    @media (prefers-reduced-motion: reduce) { .dm-ph.dm-bold { animation: none; } .pgxp-pair.spot .pgxp-side-left, .pgxp-pair.spot .pgxp-side-right { animation: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .dm-ph.dm-bold { animation: none; }
+      .pgxp-pair.spot .pgxp-side-left, .pgxp-pair.spot .pgxp-side-right { animation: none; }
+    }
 
     .dm-ptile { display: flex; align-items: center; gap: 13px; position: relative; }
-    .pgxp-side-left .dm-ptile { flex-direction: row-reverse; text-align: right; }
-    .pgxp-side-right .dm-ptile { flex-direction: row; text-align: left; }
+    .pgxp-side-left .dm-ptile { flex-direction: row-reverse; text-align: right; justify-content: flex-start; }
+    .pgxp-side-right .dm-ptile { flex-direction: row; text-align: left; justify-content: flex-start; }
     .dm-ph {
       position: relative; flex-shrink: 0; width: clamp(64px, 7vw, 88px); aspect-ratio: 1/1; border-radius: 14px;
       overflow: hidden; background: linear-gradient(180deg, #1b2130, #10141d);
@@ -106,9 +122,16 @@ function ensureStyles() {
     .dm-sil svg { width: 78%; height: 88%; opacity: .8; }
     .dm-rtbadge {
       position: absolute; top: 5px; left: 5px; z-index: 2;
-      font-family: 'Bebas Neue', sans-serif; font-size: 13px; line-height: 1; letter-spacing: .04em;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 13px; line-height: 1; letter-spacing: .04em;
       padding: 3px 6px 1px; border-radius: 5px; color: #0b0d14;
     }
+    .dm-rtedge {
+      flex-shrink: 0; font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif;
+      font-size: clamp(28px, 4.2vw, 44px); line-height: 1; letter-spacing: .02em;
+      align-self: center; min-width: 1.15em; text-align: center;
+    }
+    .pgxp-root[data-phase="reveal"] .dm-rtedge { display: none; }
+    .pgxp-root[data-phase="matchups"] .dm-rtbadge { display: none; }
     .dm-pinfo { min-width: 0; }
     .dm-nm { font-size: clamp(13px, 1.5vw, 16px); font-weight: 700; color: #fff; line-height: 1.1; white-space: nowrap; }
     .dm-jn { color: rgba(255,255,255,0.55); font-weight: 600; font-size: .85em; }
@@ -121,12 +144,11 @@ function ensureStyles() {
     .dm-sl { font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,0.40); }
     .pgxp-vs { display: flex; flex-direction: column; align-items: center; gap: 5px; }
     .pgxp-vstext {
-      font-family: 'Bebas Neue', sans-serif; font-size: 20px; line-height: 1; letter-spacing: .06em;
-      color: rgba(255,255,255,0.40);
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px; line-height: 1; letter-spacing: .06em;
     }
+    .pgxp-root[data-phase="matchups"] .pgxp-vstext { display: none; }
     .dm-favarrow { display: flex; }
     .dm-favarrow svg { width: 32px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-    .pgxp-root[data-phase="matchups"] .pgxp-vstext { display: none; }
     .pgxp-root[data-phase="matchups"] .pgxp-user .dm-ptile {
       cursor: grab; border-radius: 14px; padding: 6px 8px; margin: -6px -8px;
       transition: background .15s, box-shadow .15s;
@@ -143,7 +165,7 @@ function ensureStyles() {
       padding: 14px 22px 22px; min-height: 74px;
     }
     .pgxp-cta {
-      font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: .06em; line-height: 1;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 22px; letter-spacing: .06em; line-height: 1;
       height: 50px; padding: 0 34px; border-radius: 10px; border: none;
       background: #34EC27; color: #0a1f06; cursor: pointer;
       box-shadow: 0 10px 26px rgba(52,236,39,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
@@ -182,7 +204,7 @@ function ensureStyles() {
     }
     .pgxp-root[data-phase="tipoff"] .pgxp-tipoff { opacity: 1; }
     .pgxp-tipoff .to {
-      font-family: 'Bebas Neue', sans-serif; font-size: clamp(48px, 9vw, 120px); letter-spacing: .04em; color: #fff;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(48px, 9vw, 120px); letter-spacing: .04em; color: #fff;
       text-shadow: 0 0 40px rgba(52,236,39,0.4);
       transform: scale(.8); transition: transform .5s cubic-bezier(.2,.9,.3,1.2);
     }
@@ -192,18 +214,31 @@ function ensureStyles() {
       .dm-statline { gap: 7px; }
       .dm-sv { font-size: 11px; }
       .pgxp-pair { grid-template-columns: 1fr 50px 1fr; }
+      .dm-rtedge { font-size: 24px; }
     }
   `;
   document.head.appendChild(style);
 }
 
-/**
- * @param {string} gameId
- * @param {Object} scene
- * @param {Object} payload - raw lineup-for-matchups response (normalized by caller)
- * @param {Object} normalized - from normalizeMatchupsPayload
- * @returns {Promise<void>}
- */
+function recordsStripHtml(awayTeam, homeTeam) {
+  const aRank = Number(awayTeam?.natl_rank ?? 0);
+  const hRank = Number(homeTeam?.natl_rank ?? 0);
+  const aW = Number(awayTeam?.wins ?? 0);
+  const aL = Number(awayTeam?.losses ?? 0);
+  const hW = Number(homeTeam?.wins ?? 0);
+  const hL = Number(homeTeam?.losses ?? 0);
+  return `
+    <div class="pgxp-rec">
+      <span class="rk">#${escapeHtml(String(aRank))}</span>
+      <span class="wl">${escapeHtml(String(aW))}-${escapeHtml(String(aL))}</span>
+    </div>
+    <div class="pgxp-rec-div" aria-hidden="true"></div>
+    <div class="pgxp-rec">
+      <span class="rk">#${escapeHtml(String(hRank))}</span>
+      <span class="wl">${escapeHtml(String(hW))}-${escapeHtml(String(hL))}</span>
+    </div>`;
+}
+
 export function showPreGameExperience(gameId, scene, normalized) {
   ensureStyles();
   const existing = document.querySelector(".pgxp-root");
@@ -227,9 +262,8 @@ export function showPreGameExperience(gameId, scene, normalized) {
   root.className = "pgxp-root";
   root.innerHTML = `
     <div class="pgxp-head">
-      <div class="pgxp-eyebrow"></div>
       <div class="pgxp-title"></div>
-      <div class="pgxp-sub"></div>
+      <div class="pgxp-records">${recordsStripHtml(awayTeam, homeTeam)}</div>
     </div>
     <div class="pgxp-board"></div>
     <div class="pgxp-foot">
@@ -244,15 +278,17 @@ export function showPreGameExperience(gameId, scene, normalized) {
   document.body.appendChild(root);
 
   const board = root.querySelector(".pgxp-board");
-  const eyebrow = root.querySelector(".pgxp-eyebrow");
   const title = root.querySelector(".pgxp-title");
-  const sub = root.querySelector(".pgxp-sub");
   const cta = root.querySelector(".pgxp-cta");
   const dontShow = root.querySelector("#pgxp-dont-show");
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function playerByPos(team, pos) {
     return (team.players || []).find((p) => p.position === pos) || null;
+  }
+
+  function isMatchupsPhase() {
+    return root.dataset.phase === "matchups";
   }
 
   function renderBoard() {
@@ -269,6 +305,10 @@ export function showPreGameExperience(gameId, scene, normalized) {
   }
 
   function paintSlots() {
+    const matchups = isMatchupsPhase();
+    const statsMode = matchups ? "game" : "season";
+    const rtMode = matchups ? "edge" : "badge";
+
     root.querySelectorAll(".pgxp-pair").forEach((row, i) => {
       const oppPos = POSITIONS[i];
       const userPos = userOrder[i];
@@ -278,8 +318,6 @@ export function showPreGameExperience(gameId, scene, normalized) {
       const rightP = userIsHome
         ? playerByPos(awayTeam, oppPos)
         : playerByPos(awayTeam, userPos);
-      const leftUser = userIsHome;
-      const rightUser = !userIsHome;
 
       const leftEl = row.querySelector(".pgxp-side-left");
       const rightEl = row.querySelector(".pgxp-side-right");
@@ -287,46 +325,46 @@ export function showPreGameExperience(gameId, scene, normalized) {
         ? buildPlayerTileHtml(leftP, {
             side: "left",
             teamColor: homePrimary,
-            isUserColumn: leftUser,
-            statsMode: "season",
-            slotIndex: leftUser ? i : null,
+            isUserColumn: userIsHome && matchups,
+            statsMode,
+            rtMode,
+            slotIndex: userIsHome && matchups ? i : null,
           })
         : "";
       rightEl.innerHTML = rightP
         ? buildPlayerTileHtml(rightP, {
             side: "right",
             teamColor: awayPrimary,
-            isUserColumn: rightUser,
-            statsMode: "season",
-            slotIndex: rightUser ? i : null,
+            isUserColumn: !userIsHome && matchups,
+            statsMode,
+            rtMode,
+            slotIndex: !userIsHome && matchups ? i : null,
           })
         : "";
 
-      const leftCompareRt = Number(leftP?.rt ?? 0);
-      const rightCompareRt = Number(rightP?.rt ?? 0);
-
+      const leftRt = Number(leftP?.rt ?? 0);
+      const rightRt = Number(rightP?.rt ?? 0);
       applyFavorBorders(
         leftEl.querySelector(".dm-ph"),
         rightEl.querySelector(".dm-ph"),
-        leftCompareRt,
-        rightCompareRt,
+        leftRt,
+        rightRt,
         homePrimary,
         awayPrimary
       );
       row.querySelector(".dm-favarrow").innerHTML = favArrowSvg(
-        leftCompareRt,
-        rightCompareRt,
+        leftRt,
+        rightRt,
         homePrimary,
         awayPrimary
       );
       const vst = row.querySelector(".pgxp-vstext");
       if (vst) {
-        const d = leftCompareRt - rightCompareRt;
-        vst.style.color = d >= 3 ? homePrimary : d <= -3 ? awayPrimary : "#c8ccd6";
+        vst.style.color = favAccentColor(leftRt, rightRt, homePrimary, awayPrimary);
       }
     });
 
-    if (root.dataset.phase === "matchups") {
+    if (matchups) {
       wireUserColumnDrag(
         root,
         () => userOrder,
@@ -342,9 +380,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
     clearTimers();
     root.classList.remove("dissolved");
     root.dataset.phase = "reveal";
-    eyebrow.textContent = "Tale of the Tape";
     title.textContent = `${String(awayName).toUpperCase()}  @  ${String(homeName).toUpperCase()}`;
-    sub.innerHTML = "";
     cta.classList.remove("show");
     cta.textContent = "Set Defense Matchups";
     board.classList.add("revealing");
@@ -363,11 +399,6 @@ export function showPreGameExperience(gameId, scene, normalized) {
         setTimeout(() => {
           pairs.forEach((x) => x.classList.remove("spot"));
           p.classList.add("in", "spot");
-          const userPos = userOrder[i];
-          const oppPos = POSITIONS[i];
-          const defender = playerByPos(userIsHome ? homeTeam : awayTeam, userPos);
-          const offense = playerByPos(userIsHome ? awayTeam : homeTeam, oppPos);
-          sub.innerHTML = `<b>${defender?.name || "—"}</b> guards the ${oppPos} · <b>${offense?.name || "—"}</b>`;
           playPregameRevealClick(scene);
         }, 700 + i * 820)
       );
@@ -381,9 +412,6 @@ export function showPreGameExperience(gameId, scene, normalized) {
       p.classList.add("in");
       p.classList.remove("spot");
     });
-    eyebrow.textContent = "";
-    title.textContent = `${String(awayName).toUpperCase()}  @  ${String(homeName).toUpperCase()}`;
-    sub.innerHTML = "";
     timers.push(setTimeout(() => cta.classList.add("show"), 350));
   }
 
@@ -392,9 +420,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
     root.dataset.phase = "matchups";
     root.querySelectorAll(".pgxp-pair").forEach((p) => p.classList.add("in"));
     board.classList.remove("revealing");
-    eyebrow.textContent = "";
     title.textContent = "DEFENSE MATCHUPS";
-    sub.innerHTML = "Drag your defenders to change who guards whom. Slot order = who guards each opponent.";
     cta.textContent = "Submit & Tip Off";
     cta.classList.add("show");
     paintSlots();
@@ -431,7 +457,6 @@ export function showPreGameExperience(gameId, scene, normalized) {
 
   return new Promise((resolve) => {
     startPregameBed(scene, { tournament: !!isTournamentContext });
-
     renderBoard();
 
     const skipPersisted =
@@ -457,14 +482,5 @@ export function showPreGameExperience(gameId, scene, normalized) {
       if (root.dataset.phase === "matchups") toTipoff(resolve);
       else toMatchups();
     });
-
-    // Safety: if tip-off path never fires, don't leak the bed forever on unexpected close
-    root.addEventListener(
-      "remove",
-      () => {
-        clearTimers();
-      },
-      { once: true }
-    );
   });
 }

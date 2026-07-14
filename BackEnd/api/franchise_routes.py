@@ -11718,6 +11718,14 @@ def get_training_squad_reports(franchise_id: str, user: dict = Depends(get_curre
     return {"reports": ordered, "attr_keys": TRAINING_SQUAD_ATTR_KEYS}
 
 
+def _scouting_usage_unlocks_for_week(current_week: int, user_film_study: int) -> tuple[bool, bool]:
+    """Return (base_play_usage_unlocked, extended_usage_unlocked) for FCC scouting."""
+    if 27 <= int(current_week or 0) <= 34:
+        return True, True
+    film_study = int(user_film_study or 0)
+    return film_study > 0, film_study > 1
+
+
 @router.get("/franchise/scouting-report")
 def get_scouting_report(franchise_id: str, team_name: str):
     """
@@ -11809,10 +11817,9 @@ def get_scouting_report(franchise_id: str, team_name: str):
         scout_players, player_season_stats
     )
 
-    # Play Usage gate: the opponent's prior-game Play Usage is only revealed once
-    # the USER runs that week's training with Film Study > 0. Until then (and if
-    # Film Study == 0), Play Usage is N/A. Only Play Usage is gated — the rest of
-    # the scouting report (attributes, projected five, season stats) is unaffected.
+    # Play Usage gate: regular-season prior-game usage is revealed by the USER's
+    # Film Study allocation for that week. EOS tournament weeks 27-34 do not run
+    # training, so all scouting usage panels are visible.
     current_week = int(franchise_doc.get("week", 1) or 1)
     _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     user_film_study = 0
@@ -11829,17 +11836,19 @@ def get_scouting_report(franchise_id: str, team_name: str):
             )
         except Exception:
             user_film_study = 0
-    play_usage_unlocked = user_film_study > 0
+    play_usage_unlocked, extended_usage_unlocked = _scouting_usage_unlocks_for_week(
+        current_week,
+        user_film_study,
+    )
     if not play_usage_unlocked:
         plays_data = []
 
     # Fast Break (offense) and HCT trap (defense) play usage unlock at a higher
-    # Film Study tier (> 1); Half-Court Offense unlocks at > 0. Same per-game
-    # source as HCO — the opponent's saved last-game `scouting` snapshot.
+    # Film Study tier (> 1) in regular-season weeks. Tournament weeks bypass this
+    # gate because there is no weekly training.
     from BackEnd.utils.scouting_utils import extract_play_counters_from_game_document
     from BackEnd.constants.fast_break_play_types import FAST_BREAK_PLAY_LABELS
     from BackEnd.constants.hct_trap_play_types import HCT_TRAP_PLAY_LABELS
-    extended_usage_unlocked = user_film_study > 1
     fast_break_plays: list = []
     hct_trap_plays: list = []
     if extended_usage_unlocked:

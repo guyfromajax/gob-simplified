@@ -5164,10 +5164,9 @@ async function renderScoutingTab() {
     renderFccScoutingProjectedLineup();
     renderFccScoutingMeasures(teamData.team_attributes || {});
     if (typeof renderPlayUsage === 'function') {
-      // Play Usage is gated on the user running this week's training with Film
-      // Study (backend sets the *_unlocked flags). HCO unlocks at Film Study > 0;
-      // Fast Breaks + Half-Court Traps unlock at > 1. Until then each panel shows
-      // N/A with a hint. Absent HCO flag → treat as unlocked (back-compat).
+      // Backend owns scouting visibility. Regular-season Play Usage is gated by
+      // Film Study; EOS tournament weeks bypass the gate because training does
+      // not run. Until unlocked, each panel shows N/A with a hint.
       const playUsageUnlocked = playUsage.play_usage_unlocked !== false;
       renderPlayUsage(
         playUsageUnlocked ? (playUsage.plays || []) : [],

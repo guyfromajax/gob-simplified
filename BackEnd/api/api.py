@@ -6208,14 +6208,82 @@ try:
                     players.append(player_data)
             return {
                 "team_name": team.name,
-                "team_id": getattr(team, "team_id", None),
+                "team_id": getattr(team, "team_id", None) or getattr(team, "id", None),
                 "players": players,
                 "primary_color": getattr(team, "primary_color", "#000000"),
                 "secondary_color": getattr(team, "secondary_color", "#ffffff"),
+                "natl_rank": None,
+                "wins": 0,
+                "losses": 0,
             }
 
         home_block = build_team_block(home_team)
         away_block = build_team_block(away_team)
+
+        # Franchise meta for pre-game records strip: FTD natl_rank + standings W-L
+        if franchise_id:
+            try:
+                from BackEnd.utils.game_team_scoreboard_enrichment import (
+                    natl_rank_from_ftd_document,
+                    resolve_mongo_team_id_string,
+                )
+                from BackEnd.utils.franchise_standings import calculate_franchise_standings
+                from BackEnd.db import franchise_team_data_collection
+
+                fr = franchises_collection.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {"results": 1, "week": 1},
+                )
+                results = (fr or {}).get("results") or {}
+                team_ids = []
+                for block in (home_block, away_block):
+                    canon = resolve_mongo_team_id_string(block.get("team_id") or block.get("team_name"))
+                    block["_canon_tid"] = canon
+                    if canon:
+                        team_ids.append(canon)
+                standings = {}
+                if team_ids:
+                    standings = calculate_franchise_standings(
+                        results,
+                        {tid: {} for tid in team_ids},
+                    )
+                    oids = []
+                    for tid in team_ids:
+                        try:
+                            oids.append(ObjectId(tid))
+                        except Exception:
+                            pass
+                    ftd_by = {}
+                    if oids:
+                        for doc in franchise_team_data_collection.find(
+                            {"franchise_id": ObjectId(franchise_id), "team_id": {"$in": oids}},
+                            {"team_id": 1, "natl_rank": 1, "Recruits": 1},
+                        ):
+                            tid = doc.get("team_id")
+                            if tid is not None:
+                                ftd_by[str(tid)] = doc
+                    for block in (home_block, away_block):
+                        canon = block.pop("_canon_tid", None)
+                        if not canon:
+                            continue
+                        ftd = ftd_by.get(canon)
+                        nr = natl_rank_from_ftd_document(ftd) if ftd else None
+                        if nr is not None:
+                            block["natl_rank"] = int(nr)
+                        st = standings.get(canon) or {}
+                        try:
+                            block["wins"] = int(st.get("W", 0) or 0)
+                            block["losses"] = int(st.get("L", 0) or 0)
+                        except (TypeError, ValueError):
+                            block["wins"] = 0
+                            block["losses"] = 0
+                else:
+                    for block in (home_block, away_block):
+                        block.pop("_canon_tid", None)
+            except Exception:
+                for block in (home_block, away_block):
+                    block.pop("_canon_tid", None)
+
         user_block = home_block if user_team_side == "home" else away_block
         computer_block = away_block if user_team_side == "home" else home_block
 

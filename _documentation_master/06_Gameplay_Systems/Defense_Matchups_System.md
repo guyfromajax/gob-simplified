@@ -34,22 +34,18 @@ Tutorial mode (`?mode=tutorial`) skips the UI entirely.
 ## User Interface
 
 ### Layout (current)
-- **Columns:** Home team **left**, away team **right**
-- **Draggable:** Only the **user** team column (left if user is home, right if user is away)
-- **Five slots:** Opponent positions PG → C down the board; user defender in slot *i* guards that opponent position
-- **Default assignments:** Position-on-position (PG→PG, etc.)
+- **Columns:** Home team **left**, away team **right** (all surfaces)
+- **Draggable:** Only the **user** team column
+- **Five slots:** Opponent positions PG → C; user defender in slot *i* guards that opponent position
+- **In-game headers:** Team names centered with **team-color underline** (no tinted pill fills); no modal title
+- **Submit:** Content-sized centered button above the Don't-show checkbox
 
 ### Card Content
 Each tile:
-- Headshot (`getPlayerImageUrl(..., { size: 'card' })`) with RT badge (Attribute Bar Scale)
-- Name (`#jersey`) · HT · WT
-- Stat strip:
-  - **Pre-game:** season PPG / RPG / APG / DEF% (FPD)
-  - **In-game modal:** this-game PTS / REB / AST / DEF%
-
-### Team Headers (in-game modal)
-- Background: team primary at 0.2 alpha; border at 0.6 alpha; white text
-
+- Headshot (`getPlayerImageUrl(..., { size: 'card' })`)
+- Name (`#jersey`) · HT · WT (no class year)
+- Stat strip: **reveal** = season PPG/RPG/APG/DEF%; **matchups surfaces** = game PTS/REB/AST/DEF%
+- RT: badge on headshot (reveal only); tall outer-edge number on matchups surfaces (Attribute Bar Scale)
 ---
 
 ## Drag-and-Drop Functionality

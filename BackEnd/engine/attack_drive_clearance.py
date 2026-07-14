@@ -377,6 +377,18 @@ def _compute_halfway(
     }
 
 
+def _drive_stop_coord(
+    start: Dict[str, float], end: Dict[str, float], fraction: float
+) -> Dict[str, int]:
+    """S2d: the BH's stop point = `fraction` of the way from the drive start toward the destination
+    (0 = didn't move, 1 = reached the rim). Used to halt a contested/stopped drive short of the rim."""
+    f = max(0.0, min(1.0, float(fraction)))
+    return {
+        "x": int(round(float(start["x"]) + (float(end["x"]) - float(start["x"])) * f)),
+        "y": int(round(float(start["y"]) + (float(end["y"]) - float(start["y"])) * f)),
+    }
+
+
 def _occupied_locations(drive_end_by_pos: Dict[str, Dict[str, Any]]) -> Set[str]:
     occupied: Set[str] = set()
     for target in drive_end_by_pos.values():
@@ -1011,6 +1023,36 @@ def build_attack_drive_sequence(
                     "action": "guard_offball",
                 }
 
+    # S2d — path-stop: on a contested (B) or defense-win (C) drive, the BH is halted SHORT of the rim
+    # at the contest's stop point instead of driving all the way in. Move his drive-end + shoot coord
+    # to the stop, reclassify the shot from the stop distance (pull-up vs layup — the coord-based shot
+    # math then makes a stopped shot organically harder), and wall the primary defender just beyond the
+    # stop (between the BH and the basket). Tier A (blow-by) + flag-off are untouched. S2b routes the
+    # foul/charge/TO contact; S2e the pull-up/dish/reset options. See Dynamic_MM_Brief §S2.
+    _stop_shot_type = None
+    _stop_shot_playcall = None
+    if _three_tier and drive_tier in ("B", "C") and drive_stop_fraction < 1.0:
+        _bh_stop = _drive_stop_coord(driver_start, drive_end, drive_stop_fraction)
+        _stop_shot_type, _stop_shot_playcall = _shot_type_for_coords(_bh_stop, is_away_offense)
+        drive_end_by_pos[ball_handler_pos] = {"location": destination_location, "coords": _bh_stop}
+        drive_pos_actions[ball_handler_pos] = _pos_action_for_target(
+            drive_end_by_pos[ball_handler_pos], "drive")
+        final_off_for_defense[ball_handler_pos] = {
+            "location": destination_location, "coords": _bh_stop}
+        if bh_defender_pos and def_lineup.get(bh_defender_pos):
+            # The defender who stopped him guards the ball AT the stop (standard on-ball cushion →
+            # the pull-up is contested), between the BH and the basket. Mirrors the "defense wins →
+            # guard_ball" path, but at the stop instead of the rim.
+            defender_overrides[bh_defender_pos] = {
+                "coords": get_defender_coords(
+                    _bh_stop, is_away_offense, aggression, destination_location, None,
+                    is_ball_handler=True),
+                "action": "guard_ball",
+            }
+        logging.warning(
+            "🛑 [DRIVE STOP] tier %s → BH stopped at %.0f%% (%s) shot=%s",
+            drive_tier, drive_stop_fraction * 100, _bh_stop, _stop_shot_type)
+
     # Build full defender end coords for contest geometry
     defender_end_coords: Dict[str, Dict[str, float]] = {}
     for def_pos in _OFFENSE_POSITIONS:
@@ -1062,8 +1104,10 @@ def build_attack_drive_sequence(
 
     driver_shoots = random.random() < shoot_prob
     dish_target_pos: Optional[str] = None
-    resolved_shot_type = "attack"
-    resolved_playcall = "Attack"
+    # S2d: a stopped drive (B/C) is a pull-up from the stop, not a layup — reclassify the driver's shot
+    # from the stop coord (falls back to "attack" for a full drive / Tier A / flag-off).
+    resolved_shot_type = _stop_shot_type or "attack"
+    resolved_playcall = _stop_shot_playcall or "Attack"
     uncontested = defender_count == 0
     defense_bonus = 100 if is_double_team and driver_shoots else 0
 

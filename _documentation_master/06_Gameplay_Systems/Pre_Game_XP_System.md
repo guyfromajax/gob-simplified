@@ -37,13 +37,16 @@ Sim Quarter / Sim Full Game never open matchups UI (unchanged gate: `shouldShowM
 
 ## Layout & Matchup Model
 
-- **Columns:** home **left**, away **right** (always)
+- **Columns:** home **left**, away **right** (all surfaces: reveal, pre-game matchups, in-game modal)
 - **Draggable column:** only the **user** side (left if user is home, right if user is away)
 - **Assignment:** defender in slot *i* guards opponent position `POSITIONS[i]` (`PG`…`C`)
 - **Save shape (unchanged):** `{ userPos: guardedOppPos }` via `POST /api/save-man-defense-matchups`
-- Matchups still **reset to defaults** at each break (engine); this UI only edits the user dict for the upcoming segment
 
-Favorability: RT diff ≥ 3 → bold 4px border + arrow toward the stronger player in that team’s primary; within 2 → both white 2px borders + neutral double arrow.
+**Reveal (lineup announce):** title `AWAY @ HOME`; records strip `#Rank W-L` away then home (FTD `natl_rank` + standings W-L); RT as headshot badge; center position label colored to favorability; season stats; no eyebrow / no rolling subline.
+
+**Matchups (pre-game step + in-game modal):** RT as tall outer-edge number (Attribute Bar Scale color); arrows only in center; **game** PTS/REB/AST/DEF%; drag keeps each player's own-position RT.
+
+Favorability: RT diff ≥ 3 → bold 4px border + arrow toward the stronger player in that team’s primary; within 2 → both white 2px borders + neutral silver double arrow.
 
 ---
 
@@ -59,10 +62,12 @@ Returns:
 - `franchise_id`, `franchise_week`, `is_franchise`, `is_tournament_context` (week ≥ 27)
 - Per player: `player_id`, `position`, `name`, `jersey`, `height`, `weight`, `rt` (position RT), `game_stats` (PTS/REB/AST/DEF%), `season_stats` (PPG/RPG/APG/DEF%/GP), plus legacy `attributes` / `stats` keys
 
-| Surface | Stat strip |
-|---------|------------|
-| Pre-game | **Season** from FPD (`season_stats`) |
-| In-game modal | **This game** from in-memory `player.stats["game"]` (`game_stats`) |
+| Surface | Stat strip | RT treatment |
+|---------|------------|--------------|
+| Pre-game **reveal** | **Season** PPG/RPG/APG/DEF% (FPD) | Badge on headshot |
+| Pre-game **matchups** + in-game modal | **This game** PTS/REB/AST/DEF% | Tall edge number (no badge) |
+
+Team blocks also include `natl_rank`, `wins`, `losses` for the reveal records strip.
 
 Images: `API_CONFIG.getPlayerImageUrl(player_id, { size: 'card' })`, lazy, 176×176, silhouette fallback.
 

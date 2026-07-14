@@ -20,6 +20,41 @@ from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import GridCoord, PlayerAction, PlayerArchetype
 
 
+# --- Universal foul-contact rattle -----------------------------------------
+# On a hard collision that draws a foul (D_FOUL / O_FOUL / charge / blocking), BOTH involved sprites
+# shake. The FE already renders a `rattle` flourish (flourishes.js `runRattle`) with a `foul_rattle_mult`
+# that scales it above a normal shot-contest rattle. This is the ONE turn-type-agnostic writer — call it
+# from any foul finalization (HCO drive, FB/HCT cutoff, shot foul, …) instead of each stamping its own.
+FOUL_CONTACT_RATTLE_MULT = 1.6      # foul rattle amplitude vs a shot-contest rattle (× on the FE)
+FOUL_CONTACT_RATTLE_CYCLES = 4
+
+
+def stamp_foul_contact_rattle(
+    step: Optional[Dict[str, Any]],
+    player_ids,
+    *,
+    mult: float = FOUL_CONTACT_RATTLE_MULT,
+    cycles: int = FOUL_CONTACT_RATTLE_CYCLES,
+) -> None:
+    """Stamp a `rattle` flourish on EACH of ``player_ids`` (the fouler + the fouled) on
+    ``step.start.flourish`` so both sprites shake on a foul collision. Turn-type agnostic. Render-only
+    + UESS-safe (never mutates gameplay coords). Wrapped so a stamping error can never break a turn."""
+    try:
+        if step is None:
+            return
+        flourish = step.setdefault("start", {}).setdefault("flourish", {})
+        for pid in player_ids:
+            if pid is None:
+                continue
+            flourish[str(pid)] = {
+                "kind": "rattle",
+                "cycles": int(cycles),
+                "foul_rattle_mult": float(mult),
+            }
+    except Exception:
+        pass
+
+
 def build_final_coords(game: Any) -> Dict[str, GridCoord]:
     """Snapshot every on-court player's current ``player.coords`` as a flat
     ``{player_id: {x, y}}`` dict. Stamped on each turn_result after
