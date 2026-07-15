@@ -185,8 +185,8 @@ SHOT_CLOCK_START = 30              # clamp ceiling for shot-clock-scaled bars
 # Widened the "safe" band (300/100 vs old 200/125) so far more steps resolve as "safe" (always
 # progress / work the ball, never shoot) — cuts FGA by deferring shots, and notably shrinks the
 # bar-immune "random" tier that was chucking in the Mid shot-clock tier. See Dynamic_HCO_System.md.
-SHOOT_READ_RIGHT = 300             # read tier: optimal decision (shoot/dish if optimal, else progress)
-SHOOT_READ_SAFE = 100              # read tier: safe decision (conservative — cascades by shot clock)
+SHOOT_READ_RIGHT = 200             # read tier: optimal decision (shoot/dish if optimal, else progress)
+SHOOT_READ_SAFE = 125              # read tier: safe decision (conservative — cascades by shot clock)
 SAFE_HOLD_CLOCK = 20.0             # safe tier: clock > this → hold (work the ball)
 SAFE_PASS_CLOCK = 10.0             # safe tier: clock in (PASS, HOLD] → hold-or-pass; ≤ PASS → 3-way
 
@@ -261,7 +261,7 @@ def _shoot_threshold(shot_clock, tempo_call):
 
 
 def _shoot_read_tier(shooter, off_team, rng):
-    """Decision-quality tier: right (> SHOOT_READ_RIGHT=300) / safe (> SHOOT_READ_SAFE=100) / random (else)."""
+    """Decision-quality tier: right (> SHOOT_READ_RIGHT=200) / safe (> SHOOT_READ_SAFE=125) / random (else)."""
     read = (player_read_raw(shooter) + _team_attr(off_team, "discipline", 0)) * rng.randint(1, 6)
     if read > SHOOT_READ_RIGHT:
         return "right"
