@@ -303,7 +303,7 @@
 
     <!-- audio cue annotations -->
     <div class="cue on" id="cue-intro" style="top:80px;left:50%;transform:translateX(-50%)">♪ intro sting + crowd swell</div>
-    <div class="cue" id="cue-reveal" style="top:120px;right:24px">♪ click-beep as each matchup lands (×5, PG→C)</div>
+    <div class="cue" id="cue-reveal" style="top:120px;right:24px">♪ click-beep as each matchup lands (×5, PG→C; first at 1000ms, then every 2000ms)</div>
     <div class="cue" id="cue-matchups" style="top:80px;left:24px">♪ announcer: "DEFENSE MATCHUPS"</div>
     <div class="cue" id="cue-tipoff" style="bottom:90px;left:50%;transform:translateX(-50%)">♪ tip-off horn → gameplay music starts</div>
 
@@ -498,9 +498,9 @@
         p.classList.add('in','spot');
         sub.innerHTML = `<b>${MINE[i].name}</b> guards the ${POS[i]} · <b>${OPP[i].name}</b>`;
         setCue('cue-reveal');
-      }, 700 + i*820));
+      }, 1000 + i*2000));
     });
-    timers.push(setTimeout(settle, 700 + 5*820 + 200));
+    timers.push(setTimeout(settle, 1000 + 5*2000 + 200));
   }
 
   function settle() {

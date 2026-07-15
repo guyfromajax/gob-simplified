@@ -5024,12 +5024,19 @@ BACKDOOR_TRIGGER_BAR = 4.0          # denial (grid) — how hard the defender mu
 BACKDOOR_LANDING_OPEN_RADIUS = 8.0  # a defender within this of the rim = help protecting it → no backdoor
 
 
-def _hco_backdoor_read(commitment, def_xy, bh_pos, basket_xy):
+def _hco_backdoor_read(commitment, def_xy, bh_pos, basket_xy, defender_reads, off_to_def):
     """S3c (Goal 2) — pick the backdoor cutter, or None. An OFF-BALL man whose defender overplays the
     passing lane (`denial ≥ BACKDOOR_TRIGGER_BAR`, the locked ball-axis trigger, §6A) cuts behind him to
-    the rim — BUT only if the rim is UNPROTECTED (no defender within `BACKDOOR_LANDING_OPEN_RADIUS` of the
-    basket). So a sagging/help defense organically shuts backdoors off; a pure deny with no rim help opens
-    them. Pure geometry off the frozen grid — the finish is judged by the normal shot/catch contest."""
+    the rim — but only when THREE geometry/read gates all hold:
+      1. the rim is UNPROTECTED (no defender within `BACKDOOR_LANDING_OPEN_RADIUS` of the basket → no help),
+      2. `denial ≥ BACKDOOR_TRIGGER_BAR` (his man is overplaying the lane), and
+      3. **the READ-GATE (S3-linchpin):** his man is BEATEN on this step's reactive read
+         (`_defender_reads[def].follows is False`) — i.e. he overplayed AND failed to read the cut. A
+         defender who reads it (`follows`) would recover, so no backdoor springs. This makes the trigger
+         attribute-driven (the same IQ/CH read every defender rolls each step), not pure geometry.
+    So a sagging/help defense shuts backdoors off (gate 1), and a sharp defender denies them off his own
+    recognition (gate 3), both organically. (The open FINISH — the beaten man trailing to the rim — is the
+    remaining linchpin piece; today the finish is still the normal matchup contest.)"""
     import math
     if not commitment:
         return None
@@ -5038,13 +5045,68 @@ def _hco_backdoor_read(commitment, def_xy, bh_pos, basket_xy):
         if d and math.hypot(float(d["x"]) - float(basket_xy["x"]),
                             float(d["y"]) - float(basket_xy["y"])) <= BACKDOOR_LANDING_OPEN_RADIUS:
             return None
+    reads = defender_reads or {}
     best_pos, best_denial = None, BACKDOOR_TRIGGER_BAR
     for pos, c in commitment.items():
         if pos == bh_pos:
             continue  # the BH holds the ball — he can't be the backdoor receiver
-        if float(c.get("denial", 0.0)) >= best_denial:
-            best_pos, best_denial = pos, float(c["denial"])
+        if float(c.get("denial", 0.0)) < best_denial:
+            continue
+        r = reads.get(off_to_def.get(pos, pos))
+        if not (isinstance(r, dict) and r.get("follows") is False):
+            continue  # his man read the cut → he'd recover → no backdoor
+        best_pos, best_denial = pos, float(c["denial"])
     return best_pos
+
+
+def _hco_cut_openness_lift(cutter_rim, defender_prior, margin):
+    """S3 Option 3 — the `should_shoot` openness LIFT for a cut, from the beaten defender's TRAILED spot.
+    The defender lags from his overplay position toward the rim by the SAME lag-fraction the animator
+    applies (from his read margin), so his gap to the cutter = (1 − frac)·‖rim − overplay‖. A real beat
+    (freeze, frac→0) leaves a wide-open layup; a barely-beaten (near-stick, frac→1) defender STAYS IN
+    RANGE (tiny gap → below the ramp → the Hot Read won't feed him). Same cushion→lift ramp as step-in."""
+    import math
+    from BackEnd.models.animator import OPENNESS_LAG_MAX, OPENNESS_LAG_MARGIN_SCALE
+    beat = min(1.0, abs(float(margin)) / OPENNESS_LAG_MARGIN_SCALE)
+    frac = max(0.0, 1.0 - OPENNESS_LAG_MAX * beat)
+    cushion = (1.0 - frac) * math.hypot(
+        float(cutter_rim["x"]) - float(defender_prior.get("x", cutter_rim["x"])),
+        float(cutter_rim["y"]) - float(defender_prior.get("y", cutter_rim["y"])))
+    span = max(1e-6, STEP_IN_OPENNESS_OPEN - STEP_IN_OPENNESS_MIN)
+    return STEP_IN_QUALITY_LIFT_MAX * max(0.0, min(1.0, (cushion - STEP_IN_OPENNESS_MIN) / span))
+
+
+def _build_backdoor_cut_beat(step, cutter_pos, bh_pos, off_lineup, is_away_offense):
+    """S3 Option 3 — a CUT beat: the backdoor cutter relocates to the rim (a mover → his beaten defender
+    trails via the S1 lag on this moving beat, since `_defender_reads` is stamped on it by the caller);
+    the BH keeps the ball (`handle_ball`); everyone else holds. Mirrors `build_subtle_beat`'s shape so
+    the animator + step-states treat it identically. Returns the beat, or None if positions are missing."""
+    from BackEnd.engine.attack_drive_clearance import _basket_display_coords, _spot_display_coords
+    pos_actions = step.get("pos_actions") or {}
+    if cutter_pos not in pos_actions or bh_pos not in pos_actions:
+        return None
+    rim = _basket_display_coords(is_away_offense)
+    new_pos_actions = {}
+    for pos in off_lineup:
+        if not off_lineup.get(pos) or pos not in pos_actions:
+            continue
+        info = pos_actions.get(pos) or {}
+        if pos == cutter_pos:
+            new_pos_actions[pos] = {"coords": {"x": round(float(rim["x"]), 1), "y": round(float(rim["y"]), 1)},
+                                    "location": "basketSpot", "action": "cut"}
+            continue
+        xy = info.get("coords") or _spot_display_coords(info.get("location") or "key", is_away_offense)
+        new_pos_actions[pos] = {
+            "coords": {"x": round(float(xy["x"]), 1), "y": round(float(xy["y"]), 1)},
+            "location": info.get("location") or "key",
+            "action": "handle_ball" if pos == bh_pos else "stationary",
+        }
+    return {
+        "timestamp": step.get("timestamp", 0) + 150,
+        "pos_actions": new_pos_actions,
+        "events": [],
+        "_subtle_movement": {"bh_pos": bh_pos, "movers": [cutter_pos]},
+    }
 
 
 def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
@@ -6014,9 +6076,22 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             steps[i]["_commitment"] = _hco_commitment_map(
                 off_lineup, _c_def_xy, _c_coord, bh_pos, _c_coord(bh_pos), _c_basket, off_to_def)
             # S3c — precompute the backdoor cutter off the same frozen grid (def_xy) so the walk trigger
-            # (after the shoot decision) is a cheap stamped-value read.
-            steps[i]["_backdoor_cutter"] = _hco_backdoor_read(
-                steps[i]["_commitment"], _c_def_xy, bh_pos, _c_basket)
+            # (after the shoot decision) is a cheap stamped-value read. The read-gate consumes this step's
+            # already-rolled `_defender_reads` (S1 Part A, stamped above) + the matchup map. Store the
+            # cutter's defender's overplay coord + read margin too → the Option-3 cut opens him by his
+            # own trail (graded by margin).
+            _bd_pos = _hco_backdoor_read(
+                steps[i]["_commitment"], _c_def_xy, bh_pos, _c_basket,
+                steps[i].get("_defender_reads"), off_to_def)
+            if _bd_pos:
+                _bd_def = off_to_def.get(_bd_pos, _bd_pos)
+                steps[i]["_backdoor_cutter"] = {
+                    "cutter": _bd_pos,
+                    "def_prior": dict(_c_def_xy.get(_bd_def) or {}),
+                    "margin": float((steps[i].get("_defender_reads") or {}).get(_bd_def, {}).get("margin", 0.0)),
+                }
+            else:
+                steps[i]["_backdoor_cutter"] = None
 
         # 1. Universal shoot decision — runs BEFORE the movement matrix, every step, all
         # conditions. shoot/dish → execute (terminate); else fall through to movement.
@@ -6052,20 +6127,49 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     game, off_lineup, def_lineup, is_away_offense,
                 ), steps[i], bh_pos)
 
-        # S3c — backdoor read (Goal 2): an OFF-BALL man whose defender overplays the passing lane (denial)
-        # with an unprotected rim cuts backdoor; the BH feeds him at the basket. Precomputed geometry
-        # (`_backdoor_cutter`, from S3a's stamp) → reuses the dish path via `cut_to_location`, so assist +
-        # interception contest come free. Fires even under SM-precedence (a clear backdoor IS the payoff),
-        # after the shoot decision (an open shot still wins). No stamp off flag/zone → never fires.
-        _bd_cutter = steps[i].get("_backdoor_cutter")
-        if _bd_cutter and off_lineup.get(_bd_cutter):
-            logging.warning(f"🚪 [DYNAMIC {_kind}] step {i}: BACKDOOR {_bd_cutter} → basketSpot")
-            _bd_dec = {"action": BACKDOOR, "shooter_pos": _bd_cutter, "shot_type": "inside",
-                       "cut_to_location": "basketSpot"}
-            return _apply_dish_contest(_bd_dec, _execute_motion_decision(
-                skeleton, output_steps, steps[i], bh_pos, bh_location, _bd_dec,
-                game, off_lineup, def_lineup, is_away_offense,
-            ), steps[i], bh_pos)
+        # S3c backdoor (Goal 2, Option 3 — a MOVE that feeds the Hot Read, NOT an auto-dish): an off-ball
+        # man whose defender overplays the lane (denial) AND is beaten on his read (read-gate) cuts to the
+        # rim. We emit the cut as a beat — the cutter relocates, his beaten defender TRAILS on the moving
+        # beat (S1 lag, graded by margin) — then the BH's own Hot Read decides whether to feed him: only
+        # if his post-cut openness makes him the best look. A barely-beaten defender stays in range → low
+        # openness → no dish → the cutter clears out and the walk resumes. No stamp off flag/zone → never
+        # fires. (The OPEN FINISH — keeping the defender trailing onto the stationary shoot step — is the
+        # remaining 3-iii piece; today the layup still resolves via the normal matchup contest.)
+        _bd = steps[i].get("_backdoor_cutter")
+        if _bd and off_lineup.get(_bd["cutter"]):
+            _bd_cutter = _bd["cutter"]
+            _cut_beat = _build_backdoor_cut_beat(steps[i], _bd_cutter, bh_pos, off_lineup, is_away_offense)
+            if _cut_beat is not None:
+                _cut_beat["_defender_reads"] = steps[i].get("_defender_reads")  # trail the beaten defender
+                _cut_elapsed = float(random.randint(*SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))))
+                _cut_beat["_step_t_floor_game_seconds"] = _cut_elapsed
+                shot_clock_est = max(0.0, shot_clock_est - _cut_elapsed)
+                game_state["_hco_shot_clock_est"] = shot_clock_est
+                output_steps.append(_cut_beat)
+                # Post-cut Hot Read: the cutter is now at the rim with his beaten defender trailing → his
+                # graded openness enters the same should_shoot the whole offense reads. Dish only if he
+                # (or anyone) is the best open look; else fall through (he cleared out — resume skeleton).
+                from BackEnd.engine.attack_drive_clearance import _basket_display_coords as _bd_basket
+                _cut_rim = _bd_basket(is_away_offense)
+                _cut_open = dict(_hco_openness_map(steps[i].get("_commitment")))
+                _cut_open[_bd_cutter] = _hco_cut_openness_lift(_cut_rim, _bd.get("def_prior") or {}, _bd.get("margin", 0.0))
+                _cut_locs = {**locations, _bd_cutter: "basketSpot"}
+                _cut_shoot = should_shoot(bh_pos, off_lineup, _cut_locs, read_map, off_team,
+                                          shot_clock_est, tempo, random, allow_dish=True,
+                                          blocked_dish_targets=blocked_dish, openness_map=_cut_open)
+                if _cut_shoot:
+                    _cdec = {"action": BACKDOOR if _cut_shoot["shooter_pos"] == _bd_cutter else SHOOT,
+                             "shooter_pos": _cut_shoot["shooter_pos"], "shot_type": _cut_shoot["shot_type"]}
+                    if _cut_shoot["shooter_pos"] == _bd_cutter:
+                        _cdec["cut_to_location"] = "basketSpot"
+                    logging.warning(f"🚪 [DYNAMIC {_kind}] step {i}: CUT {_bd_cutter} → "
+                                    f"HOT READ {_cut_shoot['shooter_pos']} {_cut_shoot['shot_type']}")
+                    return _apply_dish_contest(_cdec, _execute_motion_decision(
+                        skeleton, output_steps, _cut_beat, bh_pos, bh_location, _cdec,
+                        game, off_lineup, def_lineup, is_away_offense,
+                    ), _cut_beat, bh_pos)
+                logging.warning(f"🚪 [DYNAMIC {_kind}] step {i}: CUT {_bd_cutter} covered → clear out")
+                continue
 
         # 2. Movement matrix. Under SM-precedence we force a subtle-movement beat
         # (reusing the branch below, incl. its <1s forced-shot backstop). Otherwise

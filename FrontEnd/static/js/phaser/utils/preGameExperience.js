@@ -22,6 +22,9 @@ import {
 } from "./matchupsUiShared.js";
 
 const DONT_SHOW_KEY_PREFIX = "defenseMatchupsDontShow_";
+const REVEAL_FIRST_PAIR_DELAY_MS = 1000;
+const REVEAL_NEXT_PAIR_INTERVAL_MS = 2000;
+const REVEAL_SETTLE_DELAY_MS = 200;
 
 function ensureStyles() {
   if (document.getElementById("pre-game-xp-styles")) return;
@@ -408,10 +411,15 @@ export function showPreGameExperience(gameId, scene, normalized) {
           pairs.forEach((x) => x.classList.remove("spot"));
           p.classList.add("in", "spot");
           playPregameRevealClick(scene);
-        }, 700 + i * 820)
+        }, REVEAL_FIRST_PAIR_DELAY_MS + i * REVEAL_NEXT_PAIR_INTERVAL_MS)
       );
     });
-    timers.push(setTimeout(settle, 700 + 5 * 820 + 200));
+    timers.push(
+      setTimeout(
+        settle,
+        REVEAL_FIRST_PAIR_DELAY_MS + pairs.length * REVEAL_NEXT_PAIR_INTERVAL_MS + REVEAL_SETTLE_DELAY_MS
+      )
+    );
   }
 
   function settle() {
