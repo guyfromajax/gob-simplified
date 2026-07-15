@@ -454,4 +454,71 @@ def test_pressure_step_state_projection_preserves_emitted_schema(
     states = build_pressure_step_states(payload, turn_type)
     projected = project_pressure_step_states_to_animation_steps(states)
 
+    assert any(state.get("projection_source") == "formal" for state in states)
     assert _strip_pressure_state(projected) == _strip_pressure_state(steps)
+
+
+@pytest.mark.parametrize("fcp", [False, True])
+def test_pressure_emitter_projects_first_slice_steps_through_step_state(fcp):
+    payload = _base_payload(result_type="HCO", reason="hct_pass", fcp=fcp)
+    segment_key = "fcp_loop_segments" if fcp else "hct_loop_segments"
+    payload[segment_key][0].update(
+        {
+            "pass_from_pos": "PG",
+            "pass_to_pos": "SG",
+            "ball_owner_pos": "SG",
+        }
+    )
+
+    steps = _build_steps(payload, fcp=fcp)
+
+    assert steps
+    assert all(step.get("_pressure_step_state") for step in steps)
+    assert all(
+        step["_pressure_step_state"].get("projection_source") == "formal"
+        for step in steps
+    )
+
+
+@pytest.mark.parametrize(
+    "result_type,reason",
+    [
+        ("FOUL", "hct_reach_in"),
+        ("DEAD BALL", "hct_dead_ball_turnover"),
+        ("STEAL", "hct_steal"),
+    ],
+)
+@pytest.mark.parametrize("fcp", [False, True])
+def test_pressure_emitter_projects_terminal_loop_steps_through_step_state(
+    fcp, result_type, reason
+):
+    payload = _base_payload(result_type=result_type, reason=reason, fcp=fcp)
+    if result_type == "FOUL":
+        payload.update(
+            {
+                "foul_team": "DEFENSE",
+                "foul_player_id": "def_pg",
+                "victim_id": "off_pg",
+            }
+        )
+    elif result_type == "DEAD BALL":
+        payload.update({"victim_id": "off_pg"})
+    elif result_type == "STEAL":
+        payload.update(
+            {
+                "stealer_id": "def_pg",
+                "victim_id": "off_pg",
+            }
+        )
+
+    steps = _build_steps(payload, fcp=fcp)
+
+    assert steps
+    terminal = steps[-1]
+    assert terminal.get("_pressure_step_state")
+    assert terminal["_pressure_step_state"].get("projection_source") == "formal"
+    assert terminal["_pressure_step_state"]["outcome"]["kind"] in {
+        "foul",
+        "dead_ball_turnover",
+        "steal",
+    }

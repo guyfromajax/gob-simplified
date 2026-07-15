@@ -144,7 +144,7 @@ def test_fight_and_discipline_share_training_bucket_randint_pairs(monkeypatch):
 
     monkeypatch.setattr(training.random, "randint", fake_randint)
 
-    expected_pairs = [(-4, -3), (-3, -1), (-1, 1), (1, 2), (2, 3), (2, 4)]
+    expected_pairs = [(-4, -3), (-1, 1), (0, 2), (1, 3), (2, 4), (3, 5)]
 
     team_d = {"discipline": 0}
     for bucket in range(6):
@@ -155,6 +155,92 @@ def test_fight_and_discipline_share_training_bucket_randint_pairs(monkeypatch):
         training._apply_team_training_points(team_f, "fight", bucket)
 
     assert calls == expected_pairs * 2
+
+
+def test_standard_and_chemistry_training_bucket_ranges(monkeypatch):
+    calls = []
+
+    def fake_randint(a, b):
+        calls.append((a, b))
+        return a
+
+    monkeypatch.setattr(training.random, "randint", fake_randint)
+
+    standard_expected = [(-2, -1), (0, 2), (1, 2), (2, 3), (2, 4), (2, 5)]
+    chemistry_expected = [(-3, -1), (0, 1), (1, 2), (2, 3), (2, 4), (2, 5)]
+
+    team = {"offensive_efficiency": 0, "team_chemistry": 10}
+    for bucket in range(6):
+        training._apply_team_training_points(team, "offensive_efficiency", bucket)
+    assert calls == standard_expected
+
+    calls.clear()
+    for bucket in range(6):
+        training._apply_team_training_points(team, "team_chemistry", bucket)
+    assert calls == chemistry_expected
+
+
+def test_rebound_modifier_training_bucket_ranges(monkeypatch):
+    calls = []
+
+    def fake_randint(a, b):
+        calls.append((a, b))
+        return a
+
+    monkeypatch.setattr(training.random, "randint", fake_randint)
+
+    team = {"rebound_modifier": 0.2}
+    for points in (0, 1, 2, 3, 4, 5):
+        training._apply_rebound_modifier_training(team, points)
+
+    assert calls == [(-5, -3), (3, 5), (3, 5), (3, 7), (3, 7), (3, 10)]
+
+
+def test_scrimmages_feed_team_chemistry_at_quarter_rate(monkeypatch):
+    players = [
+        {
+            "_id": "p1",
+            "attributes": {"anchor_SC": 50, "SC": 50, "NG": 1.0},
+        }
+    ]
+    team = {
+        "shot_threshold": 100,
+        "discipline": 0,
+        "fight": 0,
+        "rebound_modifier": 0.2,
+        "momentum_score": 0,
+        "offensive_efficiency": 0,
+        "team_chemistry": 10,
+        "defensive_efficiency": 0,
+        "fb_efficiency": 0,
+        "pt_efficiency": 0,
+        "fb_opp_modifier": 0,
+        "pt_opp_modifier": 0,
+    }
+    allocations = {
+        "team_drills": {
+            "scrimmages": 4,  # 4 * 0.25 => 1 effective chemistry point
+        },
+    }
+
+    chemistry_calls = []
+
+    monkeypatch.setattr(training, "_apply_player_training_points", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "_apply_breaks_effect", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "_apply_ng_reduction_from_scrimmages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(training, "_apply_ng_reduction_from_conditioning", lambda *args, **kwargs: [])
+    monkeypatch.setattr(training, "_apply_rebound_modifier_training", lambda *args, **kwargs: None)
+    monkeypatch.setattr(training, "_apply_shot_threshold_training", lambda *args, **kwargs: None)
+
+    def capture_team_training(_team, team_attr, points, *_args, **_kwargs):
+        if team_attr == "team_chemistry":
+            chemistry_calls.append(points)
+
+    monkeypatch.setattr(training, "_apply_team_training_points", capture_team_training)
+
+    training.apply_training_points(players, team, allocations)
+
+    assert chemistry_calls == [1]
 
 
 def test_training_gain_is_halved_when_player_starts_above_100(monkeypatch):

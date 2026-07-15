@@ -32,11 +32,11 @@ The following team attributes use the standard training table:
 
 | Points | Change |
 |---:|---:|
-| 0 | `-3` to `-1` |
-| 1 | `-1` to `+1` |
+| 0 | `-2` to `-1` |
+| 1 | `0` to `+2` |
 | 2 | `+1` to `+2` |
-| 3 | `+1` to `+3` |
-| 4 | `+1` to `+4` |
+| 3 | `+2` to `+3` |
+| 4 | `+2` to `+4` |
 | 5+ | `+2` to `+5` |
 
 `fight` and `discipline` use a separate shared table:
@@ -49,6 +49,17 @@ The following team attributes use the standard training table:
 | 3 | `+1` to `+3` |
 | 4 | `+2` to `+4` |
 | 5+ | `+3` to `+5` |
+
+`team_chemistry` uses its own table (`chemistry_ranges` in `training_execution_v2.py`). Effective points are the half-up rounded sum of weighted drill contributions (see Team Chemistry section), then bucketed `0–5`:
+
+| Effective Points | Change |
+|---:|---:|
+| 0 | `-3` to `-1` |
+| 1 | `0` to `+1` |
+| 2 | `+1` to `+2` |
+| 3 | `+2` to `+3` |
+| 4 | `+2` to `+4` |
+| 5+ | `+2` to `+5` |
 
 Positive gains can be amplified by coaching focus. The focus multiplier is randomly selected from `1.5x`, `1.6x`, `1.7x`, or `1.8x`.
 
@@ -132,8 +143,8 @@ During user training:
 | Effective Points | Change |
 |---:|---:|
 | < 1 | `-0.05` to `-0.03` |
-| 1-2 | `-0.03` to `+0.03` |
-| 3-4 | `+0.03` to `+0.05` |
+| 1-2 | `+0.03` to `+0.05` |
+| 3-4 | `+0.03` to `+0.07` |
 | 5+ | `+0.03` to `+0.10` |
 
 Authoritarian Rebounding can amplify positive gains.
@@ -182,7 +193,18 @@ During user training:
 
 - Free Throws feed `team_chemistry` at 0.25x.
 - Film Study feeds `team_chemistry` at 0.25x.
-- Scrimmages feed `team_chemistry` at 0.5x.
+- Scrimmages feed `team_chemistry` at 0.25x.
+- Weighted contributions are summed, then half-up rounded to an effective-point bucket (`0–5`):
+
+| Effective Points | Change |
+|---:|---:|
+| 0 | `-3` to `-1` |
+| 1 | `0` to `+1` |
+| 2 | `+1` to `+2` |
+| 3 | `+2` to `+3` |
+| 4 | `+2` to `+4` |
+| 5+ | `+2` to `+5` |
+
 - Culture Builder / Team Building gives a flat `+1` to `+3`.
 - Authoritarian / Teamwork gives a flat `0` to `+1`.
 - Culture Builder / Inspire can amplify positive chemistry gains.

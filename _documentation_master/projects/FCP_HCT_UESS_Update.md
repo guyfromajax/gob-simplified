@@ -1,6 +1,6 @@
 # FCP / HCT UESS + StepState Update Plan
 
-**Status:** Steps 1-7 implemented; Step 8 started with parity projection bridge  
+**Status:** Steps 1-7 implemented; Step 8 first + terminal slices implemented  
 **Scope:** Dynamic Full-Court Press (FCP) and Half-Court Trap (HCT) turns  
 **Primary code paths:** `BackEnd/engine/dynamic_hct.py`, `dynamic_hct_step_emitter.py`, `dynamic_fcp.py`, `dynamic_fcp_step_emitter.py`, `BackEnd/models/turn_manager.py`, `FrontEnd/static/js/phaser/animation/animationPlayback.js`  
 **Related docs:** `projects/FCPHCT_UESS_Audit.md`, `projects/StepState.md`, `05_UESS_System/UESS_System.md`, `06_Gameplay_Systems/HCT_System.md`, `06_Gameplay_Systems/Dynamic_HCO_System.md`
@@ -437,7 +437,7 @@ Remaining related work:
 
 ## Step 8: Project Pressure StepState To Animation Schema
 
-**Status:** Started; parity bridge implemented.
+**Status:** Started; first + terminal slices implemented.
 
 Once StepState exists, update `dynamic_hct_step_emitter.py` so its primary job is projection:
 
@@ -481,9 +481,24 @@ AnimationStep[] -> PressureStepState[] -> AnimationStep[]
   - HCT/FCP normal pass
   - HCT/FCP pass interception / steal
   - HCT/FCP batted-OOB contact + drift
+- First slice implemented:
+  - formal projection is now used for `hct_entry_walkup`, `hct_advance`, `hct_pass`, `hct_interception`, `hct_bat_oob_contact`, and `hct_bat_oob_drift`
+  - formal StepState now carries exact schema linkage (`next`), render tween durations, SFX triggers, flourish triggers, and explicit-vs-inferred ball motion fields
+  - tests assert at least one first-slice state uses `projection_source="formal"` and still round-trips to the original emitted schema
+- First-slice emitter boundary moved:
+  - `dynamic_hct_step_emitter.py` now routes those first-slice steps through `project_animation_step_through_pressure_state(...)` before appending them
+  - direct HCT/FCP emitter output now carries `_pressure_step_state` on the formal first-slice steps
+  - `TurnManager` still keeps the whole-turn projection bridge as a defensive consistency layer while the remaining paths migrate
+- Terminal slice implemented:
+  - formal projection now covers generic terminal pressure outcomes: `hct_steal`, `hct_foul`, `hct_reach_in`, `hct_dead_ball`, and `hct_dead_ball_turnover`
+  - dead-ball fumble beats (`advance_trigger.condition = "dead_ball_fumble"`) are also formal-projected so the appended fumble step and its rewired prior `next` pointer are frozen through StepState
+  - formal projection now preserves backend-authored terminal announcements, including the fumble whistle/banner payload
+  - `dynamic_hct_step_emitter.py` performs one final projection pass at the return boundary after late helper mutations such as post-steal transition append and dead-ball fumble injection
+  - direct HCT/FCP emitter tests assert terminal foul, dead-ball turnover, fumble, and steal paths carry `_pressure_step_state` with `projection_source="formal"`
 - Remaining Step 8 work:
-  - move individual pressure builders (`_build_loop_step`, pass, interception, batted-OOB, HCT shot paths) to create formal PressureStepState first
-  - shrink/remove the transitional `schema_projection` once formal fields are complete enough to project exact schema
+  - move individual pressure builders (`_build_loop_step`, pass, interception, batted-OOB, terminal helpers) to return formal PressureStepState directly instead of building schema then projecting
+  - convert HCT shot paths and post-shot sub-step integration
+  - shrink/remove the transitional `schema_projection` once all formal fields project exact schema
   - keep emitter decisions limited to pure render projection and explicitly allowed cosmetic lookup
 
 ---
@@ -517,7 +532,7 @@ Update these docs after implementation:
 5. Implement safe schema `DEAD_BALL_TURNOVER` and `FOUL` cleanup if still required.
 6. Centralize HCT/FCP emission in `TurnManager`.
 7. Define/stamp pressure StepState. **Implemented additively.**
-8. Convert emitter from segment interpretation to StepState projection. **Started with parity bridge; formal upstream builder migration remains.**
+8. Convert emitter from segment interpretation to StepState projection. **First slice implemented; upstream builder migration and shot paths remain.**
 9. Update documentation.
 10. Run regression tests and manual prototype checks.
 

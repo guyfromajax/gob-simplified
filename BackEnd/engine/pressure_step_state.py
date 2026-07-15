@@ -51,7 +51,10 @@ def build_pressure_step_states(
             "timing": _timing_state(start, end),
             "advance_gate": _advance_gate_state(start),
             "outcome": _outcome_state(end, result),
+            "next": _next_state(end),
             "cosmetics": _cosmetics_state(start, end),
+            "render": _render_state(start, end),
+            "projection_source": _projection_source(start),
             # Transitional Step 8 bridge: keep a full render projection snapshot
             # so ``PressureStepState -> AnimationStep`` can be parity-tested
             # before individual HCT/FCP builders produce StepState upstream.
@@ -85,12 +88,63 @@ def project_pressure_step_states_to_animation_steps(
     for state in step_states or []:
         if not isinstance(state, dict):
             continue
-        step = copy.deepcopy(state.get("schema_projection") or {})
-        if not step:
+        if state.get("projection_source") == "formal":
             step = _project_from_formal_state(state)
+        else:
+            step = copy.deepcopy(state.get("schema_projection") or {})
+            if not step:
+                step = _project_from_formal_state(state)
         step["_pressure_step_state"] = state
         projected.append(step)
     return projected
+
+
+def project_animation_step_through_pressure_state(
+    step: Dict[str, Any],
+    *,
+    index: int,
+    turn_type: str,
+    result: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Freeze one emitted step and immediately project it through StepState.
+
+    This is the incremental Step 8 migration seam for individual pressure
+    builders. The caller still builds the current schema first, but the returned
+    value is now produced by ``PressureStepState -> AnimationStep`` for any step
+    whose reason is covered by formal projection.
+    """
+    if not isinstance(step, dict):
+        return step
+    state = _state_from_step(step, index=index, turn_type=turn_type, result=result or {})
+    projected = project_pressure_step_states_to_animation_steps([state])
+    return projected[0] if projected else step
+
+
+def _state_from_step(
+    step: Dict[str, Any],
+    *,
+    index: int,
+    turn_type: str,
+    result: Dict[str, Any],
+) -> Dict[str, Any]:
+    start = step.get("start") or {}
+    end = step.get("end") or {}
+    state = {
+        "index": index,
+        "turn_type": (turn_type or result.get("current_turn") or "").upper(),
+        "players": _players_state(start, end),
+        "ball": _ball_state(start, end),
+        "timing": _timing_state(start, end),
+        "advance_gate": _advance_gate_state(start),
+        "outcome": _outcome_state(end, result),
+        "next": _next_state(end),
+        "cosmetics": _cosmetics_state(start, end),
+        "render": _render_state(start, end),
+        "projection_source": _projection_source(start),
+        "schema_projection": _schema_projection(step),
+    }
+    step["_pressure_step_state"] = state
+    return state
 
 
 def _players_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
@@ -145,6 +199,9 @@ def _project_from_formal_state(state: Dict[str, Any]) -> Dict[str, Any]:
     timing = state.get("timing") or {}
     gate = state.get("advance_gate") or {}
     outcome = state.get("outcome") or {}
+    next_state = state.get("next") or {}
+    cosmetics = state.get("cosmetics") or {}
+    render = state.get("render") or {}
 
     start = {
         "coords": {
@@ -174,27 +231,42 @@ def _project_from_formal_state(state: Dict[str, Any]) -> Dict[str, Any]:
             "metadata": copy.deepcopy(gate.get("metadata") or {}),
         },
     }
+    tween_durations = render.get("tween_durations")
+    if tween_durations:
+        start["tween_durations"] = copy.deepcopy(tween_durations)
+    flourish = cosmetics.get("flourish_triggers")
+    if flourish:
+        start["flourish"] = copy.deepcopy(flourish)
+    for sfx in cosmetics.get("sfx_triggers") or []:
+        trigger = sfx.get("trigger")
+        payload = sfx.get("payload")
+        if trigger and payload:
+            start[trigger] = copy.deepcopy(payload)
+
     if ball.get("motion_style") == "pass":
-        start["ball"] = {
-            "from_player_id": ball.get("from_owner"),
-            "to_player_id": ball.get("to_owner"),
-            "current_coords": copy.deepcopy(ball.get("from_coord")),
-        }
-        start["ball_motion_style"] = "pass"
-        if ball.get("arrival_coord") is not None:
+        if ball.get("from_owner") or ball.get("to_owner"):
+            start["ball"] = {
+                "from_player_id": ball.get("from_owner"),
+                "to_player_id": ball.get("to_owner"),
+                "current_coords": copy.deepcopy(ball.get("from_coord")),
+            }
+        else:
+            start["ball"] = {"coords": copy.deepcopy(ball.get("from_coord"))}
+        if ball.get("motion_style_explicit"):
+            start["ball_motion_style"] = "pass"
+        if ball.get("arrival_coord_explicit") and ball.get("arrival_coord") is not None:
             start["ball_arrival_coord"] = copy.deepcopy(ball.get("arrival_coord"))
+    elif ball.get("motion_style_explicit") and ball.get("from_coord"):
+        start["ball"] = {"coords": copy.deepcopy(ball.get("from_coord"))}
+        start["ball_motion_style"] = ball.get("motion_style")
     elif ball.get("from_owner"):
         start["ball"] = {"owner_player_id": ball.get("from_owner")}
     else:
         start["ball"] = {"coords": copy.deepcopy(ball.get("from_coord"))}
 
-    end_next = {"kind": "next_step", "index": int(state.get("index") or 0) + 1}
-    if outcome.get("kind") not in (None, "none"):
-        end_next = {
-            "kind": "turn_stop",
-            "event": outcome.get("event"),
-            "payload": copy.deepcopy(outcome.get("payload") or {}),
-        }
+    end_next = copy.deepcopy(next_state)
+    if not end_next:
+        end_next = {"kind": "next_step", "index": int(state.get("index") or 0) + 1}
     end = {
         "coords": {
             pid: copy.deepcopy(data.get("end_coord"))
@@ -213,6 +285,9 @@ def _project_from_formal_state(state: Dict[str, Any]) -> Dict[str, Any]:
         },
         "next": end_next,
     }
+    announcements = cosmetics.get("announcement_triggers") or []
+    if announcements:
+        end["announcement"] = copy.deepcopy(announcements[0])
     return {"start": start, "end": end}
 
 
@@ -249,6 +324,7 @@ def _ball_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
         else None
     )
     motion_style = start.get("ball_motion_style")
+    motion_style_explicit = motion_style is not None
     if not motion_style and (
         start_ball.get("from_player_id")
         or start_ball.get("to_player_id")
@@ -261,7 +337,9 @@ def _ball_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
         "to_owner": str(to_owner) if to_owner is not None else None,
         "from_coord": from_coord,
         "arrival_coord": arrival_coord,
+        "arrival_coord_explicit": start.get("ball_arrival_coord") is not None,
         "motion_style": motion_style or "held",
+        "motion_style_explicit": motion_style_explicit,
         "contact_point": contact_point,
         "resolved_by": str(end_ball.get("owner_player_id")) if end_ball.get("owner_player_id") is not None else None,
         "end_coord": _coord(end_ball.get("coords")),
@@ -309,7 +387,15 @@ def _outcome_state(end: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any
                 "event": "HCO_CONTINUATION",
                 "payload": {"result_type": result.get("result_type")},
             }
-    return {"kind": "none", "event": None, "payload": {}}
+    return {
+        "kind": "none",
+        "event": None,
+        "payload": {},
+    }
+
+
+def _next_state(end: Dict[str, Any]) -> Dict[str, Any]:
+    return copy.deepcopy((end or {}).get("next") or {})
 
 
 def _cosmetics_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
@@ -322,12 +408,45 @@ def _cosmetics_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, An
         or copy.deepcopy((end.get("announcement") or {}))
         or None
     )
-    flourishes = copy.deepcopy(start.get("flourish_triggers") or end.get("flourish_triggers") or {})
+    flourishes = copy.deepcopy(
+        start.get("flourish")
+        or start.get("flourish_triggers")
+        or end.get("flourish_triggers")
+        or {}
+    )
     return {
         "flourish_triggers": flourishes,
         "sfx_triggers": sfx,
         "announcement_triggers": [announcement] if announcement else [],
     }
+
+
+def _render_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "tween_durations": copy.deepcopy(start.get("tween_durations") or {}),
+    }
+
+
+def _projection_source(start: Dict[str, Any]) -> str:
+    trigger = start.get("advance_trigger") or {}
+    reason = ((start.get("advance_trigger") or {}).get("metadata") or {}).get("reason")
+    if trigger.get("condition") == "dead_ball_fumble":
+        return "formal"
+    if reason in {
+        "hct_entry_walkup",
+        "hct_advance",
+        "hct_pass",
+        "hct_interception",
+        "hct_bat_oob_contact",
+        "hct_bat_oob_drift",
+        "hct_steal",
+        "hct_foul",
+        "hct_reach_in",
+        "hct_dead_ball",
+        "hct_dead_ball_turnover",
+    }:
+        return "formal"
+    return "schema_projection"
 
 
 def _event_to_kind(event: Optional[str]) -> str:

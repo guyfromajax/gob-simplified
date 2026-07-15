@@ -62,6 +62,7 @@ from BackEnd.utils.animation_step_schema import (
 )
 from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
 from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
+from BackEnd.engine.pressure_step_state import project_animation_step_through_pressure_state
 from BackEnd.utils.transition_bridge import (
     _interrupted_coord,
     build_pass_step,
@@ -76,6 +77,29 @@ _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 # engine's intended target) → end (what the emitter actually renders). A
 # divergence between destination and end flags coord jank. Toggle off when done.
 LOG_HCT_STEP_COORDS = False
+
+
+def _project_pressure_step(
+    step: AnimationStep,
+    *,
+    index: int,
+    turn_type: str,
+    turn_result: Dict[str, Any],
+) -> AnimationStep:
+    """Route first-slice pressure steps through PressureStepState projection.
+
+    This is guarded so projection never becomes a live-game failure point while
+    Step 8 is still migrating one slice at a time.
+    """
+    try:
+        return project_animation_step_through_pressure_state(
+            step,
+            index=index,
+            turn_type=turn_type,
+            result=turn_result,
+        )
+    except Exception:
+        return step
 
 
 def _fmt_xy(c: Optional[Dict[str, Any]]) -> str:
@@ -977,6 +1001,7 @@ def build_dynamic_hct_animation_steps(
         turn_result.get("fcp_skip_walk_up")
         or turn_result.get("fcp_loop_segments") is not None
     )
+    pressure_turn_type = "FCP" if is_fcp else "HCT"
 
     # --- Required intermediate data from the engine -----------------------
     bh_target = turn_result.get("hct_bh_target")
@@ -1144,6 +1169,12 @@ def build_dynamic_hct_animation_steps(
                 }
                 walk_step["start"]["ball_motion_style"] = "shot"
 
+        walk_step = _project_pressure_step(
+            walk_step,
+            index=0,
+            turn_type=pressure_turn_type,
+            turn_result=turn_result,
+        )
         steps = [walk_step]
         step_clock_seconds = [round(float(walk_step["end"]["time_elapsed"]), 2)]
         prev_end_coords = walk_step["end"]["coords"]
@@ -1216,6 +1247,12 @@ def build_dynamic_hct_animation_steps(
                     first_next_index=len(steps) + 1,
                 )
                 for bat_step in bat_steps:
+                    bat_step = _project_pressure_step(
+                        bat_step,
+                        index=len(steps),
+                        turn_type=pressure_turn_type,
+                        turn_result=turn_result,
+                    )
                     steps.append(bat_step)
                     step_clock_seconds.append(round(float(bat_step["end"]["time_elapsed"]), 2))
                 prev_end_coords = bat_steps[-1]["end"]["coords"]
@@ -1357,6 +1394,12 @@ def build_dynamic_hct_animation_steps(
                     "target": "ball",
                 }
 
+        step = _project_pressure_step(
+            step,
+            index=len(steps),
+            turn_type=pressure_turn_type,
+            turn_result=turn_result,
+        )
         steps.append(step)
         step_clock_seconds.append(round(float(step["end"]["time_elapsed"]), 2))
         prev_end_coords = step["end"]["coords"]
@@ -1579,5 +1622,18 @@ def build_dynamic_hct_animation_steps(
     inject_dead_ball_fumble_before_turn_stop(
         steps, turn_result, away_offense=is_away_offense,
     )
+
+    # Late helpers above may append or rewire terminal steps after the first
+    # projection pass (for example dead-ball fumble changes the prior
+    # turn_stop's next pointer and appends a fumble beat). Keep the emitter
+    # return boundary authoritative: every returned pressure step goes through
+    # PressureStepState projection with its final index and final next pointer.
+    for idx, step in enumerate(list(steps)):
+        steps[idx] = _project_pressure_step(
+            step,
+            index=idx,
+            turn_type=pressure_turn_type,
+            turn_result=turn_result,
+        )
 
     return steps

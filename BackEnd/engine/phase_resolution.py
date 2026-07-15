@@ -6130,6 +6130,18 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 _alt_moves, _alt_reads, _alt_open = _hco_compute_altered_actions(
                     steps[i], off_lineup, def_lineup, off_to_def, bh_pos, is_away_offense,
                     off_eff, def_eff, _a_def_xy, _a_coord, random)
+                # DIAG (S3 altered actions) — one line per SM so the gate chain is traceable end to end.
+                _rd = ", ".join(f"{d}:{'stick' if v else 'FREEZE'}" for d, v in (_alt_reads or {}).items())
+                logging.warning(
+                    f"🎬 [ALT] SM: cutters={list(_alt_moves)} reads=[{_rd}] "
+                    f"open={ {p: round(o) for p, o in (_alt_open or {}).items()} }"
+                )
+            else:
+                # DIAG — SM reached but altered actions were gated OUT; shows which gate.
+                logging.warning(
+                    f"🎬 [ALT] SM but NO altered actions — offense_reads={offense_reads} "
+                    f"zone={zone} posture_set={bool(game_state.get('_hco_defense_posture'))}"
+                )
             beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random, off_eff,
                                      altered_moves=_alt_moves)
             if beat is None:

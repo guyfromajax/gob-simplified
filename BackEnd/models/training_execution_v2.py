@@ -525,7 +525,7 @@ def apply_training_points(
         "conditioning": [("fight", 0.5)],  # Conditioning → Fight 0.5x
         "free_throws": [("team_chemistry", 0.25)],  # Free Throws → Team Chemistry 0.25x
         "film_study": [("team_chemistry", 0.25)],  # Film Study → Team Chemistry 0.25x
-        "scrimmages": [("team_chemistry", 0.5)]  # Scrimmages → Team Chemistry 0.5x
+        "scrimmages": [("team_chemistry", 0.25)]  # Scrimmages → Team Chemistry 0.25x
     }
     
     # Track team attribute contributions from multipliers (will sum and apply later)
@@ -1322,11 +1322,11 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         return
 
     standard_ranges = {
-        0: (-3, -1),
-        1: (-1, 1),
+        0: (-2, -1),
+        1: (0, 2),
         2: (1, 2),
-        3: (1, 3),
-        4: (1, 4),
+        3: (2, 3),
+        4: (2, 4),
         5: (2, 5),
     }
     # Shared by Strength+Conditioning → fight and defense/passing/BH → discipline.
@@ -1340,11 +1340,11 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     }
     chemistry_ranges = {
         0: (-3, -1),
-        1: (1, 2),
-        2: (2, 3),
-        3: (3, 4),
-        4: (3, 6),
-        5: (3, 7),
+        1: (0, 1),
+        2: (1, 2),
+        3: (2, 3),
+        4: (2, 4),
+        5: (2, 5),
     }
 
     if team_attr in ("fight", "discipline"):
@@ -1382,17 +1382,17 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     
     Technical Drills / Scrimmages ranges (in 0.01 increments).
     - <1 effective point: -0.05 to -0.03
-    - 1-2 effective points: -0.03 to +0.03
-    - 3-4 effective points: +0.03 to +0.05
+    - 1-2 effective points: +0.03 to +0.05
+    - 3-4 effective points: +0.03 to +0.07
     - 5+ effective points: +0.03 to +0.10
     """
     # Both technical drills and scrimmages use the same effective-point tuning.
     if points < 1:
         increase = random.randint(-5, -3) / 100.0
     elif points in (1, 2):
-        increase = random.randint(-3, 3) / 100.0
-    elif points in (3, 4):
         increase = random.randint(3, 5) / 100.0
+    elif points in (3, 4):
+        increase = random.randint(3, 7) / 100.0
     else:
         increase = random.randint(3, 10) / 100.0
     

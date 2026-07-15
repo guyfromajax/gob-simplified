@@ -293,7 +293,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - Fast Break Defense Install → `fb_opp_modifier`
 - P/T Defense Install → `pt_efficiency`
 - P/T Offense Install → `pt_opp_modifier`
-- Scrimmages → Team Chemistry: 0.5 points, Shot Threshold: 1 point, Rebound Modifier: 0.5 points, NG Reduction (if 3-5 points)
+- Scrimmages → Team Chemistry: 0.25 points, Shot Threshold: 1 point, Rebound Modifier: 0.5 points, NG Reduction (if 3-5 points)
 
 #### Training Point Ranges
 
@@ -377,24 +377,25 @@ Traning Camp Height / Weight bonsuses
 
 **Team Attributes (training ranges by group):**
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
-  `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`
+  `0 -> -2 to -1`, `1 -> 0 to +2`, `2 -> +1 to +2`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`
 - `fight` and `discipline` (same bucket table after their respective 0.5× / 0.25× accruals round to 0–5):
   `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`
   - **Fight:** Strength + Conditioning → sum × **0.5**, half-up → `_apply_team_training_points(..., "fight", ...)`.
   - **Discipline:** Inside/Outside defense + Passing + Ball Handling → sum × **0.25**, half-up → `_apply_team_training_points(..., "discipline", ...)`.
 - `team_chemistry`:
-  `0 -> -3 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`
+  `0 -> -3 to -1`, `1 -> 0 to +1`, `2 -> +1 to +2`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`
+  - Free Throws × **0.25** + Film Study × **0.25** + Scrimmages × **0.25**, half-up → `_apply_team_training_points(..., "team_chemistry", ...)`.
 
 **Rebound Modifier (Technical Drills - in 0.01 increments):**
 - `<1 effective point -> -0.05 to -0.03`
-- `1-2 effective points -> -0.03 to +0.03`
-- `3-4 effective points -> +0.03 to +0.05`
+- `1-2 effective points -> +0.03 to +0.05`
+- `3-4 effective points -> +0.03 to +0.07`
 - `5+ effective points -> +0.03 to +0.10`
 
 **Rebound Modifier (Scrimmages - in 0.01 increments):**
 - `<1 effective point -> -0.05 to -0.03`
-- `1-2 effective points -> -0.03 to +0.03`
-- `3-4 effective points -> +0.03 to +0.05`
+- `1-2 effective points -> +0.03 to +0.05`
+- `3-4 effective points -> +0.03 to +0.07`
 - `5+ effective points -> +0.03 to +0.10`
 
 **Shot Threshold:**
