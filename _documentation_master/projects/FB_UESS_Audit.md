@@ -607,6 +607,17 @@ Readiness checklist before this step can move from deferred to implementation:
 
 - Search backend logs for `[FB_EMITTER_FALLBACK]` during prototype FB testing; expected count is zero for covered live paths.
 - Search backend logs for `[FB_UESS] ... fallback=...`; expected fallback value is `None` for covered live paths.
+- Use the local log-audit helper to summarize coverage:
+
+  ```bash
+  .venv/bin/python scripts/audit_fb_uess_logs.py path/to/backend-log.txt
+  ```
+
+  The script reports:
+  - total `[FB_UESS]` summaries
+  - total `[FB_EMITTER_FALLBACK]` hits
+  - observed play/result coverage
+  - missing result types by FB family
 - Prototype-test all four FB families:
   - Rim Runner: MAKE, MISS, BLOCK, FOUL, dead-ball turnover, bat-OOB, interception, outlet denied, hold-up.
   - Triangle: lane-pass shot, setup shot, defensive stop / enter-HCO, outlet denied, bat-OOB / interception where reachable.
