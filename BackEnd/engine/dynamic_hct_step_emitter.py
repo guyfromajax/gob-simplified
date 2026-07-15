@@ -41,8 +41,11 @@ from BackEnd.constants import (
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
+    _euclid,
     _player_lookup_by_id,
     drift_or_hold_coord,
+    pass_arrival_sfx,
+    pass_release_sfx,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -383,6 +386,286 @@ def _build_loop_step(
     }
     stamp_tween_durations(start, step_end_coords, t, off_lineup, def_lineup)
     return {"start": start, "end": end}
+
+
+def _build_interception_pass_step(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    passer_id: str,
+    stealer_id: str,
+    contact_coord: GridCoord,
+    continuing_targets: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    next_step: NextStep,
+    metadata_reason: str = "hct_interception",
+) -> AnimationStep:
+    """Schema step for a trapped/FCP pass picked off in flight.
+
+    Unlike ``build_pass_step``, the receiver is a defender and the ball arrives
+    at the contest contact point, not necessarily the defender's prior rendered
+    coord. This keeps the resolved interception geometry and rendered ball
+    trajectory in the same backend-authored step.
+    """
+    if passer_id not in start_coords or stealer_id not in start_coords:
+        raise ValueError("interception pass step requires passer and stealer coords")
+
+    passer_coord = start_coords[passer_id]
+    contact = {"x": float(contact_coord["x"]), "y": float(contact_coord["y"])}
+    from BackEnd.utils.transition_bridge import RESET_INBOUND_PASS_GRID_PER_GAME_SECOND
+
+    dist = _euclid(passer_coord, contact)
+    rate = max(1e-6, float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND))
+    t = max(0.3, dist / rate)
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    end_coords: Dict[str, GridCoord] = {pid: dict(coord) for pid, coord in start_coords.items()}
+
+    actions[passer_id] = "pass"
+    actions[stealer_id] = "receive"
+    destinations[stealer_id] = dict(contact)
+    end_coords[stealer_id] = dict(contact)
+    archetype[stealer_id] = "sprint"
+
+    for pid, target in (continuing_targets or {}).items():
+        if pid not in start_coords or pid in (passer_id, stealer_id):
+            continue
+        destinations[pid] = dict(target)
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        move_arch: PlayerArchetype = "sprint"
+        rate_player = _ag_grid_per_game_sec(player, move_arch)
+        end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate_player, t)
+        moved = (
+            int(round(end_coords[pid]["x"])) != int(round(start_coords[pid]["x"]))
+            or int(round(end_coords[pid]["y"])) != int(round(start_coords[pid]["y"]))
+        )
+        actions[pid] = "cut" if pid in {_player_id_at_pos(off_lineup, p) for p in _OFFENSE_POSITIONS} else "guard_offball"
+        archetype[pid] = move_arch if moved else "stationary"
+
+    ball_start: BallState = {
+        "from_player_id": str(passer_id),
+        "to_player_id": str(stealer_id),
+        "current_coords": dict(passer_coord),
+    }
+    ball_end: BallState = {"owner_player_id": str(stealer_id)}
+    advance_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(t),
+        "metadata": {
+            "from_player_id": str(passer_id),
+            "to_player_id": str(stealer_id),
+            "target_coords": dict(contact),
+            "reason": metadata_reason,
+        },
+    }
+
+    clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - t,
+        "shot_clock_remaining": max(0.0, shot_clock_remaining_at_start - t),
+    }
+    start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": ball_start,
+        "ball_motion_style": "pass",
+        "ball_arrival_coord": dict(contact),
+        "clock": clock_start,
+        "advance_trigger": advance_trigger,
+    }
+    end: StepEnd = {
+        "coords": end_coords,
+        "ball": ball_end,
+        "time_elapsed": t,
+        "clock": clock_end,
+        "next": next_step,
+    }
+    passer_player = _player_lookup_by_id(off_lineup, def_lineup, passer_id)
+    stealer_player = _player_lookup_by_id(off_lineup, def_lineup, stealer_id)
+    start["sfx_on_ball_release"] = pass_release_sfx(passer_player)
+    start["sfx_on_ball_arrival"] = pass_arrival_sfx(stealer_player)
+    stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
+    return {"start": start, "end": end}
+
+
+def _build_bat_oob_steps(
+    *,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    start_coords: Dict[str, GridCoord],
+    passer_id: str,
+    deflector_id: str,
+    contact_coord: GridCoord,
+    oob_coord: GridCoord,
+    continuing_targets: Dict[str, GridCoord],
+    clock_remaining_at_start: float,
+    shot_clock_remaining_at_start: float,
+    terminal_next: NextStep,
+    first_next_index: int,
+) -> List[AnimationStep]:
+    """Schema batted-OOB trajectory for dynamic HCT/FCP.
+
+    Step A: pass leaves the passer and reaches the backend-owned deflection
+    contact point. The deflector moves to the contact point and the ball becomes
+    loose there.
+
+    Step B: loose ball drifts from the contact point to the backend-owned OOB
+    target. This replaces the old frontend imperative overlay while preserving
+    the existing dead-ball / offense-retains result.
+    """
+    if passer_id not in start_coords or deflector_id not in start_coords:
+        raise ValueError("bat-OOB schema requires passer and deflector coords")
+
+    from BackEnd.utils.transition_bridge import RESET_INBOUND_PASS_GRID_PER_GAME_SECOND
+
+    contact = {"x": float(contact_coord["x"]), "y": float(contact_coord["y"])}
+    oob = {"x": float(oob_coord["x"]), "y": float(oob_coord["y"])}
+    passer_coord = start_coords[passer_id]
+    pass_rate = max(1e-6, float(RESET_INBOUND_PASS_GRID_PER_GAME_SECOND))
+    contact_t = max(0.3, _euclid(passer_coord, contact) / pass_rate)
+    drift_t = max(0.25, _euclid(contact, oob) / pass_rate)
+
+    off_ids = {_player_id_at_pos(off_lineup, p) for p in _OFFENSE_POSITIONS}
+
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+    contact_end_coords: Dict[str, GridCoord] = {
+        pid: dict(coord) for pid, coord in start_coords.items()
+    }
+
+    actions[passer_id] = "pass"
+    actions[deflector_id] = "guard_ball"
+    archetype[deflector_id] = "sprint"
+    destinations[deflector_id] = dict(contact)
+    contact_end_coords[deflector_id] = dict(contact)
+
+    for pid, target in (continuing_targets or {}).items():
+        if pid not in start_coords or pid in (passer_id, deflector_id):
+            continue
+        destinations[pid] = dict(target)
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        move_arch: PlayerArchetype = "sprint"
+        contact_end_coords[pid] = _interrupted_coord(
+            start_coords[pid],
+            target,
+            _ag_grid_per_game_sec(player, move_arch),
+            contact_t,
+        )
+        moved = (
+            int(round(contact_end_coords[pid]["x"])) != int(round(start_coords[pid]["x"]))
+            or int(round(contact_end_coords[pid]["y"])) != int(round(start_coords[pid]["y"]))
+        )
+        actions[pid] = "cut" if pid in off_ids else "guard_offball"
+        archetype[pid] = move_arch if moved else "stationary"
+
+    contact_trigger: AdvanceTrigger = {
+        "condition": "ball_reaches_player",
+        "T_game_seconds": float(contact_t),
+        "metadata": {
+            "from_player_id": str(passer_id),
+            "to_player_id": str(deflector_id),
+            "target_coords": dict(contact),
+            "contact_coords": dict(contact),
+            "oob_coords": dict(oob),
+            "reason": "hct_bat_oob_contact",
+        },
+    }
+    contact_clock_start: ClockState = {
+        "clock_remaining": clock_remaining_at_start,
+        "shot_clock_remaining": shot_clock_remaining_at_start,
+    }
+    contact_clock_end: ClockState = {
+        "clock_remaining": clock_remaining_at_start - contact_t,
+        "shot_clock_remaining": max(0.0, shot_clock_remaining_at_start - contact_t),
+    }
+    contact_start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": {
+            "from_player_id": str(passer_id),
+            "to_player_id": str(deflector_id),
+            "current_coords": dict(passer_coord),
+        },
+        "ball_motion_style": "pass",
+        "ball_arrival_coord": dict(contact),
+        "clock": contact_clock_start,
+        "advance_trigger": contact_trigger,
+        "sfx_on_ball_arrival": {
+            "file": "block1.wav",
+            "volume": 0.42,
+            "event": "bat_oob_contact",
+        },
+    }
+    contact_end: StepEnd = {
+        "coords": contact_end_coords,
+        "ball": {"coords": dict(contact)},
+        "time_elapsed": contact_t,
+        "clock": contact_clock_end,
+        "next": {"kind": "next_step", "index": first_next_index},
+    }
+    stamp_tween_durations(contact_start, contact_end_coords, contact_t, off_lineup, def_lineup)
+
+    drift_destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(coord) for pid, coord in contact_end_coords.items()
+    }
+    drift_actions: Dict[str, PlayerAction] = {
+        pid: "stationary" for pid in contact_end_coords
+    }
+    drift_archetype: Dict[str, PlayerArchetype] = {
+        pid: "stationary" for pid in contact_end_coords
+    }
+    drift_trigger: AdvanceTrigger = {
+        "condition": "fixed_duration",
+        "T_game_seconds": float(drift_t),
+        "metadata": {
+            "from_player_id": str(deflector_id),
+            "target_coords": dict(oob),
+            "contact_coords": dict(contact),
+            "oob_coords": dict(oob),
+            "reason": "hct_bat_oob_drift",
+        },
+    }
+    drift_start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in contact_end_coords.items()},
+        "destination": drift_destinations,
+        "action": drift_actions,
+        "archetype": drift_archetype,
+        "ball": {"coords": dict(contact)},
+        "ball_motion_style": "pass",
+        "clock": contact_clock_end,
+        "advance_trigger": drift_trigger,
+    }
+    drift_end: StepEnd = {
+        "coords": {pid: dict(c) for pid, c in contact_end_coords.items()},
+        "ball": {"coords": dict(oob)},
+        "time_elapsed": drift_t,
+        "clock": {
+            "clock_remaining": contact_clock_end["clock_remaining"] - drift_t,
+            "shot_clock_remaining": max(0.0, contact_clock_end["shot_clock_remaining"] - drift_t),
+        },
+        "next": terminal_next,
+    }
+    stamp_tween_durations(drift_start, drift_end["coords"], drift_t, off_lineup, def_lineup)
+    return [
+        {"start": contact_start, "end": contact_end},
+        {"start": drift_start, "end": drift_end},
+    ]
 
 
 def _build_fb_drive_step(
@@ -892,7 +1175,114 @@ def build_dynamic_hct_animation_steps(
         ball_owner_pos = segment.get("ball_owner_pos") or bh_pos
         ball_owner_id = _player_id_at_pos(off_lineup, ball_owner_pos) or walk_up_bh_id
 
-        if reason == "hct_pass":
+        if reason == "hct_bat_oob":
+            passer_id = _player_id_at_pos(off_lineup, segment.get("pass_from_pos") or bh_pos)
+            deflector_id = (
+                _player_id_at_pos(def_lineup, segment.get("deflector_pos") or "")
+                or _safe_id(turn_result.get("bat_oob_deflector_id"))
+            )
+            contact = segment.get("bat_oob_contact") or turn_result.get("bat_oob_contact")
+            oob_target = segment.get("bat_oob_target") or turn_result.get("bat_oob_target")
+            continuing_targets = {
+                pid: end_coords[pid]
+                for pid in end_coords
+                if pid not in {passer_id, deflector_id}
+            }
+            if (
+                passer_id
+                and deflector_id
+                and isinstance(contact, dict)
+                and isinstance(oob_target, dict)
+                and passer_id in prev_end_coords
+                and deflector_id in prev_end_coords
+            ):
+                terminal_next = (
+                    _resolve_final_step_next(turn_result)
+                    if (is_last and not is_shot)
+                    else {"kind": "next_step", "index": len(steps) + 2}
+                )
+                bat_steps = _build_bat_oob_steps(
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    start_coords=prev_end_coords,
+                    passer_id=passer_id,
+                    deflector_id=deflector_id,
+                    contact_coord={"x": float(contact["x"]), "y": float(contact["y"])},
+                    oob_coord={"x": float(oob_target["x"]), "y": float(oob_target["y"])},
+                    continuing_targets=continuing_targets,
+                    clock_remaining_at_start=prev_clock_end["clock_remaining"],
+                    shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
+                    terminal_next=terminal_next,
+                    first_next_index=len(steps) + 1,
+                )
+                for bat_step in bat_steps:
+                    steps.append(bat_step)
+                    step_clock_seconds.append(round(float(bat_step["end"]["time_elapsed"]), 2))
+                prev_end_coords = bat_steps[-1]["end"]["coords"]
+                prev_clock_end = bat_steps[-1]["end"]["clock"]
+                continue
+
+            step = _build_loop_step(
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                start_coords=prev_end_coords,
+                end_coords=end_coords,
+                bh_id=ball_owner_id,
+                pg_def_id=pg_def_id,
+                gate_id=gate_id,
+                seconds=seconds,
+                clock_remaining_at_start=prev_clock_end["clock_remaining"],
+                shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
+                next_step=next_step,
+                reason=reason,
+                move_archetype=segment.get("move_archetype"),
+            )
+        elif reason == "hct_interception":
+            passer_id = _player_id_at_pos(off_lineup, segment.get("pass_from_pos") or bh_pos)
+            stealer_id = _player_id_at_pos(def_lineup, segment.get("interceptor_pos") or "")
+            contact = segment.get("interception_contact") or turn_result.get("steal_coords")
+            continuing_targets = {
+                pid: end_coords[pid]
+                for pid in end_coords
+                if pid not in {passer_id, stealer_id}
+            }
+            if (
+                passer_id
+                and stealer_id
+                and isinstance(contact, dict)
+                and passer_id in prev_end_coords
+                and stealer_id in prev_end_coords
+            ):
+                step = _build_interception_pass_step(
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    start_coords=prev_end_coords,
+                    passer_id=passer_id,
+                    stealer_id=stealer_id,
+                    contact_coord={"x": float(contact["x"]), "y": float(contact["y"])},
+                    continuing_targets=continuing_targets,
+                    clock_remaining_at_start=prev_clock_end["clock_remaining"],
+                    shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
+                    next_step=_resolve_final_step_next(turn_result) if is_last and not is_shot else next_step,
+                    metadata_reason="hct_interception",
+                )
+            else:
+                step = _build_loop_step(
+                    off_lineup=off_lineup,
+                    def_lineup=def_lineup,
+                    start_coords=prev_end_coords,
+                    end_coords=end_coords,
+                    bh_id=ball_owner_id,
+                    pg_def_id=pg_def_id,
+                    gate_id=gate_id,
+                    seconds=seconds,
+                    clock_remaining_at_start=prev_clock_end["clock_remaining"],
+                    shot_clock_remaining_at_start=prev_clock_end["shot_clock_remaining"],
+                    next_step=next_step,
+                    reason=reason,
+                    move_archetype=segment.get("move_archetype"),
+                )
+        elif reason == "hct_pass":
             # Ball-in-flight: render via the universal pass primitive. Offense
             # holds; defenders drift toward their persisted pass-defense targets.
             passer_id = _player_id_at_pos(off_lineup, segment.get("pass_from_pos") or bh_pos)

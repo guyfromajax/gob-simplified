@@ -1914,148 +1914,11 @@ class TurnManager:
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
-            # Dynamic FCP returns skeleton:{} — use the FCP-specific emitter when
-            # intermediate loop data is present; fall back to legacy skeleton emitter.
-            if isinstance(result, dict) and "animation_steps" not in result:
-                try:
-                    if result.get("fcp_loop_segments"):
-                        from BackEnd.engine.dynamic_fcp_step_emitter import (
-                            build_dynamic_fcp_animation_steps,
-                        )
-
-                        anim_steps = build_dynamic_fcp_animation_steps(
-                            result, self.game
-                        )
-                    else:
-                        from BackEnd.engine.skeleton_step_emitter import (
-                            build_skeleton_animation_steps,
-                        )
-
-                        anim_steps = build_skeleton_animation_steps(
-                            result, self.game, turn_type="FCP"
-                        )
-                    if anim_steps is not None:
-                        result["animation_steps"] = anim_steps
-                        # FCP-Task 2 (FCP_UESS_Audit.md #4, mirrors HCT-Task 3):
-                        # [UESS SEAM] entry teleport detector — the HCT detector is
-                        # HCT-branch-only, and FCP is a separate callsite. Compare
-                        # the prior turn's rendered ball rest to FCP's emitted
-                        # step-0 ball. Detection-only; after Task 1 should not fire
-                        # except on the fallback ball-source path.
-                        try:
-                            _fcp_priors = getattr(self.game, "turns", None) or []
-                            _fcp_prior = _fcp_priors[-1] if _fcp_priors else None
-                            _fcp_pfbc = (
-                                _fcp_prior.get("final_ball_coords")
-                                if isinstance(_fcp_prior, dict) else None
-                            )
-                            _fs0 = (anim_steps[0].get("start") or {}) if anim_steps else {}
-                            _fs0b = _fs0.get("ball") or {}
-                            _fowner = _fs0b.get("owner_player_id")
-                            _fs0pos = (
-                                _fs0b.get("coords") or _fs0b.get("current_coords")
-                                or ((_fs0.get("coords") or {}).get(str(_fowner)) if _fowner else None)
-                            )
-                            if isinstance(_fcp_pfbc, dict) and isinstance(_fs0pos, dict):
-                                _fgap = (
-                                    (float(_fs0pos.get("x")) - float(_fcp_pfbc.get("x"))) ** 2
-                                    + (float(_fs0pos.get("y")) - float(_fcp_pfbc.get("y"))) ** 2
-                                ) ** 0.5
-                                if _fgap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
-                                    logging.warning(
-                                        "🎯 [UESS SEAM] FCP entry ball teleport candidate: "
-                                        "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
-                                        _fcp_pfbc, _fs0pos, _fgap,
-                                    )
-                        except Exception:
-                            pass
-                        fcp_result_type = (result.get("result_type") or "").upper()
-                        if fcp_result_type in ("MAKE", "MISS", "BLOCK") and anim_steps:
-                            first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
-                            last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
-                            cs_start = first_clock.get("clock_remaining")
-                            cs_end = last_clock.get("clock_remaining")
-                            if cs_start is not None and cs_end is not None:
-                                schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
-                                result["time_elapsed"] = int(round(schema_game_burn))
-                    elif result.get("fcp_loop_segments"):
-                        from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
-
-                        log_fcp_emitter_bail(
-                            "build_dynamic_fcp_animation_steps returned None",
-                            segment_count=len(result.get("fcp_loop_segments") or []),
-                            result_type=result.get("result_type"),
-                        )
-                except Exception as e:
-                    logging.warning(
-                        "build_dynamic_fcp_animation_steps (FCP) failed: %s", e
-                    )
+            self._emit_pressure_animation_steps(result, "FCP")
         elif state == "HCT":
             self.logger.log("hct:start")
             result = resolve_half_court_trap_logic(self.game)
-            # Parallel-build: stamp unified animation_steps for HCT. Dynamic
-            # HCT returns skeleton:{} so the standard skeleton emitter bails;
-            # use the dynamic-specific helper. Static HCT (legacy) is wired
-            # internally by resolve_half_court_trap_logic.
-            if isinstance(result, dict) and "animation_steps" not in result:
-                try:
-                    from BackEnd.engine.dynamic_hct_step_emitter import (
-                        build_dynamic_hct_animation_steps,
-                    )
-                    anim_steps = build_dynamic_hct_animation_steps(result, self.game)
-                    if anim_steps is not None:
-                        result["animation_steps"] = anim_steps
-                        # HCT-Task 3 (HCT_UESS_Audit.md #5, mirrors SIP/OREB):
-                        # [UESS SEAM] entry teleport detector — HCT uses its own
-                        # emitter, so it isn't covered by the skeleton emitter's
-                        # detector. Compare the prior turn's rendered ball rest to
-                        # HCT's emitted step-0 ball. Detection-only; after Task 2
-                        # should not fire except on the fallback ball-source path.
-                        try:
-                            _hct_priors = getattr(self.game, "turns", None) or []
-                            _hct_prior = _hct_priors[-1] if _hct_priors else None
-                            _hct_pfbc = (
-                                _hct_prior.get("final_ball_coords")
-                                if isinstance(_hct_prior, dict) else None
-                            )
-                            _s0 = (anim_steps[0].get("start") or {}) if anim_steps else {}
-                            _s0b = _s0.get("ball") or {}
-                            _owner = _s0b.get("owner_player_id")
-                            _s0pos = (
-                                _s0b.get("coords") or _s0b.get("current_coords")
-                                or ((_s0.get("coords") or {}).get(str(_owner)) if _owner else None)
-                            )
-                            if isinstance(_hct_pfbc, dict) and isinstance(_s0pos, dict):
-                                _gap = (
-                                    (float(_s0pos.get("x")) - float(_hct_pfbc.get("x"))) ** 2
-                                    + (float(_s0pos.get("y")) - float(_hct_pfbc.get("y"))) ** 2
-                                ) ** 0.5
-                                if _gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
-                                    logging.warning(
-                                        "🎯 [UESS SEAM] HCT entry ball teleport candidate: "
-                                        "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
-                                        _hct_pfbc, _s0pos, _gap,
-                                    )
-                        except Exception:
-                            pass
-                        # Align time_elapsed with the schema's game-clock burn
-                        # for MAKE/MISS/BLOCK HCT shot turns (§7 fast break),
-                        # mirroring the FCP realignment above — the legacy
-                        # step_clock_seconds sum omits the [ball_flight] +
-                        # [bounce] sub-step durations.
-                        hct_result_type = (result.get("result_type") or "").upper()
-                        if hct_result_type in ("MAKE", "MISS", "BLOCK") and anim_steps:
-                            first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
-                            last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
-                            cs_start = first_clock.get("clock_remaining")
-                            cs_end = last_clock.get("clock_remaining")
-                            if cs_start is not None and cs_end is not None:
-                                schema_game_burn = max(0.0, float(cs_start) - float(cs_end))
-                                result["time_elapsed"] = int(round(schema_game_burn))
-                except Exception as e:
-                    logging.warning(
-                        "build_dynamic_hct_animation_steps failed: %s", e
-                    )
+            self._emit_pressure_animation_steps(result, "HCT")
         else:
             # HCO: normal half-court offense (Force Foul after DREB is now handled at DREB time in game_manager)
             if result is not None:
@@ -4087,6 +3950,150 @@ class TurnManager:
             logging.warning(
                 "build_skeleton_animation_steps (HCO) failed: %s", e
             )
+
+    def _schema_clock_burn(self, anim_steps) -> Optional[int]:
+        """Return game-clock burn from emitted schema steps, if clocks exist."""
+        if not anim_steps:
+            return None
+        first_clock = (anim_steps[0].get("start") or {}).get("clock") or {}
+        last_clock = (anim_steps[-1].get("end") or {}).get("clock") or {}
+        cs_start = first_clock.get("clock_remaining")
+        cs_end = last_clock.get("clock_remaining")
+        if cs_start is None or cs_end is None:
+            return None
+        return int(round(max(0.0, float(cs_start) - float(cs_end))))
+
+    def _stamp_schema_clock_contract(self, result: dict, anim_steps) -> None:
+        """Align result timing fields to the emitted schema clock contract."""
+        burn = self._schema_clock_burn(anim_steps)
+        if burn is not None:
+            result["time_elapsed"] = burn
+        if anim_steps:
+            result["step_clock_seconds"] = [
+                round(float((step.get("end") or {}).get("time_elapsed") or 0.0), 2)
+                for step in anim_steps
+            ]
+            result["resolution_step_index"] = len(anim_steps) - 1
+            result["executed_step_count"] = len(anim_steps)
+
+    def _log_pressure_entry_ball_seam(self, anim_steps, turn_type: str) -> None:
+        """Detection-only seam check shared by FCP/HCT schema emission."""
+        try:
+            priors = getattr(self.game, "turns", None) or []
+            prior = priors[-1] if priors else None
+            prior_final_ball_coords = (
+                prior.get("final_ball_coords")
+                if isinstance(prior, dict) else None
+            )
+            step0 = (anim_steps[0].get("start") or {}) if anim_steps else {}
+            step0_ball = step0.get("ball") or {}
+            owner = step0_ball.get("owner_player_id")
+            step0_ball_pos = (
+                step0_ball.get("coords")
+                or step0_ball.get("current_coords")
+                or ((step0.get("coords") or {}).get(str(owner)) if owner else None)
+            )
+            if isinstance(prior_final_ball_coords, dict) and isinstance(step0_ball_pos, dict):
+                gap = (
+                    (float(step0_ball_pos.get("x")) - float(prior_final_ball_coords.get("x"))) ** 2
+                    + (float(step0_ball_pos.get("y")) - float(prior_final_ball_coords.get("y"))) ** 2
+                ) ** 0.5
+                if gap > 1.5:  # UESS_SEAM_TELEPORT_GRID_EPSILON
+                    logging.warning(
+                        "🎯 [UESS SEAM] %s entry ball teleport candidate: "
+                        "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
+                        turn_type,
+                        prior_final_ball_coords,
+                        step0_ball_pos,
+                        gap,
+                    )
+        except Exception:
+            pass
+
+    def _emit_pressure_animation_steps(self, result: dict, turn_type: str) -> None:
+        """Central schema-emission path for dynamic FCP/HCT pressure turns.
+
+        Preserves existing fallback behavior:
+          - FCP with loop segments uses the dynamic FCP wrapper.
+          - FCP without loop segments falls back to the legacy skeleton emitter.
+          - HCT uses the dynamic HCT emitter unless the resolver already stamped
+            animation_steps.
+
+        After emission, timing is derived from the schema clocks for every
+        result type, matching the HCO direction and avoiding the previous
+        shot-only realignment.
+        """
+        if not isinstance(result, dict):
+            return
+        normalized = (turn_type or "").upper()
+        anim_steps = result.get("animation_steps")
+        if not anim_steps:
+            try:
+                if normalized == "FCP":
+                    if result.get("fcp_loop_segments"):
+                        from BackEnd.engine.dynamic_fcp_step_emitter import (
+                            build_dynamic_fcp_animation_steps,
+                        )
+
+                        anim_steps = build_dynamic_fcp_animation_steps(result, self.game)
+                    else:
+                        from BackEnd.engine.skeleton_step_emitter import (
+                            build_skeleton_animation_steps,
+                        )
+
+                        anim_steps = build_skeleton_animation_steps(
+                            result, self.game, turn_type="FCP"
+                        )
+                elif normalized == "HCT":
+                    from BackEnd.engine.dynamic_hct_step_emitter import (
+                        build_dynamic_hct_animation_steps,
+                    )
+
+                    anim_steps = build_dynamic_hct_animation_steps(result, self.game)
+                else:
+                    return
+
+                if anim_steps is not None:
+                    result["animation_steps"] = anim_steps
+                elif normalized == "FCP" and result.get("fcp_loop_segments"):
+                    from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
+
+                    log_fcp_emitter_bail(
+                        "build_dynamic_fcp_animation_steps returned None",
+                        segment_count=len(result.get("fcp_loop_segments") or []),
+                        result_type=result.get("result_type"),
+                    )
+                    return
+            except Exception as e:
+                logging.warning(
+                    "build_dynamic_%s_animation_steps failed: %s",
+                    normalized.lower(),
+                    e,
+                )
+                return
+
+        anim_steps = result.get("animation_steps") or anim_steps
+        if anim_steps:
+            self._log_pressure_entry_ball_seam(anim_steps, normalized)
+            self._stamp_schema_clock_contract(result, anim_steps)
+            try:
+                from BackEnd.engine.pressure_step_state import (
+                    build_pressure_step_states,
+                    project_pressure_step_states_to_animation_steps,
+                )
+
+                pressure_states = build_pressure_step_states(result, normalized)
+                projected_steps = project_pressure_step_states_to_animation_steps(
+                    pressure_states
+                )
+                if projected_steps:
+                    result["animation_steps"] = projected_steps
+            except Exception as e:
+                logging.warning(
+                    "build_pressure_step_states (%s) failed: %s",
+                    normalized,
+                    e,
+                )
 
     def _eoq_followup_can_run_final_turn(self) -> bool:
         from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup

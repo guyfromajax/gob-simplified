@@ -12,12 +12,12 @@
 
 | Symptom / gap | Root cause | Verdict |
 |---|---|---|
-| Interception announced but no pass flight to interceptor | Backend `INTERCEPT` → `_emit_stopper("hct_interception")` only; **no `hct_pass` segment**, no Rim Runner–style intercept step | ❌ **Confirmed — known gap** |
-| Ball may stay on passer through stopper; stealer gets ball only on post-steal step (teleport) | Stopper `_build_loop_step` keeps `ball.owner = passer`; `_append_post_steal_hco_transition` sets `ball.owner = stealer_id` on next step with no pass animation | ❌ **Confirmed** |
-| Schema STEAL turn_stop does nothing useful | `dispatchTurnStop` → `runSteal` is an **explicit stub** (`console.warn` only); legacy `handleSteal` (ball attach) **bypassed** when `animation_steps` exist | ❌ **Confirmed** |
+| Interception announced but no pass flight to interceptor | Backend `INTERCEPT` used to emit `_emit_stopper("hct_interception")` only. **Updated 2026-07-15:** the engine now stamps interception metadata and the shared HCT/FCP emitter projects a real pass-flight-to-stealer schema step. | ✅ **Fixed in schema path** |
+| Ball may stay on passer through stopper; stealer gets ball only on post-steal step (teleport) | Stopper path used to keep `ball.owner = passer`; post-steal transition set `ball.owner = stealer_id` later. **Updated 2026-07-15:** `hct_interception` step now ends with `ball.owner_player_id = stealer_id` before post-steal transition. | ✅ **Fixed in schema path** |
+| Schema STEAL turn_stop does nothing useful | `dispatchTurnStop` → `runSteal` used to be a stub. **Updated 2026-07-15:** schema `runSteal` now performs cleanup-only ball ownership finalization without replaying legacy steal animation or duplicate announcements. | ✅ **Fixed in schema path** |
 | Infinite receive / ball-landing SFX loop | **Not pinned to a single wiring bug** in the interception path; would require `playTurn` re-running pass steps or runtime evidence | ⚠️ **Unconfirmed — needs repro dump** |
 
-**Fix direction (when prioritized):** Mirror Rim Runner `_build_lane_pass_intercepted_step` — pass flight BH → contact → ball attaches to stealer; implement real `runSteal` (or step-end announcement + attach) for schema FCP/HCT STEAL terminals.
+**Current next fix direction:** move pressure builders upstream to produce formal PressureStepState first. Pass-interception flight, schema terminal cleanup, batted-OOB ball flight, TurnManager pressure emission, additive pressure StepState stamping, and a parity-tested StepState projection bridge are now aligned for the dynamic schema path.
 
 ---
 
@@ -39,11 +39,12 @@ On pass decision, `_resolve_hct_pass_contest` runs **before** any pass segment i
 ```
 pass decision → contest outcome INTERCEPT
   → result_type = STEAL, is_interception = True, stealer = interceptor
-  → _emit_stopper("hct_interception", ...)   # 0.5s defensive collapse on BH
-  → break   # NO hct_pass segment
+  → _emit_stopper("hct_interception", ...)
+  → stamp pass_from_pos / pass_to_pos / interceptor_pos / interception_contact
+  → break
 ```
 
-`_emit_stopper` appends a loop segment with ball still on **passer (`bh_pos`)**; defense collapses via `_position_defense`.
+`_emit_stopper` appends the terminal loop segment; the stamped metadata lets the emitter project it as a pass-interception step rather than a generic stopper.
 
 **Turn assembly:** `BackEnd/engine/phase_resolution.py` → `_resolve_full_court_press_dynamic_first_cut` sets `stealer_id`, `is_interception`, `fcp_loop_segments`, etc.
 
@@ -54,13 +55,13 @@ pass decision → contest outcome INTERCEPT
 | Segment reason | Step builder | Pass SFX? |
 |---|---|---|
 | `hct_pass` | `build_pass_step` | Yes (`sfx_on_ball_arrival`) |
-| `hct_interception` | `_build_loop_step` (generic) | **No** |
+| `hct_interception` | `_build_interception_pass_step` | Yes (`sfx_on_ball_arrival`) |
 
-Last segment gets `end.next = turn_stop STEAL` via `_resolve_final_step_next`.
+Last segment gets `end.next = turn_stop STEAL` via `_resolve_final_step_next`, unless the existing post-steal transition rewires it to the transition step.
 
 If `next_play_type ∈ {HCO, HCT, FCP}`, `skeleton_step_emitter._append_post_steal_hco_transition`:
 - Rewires stopper `next` → post-steal step index.
-- Post-steal step: ball `owner_player_id = stealer_id`, players reposition; **turn_stop STEAL** moves to post-steal step end.
+- Post-steal step: starts after the interception step already ended with ball `owner_player_id = stealer_id`; players reposition; **turn_stop STEAL** moves to post-steal step end.
 
 **Reference implementation (what FCP/HCT lacks):** `BackEnd/engine/rim_runner_step_emitter.py` → `_build_lane_pass_intercepted_step` — BH passes, stealer sprints to contact grid, ball `attached(BH) → attached(stealer)`, `ball_reaches_player` gate, step-end “Interception!” announcement.
 
@@ -70,7 +71,8 @@ If `next_play_type ∈ {HCO, HCT, FCP}`, `skeleton_step_emitter._append_post_ste
 
 **Playback:** `animationPlayback.js`
 - `playTurn` walks steps; stops at first `turn_stop`.
-- `dispatchTurnStop` → **`runSteal` stub** (no ball attach, no follow-up animation).
+- `dispatchTurnStop` → `runSteal` cleanup-only handler.
+- `runSteal` does not animate or announce. It clears stale pass/pending-owner state and aligns BallController / legacy ball holder / visible ball attachment to the backend-authored stealer.
 
 **Announcements / SFX:**
 - Interception voice: `turnPreparation.finalizeTurnAfterAnimation` → `gameAnnouncements` STEAL handler → `isPassInterception(turn)` → “INTERCEPTION!” + `resolveInterceptionSfxFile()` (**once**, at turn end).
@@ -97,7 +99,7 @@ If `next_play_type ∈ {HCO, HCT, FCP}`, `skeleton_step_emitter._append_post_ste
 Capture on repro **before** refresh:
 
 1. **Console**
-   - `dispatchTurnStop: STEAL handler not yet implemented`
+   - unexpected `dispatchTurnStop` terminal-handler warnings
    - `[UESS PLAYBACK] schema:enter` / `schema:exit` (did `playTurn` finish?)
    - `playTurn: exceeded 200 steps` (cycle?)
    - Repeated `pass:release` or `step:post-wait` traces with same `stepId`
@@ -120,8 +122,11 @@ Capture on repro **before** refresh:
 
 | Topic | Status | Notes |
 |---|---|---|
-| Interception animation (no pass flight) | **Open** | Prior trace; same root as above |
-| `runSteal` schema stub | **Open** | `animationPlayback.js` |
+| Interception animation (no pass flight) | **Fixed** | `hct_interception` now emits pass flight to stealer/contact point |
+| `runSteal` schema stub | **Fixed** | cleanup-only finalization in `animationPlayback.js` |
+| HCT/FCP batted-OOB imperative ball-send | **Fixed** | dynamic schema emits contact + OOB drift; frontend imperative helper is fallback only |
+| HCT/FCP pressure StepState shape | **Implemented additively** | `pressure_step_state.py` freezes emitted schema into `result["pressure_step_states"]`; no consumer reads it yet |
+| HCT/FCP PressureStepState projection | **Started** | `project_pressure_step_states_to_animation_steps` round-trips current schema through StepState with parity tests |
 | Defensive mid-court recovery (stranded defenders) | **Implemented** | `_recover_defense_targets` in `dynamic_hct.py` |
 | Off-ball x=50 back-movement gate | **Implemented** | `gate_offense_backcourt_reentry` in `over_and_back.py` |
 | Rim Runner lane pass intercept | **Reference** | `_build_lane_pass_intercepted_step` |
@@ -130,13 +135,10 @@ Capture on repro **before** refresh:
 
 ---
 
-## Proposed fix plan (when scheduled)
+## Remaining fix plan
 
-1. **Backend emitter:** On `INTERCEPT`, emit a dedicated pass-intercept step (Rim Runner pattern): ball flight passer → `contact_point`, stealer movement to contact, `ball_motion_style: pass`, ownership transfer to `stealer_id` at contact — **not** a bare `_emit_stopper` only.
-2. **Optional:** Keep short stopper after intercept for defensive collapse, or fold into intercept step.
-3. **Frontend:** Implement `runSteal` for schema path (attach ball to stealer, clear `passInFlight` / pending owner) **or** rely on intercept step end state + step-end announcement for sync.
-4. **Verify:** `_append_post_steal_hco_transition` still chains correctly; `stealer_id` present in step coords.
-5. **Test:** Unit test intercept step shape; manual FCP repro; confirm no receive-SFX loop.
+1. **Upstream PressureStepState builders:** Convert the remaining pressure-turn segment model into formal `PressureStepState` before projection. The projection bridge exists; the next step is moving `_build_loop_step`, pass, interception, batted-OOB, and HCT shot paths to create StepState directly.
+2. **Manual repro:** Validate FCP/HCT pass interception, terminal fouls/dead balls, and batted-OOB in-browser.
 
 ---
 

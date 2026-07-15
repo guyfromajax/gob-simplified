@@ -379,7 +379,9 @@ export class AnimationEngine {
     // settle, fly the ball passer→contact→nearest sideline by reusing Rim
     // Runner's imperative OOB ball-send (Path B). Gated on `turnData.bat_oob`.
     if (turnData?.bat_oob) {
-      await this._runHctBatOobBallSend(turnData, sprites, ballSprite);
+      if (!this._hasSchemaBatOobTrajectory(stepsToPlay)) {
+        await this._runHctBatOobBallSend(turnData, sprites, ballSprite);
+      }
     } else if (turnData?.rim_runner_bat_oob) {
       await this._runSchemaBatOobBallSend(turnData, stepsToPlay, sprites, ballSprite);
     }
@@ -399,6 +401,20 @@ export class AnimationEngine {
     }
 
     return true;
+  }
+
+  _hasSchemaBatOobTrajectory(steps = []) {
+    if (!Array.isArray(steps)) {
+      return false;
+    }
+    return steps.some((step) => {
+      const meta = step?.start?.advance_trigger?.metadata;
+      return (
+        meta?.reason === "hct_bat_oob_contact"
+        || meta?.reason === "hct_bat_oob_drift"
+        || (meta?.contact_coords && meta?.oob_coords && meta?.reason === "hct_bat_oob")
+      );
+    });
   }
 
   /**

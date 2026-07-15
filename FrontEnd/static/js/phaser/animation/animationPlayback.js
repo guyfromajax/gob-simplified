@@ -32,7 +32,14 @@ import { attachBallToPlayer } from "./ballManager.js";
 // to the passer until properly detached via `ballController.detachFromPlayer`.
 // Without this, schema-driven ball tweens get overwritten every frame by
 // the follow callback and the pass renders as a teleport at step end.
-import { detachBall } from "./BallControllerAdapter.js";
+import {
+  attachBallToPlayer as attachBallToPlayerAdapter,
+  clearPendingOwner,
+  detachBall,
+  setCurrentOwner,
+  synchronizeBallState,
+} from "./BallControllerAdapter.js";
+import { setBallHolderId } from "./ballAnimationSimple.js";
 import { createBallTrail } from "./createBallTrail.js";
 import { playGameSfx } from "../utils/gameSfx.js";
 import {
@@ -1470,19 +1477,112 @@ async function runShotAttempt(scene, payload, context) {
   // before wiring announcements through here. Followup task.
 }
 
-async function runFoul(_scene, payload, _context) {
-  // Wire to: foul flash effect + announcement + (if shooting foul) FT setup.
-  console.warn("dispatchTurnStop: FOUL handler not yet implemented", payload);
+function cleanupSchemaTerminalState(scene) {
+  if (scene) {
+    scene.passInFlight = false;
+  }
+  synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
+  clearPendingOwner(scene);
 }
 
-async function runSteal(_scene, payload, _context) {
-  // Wire to: steal visual + possession flip (or transition to FAST_BREAK).
-  console.warn("dispatchTurnStop: STEAL handler not yet implemented", payload);
+async function runFoul(scene, _payload, _context) {
+  // Cleanup-only. The backend result + turn finalization path owns foul
+  // announcements, whistle SFX, FT setup, bonus handling, and possession.
+  await waitWhileUserPaused(scene);
+  if (shouldFastForwardPlayback(scene)) return;
+  cleanupSchemaTerminalState(scene);
 }
 
-async function runDeadBallTurnover(_scene, payload, _context) {
-  // Wire to: dead-ball animation + SIDE_INBOUND setup.
-  console.warn("dispatchTurnStop: DEAD_BALL_TURNOVER handler not yet implemented", payload);
+function resolveSpriteByPlayerId(sprites, rawId) {
+  if (rawId == null || !sprites) return null;
+  const wanted = String(rawId);
+  if (sprites[rawId]) return sprites[rawId];
+  if (sprites[wanted]) return sprites[wanted];
+  for (const [id, sprite] of Object.entries(sprites)) {
+    if (String(id) === wanted) return sprite;
+    if (String(sprite?.playerId ?? "") === wanted) return sprite;
+  }
+  return null;
+}
+
+function resolveSchemaStealerId(payload, turnData, sprites) {
+  const stealEvent = Array.isArray(turnData?.events)
+    ? turnData.events.find((event) => String(event?.event_type || "").toUpperCase() === "STEAL")
+    : null;
+  const candidates = [
+    payload?.stealer_id,
+    payload?.stealerId,
+    payload?.player_id,
+    payload?.playerId,
+    turnData?.stealer_id,
+    turnData?.stealerId,
+    stealEvent?.stealer_id,
+    stealEvent?.stealerId,
+    turnData?.roles?.ball_handler_id,
+    turnData?.roles?.ball_handler?.player_id,
+  ].filter((value) => value != null);
+  if (candidates.length > 0) return String(candidates[0]);
+
+  if (!Array.isArray(turnData?.animations) || turnData.animations.length === 0) {
+    return null;
+  }
+  const maxStep = Math.max(
+    0,
+    ...turnData.animations.map((animation) => animation?.movement?.length || 0),
+  ) - 1;
+  const inferred = turnData.animations.find((animation) => {
+    if (!animation) return false;
+    if (Array.isArray(animation.hasBallAtStep) && animation.hasBallAtStep[maxStep] === true) {
+      return true;
+    }
+    const lastAction = animation?.movement?.[maxStep]?.action;
+    return lastAction === "steal" || lastAction === "handle";
+  });
+  if (inferred?.playerId != null && resolveSpriteByPlayerId(sprites, inferred.playerId)) {
+    return String(inferred.playerId);
+  }
+  return inferred?.playerId != null ? String(inferred.playerId) : null;
+}
+
+async function runSteal(scene, payload, context) {
+  // Schema playback already rendered the steal/interception pass. This stop
+  // handler only clears stale in-flight state and makes final ball ownership
+  // match the backend-authored stealer.
+  await waitWhileUserPaused(scene);
+  if (shouldFastForwardPlayback(scene)) return;
+
+  const { sprites, ballSprite, turnData } = context || {};
+  const stealerId = resolveSchemaStealerId(payload, turnData, sprites);
+  const stealerSprite = resolveSpriteByPlayerId(sprites, stealerId);
+
+  cleanupSchemaTerminalState(scene);
+
+  if (!stealerId || !stealerSprite) {
+    console.warn("dispatchTurnStop: STEAL cleanup could not resolve stealer sprite", {
+      payload,
+      stealerId,
+      availableSprites: Object.keys(sprites || {}),
+    });
+    return;
+  }
+
+  attachBallToPlayerAdapter(scene, ballSprite, stealerSprite, {
+    debugInfo: {
+      reason: "schema_steal_turn_stop",
+      stealerId,
+    },
+  });
+  setCurrentOwner(scene, stealerId);
+  setBallHolderId(scene, stealerId);
+}
+
+async function runDeadBallTurnover(scene, _payload, _context) {
+  // Cleanup-only. Dead-ball fumble/OOB visuals are schema-authored before this
+  // turn_stop; announcements and next inbound setup stay in the existing turn
+  // finalization / next-turn pipeline.
+  await waitWhileUserPaused(scene);
+  if (shouldFastForwardPlayback(scene)) return;
+  cleanupSchemaTerminalState(scene);
 }
 
 async function runShotClockExpired(_scene, payload, _context) {

@@ -3201,6 +3201,11 @@ def compute_dynamic_hct_turn(
                 f"interception (terminal — {passer_pos}\u2192{receiver_pos} "
                 f"picked off by {interceptor_pos})",
             )
+            if loop_segments:
+                loop_segments[-1]["pass_from_pos"] = passer_pos
+                loop_segments[-1]["pass_to_pos"] = receiver_pos
+                loop_segments[-1]["interceptor_pos"] = interceptor_pos
+                loop_segments[-1]["interception_contact"] = dict(steal_coords)
             shot_clock -= sec
             text_suffix = " — pass picked off, intercepted!"
             break
@@ -3229,6 +3234,12 @@ def compute_dynamic_hct_turn(
                 f"pass batted out of bounds ({passer_pos}\u2192{receiver_pos}, "
                 f"deflected by {deflector_pos})",
             )
+            if loop_segments:
+                loop_segments[-1]["pass_from_pos"] = passer_pos
+                loop_segments[-1]["pass_to_pos"] = receiver_pos
+                loop_segments[-1]["deflector_pos"] = deflector_pos
+                loop_segments[-1]["bat_oob_contact"] = dict(bat_oob_contact)
+                loop_segments[-1]["bat_oob_target"] = dict(bat_oob_target)
             shot_clock -= sec
             text_suffix = " — batted out of bounds, they keep it!"
             break

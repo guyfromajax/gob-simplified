@@ -79,3 +79,36 @@ The **drive contest** (Dynamic_MM_Brief §S2): a drive to the rim resolves throu
 | `HCO_DRIVE_SFX_FIRE_PROB` | skeleton_step_emitter.py | `0.5` | Cosmetic — chance a drive-start VO cue fires on an attack shot (seeded coin, separate salt from the braddock/sammy pick). ↓ = quieter/rarer drive cues. |
 
 > **MC finding (2026-07-14, model — `scripts/s2_drive_monte_carlo.py`):** at the shipped `DRIVE_NEUTRAL_BAND=100`, even matchups land **A/B/C ≈ 21/50/21%** with ~8% contact; matchup lean shifts A↔C (offense-favored → 33/47/11, defense-favored → 11/47/34) while B stays broad by design. S2c blow-by demotion is driven by **aggression** (~60% normal / 82% aggressive), not corridor. Absolute rates depend on the mock attribute spread + model layout — trust the sweep deltas, and confirm the tier mix + drive FG% against the live baseline before committing.
+
+## HCO Altered Actions + Posture Placement (Dynamic MM — S3)
+
+Man defense only (zone = S4). Spec of record: `Dynamic_HCO_System.md` § Altered Actions. Placement is `shared_defense.py` (`_apply_defender_posture`); altered actions are `phase_resolution.py`.
+
+**Posture-driven defender placement** (aggression retired for the HCO path). On-ball = sit N grid off the BH toward the rim; off-ball tight = deny (ball-side), normal/loose = help (`man + sag·(ball−man) + shade·(basket−man)`, per-dim anchored by the man's basket-offset).
+
+| Constant | File | Value | Effect |
+|---|---|---|---|
+| `ONBALL_POSTURE_DIST` | shared_defense.py | `{tight:2.5, normal:3.5, loose:4.5}` | on-ball cushion (grid) toward the rim, by posture. ↑ = looser on-ball D. |
+| `HELP_SAG` | shared_defense.py | `{normal:0.30, loose:0.55}` | off-ball: how far the defender sits from his man **toward the ball** (help degree). ↑ = deeper help. |
+| `HELP_SAG_JITTER` | shared_defense.py | `0.10` | ±0–10% human randomization on the sag (resolved once + frozen → UESS-safe). |
+| `HELP_BASKET_SHADE` | shared_defense.py | `0.20` | off-ball shade toward the basket, as a fraction of the man→basket distance. |
+| `HELP_ANCHOR_FLOOR` | shared_defense.py | `0.30` | min follow in the man's **basket-aligned** axis ("comes off it some", never locks). |
+| `POSTURE_DENY_DISTANCE` | shared_defense.py | `2.0` | tight/deny: grid off the man on the ball side (in the passing lane). |
+
+**Altered-action trigger + selection** (per non-BH player, each of the BH's SM steps, on an altering turn):
+
+| Constant / rule | Value | Effect |
+|---|---|---|
+| altering-turn gate | `alterations × 20%` (`randint(1,5) ≤ setting`) | 0→0% (run the set) … 4→80% freelance turns. The strategic lever. |
+| perform roll | `randint(1,100) < 0.8·IQ + 0.2·CH + off_eff` | smart players attempt altered actions more often; else stationary. |
+| selection | random by location | inside → {post up, flash}; outside → {backdoor, jab step}. |
+
+**Dynamic defender good-read threshold** (the two non-inside actions; `d` = defender's frozen-grid distance to his man — reflects posture). Replaces the flat 110. Defender read = `(0.8·IQ + 0.2·CH + def_eff) × d6` vs the threshold; good ≥ threshold → cover, poor → the action springs.
+
+| Constant | File | Value | Effect |
+|---|---|---|---|
+| `BACKDOOR_READ_BASE` | phase_resolution.py | `150.0` | backdoor threshold = `BASE − COEF·d` → **close/deny defender = harder read → backdoor opens** (backdoors beat deny). |
+| `JAB_READ_BASE` | phase_resolution.py | `100.0` | jab threshold = `BASE + COEF·d` → **loose defender = harder read → bites → pop open** (jabs beat loose). |
+| `ALTERED_READ_PROX_COEF` | phase_resolution.py | `8.0` | per-grid distance swing. At `8` the threshold moves ~24 pts across 2–5 grid (~0.4 of a d6 pip) — a clearly noticeable distance effect. |
+
+**Backdoor openness** (once the cut fires): `BACKDOOR_OPENNESS_MIN=3` / `OPEN=8` / `QUALITY_LIFT_MAX=30` — the frozen-defender gap → should_shoot lift.

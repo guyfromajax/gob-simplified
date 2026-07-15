@@ -130,7 +130,7 @@ def _non_bh_target(loc, xy, occupied, is_away_offense, rng):
     return _radial_nudge(xy, basket, toward=False, amt=rng.randint(2, 5))
 
 
-def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng, off_eff=0):
+def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng, off_eff=0, altered_moves=None):
     """
     Build a coord-based subtle-movement beat (BH nudges off pattern; some non-BH relocate;
     the rest hold), or None if the step can't support one. Carries explicit display coords
@@ -140,6 +140,11 @@ def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng, off_eff=0)
     relocates (when a move is applicable) if it clears ``MOTION_READ_THRESHOLD`` (brief: Updated
     Subtle Movement Logic; replaces the old flat 50% coin flip). The BH always moves (he chose
     the subtle movement). ``off_eff`` = offense team offensive_efficiency.
+
+    ``altered_moves`` (S3 altered actions): ``{pos: {"coords", "location"}}`` — when provided, the
+    RANDOM per-teammate relocation is REPLACED: listed non-BH players move to their given target
+    (action ``"cut"``), everyone else holds. The caller (the walk) decides the moves via the
+    altered-action trigger/selection; the BH still nudges. None → legacy random-relocation behavior.
     """
     from BackEnd.utils.shared import player_read_raw
     from BackEnd.engine.motion_step_decision import MOTION_READ_THRESHOLD
@@ -168,16 +173,25 @@ def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng, off_eff=0)
         if pos == bh_pos:
             continue
         moved = False
-        # Per-teammate read: smart players almost always make the (correct) read to move;
-        # the d6 makes weaker readers hit-and-miss (brief G2).
-        read = (player_read_raw(off_lineup.get(pos)) + off_eff) * rng.randint(1, 6)
-        if read > MOTION_READ_THRESHOLD:
-            occupied = {_norm(l) for q, l in loc_by_pos.items() if q != pos and l}
-            target = _non_bh_target(loc_by_pos.get(pos, ""), xy, occupied, is_away_offense, rng)
-            if target:
-                new_pos_actions[pos] = {"coords": target, "action": "cut", "archetype": SUBTLE_ARCHETYPE}
+        if altered_moves is not None:
+            # S3: non-BH players do their SELECTED altered action (or hold) — no random relocation.
+            mv = altered_moves.get(pos)
+            if mv and mv.get("coords"):
+                new_pos_actions[pos] = {"coords": mv["coords"], "location": mv.get("location"),
+                                        "action": "cut", "archetype": SUBTLE_ARCHETYPE}
                 movers.append(pos)
                 moved = True
+        else:
+            # Legacy: per-teammate read → random relocation. Smart players almost always make the
+            # (correct) read; the d6 makes weaker readers hit-and-miss (brief G2).
+            read = (player_read_raw(off_lineup.get(pos)) + off_eff) * rng.randint(1, 6)
+            if read > MOTION_READ_THRESHOLD:
+                occupied = {_norm(l) for q, l in loc_by_pos.items() if q != pos and l}
+                target = _non_bh_target(loc_by_pos.get(pos, ""), xy, occupied, is_away_offense, rng)
+                if target:
+                    new_pos_actions[pos] = {"coords": target, "action": "cut", "archetype": SUBTLE_ARCHETYPE}
+                    movers.append(pos)
+                    moved = True
         if not moved:
             new_pos_actions[pos] = {"coords": {"x": round(xy["x"], 1), "y": round(xy["y"], 1)},
                                     "action": "stationary"}
