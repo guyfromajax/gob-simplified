@@ -4958,6 +4958,7 @@ JAB_FLOURISH_AMPLITUDE_GRID = 6.0  # jab step: VISUAL fake size (render-only, to
 FLASH_GREAT_READ = 200.0          # flash: defender read > this = GREAT → FRONTS (denies the catch)
 FLASH_GOOD_READ = 110.0           # flash: read > this = GOOD → stays BEHIND (covered); ≤ = POOR (open)
 FLASH_FRONT_GRID = 1.5            # flash: a fronting defender steps this far to the ball-side of the flasher
+POST_UP_ADVANTAGE_LIFT = 20.0     # post up: poor inside-D (defender sits BEHIND) → post-position openness bonus
 
 
 def _hco_cut_openness_lift(cutter_rim, defender_prior):
@@ -5097,8 +5098,11 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
         gated by the owner of the zone he enters: owner ADJUSTS → 0 (covered, matches render); owner HOLDS
         (or no owner) → geometric nearest-def gap off the prior grid (matches the held render).
     FLASH (inside player relocates to a flash spot): TERNARY read — great (>200) FRONTS (denies the catch →
-    `fronted`), good (>110) stays BEHIND (covered, receivable), poor (≤110) stationary (open). Man only for
-    now (zone flash = next build). POST UP = later.
+    `fronted`), good (>110) stays BEHIND (covered, receivable), poor (≤110) stationary (open). Reactor =
+    assigned defender (man) / owner of the destination zone (zone).
+    POST UP (inside player HOLDS + posts): NO altered read — the defender inside-defends ((ID+ST)/2 vs
+    (SC+ST)/2 ×d6): good D → FRONTS (deny → `fronted`), poor D → sits BEHIND (post advantage → openness
+    lift). Reactor = assigned defender (man) / owner of the post spot (zone).
     Returns `(altered_moves, defender_reads {def_pos:bool}, openness_map {pos:lift}, defender_overrides
     {def_pos:{coords,action}}, fronted {pos})` for build_subtle_beat + the animator + the post-SM Hot Read."""
     from BackEnd.utils.shared import player_read_raw
@@ -5115,9 +5119,8 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
             continue
         loc = (pos_actions.get(pos) or {}).get("location") or "key"
         act = _hco_select_altered_action(off_lineup[pos], loc, off_eff, rng)
-        # BUILT: backdoor + jab step (man & zone), flash (man only for now — zone flash = next build; post
-        # up = later). A not-yet-built selection just stays stationary.
-        if act in ("backdoor", "jab step") or (act == "flash" and not zone):
+        # BUILT (all man & zone): backdoor, jab step, flash, post up.
+        if act in ("backdoor", "jab step", "flash", "post up"):
             sel[pos] = act
     if not sel:
         return altered_moves, defender_reads, openness_map, defender_overrides, fronted
@@ -5145,6 +5148,13 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
                 "coords": {"x": round(float(flash_xy["x"]), 1), "y": round(float(flash_xy["y"]), 1)},
                 "location": flash_loc, "action": "flash"}
             flash_targets[pos] = (flash_loc, flash_xy)
+        elif act == "post up":
+            # Post up = HOLD position (no move) + actively post; shoots his own inside look there.
+            post_xy = coord_fn(pos)
+            altered_moves[pos] = {
+                "coords": {"x": round(float(post_xy["x"]), 1), "y": round(float(post_xy["y"]), 1)},
+                "location": (pos_actions.get(pos) or {}).get("location") or "key",
+                "action": "post up"}
 
     def _apply_jab_bite(reactor, jabber_xy):
         """Poor jab read (man OR zone) → the reactor follows the fake inward (toward the basket) and
@@ -5156,6 +5166,43 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
         defender_overrides[reactor] = {"coords": bite, "action": "guard_offball"}
         def_xy[reactor] = bite
         return _hco_lift_from_cushion(_hco_nearest_def_dist(jabber_xy, def_xy))
+
+    def _apply_flash_reaction(reactor, flash_xy, flasher_pos):
+        """Flash TERNARY reaction (man = assigned defender; zone = destination-zone owner). Flat 200/110:
+        GREAT → front (defender to the ball-side + `fronted` → can't be fed), GOOD → behind (covered, but
+        receivable → openness 0), POOR → stationary (open by nearest-def gap). Sets openness_map."""
+        read = (player_read_raw(def_lineup.get(reactor)) + def_eff) * rng.randint(1, 6)
+        if read > FLASH_GREAT_READ:
+            fronted.add(flasher_pos)
+            front = _hco_nudge_toward(flash_xy, coord_fn(bh_pos), FLASH_FRONT_GRID)
+            front = {"x": round(float(front["x"]), 1), "y": round(float(front["y"]), 1)}
+            defender_overrides[reactor] = {"coords": front, "action": "guard_offball"}
+            def_xy[reactor] = front
+            openness_map[flasher_pos] = 0.0
+        elif read > FLASH_GOOD_READ:
+            openness_map[flasher_pos] = 0.0                # behind → covered but receivable (no lift)
+        else:
+            defender_reads[reactor] = False                # stationary → flasher open
+            openness_map[flasher_pos] = _hco_lift_from_cushion(_hco_nearest_def_dist(flash_xy, def_xy))
+
+    def _apply_post_up(reactor, post_xy, post_pos):
+        """Post up (man = assigned defender / zone = owner of the post spot). NO altered read — the
+        defender INSIDE-DEFENDS: his (ID+ST)/2 vs the post player's (SC+ST)/2, each ×d6. GOOD defense
+        (def wins) → FRONTS (deny → `fronted`). POOR defense → sits BEHIND (post advantage → openness lift;
+        his default cover already renders him basket-side, so no override)."""
+        _oa = getattr(off_lineup.get(post_pos), "attributes", {}) or {}
+        _da = getattr(def_lineup.get(reactor), "attributes", {}) or {}
+        off_in = (_oa.get("SC", 0) + _oa.get("ST", 0)) / 2.0
+        def_in = (_da.get("ID", 0) + _da.get("ST", 0)) / 2.0
+        if def_in * rng.randint(1, 6) >= off_in * rng.randint(1, 6):
+            fronted.add(post_pos)
+            front = _hco_nudge_toward(post_xy, coord_fn(bh_pos), FLASH_FRONT_GRID)
+            front = {"x": round(float(front["x"]), 1), "y": round(float(front["y"]), 1)}
+            defender_overrides[reactor] = {"coords": front, "action": "guard_offball"}
+            def_xy[reactor] = front
+            openness_map[post_pos] = 0.0
+        else:
+            openness_map[post_pos] = POST_UP_ADVANTAGE_LIFT
 
     # ================= DEFENSE reaction + openness (branches by play type) =================
     if zone:
@@ -5210,6 +5257,30 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
             read = (player_read_raw(def_lineup.get(owner)) + def_eff) * rng.randint(1, 6)
             openness_map[pos] = (0.0 if read > ALTERED_ZONE_READ_THRESHOLD
                                  else _apply_jab_bite(owner, jabber_xy))
+
+        # FLASH — the owner of the DESTINATION zone reads the flasher (great front / good behind / poor
+        # stationary). No owner (flash spot in no zone) → open by geometry. The animator auto-covers on a
+        # good read; the front override / poor freeze render the other two (contest == render).
+        for pos, act in sel.items():
+            if act != "flash":
+                continue
+            _fl, flash_xy = flash_targets[pos]
+            owner = _owner(flash_xy)
+            if owner is None or not def_xy.get(owner):
+                openness_map[pos] = _hco_lift_from_cushion(_hco_nearest_def_dist(flash_xy, def_xy))
+            else:
+                _apply_flash_reaction(owner, flash_xy, pos)
+
+        # POST UP — the owner of the post player's own zone inside-defends (front / behind). No owner → open.
+        for pos, act in sel.items():
+            if act != "post up":
+                continue
+            post_xy = coord_fn(pos)
+            owner = _owner(post_xy)
+            if owner is None or not def_xy.get(owner):
+                openness_map[pos] = POST_UP_ADVANTAGE_LIFT
+            else:
+                _apply_post_up(owner, post_xy, pos)
         return altered_moves, defender_reads, openness_map, defender_overrides, fronted
 
     # MAN — the assigned defender reads his man (distance-scaled threshold).
@@ -5236,22 +5307,10 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
             openness_map[pos] = (0.0 if read >= _hco_altered_read_threshold("jab step", dist)
                                  else _apply_jab_bite(def_pos, jabber_xy))
         elif act == "flash":
-            flash_loc, flash_xy = flash_targets[pos]
-            read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
-            if read > FLASH_GREAT_READ:
-                # GREAT → front: defender steps to the ball-side of the flasher and DENIES the catch
-                # (fronted → excluded as a dish target). Override renders the front (contest == render).
-                fronted.add(pos)
-                front = _hco_nudge_toward(flash_xy, coord_fn(bh_pos), FLASH_FRONT_GRID)
-                front = {"x": round(float(front["x"]), 1), "y": round(float(front["y"]), 1)}
-                defender_overrides[def_pos] = {"coords": front, "action": "guard_offball"}
-                def_xy[def_pos] = front
-                openness_map[pos] = 0.0
-            elif read > FLASH_GOOD_READ:
-                openness_map[pos] = 0.0            # GOOD → behind: covered but receivable (contested, no lift)
-            else:
-                defender_reads[def_pos] = False    # POOR → stationary: flasher open at the flash spot
-                openness_map[pos] = _hco_lift_from_cushion(_hco_nearest_def_dist(flash_xy, def_xy))
+            _flash_loc, flash_xy = flash_targets[pos]
+            _apply_flash_reaction(def_pos, flash_xy, pos)   # reactor = the flasher's assigned defender
+        elif act == "post up":
+            _apply_post_up(def_pos, coord_fn(pos), pos)     # reactor = the post player's assigned defender
     return altered_moves, defender_reads, openness_map, defender_overrides, fronted
 
 
