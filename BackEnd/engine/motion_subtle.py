@@ -178,7 +178,7 @@ def build_subtle_beat(step, off_lineup, bh_pos, is_away_offense, rng, off_eff=0,
             mv = altered_moves.get(pos)
             if mv and mv.get("coords"):
                 new_pos_actions[pos] = {"coords": mv["coords"], "location": mv.get("location"),
-                                        "action": "cut", "archetype": SUBTLE_ARCHETYPE}
+                                        "action": mv.get("action", "cut"), "archetype": SUBTLE_ARCHETYPE}
                 movers.append(pos)
                 moved = True
         else:

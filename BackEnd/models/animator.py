@@ -43,12 +43,17 @@ from BackEnd.constants.fast_break_constants import (
 
 
 def _attack_drive_defender_override(skeleton_step, def_pos):
-    """Return drive-step defender override coords/action when present."""
+    """Return a per-defender coord/action override for this step, if present. Two producers:
+    an attack-drive beat (``_attack_drive.defender_overrides``) or an altered-action subtle beat
+    (``_subtle_movement.defender_overrides`` — e.g. a jab-step defender biting inward). Honored in
+    both the man and zone placement paths; skips the S1 lag so the defender renders AT the override."""
     if not skeleton_step:
         return None
-    meta = skeleton_step.get("_attack_drive") or {}
-    overrides = meta.get("defender_overrides") or {}
-    return overrides.get(def_pos)
+    for _key in ("_attack_drive", "_subtle_movement"):
+        ov = ((skeleton_step.get(_key) or {}).get("defender_overrides") or {}).get(def_pos)
+        if ov:
+            return ov
+    return None
 
 
 def _subtle_defender_should_freeze(skeleton_step, def_pos, anchor_off_pos):
@@ -2051,7 +2056,8 @@ class Animator:
                 # offender as "his man" for this step and apply the same read/freeze as man D.
                 # Anchor = this step's zone assignment (defender_pos → offender player_id).
                 skeleton_step_obj = skeleton_steps[step_index] if step_index < len(skeleton_steps) else None
-                if skeleton_step_obj and skeleton_step_obj.get("_subtle_movement") and def_movement:
+                if (skeleton_step_obj and skeleton_step_obj.get("_subtle_movement") and def_movement
+                        and not (step_override and step_override.get("coords"))):  # override wins over freeze
                     assigns = getattr(self.game, "zone_defender_assignments_by_step", {}).get(step_index, {})
                     anchor_id = assigns.get(def_pos)
                     anchor_off_pos = None

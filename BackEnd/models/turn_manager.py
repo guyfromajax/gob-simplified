@@ -1911,6 +1911,24 @@ class TurnManager:
                                     "prior final_ball_coords=%s → step0 ball @ %s (gap=%.1f grid)",
                                     _fb_pfbc, _fb_s0pos, _fb_gap,
                                 )
+                if _fb_steps:
+                    try:
+                        from BackEnd.engine.fb_step_state import (
+                            build_fast_break_step_states,
+                            project_fast_break_step_states_to_animation_steps,
+                        )
+
+                        fb_states = build_fast_break_step_states(result)
+                        projected_steps = project_fast_break_step_states_to_animation_steps(
+                            fb_states
+                        )
+                        if projected_steps:
+                            result["animation_steps"] = projected_steps
+                    except Exception as e:
+                        logging.warning(
+                            "build_fast_break_step_states failed: %s",
+                            e,
+                        )
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)

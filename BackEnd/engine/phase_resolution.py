@@ -4951,6 +4951,8 @@ JAB_READ_BASE = 100.0              # jab step good-read threshold = BASE + COEF�
 ALTERED_READ_PROX_COEF = 8.0       # per-grid distance coefficient on the dynamic read threshold
 ALTERED_ZONE_READ_THRESHOLD = 110.0  # zone: a defender whose zone occupancy CHANGES rolls this flat read
 #                                      (tight/loose don't apply in zone) — read > 110 ADJUSTS, ≤ 110 HOLDS
+JAB_STEP_MIN_GRID = 4.0            # jab step: jabber fakes 4–5 grid at the rim then returns; a beaten
+JAB_STEP_MAX_GRID = 5.0           #  defender FOLLOWS inward this far (the "bite") and stays → jabber open
 
 
 def _hco_cut_openness_lift(cutter_rim, defender_prior):
@@ -5047,6 +5049,14 @@ def _hco_nearest_def_dist(point, def_xy, exclude=None):
     return best
 
 
+def _hco_nudge_toward(xy, target, dist):
+    """Point `dist` grid from `xy` straight toward `target` (jab-step defender bite: follow inward)."""
+    import math
+    dx, dy = float(target["x"]) - float(xy["x"]), float(target["y"]) - float(xy["y"])
+    d = math.hypot(dx, dy) or 1.0
+    return {"x": float(xy["x"]) + dx / d * dist, "y": float(xy["y"]) + dy / d * dist}
+
+
 def _hco_lift_from_cushion(cushion):
     """S3 — a nearest-defender gap (grid) → should_shoot openness lift, via the backdoor ramp."""
     span = max(1e-6, BACKDOOR_OPENNESS_OPEN - BACKDOOR_OPENNESS_MIN)
@@ -5073,28 +5083,53 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
     for build_subtle_beat + the animator freeze + the post-SM Hot Read. jab / flash / post up are SELECTED
     but not yet dispatched → treated as stationary (build-order #4)."""
     from BackEnd.utils.shared import player_read_raw
+    from BackEnd.engine.attack_drive_clearance import _basket_display_coords
     import math
-    altered_moves, defender_reads, openness_map = {}, {}, {}
+    altered_moves, defender_reads, openness_map, defender_overrides = {}, {}, {}, {}
     pos_actions = step.get("pos_actions") or {}
 
-    # Pass 1 (defense-agnostic): trigger + selection → the backdoor cutters + their inside targets.
-    cutters = {}
+    # ================= OFFENSE (UNIVERSAL — identical vs man and zone) =================
+    # Select the action, then build its MOVE. Only the defender REACTION (below) branches by play type.
+    sel = {}
     for pos in off_lineup:
         if pos == bh_pos or not off_lineup.get(pos) or pos not in pos_actions:
             continue
         loc = (pos_actions.get(pos) or {}).get("location") or "key"
-        if _hco_select_altered_action(off_lineup[pos], loc, off_eff, rng) != "backdoor":
-            continue  # None / jab / flash / post → stationary (jab/flash/post = build-order #4)
-        target_loc, target_xy = _hco_backdoor_target(is_away_offense, rng)
-        altered_moves[pos] = {
-            "coords": {"x": round(float(target_xy["x"]), 1), "y": round(float(target_xy["y"]), 1)},
-            "location": target_loc}
-        cutters[pos] = (target_loc, target_xy)
-    if not cutters:
-        return altered_moves, defender_reads, openness_map
+        act = _hco_select_altered_action(off_lineup[pos], loc, off_eff, rng)
+        if act in ("backdoor", "jab step"):  # BUILT actions (flash / post up = build-order later → skipped)
+            sel[pos] = act
+    if not sel:
+        return altered_moves, defender_reads, openness_map, defender_overrides
 
+    backdoor_targets = {}
+    for pos, act in sel.items():
+        if act == "backdoor":
+            target_loc, target_xy = _hco_backdoor_target(is_away_offense, rng)
+            altered_moves[pos] = {
+                "coords": {"x": round(float(target_xy["x"]), 1), "y": round(float(target_xy["y"]), 1)},
+                "location": target_loc}
+            backdoor_targets[pos] = (target_loc, target_xy)
+        elif act == "jab step":
+            # A jab nets no move: fake at the rim → return to spot → shoot the own look there.
+            jabber_xy = coord_fn(pos)
+            altered_moves[pos] = {
+                "coords": {"x": round(float(jabber_xy["x"]), 1), "y": round(float(jabber_xy["y"]), 1)},
+                "location": (pos_actions.get(pos) or {}).get("location") or "key",
+                "action": "jab step"}
+
+    def _apply_jab_bite(reactor, jabber_xy):
+        """Poor jab read (man OR zone) → the reactor follows the fake inward (toward the basket) and
+        stays; the override renders the bite and the grid update makes openness geometric off the SAME
+        position (contest == render). Returns the jabber's openness lift."""
+        basket = _basket_display_coords(is_away_offense)
+        bite = _hco_nudge_toward(def_xy[reactor], basket, rng.uniform(JAB_STEP_MIN_GRID, JAB_STEP_MAX_GRID))
+        bite = {"x": round(float(bite["x"]), 1), "y": round(float(bite["y"]), 1)}
+        defender_overrides[reactor] = {"coords": bite, "action": "guard_offball"}
+        def_xy[reactor] = bite
+        return _hco_lift_from_cushion(_hco_nearest_def_dist(jabber_xy, def_xy))
+
+    # ================= DEFENSE reaction + openness (branches by play type) =================
     if zone:
-        # ZONE — read every defender whose zone occupancy CHANGES (cutter enters / man exits).
         from BackEnd.utils.shared_defense import _point_in_zone
         from BackEnd.engine.attack_drive_clearance import _zone_boundaries_for_spot
         bh_location = (pos_actions.get(bh_pos) or {}).get("location") or "key"
@@ -5106,52 +5141,72 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
                     return dp
             return None
 
-        def _occ(positions):  # {def_pos: frozenset(non-BH offenders in his zone)}
-            occ = {dp: set() for dp in zb}
-            for p, xy in positions.items():
-                if p == bh_pos:
-                    continue
-                o = _owner(xy)
-                if o is not None:
-                    occ[o].add(p)
-            return {dp: frozenset(s) for dp, s in occ.items()}
+        # BACKDOOR — read every defender whose zone occupancy CHANGES (cutter enters / man exits).
+        if backdoor_targets:
+            def _occ(positions):  # {def_pos: frozenset(non-BH offenders in his zone)}
+                occ = {dp: set() for dp in zb}
+                for p, xy in positions.items():
+                    if p == bh_pos:
+                        continue
+                    o = _owner(xy)
+                    if o is not None:
+                        occ[o].add(p)
+                return {dp: frozenset(s) for dp, s in occ.items()}
+            pre_pos = {p: coord_fn(p) for p in off_lineup if p in pos_actions and off_lineup.get(p)}
+            post_pos = dict(pre_pos)
+            for cp, (_tl, txy) in backdoor_targets.items():
+                post_pos[cp] = {"x": float(txy["x"]), "y": float(txy["y"])}
+            pre_occ, post_occ = _occ(pre_pos), _occ(post_pos)
+            for dp in zb:
+                if not def_lineup.get(dp) or pre_occ.get(dp) == post_occ.get(dp):
+                    continue  # unchanged occupancy → no read (legacy anchor-moved heuristic holds him)
+                read = (player_read_raw(def_lineup.get(dp)) + def_eff) * rng.randint(1, 6)
+                defender_reads[dp] = read > ALTERED_ZONE_READ_THRESHOLD  # > 110 adjust, ≤ 110 hold
+            for cp, (_tl, txy) in backdoor_targets.items():
+                owner = _owner(txy)
+                if owner is not None and defender_reads.get(owner) is True:
+                    openness_map[cp] = 0.0  # owner adjusts onto the cutter → covered (matches render)
+                else:
+                    openness_map[cp] = _hco_lift_from_cushion(_hco_nearest_def_dist(txy, def_xy))
 
-        pre_pos = {p: coord_fn(p) for p in off_lineup if p in pos_actions and off_lineup.get(p)}
-        post_pos = dict(pre_pos)
-        for cp, (_tl, txy) in cutters.items():
-            post_pos[cp] = {"x": float(txy["x"]), "y": float(txy["y"])}
-        pre_occ, post_occ = _occ(pre_pos), _occ(post_pos)
+        # JAB STEP — the zone owner of the jabber's spot bites the fake (poor) or holds (good). Flat 110.
+        for pos, act in sel.items():
+            if act != "jab step":
+                continue
+            jabber_xy = coord_fn(pos)
+            owner = _owner(jabber_xy)
+            if owner is None or not def_xy.get(owner):
+                openness_map[pos] = 0.0
+                continue
+            read = (player_read_raw(def_lineup.get(owner)) + def_eff) * rng.randint(1, 6)
+            openness_map[pos] = (0.0 if read > ALTERED_ZONE_READ_THRESHOLD
+                                 else _apply_jab_bite(owner, jabber_xy))
+        return altered_moves, defender_reads, openness_map, defender_overrides
 
-        for dp in zb:
-            if not def_lineup.get(dp) or pre_occ.get(dp) == post_occ.get(dp):
-                continue  # unchanged occupancy → no read (legacy anchor-moved heuristic holds him)
-            read = (player_read_raw(def_lineup.get(dp)) + def_eff) * rng.randint(1, 6)
-            defender_reads[dp] = read > ALTERED_ZONE_READ_THRESHOLD  # > 110 adjust, ≤ 110 hold
-
-        for cp, (_tl, txy) in cutters.items():
-            owner = _owner(txy)
-            if owner is not None and defender_reads.get(owner) is True:
-                openness_map[cp] = 0.0  # owner adjusts onto the cutter → covered (matches render)
-            else:
-                openness_map[cp] = _hco_lift_from_cushion(_hco_nearest_def_dist(txy, def_xy))
-        return altered_moves, defender_reads, openness_map
-
-    # MAN — per-cutter matchup read off the assigned defender's distance to his man.
-    for pos, (target_loc, target_xy) in cutters.items():
+    # MAN — the assigned defender reads his man (distance-scaled threshold).
+    for pos, act in sel.items():
         def_pos = off_to_def.get(pos, pos)
         d_xy = def_xy.get(def_pos)
         if not d_xy:
             continue
-        man_xy = coord_fn(pos)
-        dist = math.hypot(float(man_xy["x"]) - float(d_xy["x"]), float(man_xy["y"]) - float(d_xy["y"]))
-        read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
-        if read >= _hco_altered_read_threshold("backdoor", dist):
-            defender_reads[def_pos] = True     # good read → tracks the cutter → covered
-            openness_map[pos] = 0.0
-        else:
-            defender_reads[def_pos] = False    # poor read → frozen at his spot → cutter open
-            openness_map[pos] = _hco_lift_from_cushion(_hco_nearest_def_dist(target_xy, def_xy))
-    return altered_moves, defender_reads, openness_map
+        if act == "backdoor":
+            target_loc, target_xy = backdoor_targets[pos]
+            man_xy = coord_fn(pos)
+            dist = math.hypot(float(man_xy["x"]) - float(d_xy["x"]), float(man_xy["y"]) - float(d_xy["y"]))
+            read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
+            if read >= _hco_altered_read_threshold("backdoor", dist):
+                defender_reads[def_pos] = True     # good read → tracks the cutter → covered
+                openness_map[pos] = 0.0
+            else:
+                defender_reads[def_pos] = False    # poor read → frozen at his spot → cutter open
+                openness_map[pos] = _hco_lift_from_cushion(_hco_nearest_def_dist(target_xy, def_xy))
+        elif act == "jab step":
+            jabber_xy = coord_fn(pos)
+            dist = math.hypot(float(jabber_xy["x"]) - float(d_xy["x"]), float(jabber_xy["y"]) - float(d_xy["y"]))
+            read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
+            openness_map[pos] = (0.0 if read >= _hco_altered_read_threshold("jab step", dist)
+                                 else _apply_jab_bite(def_pos, jabber_xy))
+    return altered_moves, defender_reads, openness_map, defender_overrides
 
 
 def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
@@ -6185,13 +6240,13 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             # their SELECTED altered action on the BH's SM — backdoor built (man: cut + defender dynamic read;
             # zone: cut + geometric nearest-def openness), jab/flash/post = build-order #4 (selected but
             # stationary) — REPLACING the random SM relocations. Off the altering path → legacy random SM.
-            _alt_moves = _alt_reads = _alt_open = None
+            _alt_moves = _alt_reads = _alt_open = _alt_overrides = None
             if offense_reads and game_state.get("_hco_defense_posture"):
                 _a_def_xy, _a_coord, _a_loc, _a_pt = _hco_step_def_xy(
                     steps[i], bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
                     _def_aggr_call, zone, game_state.get("defense_playcall"),
                     posture=game_state.get("_hco_defense_posture"))
-                _alt_moves, _alt_reads, _alt_open = _hco_compute_altered_actions(
+                _alt_moves, _alt_reads, _alt_open, _alt_overrides = _hco_compute_altered_actions(
                     steps[i], off_lineup, def_lineup, off_to_def, bh_pos, is_away_offense,
                     off_eff, def_eff, _a_def_xy, _a_coord, random, zone=zone,
                     defense_playcall=game_state.get("defense_playcall"))
@@ -6220,11 +6275,38 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             )
             if _alt_reads:
                 beat["_subtle_movement"]["defender_reads"].update(_alt_reads)
+            if _alt_overrides:
+                # jab-step defender bite (and future actions): place the defender AT these coords on the
+                # beat — the animator's per-defender override hook renders it + skips the S1 lag.
+                beat["_subtle_movement"]["defender_overrides"] = _alt_overrides
             # Cosmetic render-space idle motion (role-based; fills the frozen tail; UESS-safe).
             beat["_subtle_movement"]["idle_motion"] = _roll_subtle_idle_motion(
                 beat, off_lineup, def_lineup, bh_pos, bh_location,
                 off_to_def, locations, is_away_offense, random,
             )
+            # S3 jab step: give each jab-STEPPER a deliberate render-space "jab" flourish — a rim-ward
+            # dip-and-return so the fake is VISIBLE. Render-only (never moves his sim/shot coord; his shot
+            # still resolves from his spot); overrides the small idle-jab heartbeat. The defender's inward
+            # bite renders separately via its own coord override.
+            if _alt_moves:
+                from BackEnd.engine.attack_drive_clearance import _basket_display_coords as _jab_basket
+                _jbx = _jab_basket(is_away_offense)
+                _jidle = beat["_subtle_movement"].get("idle_motion") or {}
+                for _jp, _jmv in _alt_moves.items():
+                    if _jmv.get("action") != "jab step" or not off_lineup.get(_jp):
+                        continue
+                    _jpid = str(getattr(off_lineup[_jp], "player_id", "") or "")
+                    _jc = _jmv.get("coords") or {}
+                    if not _jpid or not _jc:
+                        continue
+                    _jdx, _jdy = float(_jbx["x"]) - float(_jc["x"]), float(_jbx["y"]) - float(_jc["y"])
+                    _jd = (_jdx * _jdx + _jdy * _jdy) ** 0.5 or 1.0
+                    _jidle[_jpid] = {
+                        "style": "jab", "seed": int(abs(_jdx) + abs(_jdy)),
+                        "dir_x": _jdx / _jd, "dir_y": _jdy / _jd,
+                        "amplitude_grid": (JAB_STEP_MIN_GRID + JAB_STEP_MAX_GRID) / 2.0,
+                    }
+                beat["_subtle_movement"]["idle_motion"] = _jidle
             lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
             elapsed = float(random.randint(lo, hi))
             # Shot-clock expiry backstop: if finishing this beat would leave < 1s, the BH (still
@@ -6287,13 +6369,17 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 _sp = post_shoot["shooter_pos"]
                 _pdec = {"action": SHOOT, "shooter_pos": _sp, "shot_type": post_shoot["shot_type"]}
                 _sstep = steps[i]
-                # S3: fed an altered-action cutter → route the dish to his cut spot + tag the VO; the cutter's
-                # cut position is on the SM beat, so pass the beat as the shot step.
+                # S3: fed an altered-action player → tag the VO + route to his beat position (on the SM beat).
                 if _alt_moves and _sp in _alt_moves:
-                    _pdec["action"] = BACKDOOR
-                    _pdec["cut_to_location"] = _alt_moves[_sp].get("location")
-                    _pdec["get_open_move"] = "backdoor"
+                    _act = _alt_moves[_sp].get("action") or "backdoor"
+                    _pdec["get_open_move"] = _act
                     _sstep = beat
+                    if _act == "backdoor":
+                        # backdoor cut → dish to the inside cut spot (layup).
+                        _pdec["action"] = BACKDOOR
+                        _pdec["cut_to_location"] = _alt_moves[_sp].get("location")
+                    # jab step → the jabber shoots his OWN look at his spot (defender bit inward); the
+                    # decision already carries SHOOT + shot_type, so just keep them + tag the VO.
                 logging.warning(
                     f"🎯 [DYNAMIC {_kind}] post-subtle SHOOT {_sp} {post_shoot['shot_type']} "
                     f"(froze={froze}{', BACKDOOR' if _sstep is beat else ''})"
