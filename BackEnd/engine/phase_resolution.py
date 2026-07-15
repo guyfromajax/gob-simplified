@@ -6162,6 +6162,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                              "shooter_pos": _cut_shoot["shooter_pos"], "shot_type": _cut_shoot["shot_type"]}
                     if _cut_shoot["shooter_pos"] == _bd_cutter:
                         _cdec["cut_to_location"] = "basketSpot"
+                        _cdec["get_open_move"] = "backdoor"  # → reception VO at the catch (emitter)
                     logging.warning(f"🚪 [DYNAMIC {_kind}] step {i}: CUT {_bd_cutter} → "
                                     f"HOT READ {_cut_shoot['shooter_pos']} {_cut_shoot['shot_type']}")
                     return _apply_dish_contest(_cdec, _execute_motion_decision(
@@ -6346,7 +6347,12 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
         # animates him cutting from his spot to the basket as the pass arrives (a cut-and-catch layup).
         receiver_location = decision.get("cut_to_location") or (
             ((shot_step.get("pos_actions") or {}).get(shooter_pos) or {}).get("location") or bh_location)
-        new_steps.append(_create_pass_receive_step(bh_pos, shooter_pos, bh_location, receiver_location, last_timestamp + 300))
+        _recv_step = _create_pass_receive_step(bh_pos, shooter_pos, bh_location, receiver_location, last_timestamp + 300)
+        # Tag the receive step with the get-open move so the emitter fires the reception VO at the CATCH
+        # (backdoor / flash / jab), once per completed action.
+        if decision.get("get_open_move"):
+            _recv_step["_get_open_move"] = decision["get_open_move"]
+        new_steps.append(_recv_step)
         new_steps.append(_create_shoot_step(shooter_pos, receiver_location, last_timestamp + 600))
         shooter = receiver
         shooter_location = receiver_location

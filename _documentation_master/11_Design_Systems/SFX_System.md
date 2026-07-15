@@ -42,6 +42,16 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 - **Path:** `skeleton_step_emitter` (render-only) stamps `step.start.sfx_on_step_start` → FE plays it.
 - **Companion — "great stop" VO (✅ live 2026-07-14):** `duke-great-stop.wav` (`HCO_GREAT_STOP_SFX`, vol `0.85`) on a **Tier-C CLEAN stop** (defender walls off the drive, `drive_tier=="C"` + no `drive_contact`). Fired via `sfx_on_step_start` on the **driver_gate step** — the instant the BH arrives walled-off at his stop (S2d moved him there), sequenced *after* the drive-start cue (which is on the prior motion step). **Skips contact outcomes** (foul/charge/TO have their own cues — `duke-charging.wav`, `duke-its-blocked.wav`, etc., available for a future pass). Doesn't clobber the drive-start or a hot-read on the same step.
 
+### HCO get-open-move reception VO (S3 Goal 2)
+
+- **Status:** ✅ live for **backdoor** (2026-07-14); **flash** / **jab** wired but dormant until those moves ship.
+- **Trigger:** the **catch** — a player *receives* the pass off a get-open move. Fired via `sfx_on_ball_arrival` on the pass/receive step, so it lands exactly at the ball's arrival, **once per completed action**. Deliberately NOT fired when the move is merely performed (a cut that doesn't get fed makes no pass → no cue), which avoids many players' cues sounding at once.
+- **Files** (`HCO_GET_OPEN_RECEIVE_SFX`, vol `HCO_GET_OPEN_RECEIVE_VOLUME = 0.8`), 50/50 per catch by a **local seeded RNG** (SS&S-reproducible; no global-stream draw):
+  - backdoor → `braddock-backdoor.wav` / `sammy-backdoor.wav`
+  - flash → `braddock-flash.wav` / `sammy-flash.mp3`
+  - jab → `braddock-jab.wav` / `sammy-jab.mp3`
+- **Path:** the resolver tags the pass/receive step with `_get_open_move` (`_execute_motion_decision`, from the decision's `get_open_move`); the emitter reads that tag and **replaces** the generic reception sound with the move VO. To add flash/jab: set `get_open_move` on their dish decision — no emitter change needed.
+
 ## Backend Terms
 
 - `shot_score_pre_defense`: Existing `resolve_shot()` local variable. This is returned from `calculate_shot_score()` as `pre_defense_shot_score` and represents the shooter/offense value before defensive shot impact is applied.
