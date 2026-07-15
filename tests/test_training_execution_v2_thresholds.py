@@ -166,7 +166,7 @@ def test_standard_and_chemistry_training_bucket_ranges(monkeypatch):
 
     monkeypatch.setattr(training.random, "randint", fake_randint)
 
-    standard_expected = [(-2, -1), (0, 2), (1, 2), (2, 3), (2, 4), (2, 5)]
+    standard_expected = [(-2, -1), (0, 1), (1, 3), (2, 3), (2, 4), (2, 5)]
     chemistry_expected = [(-3, -1), (0, 1), (1, 2), (2, 3), (2, 4), (2, 5)]
 
     team = {"offensive_efficiency": 0, "team_chemistry": 10}
@@ -194,6 +194,37 @@ def test_rebound_modifier_training_bucket_ranges(monkeypatch):
         training._apply_rebound_modifier_training(team, points)
 
     assert calls == [(-5, -3), (3, 5), (3, 5), (3, 7), (3, 7), (3, 10)]
+
+
+def test_breaks_does_not_wipe_rebound_modifier_float_gains(monkeypatch):
+    monkeypatch.setattr(training.random, "choice", lambda seq: 0.9)
+
+    team = {"rebound_modifier": 0.26, "offensive_efficiency": 3}
+    baseline = {"rebound_modifier": 0.2, "offensive_efficiency": 0}
+
+    training._apply_breaks_effect(
+        players=[],
+        team=team,
+        breaks_points=1,
+        original_player_baselines={},
+        original_team_baseline=baseline,
+    )
+
+    # Rebound stays on the float gain; integer attrs still use int() scaling.
+    assert team["rebound_modifier"] == 0.26
+    assert team["offensive_efficiency"] == 2  # 0 + int(3 * 0.9)
+
+
+def test_rebound_modifier_training_keeps_two_decimal_precision(monkeypatch):
+    monkeypatch.setattr(training.random, "randint", lambda a, b: 3)  # +0.03
+    monkeypatch.setattr(training.random, "choice", lambda seq: 1.5)
+
+    team = {"rebound_modifier": 0.2}
+    training._apply_rebound_modifier_training(
+        team, 1, archetype="authoritarian", sub_option="authoritarian-rebounding"
+    )
+
+    assert team["rebound_modifier"] == 0.24  # round(0.03 * 1.5, 2) = 0.04 → 0.24
 
 
 def test_scrimmages_feed_team_chemistry_at_quarter_rate(monkeypatch):

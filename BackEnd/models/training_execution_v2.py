@@ -1323,8 +1323,8 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
 
     standard_ranges = {
         0: (-2, -1),
-        1: (0, 2),
-        2: (1, 2),
+        1: (0, 1),
+        2: (1, 3),
         3: (2, 3),
         4: (2, 4),
         5: (2, 5),
@@ -1403,14 +1403,20 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
         final_increase = final_increase * focus_multiplier
     
+    # Keep rebound_modifier on the 0.01 grid (never truncate with int()).
+    final_increase = round(final_increase, 2)
+
     # Apply to team
-    current_val = team.get("rebound_modifier", 0.2)  # Default to 0.2 (center)
-    team["rebound_modifier"] = current_val + final_increase
+    current_val = float(team.get("rebound_modifier", 0.2))  # Default to 0.2 (center)
+    team["rebound_modifier"] = round(current_val + final_increase, 2)
     
     # Clamp to valid range [0.0, 0.4]
-    team["rebound_modifier"] = max(
-        TEAM_ATTR_CLAMPS["rebound_modifier"][0],
-        min(TEAM_ATTR_CLAMPS["rebound_modifier"][1], team["rebound_modifier"])
+    team["rebound_modifier"] = round(
+        max(
+            TEAM_ATTR_CLAMPS["rebound_modifier"][0],
+            min(TEAM_ATTR_CLAMPS["rebound_modifier"][1], team["rebound_modifier"]),
+        ),
+        2,
     )
 
 
@@ -1668,8 +1674,12 @@ def _apply_breaks_effect(
                 attrs[anchor_key] = new_val
                 attrs[attr] = new_val
     
-    # Apply multiplier to positive team attribute increments
+    # Apply multiplier to positive team attribute increments.
+    # rebound_modifier is excluded: it is a 0.01-step float faucet/sink and is not
+    # part of the breaks fatigue model (breaks flats only touch chemistry/discipline/fight).
     for attr_name in TEAM_ATTR_CLAMPS.keys():
+        if attr_name == "rebound_modifier":
+            continue
         if attr_name in team:
             original_val = original_team_baseline.get(attr_name, 0)
             current_val = team[attr_name]

@@ -377,7 +377,7 @@ Traning Camp Height / Weight bonsuses
 
 **Team Attributes (training ranges by group):**
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
-  `0 -> -2 to -1`, `1 -> 0 to +2`, `2 -> +1 to +2`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`
+  `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`
 - `fight` and `discipline` (same bucket table after their respective 0.5× / 0.25× accruals round to 0–5):
   `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`
   - **Fight:** Strength + Conditioning → sum × **0.5**, half-up → `_apply_team_training_points(..., "fight", ...)`.
@@ -443,7 +443,7 @@ Traning Camp Height / Weight bonsuses
 
 #### Breaks Effect
 
-The "Breaks" slider applies a multiplier to all positive gains (not losses):
+The "Breaks" slider applies a multiplier to all positive gains (not losses), except **`rebound_modifier`** (float 0.01-step attribute; breaks does not scale or reset it):
 - 0 points: `random.choice([0.85, 0.9, 0.95])`
 - 1 point: `random.choice([0.9, 0.95, 1, 1, 1])`
 - 2 points: `random.choice([1, 1, 1.05, 1.1])`

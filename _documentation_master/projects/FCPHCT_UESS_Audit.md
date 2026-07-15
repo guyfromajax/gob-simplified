@@ -17,7 +17,7 @@
 | Schema STEAL turn_stop does nothing useful | `dispatchTurnStop` → `runSteal` used to be a stub. **Updated 2026-07-15:** schema `runSteal` now performs cleanup-only ball ownership finalization without replaying legacy steal animation or duplicate announcements. | ✅ **Fixed in schema path** |
 | Infinite receive / ball-landing SFX loop | **Not pinned to a single wiring bug** in the interception path; would require `playTurn` re-running pass steps or runtime evidence | ⚠️ **Unconfirmed — needs repro dump** |
 
-**Current next fix direction:** move pressure builders upstream to produce formal PressureStepState first. Pass-interception flight, schema terminal cleanup, batted-OOB ball flight, TurnManager pressure emission, additive pressure StepState stamping, and formal StepState projection for the first normal pressure slice plus terminal foul/dead-ball/steal slice are now aligned for the dynamic schema path.
+**Current next fix direction:** move pressure builders upstream to produce formal PressureStepState first. Pass-interception flight, schema terminal cleanup, batted-OOB ball flight, TurnManager pressure emission, additive pressure StepState stamping, and formal StepState projection for the current emitted HCT/FCP schema are now aligned for the dynamic schema path.
 
 ---
 
@@ -126,7 +126,7 @@ Capture on repro **before** refresh:
 | `runSteal` schema stub | **Fixed** | cleanup-only finalization in `animationPlayback.js` |
 | HCT/FCP batted-OOB imperative ball-send | **Fixed** | dynamic schema emits contact + OOB drift; frontend imperative helper is fallback only |
 | HCT/FCP pressure StepState shape | **Implemented additively** | `pressure_step_state.py` freezes emitted schema into `result["pressure_step_states"]`; no consumer reads it yet |
-| HCT/FCP PressureStepState projection | **Started / first + terminal slices implemented** | `dynamic_hct_step_emitter.py` now routes walk-up, advance, pass, interception, batted-OOB, terminal foul/dead-ball/steal, and dead-ball fumble beats through formal PressureStepState projection; shot/post-shot paths still use snapshot fallback |
+| HCT/FCP PressureStepState projection | **Projection bridge complete for current emitted schema** | `dynamic_hct_step_emitter.py` now routes walk-up, advance, pass, interception, batted-OOB, terminal foul/dead-ball/steal, dead-ball fumble, pressure-owned shot setup, and shared post-shot sub-steps through formal PressureStepState projection; direct upstream StepState builders still remain |
 | Defensive mid-court recovery (stranded defenders) | **Implemented** | `_recover_defense_targets` in `dynamic_hct.py` |
 | Off-ball x=50 back-movement gate | **Implemented** | `gate_offense_backcourt_reentry` in `over_and_back.py` |
 | Rim Runner lane pass intercept | **Reference** | `_build_lane_pass_intercepted_step` |
@@ -137,7 +137,7 @@ Capture on repro **before** refresh:
 
 ## Remaining fix plan
 
-1. **Direct PressureStepState builders:** Convert `_build_loop_step`, pass, interception, batted-OOB, and terminal helpers to return formal `PressureStepState` directly instead of building schema first and projecting. Then handle shot/post-shot paths.
+1. **Direct PressureStepState builders:** Convert `_build_loop_step`, pass, interception, batted-OOB, terminal, shot-setup, and post-shot integration helpers to return formal `PressureStepState` directly instead of building schema first and projecting.
 2. **Manual repro:** Validate FCP/HCT pass interception, terminal fouls/dead balls, and batted-OOB in-browser.
 
 ---

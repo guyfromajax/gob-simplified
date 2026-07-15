@@ -437,7 +437,7 @@ Remaining related work:
 
 ## Step 8: Project Pressure StepState To Animation Schema
 
-**Status:** Started; first + terminal slices implemented.
+**Status:** Projection bridge complete for current HCT/FCP emitted schema; upstream builder rewrite remains.
 
 Once StepState exists, update `dynamic_hct_step_emitter.py` so its primary job is projection:
 
@@ -481,6 +481,8 @@ AnimationStep[] -> PressureStepState[] -> AnimationStep[]
   - HCT/FCP normal pass
   - HCT/FCP pass interception / steal
   - HCT/FCP batted-OOB contact + drift
+  - HCT/FCP shot setup paths (`hct_fb_drive`, `hct_ab_drive`, `hct_ab_dish`, `hct_ab_shot`)
+  - HCT/FCP shared post-shot sub-steps (`shot_resolved`, make hold, miss bounce, block terminal, bank/rattle/airball variant beats)
 - First slice implemented:
   - formal projection is now used for `hct_entry_walkup`, `hct_advance`, `hct_pass`, `hct_interception`, `hct_bat_oob_contact`, and `hct_bat_oob_drift`
   - formal StepState now carries exact schema linkage (`next`), render tween durations, SFX triggers, flourish triggers, and explicit-vs-inferred ball motion fields
@@ -495,9 +497,16 @@ AnimationStep[] -> PressureStepState[] -> AnimationStep[]
   - formal projection now preserves backend-authored terminal announcements, including the fumble whistle/banner payload
   - `dynamic_hct_step_emitter.py` performs one final projection pass at the return boundary after late helper mutations such as post-steal transition append and dead-ball fumble injection
   - direct HCT/FCP emitter tests assert terminal foul, dead-ball turnover, fumble, and steal paths carry `_pressure_step_state` with `projection_source="formal"`
+- Shot-setup slice implemented:
+  - formal projection now covers pressure-owned shot setup steps: `hct_fb_drive`, `hct_ab_drive`, `hct_ab_dish`, and `hct_ab_shot`
+  - direct HCT/FCP emitter tests assert fast-break drive shot setup, attack-basket shoot-in-place, attack-basket drive, and attack-basket drive-dish setup steps carry formal `_pressure_step_state`
+- Post-shot slice implemented:
+  - formal projection now covers shared post-shot sub-steps appended by `_build_post_shot_sub_steps(...)`
+  - formal sources include `shot_resolved` and variant/follow-up beats stamped through `advance_trigger.metadata.kind`: `make_hold`, `bounce`, `rattle_hop`, `rattle_settle`, `bank_settle`, `bank_graze`, and `airball_oob`
+  - formal projection now preserves `timed_sfx` in addition to ball release/arrival SFX, announcements, flourishes, tween durations, explicit ball motion style, and final `next` pointers
+  - direct HCT/FCP emitter tests assert make, miss+bounce, block, and bank-make post-shot chains carry formal `_pressure_step_state` and round-trip without schema drift
 - Remaining Step 8 work:
-  - move individual pressure builders (`_build_loop_step`, pass, interception, batted-OOB, terminal helpers) to return formal PressureStepState directly instead of building schema then projecting
-  - convert HCT shot paths and post-shot sub-step integration
+  - move individual pressure builders (`_build_loop_step`, pass, interception, batted-OOB, terminal helpers, shot setup, and post-shot integration) to return formal PressureStepState directly instead of building schema then projecting
   - shrink/remove the transitional `schema_projection` once all formal fields project exact schema
   - keep emitter decisions limited to pure render projection and explicitly allowed cosmetic lookup
 

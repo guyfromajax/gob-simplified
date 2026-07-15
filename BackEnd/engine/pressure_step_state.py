@@ -400,7 +400,12 @@ def _next_state(end: Dict[str, Any]) -> Dict[str, Any]:
 
 def _cosmetics_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
     sfx = []
-    for key in ("sfx_on_ball_release", "sfx_on_ball_arrival"):
+    for key in (
+        "sfx_on_ball_release",
+        "sfx_on_ball_arrival",
+        "sfx_on_step_start",
+        "timed_sfx",
+    ):
         if start.get(key):
             sfx.append({"trigger": key, "payload": copy.deepcopy(start.get(key))})
     announcement = (
@@ -429,8 +434,22 @@ def _render_state(start: Dict[str, Any], end: Dict[str, Any]) -> Dict[str, Any]:
 
 def _projection_source(start: Dict[str, Any]) -> str:
     trigger = start.get("advance_trigger") or {}
-    reason = ((start.get("advance_trigger") or {}).get("metadata") or {}).get("reason")
+    metadata = (trigger.get("metadata") or {})
+    reason = metadata.get("reason")
+    kind = metadata.get("kind")
     if trigger.get("condition") == "dead_ball_fumble":
+        return "formal"
+    if trigger.get("condition") == "shot_resolved":
+        return "formal"
+    if kind in {
+        "make_hold",
+        "bounce",
+        "rattle_hop",
+        "rattle_settle",
+        "bank_settle",
+        "bank_graze",
+        "airball_oob",
+    }:
         return "formal"
     if reason in {
         "hct_entry_walkup",
@@ -444,6 +463,10 @@ def _projection_source(start: Dict[str, Any]) -> str:
         "hct_reach_in",
         "hct_dead_ball",
         "hct_dead_ball_turnover",
+        "hct_fb_drive",
+        "hct_ab_drive",
+        "hct_ab_dish",
+        "hct_ab_shot",
     }:
         return "formal"
     return "schema_projection"

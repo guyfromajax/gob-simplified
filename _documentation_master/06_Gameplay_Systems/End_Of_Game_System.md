@@ -91,12 +91,12 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - `discipline` (both teams, same criteria)
     - Compare team `(F + TO)` to opponent `(F + TO) + 8`.
     - If lower: `+= random.randint(1, 2)`.
-    - If higher: `+= random.randint(-3, -2)`.
+    - If higher: `+= random.randint(-2, -1)`.
     - If equal: `+= random.randint(-1, 0)`.
     - F = team fouls for the game (from box score / team totals).
   - `fight`
     - **Winning team:** += random.randint(0, 2).
-    - **Losing team:** += random.randint(-3, -1).
+    - **Losing team:** += random.randint(-2, 0).
   - `rebound_modifier` (winning and losing team have same criteria)
     - if team TREB for the game > opponents TREB for the game + 8: += `0.00 to 0.05`
     - elif TREB for the game < opponents TREB for the game - 8: += `-0.10 to -0.05`

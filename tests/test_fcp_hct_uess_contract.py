@@ -522,3 +522,183 @@ def test_pressure_emitter_projects_terminal_loop_steps_through_step_state(
         "dead_ball_turnover",
         "steal",
     }
+
+
+def _shot_payload(path, *, fcp=False):
+    payload = _base_payload(result_type="MISS", reason="hct_advance", fcp=fcp)
+    payload.update(
+        {
+            "shot_variant": "SHORT",
+            "uses_shot_arc": True,
+        }
+    )
+    if path == "fb_drive":
+        payload.update(
+            {
+                "hct_fb_shooter_id": "off_pg",
+                "hct_fb_bh_target": {"x": 8.0, "y": 25.0},
+                "hct_fb_defender_end": {},
+                "hct_fb_t_shooter": 0.5,
+                "shooter_id": "off_pg",
+            }
+        )
+    elif path == "ab_shot":
+        payload.update(
+            {
+                "hct_ab_shooter_id": "off_pg",
+                "hct_ab_mode": "shoot",
+                "hct_ab_shooter_target": {"x": 60.0, "y": 25.0},
+                "hct_ab_defender_end": {},
+                "hct_ab_t_shot": 0.8,
+                "shooter_id": "off_pg",
+            }
+        )
+    elif path == "ab_drive":
+        payload.update(
+            {
+                "hct_ab_shooter_id": "off_pg",
+                "hct_ab_mode": "drive",
+                "hct_ab_driver_id": "off_pg",
+                "hct_ab_driver_target": {"x": 8.0, "y": 25.0},
+                "hct_ab_teammate_targets": {},
+                "hct_ab_defender_end": {},
+                "hct_ab_t_drive": 0.6,
+                "shooter_id": "off_pg",
+            }
+        )
+    elif path == "ab_drive_dish":
+        payload.update(
+            {
+                "hct_ab_shooter_id": "off_sg",
+                "hct_ab_mode": "drive_dish",
+                "hct_ab_driver_id": "off_pg",
+                "hct_ab_driver_target": {"x": 20.0, "y": 25.0},
+                "hct_ab_teammate_targets": {},
+                "hct_ab_defender_end": {},
+                "hct_ab_dish_receiver_id": "off_sg",
+                "hct_ab_dish_receiver_target": {"x": 60.0, "y": 18.0},
+                "hct_ab_t_drive": 0.6,
+                "hct_ab_t_shot": 0.8,
+                "shooter_id": "off_sg",
+            }
+        )
+    else:
+        raise AssertionError(f"unknown shot path: {path}")
+    return payload
+
+
+@pytest.mark.parametrize("fcp", [False, True])
+@pytest.mark.parametrize(
+    "path,expected_reasons",
+    [
+        ("fb_drive", {"hct_fb_drive"}),
+        ("ab_shot", {"hct_ab_shot"}),
+        ("ab_drive", {"hct_ab_drive"}),
+        ("ab_drive_dish", {"hct_ab_drive", "hct_ab_dish", "hct_ab_shot"}),
+    ],
+)
+def test_pressure_emitter_projects_shot_setup_steps_through_step_state(
+    fcp, path, expected_reasons
+):
+    payload = _shot_payload(path, fcp=fcp)
+    turn_type = "FCP" if fcp else "HCT"
+
+    steps = _build_steps(payload, fcp=fcp)
+    payload["animation_steps"] = steps
+
+    formal_reasons = {
+        (step.get("start") or {})
+        .get("advance_trigger", {})
+        .get("metadata", {})
+        .get("reason")
+        for step in steps
+        if (step.get("_pressure_step_state") or {}).get("projection_source") == "formal"
+    }
+
+    assert expected_reasons <= formal_reasons
+
+    states = build_pressure_step_states(payload, turn_type)
+    projected = project_pressure_step_states_to_animation_steps(states)
+
+    assert _strip_pressure_state(projected) == _strip_pressure_state(steps)
+
+
+@pytest.mark.parametrize("fcp", [False, True])
+@pytest.mark.parametrize(
+    "result_type,shot_variant,extra,expected_conditions,expected_kinds",
+    [
+        (
+            "MAKE",
+            "SWISH",
+            {},
+            {"shot_resolved"},
+            {"make_hold"},
+        ),
+        (
+            "MISS",
+            "SHORT",
+            {"ball_bounce_x": 50.0, "ball_bounce_y": 30.0},
+            {"shot_resolved"},
+            {"bounce"},
+        ),
+        (
+            "BLOCK",
+            "",
+            {"ball_bounce_x": 40.0, "ball_bounce_y": 25.0, "blocker_id": "def_c"},
+            {"shot_resolved"},
+            set(),
+        ),
+        (
+            "MAKE",
+            "BANK_MAKE",
+            {},
+            {"shot_resolved"},
+            {"bank_settle", "make_hold"},
+        ),
+    ],
+)
+def test_pressure_emitter_projects_post_shot_sub_steps_through_step_state(
+    fcp, result_type, shot_variant, extra, expected_conditions, expected_kinds
+):
+    payload = _shot_payload("ab_shot", fcp=fcp)
+    payload.update(
+        {
+            "result_type": result_type,
+            "shot_variant": shot_variant,
+            **extra,
+        }
+    )
+    turn_type = "FCP" if fcp else "HCT"
+
+    steps = _build_steps(payload, fcp=fcp)
+    payload["animation_steps"] = steps
+
+    formal_steps = [
+        step
+        for step in steps
+        if (step.get("_pressure_step_state") or {}).get("projection_source") == "formal"
+    ]
+    formal_conditions = {
+        (step.get("start") or {}).get("advance_trigger", {}).get("condition")
+        for step in formal_steps
+    }
+    formal_kinds = {
+        (step.get("start") or {})
+        .get("advance_trigger", {})
+        .get("metadata", {})
+        .get("kind")
+        for step in formal_steps
+    }
+    formal_kinds.discard(None)
+
+    assert expected_conditions <= formal_conditions
+    assert expected_kinds <= formal_kinds
+    assert all(
+        (step.get("_pressure_step_state") or {}).get("projection_source") == "formal"
+        for step in steps
+    )
+
+    states = build_pressure_step_states(payload, turn_type)
+    projected = project_pressure_step_states_to_animation_steps(states)
+
+    assert _strip_pressure_state(projected) == _strip_pressure_state(steps)

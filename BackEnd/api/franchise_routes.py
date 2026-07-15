@@ -1710,15 +1710,15 @@ def update_team_attributes_after_game(
         if team_f_plus_to < opp_f_plus_to_with_buffer:
             changes["discipline"] = random.randint(1, 2)
         elif team_f_plus_to > opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(-3, -2)
+            changes["discipline"] = random.randint(-2, -1)
         else:
             changes["discipline"] = random.randint(-1, 0)
         
-        # fight: winning 0..+1, losing -1..0
+        # fight: winning 0..+2, losing -2..0
         if is_winner:
-            changes["fight"] = random.randint(0, 1)
+            changes["fight"] = random.randint(0, 2)
         else:
-            changes["fight"] = random.randint(-1, 0)
+            changes["fight"] = random.randint(-2, 0)
         
         # rebound_modifier
         if treb > (opp_treb + 8):

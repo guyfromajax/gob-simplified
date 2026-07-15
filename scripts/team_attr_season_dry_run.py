@@ -98,7 +98,7 @@ EOG_BANDS: dict[str, list[tuple[str, tuple[int, int] | tuple[float, float]]]] = 
     ],
     "discipline": [
         ("below_opp_plus_8", (1, 2)),
-        ("above_opp_plus_8", (-3, -2)),
+        ("above_opp_plus_8", (-2, -1)),
         ("equal_buffered", (-1, 0)),
     ],
     "rebound_modifier": [
@@ -139,8 +139,8 @@ EOG_BANDS: dict[str, list[tuple[str, tuple[int, int] | tuple[float, float]]]] = 
 }
 
 FIGHT_BANDS = {
-    True: ("win", (0, 1)),
-    False: ("loss", (-1, 0)),
+    True: ("win", (0, 2)),
+    False: ("loss", (-2, 0)),
 }
 
 CHEMISTRY_BANDS = {
