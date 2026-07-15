@@ -6272,6 +6272,17 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                                       shot_clock_est, tempo, random,
                                       openness=(20.0 if froze else 0.0), allow_dish=True,
                                       blocked_dish_targets=blocked_dish, openness_map=_open_map)
+            # DIAG — why an OPEN altered-action cutter is / isn't fed: per cutter, its openness + whether
+            # its BH→cutter lane is BLOCKED, then what the shoot decision did (PROGRESS = tier safe /
+            # nothing optimal → no dish; BHself = BH's own look won / random tier; DISH = fed a teammate).
+            if _alt_moves:
+                _cut_dbg = ", ".join(
+                    f"{cp}:open{round(_open_map.get(cp, 0))}"
+                    f"{'/BLOCKED' if cp in (blocked_dish or set()) else ''}" for cp in _alt_moves)
+                _res = "PROGRESS" if not post_shoot else (
+                    f"{post_shoot['shooter_pos']}"
+                    f"{'(DISH)' if post_shoot.get('via_pass') else '(BHself)'}")
+                logging.warning(f"🍽️ [ALT dish] cutters=[{_cut_dbg}] → {_res}")
             if post_shoot:
                 _sp = post_shoot["shooter_pos"]
                 _pdec = {"action": SHOOT, "shooter_pos": _sp, "shot_type": post_shoot["shot_type"]}

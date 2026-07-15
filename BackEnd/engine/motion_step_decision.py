@@ -186,7 +186,9 @@ SHOT_CLOCK_START = 30              # clamp ceiling for shot-clock-scaled bars
 # progress / work the ball, never shoot) — cuts FGA by deferring shots, and notably shrinks the
 # bar-immune "random" tier that was chucking in the Mid shot-clock tier. See Dynamic_HCO_System.md.
 SHOOT_READ_RIGHT = 300             # read tier: optimal decision (shoot/dish if optimal, else progress)
-SHOOT_READ_SAFE = 100              # read tier: safe decision (always progress / work the ball)
+SHOOT_READ_SAFE = 100              # read tier: safe decision (conservative — cascades by shot clock)
+SAFE_HOLD_CLOCK = 20.0             # safe tier: clock > this → hold (work the ball)
+SAFE_PASS_CLOCK = 10.0             # safe tier: clock in (PASS, HOLD] → hold-or-pass; ≤ PASS → 3-way
 
 
 # Shot-clock tiers — shared by the random-tier % grid and the SM-precedence grid.
@@ -259,7 +261,7 @@ def _shoot_threshold(shot_clock, tempo_call):
 
 
 def _shoot_read_tier(shooter, off_team, rng):
-    """Decision-quality tier (form B): right (>200) / safe (>125) / non-strategic (else)."""
+    """Decision-quality tier: right (> SHOOT_READ_RIGHT=300) / safe (> SHOOT_READ_SAFE=100) / random (else)."""
     read = (player_read_raw(shooter) + _team_attr(off_team, "discipline", 0)) * rng.randint(1, 6)
     if read > SHOOT_READ_RIGHT:
         return "right"
@@ -354,20 +356,40 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     )
 
     tier = _shoot_read_tier(shooter, off_team, rng)
-    if tier == "safe":
-        return None  # pass the look up → progress
+
+    def _dish_to_best():
+        return {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
+                "via_pass": True, "hot_read": best["mismatch"]}
+
+    def _nonstrategic():
+        # SHOOT / HOLD / PASS coin flip: pass → dish to the best open man (finds a cutter when the BH
+        # isn't reading); shoot → clock+tempo-gated BH look (so early possessions don't dump shots);
+        # else hold → progress.
+        c = rng.choice(("shoot", "hold", "pass"))
+        if c == "pass" and best["via_pass"]:
+            return _dish_to_best()
+        if c == "shoot" and rng.randint(1, 100) <= _random_tier_shoot_pct(shot_clock, tempo_call):
+            return {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
+                    "via_pass": False, "hot_read": False}
+        return None
+
     if tier == "right":
         if best["optimal"]:
             return {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
                     "via_pass": best["via_pass"], "hot_read": best["mismatch"]}
         return None  # nothing optimal → progress
-    # non-strategic: clock+tempo shoot progression (low early, high late)
-    # instead of a flat 50/50, so undisciplined possessions stop dumping early
-    # shots. Very-late (1–3s) is ~95% for all tempos; <1s forced upstream.
-    if rng.randint(1, 100) <= _random_tier_shoot_pct(shot_clock, tempo_call):
-        return {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
-                "via_pass": False, "hot_read": False}
-    return None
+    if tier == "safe":
+        # Conservative read CASCADES by shot clock: lots of time → work the ball; mid → work it or take
+        # the easy pass; late → open up to a full shoot/hold/pass. Never forces the BH's own shot early.
+        sc = float(shot_clock or 0)
+        if sc > SAFE_HOLD_CLOCK:                        # > 20 → hold (work the ball)
+            return None
+        if sc > SAFE_PASS_CLOCK:                        # 10–20 → hold, or the easy pass to an open man
+            if rng.choice(("hold", "pass")) == "pass" and best["via_pass"]:
+                return _dish_to_best()
+            return None
+        return _nonstrategic()                          # ≤ 10 → shoot / hold / pass
+    return _nonstrategic()                              # random tier
 
 
 # --------------------------------------------------------------------------- #
