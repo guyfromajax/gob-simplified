@@ -450,3 +450,45 @@ MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_setplay_prototype.py
 - [projects/StepState.md](../projects/StepState.md) (historical refactor record) · [projects/stepState_gaps.md](../projects/stepState_gaps.md) (remaining UESS gaps)
 - [Shot_Micro_Movements_System.md](Shot_Micro_Movements_System.md) — shot-time micros (pump fake, dunk, etc.) — separate from mid-HCO subtle movement
 - [HCO_Turn_Resolution_System.md](HCO_Turn_Resolution_System.md) · [Motion_Offense_Shot_System.md](Motion_Offense_Shot_System.md) · [HCT_System.md](HCT_System.md) · [FCP_System.md](FCP_System.md) · [Stopper_System.md](Stopper_System.md) · [Steal_System.md](Steal_System.md) · [SFX_System.md](../11_Design_Systems/SFX_System.md)
+
+
+##Altered Actions
+**Gated**
+- Offensie players can only perform altered actions on steps where the bh executes a subtle movmenet or in freelance situations
+
+**Definitiions**
+- Inide locations: basketSpot, midLane, upper/lower: lowPost, midPost
+- "Flash To" locations: midLane, topLane, upper/lower: midPost, highPost
+- "Good Read": >110
+- "Great Read: >200 (not applicable to all actions)
+
+**Actions & Naming Convention**
+- Backdoor Cut: "backdoor"
+- Jab Step "jab step"
+- Flash "flash"
+- Post Up "post up"
+
+**Backdoor Cut**
+- If an offensie player is in a non-inside location he can perform a backdoor cut targeting an inside location
+- Defender reads to binary result:
+  - Good read: stick with cutter
+  - Poor read: remains stationary
+
+**Jab Step**
+- If an offensie player is in a non-inside location he can perform a jab step -- moving in toward the basket at a direct angle toward teh baskeet 4-5 euclidian grid spots then returning to his spot
+- Defender reads to binary result: 
+  - Good read: sticks with jab stepper
+  - Poor read: follow jab stepper inward an remains at the jab step defense location nearest the basket
+
+**Flash**
+- If an offensie player is at an inside location he can perform a flash -- moving to a flash location tha tis != his starting location
+- Defender reads to binary result: 
+  - Great read: sticks with flasher and fronts the pass
+  - Good read: sticks with the flasher and stays behind him
+  - Poor read: remains stationary
+
+**Post Up**
+- If an offensie player is at an inside location he can perform a flash, he can hold his position and actively post up
+- Defender does not read, he inside defends:
+  - Good defense: he fronts the post up
+  - Poor defense: he sits behind the post up

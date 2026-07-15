@@ -1761,13 +1761,17 @@ def calculate_defender_coords(
 # sit at fixed court x; away orientation mirrors only the players). The tight-deny uses the ball
 # direction instead, so it is orientation-agnostic.
 # On-ball cushion delta along the man→basket axis (+ = toward basket = more cushion / sag).
-POSTURE_ONBALL_CUSHION_DELTA = {"tight": -1.0, "loose": 2.0}
+# Dynamic MM S3 — POSTURE-driven placement (retires aggression for the HCO path). All tunable.
+# On-ball: sit this many grid off the BH toward the rim, by posture (was aggression's get_spacing 2/3/4).
+ONBALL_POSTURE_DIST = {"tight": 2.5, "normal": 3.5, "loose": 4.5}
 # Off-ball tight = DENY: sit this many grid off the man, on the ball side (in his passing lane).
 POSTURE_DENY_DISTANCE = 2.0
-# Off-ball loose = HELP: sag this fraction from the baseline toward the help anchor (a point on
-# the ball→basket line, HELP_ANCHOR_FRAC along it — the middle of the floor).
-POSTURE_HELP_ANCHOR_FRAC = 0.5
-POSTURE_HELP_SHADE = {"loose": 0.55}
+# Off-ball normal/loose = HELP: sit `sag` of the way from the man toward the ball, + a shade toward the
+# basket (fraction of man→basket), then anchor per dimension (see _apply_defender_posture).
+HELP_SAG = {"normal": 0.30, "loose": 0.55}
+HELP_SAG_JITTER = 0.10          # ±0–10% human jitter on the sag fraction (resolved once + frozen → UESS-safe)
+HELP_BASKET_SHADE = 0.20        # shade toward the basket, as a fraction of the man→basket distance
+HELP_ANCHOR_FLOOR = 0.30        # min follow in the man's basket-aligned dimension ("comes off it some")
 # Canonical inside spots (matches motion_read_map.INSIDE_SPOTS; duplicated to avoid an engine
 # import cycle in this low-level util). Defenders on these men ignore posture (normal post D).
 _POSTURE_INSIDE_SPOTS = frozenset({
@@ -1784,34 +1788,44 @@ def _posture_nudge(px, py, tx, ty, amt):
 
 def _apply_defender_posture(def_coords, off_coords, ball_coords, is_ball_handler, o_spot,
                             posture, is_away_offense):
-    """Shade the baseline man position by the turn's team posture, in the caller's orientation.
-    posture None/"normal" → unchanged. Inside-man matchups locked to normal. See Dynamic_MM_Brief §5."""
-    if not posture or posture == "normal":
+    """Dynamic MM S3 — POSTURE-DRIVEN defender placement (aggression retired for the HCO path). Computes
+    the FULL position from man/ball/basket + posture, in the caller's orientation; the aggression base
+    (`def_coords`) is used ONLY for inside-man matchups (locked to normal post-D — post-up defense is a
+    separate altered-action reaction). posture None → legacy base (FB / tip-off / non-HCO, untouched).
+
+      • On-ball → `ONBALL_POSTURE_DIST[posture]` grid off the BH toward the rim.
+      • Off-ball tight → DENY: `POSTURE_DENY_DISTANCE` grid off the man on the ball side (passing lane).
+      • Off-ball normal/loose → HELP: sit `HELP_SAG[posture]` (± jitter) of the way from the man toward the
+        ball, + `HELP_BASKET_SHADE`·(basket−man) toward the rim, then ANCHOR per dimension by the man's
+        basket-offset — `w_d = max(FLOOR, off_d / max(off_x,off_y))` — so the defender follows the help
+        spot fully in the far-from-basket dimension but stays near his man (with a floor) in the aligned
+        one (key man → anchored in y, corner man → anchored in x; the whole arc, continuously)."""
+    if not posture:
         return def_coords
     if (o_spot or "").strip().lower() in _POSTURE_INSIDE_SPOTS:
-        return def_coords  # inside-man lock → normal post D
-    # Attacked rim in the input orientation (away offense attacks the low-x basket).
+        return def_coords  # inside-man lock → base post-D
     basket = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
-    bkx, bky = float(basket["x"]), float(basket["y"])
-    if is_ball_handler:
-        # cushion along man→basket: tight = toward the man (tighter), loose = toward basket (sag)
-        delta = POSTURE_ONBALL_CUSHION_DELTA.get(posture, 0.0)
-        nx, ny = _posture_nudge(def_coords["x"], def_coords["y"], bkx, bky, delta)
-        return {"x": int(round(nx)), "y": int(round(ny))}
     ox, oy = float(off_coords["x"]), float(off_coords["y"])
-    if posture == "tight":
-        # deny: hug the man on the ball side (in the direct passing lane to HIS man)
-        bx, by = (float(ball_coords["x"]), float(ball_coords["y"])) if ball_coords else (bkx, bky)
-        nx, ny = _posture_nudge(ox, oy, bx, by, POSTURE_DENY_DISTANCE)
+    bkx, bky = float(basket["x"]), float(basket["y"])
+
+    if is_ball_handler:
+        nx, ny = _posture_nudge(ox, oy, bkx, bky, ONBALL_POSTURE_DIST.get(posture, 3.5))
         return {"x": int(round(nx)), "y": int(round(ny))}
-    # loose: help — sag toward the middle of the floor (a point on the ball→basket line)
-    bx, by = (float(ball_coords["x"]), float(ball_coords["y"])) if ball_coords else (ox, oy)
-    hax = bx + (bkx - bx) * POSTURE_HELP_ANCHOR_FRAC
-    hay = by + (bky - by) * POSTURE_HELP_ANCHOR_FRAC
-    shade = POSTURE_HELP_SHADE.get(posture, 0.0)
-    nx = def_coords["x"] + (hax - def_coords["x"]) * shade
-    ny = def_coords["y"] + (hay - def_coords["y"]) * shade
-    return {"x": int(round(nx)), "y": int(round(ny))}
+
+    bx, by = (float(ball_coords["x"]), float(ball_coords["y"])) if ball_coords else (bkx, bky)
+    if posture == "tight":
+        nx, ny = _posture_nudge(ox, oy, bx, by, POSTURE_DENY_DISTANCE)  # DENY: ball-side, in the lane
+        return {"x": int(round(nx)), "y": int(round(ny))}
+
+    # normal / loose HELP
+    sag = HELP_SAG.get(posture, 0.30) * (1.0 + random.uniform(-HELP_SAG_JITTER, HELP_SAG_JITTER))
+    hx = ox + sag * (bx - ox) + HELP_BASKET_SHADE * (bkx - ox)   # ideal help spot (between ball & man, + shade)
+    hy = oy + sag * (by - oy) + HELP_BASKET_SHADE * (bky - oy)
+    off_x, off_y = abs(ox - bkx), abs(oy - bky)                  # man's basket-offset per axis
+    m = max(off_x, off_y) or 1.0
+    wx = max(HELP_ANCHOR_FLOOR, off_x / m)
+    wy = max(HELP_ANCHOR_FLOOR, off_y / m)
+    return {"x": int(round(ox + (hx - ox) * wx)), "y": int(round(oy + (hy - oy) * wy))}
 
 
 def get_defender_coords(
@@ -1939,9 +1953,10 @@ def get_defender_coords(
         # Return coords in home orientation (no flip needed)
         result = defender_coords_home
 
-    # Dynamic HCO Defense (P1): layer the per-turn posture shade on the baseline man position,
-    # in the SAME (input) orientation. posture None/"normal" → unchanged (every non-HCO caller).
-    if posture and posture != "normal":
+    # Dynamic MM S3: POSTURE-DRIVEN placement (tight/normal/loose), computed from man/ball/basket in the
+    # SAME (input) orientation — aggression retired for the HCO path. posture None → the aggression base
+    # above (every non-HCO caller: FB, rim-runner, tip-off — untouched). "normal" now ALSO routes here.
+    if posture:
         result = _apply_defender_posture(
             result, offensive_coords, ball_handler_coords, is_ball_handler, spot, posture,
             is_away_offense)
