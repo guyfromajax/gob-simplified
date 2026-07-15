@@ -59,6 +59,7 @@ from BackEnd.constants import (
     HOME_RIM_COORDS,
 )
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
+from BackEnd.engine.fb_uess_debug import mark_fb_emitter_fallback
 from BackEnd.engine.skeleton_step_emitter import _compute_pass_meet_point
 from BackEnd.utils.animation_step_helpers import floor_step_t_to_traversal
 from BackEnd.utils.shared import get_away_player_coords
@@ -2311,6 +2312,12 @@ def build_rim_runner_animation_steps(
     the legacy renderer.
     """
     if turn_result.get("fast_break_play") != "rim_runner":
+        mark_fb_emitter_fallback(
+            turn_result,
+            "rim_runner",
+            "fast_break_play_mismatch",
+            detail=str(turn_result.get("fast_break_play")),
+        )
         logging.warning(
             "🚨 [RR EMITTER NULL] guard=fast_break_play_mismatch "
             "fast_break_play=%s result_type=%s — FE will fall to LEGACY_HANDLER",
@@ -2321,6 +2328,12 @@ def build_rim_runner_animation_steps(
     fb_roles = turn_result.get("roles") or {}
     burst_phase = fb_roles.get("rim_runner_burst_phase")
     if not burst_phase:
+        mark_fb_emitter_fallback(
+            turn_result,
+            "rim_runner",
+            "missing_burst_phase",
+            detail=str(list(fb_roles.keys()) if isinstance(fb_roles, dict) else None),
+        )
         logging.warning(
             "🚨 [RR EMITTER NULL] guard=missing_burst_phase result_type=%s "
             "fb_roles_keys=%s — FE will fall to LEGACY_HANDLER",
@@ -2339,6 +2352,7 @@ def build_rim_runner_animation_steps(
 
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
+        mark_fb_emitter_fallback(turn_result, "rim_runner", "empty_start_coords")
         logging.warning(
             "🚨 [RR EMITTER NULL] guard=empty_start_coords result_type=%s "
             "— FE will fall to LEGACY_HANDLER",
@@ -2390,6 +2404,7 @@ def build_rim_runner_animation_steps(
         next_step_index=1,
     )
     if burst_step is None:
+        mark_fb_emitter_fallback(turn_result, "rim_runner", "burst_step_none")
         return None
     steps.append(burst_step)
     elapsed += float(burst_step["end"]["time_elapsed"])
@@ -2412,6 +2427,11 @@ def build_rim_runner_animation_steps(
             next_step_index=999,  # implicit end → HCO turn
         )
         if denied_defender is None:
+            mark_fb_emitter_fallback(
+                turn_result,
+                "rim_runner",
+                "outlet_denied_defender_step_none",
+            )
             return None
         steps.append(denied_defender)
         return _finalize_rr_steps(turn_result, game, steps)
@@ -2430,6 +2450,7 @@ def build_rim_runner_animation_steps(
             next_step_index=2,
         )
         if outlet_step is None:
+            mark_fb_emitter_fallback(turn_result, "rim_runner", "outlet_step_none")
             return None
         steps.append(outlet_step)
         elapsed += float(outlet_step["end"]["time_elapsed"])

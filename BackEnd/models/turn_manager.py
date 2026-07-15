@@ -1929,6 +1929,21 @@ class TurnManager:
                             "build_fast_break_step_states failed: %s",
                             e,
                         )
+                try:
+                    from BackEnd.engine.fb_uess_debug import log_fb_uess_summary
+
+                    log_fb_uess_summary(
+                        result,
+                        self.game,
+                        fallback_reason=(
+                            None
+                            if _fb_steps
+                            else result.get("fb_emitter_fallback_reason")
+                            or "no_animation_steps"
+                        ),
+                    )
+                except Exception as e:
+                    logging.warning("[FB_UESS] summary log failed: %s", e)
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)

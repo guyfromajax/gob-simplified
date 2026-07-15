@@ -4951,8 +4951,13 @@ JAB_READ_BASE = 100.0              # jab step good-read threshold = BASE + COEF�
 ALTERED_READ_PROX_COEF = 8.0       # per-grid distance coefficient on the dynamic read threshold
 ALTERED_ZONE_READ_THRESHOLD = 110.0  # zone: a defender whose zone occupancy CHANGES rolls this flat read
 #                                      (tight/loose don't apply in zone) — read > 110 ADJUSTS, ≤ 110 HOLDS
-JAB_STEP_MIN_GRID = 4.0            # jab step: jabber fakes 4–5 grid at the rim then returns; a beaten
-JAB_STEP_MAX_GRID = 5.0           #  defender FOLLOWS inward this far (the "bite") and stays → jabber open
+JAB_STEP_MIN_GRID = 4.0            # jab step: a beaten defender FOLLOWS the fake inward this far (the
+JAB_STEP_MAX_GRID = 5.0           #  "bite", 4–5 grid toward the basket) and stays → jabber open
+JAB_FLOURISH_AMPLITUDE_GRID = 6.0  # jab step: VISUAL fake size (render-only, toward the basket). Decoupled
+#   from the defender give-ground above; idle-jab heartbeat is 1.2 for reference.
+FLASH_GREAT_READ = 200.0          # flash: defender read > this = GREAT → FRONTS (denies the catch)
+FLASH_GOOD_READ = 110.0           # flash: read > this = GOOD → stays BEHIND (covered); ≤ = POOR (open)
+FLASH_FRONT_GRID = 1.5            # flash: a fronting defender steps this far to the ball-side of the flasher
 
 
 def _hco_cut_openness_lift(cutter_rim, defender_prior):
@@ -5025,6 +5030,18 @@ def _hco_backdoor_target(is_away_offense, rng):
     return loc, _spot_display_coords(loc, is_away_offense)
 
 
+# S3 flash — the "flash to" targets (Dynamic_HCO_System.md): an inside player relocates to one of these.
+_FLASH_TARGET_SPOTS = ("midLane", "topLane", "upper midPost", "lower midPost", "upper highPost", "lower highPost")
+
+
+def _hco_flash_target(is_away_offense, rng, exclude_loc=None):
+    """S3 flash — a RANDOM flash-to spot (≠ the flasher's start), location string + display coords."""
+    from BackEnd.engine.attack_drive_clearance import _spot_display_coords
+    cands = [s for s in _FLASH_TARGET_SPOTS if s != exclude_loc] or list(_FLASH_TARGET_SPOTS)
+    loc = rng.choice(cands)
+    return loc, _spot_display_coords(loc, is_away_offense)
+
+
 def _hco_altered_read_threshold(action, dist):
     """S3 — the DYNAMIC good-read threshold for a non-inside altered action, by the defender's distance `d`
     to his man (his frozen-grid cushion → posture). **backdoor** = `BASE − COEF·d` (close/deny → higher →
@@ -5079,13 +5096,15 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
         exited man / re-anchor), **≤ 110 → HOLD** (False → freeze at prior spot). A cutter's openness is
         gated by the owner of the zone he enters: owner ADJUSTS → 0 (covered, matches render); owner HOLDS
         (or no owner) → geometric nearest-def gap off the prior grid (matches the held render).
-    Returns `(altered_moves {pos:{coords,location}}, defender_reads {def_pos:bool}, openness_map {pos:lift})`
-    for build_subtle_beat + the animator freeze + the post-SM Hot Read. jab / flash / post up are SELECTED
-    but not yet dispatched → treated as stationary (build-order #4)."""
+    FLASH (inside player relocates to a flash spot): TERNARY read — great (>200) FRONTS (denies the catch →
+    `fronted`), good (>110) stays BEHIND (covered, receivable), poor (≤110) stationary (open). Man only for
+    now (zone flash = next build). POST UP = later.
+    Returns `(altered_moves, defender_reads {def_pos:bool}, openness_map {pos:lift}, defender_overrides
+    {def_pos:{coords,action}}, fronted {pos})` for build_subtle_beat + the animator + the post-SM Hot Read."""
     from BackEnd.utils.shared import player_read_raw
     from BackEnd.engine.attack_drive_clearance import _basket_display_coords
     import math
-    altered_moves, defender_reads, openness_map, defender_overrides = {}, {}, {}, {}
+    altered_moves, defender_reads, openness_map, defender_overrides, fronted = {}, {}, {}, {}, set()
     pos_actions = step.get("pos_actions") or {}
 
     # ================= OFFENSE (UNIVERSAL — identical vs man and zone) =================
@@ -5096,12 +5115,14 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
             continue
         loc = (pos_actions.get(pos) or {}).get("location") or "key"
         act = _hco_select_altered_action(off_lineup[pos], loc, off_eff, rng)
-        if act in ("backdoor", "jab step"):  # BUILT actions (flash / post up = build-order later → skipped)
+        # BUILT: backdoor + jab step (man & zone), flash (man only for now — zone flash = next build; post
+        # up = later). A not-yet-built selection just stays stationary.
+        if act in ("backdoor", "jab step") or (act == "flash" and not zone):
             sel[pos] = act
     if not sel:
-        return altered_moves, defender_reads, openness_map, defender_overrides
+        return altered_moves, defender_reads, openness_map, defender_overrides, fronted
 
-    backdoor_targets = {}
+    backdoor_targets, flash_targets = {}, {}
     for pos, act in sel.items():
         if act == "backdoor":
             target_loc, target_xy = _hco_backdoor_target(is_away_offense, rng)
@@ -5116,6 +5137,14 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
                 "coords": {"x": round(float(jabber_xy["x"]), 1), "y": round(float(jabber_xy["y"]), 1)},
                 "location": (pos_actions.get(pos) or {}).get("location") or "key",
                 "action": "jab step"}
+        elif act == "flash":
+            # Inside player relocates to a DIFFERENT flash-to spot (catches + shoots there).
+            _start_loc = (pos_actions.get(pos) or {}).get("location") or "key"
+            flash_loc, flash_xy = _hco_flash_target(is_away_offense, rng, exclude_loc=_start_loc)
+            altered_moves[pos] = {
+                "coords": {"x": round(float(flash_xy["x"]), 1), "y": round(float(flash_xy["y"]), 1)},
+                "location": flash_loc, "action": "flash"}
+            flash_targets[pos] = (flash_loc, flash_xy)
 
     def _apply_jab_bite(reactor, jabber_xy):
         """Poor jab read (man OR zone) → the reactor follows the fake inward (toward the basket) and
@@ -5181,7 +5210,7 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
             read = (player_read_raw(def_lineup.get(owner)) + def_eff) * rng.randint(1, 6)
             openness_map[pos] = (0.0 if read > ALTERED_ZONE_READ_THRESHOLD
                                  else _apply_jab_bite(owner, jabber_xy))
-        return altered_moves, defender_reads, openness_map, defender_overrides
+        return altered_moves, defender_reads, openness_map, defender_overrides, fronted
 
     # MAN — the assigned defender reads his man (distance-scaled threshold).
     for pos, act in sel.items():
@@ -5206,7 +5235,24 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
             read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
             openness_map[pos] = (0.0 if read >= _hco_altered_read_threshold("jab step", dist)
                                  else _apply_jab_bite(def_pos, jabber_xy))
-    return altered_moves, defender_reads, openness_map, defender_overrides
+        elif act == "flash":
+            flash_loc, flash_xy = flash_targets[pos]
+            read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
+            if read > FLASH_GREAT_READ:
+                # GREAT → front: defender steps to the ball-side of the flasher and DENIES the catch
+                # (fronted → excluded as a dish target). Override renders the front (contest == render).
+                fronted.add(pos)
+                front = _hco_nudge_toward(flash_xy, coord_fn(bh_pos), FLASH_FRONT_GRID)
+                front = {"x": round(float(front["x"]), 1), "y": round(float(front["y"]), 1)}
+                defender_overrides[def_pos] = {"coords": front, "action": "guard_offball"}
+                def_xy[def_pos] = front
+                openness_map[pos] = 0.0
+            elif read > FLASH_GOOD_READ:
+                openness_map[pos] = 0.0            # GOOD → behind: covered but receivable (contested, no lift)
+            else:
+                defender_reads[def_pos] = False    # POOR → stationary: flasher open at the flash spot
+                openness_map[pos] = _hco_lift_from_cushion(_hco_nearest_def_dist(flash_xy, def_xy))
+    return altered_moves, defender_reads, openness_map, defender_overrides, fronted
 
 
 def _hco_blocked_dish_targets(step, bh_pos, off_lineup, def_lineup, off_to_def,
@@ -6246,10 +6292,13 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     steps[i], bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
                     _def_aggr_call, zone, game_state.get("defense_playcall"),
                     posture=game_state.get("_hco_defense_posture"))
-                _alt_moves, _alt_reads, _alt_open, _alt_overrides = _hco_compute_altered_actions(
+                _alt_moves, _alt_reads, _alt_open, _alt_overrides, _alt_fronted = _hco_compute_altered_actions(
                     steps[i], off_lineup, def_lineup, off_to_def, bh_pos, is_away_offense,
                     off_eff, def_eff, _a_def_xy, _a_coord, random, zone=zone,
                     defense_playcall=game_state.get("defense_playcall"))
+                if _alt_fronted:
+                    # a FRONTED flasher (great read) can't receive → exclude him as a dish target.
+                    blocked_dish = (blocked_dish or set()) | _alt_fronted
                 # DIAG (S3 altered actions) — one line per SM so the gate chain is traceable end to end.
                 # read True = defender reacts (man: sticks/covers, zone: adjusts); False = holds/frozen.
                 _rd = ", ".join(f"{d}:{'react' if v else 'HOLD'}" for d, v in (_alt_reads or {}).items())
@@ -6304,7 +6353,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     _jidle[_jpid] = {
                         "style": "jab", "seed": int(abs(_jdx) + abs(_jdy)),
                         "dir_x": _jdx / _jd, "dir_y": _jdy / _jd,
-                        "amplitude_grid": (JAB_STEP_MIN_GRID + JAB_STEP_MAX_GRID) / 2.0,
+                        "amplitude_grid": JAB_FLOURISH_AMPLITUDE_GRID,
                     }
                 beat["_subtle_movement"]["idle_motion"] = _jidle
             lo, hi = SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))
@@ -6372,7 +6421,9 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 # S3: fed an altered-action player → tag the VO + route to his beat position (on the SM beat).
                 if _alt_moves and _sp in _alt_moves:
                     _act = _alt_moves[_sp].get("action") or "backdoor"
-                    _pdec["get_open_move"] = _act
+                    # Map the action to the receive-SFX registry key (HCO_GET_OPEN_RECEIVE_SFX:
+                    # backdoor / jab / flash / post). The action name ("jab step") ≠ the SFX key ("jab").
+                    _pdec["get_open_move"] = {"jab step": "jab", "post up": "post"}.get(_act, _act)
                     _sstep = beat
                     if _act == "backdoor":
                         # backdoor cut → dish to the inside cut spot (layup).

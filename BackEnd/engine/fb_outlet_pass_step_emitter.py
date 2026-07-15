@@ -226,4 +226,23 @@ def build_fb_outlet_pass_step(
         "next": {"kind": "next_step", "index": next_step_index},
     }
     _stamp_tween_durations(start, end_coords, t, off_lineup, def_lineup)
-    return {"start": start, "end": end}
+    step: AnimationStep = {"start": start, "end": end}
+    try:
+        from BackEnd.engine.fb_step_state import (
+            project_animation_step_through_fast_break_state,
+        )
+
+        return project_animation_step_through_fast_break_state(
+            step,
+            index=0,
+            result={"current_turn": "FAST_BREAK"},
+        )
+    except Exception as e:
+        logging.warning(
+            "🐛 [FB_OUTLET_PASS_STEPSTATE] projection failed passer_id=%s "
+            "receiver_id=%s: %s",
+            passer_id,
+            receiver_id,
+            e,
+        )
+        return step

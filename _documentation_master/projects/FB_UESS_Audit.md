@@ -189,7 +189,7 @@ The main gap is not “FB is broken architecture”; it is that FB has not yet a
 
 # Fast Break UESS + StepState Implementation Plan
 
-**Status:** Steps 1-4 first slices implemented  
+**Status:** Steps 1-6 first slices implemented  
 **Scope:** Rim Runner, Triangle, Covert Release, and After-Steal Fast Break turns  
 **Primary code paths:** `BackEnd/engine/fb_drive_step_emitter.py`, `fb_outlet_pass_step_emitter.py`, `rim_runner_step_emitter.py`, `triangle_step_emitter.py`, `covert_release_step_emitter.py`, `after_steal_fast_break_step_emitter.py`, `BackEnd/models/turn_manager.py`, `FrontEnd/static/js/phaser/animation/AnimationEngine.js`  
 **Related docs:** `projects/FB_UESS_Migration.md`, `projects/UESS Audits/Fast_Break_UESS_Audit.md`, `06_Gameplay_Systems/Fast_Break_System.md`, `projects/StepState.md`, `06_Gameplay_Systems/Dynamic_HCO_System.md`, `projects/FCP_HCT_UESS_Update.md`
@@ -447,7 +447,7 @@ Verification: `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_fb_step_state_
 
 ## Step 5: Move The Universal Drive Helper Through StepState First
 
-**Status:** Pending / only after Steps 1-4 pass
+**Status:** First slice implemented in `BackEnd/engine/fb_drive_step_emitter.py`
 
 Start with `BackEnd/engine/fb_drive_step_emitter.py::build_fb_drive_resolution_steps` because it is already the broadest shared FB primitive.
 
@@ -465,9 +465,24 @@ Acceptance criteria:
 - Post-shot sub-steps remain intact.
 - Terminal freeze announcements remain single-stamped.
 
+### Drive Helper Projection Added
+
+`BackEnd/engine/fb_drive_step_emitter.py::build_fb_drive_resolution_steps` now projects its emitted drive-resolution `AnimationStep[]` through `project_animation_step_through_fast_break_state(...)` before returning.
+
+This is still intended to be behavior-neutral:
+
+- the helper builds the same schema first
+- projection uses the schema snapshot path
+- `_fb_step_state` is stamped on the returned steps
+- if projection fails, the helper logs a warning and returns the original schema steps
+
+`tests/test_fb_step_state_contract.py` now asserts universal drive-helper outputs are already `_fb_step_state` stamped, and that schema remains identical when the stamp is stripped.
+
+Verification: `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_fb_step_state_contract.py -q` -> **33 passed**.
+
 ## Step 6: Move The Universal Outlet-Pass Helper Through StepState
 
-**Status:** Pending / only after Step 5 passes
+**Status:** First slice implemented in `BackEnd/engine/fb_outlet_pass_step_emitter.py`
 
 Apply the same pattern to `BackEnd/engine/fb_outlet_pass_step_emitter.py::build_fb_outlet_pass_step`.
 
@@ -481,13 +496,37 @@ Acceptance criteria:
 - Interrupted receiver / passer / defender coords remain unchanged.
 - SFX and pass-arrival advance triggers remain unchanged.
 
+### Outlet Helper Projection Added
+
+`BackEnd/engine/fb_outlet_pass_step_emitter.py::build_fb_outlet_pass_step` now projects its emitted outlet-pass `AnimationStep` through `project_animation_step_through_fast_break_state(...)` before returning.
+
+This remains behavior-neutral:
+
+- the helper builds the same schema first
+- projection uses the schema snapshot path
+- `_fb_step_state` is stamped on the returned step
+- if projection fails, the helper logs a warning and returns the original schema step
+
+`tests/test_fb_step_state_contract.py` now asserts shared outlet-pass output is `_fb_step_state` stamped, and that schema remains identical when the stamp is stripped.
+
+Verification: `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_fb_step_state_contract.py -q` -> **33 passed**.
+
 ## Step 7: Add FB Observability Helper
 
-**Status:** Optional but recommended
+**Status:** Complete
 
-Create a small helper such as `BackEnd/engine/fb_uess_debug.py`.
+`BackEnd/engine/fb_uess_debug.py` now provides the shared FB observability helper:
 
-Standardize logging for:
+- `build_fb_uess_summary(result, game, fallback_reason=None)`
+- `log_fb_uess_summary(result, game, fallback_reason=None)`
+
+The `FAST_BREAK` branch in `BackEnd/models/turn_manager.py` emits one summary line after StepState projection:
+
+```text
+[FB_UESS] game_id=... play=... result=... steps=... schema_burn=... time_elapsed=... first_owner=... final_owner=... final_coords=... states=... fallback=...
+```
+
+Standardized fields:
 
 - `game_id`
 - `fast_break_play`
@@ -498,35 +537,50 @@ Standardize logging for:
 - first ball owner
 - final ball owner
 - final coords count
-- fallback reason if emitter returns `None`
+- FB StepState count
+- fallback reason (`no_animation_steps` when a FB result has no emitted animation steps)
 
 Acceptance criteria:
 
-- Logs are concise and searchable.
-- No noisy per-frame logging.
+- Logs are concise and searchable via `[FB_UESS]`.
+- No noisy per-frame logging; exactly one summary line per FB turn at the TurnManager seam.
 - Log keys are shared across all four FB families.
+
+Verification: `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_fb_step_state_contract.py -q` -> expected pass.
 
 ## Step 8: Make Emitter-None Fallbacks Loud In Tests
 
-**Status:** Pending / after StepState bridge is stable
+**Status:** Complete
 
 The migration doc still notes legacy fallback/render artifact paths around old FB animation handling. These are useful safety rails, but they can also hide regressions.
 
-Before deleting any fallback:
+Current implementation:
 
-1. Identify every emitter `None` return path.
-2. Add explicit guard labels.
-3. Add tests that fail if covered live paths return `None`.
-4. Keep the production fallback temporarily.
+1. Public FB emitters stamp `fb_emitter_fallback_reason` before known production fallback `None` exits:
+   - `rim_runner:<guard>`
+   - `triangle:<guard>`
+   - `covert_release:<guard>`
+   - `after_steal:<guard>`
+2. `BackEnd/engine/fb_uess_debug.py::mark_fb_emitter_fallback(...)` owns the shared marker and emits:
+
+   ```text
+   [FB_EMITTER_FALLBACK] family=... guard=... detail=... result_type=... play=...
+   ```
+
+3. `TurnManager` forwards `fb_emitter_fallback_reason` into the shared `[FB_UESS]` summary when a FB result has no `animation_steps`; otherwise it reports `no_animation_steps`.
+4. Production fallback remains intact. No legacy fallback removal was done in this step.
 
 Acceptance criteria:
 
 - Covered FB paths cannot silently fall back in tests.
+- Public fallback paths carry a machine-readable reason.
 - Production still has safety fallback until prototype testing clears removal.
+
+Verification: `MONGO_DB_NAME=gob-test .venv/bin/pytest tests/test_fb_step_state_contract.py -q` -> **40 passed**.
 
 ## Step 9: Retire Legacy FB Render Artifacts / Fallbacks
 
-**Status:** Deferred
+**Status:** Deferred / blocked pending prototype coverage
 
 Only do this after:
 
@@ -534,6 +588,8 @@ Only do this after:
 - All four FB families are covered by contract tests.
 - Prototype testing covers normal play, fouls, dead-ball turnovers, steals, bat-OOB, DREB, and pass-ahead.
 - Emitter-null paths are confirmed not to occur in live paths.
+
+Current decision: **do not remove production fallback code yet.** Steps 7-8 made fallback paths observable and test-loud, but they did not prove every exotic live branch is covered in the prototype. Removing `capture_fast_break_animation` render artifacts or legacy fallback handlers before that proof would weaken safety and could create missing-animation failures on rare FB outcomes.
 
 Candidate removals:
 
@@ -546,6 +602,20 @@ Acceptance criteria:
 - No frontend behavior loss.
 - No missing fallback for untested exotic cases.
 - Reduced code surface without weakening safety.
+
+Readiness checklist before this step can move from deferred to implementation:
+
+- Search backend logs for `[FB_EMITTER_FALLBACK]` during prototype FB testing; expected count is zero for covered live paths.
+- Search backend logs for `[FB_UESS] ... fallback=...`; expected fallback value is `None` for covered live paths.
+- Prototype-test all four FB families:
+  - Rim Runner: MAKE, MISS, BLOCK, FOUL, dead-ball turnover, bat-OOB, interception, outlet denied, hold-up.
+  - Triangle: lane-pass shot, setup shot, defensive stop / enter-HCO, outlet denied, bat-OOB / interception where reachable.
+  - Covert Release: MAKE, MISS, BLOCK, FOUL, defensive stop, dead-ball turnover, steal.
+  - After Steal: MAKE, MISS, BLOCK, FOUL, dead-ball turnover.
+- Only after those pass should we remove:
+  - RR/Triangle `capture_fast_break_animation` render-only fallback packets.
+  - CR flag-gated legacy drive fallback.
+  - frontend legacy FB handlers for migrated schema turns.
 
 ## Step 10: Documentation Updates
 

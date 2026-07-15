@@ -17,11 +17,16 @@ from BackEnd.engine.fb_step_state import (
     project_animation_step_through_fast_break_state,
     project_fast_break_step_states_to_animation_steps,
 )
+from BackEnd.engine.fb_uess_debug import build_fb_uess_summary
 from BackEnd.engine.after_steal_fast_break_step_emitter import (
     build_after_steal_fast_break_animation_steps,
 )
 from BackEnd.engine.covert_release_step_emitter import build_covert_release_animation_steps
-from BackEnd.engine.rim_runner_step_emitter import _build_finisher_drive_resolution_steps
+from BackEnd.engine.rim_runner_step_emitter import (
+    _build_finisher_drive_resolution_steps,
+    build_rim_runner_animation_steps,
+)
+from BackEnd.engine.triangle_step_emitter import build_triangle_animation_steps
 from BackEnd.models.turn_manager import TurnManager
 from tests.test_utils import build_mock_game
 
@@ -148,6 +153,37 @@ def _turn_result(*, result_type="MAKE", outcome="NO_MEET", play_key="covert_rele
     return result
 
 
+def _rr_triangle_live_turn_result(game, play_key):
+    off_lineup = game.offense_team.lineup
+    def_lineup = game.defense_team.lineup
+    return {
+        "fast_break_play": play_key,
+        "result_type": "MISS",
+        "rim_runner_pass_attempted": True,
+        "rim_runner_fb_open": True,
+        "rebound_type": "DREB",
+        "animations": [],
+        "shooter": off_lineup["PF"],
+        "defender": def_lineup["PG"],
+        "roles": {
+            "fast_break_play": play_key,
+            "rim_runner_burst_phase": {
+                "rr_id": "off-PF",
+                "outlet_receiver_id": "off-PG",
+                "outlet_passer_id": None,
+                "skip_outlet_pass": True,
+                "rr_to": {"x": 87.0, "y": 25.0, "movement_archetype": "sprint"},
+                "receiver_to": {"x": 50.0, "y": 25.0},
+                "other_players": [],
+                "is_away_offense": False,
+                "fb_efficiency": 0,
+            },
+            "shooter": off_lineup["PF"],
+            "ball_handler": off_lineup["PG"],
+        },
+    }
+
+
 def _assert_schema_chain(steps):
     assert steps
     for idx, step in enumerate(steps):
@@ -188,7 +224,7 @@ def _strip_fb_state(steps):
 
 
 def _assert_fb_projection_parity(steps, *, play_key, result_type):
-    original = copy.deepcopy(steps)
+    original = _strip_fb_state(copy.deepcopy(steps))
     result = {
         "current_turn": "FAST_BREAK",
         "fast_break_play": play_key,
@@ -259,6 +295,7 @@ def test_fb_drive_schema_contract_for_all_families(
 
     assert steps is not None, f"{family} {outcome} should emit FB schema"
     _assert_schema_chain(steps)
+    assert all(step.get("_fb_step_state") for step in steps)
     assert _schema_clock_burn(steps) >= 0
     assert "off-PG" in steps[-1]["end"]["coords"]
     if outcome == "DEAD BALL":
@@ -340,6 +377,67 @@ def test_fb_step_state_bridge_projects_rr_triangle_finisher_adapter_schema(play_
 
 
 @pytest.mark.parametrize(
+    "play_key,builder",
+    [
+        ("rim_runner", build_rim_runner_animation_steps),
+        ("triangle", build_triangle_animation_steps),
+    ],
+)
+def test_fb_top_level_rr_triangle_live_paths_do_not_fall_back(play_key, builder):
+    game = _game()
+    turn_result = _rr_triangle_live_turn_result(game, play_key)
+
+    steps = builder(turn_result, game)
+
+    assert steps is not None
+    assert "fb_emitter_fallback_reason" not in turn_result
+    _assert_schema_chain(steps)
+
+
+@pytest.mark.parametrize(
+    "family,builder,bad_result,expected_reason",
+    [
+        (
+            "rim_runner",
+            build_rim_runner_animation_steps,
+            {"fast_break_play": "rim_runner", "result_type": "MISS", "roles": {}},
+            "rim_runner:missing_burst_phase",
+        ),
+        (
+            "triangle",
+            build_triangle_animation_steps,
+            {"fast_break_play": "triangle", "result_type": "MISS", "roles": {}},
+            "triangle:missing_burst_phase",
+        ),
+        (
+            "covert_release",
+            build_covert_release_animation_steps,
+            {"fast_break_play": "covert_release", "result_type": "MISS", "roles": {}},
+            "covert_release:missing_bh_id",
+        ),
+        (
+            "after_steal",
+            build_after_steal_fast_break_animation_steps,
+            {"fast_break_play": "after_steal", "result_type": "DEAD BALL"},
+            "after_steal:unsupported_result_type",
+        ),
+    ],
+)
+def test_fb_public_builders_stamp_explicit_fallback_reason(
+    family,
+    builder,
+    bad_result,
+    expected_reason,
+):
+    game = _game()
+
+    steps = builder(bad_result, game)
+
+    assert steps is None, family
+    assert bad_result.get("fb_emitter_fallback_reason") == expected_reason
+
+
+@pytest.mark.parametrize(
     "family,mover_targets",
     [
         (
@@ -379,6 +477,7 @@ def test_fb_outlet_pass_schema_contract_for_shared_core(family, mover_targets):
 
     assert step is not None
     _assert_schema_chain([step])
+    assert step.get("_fb_step_state")
     trigger = step["start"]["advance_trigger"]
     assert trigger["condition"] == "ball_reaches_player"
     assert trigger["metadata"]["from_player_id"] == "off-C"
@@ -465,7 +564,7 @@ def test_fb_step_state_bridge_projects_outlet_pass_without_behavior_change():
     )
     assert step is not None
 
-    original = [copy.deepcopy(step)]
+    original = _strip_fb_state([copy.deepcopy(step)])
     result = {
         "current_turn": "FAST_BREAK",
         "fast_break_play": "rim_runner",
@@ -514,6 +613,61 @@ def test_project_single_animation_step_through_fast_break_state_preserves_schema
 
     assert projected.get("_fb_step_state")
     assert _strip_fb_state([projected]) == [original]
+
+
+def test_fb_uess_summary_reports_shared_observability_fields():
+    result = {
+        "result_type": "MAKE",
+        "fast_break_play": "covert_release",
+        "time_elapsed": 3,
+        "animation_steps": [
+            {
+                "start": {
+                    "ball": {"owner_player_id": "off-PG"},
+                    "clock": {"clock_remaining": 420.0, "shot_clock_remaining": 25.0},
+                },
+                "end": {
+                    "coords": {"off-PG": {"x": 60.0, "y": 25.0}},
+                    "ball": {"owner_player_id": "off-PG"},
+                    "clock": {"clock_remaining": 418.5, "shot_clock_remaining": 23.5},
+                },
+            },
+            {
+                "start": {
+                    "ball": {"owner_player_id": "off-PG"},
+                    "clock": {"clock_remaining": 418.5, "shot_clock_remaining": 23.5},
+                },
+                "end": {
+                    "coords": {
+                        "off-PG": {"x": 88.0, "y": 25.0},
+                        "def-PG": {"x": 82.0, "y": 25.0},
+                    },
+                    "ball": {"owner_player_id": "off-PG"},
+                    "clock": {"clock_remaining": 417.0, "shot_clock_remaining": 22.0},
+                },
+            },
+        ],
+        "fb_step_states": [{"index": 0}, {"index": 1}],
+    }
+    summary = build_fb_uess_summary(
+        result,
+        SimpleNamespace(game_id="game-1"),
+        fallback_reason=None,
+    )
+
+    assert summary == {
+        "game_id": "game-1",
+        "fast_break_play": "covert_release",
+        "result_type": "MAKE",
+        "step_count": 2,
+        "schema_clock_burn": 3.0,
+        "time_elapsed": 3,
+        "first_ball_owner": "off-PG",
+        "final_ball_owner": "off-PG",
+        "final_coords_count": 2,
+        "fb_step_state_count": 2,
+        "fallback_reason": None,
+    }
 
 
 def test_turn_manager_fast_break_branch_stamps_and_projects_fb_step_state(monkeypatch):

@@ -22,6 +22,7 @@ from BackEnd.constants import (
     FB_PASS_MIN_GAME_SECONDS,
 )
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
+from BackEnd.engine.fb_uess_debug import mark_fb_emitter_fallback
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -689,6 +690,12 @@ def build_triangle_animation_steps(
 ) -> Optional[List[AnimationStep]]:
     """Convert a Triangle FB ``turn_result`` into ``AnimationStep[]``."""
     if turn_result.get("fast_break_play") != "triangle":
+        mark_fb_emitter_fallback(
+            turn_result,
+            "triangle",
+            "fast_break_play_mismatch",
+            detail=str(turn_result.get("fast_break_play")),
+        )
         logging.warning(
             "🚨 [TRIANGLE EMITTER NULL] guard=fast_break_play_mismatch "
             "fast_break_play=%s result_type=%s — FE will fall to LEGACY_HANDLER",
@@ -702,6 +709,12 @@ def build_triangle_animation_steps(
     fb_roles = turn_result.get("roles") or {}
     burst_phase = fb_roles.get("rim_runner_burst_phase")
     if not burst_phase:
+        mark_fb_emitter_fallback(
+            turn_result,
+            "triangle",
+            "missing_burst_phase",
+            detail=str(list(fb_roles.keys()) if isinstance(fb_roles, dict) else None),
+        )
         logging.warning(
             "🚨 [TRIANGLE EMITTER NULL] guard=missing_burst_phase result_type=%s "
             "fb_roles_keys=%s — FE will fall to LEGACY_HANDLER",
@@ -720,6 +733,7 @@ def build_triangle_animation_steps(
 
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
+        mark_fb_emitter_fallback(turn_result, "triangle", "empty_start_coords")
         logging.warning(
             "🚨 [TRIANGLE EMITTER NULL] guard=empty_start_coords result_type=%s "
             "— FE will fall to LEGACY_HANDLER",
@@ -751,6 +765,7 @@ def build_triangle_animation_steps(
         next_step_index=_next_step_index(steps),
     )
     if burst_step is None:
+        mark_fb_emitter_fallback(turn_result, "triangle", "burst_step_none")
         _tri_log.warning(
             "🐛 [TRIANGLE_NONE site=burst_step] outlet_failed=%s triangle_enter_hco=%s result_type=%s skip_outlet_pass=%s",
             outlet_failed, triangle_enter_hco, result_type,
@@ -773,6 +788,11 @@ def build_triangle_animation_steps(
             next_step_index=999,
         )
         if denied is None:
+            mark_fb_emitter_fallback(
+                turn_result,
+                "triangle",
+                "outlet_denied_defender_step_none",
+            )
             _tri_log.warning(
                 "🐛 [TRIANGLE_NONE site=outlet_denied_defender_step] outlet_failed=%s triangle_enter_hco=%s result_type=%s",
                 outlet_failed, triangle_enter_hco, result_type,
@@ -797,6 +817,7 @@ def build_triangle_animation_steps(
             rr_archetype_override="sprint",
         )
         if outlet_step is None:
+            mark_fb_emitter_fallback(turn_result, "triangle", "outlet_step_none")
             _tri_log.warning(
                 "🐛 [TRIANGLE_NONE site=outlet_pass_step] outlet_failed=%s triangle_enter_hco=%s result_type=%s skip_outlet_pass=%s passer_id=%s receiver_id=%s",
                 outlet_failed, triangle_enter_hco, result_type, skip_outlet_pass,
@@ -845,6 +866,7 @@ def build_triangle_animation_steps(
             is_away_offense=is_away_offense,
         )
         if lane_pass_steps is None:
+            mark_fb_emitter_fallback(turn_result, "triangle", "lane_pass_steps_none")
             _tri_log.warning(
                 "🐛 [TRIANGLE_NONE site=lane_pass_to_rr] outlet_failed=%s "
                 "result_type=%s skip_outlet_pass=%s pass_attempted=%s",
@@ -857,6 +879,7 @@ def build_triangle_animation_steps(
 
     payload = _triangle_setup_payload(fb_roles)
     if not payload:
+        mark_fb_emitter_fallback(turn_result, "triangle", "setup_payload_missing")
         _tri_log.warning(
             "🐛 [TRIANGLE_NONE site=setup_payload] outlet_failed=%s triangle_enter_hco=%s result_type=%s triangle_branch=%s",
             outlet_failed, triangle_enter_hco, result_type,
@@ -877,6 +900,7 @@ def build_triangle_animation_steps(
         next_step_index=_next_step_index(steps),
     )
     if setup_step is None:
+        mark_fb_emitter_fallback(turn_result, "triangle", "setup_step_none")
         _tri_log.warning(
             "🐛 [TRIANGLE_NONE site=setup_step] triangle_branch=%s payload_keys=%s",
             turn_result.get("triangle_branch"), list(payload.keys()) if payload else None,

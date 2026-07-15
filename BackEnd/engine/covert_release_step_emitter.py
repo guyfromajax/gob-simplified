@@ -46,6 +46,7 @@ from BackEnd.constants import (
     PASS_GRID_SPOTS_PER_GAME_SECOND,
 )
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
+from BackEnd.engine.fb_uess_debug import mark_fb_emitter_fallback
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -1476,6 +1477,12 @@ def build_covert_release_animation_steps(
 
     fast_break_play = turn_result.get("fast_break_play")
     if fast_break_play != "covert_release":
+        mark_fb_emitter_fallback(
+            turn_result,
+            "covert_release",
+            "fast_break_play_mismatch",
+            detail=str(fast_break_play),
+        )
         import logging
         logging.warning(
             "🚨 [CR EMITTER NULL] guard=fast_break_play_mismatch fast_break_play=%s "
@@ -1492,6 +1499,7 @@ def build_covert_release_animation_steps(
     bh = fb_roles.get("ball_handler")
     bh_id = _safe_id(bh)
     if not bh_id:
+        mark_fb_emitter_fallback(turn_result, "covert_release", "missing_bh_id")
         import logging
         logging.warning(
             "🚨 [CR EMITTER NULL] guard=missing_bh_id result_type=%s "
@@ -1513,6 +1521,7 @@ def build_covert_release_animation_steps(
     # mutates `player.coords` mid-resolution, so live coords are trustworthy.
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
+        mark_fb_emitter_fallback(turn_result, "covert_release", "empty_all_start_coords")
         import logging
         logging.warning(
             "🚨 [CR EMITTER NULL] guard=empty_all_start_coords result_type=%s "
@@ -1542,6 +1551,12 @@ def build_covert_release_animation_steps(
         passer_coord = all_start_coords.get(passer_id)
         receiver_coord = all_start_coords.get(receiver_id)
         if passer_coord is None or receiver_coord is None:
+            mark_fb_emitter_fallback(
+                turn_result,
+                "covert_release",
+                "missing_outlet_coords",
+                detail=f"{passer_id}->{receiver_id}",
+            )
             import logging
             logging.warning(
                 "🚨 [CR EMITTER NULL] guard=missing_outlet_coords result_type=%s "

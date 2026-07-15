@@ -573,6 +573,36 @@ def build_fb_drive_resolution_steps(
     if suppress_stinger:
         _suppress_fast_break_stinger(steps)
 
+    try:
+        from BackEnd.engine.fb_step_state import (
+            project_animation_step_through_fast_break_state,
+        )
+
+        fb_state_result = {
+            "current_turn": "FAST_BREAK",
+            "fast_break_play": turn_result.get("fast_break_play")
+            or (fb_roles or {}).get("fast_break_play")
+            or kind_prefix,
+            "result_type": turn_result.get("result_type"),
+        }
+        projected_steps = [
+            project_animation_step_through_fast_break_state(
+                step,
+                index=index,
+                result=fb_state_result,
+            )
+            for index, step in enumerate(steps)
+        ]
+        if projected_steps:
+            steps = projected_steps
+    except Exception as e:
+        logging.warning(
+            "🧩 [FB_DR] StepState projection failed prefix=%s result_type=%s: %s",
+            kind_prefix,
+            result_type,
+            e,
+        )
+
     logging.warning(
         "🧩 [FB_DR] prefix=%s result_type=%s outcome=%s uses_meet=%s "
         "stealer_id=%s n_steps=%d",

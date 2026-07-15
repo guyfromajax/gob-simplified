@@ -41,6 +41,7 @@ from typing import Any, Dict, List, Optional
 from BackEnd.engine.skeleton_step_emitter import (
     _build_post_shot_sub_steps,
 )
+from BackEnd.engine.fb_uess_debug import mark_fb_emitter_fallback
 from BackEnd.engine.shot_micro_movements import inject_shot_micro_before_post_shot
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
@@ -620,6 +621,12 @@ def build_after_steal_fast_break_animation_steps(
 
     result_type = (turn_result.get("result_type") or "").upper()
     if result_type not in ("MAKE", "MISS", "BLOCK"):
+        mark_fb_emitter_fallback(
+            turn_result,
+            "after_steal",
+            "unsupported_result_type",
+            detail=result_type,
+        )
         logging.warning(
             "🐛 [AFTER_STEAL_NONE site=unsupported_result_type] result_type=%s",
             result_type,
@@ -632,6 +639,7 @@ def build_after_steal_fast_break_animation_steps(
         or _safe_id(turn_result.get("shooter_id"))
     )
     if not stealer_id:
+        mark_fb_emitter_fallback(turn_result, "after_steal", "stealer_id_missing")
         logging.warning(
             "🐛 [AFTER_STEAL_NONE site=stealer_id_missing] turn_keys=%s",
             list(turn_result.keys())[:10],
@@ -658,6 +666,12 @@ def build_after_steal_fast_break_animation_steps(
 
     start_coords = _build_start_coords(off_lineup, def_lineup, prior_final_coords)
     if stealer_id not in start_coords:
+        mark_fb_emitter_fallback(
+            turn_result,
+            "after_steal",
+            "stealer_not_in_start_coords",
+            detail=stealer_id,
+        )
         logging.warning(
             "🐛 [AFTER_STEAL_NONE site=stealer_not_in_start_coords] stealer_id=%s start_keys=%s",
             stealer_id, list(start_coords.keys()),
@@ -668,6 +682,7 @@ def build_after_steal_fast_break_animation_steps(
     # end.coords reads from here.
     raw_end_coords = turn_result.get("after_steal_end_coords") or {}
     if not isinstance(raw_end_coords, dict) or not raw_end_coords:
+        mark_fb_emitter_fallback(turn_result, "after_steal", "end_coords_missing")
         logging.warning(
             "🐛 [AFTER_STEAL_NONE site=end_coords_missing] turn_keys=%s",
             list(turn_result.keys())[:15],
