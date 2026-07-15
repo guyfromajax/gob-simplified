@@ -53,17 +53,25 @@ def _attack_drive_defender_override(skeleton_step, def_pos):
 
 def _subtle_defender_should_freeze(skeleton_step, def_pos, anchor_off_pos):
     """Dynamic HCO subtle beat: should this defender FREEZE (hold prior coords) instead of
-    tracking his man? Returns False for non-subtle steps. On a subtle beat he freezes when
-    his guarded man did NOT move, OR when he failed his per-defender read (brief: Updated
-    Subtle Movement Logic — Defense Behavior). The read outcome is rolled in the resolver and
-    rides on the beat (``_subtle_movement.defender_reads``); the man-moved check is geometric
-    here. Works for man (anchor = matchup) and zone (anchor = assigned zone offender)."""
+    tracking his man / re-placing? Returns False for non-subtle steps.
+
+    An EXPLICIT per-defender read on the beat (``_subtle_movement.defender_reads[def_pos]``) is
+    AUTHORITATIVE: True → track/adjust (do the proper thing), False → freeze (hold prior). This holds
+    even when his anchor didn't move, so a ZONE defender reacting to a VACATED zone (good read) can drop
+    off / re-anchor instead of being force-frozen by the anchor-moved heuristic. (Man is unaffected: a
+    read that passed on a stationary man tracks to the same spot he'd hold anyway.)
+
+    With NO explicit read (unchanged-occupancy zone defenders; non-dynamic beats) it falls back to the
+    legacy heuristic: freeze when the guarded man did NOT move (brief: Updated Subtle Movement Logic —
+    Defense Behavior). Works for man (anchor = matchup) and zone (anchor = assigned zone offender)."""
     sm = skeleton_step.get("_subtle_movement") if skeleton_step else None
     if not sm:
         return False
+    reads = sm.get("defender_reads") or {}
+    if def_pos in reads:
+        return not reads[def_pos]                       # explicit read governs (True → move, False → hold)
     anchor_moved = anchor_off_pos in (sm.get("movers") or [])
-    read_follows = (sm.get("defender_reads") or {}).get(def_pos, True)
-    return (not anchor_moved) or (not read_follows)
+    return not anchor_moved
 
 
 # Dynamic HCO Defense — S1 Part B (Dynamic_MM_Brief §7). A beaten defender LAGS instead of tracking:

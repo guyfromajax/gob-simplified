@@ -4949,6 +4949,8 @@ BACKDOOR_QUALITY_LIFT_MAX = 30.0   # max should_shoot lift — enough for an ope
 BACKDOOR_READ_BASE = 150.0         # backdoor good-read threshold = BASE − COEF·d
 JAB_READ_BASE = 100.0              # jab step good-read threshold = BASE + COEF·d
 ALTERED_READ_PROX_COEF = 8.0       # per-grid distance coefficient on the dynamic read threshold
+ALTERED_ZONE_READ_THRESHOLD = 110.0  # zone: a defender whose zone occupancy CHANGES rolls this flat read
+#                                      (tight/loose don't apply in zone) — read > 110 ADJUSTS, ≤ 110 HOLDS
 
 
 def _hco_cut_openness_lift(cutter_rim, defender_prior):
@@ -5052,11 +5054,21 @@ def _hco_lift_from_cushion(cushion):
 
 
 def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_pos, is_away_offense,
-                                 off_eff, def_eff, def_xy, coord_fn, rng):
-    """S3 — on the BH's SM step, run the per-non-BH trigger + selection and wire the BACKDOOR: pick the
-    cutter's random inside target, then roll his defender's DYNAMIC-threshold read (`(0.8·IQ+0.2·CH+def_eff)
-    ×d6` vs `150 − 3·d`, `d` = the defender's frozen-grid distance to his man) — **good → STICK** (tracks
-    the cutter → covered), **poor → FREEZE** (holds his spot → cutter open by the nearest-defender gap).
+                                 off_eff, def_eff, def_xy, coord_fn, rng, zone=False, defense_playcall=None):
+    """S3 — on the BH's SM step, run the per-non-BH trigger + selection and wire the BACKDOOR (universal:
+    fires vs man AND zone). Offense half (trigger + selection + the cut) is defense-agnostic; the DEFENDER
+    REACTION differs by defense, but BOTH ride the ONE grid via `defender_reads` (the beat's freeze channel
+    — `_subtle_defender_should_freeze`: True → track/adjust, False → hold prior). Contest == render.
+      • MAN — roll the cutter's assigned defender's DYNAMIC-threshold read (`(0.8·IQ+0.2·CH+def_eff)×d6` vs
+        `150 − 8·d`, `d` = defender's frozen-grid distance to his man): good → STICK (covered, openness 0),
+        poor → FREEZE (open by nearest-def gap).
+      • ZONE — the animator re-places every zone defender per step (assign_all_zone_defenders), so a cut
+        CHANGES occupancy. Every defender whose zone occupancy changes (a cutter ENTERS, or his man EXITS)
+        rolls a flat read `×d6` vs `ALTERED_ZONE_READ_THRESHOLD` (110; tight/loose N/A in zone): **> 110 →
+        ADJUST** (defender_reads True → animator does the proper thing: cover the new cutter / drop an
+        exited man / re-anchor), **≤ 110 → HOLD** (False → freeze at prior spot). A cutter's openness is
+        gated by the owner of the zone he enters: owner ADJUSTS → 0 (covered, matches render); owner HOLDS
+        (or no owner) → geometric nearest-def gap off the prior grid (matches the held render).
     Returns `(altered_moves {pos:{coords,location}}, defender_reads {def_pos:bool}, openness_map {pos:lift})`
     for build_subtle_beat + the animator freeze + the post-SM Hot Read. jab / flash / post up are SELECTED
     but not yet dispatched → treated as stationary (build-order #4)."""
@@ -5064,22 +5076,74 @@ def _hco_compute_altered_actions(step, off_lineup, def_lineup, off_to_def, bh_po
     import math
     altered_moves, defender_reads, openness_map = {}, {}, {}
     pos_actions = step.get("pos_actions") or {}
+
+    # Pass 1 (defense-agnostic): trigger + selection → the backdoor cutters + their inside targets.
+    cutters = {}
     for pos in off_lineup:
         if pos == bh_pos or not off_lineup.get(pos) or pos not in pos_actions:
             continue
         loc = (pos_actions.get(pos) or {}).get("location") or "key"
         if _hco_select_altered_action(off_lineup[pos], loc, off_eff, rng) != "backdoor":
             continue  # None / jab / flash / post → stationary (jab/flash/post = build-order #4)
+        target_loc, target_xy = _hco_backdoor_target(is_away_offense, rng)
+        altered_moves[pos] = {
+            "coords": {"x": round(float(target_xy["x"]), 1), "y": round(float(target_xy["y"]), 1)},
+            "location": target_loc}
+        cutters[pos] = (target_loc, target_xy)
+    if not cutters:
+        return altered_moves, defender_reads, openness_map
+
+    if zone:
+        # ZONE — read every defender whose zone occupancy CHANGES (cutter enters / man exits).
+        from BackEnd.utils.shared_defense import _point_in_zone
+        from BackEnd.engine.attack_drive_clearance import _zone_boundaries_for_spot
+        bh_location = (pos_actions.get(bh_pos) or {}).get("location") or "key"
+        zb = _zone_boundaries_for_spot(defense_playcall, bh_location, is_away_offense) or {}
+
+        def _owner(xy):  # the zone defender whose area `xy` falls in (None if in no zone)
+            for dp in zb:
+                if def_lineup.get(dp) and _point_in_zone(xy, zb[dp], False):
+                    return dp
+            return None
+
+        def _occ(positions):  # {def_pos: frozenset(non-BH offenders in his zone)}
+            occ = {dp: set() for dp in zb}
+            for p, xy in positions.items():
+                if p == bh_pos:
+                    continue
+                o = _owner(xy)
+                if o is not None:
+                    occ[o].add(p)
+            return {dp: frozenset(s) for dp, s in occ.items()}
+
+        pre_pos = {p: coord_fn(p) for p in off_lineup if p in pos_actions and off_lineup.get(p)}
+        post_pos = dict(pre_pos)
+        for cp, (_tl, txy) in cutters.items():
+            post_pos[cp] = {"x": float(txy["x"]), "y": float(txy["y"])}
+        pre_occ, post_occ = _occ(pre_pos), _occ(post_pos)
+
+        for dp in zb:
+            if not def_lineup.get(dp) or pre_occ.get(dp) == post_occ.get(dp):
+                continue  # unchanged occupancy → no read (legacy anchor-moved heuristic holds him)
+            read = (player_read_raw(def_lineup.get(dp)) + def_eff) * rng.randint(1, 6)
+            defender_reads[dp] = read > ALTERED_ZONE_READ_THRESHOLD  # > 110 adjust, ≤ 110 hold
+
+        for cp, (_tl, txy) in cutters.items():
+            owner = _owner(txy)
+            if owner is not None and defender_reads.get(owner) is True:
+                openness_map[cp] = 0.0  # owner adjusts onto the cutter → covered (matches render)
+            else:
+                openness_map[cp] = _hco_lift_from_cushion(_hco_nearest_def_dist(txy, def_xy))
+        return altered_moves, defender_reads, openness_map
+
+    # MAN — per-cutter matchup read off the assigned defender's distance to his man.
+    for pos, (target_loc, target_xy) in cutters.items():
         def_pos = off_to_def.get(pos, pos)
         d_xy = def_xy.get(def_pos)
         if not d_xy:
             continue
         man_xy = coord_fn(pos)
         dist = math.hypot(float(man_xy["x"]) - float(d_xy["x"]), float(man_xy["y"]) - float(d_xy["y"]))
-        target_loc, target_xy = _hco_backdoor_target(is_away_offense, rng)
-        altered_moves[pos] = {
-            "coords": {"x": round(float(target_xy["x"]), 1), "y": round(float(target_xy["y"]), 1)},
-            "location": target_loc}
         read = (player_read_raw(def_lineup.get(def_pos)) + def_eff) * rng.randint(1, 6)
         if read >= _hco_altered_read_threshold("backdoor", dist):
             defender_reads[def_pos] = True     # good read → tracks the cutter → covered
@@ -6117,19 +6181,20 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 game, off_lineup, def_lineup, is_away_offense,
             ), steps[i], bh_pos)
         if action == SUBTLE_MOVEMENT:
-            # S3 ALTERED ACTIONS: on an altering turn (man only, posture set), the non-BH players do their
-            # SELECTED altered action on the BH's SM — backdoor built (cut + defender dynamic-threshold read),
-            # jab/flash/post = build-order #4 (selected but stationary for now) — REPLACING the random SM
-            # relocations. Off the altering path → legacy random SM (byte-identical).
+            # S3 ALTERED ACTIONS: on an altering turn (man OR zone, defense rolled), the non-BH players do
+            # their SELECTED altered action on the BH's SM — backdoor built (man: cut + defender dynamic read;
+            # zone: cut + geometric nearest-def openness), jab/flash/post = build-order #4 (selected but
+            # stationary) — REPLACING the random SM relocations. Off the altering path → legacy random SM.
             _alt_moves = _alt_reads = _alt_open = None
-            if offense_reads and not zone and game_state.get("_hco_defense_posture"):
+            if offense_reads and game_state.get("_hco_defense_posture"):
                 _a_def_xy, _a_coord, _a_loc, _a_pt = _hco_step_def_xy(
                     steps[i], bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
                     _def_aggr_call, zone, game_state.get("defense_playcall"),
                     posture=game_state.get("_hco_defense_posture"))
                 _alt_moves, _alt_reads, _alt_open = _hco_compute_altered_actions(
                     steps[i], off_lineup, def_lineup, off_to_def, bh_pos, is_away_offense,
-                    off_eff, def_eff, _a_def_xy, _a_coord, random)
+                    off_eff, def_eff, _a_def_xy, _a_coord, random, zone=zone,
+                    defense_playcall=game_state.get("defense_playcall"))
                 # DIAG (S3 altered actions) — one line per SM so the gate chain is traceable end to end.
                 _rd = ", ".join(f"{d}:{'stick' if v else 'FREEZE'}" for d, v in (_alt_reads or {}).items())
                 logging.warning(
@@ -6137,10 +6202,10 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     f"open={ {p: round(o) for p, o in (_alt_open or {}).items()} }"
                 )
             else:
-                # DIAG — SM reached but altered actions were gated OUT; shows which gate.
+                # DIAG — SM reached but altered actions gated OUT (non-altering turn or flag off).
                 logging.warning(
                     f"🎬 [ALT] SM but NO altered actions — offense_reads={offense_reads} "
-                    f"zone={zone} posture_set={bool(game_state.get('_hco_defense_posture'))}"
+                    f"(altering turn?) flag_on={bool(game_state.get('_hco_defense_posture'))} zone={zone}"
                 )
             beat = build_subtle_beat(steps[i], off_lineup, bh_pos, is_away_offense, random, off_eff,
                                      altered_moves=_alt_moves)
