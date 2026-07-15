@@ -4931,34 +4931,26 @@ def _hco_backdoor_read(commitment, def_xy, bh_pos, basket_xy, defender_reads, of
     return best_pos
 
 
-# Backdoor cut openness (S3 Option 3) — computed the SAME way the animator RENDERS the cut defender, so
-# the openness the Hot Read reads == the gap that gets drawn (UESS: one computation, not a parallel
-# prediction). The defender lags `lerp(prior, tracked, frac)` where `frac` is the animator's own
-# `_defender_lag_fraction` value (1 − OPENNESS_LAG_MAX·beat, from the read margin) and `tracked` is the
-# same `get_defender_coords(...)` guard spot the animator uses; cushion = the cutter's gap to that lagged
-# spot. A real beat leaves the overplaying defender far → open layup; a barely-beaten one recovers into
-# range (cushion < MIN → no lift → no dish). Ramp constants are tunable (S3e); verify the dish RATE in-app.
+# Backdoor cut openness (S3 Option 3) — BINARY defender reaction (owner, 2026-07-15): the cut fires only
+# when the defender is beaten (read-gate, `follows==False`), and a beaten cut defender stays STATIONARY
+# (frozen at his overplay spot via the cut beat's `_subtle_movement.defender_reads` → the animator's
+# `_subtle_defender_should_freeze`), NOT scaled-trailing. So the cutter's openness = his gap to that
+# frozen defender, ‖cutter_rim − def_prior‖ — the SAME gap that gets drawn (UESS: one data source). It
+# grades organically by how far the defender overplayed (a bigger overplay → a more open backdoor). If the
+# defender READS it (>110) he sticks → no cut fires at all. Ramp constants tunable (S3e); verify RATE in-app.
 BACKDOOR_OPENNESS_MIN = 3.0        # cushion (grid) below which the cutter is still covered → no lift
 BACKDOOR_OPENNESS_OPEN = 8.0       # cushion (grid) at/above which the cut is wide open → full lift
 BACKDOOR_QUALITY_LIFT_MAX = 30.0   # max should_shoot lift — enough for an open layup to beat the BH's own look
 
 
-def _hco_cut_openness_lift(cutter_rim, defender_prior, defender_tracked, margin):
-    """S3 Option 3 — the `should_shoot` openness LIFT for a backdoor cut, computed IDENTICALLY to how the
-    animator renders the cut defender (UESS): `frac` = the animator's `_defender_lag_fraction` value from
-    the read margin; the defender ends at `lerp(prior, tracked, frac)`; cushion = ‖cutter_rim − lagged‖.
-    So the openness the offense reads is the same gap drawn on screen — not a siloed guess. Ramp → lift."""
+def _hco_cut_openness_lift(cutter_rim, defender_prior):
+    """S3 Option 3 — the `should_shoot` openness LIFT for a backdoor cut. The beaten cut defender is frozen
+    at his overplay spot (`defender_prior`), so the cutter's openness = ‖cutter_rim − defender_prior‖ — the
+    exact gap the animator draws (it freezes the same defender at the same spot). Ramp → lift."""
     import math
-    from BackEnd.models.animator import OPENNESS_LAG_MAX, OPENNESS_LAG_MARGIN_SCALE
-    beat = min(1.0, abs(float(margin)) / OPENNESS_LAG_MARGIN_SCALE)
-    frac = max(0.0, 1.0 - OPENNESS_LAG_MAX * beat)
-    px = float(defender_prior.get("x", cutter_rim["x"]))
-    py = float(defender_prior.get("y", cutter_rim["y"]))
-    tx = float(defender_tracked.get("x", px))
-    ty = float(defender_tracked.get("y", py))
     cushion = math.hypot(
-        float(cutter_rim["x"]) - (px + (tx - px) * frac),
-        float(cutter_rim["y"]) - (py + (ty - py) * frac))
+        float(cutter_rim["x"]) - float(defender_prior.get("x", cutter_rim["x"])),
+        float(cutter_rim["y"]) - float(defender_prior.get("y", cutter_rim["y"])))
     span = max(1e-6, BACKDOOR_OPENNESS_OPEN - BACKDOOR_OPENNESS_MIN)
     return BACKDOOR_QUALITY_LIFT_MAX * max(0.0, min(1.0, (cushion - BACKDOOR_OPENNESS_MIN) / span))
 
@@ -6027,29 +6019,24 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             _bd_cutter = _bd["cutter"]
             _cut_beat = _build_backdoor_cut_beat(steps[i], _bd_cutter, bh_pos, off_lineup, is_away_offense)
             if _cut_beat is not None:
-                _cut_beat["_defender_reads"] = steps[i].get("_defender_reads")  # trail the beaten defender
+                # BINARY cut-defender reaction (owner, 2026-07-15): the cut only fires when he's beaten
+                # (read-gate), and a beaten cut defender stays STATIONARY (frozen at his overplay spot) —
+                # NOT scaled-trailing. Stamp his SM freeze so the animator holds him at his prior coord;
+                # the openness below reads that same stationary gap (UESS-aligned, one data source).
+                _cut_def_pos = off_to_def.get(_bd_cutter, _bd_cutter)
+                _cut_beat.setdefault("_subtle_movement", {})["defender_reads"] = {_cut_def_pos: False}
                 _cut_elapsed = float(random.randint(*SUBTLE_STEP_ELAPSED_BY_TEMPO.get(tempo, (3, 5))))
                 _cut_beat["_step_t_floor_game_seconds"] = _cut_elapsed
                 shot_clock_est = max(0.0, shot_clock_est - _cut_elapsed)
                 game_state["_hco_shot_clock_est"] = shot_clock_est
                 output_steps.append(_cut_beat)
-                # Post-cut Hot Read: the cutter is now at the rim with his beaten defender trailing → his
-                # graded openness enters the same should_shoot the whole offense reads. Dish only if he
-                # (or anyone) is the best open look; else fall through (he cleared out — resume skeleton).
-                from BackEnd.engine.attack_drive_clearance import _basket_display_coords as _bd_basket, _spot_display_coords
-                from BackEnd.utils.shared_defense import get_defender_coords as _gdc
+                # Post-cut Hot Read: the beaten defender is frozen at his overplay spot → the cutter's gap
+                # to him = his openness (the same gap drawn). Dish only if he's the best open look; else
+                # fall through (he cleared out — resume skeleton).
+                from BackEnd.engine.attack_drive_clearance import _basket_display_coords as _bd_basket
                 _cut_rim = _bd_basket(is_away_offense)
-                # UESS: the cutter-defender's would-be guard spot, computed with the SAME get_defender_coords
-                # the animator uses to render him — so the openness the Hot Read reads is the SAME gap that
-                # gets drawn (the lift fn lerps prior→this by the animator's own lag frac), not a siloed guess.
-                _cut_bh_xy = (_cut_beat["pos_actions"].get(bh_pos, {}).get("coords")
-                              or _spot_display_coords(bh_location, is_away_offense))
-                _cut_tracked = _gdc(_cut_rim, is_away_offense, _def_aggr_call, "basketSpot",
-                                    _cut_bh_xy, is_ball_handler=False, ball_spot=bh_location,
-                                    posture=game_state.get("_hco_defense_posture"))
                 _cut_open = dict(_hco_openness_map(steps[i].get("_commitment")))
-                _cut_open[_bd_cutter] = _hco_cut_openness_lift(
-                    _cut_rim, _bd.get("def_prior") or {}, _cut_tracked, _bd.get("margin", 0.0))
+                _cut_open[_bd_cutter] = _hco_cut_openness_lift(_cut_rim, _bd.get("def_prior") or {})
                 _cut_locs = {**locations, _bd_cutter: "basketSpot"}
                 _cut_shoot = should_shoot(bh_pos, off_lineup, _cut_locs, read_map, off_team,
                                           shot_clock_est, tempo, random, allow_dish=True,
