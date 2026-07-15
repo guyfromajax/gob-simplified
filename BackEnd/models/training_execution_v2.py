@@ -646,7 +646,7 @@ def apply_training_points(
         cur_ch = team.get("team_chemistry", 0)
         team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + team_ch_bump))
 
-    # Flat team-attribute bonuses from coaching focus, beyond normal gain amplification.
+    # Flat team-attribute bonuses/penalties from coaching focus, beyond normal gain amplification.
     # Culture Builder fight bump applies to Inspire / Confidence / Community only — not Team Building.
     if (
         archetype == "culture-builder"
@@ -656,14 +656,24 @@ def apply_training_points(
         fight_lo, fight_hi = TEAM_ATTR_CLAMPS["fight"]
         team["fight"] = max(fight_lo, min(fight_hi, team.get("fight", 0) + random.randint(1, 2)))
 
+    # Culture Builder generally trades discipline for morale/culture work; Confidence is excluded.
+    if archetype == "culture-builder" and sub_option != "culture-builder-confidence" and "discipline" in team:
+        disc_lo, disc_hi = TEAM_ATTR_CLAMPS["discipline"]
+        team["discipline"] = max(disc_lo, min(disc_hi, team.get("discipline", 0) + random.randint(-2, -1)))
+
     # Authoritarian discipline bump applies to Discipline / Rebounding / Execution — not Teamwork.
     if archetype == "authoritarian" and sub_option != "authoritarian-teamwork" and "discipline" in team:
         disc_lo, disc_hi = TEAM_ATTR_CLAMPS["discipline"]
         team["discipline"] = max(disc_lo, min(disc_hi, team.get("discipline", 0) + random.randint(1, 2)))
 
+    # Authoritarian work generally costs fight/energy unless the focus is specifically Rebounding.
+    if archetype == "authoritarian" and sub_option != "authoritarian-rebounding" and "fight" in team:
+        fight_lo, fight_hi = TEAM_ATTR_CLAMPS["fight"]
+        team["fight"] = max(fight_lo, min(fight_hi, team.get("fight", 0) + random.randint(-2, -1)))
+
     if sub_option == "authoritarian-teamwork":
         ch_lo, ch_hi = TEAM_ATTR_CLAMPS["team_chemistry"]
-        ch_bump = random.randint(1, 2)
+        ch_bump = random.randint(0, 1)
         cur_ch = team.get("team_chemistry", 0)
         team["team_chemistry"] = max(ch_lo, min(ch_hi, cur_ch + ch_bump))
     
@@ -685,32 +695,30 @@ def apply_training_points(
     # Docs: Rebounding gives rebound_modifier 0.5 points per drill point.
     if "technical_drills" in normalized_allocations:
         rebounding_points = normalized_allocations["technical_drills"].get("rebounding", 0)
-        if rebounding_points > 0:
+        if rebounding_points is not None:
             # Convert to effective team-attribute points using 0.5x accrual, then round half-up.
             effective_points = int((rebounding_points * 0.5) + 0.5)
-            if effective_points > 0:
-                _apply_rebound_modifier_training(
-                    team, effective_points, archetype, sub_option, source="technical_drills"
-                )
+            _apply_rebound_modifier_training(
+                team, effective_points, archetype, sub_option, source="technical_drills"
+            )
     
     # Handle scrimmages (if scrimmages category exists in allocations)
     # Scrimmages: Team Chemistry (0.5x multiplier), Shot Threshold (1 point), Rebounding (0.5x)
     # Note: Scrimmages category may not be in the frontend structure yet
     if "scrimmages" in normalized_allocations:
         scrimmage_points = normalized_allocations["scrimmages"]
-        if isinstance(scrimmage_points, int) and scrimmage_points > 0:
+        if isinstance(scrimmage_points, int) and scrimmage_points >= 0:
             # Track Team Chemistry contribution (0.5x multiplier) - will be applied with other contributions
-            if "scrimmages" in team_attr_multipliers:
+            if scrimmage_points > 0 and "scrimmages" in team_attr_multipliers:
                 for team_attr, mult in team_attr_multipliers["scrimmages"]:
                     team_attr_contributions[team_attr] += scrimmage_points * mult
             # Apply to Shot Threshold (decreases)
             _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
             # Apply to Rebounding (rebound_modifier) with 0.5x accrual, rounded half-up.
             effective_points = int((scrimmage_points * 0.5) + 0.5)
-            if effective_points > 0:
-                _apply_rebound_modifier_training(
-                    team, effective_points, archetype, sub_option, source="scrimmages"
-                )
+            _apply_rebound_modifier_training(
+                team, effective_points, archetype, sub_option, source="scrimmages"
+            )
     
     # Apply team attribute contributions from multipliers
     # Sum all contributions, round (0.5 rounds up, <0.5 rounds down), then apply
@@ -1314,12 +1322,12 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         return
 
     standard_ranges = {
-        0: (-2, -1),
-        1: (1, 2),
-        2: (2, 3),
-        3: (3, 4),
-        4: (3, 6),
-        5: (3, 7),
+        0: (-3, -1),
+        1: (-1, 1),
+        2: (1, 2),
+        3: (1, 3),
+        4: (1, 4),
+        5: (2, 5),
     }
     # Shared by Strength+Conditioning → fight and defense/passing/BH → discipline.
     fight_discipline_training_ranges = {
@@ -1372,35 +1380,21 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         sub_option: Optional coaching focus sub-option
         source: "technical_drills" or "scrimmages" - determines which range to use
     
-    Technical Drills ranges (in 0.01 increments).
-    - 1-2 points: +0.01 to +0.05
-    - 3-4 points: +0.04 to +0.08
-    - 5+ points: +0.06 to +0.10
-
-    Scrimmages ranges (in 0.01 increments).
-    - 1-2 points: +0.00 to +0.03
-    - 3-4 points: +0.03 to +0.05
-    - 5+ points: +0.04 to +0.07
+    Technical Drills / Scrimmages ranges (in 0.01 increments).
+    - <1 effective point: -0.05 to -0.03
+    - 1-2 effective points: -0.03 to +0.03
+    - 3-4 effective points: +0.03 to +0.05
+    - 5+ effective points: +0.03 to +0.10
     """
-    # Get base increase based on source and points
-    if source == "technical_drills":
-        if points in (1, 2):
-            increase = random.randint(1, 5) / 100.0
-        elif points in (3, 4):
-            increase = random.randint(4, 8) / 100.0
-        elif points >= 5:
-            increase = random.randint(6, 10) / 100.0
-        else:
-            increase = 0.0
-    else:  # scrimmages
-        if points in (1, 2):
-            increase = random.randint(0, 3) / 100.0
-        elif points in (3, 4):
-            increase = random.randint(3, 5) / 100.0
-        elif points >= 5:
-            increase = random.randint(4, 7) / 100.0
-        else:
-            increase = 0.0
+    # Both technical drills and scrimmages use the same effective-point tuning.
+    if points < 1:
+        increase = random.randint(-5, -3) / 100.0
+    elif points in (1, 2):
+        increase = random.randint(-3, 3) / 100.0
+    elif points in (3, 4):
+        increase = random.randint(3, 5) / 100.0
+    else:
+        increase = random.randint(3, 10) / 100.0
     
     final_increase = increase
     
@@ -1424,37 +1418,37 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
     """
     Apply training points to shot_threshold (doc ranges).
     
-    - 0 points: += random.randint(5, 10)
-    - 1 point: += random.randint(-5, 0)  (neutral to slight improvement)
-    - 2 points: -= random.randint(5, 15)
-    - 3 points: -= random.randint(10, 15)
-    - 4 points: -= random.randint(10, 20)
-    - 5+ points: -= random.randint(15, 20)
+    - 0 points: += random.randint(5, 15)
+    - 1 point: += random.randint(0, 5)
+    - 2 points: -= random.randint(3, 8)
+    - 3 points: -= random.randint(5, 11)
+    - 4 points: -= random.randint(5, 15)
+    - 5+ points: -= random.randint(5, 20)
     """
     lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
     current_val = team.get("shot_threshold", lower)
 
     if points == 0:
-        increase = random.randint(5, 10)
+        increase = random.randint(5, 15)
         team["shot_threshold"] = max(lower, min(upper, current_val + increase))
         return
 
     if points == 1:
-        delta = random.randint(-5, 0)
-        team["shot_threshold"] = max(lower, min(upper, current_val + delta))
+        increase = random.randint(0, 5)
+        team["shot_threshold"] = max(lower, min(upper, current_val + increase))
         return
 
     # 2–5: decrease threshold
     if points == 2:
-        decrease = random.randint(5, 15)
+        decrease = random.randint(3, 8)
     elif points == 3:
-        decrease = random.randint(10, 15)
+        decrease = random.randint(5, 11)
     elif points == 4:
-        decrease = random.randint(10, 20)
+        decrease = random.randint(5, 15)
     elif points == 5:
-        decrease = random.randint(15, 20)
+        decrease = random.randint(5, 20)
     else:
-        decrease = random.randint(15, 20)
+        decrease = random.randint(5, 20)
     team["shot_threshold"] = max(lower, min(upper, current_val - decrease))
 
 
@@ -1562,9 +1556,9 @@ def _apply_breaks_effect(
     - 0: random.choice([0.85, 0.9, 0.95]) - applied to all positive increments
     - 1: random.choice([0.9, 0.95, 1, 1, 1])
     - 2: random.choice([1, 1, 1.05, 1.1])
-    - 3: random.choice([1, 1.05, 1.1]), and team chemistry += random.randint(-1,1)
-    - 4: random.choice([1, 1.05, 1.1, 1.1]), and team chemistry += random.randint(-2,2), discipline += random.randint(-2,0), fight += random.randint(-2,0)
-    - 5: random.choice([1, 1.05, 1.1, 1.15]), and team chemistry += random.randint(-3,3), discipline += random.randint(-3,-1), fight += random.randint(-3,-1)
+    - 3: random.choice([1, 1.05, 1.1]), team chemistry += randint(-1,1), discipline/fight += randint(-1,0)
+    - 4: random.choice([1, 1.05, 1.1, 1.1]), team chemistry += randint(-2,1), discipline/fight += randint(-2,-1)
+    - 5: random.choice([1, 1.05, 1.1, 1.15]), team chemistry += randint(-3,1), discipline/fight += randint(-3,-1)
     
     Note: Only applies to positive increments (gains), not losses.
     Calculates change from original baseline, if positive, multiplies the increment by multiplier.
@@ -1582,22 +1576,34 @@ def _apply_breaks_effect(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
         )
-    elif breaks_points == 4:
-        multiplier = random.choice([1, 1.05, 1.1, 1.1])
-        # Also adjust team chemistry, discipline, and fight
-        team["team_chemistry"] += random.randint(-2, 2)
-        team["team_chemistry"] = max(
-            TEAM_ATTR_CLAMPS["team_chemistry"][0],
-            min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
-        )
         if "discipline" in team:
-            team["discipline"] += random.randint(-2, 0)
+            team["discipline"] += random.randint(-1, 0)
             team["discipline"] = max(
                 TEAM_ATTR_CLAMPS["discipline"][0],
                 min(TEAM_ATTR_CLAMPS["discipline"][1], team["discipline"])
             )
         if "fight" in team:
-            team["fight"] += random.randint(-2, 0)
+            team["fight"] += random.randint(-1, 0)
+            team["fight"] = max(
+                TEAM_ATTR_CLAMPS["fight"][0],
+                min(TEAM_ATTR_CLAMPS["fight"][1], team["fight"])
+            )
+    elif breaks_points == 4:
+        multiplier = random.choice([1, 1.05, 1.1, 1.1])
+        # Also adjust team chemistry, discipline, and fight
+        team["team_chemistry"] += random.randint(-2, 1)
+        team["team_chemistry"] = max(
+            TEAM_ATTR_CLAMPS["team_chemistry"][0],
+            min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
+        )
+        if "discipline" in team:
+            team["discipline"] += random.randint(-2, -1)
+            team["discipline"] = max(
+                TEAM_ATTR_CLAMPS["discipline"][0],
+                min(TEAM_ATTR_CLAMPS["discipline"][1], team["discipline"])
+            )
+        if "fight" in team:
+            team["fight"] += random.randint(-2, -1)
             team["fight"] = max(
                 TEAM_ATTR_CLAMPS["fight"][0],
                 min(TEAM_ATTR_CLAMPS["fight"][1], team["fight"])
@@ -1605,7 +1611,7 @@ def _apply_breaks_effect(
     elif breaks_points == 5:
         multiplier = random.choice([1, 1.05, 1.1, 1.15])
         # Also adjust team chemistry, discipline, and fight
-        team["team_chemistry"] += random.randint(-3, 3)
+        team["team_chemistry"] += random.randint(-3, 1)
         team["team_chemistry"] = max(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])
@@ -1625,7 +1631,7 @@ def _apply_breaks_effect(
     else:
         # For breaks > 5, use same as 5
         multiplier = random.choice([1, 1.05, 1.1, 1.15])
-        team["team_chemistry"] += random.randint(-3, 3)
+        team["team_chemistry"] += random.randint(-3, 1)
         team["team_chemistry"] = max(
             TEAM_ATTR_CLAMPS["team_chemistry"][0],
             min(TEAM_ATTR_CLAMPS["team_chemistry"][1], team["team_chemistry"])

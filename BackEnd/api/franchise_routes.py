@@ -1594,6 +1594,7 @@ def update_team_attributes_after_game(
     # Calculate attribute changes for each team. team_object_id = ObjectId for FTD; team_id_label = string for logging.
     def calculate_attr_changes(
         team_object_id,
+        opponent_team_object_id,
         team_id_label,
         is_winner,
         team_totals,
@@ -1624,13 +1625,28 @@ def update_team_attributes_after_game(
         # ✅ FTD: Get current team attributes from FTD collection (keyed by ObjectId)
         ftd_doc = franchise_team_data_collection.find_one(
             {"franchise_id": franchise_id, "team_id": team_object_id},
-            {"team_attributes": 1}
+            {"team_attributes": 1, "natl_rank": 1}
         )
         if not ftd_doc:
             logger.error(f"❌ [UPDATE-TEAM-ATTRS] FTD not found for franchise={franchise_id}, team={team_id_label}")
             return {}
         
         team_attrs = ftd_doc.get("team_attributes", {})
+        opponent_ftd_doc = {}
+        if opponent_team_object_id is not None:
+            opponent_ftd_doc = franchise_team_data_collection.find_one(
+                {"franchise_id": franchise_id, "team_id": opponent_team_object_id},
+                {"natl_rank": 1},
+            ) or {}
+
+        def _rank_value(doc: dict) -> int:
+            try:
+                return int(doc.get("natl_rank") or 999)
+            except (TypeError, ValueError):
+                return 999
+
+        team_rank = _rank_value(ftd_doc)
+        opponent_rank = _rank_value(opponent_ftd_doc)
 
         logger.warning(
             "🧪 [EOG-TEAM-INPUTS] team=%s winner=%s totals=%s opp_totals=%s scouting=%s opp_scouting=%s",
@@ -1698,11 +1714,11 @@ def update_team_attributes_after_game(
         else:
             changes["discipline"] = random.randint(-1, 0)
         
-        # fight: winning 0..+2, losing −3..−1
+        # fight: winning 0..+1, losing -1..0
         if is_winner:
-            changes["fight"] = random.randint(0, 2)
+            changes["fight"] = random.randint(0, 1)
         else:
-            changes["fight"] = random.randint(-3, -1)
+            changes["fight"] = random.randint(-1, 0)
         
         # rebound_modifier
         if treb > (opp_treb + 8):
@@ -1732,65 +1748,63 @@ def update_team_attributes_after_game(
         else:
             if offensive_play_count > 12:
                 changes["offensive_efficiency"] = random.randint(0, 1)
-            elif offensive_play_count > 7:
-                changes["offensive_efficiency"] = random.randint(-2, -1)
+            elif offensive_play_count > 10:
+                changes["offensive_efficiency"] = random.randint(-1, 0)
             else:
-                changes["offensive_efficiency"] = random.randint(-3, -2)
+                changes["offensive_efficiency"] = random.randint(-2, -1)
 
             if defensive_max_share <= 0.39:
                 changes["defensive_efficiency"] = random.randint(0, 1)
             elif defensive_max_share <= 0.49:
-                changes["defensive_efficiency"] = random.randint(-2, -1)
+                changes["defensive_efficiency"] = random.randint(-1, 0)
             else:
-                changes["defensive_efficiency"] = random.randint(-3, -2)
+                changes["defensive_efficiency"] = random.randint(-2, -1)
 
             if team_fb_max_share > 0.60:
-                changes["fb_efficiency"] = random.randint(-3, -2)
-            elif team_fb_max_share > 0.50:
                 changes["fb_efficiency"] = random.randint(-2, -1)
+            elif team_fb_max_share > 0.50:
+                changes["fb_efficiency"] = random.randint(-1, 0)
             else:
-                changes["fb_efficiency"] = random.randint(-1, 1)
+                changes["fb_efficiency"] = random.randint(0, 1)
 
             if opponent_fb_total > 15:
-                changes["fb_opp_modifier"] = random.randint(-3, -2)
-            elif opponent_fb_total > 10:
                 changes["fb_opp_modifier"] = random.randint(-2, -1)
+            elif opponent_fb_total > 10:
+                changes["fb_opp_modifier"] = random.randint(-1, 0)
             else:
                 changes["fb_opp_modifier"] = random.randint(0, 1)
 
             if team_pt_total > 20:
-                changes["pt_efficiency"] = random.randint(-3, -1)
-            elif team_pt_total > 16:
                 changes["pt_efficiency"] = random.randint(-2, -1)
-            elif team_pt_total <= 12:
-                changes["pt_efficiency"] = random.randint(0, 1)
+            elif team_pt_total > 16:
+                changes["pt_efficiency"] = random.randint(-1, 0)
             else:
-                # 13–16 attempts (between ≤12 and >16 bands in EOG doc).
                 changes["pt_efficiency"] = random.randint(0, 1)
 
             if opponent_pt_total > 16:
-                changes["pt_opp_modifier"] = random.randint(-3, -2)
-            elif opponent_pt_total > 12:
                 changes["pt_opp_modifier"] = random.randint(-2, -1)
+            elif opponent_pt_total > 12:
+                changes["pt_opp_modifier"] = random.randint(-1, 0)
             else:
                 changes["pt_opp_modifier"] = random.randint(0, 1)
         
-        # team_chemistry
-        score_delta = winner_score - loser_score
+        # team_chemistry: rank-relative performance. Lower natl_rank integer is better.
         if is_winner:
-            if score_delta < 4:
-                changes["team_chemistry"] = random.randint(1, 2)
-            elif score_delta < 10:
-                changes["team_chemistry"] = random.randint(1, 3)
-            else:
+            if opponent_rank > team_rank:
+                changes["team_chemistry"] = random.randint(0, 1)
+            elif opponent_rank <= 10:
                 changes["team_chemistry"] = random.randint(2, 4)
-        else:
-            if score_delta < 4:
-                changes["team_chemistry"] = random.randint(-2, -1)
-            elif score_delta < 10:
-                changes["team_chemistry"] = random.randint(-3, -2)
             else:
+                changes["team_chemistry"] = random.randint(1, 2)
+        else:
+            if opponent_rank < team_rank and opponent_rank <= 10:
+                changes["team_chemistry"] = random.randint(-1, 0)
+            elif opponent_rank < team_rank:
+                changes["team_chemistry"] = random.randint(-2, 0)
+            elif 100 <= opponent_rank <= 128:
                 changes["team_chemistry"] = random.randint(-5, -3)
+            else:
+                changes["team_chemistry"] = random.randint(-3, -2)
 
         # Apply changes and clamp to valid ranges
         ftd_update = {}
@@ -1838,11 +1852,11 @@ def update_team_attributes_after_game(
     logger.info(f"🔍 [UPDATE-TEAM-ATTRS] Calculating changes - home_team_id={home_team_id}, away_team_id={away_team_id}, winner_id={winner_id}")
     
     home_changes = calculate_attr_changes(
-        home_oid, home_team_id, home_is_winner, home_totals, away_totals,
+        home_oid, away_oid, home_team_id, home_is_winner, home_totals, away_totals,
         home_scouting, away_scouting, home_team_obj, away_team_obj
     ) if home_oid else {}
     away_changes = calculate_attr_changes(
-        away_oid, away_team_id, away_is_winner, away_totals, home_totals,
+        away_oid, home_oid, away_team_id, away_is_winner, away_totals, home_totals,
         away_scouting, home_scouting, away_team_obj, home_team_obj
     ) if away_oid else {}
 

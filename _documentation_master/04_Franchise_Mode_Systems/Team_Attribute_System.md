@@ -136,29 +136,29 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 | Attribute | Direction | Rule (after clamp) |
 |-----------|-----------|---------------------|
-| **Offensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if total offensive **`times_run`** **> 12**; **−2…−1** if **> 7** (i.e. **8–12**); **−3…−2** if **≤ 7**. |
-| **Defensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if max HCO defense **`used`** share **≤ 39%**; **−2…−1** if **> 39%** and **≤ 49%**; **−3…−2** if **> 49%**. |
-| **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else Non-distant: **-1…+1** / **−2…−1** / **−3…−2** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
-| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else: **0…+1** if **≤ 12**; **0…+1** if **13–16**; **−2…−1** if **> 16** and **≤ 20**; **−3…−1** if **> 20**. |
-| **Fast break opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−2…−1** / **−3…−2** when opponent FB tries are **≤ 10** / **> 10** / **> 15**. |
-| **PT opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−2…−1** / **−3…−2** when opponent **`pt_total_attempts`** is **≤ 12** / **> 12** / **> 16**. |
-| **Fight** | **Up** if win (**0…+2**); **down** if lose (**−3…−1**) | Margin does not change fight; only W/L. |
+| **Offensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if total offensive **`times_run`** **> 12**; **−1…0** if **> 10**; **−2…−1** if **≤ 10**. |
+| **Defensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if max HCO defense **`used`** share **≤ 39%**; **−1…0** if **> 39%** and **≤ 49%**; **−2…−1** if **> 49%**. |
+| **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else Non-distant: **0…+1** / **−1…0** / **−2…−1** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
+| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else: **0…+1** if **≤ 16**; **−1…0** if **> 16** and **≤ 20**; **−2…−1** if **> 20**. |
+| **Fast break opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−1…0** / **−2…−1** when opponent FB tries are **≤ 10** / **> 10** / **> 15**. |
+| **PT opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−1…0** / **−2…−1** when opponent **`pt_total_attempts`** is **≤ 12** / **> 12** / **> 16**. |
+| **Fight** | **Up** if win (**0…+1**); **flat/down** if lose (**−1…0**) | Margin does not change fight; only W/L. |
 | **Discipline** | **Up** (**+1…+2**) if your **F + TO** is **lower** than opponent **F + TO + 8**. **Down** (**−3…−2**) if yours is **higher**. Else **down or flat** (**−1…0**) | “Lower fouls + turnovers (with buffer)” rewards discipline. |
-| **Team chemistry** | **Up** on win; **down** on loss | Win: **+1…+2** if margin **< 4**; **+1…+3** if **< 10**; **+2…+4** if blowout. Loss: **−2…−1** / **−3…−2** / **−5…−3** for the same margin bands. |
+| **Team chemistry** | **Rank-relative** | Based on opponent `natl_rank` where lower rank is better. Beat lower-ranked: **0…+1**; beat higher-ranked non-top-10: **+1…+2**; beat top-10: **+2…+4**. Lose to top-10: **−1…0**; lose to higher-ranked non-top-10: **−2…0**; lose to lower-ranked 100-128: **−5…−3**; lose to other lower-ranked: **−3…−2**. |
 | **Shot threshold** | See golf note | **FG% > 50%:** **down** (**−10…−5**) both teams. **FG% > 45% and ≤ 50%:** winner **down or flat** (**−5…0**), loser **up** (**0…+5**). **FG% ≤ 45%:** **up** (**+5…+10**) both. |
 | **Rebound modifier** | **Up** only with big edge; else **down** | **Up** (**+0.00…+0.05**) if your **DREB+OREB** **> opponent + 8**. **Down** (**−0.10…−0.05**) if **< opponent − 8**. Otherwise **down** (**−0.05…−0.01**). |
 
 #### Training
 
-**Install-driven attrs** (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `fb_opp_modifier`, `pt_efficiency`, `pt_opp_modifier`): each session uses that line’s **install points** (0–5). Random delta by bucket — **0 → down −2…−1**; **1 → up +1…+2**; **2 → up +2…+3**; **3 → up +3…+4**; **4 → up +3…+6**; **5 → up +3…+7**. Matching **Systems Coach** focus **multiplies positive deltas only** (×1.5–1.8 rounded down).
+**Install-driven attrs** (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `fb_opp_modifier`, `pt_efficiency`, `pt_opp_modifier`): each session uses that line’s **install points** (0–5). Random delta by bucket — **0 → down −3…−1**; **1 → −1…+1**; **2 → +1…+2**; **3 → +1…+3**; **4 → +1…+4**; **5 → +2…+5**. Matching **Systems Coach** focus **multiplies positive deltas only** (×1.5–1.8 rounded down).
 
 | Attribute | Direction | Rule |
 |-----------|-----------|------|
-| **Fight** | **Up, down, or mixed** by bucket | Effective points = **0.5× strength + 0.5× conditioning** (half-up) → bucket **0…5** random delta: **0 → −4…−3**; **1 → −1…+1**; **2 → 0…+2**; **3 → +1…+3**; **4 → +2…+4**; **5 → +3…+5**. **Culture Builder** (Inspire / Confidence / Community Engagement; not **Team Building**): **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** fight deltas. **Breaks 4:** fight **−2…0**; **breaks 5+:** **−3…−1**. |
-| **Discipline** | **Up, down, or mixed** by bucket | Effective points = **0.25×** (inside + outside defense + passing + ball handling), half-up → **same bucket table as Fight**. **Authoritarian** (Discipline / Rebounding / Execution; not **Teamwork**): **+1…+2** once. **Authoritarian–Discipline** focus: multiplies **positive** discipline deltas. **Breaks 4:** discipline **−2…0**; **breaks 5+:** **−3…−1**. |
-| **Team chemistry** | **Down** at 0 pts mix; **up** at 1+ | Chemistry-weighted sum: **free throws ×0.25 + film ×0.25 + scrimmages ×0.5**, rounded half-up → bucket: **0 → down −3…−1**; **1 → up +1…+2**; **2 → +2…+3**; **3 → +3…+4**; **4 → +3…+6**; **5 → +3…+7**. **Team Building** focus: **+1…+3** once. **Authoritarian–Teamwork** focus: **+1…+2** once. **Culture Builder–Inspire:** multiplies **positive** chemistry deltas. **Breaks 3:** **±1**; **breaks 4:** **±2**; **breaks 5+:** **±3** (applied to chemistry after other training, then clamped). |
-| **Shot threshold** | Scrimmages only | **0 pts → up +5…+10** (worse). **1 → down or flat −5…0**. **2 → down −5…−15**; **3 → −10…−15**; **4 → −10…−20**; **5+ → −15…−20** (larger scrimmage = more **down** = better golf score). **Breaks** can scale how much of a **session “gain”** sticks (for shot threshold, a **decrease** counts as a gain). |
-| **Rebound modifier** | **Up** only (no install path) | **Rebounding drill:** half-up(**0.5 × rebounding points**), then by bucket: **1–2 → +0.01…+0.05**; **3–4 → +0.04…+0.08**; **5+ → +0.06…+0.10**. **Scrimmages slice** uses half-up(**0.5 × scrimmage points**): **1–2 → +0.00…+0.03**; **3–4 → +0.03…+0.05**; **5+ → +0.04…+0.07**. **Authoritarian–Rebounding** / focus match can **amplify positive** rebound bumps. |
+| **Fight** | **Up, down, or mixed** by bucket | Effective points = **0.5× strength + 0.5× conditioning** (half-up) → bucket **0…5** random delta: **0 → −4…−3**; **1 → −1…+1**; **2 → 0…+2**; **3 → +1…+3**; **4 → +2…+4**; **5 → +3…+5**. **Culture Builder** (Inspire / Confidence / Community Engagement; not **Team Building**): **+1…+2** once. **Authoritarian** except **Rebounding**: **−2…−1** once. **Authoritarian–Discipline** focus: multiplies **positive** fight deltas. **Breaks 3:** fight **−1…0**; **breaks 4:** **−2…−1**; **breaks 5+:** **−3…−1**. |
+| **Discipline** | **Up, down, or mixed** by bucket | Effective points = **0.25×** (inside + outside defense + passing + ball handling), half-up → **same bucket table as Fight**. **Authoritarian** (Discipline / Rebounding / Execution; not **Teamwork**): **+1…+2** once. **Culture Builder** except **Confidence**: **−2…−1** once. **Authoritarian–Discipline** focus: multiplies **positive** discipline deltas. **Breaks 3:** discipline **−1…0**; **breaks 4:** **−2…−1**; **breaks 5+:** **−3…−1**. |
+| **Team chemistry** | **Down** at 0 pts mix; **up** at 1+ | Chemistry-weighted sum: **free throws ×0.25 + film ×0.25 + scrimmages ×0.5**, rounded half-up → bucket: **0 → down −3…−1**; **1 → up +1…+2**; **2 → +2…+3**; **3 → +3…+4**; **4 → +3…+6**; **5 → +3…+7**. **Team Building** focus: **+1…+3** once. **Authoritarian–Teamwork** focus: **0…+1** once. **Culture Builder–Inspire:** multiplies **positive** chemistry deltas. **Breaks 3:** **−1…+1**; **breaks 4:** **−2…+1**; **breaks 5+:** **−3…+1**. |
+| **Shot threshold** | Scrimmages only | **0 pts → up +5…+15** (worse). **1 → up/flat 0…+5**. **2 → down −3…−8**; **3 → −5…−11**; **4 → −5…−15**; **5+ → −5…−20** (larger scrimmage = more **down** = better golf score). **Breaks** can scale how much of a **session “gain”** sticks (for shot threshold, a **decrease** counts as a gain). |
+| **Rebound modifier** | **Up or down** | **Rebounding drill and scrimmages:** half-up(**0.5 × points**) then same bucket table: **<1 effective point → −0.05…−0.03**; **1–2 → −0.03…+0.03**; **3–4 → +0.03…+0.05**; **5+ → +0.03…+0.10**. **Authoritarian–Rebounding** / focus match can **amplify positive** rebound bumps. |
 
 **Breaks (training, all attrs above):** **0–2** mostly changes a **multiplier** on **positive** session gains (player attrs + team attrs; for **shot_threshold**, a **decrease** is treated as a positive gain). **3+** adds the **team chemistry** random shifts in the table; **4–5** also applies the **discipline** and **fight** **down** ranges in the Fight/Discipline rows.
 
@@ -186,7 +186,7 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 **Notes**
 - **Initial seed:** Included below for completeness. It sets the franchise starting baseline, but is not a progression faucet/sink after the team already exists.
-- **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry` at 3-5 points and to `discipline` / `fight` at 4-5 points.
+- **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry`, `discipline`, and `fight` at 3+ points.
 - **CPU teams:** When the user runs training, non-user teams use distant-training templates. Those template deltas are database-driven and can be positive or negative for any standard team attribute except `momentum_score`.
 
 ### Shooting (`shot_threshold`) (range: 20 to 220)
@@ -208,13 +208,13 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 - Initial seed: Franchise init / missing-FTD creation (`range: 130 to 140`, random).
 - Faucet: Training System / Scrimmages.
   Condition: `scrimmages` slider at `0`.
-  Range: `0 pts -> +5 to +10` (worse shooting attribute).
+  Range: `0 pts -> +5 to +15` (worse shooting attribute).
 - Faucet / slight sink: Training System / Scrimmages.
   Condition: `scrimmages` at `1` pt.
-  Range: `+= random.randint(-5, 0)` (neutral to slight improvement).
+  Range: `+= random.randint(0, 5)` (neutral to slight worsening).
 - Sink: Training System / Scrimmages.
   Condition: `scrimmages` at `2+` pts.
-  Range: `2 pts -> -5 to -15`, `3 pts -> -10 to -15`, `4 pts -> -10 to -20`, `5+ pts -> -15 to -20`.
+  Range: `2 pts -> -3 to -8`, `3 pts -> -5 to -11`, `4 pts -> -5 to -15`, `5+ pts -> -5 to -20`.
 - Faucet: End Of Game System.
   Condition: team FG% `<= 45%`.
   Range: **both** teams `+5 to +10`.
@@ -233,10 +233,10 @@ This is the team's intangible mindset when it comes to rebounding. Their overall
 - Initial seed: Franchise init / missing-FTD creation (`0.2` fixed).
 - Faucet: Training System / Rebounding drill.
   Condition: `rebounding` slider contributes rounded effective points.
-  Range: `1-2 effective pts -> +0.01 to +0.05`, `3-4 -> +0.04 to +0.08`, `5+ -> +0.06 to +0.10`.
+  Range: `<1 effective pt -> -0.05 to -0.03`, `1-2 -> -0.03 to +0.03`, `3-4 -> +0.03 to +0.05`, `5+ -> +0.03 to +0.10`.
 - Faucet + Sink: Training System / Scrimmages.
   Condition: scrimmages contributes rounded effective points.
-  Range: `1-2 effective pts -> +0.00 to +0.03`, `3-4 -> +0.03 to +0.05`, `5+ -> +0.04 to +0.07`.
+  Range: `<1 effective pt -> -0.05 to -0.03`, `1-2 -> -0.03 to +0.03`, `3-4 -> +0.03 to +0.05`, `5+ -> +0.03 to +0.10`.
 - Faucet + Sink: End Of Game System.
   Condition: compare team TREB to opponent TREB.
   <!-- Range: `> opp + 5 -> +0.00 to +0.10`, `< opp - 5 -> -0.10 to +0.00`, otherwise `-0.05 to +0.05`. -->
@@ -248,12 +248,12 @@ This is how well your team executes the Xs & Os of your offense — running play
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet + Sink: Training System / Offense Install.
   Condition: offense install slider `0-5`.
-  Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
+  Range: `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`.
 - Sink: End Of Game System.
   Condition: every completed franchise game (non-distant); sum of offensive `times_run` across playbook rows.
   If total > 12: Range: `0 to +1`
-  Elif total > 7 (i.e. 8–12): Range: `-2 to -1`
-  Else (≤ 7): Range: `-3 to -2`
+  Elif total > 10 (i.e. 11–12): Range: `-1 to 0`
+  Else (≤ 10): Range: `-2 to -1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -264,12 +264,12 @@ This is how well your team executes the Xs & Os of your defense — rotating on 
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet + Sink: Training System / Defense Install.
   Condition: defense install slider `0-5`.
-  Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
+  Range: `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`.
 - Sink: End Of Game System.
   Condition: every completed franchise game (non-distant); max HCO defense `used` share among `man` / `2-3-zone` / `3-2-zone` / `1-3-1-zone`.
   If max share ≤ 39%: Range: `0 to +1`
-  Elif max share ≤ 49%: Range: `-2 to -1`
-  Else (> 49%): Range: `-3 to -2`
+  Elif max share ≤ 49%: Range: `-1 to 0`
+  Else (> 49%): Range: `-2 to -1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -280,12 +280,12 @@ This is how well your team executes in transition — pushing the pace, hitting 
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet + Sink: Training System / Fast Break Offense Install.
   Condition: fast-break offense install slider `0-5`.
-  Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
+  Range: `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
   Condition: every completed franchise game (non-distant)
-  If any one Fast Break Play > 60% of Fast Break tries: Range: `-3 to -2`
-  Elif any one Fast Break Play > 50%: Range: `-2 to -1`
-  Else: Range: `-1 to +1`
+  If any one Fast Break Play > 60% of Fast Break tries: Range: `-2 to -1`
+  Elif any one Fast Break Play > 50%: Range: `-1 to 0`
+  Else: Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -296,13 +296,12 @@ This is how well your team executes full court presses and half court traps — 
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet + Sink: Training System / P/T Defense Install.
   Condition: press/trap defense install slider `0-5`.
-  Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
+  Range: `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
   Condition: every completed franchise game (non-distant); team HCT + FCP uses.
-  If total > 20: Range: `-3 to -1`
-  Elif total > 16: Range: `-2 to -1`
-  Elif total ≤ 12: Range: `0 to +1`
-  Else (13–16 attempts): Range: `0 to +1`
+  If total > 20: Range: `-2 to -1`
+  Elif total > 16: Range: `-1 to 0`
+  Else: Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
@@ -315,16 +314,18 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
   Condition: strength and conditioning contribute positive rounded effective points.
   Range (shared fight/discipline bucket table after 0.5× accrual rounds): `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`.
 - Sink: Training System / Breaks.
-  Condition: `breaks` slider at `4` or `5`.
-  Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
+  Condition: `breaks` slider at `3+`.
+  Range: `3 pts -> -1 to 0`, `4 pts -> -2 to -1`, `5+ pts -> -3 to -1`.
 - Faucet: Training System / Coaching Focus
   If the user chooses **Culture Builder** — **Inspire**, **Confidence**, or **Community Engagement** (not **Team Building**): Range: `+1 to +2`
+- Sink: Training System / Coaching Focus
+  If the user chooses **Authoritarian** except **Rebounding**: Range: `-2 to -1`
 - Faucet: End Of Game System.
   Condition: team won the game.
-  Range: `0 to +2`.
+  Range: `0 to +1`.
 - Sink: End Of Game System.
   Condition: team lost the game.
-  Range: `-3 to -1`.
+  Range: `-1 to 0`.
 
 ### Discipline (`discipline`) (range: -10 to 10)
 Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight very well — aggression without structure becomes chaos. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
@@ -334,10 +335,12 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
   Condition: those drills contribute positive rounded effective points (0.25× per drill point, summed, half-up).
   Range: same bucket table as **Fight** after rounding: `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`.
 - Sink: Training System / Breaks.
-  Condition: `breaks` slider at `4` or `5`.
-  Range: `4 pts -> -2 to 0`, `5 pts -> -3 to -1`.
+  Condition: `breaks` slider at `3+`.
+  Range: `3 pts -> -1 to 0`, `4 pts -> -2 to -1`, `5+ pts -> -3 to -1`.
 - Faucet: Training System / Coaching Focus
   If the user chooses **Authoritarian** — **Discipline**, **Rebounding**, or **Execution** (not **Teamwork**): Range: `+1 to +2`
+- Sink: Training System / Coaching Focus
+  If the user chooses **Culture Builder** except **Confidence**: Range: `-2 to -1`
 - Faucet: End Of Game System.
   Condition: team `(F + TO)` is lower than opponent `(F + TO)` + 8.
   Range: `+1 to +2`.
@@ -365,20 +368,17 @@ The connective tissue of your roster. Chemistry influences how well players supp
   Condition: those drills contribute positive rounded effective points.
   Range: standard team-attr training range after rounding: `0 -> -3 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
 - Faucet + Sink: Training System / Breaks.
-  Condition: `breaks` slider at `4` or `5`.
-  Range: `3 pts -> -1 to +1`, `4 pts -> -2 to +2`, `5 pts -> -3 to +3`.
+  Condition: `breaks` slider at `3+`.
+  Range: `3 pts -> -1 to +1`, `4 pts -> -2 to +1`, `5+ pts -> -3 to +1`.
 - Faucet: Training System / Team Building.
   Condition: coaching focus = `culture-builder-teamwork`.
   Range: `+1 to +3`.
 - Faucet: Training System / Authoritarian Teamwork.
   Condition: coaching focus = `authoritarian-teamwork`.
-  Range: `+1 to +2`.
-- Faucet: End Of Game System.
-  Condition: team won the game.
-  Range: score delta `<4 -> +1 to +2`, `<10 -> +1 to +3`, `>=10 -> +2 to +4`.
-- Sink: End Of Game System.
-  Condition: team lost the game.
-  Range: score delta `<4 -> -2 to -1`, `<10 -> -3 to -2`, `>=10 -> -5 to -3`.
+  Range: `0 to +1`.
+- Faucet + Sink: End Of Game System.
+  Condition: rank-relative result using `natl_rank` (lower integer is better; missing rank = 999).
+  Range: beat lower-ranked `0 to +1`; beat higher-ranked non-top-10 `+1 to +2`; beat top-10 `+2 to +4`; lose to top-10 `-1 to 0`; lose to higher-ranked non-top-10 `-2 to 0`; lose to lower-ranked 100-128 `-5 to -3`; lose to other lower-ranked `-3 to -2`.
 
 ### FB Opp Modifier (`fb_opp_modifier`) (range: -10 to 10)
 This is how well your team defends fast breaks and transition offenses. Containing the pace, cutting off passing lanes, and not allowing easy transition buckets. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Fast Break Defense install and film study of your opponent.
@@ -386,11 +386,11 @@ This is how well your team defends fast breaks and transition offenses. Containi
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet + Sink: Training System / Fast Break Defense Install.
   Condition: fast-break defense install slider `0-5`.
-  Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
+  Range: `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
   Condition: every completed franchise game (non-distant); opponent fast-break try total.
-  If opponent tries > 15: Range: `-3 to -2`
-  Elif opponent tries > 10: Range: `-2 to -1`
+  If opponent tries > 15: Range: `-2 to -1`
+  Elif opponent tries > 10: Range: `-1 to 0`
   Else: Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.
@@ -402,11 +402,11 @@ This is how well your team and work through your opponent's presses and traps. H
 - Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
 - Faucet + Sink: Training System / P/T Offense Install.
   Condition: press/trap offense install slider `0-5`.
-  Range: `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`.
+  Range: `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
   Condition: every completed franchise game (non-distant); opponent HCT + FCP uses.
-  If opponent uses > 16: Range: `-3 to -2`
-  Elif opponent uses > 12: Range: `-2 to -1`
+  If opponent uses > 16: Range: `-2 to -1`
+  Elif opponent uses > 12: Range: `-1 to 0`
   Else: Range: `0 to +1`
 - Faucet + Sink: End Of Game System / distant-sim override.
   Condition: distant-simmed franchise games only.

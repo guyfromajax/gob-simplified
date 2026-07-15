@@ -377,7 +377,7 @@ Traning Camp Height / Weight bonsuses
 
 **Team Attributes (training ranges by group):**
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
-  `0 -> -2 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`
+  `0 -> -3 to -1`, `1 -> -1 to +1`, `2 -> +1 to +2`, `3 -> +1 to +3`, `4 -> +1 to +4`, `5 -> +2 to +5`
 - `fight` and `discipline` (same bucket table after their respective 0.5× / 0.25× accruals round to 0–5):
   `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`
   - **Fight:** Strength + Conditioning → sum × **0.5**, half-up → `_apply_team_training_points(..., "fight", ...)`.
@@ -386,22 +386,24 @@ Traning Camp Height / Weight bonsuses
   `0 -> -3 to -1`, `1 -> +1 to +2`, `2 -> +2 to +3`, `3 -> +3 to +4`, `4 -> +3 to +6`, `5 -> +3 to +7`
 
 **Rebound Modifier (Technical Drills - in 0.01 increments):**
-- `1-2 points -> +0.01 to +0.05`
-- `3-4 points -> +0.04 to +0.08`
-- `5+ points -> +0.06 to +0.10`
+- `<1 effective point -> -0.05 to -0.03`
+- `1-2 effective points -> -0.03 to +0.03`
+- `3-4 effective points -> +0.03 to +0.05`
+- `5+ effective points -> +0.03 to +0.10`
 
 **Rebound Modifier (Scrimmages - in 0.01 increments):**
-- `1-2 points -> +0.00 to +0.03`
-- `3-4 points -> +0.03 to +0.05`
-- `5+ points -> +0.04 to +0.07`
+- `<1 effective point -> -0.05 to -0.03`
+- `1-2 effective points -> -0.03 to +0.03`
+- `3-4 effective points -> +0.03 to +0.05`
+- `5+ effective points -> +0.03 to +0.10`
 
 **Shot Threshold:**
-- 0 points: `+= random.randint(5, 10)`
-- 1 point: `+= random.randint(-5, 0)`
-- 2 points: `-= random.randint(5, 15)`
-- 3 points: `-= random.randint(10, 15)`
-- 4 points: `-= random.randint(10, 20)`
-- 5+ points: `-= random.randint(15, 20)`
+- 0 points: `+= random.randint(5, 15)`
+- 1 point: `+= random.randint(0, 5)`
+- 2 points: `-= random.randint(3, 8)`
+- 3 points: `-= random.randint(5, 11)`
+- 4 points: `-= random.randint(5, 15)`
+- 5+ points: `-= random.randint(5, 20)`
 
 #### Coaching Focus Amplifiers
 
@@ -415,7 +417,7 @@ Traning Camp Height / Weight bonsuses
 **Authoritarian (all four sub-options implemented):**
 - **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(1, 2)` once per training session (shared with Rebounding and Execution only — not Teamwork).
 - **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*). Receives the shared flat `discipline += random.randint(1, 2)` once per session.
-- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus. Adds flat **`team_chemistry += random.randint(1, 2)`** once per session (clamped). Does **not** add the shared Authoritarian **discipline** flat.
+- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus. Adds flat **`team_chemistry += random.randint(0, 1)`** once per session (clamped). Does **not** add the shared Authoritarian **discipline** flat.
 - **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus. Receives the shared flat `discipline += random.randint(1, 2)` once per session.
 
 **Systems Coach:**
@@ -435,6 +437,8 @@ Traning Camp Height / Weight bonsuses
 - **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged. Does **not** add the shared Culture Builder **`fight`** flat (that applies only to Inspire, Confidence, and Community Engagement).
 - **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). No flat EM/MO block; no Inspire-style team chemistry mult.
 - **Inspire**, **Confidence**, and **Community Engagement** also add flat **`fight += random.randint(1, 2)`** once per training session (Culture Builder shared block; Team Building excluded).
+- **Culture Builder**, except **Confidence**, also adds flat **`discipline += random.randint(-2, -1)`** once per training session.
+- **Authoritarian**, except **Rebounding**, also adds flat **`fight += random.randint(-2, -1)`** once per training session.
 
 #### Breaks Effect
 
@@ -442,9 +446,9 @@ The "Breaks" slider applies a multiplier to all positive gains (not losses):
 - 0 points: `random.choice([0.85, 0.9, 0.95])`
 - 1 point: `random.choice([0.9, 0.95, 1, 1, 1])`
 - 2 points: `random.choice([1, 1, 1.05, 1.1])`
-- 3 points: `random.choice([1, 1.05, 1.1])` + Team Chemistry `+= random.randint(-1, 1)`
-- 4 points: `random.choice([1, 1.05, 1.1, 1.1])` + Team Chemistry `+= random.randint(-2, 2)` + Discipline `+= random.randint(-2, 0)` + Fight `+= random.randint(-2, 0)`
-- 5 points: `random.choice([1, 1.05, 1.1, 1.15])` + Team Chemistry `+= random.randint(-3, 3)` + Discipline `+= random.randint(-3, -1)` + Fight `+= random.randint(-3, -1)`
+- 3 points: `random.choice([1, 1.05, 1.1])` + Team Chemistry `+= random.randint(-1, 1)` + Discipline/Fight `+= random.randint(-1, 0)`
+- 4 points: `random.choice([1, 1.05, 1.1, 1.1])` + Team Chemistry `+= random.randint(-2, 1)` + Discipline/Fight `+= random.randint(-2, -1)`
+- 5+ points: `random.choice([1, 1.05, 1.1, 1.15])` + Team Chemistry `+= random.randint(-3, 1)` + Discipline/Fight `+= random.randint(-3, -1)`
 
 #### NG Reduction from Scrimmages and Conditioning
 
