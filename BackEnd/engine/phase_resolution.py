@@ -6196,9 +6196,10 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     off_eff, def_eff, _a_def_xy, _a_coord, random, zone=zone,
                     defense_playcall=game_state.get("defense_playcall"))
                 # DIAG (S3 altered actions) — one line per SM so the gate chain is traceable end to end.
-                _rd = ", ".join(f"{d}:{'stick' if v else 'FREEZE'}" for d, v in (_alt_reads or {}).items())
+                # read True = defender reacts (man: sticks/covers, zone: adjusts); False = holds/frozen.
+                _rd = ", ".join(f"{d}:{'react' if v else 'HOLD'}" for d, v in (_alt_reads or {}).items())
                 logging.warning(
-                    f"🎬 [ALT] SM: cutters={list(_alt_moves)} reads=[{_rd}] "
+                    f"🎬 [ALT {'zone' if zone else 'man'}] SM: cutters={list(_alt_moves)} reads=[{_rd}] "
                     f"open={ {p: round(o) for p, o in (_alt_open or {}).items()} }"
                 )
             else:
