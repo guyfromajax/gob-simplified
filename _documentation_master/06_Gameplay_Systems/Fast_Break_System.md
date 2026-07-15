@@ -964,14 +964,18 @@ positions (no movement during the shot step).
 
 ## Feature flags (per-FB revert)
 
-`BackEnd/constants/__init__.py`:
+`USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `_CR` were **retired** (UESS Phase 4). Live RR/CR shot spots come from drive resolution (`_compute_bh_target` / `fb_drive`). `compute_fb_shot_geometry` remains for broken-HCT FB and the after-steal legacy path.
+
+Drive-resolution safety switches (still reversible):
 
 ```python
-USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR = True   # set False to revert RR to legacy
-USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR = True   # set False to revert CR to legacy
+USE_FB_DRIVE_RESOLUTION_AFTER_STEAL = True
+USE_FB_DRIVE_RESOLUTION_CR = True
+USE_FB_DRIVE_RESOLUTION_RR = True
+USE_FB_DRIVE_RESOLUTION_TRIANGLE = True
 ```
 
-Steal-FB always uses the helper; Triangle is intentionally untouched.
+Steal-FB live path uses drive resolution when the after-steal flag is on; Triangle contest uses the RR/Triangle drive flag.
 
 ## Function signature
 

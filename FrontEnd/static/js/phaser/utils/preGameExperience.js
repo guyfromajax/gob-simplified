@@ -439,6 +439,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
     title.textContent = `${String(awayName).toUpperCase()}  @  ${String(homeName).toUpperCase()}`;
     cta.textContent = "Submit & Tip Off";
     cta.classList.add("show");
+    playPregameRevealClick(scene);
     paintSlots();
   }
 

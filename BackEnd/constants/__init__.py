@@ -309,18 +309,10 @@ FB_PASS_MIN_GAME_SECONDS = 0.5                  # T floor for FB pass steps (sho
 # the upper bound the pacing uses to size the handoff for the fit-or-FLSS gate.
 FINAL_TURN_HANDOFF_CONVERGE_GRID = 6.0
 
-# Universal Fast Break shot geometry feature flags. When True, the FB
-# resolver replaces its legacy shot location + shot defender selection +
-# contested decision with the universal helper in
-# BackEnd/utils/fast_break_shot_geometry.py. Flip to False to revert to
-# legacy on a per-FB basis. Steal-FB always uses the helper; Triangle is
-# intentionally untouched. See:
-#   _documentation_master/00_General_Systems/Step_By_Step_System.md
-#   _documentation_master/05_GP_Supporting_Systems/Fast_Break_System.md
-# NOTE: the RR flag was retired (UESS Phase 4) — Rim Runner now resolves its
-# shot spot via the drive resolver + rim-relative `_compute_bh_target`; the
-# legacy `_apply_universal_geometry_for_rr_shot` adapter was removed.
-USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR = True
+# Universal FB shot-geometry flags (USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR / _CR)
+# retired in UESS Phase 4. Live RR/CR shot spots come from drive resolution
+# (`_compute_bh_target` / fb_drive). `compute_fb_shot_geometry` remains for
+# broken-HCT FB (`dynamic_hct_shot.py`) and the after-steal legacy path.
 
 # FB Drive Cutoff & Stop Decision — per-play rollout (see FB_Drive_Cutoff_Work_Plan.md)
 USE_FB_DRIVE_RESOLUTION_AFTER_STEAL = True

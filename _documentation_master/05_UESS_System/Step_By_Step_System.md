@@ -415,7 +415,7 @@ the result of these stages.)
   transition to HCO). `stopper_id` is set.
 - If BH wins: `hold_up=False`, proceed to stage 2.
 
-**Stage 2: Shot location** (universal helper — gated by `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `_CR`)
+**Stage 2: Shot location** (rim-relative / drive-resolution for live RR/CR; `compute_fb_shot_geometry` for broken-HCT FB and after-steal legacy — `USE_UNIVERSAL_FB_SHOT_GEOMETRY_*` flags retired)
 - New: shooter target = `basket_x ± random(2, 4)` toward center,
   `y = random.randint(19, 31)`. Replaces the play-specific shot spot.
 - Legacy path preserved behind the flag for revert.

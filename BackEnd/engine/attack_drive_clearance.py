@@ -473,6 +473,7 @@ def _compute_drive_scores(
 # roll yields the tier + stop point + contact outcome, tuned via the shared HCT_D8_* levels. This
 # retires S2a's `_classify_drive_tier` + the `DRIVE_TIER_*` band/lean constants (never consumed).
 DRIVE_NEUTRAL_STOP_FRACTION = 0.5   # Tier B (contested NEUTRAL): BH pulls up ~midway to the rim
+DRIVE_STOPPED_MAX_GRID = 2.0        # Tier C (defense WINS): BH advances AT MOST this many grid before the wall
 # Win/lose gate width for the HCO drive contest (± each way, in o_score/d_score points). The shared
 # default (chem+eff, a few pts) makes the neutral tier vanishingly rare; ~100 gives B real presence.
 # Tunable (S2f). Passed to `_resolve_moment(neutral_band=...)`; FB/HCT keep the chem+eff default.
@@ -1126,7 +1127,15 @@ def build_attack_drive_sequence(
     _stop_shot_type = None
     _stop_shot_playcall = None
     if _three_tier and drive_tier in ("B", "C") and drive_stop_fraction < 1.0:
-        _bh_stop = _drive_stop_coord(driver_start, drive_end, drive_stop_fraction)
+        if drive_tier == "C":
+            # Defense WON — the BH is walled almost at once: cap his advance to an ABSOLUTE 0–2 grid
+            # (scaled by how narrowly he was stopped), NOT a fraction of the full drive (which let a
+            # narrow stop carry him most of the way in). Fixes "Nice Stop but the driver kept going".
+            _full = math.hypot(drive_end["x"] - driver_start["x"], drive_end["y"] - driver_start["y"])
+            _cap_frac = min(1.0, (drive_stop_fraction * DRIVE_STOPPED_MAX_GRID) / _full) if _full > 1e-6 else 0.0
+            _bh_stop = _drive_stop_coord(driver_start, drive_end, _cap_frac)
+        else:
+            _bh_stop = _drive_stop_coord(driver_start, drive_end, drive_stop_fraction)  # B: contested pull-up midway
         _stop_shot_type, _stop_shot_playcall = _shot_type_for_coords(_bh_stop, is_away_offense)
         drive_end_by_pos[ball_handler_pos] = {"location": destination_location, "coords": _bh_stop}
         drive_pos_actions[ball_handler_pos] = _pos_action_for_target(

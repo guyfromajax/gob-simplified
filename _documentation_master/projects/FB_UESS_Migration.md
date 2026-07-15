@@ -1,6 +1,6 @@
 # Fast Break → Full UESS Compliance Migration
 
-**Status:** Proposed work plan (not started)
+**Status:** Phases 0–5 + post–Phase 5 helpers DONE. Phase 4 CR universal geometry retired (2026-07). Remaining: optional `USE_FB_DRIVE_RESOLUTION_*` collapse + RR `bh_start` meet-point residual.
 **Owner:** TBD
 **Scope:** Make all Fast Break (FB) **backend logic** source player coordinates from the same live/shared state the UESS animation renders from, and close the remaining frontend fallback/observability gaps.
 
@@ -57,8 +57,8 @@ Legend: 🟢 compliant (live/shared/geometric) · 🔴 gap (reads legacy animato
 ### Dead code / latent gaps (only reachable if flags flip off)
 
 - ✅ ~~`_apply_universal_geometry_for_rr_shot`~~ **removed (Phase 4)** along with its 3 dead call sites and the `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` flag. RR's legacy fallback now goes straight to `resolve_shot` with the rim-relative `roles["shot_spot"]`. Note: `compute_fb_shot_geometry` itself is **kept** — it is still live via `dynamic_hct_shot.py` (broken-HCT FB) and the legacy after-steal path.
-- ⚫ `phase_resolution.py:2026-2148` ("FB UNIVERSAL CR" legacy SHOT branch) sources `cr_shooter_start`/`cr_defender_starts` from `fb_animations`. Dead while `USE_FB_DRIVE_RESOLUTION_CR = True`. *(Not removed — CR flag retirement deferred; tracked below.)*
-- ⚫ `covert_release_step_emitter._build_outcome_step` (`:1084-1148`) reads `turn_result["animations"]`. Dead while CR routes to `_build_cr_drive_resolution_animation_steps`.
+- ✅ ~~`phase_resolution.py` "FB UNIVERSAL CR" SHOT branch + `USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR`~~ **removed (Phase 4, 2026-07)**. Live CR never reached it (`USE_FB_DRIVE_RESOLUTION_CR`); legacy flag-off CR SHOT now uses animator `_bh_final_*` / `roles["shot_spot"]` only.
+- ⚫ `covert_release_step_emitter._build_outcome_step` reads `turn_result["animations"]`. Dead while CR routes to `_build_cr_drive_resolution_animation_steps` (`USE_FB_DRIVE_RESOLUTION_CR`).
 
 ---
 
@@ -99,7 +99,7 @@ This is why Candidates A/B (`player.coords` / `off_starts`) were rejected: for R
 **Resolution.** All three RR shot seams in `rim_runner_fast_break.py` (fb_open-with-defender, catch-and-shoot, completion) now set `roles["shot_spot"] = _compute_bh_target(is_away_offense)` — the same rim-relative helper CR and After-Steal use (`x = 91-(2..4)` home / `9+(2..4)` away, `y ∈ [19,31]`). Per the decision recorded in scope, RR adopts **rim-relative** geometry (not Triangle's HCO string spots). Computed once per turn so the pre-shot snapshot, drive resolver (`shot_spot` → `target`), and legacy fallback all share one geometric spot.
 
 - **Behavior note:** value-correcting — the shot spot is now deterministic rim-relative geometry instead of the animator-written `_bh_final_x/_y` catch/heuristic coord that produced the "shot from the complete other side of the court" class of bugs.
-- The `_bh_final_x/_y` keys are still stamped by the animator but are **no longer read** by RR logic. Remaining reads live only in the legacy CR/universal branch (`phase_resolution.py`), addressed in Phase 4.
+- The `_bh_final_x/_y` keys are still stamped by the animator but are **no longer read** by RR logic. Remaining `_bh_final` reads live only in the legacy CR flag-off SHOT branch (`phase_resolution.py`); the dead `USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR` overlay was removed in Phase 4.
 - **Tests:** `tests/test_rr_triangle_drive_resolution.py::test_rr_shot_spot_is_rim_relative_not_animator_packet` (parametrized home/away; asserts the spot the RR seams stamp is within 2–4 grid of the attacking rim, never backcourt).
 
 ### Phase 3 — Retire `capture_fast_break_animation` from the RR/Triangle **logic** path (DONE)
@@ -118,21 +118,21 @@ This is why Candidates A/B (`player.coords` / `off_starts`) were rejected: for R
 - **Acceptance met:** `rg` shows zero logic reads of `fb_animations` / `_bh_final_*` on RR/Triangle; emitters seed from live `player.coords` / geometry (`rim_runner_step_emitter._all_player_start_coords`, `triangle_step_emitter`).
 - **Tests:** `tests/test_rr_triangle_drive_resolution.py::test_resolver_ignores_animation_packet_for_logic` (empty `fb_animations` still resolves; packet passes through only as the render artifact).
 
-### Phase 4 — Dead-code removal & flag retirement (PARTIAL — RR-scoped DONE)
-Scoped to the RR-specific dead code per decision (full flag retirement deferred — see below).
+### Phase 4 — Dead-code removal & flag retirement (PARTIAL — universal geometry DONE)
+Universal shot-geometry flags fully retired; drive-resolution safety switches still kept.
 
-**Done (RR-scoped):**
-- Removed `_apply_universal_geometry_for_rr_shot` (function + all 3 dead call sites in `rim_runner_fast_break.py`) and the now-unused `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` import.
-- Retired the `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` flag constant (`BackEnd/constants/__init__.py`). RR's legacy fallback (only reachable if `USE_FB_DRIVE_RESOLUTION_RR` is flipped off) now calls `resolve_shot` directly with the rim-relative `roles["shot_spot"]` from Phase 2.
-- **Verified:** `rg USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `_apply_universal_geometry_for_rr_shot` → no live code references (only a historical docstring/comment). 79 FB tests pass, including `test_after_steal_fast_break_stats` (legacy flag-flip path intact).
+**Done:**
+- Removed `_apply_universal_geometry_for_rr_shot` + `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` (RR-scoped).
+- Removed dead "FB UNIVERSAL CR" SHOT branch in `phase_resolution.py` + `USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR` (2026-07). Live CR is `resolve_covert_release_fast_break`; legacy flag-off CR SHOT no longer calls `compute_fb_shot_geometry` from animator packet coords.
+- **Verified:** `rg USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR` / `FB UNIVERSAL CR` → no live code references.
 
 **Explicitly NOT removed (why):**
 - `compute_fb_shot_geometry` — **still live** via `dynamic_hct_shot.py` (broken-HCT FB) and the legacy after-steal path. Must stay.
-- `USE_FB_DRIVE_RESOLUTION_*` flags — kept as the reversible safety switch. Legacy after-steal is still exercised by `test_after_steal_fast_break_stats.py` (flag off), so these are not yet permanent.
-- CR: the `phase_resolution.py:2026-2148` "FB UNIVERSAL CR" branch + `USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR` + legacy CR `_build_outcome_step` animator reads — deferred (CR flag retirement belongs with the CR migration soak, tracked in `FB_Drive_Cutoff_Work_Plan.md`).
+- `USE_FB_DRIVE_RESOLUTION_*` flags — kept as the reversible safety switch. Legacy after-steal is still exercised by `test_after_steal_fast_break_stats.py` (flag off).
+- CR legacy emitter `_build_outcome_step` animator reads — dies with `USE_FB_DRIVE_RESOLUTION_CR` collapse.
 
-**Remaining for a future full Phase 4** (once CR/after-steal drive resolution is confirmed permanent): delete the CR universal branch + CR/`_CR` flag, then collapse `USE_FB_DRIVE_RESOLUTION_*`.
-- **Acceptance (RR portion):** no reachable code path reads the animator packet for RR logic; `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` removed.
+**Remaining for a future full Phase 4** (once drive resolution is confirmed permanent): collapse `USE_FB_DRIVE_RESOLUTION_*` and delete the gated legacy CR/after-steal implementations.
+- **Acceptance (geometry portion):** `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `_CR` removed; live RR/CR logic does not read animator packet for shot geometry.
 
 ### Phase 5 — Frontend hardening & observability parity (DONE)
 Additive-only (logging + comments); no logic/flow changes. All four FB emitters + their caller wrap sites now emit a consistent, greppable trail whenever a turn drops to the legacy renderer.

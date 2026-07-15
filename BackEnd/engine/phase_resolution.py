@@ -2034,138 +2034,10 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_snap = build_fast_break_pre_shot_snapshot(
             game, off_lineup, def_lineup, snap_roles, "fb_logic_pre_shot"
         )
-        # Universal geometry: CR shot path. Overrides shot_spot + defender
-        # + threshold using the helper. Gated by feature flag for revert.
-        # Race pool: all defenders EXCEPT stopper (CR has no outlet defender
-        # concept). See _documentation_master/projects/fast_break_*.md.
-        if fb_play_key == "covert_release":
-            from BackEnd.constants import USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR
-            if USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR:
-                from BackEnd.utils.fast_break_shot_geometry import (
-                    compute_fb_shot_geometry,
-                )
-
-                cr_shooter = fb_roles["shooter"]
-                cr_shooter_id = (
-                    str(getattr(cr_shooter, "player_id", "")) or None
-                )
-                cr_stopper_id = (
-                    str(stopper_id) if stopper_id is not None else None
-                )
-                cr_available: list = []
-                cr_defender_starts: dict = {}
-                for _d in def_lineup.values():
-                    if _d is None:
-                        continue
-                    _did = getattr(_d, "player_id", None)
-                    if _did is None:
-                        continue
-                    _did_s = str(_did)
-                    if cr_stopper_id is not None and _did_s == cr_stopper_id:
-                        continue
-                    cr_available.append(_d)
-                    # Start coord = end of preceding step. Source from
-                    # animator output; fall back to live coords.
-                    _anim_end = None
-                    for _entry in (fb_animations or []):
-                        if str(_entry.get("playerId")) == _did_s:
-                            _anim_end = (
-                                _entry.get("end") or _entry.get("end_coords")
-                            )
-                            if isinstance(_anim_end, dict):
-                                break
-                    if isinstance(_anim_end, dict) and "x" in _anim_end and "y" in _anim_end:
-                        cr_defender_starts[_did_s] = {
-                            "x": float(_anim_end["x"]),
-                            "y": float(_anim_end["y"]),
-                        }
-                    else:
-                        _raw = getattr(_d, "coords", None) or {}
-                        cr_defender_starts[_did_s] = {
-                            "x": float(_raw.get("x", 50.0)),
-                            "y": float(_raw.get("y", 25.0)),
-                        }
-
-                # Shooter start: animator end → live coords fallback.
-                cr_shooter_start = {"x": 50.0, "y": 25.0}
-                _found = False
-                for _entry in (fb_animations or []):
-                    if str(_entry.get("playerId")) == cr_shooter_id:
-                        _anim_end = (
-                            _entry.get("end") or _entry.get("end_coords")
-                        )
-                        if isinstance(_anim_end, dict) and "x" in _anim_end and "y" in _anim_end:
-                            cr_shooter_start = {
-                                "x": float(_anim_end["x"]),
-                                "y": float(_anim_end["y"]),
-                            }
-                            _found = True
-                            break
-                if not _found:
-                    _raw = getattr(cr_shooter, "coords", None) or {}
-                    if isinstance(_raw, dict) and "x" in _raw and "y" in _raw:
-                        cr_shooter_start = {
-                            "x": float(_raw["x"]),
-                            "y": float(_raw["y"]),
-                        }
-
-                cr_geometry = compute_fb_shot_geometry(
-                    shooter=cr_shooter,
-                    shooter_start=cr_shooter_start,
-                    available_defenders=cr_available,
-                    defender_starts=cr_defender_starts,
-                    is_away_offense=is_away_offense,
-                )
-
-                # Override shot_spot + defender + threshold.
-                roles["shot_spot"] = dict(cr_geometry["shooter_target"])
-                # UESS: contest was decided here from the render-matched defender
-                # ends — tell resolve_shot to honor roles["defender"] instead of
-                # re-deriving from stale (pre-race) def_lineup.coords, so the block
-                # path fires on contested CR. See Coord_Consumer_UESS_Audit.md #2.
-                roles["fb_geometry_contest_resolved"] = True
-                if cr_geometry["contested"] and cr_geometry["shot_defender_id"]:
-                    for _d in def_lineup.values():
-                        if _d is None:
-                            continue
-                        if str(getattr(_d, "player_id", "")) == cr_geometry["shot_defender_id"]:
-                            roles["defender"] = _d
-                            fb_roles["defender"] = _d
-                            fb_roles["defender_count"] = 1
-                            break
-                else:
-                    roles["defender"] = None
-                    fb_roles["defender"] = None
-                    fb_roles["defender_count"] = 0
-                    game_state["fast_break_shot_threshold_override"] = 1
-
-                # Update fb_animations end coords for shooter + racing
-                # defenders so the schema emitter renders new positions.
-                # Must write BOTH `entry["end"]` (downstream BE wiring +
-                # FE legacy paths) AND `entry["movement"][-1]["coords"]`
-                # (UESS emitter reads via `_movement_end_coord`). Writing
-                # only `entry["end"]` silently drops the override at the
-                # emitter — BH renders at the legacy animator's spot.
-                _override = dict(cr_geometry["defender_end_coords"])
-                if cr_shooter_id:
-                    _override[cr_shooter_id] = cr_geometry["shooter_target"]
-                _override_applied = 0
-                for _entry in (fb_animations or []):
-                    _pid_s = str(_entry.get("playerId"))
-                    if _pid_s in _override:
-                        _new = dict(_override[_pid_s])
-                        _entry["end"] = _new
-                        _mv = _entry.get("movement") or []
-                        if _mv and isinstance(_mv[-1], dict):
-                            _mv[-1]["coords"] = dict(_new)
-                        _override_applied += 1
-                logging.warning(
-                    "🔍 [FB UNIVERSAL CR] shot_spot=%s contested=%s shot_def=%s applied_overrides=%d",
-                    cr_geometry["shooter_target"],
-                    cr_geometry["contested"],
-                    cr_geometry["shot_defender_id"],
-                    _override_applied,
-                )
+        # Live Covert Release returns earlier via resolve_covert_release_fast_break
+        # (USE_FB_DRIVE_RESOLUTION_CR). This SHOT branch is legacy flag-off only;
+        # USE_UNIVERSAL_FB_SHOT_GEOMETRY_CR was retired (UESS Phase 4) — shot_spot
+        # comes from animator _bh_final_* / roles above, not compute_fb_shot_geometry.
 
         turn_result = game.shot_manager.resolve_shot(roles)
         game_state.pop("fast_break_shot_threshold_override", None)
@@ -5059,21 +4931,36 @@ def _hco_backdoor_read(commitment, def_xy, bh_pos, basket_xy, defender_reads, of
     return best_pos
 
 
-def _hco_cut_openness_lift(cutter_rim, defender_prior, margin):
-    """S3 Option 3 — the `should_shoot` openness LIFT for a cut, from the beaten defender's TRAILED spot.
-    The defender lags from his overplay position toward the rim by the SAME lag-fraction the animator
-    applies (from his read margin), so his gap to the cutter = (1 − frac)·‖rim − overplay‖. A real beat
-    (freeze, frac→0) leaves a wide-open layup; a barely-beaten (near-stick, frac→1) defender STAYS IN
-    RANGE (tiny gap → below the ramp → the Hot Read won't feed him). Same cushion→lift ramp as step-in."""
+# Backdoor cut openness (S3 Option 3) — computed the SAME way the animator RENDERS the cut defender, so
+# the openness the Hot Read reads == the gap that gets drawn (UESS: one computation, not a parallel
+# prediction). The defender lags `lerp(prior, tracked, frac)` where `frac` is the animator's own
+# `_defender_lag_fraction` value (1 − OPENNESS_LAG_MAX·beat, from the read margin) and `tracked` is the
+# same `get_defender_coords(...)` guard spot the animator uses; cushion = the cutter's gap to that lagged
+# spot. A real beat leaves the overplaying defender far → open layup; a barely-beaten one recovers into
+# range (cushion < MIN → no lift → no dish). Ramp constants are tunable (S3e); verify the dish RATE in-app.
+BACKDOOR_OPENNESS_MIN = 3.0        # cushion (grid) below which the cutter is still covered → no lift
+BACKDOOR_OPENNESS_OPEN = 8.0       # cushion (grid) at/above which the cut is wide open → full lift
+BACKDOOR_QUALITY_LIFT_MAX = 30.0   # max should_shoot lift — enough for an open layup to beat the BH's own look
+
+
+def _hco_cut_openness_lift(cutter_rim, defender_prior, defender_tracked, margin):
+    """S3 Option 3 — the `should_shoot` openness LIFT for a backdoor cut, computed IDENTICALLY to how the
+    animator renders the cut defender (UESS): `frac` = the animator's `_defender_lag_fraction` value from
+    the read margin; the defender ends at `lerp(prior, tracked, frac)`; cushion = ‖cutter_rim − lagged‖.
+    So the openness the offense reads is the same gap drawn on screen — not a siloed guess. Ramp → lift."""
     import math
     from BackEnd.models.animator import OPENNESS_LAG_MAX, OPENNESS_LAG_MARGIN_SCALE
     beat = min(1.0, abs(float(margin)) / OPENNESS_LAG_MARGIN_SCALE)
     frac = max(0.0, 1.0 - OPENNESS_LAG_MAX * beat)
-    cushion = (1.0 - frac) * math.hypot(
-        float(cutter_rim["x"]) - float(defender_prior.get("x", cutter_rim["x"])),
-        float(cutter_rim["y"]) - float(defender_prior.get("y", cutter_rim["y"])))
-    span = max(1e-6, STEP_IN_OPENNESS_OPEN - STEP_IN_OPENNESS_MIN)
-    return STEP_IN_QUALITY_LIFT_MAX * max(0.0, min(1.0, (cushion - STEP_IN_OPENNESS_MIN) / span))
+    px = float(defender_prior.get("x", cutter_rim["x"]))
+    py = float(defender_prior.get("y", cutter_rim["y"]))
+    tx = float(defender_tracked.get("x", px))
+    ty = float(defender_tracked.get("y", py))
+    cushion = math.hypot(
+        float(cutter_rim["x"]) - (px + (tx - px) * frac),
+        float(cutter_rim["y"]) - (py + (ty - py) * frac))
+    span = max(1e-6, BACKDOOR_OPENNESS_OPEN - BACKDOOR_OPENNESS_MIN)
+    return BACKDOOR_QUALITY_LIFT_MAX * max(0.0, min(1.0, (cushion - BACKDOOR_OPENNESS_MIN) / span))
 
 
 def _build_backdoor_cut_beat(step, cutter_pos, bh_pos, off_lineup, is_away_offense):
@@ -6149,10 +6036,20 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 # Post-cut Hot Read: the cutter is now at the rim with his beaten defender trailing → his
                 # graded openness enters the same should_shoot the whole offense reads. Dish only if he
                 # (or anyone) is the best open look; else fall through (he cleared out — resume skeleton).
-                from BackEnd.engine.attack_drive_clearance import _basket_display_coords as _bd_basket
+                from BackEnd.engine.attack_drive_clearance import _basket_display_coords as _bd_basket, _spot_display_coords
+                from BackEnd.utils.shared_defense import get_defender_coords as _gdc
                 _cut_rim = _bd_basket(is_away_offense)
+                # UESS: the cutter-defender's would-be guard spot, computed with the SAME get_defender_coords
+                # the animator uses to render him — so the openness the Hot Read reads is the SAME gap that
+                # gets drawn (the lift fn lerps prior→this by the animator's own lag frac), not a siloed guess.
+                _cut_bh_xy = (_cut_beat["pos_actions"].get(bh_pos, {}).get("coords")
+                              or _spot_display_coords(bh_location, is_away_offense))
+                _cut_tracked = _gdc(_cut_rim, is_away_offense, _def_aggr_call, "basketSpot",
+                                    _cut_bh_xy, is_ball_handler=False, ball_spot=bh_location,
+                                    posture=game_state.get("_hco_defense_posture"))
                 _cut_open = dict(_hco_openness_map(steps[i].get("_commitment")))
-                _cut_open[_bd_cutter] = _hco_cut_openness_lift(_cut_rim, _bd.get("def_prior") or {}, _bd.get("margin", 0.0))
+                _cut_open[_bd_cutter] = _hco_cut_openness_lift(
+                    _cut_rim, _bd.get("def_prior") or {}, _cut_tracked, _bd.get("margin", 0.0))
                 _cut_locs = {**locations, _bd_cutter: "basketSpot"}
                 _cut_shoot = should_shoot(bh_pos, off_lineup, _cut_locs, read_map, off_team,
                                           shot_clock_est, tempo, random, allow_dish=True,

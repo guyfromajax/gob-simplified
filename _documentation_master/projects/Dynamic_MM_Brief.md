@@ -221,9 +221,9 @@ The shot/dish half is **already done** — S3b made `should_shoot` openness-awar
 | Move | Read that triggers it | Defender reaction that opens it |
 |---|---|---|
 | **backdoor** | defender **denies** (`denial ≥ bar`) + rim unprotected | beaten ball-side → **trails** behind the cut → open at the rim |
-| **jab-and-pop** | on-ball pressure / a bait jab | defender **bites** the jab in → caught leaning → pop-out open |
+| **jab step** | on-ball pressure / a bait jab | defender **bites** the jab in → caught leaning → pop-out open |
 | **flash** (a deferred `motion_subtle` variant) | defender **sags / loses contact** (`cushion` / help-side) | doesn't recover to the flashed gap → open catch |
-| **post** | **mismatch** / defender behind | sealed → entry angle open |
+| **post up** | **mismatch** / defender behind | sealed → entry angle open |
 | step-in *(built — S3b)* | `cushion ≥ min` (conceded look) | already sagged → take the shot |
 | attack *(built — S2)* | already-open (S1 lag / blow-by) | drive, S2 outcomes |
 
@@ -236,13 +236,22 @@ So the whole layer is: `_hco_commitment` (the ONE primitive) drives every read; 
 | **Stick** | follows | none (covered) | lag `1.0` |
 | **Trail** | beaten (mild) | behind the move | lag graded |
 | **Freeze** | beaten (bad) | full — the man left him | lag → `0.0` |
-| **Bite** — **cut + jab only** (a fake/misdirection; **NOT** flash/post-up) | beaten + faked | *opposite* the fake | **new** |
+| **Bite** — **backdoor + jab step only** (a fake/misdirection; **NOT** flash/post up) | beaten + faked | *opposite* the fake | **new** |
 
 Stick / Trail / Freeze are the *existing* S1 graded lag (`_defender_lag_fraction`, `1.0 → 0.0`) — freeze is just the worst-beat end of trail, not a separate action. **Bite** (commit the *wrong* way) is the one net-new reaction — built with jab-and-pop, reused by the cut's fake. The defender's "chance to stay in range" is the graded trail: a **barely-beaten** defender stays close → the mover is covered → the Hot Read won't feed him; only a real beat opens him.
 
 **Decisions locked (2026-07-14 kickoff):** (1) **denial = ball-axis projection** — `denial = (defender − man) · unit(BH − man)`, signed toward the passer; backdoor fires on `denial ≥ BACKDOOR_TRIGGER_BAR` + a clear man→basket landing (openness radius). (2) **Scope = all five off-ball** — every offensive player reads his own defender; an off-ball player whose man overplays can trigger the backdoor/relocate and the BH feeds him (cut+pass, reusing the §4 pass contest). (3) **Geometry-only first** — triggers gate purely on the commitment geometry; the finish is judged by the existing openness shot/catch contest (which already reads attributes). Any extra execution modifier (a slow cutter caught in open space) is a later tune knob, not the first build.
 
 **Decisions locked (2026-07-14, architecture pass):** (4) **Get-open moves feed the Hot Read** — the shot/dish decision is NOT re-implemented per action; it stays the one Hot Read (`should_shoot` + openness map). Moves only reposition + set up the defender reaction. (5) **The linchpin = a move's beaten defender TRAILS** (reuse S1 lag) — without it no move creates openness, so the Hot Read can't reward it; build it first, and it also completes `backdoor`. (6) **Move menu = backdoor + jab-and-pop + flash + post** (plus step-in/attack, already built). (7) **jab-and-pop = off-ball first** (a spot-up player faking his man → pop to an open catch, folding into the dish read); the **on-ball BH jab-and-pull** version (folds into `should_shoot`'s self-shot) is a noted extension, not the first build.
+
+**Terminology (official, locked 2026-07-15):** the four moves are collectively **"altered actions"** — **backdoor**, **jab step**, **flash**, **post up**. (Replaces the working term "get-open moves"; `jab-and-pop`→`jab step`, `post`→`post up`. Doc + code rename `get_open`→`altered_action` bundles with the lever wiring below.)
+
+**Strategic lever — the `alterations` setting gates altered actions (locked 2026-07-15):** altered actions are a coach-controlled lever, hung off the existing per-turn alterations roll:
+1. **Once per turn**, roll: is this an **altering turn**? at **`alterations × 20%`** (setting 0→0% / 1→20% / 2→40% / 3→60% / 4→80%). 0 = always run the set straight; 4 = freelance 80% of turns. (Shifts today's `randint(0,4) ≤ alterations` = 20–100% down a notch so **0 = never**.)
+2. **Non-altering turn** → set play straight, no SM, **no altered actions**.
+3. **Altering turn** → the BH does SMs, and **altered actions fire ONLY on the BH's SM** — they ride the freelance moment (the SM = the BH "probing off-pattern", the natural trigger for off-ball creation). The BH's SM is always him *moving with the ball* (`handle_ball`); shoot/dish is the separate universal `should_shoot`, before the movement matrix.
+- This **restructures** the current backdoor (fires ungated, *before* the movement matrix) → evaluated **when the BH executes an SM**. **Defense disruption stays independent** (its own `aggression` roll — a passive offense can still be disrupted).
+- **Wiring deferred** to after the 3-i/3-ii in-app verify (a gate is cleanest added once the moves are proven — fits S3e). Design is locked; only the wiring waits.
 
 **S3 sub-plan (man-first; each ships behind `GOB_DYNAMIC_HCO_DEFENSE`, flag-off byte-identical):**
 - **S3a — the primitive. ✅ BUILT (uncommitted 2026-07-14).** `_hco_commitment(man_xy, def_pt, bh_xy, basket_xy)→{cushion, denial, sag}` + `_hco_commitment_map(...)` (phase_resolution.py, after `_hco_step_def_xy`); stamped as `steps[i]["_commitment"]` in the walk right after `bh_pos` resolves, off the shared `_hco_step_def_xy` `def_xy` + `_basket_display_coords`. Flag+man-gated on posture (zone read = S4), additive/no consumer (like S1 Part A) → flag-off/zone byte-identical. Verified signs: denying→denial+, sagging→sag+, tight→low cushion, trailing→sag−; BH denial forced 0; missing-defender skipped.

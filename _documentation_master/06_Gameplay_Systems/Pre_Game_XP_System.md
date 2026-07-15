@@ -104,7 +104,7 @@ Regular season = franchise weeks **1–26**. Bed selection (`resolvePregameBedFi
 
 | Layered SFX | Asset | When |
 |-------------|--------|------|
-| Reveal clicks | `click-beep.wav` | Each reveal row land (×5) |
+| Reveal clicks | `click-beep.wav` | Each reveal row land (×5), plus the **Submit & Tip Off** CTA reveal |
 | In-game modal open | `defense-sammy.mp3` | In-game modal only (first time per game); **not** during pre-game |
 
 Bed starts with the cinematic and **stops** when the Tip Off veil dissolves. It must not play during mid-game modals.

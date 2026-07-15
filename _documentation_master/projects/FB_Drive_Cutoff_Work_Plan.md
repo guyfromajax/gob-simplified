@@ -233,7 +233,7 @@ Phases **3** and **4** can run in parallel after Phase **2** validates the `fb_d
 | Team stats | `zero/one/two_defenders_back` from geo count |
 | `shot_manager.py` | FB contest 11 + x-trail consistently; skip charge at meet if resolver already terminal; pull-up `inside`/`outside` from stop |
 | `fast_break_shot_geometry.py` | Deprecate → delete when all flags default True |
-| `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR/CR` | Remove after migration |
+| `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR/CR` | ✅ Removed (UESS Phase 4) |
 | `animator.py` / legacy `fastBreak.js` | Minimal touch; schema path primary |
 
 **Exit criteria:** No `compute_fb_shot_geometry` callers when all flags on; stats match spec.
@@ -280,7 +280,7 @@ Phases **3** and **4** can run in parallel after Phase **2** validates the `fb_d
 | `USE_FB_DRIVE_RESOLUTION_RR` | `rim_runner` | `False` until Phase 4 verified |
 | `USE_FB_DRIVE_RESOLUTION_TRIANGLE` | `triangle` | `False` until Phase 4 verified |
 
-Remove `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `CR` when respective migrations complete.
+✅ Removed `USE_UNIVERSAL_FB_SHOT_GEOMETRY_RR` / `CR` (UESS Phase 4). Drive-resolution flags (`USE_FB_DRIVE_RESOLUTION_*`) remain as reversible switches.
 
 ---
 
