@@ -8364,12 +8364,15 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
     doc["season"] = doc.get("ps_season_stats") or {}
     doc["is_recruit"] = True
 
-    # Lean maps rank -> team_id; the page has no team-name map of its own, so
-    # resolve the top choice to a display name here. "open" = no lean yet.
+    # Lean maps rank -> team_id (the STRING form of teams._id, which is an
+    # ObjectId — a plain {"_id": <str>} lookup silently misses). The page has no
+    # team-name map of its own, so resolve the top choice here. "open" = no lean.
     top_lean = (doc.get("Lean") or {}).get("1")
     if top_lean and top_lean != "open":
-        team_doc = db.teams.find_one({"_id": top_lean}, {"name": 1})
-        doc["lean_display"] = (team_doc or {}).get("name") or str(top_lean)
+        name = _resolve_team_name_from_any(top_lean)
+        # The shared resolver echoes the raw ref back when it can't find a team;
+        # never surface an id to the UI — that reads as a bug to the player.
+        doc["lean_display"] = "--" if not name or name == str(top_lean) else name
     else:
         doc["lean_display"] = "Open" if top_lean == "open" else "--"
 

@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi.testclient import TestClient
 
 from BackEnd.api.api import app
@@ -6,6 +7,21 @@ import BackEnd.api.franchise_routes as franchise_routes
 
 client = TestClient(app)
 
+# Mirrors the real schema: teams._id is an ObjectId, while FRD's Lean stores its
+# STRING form. A mock with string _ids hides the type mismatch that shipped a raw
+# id to the UI, so these ids are ObjectIds on purpose.
+LEAN_TEAM_OID = ObjectId("69a6fcb68d2c56aa82e48abd")
+
+
+def _matches(doc, query):
+    for k, v in query.items():
+        if k == "$or":
+            if not any(_matches(doc, sub) for sub in v):
+                return False
+        elif doc.get(k) != v:
+            return False
+    return True
+
 
 class _MockCollection:
     def __init__(self, docs):
@@ -13,7 +29,7 @@ class _MockCollection:
 
     def find_one(self, query, projection=None):
         for doc in self.docs:
-            if all(doc.get(k) == v for k, v in query.items()):
+            if _matches(doc, query):
                 out = dict(doc)
                 if projection:
                     for key, include in projection.items():
@@ -41,7 +57,8 @@ RECRUIT = {
     "archetype": "Slasher",
     "year": "JH",
     "Home Region": "A",
-    "Lean": {"1": "MORRISTOWN", "2": None, "3": None},
+    # Lean holds the string form of an ObjectId, as the real FRD docs do.
+    "Lean": {"1": str(LEAN_TEAM_OID), "2": None, "3": None},
 }
 
 
@@ -54,7 +71,7 @@ def _patch(monkeypatch, recruits, teams=None):
     monkeypatch.setattr(
         franchise_routes,
         "db",
-        _MockDb(teams if teams is not None else [{"_id": "MORRISTOWN", "name": "Morristown"}]),
+        _MockDb(teams if teams is not None else [{"_id": LEAN_TEAM_OID, "name": "Seattle AAA"}]),
     )
 
 
@@ -97,10 +114,22 @@ def test_recruit_endpoint_season_empty_when_never_played(monkeypatch):
 
 
 def test_recruit_endpoint_resolves_lean_team_name(monkeypatch):
+    """Lean stores a stringified ObjectId; the page must show the team NAME."""
     _patch(monkeypatch, [RECRUIT])
 
     data = client.get("/recruit/r1?franchise_id=f1").json()
-    assert data["lean_display"] == "Morristown"
+    assert data["lean_display"] == "Seattle AAA"
+    # Regression: a {"_id": <str>} lookup misses (teams._id is an ObjectId) and
+    # used to fall back to echoing the raw id into the UI.
+    assert data["lean_display"] != str(LEAN_TEAM_OID)
+
+
+def test_recruit_endpoint_lean_never_leaks_raw_id(monkeypatch):
+    """If the team can't be resolved, show '--' rather than a raw id."""
+    _patch(monkeypatch, [RECRUIT], teams=[])
+
+    data = client.get("/recruit/r1?franchise_id=f1").json()
+    assert str(LEAN_TEAM_OID) not in data["lean_display"]
 
 
 def test_recruit_endpoint_open_lean(monkeypatch):
