@@ -49,6 +49,24 @@ def mark_late_clock_eoq_turn(result: Dict[str, Any]) -> None:
     result["late_clock_eoq"] = True
 
 
+def tag_result_if_late_clock_eoq_chain(game: Any, result: Optional[Dict[str, Any]]) -> bool:
+    """Stamp ``late_clock_eoq`` on FOUL/CHARGE/DEAD_BALL (etc.) when the EOQ chain is already active.
+
+    Does **not** start a new chain — only tags turns that sit inside an armed
+    Final Shot / FLSS period so ``schedule_flss_after_inbound`` can arm the
+    next possession after SIP/BIP. Returns True when the tag was applied.
+    """
+    if not isinstance(result, dict):
+        return False
+    gs = getattr(game, "game_state", None) or {}
+    if not is_late_clock_eoq_chain_active(gs):
+        return False
+    if result.get("late_clock_eoq"):
+        return True
+    mark_late_clock_eoq_turn(result)
+    return True
+
+
 def mark_late_clock_ft_resolution(result: Dict[str, Any]) -> None:
     """Tag last-FT resolution at <=30s without starting the EOQ chain."""
     result["late_clock_ft_resolution"] = True
@@ -345,16 +363,26 @@ def schedule_flss_after_dreb(
 
 
 def schedule_flss_after_inbound(game: Any, inbound_source_turn: Optional[Dict[str, Any]]) -> None:
-    """After BIP/SIP when clock remains, next possession is FLSS sprint-and-shoot."""
+    """After BIP/SIP when clock remains, next possession is FLSS sprint-and-shoot.
+
+    Arms when the source turn is tagged ``late_clock_eoq`` **or** the EOQ chain
+    is already active (covers FOUL/CHARGE→SIP that historically lacked the
+    turn-level tag). Always stamps the source turn for observability.
+    """
     if not isinstance(inbound_source_turn, dict):
         return
-    if not inbound_source_turn.get("late_clock_eoq"):
+    gs = getattr(game, "game_state", None) or {}
+    chain_active = is_late_clock_eoq_chain_active(gs)
+    source_tagged = bool(inbound_source_turn.get("late_clock_eoq"))
+    if not source_tagged and not chain_active:
         return
-    if int(game.game_state.get("time_remaining") or 0) <= 0:
+    if int(gs.get("time_remaining") or 0) <= 0:
         return
-    activate_late_clock_eoq_chain(game.game_state)
-    game.game_state["flss_possession_pending"] = True
-    game.game_state["offensive_state"] = "HCO"
+    if not source_tagged:
+        mark_late_clock_eoq_turn(inbound_source_turn)
+    activate_late_clock_eoq_chain(gs)
+    gs["flss_possession_pending"] = True
+    gs["offensive_state"] = "HCO"
     try:
         from BackEnd.engine.eoq_debug_log import begin_eoq_trace_sequence, log_eoq_chain_event
 
@@ -365,7 +393,8 @@ def schedule_flss_after_inbound(game: Any, inbound_source_turn: Optional[Dict[st
             extra={
                 "inbound_source_result_type": inbound_source_turn.get("result_type"),
                 "inbound_source_late_clock_eoq": inbound_source_turn.get("late_clock_eoq"),
-                "time_remaining": game.game_state.get("time_remaining"),
+                "chain_was_active": chain_active,
+                "time_remaining": gs.get("time_remaining"),
             },
         )
     except Exception:

@@ -148,74 +148,87 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
   const initialContent = photoUrl
     ? `<img src="${safePhotoUrl}" alt="${safeName}" class="foul-out-player-image" onerror="this.onerror=null;this.src='${safeDefaultImg}'">`
     : `<div class="foul-out-player-placeholder">${(player?.name || 'P').charAt(0)}</div>`;
+  const safeDisplayName = (player?.name || 'Player')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 
-  // Create popup (same design as end-of-quarter and timeout: white content, gray border)
+  // Functional Modal shell (same as timeout gate) + portrait / name subject
   const popup = document.createElement('div');
   popup.className = 'foul-out-popup';
+  popup.setAttribute('role', 'dialog');
+  popup.setAttribute('aria-modal', 'true');
+  popup.setAttribute('aria-labelledby', 'foul-out-title');
   popup.innerHTML = `
     <div class="foul-out-content">
-      <div class="foul-out-header">
+      <div class="foul-out-modal-accent"></div>
+      <div class="foul-out-modal-body">
         <div class="foul-out-player-image-container">
           ${initialContent}
         </div>
-        <h2 class="foul-out-title">FOULED OUT!</h2>
+        <h2 id="foul-out-title" class="foul-out-title">Fouled Out!</h2>
+        <div class="foul-out-player-name">${safeDisplayName}</div>
       </div>
-      <div class="foul-out-player-name">${(player?.name || 'Player').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
       <div class="foul-out-button-container">
         <a href="${lineupUrl}" class="foul-out-button sub-players-button">Sub Players</a>
       </div>
     </div>
   `;
 
-  // Add styles if not already present (same design as end-of-quarter and timeout popups)
   if (!document.getElementById('foul-out-popup-styles')) {
     const style = document.createElement('style');
     style.id = 'foul-out-popup-styles';
     style.textContent = `
       .foul-out-popup {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
+        inset: 0;
+        background: rgba(0, 0, 0, 0.72);
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 10001;
+        padding: 20px;
       }
 
       .foul-out-content {
-        background: #fff;
-        border: 6px solid #c0c0c0;
-        border-radius: 12px;
-        padding: 40px 60px;
+        width: min(420px, calc(100vw - 40px));
+        background: rgba(22, 26, 36, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        gap: 30px;
-        align-items: center;
-        min-width: 400px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
         text-align: center;
       }
 
-      .foul-out-header {
+      .foul-out-modal-accent {
+        height: 3px;
+        width: 100%;
+        background: #F79420;
+        flex-shrink: 0;
+      }
+
+      .foul-out-modal-body {
+        padding: 24px 28px 16px;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 20px;
+        gap: 12px;
       }
 
       .foul-out-player-image-container {
-        width: 120px;
-        height: 160px;
-        border-radius: 8px;
+        width: 96px;
+        height: 128px;
+        border-radius: 10px;
         overflow: hidden;
-        border: 3px solid #c0c0c0;
-        background: #f5f5f5;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.06);
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
       }
 
       .foul-out-player-image {
@@ -230,58 +243,68 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 60px;
-        font-weight: bold;
-        color: #999;
-        background: #f5f5f5;
+        font-size: 48px;
+        font-weight: 700;
+        font-family: 'Bebas Neue', sans-serif;
+        color: rgba(255, 255, 255, 0.45);
+        background: rgba(255, 255, 255, 0.04);
       }
 
       .foul-out-title {
-        font-size: 36px;
-        font-weight: bold;
-        color: #333;
+        font-size: 28px;
+        color: #ffffff;
         margin: 0;
         font-family: 'Bebas Neue', sans-serif;
-        letter-spacing: 2px;
+        letter-spacing: 0.04em;
+        line-height: 1;
       }
 
       .foul-out-player-name {
-        font-size: 24px;
-        font-weight: bold;
-        color: #333;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: Inter, system-ui, sans-serif;
+        color: rgba(255, 255, 255, 0.55);
         text-align: center;
         margin: 0;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
       }
 
       .foul-out-button-container {
         display: flex;
-        gap: 20px;
+        gap: 10px;
         width: 100%;
-        justify-content: center;
+        justify-content: stretch;
+        padding: 0 28px 24px;
+        box-sizing: border-box;
       }
 
       .foul-out-button {
-        padding: 15px 40px;
-        font-size: 18px;
-        font-weight: bold;
-        border: none;
-        border-radius: 6px;
+        appearance: none;
+        flex: 1;
+        height: 42px;
+        border-radius: 10px;
         cursor: pointer;
         text-decoration: none;
-        display: inline-block;
-        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: filter 0.14s ease, transform 0.14s ease;
         font-family: 'Bebas Neue', sans-serif;
+        font-size: 16px;
+        letter-spacing: 0.04em;
+        border: 1px solid transparent;
       }
 
       .sub-players-button {
-        background: #ff9800;
-        color: #fff;
+        background: #F79420;
+        border-color: rgba(247, 148, 32, 0.45);
+        color: #15181f;
       }
 
       .sub-players-button:hover {
-        background: #f57c00;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
+        filter: brightness(1.06);
+        transform: translateY(-1px);
       }
     `;
     document.head.appendChild(style);

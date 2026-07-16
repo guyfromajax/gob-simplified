@@ -339,13 +339,15 @@ export class AnimationEngine {
       });
     }
 
-    const turnStop = await playTurn(
+    const playResult = await playTurn(
       this.scene,
       stepsToPlay,
       sprites,
       ballSprite,
       { turnData },
     );
+    const turnStop = playResult?.turnStop ?? null;
+    const stepsExecuted = Number(playResult?.stepsExecuted) || 0;
     if (turnStop) {
       await dispatchTurnStop(this.scene, turnStop, {
         sprites,
@@ -358,6 +360,7 @@ export class AnimationEngine {
       resultType: turnData?.result_type ?? null,
       currentTurn: turnData?.current_turn ?? null,
       turnStop: turnStop ?? null,
+      stepsExecuted,
       ballVisible: ballSprite?.visible ?? null,
       isPaused: this.scene?.isPaused ?? null,
       skipToEnd: this.scene?.skipToEnd ?? null,
@@ -386,15 +389,19 @@ export class AnimationEngine {
       await this._runSchemaBatOobBallSend(turnData, stepsToPlay, sprites, ballSprite);
     }
 
+    const schemaPlaybackRendered = stepsExecuted > 0 && !turnData?.eoq_schema_emit_failed;
+    const finishOpts = { announceMake: schemaPlaybackRendered };
     if (isFinalTurnShot && turnData?.quarter_ends_after) {
-      await this._finishFinalTurnQuarterEnd(turnData, context);
+      await this._finishFinalTurnQuarterEnd(turnData, context, finishOpts);
     } else if (turnData?.flss && turnData?.quarter_ends_after) {
       const { logEoqStep, logEoqTurn } = await import('../utils/eoqDebugLog.js');
       logEoqTurn(this.scene, 'PLAYBACK_END', turnData, context);
       logEoqStep(this.scene, 'FLSS', 'schema_playback_complete', 'END', turnData, context, {
         animation_step_count: stepsToPlay?.length ?? 0,
+        steps_executed: stepsExecuted,
+        schema_playback_rendered: schemaPlaybackRendered,
       });
-      await this._finishFinalTurnQuarterEnd(turnData, context);
+      await this._finishFinalTurnQuarterEnd(turnData, context, finishOpts);
     } else if (isFinalTurnShot || turnData?.flss) {
       const { logEoqTurn } = await import('../utils/eoqDebugLog.js');
       logEoqTurn(this.scene, 'PLAYBACK_END', turnData, context);
@@ -1726,7 +1733,7 @@ export class AnimationEngine {
     return resultType === 'MAKE' || resultType === 'MISS' || resultType === 'BLOCK';
   }
 
-  async _finishFinalTurnQuarterEnd(turnData, context) {
+  async _finishFinalTurnQuarterEnd(turnData, context, options = {}) {
     if (context.onUpdate) {
       context.onUpdate({
         home_score: turnData.home_score,
@@ -1740,7 +1747,14 @@ export class AnimationEngine {
     signalQuarterEnded(this.scene, turnData, { phase: 'playbackComplete' });
     const animationConfig = (await import('./animation_config.js')).default;
     const holdMs = animationConfig?.finalTurn?.holdFinalShotMs ?? 2000;
-    if (turnData.result_type === 'MAKE') {
+    // SHOT_MAKE only when schema steps actually played. Empty emit / skipToEnd
+    // used to announce "It's Good!" with no court motion (SIP→FLSS bug class).
+    const announceMake = options.announceMake !== false;
+    if (
+      announceMake
+      && turnData.result_type === 'MAKE'
+      && !turnData.eoq_schema_emit_failed
+    ) {
       const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
       announceGameEvent('SHOT_MAKE', turnData, this.scene, context);
     }
@@ -1809,7 +1823,12 @@ export class AnimationEngine {
       });
     }
     if (turnData.quarter_ends_after) {
-      await this._finishFinalTurnQuarterEnd(turnData, context);
+      const hasMotion =
+        (Array.isArray(turnData.animation_steps) && turnData.animation_steps.length > 0)
+        || (Array.isArray(turnData.animations) && turnData.animations.length > 0);
+      await this._finishFinalTurnQuarterEnd(turnData, context, {
+        announceMake: hasMotion && !turnData.eoq_schema_emit_failed,
+      });
     }
   }
 

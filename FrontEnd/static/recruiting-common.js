@@ -76,6 +76,43 @@
     };
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Link to a recruit's detail page (player-detail.html in recruit mode).
+   * franchiseId is required: recruits are per-franchise FRD docs, so recruit_id
+   * alone cannot resolve one. Returns '' when either id is missing, which callers
+   * treat as "render the name as plain text".
+   */
+  function buildRecruitDetailUrl(recruitId, franchiseId) {
+    if (!recruitId || !franchiseId) return '';
+    var params = new URLSearchParams();
+    params.set('recruit_id', String(recruitId));
+    params.set('franchise_id', String(franchiseId));
+    params.set('return_url', global.getCurrentRelativeUrl
+      ? global.getCurrentRelativeUrl()
+      : global.location.pathname + global.location.search + (global.location.hash || ''));
+    return '/player-detail.html?' + params.toString();
+  }
+
+  /**
+   * Recruit name as a link to its detail page, or escaped plain text when the
+   * recruit can't be resolved (missing recruit_id/franchise_id).
+   */
+  function recruitNameLinkHtml(recruitId, franchiseId, name) {
+    var safeName = escapeHtml(name || '--');
+    var href = buildRecruitDetailUrl(recruitId, franchiseId);
+    if (!href) return safeName;
+    return '<a class="recruit-name-link" href="' + escapeHtml(href) + '">' + safeName + '</a>';
+  }
+
   function buildFccUrl(context) {
     if (global.resolveFranchiseLockerRoomUrl) {
       return global.resolveFranchiseLockerRoomUrl({
@@ -139,6 +176,7 @@
       });
       return {
         recruitId: recruit.recruit_id,
+        imageId: recruit.image_id || null,
         name: recruit.name || '--',
         homeRegion: recruit['Home Region'] || '--',
         archetype: recruit.archetype || '--',
@@ -235,6 +273,7 @@
     var onRowClick = options && options.onRowClick;
     var onActionClick = options && options.onActionClick;
     var getActionLabel = options && options.getActionLabel;
+    var franchiseId = options && options.franchiseId;
     tbody.innerHTML = '';
 
     recruits.forEach(function (recruit) {
@@ -243,9 +282,10 @@
       if (selectedIds.has(recruit.recruitId)) tr.classList.add('recruit-selected');
       if (newLeanIds.has(String(recruit.recruitId))) tr.classList.add('fcc-newlean');
       if (onRowClick) tr.classList.add('recruit-clickable');
+      var nameHtml = recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name);
       var nameCell = newLeanIds.has(String(recruit.recruitId))
-        ? '<td><span class="fcc-newlean-cell"><span class="fcc-newlean-badge">New</span>' + recruit.name + '</span></td>'
-        : '<td>' + recruit.name + '</td>';
+        ? '<td><span class="fcc-newlean-cell"><span class="fcc-newlean-badge">New</span>' + nameHtml + '</span></td>'
+        : '<td>' + nameHtml + '</td>';
       tr.innerHTML = [
         nameCell,
         '<td>' + recruit.homeRegion + '</td>',
@@ -280,6 +320,14 @@
         tr.addEventListener('click', function () {
           onRowClick(recruit);
         });
+        // The name link navigates; without this the row's click would also fire
+        // and toggle selection on the way out.
+        var nameLink = tr.querySelector('.recruit-name-link');
+        if (nameLink) {
+          nameLink.addEventListener('click', function (e) {
+            e.stopPropagation();
+          });
+        }
       }
       tbody.appendChild(tr);
     });
@@ -318,11 +366,14 @@
     getYearSortValue: getYearSortValue,
     bindSortableHeaders: bindSortableHeaders,
     buildFccUrl: buildFccUrl,
+    buildRecruitDetailUrl: buildRecruitDetailUrl,
     buildRecruitingUrl: buildRecruitingUrl,
+    escapeHtml: escapeHtml,
     fetchJSON: fetchJSON,
     getQueryContext: getQueryContext,
     normalizeRecruits: normalizeRecruits,
     playSound: playSound,
+    recruitNameLinkHtml: recruitNameLinkHtml,
     recruitRtClass: recruitRtClass,
     recruitingOrderIds: recruitingOrderIds,
     renderRecruitTableRows: renderRecruitTableRows,

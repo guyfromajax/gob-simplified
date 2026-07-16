@@ -79,7 +79,7 @@
      - Suppressed if `turn.roles?.is_steal_entry` is true (steal announcement takes priority)
    - **"Slow It Down"** - Q4/OT HCO turns when `turn.slow_it_down` is true
    - **"Quick Shot"** - Q4/OT HCO turns when `turn.quick_shot` is true
-   - **"Final Shot"** - Final-turn shot attempts when `turn.final_turn` is true and `result_type !== 'FINAL_HOLD'`
+   - **"Final Shot"** - Final-turn shot attempts when `turn.final_turn` is true, `turn.flss !== true`, and `result_type !== 'FINAL_HOLD'`
 
 2. **End Announcements** (`timing='end'`) — route to **primary** tier (center-court overlay)
     - **"It's Good!"** - Made shot (ballManager.js, when ball reaches rim)
@@ -116,7 +116,9 @@ The Announcement System provides visual feedback for game events using timing-ba
   - `turn.roles?.is_steal_entry` is true (steal-initiated Fast Break)
 - **"Slow It Down"** - HCO turns (`current_turn === 'HCO'` or `play_type === 'HCO'`) when `turn.slow_it_down` is true (Q4/OT pacing).
 - **"Quick Shot"** - HCO turns when `turn.quick_shot` is true (Q4/OT pacing). `slow_it_down` takes precedence if both are set.
-- **"Final Shot"** - When `turn.final_turn` is true and `result_type !== 'FINAL_HOLD'`.
+- **"Final Shot"** - When `turn.final_turn` is true, `turn.flss !== true`, and `result_type !== 'FINAL_HOLD'`.
+
+**EOQ MAKE announce gate:** Schema Final Shot / FLSS quarter-end paths call `announceGameEvent('SHOT_MAKE')` from `_finishFinalTurnQuarterEnd` **only when** `playTurn` actually executed steps (`stepsExecuted > 0`) and `eoq_schema_emit_failed` is not set. Legacy `ShotAnimationSystem` skips "It's Good!" for FLSS/Final Turn when `animation_steps` / `animations` are empty. Scoring still updates via `onUpdate`. See [`EOQ_System.md`](EOQ_System.md) §8 schema emit contract.
 
 **Pressure dispatch from Free Throws:** `FreeThrowAnimationSystem.js` also dispatches `PRESSURE_FCP` / `PRESSURE_HCT` when `next_defensive_setup` indicates pressure after a final FT.
 

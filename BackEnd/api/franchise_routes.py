@@ -7287,38 +7287,6 @@ def command_center_data(
                 response["eos_tournament"] = national_tournament if national_tournament else None
             else:
                 response["eos_tournament"] = None
-            # Championship summary when national tournament is complete (week 34 done)
-            if national_tournament.get("champion"):
-                bracket = national_tournament.get("bracket", {})
-                final_list = bracket.get("final", [])
-                final_matchup = final_list[0] if final_list else {}
-                home_team_id = final_matchup.get("home_team")
-                away_team_id = final_matchup.get("away_team")
-                winner_id = final_matchup.get("winner") or national_tournament.get("champion")
-                score = final_matchup.get("score") or {}
-                home_score = score.get("home")
-                away_score = score.get("away")
-                id_to_name = {}
-                for tid in [home_team_id, away_team_id, winner_id]:
-                    if not tid:
-                        continue
-                    try:
-                        tdoc = db.teams.find_one({"_id": ObjectId(tid)}, {"name": 1})
-                        if tdoc:
-                            id_to_name[str(tid)] = tdoc.get("name", str(tid))
-                    except Exception:
-                        id_to_name[str(tid)] = str(tid)
-                response["championship_summary"] = {
-                    "game_id": final_matchup.get("game_id"),
-                    "home_team_id": home_team_id,
-                    "away_team_id": away_team_id,
-                    "home_team_name": id_to_name.get(str(home_team_id), home_team_id),
-                    "away_team_name": id_to_name.get(str(away_team_id), away_team_id),
-                    "home_score": home_score,
-                    "away_score": away_score,
-                    "winner_team_id": winner_id,
-                    "winner_team_name": id_to_name.get(str(winner_id), winner_id),
-                }
         eos_status = (
             _get_user_eos_phase_status(franchise_doc, str(team_id), week)
             if franchise_id and franchise_doc and team_id and eos_tournament_active and week in ft.EOS_WEEKS
@@ -8371,6 +8339,41 @@ def recruits(franchise_id: str = Query(...)):
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/recruits COMPLETE: {total_time:.3f}s ({len(rec_docs)} recruits)")
     return {"recruits": rec_docs}
+
+
+@router.get("/recruit/{recruit_id}")
+def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
+    """Single recruit for the detail page (player-detail.html in recruit mode).
+
+    franchise_id is required: recruits are per-franchise FRD docs, so recruit_id
+    alone does not identify one.
+
+    Practice-squad stats accumulate at FRD.ps_season_stats, which shares the
+    BOX_SCORE_KEYS vocabulary with player.season. It is surfaced as `season` so
+    the player page's existing stats renderer reads a recruit unchanged; the raw
+    field is kept too. Both are sparse (only non-zero keys are $inc'd) — readers
+    already default missing keys to 0.
+    """
+    doc = franchise_recruits_data_collection.find_one(
+        {"franchise_id": str(franchise_id), "recruit_id": str(recruit_id)},
+        {"_id": 0, "franchise_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Recruit not found")
+
+    doc["season"] = doc.get("ps_season_stats") or {}
+    doc["is_recruit"] = True
+
+    # Lean maps rank -> team_id; the page has no team-name map of its own, so
+    # resolve the top choice to a display name here. "open" = no lean yet.
+    top_lean = (doc.get("Lean") or {}).get("1")
+    if top_lean and top_lean != "open":
+        team_doc = db.teams.find_one({"_id": top_lean}, {"name": 1})
+        doc["lean_display"] = (team_doc or {}).get("name") or str(top_lean)
+    else:
+        doc["lean_display"] = "Open" if top_lean == "open" else "--"
+
+    return doc
 
 
 def _recruit_rt(recruit_doc: dict) -> int:

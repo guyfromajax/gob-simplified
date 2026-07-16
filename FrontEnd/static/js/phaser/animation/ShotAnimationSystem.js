@@ -1117,7 +1117,16 @@ export class ShotAnimationSystem {
     }
 
     // Show announcement and flash immediately so they run in unison with the make hold.
-    if (!isPutbackMake) {
+    // EOQ contract: never announce MAKE when Final Shot / FLSS arrived with empty
+    // choreography (schema emit failed → legacy fallback with animations=[]).
+    const hasLegacyMotion = Array.isArray(turnData.animations) && turnData.animations.some(
+      (anim) => Array.isArray(anim?.movement) && anim.movement.length > 0,
+    );
+    const hasSchemaSteps = Array.isArray(turnData.animation_steps) && turnData.animation_steps.length > 0;
+    const skipEoqMakeAnnounce =
+      (turnData.flss === true || turnData.final_turn === true)
+      && (turnData.eoq_schema_emit_failed === true || (!hasLegacyMotion && !hasSchemaSteps));
+    if (!isPutbackMake && !skipEoqMakeAnnounce) {
       const { showAnnouncement, showAndOneAnnouncement, getSecondaryColorForTeam } = await import('../utils/announcements.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
       const shooterSprite = this.playerSprites[turnData.shooter_id];

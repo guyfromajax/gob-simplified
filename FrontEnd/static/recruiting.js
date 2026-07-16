@@ -98,6 +98,7 @@
       var rows = recruits.map(function (recruit) {
         var signedInfo = signedMap[recruit.recruitId];
         return {
+          recruitId: recruit.recruitId,
           name: recruit.name,
           homeRegion: recruit.homeRegion,
           archetype: recruit.archetype,
@@ -161,9 +162,11 @@
       : (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(row.rt) : '');
     var rtCell = '<td class="' + rtClass + '">' + (row.rt != null ? row.rt : '--') + '</td>';
     var yearCell = '<td>' + (row.yearDisplay || '--') + '</td>';
+    // Walk-ons have no recruit_id and fall back to plain text.
+    var nameCell = '<td>' + Recruiting.recruitNameLinkHtml(row.recruitId, context.franchiseId, row.name) + '</td>';
     var tr = document.createElement('tr');
     tr.innerHTML = isWeek36 ? [
-      '<td>' + row.name + '</td>',
+      nameCell,
       '<td>' + (row.archetype || '--') + '</td>',
       '<td>' + (row.height || '--') + '</td>',
       '<td>' + (row.weight != null ? row.weight : '--') + '</td>',
@@ -184,7 +187,7 @@
       rtCell,
       '<td>' + row.signedDisplay + '</td>'
     ].join('') : [
-      '<td>' + row.name + '</td>',
+      nameCell,
       '<td>' + (row.archetype || '--') + '</td>',
       '<td>' + (row.height || '--') + '</td>',
       '<td>' + (row.weight != null ? row.weight : '--') + '</td>',

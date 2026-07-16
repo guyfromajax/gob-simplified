@@ -780,7 +780,10 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
             "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None
         }
         logging.info(f"✅ FOUL OUT: Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_play_type}")
-    
+
+    from BackEnd.utils.eoq_clock_progression import tag_result_if_late_clock_eoq_chain
+
+    tag_result_if_late_clock_eoq_chain(game, result)
     return result
 
 

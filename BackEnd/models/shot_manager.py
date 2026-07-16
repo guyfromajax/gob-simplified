@@ -1355,6 +1355,9 @@ class ShotManager:
                     if defender:
                         defender.add_momentum(MO_CHARGE_DELTA)
                     shooter.add_momentum(-MO_CHARGE_DELTA)
+                    from BackEnd.utils.eoq_clock_progression import tag_result_if_late_clock_eoq_chain
+
+                    tag_result_if_late_clock_eoq_chain(self.game, result)
                     return result
 
                 # Handle BLOCKING_FOUL: Return early, nullify shot attempt (same as CHARGE)

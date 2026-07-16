@@ -19,7 +19,6 @@
       + '.afm-overlay.is-visible,'
       + '.gob-talert-overlay,'
       + '.sammy-modal-backdrop.open,'
-      + '.fcc-modal-overlay,'
       + '.bn-overlay.show'
     ));
   }

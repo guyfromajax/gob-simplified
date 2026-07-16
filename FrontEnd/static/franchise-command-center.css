@@ -1712,6 +1712,13 @@ body.has-auth-bar #franchise-container {
   gap: 10px;
   justify-content: flex-start;
   min-width: 0;
+  align-self: stretch;
+}
+
+.fcc-tb-region-col--champ {
+  /* Stretch with the Round 1 column so the champ body can vertically center. */
+  height: 100%;
+  min-height: 100%;
 }
 
 /* Championship column: header stays top-aligned with ROUND 1; the trophy +
@@ -1722,6 +1729,7 @@ body.has-auth-bar #franchise-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: stretch;
   gap: 10px;
   min-height: 0;
 }
@@ -1736,11 +1744,7 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-mu-wrap--region4-champ {
-  margin-top: 36px;
-}
-
-.fcc-tb-mu-wrap--region4-champ {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1807,72 +1811,6 @@ body.has-auth-bar #franchise-container {
   .fcc-tb-region-col--spacer {
     display: none;
   }
-}
-
-/* Reusable FCC modal styling (EOS and confirmation popups) */
-.fcc-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 20px;
-}
-
-.fcc-modal-card {
-  width: min(520px, 100%);
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 24px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.3);
-  text-align: center;
-}
-
-.fcc-modal-title {
-  margin: 0 0 12px;
-  font-family: 'Bebas Neue', cursive;
-  font-size: 34px;
-  line-height: 1;
-  color: #1a1a2e;
-}
-
-.fcc-modal-copy {
-  margin: 6px 0;
-  font-family: 'Inter', sans-serif;
-  color: #222;
-}
-
-.fcc-modal-actions {
-  margin-top: 18px;
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.fcc-modal-btn {
-  border: none;
-  border-radius: 6px;
-  padding: 10px 16px;
-  font-family: 'Bebas Neue', sans-serif;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.fcc-modal-btn-primary,
-#fcc-champ-back,
-#fcc-new-season-proceed {
-  background: #ff7a00;
-  color: #fff;
-}
-
-.fcc-modal-btn-secondary,
-#fcc-champ-box-score,
-#fcc-new-season-cancel {
-  background: #4065af;
-  color: #fff;
 }
 
 .fcc-new-season-modal,

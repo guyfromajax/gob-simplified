@@ -738,6 +738,17 @@ input[type="reset"] {
   cursor: pointer;
 }
 
+.recruit-name-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.recruit-name-link:hover,
+.recruit-name-link:focus-visible {
+  text-decoration: underline;
+}
+
 .recruit-selected {
   outline: 2px solid rgba(52, 236, 39, 0.8);
   outline-offset: -2px;

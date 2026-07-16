@@ -170,6 +170,7 @@ The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except 
 
 **Frontend (popup):**
 - **File:** `FrontEnd/static/js/phaser/utils/foulOutPopup.js`
+- **Visual:** Functional Modal shell matching the timeout gate (dark card, orange accent bar, Bebas title, orange CTA). Content adds fouling-out player headshot + name above **Sub Players**.
 - **Logic:** `imagePlayerId` = `foulOutPlayerIdFromTurn` when present, else from `player`. `photoUrl` = `playerId ? staticPrefix + '/images/players/' + playerId + '.png' : ''`. No use of `player.photo` or `player.image_url` for the image.
 - **Call sites:** `gameScene.js` and `AnimationEngine.js` pass `foulOutPlayerId` from the turn so the image is always wired to the fouling-out player’s id. The backend sets `foul_out_player` for every foul-out type, so this works universally.
 

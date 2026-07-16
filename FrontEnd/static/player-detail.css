@@ -257,6 +257,38 @@ input[type="reset"] {
   line-height: 1;
 }
 
+/* Recruit-only block; sits where STATUS sits for a signed player. */
+.pd-recruiting-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.pd-recruiting-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.pd-recruiting-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.06em;
+}
+
+.pd-recruiting-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: right;
+}
+
 .pd-right-column {
   flex: 1 1 auto;
   min-width: 0;

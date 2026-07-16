@@ -151,7 +151,7 @@
     var dot = isUserInLeanTopThree(recruit)
       ? '<span class="lean-dot is-solid lean-after-name" aria-label="Your team is on this recruit\u2019s lean list"></span>'
       : '';
-    return escapeHtml(recruit.name || '') + dot;
+    return Recruiting.recruitNameLinkHtml(recruit.recruitId, context.franchiseId, recruit.name) + dot;
   }
 
   function getPositionCounts() {
@@ -510,6 +510,7 @@
       Recruiting.sortRecruits(applyPoolFilters(recruits), sortState),
       {
         selectedIds: getSelectedIds(),
+        franchiseId: context.franchiseId,
         onRowClick: function (recruit) {
           toggleRecruitSelection(recruit.recruitId);
         },
@@ -1283,6 +1284,16 @@
     var backBtn = document.getElementById('back-btn');
     backBtn.addEventListener('click', function () {
       attemptLeave(resolveBackUrl());
+    });
+
+    // Recruit-name links leave the page like any other nav, so they go through
+    // the same unsaved-orders guard as the back button rather than tripping the
+    // browser's native beforeunload dialog.
+    document.addEventListener('click', function (e) {
+      var link = e.target.closest && e.target.closest('.recruit-name-link');
+      if (!link) return;
+      e.preventDefault();
+      attemptLeave(link.getAttribute('href'));
     });
 
     window.addEventListener('beforeunload', function (e) {

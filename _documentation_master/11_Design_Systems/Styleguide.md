@@ -304,6 +304,7 @@ Used for confirmations, warnings, settings changes, and destructive actions. Goa
 **Canonical examples:**
 - Auto-Train confirmation (training.html) — first canonical implementation
 - In-game timeout confirmation
+- In-game player foul-out gate (`foulOutPopup.js`) — same shell as timeout; adds player headshot + name
 - End of quarter confirmation
 - Delete Franchise confirmation
 - Unsaved changes warning

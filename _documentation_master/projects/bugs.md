@@ -4,7 +4,7 @@
 3. HCO entry pass on offense side teleported
 5. Dead ball turnove rin HCO is passing ahead then teleppring back to animate the DB turnover
 6. Improve reset action in HCO
-7. SIP to Final Shot made shot but did not animate it or sound airhorm at quarter end.
+7. ~~SIP → Final Shot/FLSS make announced ("It's Good!") but nothing animated~~ — **Fixed 2026-07-16:** FOUL→SIP now arms FLSS when EOQ chain active (`schedule_flss_after_inbound` + `tag_result_if_late_clock_eoq_chain`); FLSS beats quick foul when pending; empty schema emit stamps `eoq_schema_emit_failed`; FE gates SHOT_MAKE on `playTurn.stepsExecuted > 0`. See EOQ_System.md §8 / §9.
 
 ##Full Product Readiness
 102. Team court images

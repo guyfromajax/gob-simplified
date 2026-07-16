@@ -135,6 +135,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - **Helper:** `signalQuarterEnded(scene, turnData, { phase })` in `FrontEnd/static/js/phaser/utils/quarterEndAirhorn.js` — single entry for all quarter-end paths. Eligibility: `quarter_ends_after === true` **or** (`clock_end === 0` && `clock_start > 0`). Once-per-turn dedupe via `scene._endOfQuarterAirhornTurnKeys`. File: `airhorn-lowervol.wav` at 0.7 — raw `Audio()`.
 - **Phase `clockTween`:** `AnimationRouter.js` clock interpolation. Plays on the clock contract unless `quarter_ends_after` is set (defer to playback so the horn aligns with rim/hold/FT finish).
 - **Phase `playbackComplete`:** after turn animation finishes — `AnimationRouter` calls `signalQuarterEnded` for **every** turn (universal fallback after boundary tween drain). EOQ-specific handlers (Final Turn / FLSS hold, schema FT, `FINAL_HOLD`, run-out) may fire earlier; per-turn dedupe prevents double-play. Plays on `quarter_ends_after` even when `clock_start === 0`.
+- **EOQ MAKE card vs airhorn:** `_finishFinalTurnQuarterEnd` still runs airhorn/hold on `quarter_ends_after`, but **`SHOT_MAKE` ("It's Good!") is gated** on schema steps actually executing (`playTurn.stepsExecuted > 0`) and `eoq_schema_emit_failed !== true`. Empty Final Shot / FLSS emit must not announce a make with no court motion.
 - Scope: live turn-by-turn court playback (Q1–Q4). Not tied to the quarter-break locker-room screen or the "Quarter X Complete!" popup.
 
 **Defense Matchup Modal**

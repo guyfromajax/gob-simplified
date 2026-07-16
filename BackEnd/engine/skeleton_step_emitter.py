@@ -1481,11 +1481,30 @@ def build_skeleton_animation_steps(
             # (attached to him via HIGH-2) stays seam-continuous with the prior
             # turn's final ball rest. Only seed the shot-spot coord as a fallback
             # if prior final_coords is somehow missing the shooter.
-            if str(shooter_id) not in flss_seed_coords:
-                flss_seed_coords[str(shooter_id)] = {
-                    "x": float(shooter_coords.get("x", 50)),
-                    "y": float(shooter_coords.get("y", 25)),
-                }
+            shooter_key = str(shooter_id)
+            if shooter_key not in flss_seed_coords:
+                # Post-SIP/BIP seam: prefer prior ball rest / prior BH body over
+                # drive-end so FLSS never collapses to a zero-length sprint.
+                prior_ball = prior_turn.get("final_ball_coords")
+                if isinstance(prior_ball, dict) and prior_ball.get("x") is not None:
+                    flss_seed_coords[shooter_key] = {
+                        "x": float(prior_ball.get("x", 50)),
+                        "y": float(prior_ball.get("y", 25)),
+                    }
+                else:
+                    prior_bh = (
+                        (prior_turn.get("roles") or {}).get("ball_handler")
+                        if isinstance(prior_turn.get("roles"), dict)
+                        else None
+                    )
+                    prior_bh_id = _safe_id(prior_bh) if prior_bh is not None else None
+                    if prior_bh_id and prior_bh_id in flss_seed_coords:
+                        flss_seed_coords[shooter_key] = dict(flss_seed_coords[prior_bh_id])
+                    else:
+                        flss_seed_coords[shooter_key] = {
+                            "x": float(shooter_coords.get("x", 50)),
+                            "y": float(shooter_coords.get("y", 25)),
+                        }
     elif turn_type == "FCP" and isinstance(prior_turn, dict):
         prior_fc = prior_turn.get("final_coords") or {}
         if isinstance(prior_fc, dict) and prior_fc:

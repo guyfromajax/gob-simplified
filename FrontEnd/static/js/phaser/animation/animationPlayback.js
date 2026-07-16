@@ -1406,12 +1406,15 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
  * @param {Object} [options]
  * @param {number} [options.startIndex=0]
  * @param {number} [options.maxStepsGuard=200]  Cycle/loop safety bound.
- * @returns {Promise<{event: import("./animationStepSchema.js").TurnStopEvent, payload: Object} | null>}
- *   Turn-stop event when the turn ends with one; null when steps complete
- *   without one (implicit end of turn).
+ * @returns {Promise<{turnStop: {event: import("./animationStepSchema.js").TurnStopEvent, payload: Object}|null, stepsExecuted: number} | null>}
+ *   Playback result. ``null`` only when ``steps`` is empty/missing; otherwise
+ *   always ``{ turnStop, stepsExecuted }`` (turnStop null = implicit end).
  */
 export async function playTurn(scene, steps, sprites, ballSprite, options = {}) {
-  if (!Array.isArray(steps) || steps.length === 0) return null;
+  if (!Array.isArray(steps) || steps.length === 0) {
+    if (scene) scene.__lastPlayTurnStepsExecuted = 0;
+    return { turnStop: null, stepsExecuted: 0 };
+  }
 
   const startIndex = options.startIndex ?? 0;
   const maxStepsGuard = options.maxStepsGuard ?? 200;
@@ -1441,9 +1444,15 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
   const repeatDiagnosticThreshold = options.repeatDiagnosticThreshold ?? 12;
 
   while (currentIndex >= 0 && currentIndex < steps.length) {
-    if (scene?.skipToEnd) return null;
+    if (scene?.skipToEnd) {
+      if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+      return { turnStop: null, stepsExecuted };
+    }
     await waitWhileUserPaused(scene);
-    if (scene?.skipToEnd) return null;
+    if (scene?.skipToEnd) {
+      if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+      return { turnStop: null, stepsExecuted };
+    }
     if (stepsExecuted++ >= maxStepsGuard) {
       throw new Error(
         `playTurn: exceeded ${maxStepsGuard} steps — likely a cycle in next pointers`,
@@ -1502,7 +1511,10 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       currentIndex,
       next,
     });
-    if (!next) return null;
+    if (!next) {
+      if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+      return { turnStop: null, stepsExecuted };
+    }
 
     if (next.kind === "turn_stop") {
       tracePlayback(scene, "turn:stop", {
@@ -1510,14 +1522,19 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
         event: next.event,
         payload: next.payload ?? null,
       });
-      return { event: next.event, payload: next.payload };
+      if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+      return {
+        turnStop: { event: next.event, payload: next.payload },
+        stepsExecuted,
+      };
     }
     if (next.kind === "end_of_turn") {
       tracePlayback(scene, "turn:end-of-turn", {
         turnIndex: options.turnData?.index ?? null,
         currentIndex,
       });
-      return null;
+      if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+      return { turnStop: null, stepsExecuted };
     }
     if (next.kind === "next_step") {
       if (next.index === currentIndex) {
@@ -1576,7 +1593,8 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
     currentIndex,
     stepsExecuted,
   });
-  return null;
+  if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+  return { turnStop: null, stepsExecuted };
 }
 
 // --- Turn-stop dispatcher --------------------------------------------------

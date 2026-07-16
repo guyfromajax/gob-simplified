@@ -134,6 +134,7 @@ flowchart TD
 - Late-clock **makes** in chain → `apply_post_make_late_clock_routing`.
 - **FLSS** post-emit → `finalize_flss_post_emit`.
 - **BIP after make** → `schedule_flss_after_inbound`.
+- **SIP after FOUL/CHARGE/DEAD_BALL in chain** → `schedule_flss_after_inbound(sip_gate_result)` (source tagged via `tag_result_if_late_clock_eoq_chain` or chain-active gate).
 - **DREB after miss/block in chain (clock > 2s)** → `schedule_flss_after_dreb` (rebounder = ball handler; no HCO outlet).
 
 ### Critical bug class (fixed 2026-06)
@@ -271,7 +272,7 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 | Condition | Source |
 |-----------|--------|
 | Follow-up runway check fails (`EOQ_FOLLOWUP_FLSS`) | `turn_manager.run_micro_turn()` after `final_shot_ran_this_chain` |
-| `flss_possession_pending` after late-clock BIP/SIP make in chain | `schedule_flss_after_inbound()` — may be cleared at entry if follow-up runway favors Final Turn |
+| `flss_possession_pending` after late-clock BIP/SIP (make **or** FOUL/CHARGE→SIP in chain) | `schedule_flss_after_inbound()` — arms when source has `late_clock_eoq` **or** `late_clock_eoq_chain_active`; may be cleared at entry if follow-up runway favors Final Turn |
 | Final Turn preflight budget fail at ≤ 8s | `resolve_final_turn_shot()` |
 | Post-DREB when chain active and clock > 2s | `schedule_flss_after_dreb()` |
 | Game clock ≤ 0, eligible, Final Turn not already flagged (or state ≠ HCO) | `turn_manager` low-clock branch |
@@ -285,6 +286,12 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 
 **Post-emit:** `finalize_flss_post_emit()` — 1s make burn at ≤ 1s clock; quarter drain when terminal.
 
+**Schema emit contract (Final Shot + FLSS):** `_emit_hco_animation_steps` must produce non-empty `animation_steps`. On empty emit / emitter exception, stamp `eoq_schema_emit_failed: true` and log error (`_assert_eoq_animation_steps`). FE must **not** treat that turn as a rendered MAKE (no `_finishFinalTurnQuarterEnd` → `SHOT_MAKE`, no legacy "It's Good!" on empty anim). Scoring still applies.
+
+**Quick foul vs pending FLSS:** When `flss_possession_pending` is set at HCO entry, quick foul is skipped so the HCO branch consumes FLSS. FOUL must not strand the pending flag across FOUL→SIP.
+
+**SIP/BIP → FLSS seam:** Emitter seeds FLSS step 0 from `prior_turn.final_coords`. If shooter is missing, fall back to `final_ball_coords` / prior ball-handler body — never park shooter at drive-end (zero-length sprint).
+
 **Micro-movements:** FLSS does **not** use shot micro-movements — no family selection, no `inject_shot_micro_before_post_shot` (see [`Shot_Micro_Movements_System.md`](Shot_Micro_Movements_System.md)).
 
 **FLSS AIRBALL animation:** On `shot_variant === "AIRBALL"`, backend rolls a random short landing (`2–5` grid x-units out from the attacking basket, y `basket_y ± 5`) via `roll_flss_airball_animation_coords()` — stamped as `flss_airball_land_*` / `flss_airball_oob_*` on the turn. Schema `[ball_flight]` ends at the landing; OOB continuation tweens to the sideline at the **same y** (`airball_oob` trigger, `airball.wav` unchanged). No **Airball!** headline on heave-zone FLSS. FG/FT AIRBALL paths are unchanged. See [`Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) § FLSS.
@@ -297,7 +304,8 @@ After shot resolution or the **last FT** of a trip, if `time_remaining > 0`:
 
 | Outcome | Next step |
 |---------|-----------|
-| **Make, no foul** (in chain) | BIP/SIP → `schedule_flss_after_inbound` may set `flss_possession_pending` → **next HCO/HCT/FCP entry runs §6b runway check** (Final Turn or FLSS) |
+| **Make, no foul** (in chain) | BIP → `schedule_flss_after_inbound` may set `flss_possession_pending` → **next HCO/HCT/FCP entry runs §6b runway check** (Final Turn or FLSS) |
+| **Non-shooting FOUL / CHARGE / DEAD_BALL → SIP** (in chain) | Tag source with `late_clock_eoq` via `tag_result_if_late_clock_eoq_chain` (or chain-active gate in `schedule_flss_after_inbound`) → SIP → next HCO consumes FLSS (quick foul deferred while pending) |
 | **Miss / Block, OREB** | `pending_oreb` → putback turn; kickout → HCO may arm first Final Shot or §6b follow-up |
 | **Miss / Block, DREB** (late chain, clock **> 2s**) | Discrete DREB → `schedule_flss_after_dreb` → FLSS (rebounder = BH; no HCO outlet) |
 | **Miss / Block, DREB** (late chain, clock **≤ 2s**) | `terminal_dreb_eoq` → DREB animation → clock drain |
@@ -311,7 +319,7 @@ When `time_remaining == 0`:
 
 **BIP clock runoff:** `resolve_late_clock_bip_runoff()` burns up to 2s on inbound when prior turn has `late_clock_eoq` **or** `late_clock_ft_resolution`.
 
-Turns in an active chain carry `late_clock_eoq: true` when tagged by make/miss/FLSS/OREB-in-chain paths.
+Turns in an active chain carry `late_clock_eoq: true` when tagged by make/miss/FLSS/OREB-in-chain paths, **and** when FOUL/CHARGE (etc.) occur while `late_clock_eoq_chain_active` so SIP can re-arm FLSS.
 
 ---
 

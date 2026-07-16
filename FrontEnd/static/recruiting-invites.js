@@ -307,6 +307,7 @@
       Recruiting.sortRecruits(recruits, sortState),
       {
         selectedIds: getSelectedIds(),
+        franchiseId: context.franchiseId,
         onRowClick: function (recruit) {
           toggleRecruitSelection(recruit.recruitId);
         },
@@ -1073,6 +1074,16 @@
     var backBtn = document.getElementById('back-btn');
     backBtn.addEventListener('click', function () {
       attemptLeave(resolveBackUrl());
+    });
+
+    // Recruit-name links leave the page like any other nav, so they go through
+    // the same unsaved-changes guard as the back button rather than tripping the
+    // browser's native beforeunload dialog.
+    document.addEventListener('click', function (e) {
+      var link = e.target.closest && e.target.closest('.recruit-name-link');
+      if (!link) return;
+      e.preventDefault();
+      attemptLeave(link.getAttribute('href'));
     });
 
     window.addEventListener('beforeunload', function (e) {

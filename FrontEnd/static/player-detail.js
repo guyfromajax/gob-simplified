@@ -188,7 +188,10 @@
 
   function goBack() {
     const params = new URLSearchParams(window.location.search);
-    const returnUrl = params.get('return_url');
+    // Same-origin guard: return_url is attacker-controllable via the query string.
+    const returnUrl = typeof getSafeReturnUrl === 'function'
+      ? getSafeReturnUrl(params.get('return_url'))
+      : params.get('return_url');
     if (returnUrl) {
       window.location.href = returnUrl;
       return;
@@ -197,7 +200,7 @@
     if (window.history.length > 1) {
       window.history.back();
     } else {
-      window.location.href = '/static/homepage.html';
+      window.location.href = '/homepage.html';
     }
   }
 
@@ -325,12 +328,71 @@
     return `<div class="pd-position-ratings">${rows}</div>`;
   }
 
+  /**
+   * Un-signed recruit portrait: the white master keyed by image_id. Painted
+   * lazily, so a 404 means "not painted yet" — ensure, retry once cache-busted,
+   * then fall back to generic. Wired imperatively (not via buildPortrait's
+   * inline onerror) because the retry is async.
+   */
+  function buildRecruitPortrait(fullName) {
+    return `<img alt="${escapeAttr(fullName)}" class="pd-portrait" id="pd-recruit-portrait">`;
+  }
+
+  function wireRecruitPortrait(imageId) {
+    const img = document.getElementById('pd-recruit-portrait');
+    if (!img) return;
+    const api = window.API_CONFIG;
+    const url = api.getRecruitImageUrl(imageId, { size: 'modal' });
+    const generic = api.getGenericHeadshotUrl({ size: 'modal' });
+    img.onerror = () => {
+      api.ensureRecruitImage(imageId).then(() => {
+        img.onerror = () => { img.onerror = null; img.src = generic; };
+        img.src = api.getRecruitImageUrl(imageId, { size: 'modal' }) + '?r=1';
+      });
+    };
+    img.src = url;
+  }
+
+  function escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function buildPortrait(photo, fullName, genericPhoto, fallbackPhoto) {
     if (!photo) {
       return '<div class="pd-portrait-placeholder" aria-hidden="true"></div>';
     }
     const initialFallbackState = photo === fallbackPhoto ? 'player' : 'primary';
-    return `<img src="${photo}" alt="${fullName}" class="pd-portrait" onerror="if(this.dataset.fallbackState==='generic'){this.remove();this.parentElement.innerHTML='<div class=&quot;pd-portrait-placeholder&quot; aria-hidden=&quot;true&quot;></div>';}else if(this.dataset.fallbackState==='player'){this.dataset.fallbackState='generic';this.src='${genericPhoto}';}else{this.dataset.fallbackState='player';this.src='${fallbackPhoto}';}" data-fallback-state="${initialFallbackState}">`;
+    return `<img src="${photo}" alt="${escapeAttr(fullName)}" class="pd-portrait" onerror="if(this.dataset.fallbackState==='generic'){this.remove();this.parentElement.innerHTML='<div class=&quot;pd-portrait-placeholder&quot; aria-hidden=&quot;true&quot;></div>';}else if(this.dataset.fallbackState==='player'){this.dataset.fallbackState='generic';this.src='${genericPhoto}';}else{this.dataset.fallbackState='player';this.src='${fallbackPhoto}';}" data-fallback-state="${initialFallbackState}">`;
+  }
+
+  /**
+   * Recruit-only block. Home Region / Lean / archetype exist on FRD docs but
+   * never on players, and fill the space where STATUS sits for a player.
+   * `Lean` is a {"1","2","3"} -> team_id ranking; only the top choice is shown.
+   */
+  function buildRecruitingBlock(player) {
+    const rows = [
+      ['ARCHETYPE', player.archetype || '--'],
+      ['HOME REGION', player['Home Region'] || '--'],
+      ['LEAN', player.lean_display || '--'],
+    ];
+    return `
+      <div class="pd-divider"></div>
+      <div class="pd-status-label">RECRUITING</div>
+      <div class="pd-recruiting-grid">
+        ${rows.map(([label, value]) => `
+          <div class="pd-recruiting-row">
+            <span class="pd-recruiting-label">${label}</span>
+            <span class="pd-recruiting-value">${escapeAttr(value)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   function formatScoutingReport(player) {
@@ -353,9 +415,11 @@
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const staticPrefix = isLocalhost ? '/static' : '';
 
+    const isRecruit = !!player.is_recruit;
     const firstName = player.first_name || '';
     const lastName = player.last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim() || 'Unknown Player';
+    // Recruits carry a single `name`; players carry first_name/last_name.
+    const fullName = `${firstName} ${lastName}`.trim() || player.name || 'Unknown Player';
     const rawTeam = player.team || 'Free Agent';
     const team = normalizeTeamName(rawTeam);
     const heightValue = player.height || player.HT || 75;
@@ -388,7 +452,7 @@
         <aside class="pd-left-card">
           <button class="pd-back-btn" id="pd-back-btn">Back</button>
           <div class="pd-portrait-wrap" style="background-image:url('${teamBackground}');background-size:cover;background-position:center;">
-            ${buildPortrait(photo, fullName, genericPhoto, fallbackPhoto)}
+            ${isRecruit ? buildRecruitPortrait(fullName) : buildPortrait(photo, fullName, genericPhoto, fallbackPhoto)}
           </div>
           <div class="pd-player-name">${fullName}</div>
           <div class="pd-pos-line">${yearJerseyLine}</div>
@@ -398,6 +462,7 @@
             <div class="pd-overall-value">${rtValue}</div>
           </div>
           ${positionRatingsBlock}
+          ${isRecruit ? buildRecruitingBlock(player) : `
           <div class="pd-divider"></div>
           <div class="pd-status-label">STATUS</div>
           <div class="pd-status-grid">
@@ -409,7 +474,7 @@
               <div class="pd-status-cell-label">MOMENTUM</div>
               <div class="pd-status-value">${momentumValue}</div>
             </div>
-          </div>
+          </div>`}
         </aside>
 
         <div class="pd-right-column">
@@ -467,6 +532,8 @@
     const backBtn = document.getElementById('pd-back-btn');
     if (backBtn) backBtn.addEventListener('click', goBack);
 
+    if (isRecruit) wireRecruitPortrait(player.image_id);
+
     renderAttributes(attributes);
     renderCareerStats(player, team, teamPrimaryColor);
     animateAttributeBars();
@@ -479,13 +546,39 @@
     }
   }
 
+  async function loadRecruitData(recruitId, franchiseId) {
+    if (!franchiseId) {
+      showError('No franchise ID provided');
+      return;
+    }
+    try {
+      const apiUrl = API_CONFIG.buildUrl(`/recruit/${encodeURIComponent(recruitId)}`)
+        + `?franchise_id=${encodeURIComponent(franchiseId)}`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load recruit: ${response.statusText}`);
+      }
+      renderPlayerPage(await response.json());
+    } catch (error) {
+      console.error('Error loading recruit:', error);
+      showError(`Failed to load recruit data: ${error.message}`);
+    }
+  }
+
   async function loadPlayerData() {
     const params = new URLSearchParams(window.location.search);
     const playerId = params.get('id');
+    const recruitId = params.get('recruit_id');
     const mode = params.get('mode');
     const franchiseId = params.get('franchise_id');
     const tournamentId = params.get('tournament_id');
     const gameId = params.get('game_id');
+
+    // Recruit mode: un-signed recruits live in FRD, not the players collection.
+    if (recruitId) {
+      await loadRecruitData(recruitId, franchiseId);
+      return;
+    }
 
     if (!playerId) {
       showError('No player ID provided');

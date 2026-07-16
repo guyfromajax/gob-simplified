@@ -154,6 +154,34 @@ def test_schedule_flss_after_inbound():
     assert is_late_clock_eoq_chain_active(game.game_state) is True
 
 
+def test_schedule_flss_after_inbound_uses_active_chain_without_source_tag():
+    """FOUL→SIP historically lacked late_clock_eoq; chain-active must still arm FLSS."""
+    from BackEnd.utils.eoq_clock_progression import activate_late_clock_eoq_chain
+
+    game = SimpleNamespace(game_state={"time_remaining": 4, "offensive_state": "HCO"})
+    activate_late_clock_eoq_chain(game.game_state)
+    foul = {"result_type": "FOUL", "next_play_type": "SIDE_INBOUND"}
+    schedule_flss_after_inbound(game, foul)
+    assert foul["late_clock_eoq"] is True
+    assert game.game_state["flss_possession_pending"] is True
+    assert game.game_state["offensive_state"] == "HCO"
+
+
+def test_tag_result_if_late_clock_eoq_chain():
+    from BackEnd.utils.eoq_clock_progression import (
+        activate_late_clock_eoq_chain,
+        tag_result_if_late_clock_eoq_chain,
+    )
+
+    game = SimpleNamespace(game_state={})
+    foul = {"result_type": "FOUL"}
+    assert tag_result_if_late_clock_eoq_chain(game, foul) is False
+    assert foul.get("late_clock_eoq") is None
+    activate_late_clock_eoq_chain(game.game_state)
+    assert tag_result_if_late_clock_eoq_chain(game, foul) is True
+    assert foul["late_clock_eoq"] is True
+
+
 def test_schedule_flss_after_dreb():
     rebounder = SimpleNamespace(player_id="r9")
     dreb_turn = {"late_clock_eoq": True, "flss_after_dreb": True}

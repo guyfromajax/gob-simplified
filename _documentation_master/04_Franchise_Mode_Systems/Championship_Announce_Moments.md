@@ -68,7 +68,7 @@ Public API (`window.ChampionshipMoments`):
 
 ### Integration points
 
-- **FCC mount** — [franchise-command-center.js:~3039](../../FrontEnd/static/franchise-command-center.js#L3039). After `topData` loads, the queue is consumed via `processPendingMoments`. When the queue is non-empty, the legacy `maybeShowChampionshipCompleteModal` (~L3282) is skipped to avoid double-show.
+- **FCC mount** — [franchise-command-center.js](../../FrontEnd/static/franchise-command-center.js). After `topData` loads, the queue is consumed via `processPendingMoments`. (The former legacy `championship_summary` / Season Complete modal has been removed.)
 - **Live game** — [gameCompletionPopup.js:~32](../../FrontEnd/static/js/phaser/utils/gameCompletionPopup.js#L32). On franchise mode the popup first calls `/franchise/championship-moments/context`. If the just-completed game is a championship, the championship overlay replaces the standard EOG modal and the EOG flow short-circuits. The shared module is lazy-loaded on the gameplay page (FCC pre-loads it).
 
 ### Behavioral rules (all four)

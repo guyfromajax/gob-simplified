@@ -1167,7 +1167,7 @@ function partitionRecruitsWithNewLeans(recruits, sortFn, sortState) {
 function buildHomeRecruitRowHtml(recruit) {
   const rowHtml = `
     <div class="fcc-home-recruit-row">
-      <span class="fcc-home-recruit-name">${escapeHomeHtml(recruit.name || '--')}</span>
+      <span class="fcc-home-recruit-name">${RecruitingCommon.recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name)}</span>
       <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
@@ -1943,7 +1943,7 @@ function renderFccRecruits() {
     rows.forEach(function (recruit) {
       const tr = document.createElement('tr');
       tr.innerHTML = [
-        '<td>' + recruit.name + '</td>',
+        '<td>' + RecruitingCommon.recruitNameLinkHtml(recruit.detailRecruitId, franchiseId, recruit.name) + '</td>',
         '<td>' + recruit.homeRegion + '</td>',
         '<td>' + recruit.archetype + '</td>',
         '<td>' + recruit.height + '</td>',
@@ -1980,7 +1980,7 @@ function renderFccRecruits() {
       RecruitingCommon.sortRecruits.bind(RecruitingCommon),
       recruitSortState
     ),
-    { newLeanIds: getNewLeanRecruitIdSet() }
+    { newLeanIds: getNewLeanRecruitIdSet(), franchiseId: franchiseId }
   );
 }
 
@@ -1997,6 +1997,9 @@ function initFccRecruits(topData) {
     const attrs = player.attributes || {};
     return {
       recruitId: player.recruit_id || player.player_id,
+      // Link target only: recruitId falls back to player_id for walk-ons, which
+      // would not resolve against FRD. Null here means "render name as text".
+      detailRecruitId: player.recruit_id || null,
       name: player.walk_on ? player.name + ' (walk on)' : player.name,
       homeRegion: player.home_region || '--',
       archetype: player.archetype || '--',
@@ -3237,9 +3240,6 @@ async function init() {
     void renderFccPlaybooksSummary();
   }
   renderFccInbox(topData);
-  // Championship Announce moments take precedence over the legacy
-  // championship_summary modal: when the new system has anything queued, render
-  // those overlays instead of the older one for the same game.
   const pendingMoments = Array.isArray(topData?.pending_championship_moments)
     ? topData.pending_championship_moments
     : [];
@@ -3252,8 +3252,6 @@ async function init() {
         boxScoreUrlBuilder: (moment) => buildFccBoxScoreUrlForMoment(moment),
       }
     );
-  } else {
-    maybeShowChampionshipCompleteModal(topData);
   }
   championshipMomentsDone.then(() => {
     if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
@@ -3436,11 +3434,6 @@ function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
   if (teamNameRaw) params.set('banner_team', teamNameRaw);
 }
 
-function getChampionshipSeenKey(franchiseIdValue, gameId) {
-  if (!franchiseIdValue || !gameId) return null;
-  return `fcc_championship_seen_${franchiseIdValue}_${gameId}`;
-}
-
 // True if any higher-priority FCC modal/prompt claims this visit, so the
 // lowest-priority archetype-evolution modal must yield. Combines a DOM check
 // (same overlay selectors RegionByeModal.blockerVisible uses, for modals already
@@ -3451,16 +3444,10 @@ function getChampionshipSeenKey(franchiseIdValue, gameId) {
 function fccHasCompetingModal(topData) {
   if (typeof document !== 'undefined' && document.querySelector(
       '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
-      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.fcc-modal-overlay,.bn-overlay.show')) {
+      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show')) {
     return true;
   }
   if (Array.isArray(topData?.pending_championship_moments) && topData.pending_championship_moments.length) return true;
-  const summary = topData?.championship_summary;
-  if (summary && summary.game_id) {
-    const seenKey = getChampionshipSeenKey(franchiseId, summary.game_id);
-    const seen = seenKey && typeof localStorage !== 'undefined' && localStorage.getItem(seenKey) === '1';
-    if (!seen) return true;
-  }
   if (topData?.region_bye_modal_eligible) return true;
   if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;
@@ -3486,65 +3473,6 @@ function buildFccBoxScoreUrlForMoment(moment) {
   if (moment.loser_team_name) params.set('away', moment.loser_team_name);
   appendFranchiseBoxScoreUserHints(params, moment.winner_team_name, moment.loser_team_name);
   return `/box-score.html?${params.toString()}`;
-}
-
-function maybeShowChampionshipCompleteModal(topData) {
-  const summary = topData?.championship_summary;
-  if (!summary || !summary.game_id) return;
-
-  const seenKey = getChampionshipSeenKey(franchiseId, summary.game_id);
-  if (seenKey && typeof localStorage !== 'undefined' && localStorage.getItem(seenKey) === '1') {
-    return;
-  }
-  showChampionshipCompleteModal(summary);
-}
-
-function showChampionshipCompleteModal(summary) {
-  const winner = summary.winner_team_name || 'Champion';
-  const homeName = summary.home_team_name || 'Home';
-  const awayName = summary.away_team_name || 'Away';
-  const homeScore = summary.home_score ?? '--';
-  const awayScore = summary.away_score ?? '--';
-  const gameId = summary.game_id;
-
-  const overlay = document.createElement('div');
-  overlay.className = 'fcc-modal-overlay';
-  overlay.innerHTML = `
-    <div class="fcc-modal-card" role="dialog" aria-modal="true" aria-label="Season Complete">
-      <h3 class="fcc-modal-title">Season Complete</h3>
-      <p class="fcc-modal-copy"><strong>${winner}</strong> won the Championship.</p>
-      <p class="fcc-modal-copy">${awayName} ${awayScore} at ${homeName} ${homeScore}</p>
-      <div class="fcc-modal-actions">
-        <button class="fcc-modal-btn fcc-modal-btn-secondary" id="fcc-champ-box-score">Box Score</button>
-        <button class="fcc-modal-btn fcc-modal-btn-primary" id="fcc-champ-back">Back To Locker Room</button>
-      </div>
-    </div>
-  `;
-
-  const markSeen = () => {
-    const seenKey = getChampionshipSeenKey(franchiseId, gameId);
-    if (seenKey && typeof localStorage !== 'undefined') localStorage.setItem(seenKey, '1');
-  };
-
-  overlay.querySelector('#fcc-champ-box-score')?.addEventListener('click', () => {
-    markSeen();
-    const params = new URLSearchParams();
-    params.set('mode', 'franchise');
-    params.set('franchise_id', franchiseId);
-    params.set('game_id', gameId);
-    if (homeName) params.set('home', homeName);
-    if (awayName) params.set('away', awayName);
-    appendFranchiseBoxScoreUserHints(params, homeName, awayName);
-    window.location.href = `/box-score.html?${params.toString()}`;
-  });
-
-  overlay.querySelector('#fcc-champ-back')?.addEventListener('click', () => {
-    markSeen();
-    overlay.remove();
-    window.location.href = `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}`;
-  });
-
-  document.body.appendChild(overlay);
 }
 
 function showNewSeasonConfirmModal() {

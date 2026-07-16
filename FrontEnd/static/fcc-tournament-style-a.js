@@ -58,13 +58,16 @@
     return null;
   }
 
-  function recordStrFor(id, teamIdMetaMap) {
+  function recordStrFor(id, teamIdMetaMap, recordMap) {
     if (!isRealTeamId(id)) return '';
     var m = teamIdMetaMap[String(id)] || {};
-    if (!Object.prototype.hasOwnProperty.call(m, 'W') && !Object.prototype.hasOwnProperty.call(m, 'L')) return '';
-    var w = Number.isFinite(Number(m.W)) ? Number(m.W) : 0;
-    var l = Number.isFinite(Number(m.L)) ? Number(m.L) : 0;
-    return w + '-' + l;
+    if (Object.prototype.hasOwnProperty.call(m, 'W') || Object.prototype.hasOwnProperty.call(m, 'L')) {
+      var w = Number.isFinite(Number(m.W)) ? Number(m.W) : 0;
+      var l = Number.isFinite(Number(m.L)) ? Number(m.L) : 0;
+      return w + '-' + l;
+    }
+    if (recordMap && recordMap[String(id)]) return recordMap[String(id)];
+    return '';
   }
 
   function seedFor(id, seeds) {
@@ -82,13 +85,67 @@
     return m;
   }
 
+  function buildRecordMap(topData) {
+    var m = {};
+    (topData && topData.rankings ? topData.rankings : []).forEach(function (r) {
+      if (!r || r.team_id == null) return;
+      if (!Object.prototype.hasOwnProperty.call(r, 'W') && !Object.prototype.hasOwnProperty.call(r, 'L')) return;
+      var w = Number.isFinite(Number(r.W)) ? Number(r.W) : 0;
+      var l = Number.isFinite(Number(r.L)) ? Number(r.L) : 0;
+      m[String(r.team_id)] = w + '-' + l;
+    });
+    return m;
+  }
+
+  function scoreValuePresent(v) {
+    return v != null && v !== '' && Number.isFinite(Number(v));
+  }
+
   function scoresFor(m, hid, aid, hName, aName) {
     var sc = (m && m.score) || {};
-    var hs = sc[hid];
-    if (hs == null) hs = sc[hName];
-    var as = sc[aid];
-    if (as == null) as = sc[aName];
-    return { hs: hs != null ? hs : '', as: as != null ? as : '' };
+    // Franchise EOS progression writes { home, away }. Older / legacy shapes
+    // may key by team id or team name — accept all three.
+    var hs = sc.home;
+    if (!scoreValuePresent(hs)) hs = sc[hid];
+    if (!scoreValuePresent(hs)) hs = sc[hName];
+    var as = sc.away;
+    if (!scoreValuePresent(as)) as = sc[aid];
+    if (!scoreValuePresent(as)) as = sc[aName];
+    return {
+      hs: scoreValuePresent(hs) ? Number(hs) : '',
+      as: scoreValuePresent(as) ? Number(as) : '',
+    };
+  }
+
+  /**
+   * Region shape-3 finals are stored as home=R1 path, away=bye team. Display
+   * always puts the bye team on top (and the R1 path / TBD on bottom).
+   */
+  function regionChampionshipMatchupForDisplay(bracket) {
+    var fin = bracket && bracket.final && bracket.final[0] ? bracket.final[0] : null;
+    if (!fin || detectRegionShape(bracket) !== '3') return fin;
+    var byeId = regionByeTeamId(fin);
+    if (!byeId && isRealTeamId(fin.away_team)) byeId = String(fin.away_team);
+    if (!byeId || String(fin.home_team) === byeId) return fin;
+    var sc = fin.score || {};
+    var swappedScore;
+    if (scoreValuePresent(sc.home) || scoreValuePresent(sc.away)) {
+      swappedScore = { home: sc.away, away: sc.home };
+    } else {
+      swappedScore = {};
+      if (sc[fin.home_team] != null) swappedScore[fin.away_team] = sc[fin.home_team];
+      if (sc[fin.away_team] != null) swappedScore[fin.home_team] = sc[fin.away_team];
+      Object.keys(sc).forEach(function (k) {
+        if (k === 'home' || k === 'away') return;
+        if (String(k) === String(fin.home_team) || String(k) === String(fin.away_team)) return;
+        swappedScore[k] = sc[k];
+      });
+    }
+    return Object.assign({}, fin, {
+      home_team: fin.away_team,
+      away_team: fin.home_team,
+      score: swappedScore,
+    });
   }
 
   function conferenceDisplayModel(week, bracket, allBrackets) {
@@ -263,6 +320,9 @@
 
     row.appendChild(elSpan('fcc-tb-seed', slot.seed != null ? String(slot.seed) : ''));
 
+    // Logos: shown on FCC Tournament tab / All Brackets. Bracket modals hide
+    // them via `.bn-bracket-scale .fcc-tb-logo { display: none }`. Reveal mode
+    // still skips creating logo nodes until product decides logo policy there.
     if (slot.name && !slot.revealMode) {
       row.appendChild(createBannerEl(slot.name));
     } else if (!slot.revealMode) {
@@ -279,7 +339,7 @@
       chip.textContent = slot.regionChip;
       nameCell.appendChild(chip);
     }
-    if (slot.rank != null && !slot.revealMode) {
+    if (slot.rank != null) {
       var rk = document.createElement('span');
       rk.className = 'fcc-tb-rank-prefix';
       rk.textContent = '#' + slot.rank + ' ';
@@ -292,7 +352,7 @@
     if (slot.showCrown) {
       nameCell.insertAdjacentHTML('beforeend', CROWN_SVG);
     }
-    if (slot.recordStr && !slot.revealMode) {
+    if (slot.recordStr) {
       var rec = document.createElement('span');
       rec.className = 'fcc-tb-record';
       rec.textContent = '\u00a0' + slot.recordStr;
@@ -324,11 +384,16 @@
     var lost = w != null && !won && isRealTeamId(w);
     var name = teamName(id, teamIdToNameMap);
     var sc = scoresFor(m, m.home_team, m.away_team, name, teamName(m.away_team, teamIdToNameMap));
-    var score = opponentIsBye ? '' : side === 'home' ? sc.hs : sc.as;
+    // Scores only for completed games (winner set). Bye cards never show a score.
+    var score =
+      opponentIsBye || w == null || opts.revealMode
+        ? ''
+        : side === 'home'
+          ? sc.hs
+          : sc.as;
     if (opts.revealMode) {
       won = false;
       lost = false;
-      score = '';
     }
     return {
       tbd: false,
@@ -336,7 +401,7 @@
       seed: seedFor(id, seeds),
       rank: natRankFor(id, teamIdMetaMap, rankMap),
       name: name,
-      recordStr: recordStrFor(id, teamIdMetaMap),
+      recordStr: recordStrFor(id, teamIdMetaMap, opts.recordMap),
       score: score,
       isUser: userTeamId != null && String(userTeamId) === String(id),
       outcome: won ? 'winner' : lost ? 'loser' : null,
@@ -386,6 +451,7 @@
       showCrown: !!opts.showCrown,
       showChampion: !!opts.showChampion,
       revealMode: !!opts.revealMode,
+      recordMap: opts.recordMap || {},
     };
     var topSlot = homeIsBye
       ? { bye: true }
@@ -499,6 +565,7 @@
     var teamIdMetaMap = opts.teamIdMetaMap || {};
     var userTeamId = opts.userTeamId;
     var rankMap = opts.rankMap || {};
+    var recordMap = opts.recordMap || {};
     var natChips = opts.nationalRegionChips || null;
     var wl = opts.weekLines || {};
     var finalBadge = opts.finalBadge || '★ CONFERENCE ★';
@@ -522,10 +589,10 @@
     var r1 = model.r1;
     var r2 = model.r2;
     var fin = model.fin;
-    var slotOpts = { revealMode: revealMode };
+    var slotOpts = { revealMode: revealMode, recordMap: recordMap };
     var finOpts = revealMode
-      ? { championship: true, revealMode: true }
-      : { championship: true, showCrown: true, showChampion: true, revealMode: false };
+      ? { championship: true, revealMode: true, recordMap: recordMap }
+      : { championship: true, showCrown: true, showChampion: true, revealMode: false, recordMap: recordMap };
 
     grid.appendChild(
       col('fcc-tb-col--r1l', wl.r1 || 'WEEK 27 · ROUND 1', [
@@ -743,14 +810,23 @@
     var teamIdMetaMap = opts.teamIdMetaMap || {};
     var userTeamId = opts.userTeamId;
     var rankMap = opts.rankMap || {};
+    var recordMap = opts.recordMap || {};
     var tier = opts.tier || 'region';
     var revealMode = !!opts.revealMode;
     var r1 = normalizeRegionRound1Matchups(bracket);
-    var fin = bracket.final && bracket.final[0] ? bracket.final[0] : null;
-    var slotOpts = { revealMode: revealMode };
+    // Display-only: single-bye finals put the bye team on top (see helper).
+    var fin = regionChampionshipMatchupForDisplay(bracket);
+    var slotOpts = { revealMode: revealMode, recordMap: recordMap };
     var finOpts = revealMode
-      ? { championship: true, revealMode: true, suppressBye: true }
-      : { championship: true, showCrown: true, showChampion: true, revealMode: false, suppressBye: true };
+      ? { championship: true, revealMode: true, suppressBye: true, recordMap: recordMap }
+      : {
+          championship: true,
+          showCrown: true,
+          showChampion: true,
+          revealMode: false,
+          suppressBye: true,
+          recordMap: recordMap,
+        };
 
     var frame = document.createElement('div');
     frame.className = 'fcc-tb-region fcc-tb-region--full fcc-tb-enter';
@@ -804,6 +880,7 @@
     var teamIdMetaMap = config.teamIdMetaMap || {};
     var userTeamId = config.userTeamId;
     var rankMap = buildRankMap(topData);
+    var recordMap = buildRecordMap(topData);
 
     if (tier === 'region' || layout === 'compact4') {
       renderRegionBracket(bodyEl, bracket, {
@@ -812,6 +889,7 @@
         teamIdMetaMap: teamIdMetaMap,
         userTeamId: userTeamId,
         rankMap: rankMap,
+        recordMap: recordMap,
         tier: tier,
         revealMode: revealMode,
       });
@@ -844,6 +922,7 @@
       teamIdMetaMap: teamIdMetaMap,
       userTeamId: userTeamId,
       rankMap: rankMap,
+      recordMap: recordMap,
       nationalRegionChips: natChips,
       weekLines: weekLines,
       finalBadge: badge,

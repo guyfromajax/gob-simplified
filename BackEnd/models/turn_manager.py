@@ -1722,8 +1722,17 @@ class TurnManager:
         # with one code path. The fouler converges (sprint archetype, clock runs)
         # then reaches in (clock stops) — pure UESS schema animation. Runs before
         # state routing; setting ``result`` short-circuits the HCO/HCT/FCP paths.
+        #
+        # EOQ priority: armed FLSS wins over quick foul. Pending FLSS is consumed
+        # in the HCO branch below; skipping foul here prevents FOUL→SIP from
+        # stranding ``flss_possession_pending`` across the inbound.
         from BackEnd.utils.quick_foul import quick_foul_in_play
-        if result is None and state == "HCO" and quick_foul_in_play(self.game):
+        if (
+            result is None
+            and state == "HCO"
+            and not game_state.get("flss_possession_pending")
+            and quick_foul_in_play(self.game)
+        ):
             result = self._execute_quick_foul_at_hco_start()
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
@@ -2131,6 +2140,11 @@ class TurnManager:
                 and result.get("animation_steps")
             ):
                 self._emit_hco_animation_steps(result)
+            self._assert_eoq_animation_steps(
+                result,
+                anim_steps=result.get("animation_steps"),
+                context="flss_post_emit",
+            )
             finalize_flss_post_emit(self.game, result)
             result["final_shot_possession"] = True
             self.game.game_state.pop("final_shot_possession_active", None)
@@ -3929,8 +3943,10 @@ class TurnManager:
             )
             anim_steps = build_skeleton_animation_steps(result, self.game)
             if anim_steps is None:
+                self._assert_eoq_animation_steps(result, anim_steps=None, context="emit_none")
                 return
             result["animation_steps"] = anim_steps
+            result.pop("eoq_schema_emit_failed", None)
             result_type_for_te = (result.get("result_type") or "").upper()
             # UESS §5 clock authority (HCO_UESS_Audit.md Task 2): derive
             # time_elapsed from the emitted animation_steps for EVERY HCO turn —
@@ -3979,10 +3995,37 @@ class TurnManager:
 
                 role = "FLSS" if result.get("flss") else "FINAL_SHOT"
                 log_eoq_turn(self.game, role, result, phase="POST_EMIT")
+            self._assert_eoq_animation_steps(result, anim_steps=anim_steps, context="emit_ok")
         except Exception as e:
             logging.warning(
                 "build_skeleton_animation_steps (HCO) failed: %s", e
             )
+            self._assert_eoq_animation_steps(result, anim_steps=None, context=f"emit_exc:{e}")
+
+    def _assert_eoq_animation_steps(self, result, *, anim_steps, context: str) -> None:
+        """Fail closed for Final Shot / FLSS: empty schema emit must be explicit.
+
+        Does not raise (sim must continue) but stamps ``eoq_schema_emit_failed``
+        so FE can skip MAKE announce / airhorn polish that depends on playback.
+        """
+        if not isinstance(result, dict):
+            return
+        if not (result.get("final_turn") or result.get("flss")):
+            return
+        steps = anim_steps if anim_steps is not None else result.get("animation_steps")
+        if isinstance(steps, list) and len(steps) > 0:
+            result.pop("eoq_schema_emit_failed", None)
+            return
+        result["eoq_schema_emit_failed"] = True
+        logging.error(
+            "EOQ schema emit failed closed (%s): final_turn=%s flss=%s result_type=%s "
+            "animation_step_count=%s — FE must not announce MAKE as if shot rendered",
+            context,
+            bool(result.get("final_turn")),
+            bool(result.get("flss")),
+            result.get("result_type"),
+            len(steps) if isinstance(steps, list) else 0,
+        )
 
     def _schema_clock_burn(self, anim_steps) -> Optional[int]:
         """Return game-clock burn from emitted schema steps, if clocks exist."""

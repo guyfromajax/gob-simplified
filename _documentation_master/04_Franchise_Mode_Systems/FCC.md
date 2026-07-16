@@ -882,7 +882,7 @@ Extra team-name mapping fetch:
 
 - training may be disabled for eliminated teams
 - hero CTA becomes the week-specific tournament simulation label
-- champion completion can trigger championship summary modal
+- champion completion is announced via Championship Announce Moments (`pending_championship_moments`); see [Championship_Announce_Moments.md](Championship_Announce_Moments.md)
 
 ---
 
@@ -890,14 +890,9 @@ Extra team-name mapping fetch:
 
 FCC currently owns several modal flows:
 
-### Championship Complete
+### Championship Announce Moments
 
-Shown when `topData.championship_summary` exists and the result has not already been marked seen in localStorage.
-
-Actions:
-
-- `Box Score`
-- `Back To Locker Room`
+Queued championship overlays from `topData.pending_championship_moments`, rendered by `window.ChampionshipMoments` on FCC mount. See [Championship_Announce_Moments.md](Championship_Announce_Moments.md).
 
 ### Cut Players Required
 
@@ -1029,7 +1024,7 @@ Current response fields used by FCC include:
 - `region_tournaments`
 - `national_tournament`
 - `eos_tournament`
-- `championship_summary`
+- `pending_championship_moments`
 - `training_disabled_for_eos`
 - `training_disabled_for_postseason`
 - `eog_team_attrs_frozen_for_postseason`
