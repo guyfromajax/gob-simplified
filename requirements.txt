@@ -16,3 +16,9 @@ email-validator
 python-dotenv==1.1.0
 sentry-sdk[fastapi]
 slowapi>=0.1.9,<0.2
+
+# Recruit image paint service (lazy generate-on-miss recolor + R2 read/write)
+Pillow
+numpy
+scipy
+boto3
