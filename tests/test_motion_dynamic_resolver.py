@@ -332,6 +332,64 @@ def test_freelance_pass_transfers_ball_to_receiver():
     assert res["shooter_pos"] == "SG"           # possession transferred to the pass receiver
 
 
+def test_freelance_pass_contest_stamps_beat_before_contest(monkeypatch):
+    """Regression: zone+away BAT_OOB mirrored when freelance contested an unstamped beat
+    (Sentry PYTHON-FASTAPI-6H / 🚨 [BAT-OOB ORIENTATION]). Contest must see a stamped defense grid."""
+    from BackEnd.engine.phase_resolution import _resolve_freelance
+
+    game = _FakeGame(defense_playcall="2-3 Zone", shot_clock=30)
+    game.offense_team = game.away_team
+    game.defense_team = game.home_team
+    game.game_state["_hco_defense_posture"] = "tight"
+    off = _lineup(PG=_FakePlayer("pg"), SG=_FakePlayer("sg"))
+    def_lineup = _lineup(PG=_FakePlayer("dpg"), SG=_FakePlayer("dsg"), SF=_FakePlayer("dsf"),
+                         PF=_FakePlayer("dpf"), C=_FakePlayer("dc"))
+    skel = _skeleton({"PG": "key", "SG": "upper midWing"}, {"PG": "key", "SG": "upper midWing"})
+
+    stamped_before_contest = {"ok": False}
+
+    def fake_stamp(skeleton, _game, _off, _defl):
+        for i, step in enumerate(skeleton.get("steps") or []):
+            ss = step.get("_step_state") or {"index": i}
+            # Away-offense display frame (low-x). Legacy unstamped zone recon would be HOME (~80+).
+            ss["defense"] = {dp: {"x": 18.0, "y": 25.0} for dp in ("PG", "SG", "SF", "PF", "C")}
+            step["_step_state"] = ss
+
+    def wrap_contest(step, *a, **k):
+        stamped_before_contest["ok"] = bool((step.get("_step_state") or {}).get("defense"))
+        return {
+            "outcome": "BAT_OOB",
+            "deflector": "SF",
+            "contact_point": {"x": 18.0, "y": 25.0},
+            "stage": "test",
+        }
+
+    class _Rng:
+        def __init__(self):
+            self.i = 0
+
+        def random(self):
+            return 0.1  # subtle + pass
+
+        def randint(self, a, b):
+            if (a, b) == (1, 100):
+                return 1  # don't shoot → pass path
+            return 2
+
+        def choice(self, seq):
+            return list(seq)[0]
+
+    monkeypatch.setattr(PR, "_stamp_contest_defender_grid", fake_stamp)
+    monkeypatch.setattr(PR, "_hco_resolve_dish_contest", wrap_contest)
+
+    res = _resolve_freelance(
+        skel, skel["steps"][:2], skel["steps"][1], "PG", game, off, def_lineup, True, _Rng())
+
+    assert stamped_before_contest["ok"] is True
+    assert res.get("pass_bat_oob") is True
+    assert res.get("pass_contact_point", {}).get("x") == 18.0
+
+
 def test_walk_no_shot_forces_terminal_shot(monkeypatch):
     game = _FakeGame()
     bh = _FakePlayer("bh")

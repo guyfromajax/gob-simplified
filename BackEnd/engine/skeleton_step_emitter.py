@@ -88,10 +88,9 @@ HCO_GET_OPEN_RECEIVE_SFX = {
     "backdoor": ("braddock-backdoor.wav", "sammy-backdoor.wav"),
     "flash": ("braddock-flash.wav", "sammy-flash.mp3"),
     "jab": ("braddock-jab.wav", "sammy-jab.mp3"),
-    # NOTE: post-up catch VO — these audio files do NOT exist yet in FrontEnd/static/sounds/. Add
-    # braddock-post.wav + sammy-post.mp3 or the FE will reference missing files (until then, remove this
-    # key to fall back to the generic reception sound).
-    "post": ("braddock-post.wav", "sammy-post.mp3"),
+    # POST UP: audio not created yet. Add braddock-post.wav + sammy-post.mp3 to FrontEnd/static/sounds/
+    # then re-add the key below → post-up catches get their VO (dispatch already tags them "post"):
+    #   "post": ("braddock-post.wav", "sammy-post.mp3"),
 }
 HCO_GET_OPEN_RECEIVE_VOLUME = 0.8
 

@@ -6729,6 +6729,13 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
                 # INTERCEPT/BAT_OOB, show the pass being thrown then return a STEAL turnover (routed
                 # by the outer resolver's pass_intercepted check, same path as a dish).
                 if posture:
+                    # Freelance beats are appended AFTER the walk's pre-stamp, so without a fresh
+                    # stamp here `_hco_step_def_xy` falls back to legacy zone recon (HOME frame) and
+                    # away-offense BAT_OOB/INTERCEPT contact mirrors to the wrong court end
+                    # (🚨 [BAT-OOB ORIENTATION] / Sentry PYTHON-FASTAPI-6H). Same helper as the
+                    # walk + coverage paths — display-frame grid, identity `_pt`.
+                    skeleton["steps"] = output
+                    _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup)
                     contest = _hco_resolve_dish_contest(
                         beat, cur_bh, rp, off_lineup, def_lineup, fl_off_to_def, is_away_offense,
                         def_aggr, fl_lane_dist, zone, defense_playcall, off_team, rng,
