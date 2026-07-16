@@ -4,6 +4,7 @@
 3. HCO entry pass on offense side teleported
 5. Dead ball turnove rin HCO is passing ahead then teleppring back to animate the DB turnover
 6. Improve reset action in HCO
+7. SIP to Final Shot made shot but did not animate it or sound airhorm at quarter end.
 
 ##Full Product Readiness
 102. Team court images
@@ -58,26 +59,20 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 "SUNSET MODE" tag inside the docs that describe those paths, and is cross-linked from here.)
 -->
 
-## Stale FB test suite (found + cleaned up 6-12-26, was not a product bug)
+## Stale FB test suite — open follow-up [CODE-CLEANUP]
 
-15 tests across 4 FB test files were failing because they asserted **pre-refactor** fast-break behavior (test files last touched Dec 2025–Mar 2026; FB engine rewritten May–Jun 2026): mock players missing the `MIN` stat key, hard-coded coordinates from the old outlet logic, and stale role-plumbing assertions.
+Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
 
-**Resolved 6-12-26:** deleted `test_fast_break_comprehensive.py`, `test_fast_break_miss_dreb_flow.py`, `test_fast_break_position_logic.py` (fully red); trimmed the two stale tests from `test_fast_break_outlet_pass.py` (its two edge-case tests still pass and were kept). FB suite is now green.
+## P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
 
-**Open follow-up [CODE-CLEANUP]:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
+Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`):
 
-## P0 — HCO contract clock overruns with invalid elapsed time (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
+1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. **Partial mitigation (Option A):** turn-boundary guards in `turnAnimation.js` use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`). Throws still exist; needs live validation before closing.
+2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6`. **Still uncapped** — step-pass guard uses raw `Date.now() - stepStartMs` (no Option A). Track separately from #1.
 
-Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`), copied here so they're visible in the bug tracker:
-
-1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. Magnitude indicates timer baseline/state contamination, not normal jitter. Mitigation applied (Option A): turn-boundary guards use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`); needs validation in live runs before closing.
-2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6` on a `DEAD BALL` batch sub-turn. Same timer-source class as #1 but a distinct enforcement site (`step pass` guard); track separately.
-
-## Animation timing pauses (merged from `animation_wonkiness.md`, July 2026)
+## Animation timing pauses
 
 **Meta:** With dynamic HCO on, Motion/Set-Play render via backend `animation_steps[]` (`animationPlayback.js`). Pause durations are stamped in Python (`time_elapsed`, `hold_ms`); FE-only fixes miss the source. Design work applies only to optional idle-sprite drift (Bucket 1 secondary).
-
-**Recommended fix order:** Bucket 2 (turn transitions) → Bucket 1 (Motion step freezes).
 
 ### Open — Bucket 1: Long pauses between HCO steps (Motion only)
 - **Symptom:** All ten players frozen 700–1400ms on many Motion steps; Set Play unaffected.
@@ -85,35 +80,9 @@ Two critical issues from the animation blueprint's "Known HCO Turn Issues" list 
 - **Fix:** Decouple sim clock from visual time — keep 2–4s on game ledger, stamp small visual `time_elapsed`. Optional: off-ball drift during BH hold so 9 players don't read as frozen.
 - **Secondary:** Confirm BH hold doesn't block the other 9 from moving; consider idle organic sprite animation on truly stationary steps.
 
-### Open — Bucket 2: Pauses between turn transitions
-- **Symptom:** Dead air at DREB→HCO, DREB→FB (partial), HCT-steal→FB.
-- **Root cause:** Blocking `hold_ms: 1000` announcements — DREB `"Rebound!"` (`dreb_step_emitter.py`), steal→FB `"Fast Break!"` on step start (`after_steal_fast_break_step_emitter.py` / `FB_ANNOUNCE_HOLD_MS`). FE blocks on `waitMsRespectingPause` (`animationPlayback.js`). DREB→HCO outlet lead-in removed from `AnimationEngine.js`, leaving the hold bare.
-- **Partial fix (shipped):** `SUPPRESS_DREB_REBOUND_ANNOUNCE_ON_FAST_BREAK=True` in `dreb_step_emitter.py` — DREB→FB only.
-- **Fix (remaining):** Conditional boundary holds on `next_play_type` (zero for live continuations), or `non_blocking` announcement flag so overlay shows while play continues. Same pattern for HCT-steal→FB.
-
-### ✅ Fixed — Bucket 3: RR/Triangle FB outlet → rim-runner pass dead air (2026-06-30)
-- RR sprint no longer in awaited `secondary` set when downstream pass re-drives RR from live position. See `Fast_Break_System.md` → "Rim-runner sprint barrier (dead-air fix)".
-
-### ✅ Fixed — Bucket 4: Defenders move before ball detaches on HCO passes (2026-07-01)
-- Backend step-placement off-by-one: defender rotation authored one beat early. Two-handler pass-step model in `animator.py`. See `05_UESS_System/Defense_Coords_System.md` → "Per-Step Timing: The Two-Handler Pass Step".
-
-### ✅ Fixed — HCO batted-OOB: ball went OOB *then* bounced off the defender (double send) (2026-07-12)
-- **Symptom:** HCO bat-OOB only — ball detached from passer → flew OOB → then animated back to the defender, bounced, and went OOB again. HCT/FCP were clean (pass→defender→OOB, one motion).
-- **Root cause:** HCO fired **two** OOB ball trajectories. (1) `_finalize_hco_pass_bat_oob` baked a step-based trajectory (`bat_reach` override + `bat_oob` step event → `skeleton_step_emitter` ball motion). (2) The turn_result also set `bat_oob: True`, which triggers the FE's HCT-era imperative send `AnimationEngine._runHctBatOobBallSend` (runs after the steps settle). HCT never bakes a step trajectory, so it fired only (2); HCO fired both. The step path also *snapped* contact→OOB (no bounce) and lacked the `block1.wav` bounce SFX — the imperative had the good animation.
-- **Fix (imperative-only, UESS-compliant):** removed the step-based trajectory from `_finalize_hco_pass_bat_oob` (no `bat_reach`/`bat_oob` step event, ball stays with the passer — receiver already un-caught — so the imperative flies it), kept the turn_result `bat_oob` + contact/target/deflector fields. Made the FE imperative read the backend's authoritative exit point: `oobGrid = turnData.bat_oob_target ?? resolveNearestOutOfBoundsGrid(contact)` (`AnimationEngine.js`) instead of always recomputing — so the OOB position is engine-owned, FE only draws.
-- **Follow-ups — ✅ DONE (2026-07-13):**
-  - ✅ Removed the inert `bat_reach`/step-`bat_oob` handling from `skeleton_step_emitter.py` (the override loop, the `ball_end`=OOB override, and the ball_arrival_coord/ball_motion_style stamping) — `steal_reach` preserved. No writer remained.
-  - ✅ Closed the **HCT UESS gap:** `dynamic_hct.py` now sends `bat_oob_target = nearest_oob_point(bat_oob_contact)` on the turn_result, so `AnimationEngine._runHctBatOobBallSend` reads the engine-owned exit point (`turnData.bat_oob_target ?? resolveNearestOutOfBoundsGrid(...)`) instead of recomputing. All three modes (HCO/HCT/FCP) now source the OOB exit from the backend.
-
-## Screen capture (marketing)
-
-**✅ Shipped (manual only, staging + localhost):** `Shift+C` arms → `c` captures. Court = Phaser canvas + DOM composite (`captureCourt.js`); other pages = DOM region (`captureDom.js`). Loads via `API_CONFIG.isCaptureEnv()` → `captureBootstrap.js`. Disarmed by default; zero files unless armed.
-
-**Deferred — auto-capture moments:** Q4 curated shots (made-shot milestones, late non-makes, FB/Trap/Press ribbons, pure-action clean frames, game-over modal, Q3→Q4 lineup screen). Full moment list in [`Z-Completed/screen_capture_tool_spec.md`](Z-Completed/screen_capture_tool_spec.md) §6. Not required for manual marketing workflow.
-
 ## Fast Break animation backlog (legacy path) [CODE-CLEANUP]
 
-Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Break_Refactor.md). **UESS schema path is primary** for `covert_release`, `rim_runner`, `triangle`, `after_steal` when `animation_steps` exist.
+Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Break_Refactor.md). **UESS schema path is primary** for `covert_release`, `rim_runner`, `triangle`, `after_steal` when `animation_steps` exist; legacy `runFastBreakSequence` remains the fallback when steps are missing / variant unmigrated.
 
 - Advance triggers unreliable on legacy `fastBreak.js` / `runFastBreakSequence` (phase boundaries hang or short-circuit).
 - FB visual timing still uses FE `getPlayerDuration` on legacy path; backend does not stamp per-player `game_seconds` in legacy `animator.capture_fast_break_animation` payload.
@@ -124,12 +93,6 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 
 ## Future Cleanup (Non-Critical Warnings)
 
-### Coordinate flip off-by-one: backend `100 − x` vs frontend `101 − x` (found 6-12-26 during doc sweep) [CODE-CLEANUP]
-- **Issue**: Two different mirror-flip conventions coexist. Backend `getAwayTeamCoords()` (`BackEnd/utils/shared.py`) flips with `x = 100 − x`; legacy frontend helpers in `turnAnimation.js` (4 sites: skeleton position conversion, FCP defensive setup, and two local `flipCoords` helpers) flip with `x = 101 − x`.
-- **Impact**: Low/medium — a 1-grid-spot horizontal discrepancy whenever a frontend-flipped coordinate is compared to or layered on a backend-flipped one. On a 1–100 grid, `101 − x` is the symmetric mirror (1↔100); `100 − x` maps 1→99, drifting everything 1 spot. Not known to cause a visible bug today, but it's a trap for any future code that mixes the two.
-- **Action**: Pick one convention (likely `101 − x` if the grid is 1–100) and unify; at minimum, audit the 4 frontend `101 − x` sites against the backend coords they consume. As UESS schema playback takes over, the legacy frontend flip sites should shrink toward dead code anyway.
-- **Priority**: Low (documented in `05_GP_Supporting_Systems/BIP_System.md` → "Coordinate System and `opp` Field")
-
 ### Sunset mode code removal (Single Game + Tournament) — surfaced during doc sweep 6-13-26 [CODE-CLEANUP]
 - **Issue**: Single Game and Tournament modes are sunset (not user-facing), but their code paths still exist throughout the backend/frontend (e.g. `init_game()` mode branches for `single`/`tournament` in `BackEnd/api/api.py`, tournament master-copy seeding, single-game empty-playbook init, plus tournament/single routes and frontend pages).
 - **Decision (prior)**: When tournaments / single games are reintroduced, build fresh from current architecture rather than reviving these early-build paths (lots of legacy bloat). So this code is removable, not preserve-for-reuse.
@@ -137,285 +100,49 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - **Priority**: Low (dead-end paths; not causing bugs, just bloat/confusion). Do as a deliberate sweep, not piecemeal.
 
 ### Steal → HCO setup: backend computes positioning that the frontend no longer renders (found 6-13-26 during doc sweep) [CODE-CLEANUP]
-- **Issue**: `resolve_half_court_offense_logic` (~L4820, `BackEnd/.../half_court_offense*`) still computes detailed Steal → HCO setup positioning — moving the stealer away from the basket plus a bespoke PG reposition for other players — and emits fields like `is_steal_hco_setup`, `ball_handler_hco_setup_*`, and `other_players_hco_setup_movements`. The frontend has removed all of the corresponding animation code (`animateStealHCOSetup()`) and stopped reading those fields.
-- **Impact**: Low — backend is doing compute-but-unrendered work. No visible bug, just wasted computation and a misleading contract (emitted fields nothing consumes).
-- **Action**: Remove the Steal → HCO setup positioning computation and its emitted fields from the backend resolver (or, if the visual is wanted back, re-add the frontend animation). Confirm no other consumer reads `is_steal_hco_setup` / `ball_handler_hco_setup_*` / `other_players_hco_setup_movements` first.
+- **Issue**: `resolve_half_court_offense_logic` (`BackEnd/engine/phase_resolution.py`) still emits `is_steal_hco_setup`, `ball_handler_hco_setup_*`, and `other_players_hco_setup_movements`. The frontend has removed `animateStealHCOSetup()` and stopped reading those fields. UESS has a replacement (`_append_post_steal_hco_transition` in `skeleton_step_emitter.py`), but the old role-field contract is unused.
+- **Impact**: Low — backend is doing compute-but-unrendered work. No visible bug, just wasted computation and a misleading contract.
+- **Action**: Remove the Steal → HCO setup positioning computation and its emitted fields from the backend resolver. Confirm no other consumer reads those fields first.
 - **Priority**: Low (dead/unrendered compute, not causing bugs)
 
 ### Legacy steal-entry Fast Break dead code + unused `STEAL_ENTRY_*` constants (found 6-13-26 during doc sweep) [CODE-CLEANUP]
-- **Issue**: All steals are short-circuited to the UESS-migrated `after_steal` resolver early in `resolve_fast_break_logic` (~L1056), which makes the legacy steal-entry movement block later in the same function (~L1195–1360) unreachable dead code. The `STEAL_ENTRY_MOVE_*` / `STEAL_ENTRY_Y_*` constants that block relied on are now unused on the rendered path in both `BackEnd/constants/fast_break_constants.py` and `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`.
+- **Issue**: All steals are short-circuited to the UESS-migrated `after_steal` resolver early in `resolve_fast_break_logic` (~L1205), which makes the legacy steal-entry movement block later in the same function (~L1517–1541) unreachable dead code. The `STEAL_ENTRY_MOVE_*` / `STEAL_ENTRY_Y_*` constants that block relied on are now unused on the rendered path in both `BackEnd/constants/fast_break_constants.py` and `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`.
 - **Impact**: Low — unreachable code + orphaned constants. No runtime effect, just bloat/confusion for anyone reading the FB resolver.
 - **Action**: Delete the unreachable steal-entry block in `resolve_fast_break_logic` and remove the unused `STEAL_ENTRY_*` constants from both the backend and frontend constants files. Verify nothing on the live `after_steal` path references those constants before removing.
 - **Priority**: Low (dead code; tie in with the FB-coverage follow-up noted in the "Stale FB test suite" item above)
 
 ### State Telemetry Violations (Phase 1.3) [CODE-CLEANUP]
 - **Issue**: `game_id` is being read/written to `gameStore` when it should come from URL according to State & Persistence Contract
-- **Location**: Multiple locations detected by Phase 1.3 telemetry
+- **Location**: `FrontEnd/static/js/state/gameStore.js` (`setGameId` / `getGameId` + telemetry)
 - **Impact**: Low - telemetry is working as intended, detecting contract violations
 - **Action**: Future cleanup - refactor to use URL as source of truth for `game_id` instead of `gameStore`
 - **Priority**: Low (informational only, not causing bugs)
 
-### Missing Rebound Data Warning [CODE-CLEANUP]
-- **Issue**: ShotAnimationSystem reports "Rebound data missing, skipping embedded rebound" for some MISS shots
-- **Location**: `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
-- **Impact**: Low - may be expected if rebound is handled in separate turn, but worth monitoring
-- **Action**: Investigate if this is expected behavior or if rebound data should always be present
-- **Priority**: Low (monitoring only)
-
 ### Invalid State Transition Warning [CODE-CLEANUP]
 - **Issue**: State machine attempts no-op transition (HalfCourt -> HalfCourt)
-- **Location**: `FrontEnd/static/js/phaser/animation/AnimationEngine.js` → `handleBaselineInbound()`
+- **Location**: `FrontEnd/static/js/phaser/animation/AnimationEngine.js` → `handleBaselineInbound()` still calls `safeTransition` unconditionally (tip path has an `is(HalfCourt)` guard; BIP does not)
 - **Impact**: Low - harmless but indicates unnecessary `safeTransition()` call
 - **Action**: Review `handleBaselineInbound()` to avoid calling `safeTransition()` when already in target state
 - **Priority**: Low (code cleanup)
 
-### Missing Team Background Images (404s) [CODE-CLEANUP]
-- **Issue**: 404 errors for team background images (e.g., `south_lancaster-background.png`, `little_york-background.png`)
-- **Location**: `FrontEnd/static/images/teams/{team_slug}/` (`{team_slug}_background.png`; see `docs/docs_1_systems/00_General_Systems/Team_Images_System.md` and `FrontEnd/static/common.js` asset helpers)
-- **Impact**: Low - missing assets, doesn't affect functionality
-- **Action**: Add missing team background images or update references
-- **Priority**: Low (cosmetic only)
+---
 
+## Open Investigations
 
-## Fixed Bugs (January 2025)
-
-✅ **Playcall Center Overrides Not Working After Sim Quarter → Play Quarter** (Fixed: January 2025)
-- **Issue**: Playcall overrides were not being applied during Play Quarter after simulating previous quarters (e.g., Sim Quarter for Q1-Q3, then Play Quarter for Q4).
-- **Root Cause**: `user_team_side` was `None` in the game state, causing the override check in `turn_manager.py` to skip processing with "no user_team (user_team_side=None)". This happened because `user_team_side` wasn't being preserved when games were loaded from the database or when transitioning between Sim Quarter and Play Quarter modes.
-- **Fix**: Added safeguards to preserve and restore `user_team_side`:
-  - Preserve `user_team_side` from in-memory game before any DB operations
-  - When loading from DB, use priority: saved document → preserved in-memory value → request value
-  - Set `user_team_side` in in-memory game if missing (from request or preserved value)
-- **Result**: Playcall overrides now work correctly after Sim Quarter → Play Quarter transitions
-- **Status**: ✅ Fixed and committed (January 2025)
-
-✅ **Tournament Command Center Stats Bugs** (Fixed: January 2025)
-- **Totals showing "undefined"**: Fixed missing W/L initialization in totals object
-- **Player stats not populating on Roster tab**: ✅ **FIXED** - Refactored Tournament mode to match Franchise pattern exactly
-  - `loadRoster()` now merges stats from tournament document into roster data (matches Franchise pattern)
-  - `renderRoster()` now calls `renderRosterStats()` internally (matches Franchise `renderTeam()` pattern)
-  - Removed old `renderStats()` function that used separate stats array
-  - Updated HTML to use `roster-stats-body` instead of `stats-body` (matches Franchise)
-- **Team stats container scroll issue**: Fixed by removing `scroll-x` wrapper and using inline overflow styling
-- **Teams from user's game not populating on Stats tab**: ✅ **FIXED** - Now using shared `TeamStatsTable` module (same as Franchise)
-- **Note**: Computer teams showing 2 games is a backend issue (likely double finalization) - needs backend investigation
-
-✅ **Team Stats SS&S Refactoring** (Completed: January 2025)
-- **Frontend**: Extracted shared `teamStatsTable.js` module (~160 lines of duplicate code removed)
-  - Both Tournament and Franchise modes now use `TeamStatsTable.renderTeamStatsTable()` and `TeamStatsTable.sortTeamStats()`
-  - Removed unnecessary roster refresh logic from Tournament `refreshTeamStats()`
-- **Backend**: Extracted shared `team_stats_aggregator.py` utility (~130 lines of duplicate code removed)
-  - Both Tournament and Franchise endpoints now use `aggregate_team_stats_from_players()`
-  - Single source of truth for team stats aggregation logic
-- **Total Reduction**: ~290 lines of duplicate code eliminated
-- **Benefits**: One fix applies to both modes, prevents future bugs, ensures consistent behavior
-
-✅ **Tournament Mode Roster/Stats Refactoring** (Completed: January 2025)
-- **Refactored to match Franchise pattern exactly**: Tournament mode now uses identical code structure as Franchise mode
-  - `loadRoster()`: Loads roster, loads tournament doc, merges stats into roster data (matches Franchise exactly)
-  - `renderRoster()`: Calls `renderRosterStats()` internally (matches Franchise `renderTeam()` pattern)
-  - Removed old `renderStats()` and `renderStatsTable()` functions that used separate stats array
-  - Updated HTML: Changed `stats-body` to `roster-stats-body` to match Franchise
-  - **Result**: Tournament and Franchise modes now use the exact same execution pattern with only variable names different (`tournament_id` vs `franchise_id`, `tournament.players` vs `franchise.players`)
-
-✅ **Tournament Player Stats Not Saving - SS&S Refactoring** (Fixed: January 2025)
-  - **Issue**: Player stats remained at zero after Tournament games, even though games were played
-  - **Root Cause**: Tournament mode used per-player update pattern with complex nested path queries, while Franchise mode used single atomic update
-  - **Fix**: Refactored Tournament mode's `finalize_game()` to match Franchise mode's pattern exactly:
-    - Single atomic MongoDB update for all players (instead of per-player updates)
-    - Document-level `applied_games` check (removed complex nested path queries)
-    - Uses `$setOnInsert` for automatic player initialization
-    - Processes all players from `box_score` in one operation
-  - **Result**: Tournament and Franchise modes now use identical execution patterns, ensuring consistent behavior and eliminating zero stats issues
-  - **Documentation**: See `docs/To Do/Tournament_vs_Franchise_Player_Stats_Comparison.md` for detailed comparison
-
-## Current Investigation (January 2025)
-
-### ✅ Fixed (Jun 2026): Franchise season stats ~2× box score (Player Stats + Team Stats)
-- **Symptom:** Box score shows correct game totals (e.g. Morristown **79 FGA**), but FCC Player Stats and Team Stats sum to ~**2×** (e.g. **164 FGA**). Not practice squad (`ps_season_stats` is separate).
-- **Root cause:** `finalize_game()` idempotency used **`applied_games` by game `_id` only**. Phase-A persisted `game_document` with a **string `_id` upsert** while simulate-quarter saves the canonical doc under **ObjectId `_id`** — two Mongo records for one game. A second finalize with the other `_id` bypassed the guard and rolled the same box score into FPD `season` again.
-- **Fix:**
-  - **`applied_matchups`** claim in `finalize_game()` (`week:sorted_team_ids`) alongside `applied_games`.
-  - Phase-A uses **`resolve_game_write_id`**, purges string/ObjectId duplicates, and deletes other week/matchup game docs before finalize (`_persist_franchise_user_game_snapshot`).
-  - Team aggregator dedupes duplicate player IDs in FTD rosters.
-- **Existing saves:** Inflated FPD `season` totals remain until repaired (check `GP` — likely **2** after one game). New games after deploy will rollup once.
-
-### ✅ Addressed (Jun 2026): HCO entry `current_bh_id is None` after MISS with schema bounce
-- **Issue:** Prior turn was **HCO MISS** with `ball_bounce_x/y` and schema `animation_steps`, but `rebounderId` / `rebound_type` / `next_play_type` were missing → discrete **DREB** promotion skipped → next **HCO** turn's entry orchestrator logged `[HCO ENTRY BUG]` (loose-ball prior turn, no `final_ball_handler_id`).
-- **Fix:** `game_manager._repair_miss_bounce_rebound_contract()` runs in `simulate_macro_turn` before `_append_turn`, restoring rebound metadata from `game_state.last_rebounder` / `last_rebound` when bounce coords exist on migrated MISS/BLOCK rows. See `Turn_by_Turn_System.md` (Discrete DREB turn §2) and `Rebound_System.md` (MISS/BLOCK turn contract).
-
-### ✅ Addressed (May 2026): Discrete HCO / HCT / FB MISS → DREB → HCO outlet (`AnimationEngine`)
-- **Fix:** After discrete **`DREB`** `animation_steps` `playTurn`, `AnimationEngine._maybeRunDiscreteDrebOutletLeadIn` calls **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP**, using the prior **MISS/BLOCK** turn for **`dreb_outlet_pass`** / get-back. Skips **FAST_BREAK** next and **`force_foul_after_dreb`**. See `FrontEnd/static/js/phaser/animation/AnimationEngine.js` and **`Turn_by_Turn_System.md`** (Discrete `DREB` turn).
-- **Remaining (optional hardening):** suppress duplicate embedded rebound animation on the MISS when `next_play_type === "DREB"` if double-capture is still visible; HCO step-0 tolerance tuning if any edge case remains.
-
-### 📜 Historical: HCO MISS → discrete DREB outlet gap (pre–May 2026)
-- Prior to **`AnimationEngine._maybeRunDiscreteDrebOutletLeadIn`**, `runDefensiveReboundSetup` was not invoked after discrete **`DREB`** `playTurn`, and **`ShotAnimationSystem.handleDefensiveRebound`** skipped outlet when the MISS row’s **`next_play_type`** was rewritten to **`"DREB"`**. Root-cause write-up and diagnostics lived here during migration; see **✅ Addressed** above and **`Turn_by_Turn_System.md`**.
-
-### ✅ Fixed: Duplicate Teams Bug
-- **Root Cause**: When `team_id_str` was not a valid ObjectId (e.g., "BENTLEY_TRUMAN"), the code still added it to output, creating duplicates
-- **Fix**: Updated `BackEnd/utils/team_stats_aggregator.py` to resolve non-ObjectId team IDs to ObjectIds before adding to output, or skip them if they can't be resolved
-- **Status**: ✅ Fixed and committed
-
-### ✅ Fixed: Player Stats Not Saving for User Games (Mode Field Missing)
-- **Root Cause**: Frontend was not passing `tournament_id` and `mode` in `/api/simulate-quarter` request payload, causing backend to default to `mode: "single"` instead of `mode: "tournament"`. When `finalize_game()` was called with `mode="tournament"`, the game document had `mode: "single"`, causing a mismatch and potentially skipping Tournament processing.
-- **Fix**: 
-  - Added `tournament_id` and `mode` to payload in `gameScene.js` (main gameplay flow)
-  - Added `tournament_id` and `mode` to payload in `bootGame.js` (sim-to-4th and sim-full-game flows)
-  - This ensures backend correctly sets `mode: "tournament"` on game document, allowing `finalize_game()` to process Tournament stats correctly
-- **Result**: Game documents now have correct `mode: "tournament"` field, ensuring `finalize_game()` processes player stats correctly for Tournament mode
-- **Status**: ✅ Fixed and committed
-
-### ✅ Fixed: Player Stats Not Saving for User Games (Mode Field Missing)
-- **Root Cause**: Frontend was not passing `tournament_id` and `mode` in `/api/simulate-quarter` request payload, causing backend to default to `mode: "single"` instead of `mode: "tournament"`. When `finalize_game()` was called with `mode="tournament"`, the game document had `mode: "single"`, causing a mismatch and potentially skipping Tournament processing.
-- **Fix**: 
-  - Added `tournament_id` and `mode` to payload in `gameScene.js` (main gameplay flow)
-  - Added `tournament_id` and `mode` to payload in `bootGame.js` (sim-to-4th and sim-full-game flows)
-  - This ensures backend correctly sets `mode: "tournament"` on game document, allowing `finalize_game()` to process Tournament stats correctly
-- **Result**: Game documents now have correct `mode: "tournament"` field, ensuring `finalize_game()` processes player stats correctly for Tournament mode
-- **Status**: ✅ Fixed and committed
-
-### ✅ Fixed: Player Stats Not Saving for User Games (Race Condition + Missing game_document)
-- **Root Cause**: Two issues prevented player stats from saving:
-  1. **Race Condition**: Tournament mode was looking up game document from database in `/tournament/save-result`, which could be stale or incomplete (save-result called before Q4 save completes). Franchise mode avoided this by accepting `game_document` directly from the request.
-  2. **Missing game_document in Sim Full Game**: When using "Sim Full Game" in `bootGame.js`, the fetched game document wasn't being passed as `game_document` to `finalizeGame()`, so `finalizeGame()` couldn't detect it and pass it to the backend.
-- **Fix**: 
-  - **Frontend (`finalizeGame.js`)**: Added logic to detect if `simData` itself is a complete game document (has `box_score` and `game_id`) and use it directly as `game_document` when calling `/tournament/save-result`. This handles the "Sim Full Game" flow from `bootGame.js`.
-  - **Backend (`tournament_routes.py`)**: 
-    - Added `game_document` field to `TournamentResultRequest` (matches Franchise `CompleteWeekRequest`)
-    - Updated `/tournament/save-result` to use `request.game_document` if provided (matches Franchise pattern)
-    - Added logic to save `game_document` to database before calling `finalize_game()` to ensure complete data is available
-  - **Frontend (`finalizeGame.js`)**: Updated to pass `final_game_document` from `simulate-quarter` response to `/tournament/save-result` (matches Franchise pattern)
-- **Result**: Tournament mode now uses the exact same pattern as Franchise mode - receives fresh, complete game document directly from frontend, saves it to database, and `finalize_game()` processes complete `box_score` data. Player stats now save correctly for both regular gameplay and "Sim Full Game" flows.
-- **Status**: ✅ Fixed and committed (January 2025)
-
-### 🔍 Investigating: Formatting Bug (Team Stats Table)
-- **Current State**: 
-  - HTML has `overflow-x: auto` on wrapper div (line 143 in tournament.html)
-  - CSS has `min-width: 800px` on `.stats-table` (line 425 in tournament.css)
-  - Structure matches Franchise mode
-- **Possible Causes**:
-  1. CSS not being applied correctly
-  2. Container width constraint
-  3. Browser caching
-- **Next Steps**: Verify CSS is loading and container width is correct
-
-### 🔍 Investigating: Continuous 404 Requests for Player Tooltip Images (court.html)
-- **Issue**: Continuous stream of 404 requests for player headshot images (`/images/players/${playerId}.png` and `/images/players/generic_headshot.png`) even when game is paused
-- **Location**: `FrontEnd/static/js/phaser/gameScene.js` lines 519-523 (player tooltip image loading)
-- **Root Cause**:
-  1. Tooltip tries to load player image: `/images/players/${playerId}.png` (UUID-based filenames)
-  2. When that fails (404), `onerror` handler tries fallback: `/images/players/generic_headshot.png`
-  3. Fallback also doesn't exist (404), creating a retry loop
-  4. `mousemove` event listener (lines 673-683) is active even when paused, continuously triggering tooltip updates and image load attempts
-- **Impact**:
-  - Unnecessary network requests (continuous 404s)
-  - Console noise
-  - Potential performance impact from repeated failed requests
-  - May contribute to slow initial game download
-- **Expected Behavior**:
-  - Image should load once when tooltip is first shown
-  - Should fail gracefully if missing (hide image or show placeholder)
-  - Should not retry continuously after failure
-  - Tooltips should be disabled when game is paused
-- **Fix Required**:
-  1. Add flag to prevent retries after first failure
-  2. Hide image element on error instead of trying non-existent fallback
-  3. Optionally disable tooltips when game is paused
-  4. Ensure tooltip image only loads once per tooltip show, not on every mousemove
-
-### 🔍 Investigating: Stale Data on Initial Page Load (Race Condition)
-- **Issue**: When landing on `court.html`, the page initially displays stale/inaccurate data:
-  - Team TOL (timeouts) shows as 5 (hardcoded HTML default)
-  - Team scores may be incorrect (defaults to 0)
-  - All players in box score show 100% NG (energy)
-  - After a few seconds or after first turn processes, data calibrates to correct values
-- **Location**: 
-  - `FrontEnd/static/court.html` - Hardcoded HTML defaults (lines 2187, 2289: `TOL: 5`)
-  - `FrontEnd/static/js/phaser/utils/loadGameStats.js` - `initializeGameStats()` function
-- **Root Cause**: 
-  1. **HTML Defaults**: `court.html` has hardcoded defaults (`TOL: 5`, scores `0`) that render immediately
-  2. **Race Condition**: `initializeGameStats()` runs asynchronously, so page renders with defaults before API call completes
-  3. **Incomplete Data Loading**: `displayAccumulatedScores()` only updates scores, NOT timeouts (missing timeout update)
-  4. **Missing gameId**: If URL lacks `game_id`, `initializeGameStats()` returns early and defaults persist
-  5. **Player Energy Not Updated**: `displayAccumulatedPlayerStats()` doesn't show/update NG (energy) in box score
-- **Why It "Calibrates" After Turn**: 
-  - When first turn processes, `gameScene.js` `updateScoreboard()` receives real turn data
-  - Updates scores, fouls, AND timeouts from turn data, overwriting stale defaults
-- **Impact**:
-  - Poor user experience - users see incorrect data on page load
-  - Confusing behavior - data "magically" updates after a few seconds or first turn
-  - May cause users to make decisions based on stale data
-- **Expected Behavior**: 
-  - Page should show correct data immediately on load (or show loading state until data is ready)
-  - Timeouts should be updated from game state, not hardcoded defaults
-  - Player energy should reflect actual values from game state
-- **Fix Required**: 
-  1. **Update `displayAccumulatedScores()`** to also update timeouts:
-     - Read from `gameData.teams[team_id].timeouts` (unified structure) or fallback to `gameData.timeouts.home/away`
-     - Update `#home-tol` and `#away-tol` elements with correct values
-  2. **Ensure `initializeGameStats()` completes before page is "ready"**:
-     - Show loading state until data is loaded, OR
-     - Wait for `initializeGameStats()` to complete before rendering scoreboard
-  3. **Update player energy display** if shown in stats panel (may require separate function)
-  4. **Handle missing `gameId` gracefully**:
-     - If `gameId` missing, either fetch from another source or show appropriate defaults
-     - Don't silently fail and leave stale defaults
-- **Priority**: Medium-High (affects user experience and data accuracy)
-
-### 🔍 Investigating: "Play Quarter" Button Requires Two Clicks (Initialization Timing Bug)
-- **Issue**: On first page load, users must click "Play Quarter" button twice to start the game. First click does nothing, second click works. When returning to the page (e.g., after navigating away and back), first click works correctly.
+### "Play Quarter" Button Requires Two Clicks (Initialization Timing Bug)
+- **Issue**: On first page load, users must click "Play Quarter" twice to start the game. First click does nothing, second click works. When returning to the page (e.g., after navigating away and back), first click works correctly.
 - **Location**: `FrontEnd/static/js/phaser/bootGame.js` - `initGame()` function
-- **Root Cause**: 
-  - The "Play Quarter" button is visible and clickable immediately when the page loads
-  - `bootGame.js` runs asynchronously and attaches the click event listener in `initGame()` function
+- **Root Cause**:
+  - The "Play Quarter" button is visible and clickable immediately when the page loads (`court.html`)
+  - `bootGame.js` runs asynchronously and attaches the click event listener late in `initGame()`
   - If user clicks before `initGame()` finishes attaching the handler, the click does nothing
-  - On subsequent visits, the handler is already attached (or page loads faster), so first click works
-- **Impact**:
-  - Poor user experience - users must click twice on first load
-  - Confusing behavior - button appears clickable but doesn't respond
-  - Test reliability issues - tests need workarounds to handle this timing issue
-- **Expected Behavior**: 
-  - Button should be disabled/hidden until initialization completes, OR
-  - Handler should be attached synchronously before button is shown, OR
-  - Show loading state until ready
-- **Fix Required**: 
+- **Fix Required**:
   1. Disable button initially, enable after `initGame()` completes
   2. OR attach handlers before showing button
   3. OR show loading state until initialization is complete
 - **Priority**: Medium (affects user experience and test reliability)
 
-### ✅ Fixed: Pre-Game Set-Lineup MO Bars Show Stale Non-Zero Values (June 2026)
-- **Issue**: At pre-game set-lineup, starter MO bars showed persistent non-zero fills (same every game); court correctly showed MO 0.
-- **Root Cause**: `init-game` wrote `game_id` to the URL but `loadRoster()` still used the page-load `gameId` const (null), skipped `/api/game/...` merge, and displayed MO from franchise roster (FPD training Inspire).
-- **Fix**: `getActiveGameId()` in `set-lineup.js` reads URL after `init-game`; game doc EM/MO/NG merge runs before slot render.
-- **Docs**: `Lineup_Selection_Screen.md`, `Player_Momentum_System.md`.
-
-### 🔍 Investigating: Slow Lineup Screen Load in Single Game Mode
-- **Issue**: Lineup screen takes 5-10 seconds to load player data when starting a Single Game, despite network request completing in only 294ms (49.4 kB response). The delay occurs after the network response is received, indicating a frontend processing bottleneck.
-- **Location**: `FrontEnd/static/set-lineup.js` - Likely contains the bottleneck
-- **Environment**: Staging
-- **Mode**: Single Game Mode
-- **Symptoms**:
-  - Network request completes quickly (294ms)
-  - Response size: 49.4 kB (reasonable)
-  - UI takes 5-10 seconds to appear after network completion
-  - Users see loading state for extended period
-- **Root Cause Analysis (Initial)**:
-  - **Network is NOT the bottleneck** - Request completes in 294ms
-  - **Frontend processing is the bottleneck** - 4.7-9.7 seconds of blocking JavaScript execution
-  - Likely causes:
-    1. Heavy synchronous data processing (player stats/attributes/energy calculations)
-    2. Inefficient DOM rendering (creating many player elements in loop, no batching)
-    3. Sequential blocking operations (for loops, synchronous await calls)
-    4. Missing optimization patterns (no debouncing, no requestAnimationFrame, no lazy loading)
-- **Investigation Needed**:
-  1. Check browser performance profiler to identify where time is spent (scripting vs rendering)
-  2. Review `set-lineup.js` for synchronous loops processing player data
-  3. Check for DOM thrashing (too many DOM updates causing reflows)
-  4. Identify any hidden sequential operations happening after network request
-- **Expected Behavior**: Lineup screen should load and display player data within 1-2 seconds after network request completes.
-
-### Open: Live Court Sidebar Shows All 12 Players Instead of Active 5 (July 2026)
+### Live Court Sidebar Shows All 12 Players Instead of Active 5 (July 2026)
 
 - **Symptom:** During live `court.html` gameplay, both player box-score sidebars listed the full 12-man roster per team instead of the five active players. Court sprites still showed 5 per side. Observed after a **computer timeout** (no lineup changes); corrected after a later **user timeout + lineup change** return to court.
 - **Fingerprint:** Bad rows used bare full names (`Yadiel Terra`), not Phaser’s `#jersey LastName` format — so the writer was not `gameScene.js` `initTeamTable`.
