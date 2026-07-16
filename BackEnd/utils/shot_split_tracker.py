@@ -441,6 +441,81 @@ def format_hco_shot_tier_summary(game) -> str:
     return "\n".join(lines)
 
 
+# --- subtle movements + altered actions (Dynamic MM / Goal 2) --------------
+
+_ALTERED_ACTIONS = ("backdoor", "jab step", "flash", "post up")
+
+
+def _empty_altered_team(team):
+    return {
+        "name": getattr(team, "name", None) or str(getattr(team, "team_id", "?")),
+        "subtle_movements": 0,
+        "altered_actions": {a: 0 for a in _ALTERED_ACTIONS},
+    }
+
+
+def _altered_bucket(game):
+    """The current OFFENSE team's tally bucket in this game's game_state (created on demand), or None.
+    Per-game_state → the tracking is naturally contained to this game's two teams."""
+    state = getattr(game, "game_state", None)
+    team = getattr(game, "offense_team", None)
+    if not isinstance(state, dict) or team is None:
+        return None
+    tid = str(getattr(team, "team_id", "?"))
+    return state.setdefault("altered_action_tracking", {}).setdefault(tid, _empty_altered_team(team))
+
+
+def record_subtle_movement(game) -> None:
+    """Count one subtle movement entered by the current offense team."""
+    bucket = _altered_bucket(game)
+    if bucket is not None:
+        bucket["subtle_movements"] = int(bucket.get("subtle_movements", 0) or 0) + 1
+
+
+def record_altered_action(game, action) -> None:
+    """Count one altered action (backdoor / jab step / flash / post up) performed by the offense."""
+    bucket = _altered_bucket(game)
+    if bucket is None:
+        return
+    act = action if action in _ALTERED_ACTIONS else "backdoor"
+    aa = bucket.setdefault("altered_actions", {a: 0 for a in _ALTERED_ACTIONS})
+    aa[act] = int(aa.get(act, 0) or 0) + 1
+
+
+def restore_altered_action_tracking_from_saved(game_state, saved) -> None:
+    """Reapply the per-team subtle-movement / altered-action tallies from a loaded game document
+    (quarter-by-quarter persistence), so the end-of-game report covers the whole game."""
+    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+        return
+    prior = saved.get("altered_action_tracking")
+    if isinstance(prior, dict):
+        import copy as _copy
+        game_state["altered_action_tracking"] = _copy.deepcopy(prior)
+
+
+def format_altered_action_summary(game) -> str:
+    """End-of-game: subtle movements entered + altered actions performed, per team."""
+    state = getattr(game, "game_state", None) or {}
+    track = state.get("altered_action_tracking") or {}
+    lines = ["", "===== SUBTLE MOVEMENTS + ALTERED ACTIONS (per team) ====="]
+    if not track:
+        lines.append("(none recorded)")
+    for tid, d in track.items():
+        aa = d.get("altered_actions") or {}
+        total = sum(int(v or 0) for v in aa.values())
+        sm = int(d.get("subtle_movements", 0) or 0)
+        rate = (total / sm * 100.0) if sm else 0.0
+        lines.append(
+            f"{str(d.get('name', tid)):<22}: {sm:>4} SM  |  {total:>4} altered ({rate:5.1f}% of SM)"
+        )
+        lines.append(
+            f"{'':<22}    bd {aa.get('backdoor', 0)} / jab {aa.get('jab step', 0)} / "
+            f"flash {aa.get('flash', 0)} / post {aa.get('post up', 0)}"
+        )
+    lines.append("=========================================================")
+    return "\n".join(lines)
+
+
 # --- master end-of-game report ---------------------------------------------
 
 
@@ -454,6 +529,7 @@ def format_master_eog_report(game) -> str:
         format_turn_type_fga_summary(game),
         format_undefended_by_turn_type_summary(game),
         format_hco_shot_tier_summary(game),
+        format_altered_action_summary(game),
         "###############################################################",
         "",
     ])

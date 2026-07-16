@@ -6375,6 +6375,12 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                                      altered_moves=_alt_moves)
             if beat is None:
                 continue
+            # Dynamic MM tracking (per-team, this game only via game_state): one SM entered + each altered
+            # action actually performed on it (backdoor / jab step / flash / post up).
+            from BackEnd.utils.shot_split_tracker import record_subtle_movement, record_altered_action
+            record_subtle_movement(game)
+            for _ap, _amv in (_alt_moves or {}).items():
+                record_altered_action(game, (_amv or {}).get("action") or "backdoor")
             # Per-defender reads (man + zone, applied in the animator) ride on the beat. Roll all (incl. the
             # BH's, for his froze bonus), then OVERRIDE the altered-action cutters' defenders with their
             # dynamic-threshold reactions (backdoor: good=stick / poor=freeze).

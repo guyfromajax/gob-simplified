@@ -2958,6 +2958,9 @@ def summarize_game_state(game, exclude_animations=True):
         "hco_shot_tier_counts": deepcopy(game.game_state.get("hco_shot_tier_counts", {}))
         if isinstance(game.game_state.get("hco_shot_tier_counts", {}), dict)
         else {},
+        "altered_action_tracking": deepcopy(game.game_state.get("altered_action_tracking", {}))
+        if isinstance(game.game_state.get("altered_action_tracking", {}), dict)
+        else {},
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),
