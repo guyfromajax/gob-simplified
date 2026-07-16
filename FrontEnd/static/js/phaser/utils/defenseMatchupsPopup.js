@@ -2,7 +2,7 @@
  * Defense Matchups Popup + franchise Q1 pre-game handoff.
  *
  * - Franchise Q1 (Play Quarter): cinematic pre-game experience
- * - All other Play Quarter gates: restyled Strategic Modal (home left / away right)
+ * - All other Play Quarter gates: restyled Strategic Modal (away left / home right)
  * - Tutorial: skipped
  * - Single-game: restyled modal only (no cinematic / no pregame bed)
  */
@@ -224,9 +224,9 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   popup.innerHTML = `
     <div class="defense-matchups-content" role="dialog" aria-label="Defense Matchups">
       <div class="dm-m-heads">
-        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeTeam.team_name || "Home"}</div>
-        <div></div>
         <div class="dm-m-head" style="--head-underline:${awayPrimary}">${awayTeam.team_name || "Away"}</div>
+        <div></div>
+        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeTeam.team_name || "Home"}</div>
       </div>
       <div class="dm-rows"></div>
       <div class="dm-m-foot">
@@ -246,42 +246,43 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   function render() {
     rows.innerHTML = POSITIONS.map((pos, i) => `
       <div class="dm-pair" data-slot="${i}">
-        <div class="dm-side-left ${userIsHome ? "dm-user-col" : ""}"></div>
+        <div class="dm-side-left ${userIsHome ? "" : "dm-user-col"}"></div>
         <div class="dm-vs"><span class="dm-favarrow"></span></div>
-        <div class="dm-side-right ${userIsHome ? "" : "dm-user-col"}"></div>
+        <div class="dm-side-right ${userIsHome ? "dm-user-col" : ""}"></div>
       </div>
     `).join("");
 
     rows.querySelectorAll(".dm-pair").forEach((row, i) => {
       const oppPos = POSITIONS[i];
       const userPos = userOrder[i];
+      // Court convention: away left / home right (user column follows userTeamSide).
       const leftP = userIsHome
-        ? playerByPos(homeTeam, userPos)
-        : playerByPos(homeTeam, oppPos);
-      const rightP = userIsHome
         ? playerByPos(awayTeam, oppPos)
         : playerByPos(awayTeam, userPos);
+      const rightP = userIsHome
+        ? playerByPos(homeTeam, userPos)
+        : playerByPos(homeTeam, oppPos);
 
       const leftEl = row.querySelector(".dm-side-left");
       const rightEl = row.querySelector(".dm-side-right");
       leftEl.innerHTML = leftP
         ? buildPlayerTileHtml(leftP, {
             side: "left",
-            teamColor: homePrimary,
-            isUserColumn: userIsHome,
-            statsMode: "game",
-            rtMode: "edge",
-            slotIndex: userIsHome ? i : null,
-          })
-        : "";
-      rightEl.innerHTML = rightP
-        ? buildPlayerTileHtml(rightP, {
-            side: "right",
             teamColor: awayPrimary,
             isUserColumn: !userIsHome,
             statsMode: "game",
             rtMode: "edge",
             slotIndex: userIsHome ? null : i,
+          })
+        : "";
+      rightEl.innerHTML = rightP
+        ? buildPlayerTileHtml(rightP, {
+            side: "right",
+            teamColor: homePrimary,
+            isUserColumn: userIsHome,
+            statsMode: "game",
+            rtMode: "edge",
+            slotIndex: userIsHome ? i : null,
           })
         : "";
 
@@ -292,14 +293,14 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
         rightEl.querySelector(".dm-ph"),
         leftRt,
         rightRt,
-        homePrimary,
-        awayPrimary
+        awayPrimary,
+        homePrimary
       );
       row.querySelector(".dm-favarrow").innerHTML = favArrowSvg(
         leftRt,
         rightRt,
-        homePrimary,
-        awayPrimary
+        awayPrimary,
+        homePrimary
       );
     });
 

@@ -11,6 +11,9 @@ import logging
 from typing import Any, Dict, Optional
 
 
+_reported_fb_uess_fallback_keys = set()
+
+
 def build_fb_uess_summary(
     result: Dict[str, Any],
     game: Optional[Any] = None,
@@ -51,6 +54,8 @@ def build_fb_uess_summary(
         "final_coords_count": len(final_coords) if isinstance(final_coords, dict) else 0,
         "fb_step_state_count": len(result.get("fb_step_states") or []),
         "fallback_reason": fallback_reason,
+        "next_play_type": result.get("next_play_type"),
+        "is_full_simulation": _is_full_simulation(game),
     }
 
 
@@ -84,6 +89,7 @@ def log_fb_uess_summary(
         summary["fb_step_state_count"],
         summary["fallback_reason"],
     )
+    _report_fb_uess_fallback_to_sentry(summary, result)
     return summary
 
 
@@ -121,6 +127,71 @@ def _game_id(result: Dict[str, Any], game: Optional[Any]) -> Optional[str]:
     if isinstance(game_state, dict) and game_state.get("game_id") is not None:
         return str(game_state.get("game_id"))
     return None
+
+
+def _is_full_simulation(game: Optional[Any]) -> bool:
+    game_state = getattr(game, "game_state", None)
+    if isinstance(game_state, dict):
+        return bool(game_state.get("_is_full_simulation"))
+    return False
+
+
+def _report_fb_uess_fallback_to_sentry(
+    summary: Dict[str, Any],
+    result: Dict[str, Any],
+) -> None:
+    """Report live Fast Break UESS fallbacks without spamming full-sim noise."""
+    fallback_reason = summary.get("fallback_reason")
+    game_id = summary.get("game_id")
+    if not fallback_reason or not game_id or summary.get("is_full_simulation"):
+        return
+
+    key = (
+        game_id,
+        summary.get("fast_break_play"),
+        summary.get("result_type"),
+        fallback_reason,
+        summary.get("step_count"),
+        summary.get("next_play_type"),
+    )
+    if key in _reported_fb_uess_fallback_keys:
+        return
+    _reported_fb_uess_fallback_keys.add(key)
+
+    try:
+        import sentry_sdk
+
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("gob.area", "fb_uess")
+            scope.set_tag("gob.issue", "fast_break_uess_fallback")
+            scope.set_tag("gob.fast_break_play", summary.get("fast_break_play"))
+            scope.set_tag("gob.result_type", summary.get("result_type"))
+            scope.set_tag("gob.fallback_reason", fallback_reason)
+            scope.set_tag("gob.next_play_type", summary.get("next_play_type"))
+            scope.set_context(
+                "fb_uess_fallback",
+                {
+                    "game_id": game_id,
+                    "fast_break_play": summary.get("fast_break_play"),
+                    "result_type": summary.get("result_type"),
+                    "next_play_type": summary.get("next_play_type"),
+                    "step_count": summary.get("step_count"),
+                    "fb_step_state_count": summary.get("fb_step_state_count"),
+                    "schema_clock_burn": summary.get("schema_clock_burn"),
+                    "time_elapsed": summary.get("time_elapsed"),
+                    "first_ball_owner": summary.get("first_ball_owner"),
+                    "final_ball_owner": summary.get("final_ball_owner"),
+                    "final_coords_count": summary.get("final_coords_count"),
+                    "fallback_reason": fallback_reason,
+                    "fb_emitter_fallback_reason": result.get("fb_emitter_fallback_reason"),
+                },
+            )
+            sentry_sdk.capture_message(
+                "Fast Break UESS emitted fallback/no animation steps",
+                level="error",
+            )
+    except Exception as exc:
+        logging.warning("[FB_UESS_SENTRY] report failed: %s", exc)
 
 
 def _ball_owner(ball: Dict[str, Any]) -> Optional[str]:

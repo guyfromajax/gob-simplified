@@ -42,6 +42,8 @@
         - do I get play statistics with this?
     b. launch an online version of the playtest (like I'm doing now) so I can track all usage via my Google Analytics? Does Steam allow this?
     c. something else?
+2. What is the ideal order of operations for getting onto Steam and achieving my 3 objectives (play test, beta test, launch)? My first pass at a proposed plan is below.
+3. What am I overlooking? What are some other best practices for succeeding on Steam?
 
 ##Order of operations -- below is my current understanding, but I need help framing this up in the right order. I'm not sure if this is correct or if I'm missing some key items.
 

@@ -305,12 +305,12 @@ export function showPreGameExperience(gameId, scene, normalized) {
   function renderBoard() {
     board.innerHTML = POSITIONS.map((pos, i) => `
       <div class="pgxp-pair" data-slot="${i}" data-opp-pos="${pos}">
-        <div class="pgxp-side-left ${userIsHome ? "pgxp-user" : "pgxp-opp"}"></div>
+        <div class="pgxp-side-left ${userIsHome ? "pgxp-opp" : "pgxp-user"}"></div>
         <div class="pgxp-vs">
           <span class="dm-favarrow"></span>
           <span class="pgxp-vstext">${pos}</span>
         </div>
-        <div class="pgxp-side-right ${userIsHome ? "pgxp-opp" : "pgxp-user"}"></div>
+        <div class="pgxp-side-right ${userIsHome ? "pgxp-user" : "pgxp-opp"}"></div>
       </div>`).join("");
     paintSlots();
   }
@@ -323,33 +323,34 @@ export function showPreGameExperience(gameId, scene, normalized) {
     root.querySelectorAll(".pgxp-pair").forEach((row, i) => {
       const oppPos = POSITIONS[i];
       const userPos = userOrder[i];
+      // Court convention: away left / home right (user column follows userTeamSide).
       const leftP = userIsHome
-        ? playerByPos(homeTeam, userPos)
-        : playerByPos(homeTeam, oppPos);
-      const rightP = userIsHome
         ? playerByPos(awayTeam, oppPos)
         : playerByPos(awayTeam, userPos);
+      const rightP = userIsHome
+        ? playerByPos(homeTeam, userPos)
+        : playerByPos(homeTeam, oppPos);
 
       const leftEl = row.querySelector(".pgxp-side-left");
       const rightEl = row.querySelector(".pgxp-side-right");
       leftEl.innerHTML = leftP
         ? buildPlayerTileHtml(leftP, {
             side: "left",
-            teamColor: homePrimary,
-            isUserColumn: userIsHome && matchups,
-            statsMode,
-            rtMode,
-            slotIndex: userIsHome && matchups ? i : null,
-          })
-        : "";
-      rightEl.innerHTML = rightP
-        ? buildPlayerTileHtml(rightP, {
-            side: "right",
             teamColor: awayPrimary,
             isUserColumn: !userIsHome && matchups,
             statsMode,
             rtMode,
             slotIndex: !userIsHome && matchups ? i : null,
+          })
+        : "";
+      rightEl.innerHTML = rightP
+        ? buildPlayerTileHtml(rightP, {
+            side: "right",
+            teamColor: homePrimary,
+            isUserColumn: userIsHome && matchups,
+            statsMode,
+            rtMode,
+            slotIndex: userIsHome && matchups ? i : null,
           })
         : "";
 
@@ -360,18 +361,18 @@ export function showPreGameExperience(gameId, scene, normalized) {
         rightEl.querySelector(".dm-ph"),
         leftRt,
         rightRt,
-        homePrimary,
-        awayPrimary
+        awayPrimary,
+        homePrimary
       );
       row.querySelector(".dm-favarrow").innerHTML = favArrowSvg(
         leftRt,
         rightRt,
-        homePrimary,
-        awayPrimary
+        awayPrimary,
+        homePrimary
       );
       const vst = row.querySelector(".pgxp-vstext");
       if (vst) {
-        vst.style.color = favAccentColor(leftRt, rightRt, homePrimary, awayPrimary);
+        vst.style.color = favAccentColor(leftRt, rightRt, awayPrimary, homePrimary);
       }
     });
 

@@ -2,12 +2,15 @@
 1. Teleported an HCO entry step, result was a DB turnover
 2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 3. HCO entry pass on offense side teleported
+5. Dead ball turnove rin HCO is passing ahead then teleppring back to animate the DB turnover
+6. Improve reset action in HCO
 
 ##Full Product Readiness
 102. Team court images
 105. More responsive front end
 106. Monetization plan
 107. Stripe
+108. Steam Strategy
 119. PvP sim
 120. PvP live
 121. Tunable Constants file
@@ -15,6 +18,8 @@
 125. MM: Micro Movement SFX
 127. Add a new hire news story for user team
 128. Add a badass design appraoch to New Stories
+129. Comprehensive Blowout Governor
+132. Watermark free version of player headshots
 
 ##Full Product Perfection
 1. Training Camp News Report
@@ -31,6 +36,8 @@
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 129: Loose Balls!
 131. Centralized Turn Transition Helper / System
+132. Players as Characters
+133. Loose/Normal/Tight Defense Play Types
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
@@ -421,10 +428,3 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - **Why “fixed” after user timeout + lineup change:** set-lineup Return forces `resume_from_timeout=true` → resume-state probe skipped → `/api/game` path → name lookup fails → dump does not run; Phaser remount rebuilds 5.
 - **Not proven without URL/network capture:** exact entry params on the bad computer-timeout return (e.g. whether resume-state was probed because `resume_from_timeout` was missing/false). Mechanism that produces 12 rows is clear; that one trigger instance is the remaining link.
 - **Likely fix (when authorized):** filter to `PG`–`C` (or current lineup IDs) in `displayAccumulatedPlayerStats`, and/or resolve box score by `team_id` consistently.
-
-### Open Technical Debt: FCP/HCT Direct PressureStepState Builders
-
-- **Context:** FCP/HCT UESS projection bridge is now complete for the current emitted schema. Walk-up, advance, pass, interception, batted-OOB, terminal foul/dead-ball/steal, dead-ball fumble, shot setup, and shared post-shot sub-steps all round-trip through formal `PressureStepState` projection.
-- **Remaining item:** Convert the pressure builders to produce formal `PressureStepState` directly instead of building `AnimationStep` schema first and projecting it.
-- **Why it matters:** The current bridge is stable and system-level, but it still keeps a transitional `schema_projection` snapshot for parity. Direct builders are the final cleanup to make FCP/HCT match the intended resolve -> freeze -> project UESS architecture.
-- **Reference doc:** `_documentation_master/projects/FCP_HCT_UESS_Update.md`, Step 8.

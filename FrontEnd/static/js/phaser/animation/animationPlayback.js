@@ -18,7 +18,7 @@
  * etc.) are layered in subsequent iterations.
  */
 
-import { gridToPixels } from "../utils/gridToPixels.js";
+import { gridToPixels, pixelsToGrid } from "../utils/gridToPixels.js";
 import {
   resolvePathKnotWaypoints,
   tweenPlayerThroughPathKnots,
@@ -112,6 +112,196 @@ function tracePlayback(scene, label, payload = {}) {
   if (!ALWAYS_TRACE_LABELS.has(label) && !shouldTracePlayback(scene)) return;
   try {
     console.log(`[UESS_TRACE] ${label}`, payload);
+  } catch (_) {
+    // Diagnostic only; never throw into playback.
+  }
+}
+
+function shouldDebugOobAnchors(scene = null) {
+  if (typeof window === "undefined") return Boolean(scene?.__debugOobAnchors);
+  if (window.DEBUG_OOB_ANCHORS === true) return true;
+  if (window.DEBUG_OOB_ANCHORS === false) return false;
+  try {
+    const raw = new URLSearchParams(window.location.search).get("debug_oob");
+    return ["1", "true", "yes", "on"].includes(String(raw || "").toLowerCase());
+  } catch (_) {
+    return Boolean(scene?.__debugOobAnchors);
+  }
+}
+
+function clearOobAnchorOverlay(scene) {
+  const objects = scene?.__oobAnchorDebugObjects;
+  if (!Array.isArray(objects)) return;
+  for (const obj of objects) {
+    try {
+      obj?.destroy?.();
+    } catch (_) {
+      // Debug overlay only.
+    }
+  }
+  scene.__oobAnchorDebugObjects = [];
+}
+
+function spriteGridPosition(sprite, width, height) {
+  if (!sprite) return null;
+  if (Number.isFinite(sprite.gridX) && Number.isFinite(sprite.gridY)) {
+    return { x: Number(sprite.gridX), y: Number(sprite.gridY) };
+  }
+  if (Number.isFinite(sprite.x) && Number.isFinite(sprite.y)) {
+    return pixelsToGrid(sprite.x, sprite.y, width, height);
+  }
+  return null;
+}
+
+function classifyHalfCourt(coord, isAwayOffense) {
+  if (!coord || typeof isAwayOffense !== "boolean") return "unknown";
+  const x = Number(coord.x);
+  if (!Number.isFinite(x)) return "unknown";
+  const crossed = isAwayOffense ? x <= 50 : x >= 50;
+  return crossed ? "frontcourt" : "backcourt";
+}
+
+function drawOobAnchorDot(scene, graphics, textObjects, coord, label, color, width, height, yOffset = 0) {
+  if (!coord || !Number.isFinite(Number(coord.x)) || !Number.isFinite(Number(coord.y))) return;
+  const px = gridToPixels(Number(coord.x), Number(coord.y), width, height);
+  graphics.fillStyle(color, 0.95);
+  graphics.fillCircle(px.x, px.y, 7);
+  graphics.lineStyle(2, 0xffffff, 0.95);
+  graphics.strokeCircle(px.x, px.y, 8);
+  const text = scene.add.text(
+    px.x + 10,
+    px.y - 10 + yOffset,
+    `${label} (${Number(coord.x).toFixed(1)}, ${Number(coord.y).toFixed(1)})`,
+    {
+      fontFamily: "Arial",
+      fontSize: "12px",
+      color: "#ffffff",
+      backgroundColor: "rgba(0, 0, 0, 0.75)",
+      padding: { x: 4, y: 2 },
+    },
+  );
+  text.setDepth?.(999998);
+  textObjects.push(text);
+}
+
+function logAndDrawOobAnchorDebug(scene, step, sprites, width, height, options = {}, phase = "start") {
+  if (!shouldDebugOobAnchors(scene) || !isSchemaPassStep(step)) return;
+  const reason = step?.start?.advance_trigger?.metadata?.reason;
+  const currentTurn = options.turnData?.current_turn ?? null;
+  const isPressurePass = (
+    reason === "hct_pass"
+    || currentTurn === "HCT"
+    || currentTurn === "FCP"
+  );
+  if (!isPressurePass) return;
+
+  const passerId = schemaPassStartOwnerId(step);
+  const receiverId = schemaPassEndOwnerId(step);
+  const passerStartCoord = passerId ? step.start?.coords?.[passerId] : null;
+  const receiverStartCoord = receiverId ? step.start?.coords?.[receiverId] : null;
+  const receiverEndCoord = receiverId ? step.end?.coords?.[receiverId] : null;
+  const ballArrivalCoord = step.start?.ball_arrival_coord ?? null;
+  const isAwayOffenseRaw =
+    options.turnData?.is_away_offense
+    ?? options.turnData?.away_offense
+    ?? options.turnData?.roles?.is_away_offense
+    ?? null;
+  const isAwayOffense = typeof isAwayOffenseRaw === "boolean" ? isAwayOffenseRaw : null;
+  const passerSpriteGrid = spriteGridPosition(sprites?.[passerId], width, height);
+  const receiverSpriteGrid = spriteGridPosition(sprites?.[receiverId], width, height);
+  const payload = {
+    phase,
+    turnIndex: options.turnData?.index ?? null,
+    currentTurn,
+    resultType: options.turnData?.result_type ?? null,
+    stepId: step.id ?? null,
+    reason,
+    passerId,
+    receiverId,
+    passerStartCoord,
+    receiverStartCoord,
+    receiverEndCoord,
+    ballArrivalCoord,
+    passerSpriteGrid,
+    receiverSpriteGrid,
+    isAwayOffense,
+    receiverStartHalf: classifyHalfCourt(receiverStartCoord, isAwayOffense),
+    receiverEndHalf: classifyHalfCourt(receiverEndCoord, isAwayOffense),
+  };
+
+  try {
+    console.log("[OOB_ANCHOR_TRACE]", payload);
+  } catch (_) {
+    // Debug only.
+  }
+
+  clearOobAnchorOverlay(scene);
+  if (!scene?.add?.graphics) return;
+
+  const graphics = scene.add.graphics();
+  graphics.setDepth?.(999997);
+  const textObjects = [];
+  const halfTop = gridToPixels(50, 50, width, height);
+  const halfBottom = gridToPixels(50, 0, width, height);
+  graphics.lineStyle(3, 0xffff00, 0.9);
+  graphics.lineBetween(halfTop.x, halfTop.y, halfBottom.x, halfBottom.y);
+  drawOobAnchorDot(scene, graphics, textObjects, passerStartCoord, "PASSER", 0x00d1ff, width, height, 0);
+  drawOobAnchorDot(scene, graphics, textObjects, receiverStartCoord, "REC START", 0xffa500, width, height, 14);
+  drawOobAnchorDot(scene, graphics, textObjects, receiverEndCoord, "REC CATCH", 0xff2d55, width, height, 28);
+  drawOobAnchorDot(scene, graphics, textObjects, ballArrivalCoord, "BALL ARR", 0x80ff00, width, height, 42);
+  scene.__oobAnchorDebugObjects = [graphics, ...textObjects];
+  scene.time?.delayedCall?.(4000, () => clearOobAnchorOverlay(scene));
+}
+
+function stringifyPlaybackDiagnostic(payload = {}) {
+  try {
+    return JSON.stringify(payload);
+  } catch (_) {
+    return "[unserializable playback diagnostic]";
+  }
+}
+
+const reportedPlaybackLoopKeys = new Set();
+
+function reportPlaybackLoopToSentry(payload = {}) {
+  if (typeof window === "undefined" || !window.Sentry) return;
+  const key = [
+    payload.turnIndex ?? "unknown_turn",
+    payload.currentTurn ?? "unknown_type",
+    payload.currentIndex ?? "unknown_step",
+  ].join(":");
+  if (reportedPlaybackLoopKeys.has(key)) return;
+  reportedPlaybackLoopKeys.add(key);
+
+  const diagnosticJson = stringifyPlaybackDiagnostic(payload);
+  try {
+    window.Sentry.withScope((scope) => {
+      scope.setLevel("error");
+      scope.setTag("gob.area", "uess_playback");
+      scope.setTag("gob.issue", "repeated_same_step");
+      scope.setTag("gob.turn_type", String(payload.currentTurn ?? "unknown"));
+      scope.setTag("gob.result_type", String(payload.resultType ?? "unknown"));
+      scope.setContext("uess_playback_loop", {
+        turnIndex: payload.turnIndex ?? null,
+        currentIndex: payload.currentIndex ?? null,
+        repeatCount: payload.repeatCount ?? null,
+        stepsExecuted: payload.stepsExecuted ?? null,
+        stepCount: payload.stepCount ?? null,
+        next: payload.next ?? null,
+      });
+      scope.setExtra("diagnostic_json", diagnosticJson);
+      window.Sentry.captureMessage("UESS playback repeated the same animation step");
+    });
+  } catch (_) {
+    // Diagnostic only; never throw into playback.
+  }
+}
+
+function logPlaybackLoopGuard(payload = {}) {
+  try {
+    console.warn("[UESS_PLAYBACK_LOOP_GUARD]", payload);
+    console.warn("[UESS_PLAYBACK_LOOP_GUARD_JSON]", stringifyPlaybackDiagnostic(payload));
+    reportPlaybackLoopToSentry(payload);
   } catch (_) {
     // Diagnostic only; never throw into playback.
   }
@@ -914,6 +1104,8 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     ? schemaPassEndOwnerId(step)
     : null;
 
+  logAndDrawOobAnchorDebug(scene, step, sprites, width, height, options, "step_start");
+
   const stepWaitMs =
     isShotBallMotionStep(step) && !isFreeThrowShotStep(step)
       ? Math.max(durationMs, SHOT_BALL_MIN_WALL_CLOCK_MS)
@@ -1182,6 +1374,8 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   // Snap ball to its end coord and reconcile ownership state.
   snapBallToEndState(scene, step, sprites, ballSprite, width, height);
 
+  logAndDrawOobAnchorDebug(scene, step, sprites, width, height, options, "step_end");
+
   // step.end.announcement: play after tweens + snap, before returning next.
   if (step.end?.announcement) {
     await runStepAnnouncement(scene, step.end.announcement, sprites, step, options.turnData);
@@ -1242,6 +1436,9 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
 
   let currentIndex = startIndex;
   let stepsExecuted = 0;
+  let repeatIndex = null;
+  let repeatCount = 0;
+  const repeatDiagnosticThreshold = options.repeatDiagnosticThreshold ?? 12;
 
   while (currentIndex >= 0 && currentIndex < steps.length) {
     if (scene?.skipToEnd) return null;
@@ -1323,10 +1520,50 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
       return null;
     }
     if (next.kind === "next_step") {
+      if (next.index === currentIndex) {
+        repeatCount = repeatIndex === currentIndex ? repeatCount + 1 : 1;
+        repeatIndex = currentIndex;
+        if (repeatCount === repeatDiagnosticThreshold || repeatCount % repeatDiagnosticThreshold === 0) {
+          logPlaybackLoopGuard({
+            turnIndex: options.turnData?.index ?? null,
+            resultType: options.turnData?.result_type ?? null,
+            currentTurn: options.turnData?.current_turn ?? null,
+            currentIndex,
+            next,
+            repeatCount,
+            stepsExecuted,
+            stepCount: steps.length,
+            step,
+          });
+        }
+      } else {
+        repeatIndex = null;
+        repeatCount = 0;
+      }
       currentIndex = next.index;
       continue;
     }
     if (next.kind === "branch") {
+      if (next.next_step_index === currentIndex) {
+        repeatCount = repeatIndex === currentIndex ? repeatCount + 1 : 1;
+        repeatIndex = currentIndex;
+        if (repeatCount === repeatDiagnosticThreshold || repeatCount % repeatDiagnosticThreshold === 0) {
+          logPlaybackLoopGuard({
+            turnIndex: options.turnData?.index ?? null,
+            resultType: options.turnData?.result_type ?? null,
+            currentTurn: options.turnData?.current_turn ?? null,
+            currentIndex,
+            next,
+            repeatCount,
+            stepsExecuted,
+            stepCount: steps.length,
+            step,
+          });
+        }
+      } else {
+        repeatIndex = null;
+        repeatCount = 0;
+      }
       currentIndex = next.next_step_index;
       continue;
     }

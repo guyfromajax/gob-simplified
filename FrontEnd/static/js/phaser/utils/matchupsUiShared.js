@@ -78,7 +78,7 @@ export function formatStatLine(player, statsMode) {
 
 /**
  * Build a player tile.
- * RT always lives in a fixed outer gutter (home left / away right) so columns align.
+ * RT always lives in a fixed outer gutter (away left / home right) so columns align.
  * @param {'edge'|'none'} rtMode
  */
 export function buildPlayerTileHtml(player, {
