@@ -20,15 +20,59 @@ logger = logging.getLogger(__name__)
 
 COLLECTION = "recruit_sets"
 
+# The base image library every copy of the game ships with. Dynamic recruits
+# (when a user hasn't bought fresh packs) borrow portraits from this set. It is
+# the image source regardless of whether the set was ever consumed as a class.
+BASE_IMAGE_SET_ID = "set_0001"
+
+
+def _base_image_pool(db, set_id=BASE_IMAGE_SET_ID):
+    """The recruit_ids of the base image library — the portraits a dynamic
+    recruit can borrow. Empty (→ generic headshots) if the set isn't loaded."""
+    try:
+        doc = db[COLLECTION].find_one({"set_id": set_id}, {"recruits.recruit_id": 1})
+        return [r.get("recruit_id") for r in (doc or {}).get("recruits", []) if r.get("recruit_id")]
+    except Exception as e:  # noqa: BLE001 — image assignment must never break generation
+        logger.warning(f"base image pool lookup failed: {e}")
+        return []
+
+
+def assign_image_ids(recruits, db, base_set_id=BASE_IMAGE_SET_ID):
+    """Stamp `image_id` on each recruit — the portrait it wears. Returns recruits.
+
+    - A SET recruit already carries a stable recruit_id that IS its portrait, so
+      image_id = recruit_id.
+    - A DYNAMIC recruit (no recruit_id/image_id yet) BORROWS a portrait from the
+      base image library at random — a shuffled 1:1 mapping so no two recruits in
+      the same class share a face (wraps only if the class exceeds the library).
+      If the library is unavailable, image_id is left unset → generic headshot.
+    """
+    borrowers = []
+    for r in recruits:
+        if r.get("image_id"):
+            continue
+        if r.get("recruit_id"):
+            r["image_id"] = r["recruit_id"]
+        else:
+            borrowers.append(r)
+    if borrowers:
+        pool = list(_base_image_pool(db, base_set_id))
+        if pool:
+            random.shuffle(pool)
+            for j, r in enumerate(borrowers):
+                r["image_id"] = pool[j % len(pool)]
+    return recruits
+
 
 def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=300):
-    """Return (recruits, used_set_id).
+    """Return (recruits, used_set_id), each recruit stamped with an image_id.
 
     Pick a random set from `recruit_sets` whose set_id is not in used_set_ids and
     return its frozen recruit records (each with a stable recruit_id) + the set_id
     used. If none are available — or on ANY error — fall back to dynamic
     generation and return (generated_recruits, None), leaving current behavior
-    unchanged.
+    unchanged. Either way, every returned recruit gets an image_id (its own for
+    set recruits; a borrowed base-library portrait for dynamic recruits).
     """
     try:
         used = set(used_set_ids or [])
@@ -40,7 +84,7 @@ def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=300):
             recruits = (doc or {}).get("recruits") or []
             if recruits:
                 logger.info(f"Loaded recruit set {pick} ({len(recruits)} recruits)")
-                return recruits, pick
+                return assign_image_ids(recruits, db), pick
     except Exception as e:  # noqa: BLE001 — any failure must degrade gracefully
         logger.warning(f"recruit_sets lookup failed; using dynamic generation: {e}")
-    return recruit_manager.generate_recruits_list(count=count), None
+    return assign_image_ids(recruit_manager.generate_recruits_list(count=count), db), None

@@ -67,6 +67,7 @@ try:
     from .tournament_routes import router as tournament_router
     from .training_routes import router as training_router
     from .franchise_routes import router as franchise_router
+    from .player_image_routes import router as player_image_router
     from .press_conference_routes import router as press_conference_router
     from .community_highlights_routes import router as community_highlights_router
     from .gameplan_routes import router as gameplan_router
@@ -335,6 +336,7 @@ try:
     app.include_router(tournament_router)
     app.include_router(training_router)
     app.include_router(franchise_router)
+    app.include_router(player_image_router)
     app.include_router(press_conference_router)
     app.include_router(community_highlights_router)
     app.include_router(gameplan_router)

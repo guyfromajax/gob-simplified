@@ -276,6 +276,50 @@ const API_CONFIG = {
     }
     return this.buildStaticPath('/images/players/generic_headshot.png');
   },
+
+  // --- Recruit portraits (pre-signing) --------------------------------------
+  // An un-signed recruit shows a finished WHITE display master keyed by its
+  // image_id (its own portrait for set recruits, a borrowed base-library one for
+  // dynamic recruits — the field ships on the recruit record from the API).
+  RECRUIT_IMAGE_WHITE_PREFIX: 'recruits/white',
+
+  /**
+   * Resolve an un-signed recruit's display portrait (white master) by image_id.
+   * Pair with an onerror -> ensureRecruitImage(imageId) -> retry, then generic.
+   * @param {string} imageId
+   * @param {Object} [opts] - { size }
+   * @returns {string}
+   */
+  getRecruitImageUrl(imageId, opts = {}) {
+    const size = opts.size || 'card';
+    if (!imageId) return this.getGenericHeadshotUrl(opts);
+    if (this.usePlayerImageRemote()) {
+      return this._remotePlayerImageUrl(`${this.RECRUIT_IMAGE_WHITE_PREFIX}/${imageId}.png`, size);
+    }
+    return this.buildStaticPath(`/images/recruits/${imageId}.png`);
+  },
+
+  // --- Lazy paint (generate-on-miss) ----------------------------------------
+  // Call on an <img> 404 to have the backend paint the master from the recruit's
+  // kit, then retry the CDN URL. Resolves to { status: 'painted'|'exists'|... };
+  // any non-success just means fall back to the generic headshot.
+  ensureRecruitImage(imageId) {
+    if (!imageId) return Promise.resolve({ status: 'skip' });
+    return fetch(this.buildUrl('/recruit-image/ensure'), {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, this.getAuthHeaders()),
+      body: JSON.stringify({ image_id: imageId }),
+    }).then((r) => r.json()).catch(() => ({ status: 'error' }));
+  },
+
+  ensurePlayerImage(franchiseId, playerId) {
+    if (!franchiseId || !playerId) return Promise.resolve({ status: 'skip' });
+    return fetch(this.buildUrl('/player-image/ensure'), {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, this.getAuthHeaders()),
+      body: JSON.stringify({ franchise_id: franchiseId, player_id: playerId }),
+    }).then((r) => r.json()).catch(() => ({ status: 'error' }));
+  },
 };
 
 // Make it globally available

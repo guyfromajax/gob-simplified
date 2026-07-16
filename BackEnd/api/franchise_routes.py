@@ -10367,6 +10367,10 @@ def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: di
         # roster (players/master/<id>.png). Walk-ons have no recruit_id -> fresh uuid.
         "player_id": recruit_doc.get("recruit_id") or str(uuid.uuid4()),
         "recruit_id": recruit_doc.get("recruit_id"),
+        # the portrait to paint into this team's uniform at signing (its own for
+        # set recruits, a borrowed base-library id for dynamic ones). Walk-ons
+        # have none -> generic headshot.
+        "image_id": recruit_doc.get("image_id"),
         "team_id": str(team_doc["_id"]),
         "team_name": team_doc.get("name", ""),
         "name": recruit_doc.get("name", "--"),
@@ -14005,6 +14009,10 @@ def finish_season(req: FinishSeasonRequest):
                 "year": advance_year(signed_player.get("year")),
                 "jersey": signed_player.get("jersey"),
                 "archetype": signed_player.get("archetype"),
+                # portrait to paint into this team's uniform (kit/<image_id>) ->
+                # master/<player_id>. Lets the sign-time painter resolve the kit
+                # for a rostered player even after signed_players is cleared.
+                "image_id": signed_player.get("image_id"),
             },
             "season": zero_stats.copy(),
             "career": zero_stats.copy(),
@@ -14135,6 +14143,9 @@ def finish_season(req: FinishSeasonRequest):
             "franchise_id": str(franchise_id),
             # stable id from the pre-built set (keys the portrait); uuid4 for dynamic recruits
             "recruit_id": recruit.get("recruit_id") or str(uuid.uuid4()),
+            # the portrait this recruit wears: its own id for set recruits, a
+            # borrowed base-library id for dynamic ones (assign_image_ids).
+            "image_id": recruit.get("image_id"),
             "name": recruit["name"],
             "attributes": recruit["attributes"],
             "position_ratings": recruit["position_ratings"],

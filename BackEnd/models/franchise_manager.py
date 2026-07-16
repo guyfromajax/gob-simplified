@@ -526,6 +526,9 @@ class FranchiseManager:
                 "franchise_id": str(self.franchise_id),
                 # stable id from the pre-built set (keys the portrait); uuid4 for dynamic recruits
                 "recruit_id": recruit.get("recruit_id") or str(uuid.uuid4()),
+                # the portrait this recruit wears: its own id for set recruits, a
+                # borrowed base-library id for dynamic ones (assign_image_ids).
+                "image_id": recruit.get("image_id"),
                 "name": recruit["name"],
                 "attributes": recruit["attributes"],
                 "position_ratings": recruit["position_ratings"],
