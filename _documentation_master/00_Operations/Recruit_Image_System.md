@@ -1,19 +1,103 @@
 # Recruit Image System
 
-> **Status: DESIGN / not yet built.** This is the agreed architecture and build plan for
-> recruit portraits + on-signing uniform application. No code, assets, or R2 objects exist
-> yet. Sections describing runtime behavior are the *intended* design, not current state.
+> **Status: BUILT (backend) — verifying in staging.** The backend is implemented and merged/in
+> review; `set_0001` (300 recruits) + kits are live in R2 and loaded in staging. Remaining:
+> wire R2 creds on Railway, frontend *rendering* (owner + C+C), and the offline port.
+> **The [As-built architecture](#as-built-architecture-current) section below is authoritative;**
+> the deeper design sections that follow it (build projection, classifier, monetization, Conf1)
+> remain the design rationale and are still accurate.
 
-Every season a franchise generates **300 recruits**. They currently have **no images**. This
-system gives each recruit a **generic white-shirt portrait** for the recruiting season
-(weeks 1–34), then **paints their new team's uniform onto that white shirt when they sign**
-(week 35). The same design runs **online today** and in the future **downloadable/offline
-build** — identical recolor logic, different place it executes.
+Every season a franchise generates **300 recruits**. This system gives each a **white-shirt
+portrait** during the recruiting season, then **paints their new team's uniform onto that white
+shirt when they sign** (week 35). The same design runs **online today** and in the future
+**downloadable/offline build** — identical recolor logic, different place it executes.
 
 It is the recruit-facing extension of the [Player Image System](./Player_Image_System.md)
-(and the realization of the "layered pipeline: base portrait + per-team uniform overlay"
-flagged as planned there). It reuses the same R2 bucket, `assets.geekedoutgames.com` domain,
-UUID-keyed object layout, and the frontend resolver.
+(the "layered pipeline: base portrait + per-team uniform overlay"). It reuses the same R2 bucket,
+`assets.geekedoutgames.com` domain, UUID-keyed object layout, and the frontend resolver.
+
+---
+
+## As-built architecture (current)
+
+Two ideas the original design didn't have, both now implemented:
+
+### 1. `image_id` — the indirection that makes images reusable
+
+Every recruit carries an **`image_id`**: *the portrait it wears*. Image resolution always keys
+off `image_id`, never the recruit's own id. This is the single field that lets the same 300 base
+images back both purchased sets and dynamically generated classes:
+
+- **Set recruit** → `image_id = recruit_id` (its own pre-built portrait).
+- **Dynamic recruit** (a season where no fresh pack was bought) → **borrows** a portrait from the
+  **base image library `set_0001`** at random — a shuffled 1:1 mapping so no two recruits in a
+  class share a face (wraps only if a class exceeds the library; no library → generic headshot).
+
+`image_id` is stamped by `assign_image_ids()` in `BackEnd/models/recruit_sets.py` and flows
+**FRD → `signed_players` → FPD.meta**. The base library is independent of `used_recruit_set_ids`,
+so the borrow pool survives after `set_0001` is consumed as a class.
+
+This serves all three monetization profiles with one mechanism:
+
+| Profile | Each season |
+|---|---|
+| **Never buys packs** | dynamic class + borrowed `set_0001` faces — always has images; the same 300 recur (the intended staleness that drives pack sales) |
+| **Buys a fresh pack every season** | loads a purchased set — unique art, `image_id = recruit_id` |
+| **Mix** | each season independently loads a set *or* generates + borrows |
+
+Reuse assignment is **purely random** (shuffled) by decision — recruits have no in-game race, so
+the image simply *defines* appearance; only body plausibility could matter and it was judged not
+worth the complexity.
+
+### 2. Lazy paint (generate-on-miss) — nothing pre-rendered but the kit
+
+The only baked artifact is the **kit** (pre-finish white bust + tank mask + geometry). Both the
+white display master *and* the uniformed master are **painted on first view and cached in R2
+forever after** — no pre-generation, no batch job, no queue:
+
+```
+<img src = CDN/players/master/<player_id>.png>
+   200 → show it (painted already; backend never touched again)
+   404 → onerror → POST /player-image/ensure {franchise_id, player_id}
+             backend: resolve image_id+team → read kit from R2 → recolor → upload master
+          → retry <img> → 200 → show   (still fails → generic_headshot)
+```
+
+- **White master** (`recruits/white/<image_id>.png`, pre-signing) → `POST /recruit-image/ensure
+  {image_id}` finishes the kit bust. No recolor.
+- **Uniformed master** (`players/master/<player_id>.png`, post-signing) → `POST
+  /player-image/ensure` recolors the kit into the signed team's colors.
+
+Both endpoints (`BackEnd/api/player_image_routes.py`) are idempotent, auth'd, and degrade to a
+status the frontend reads as "use generic" — **never a 500**. The paint core
+(`BackEnd/services/recruit_image.py`) is a **verbatim port** of the league recolor + finish, so
+recruits render pixel-identical to live players. R2 I/O is a thin `boto3` client
+(`BackEnd/services/r2_images.py`); creds come from env vars on Railway.
+
+**Team colors + wordmark come from the Mongo `team` doc** (`primary_color`, `secondary_color`,
+`mascot`) — `teams_uniforms.json` is a **build-time artifact only**, not read server-side.
+
+### Costs
+No runtime AI cost (reuse + deterministic recolor). Only R2 storage (cheap, egress-free) + the
+Cloudflare image transforms already used for league players + modest paint CPU on the existing
+service. The NB generation cost is one-time, upfront, per sellable set.
+
+### Portability
+Online, `ensure` is a backend endpoint. In the download build the same "if missing, paint
+locally, then show" runs on the user's machine (paint core reimplemented in the download
+runtime). The `onerror → ensure` pattern maps directly to a local ensure call.
+
+### As-built code map
+
+| Piece | Location |
+|---|---|
+| `image_id` assignment + set loading | `BackEnd/models/recruit_sets.py` (`assign_image_ids`, `load_unused_set_or_generate`) |
+| FRD/signed/FPD `image_id` plumbing | `franchise_manager.py`, `franchise_routes.py` |
+| Paint core (recolor + finish, in-memory) | `BackEnd/services/recruit_image.py` |
+| R2 client | `BackEnd/services/r2_images.py` |
+| Lazy paint endpoints | `BackEnd/api/player_image_routes.py` |
+| Frontend resolver + on-miss helpers | `getRecruitImageUrl` / `ensureRecruitImage` / `ensurePlayerImage` in `api-config.js` |
+| Ops tooling (bake sets, kits, upload, load) | `scripts/recruit_sets/` |
 
 ---
 
