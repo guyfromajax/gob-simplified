@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""
+Finish uniformed busts into upload-ready masters (stage 3 — final).
+
+Input busts are already cut out (transparent RGBA from the uniform stage). This
+stage:
+  1. FACE-ANCHORS the framing (detect the face, place the head near the top with
+     a consistent eye-line, scale to a consistent face size so all portraits sit
+     the same in the frame; build still reads via shoulder-to-head width).
+  2. Cleans the alpha edge (erode + feather) to kill any white halo.
+  3. Outputs 3530 x 3412 RGBA PNG named <uuid>.png.
+
+    python3 scripts/finish_portraits.py --team "Durham"
+    python3 scripts/finish_portraits.py --only "Ricky Chang"
+    python3 scripts/finish_portraits.py --all
+
+Inputs:  tmp/portrait-pilot/uniformed/<Name>.png  (RGBA, cut out)
+         scripts/players_archetypes.csv            (name -> uuid, team)
+Output:  assets_staging/players/<uuid>.png         (3530x3412 RGBA)
+"""
+import os
+import re
+import csv
+import sys
+import argparse
+
+CANVAS_W, CANVAS_H = 3530, 3412
+
+# Framing (fractions of canvas). Matched to Conf1: head near the top, face a
+# consistent size, chest filling the bottom. Tunable.
+FACE_H_FRAC = 0.26        # face height as a fraction of canvas height
+FACE_CY_FRAC = 0.34       # vertical position of the face CENTER
+FACE_CX_FRAC = 0.50       # horizontal position of the face center
+
+
+def slug(s):
+    return re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+
+def finish(in_path, out_path):
+    """Preserve the input's (already-consistent) framing: uniformly scale it to
+    fill the canvas width, top-align (head near top), and clean the alpha edge.
+    Every image gets the identical transform, so the framing you already have is
+    kept, just re-sized to 3530x3412. (The wordmark is applied in the uniform
+    stage, placed low so its top slice lands at this frame's bottom edge.)"""
+    import numpy as np
+    from scipy import ndimage
+    from PIL import Image
+
+    im = Image.open(in_path).convert("RGBA")
+    arr = np.asarray(im)
+    rgb = arr[..., :3].copy()
+    alpha = arr[..., 3]
+    if (alpha > 20).sum() == 0:
+        raise ValueError("empty image")
+
+    # edge cleanup: erode + feather to kill the white halo
+    a = ndimage.binary_erosion(alpha > 20, iterations=2).astype(np.float32)
+    a = ndimage.gaussian_filter(a, 1.5)
+    alpha = np.clip(a * 255, 0, 255).astype(np.uint8)
+
+    src = Image.fromarray(np.dstack([rgb, alpha]), "RGBA")
+    scale = CANVAS_W / src.width                        # fill width uniformly
+    new_h = max(1, round(src.height * scale))
+    src = src.resize((CANVAS_W, new_h), Image.LANCZOS)
+
+    canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
+    canvas.alpha_composite(src, (0, 0))                 # top-aligned (head near top)
+    canvas.save(out_path, "PNG")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument("--only")
+    g.add_argument("--team")
+    g.add_argument("--all", action="store_true")
+    ap.add_argument("--map", default="scripts/players_archetypes.csv")
+    ap.add_argument("--in", dest="indir", default="tmp/portrait-pilot/uniformed")
+    ap.add_argument("--out", dest="outdir", default="assets_staging/players")
+    ap.add_argument("--name-output", action="store_true",
+                    help="name outputs by player name instead of uuid (QC)")
+    args = ap.parse_args()
+
+    try:
+        import numpy, scipy, PIL  # noqa: F401
+    except ImportError:
+        sys.exit("missing deps. Run:  pip install pillow numpy scipy")
+
+    rows = list(csv.DictReader(open(args.map)))
+    if args.only:
+        sel = [r for r in rows if slug(r["name"]) == slug(args.only)]
+    elif args.team:
+        sel = [r for r in rows if slug(r.get("team", "")) == slug(args.team)]
+    else:
+        sel = rows
+    if not sel:
+        sys.exit("no matching players")
+
+    os.makedirs(args.outdir, exist_ok=True)
+    ok = miss = 0
+    for r in sel:
+        in_path = os.path.join(args.indir, f"{r['name']}.png")
+        if not os.path.exists(in_path):
+            miss += 1
+            continue
+        name = r["name"] if args.name_output else r["_id"]
+        out_path = os.path.join(args.outdir, f"{name}.png")
+        try:
+            finish(in_path, out_path)
+            print(f"[ok] {r['name']} -> {name}.png")
+            ok += 1
+        except Exception as e:
+            print(f"[fail] {r['name']}: {type(e).__name__}: {str(e)[:150]}")
+    print(f"\n[done] {ok} finished, {miss} missing -> {args.outdir}  ({CANVAS_W}x{CANVAS_H})")
+
+
+if __name__ == "__main__":
+    main()
