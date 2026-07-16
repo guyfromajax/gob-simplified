@@ -3,6 +3,11 @@
 
 [phases.setup]
 nixPkgs = ["python311", "nodejs_18"]
+# numpy/scipy's compiled C-extensions dlopen libstdc++.so.6 at runtime; the base
+# image doesn't provide it, so `import numpy` fails with
+# "libstdc++.so.6: cannot open shared object file". nixLibs puts the gcc C++
+# runtime on LD_LIBRARY_PATH so the recruit paint service (Pillow/numpy/scipy) loads.
+nixLibs = ["stdenv.cc.cc.lib"]
 
 [phases.install]
 cmds = [
