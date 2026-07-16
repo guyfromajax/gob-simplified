@@ -3856,6 +3856,29 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 @media (prefers-reduced-motion: reduce) { .fcc-invite__dot { animation: none; } }
 
+/* ───────── Recruit name -> player page links (Recruiting surfaces) ─────────
+   Lives here, not recruiting.css: recruiting.html and the FCC don't load that
+   file. Inherits the cell's text colour so names read as table copy, not as
+   default-blue hyperlinks; the affordance is hover/focus, not colour. */
+.recruit-name-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.recruit-name-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.recruit-name-link:focus-visible {
+  outline: 2px solid var(--fcc-newlean-accent, #34c77a);
+  outline-offset: 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ───────── New-lean highlight (Recruiting surfaces) ───────── */
 :root { --fcc-newlean-accent: #34c77a; }
 .fcc-newlean-badge {
