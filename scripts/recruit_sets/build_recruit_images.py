@@ -118,13 +118,14 @@ def main():
     args = ap.parse_args()
 
     gen.load_env()
+    # Only PIL/numpy/scipy are needed to finish kits into white masters; the
+    # cloud SDK (google-genai) loads lazily in get_client() when actually baking.
     try:
-        from google import genai
         from PIL import Image
         import numpy as np
         from scipy import ndimage
     except ImportError as e:
-        sys.exit(f"missing deps ({e}). Run: pip install google-genai pillow numpy scipy")
+        sys.exit(f"missing deps ({e}). Run: pip install pillow numpy scipy")
 
     set_doc, entries = load_manifest(args.set)
     recruits = set_doc["recruits"]
@@ -142,6 +143,10 @@ def main():
             if not os.environ.get("GEMINI_API_KEY"):
                 sys.exit("GEMINI_API_KEY not set — needed to bake new kits "
                          "(existing kits finish to white without it).")
+            try:
+                from google import genai
+            except ImportError as e:
+                sys.exit(f"missing dep google-genai ({e}). Run: pip install google-genai")
             _client["c"] = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         return _client["c"]
     _ref_cache = {}
