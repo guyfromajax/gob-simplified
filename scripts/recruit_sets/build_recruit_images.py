@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build recruit uniform KITS from a set manifest — Phase 2b.
+Build recruit uniform KITS + finished WHITE MASTERS from a set manifest — Phase 2b.
 
 For each recruit in a set's manifest, this:
   1. GENERATES a fresh white-tank bust via Nano Banana using the recruit's
@@ -13,12 +13,17 @@ For each recruit in a set's manifest, this:
        assets_staging/recruits/kit/<recruit_id>.png      pre-finish white RGBA bust (recolor input)
        assets_staging/recruits/kit/<recruit_id>.mask.png tank mask (which pixels the recolor paints)
        assets_staging/recruits/kit/<recruit_id>.json     bbox/center for wordmark placement
+       assets_staging/recruits/white/<recruit_id>.png    finished white DISPLAY master (weeks 1-34 UI)
 
-The kit is the ONLY pre-sign asset: nothing in the game ever displays an
-un-signed recruit's portrait (the recruiting board is a stats table, and
-un-signed recruits sunset at week 35). A finished display master is produced
-only at signing, by the recolor step (apply_recruit_uniform / sign_recruits),
-which reads the kit and writes players/master/<recruit_id>.png.
+The KIT is the sign-time recolor input; the WHITE master is the finished,
+canvas-cropped portrait the recruiting UI shows before a recruit signs (same
+framing as rostered players). At signing, the recolor step
+(apply_recruit_uniform / sign_recruits) reads the kit and writes the uniformed
+master to players/master/<recruit_id>.png.
+
+The white master is just the kit bust run through finish_portraits (no NB, no
+u2net) — so if a kit ALREADY exists, this backfills its white master cheaply
+without re-rolling the (expensive) NB generation.
 
 Reuses the proven functions from generate_player_portraits / apply_team_uniforms
 / finish_portraits — this script is orchestration only.
@@ -26,11 +31,12 @@ Reuses the proven functions from generate_player_portraits / apply_team_uniforms
 Run on your machine (needs GEMINI_API_KEY + u2net, same as the league pipeline):
     # cheap end-to-end proof first — 15 recruits (~$1):
     python3 scripts/recruit_sets/build_recruit_images.py --set scripts/recruit_sets/set_0001.json --limit 15
-    # then the whole set:
+    # then the whole set (existing kits are just finished into white masters, no re-roll):
     python3 scripts/recruit_sets/build_recruit_images.py --set scripts/recruit_sets/set_0001.json
 
-Idempotent: skips recruits whose kit already exists (unless --force).
-Upload (recruits/kit -> R2) is the next step.
+Idempotent: skips recruits whose kit AND white master already exist; if only the
+kit exists, finishes the white master (no NB call); re-rolls only with --force.
+Upload (recruits/kit + recruits/white -> R2) is the next step.
 """
 import os
 import sys
@@ -48,6 +54,7 @@ import finish_portraits as fin                  # noqa: E402  (CANVAS_W/H for ki
 
 REF_DIR = gen.REF_DIR                            # tmp/portrait-pilot/reference_bodies/final/<frame>.png
 OUT_KIT = "assets_staging/recruits/kit"
+OUT_WHITE = "assets_staging/recruits/white"      # finished display masters (weeks 1-34 UI)
 
 
 def strip_watermark(a, alpha, cx=0.95, cy=0.95, r=0.055):
@@ -107,11 +114,10 @@ def main():
     ap.add_argument("--wm-cy", type=float, default=0.95, help="sparkle center y (frac of H)")
     ap.add_argument("--wm-r", type=float, default=0.055, help="sparkle inpaint radius (frac)")
     ap.add_argument("--out-kit", default=OUT_KIT)
+    ap.add_argument("--out-white", default=OUT_WHITE)
     args = ap.parse_args()
 
     gen.load_env()
-    if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env).")
     try:
         from google import genai
         from PIL import Image
@@ -126,7 +132,18 @@ def main():
         recruits = recruits[:args.limit]
 
     os.makedirs(args.out_kit, exist_ok=True)
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    os.makedirs(args.out_white, exist_ok=True)
+
+    # NB client is created lazily — only when we actually bake a NEW kit. A run
+    # that only backfills white masters over existing kits needs no API key.
+    _client = {}
+    def get_client():
+        if "c" not in _client:
+            if not os.environ.get("GEMINI_API_KEY"):
+                sys.exit("GEMINI_API_KEY not set — needed to bake new kits "
+                         "(existing kits finish to white without it).")
+            _client["c"] = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        return _client["c"]
     _ref_cache = {}
 
     def ref_body(frame):
@@ -138,12 +155,20 @@ def main():
             _ref_cache[key] = Image.open(path)
         return _ref_cache[key]
 
-    ok = skipped = failed = 0
+    ok = whited = skipped = failed = 0
     for rec in recruits:
         rid = rec["recruit_id"]
         kit_path = os.path.join(args.out_kit, f"{rid}.png")
+        white_path = os.path.join(args.out_white, f"{rid}.png")
+        # Kit already baked: never re-roll NB. Just ensure the finished white
+        # display master exists (cheap: finish the kit bust, no API call). This
+        # backfills white masters for kits baked before white was produced.
         if os.path.exists(kit_path) and not args.force:
-            skipped += 1
+            if not os.path.exists(white_path):
+                fin.finish(kit_path, white_path)
+                whited += 1
+            else:
+                skipped += 1
             continue
         man = entries.get(rid)
         if not man:
@@ -155,7 +180,7 @@ def main():
 
         try:
             # 1. generate raw white-tank bust
-            resp = client.models.generate_content(model=args.model, contents=[prompt, ref_body(frame)])
+            resp = get_client().models.generate_content(model=args.model, contents=[prompt, ref_body(frame)])
             raw = None
             for part in resp.candidates[0].content.parts:
                 if getattr(part, "inline_data", None) and part.inline_data.data:
@@ -198,17 +223,22 @@ def main():
                       open(os.path.join(args.out_kit, f"{rid}.json"), "w"))
 
             os.remove(raw_tmp)
+
+            # finished white DISPLAY master (weeks 1-34 UI) from the kit bust
+            fin.finish(kit_path, white_path)
+
             print(f"[ok] {rec['name']:22} ({frame}/{man['build']['definition']}, "
-                  f"{man['portrait']['race']}) -> {rid}.png")
+                  f"{man['portrait']['race']}) -> {rid}.png (+white)")
             ok += 1
         except Exception as e:
             print(f"[fail] {rec['name']} ({rid}): {type(e).__name__}: {str(e)[:160]}")
             failed += 1
 
-    print(f"\n[done] {ok} built, {skipped} skipped, {failed} failed")
-    print(f"  kits -> {args.out_kit}")
-    if ok:
-        print("Spot-check a few kits, then upload recruits/kit to R2 and recolor a proof team.")
+    print(f"\n[done] {ok} baked, {whited} white-only backfilled, {skipped} skipped, {failed} failed")
+    print(f"  kits          -> {args.out_kit}")
+    print(f"  white masters -> {args.out_white}")
+    if ok or whited:
+        print("Upload with: upload_recruit_images_to_r2.py --stage kit white")
 
 
 if __name__ == "__main__":

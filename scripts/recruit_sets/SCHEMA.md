@@ -110,6 +110,7 @@ and `portrait` drive the reference-body pick + NB face-swap, exactly like the 12
 |---|---|
 | `set_id` | `set_NNNN` zero-padded, human-readable, unique (`set_0001`, `set_0002`, …) |
 | `recruit_id` | UUIDv4 string |
+| White display master (R2) | `recruits/white/<recruit_id>.png` (finished, shown weeks 1-34) |
 | Uniform kit (R2) | `recruits/kit/<recruit_id>.png` (+ `.mask.png`, `.json` sidecars) |
 | Uniformed master (post-sign, R2) | `players/master/<recruit_id>.png` |
 | Set file (offline pack) | `set_NNNN.json` (Artifact A) |
@@ -121,6 +122,6 @@ and `portrait` drive the reference-body pick + NB face-swap, exactly like the 12
 
 1. `recruits` length == `recruit_count` == 300.
 2. All `recruit_id`s unique **within the set** (and, for online, globally across `recruit_sets`).
-3. Every recruit has a kit (bust + mask + geometry) at its R2 keys before the set is published.
+3. Every recruit has a kit (bust + mask + geometry) **and** a finished white display master at its R2 keys before the set is published.
 4. Frames span all five (`Slight, Lean, Normal, Broad, Doughy`) so builds match faces.
 5. `year` ∈ the four-value enum; `attributes` contains the core 13 codes.
