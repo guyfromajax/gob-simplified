@@ -6,16 +6,17 @@ introduced by the SS&S animation refactor (see
 `Rebound_System.md` §DREB).
 
 Design — single-placement-authority model:
-- `shot_manager` is the sole authority for post-shot player positions. It
-  populates `offense_rebounder_coords`, `defense_rebounder_coords`,
-  `offense_getback_coords`, and `defense_release_coords` on the MISS turn,
-  and the MISS turn emitter absorbs those into its final step's
-  `end.coords`. Sync writes them to `player.coords`.
+- The prior MISS turn owns post-shot player positions via overlay maps
+  (`offense_rebounder_coords`, `defense_rebounder_coords`,
+  `offense_getback_coords`, `defense_release_coords`). HCO stamps those in
+  `shot_manager`; FAST_BREAK / HCT / FCP also stamp rebounder overlays via
+  `transition_shot_board_crash` inside `_build_post_shot_sub_steps` when
+  needed. Sync writes final coords to `player.coords`.
 - The DREB turn animates only the rebound capture itself: the rebounder
-  moves from his post-shot position to the bounce coords. Every other
-  player holds the position shot_manager assigned. This avoids the
-  brittle "two authorities racing via player-id matching" pattern that
-  caused release / get-back players to get yanked to the rim cluster.
+  moves from his post-shot position to the bounce coords. Non-captors hold
+  those post-shot coords except failed attemptors (near-bounce collapse).
+  This avoids the brittle "two authorities racing via player-id matching"
+  pattern that yanked release / get-back players to the rim cluster.
 
 Algorithm:
 - 1 schema step.

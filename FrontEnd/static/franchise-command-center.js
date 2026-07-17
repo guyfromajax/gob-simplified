@@ -1626,6 +1626,21 @@ function escapePlaybookHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function fccPlaybookSectionPcSide(key) {
+  if (key === 'motion' || key === 'set_plays') return 'offense';
+  if (key === 'man_defense' || key === 'zone_defense') return 'defense';
+  return null;
+}
+
+/** Show weighted plays, plus 0% plays that are still on the call sheet. */
+function fccPlaybookItemVisible(item, key, data) {
+  if (Number(item.percentage || 0) > 0) return true;
+  const side = fccPlaybookSectionPcSide(key);
+  if (!side) return false;
+  const order = ((data?.pc_order || {})[side] || []).map(String);
+  return order.includes(String(item.id || ''));
+}
+
 function buildFccPlaybooksItems(data, key) {
   const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
   let items = [];
@@ -1685,7 +1700,7 @@ function buildFccPlaybooksItems(data, key) {
   }
 
   return items
-    .filter((item) => Number(item.percentage || 0) > 0)
+    .filter((item) => fccPlaybookItemVisible(item, key, data))
     .sort((a, b) => Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name)));
 }
 

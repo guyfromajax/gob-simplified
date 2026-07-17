@@ -2994,6 +2994,18 @@ def _build_post_shot_sub_steps(
     shoot_end_coords = shoot_step.setdefault("end", {}).setdefault("coords", {})
     shoot_end_coords[str(shooter_id)] = dict(shot_spot)
 
+    # FB / HCT / FCP: stamp rebounder-board crash overlays when shot_manager did
+    # not (live drive / dynamic paths). Continues existing shoot-step
+    # destinations through flight; assigns idle far players a random spot
+    # within CONTEST_EUCLIDEAN_RADIUS of the basket. No-op for HCO / OREB / FT.
+    from BackEnd.utils.transition_shot_board_crash import (
+        maybe_stamp_transition_shot_board_crash_overlays,
+    )
+
+    maybe_stamp_transition_shot_board_crash_overlays(
+        turn_result, shoot_step, off_lineup, def_lineup, away_offense,
+    )
+
     overlay_players = _collect_overlay_players(turn_result)
     _apply_overlay_motion_to_shoot_step(
         shoot_step, overlay_players, off_lineup, def_lineup,

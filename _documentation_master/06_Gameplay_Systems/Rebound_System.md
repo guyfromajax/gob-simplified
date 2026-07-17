@@ -7,14 +7,27 @@ A unified system that handles rebound logic for all missed shot instances.
 
 ## Post-shot placement authority (single source of truth)
 
-`shot_manager` is the **sole authority** for where every player ends up after a missed shot. On any MISS turn it populates four overlay maps on the turn result dict:
+Post-shot player destinations are authored into four overlay maps on the turn result dict, then absorbed into schema steps / `player.coords`:
 
 - `offense_rebounder_coords` — non-get-back offensive players, clustered near the rim of the basket just attacked.
 - `defense_rebounder_coords` — non-release defensive players, clustered near the rim of the basket just attacked.
 - `offense_getback_coords` — offensive get-back retreaters (HCO only; HCT / FCP / Fast Break skip the get-back mechanic). The shot shooter is never a get-back retreater; backend selection excludes the shooter by both role position and `player_id` so stale position derivation cannot make the shooter eligible.
 - `defense_release_coords` — defensive release players running for the outlet on a Covert Release fast break.
 
-The MISS turn emitter absorbs these into the final step's `end.coords` via its `_apply_post_shot_overlay` helper. `sync_lineup_coords_from_turn` then writes them to `player.coords`. Overlay precedence is set in `TURN_COORDS_OVERLAY_KEYS` (rebounder maps applied first, get-back / release applied last — get-back / release win for the specific role-players they designate).
+**Who stamps the maps**
+
+- **HCO** — `shot_manager.resolve_shot` authors the maps (paint-cluster randoms for rebounders; get-back / release as applicable).
+- **FAST_BREAK / HCT / FCP** — when those maps are empty (or missing a player) at schema post-shot time, `maybe_stamp_transition_shot_board_crash_overlays()` in `BackEnd/utils/transition_shot_board_crash.py` stamps rebounder overlays from the terminal shoot / finish step. It is invoked inside `skeleton_step_emitter._build_post_shot_sub_steps` (after shot-micro injection). Rules:
+  - Eligible: offense and defense on `current_turn` ∈ {`FAST_BREAK`, `HCT`, `FCP`} for MAKE / MISS / BLOCK.
+  - Always hold: shooter and shot defender (`shot_defender_id` / `defender_id` / `fb_drive_resolution` stopper / shot-defender keys).
+  - Already moving on the shoot step → keep that destination in the overlay so `[ball_flight]` / `[bounce]` continue it.
+  - Idle and already within `CONTEST_EUCLIDEAN_RADIUS` (11) of the attacked basket → leave in place.
+  - Idle and farther than 11 → random destination within 11 Euclidean of the basket.
+  - **Fast Break NEUTRAL** — hold all five defenders (matchup + help + shot/BH defender) and the two lead offenders; trailers may crash. Rim-finish / non-NEUTRAL FB uses the general hold set (shooter + shot defender only).
+  - Existing overlay entries from `shot_manager` are left intact (not overwritten).
+- **OREB putback** — does **not** re-stamp during-putback board crash; players hold post-MISS coords through putback flight. Failed-attemptor near-bounce collapse still runs on the OREB **capture** step (same helper as DREB).
+
+Schema emitters apply overlays via `_apply_overlay_motion_to_shoot_step` and continue them through `_build_ball_motion_sub_step` (`[ball_flight]` / `[bounce]`). `sync_lineup_coords_from_turn` writes final coords to `player.coords`. Overlay precedence is set in `TURN_COORDS_OVERLAY_KEYS` (rebounder maps applied first, get-back / release applied last — get-back / release win for the specific role-players they designate).
 
 ### DREB animates rebound capture only (backend step); outlet is a separate client beat
 
@@ -228,3 +241,4 @@ Notes:
 - Dynamic HCT and OREB putback-miss paths use the default `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE = 20`.
 - Free Throw misses use the FT-specific x-axis gate (`FREE_THROW_REBOUND_MAX_X_DELTA = 20`), not the Euclidean geo helper.
 - UESS emitter sanity check: migrated Fast Break miss paths have backend emitters at the shot/miss point before downstream rebound animation. After-Steal FB uses `build_after_steal_fast_break_animation_steps`; RR FB uses `build_rim_runner_animation_steps`; Triangle FB uses `build_triangle_animation_steps`; CR FB uses `build_covert_release_animation_steps`. The rebound helper reads backend-owned shot-end coordinates, and the frontend only renders the emitted payload.
+- Near-bounce failed-attemptor collapse (`stamp_rebound_capture_player_motion`) runs on **DREB / OREB capture**, not on the schema `[bounce]` step. Schema bounce continues rebounder overlay destinations from the shot turn.

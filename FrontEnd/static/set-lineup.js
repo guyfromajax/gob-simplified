@@ -552,6 +552,21 @@ function getLineupPlaybookPercentage(percentages, key, id) {
   return Number(value || 0);
 }
 
+function lineupPlaybookSectionPcSide(key) {
+  if (key === 'motion' || key === 'set_plays') return 'offense';
+  if (key === 'man_defense' || key === 'zone_defense') return 'defense';
+  return null;
+}
+
+/** Show weighted plays, plus 0% plays that are still on the call sheet. */
+function lineupPlaybookItemVisible(item, key, data) {
+  if (Number(item.percentage || 0) > 0) return true;
+  const side = lineupPlaybookSectionPcSide(key);
+  if (!side) return false;
+  const order = ((data?.pc_order || {})[side] || []).map(String);
+  return order.includes(String(item.id || ''));
+}
+
 function buildLineupPlaybookItems(data, key) {
   const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
   let items = [];
@@ -608,7 +623,7 @@ function buildLineupPlaybookItems(data, key) {
   }
 
   return items
-    .filter((item) => Number(item.percentage || 0) > 0)
+    .filter((item) => lineupPlaybookItemVisible(item, key, data))
     .sort(function (a, b) {
       return (
         Number(b.percentage || 0) - Number(a.percentage || 0) ||
@@ -1506,11 +1521,19 @@ async function autosetLineup() {
   }
 
   try {
+    // Shot-weight autoset: pass franchise/team ids so the backend orders the fill by this
+    // team's playbook shot-attempt likelihood. Franchise mode only; other modes → backend shuffle.
+    const autosetTeamId =
+      (typeof window.resolvePlaybookTeamIdFromSearch === 'function'
+        ? window.resolvePlaybookTeamIdFromSearch(urlParams)
+        : null) || userTeamIdParam || teamIdParam || null;
     const payload = {
       players: rosterRowsForAutosetApi(),
       game_state: buildAutosetGameState(),
       team_chemistry: rosterTeamChemistry,
     };
+    if (franchiseId) payload.franchise_id = franchiseId;
+    if (autosetTeamId) payload.team_id = autosetTeamId;
     const res = await fetch(API_CONFIG.buildUrl('/api/autoset-lineup'), {
       method: 'POST',
       headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },

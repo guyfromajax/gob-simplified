@@ -6,8 +6,14 @@
 
 The Playbooks page configures offensive and defensive weighting plus Playcall Center ordering.
 
+**UI (redesign on `develop`):** D2-style editable tiles (3-across) under Offense / Defense tabs; enforced redistribution for Motion / Set / Man / Zone; Normalize chips for Fast Breaks / HC Traps; PCC badges derived from `pc_order` only; durable `locks`; live shot-weights via debounced `POST /api/playbooks/preview-shot-weights`; save toast `"Playbooks Saved"` (no confirm modal). Sort UI removed.
+
+**Read-only venues (FCC playbooks summary + Set Lineup modal):** show items with `percentage > 0`, and also `percentage === 0` when the play is in `pc_order` for that side. 0% plays not on the call sheet stay hidden.
+
 Primary frontend:
 - `FrontEnd/static/playbooks.js`
+- `FrontEnd/static/playbooks.html`
+- `FrontEnd/static/css/playbook-tiles.css` (+ `playbook-cmd.css`, `playbooks.css`)
 
 Primary backend:
 - `BackEnd/api/gameplan_routes.py`
@@ -68,7 +74,7 @@ Play-level metadata is stored on the team `plays` objects:
 - Shape: per-section lists of locked ids (same id space as the percentage maps).
 - Normalized by `normalize_playbook_locks()` in `playbook_settings_utils.py` (accepts lists or `{id: truthy}` dicts; resolves play names → `play_id` for motion/set).
 - `GET /api/playbooks` returns `locks`.
-- `POST /api/playbooks` persists `locks` from the save payload. Until the redesign UI sends them, saves typically write empty lists (safe — no existing locks yet).
+- `POST /api/playbooks` persists `locks` from the save payload (Playbooks page includes lock toggles in the save body).
 - Gameplay engines do not read locks; UI arithmetic only.
 
 ## Play Loading
@@ -96,12 +102,11 @@ Normalization rules:
 
 > This section covers only the **config side** — Playcall Center *membership + ordering* (`pc_order`) as set on the Playbooks page. The **in-game Playcall Center** tactical hub (live override UI, tempo/aggression/press-trap, defense cards) is documented in `../05_Features/Playcall_Center.md`; CPU/sim call selection is in `../05_GP_Supporting_Systems/Sim_Playcalling_System.md`.
 
-`pc_order` is the only authoritative persistence model for Playcall Center membership and ordering.
+`pc_order` is the only authoritative persistence model for Playcall Center membership and ordering. Tile PCC badges (`+ OFF` / `OFF · n`, `+ DEF` / `DEF · n`) are derived from `pc_order` index — there is no parallel checkbox selection state.
 
 Implications:
-- a checked offensive play must exist in `pc_order.offense`
-- a checked defensive scheme must exist in `pc_order.defense`
-- unchecked rows must be removed from the appropriate list
+- assigning a play from a tile badge appends to `pc_order.offense` or `pc_order.defense` (cap 8/side)
+- removing a rail slot (or toggling an assigned badge) drops that id and renumbers badges live
 - gameplay ordering should be restored from `pc_order` first
 - `slot_assignments` may still exist as a compatibility output for older callers, but should not be treated as the source of truth
 

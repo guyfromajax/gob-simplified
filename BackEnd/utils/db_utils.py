@@ -227,17 +227,119 @@ def _blowout_lineup_active(team, game_state) -> bool:
     return False  # Q1, Q2, OT (quarter >= 5) → never
 
 
+_FILL_ORDER_UNSET = object()
+
+
+def _shot_weight_fill_order(playbooks_weights) -> Optional[List[str]]:
+    """The 5 lineup positions sorted by DESCENDING playbook shot-attempt weight, or ``None``
+    when the weights carry no usable signal (not a dict, missing, all-zero, or all-equal) — in
+    which case the caller falls back to a random shuffle. Ties among non-equal weights break by
+    canonical PG..C order so the result is deterministic.
+
+    ``playbooks_weights`` is the ``["playbooks"]`` map from ``compute_position_shot_weights`` —
+    {PG..C: int} summing to 100 (computed from playbook usage only; no playcall center needed).
+    """
+    if not isinstance(playbooks_weights, dict):
+        return None
+    try:
+        vals = {pos: float(playbooks_weights.get(pos, 0) or 0) for pos in _LINEUP_POSITIONS}
+    except (TypeError, ValueError):
+        return None
+    if not any(vals.values()):
+        return None  # missing / all-zero → no signal
+    if len(set(vals.values())) == 1:
+        return None  # all-equal → no signal
+    return sorted(_LINEUP_POSITIONS, key=lambda p: (-vals[p], _LINEUP_POSITIONS.index(p)))
+
+
+def compute_team_fill_order(team) -> Optional[List[str]]:
+    """Shot-weight autoset fill order for a team from its playbook_settings + plays. Returns a
+    position list (highest shot-attempt weight first) or ``None`` (→ caller shuffles). Any failure
+    (no playbook, compute error, unusable weights) degrades safely to ``None``."""
+    playbook_settings = getattr(team, "playbook_settings", None) or {}
+    plays = getattr(team, "plays", None) or {}
+    if not playbook_settings or not plays:
+        return None
+    try:
+        from BackEnd.utils.playbook_weights_utils import compute_position_shot_weights
+
+        weights = compute_position_shot_weights(playbook_settings, plays)
+    except Exception as e:  # never let lineup construction fail on the weights
+        logging.warning("Autoset fill-order: shot-weight compute failed (%s); using shuffle", e)
+        return None
+    return _shot_weight_fill_order((weights or {}).get("playbooks"))
+
+
+def compute_fill_order_for_franchise_team(franchise_id, team_id) -> Optional[List[str]]:
+    """Shot-weight autoset fill order for a franchise team, looked up by (franchise_id, team_id)
+    from the persisted franchise_team_data (playbook_settings + plays). Used by the lineup-UI
+    autoset endpoint, which has no in-memory TeamManager. Returns a position list or ``None``
+    (→ shuffle) when the team, its playbook, or the weights can't be resolved."""
+    if not franchise_id or not team_id:
+        return None
+    try:
+        from bson import ObjectId
+        from BackEnd.db import franchise_team_data_collection
+
+        def _oid(v):
+            try:
+                return ObjectId(str(v))
+            except Exception:
+                return v
+
+        ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": _oid(franchise_id), "team_id": _oid(team_id)},
+            {"playbook_settings": 1, "plays": 1},
+        )
+        if not ftd:
+            return None
+        from BackEnd.utils.playbook_weights_utils import compute_position_shot_weights
+
+        weights = compute_position_shot_weights(
+            ftd.get("playbook_settings") or {}, ftd.get("plays") or {}
+        )
+    except Exception as e:
+        logging.warning("Autoset fill-order (franchise team): failed (%s); using shuffle", e)
+        return None
+    return _shot_weight_fill_order((weights or {}).get("playbooks"))
+
+
+def _get_or_compute_team_fill_order(team) -> Optional[List[str]]:
+    """Lazily compute and cache the shot-weight fill order on a TeamManager. Playbooks are frozen
+    during a game, so this is computed on the first lineup build and reused by every in-game
+    rebuild (timeouts / quarter breaks / foul-outs). Returns a position list or ``None``."""
+    if not isinstance(team, TeamManager):
+        return None
+    cached = getattr(team, "_position_fill_order", _FILL_ORDER_UNSET)
+    if cached is not _FILL_ORDER_UNSET:
+        return cached
+    order = compute_team_fill_order(team)
+    try:
+        team._position_fill_order = order
+    except Exception:
+        pass
+    return order
+
+
 def build_unified_autoset_lineup_from_eligible(
     eligible_players: List[Player],
     team_chemistry: float,
     force_include_ids: Optional[List[str]] = None,
     *,
     prefer_lowest_rt: bool = False,
+    position_fill_order: Optional[List[str]] = None,
 ) -> Dict[str, Player]:
     """
-    Canonical autoset selection after eligibility + waterfall: shuffle role order,
-    then for each fill slot use team-chemistry pool size N: top N by slot rating,
-    random if N > 1 else top player.
+    Canonical autoset selection after eligibility + waterfall: pick the position FILL ORDER,
+    then for each fill slot use team-chemistry pool size N: top N by slot rating, random if
+    N > 1 else top player. Because the fill is greedy, the position filled first gets first
+    pick of the whole eligible pool at that position.
+
+    ``position_fill_order`` (shot-weight autoset): order the fill by descending playbook
+    shot-attempt likelihood so the biggest-shooting positions pick their best-fit player first —
+    contested talent flows to the spots that shoot most, and the chemistry random pool lands on
+    the lowest-shot position (fill slot 5). When ``None`` (or unusable) the order is a random
+    shuffle, exactly as before. Ignored under ``prefer_lowest_rt`` (blowout keeps the shuffle).
 
     ``prefer_lowest_rt`` (blowout / garbage time): seat the team's WORST players instead — rank
     by each player's RT (highest slot rating across positions) and take the LOWEST N. Same
@@ -251,8 +353,18 @@ def build_unified_autoset_lineup_from_eligible(
     fill normally.
     """
     pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
-    position_order = ["PG", "SG", "SF", "PF", "C"]
-    random.shuffle(position_order)
+    if prefer_lowest_rt or not position_fill_order:
+        position_order = ["PG", "SG", "SF", "PF", "C"]
+        random.shuffle(position_order)
+    else:
+        # Shot-weight order: dedupe to the canonical five, appending any missing in PG..C order.
+        position_order = []
+        for p in position_fill_order:
+            if p in _LINEUP_POSITIONS and p not in position_order:
+                position_order.append(p)
+        for p in _LINEUP_POSITIONS:
+            if p not in position_order:
+                position_order.append(p)
     assigned_ids = set()
     lineup: Dict[str, Player] = {}
 
@@ -329,10 +441,14 @@ def autoset_lineup_player_ids_from_payload(
     players_payload: List[dict],
     game_state: Optional[dict],
     team_chemistry: float,
+    position_fill_order: Optional[List[str]] = None,
 ) -> Dict[str, str]:
     """
     Server-side autoset for lineup UI: JSON roster rows -> { PG/SG/...: player_id }.
     Uses is_player_eligible_for_lineup + waterfall + unified chemistry pools.
+
+    ``position_fill_order`` (shot-weight autoset): optional pre-computed fill order (highest
+    shot-attempt position first) from the team's playbook; ``None`` falls back to a shuffle.
     """
     players: List[Player] = []
     for raw in players_payload:
@@ -359,7 +475,9 @@ def autoset_lineup_player_ids_from_payload(
             "Fewer than 5 eligible players for autoset after waterfall (check NG/fouls/quarter)."
         )
 
-    lineup_players = build_unified_autoset_lineup_from_eligible(eligible, team_chemistry)
+    lineup_players = build_unified_autoset_lineup_from_eligible(
+        eligible, team_chemistry, position_fill_order=position_fill_order
+    )
     return {pos: pl.player_id for pos, pl in lineup_players.items()}
 
 
@@ -516,9 +634,12 @@ def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> D
     # its lowest-RT players instead. Re-checked here each lineup set, so it auto-reverts when the
     # margin drops back. See Computer_Team_GamePlan_System.md §Blowout Situation.
     prefer_lowest_rt = _blowout_lineup_active(team, game_state)
+    # Shot-weight autoset: seat best-fit players at the highest shot-attempt positions first
+    # (computed once from the team's frozen playbook, cached for the game). Ignored in blowout.
+    fill_order = _get_or_compute_team_fill_order(team)
     return build_unified_autoset_lineup_from_eligible(
         eligible_players, tc, force_include_ids=force_include,
-        prefer_lowest_rt=prefer_lowest_rt,
+        prefer_lowest_rt=prefer_lowest_rt, position_fill_order=fill_order,
     )
 
 

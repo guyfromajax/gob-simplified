@@ -6732,7 +6732,10 @@ try:
         Canonical lineup autoset: eligibility waterfall + team-chemistry pool sizes
         (same path as build_lineup_from_mongo / computer lineups).
         """
-        from BackEnd.utils.db_utils import autoset_lineup_player_ids_from_payload
+        from BackEnd.utils.db_utils import (
+            autoset_lineup_player_ids_from_payload,
+            compute_fill_order_for_franchise_team,
+        )
 
         players = request.get("players") or []
         if not isinstance(players, list) or len(players) < 5:
@@ -6748,9 +6751,15 @@ try:
             team_chemistry = float(raw_tc)
         except (TypeError, ValueError):
             team_chemistry = 15.0
+        # Shot-weight autoset: order fill by the team's playbook shot-attempt likelihood when the
+        # caller supplies franchise/team ids; otherwise (or on any failure) fall back to shuffle.
+        position_fill_order = compute_fill_order_for_franchise_team(
+            request.get("franchise_id"), request.get("team_id")
+        )
         try:
             lineup_ids = autoset_lineup_player_ids_from_payload(
-                players, game_state, team_chemistry
+                players, game_state, team_chemistry,
+                position_fill_order=position_fill_order,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e

@@ -35,7 +35,8 @@ Where this doc and D2 disagree, **this doc wins**, except where a decision below
 | --- | --- |
 | `FrontEnd/static/playbooks.html` | Layout rebuild — tabs, tile grids, rail, shot-weights strip; toast host |
 | `FrontEnd/static/playbooks.js` | Enforced model, PCC single-source, delete `syncSelectionFromPcOrder` + sort, debounced shot-weights preview, locks in state/payload |
-| `FrontEnd/static/playbooks.css` | Tile styles, rail restyle; consume shared CMD tokens |
+| `FrontEnd/static/css/playbook-tiles.css` | Tile/chip/tab/ready styles (3-col grid); consume `--cmd-*` / `.is-good|mid|low` |
+| `FrontEnd/static/playbooks.css` | Page shell + rail; consume shared CMD tokens |
 | `FrontEnd/static/franchise-command-center.css` | Consume shared tokens; drop scoped CMD color drift |
 | `FrontEnd/static/franchise-command-center.js` | 0%-in-PCC visibility; CMD via shared helper/tokens |
 | `FrontEnd/static/set-lineup.js` | 0%-in-PCC visibility; CMD thresholds/classes aligned |
@@ -333,14 +334,14 @@ There are **9** `playSound` call sites in `playbooks.js` today. Sort is deleted 
 1. ~~**CMD fix** (§2)~~ — done (PR #570)
 2. ~~**Shared CMD tokens**~~ — done (`css/playbook-cmd.css` + `getPlaybookCmdClass`)
 3. ~~**Backend:** locks + shot-weights preview~~ — done on `develop`
-4. **Tile component** (§4) + tile states ← **next**
-5. **Enforced model** (§3) — inactive-row filter from day one
-6. **PCC single-source** (§6) — delete `syncSelectionFromPcOrder`; drop sort
-7. **Page layout** (§7) — tabs, rail, live shot-weights strip (wire preview endpoint), D2 ready indicator
-8. **Read-only venue filters** — FCC + Set Lineup `percentage > 0 || inPCC`
-9. **SFX pass** (§8) — 8 remaining sites (sort dropped)
-10. **Toast** replacing save-confirm modal
-11. **Docs** — keep `Playbooks_Page.md` + this spec current as UI lands
+4. ~~**Tile component** (§4) + tile states~~ — done (`css/playbook-tiles.css`, tile/chip renderers)
+5. ~~**Enforced model** (§3)~~ — done (`distribute` / `setEnforced`, inactive-aware, normalize FB/HC Traps)
+6. ~~**PCC single-source** (§6)~~ — done (`pcOrder` only; sync/checkboxes/sort removed)
+7. ~~**Page layout** (§7)~~ — done (tabs, `#shot-weights-live` preview, D2 ready indicator)
+8. ~~**Read-only venue filters**~~ — done (FCC + Set Lineup: `percentage > 0 || inPCC`)
+9. ~~**SFX pass** (§8)~~ — done (slider `pointerup`, % commit, PCC, selects, save; sort dropped)
+10. ~~**Toast**~~ — done (`"Playbooks Saved"`; modal removed)
+11. **Docs** — keep current; browser smoke still recommended before merge confidence
 
 ---
 
