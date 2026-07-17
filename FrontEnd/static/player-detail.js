@@ -353,6 +353,34 @@
     img.src = url;
   }
 
+  /**
+   * Signed-player portrait: the UNIFORMED master keyed by player_id. Just like
+   * the recruit portrait it's painted lazily, so a 404 on the master means "not
+   * painted yet" — ensure (which recolors the recruit's kit into the team's
+   * uniform), retry once cache-busted, then fall back to generic. Only used for
+   * players that carry an image_id (signed recruits / dynamic recruits); league
+   * players keep buildPortrait's pre-existing-master cascade.
+   */
+  function buildSignedPlayerPortrait(fullName) {
+    return `<img alt="${escapeAttr(fullName)}" class="pd-portrait" id="pd-player-portrait">`;
+  }
+
+  function wireSignedPlayerPortrait(playerId) {
+    const img = document.getElementById('pd-player-portrait');
+    if (!img) return;
+    const api = window.API_CONFIG;
+    const franchiseId = new URLSearchParams(window.location.search).get('franchise_id');
+    const url = api.getPlayerImageUrl(playerId, { size: 'modal' });
+    const generic = api.getGenericHeadshotUrl({ size: 'modal' });
+    img.onerror = () => {
+      api.ensurePlayerImage(franchiseId, playerId).then(() => {
+        img.onerror = () => { img.onerror = null; img.src = generic; };
+        img.src = api.getPlayerImageUrl(playerId, { size: 'modal' }) + '?r=1';
+      });
+    };
+    img.src = url;
+  }
+
   function escapeAttr(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -433,6 +461,10 @@
       ? window.API_CONFIG.getGenericHeadshotUrl({ size: 'modal' })
       : `${staticPrefix}/images/players/generic_headshot.png`;
     const photo = fallbackPhoto;
+    // Signed recruits / dynamic recruits carry an image_id and their uniformed
+    // master is painted lazily on first view — wire the ensure-on-404 flow for
+    // them. League players (no image_id) keep the pre-existing-master cascade.
+    const hasLazyMaster = !isRecruit && !!player.image_id;
     const attributes = player.attributes || {};
     const year = formatYear(player.year);
     const positionAbbrev = getHighestPosition(player);
@@ -452,7 +484,11 @@
         <aside class="pd-left-card">
           <button class="pd-back-btn" id="pd-back-btn">Back</button>
           <div class="pd-portrait-wrap" style="background-image:url('${teamBackground}');background-size:cover;background-position:center;">
-            ${isRecruit ? buildRecruitPortrait(fullName) : buildPortrait(photo, fullName, genericPhoto, fallbackPhoto)}
+            ${isRecruit
+              ? buildRecruitPortrait(fullName)
+              : (hasLazyMaster
+                  ? buildSignedPlayerPortrait(fullName)
+                  : buildPortrait(photo, fullName, genericPhoto, fallbackPhoto))}
           </div>
           <div class="pd-player-name">${fullName}</div>
           <div class="pd-pos-line">${yearJerseyLine}</div>
@@ -533,6 +569,7 @@
     if (backBtn) backBtn.addEventListener('click', goBack);
 
     if (isRecruit) wireRecruitPortrait(player.image_id);
+    else if (hasLazyMaster) wireSignedPlayerPortrait(player._id);
 
     renderAttributes(attributes);
     renderCareerStats(player, team, teamPrimaryColor);
