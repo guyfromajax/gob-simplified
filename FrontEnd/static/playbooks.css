@@ -7,9 +7,10 @@
   --danger: #ff6767;
   --success: #34EC27;
   --shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
-  --eff-low: #F5C518;
-  --eff-mid: #A8D400;
-  --eff-high: #4CAF50;
+  /* CMD bands: see css/playbook-cmd.css (--cmd-*) */
+  --eff-low: var(--cmd-low, #FFD700);
+  --eff-mid: var(--cmd-mid, #34EC27);
+  --eff-good: var(--cmd-good, #4A90D9);
 }
 
 * {
@@ -600,17 +601,7 @@ input[type="reset"] {
   font-weight: 600;
 }
 
-.eff-score.is-low {
-  color: var(--eff-low);
-}
-
-.eff-score.is-mid {
-  color: var(--eff-mid);
-}
-
-.eff-score.is-high {
-  color: var(--eff-high);
-}
+/* .eff-score.is-good / .is-mid / .is-low colors → css/playbook-cmd.css */
 
 .stat-muted {
   color: var(--text-muted);

@@ -1,0 +1,31 @@
+/**
+ * Canonical playbook CMD (effectiveness) scale.
+ * Blue ranks above green (OOTP-conditioned). Do not invent a parallel ramp.
+ * Thresholds: ≥70 good · ≥40 mid · <40 low — keep in sync with getPlaybookCmdClass() in common.js.
+ */
+:root {
+  --cmd-good: #4A90D9;
+  --cmd-mid: #34EC27;
+  --cmd-low: #FFD700;
+}
+
+.eff-score.is-good,
+.fcc-playbooks-item-eff.is-good,
+.lineup-playbook-card-eff.is-good,
+#franchise-container .fcc-playbooks-item-eff.is-good {
+  color: var(--cmd-good);
+}
+
+.eff-score.is-mid,
+.fcc-playbooks-item-eff.is-mid,
+.lineup-playbook-card-eff.is-mid,
+#franchise-container .fcc-playbooks-item-eff.is-mid {
+  color: var(--cmd-mid);
+}
+
+.eff-score.is-low,
+.fcc-playbooks-item-eff.is-low,
+.lineup-playbook-card-eff.is-low,
+#franchise-container .fcc-playbooks-item-eff.is-low {
+  color: var(--cmd-low);
+}

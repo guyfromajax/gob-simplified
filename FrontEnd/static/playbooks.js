@@ -748,7 +748,9 @@
 
     renderEffScore(value) {
       const numeric = parseInteger(value, 0);
-      const className = numeric >= 67 ? "is-high" : (numeric >= 34 ? "is-mid" : "is-low");
+      const className = typeof getPlaybookCmdClass === "function"
+        ? getPlaybookCmdClass(numeric)
+        : (numeric >= 70 ? "is-good" : (numeric >= 40 ? "is-mid" : "is-low"));
       return `<span class="eff-score ${className}">${numeric}</span>`;
     }
 

@@ -185,6 +185,17 @@ function getPswColor(pct) {
   return '#ff6d6d';
 }
 
+/**
+ * Canonical playbook CMD (effectiveness) band class.
+ * Thresholds and colors: css/playbook-cmd.css — blue ≥70, green ≥40, yellow <40.
+ */
+function getPlaybookCmdClass(value) {
+  const numeric = Number(value || 0);
+  if (numeric >= 70) return 'is-good';
+  if (numeric >= 40) return 'is-mid';
+  return 'is-low';
+}
+
 function renderShotWeights(container, shotWeights, compact = false) {
   if (!container) return;
   container.classList.add('psw-root');

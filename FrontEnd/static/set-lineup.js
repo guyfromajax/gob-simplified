@@ -463,9 +463,12 @@ function escapeLineupPlaybookHtml(value) {
 }
 
 function getLineupPlaybookEffClass(value) {
+  if (typeof getPlaybookCmdClass === 'function') {
+    return getPlaybookCmdClass(value);
+  }
   const numeric = Number(value || 0);
-  if (numeric >= 67) return 'is-high';
-  if (numeric >= 34) return 'is-mid';
+  if (numeric >= 70) return 'is-good';
+  if (numeric >= 40) return 'is-mid';
   return 'is-low';
 }
 

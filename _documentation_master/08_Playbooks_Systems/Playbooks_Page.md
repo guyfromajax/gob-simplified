@@ -13,6 +13,18 @@ Primary backend:
 - `BackEnd/api/gameplan_routes.py`
 - `BackEnd/utils/playbook_settings_utils.py`
 
+### CMD (effectiveness) display scale
+
+Play CMD colors are shared across the Playbooks page, FCC playbooks summary, and Set Lineup playbooks modal:
+
+| Band | Threshold | Class | Color |
+| --- | --- | --- | --- |
+| Good | ≥ 70 | `is-good` | `#4A90D9` (blue) |
+| Mid | ≥ 40 | `is-mid` | `#34EC27` (green) |
+| Low | < 40 | `is-low` | `#FFD700` (yellow) |
+
+Blue ranks above green (OOTP-conditioned). Source of truth: `FrontEnd/static/css/playbook-cmd.css` + `getPlaybookCmdClass()` in `common.js`. Do not fork thresholds or hex values per screen.
+
 ## Current Identity Model
 
 Offensive playbook persistence is now `play_id`-first, and the internal persistence model is the simplified canonical shape.
