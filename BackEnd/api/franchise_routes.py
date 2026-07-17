@@ -10369,9 +10369,14 @@ def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str
 def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: dict[str, Any], scholarship: bool, playing_time: bool, walk_on: bool = False) -> dict[str, Any]:
     best_pos = _best_position(recruit_doc.get("position_ratings") or {})
     return {
-        # keep the recruit's stable id so its pre-generated portrait follows him onto the
-        # roster (players/master/<id>.png). Walk-ons have no recruit_id -> fresh uuid.
-        "player_id": recruit_doc.get("recruit_id") or str(uuid.uuid4()),
+        # ALWAYS a fresh uuid — never the recruit_id. Set recruits share one
+        # recruit_id across every franchise (they all draw set_0001), so keying the
+        # signed uniform master by recruit_id collides: franchise A signs recruit X
+        # to team A and franchise B signs the same X to team B, but both would
+        # resolve to players/master/<recruit_id>.png (first-writer-wins → wrong
+        # jersey for everyone else). A unique player_id gives each signed player its
+        # own master. The portrait link is image_id (below), not player_id.
+        "player_id": str(uuid.uuid4()),
         "recruit_id": recruit_doc.get("recruit_id"),
         # the portrait to paint into this team's uniform at signing (its own for
         # set recruits, a borrowed base-library id for dynamic ones). Walk-ons
