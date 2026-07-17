@@ -3,6 +3,12 @@
  * Used when loading Q4 after simming Q1-Q3
  */
 
+import {
+  COURT_BOOT_MODES,
+  classifyCourtBootMode,
+  shouldProbeResumeStateForBoot,
+} from './courtEntryResolver.js';
+
 /** Throttle rank/record diagnostic: log when payload changes or every ~3.5s. */
 let _gobScoreboardHeaderLogAt = 0;
 let _gobScoreboardHeaderLastSig = '';
@@ -616,12 +622,10 @@ export async function initializeGameStats() {
   const gameId = urlParams.get('game_id');
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');
-  const quarterBreakFrom = urlParams.get('quarter_break_from');
   const quarter = Number(urlParams.get('quarter') || 1);
-  const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
-  const acceptedAnchorReturn = urlParams.get('consume_resume_anchor') === 'true';
-  const liveTimeoutReturn = urlParams.get('resume_from_timeout') === 'true';
-  const shouldProbeResumeState = !liveQuarterStart && !acceptedAnchorReturn && !liveTimeoutReturn;
+  const bootMode = classifyCourtBootMode(urlParams);
+  const shouldProbeResumeState = shouldProbeResumeStateForBoot(bootMode, urlParams);
+  const liveQuarterStart = bootMode === COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
   const resumeFlowFlags = hasResumeFlowFlags(urlParams);
   
   if (!homeTeam || !awayTeam) return;
@@ -631,6 +635,14 @@ export async function initializeGameStats() {
   
   const resumeState = shouldProbeResumeState ? await fetchResumeState(gameId) : null;
   publishCourtResumeState(resumeState, resumeState ? 'loadGameStats:resume-state' : 'loadGameStats:no-anchor');
+  console.warn('[MGR-ENTRY-RESOLVER] loadGameStats court entry', {
+    boot_mode: bootMode,
+    game_id: gameId,
+    should_probe_resume_state: shouldProbeResumeState,
+    published_resume_state: !!resumeState,
+    quarter_break_from: urlParams.get('quarter_break_from'),
+    lineup_checkpoint: urlParams.get('lineup_checkpoint'),
+  });
   const gameData = resumeState || await fetchGameState(gameId);
   if (resumeFlowFlags || resumeState || hasActiveResumeAnchor(gameData)) {
     clearPreAnchorQ1RefreshFlag(

@@ -1258,13 +1258,20 @@ export function createGameScene(Phaser) {
       if (typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
         const liveEntryParams = new URLSearchParams(window.location.search);
         const quarterBreakFrom = liveEntryParams.get('quarter_break_from');
-        if (quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter') {
-          liveEntryParams.delete('quarter_break_from');
+        const hadLiveQuarterMarker =
+          quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
+        const hadLineupCheckpoint = liveEntryParams.get('lineup_checkpoint') === 'true';
+        // One-load markers: must not survive into mid-quarter refresh or MGR
+        // falsely classifies the page as live_quarter_entry and skips /resume-state.
+        if (hadLiveQuarterMarker || hadLineupCheckpoint) {
+          if (hadLiveQuarterMarker) liveEntryParams.delete('quarter_break_from');
+          if (hadLineupCheckpoint) liveEntryParams.delete('lineup_checkpoint');
           history.replaceState(null, '', `${window.location.pathname}?${liveEntryParams.toString()}`);
           console.warn('[COURT BOOT MODE] consumed live quarter entry marker after successful quarter start', {
             game_id: this.gameId,
             quarter: this.quarter,
             quarter_break_from: quarterBreakFrom,
+            lineup_checkpoint_cleared: hadLineupCheckpoint,
           });
         }
       }

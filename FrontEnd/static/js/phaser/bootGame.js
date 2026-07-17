@@ -9,6 +9,11 @@ import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
 import { getOrStartFranchiseStartCpuSims } from './utils/franchiseStartCpuSimsClient.js';
 import { preloadGameSfx } from './utils/gameSfx.js';
 import { getGameMode } from '../shared/getGameMode.js';
+import {
+  COURT_BOOT_MODES,
+  classifyCourtBootMode,
+  shouldProbeResumeStateForBoot,
+} from './utils/courtEntryResolver.js';
 
 // API_CONFIG is loaded as a global script, access via window
 const API_CONFIG = window.API_CONFIG;
@@ -385,26 +390,6 @@ console.log("🏀 Tournament launch params:", {
 const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
-
-const COURT_BOOT_MODES = Object.freeze({
-  LIVE_QUARTER_ENTRY: 'live_quarter_entry',
-  COLD_RESUME_ENTRY: 'cold_resume_entry',
-  ANCHOR_RESTORE_ENTRY: 'anchor_restore_entry',
-  TIMEOUT_DIRECT_ENTRY: 'timeout_direct_entry',
-  NORMAL_ENTRY: 'normal_entry',
-});
-
-function classifyCourtBootMode(params) {
-  const quarterBreakFrom = params.get('quarter_break_from');
-  const liveQuarterStart = quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
-  if (liveQuarterStart) return COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
-  if (params.get('active_resume') === 'true') return COURT_BOOT_MODES.COLD_RESUME_ENTRY;
-  if (params.get('resume_from_anchor') === 'true' || params.get('consume_resume_anchor') === 'true') {
-    return COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY;
-  }
-  if (params.get('resume_from_timeout') === 'true') return COURT_BOOT_MODES.TIMEOUT_DIRECT_ENTRY;
-  return COURT_BOOT_MODES.NORMAL_ENTRY;
-}
 
 function hasResumeFlowFlags(params) {
   return (
@@ -3021,17 +3006,9 @@ async function initGame() {
   const normalizedBootParams = new URLSearchParams(window.location.search);
   const urlResumeFromTimeoutParam = normalizedBootParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
-  const consumeResumeAnchor = normalizedBootParams.get('consume_resume_anchor') === 'true';
   const liveQuarterStart = bootMode === COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
   const shouldProbeResumeState =
-    !liveQuarterStart &&
-    !consumeResumeAnchor &&
-    !!gameId &&
-    (
-      bootMode === COURT_BOOT_MODES.COLD_RESUME_ENTRY ||
-      bootMode === COURT_BOOT_MODES.ANCHOR_RESTORE_ENTRY ||
-      bootMode === COURT_BOOT_MODES.NORMAL_ENTRY
-    );
+    !!gameId && shouldProbeResumeStateForBoot(bootMode, normalizedBootParams);
   let resumeState = shouldProbeResumeState ? getPublishedCourtResumeState() : null;
   let activeResume = !!resumeState;
   console.warn('[COURT BOOT MODE] classified court entry', {

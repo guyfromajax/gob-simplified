@@ -34,7 +34,8 @@ Active implementation direction:
 - The durable anchor remains available until a newer timeout, foul-out, or non-final quarter-break anchor overwrites it, or until the game becomes final.
 - When the first restored turn is `SIDE_INBOUND`, court playback skips only the SIP setup/walk-in phase because the resume anchor already hydrates player sprites at the SIP setup spots. The inbound pass phase still plays. This skip is scoped to accepted MGR Set Lineup returns and is not applied to normal live Set Lineup returns.
 - Normal live quarter breaks must send `quarter_break_from=play_quarter` to Set Lineup and preserve it when returning to `court.html`; this marker tells the court boot code not to read the durable resume anchor or show the mid-game resume modal.
-- `quarter_break_from=play_quarter|sim_quarter` is a one-load court-entry marker. After the first successful `/api/simulate-quarter` call starts that live quarter, `gameScene.js` removes it from the URL. If it survives into later mid-quarter refreshes, the court falsely classifies the page as a live quarter entry, skips `/resume-state`, and paints dirty current-document scores/stats instead of the saved stoppage anchor.
+- If `quarter_break_from` is dropped on a side hop, `lineup_checkpoint=true` (without cold-resume flags) is the documented live-entry fallback so an in-session Set Lineup return never shows Resume Game merely because a durable stoppage anchor exists.
+- `quarter_break_from=play_quarter|sim_quarter` and `lineup_checkpoint=true` are one-load court-entry markers. After the first successful `/api/simulate-quarter` call starts that live quarter, `gameScene.js` removes them from the URL. If they survive into later mid-quarter refreshes, the court falsely classifies the page as a live quarter entry, skips `/resume-state`, and paints dirty current-document scores/stats instead of the saved stoppage anchor.
 - Live quarter entries are authoritative. If stale resume flags survive into a live quarter URL, `bootGame.js` strips them and `loadGameStats.js` ignores them.
 - Resume-anchor writes must resolve and update the existing game document id before writing. Do not upsert a string `_id` first and then retry `ObjectId`; that can create duplicate game documents with different anchors.
 - Mode Select resume card clock text is display-only. If a quarter-break anchor has already advanced the period but still reports `0:00`, Mode Select displays `8:00` in the resume card so the capsule reads as the next quarter start. This does not mutate the backend clock, URL clock, or court resume logic.
@@ -691,11 +692,15 @@ Simplified v1 should remove or bypass this guard for MGR cold/refresh resume. Ti
 
 ## Court Boot Classifier
 
-`FrontEnd/static/js/phaser/bootGame.js` owns the frontend boot-mode decision. This classifier is the single frontend authority for whether `court.html` is entering live gameplay, restoring an anchor, or showing the `Game In Progress` modal.
+Shared authority: `FrontEnd/static/js/phaser/utils/courtEntryResolver.js`.
+
+Both `bootGame.js` and `loadGameStats.js` must call `classifyCourtBootMode` / `shouldProbeResumeStateForBoot` from that module. Do not re-implement live vs MGR probe rules locally — divergent guards caused live quarter-break returns to show Resume Game when a durable `quarter_break` anchor existed.
 
 Boot modes:
 
-- `live_quarter_entry`: `quarter_break_from=play_quarter` or `quarter_break_from=sim_quarter`
+- `live_quarter_entry`:
+  - `quarter_break_from=play_quarter` or `quarter_break_from=sim_quarter`, **or**
+  - `lineup_checkpoint=true` without cold-resume flags (`active_resume` / `resume_from_anchor` / `consume_resume_anchor`) and without `quarter_break_from=mid_game_resume`
 - `anchor_restore_entry`: `resume_from_anchor=true` or `consume_resume_anchor=true`
 - `cold_resume_entry`: `active_resume=true`
 - `timeout_direct_entry`: `resume_from_timeout=true` (deprecated for MGR cold/refresh resume)
@@ -703,13 +708,19 @@ Boot modes:
 
 Rules:
 
-- `live_quarter_entry` always wins over stale resume flags.
+- Cold / restore / timeout flags are classified **before** the `lineup_checkpoint` live fallback (MGR Set Lineup returns also set `lineup_checkpoint=true`).
+- Explicit `quarter_break_from=play_quarter|sim_quarter` still wins first for live entry.
+- `live_quarter_entry` always wins over stale resume flags once classified.
 - `live_quarter_entry` strips `active_resume`, `resume_from_anchor`, `consume_resume_anchor`, and `anchor_type` from the URL and forces `resume_from_timeout=false`.
-- `cold_resume_entry` and refresh/normal entries may probe `/api/game/:game_id/resume-state` for the resume modal.
+- `live_quarter_entry` and `timeout_direct_entry` must **not** probe or publish `/resume-state` for the Resume Game modal. A durable stoppage anchor may exist for cold recovery; that must not imply modal on an in-session return.
+- `consume_resume_anchor=true` must not probe for the modal (accepted cold resume returning from Set Lineup).
+- `cold_resume_entry` and refresh/`normal_entry` may probe `/api/game/:game_id/resume-state` for the resume modal.
 - `anchor_restore_entry` restores from the anchor through `/api/simulate-quarter` and leaves the durable anchor available for later rollback until replaced or final.
 - `timeout_direct_entry` should not be used for MGR cold/refresh resume in simplified v1.
 
-`FrontEnd/static/js/phaser/utils/loadGameStats.js` must apply the same live-quarter guard when deciding whether to hydrate from `/resume-state`. This matters because court stats hydrate before `bootGame.js` starts Phaser. On non-live, non-consumed court loads, `loadGameStats.js` probes `/resume-state` first and publishes a valid anchor to `window.__GOB_MGR_RESUME_STATE__`; `bootGame.js` consumes that published state before showing controls or making its own fallback probe.
+`loadGameStats.js` hydrates before Phaser starts. It must use the same resolver so it does not publish `window.__GOB_MGR_RESUME_STATE__` on live quarter / live timeout / accepted-consume returns (that publication alone can make `bootGame.js` show Resume Game).
+
+`TimeoutNavigationHelper.buildGameNavigationParams` preserves MGR/live court-entry flags across hops (`quarter_break_from`, `lineup_checkpoint`, `resume_from_anchor`, `consume_resume_anchor`, `active_resume`, `anchor_type`, `timeout_next_play_type`) so Game Plan / Box Score / Set Lineup side paths cannot drop live markers and false-trigger MGR.
 
 ## Lineup Checkpoint Contract
 
@@ -717,16 +728,23 @@ Rules:
 
 Only requests with this flag may perform checkpoint lineup work such as rebuilding the computer team's lineup from energy/foul restrictions and autosetting computer strategy. Plain `court.html` refreshes must not rebuild the computer lineup, because the user never left the court and existing sprites still represent the active lineup.
 
+Court-entry role (MGR):
+
+- On a live Set Lineup → court return, `lineup_checkpoint=true` (without cold-resume flags) classifies as `live_quarter_entry` even if `quarter_break_from=play_quarter|sim_quarter` was dropped on a side hop.
+- Like `quarter_break_from=play_quarter|sim_quarter`, it is a **one-load** marker: after the first successful `/api/simulate-quarter` for that entry, `gameScene.js` removes `lineup_checkpoint` from the URL so a mid-quarter refresh can still probe `/resume-state` for true cold MGR.
+
 Current wiring:
 
 - `FrontEnd/static/set-lineup.js` adds `lineup_checkpoint=true` to court navigation after the user submits a lineup.
-- `FrontEnd/static/js/phaser/gameScene.js` forwards the flag in `/api/simulate-quarter`.
+- `FrontEnd/static/js/shared/timeoutNavigationHelper.js` preserves `lineup_checkpoint` (and other MGR/live flags) across Set Lineup / Game Plan / Box Score hops.
+- `FrontEnd/static/js/phaser/gameScene.js` forwards the flag in `/api/simulate-quarter`, then clears it from the URL after a successful quarter start.
 - `BackEnd/api/api.py` accepts `lineup_checkpoint`.
 - `BackEnd/main.py::simulate_quarter()` rebuilds the computer lineup only when `lineup_checkpoint=true` or when the request is a full-sim path (`turn_by_turn_mode=false`).
 
 This keeps the MGR flow consistent:
 
-- refresh/close with an anchor: modal -> Set Lineup -> `lineup_checkpoint=true` -> restore from durable anchor
+- refresh/close with an anchor: modal -> Set Lineup -> `lineup_checkpoint=true` + consume flags -> restore from durable anchor (`anchor_restore_entry`, not live)
+- live quarter break: Set Lineup -> `lineup_checkpoint=true` (+ preferably `quarter_break_from=play_quarter`) -> Play Quarter controls, no Resume Game modal
 - refresh without leaving court and without a Set Lineup submit: no hidden lineup mutation
 - full sim: computer lineup automation remains allowed
 
@@ -1005,17 +1023,15 @@ The formal resume contract is:
 
 ## Deferred Future Hardening: Central Court Entry Resolver
 
-This is no longer the active v1 plan. It remains useful future context if the team later chooses to support broader entry-state handling or exact mid-quarter recovery.
+**Partial progress (live false-MGR fix):** `courtEntryResolver.js` is now the shared classifier for `bootGame.js` + `loadGameStats.js` probe/modal eligibility, including `lineup_checkpoint` as a live-entry fallback. `TimeoutNavigationHelper` preserves MGR/live URL flags across hops. Full enum / Mode Select / Set Lineup adoption and the Phase 5–6 test matrix below remain future work.
 
-The current implementation has been stabilized incrementally, but several frontend modules still infer resume state independently:
+The remaining fragility is modules that still infer resume state independently:
 
 - `mode-select.js`
-- `bootGame.js`
-- `loadGameStats.js`
-- `set-lineup.js`
+- `set-lineup.js` (flag emission; court consumers are shared)
 - `gameScene.js`
 
-That distributed inference is the main fragility risk. A future hardening pass should centralize court-entry classification into one resolver so UI behavior, URL handling, backend restore flags, and pre-anchor reset rules are derived from the same state.
+A future hardening pass should finish centralizing court-entry classification so UI behavior, URL handling, backend restore flags, and pre-anchor reset rules are derived from the same state everywhere.
 
 ### Goal
 

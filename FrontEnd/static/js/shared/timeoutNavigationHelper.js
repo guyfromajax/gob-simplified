@@ -210,7 +210,32 @@
     // ✅ SS&S: No warning if both are false/null - that's expected for normal navigation
     
     // ============================================
-    // 10. DEBUG PARAMS
+    // 10. MGR / LIVE COURT-ENTRY FLAGS (preserve across hops)
+    // ============================================
+    // Durable resume_anchor must not be mistaken for cold MGR when these are lost.
+    // See Mid_Game_Resume_System.md → Court Boot Classifier / TimeoutNavigationHelper.
+    const mgrLiveKeys = [
+      'quarter_break_from',
+      'lineup_checkpoint',
+      'resume_from_anchor',
+      'consume_resume_anchor',
+      'active_resume',
+      'anchor_type',
+      'timeout_next_play_type',
+    ];
+    mgrLiveKeys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(overrides, key) && overrides[key] != null && overrides[key] !== '') {
+        params.set(key, String(overrides[key]));
+        return;
+      }
+      const existing = sourceParams.get(key);
+      if (existing != null && existing !== '') {
+        params.set(key, existing);
+      }
+    });
+
+    // ============================================
+    // 11. DEBUG PARAMS
     // ============================================
     if (sourceParams.get('debug') === '1') {
       params.set('debug', '1');
