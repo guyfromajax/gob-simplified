@@ -2,7 +2,7 @@
 (`_resolve_setplay_offense_shot_dynamic`). These isolate the SET-PLAY-specific behaviour vs the
 motion resolver: (1) the offense never proactively subtle-moves (`offense_reads` forced False), so
 the offense only leaves the skeleton when the DEFENSE forces it; (2) after a defense-forced subtle
-the BH either re-enters the skeleton (`_setplay_recovery_roll` True) or is forced into freelance
+the BH either re-enters the skeleton (`_hco_recovery_roll` True) or is forced into freelance
 (False). The universal `should_shoot` hot read still runs every step.
 
 The inner helpers (read map, should_shoot, decide_step_action, recovery roll, freelance) are
@@ -143,7 +143,7 @@ def test_post_subtle_recovery_reenters_skeleton(monkeypatch):
     _patch_common(monkeypatch)
     _subtle_then_advance(monkeypatch)
     monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
-    monkeypatch.setattr(PR, "_setplay_recovery_roll", lambda *a, **k: True)
+    monkeypatch.setattr(PR, "_hco_recovery_roll", lambda *a, **k: True)
     freelanced = {"hit": False}
     monkeypatch.setattr(PR, "_resolve_freelance", lambda *a, **k: freelanced.update(hit=True))
     game = _FakeGame(def_aggression=4)
@@ -163,7 +163,7 @@ def test_post_subtle_recovery_lost_goes_freelance(monkeypatch):
     _patch_common(monkeypatch)
     _subtle_then_advance(monkeypatch)
     monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
-    monkeypatch.setattr(PR, "_setplay_recovery_roll", lambda *a, **k: False)
+    monkeypatch.setattr(PR, "_hco_recovery_roll", lambda *a, **k: False)
     sentinel = {"skeleton": {"steps": []}, "shooter_pos": "FREELANCE", "shot_type": "inside"}
     monkeypatch.setattr(PR, "_resolve_freelance", lambda *a, **k: sentinel)
     game = _FakeGame(def_aggression=4)
@@ -187,7 +187,7 @@ def test_post_subtle_shot_fires_after_beat(monkeypatch):
                                              "via_pass": False, "hot_read": False}
 
     monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", fake_shoot)
-    monkeypatch.setattr(PR, "_setplay_recovery_roll",
+    monkeypatch.setattr(PR, "_hco_recovery_roll",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("recovery should not run")))
     game = _FakeGame(def_aggression=4)
     monkeypatch.setattr(random, "randint", lambda a, b: a)
@@ -223,7 +223,7 @@ def test_subtle_forced_shot_when_clock_expiring(monkeypatch):
                         lambda *a, **k: {"action": "SUBTLE_MOVEMENT"})
     monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
     monkeypatch.setattr(PR, "_estimate_step_game_seconds", lambda *a, **k: 0.0)
-    monkeypatch.setattr(PR, "_setplay_recovery_roll",
+    monkeypatch.setattr(PR, "_hco_recovery_roll",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("backstop should pre-empt recovery")))
 
     # (0,4) pressure roll → 0 (True); the subtle elapsed roll (3,5) → 5 → 2 - 5 < 1 → backstop.

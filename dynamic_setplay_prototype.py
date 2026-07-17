@@ -4,7 +4,7 @@
 Reproducible (seeded) Monte-Carlo over the two locked set-play mechanics, runnable with no DB or
 server:
 
-  1. Recovery roll (_setplay_recovery_roll) — re-enter-the-skeleton vs forced-freelance rate across
+  1. Recovery roll (_hco_recovery_roll) — re-enter-the-skeleton vs forced-freelance rate across
      a grid of offense (chem+off_eff) vs defense (chem+def_eff) strength. Validates the locked
      formula `(chem+eff) × d6` behaves monotonically (stronger offense → recovers more).
   2. Walk path distribution (_resolve_hco_offense_shot_dynamic, is_setplay=True) — over N possessions with a
@@ -68,7 +68,7 @@ def recovery_grid():
         row = f"{o[0]+o[1]:>9} |"
         for d in levels:
             g = _Game(off, _Team("D", chem=d[0], eff=d[1]))
-            wins = sum(PR._setplay_recovery_roll(g, rng=rng) for _ in range(N)) / N
+            wins = sum(PR._hco_recovery_roll(g, rng=rng) for _ in range(N)) / N
             row += f"{wins*100:>6.0f}%"
         print(row)
 

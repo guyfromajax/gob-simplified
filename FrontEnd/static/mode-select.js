@@ -21,7 +21,6 @@ const franchiseCardRecord = document.getElementById('franchise-card-record');
 const franchiseCardRank = document.getElementById('franchise-card-rank');
 const franchiseCardPrestige = document.getElementById('franchise-card-prestige');
 const franchiseCardNext = document.getElementById('franchise-card-next');
-const franchiseCardCareerSummary = document.getElementById('franchise-card-career-summary');
 const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
 const franchiseResumeCard = document.getElementById('franchise-resume-card');
 const franchiseResumeMatchup = document.getElementById('franchise-resume-matchup');
@@ -190,44 +189,6 @@ function deriveSeasonProgress(commandCenterData, franchiseData) {
   const currentSeason = deriveCurrentSeason(commandCenterData);
   const week = safeNumber(franchiseData && franchiseData.week, 1);
   return 'Season ' + currentSeason + ' · Week ' + week + ' of 26';
-}
-
-function renderCareerSummary(commandCenterData) {
-  if (!franchiseCardCareerSummary) return;
-  const careerBestRankRaw = commandCenterData && commandCenterData.career_best_rank;
-  const careerBestRank = (careerBestRankRaw !== undefined && careerBestRankRaw !== null && String(careerBestRankRaw).trim() !== '')
-    ? String(careerBestRankRaw)
-    : '--';
-  const bestRankSeasonsRaw =
-    (commandCenterData && commandCenterData.career_best_rank_seasons) ||
-    (commandCenterData && commandCenterData.best_rank_seasons) ||
-    (commandCenterData && commandCenterData.career_best_seasons) ||
-    (commandCenterData && commandCenterData.career_best_rank_season);
-
-  let seasons = [];
-  if (Array.isArray(bestRankSeasonsRaw)) {
-    seasons = bestRankSeasonsRaw
-      .map(function (value) { return safeNumber(value, null); })
-      .filter(function (value) { return Number.isFinite(value); });
-  } else {
-    const singleSeason = safeNumber(bestRankSeasonsRaw, null);
-    if (Number.isFinite(singleSeason)) seasons = [singleSeason];
-  }
-
-  let dedupedSortedSeasons = Array.from(new Set(seasons)).sort(function (a, b) { return a - b; });
-  if (!dedupedSortedSeasons.length) {
-    const currentSeason = deriveCurrentSeason(commandCenterData);
-    if (careerBestRank !== '--' && Number.isFinite(currentSeason)) dedupedSortedSeasons = [currentSeason];
-  }
-
-  if (!dedupedSortedSeasons.length) {
-    franchiseCardCareerSummary.textContent = 'Career Best Ranking: #' + careerBestRank;
-    return;
-  }
-
-  const seasonLabel = dedupedSortedSeasons.length === 1 ? 'Season ' : 'Seasons ';
-  franchiseCardCareerSummary.textContent =
-    'Career Best Ranking: #' + careerBestRank + ' (' + seasonLabel + dedupedSortedSeasons.join(', ') + ')';
 }
 
 function displayCommunityLeaderboardPoints(geekPoints) {
@@ -1138,7 +1099,6 @@ function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   }
   if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
   if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
-  renderCareerSummary(commandCenterData);
   const activeGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
   currentActiveGameResume = activeGameResume && activeGameResume.status === 'stoppage_anchor'
     ? activeGameResume

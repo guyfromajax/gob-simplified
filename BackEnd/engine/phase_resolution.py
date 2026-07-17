@@ -4478,12 +4478,30 @@ def _roll_defense_posture(game, rng=None):
     return posture
 
 
-def _setplay_recovery_roll(game, rng=None):
-    """Set-play forced-subtle recovery (Z-Completed/Dynamic_HCO_SP_Brief): after the defense knocks the BH off
-    the play and he chooses to hold rather than shoot/dish, he either re-enters the set-play
-    skeleton or is forced into freelance. `offense_score = (team_chemistry + offensive_efficiency)
-    × d6` vs `defense_score = (team_chemistry + defensive_efficiency) × d6` (each team's own
-    chemistry). Returns True → re-enter the skeleton at the next defined step; False → freelance."""
+# ── Scenario 3 (post-subtle, no shot/dish) — "he worked the ball and got nothing" ──────────────
+# GATE 1 = `_hco_recovery_roll` (below): can he re-enter the set? WON → resume the skeleton.
+# LOST → he has PICKED UP HIS DRIBBLE (HCT D21 `dribble_alive=False` semantics — a drive is now
+# impossible) and GATE 2 (`_hco_freelance_beats_dead_ball`) decides his fate from a FRESH read at
+# that moment (nothing is carried forward from how the subtle was entered):
+#   • offense wins → FREELANCE — he keeps playing/improvising (offense-favorable);
+#   • defense wins → DEAD BALL — defenders swarm the now-stationary BH and deny the passing lanes
+#     (`_resolve_hco_dead_ball`, defense-favorable).
+# The read reuses `_hco_blocked_dish_targets`: lanes NOT blocked = open teammates (favor freelance);
+# lanes blocked = defenders in their deny actions (favor the dead ball).
+HCO_OPEN_LANE_BONUS = 15.0          # per OPEN teammate lane → offense score (↑ = more freelance)
+HCO_DENY_PRESSURE_BASE = 20.0       # per DENIED teammate lane → defense score (↑ = more dead balls)
+HCO_DEAD_BALL_TURNOVER_PCT = 50     # fully-denied BH: % turnover (held ball / 5-sec) vs desperation shot
+HCO_DEAD_BALL_FORCED_SHOT_PENALTY = 50.0  # shot_score penalty on that desperation shot
+
+
+def _hco_recovery_roll(game, rng=None):
+    """Scenario 3 GATE 1 — forced-subtle recovery, MOTION + SET PLAY (generalized 2026-07-13 from the
+    set-play-only `_setplay_recovery_roll`; motion previously resumed unconditionally, which was a
+    placeholder). After the BH works the ball and neither shoots nor dishes, he either re-enters the
+    skeleton or has picked up his dribble → GATE 2. `offense_score = (team_chemistry +
+    offensive_efficiency) × d6` vs `defense_score = (team_chemistry + defensive_efficiency) × d6`
+    (each team's own chemistry). True → re-enter at the next defined step; False → GATE 2.
+    Formula unchanged from Z-Completed/Dynamic_HCO_SP_Brief."""
     import random as _r
     rng = rng or _r
     oa = (getattr(game.offense_team, "team_attributes", {}) or {})
@@ -4491,6 +4509,92 @@ def _setplay_recovery_roll(game, rng=None):
     offense_score = (float(oa.get("team_chemistry", 7) or 7) + float(oa.get("offensive_efficiency", 0) or 0)) * rng.randint(1, 6)
     defense_score = (float(da.get("team_chemistry", 7) or 7) + float(da.get("defensive_efficiency", 0) or 0)) * rng.randint(1, 6)
     return offense_score > defense_score
+
+
+def _hco_freelance_beats_dead_ball(game, bh, bh_pos, off_lineup, step, blocked_dish, rng):
+    """Scenario 3 GATE 2 — the BH has picked up his dribble; does he get a FREELANCE moment (offense)
+    or a DEAD BALL moment (defense)? Resolved from a fresh read AT THIS MOMENT — the BH's own read +
+    how many teammates have an open lane, vs how many lanes the defense is denying:
+        offense = (player_read_raw(BH) + off_eff + HCO_OPEN_LANE_BONUS × open_lanes) × d6
+        defense = (HCO_DENY_PRESSURE_BASE × denied_lanes + def_eff) × d6
+    True → freelance; False → dead ball. `blocked_dish` is `_hco_blocked_dish_targets`' covered-lane
+    set (the same read the dish gate uses), so deny posture feeds this directly."""
+    from BackEnd.engine.motion_step_decision import player_read_raw
+    oa = (getattr(game.offense_team, "team_attributes", {}) or {})
+    da = (getattr(game.defense_team, "team_attributes", {}) or {})
+    off_eff = float(oa.get("offensive_efficiency", 0) or 0)
+    def_eff = float(da.get("defensive_efficiency", 0) or 0)
+    _blocked = blocked_dish or set()
+    _mates = [p for p in off_lineup
+              if p != bh_pos and off_lineup.get(p) and p in (step.get("pos_actions") or {})]
+    open_lanes = sum(1 for p in _mates if p not in _blocked)
+    denied_lanes = sum(1 for p in _mates if p in _blocked)
+    offense_score = (player_read_raw(bh) + off_eff + HCO_OPEN_LANE_BONUS * open_lanes) * rng.randint(1, 6)
+    defense_score = (HCO_DENY_PRESSURE_BASE * denied_lanes + def_eff) * rng.randint(1, 6)
+    return offense_score > defense_score
+
+
+def _resolve_hco_dead_ball(skeleton, output_steps, step, bh_pos, bh_location, bh_defender,
+                           game, off_lineup, def_lineup, is_away_offense,
+                           blocked_dish, rng, apply_dish_contest, kind="MOTION",
+                           roll_moment=True):
+    """Scenario 3 DEAD BALL branch — the BH picked up his dribble and the defense swarmed. He has NO
+    live dribble (HCT D21 `dribble_alive=False`: a drive is impossible), so he must pass or shoot from
+    where he stands — never `attack`:
+      • an OPEN teammate → FORCED pass (this is NOT an optimal look — `should_shoot` already declined;
+        he's forced to make a play) → routed through the normal dish contest, so the pass can still be
+        picked off (STEAL / BAT_OOB);
+      • ALL lanes denied → he's trapped: `HCO_DEAD_BALL_TURNOVER_PCT` → DEAD_BALL_TURNOVER (held ball /
+        5-second), else a desperation contested shot at `HCO_DEAD_BALL_FORCED_SHOT_PENALTY`.
+    Returns the shot-info contract, or the moment dict (`moment_result`) for the turnover so the
+    spine's EXISTING non-shot machinery + stopper route/render it (no new emission path).
+
+    `roll_moment` mirrors the fused moment's gate: DEAD_BALL_TURNOVER is a moment-class
+    (possession-ending) outcome, so ONLY the authoritative up-front walk may return it. The `[5]`
+    fallback re-walks pass False — that path can only route a SHOT dict (it reads
+    `motion_shot_info["shooter"]`) and `[4]` has already run — so there a trapped BH always takes the
+    desperation shot instead. (Same trap the fused moment hit: KeyError 'shooter'.)"""
+    from BackEnd.engine.motion_step_decision import SHOOT
+
+    game_state = game.game_state
+    _blocked = blocked_dish or set()
+    _pa = step.get("pos_actions") or {}
+    _mates = [p for p in off_lineup if p != bh_pos and off_lineup.get(p) and p in _pa]
+    _open = [p for p in _mates if p not in _blocked]
+
+    if _open:
+        _tgt = rng.choice(_open)
+        _tgt_loc = (_pa.get(_tgt) or {}).get("location") or bh_location
+        # No live dribble → the receiver catches and shoots; never an attack drive for the BH.
+        _shot_type = "inside" if _is_inside_location(_tgt_loc) else "outside"
+        _dec = {"action": SHOOT, "shooter_pos": _tgt, "shot_type": _shot_type}
+        logging.warning(
+            f"🧱 [DYNAMIC {kind}] DEAD BALL → forced pass {bh_pos}→{_tgt} "
+            f"(open={len(_open)}/{len(_mates)})")
+        return apply_dish_contest(_dec, _execute_motion_decision(
+            skeleton, output_steps, step, bh_pos, bh_location, _dec,
+            game, off_lineup, def_lineup, is_away_offense,
+        ), step, bh_pos)
+
+    if roll_moment and rng.randint(1, 100) <= HCO_DEAD_BALL_TURNOVER_PCT:
+        _stop_idx = len(output_steps) - 1  # trapped on the subtle beat (reached/output step space)
+        _cred_id = getattr(bh_defender, "player_id", None)
+        game_state["_hco_moment_defender_id"] = _cred_id
+        game_state["_hco_moment_stop_index"] = _stop_idx
+        logging.warning(
+            f"🧱 [DYNAMIC {kind}] DEAD BALL → all {len(_mates)} lanes denied → DEAD_BALL_TURNOVER")
+        skeleton["steps"] = list(output_steps)
+        return {"moment_result": "DEAD_BALL_TURNOVER", "skeleton": skeleton,
+                "moment_stop_index": _stop_idx, "moment_defender_id": _cred_id}
+
+    _st = "inside" if _is_inside_location(bh_location) else "outside"
+    logging.warning(f"🧱 [DYNAMIC {kind}] DEAD BALL → all lanes denied → desperation {_st} shot")
+    return _execute_motion_decision(
+        skeleton, output_steps, step, bh_pos, bh_location,
+        {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": _st},
+        game, off_lineup, def_lineup, is_away_offense,
+        forced_shot_penalty=HCO_DEAD_BALL_FORCED_SHOT_PENALTY,
+    )
 
 
 # Coach VO clips fired when the offense consciously breaks pattern on a hot read. One is
@@ -6076,10 +6180,16 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     the end, force one at the last step. Returns the shot-info result contract (``skeleton`` +
     ``shooter*`` + ``shot_type`` …), a moment dict (``moment_result`` …), or ``None`` on a malformed skeleton.
 
-    ``is_setplay`` gates the ONE behavioral difference: after a forced subtle where the BH then
-    doesn't shoot/dish, a set play runs ``_setplay_recovery_roll`` (WON → resume the skeleton; LOST →
-    forced ``_resolve_freelance``), modeling a broken-down set. Motion always resumes. Log labels use
-    ``_kind`` accordingly.
+    ``is_setplay`` now only selects the set-play recovery-roll *flavor* of logging + the variant
+    behavior noted below; the post-subtle resolution itself is UNIFIED (see Scenario 3). Log labels
+    use ``_kind`` accordingly.
+
+    SCENARIO 3 — post-subtle, no shot/dish (unified motion + set play, 2026-07-13): GATE 1
+    ``_hco_recovery_roll`` (WON → resume the skeleton) — motion used to resume unconditionally, a
+    placeholder. LOST → the BH has PICKED UP HIS DRIBBLE (HCT D21 ``dribble_alive=False``: no drive)
+    → GATE 2 ``_hco_freelance_beats_dead_ball`` resolves it from a FRESH read at that moment:
+    offense wins → ``_resolve_freelance``; defense wins → ``_resolve_hco_dead_ball`` (swarmed +
+    lanes denied → forced pass / DEAD_BALL_TURNOVER / desperation shot).
 
     FUSED ON-BALL MOMENT (formal Stage 1, 2026-07-12): the per-step foul/steal/turnover moment now
     rolls INSIDE this walk — moment-FIRST each step (Decision #1), only on steps the offense actually
@@ -6507,19 +6617,34 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     skeleton, output_steps, _sstep, bh_pos, bh_location, _pdec,
                     game, off_lineup, def_lineup, is_away_offense,
                 ), _sstep, bh_pos)
-            if is_setplay:
-                # SET PLAY ONLY (the sole motion/setplay behavioral fork): held instead of
-                # shooting/dishing after a forced subtle → recover into the play or get forced into
-                # freelance (Z-Completed/Dynamic_HCO_SP_Brief: chemistry+efficiency × d6, each team).
-                # Motion always resumes the skeleton (falls through to the next step).
-                if _setplay_recovery_roll(game):
-                    logging.warning(f"↩️ [DYNAMIC {_kind}] recovery WON → re-enter skeleton at step {i + 1}")
-                    continue  # next iteration appends the next defined step (players pop back to spots)
-                logging.warning(f"🌀 [DYNAMIC {_kind}] recovery LOST → forced freelance")
+            # Scenario 3 — he worked the ball and neither shot nor dished. GATE 1 (motion + set play,
+            # unified 2026-07-13; motion used to resume unconditionally, a placeholder): can he
+            # re-enter the set? WON → resume the skeleton. LOST → he's PICKED UP HIS DRIBBLE, so
+            # GATE 2 decides his fate from a fresh read right now — freelance (offense keeps playing)
+            # vs dead ball (defenders swarm the stationary BH + deny the lanes).
+            if _hco_recovery_roll(game):
+                logging.warning(f"↩️ [DYNAMIC {_kind}] recovery WON → re-enter skeleton at step {i + 1}")
+                continue  # next iteration appends the next defined step (players pop back to spots)
+            _db_bh = off_lineup[bh_pos]
+            if _hco_freelance_beats_dead_ball(game, _db_bh, bh_pos, off_lineup, steps[i],
+                                              blocked_dish, random):
+                logging.warning(f"🌀 [DYNAMIC {_kind}] recovery LOST → FREELANCE (offense read wins)")
                 return _resolve_freelance(
                     skeleton, output_steps, steps[i], bh_pos,
                     game, off_lineup, def_lineup, is_away_offense, random,
                 )
+            if zone:
+                _db_def = _zone_bh_defender(
+                    game_state.get("defense_playcall"), bh_location, is_away_offense,
+                    def_lineup, bh_pos)
+            else:
+                _db_def = def_lineup.get(off_to_def.get(bh_pos, bh_pos))
+            return _resolve_hco_dead_ball(
+                skeleton, output_steps, steps[i], bh_pos, bh_location, _db_def,
+                game, off_lineup, def_lineup, is_away_offense,
+                blocked_dish, random, _apply_dish_contest, kind=_kind,
+                roll_moment=roll_moment,
+            )
         elif action == FREELANCE_FORCED:
             # Leave the skeleton and run the freelance progression to a shot.
             return _resolve_freelance(

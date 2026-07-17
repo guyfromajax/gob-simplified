@@ -30,10 +30,10 @@ class _Rng:
 def test_recovery_reenters_when_offense_wins():
     # offense (10+5)*6=90 vs defense (7+0)*1=7 → re-enter
     g = _Game(_Team(10, 5), _Team(7, 0))
-    assert PR._setplay_recovery_roll(g, rng=_Rng([6, 1])) is True
+    assert PR._hco_recovery_roll(g, rng=_Rng([6, 1])) is True
 
 
 def test_recovery_freelance_when_defense_wins():
     # offense (7+0)*1=7 vs defense (10+5)*6=90 → freelance
     g = _Game(_Team(7, 0), _Team(10, 5))
-    assert PR._setplay_recovery_roll(g, rng=_Rng([1, 6])) is False
+    assert PR._hco_recovery_roll(g, rng=_Rng([1, 6])) is False
