@@ -192,17 +192,55 @@ def test_excluded_stopper_not_selected(monkeypatch):
 
 
 def test_steal_meet_rejected_when_not_x_ahead(monkeypatch):
+    """Only invalid (not x-ahead) meet → NO_MEET after skipping that defender."""
     meet = {"x": 60, "y": 25}  # same x as bh_start — invalid for steal
+    calls = {"n": 0}
+
+    def fake_best(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return ("SF", meet)
+        return (None, None)
 
     monkeypatch.setattr(
         "BackEnd.engine.fb_drive_resolution.best_cutoff_on_drive",
-        lambda *a, **k: ("SF", meet),
+        fake_best,
     )
 
     result = resolve_fb_drive_step(**_drive_kwargs(steal_entry=True))
 
     assert result["outcome"] == "NO_MEET"
     assert result.get("steal_meet_rejected") is True
+    assert calls["n"] == 2
+
+
+def test_steal_meet_skips_x_ahead_reject_and_uses_next(monkeypatch):
+    """First meet fails x-ahead; next-soonest defender gets the stop contest."""
+    bad_meet = {"x": 60, "y": 25}
+    good_meet = {"x": 75, "y": 25}
+    calls = {"n": 0}
+
+    def fake_best(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return ("SF", bad_meet)
+        return ("PF", good_meet)
+
+    monkeypatch.setattr(
+        "BackEnd.engine.fb_drive_resolution.best_cutoff_on_drive",
+        fake_best,
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.fb_drive_resolution.resolve_cutoff_contest",
+        lambda *a, **k: ("NEUTRAL", 1.0, None),
+    )
+
+    result = resolve_fb_drive_step(**_drive_kwargs(steal_entry=True))
+
+    assert result["outcome"] == "NEUTRAL"
+    assert result["stopper_pos"] == "PF"
+    assert result.get("steal_meet_rejected") is True
+    assert calls["n"] == 2
 
 
 def test_neutral_stop_decision_optimal_pass():

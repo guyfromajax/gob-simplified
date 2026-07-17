@@ -10,11 +10,11 @@ When a defender records a steal, the system:
 
 1. **Records the steal** and attaches the ball to the stealer (the defender who made the steal).
 2. Stores **`game_state["last_stealer"]`** (the stealer) and **`game_state["last_stealer_coords"]`** (position at the moment of the steal).
-3. Makes **one** routing roll using the **stealing team's** aggression to pick the next state:
+3. Makes **one** routing roll (potential cutoffs × stealing-team aggression) to pick the next state:
    - **`FAST_BREAK`** → the **`after_steal`** Fast Break play (UESS schema).
    - **`HCO`** → a half-court possession, preceded by a backend **steal-HCO setup** repositioning of the stealer + other players.
 
-The stealing team is **`def_team`** at resolution time (the defense recorded the steal); the roll uses **their** aggression, *not* the victim/prior-offense team's.
+The stealing team is **`def_team`** at resolution time (the defense recorded the steal). The roll uses **their** aggression plus how many of the **victim team's** five on-floor players can challenge the stealer’s drive (see below) — *not* the old aggression-only slider table.
 
 ---
 
@@ -25,18 +25,23 @@ The stealing team is **`def_team`** at resolution time (the defense recorded the
 - the **FCP** steal branch (`resolve_full_court_press_logic`),
 - the **HCT** steal branch (`resolve_half_court_trap_logic`).
 
-**The single routing roll (stealing team's aggression):**
+**The single routing roll (potential cutoffs × aggression):**
 
-```python
-p_steal = fast_break_probability_from_slider(def_team.strategy_settings.get("aggression", 2))
-if random.random() < p_steal:
-    game_state["offensive_state"] = "FAST_BREAK"
-else:
-    game_state["offensive_state"] = "HCO"
-```
+Implemented in `BackEnd/engine/steal_fast_break_routing.py` (`choose_steal_next_offensive_state`). Runs at the end of the steal turn after `last_stealer` / `last_stealer_coords` are set.
 
-- `fast_break_probability_from_slider()` and `SLIDER_TO_FAST_BREAK_PROB` live in `BackEnd/utils/shared.py`; aggression **0–4** maps to **0% / 25% / 50% / 75% / 100%**.
-- **Contrast:** DREB (missed-shot) fast breaks use the **rebounding team's `fast_breaks`** slider with the same probability table — see [`Fast_Break_System.md`](Fast_Break_System.md) — *not* aggression.
+1. **Shot spot** — same rim-band sample as after-steal drive (`sample_after_steal_shot_spot`: basket_x ± 2–4, y 19–31).
+2. **Potential challengers** — count of victim-team players who can win an AG **sprint** race to a meet on stealer → shot spot that is **x-ahead** of the stealer (`cutoff_meet_point` + `steal_meet_x_ahead_valid`). **No** path-corridor pre-filter (corridor remains for drive/shot contest elsewhere). High-AG players starting behind can still count if they can angle into an x-ahead meet in time.
+3. **Bucket** the count: **0 / 1 / 2+**.
+4. **Aggression** — stealing team's Game Plan aggression **0–4** (Slow It Down may force 0).
+5. **P(FAST_BREAK)** from `STEAL_FB_PROB_BY_POTENTIAL_CUTOFFS` (`fast_break_constants.py`):
+
+| Potential cutoffs | Agg 0 | Agg 1 | Agg 2 | Agg 3 | Agg 4 |
+|---|---|---|---|---|---|
+| **2+** | 0% | 10% | 20% | 30% | 40% |
+| **1** | 0% | 20% | 40% | 60% | 80% |
+| **0** | 50% | 80% | 85% | 90% | 99% |
+
+- **Contrast:** DREB (missed-shot) fast breaks still use the **rebounding team's `fast_breaks`** slider via `fast_break_probability_from_slider` / `SLIDER_TO_FAST_BREAK_PROB` — see [`Fast_Break_System.md`](Fast_Break_System.md).
 
 `game_manager` flips possession and routes to the chosen state. When `FAST_BREAK`, the Fast Break play key is **`after_steal`** (no DREB outlet pass).
 

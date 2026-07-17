@@ -268,14 +268,16 @@ def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_sco
     penalty = help_score * 0.15
     return shot_score - penalty, help_defender, penalty
 
-# 0–4 strategy sliders → P(initiate fast break) for DREB (fast_breaks) and steals (aggression).
+# 0–4 strategy sliders → P(initiate fast break) for DREB (fast_breaks).
+# Steal → FB/HCO uses potential-cutoff count × aggression
+# (``steal_fast_break_routing`` / ``STEAL_FB_PROB_BY_POTENTIAL_CUTOFFS``).
 SLIDER_TO_FAST_BREAK_PROB = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
 
 
 def fast_break_probability_from_slider(level: int) -> float:
     """
     Map a 0–4 Game Plan slider to P(one-shot fast break initiation).
-    Used for: DREB path (rebounding team's fast_breaks) and steal path (stealing team's aggression).
+    Used for the DREB path (rebounding team's ``fast_breaks`` slider).
     """
     try:
         lv = int(level)

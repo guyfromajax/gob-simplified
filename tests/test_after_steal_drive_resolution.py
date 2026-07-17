@@ -336,14 +336,22 @@ def test_cascade_no_op_when_first_attempt_not_pos_o(monkeypatch):
     assert "cascade_beaten_stopper_ids" not in drive
 
 
-def test_cascade_respects_attempt_cap(monkeypatch):
-    """POS_O on every attempt → stops at the cap and collapses to a rim finish."""
+def test_cascade_uncapped_beats_all_then_rim(monkeypatch):
+    """POS_O until no defenders left: uncapped cascade re-ranks through all five."""
     from BackEnd.engine import after_steal_drive_integration as asi
 
     calls = {"n": 0}
 
     def fake_resolve(**kw):
         calls["n"] += 1
+        excluded = kw.get("excluded_stopper_ids") or set()
+        if len(excluded) >= 5:
+            return {
+                "outcome": "NO_MEET",
+                "t_drive_game_seconds": 0.5,
+                "shot_spot": {"x": 88, "y": 25},
+                "bh_start": kw["bh_start"],
+            }
         payload = _pos_o_payload()
         payload["stopper_id"] = f"away-{calls['n']}"
         return payload
@@ -352,12 +360,13 @@ def test_cascade_respects_attempt_cap(monkeypatch):
     drive = asi._resolve_drive_with_cascade(
         resolve_kwargs={"bh_start": {"x": 55, "y": 25}},
         shot_spot={"x": 88, "y": 25},
-        max_attempts=2,
+        max_attempts=None,
     )
-    assert calls["n"] == 2
+    assert calls["n"] == 6  # 5 POS_O + final NO_MEET
     assert drive["outcome"] == "POS_O"
-    # Only the first stopper was beaten-and-excluded; the capped attempt finishes.
-    assert drive["cascade_beaten_stopper_ids"] == ["away-1"]
+    assert drive["cascade_beaten_stopper_ids"] == [
+        "away-1", "away-2", "away-3", "away-4", "away-5",
+    ]
 
 
 def _pa_player(pid, x, y):

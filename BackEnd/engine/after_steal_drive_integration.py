@@ -26,8 +26,12 @@ from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum
-from BackEnd.engine.fb_drive_resolution import resolve_fb_drive_step
+from BackEnd.engine.fb_drive_resolution import (
+    resolve_fb_drive_step,
+    resolve_fb_drive_with_cascade,
+)
 from BackEnd.engine.phase_resolution import apply_fb_meet_non_shooting_defensive_foul
+from BackEnd.engine.steal_fast_break_routing import sample_after_steal_shot_spot
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
 from BackEnd.utils.fb_geo_helpers import (
     pick_nearest_contesting_defender,
@@ -57,13 +61,7 @@ def _mirror_x(home_x: float) -> float:
 
 
 def _compute_bh_target(is_away_offense: bool) -> Dict[str, float]:
-    distance = random.randint(2, 4)
-    if is_away_offense:
-        x = 9.0 + distance
-    else:
-        x = 91.0 - distance
-    y = float(random.randint(19, 31))
-    return {"x": x, "y": y}
+    return sample_after_steal_shot_spot(is_away_offense)
 
 
 def _sample_unique_offense_spots(n: int, is_away_offense: bool) -> List[Dict[str, float]]:
@@ -700,69 +698,15 @@ def _resolve_drive_with_cascade(
     *,
     resolve_kwargs: Dict[str, Any],
     shot_spot: Dict[str, float],
-    max_attempts: int,
+    max_attempts: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Resolve the BH's drive with a cutoff cascade.
-
-    ``resolve_fb_drive_step`` picks a single best cutoff. If the BH beats it
-    (``POS_O``), the next-closest eligible defender takes over: we re-resolve
-    from the BH's shimmy point with the beaten stopper excluded, up to
-    ``max_attempts`` total cutoff attempts. Cascades that ultimately reach the
-    rim are collapsed into one curved ``POS_O`` drive through every shimmy knot;
-    a later defender who *stops* the BH ends the cascade with his own outcome.
-    Beaten stoppers are recorded on ``cascade_beaten_stopper_ids`` so the
-    defensive planner trails them behind the play.
-    """
-    beaten: List[str] = []
-    knots: Optional[List[Dict[str, float]]] = None
-    total_t = 0.0
-    cur_start = dict(resolve_kwargs["bh_start"])
-    drive: Dict[str, Any] = {}
-
-    for attempt in range(max_attempts):
-        kw = dict(resolve_kwargs)
-        kw["bh_start"] = cur_start
-        kw["excluded_stopper_ids"] = set(beaten)
-        drive = resolve_fb_drive_step(**kw)
-        can_cascade = attempt < max_attempts - 1
-        if (
-            drive.get("outcome") == "POS_O"
-            and can_cascade
-            and drive.get("stopper_id")
-        ):
-            meet = {"x": float(drive["meet_x"]), "y": float(drive["meet_y"])}
-            shimmy_raw = drive.get("shimmy") or meet
-            shimmy = {"x": float(shimmy_raw["x"]), "y": float(shimmy_raw["y"])}
-            if knots is None:
-                start_knot = drive.get("bh_start") or cur_start
-                knots = [{"x": float(start_knot["x"]), "y": float(start_knot["y"])}]
-            knots.append(dict(meet))
-            knots.append(dict(shimmy))
-            segs = drive.get("path_segment_game_seconds") or []
-            total_t += float(segs[0]) if len(segs) >= 1 else 0.0
-            total_t += float(segs[1]) if len(segs) >= 2 else 0.0
-            beaten.append(str(drive.get("stopper_id")))
-            cur_start = dict(shimmy)
-            continue
-        break
-
-    if beaten and drive:
-        drive["cascade_beaten_stopper_ids"] = beaten
-        if drive.get("outcome") in ("NO_MEET", "POS_O"):
-            # BH ultimately reaches the rim after beating ≥1 defender: render as
-            # one curved POS_O drive threading all shimmy knots to the finish.
-            if knots is None:
-                knots = [dict(cur_start)]
-            final = drive.get("shot_spot") or shot_spot
-            knots.append({"x": float(final["x"]), "y": float(final["y"])})
-            total_t += float(drive.get("t_drive_game_seconds") or 0.0)
-            drive["outcome"] = "POS_O"
-            drive["bh_path_knots"] = knots
-            drive.pop("path_segment_game_seconds", None)
-            if total_t > 0:
-                drive["t_drive_game_seconds"] = total_t
-        # NEUTRAL / terminal: keep the final defender's own meet + outcome.
-    return drive
+    """After-steal wrapper around universal ``resolve_fb_drive_with_cascade``."""
+    return resolve_fb_drive_with_cascade(
+        resolve_kwargs=resolve_kwargs,
+        shot_spot=shot_spot,
+        max_attempts=max_attempts,
+        resolve_fn=resolve_fb_drive_step,
+    )
 
 
 def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:

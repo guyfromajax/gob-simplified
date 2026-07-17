@@ -20,6 +20,7 @@ from BackEnd.utils.shared import (
 )
 from BackEnd.models.shot_manager import ShotManager
 from BackEnd.utils.situational_logic import slow_it_down_defense_setting
+from BackEnd.engine.steal_fast_break_routing import choose_steal_next_offensive_state
 if TYPE_CHECKING:
     from BackEnd.models.turn_manager import TurnManager
 if TYPE_CHECKING:
@@ -36,7 +37,6 @@ from BackEnd.utils.shared import (
     calc_isotropic_segment_seconds,
     calc_pass_segment_seconds,
     clamp_turn_time_elapsed,
-    fast_break_probability_from_slider,
     calculate_rebound_score,
     calculate_outlet_pass_score,
     resolve_offensive_rebound,
@@ -2618,23 +2618,10 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
         if ball_handler:
             ball_handler.add_momentum(-MO_STEAL_DELTA)
         text = f"{stealer_name} jumps the pass"
-        # Stealing team = def_team; single roll uses their aggression only.
-        p_steal = fast_break_probability_from_slider(
-            slow_it_down_defense_setting(
-                game_state, def_team, "aggression",
-                def_team.strategy_settings.get("aggression", 2),
-            )
-        )
-        fast_break_roll = random.random()
-        if fast_break_roll < p_steal:
-            game_state["offensive_state"] = "FAST_BREAK"
-            text += " and takes it the other way!"
-        else:
-            game_state["offensive_state"] = "HCO"
-            text += " and waits to set up the half-court offense."
+        # Stealing team = def_team; FB vs HCO from potential cutoffs × aggression.
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
-        
+
         # ✅ FIX: Use stored stealer position from skeleton step (if available)
         # This ensures intermediate steps use the position at the exact moment of the steal
         if "last_stealer_coords" in game_state and game_state["last_stealer_coords"]:
@@ -2643,12 +2630,17 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL", from_resoluti
             logging.debug(f"🏀 [STEAL POSITION] Using stored stealer position: x={stealer_coords['x']}, y={stealer_coords['y']}")
         else:
             logging.debug(f"⚠️ [STEAL POSITION] No stored stealer position, using defender.coords: x={getattr(defender, 'coords', {}).get('x', 'N/A')}, y={getattr(defender, 'coords', {}).get('y', 'N/A')}")
-        
+
+        game_state["offensive_state"] = choose_steal_next_offensive_state(game, defender)
+        if game_state["offensive_state"] == "FAST_BREAK":
+            text += " and takes it the other way!"
+        else:
+            text += " and waits to set up the half-court offense."
+
         # ✅ DEBUG: Log steal flow for HCO steals
         logging.debug(f"🏀 [STEAL FLOW] HCO Steal detected:")
         logging.debug(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
         logging.debug(f"  Victim: {get_name_safe(ball_handler)} (ID: {victim_id})")
-        logging.debug(f"  Fast break chance: {p_steal:.2%}, Roll: {fast_break_roll:.3f}")
         logging.debug(f"  Next offensive_state: {game_state['offensive_state']}")
         logging.debug(f"  last_stealer SET: {get_name_safe(defender)} (ID: {stealer_id})")
 
@@ -9190,18 +9182,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
     next_play_type = None
     if result_type == "STEAL":
-        p_steal = fast_break_probability_from_slider(
-            slow_it_down_defense_setting(
-                game_state, def_team, "aggression",
-                def_team.strategy_settings.get("aggression", 2),
-            )
+        game_state["offensive_state"] = choose_steal_next_offensive_state(
+            game, defender
         )
-        if random.random() < p_steal:
-            next_play_type = "FAST_BREAK"
-            game_state["offensive_state"] = "FAST_BREAK"
-        else:
-            next_play_type = "HCO"
-            game_state["offensive_state"] = "HCO"
+        next_play_type = game_state["offensive_state"]
     elif result_type == "HCO":
         # ✅ SS&S: Match Fast Break pattern - set offensive_state when transitioning to HCO
         # This prevents duplicate FCP turns (offensive_state must change from "FCP" to "HCO")
@@ -10440,18 +10424,11 @@ def _resolve_full_court_press_dynamic_first_cut(game, def_scouting, text):
         if game_state.get("offensive_state") in ("FCP", "HCT"):
             game_state["offensive_state"] = "HCO"
     elif result_type == "STEAL":
-        p_steal = fast_break_probability_from_slider(
-            slow_it_down_defense_setting(
-                game_state, def_team, "aggression",
-                def_team.strategy_settings.get("aggression", 2),
-            )
+        stealer_for_fb = game_state.get("last_stealer") or stealer
+        game_state["offensive_state"] = choose_steal_next_offensive_state(
+            game, stealer_for_fb
         )
-        if random.random() < p_steal:
-            next_play_type = "FAST_BREAK"
-            game_state["offensive_state"] = "FAST_BREAK"
-        else:
-            next_play_type = "HCO"
-            game_state["offensive_state"] = "HCO"
+        next_play_type = game_state["offensive_state"]
     elif result_type == "FOUL":
         if game_state.get("offensive_state") != "FREE_THROW":
             next_play_type = "SIDE_INBOUND"
@@ -10701,19 +10678,11 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         if game_state.get("offensive_state") in ("FCP", "HCT"):
             game_state["offensive_state"] = "HCO"
     elif result_type == "STEAL":
-        # Steal → fast break chance off the takeaway, else settle into HCO.
-        p_steal = fast_break_probability_from_slider(
-            slow_it_down_defense_setting(
-                game_state, def_team, "aggression",
-                def_team.strategy_settings.get("aggression", 2),
-            )
+        stealer_for_fb = game_state.get("last_stealer") or stealer
+        game_state["offensive_state"] = choose_steal_next_offensive_state(
+            game, stealer_for_fb
         )
-        if random.random() < p_steal:
-            next_play_type = "FAST_BREAK"
-            game_state["offensive_state"] = "FAST_BREAK"
-        else:
-            next_play_type = "HCO"
-            game_state["offensive_state"] = "HCO"
+        next_play_type = game_state["offensive_state"]
     elif result_type == "FOUL":
         # Defensive foul in bonus already set FREE_THROW above; otherwise the
         # whistle resumes from a side inbound.
@@ -11294,18 +11263,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
     next_play_type = None
     if result_type == "STEAL":
-        p_steal = fast_break_probability_from_slider(
-            slow_it_down_defense_setting(
-                game_state, def_team, "aggression",
-                def_team.strategy_settings.get("aggression", 2),
-            )
+        game_state["offensive_state"] = choose_steal_next_offensive_state(
+            game, defender
         )
-        if random.random() < p_steal:
-            next_play_type = "FAST_BREAK"
-            game_state["offensive_state"] = "FAST_BREAK"
-        else:
-            next_play_type = "HCO"
-            game_state["offensive_state"] = "HCO"
+        next_play_type = game_state["offensive_state"]
     elif result_type == "HCO":
         # ✅ SS&S: Match Fast Break pattern - set offensive_state when transitioning to HCO
         # This prevents duplicate HCT turns (offensive_state must change from "HCT" to "HCO")

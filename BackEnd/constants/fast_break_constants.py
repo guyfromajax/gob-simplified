@@ -171,9 +171,19 @@ FB_AS_HELP_SPOTS_UPPER = ("upper highPost", "upper apex", "topLane")
 FB_AS_HELP_SPOTS_LOWER = ("lower highPost", "lower apex", "topLane")
 
 # Cutoff cascade (Phase 4): if the BH beats his primary cutoff defender (POS_O),
-# the next-closest defender abandons his assignment to take the ball handler.
-# Total cutoff attempts = initial cutoff + this many cascade takeovers.
-FB_AS_MAX_CUTOFF_ATTEMPTS = 2
+# the next-closest eligible defender is re-ranked from the shimmy and takes over.
+# ``None`` = uncapped (one attempt per on-floor defender). Legacy callers may
+# still pass an explicit int cap into ``resolve_fb_drive_with_cascade``.
+FB_AS_MAX_CUTOFF_ATTEMPTS = None
+
+# Steal → FB vs HCO initiation: P(FAST_BREAK) by potential-cutoff count × aggression.
+# Count buckets: 0, 1, or 2+ (key 2). Aggression is the 0–4 Game Plan slider
+# (Slow It Down may force 0). See Steal_System.md §Steal resolution & next-turn routing.
+STEAL_FB_PROB_BY_POTENTIAL_CUTOFFS = {
+    0: {0: 0.50, 1: 0.80, 2: 0.85, 3: 0.90, 4: 0.99},
+    1: {0: 0.00, 1: 0.20, 2: 0.40, 3: 0.60, 4: 0.80},
+    2: {0: 0.00, 1: 0.10, 2: 0.20, 3: 0.30, 4: 0.40},
+}
 
 # Pass-ahead (Phase 5): when the BH has a clear lane to the rim (NO_MEET/POS_O)
 # and an open teammate is ahead of him, he may dish ahead. The receiver becomes

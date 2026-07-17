@@ -9,7 +9,7 @@ Spec: ``_documentation_master/06_Gameplay_Systems/Fast_Break_System.md``
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from BackEnd.constants import HCO_STRING_SPOTS
 from BackEnd.constants.fast_break_constants import (
@@ -317,29 +317,6 @@ def resolve_fb_drive_step(
         arch = _defender_archetype(defender, drift_ids)
         return _ag_grid_per_game_sec(defender, arch)
 
-    filtered_def_starts: Dict[str, GridCoordDict] = {}
-    for pos in POSITIONS:
-        defender = def_lineup.get(pos)
-        if defender is None or pos not in def_starts:
-            continue
-        pid = _player_id(defender)
-        if pid and pid in excluded:
-            continue
-        filtered_def_starts[pos] = def_starts[pos]
-
-    cutoff_pos, cutoff_meet = best_cutoff_on_drive(
-        bh_start,
-        shot_spot,
-        bh_rate,
-        filtered_def_starts,
-        def_lineup,
-        get_defender_rate=get_defender_rate,
-        path_corridor=FB_DRIVE_CUTOFF_PATH_CORRIDOR,
-        defender_time_slack=FB_DRIVE_CUTOFF_TIME_SLACK,
-        stop_attempt_prob=None,
-        clamp_fn=_clamp_drive_coord,
-    )
-
     geo_participant_positions = _geo_corridor_participants(
         bh_start, shot_spot, def_starts, corridor=FB_DRIVE_CUTOFF_PATH_CORRIDOR
     )
@@ -373,9 +350,10 @@ def resolve_fb_drive_step(
                 ids.append(pid)
         payload["geo_participant_defender_ids"] = ids
 
-    # --- No geometric meet -------------------------------------------------
-    if cutoff_pos is None or cutoff_meet is None:
+    def _no_meet_payload(*, steal_meet_rejected: bool = False) -> Dict[str, Any]:
         payload["outcome"] = "NO_MEET"
+        if steal_meet_rejected:
+            payload["steal_meet_rejected"] = True
         ends, arch = _build_defender_ends_at_basket(
             def_lineup,
             def_starts,
@@ -404,45 +382,61 @@ def resolve_fb_drive_step(
         _stamp_geo_ids(shot_def_id)
         return payload
 
-    meet = _clamp_drive_coord(cutoff_meet)
-    stopper = def_lineup.get(cutoff_pos)
-    stopper_id = _player_id(stopper)
+    # Pick earliest cutoff; for after-steal, skip meets that fail the x-ahead
+    # filter and try the next-soonest defender until one is valid or none remain.
+    steal_meet_rejected_any = False
+    cutoff_pos: Optional[str] = None
+    cutoff_meet: Optional[GridCoordDict] = None
+    skip_ids = set(excluded)
+    while True:
+        filtered_def_starts: Dict[str, GridCoordDict] = {}
+        for pos in POSITIONS:
+            defender = def_lineup.get(pos)
+            if defender is None or pos not in def_starts:
+                continue
+            pid = _player_id(defender)
+            if pid and pid in skip_ids:
+                continue
+            filtered_def_starts[pos] = def_starts[pos]
 
-    if steal_entry and not steal_meet_x_ahead_valid(meet, bh_start, is_away_offense=is_away_offense):
-        payload["outcome"] = "NO_MEET"
-        payload["steal_meet_rejected"] = True
-        ends, arch = _build_defender_ends_at_basket(
+        cutoff_pos, cutoff_meet = best_cutoff_on_drive(
+            bh_start,
+            shot_spot,
+            bh_rate,
+            filtered_def_starts,
             def_lineup,
-            def_starts,
-            is_away_offense=is_away_offense,
-            drift_defender_ids=drift_ids,
+            get_defender_rate=get_defender_rate,
+            path_corridor=FB_DRIVE_CUTOFF_PATH_CORRIDOR,
+            defender_time_slack=FB_DRIVE_CUTOFF_TIME_SLACK,
+            stop_attempt_prob=None,
+            clamp_fn=_clamp_drive_coord,
         )
-        ends = _reachable_defender_ends(
-            ends,
-            def_lineup=def_lineup,
-            def_starts=def_starts,
-            archetypes=arch,
-            time_budget=payload["t_drive_game_seconds"],
-        )
-        payload["defender_end_coords"] = ends
-        payload["defender_archetypes"] = arch
-        _, shot_def_id = _apply_rendered_spread_contest(
-            payload,
-            off_lineup=off_lineup,
-            off_starts=off_starts,
-            def_lineup=def_lineup,
-            def_starts=def_starts,
-            bh_start=bh_start,
-            shot_spot=shot_spot,
-            is_away_offense=is_away_offense,
-        )
-        _stamp_geo_ids(shot_def_id)
-        return payload
+        if cutoff_pos is None or cutoff_meet is None:
+            return _no_meet_payload(steal_meet_rejected=steal_meet_rejected_any)
+
+        meet = _clamp_drive_coord(cutoff_meet)
+        stopper = def_lineup.get(cutoff_pos)
+        stopper_id = _player_id(stopper)
+        if (
+            steal_entry
+            and not steal_meet_x_ahead_valid(
+                meet, bh_start, is_away_offense=is_away_offense
+            )
+        ):
+            steal_meet_rejected_any = True
+            if stopper_id:
+                skip_ids.add(stopper_id)
+            else:
+                return _no_meet_payload(steal_meet_rejected=True)
+            continue
+        break
 
     payload["meet_x"] = float(meet["x"])
     payload["meet_y"] = float(meet["y"])
     payload["stopper_id"] = stopper_id
     payload["stopper_pos"] = cutoff_pos
+    if steal_meet_rejected_any:
+        payload["steal_meet_rejected"] = True
 
     d8_outcome, _ratio, credited = resolve_cutoff_contest(
         off_team,
@@ -614,3 +608,75 @@ def resolve_fb_drive_step(
             )
     _stamp_geo_ids(stopper_id)
     return payload
+
+
+def resolve_fb_drive_with_cascade(
+    *,
+    resolve_kwargs: Dict[str, Any],
+    shot_spot: Dict[str, float],
+    max_attempts: Optional[int] = None,
+    resolve_fn=None,
+) -> Dict[str, Any]:
+    """Resolve a drive with POS_O cutoff cascade (universal helper).
+
+    On ``POS_O``, re-ranks remaining defenders from the BH shimmy (path changes)
+    with beaten stoppers excluded. Continues until a non-``POS_O`` outcome or no
+    defenders remain. ``max_attempts=None`` means uncapped (bounded by on-floor
+    defenders). After-steal is the first caller; other FB plays may opt in later.
+
+    ``resolve_fn`` defaults to ``resolve_fb_drive_step``; callers may pass their
+    module-local binding so tests can monkeypatch it.
+    """
+    if resolve_fn is None:
+        resolve_fn = resolve_fb_drive_step
+    beaten: List[str] = []
+    knots: Optional[List[Dict[str, float]]] = None
+    total_t = 0.0
+    cur_start = dict(resolve_kwargs["bh_start"])
+    drive: Dict[str, Any] = {}
+    # Safety bound: initial attempt + one per on-floor defender.
+    hard_ceiling = (
+        max_attempts if max_attempts is not None else (len(POSITIONS) + 1)
+    )
+
+    for attempt in range(max(1, hard_ceiling)):
+        kw = dict(resolve_kwargs)
+        kw["bh_start"] = cur_start
+        kw["excluded_stopper_ids"] = set(beaten)
+        drive = resolve_fn(**kw)
+        if drive.get("outcome") != "POS_O" or not drive.get("stopper_id"):
+            break
+        # Cap: this POS_O is the final attempt (legacy callers).
+        if max_attempts is not None and attempt >= max_attempts - 1:
+            break
+        meet = {"x": float(drive["meet_x"]), "y": float(drive["meet_y"])}
+        shimmy_raw = drive.get("shimmy") or meet
+        shimmy = {"x": float(shimmy_raw["x"]), "y": float(shimmy_raw["y"])}
+        if knots is None:
+            start_knot = drive.get("bh_start") or cur_start
+            knots = [{"x": float(start_knot["x"]), "y": float(start_knot["y"])}]
+        knots.append(dict(meet))
+        knots.append(dict(shimmy))
+        segs = drive.get("path_segment_game_seconds") or []
+        total_t += float(segs[0]) if len(segs) >= 1 else 0.0
+        total_t += float(segs[1]) if len(segs) >= 2 else 0.0
+        beaten.append(str(drive.get("stopper_id")))
+        cur_start = dict(shimmy)
+
+    if beaten and drive:
+        drive["cascade_beaten_stopper_ids"] = beaten
+        if drive.get("outcome") in ("NO_MEET", "POS_O"):
+            # BH ultimately reaches the rim after beating ≥1 defender: render as
+            # one curved POS_O drive threading all shimmy knots to the finish.
+            if knots is None:
+                knots = [dict(cur_start)]
+            final = drive.get("shot_spot") or shot_spot
+            knots.append({"x": float(final["x"]), "y": float(final["y"])})
+            total_t += float(drive.get("t_drive_game_seconds") or 0.0)
+            drive["outcome"] = "POS_O"
+            drive["bh_path_knots"] = knots
+            drive.pop("path_segment_game_seconds", None)
+            if total_t > 0:
+                drive["t_drive_game_seconds"] = total_t
+        # NEUTRAL / terminal: keep the final defender's own meet + outcome.
+    return drive
