@@ -1,10 +1,31 @@
 # Implementation Spec — Playbooks Page Redesign
 
-**Repo:** `guyfromajax/gob-simplified` · branch `develop`
+**Repo:** `guyfromajax/gob-simplified` · feature branch off `develop`
 **Lens:** Simple, Stable, Scalable (SS&S)
-**Design source:** four signed-off Claude Design files — `Playbooks Editing Tile.html` (D1), `Playbooks Page.html` (D2), `Playbooks Redistribution.html` (D3), `Playbooks PCC Assign + Reorder.html` (D4)
+**Design source (sole SoT):** `Playbooks_Page_D2_CURRENT.html` (Deliverable 2)
 
-Design is complete and signed off. This spec is the handoff. Where this doc and the design HTML disagree, **this doc wins** — it's grounded in the real repo state.
+D1 / D3 / D4 are **stale** — do not add them unless Design re-cuts. D3 in particular still contains the inactive-row bug.
+
+Where this doc and D2 disagree, **this doc wins**, except where a decision below explicitly prefers D2 (ready indicator).
+
+---
+
+## Decisions (resolved 2026-07-17)
+
+| # | Decision |
+| --- | --- |
+| 1 | **Design SoT** = D2 only. |
+| 2 | **Live shot-weights** = debounced preview **backend** endpoint. Do not port `compute_position_shot_weights` to JS. Fire on settle (same principle as slider SFX / one gesture → one delta), not per `pointermove`. Spec's earlier "no backend changes" is **wrong** on this point. |
+| 3 | **0%-in-PCC on read-only venues** is in scope. Change FCC + Set Lineup filters from `percentage > 0` to `percentage > 0 \|\| inPCC`. 0% and not in PCC stays excluded. |
+| 4 | **CSS sharing** = extract shared CMD/tile tokens out of `#franchise-container` (option A). No duplicated drifting hex/threshold values. |
+| 5 | **Locks persist** in the save payload (backend work with #2). Not session-only. |
+| 6 | **Sort** = drop entirely. No sort UI; array order is not user-controllable. |
+| 7 | **Save feedback** = existing toast pattern, copy `"Playbooks Saved"`. Drop save-confirm modal and its "Back To Locker Room" CTA. |
+| 8 | **Ready indicator** = implement D2's successor (`N of 2 flexible sections` / `Ready to save`), not a bare deletion. Spec's "delete 0/6" means delete the incoherent counter only. |
+| 9 | Doc ≠ D2 → doc wins for enforced/inactive arithmetic. **Note:** the checked-in D2 export's `setEnforced` still lacks the inactive-row filter — treat that export as stale until Design re-pulls; implement the active-aware version in §3. |
+| 10 | **Docs** = update `Playbooks_Page.md` + this spec if build changes anything. |
+| 11 | **Ship order** = CMD fix (§2) as its own commit/PR, then redesign. |
+| 12 | **Branch** = feature branch off `develop`. |
 
 ---
 
@@ -12,30 +33,34 @@ Design is complete and signed off. This spec is the handoff. Where this doc and 
 
 | File | Change |
 | --- | --- |
-| `FrontEnd/static/playbooks.html` | Layout rebuild — tabs, tile grids, rail, shot-weights strip |
-| `FrontEnd/static/playbooks.js` | Enforced model, PCC single-source, delete `syncSelectionFromPcOrder` |
-| `FrontEnd/static/playbooks.css` | Tile styles, CMD tokens, rail restyle |
-| `FrontEnd/static/franchise-command-center.css` | CMD tokens only (§2) |
-| `FrontEnd/static/franchise-command-center.js` | CMD threshold fn only (§2) |
+| `FrontEnd/static/playbooks.html` | Layout rebuild — tabs, tile grids, rail, shot-weights strip; toast host |
+| `FrontEnd/static/playbooks.js` | Enforced model, PCC single-source, delete `syncSelectionFromPcOrder` + sort, debounced shot-weights preview, locks in state/payload |
+| `FrontEnd/static/playbooks.css` | Tile styles, rail restyle; consume shared CMD tokens |
+| `FrontEnd/static/franchise-command-center.css` | Consume shared tokens; drop scoped CMD color drift |
+| `FrontEnd/static/franchise-command-center.js` | 0%-in-PCC visibility; CMD via shared helper/tokens |
+| `FrontEnd/static/set-lineup.js` | 0%-in-PCC visibility; CMD thresholds/classes aligned |
+| `FrontEnd/static/set-lineup.css` | CMD colors aligned (`is-good` / mid / low) |
+| Shared stylesheet (new) | CMD thresholds + colors (+ later shared tile tokens) — one place |
+| Backend playbook routes / settings utils | Locks persistence; debounced shot-weights **preview** endpoint |
 
-**No backend changes.** The save payload shape (`playbook_settings.{motion,set_plays,fast_breaks,hc_traps,man_defense,zone_defense,pc_order,...}`) is unchanged. This is a frontend redesign against the existing API.
+Payload grows: existing `playbook_settings` maps stay; add **locks** (durable per-play) and keep computing `position_shot_weights` server-side only.
 
 ---
 
 ## 1. Ship this first, independently
 
-**The CMD fork fix.** It's ~5 lines, has zero dependency on the redesign, and shipping it now means the live app and the comps agree while the rest is built.
+**The CMD fork fix.** Zero dependency on the redesign. Ship as its own PR so live venues agree while the rest is built.
 
-Currently the two screens use different scales and neither knows about the other:
+Currently venues disagree:
 
-| | FCC | playbooks.js |
-| --- | --- | --- |
-| classes | `is-good` / `is-mid` / `is-low` | `is-high` / `is-mid` / `is-low` |
-| thresholds | ≥70 / ≥40 | ≥67 / ≥34 |
+| | FCC | playbooks.js | set-lineup.js |
+| --- | --- | --- | --- |
+| classes | `is-good` / `is-mid` / `is-low` | `is-high` / `is-mid` / `is-low` | `is-high` / `is-mid` / `is-low` |
+| thresholds | ≥70 / ≥40 | ≥67 / ≥34 | ≥67 / ≥34 |
 
-A play with CMD 68 is currently amber in the FCC and green on the playbooks page. Same play, same number, two colors.
+A play with CMD 68 is amber in the FCC and green on the playbooks page / Set Lineup. Same play, same number, two colors.
 
-See §2 for the exact change.
+See §2 for the exact change. Include Set Lineup in the CMD PR — acceptance requires all three venues.
 
 ---
 
@@ -51,41 +76,16 @@ CMD < 40  → is-low  → #FFD700  (yellow)
 
 **Blue ranks above green. This is deliberate.** GOB's rating scale drafts off OOTP Baseball, where players are conditioned to read blue as the top band. Do not "correct" this to a green-is-best ramp.
 
-### 2a. `playbooks.css`
+### 2a. Shared source of truth (landed with CMD PR)
 
-```css
-/* :root — replace */
---eff-low:  #F5C518;   →  #FFD700
---eff-mid:  #A8D400;   →  #34EC27
---eff-high: #4CAF50;   →  #4A90D9
-```
+| Artifact | Role |
+| --- | --- |
+| `FrontEnd/static/css/playbook-cmd.css` | `--cmd-good/mid/low` + `.is-good/.is-mid/.is-low` colors for playbooks, FCC, Set Lineup |
+| `FrontEnd/static/common.js` → `getPlaybookCmdClass()` | Thresholds 70 / 40 → class names |
 
-Rename `--eff-high` → `--eff-good` and the `.eff-score.is-high` rule → `.eff-score.is-good` (the class name `is-high` is emitted by `playbooks.js` but matches nothing in the FCC stylesheet — killing it removes a live footgun).
+Venue wrappers (`renderEffScore`, `getFccPlaybookEffClass`, `getLineupPlaybookEffClass`) call the shared helper. Local hex/threshold copies removed from venue stylesheets.
 
-Note `--success: #34EC27` already exists in this file and is the same green as `--eff-mid`. Consider whether they should reference one token.
-
-### 2b. `playbooks.js` — `renderEffScore()` (~line 751)
-
-```js
-// FROM
-const className = numeric >= 67 ? "is-high" : (numeric >= 34 ? "is-mid" : "is-low");
-// TO
-const className = numeric >= 70 ? "is-good" : (numeric >= 40 ? "is-mid" : "is-low");
-```
-
-### 2c. `franchise-command-center.css` (~lines 2620–2630)
-
-```css
-.fcc-playbooks-item-eff.is-good { color: #4CAF50; }  →  #4A90D9
-.fcc-playbooks-item-eff.is-mid  { color: #A8D400; }  →  #34EC27
-.fcc-playbooks-item-eff.is-low  { color: #F5C518; }  →  #FFD700
-```
-
-### 2d. `franchise-command-center.js` — `getFccPlaybookEffClass()` (~line 1692)
-
-Thresholds are already 70/40 and classes already `is-good`. **No change needed** — it's the reference implementation.
-
-**Expected visual delta:** the playbooks page scale *tightens* (67→70, 34→40), so some plays shift down a band. That's the fix landing, not a regression.
+**Expected visual delta:** playbooks + Set Lineup scales *tighten* (67→70, 34→40), so some plays shift down a band. That's the fix landing, not a regression.
 
 ---
 
@@ -146,7 +146,7 @@ function setEnforced(arr, idx, target) {
 
 **Rules:**
 - **Proportional.** Plays surrender in proportion to current share; relative shape of untouched plays preserved.
-- **Locks.** Per-tile lock affordance. Locked plays exempt from redistribution; their value counts toward `lockedSum`. This is what makes the model tolerable — without it, a coach who sets Play B to exactly 25 watches it drift on every unrelated edit.
+- **Locks.** Per-tile lock affordance. Locked plays exempt from redistribution; their value counts toward `lockedSum`. This is what makes the model tolerable — without it, a coach who sets Play B to exactly 25 watches it drift on every unrelated edit. **Locks persist in the save payload** (Decision 5) — durable intention, not session UI state. Exact key shape is set during backend work; must round-trip on GET/save and survive reload.
 - **Floors cascade.** Handled naturally by `distribute` — a play at 0 gives nothing further; shortfall spreads to whoever's left.
 - **Hard stop.** When `target > 100 - lockedSum`, the slider **visibly stops**. Never a slider that silently refuses.
 - **Computed last play.** If exactly one non-locked active play remains, it's fully determined → render as a **value, not a control** (no slider). See §3b.
@@ -188,9 +188,9 @@ Rationale for the split: 3a's machinery is real cost against SS&S and only earns
 ### 3d. Section totals & save gating
 
 - Enforced sections: quiet `100 · balanced`. No counter, no error, no gate.
-- Normalize sections: `8 left to assign` + Normalize button. **Countdown, not scold** — never `73 / 100` in red.
+- Normalize sections: `8 left to assign` + Normalize button. **Countdown, not scold** — never `73 / 100` in red. Normalize snaps via `distribute(currentWeights, 100)` (proportional; all-zero → equal split).
 - **Save gates on the two normalize sections only.**
-- **Delete the `0 / 6 sections ready` indicator** (`#sections-ready-indicator`). It's incoherent — four of six can never be un-ready.
+- **Replace** `#sections-ready-indicator` (`0 / 6 sections ready`) with D2's successor: warn `N of 2 flexible sections balanced` / ok `Ready to save · all sections balanced`. Delete the incoherent 0/6 counter — not the readiness concept.
 
 ---
 
@@ -228,6 +228,8 @@ Sibling of the FCC read-only chip, not a clone. Inherits radius, border, gradien
 | **FCC / Set Lineup modal** | Omit | **Show** — it's on the call sheet |
 
 **A play stays in the PCC until the user explicitly removes it. Redistribution never evicts.** A slot holding a play at 0% is a real state: "never called by default, but on the call sheet."
+
+**Read-only venues (FCC summary + Set Lineup playbooks modal):** filter `percentage > 0 || inPCC` (Decision 3). Exclusion of 0%-not-in-PCC stays; only the PCC exception is new.
 
 **Dimming is purely visual.** Full opacity on hover, full-size hit target, live slider, `pointer-events: auto`. A 0% play is the one that most needs an obvious "drag me back" affordance — if dimming shrinks the target, the recovery gesture is harder than the normal one, which is backwards.
 
@@ -280,21 +282,23 @@ The %-only lightweights are demoted to compact strips — they're not peers of M
 
 **Live shot-weights: sticky strip atop the editing column.** Not in the right rail — the PCC owns that. This puts the consequence directly above its cause.
 
-`renderShotWeights` (Position Shot Weights) already exists and already renders in the FCC tab and in this page's save-confirm modal. **Today the user sees the consequence of the decision only after it's locked.** Wire it live: as percentages move, expected shot distribution shifts in front of them. This is what converts the page from a form into a tactics screen.
+`renderShotWeights` already exists. **Server remains the only computation** (`compute_position_shot_weights`). Wire a **debounced preview endpoint**; refresh the strip on settle (slider `pointerup`, % commit, normalize, lock toggle that changes arithmetic) — not on every `pointermove`. No client-side port of the weight math (Decision 2).
 
-**Keep:** `#gameplay-lockout` card (top banner, dims the editing column), the `.pc-card` sticky rail structure, `back-btn` / return-url handling, `authGuard`, `gameStore` import, sort behavior where it still applies.
+**Keep:** `#gameplay-lockout` card (top banner, dims the editing column), the `.pc-card` sticky rail structure, `back-btn` / return-url handling, `authGuard`, `gameStore` import.
 
-**Collapse the save-confirm modal to a toast.** With shot-weights live, `#save-confirm-modal` + `psw-root` is redundant — it shows the distribution *after* the decision the user has now been watching the whole time.
+**Drop sort entirely** (Decision 6).
+
+**Collapse the save-confirm modal to a toast** (Decision 7): reuse the existing toast pattern; copy `"Playbooks Saved"`; no "Back To Locker Room" in that flow — header back link already covers return.
 
 ---
 
 ## 8. ⚠️ SFX — preserve all of it
 
-There are **9** `playSound` call sites in `playbooks.js` today. The redesign removes the controls several of them are bound to. **Rebind, don't drop.**
+There are **9** `playSound` call sites in `playbooks.js` today. Sort is deleted (Decision 6), so **8** remain to rebind. **Rebind, don't drop** the rest.
 
 | Current site | Fires on | After |
 | --- | --- | --- |
-| L390 | sort button click | keep if sort survives |
+| L390 | sort button click | **drop** with sort (Decision 6) |
 | L667 | `.pc-remove-btn` click | **keep** → `×` on slot |
 | L714 | `handleDrop` | **keep** → rail reorder |
 | L825 | % `input` change | → **type-to-set commit** (blur/Enter) |
@@ -310,38 +314,41 @@ There are **9** `playSound` call sites in `playbooks.js` today. The redesign rem
 
 ---
 
-## 9. Known constraint
+## 9. Shared CSS / tokens
 
-FCC tile CSS is entirely scoped under `#franchise-container` (`franchise-command-center.css` ~lines 2490–2660). A genuinely shared tile component has to escape that selector.
-
-Decide deliberately: extract to a shared component/stylesheet, or accept duplication with the tokens centralized. **Duplication with drifting values is what caused the CMD fork in the first place** — whatever the choice, the color and threshold values must live in exactly one place.
+**Decided (Decision 4):** extract shared tokens/stylesheet out of `#franchise-container`. FCC tile CSS today is scoped under `#franchise-container` (~lines 2490–2660). Shared CMD colors + thresholds (and later tile anatomy tokens) live in exactly one stylesheet/helper. CMD PR may still inline the canonical hex once in each venue if the shared sheet lands with the redesign — but values must not diverge; prefer extracting the shared sheet in or immediately after the CMD PR.
 
 ---
 
 ## 10. Suggested sequence
 
-1. **CMD fix** (§2) — ship standalone, immediately
-2. **Tile component** (§4) + tile states — the grid depends on it
-3. **Enforced model** (§3) — with the inactive-row filter from day one, not bolted on
-4. **PCC single-source** (§6) — delete `syncSelectionFromPcOrder`
-5. **Page layout** (§7) — tabs, rail, shot-weights strip
-6. **SFX pass** (§8) — verify all 9 sites
-7. **Toast** replacing save-confirm modal
+1. **CMD fix** (§2) — own commit/PR (playbooks + FCC colors + Set Lineup)
+2. **Shared tokens sheet** (§9) if not landed in step 1
+3. **Backend:** locks persistence + shot-weights preview endpoint
+4. **Tile component** (§4) + tile states
+5. **Enforced model** (§3) — inactive-row filter from day one
+6. **PCC single-source** (§6) — delete `syncSelectionFromPcOrder`; drop sort
+7. **Page layout** (§7) — tabs, rail, live shot-weights strip, D2 ready indicator
+8. **Read-only venue filters** — FCC + Set Lineup `percentage > 0 || inPCC`
+9. **SFX pass** (§8) — 8 remaining sites (sort dropped)
+10. **Toast** replacing save-confirm modal
+11. **Docs** — `Playbooks_Page.md` + this spec
 
 ---
 
 ## 11. Acceptance
 
-- [ ] CMD reads identically on playbooks page, FCC tab, Set Lineup modal (blue/green/yellow, 40/70)
+- [ ] CMD reads identically on playbooks page, FCC tab, Set Lineup modal (blue/green/yellow, 40/70, `is-good`/`is-mid`/`is-low`)
 - [ ] Motion/Set/Man/Zone always sum to exactly 100 — invalid state unreachable
 - [ ] **Redistribution never assigns value to an `is_active: false` row** (drag Man 100→60; Box-and-One and Triangle-2 stay at 0)
 - [ ] Man renders `= 100%` computed today; becomes a normal slider grid when a second man defense activates — **with no code change**
-- [ ] Locked plays never drift
+- [ ] Locked plays never drift; locks survive save/reload
 - [ ] Raised slider visibly stops at `100 - lockedSum`
 - [ ] `syncSelectionFromPcOrder` no longer exists; PCC badge derives from `pcOrder` index
 - [ ] PCC cap 8/side; tiles pre-disabled at capacity
 - [ ] 0%-in-PCC play survives redistribution and still shows in FCC / Set Lineup modal
 - [ ] 0%-unassigned tile is dimmed but fully grabbable
-- [ ] Shot-weights move live as percentages change
-- [ ] All 9 SFX sites fire; slider fires on release only, never during drag
-- [ ] `0 / 6 sections ready` is gone; save gates on the two normalize sections
+- [ ] Shot-weights update from **server preview** on settle (not a JS port; not per-`pointermove`)
+- [ ] SFX: assign/unassign, rail reorder/remove, selects, % commit, slider `pointerup` only, save toast — redistribution silent; sort SFX gone with sort
+- [ ] `0 / 6 sections ready` is gone; D2 ready copy + save gates on the two normalize sections only
+- [ ] Save success = `"Playbooks Saved"` toast; no save-confirm modal

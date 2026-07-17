@@ -2617,17 +2617,7 @@ body.has-auth-bar #franchise-container {
   margin-top: 5px;
 }
 
-#franchise-container .fcc-playbooks-item-eff.is-good {
-  color: #4CAF50;
-}
-
-#franchise-container .fcc-playbooks-item-eff.is-mid {
-  color: #A8D400;
-}
-
-#franchise-container .fcc-playbooks-item-eff.is-low {
-  color: #F5C518;
-}
+/* CMD band colors → css/playbook-cmd.css */
 
 #franchise-container .fcc-playbooks-item-top-scorer {
   flex: 0 0 auto;

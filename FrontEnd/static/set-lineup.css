@@ -1094,9 +1094,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: rgba(255,255,255,0.72);
 }
 
-.lineup-playbook-card-eff.is-high { color: #4CAF50; }
-.lineup-playbook-card-eff.is-mid { color: #A8D400; }
-.lineup-playbook-card-eff.is-low { color: #F5C518; }
+/* CMD band colors → css/playbook-cmd.css */
 
 .lineup-playbook-card-top-scorer {
   color: #9e9d9d;
