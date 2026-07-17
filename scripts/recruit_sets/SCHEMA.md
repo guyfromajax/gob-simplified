@@ -6,8 +6,9 @@ for the full architecture; this file is the exact field-level spec the **baker**
 **loader** reads.
 
 A "set" is 300 pre-built recruits shipped as a unit. Each recruit carries a **stable
-`recruit_id`** that keys its pre-generated uniform kit in R2 (`recruits/kit/<recruit_id>.png`) and
-survives all the way to the rostered player (`player_id = recruit_id` at signing).
+`recruit_id`** that keys its pre-generated uniform kit in R2 (`recruits/kit/<recruit_id>.png`).
+At signing the player gets a fresh unique `player_id` (not the recruit_id — set recruits share
+one recruit_id across franchises, which would collide); the portrait follows via `image_id`.
 
 There are **two artifacts**:
 

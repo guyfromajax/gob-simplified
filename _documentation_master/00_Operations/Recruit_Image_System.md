@@ -68,6 +68,12 @@ forever after** — no pre-generation, no batch job, no queue:
 - **Uniformed master** (`players/master/<player_id>.png`, post-signing) → `POST
   /player-image/ensure` recolors the kit into the signed team's colors.
 
+> **`player_id` is a fresh unique uuid at signing — NOT the recruit_id.** Set recruits share one
+> recruit_id across every franchise (all draw set_0001), so keying the uniformed master by
+> recruit_id would collide across franchises that sign the same recruit to different teams
+> (first-writer-wins → wrong jersey). The portrait link is `image_id`, not `player_id`, so a
+> unique player_id is free — each signed player gets its own uniformed master.
+
 Both endpoints (`BackEnd/api/player_image_routes.py`) are idempotent, auth'd, and degrade to a
 status the frontend reads as "use generic" — **never a 500**. The paint core
 (`BackEnd/services/recruit_image.py`) is a **verbatim port** of the league recolor + finish, so
@@ -463,7 +469,9 @@ exactly. Decision: **use the templated system for their recruits anyway.**
 - **Fixed sets** of 300 (not a face library); a franchise loads a whole set per season.
 - **Never reuse a set within a franchise**; random pick from unused; graceful fallback to
   dynamic generation when exhausted.
-- **`player_id = recruit_id`** through signing — one image lineage; walk-ons excepted.
+- **`player_id` is a fresh unique uuid at signing** (superseding the earlier `player_id =
+  recruit_id`). The image lineage runs through `image_id`, not `player_id`, so a unique player_id
+  avoids cross-franchise uniformed-master collisions (see the as-built section).
 - **First proof set reuses existing faces** (free); fresh NB for real sets.
 - **Portrait = projected mature build.** Attribute maturity scaling (ST/AG/RT) by per-year
   factor **JH 0.55 / FR 0.65 / SO 0.80 / JR 1.00**, plus height/weight growth projection; then
