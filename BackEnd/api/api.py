@@ -7191,6 +7191,38 @@ try:
             print(f"🔍 Looking up player with ID: {player_id}")
             player = players_collection.find_one({"_id": player_id})
             if not player:
+                # Signed recruits (and walk-ons) never enter the universal
+                # `players` collection — they live only in FPD, keyed by a fresh
+                # per-franchise player_id. Serve those from FPD so their player
+                # page loads after a season rollover. The universal collection
+                # stays read-only; we build a response here without touching it.
+                if mode == "franchise" and franchise_id:
+                    fpd_doc = franchise_players_data_collection.find_one(
+                        {"franchise_id": str(franchise_id), "player_id": str(player_id)}
+                    )
+                    if fpd_doc:
+                        meta = fpd_doc.get("meta") or {}
+                        first_name = meta.get("first_name", "")
+                        last_name = meta.get("last_name", "")
+                        fpd_player = {
+                            "_id": str(player_id),
+                            "first_name": first_name,
+                            "last_name": last_name,
+                            "name": f"{first_name} {last_name}".strip(),
+                            "team": meta.get("team", meta.get("team_id", "")),
+                            "team_id": meta.get("team_id"),
+                            "year": meta.get("year"),
+                            "height": meta.get("height"),
+                            "weight": meta.get("weight"),
+                            "jersey": meta.get("jersey"),
+                            "archetype": meta.get("archetype"),
+                            "image_id": meta.get("image_id"),
+                            "attributes": fpd_doc.get("attributes") or {},
+                            "position_ratings": fpd_doc.get("position_ratings") or {},
+                            "season": fpd_doc.get("season") or {},
+                            "career": fpd_doc.get("career") or {},
+                        }
+                        return fpd_player
                 print(f"❌ Player not found with _id: {player_id}")
                 # Try a broader search to help debug
                 sample = players_collection.find_one({})
