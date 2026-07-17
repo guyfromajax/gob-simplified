@@ -23,9 +23,11 @@ from BackEnd.utils.playbook_settings_utils import (
     build_play_lookups_from_team_plays,
     build_play_lookups_from_universal_plays,
     build_simplified_playbook_settings,
+    empty_playbook_locks,
     normalize_motion_dropdowns_to_play_ids,
     normalize_pc_order,
     normalize_percentage_map_to_play_ids,
+    normalize_playbook_locks,
     normalize_string_keyed_map,
     normalize_slot_assignments_to_play_ids,
 )
@@ -708,6 +710,7 @@ def initialize_playbook_settings():
                 "C": []          # Center plays (play_id ObjectId strings)
             },
             "even_distribution_all": True,  # Macro toggle for Even Distribution - All
+            "locks": empty_playbook_locks(),
             "_meta": {
                 "user_saved": False,
                 "schema_version": 2,
@@ -851,6 +854,7 @@ def initialize_playbook_settings():
                 "C": []
             },
             "even_distribution_all": True,
+            "locks": empty_playbook_locks(),
             "_meta": {
                 "user_saved": False,
                 "schema_version": 2,
@@ -2846,6 +2850,7 @@ def get_playbooks(
         pc_order = simplified_playbook_settings.get("pc_order", {"offense": [], "defense": []})
         even_distribution_all = playbook_settings.get("even_distribution_all", False) if playbook_settings else False
         playbook_meta = simplified_playbook_settings.get("_meta", {})
+        locks = simplified_playbook_settings.get("locks") or empty_playbook_locks()
         
         if _debug_pc_on(debug_pc):
             _off = (pc_order or {}).get("offense") or []
@@ -2923,6 +2928,7 @@ def get_playbooks(
                 for defense_id, defense_name in ZONE_DEFENSE_ID_TO_NAME.items()
             ],
             "pc_order": pc_order,
+            "locks": locks,
             "position_shot_weights": position_shot_weights,
             "motion_dropdowns": motion_dropdowns,
             "position_filters": position_filters,
@@ -2984,6 +2990,128 @@ class PlaybookSettingsRequest(BaseModel):
     play_updates: Optional[dict] = None
 
 
+def _apply_play_updates_to_plays(plays: dict, play_updates: dict | None) -> dict:
+    """Return a copy of team plays with draft motion_focus / target_shooter applied (no persistence)."""
+    updated = dict(plays or {})
+    if not isinstance(play_updates, dict) or not play_updates:
+        return updated
+
+    for _play_key, play_data, _display_name in iter_team_plays(updated):
+        if not isinstance(play_data, dict):
+            continue
+        play_id = str(play_data.get("play_id") or "")
+        if not play_id or play_id not in play_updates:
+            continue
+        update_data = play_updates.get(play_id) or {}
+        if play_data.get("play_type") == "motion" and "motion_focus" in update_data:
+            next_focus = update_data.get("motion_focus")
+            play_data["motion_focus"] = next_focus if next_focus in {"inside", "attack", "outside"} else None
+        if play_data.get("play_type") == "set_play" and "target_shooter" in update_data:
+            next_target = update_data.get("target_shooter")
+            if next_target in {"PG", "SG", "SF", "PF", "C"}:
+                play_data["target_shooter"] = next_target
+    return updated
+
+
+def _normalize_playbook_settings_payload(
+    incoming_playbook_settings: dict,
+    plays_by_id: dict,
+    plays_by_name: dict,
+) -> dict:
+    """Canonicalize an incoming playbook_settings dict for save or preview."""
+    playbook_settings = build_simplified_playbook_settings(
+        incoming_playbook_settings,
+        plays_by_id,
+        plays_by_name,
+    )
+    playbook_settings["motion"] = normalize_percentage_map_to_play_ids(
+        playbook_settings.get("motion", {}),
+        plays_by_id,
+        plays_by_name,
+    )
+    playbook_settings["set_plays"] = normalize_percentage_map_to_play_ids(
+        playbook_settings.get("set_plays", {}),
+        plays_by_id,
+        plays_by_name,
+    )
+    playbook_settings["fast_breaks"] = normalize_string_keyed_map(
+        playbook_settings.get("fast_breaks", {}),
+        {"Triangle": "triangle", "Rim Runner": "rim_runner", "Covert Release": "covert_release"},
+    )
+    playbook_settings["hc_traps"] = normalize_string_keyed_map(
+        playbook_settings.get("hc_traps", {}),
+        {"Standard Trap": "standard_trap", "Straight Pressure": "straight_pressure", "Standard Diamond": "standard_diamond", "Diamond": "standard_diamond"},
+    )
+    playbook_settings["zone_defense"] = normalize_string_keyed_map(
+        playbook_settings.get("zone_defense", {}),
+        {"2-3 Zone": "zone_23", "3-2 Zone": "zone_32", "1-3-1 Zone": "zone_131"},
+    )
+    playbook_settings["man_defense"] = normalize_string_keyed_map(
+        playbook_settings.get("man_defense", {}),
+        {"Man": "man_normal", "Man Pressure": "man_pressure", "Man Loose": "man_loose"},
+    )
+    playbook_settings["pc_order"] = normalize_pc_order(
+        playbook_settings.get("pc_order", {}),
+        plays_by_id,
+        plays_by_name,
+    )
+    playbook_settings["locks"] = normalize_playbook_locks(
+        incoming_playbook_settings.get("locks", playbook_settings.get("locks")),
+        plays_by_id,
+        plays_by_name,
+    )
+    if isinstance(incoming_playbook_settings.get("position_filters"), dict):
+        playbook_settings["position_filters"] = incoming_playbook_settings.get("position_filters", {})
+    playbook_settings["even_distribution_all"] = bool(
+        incoming_playbook_settings.get("even_distribution_all", False)
+    )
+    return playbook_settings
+
+
+@router.post("/api/playbooks/preview-shot-weights")
+def preview_playbook_shot_weights(request: PlaybookSettingsRequest):
+    """
+    Compute position_shot_weights for a draft playbook without saving.
+
+    Same payload shape as POST /api/playbooks. Intended for debounced live
+    preview on the Playbooks page (fire on settle, not per pointermove).
+    """
+    try:
+        incoming_playbook_settings = dict(request.playbook_settings or {})
+        from BackEnd.db import plays_collection
+
+        universal_plays = list(plays_collection.find({}, {"_id": 1, "name": 1}))
+        plays_by_id, plays_by_name = build_play_lookups_from_universal_plays(universal_plays)
+
+        playbook_settings = _normalize_playbook_settings_payload(
+            incoming_playbook_settings,
+            plays_by_id,
+            plays_by_name,
+        )
+
+        current_plays, _plays_team_id = _load_current_team_plays_for_save(
+            request.mode,
+            request.team_id,
+            franchise_id=request.franchise_id,
+            tournament_id=request.tournament_id,
+            game_id=request.game_id,
+        )
+        draft_plays = _apply_play_updates_to_plays(current_plays, request.play_updates)
+
+        return {
+            "success": True,
+            "position_shot_weights": compute_position_shot_weights(
+                playbook_settings,
+                draft_plays,
+            ),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing playbook shot weights: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.post("/api/playbooks")
 def save_playbooks(request: PlaybookSettingsRequest):
     """
@@ -3000,45 +3128,11 @@ def save_playbooks(request: PlaybookSettingsRequest):
         universal_plays = list(plays_collection.find({}, {"_id": 1, "name": 1}))
         plays_by_id, plays_by_name = build_play_lookups_from_universal_plays(universal_plays)
 
-        playbook_settings = build_simplified_playbook_settings(
+        playbook_settings = _normalize_playbook_settings_payload(
             incoming_playbook_settings,
             plays_by_id,
             plays_by_name,
         )
-        playbook_settings["motion"] = normalize_percentage_map_to_play_ids(
-            playbook_settings.get("motion", {}),
-            plays_by_id,
-            plays_by_name,
-        )
-        playbook_settings["set_plays"] = normalize_percentage_map_to_play_ids(
-            playbook_settings.get("set_plays", {}),
-            plays_by_id,
-            plays_by_name,
-        )
-        playbook_settings["fast_breaks"] = normalize_string_keyed_map(
-            playbook_settings.get("fast_breaks", {}),
-            {"Triangle": "triangle", "Rim Runner": "rim_runner", "Covert Release": "covert_release"},
-        )
-        playbook_settings["hc_traps"] = normalize_string_keyed_map(
-            playbook_settings.get("hc_traps", {}),
-            {"Standard Trap": "standard_trap", "Straight Pressure": "straight_pressure", "Standard Diamond": "standard_diamond", "Diamond": "standard_diamond"},
-        )
-        playbook_settings["zone_defense"] = normalize_string_keyed_map(
-            playbook_settings.get("zone_defense", {}),
-            {"2-3 Zone": "zone_23", "3-2 Zone": "zone_32", "1-3-1 Zone": "zone_131"},
-        )
-        playbook_settings["man_defense"] = normalize_string_keyed_map(
-            playbook_settings.get("man_defense", {}),
-            {"Man": "man_normal", "Man Pressure": "man_pressure", "Man Loose": "man_loose"},
-        )
-        playbook_settings["pc_order"] = normalize_pc_order(
-            playbook_settings.get("pc_order", {}),
-            plays_by_id,
-            plays_by_name,
-        )
-        if isinstance(incoming_playbook_settings.get("position_filters"), dict):
-            playbook_settings["position_filters"] = incoming_playbook_settings.get("position_filters", {})
-        playbook_settings["even_distribution_all"] = bool(incoming_playbook_settings.get("even_distribution_all", False))
         playbook_meta = playbook_settings.get("_meta", {})
         if not isinstance(playbook_meta, dict):
             playbook_meta = {}

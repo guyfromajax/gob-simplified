@@ -1,6 +1,6 @@
-## Playbooks Page (**verified 2026-06-13**)
+## Playbooks Page (**verified 2026-07-17**)
 
-> Verified vs code: canonical `playbook_settings` shape + `fast_breaks` defaults (triangle 34 / rim_runner 33 / covert_release 33) and defense maps (`zone_23/zone_32/zone_131`, `man_normal/man_pressure/man_loose`) match `initialize_playbook_settings`; normalization via `build_simplified_playbook_settings` (`playbook_settings_utils.py`); `slot_assignments` still present as compatibility output (not source of truth — `pc_order` is). **The canonical `playbook_settings` shape + seeded defaults are owned by `Mode_Init_System.md`; the derived likely-shot percentages are documented in the **"Likely Shot Percentages (Derived Output)"** section below.** This doc focuses on the **Playbooks page** persistence/normalization + franchise two-stage policy, and the player-facing shot-likelihood readout derived from those settings.
+> Verified vs code: canonical `playbook_settings` shape + `fast_breaks` defaults (triangle 34 / rim_runner 33 / covert_release 33) and defense maps (`zone_23/zone_32/zone_131`, `man_normal/man_pressure/man_loose`) match `initialize_playbook_settings`; normalization via `build_simplified_playbook_settings` (`playbook_settings_utils.py`); durable `locks` via `normalize_playbook_locks`; `slot_assignments` still present as compatibility output (not source of truth — `pc_order` is). **The canonical `playbook_settings` shape + seeded defaults are owned by `Mode_Init_System.md`; the derived likely-shot percentages are documented in the **"Likely Shot Percentages (Derived Output)"** section below.** This doc focuses on the **Playbooks page** persistence/normalization + franchise two-stage policy, and the player-facing shot-likelihood readout derived from those settings.
 
 ## Overview
 
@@ -36,11 +36,20 @@ playbook_settings = {
     "motion": {play_id: percentage},
     "set_plays": {play_id: percentage},
     "fast_breaks": {"triangle": 34, "rim_runner": 33, "covert_release": 33},
+    "hc_traps": {"standard_trap": 34, "straight_pressure": 33, "standard_diamond": 33},
     "man_defense": {defense_id: percentage},
     "zone_defense": {defense_id: percentage},
     "pc_order": {
         "offense": [play_id_1, play_id_2, ...],
         "defense": [defense_id_1, defense_id_2, ...]
+    },
+    "locks": {
+        "motion": [play_id, ...],
+        "set_plays": [play_id, ...],
+        "fast_breaks": [id, ...],
+        "hc_traps": [id, ...],
+        "man_defense": [defense_id, ...],
+        "zone_defense": [defense_id, ...],
     },
     "position_filters": {...},
     "even_distribution_all": bool,
@@ -51,6 +60,16 @@ playbook_settings = {
 Play-level metadata is stored on the team `plays` objects:
 - motion plays use `motion_focus`
 - set plays use `target_shooter`
+
+### Locks (durable)
+
+`locks` marks plays exempt from enforced redistribution on the Playbooks redesign UI. They are **persisted** with `playbook_settings` (not session-only).
+
+- Shape: per-section lists of locked ids (same id space as the percentage maps).
+- Normalized by `normalize_playbook_locks()` in `playbook_settings_utils.py` (accepts lists or `{id: truthy}` dicts; resolves play names → `play_id` for motion/set).
+- `GET /api/playbooks` returns `locks`.
+- `POST /api/playbooks` persists `locks` from the save payload. Until the redesign UI sends them, saves typically write empty lists (safe — no existing locks yet).
+- Gameplay engines do not read locks; UI arithmetic only.
 
 ## Play Loading
 
@@ -134,6 +153,7 @@ This applies to:
 - defense percentages
 - fast break percentages
 - Playcall Center ordering for offense and defense
+- locks
 - motion focus
 - target shooter
 
@@ -143,7 +163,7 @@ Gameplay changes do not write back to `FTD`. FCC remains the franchise master ed
 
 This is the **likely-shot-percentage** readout produced *from* this page's settings — a player-facing planning aid, **not** a gameplay input (the live shot engine does not read it). It answers: *based on the user's current Playbooks weighting + offensive Playcall Center assignments, how likely is each position (`PG/SG/SF/PF/C`) to be the shot-taker?* Two outputs are derived: `Playbooks` and `Playcall Center`.
 
-> **Verified vs `playbook_weights_utils.py` (2026-06-13) — algorithm matches exactly:** 60% target / 40%-by-frequency (`_calculate_single_play_distribution` L197/L201), zero-non-success → 100%, target-shooter priority (successful skeleton → team → universal, `_resolve_target_shooter`), `pos1-4`-preferred / skeleton-fallback, even Playcall split (`100/N`), floor+largest-remainder rounding (`_round_weights_to_100`), `WEIGHTS_ALGORITHM_VERSION = 1`, `NON_SUCCESS_VARIANTS=(mid_play_change, contested, broken)`, cache invalidation via `weights_cache_is_stale`. Endpoints `GET /api/playbooks` (gameplan_routes.py L1813) + `POST /api/playbooks` (L2964) confirmed. Read by 3 surfaces: Playbooks page, Set Lineup, FCC Playbooks tab.
+> **Verified vs `playbook_weights_utils.py` (2026-07-17) — algorithm matches exactly:** 60% target / 40%-by-frequency (`_calculate_single_play_distribution`), zero-non-success → 100%, target-shooter priority (successful skeleton → team → universal, `_resolve_target_shooter`), `pos1-4`-preferred / skeleton-fallback, even Playcall split (`100/N`), floor+largest-remainder rounding (`_round_weights_to_100`), `WEIGHTS_ALGORITHM_VERSION = 1`, `NON_SUCCESS_VARIANTS=(mid_play_change, contested, broken)`, cache invalidation via `weights_cache_is_stale`. Endpoints: `GET /api/playbooks`, `POST /api/playbooks` (persists cache), `POST /api/playbooks/preview-shot-weights` (draft compute, no write). Read by 3 surfaces: Playbooks page, Set Lineup, FCC Playbooks tab.
 
 These values are:
 
@@ -251,6 +271,7 @@ Internal aggregation uses floats; stored output is integer percentages. After fl
 The cache stays dynamic in two ways:
 
 - **User-driven changes:** recomputed whenever the user saves Playbooks via `POST /api/playbooks` (percentage changes, Playcall Center ordering changes, set-play `target_shooter` changes).
+- **Live draft preview (no save):** `POST /api/playbooks/preview-shot-weights` accepts the same body as save (`mode`, `team_id`, ids, `playbook_settings`, optional `play_updates`), runs `compute_position_shot_weights` on the draft (with in-memory play updates), and returns `{ success, position_shot_weights }` **without writing** to DB or GameManager. The Playbooks redesign page should call this on settle (slider `pointerup`, % commit, normalize) — not per `pointermove`.
 - **Play-definition changes:** universal play DB changes can alter the result even if the user changes nothing. The system stores `algorithm_version` + `source_hash`; `GET /api/playbooks` recomputes a fresh result and compares cache metadata. If missing/stale, it refreshes `playbook_settings.position_shot_weights` and persists it back through canonical `playbook_settings`.
 
 ### Persistence (Franchise / Tournament / Single)

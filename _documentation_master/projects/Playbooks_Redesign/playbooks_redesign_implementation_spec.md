@@ -45,6 +45,14 @@ Where this doc and D2 disagree, **this doc wins**, except where a decision below
 
 Payload grows: existing `playbook_settings` maps stay; add **locks** (durable per-play) and keep computing `position_shot_weights` server-side only.
 
+**Backend landed (2026-07-17 on `develop`):**
+
+| Piece | Detail |
+| --- | --- |
+| `locks` shape | `{ motion/set_plays/fast_breaks/hc_traps/man_defense/zone_defense: [id, ...] }` via `normalize_playbook_locks` |
+| GET/POST `/api/playbooks` | Round-trips `locks` |
+| Preview | `POST /api/playbooks/preview-shot-weights` — same body as save; returns weights; **no write** |
+
 ---
 
 ## 1. Ship this first, independently
@@ -322,17 +330,17 @@ There are **9** `playSound` call sites in `playbooks.js` today. Sort is deleted 
 
 ## 10. Suggested sequence
 
-1. **CMD fix** (§2) — own commit/PR (playbooks + FCC colors + Set Lineup)
-2. **Shared tokens sheet** (§9) if not landed in step 1
-3. **Backend:** locks persistence + shot-weights preview endpoint
-4. **Tile component** (§4) + tile states
+1. ~~**CMD fix** (§2)~~ — done (PR #570)
+2. ~~**Shared CMD tokens**~~ — done (`css/playbook-cmd.css` + `getPlaybookCmdClass`)
+3. ~~**Backend:** locks + shot-weights preview~~ — done on `develop`
+4. **Tile component** (§4) + tile states ← **next**
 5. **Enforced model** (§3) — inactive-row filter from day one
 6. **PCC single-source** (§6) — delete `syncSelectionFromPcOrder`; drop sort
-7. **Page layout** (§7) — tabs, rail, live shot-weights strip, D2 ready indicator
+7. **Page layout** (§7) — tabs, rail, live shot-weights strip (wire preview endpoint), D2 ready indicator
 8. **Read-only venue filters** — FCC + Set Lineup `percentage > 0 || inPCC`
 9. **SFX pass** (§8) — 8 remaining sites (sort dropped)
 10. **Toast** replacing save-confirm modal
-11. **Docs** — `Playbooks_Page.md` + this spec
+11. **Docs** — keep `Playbooks_Page.md` + this spec current as UI lands
 
 ---
 

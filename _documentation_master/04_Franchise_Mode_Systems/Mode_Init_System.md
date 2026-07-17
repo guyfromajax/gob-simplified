@@ -1,6 +1,6 @@
 ## Mode Initialization System (**verified 2026-06-13**)
 
-> Verified vs code: `initialize_playbook_settings()` (`gameplan_routes.py` L678) seeds the documented shape (`motion`/`set_plays`/`fast_breaks`/`zone_defense`/`man_defense`/`pc_order{offense,defense}`/`position_filters{standard,PG,SG,SF,PF,C}`/`_meta`) with offense seeded by `play_id` via `SEEDED_OFFENSE_PLAY_IDS`; team play copies (`team_manager.py` ~L636-666) carry `play_focus`, `target_shooter`, and per-team `effectiveness`/`momentum`/`cloaking` + stats containers. (Code also includes an `even_distribution_all` toggle and `_meta.schema_version: 2` not listed in the shape below.)
+> Verified vs code: `initialize_playbook_settings()` (`gameplan_routes.py`) seeds the documented shape (`motion`/`set_plays`/`fast_breaks`/`hc_traps`/`zone_defense`/`man_defense`/`pc_order`/`locks`/`position_filters`/`_meta`) with offense seeded by `play_id` via `SEEDED_OFFENSE_PLAY_IDS`; team play copies (`team_manager.py`) carry `play_focus`, `target_shooter`, and per-team `effectiveness`/`momentum`/`cloaking` + stats containers. (Also `even_distribution_all` + `_meta.schema_version: 2`.)
 
 ## Overview
 
@@ -62,6 +62,14 @@ Current default shape:
         "offense": [play_id, ...],
         "defense": ["Man", "2-3 Zone", ...]
     },
+    "locks": {
+        "motion": [],
+        "set_plays": [],
+        "fast_breaks": [],
+        "hc_traps": [],
+        "man_defense": [],
+        "zone_defense": [],
+    },
     "_meta": {...},
     "position_filters": {
         "standard": [play_id, ...],
@@ -86,6 +94,7 @@ Default offense seed behavior:
 - **`man_defense`**: `man_normal` 100 / `man_pressure` 0 / `man_loose` 0.
 - **`position_filters`**: `standard` + `PG/SG/SF/PF/C`, each storing `play_id` arrays (filtered to plays that exist in the universal collection); legacy-curated, not yet metadata-generated.
 - **`pc_order`**: starts empty (`offense: []`, `defense: []`).
+- **`locks`**: empty per-section lists (Playbooks redesign durable lock state; UI-only arithmetic).
 - **`even_distribution_all`**: macro toggle defaults to `True`.
 
 ## Strategy Settings

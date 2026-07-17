@@ -26,6 +26,16 @@ PLAYBOOK_PERCENTAGE_KEYS = (
     "set_plays",
 )
 
+# Sections that may carry durable per-play locks (Playbooks redesign enforced model).
+PLAYBOOK_LOCK_SECTION_KEYS = (
+    "motion",
+    "set_plays",
+    "fast_breaks",
+    "hc_traps",
+    "man_defense",
+    "zone_defense",
+)
+
 LEGACY_SET_PLAY_KEYS = (
     "set_play_inside",
     "set_play_attack",
@@ -267,6 +277,105 @@ def merge_percentage_maps(*maps: Dict[str, Any] | None) -> Dict[str, Any]:
     return merged
 
 
+def empty_playbook_locks() -> Dict[str, List[str]]:
+    """Canonical empty locks object — every percentage section has a list."""
+    return {key: [] for key in PLAYBOOK_LOCK_SECTION_KEYS}
+
+
+def _resolve_lock_entry_id(
+    raw_key: Any,
+    *,
+    section_key: str,
+    plays_by_id: Dict[str, Dict[str, Any]],
+    plays_by_name: Dict[str, Dict[str, Any]],
+    aliases: Dict[str, str],
+) -> str | None:
+    if raw_key is None:
+        return None
+    key = str(raw_key).strip()
+    if not key:
+        return None
+
+    if section_key in ("motion", "set_plays"):
+        if key in plays_by_id:
+            return key
+        play_data = plays_by_name.get(key)
+        if isinstance(play_data, dict):
+            play_id = play_data.get("play_id") or play_data.get("_id")
+            if play_id:
+                return str(play_id)
+        return key
+
+    return aliases.get(key, key)
+
+
+def normalize_playbook_locks(
+    raw_locks: Any,
+    plays_by_id: Dict[str, Dict[str, Any]] | None,
+    plays_by_name: Dict[str, Dict[str, Any]] | None,
+) -> Dict[str, List[str]]:
+    """
+    Normalize durable playbook locks into:
+
+        {
+          "motion": [play_id, ...],
+          "set_plays": [...],
+          "fast_breaks": [...],
+          "hc_traps": [...],
+          "man_defense": [...],
+          "zone_defense": [...],
+        }
+
+    Accepts per-section lists of ids/names, or dicts of id → truthy (locked).
+    Missing / invalid input → empty lists. Order preserved; duplicates dropped.
+    """
+    locks = empty_playbook_locks()
+    if not isinstance(raw_locks, dict):
+        return locks
+
+    plays_by_id = plays_by_id or {}
+    plays_by_name = plays_by_name or {}
+    section_aliases = {
+        "motion": {},
+        "set_plays": {},
+        "fast_breaks": FAST_BREAK_ID_ALIASES,
+        "hc_traps": HCT_TRAP_ID_ALIASES,
+        "man_defense": {**{v: k for k, v in MAN_DEFENSE_ID_TO_NAME.items()}, **{k: k for k in MAN_DEFENSE_ID_TO_NAME}},
+        "zone_defense": {**{v: k for k, v in ZONE_DEFENSE_ID_TO_NAME.items()}, **{k: k for k in ZONE_DEFENSE_ID_TO_NAME}},
+    }
+
+    for section_key in PLAYBOOK_LOCK_SECTION_KEYS:
+        raw_section = raw_locks.get(section_key)
+        aliases = section_aliases[section_key]
+        seen: set[str] = set()
+        normalized_ids: List[str] = []
+
+        def _append(raw_id: Any) -> None:
+            resolved = _resolve_lock_entry_id(
+                raw_id,
+                section_key=section_key,
+                plays_by_id=plays_by_id,
+                plays_by_name=plays_by_name,
+                aliases=aliases,
+            )
+            if not resolved or resolved in seen:
+                return
+            seen.add(resolved)
+            normalized_ids.append(resolved)
+
+        if isinstance(raw_section, list):
+            for entry in raw_section:
+                _append(entry)
+        elif isinstance(raw_section, dict):
+            for raw_id, flag in raw_section.items():
+                if flag:
+                    _append(raw_id)
+
+        locks[section_key] = normalized_ids
+
+    return locks
+
+
 def normalize_pc_order(
     pc_order: Dict[str, Any] | None,
     plays_by_id: Dict[str, Dict[str, Any]] | None,
@@ -455,6 +564,12 @@ def build_simplified_playbook_settings(
         "schema_version": meta.get("schema_version", 2),
     }
 
+    locks = normalize_playbook_locks(
+        playbook_settings.get("locks"),
+        plays_by_id,
+        plays_by_name,
+    )
+
     return {
         "motion": motion,
         "set_plays": set_plays,
@@ -463,6 +578,7 @@ def build_simplified_playbook_settings(
         "man_defense": man_defense,
         "zone_defense": zone_defense,
         "pc_order": pc_order,
+        "locks": locks,
         "_meta": meta,
     }
 

@@ -387,6 +387,7 @@ def _transform_playbook_api_response_to_db_structure(playbook_settings: dict) ->
         "man_defense": {...},
         "zone_defense": {...},
         "pc_order": {"offense": [...], "defense": [...]},
+        "locks": {section: [id, ...]},
         "position_filters": {...},
         "even_distribution_all": bool,
         "_meta": {...}
@@ -423,6 +424,7 @@ def _transform_playbook_api_response_to_db_structure(playbook_settings: dict) ->
             "zone_defense": percentages.get("zone_defense", {}),
             "man_defense": percentages.get("man_defense", {}),
             "pc_order": playbook_settings.get("pc_order"),
+            "locks": playbook_settings.get("locks"),
             "slot_assignments": playbook_settings.get("slot_assignments", {}),
             "position_filters": playbook_settings.get("position_filters", {}),
             "even_distribution_all": playbook_settings.get("even_distribution_all", False),
@@ -432,6 +434,7 @@ def _transform_playbook_api_response_to_db_structure(playbook_settings: dict) ->
     canonical = build_simplified_playbook_settings(source, {}, {})
     canonical["position_filters"] = dict(source.get("position_filters", {}) or {})
     canonical["even_distribution_all"] = bool(source.get("even_distribution_all", False))
+    # locks are included by build_simplified_playbook_settings
 
     logger.info("✅ [UNIFIED-SETTINGS] Normalized playbook request to simplified canonical structure")
     return canonical
