@@ -13889,6 +13889,60 @@ def sim_championship(req: SimChampionshipRequest):
 
 
 @router.post("/franchise/finish-season")
+def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):
+    """Eager-paint the USER team's freshly-signed players' uniform masters at
+    rollover, so their portraits are already in R2 the instant they open their
+    roster next season — matching the "already baked" experience of the original
+    start-of-franchise players. CPU opponents stay lazy (painted on first view).
+
+    Best-effort and self-contained: any failure is logged and swallowed so a
+    portrait paint can never break the season transition. Mirrors the paint in
+    player_image_routes.ensure_player_image, minus the HTTP layer."""
+    from BackEnd.services import recruit_image, r2_images
+
+    if not r2_images.is_configured():
+        return
+    user_team_id = str(franchise_doc.get("user_team_id") or "")
+    if not user_team_id:
+        return
+    to_warm = [
+        s for s in signed_players
+        if str(s.get("team_id") or "") == user_team_id and s.get("image_id") and s.get("player_id")
+    ]
+    if not to_warm:
+        return
+
+    team = db.teams.find_one({"_id": ObjectId(user_team_id)}) if ObjectId.is_valid(user_team_id) else None
+    if not team:
+        return
+    primary = team.get("primary_color", "#000000")
+    secondary = team.get("secondary_color", "#ffffff")
+    wordmark = team.get("mascot", "")
+
+    painted = 0
+    for s in to_warm:
+        player_id = str(s["player_id"])
+        image_id = s["image_id"]
+        master_key = f"players/master/{player_id}.png"
+        try:
+            if r2_images.exists(master_key):
+                continue
+            kit_key = f"recruits/kit/{image_id}.png"
+            mask_key = f"recruits/kit/{image_id}.mask.png"
+            if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
+                continue
+            master = recruit_image.make_signed_master(
+                r2_images.get(kit_key), r2_images.get(mask_key), primary, secondary, wordmark)
+            r2_images.put(master_key, master)
+            painted += 1
+        except Exception:
+            logger.exception("[IMG-WARM] paint failed franchise_id=%s player_id=%s",
+                              str(franchise_id), player_id)
+    if painted:
+        logger.info("[IMG-WARM] pre-painted %s user signings franchise_id=%s",
+                    painted, str(franchise_id))
+
+
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""
     try:
@@ -14137,6 +14191,14 @@ def finish_season(req: FinishSeasonRequest):
     franchise_players_data_collection.delete_many({"franchise_id": str(franchise_id)})
     if next_fpd_docs:
         franchise_players_data_collection.insert_many(next_fpd_docs)
+
+    # Eager-warm the user's own signed players' uniform masters (best-effort, never
+    # blocks the transition on a portrait paint) so their new signings are already
+    # painted when they open next season's roster. Opponents paint lazily on view.
+    try:
+        _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players)
+    except Exception:
+        logger.exception("[IMG-WARM] eager paint pass failed franchise_id=%s", str(franchise_id))
 
     fm = FranchiseManager(db)
     fm.franchise_id = franchise_id
