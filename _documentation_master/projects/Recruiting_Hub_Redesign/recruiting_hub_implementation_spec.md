@@ -29,7 +29,7 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 | **1** | D1 The Spine: pool (~300 recruits, region A–H collapse, sort/filter, condensed variant) + assembled shell | **DONE** — `recruiting-hub.js` took over `recruiting.html`; real data; headless render + interaction verified |
 | **2** | D2 Invite Dock (wks 20–26) — merge Orders pages into one hub dock | **DONE** — no backend decouple (see below); dock built in hub, render+interactions verified |
 | **3** | D3 Signing Board (wk 35) — pool-as-worksheet, 50-pt budget, binding Playing-Time promise, live sign-odds | **DONE** — signing surface in hub; wired to existing wk-35 save+run; verified |
-| 4 | D4 Results — hub **states** (weekly overlay + wk-36 signed pool), not a route | pending |
+| **4** | D4 Results — hub **states** (weekly overlay + wk-36 signed pool), not a route | **DONE** — calendar-driven states, real data, verified |
 | 5 | D5 Consistency sweep — FCC Recruits tab + Home/Coach cards + tutorial (Signing Day rename, 50-pt, no cap) | pending |
 | 6 | Training Report recent-leans callout — reuse the ladder markup | pending |
 
@@ -61,6 +61,13 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 - **Odds are a placeholder** (`signOdds`, isolated/swappable): `base(standing) + points·2.2 + (promise?18:0)`, bands Strong≥72 / In-the-Mix≥48 / Slim≥26 / Long-shot. Real signing math is league-relative (`(1+points+PT_bonus)·lean_mult`, weighted-random finalists) → an absolute per-recruit % isn't client-computable; the placeholder is directionally consistent. Swap-in = a deferred enhancement.
 - **Roster-cap divergence (noted, not fixed):** funding is uncapped (bound by 50 pts) per the design, but the backend signing engine hard-caps actual signings at a 15-man roster. Consistent with the prompt's "no recruit cap" (that's about funding); surfacing available roster spots is a possible later enhancement.
 - Verified headless @wk35: auto-fill, stepper budget-cap (all `+` disable at 0), promise toggle, live odds recompute, rail add/remove/jump, Submit dual-POST payloads; zero console errors.
+
+## Prompt 4 — shipped
+- Results are **calendar-driven hub states** (no route added; the demo's top toggle was not built). `recruiting-results-hub.css` loaded. Prompt-1 transition docks (day/results) removed — those phases are now real bodies.
+- **Weekly-visit panel (wks 20–26):** shows when `current_results_week === week` (and not dismissed this session — no backend seen-flag for 20–26). Lazily fetches `GET /franchise/recruiting-results?week=N` (region→conference→team visit tree), then renders: your visit (user team's visit from the tree; "now leaning you at #N" if it leans), what changed (`new_lean_recruit_ids` count + leaner total + invites left), and contested region activity (your leaners a rival visited this week, grouped by region, ≤4). Sits **above the live pool + invite dock**; "Back to hub" / the Recruit Pool anchor dismisses it (`onDismiss`) and scrolls to the pool.
+- **Wk-36 final signings (phase `results`):** replaces pool/dock with the signings board — summary tiles (signings to you / targets won / targets lost / leaned) + filter chips (all / signed-with-you / your-targets) + signed table (standing chip, "Signed with" logo+team, Signed/Lost outcome), won-first sort. Data: `week_35_recruiting_results.signed_by_recruit_id` ∩ `recruits`, `withYou = team_id === user team_id`. Rows = **signed recruits only** (walk-ons/unsigned excluded; unsigned targets still counted in "targets lost").
+- Verified headless: wk-36 summary/filters/won-lost + wk-22 weekly panel overlay/dismiss over a live pool; zero console errors.
+- **Deferred to final cutover (Prompt 5):** FCC's weekly-results "Recruiting" button (wks 20–26) still links to the old `recruiting-results.html`; repoint it (and retire `recruiting-invites/orders/results.html`) in the consistency sweep. The hub states are reachable via the FCC home-card / recruits-tab (→ recruiting.html) today.
 
 ## Deferred backend items (do NOT bury in a UI prompt)
 1. ~~Invite-loop decouple~~ — **decided AGAINST** (Prompt 2). Execution stays in Run Training by design; do not relocate it.

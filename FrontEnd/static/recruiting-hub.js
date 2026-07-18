@@ -35,7 +35,10 @@
     drag: { from: null, over: null },
     // Signing Day (wk 35)
     alloc: {},                       // { recruitId: {points, promise} }
-    sTab: 'mine', sRegion: 'all', sSearch: '', week35Ran: false, flashId: null
+    sTab: 'mine', sRegion: 'all', sSearch: '', week35Ran: false, flashId: null,
+    // Results (D4)
+    currentResultsWeek: null, weeklyDismissed: false, visitTree: null,
+    week35Results: {}, signFilter: 'all'
   };
   var SIGN = { TOTAL: 50, MAX_PER: 20, PROMISE_W: 18 };
 
@@ -49,13 +52,9 @@
   var INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5v.5"></path></svg>';
   var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"></path></svg>';
 
-  // Transition routing for signing/results (invite is a real dock, handled separately).
-  function transitionDock(phase) {
-    if (phase === 'day') return { pill: 'Signing Day', tag: 'Signing Board', page: 'recruiting-orders.html', cta: 'Open Signing Board', desc: 'Spend your 50 points and make binding promises. Opens in the current page until it docks here.' };
-    if (phase === 'results') return { pill: 'Results', tag: 'Signing Results', page: 'recruiting-results.html', cta: 'View Signing Results', desc: 'Signings are final. Full results open in the current page until they dock here.' };
-    return null;
-  }
-  function hasDock() { return boardActive() || !!transitionDock(state.phase); }
+  // Only the invite phase uses the standard pool+dock layout. Signing (day) and Results
+  // are their own full-width bodies, handled in renderShell.
+  function hasDock() { return boardActive(); }
 
   // ===================== POOL =====================
   function filteredRecruits() {
@@ -246,17 +245,9 @@
       '<div class="idock-foot"><button class="idock-clear" id="dock-clear" type="button">Clear</button>' +
         '<button class="idock-save" id="dock-save" type="button">Save Board</button></div></aside>';
   }
-  function transitionDockHtml() {
-    var d = transitionDock(state.phase); if (!d) return '';
-    var href = Common.buildRecruitingUrl(d.page, context);
-    return '<div class="dock-ph"><span class="pill">' + d.pill + '</span><span class="tag">' + d.tag + '</span>' +
-      '<span class="desc">' + d.desc + '</span>' +
-      '<a class="hub-anchor" style="margin:0;text-decoration:none" href="' + Common.escapeHtml(href) + '">' + d.cta + ' →</a></div>';
-  }
   function renderDock() {
     var host = document.getElementById('hub-dock'); if (!host) return;
-    if (boardActive()) { host.innerHTML = inviteDockHtml(); bindDock(host); }
-    else host.innerHTML = transitionDockHtml();
+    host.innerHTML = inviteDockHtml(); bindDock(host);
   }
   function bindDock(host) {
     host.querySelectorAll('.islot-remove').forEach(function (b) { b.addEventListener('click', function () { removeFromBoard(this.dataset.id); }); });
@@ -483,17 +474,148 @@
     });
   }
 
+  // ===================== RESULTS (D4) =====================
+  // ---- Week-36 final signings ----
+  function signStandChip(r, cls) {
+    cls = cls || 'sstand';
+    if (r.yourRank === 1) return '<span class="' + cls + ' you1">' + DOT_SVG + '#1</span>';
+    if (r.yourRank > 1) return '<span class="' + cls + ' list">#' + r.yourRank + '</span>';
+    return '<span class="' + cls + ' none">—</span>';
+  }
+  function signingsList() {
+    var signed = state.week35Results.signed_by_recruit_id || {};
+    return state.recruits.filter(function (r) { return signed[r.recruitId]; }).map(function (r) {
+      var info = signed[r.recruitId] || {};
+      var withYou = String(info.team_id) === String(state.userTeamId);
+      return { r: r, team: info.team_name || info.team_id || '—', withYou: withYou };
+    }).sort(function (a, b) { return (b.withYou - a.withYou) || ((b.r.rt || 0) - (a.r.rt || 0)); });
+  }
+  function finalSigningsHtml() {
+    var all = signingsList();
+    var won = all.filter(function (s) { return s.withYou; });
+    var targets = state.recruits.filter(function (r) { return r.leansToUser; });
+    var targetsWon = targets.filter(function (r) { var s = (state.week35Results.signed_by_recruit_id || {})[r.recruitId]; return s && String(s.team_id) === String(state.userTeamId); }).length;
+    var rows = state.signFilter === 'mine' ? all.filter(function (s) { return s.withYou; })
+      : state.signFilter === 'targets' ? all.filter(function (s) { return s.r.leansToUser; }) : all;
+    var chip = function (k, l) { return '<button class="chip' + (state.signFilter === k ? ' on' : '') + '" data-sfilter="' + k + '">' + l + '</button>'; };
+    var rowsHtml = rows.map(function (s) {
+      var r = s.r, ab = Spine.Lean.deriveAbbr(s.team);
+      return '<div class="srow' + (s.withYou ? ' win' : '') + '">' +
+        '<div class="sname"><span class="nm">' + Common.escapeHtml(r.name) + '</span></div>' +
+        '<span class="scol spos">' + Common.escapeHtml(r.pos) + '</span>' +
+        '<span class="scol sregion">' + regionOf(r) + '</span>' +
+        '<span class="scol srt"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + (r.rt != null ? r.rt : '--') + '</span></span>' +
+        '<span class="scol">' + signStandChip(r) + '</span>' +
+        '<div class="ssigned"><span class="logo ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(ab) + '</span>' +
+          '<span class="team ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(s.team) + '</span></div>' +
+        '<span class="soutcome ' + (s.withYou ? 'win' : 'loss') + '">' + (s.withYou ? 'Signed' : 'Lost') + '</span></div>';
+    }).join('') || '<div class="srow" style="grid-template-columns:1fr"><span style="color:var(--muted-3);padding:20px">No signings to show.</span></div>';
+    return '<div class="signings-wrap" style="margin:0 22px 22px;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--panel-2)">' +
+      '<div class="signsum"><div><div class="signsum-big"><span class="n">' + won.length + '</span><span class="of">signings</span></div>' +
+        '<div class="signsum-cap">To ' + Common.escapeHtml(state.teamName || 'your program') + '</div></div>' +
+        '<div class="signsum-breakdown">' +
+          '<div class="ssb"><span class="v win">' + targetsWon + '</span><span class="l">Targets won</span></div>' +
+          '<div class="ssb"><span class="v loss">' + (targets.length - targetsWon) + '</span><span class="l">Targets lost</span></div>' +
+          '<div class="ssb"><span class="v">' + targets.length + '</span><span class="l">Leaned to you</span></div></div></div>' +
+      '<div class="sign-filter">' + chip('all', 'All signings') + chip('mine', 'Signed with you') + chip('targets', 'Your targets') + '</div>' +
+      '<div class="signtable"><div class="shdr"><span>Recruit</span><span class="c">Pos</span><span class="c">Region</span><span class="c">RT</span>' +
+        '<span class="c">Your standing</span><span>Signed with</span><span></span></div>' + rowsHtml + '</div></div>';
+  }
+  function bindSignings() {
+    document.querySelectorAll('[data-sfilter]').forEach(function (b) { b.addEventListener('click', function () { state.signFilter = this.dataset.sfilter; document.getElementById('hub-signings').innerHTML = finalSigningsHtml(); bindSignings(); }); });
+  }
+
+  // ---- Weekly-visit results panel (wks 20-26) ----
+  function showWeeklyPanel() { return state.phase === 'invite' && state.currentResultsWeek === state.week && !state.weeklyDismissed; }
+  function weeklyPanelHtml() {
+    var tree = state.visitTree;
+    if (!tree) return '<div class="wpanel"><div class="wpanel-head"><div class="wpanel-title"><small>Loading</small>This Week\'s Results</div></div></div>';
+    // Flatten team visits → your visit + a recruit→visitors map.
+    var yourVisit = null, visitors = {};
+    (tree.regions || []).forEach(function (rg) {
+      (rg.conferences || []).forEach(function (cf) {
+        (cf.teams || []).forEach(function (t) {
+          if (!t.visit) return;
+          var rid = String(t.visit.recruit_id);
+          (visitors[rid] = visitors[rid] || []).push({ team_id: String(t.team_id), team_name: t.team_name });
+          if (String(t.team_id) === String(state.userTeamId)) yourVisit = t.visit;
+        });
+      });
+    });
+    var mineCount = state.recruits.filter(function (r) { return r.leansToUser; }).length;
+    var invitesLeft = INVITE_WEEKS.filter(function (w) { return w > state.week; }).length;
+
+    // Hero: your visit
+    var heroVisit;
+    if (yourVisit) {
+      var vrec = state.byId[String(yourVisit.recruit_id)];
+      var leanNote = vrec && vrec.leansToUser ? 'now leaning you at <b>#' + (vrec.yourRank || 1) + '</b>. Odds up sharply.' : 'visit logged this week.';
+      heroVisit = '<div class="wvisit"><span class="wvisit-mark gain">' + ARROW_UP + '</span><div class="wvisit-body">' +
+        '<div class="nm">' + Common.escapeHtml(yourVisit.name) + '<span class="wmeta"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.escapeHtml(yourVisit.rt) + ' RT</span></div>' +
+        '<div class="sub">Visit landed — ' + leanNote + '</div></div></div>';
+    } else {
+      heroVisit = '<div class="wvisit"><div class="wvisit-body"><div class="nm">No visit this week</div><div class="sub">Your program didn\'t land a visit in Week ' + state.week + '.</div></div></div>';
+    }
+
+    // Contested region activity: your leaners a rival visited this week, grouped by region.
+    var byRegion = {};
+    state.recruits.filter(function (r) { return r.leansToUser; }).forEach(function (r) {
+      var v = visitors[String(r.recruitId)]; if (!v) return;
+      var rival = v.filter(function (x) { return x.team_id !== String(state.userTeamId); })[0];
+      (byRegion[regionOf(r)] = byRegion[regionOf(r)] || []).push({ r: r, rival: rival });
+    });
+    var regionsShown = REGION_ORDER.filter(function (rg) { return byRegion[rg]; }).slice(0, 4);
+    var regionHtml = regionsShown.map(function (rg) {
+      var visits = byRegion[rg].slice(0, 6).map(function (x) {
+        var rivalPart = x.rival
+          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name)) + '</span><span class="note threat">also visited — contested</span>'
+          : '<span class="note">no rival visits — clear lane</span>';
+        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You')) + '</span>' +
+          '<span class="who">' + Common.escapeHtml(x.r.name) + '</span><span class="arrow">·</span>' + rivalPart + '</div>';
+      }).join('');
+      return '<div class="wregion-row"><span class="wregion-tag">' + rg + '</span><div class="wregion-visits">' + visits + '</div></div>';
+    }).join('');
+    if (!regionHtml) regionHtml = '<div class="wregion-row"><div class="wregion-visits"><div class="wvrow"><span class="note">No contested visits among your leaners this week — clear lanes.</span></div></div></div>';
+
+    return '<div class="wpanel"><div class="wpanel-head"><span class="wpanel-badge">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h13l-2 4 2 4H4"></path></svg></span>' +
+        '<div class="wpanel-title"><small>Week ' + state.week + ' · Visits processed</small>This Week\'s Results</div>' +
+        '<button class="wpanel-dismiss" id="weekly-dismiss">Back to hub</button></div>' +
+      '<div class="wpanel-hero"><div class="whero"><div class="whero-lbl">Your visit</div>' + heroVisit + '</div>' +
+        '<div class="whero"><div class="whero-lbl">What it changed</div><div class="wvisit"><span class="wvisit-mark gain">' + DOT_SVG + '</span>' +
+          '<div class="wvisit-body"><div class="nm">' + state.newLeanIds.size + ' new lean' + (state.newLeanIds.size === 1 ? '' : 's') + ' this week</div>' +
+          '<div class="sub"><b>' + mineCount + '</b> recruits now have your team on their list. ' + invitesLeft + ' invite' + (invitesLeft === 1 ? '' : 's') + ' left this season.</div></div></div></div></div>' +
+      '<div class="wregion">' + regionHtml + '</div></div>';
+  }
+  function dismissWeekly() {
+    state.weeklyDismissed = true;
+    var host = document.getElementById('hub-weekly'); if (host) host.innerHTML = '';
+    var pool = document.querySelector('.pool-wrap');
+    if (pool) window.scrollTo({ top: pool.getBoundingClientRect().top + window.scrollY - 60, behavior: 'smooth' });
+  }
+  function loadWeeklyPanel() {
+    var host = document.getElementById('hub-weekly'); if (!host) return;
+    var render = function () { host.innerHTML = weeklyPanelHtml(); var d = host.querySelector('#weekly-dismiss'); if (d) d.addEventListener('click', dismissWeekly); };
+    if (state.visitTree) { render(); return; }
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-results') + '?franchise_id=' + encodeURIComponent(context.franchiseId) + '&week=' + encodeURIComponent(state.week))
+      .then(function (tree) { state.visitTree = tree || {}; render(); })
+      .catch(function (err) { console.error(err); state.weeklyDismissed = true; host.innerHTML = ''; });
+  }
+
   // ===================== SHELL =====================
   function renderShell() {
     var root = document.getElementById('hub-root');
-    var signing = state.phase === 'day';
-    var body = signing
-      ? '<div class="hub-body-sign" id="hub-sign"></div>'
-      : '<div class="spine-body ' + (hasDock() ? 'with-dock' : 'no-dock') + '" style="padding-top:14px">' +
-          '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
-            (state.phase === 'passive' ? storyHtml() : '') +
-            '<div class="pool-wrap"><div id="hub-pool"></div></div></div>' +
-          (hasDock() ? '<div id="hub-dock"></div>' : '') + '</div>';
+    var signing = state.phase === 'day', results = state.phase === 'results';
+    var body;
+    if (signing) body = '<div class="hub-body-sign" id="hub-sign"></div>';
+    else if (results) body = '<div id="hub-signings"></div>';
+    else body =
+      (showWeeklyPanel() ? '<div id="hub-weekly"></div>' : '') +
+      '<div class="spine-body ' + (hasDock() ? 'with-dock' : 'no-dock') + '" style="padding-top:14px">' +
+        '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
+          (state.phase === 'passive' ? storyHtml() : '') +
+          '<div class="pool-wrap"><div id="hub-pool"></div></div></div>' +
+        (hasDock() ? '<div id="hub-dock"></div>' : '') + '</div>';
     root.innerHTML =
       '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
       '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;
@@ -503,9 +625,13 @@
     Spine.Phase.bind(phaseHost);
     var mount = document.getElementById('hub-anchor-mount');
     mount.innerHTML = Spine.Anchor.html();
-    Spine.Anchor.bind(mount.querySelector('.hub-anchor'), { poolSelector: signing ? '.spool' : '.pool-wrap' });
+    Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
+      poolSelector: signing ? '.spool' : results ? '.signings-wrap' : '.pool-wrap',
+      onDismiss: (!signing && !results) ? function () { if (showWeeklyPanel()) dismissWeekly(); } : null
+    });
     if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); bindSignBoard(); }
-    else { renderPool(); if (hasDock()) renderDock(); }
+    else if (results) { document.getElementById('hub-signings').innerHTML = finalSigningsHtml(); bindSignings(); }
+    else { renderPool(); if (hasDock()) renderDock(); if (showWeeklyPanel()) loadWeeklyPanel(); }
   }
 
   // ===================== INIT =====================
@@ -518,6 +644,9 @@
         state.week = Number(data.week || 1);
         state.phase = Spine.Phase.forWeek(state.week);
         state.userTeamId = data.team_id || context.teamId;
+        state.teamName = data.team || 'your program';
+        state.currentResultsWeek = data.current_results_week;
+        state.week35Results = data.week_35_recruiting_results || {};
         state.newLeanIds = new Set((data.new_lean_recruit_ids || []).map(String));
         var teamNameMap = data.team_name_map || {};
         state.recruits = Common.normalizeRecruits(data.recruits || [], teamNameMap).map(function (r) {
