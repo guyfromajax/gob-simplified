@@ -320,10 +320,69 @@ const API_CONFIG = {
       body: JSON.stringify({ franchise_id: franchiseId, player_id: playerId }),
     }).then((r) => r.json()).catch(() => ({ status: 'error' }));
   },
+
+  // Franchise id for the current page. Every franchise screen carries it as the
+  // `franchise_id` query param (that's how the whole app sources it); fall back
+  // to localStorage for the rare context that doesn't.
+  currentFranchiseId() {
+    try {
+      const q = new URLSearchParams(window.location.search).get('franchise_id');
+      if (q) return q;
+    } catch (e) { /* no window/search */ }
+    try { return localStorage.getItem('franchise_id') || null; } catch (e) { return null; }
+  },
 };
 
 // Make it globally available
 window.API_CONFIG = API_CONFIG;
+
+// --- Universal paint-on-miss -------------------------------------------------
+// Player/recruit masters are painted lazily (generate-on-miss). Rather than wire
+// the ensure->retry dance into every screen that renders a headshot, install ONE
+// delegated handler: any <img> that 404s on a canonical master URL is painted and
+// retried here, so every current and future render site is covered by default.
+//
+//   players/master/<player_id>.png   -> ensurePlayerImage(franchise_id, player_id)
+//   recruits/white/<image_id>.png    -> ensureRecruitImage(image_id)
+//
+// Error events don't bubble, so we listen in the CAPTURE phase (3rd arg true).
+// On the first miss we take over (stopImmediatePropagation) so the site's own
+// onerror->generic fallback doesn't clobber the retry; if the paint fails and the
+// retry 404s again, we've restored the site's handler and no longer intercept, so
+// its normal fallback (generic / initials / hide) runs exactly as before.
+(function installPaintOnMiss() {
+  if (typeof document === 'undefined') return;
+  const MASTER_RE = /players\/master\/([^/.?]+)\.png/;
+  const WHITE_RE = /recruits\/white\/([^/.?]+)\.png/;
+
+  document.addEventListener('error', function (e) {
+    const img = e.target;
+    if (!img || img.tagName !== 'IMG') return;
+    if (img.dataset.gobPaintTried) return;                 // already attempted once
+    const src = img.currentSrc || img.getAttribute('src') || '';
+
+    const pm = src.match(MASTER_RE);
+    const rw = pm ? null : src.match(WHITE_RE);
+    if (!pm && !rw) return;                                 // not a canonical master — leave it alone
+
+    img.dataset.gobPaintTried = '1';
+    e.stopImmediatePropagation();                          // suppress the site's onerror until we've retried
+    const originalOnerror = img.onerror;                   // preserve the site's fallback for a failed retry
+
+    const retry = function () {
+      // Restore the site's own fallback so a still-missing master degrades as it
+      // always did, then re-request the (now hopefully painted) master. A cache-
+      // buster forces a fresh origin fetch past any cached 404.
+      img.onerror = originalOnerror;
+      img.src = src + (src.indexOf('?') === -1 ? '?' : '&') + 'gobr=1';
+    };
+
+    const ensure = pm
+      ? API_CONFIG.ensurePlayerImage(API_CONFIG.currentFranchiseId(), pm[1])
+      : API_CONFIG.ensureRecruitImage(rw[1]);
+    ensure.then(retry, retry);
+  }, true);
+})();
 
 (function loadCaptureBootstrap() {
   if (typeof document === 'undefined' || !API_CONFIG.isCaptureEnv()) return;

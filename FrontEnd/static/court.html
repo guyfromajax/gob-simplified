@@ -5343,7 +5343,7 @@
           if (shooterId) {
             const headshotImg = playOption.querySelector('.play-headshot');
             if (headshotImg) {
-              const imgPath = API_CONFIG.buildStaticPath(`/images/players/${shooterId}.png`);
+              const imgPath = API_CONFIG.getPlayerImageUrl(shooterId, { size: 'card' });
               headshotImg.setAttribute('data-player-id', shooterId);
               // Team-aware initials fallback when the per-player photo fails;
               // matches the announcement system + v2 on-court sprite rule.
@@ -7171,7 +7171,7 @@
       
       // Set player image — team-aware initials fallback when the per-player
       // photo fails (matches announcement system + v2 on-court sprite rule).
-      const tooltipImgSrc = API_CONFIG.buildStaticPath(`/images/players/${playerId}.png`);
+      const tooltipImgSrc = API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' });
       window.applyHeadshotFallback(image, tooltipImgSrc, window.buildPlaycallInitialsInfo(playerId));
       
       // Energy (NG)
@@ -7262,7 +7262,7 @@
       
       // Set intended shooter headshot
       if (data.intendedShooterId) {
-        const photoUrl = API_CONFIG.buildStaticPath(`/images/players/${data.intendedShooterId}.png`);
+        const photoUrl = API_CONFIG.getPlayerImageUrl(data.intendedShooterId, { size: 'card' });
         headshotEl.style.display = 'block';
         // Team-aware initials fallback when the per-player photo fails;
         // matches the announcement system + v2 on-court sprite rule.
