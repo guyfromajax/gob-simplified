@@ -6876,6 +6876,13 @@ def delete_current_franchise(user: dict = Depends(get_current_user)):
     if not doc:
         return {"deleted": False, "count": 0}
     fid = doc["_id"]
+    # GC this franchise's painted signed-recruit masters from R2 before wiping FPD
+    # (the helper reads FPD to find the keys). Best-effort — never blocks the delete.
+    try:
+        from BackEnd.api.player_image_routes import delete_signed_masters_for_franchise
+        delete_signed_masters_for_franchise(fid)
+    except Exception:
+        logger.exception("[IMG-GC] cleanup failed on franchise delete fid=%s", str(fid))
     # FTD stores franchise_id as ObjectId; FPD/FRD store as string; games store franchise_id as string
     franchise_team_data_collection.delete_many({"franchise_id": fid})
     franchise_players_data_collection.delete_many({"franchise_id": str(fid)})

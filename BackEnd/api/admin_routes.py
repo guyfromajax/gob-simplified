@@ -4,6 +4,7 @@ Admin API (Step 12.2).
 All endpoints require role=admin (get_admin_user).
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +59,14 @@ def reset_user_state(
     franchises_deleted = 0
     for doc in franchise_docs:
         fid = doc["_id"]
+        # GC this franchise's painted signed-recruit masters from R2 before wiping
+        # FPD (the helper reads FPD to find the keys). Best-effort.
+        try:
+            from BackEnd.api.player_image_routes import delete_signed_masters_for_franchise
+            delete_signed_masters_for_franchise(fid)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "[IMG-GC] cleanup failed on admin franchise delete fid=%s", str(fid))
         # FTD uses ObjectId; FPD/FRD use string franchise_id
         franchise_team_data_collection.delete_many({"franchise_id": fid})
         franchise_players_data_collection.delete_many({"franchise_id": str(fid)})

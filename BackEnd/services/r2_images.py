@@ -56,3 +56,18 @@ def put(key: str, data: bytes, content_type: str = "image/png") -> None:
     s3, bucket = _s3()
     s3.put_object(Bucket=bucket, Key=key, Body=data,
                   ContentType=content_type, CacheControl=CACHE_CONTROL)
+
+
+def delete(key: str) -> bool:
+    """Delete an object. Returns True if the object existed and was removed, False
+    if it was already absent. Idempotent — deleting a missing key is not an error."""
+    s3, bucket = _s3()
+    from botocore.exceptions import ClientError
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
+    s3.delete_object(Bucket=bucket, Key=key)
+    return True
