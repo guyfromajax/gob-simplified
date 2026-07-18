@@ -1358,7 +1358,8 @@ async function initializeTrainingPoints() {
               if (teamId) params.set('team_id', teamId);
               params.set('from', 'training');
               params.set('session_type', urlParams.get('session_type') || 'in-season');
-              window.location.href = `/recruiting-invites.html?${params.toString()}`;
+              // Recruiting Hub owns the invite board now (D2). Was recruiting-invites.html.
+              window.location.href = `/recruiting.html?${params.toString()}`;
             };
           }
         }

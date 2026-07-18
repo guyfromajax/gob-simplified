@@ -27,7 +27,7 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 |---|---|---|
 | **0** | Foundation: tokens, lean-model adapter, ranked ladder, phase strip, pool anchor | **DONE** — QA gallery `recruiting-spine-gallery.html`; 25/25 logic tests + headless render verified |
 | **1** | D1 The Spine: pool (~300 recruits, region A–H collapse, sort/filter, condensed variant) + assembled shell | **DONE** — `recruiting-hub.js` took over `recruiting.html`; real data; headless render + interaction verified |
-| 2 | D2 Invite Dock (wks 20–26) — merge Orders pages; **+ backend: decouple invite loop from Training's Submit** | pending |
+| **2** | D2 Invite Dock (wks 20–26) — merge Orders pages into one hub dock | **DONE** — no backend decouple (see below); dock built in hub, render+interactions verified |
 | 3 | D3 Signing Board (wk 35) — pool-as-worksheet, 50-pt budget, binding Playing-Time promise, live sign-odds | pending |
 | 4 | D4 Results — hub **states** (weekly overlay + wk-36 signed pool), not a route | pending |
 | 5 | D5 Consistency sweep — FCC Recruits tab + Home/Coach cards + tutorial (Signing Day rename, 50-pt, no cap) | pending |
@@ -47,9 +47,16 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 - Backend: `new_lean_recruit_ids` added to `/franchise/recruiting-data` (additive, gated on a played game — mirrors the FCC card). Powers the story strip + "New" badge. "Dropped you" deferred (no signal).
 - Verified: passive (no dock, full pool) + invite@1280px (dock + condensed) render clean; region collapse / sort / region+mine+search filters all work; zero console errors.
 
+## Prompt 2 — shipped
+- **Decouple decision REVERSED (user call):** the prompt's "decouple invite execution from Training's Submit" was overstated. Invite **execution stays in Run Training** (`franchise_routes.py:12866-12869` untouched) — it's the mandatory weekly step and the only guaranteed trigger (week advances only via complete-week; **no back-fill** exists, so relocating the run risked permanently-missed weeks). The week-20 "must save orders before training" guard is **kept**. What D2 actually merges is the two forked *ranking* pages → one hub dock; the *cross-page UX* coupling is what's removed, not the backend sequencing.
+- **Invite dock** built in `recruiting-hub.js` (invite phase only): condensed pool + add-column (`+` ⇄ rank badge, `on-board` row), draggable ranked slots (≤20) with standing chip (#1 green / on-list amber) + 0–3 lean-fill dots, header (count/20, W20–26 weekly tracker, "leaning to you" badge, position breakdown), empty-state + "rank N more" nudge, Clear + **Save Board**. Board seeds from `saved_orders` (deduped). Save → **existing** `POST /franchise/recruiting-orders` (`{franchise_id, recruit_ids}`) + success toast. `recruiting-dock.css` loaded.
+- **Entry points repointed:** Training's "Recruiting Invites" button (wks 20–26) now → `recruiting.html` (the hub) instead of `recruiting-invites.html`. The forked `recruiting-invites/orders.html` are **left in place** (still serve the week-35 flow until Prompt 3); full redirect/delete is the final cutover.
+- Verified headless @1280px: dock render, weekly tracker/badges/breakdown, add/remove/drag-reorder, Save (toast + correct payload), Clear; zero console errors.
+
 ## Deferred backend items (do NOT bury in a UI prompt)
-1. **Invite-loop decouple (Prompt 2):** invites are saved on the recruiting page (`POST /franchise/recruiting-orders`) but executed from Training's Submit (`franchise_routes.py:12849` → `_process_weekly_recruiting_invites`). Hub must own rank+save+run.
+1. ~~Invite-loop decouple~~ — **decided AGAINST** (Prompt 2). Execution stays in Run Training by design; do not relocate it.
 2. **Loyalty signal (if wanted):** no backend `loyal/locked` flag today; ladder lock stays capability-only until one exists.
+3. **"Dropped you" story-strip signal:** none exists; passive strip shows gains only.
 
 ## Notes for Prompt 1
 - Recruit attributes are stored 0–1000 (÷10 → 0–100 display); the mock's 0–8 `attrCls` thresholds must be re-scaled for real data in the pool.
