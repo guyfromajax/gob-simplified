@@ -1567,6 +1567,7 @@ class TurnManager:
         from BackEnd.utils.eoq_clock_progression import (
             activate_late_clock_eoq_chain,
             clear_late_clock_eoq_chain,
+            eoq_first_gate_open,
             is_late_clock_eoq_chain_active,
             should_force_eoq_last_shot,
         )
@@ -1580,9 +1581,18 @@ class TurnManager:
             game_state["_last_final_turn_quarter"] = quarter
             clear_late_clock_eoq_chain(game_state)
 
-        # ✅ Final Turn: clock-driven — first eligible possession at <=30s runs full
-        # Final Shot setup; follow-ups in the EOQ chain use FLSS / OREB / terminal DREB.
+        # ✅ EOQ window / Final Shot ownership (see EOQ_System.md §6):
+        # - Clock ≤30 on HCO/HCT/FCP may open the EOQ window (chain).
+        # - Full Final Shot execute flags are HCO-only (only HCO runs
+        #   resolve_final_turn_shot). HCT/FCP play normal until ≤8 → FLSS.
+        # - Never leave final_turn_shot_this_turn armed on HCT/FCP.
         time_remaining_sec = game_state.get("time_remaining")
+        chain_active = is_late_clock_eoq_chain_active(game_state)
+        first_gate_open = eoq_first_gate_open(
+            state=state,
+            chain_active=chain_active,
+            final_shot_ran_this_chain=bool(game_state.get("final_shot_ran_this_chain")),
+        )
         final_turn_eligible = (
             quarter is not None
             and time_remaining_sec is not None
@@ -1590,7 +1600,7 @@ class TurnManager:
             and state != "FAST_BREAK"
             and state in ("HCO", "HCT", "FCP")
             and not game_state.get("flss_possession_pending")
-            and not is_late_clock_eoq_chain_active(game_state)
+            and first_gate_open
         )
         if final_turn_eligible:
             if quarter >= 4:
@@ -1619,66 +1629,27 @@ class TurnManager:
                     # Normal Quick Shot turn — fall through to state routing (don't set result)
                     pass
                 else:
-                    # Normal final shot (trailing/tied): use Final Turn play execution (Phase 2)
-                    from BackEnd.engine.eoq_debug_log import log_eoq_step
-
-                    log_eoq_step(
-                        self.game,
-                        "FINAL_SHOT",
-                        "turn_trigger",
-                        "START",
-                        extra={"quarter_gte_4": True, "time_remaining_sec": time_remaining_sec},
-                    )
-                    game_state["final_turn_shot_this_turn"] = True
-                    game_state["final_shot_possession_active"] = True
-                    activate_late_clock_eoq_chain(game_state)
-                    begin_eoq_trace_sequence(self.game)
-                    log_eoq_chain_event(
-                        self.game,
-                        "FINAL_SHOT_TRIGGERED",
-                        extra={
-                            "quarter_gte_4": True,
-                            "time_remaining_sec": time_remaining_sec,
-                            "offensive_state": state,
-                        },
-                    )
-                    log_eoq_step(
-                        self.game,
-                        "FINAL_SHOT",
-                        "turn_trigger",
-                        "END",
-                        extra={"flags_set": True},
+                    # Trailing/tied EOQ window. HCO arms Final Shot; HCT/FCP only
+                    # open the window and continue normal pressure.
+                    self._enter_eoq_first_gate(
+                        game_state,
+                        state=state,
+                        quarter_gte_4=True,
+                        time_remaining_sec=time_remaining_sec,
+                        begin_eoq_trace_sequence=begin_eoq_trace_sequence,
+                        log_eoq_chain_event=log_eoq_chain_event,
+                        activate_late_clock_eoq_chain=activate_late_clock_eoq_chain,
                     )
             else:
-                # Qs 1–3: Final Turn shot (same play execution as Q4 "normal" final shot)
-                from BackEnd.engine.eoq_debug_log import log_eoq_step
-
-                log_eoq_step(
-                    self.game,
-                    "FINAL_SHOT",
-                    "turn_trigger",
-                    "START",
-                    extra={"quarter_gte_4": False, "time_remaining_sec": time_remaining_sec},
-                )
-                game_state["final_turn_shot_this_turn"] = True
-                game_state["final_shot_possession_active"] = True
-                activate_late_clock_eoq_chain(game_state)
-                begin_eoq_trace_sequence(self.game)
-                log_eoq_chain_event(
-                    self.game,
-                    "FINAL_SHOT_TRIGGERED",
-                    extra={
-                        "quarter_gte_4": False,
-                        "time_remaining_sec": time_remaining_sec,
-                        "offensive_state": state,
-                    },
-                )
-                log_eoq_step(
-                    self.game,
-                    "FINAL_SHOT",
-                    "turn_trigger",
-                    "END",
-                    extra={"flags_set": True},
+                # Qs 1–3: same ownership split (HCO Final Shot vs HCT/FCP window).
+                self._enter_eoq_first_gate(
+                    game_state,
+                    state=state,
+                    quarter_gte_4=False,
+                    time_remaining_sec=time_remaining_sec,
+                    begin_eoq_trace_sequence=begin_eoq_trace_sequence,
+                    log_eoq_chain_event=log_eoq_chain_event,
+                    activate_late_clock_eoq_chain=activate_late_clock_eoq_chain,
                 )
 
         elif (
@@ -1689,20 +1660,34 @@ class TurnManager:
             and state in ("HCO", "HCT", "FCP")
         ):
             # After the first EOQ terminal shot, pick full Final Turn vs FLSS by runway.
+            # Final Turn execute flags are HCO-only; HCT/FCP with runway defer to a
+            # later HCO entry (or FLSS at ≤8). Runway-fail → flss_possession_pending.
             if self._eoq_followup_can_run_final_turn():
-                game_state.pop("flss_possession_pending", None)
-                game_state["final_turn_shot_this_turn"] = True
-                game_state["final_shot_possession_active"] = True
-                game_state["suppress_final_shot_sfx"] = True
-                begin_eoq_trace_sequence(self.game)
-                log_eoq_chain_event(
-                    self.game,
-                    "EOQ_FOLLOWUP_FINAL_TURN",
-                    extra={
-                        "time_remaining_sec": time_remaining_sec,
-                        "offensive_state": state,
-                    },
-                )
+                if state == "HCO":
+                    game_state.pop("flss_possession_pending", None)
+                    game_state["final_turn_shot_this_turn"] = True
+                    game_state["final_shot_possession_active"] = True
+                    game_state["suppress_final_shot_sfx"] = True
+                    begin_eoq_trace_sequence(self.game)
+                    log_eoq_chain_event(
+                        self.game,
+                        "EOQ_FOLLOWUP_FINAL_TURN",
+                        extra={
+                            "time_remaining_sec": time_remaining_sec,
+                            "offensive_state": state,
+                        },
+                    )
+                else:
+                    begin_eoq_trace_sequence(self.game)
+                    log_eoq_chain_event(
+                        self.game,
+                        "EOQ_FOLLOWUP_DEFER_FINAL_TURN",
+                        extra={
+                            "time_remaining_sec": time_remaining_sec,
+                            "offensive_state": state,
+                            "reason": "final_shot_hco_only",
+                        },
+                    )
             elif not game_state.get("flss_possession_pending"):
                 game_state["flss_possession_pending"] = True
                 begin_eoq_trace_sequence(self.game)
@@ -4170,6 +4155,72 @@ class TurnManager:
                     normalized,
                     e,
                 )
+
+    def _enter_eoq_first_gate(
+        self,
+        game_state,
+        *,
+        state,
+        quarter_gte_4,
+        time_remaining_sec,
+        begin_eoq_trace_sequence,
+        log_eoq_chain_event,
+        activate_late_clock_eoq_chain,
+    ) -> None:
+        """Open the EOQ window; arm Final Shot execute flags only on HCO.
+
+        HCT/FCP at ≤30 start the late-clock chain and continue as normal
+        pressure until ``LOW_CLOCK_FLSS`` (≤8) or a later HCO arms Final Shot.
+        Never sets ``final_turn_shot_this_turn`` on non-HCO states.
+        """
+        from BackEnd.engine.eoq_debug_log import log_eoq_step
+
+        from BackEnd.utils.eoq_clock_progression import should_arm_final_shot_execute_flags
+
+        activate_late_clock_eoq_chain(game_state)
+        begin_eoq_trace_sequence(self.game)
+        if should_arm_final_shot_execute_flags(state):
+            log_eoq_step(
+                self.game,
+                "FINAL_SHOT",
+                "turn_trigger",
+                "START",
+                extra={
+                    "quarter_gte_4": quarter_gte_4,
+                    "time_remaining_sec": time_remaining_sec,
+                    "offensive_state": state,
+                },
+            )
+            game_state["final_turn_shot_this_turn"] = True
+            game_state["final_shot_possession_active"] = True
+            log_eoq_chain_event(
+                self.game,
+                "FINAL_SHOT_TRIGGERED",
+                extra={
+                    "quarter_gte_4": quarter_gte_4,
+                    "time_remaining_sec": time_remaining_sec,
+                    "offensive_state": state,
+                },
+            )
+            log_eoq_step(
+                self.game,
+                "FINAL_SHOT",
+                "turn_trigger",
+                "END",
+                extra={"flags_set": True, "arm_final_shot": True},
+            )
+            return
+
+        log_eoq_chain_event(
+            self.game,
+            "EOQ_WINDOW_OPENED",
+            extra={
+                "quarter_gte_4": quarter_gte_4,
+                "time_remaining_sec": time_remaining_sec,
+                "offensive_state": state,
+                "arm_final_shot": False,
+            },
+        )
 
     def _eoq_followup_can_run_final_turn(self) -> bool:
         from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup

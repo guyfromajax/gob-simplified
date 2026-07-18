@@ -54,9 +54,9 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 
 | Flag | Set when | Cleared when | Purpose |
 |------|----------|--------------|---------|
-| `late_clock_eoq_chain_active` | Final Shot arms; extended during active EOQ chain | `clear_late_clock_eoq_chain()` at quarter boundary | Marks EOQ chain in progress; blocks **first** Final Shot gate only |
-| `final_turn_shot_this_turn` | Final Shot gate or follow-up runway passes | Popped when turn resolves | Routes turn to `resolve_final_turn_shot()` |
-| `final_shot_possession_active` | Same as above | Cleared after turn stamped | Internal arming guard |
+| `late_clock_eoq_chain_active` | EOQ window opens (HCO Final Shot arm **or** HCT/FCP window-only); extended during chain | `clear_late_clock_eoq_chain()` at quarter boundary | Marks ≤30 EOQ window in progress. Blocks first gate for non-HCO; HCO may still arm first Final Shot if `final_shot_ran_this_chain` is false |
+| `final_turn_shot_this_turn` | **HCO only** — first gate Final Shot arm or §6b follow-up Final Turn | Popped when turn resolves | Routes HCO to `resolve_final_turn_shot()`. **Never set on HCT/FCP** |
+| `final_shot_possession_active` | Same as above (HCO only) | Cleared after turn stamped | Internal arming guard for Final Shot execute |
 | `suppress_final_shot_sfx` | Follow-up Final Turn armed (`EOQ_FOLLOWUP_FINAL_TURN`); **and all FLSS turns** (stamped by `resolve_flss_shot_logic`) | Popped when turn resolves; stamped on turn payload | FE skips the Final Shot stinger — on repeat full Final Turns, and on **every FLSS** (which fires its own heave/launch VO instead) |
 | `flss_possession_pending` | FLSS follow-up chosen; or `schedule_flss_after_inbound` after chain make | Popped at FLSS turn start | Next offense turn → FLSS (may be overridden at entry by runway check) |
 | `final_shot_ran_this_chain` | First EOQ terminal shot completes (`final_turn` or FLSS w/ `final_shot_possession`) | Quarter break clear | Enables runway-based follow-up routing |
@@ -125,8 +125,8 @@ flowchart TD
 
 **Only these should set `late_clock_eoq_chain_active` for the first time in a quarter:**
 
-1. **Final Shot arming** in `turn_manager.run_micro_turn()` when `final_turn_eligible` passes.
-2. **FLSS** paths when entering forced last-second shot (including preflight fallback).
+1. **EOQ first gate** in `turn_manager.run_micro_turn()` when `final_turn_eligible` passes — HCO arms Final Shot (`FINAL_SHOT_TRIGGERED`); HCT/FCP open the window only (`EOQ_WINDOW_OPENED`).
+2. **FLSS** paths when entering forced last-second shot (including preflight fallback / `LOW_CLOCK_FLSS`).
 
 **What extends but does not start the chain:**
 
@@ -145,31 +145,48 @@ flowchart TD
 
 ---
 
-## 6. Final Shot — trigger gate (first possession)
+## 6. EOQ window + Final Shot ownership (first gate)
+
+**Ownership rule**
+
+> When clock ≤ 30, the EOQ **window** may open on any eligible possession entry (HCO / HCT / FCP).  
+> **Full Final Shot** execute flags are **HCO-only**.  
+> HCT / FCP / FB in that window play their normal state until entry clock ≤ 8 (or ≤ 0), then **FLSS**.  
+> Never leave `final_turn_shot_this_turn` armed on a state that will not run Final Shot.  
+> `final_shot_ran_this_chain` flips only after an **executed** Final Shot or FLSS.
+
+Helpers: `eoq_first_gate_open()`, `should_arm_final_shot_execute_flags()` in `eoq_clock_progression.py`.
 
 Evaluated at **possession entry** in `turn_manager.run_micro_turn()` (before state routing):
 
 ```text
+first_gate_open =
+    NOT late_clock_eoq_chain_active
+    OR (state == HCO AND NOT final_shot_ran_this_chain)
+
 final_turn_eligible =
     quarter is set
     AND int(time_remaining) <= 30
     AND state != FAST_BREAK
     AND state in (HCO, HCT, FCP)
     AND NOT flss_possession_pending
-    AND NOT late_clock_eoq_chain_active
+    AND first_gate_open
 ```
 
 **Also:** at start of each quarter, if `_last_final_turn_quarter != quarter`, call `clear_late_clock_eoq_chain()`.
 
 **Excluded at first-gate entry:** Fast Break, OREB putback turn, possessions while `flss_possession_pending` is set (unless overridden — see §6b).
 
-**Important:** Eligibility uses clock **at possession start**, not when the shot is released. A possession entering at 0:43 will not arm Final Shot even if the shot occurs at 0:28.
+**Important:** Eligibility uses clock **at possession start**, not when the shot is released. A possession entering at 0:43 will not open the EOQ window even if the shot occurs at 0:28.
 
-When the first gate passes:
+When the first gate passes (trailing/tied path; Q4 situational branches may short-circuit first):
 
-1. Set `final_turn_shot_this_turn`, `final_shot_possession_active`.
-2. `activate_late_clock_eoq_chain(game_state)`.
-3. Log `CHAIN` event `FINAL_SHOT_TRIGGERED` (when EOQ trace enabled).
+| Entry state | Action | Trace event |
+|-------------|--------|-------------|
+| **HCO** | `activate_late_clock_eoq_chain`; set `final_turn_shot_this_turn` + `final_shot_possession_active` | `FINAL_SHOT_TRIGGERED` |
+| **HCT / FCP** | `activate_late_clock_eoq_chain` only — **no** Final Shot execute flags; continue normal trap/press | `EOQ_WINDOW_OPENED` |
+
+After an HCT/FCP window-open, a later **HCO** entry with `final_shot_ran_this_chain` still false may still pass the first gate and arm Final Shot (fixes BIP→HCT@30 then later HCO without poisoning the quarter).
 
 After the turn completes, if `final_turn` **or** (`flss` and `final_shot_possession`), set **`final_shot_ran_this_chain`**.
 
@@ -190,17 +207,18 @@ AND state in (HCO, HCT, FCP)
 
 - Builds conservative Final Turn skeleton scenarios (Outside @ 3s anchor, Attack @ 4s anchor; BH-shooter and pass-to-shooter variants).
 - Simulates walk-up from `prior_turn.final_coords`, alignment, the **PG handoff** (converge+pass, sized by real PG→handler travel), and pre-anchor moves via `evaluate_final_turn_pacing()` — which returns a dual verdict (`can_meet_anchor` = base fits; `handoff_fits`) driving the 4-mode BH cascade in §7.
-- **If any scenario fits** → arm another full Final Turn:
+- **If any scenario fits and `state == HCO`** → arm another full Final Turn:
   - Set `final_turn_shot_this_turn`, `final_shot_possession_active`, `suppress_final_shot_sfx`.
   - Clear `flss_possession_pending` if set (overrides inbound-scheduled FLSS).
   - Log `CHAIN` / `EOQ_FOLLOWUP_FINAL_TURN`.
-- **Else** → FLSS:
+- **If any scenario fits and `state` is HCT/FCP** → **defer** (no execute flags): log `EOQ_FOLLOWUP_DEFER_FINAL_TURN`; next HCO may arm Final Shot, or ≤8 forces FLSS.
+- **Else** (runway fail) → FLSS:
   - Set `flss_possession_pending` if not already set.
   - Log `CHAIN` / `EOQ_FOLLOWUP_FLSS`.
 
 **Design intent:** Replace the old “chain active → always BIP → FLSS” loop with a per-entry runway check. Entry context matters: OREB kickout, BIP with runoff, DREB outlet, and press setup all change available time.
 
-**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” headline but skips the court stinger. FLSS never shows the headline; penalty/heave zones play coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step.
+**SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” headline but skips the court stinger. FLSS never shows the headline; penalty/heave zones play coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step. Presentation rules do **not** drive routing.
 
 **Not re-evaluated on:** OREB putback turns, BIP/SIP bypass turns, discrete DREB turns, FT line. The next **half-court entry** after those paths runs this check.
 
@@ -362,7 +380,9 @@ Enabled by default (`game_state['eoq_trace'] !== false`). Filter logs: **`[EOQ-T
 
 | Event | Meaning |
 |-------|---------|
-| `CHAIN` / `FINAL_SHOT_TRIGGERED` | **First** full Final Shot armed — must appear for initial Final Turn |
+| `CHAIN` / `FINAL_SHOT_TRIGGERED` | **First** full Final Shot **armed on HCO** — must appear before HCO runs Final Shot |
+| `CHAIN` / `EOQ_WINDOW_OPENED` | EOQ window opened on HCT/FCP without Final Shot execute flags |
+| `CHAIN` / `EOQ_FOLLOWUP_DEFER_FINAL_TURN` | Follow-up runway would allow Final Turn but entry is HCT/FCP — deferred |
 | `CHAIN` / `EOQ_FOLLOWUP_FINAL_TURN` | Runway check passed → repeat full Final Turn (SFX suppressed) |
 | `CHAIN` / `EOQ_FOLLOWUP_FLSS` | Runway check failed → FLSS on this entry |
 | `CHAIN` / `FLSS_POSSESSION_START` | FLSS turn starting |

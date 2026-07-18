@@ -9,6 +9,7 @@ from BackEnd.utils.eoq_clock_progression import (
     apply_post_miss_rebound_routing,
     clear_late_clock_eoq_chain,
     ensure_quarter_end_clock_drain,
+    eoq_first_gate_open,
     finalize_flss_post_emit,
     infer_eoq_trace_role,
     is_late_clock_eoq_chain_active,
@@ -17,6 +18,7 @@ from BackEnd.utils.eoq_clock_progression import (
     schedule_flss_after_dreb,
     schedule_flss_after_inbound,
     scrub_timeout_fields_from_snapshot,
+    should_arm_final_shot_execute_flags,
     should_force_eoq_last_shot,
     should_force_oreb_putback,
     should_route_eoq_rebound,
@@ -27,6 +29,30 @@ from BackEnd.engine.final_turn_pacing import evaluate_final_turn_pacing
 
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+
+def test_eoq_first_gate_ownership_split():
+    # Fresh window — any half-court entry may evaluate.
+    assert eoq_first_gate_open(
+        state="HCT", chain_active=False, final_shot_ran_this_chain=False
+    )
+    assert eoq_first_gate_open(
+        state="HCO", chain_active=False, final_shot_ran_this_chain=False
+    )
+    # Window opened by HCT without an EOQ shot → only HCO may still arm Final Shot.
+    assert eoq_first_gate_open(
+        state="HCO", chain_active=True, final_shot_ran_this_chain=False
+    )
+    assert not eoq_first_gate_open(
+        state="HCT", chain_active=True, final_shot_ran_this_chain=False
+    )
+    # After an EOQ shot ran → first gate closed (follow-up §6b owns routing).
+    assert not eoq_first_gate_open(
+        state="HCO", chain_active=True, final_shot_ran_this_chain=True
+    )
+    assert should_arm_final_shot_execute_flags("HCO") is True
+    assert should_arm_final_shot_execute_flags("HCT") is False
+    assert should_arm_final_shot_execute_flags("FCP") is False
 
 
 def test_should_force_oreb_putback_under_six():

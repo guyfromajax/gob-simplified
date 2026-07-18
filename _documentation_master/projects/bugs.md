@@ -1,19 +1,19 @@
 ##Bugs
 1. Teleported an HCO entry step, result was a DB turnover
 2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-3. HCO entry pass on offense side teleported
 5. Dead ball turnove rin HCO is passing ahead then teleppring back to animate the DB turnover
-6. Improve reset action in HCO
-7. ~~SIP → Final Shot/FLSS make announced ("It's Good!") but nothing animated~~ — **Fixed 2026-07-16:** FOUL→SIP now arms FLSS when EOQ chain active (`schedule_flss_after_inbound` + `tag_result_if_late_clock_eoq_chain`); FLSS beats quick foul when pending; empty schema emit stamps `eoq_schema_emit_failed`; FE gates SHOT_MAKE on `playTurn.stepsExecuted > 0`. See EOQ_System.md §8 / §9.
+8. Need to keep games closer / blowout governor
+9. Fix triple teams on HCT and FCP
+13. Better timing on shots, most shoudl be more immediate, those that are not should have pre-shot movement
+14. ~~BIP→HCT@≤30 poisoned EOQ chain (Final Shot armed but never executed)~~ — **Fixed 2026-07-18:** HCT/FCP open window only; Final Shot execute flags HCO-only. See EOQ_System.md §6.
+
 
 ##Full Product Readiness
-102. Team court images
 105. More responsive front end
 106. Monetization plan
 107. Stripe
 108. Steam Strategy
 119. PvP sim
-120. PvP live
 121. Tunable Constants file
 123. Downloadable game vs Live game dynamics
 125. MM: Micro Movement SFX
@@ -27,6 +27,7 @@
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
 25. Fast Break and P/T callouts in the Scouting Report of opponent
+102. Team court images
 108. Message board
 110. Strategic Geek Points system
 113. Bring logic to screens
@@ -39,6 +40,9 @@
 131. Centralized Turn Transition Helper / System
 132. Players as Characters
 133. Loose/Normal/Tight Defense Play Types
+134. Better simming of computer games
+135. Better simming of computer training
+200. PvP live
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed

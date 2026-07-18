@@ -138,6 +138,30 @@ def should_route_final_turn_to_flss(time_remaining: Optional[int]) -> bool:
     return tr <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK
 
 
+def eoq_first_gate_open(
+    *,
+    state: Optional[str],
+    chain_active: bool,
+    final_shot_ran_this_chain: bool,
+) -> bool:
+    """True when the ≤30s first gate may evaluate for this possession entry.
+
+    Ownership (EOQ_System.md §6):
+    - Fresh entry (no chain) → open for HCO/HCT/FCP.
+    - Chain already opened by HCT/FCP without an executed EOQ shot → HCO may
+      still arm the first Final Shot (``final_shot_ran_this_chain`` false).
+    - After an EOQ shot has run → first gate closed; §6b follow-up owns routing.
+    """
+    if not chain_active:
+        return True
+    return state == "HCO" and not final_shot_ran_this_chain
+
+
+def should_arm_final_shot_execute_flags(state: Optional[str]) -> bool:
+    """Full Final Shot execute flags are HCO-only (HCT/FCP never arm them)."""
+    return str(state or "").upper() == "HCO"
+
+
 def should_route_post_dreb_flss(time_remaining: Optional[int]) -> bool:
     """True when enough game clock remains for post-DREB FLSS (rebounder sprint-and-shoot)."""
     if time_remaining is None:
