@@ -541,7 +541,11 @@ class FranchiseManager:
                 "created_at": recruit.get("created_at") or datetime.utcnow(),
             }
             for recruit in recruits
-            for home_region in [random.choice(list(region_team_ids.keys()))]
+            # Home Region is now stable identity baked into the set — use it when
+            # present. Dynamic recruits (and any un-baked legacy set) have none, so
+            # they fall back to the original per-franchise random draw. Lean still
+            # derives from the region with its own randomness (see _build_recruit_lean).
+            for home_region in [recruit.get("Home Region") or random.choice(list(region_team_ids.keys()))]
         ]
         _t0 = time.time()
         if frd_docs:

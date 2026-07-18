@@ -14238,7 +14238,10 @@ def finish_season(req: FinishSeasonRequest):
             "created_at": recruit.get("created_at") or datetime.utcnow(),
         }
         for recruit in recruits
-        for home_region in [random.choice(list(region_team_ids.keys()))]
+        # Home Region is now stable identity baked into the set — use it when
+        # present; dynamic/un-baked recruits fall back to the per-franchise random
+        # draw. Lean still derives from the region with its own randomness.
+        for home_region in [recruit.get("Home Region") or random.choice(list(region_team_ids.keys()))]
     ]
     if frd_docs:
         franchise_recruits_data_collection.insert_many(frd_docs)
