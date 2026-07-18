@@ -70,6 +70,44 @@ def _resolve_signed(franchise_id: str, player_id: str):
     return None, None
 
 
+def delete_signed_masters_for_franchise(franchise_id) -> int:
+    """Best-effort GC of a deleted franchise's signed-recruit uniform masters in R2.
+
+    Only removes players/master/<player_id>.png for THIS franchise's signed
+    recruits — identified by their FPD doc carrying meta.image_id. That is safe on
+    two counts: (1) a signed player's player_id is a fresh per-franchise uuid, so a
+    key can never belong to another franchise; (2) original/universal players have
+    no image_id, so their shared masters are never touched. The shared uniform
+    cache (recruits/uniform-cache/...) is also left intact. Never raises — a portrait
+    GC failure must not block the franchise delete. Returns count removed.
+
+    Call BEFORE deleting the franchise's FPD docs (it reads them to find the keys).
+    """
+    if not r2_images.is_configured():
+        return 0
+    deleted = 0
+    try:
+        cursor = franchise_players_data_collection.find(
+            {"franchise_id": str(franchise_id), "meta.image_id": {"$exists": True, "$ne": None}},
+            {"player_id": 1},
+        )
+        for doc in cursor:
+            pid = doc.get("player_id")
+            if not pid:
+                continue
+            try:
+                if r2_images.delete(f"players/master/{pid}.png"):
+                    deleted += 1
+            except Exception:
+                logger.exception("[IMG-GC] delete failed franchise_id=%s player_id=%s",
+                                 str(franchise_id), pid)
+    except Exception:
+        logger.exception("[IMG-GC] scan failed franchise_id=%s", str(franchise_id))
+    if deleted:
+        logger.info("[IMG-GC] removed %s signed masters franchise_id=%s", deleted, str(franchise_id))
+    return deleted
+
+
 @router.post("/player-image/ensure")
 def ensure_player_image(req: EnsurePlayerImageRequest, user: dict = Depends(get_current_user)):
     """Paint a signed player's uniformed master into R2 if it's missing."""
