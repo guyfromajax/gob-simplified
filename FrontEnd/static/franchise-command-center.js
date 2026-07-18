@@ -86,6 +86,7 @@ let leanRecruitsDataCache = [];
 let signedRecruitsDataCache = [];
 let currentWeekInviteRecruitCache = null;
 let newLeanRecruitIdsCache = [];
+let recruitTeamNameMapCache = {};
 let fccTeamStatsSummaryCache = null;
 let commandCenterTopDataCache = null;
 let playbooksWeekSavedCache = null;
@@ -1164,10 +1165,25 @@ function partitionRecruitsWithNewLeans(recruits, sortFn, sortState) {
   return sortFn(newOnes, sortState).concat(sortFn(rest, sortState));
 }
 
+// Per-user standing rank (1/2/3, or 0) from the recruit's raw Lean map vs the user's team.
+function fccRecruitStandingRank(recruit) {
+  const lean = (recruit && recruit.lean) || {};
+  const uid = String(userTeamId);
+  if (String(lean['1']) === uid) return 1;
+  if (String(lean['2']) === uid) return 2;
+  if (String(lean['3']) === uid) return 3;
+  return 0;
+}
+
 function buildHomeRecruitRowHtml(recruit) {
+  const rank = fccRecruitStandingRank(recruit);
+  const standCls = rank === 1 ? 'you1' : rank > 1 ? 'list' : '';
+  // Dot only when it isn't already flagged "New" (the New badge is that row's marker).
+  const standDot = (rank && !isNewLeanRecruit(recruit)) ? `<span class="recruit-stand-dot ${standCls}"></span>` : '';
+  const standChip = rank ? `<span class="recruit-stand-chip ${standCls}">#${rank}</span>` : '';
   const rowHtml = `
     <div class="fcc-home-recruit-row">
-      <span class="fcc-home-recruit-name">${RecruitingCommon.recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name)}</span>
+      <span class="fcc-home-recruit-name">${standDot}${RecruitingCommon.recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name)}${standChip}</span>
       <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
@@ -1953,7 +1969,7 @@ function renderFccRecruits() {
     psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
   }
   if (lastCol) {
-    lastCol.textContent = 'Current Lean';
+    lastCol.textContent = 'Leans / Your Standing';
     lastCol.dataset.sortKey = 'lean';
     lastCol.style.display = useSignedRecruits ? 'none' : '';
   }
@@ -2005,7 +2021,8 @@ function renderFccRecruits() {
       RecruitingCommon.sortRecruits.bind(RecruitingCommon),
       recruitSortState
     ),
-    { newLeanIds: getNewLeanRecruitIdSet(), franchiseId: franchiseId }
+    { newLeanIds: getNewLeanRecruitIdSet(), franchiseId: franchiseId,
+      userTeamId: userTeamId, teamNameMap: recruitTeamNameMapCache }
   );
 }
 
@@ -2014,9 +2031,10 @@ function initFccRecruits(topData) {
   document.body.dataset.fccWeek = String(Number(topData?.week || 1));
   currentWeekInviteRecruitCache = topData?.current_week_invite_recruit || null;
   newLeanRecruitIdsCache = Array.isArray(topData?.new_lean_recruit_ids) ? topData.new_lean_recruit_ids : [];
+  recruitTeamNameMapCache = topData?.team_name_map || {};
   leanRecruitsDataCache = RecruitingCommon.normalizeRecruits(
     topData?.lean_recruits || [],
-    topData?.team_name_map || {}
+    recruitTeamNameMapCache
   );
   signedRecruitsDataCache = (topData?.week_35_user_recruits || []).map((player) => {
     const attrs = player.attributes || {};
@@ -3674,32 +3692,41 @@ function updatePlayButton(data) {
 function updateRecruitingButton(data) {
   const week = Number(data?.week || 1);
   const resultsWeek = Number(data?.current_recruiting_results_week || 0);
-  let text = 'Recruiting Invites Begin Week 20';
-  let href = null;
-  let showButton = false;
+  // Phase-aware footnote that speaks the hub phase strip's language (calendar-driven).
+  const phase = (window.RecruitingSpine && window.RecruitingSpine.Phase)
+    ? window.RecruitingSpine.Phase.forWeek(week)
+    : (week >= 20 && week <= 26 ? 'invite' : week === 35 ? 'day' : week === 36 ? 'results' : 'passive');
+  const resultsReady = week >= 20 && week <= 26 && resultsWeek === week;
 
-  if (week >= 20 && week <= 26 && resultsWeek === week) {
+  let text, btnLabel = null, showButton = false;
+  if (phase === 'invite') {
+    const sent = Math.max(0, Math.min(7, week - 20)); // matches the phase strip's "N/7 sent"
+    text = `Invite Season · Wk ${week} · ${sent} of 7 sent`;
     showButton = true;
-    text = `Week ${week} Recruiting Visits`;
+    btnLabel = resultsReady ? `View Week ${week} Results` : 'Open Invite Board';
+  } else if (phase === 'day') {
+    text = 'Signing Day · 50 points';
+    showButton = true;
+    btnLabel = 'Open Signing Board';
+  } else if (phase === 'results') {
+    text = 'Signings are final';
+    showButton = true;
+    btnLabel = 'View Signings';
+  } else { // passive
+    text = week >= 27 ? `Passive · Wk ${week} — postseason. Signing Day is Week 35.`
+      : week === 19 ? 'Passive · Wk 19 — Invite Season begins next week.'
+        : 'Passive — leans come to you. Invite Season opens Week 20.';
+  }
+
+  // The Recruiting Hub (recruiting.html) now owns invites / signing / results.
+  let href = null;
+  if (showButton) {
     const params = new URLSearchParams();
     params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
+    if (userTeamId) params.set('team_id', userTeamId);
     params.set('from', 'fcc');
-    params.set('week', String(week));
     params.set('return_url', getCurrentRelativeUrl());
-    href = `/recruiting-results.html?${params.toString()}`;
-  } else if (week >= 20 && week <= 26) {
-    text = 'Recruiting Invites Active';
-  } else if (week === 19) {
-    text = 'Recruiting Invites Begin Next Week';
-  } else if (week >= 1 && week <= 18) {
-    text = 'Recruiting Invites Begin Week 20';
-  } else if (week === 35) {
-    text = 'Recruiting Is Live';
-  } else if (week === 36) {
-    text = 'Recruiting Is Complete';
-  } else if (week > 26) {
-    text = 'Recruiting Runs After National Tourney';
+    href = `/recruiting.html?${params.toString()}`;
   }
 
   const slots = [
@@ -3711,9 +3738,9 @@ function updateRecruitingButton(data) {
     const liveCopy = document.getElementById(copyId);
     if (!recruitingBtn || !liveCopy) continue;
     liveCopy.textContent = text;
-    liveCopy.style.display = showButton ? 'none' : 'block';
+    liveCopy.style.display = 'block';                 // footnote always shows the phase
     recruitingBtn.style.display = showButton ? 'inline-flex' : 'none';
-    recruitingBtn.textContent = text;
+    recruitingBtn.textContent = btnLabel || '';
     recruitingBtn.disabled = !showButton;
     recruitingBtn.classList.toggle('is-dead', !showButton);
     recruitingBtn.onclick = null;

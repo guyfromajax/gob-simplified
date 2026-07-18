@@ -30,7 +30,7 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 | **2** | D2 Invite Dock (wks 20–26) — merge Orders pages into one hub dock | **DONE** — no backend decouple (see below); dock built in hub, render+interactions verified |
 | **3** | D3 Signing Board (wk 35) — pool-as-worksheet, 50-pt budget, binding Playing-Time promise, live sign-odds | **DONE** — signing surface in hub; wired to existing wk-35 save+run; verified |
 | **4** | D4 Results — hub **states** (weekly overlay + wk-36 signed pool), not a route | **DONE** — calendar-driven states, real data, verified |
-| 5 | D5 Consistency sweep — FCC Recruits tab + Home/Coach cards + tutorial (Signing Day rename, 50-pt, no cap) | pending |
+| **5** | D5 Consistency sweep — FCC Recruits tab + Home/Coach cards + tutorial + final cutover | **DONE** — ladder everywhere, phase-aware footnote, forked pages redirected; verified |
 | 6 | Training Report recent-leans callout — reuse the ladder markup | pending |
 
 ## Prompt 0 — shipped
@@ -68,6 +68,15 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 - **Wk-36 final signings (phase `results`):** replaces pool/dock with the signings board — summary tiles (signings to you / targets won / targets lost / leaned) + filter chips (all / signed-with-you / your-targets) + signed table (standing chip, "Signed with" logo+team, Signed/Lost outcome), won-first sort. Data: `week_35_recruiting_results.signed_by_recruit_id` ∩ `recruits`, `withYou = team_id === user team_id`. Rows = **signed recruits only** (walk-ons/unsigned excluded; unsigned targets still counted in "targets lost").
 - Verified headless: wk-36 summary/filters/won-lost + wk-22 weekly panel overlay/dismiss over a live pool; zero console errors.
 - **Deferred to final cutover (Prompt 5):** FCC's weekly-results "Recruiting" button (wks 20–26) still links to the old `recruiting-results.html`; repoint it (and retire `recruiting-invites/orders/results.html`) in the consistency sweep. The hub states are reachable via the FCC home-card / recruits-tab (→ recruiting.html) today.
+
+## Prompt 5 — shipped
+- **Shared component CSS:** new `recruiting-lean-ladder.css` — self-contained (hex-inlined) `.lean-b` ladder + `.recruit-stand-dot`/`.recruit-stand-chip` marker, for tertiary surfaces that can't load the full `recruiting-spine.css` (it sets global `:root`/`html,body`). Keep in sync with the spine's `.lean-b` block. FCC now loads `recruiting-spine.js` + this CSS.
+- **FCC Recruits tab:** `renderRecruitTableRows` gained `userTeamId` + `teamNameMap` options → lean cell renders the **shared ranked ladder** (identical markup to the hub via `RecruitingSpine.Lean.ladderHtml`) instead of the comma text; header → "Leans / Your Standing". Year column was already present. Falls back to `leanDisplay` when no `userTeamId` (backward-compatible for any other caller).
+- **FCC Home / Coach's-Office card:** `buildHomeRecruitRowHtml` adds a standing marker (green #1 dot / amber on-list dot + rank chip) via `fccRecruitStandingRank`; RT already colored; New badge kept (dot suppressed on New rows).
+- **Phase-aware footnote:** `updateRecruitingButton` rewritten to speak the phase-strip language (Passive / "Invite Season · Wk N · X of 7 sent" / "Signing Day · 50 points" / "Signings are final") and its button now points to the **hub** (`recruiting.html`), not the old `recruiting-results.html`.
+- **Tutorial** (`tutorial-recruiting.html`): "Recruiting Day" → **"Signing Day"** throughout; the stale Signing-Day 20-recruit cap replaced with "no cap … only the 50 points" (the wks-20–26 "up to 20" invite cap is correct and kept); 50-pt + ladder/RT explainers preserved.
+- **Final cutover:** `recruiting-invites/orders/results.html` now client-redirect to `recruiting.html` (preserving franchise/team/return params). All main entry points (FCC footnote, FCC full-list, Training invite button) route to the hub. Old page bodies left in place behind the redirect (git-recoverable).
+- Verified headless: FCC tab renders 5 ladders (is-you / is-you-list), **0 comma-lean cells**, Year present; home-card dots + chips; footnote strings for wks 12/22/35/36; tutorial rename + cap fix; zero console errors.
 
 ## Deferred backend items (do NOT bury in a UI prompt)
 1. ~~Invite-loop decouple~~ — **decided AGAINST** (Prompt 2). Execution stays in Run Training by design; do not relocate it.

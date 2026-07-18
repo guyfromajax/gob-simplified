@@ -1,0 +1,39 @@
+/* ============================================================
+   Recruit lean object — shared, self-contained component styles
+   ------------------------------------------------------------
+   The ranked-ladder (variant B) + the compact standing marker, for
+   TERTIARY surfaces that can't load the full recruiting-spine.css
+   (which sets global :root / html,body): the FCC Recruits tab, the FCC
+   home/Coach's-Office card, and the Training Report callout.
+
+   Rules mirror the .lean-b block in recruiting-spine.css but with the
+   spine tokens resolved to hex so this file drops onto any page without
+   the spine's global reset. The MARKUP is produced by the identical
+   RecruitingSpine.Lean.ladderHtml(), so every surface reads as one system.
+   Keep in sync with the .lean-b block in recruiting-spine.css.
+   ============================================================ */
+
+/* ---- Ranked ladder (variant B) ---- */
+.lean-b{display:flex;align-items:center;gap:6px}
+.lean-b .lb-slot{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:52px;padding:5px 3px 4px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+.lean-b .lb-slot .rk{font:700 8px/1 'Inter',system-ui,sans-serif;letter-spacing:.1em;color:rgba(255,255,255,.24)}
+.lean-b .lb-tok{display:flex;align-items:center;justify-content:center;width:100%;height:18px;border-radius:4px;font:700 10px/1 'Inter',system-ui,sans-serif;color:rgba(255,255,255,.62);background:rgba(255,255,255,.06)}
+.lean-b .lb-slot.is-open{border-style:dashed;border-color:rgba(255,255,255,.24)}
+.lean-b .lb-slot.is-open .lb-tok{background:transparent;color:rgba(255,255,255,.24);font-style:italic}
+.lean-b .lb-slot.is-you{background:rgba(52,236,39,.14);border-color:rgba(52,236,39,.42);box-shadow:0 0 0 1px rgba(52,236,39,.42),0 0 12px rgba(52,236,39,.25)}
+.lean-b .lb-slot.is-you .rk{color:#a9ff9c}
+.lean-b .lb-slot.is-you .lb-tok{background:#34EC27;color:#0c1f0a;font-weight:800}
+.lean-b .lb-slot.is-you-list{background:rgba(242,193,78,.13);border-color:rgba(242,193,78,.4)}
+.lean-b .lb-slot.is-you-list .rk{color:#ffdf9e}
+.lean-b .lb-slot.is-you-list .lb-tok{background:#f2c14e;color:#3a2c05;font-weight:800}
+.lean-b .lb-lock{position:absolute;top:-6px;right:-5px;width:15px;height:15px;display:grid;place-items:center;background:#1a1420;border:1px solid rgba(255,109,109,.5);border-radius:50%;color:#ff6d6d}
+.lean-b .lb-lock svg{width:8px;height:8px}
+.lean-b .lb-empty{font-size:11px;color:rgba(255,255,255,.24);font-style:italic;padding-left:2px}
+
+/* ---- Compact standing marker (green #1 dot / amber on-list dot + rank chip) ---- */
+.recruit-stand-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;vertical-align:middle;margin-right:6px}
+.recruit-stand-dot.you1{background:#34EC27;box-shadow:0 0 7px rgba(52,236,39,.6)}
+.recruit-stand-dot.list{background:#f2c14e}
+.recruit-stand-chip{display:inline-block;vertical-align:middle;margin-left:6px;font:700 8.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.03em;padding:2px 5px;border-radius:4px}
+.recruit-stand-chip.you1{color:#a9ff9c;background:rgba(52,236,39,.14);border:1px solid rgba(52,236,39,.42)}
+.recruit-stand-chip.list{color:#ffdf9e;background:rgba(242,193,78,.13);border:1px solid rgba(242,193,78,.4)}

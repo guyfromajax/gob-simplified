@@ -274,6 +274,11 @@
     var onActionClick = options && options.onActionClick;
     var getActionLabel = options && options.getActionLabel;
     var franchiseId = options && options.franchiseId;
+    // When a user team id is supplied, render the shared ranked-ladder lean object
+    // (identical markup to the hub) instead of the legacy comma-separated text cell.
+    var userTeamId = options && options.userTeamId != null ? options.userTeamId : null;
+    var teamNameMap = (options && options.teamNameMap) || {};
+    var useLadder = userTeamId != null && global.RecruitingSpine && global.RecruitingSpine.Lean;
     tbody.innerHTML = '';
 
     recruits.forEach(function (recruit) {
@@ -307,7 +312,11 @@
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
         '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
-        '<td>' + (recruit.leanDisplay || '--') + '</td>',
+        useLadder
+          ? '<td class="lean-ladder-cell">' + global.RecruitingSpine.Lean.ladderHtml(
+              global.RecruitingSpine.Lean.fromBackend({ Lean: recruit.lean }, { userTeamId: userTeamId, teamNameMap: teamNameMap })
+            ) + '</td>'
+          : '<td>' + (recruit.leanDisplay || '--') + '</td>',
         onActionClick ? '<td><button class="recruiting-row-action-btn" type="button">' + (getActionLabel ? getActionLabel(recruit, selectedIds.has(recruit.recruitId)) : '+') + '</button></td>' : ''
       ].join('');
       if (onActionClick) {
