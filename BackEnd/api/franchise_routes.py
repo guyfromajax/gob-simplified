@@ -8552,19 +8552,43 @@ def _training_report_recruiting_display(
     fid_str = str(fid)
     tid_str = str(user_team_object_id)
 
+    # Structured item (recruit_id, name, pos, rt, lean) so the callout can render the
+    # shared ranked lean-ladder instead of a text string. Lean values are stringified
+    # (they may be stored as ObjectId or str) so they match team_name_map keys client-side.
+    def _lean_strkeys(lean):
+        lean = lean or {}
+        out = {}
+        for s in ("1", "2", "3"):
+            v = lean.get(s)
+            out[s] = None if v is None else ("open" if v == "open" else str(v))
+        return out
+
+    def _rec_item(r):
+        prs = r.get("position_ratings") or {}
+        best_pos = max(prs, key=lambda p: prs.get(p) or 0) if prs else "--"
+        return {
+            "recruit_id": str(r.get("recruit_id") or ""),
+            "name": _recruit_display_name_for_training_report(r),
+            "pos": best_pos,
+            "rt": _recruit_rt(r),
+            "lean": _lean_strkeys(r.get("Lean")),
+        }
+
+    _proj = {"name": 1, "first_name": 1, "last_name": 1, "position_ratings": 1, "recruit_id": 1, "Lean": 1}
+
     if 20 <= w <= 26:
         rid = _user_week_visit_recruit_id(franchise_doc.get("recruiting_results"), w, tid_str)
         if not rid:
-            return {"header": "Recruiting Visit", "meta_line": None}
+            return {"header": "Recruiting Visit", "meta_line": None, "recruits": [], "total": 0}
         recruit = franchise_recruits_data_collection.find_one(
-            {"franchise_id": fid_str, "recruit_id": rid},
-            {"name": 1, "first_name": 1, "last_name": 1, "position_ratings": 1, "recruit_id": 1},
+            {"franchise_id": fid_str, "recruit_id": rid}, _proj,
         )
         if not recruit:
-            return {"header": "Recruiting Visit", "meta_line": None}
+            return {"header": "Recruiting Visit", "meta_line": None, "recruits": [], "total": 0}
         nm = _recruit_display_name_for_training_report(recruit)
         rt = _recruit_rt(recruit)
-        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {rt}"}
+        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {rt}",
+                "recruits": [_rec_item(recruit)], "total": 1}
 
     if (1 <= w <= 19) or (27 <= w <= 34):
         lean_or = []
@@ -8576,20 +8600,20 @@ def _training_report_recruiting_display(
                 pass
         recruits = list(
             franchise_recruits_data_collection.find(
-                {"franchise_id": fid_str, "$or": lean_or},
-                {"name": 1, "first_name": 1, "last_name": 1, "position_ratings": 1, "recruit_id": 1},
+                {"franchise_id": fid_str, "$or": lean_or}, _proj,
             )
         )
         recruits.sort(key=lambda r: (-_recruit_rt(r), str(r.get("recruit_id") or "")))
         header = "Recruits Leaning Your Way"
         if not recruits:
-            return {"header": header, "meta_line": ""}
+            return {"header": header, "meta_line": "", "recruits": [], "total": 0}
         top = recruits[:3]
         parts = [f"{_recruit_display_name_for_training_report(r)} - RT: {_recruit_rt(r)}" for r in top]
         line = ", ".join(parts)
         if len(recruits) > 3:
             line += " ..."
-        return {"header": header, "meta_line": line}
+        return {"header": header, "meta_line": line,
+                "recruits": [_rec_item(r) for r in top], "total": len(recruits)}
 
     return None
 
@@ -13397,11 +13421,18 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
 
         rec_header = None
         rec_meta = None
+        rec_recruits = []          # structured recruits (recruit_id/name/pos/rt/lean) for the ladder
+        rec_total = 0
+        rec_team_name_map = {}     # team_id → name, so the ladder can resolve team tokens
         if mode == "franchise" and isinstance(report_data, dict):
             try:
                 report_week_int = int(week)
             except (TypeError, ValueError):
                 report_week_int = 0
+            # Compute the structured display once; header/meta still prefer the saved snapshot.
+            rec_struct = _training_report_recruiting_display(
+                doc, report_week_int, str(authoritative_team_id)
+            )
             visit_window = 20 <= report_week_int <= 26
             rec_header_snap = report_data.get("recruiting_header")
             rec_meta_snap = report_data.get("recruiting_meta_line")
@@ -13419,13 +13450,18 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             if keys_present and not stale_visit_strip:
                 rec_header = rec_header_snap
                 rec_meta = rec_meta_snap
-            else:
-                rec_snap = _training_report_recruiting_display(
-                    doc, report_week_int, str(authoritative_team_id)
-                )
-                if rec_snap is not None:
-                    rec_header = rec_snap.get("header")
-                    rec_meta = rec_snap.get("meta_line")
+            elif rec_struct is not None:
+                rec_header = rec_struct.get("header")
+                rec_meta = rec_struct.get("meta_line")
+            # Structured recruits + team_name_map are never in the saved snapshot → always fresh.
+            if rec_struct is not None:
+                rec_recruits = rec_struct.get("recruits") or []
+                rec_total = int(rec_struct.get("total") or 0)
+                if rec_recruits:
+                    rec_team_name_map = {
+                        str(team["_id"]): team.get("name", str(team["_id"]))
+                        for team in db.teams.find({}, {"name": 1})
+                    }
 
         return {
             "status": "success",
@@ -13446,6 +13482,10 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "projected_starting_five": projected_starting_five,
             "recruiting_header": rec_header if mode == "franchise" else None,
             "recruiting_meta_line": rec_meta if mode == "franchise" else None,
+            "recruiting_recruits": rec_recruits if mode == "franchise" else None,
+            "recruiting_total": rec_total if mode == "franchise" else None,
+            "recruiting_team_name_map": rec_team_name_map if mode == "franchise" else None,
+            "recruiting_team_id": str(authoritative_team_id) if mode == "franchise" else None,
         }
         
     except HTTPException:

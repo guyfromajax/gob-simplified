@@ -570,12 +570,53 @@ function renderTrainingReportRecruitingBanner() {
   if (!titleEl || !metaLineEl) return;
 
   const h = reportData && reportData.recruiting_header != null ? String(reportData.recruiting_header).trim() : '';
-  const mRaw = reportData && reportData.recruiting_meta_line != null ? reportData.recruiting_meta_line : '';
-  const m = mRaw === null || mRaw === undefined ? '' : String(mRaw).trim();
-
   titleEl.textContent = h;
   titleEl.classList.toggle('is-hidden', !h);
 
+  // Preferred: render each recruit's lean as the shared ranked ladder (identical markup to the
+  // hub pool). Read-only; RT colored on the recruit scale; links through to the hub.
+  const recruits = reportData && Array.isArray(reportData.recruiting_recruits) ? reportData.recruiting_recruits : [];
+  const teamNameMap = (reportData && reportData.recruiting_team_name_map) || {};
+  const recruitTeamId = reportData && reportData.recruiting_team_id;
+  const total = Number((reportData && reportData.recruiting_total) || recruits.length);
+  const Spine = window.RecruitingSpine;
+  if (recruits.length && recruitTeamId && Spine && Spine.Lean) {
+    metaLineEl.textContent = '';
+    metaLineEl.classList.remove('is-hidden');
+    const list = document.createElement('div');
+    list.className = 'trr-lean-list';
+    recruits.forEach(function (rec) {
+      const model = Spine.Lean.fromBackend({ Lean: rec.lean }, { userTeamId: recruitTeamId, teamNameMap: teamNameMap });
+      const rtCls = typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(rec.rt) : '';
+      const row = document.createElement('div');
+      row.className = 'trr-lean-row';
+      row.innerHTML =
+        '<span class="trr-lean-name">' + Spine.esc(rec.name) + '</span>' +
+        '<span class="trr-lean-pos">' + Spine.esc(rec.pos) + '</span>' +
+        '<span class="trr-lean-rt ' + rtCls + '">' + (rec.rt != null ? rec.rt : '--') + '</span>' +
+        Spine.Lean.ladderHtml(model);
+      list.appendChild(row);
+    });
+    metaLineEl.appendChild(list);
+    const foot = document.createElement('div');
+    foot.className = 'trr-lean-foot';
+    const moreN = Math.max(0, total - recruits.length);
+    const link = document.createElement('a');
+    link.className = 'trr-hub-link';
+    const params = new URLSearchParams();
+    if (franchiseId) params.set('franchise_id', franchiseId);
+    if (teamId) params.set('team_id', teamId);
+    params.set('from', 'training-report');
+    link.href = '/recruiting.html?' + params.toString();
+    link.textContent = (moreN > 0 ? '+' + moreN + ' more · ' : '') + 'View in Recruiting Hub →';
+    foot.appendChild(link);
+    metaLineEl.appendChild(foot);
+    return;
+  }
+
+  // Fallback: legacy comma text meta line with RT highlighting (old cached reports / no spine).
+  const mRaw = reportData && reportData.recruiting_meta_line != null ? reportData.recruiting_meta_line : '';
+  const m = mRaw === null || mRaw === undefined ? '' : String(mRaw).trim();
   metaLineEl.textContent = '';
   metaLineEl.classList.toggle('is-hidden', !m);
   if (!m) return;

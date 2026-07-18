@@ -31,7 +31,7 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 | **3** | D3 Signing Board (wk 35) — pool-as-worksheet, 50-pt budget, binding Playing-Time promise, live sign-odds | **DONE** — signing surface in hub; wired to existing wk-35 save+run; verified |
 | **4** | D4 Results — hub **states** (weekly overlay + wk-36 signed pool), not a route | **DONE** — calendar-driven states, real data, verified |
 | **5** | D5 Consistency sweep — FCC Recruits tab + Home/Coach cards + tutorial + final cutover | **DONE** — ladder everywhere, phase-aware footnote, forked pages redirected; verified |
-| 6 | Training Report recent-leans callout — reuse the ladder markup | pending |
+| **6** | Training Report recent-leans callout — reuse the ladder markup | **DONE** — structured recruits added to endpoint; ladder callout + hub link; verified |
 
 ## Prompt 0 — shipped
 - `FrontEnd/static/css/fonts.css` (new) — canonical Bebas Neue Pro `@font-face`, loaded app-wide.
@@ -77,6 +77,14 @@ Backend `franchise_recruits_data_collection.Lean = {"1": team_id|"open"|null, "2
 - **Tutorial** (`tutorial-recruiting.html`): "Recruiting Day" → **"Signing Day"** throughout; the stale Signing-Day 20-recruit cap replaced with "no cap … only the 50 points" (the wks-20–26 "up to 20" invite cap is correct and kept); 50-pt + ladder/RT explainers preserved.
 - **Final cutover:** `recruiting-invites/orders/results.html` now client-redirect to `recruiting.html` (preserving franchise/team/return params). All main entry points (FCC footnote, FCC full-list, Training invite button) route to the hub. Old page bodies left in place behind the redirect (git-recoverable).
 - Verified headless: FCC tab renders 5 ladders (is-you / is-you-list), **0 comma-lean cells**, Year present; home-card dots + chips; footnote strings for wks 12/22/35/36; tutorial rename + cap fix; zero console errors.
+
+## Prompt 6 — shipped
+- **Training Report recent-leans callout** now renders the shared ranked ladder per recruit instead of a "Name - RT: N" text line. Loads `recruiting-spine.js` + `recruiting-lean-ladder.css`; ladder is byte-identical to the hub (same `RecruitingSpine.Lean.ladderHtml`). RT colored on the recruit scale (`getRecruitRtBucketClass`), read-only, with a "+N more · View in Recruiting Hub →" link. No "Recruiting Day" wording existed to rename.
+- **Backend (additive):** `_training_report_recruiting_display` now also returns a structured `recruits` list (`{recruit_id, name, pos, rt, lean}`, `Lean` added to the projection + stringified) + `total`; `GET /franchise/training-report` exposes `recruiting_recruits`, `recruiting_total`, `recruiting_team_name_map`, `recruiting_team_id`. Legacy `recruiting_header`/`recruiting_meta_line` kept; the frontend falls back to the old RT-highlighted text when structured data is absent (old cached reports).
+- Verified headless: 3 ladders (is-you / is-you-list), RT recruit-scale colored, hub link + "+N more", **no comma text**, zero errors.
+
+## Project status: COMPLETE (Prompts 0–6 all shipped, uncommitted)
+The recruiting experience is a single phase-aware hub (`recruiting.html`) with the lean ladder, phase strip, and pool anchor as the shared spine; every recruit surface (hub, FCC tab, FCC cards, training report) renders the identical lean object; forked pages redirect to the hub. Optional future polish: swap the Signing-Day placeholder odds for real math (league-relative); surface available roster spots on the signing board; add a backend "dropped-you" signal for the passive story strip; add a real loyalty flag for the lock badge.
 
 ## Deferred backend items (do NOT bury in a UI prompt)
 1. ~~Invite-loop decouple~~ — **decided AGAINST** (Prompt 2). Execution stays in Run Training by design; do not relocate it.
