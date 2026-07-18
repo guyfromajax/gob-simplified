@@ -166,7 +166,7 @@ body.homepage-v2.has-auth-bar {
 }
 
 .carousel-slide-content h1 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: clamp(2.25rem, 5.5vw, 3.75rem);
   line-height: 1.1;
   margin: 0 0 var(--spacing-sm);
@@ -190,7 +190,7 @@ body.homepage-v2.has-auth-bar {
   align-items: center;
   justify-content: center;
   padding: 0.75rem 1.75rem;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1rem;
   font-weight: 600;
   color: #fff;

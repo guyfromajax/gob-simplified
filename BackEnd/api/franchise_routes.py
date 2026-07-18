@@ -8383,6 +8383,34 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
     else:
         doc["lean_display"] = "Open" if top_lean == "open" else "--"
 
+    # After week-35 recruiting runs, FRD Lean is stale — signed school lives on the
+    # franchise results map (same source recruiting.html week-36 uses).
+    doc["is_signed"] = False
+    doc["signed_team_name"] = None
+    doc["signed_display"] = None
+    try:
+        franchise_oid = ObjectId(str(franchise_id))
+    except Exception:
+        franchise_oid = None
+    if franchise_oid is not None:
+        franchise_doc = db.franchises.find_one(
+            {"_id": franchise_oid},
+            {"week_35_recruiting_ran": 1, WEEK_35_RECRUITING_RESULTS_FIELD: 1},
+        ) or {}
+        if franchise_doc.get("week_35_recruiting_ran"):
+            results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+            by_id = results.get("signed_by_recruit_id") or {}
+            signed_info = by_id.get(str(recruit_id)) if isinstance(by_id, dict) else None
+            if isinstance(signed_info, dict):
+                team_name = str(signed_info.get("team_name") or "").strip()
+                walk_on = bool(signed_info.get("walk_on"))
+                doc["is_signed"] = True
+                doc["signed_team_name"] = team_name or None
+                if team_name:
+                    doc["signed_display"] = f"{team_name} (walk on)" if walk_on else team_name
+                else:
+                    doc["signed_display"] = "--"
+
     return doc
 
 
@@ -10833,10 +10861,27 @@ def get_recruiting_data(
         for team in db.teams.find({}, {"name": 1})
     }
 
+    # Recruiting Hub passive "story strip" + row "New" badge: the recruits that recently
+    # added the user's team to their lean list. Mirrors the FCC-card computation
+    # (FCC_PENDING_NEW_LEAN_RECRUITS_FIELD ∩ recruits leaning to the user, gated on a
+    # played game). "Dropped you" has no backend signal yet and is intentionally omitted.
+    new_lean_recruit_ids = []
+    pending_new_lean_ids = [
+        str(rid) for rid in (franchise_doc.get(FCC_PENDING_NEW_LEAN_RECRUITS_FIELD) or []) if rid
+    ]
+    if pending_new_lean_ids and _find_user_last_completed_game(franchise_doc, str(user_team_id)):
+        user_lean_ids = set()
+        for _rec in recruits:
+            _lean = _rec.get("Lean") or {}
+            if str(user_team_id) in {str(_lean.get("1")), str(_lean.get("2")), str(_lean.get("3"))}:
+                user_lean_ids.add(str(_rec.get("recruit_id")))
+        new_lean_recruit_ids = [rid for rid in pending_new_lean_ids if rid in user_lean_ids]
+
     return {
         "team": team_name,
         "team_id": user_team_id,
         "week": franchise_doc.get("week", 1),
+        "new_lean_recruit_ids": new_lean_recruit_ids,
         "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,
         "saved_orders": saved_orders,
         "saved_orders_week_35": saved_week_35_orders,

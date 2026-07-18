@@ -38,7 +38,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .pd-shell {
@@ -116,7 +116,7 @@ input[type="reset"] {
 .pd-player-name {
   margin-top: 12px;
   text-align: center;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 36px;
   line-height: 1.1;
   color: #ffffff;
@@ -149,7 +149,7 @@ input[type="reset"] {
 }
 
 .pd-overall-value {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 72px;
   line-height: 1;
   color: #F79420;
@@ -308,7 +308,7 @@ input[type="reset"] {
 
 .pd-section-header {
   display: block;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 20px;
   color: #ffffff;
   border-bottom: 2px solid #F79420;
@@ -459,7 +459,7 @@ input[type="reset"] {
 }
 
 .pd-error-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 24px;
   color: #ff6d6d;
   letter-spacing: 0.03em;

@@ -40,13 +40,17 @@ class _MockCollection:
 
 
 class _MockDb:
-    def __init__(self, teams):
+    def __init__(self, teams, franchises=None):
         self.teams = _MockCollection(teams)
+        self.franchises = _MockCollection(franchises if franchises is not None else [])
 
+
+FRANCHISE_OID = ObjectId("6a5b8beb332cb691f1fa043b")
+FRANCHISE_ID = str(FRANCHISE_OID)
 
 RECRUIT = {
     "_id": "mongo1",
-    "franchise_id": "f1",
+    "franchise_id": FRANCHISE_ID,
     "recruit_id": "r1",
     "image_id": "img1",
     "name": "Test Recruit",
@@ -62,7 +66,7 @@ RECRUIT = {
 }
 
 
-def _patch(monkeypatch, recruits, teams=None):
+def _patch(monkeypatch, recruits, teams=None, franchises=None):
     monkeypatch.setattr(
         franchise_routes,
         "franchise_recruits_data_collection",
@@ -71,14 +75,17 @@ def _patch(monkeypatch, recruits, teams=None):
     monkeypatch.setattr(
         franchise_routes,
         "db",
-        _MockDb(teams if teams is not None else [{"_id": LEAN_TEAM_OID, "name": "Seattle AAA"}]),
+        _MockDb(
+            teams if teams is not None else [{"_id": LEAN_TEAM_OID, "name": "Seattle AAA"}],
+            franchises=franchises if franchises is not None else [{"_id": FRANCHISE_OID}],
+        ),
     )
 
 
 def test_recruit_endpoint_returns_recruit(monkeypatch):
     _patch(monkeypatch, [RECRUIT])
 
-    resp = client.get("/recruit/r1?franchise_id=f1")
+    resp = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}")
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "Test Recruit"
@@ -86,6 +93,7 @@ def test_recruit_endpoint_returns_recruit(monkeypatch):
     assert data["is_recruit"] is True
     assert data["attributes"]["SC"] == 80
     assert data["position_ratings"]["PG"] == 92
+    assert data["is_signed"] is False
     # projection strips mongo internals
     assert "_id" not in data
     assert "franchise_id" not in data
@@ -97,7 +105,7 @@ def test_recruit_endpoint_surfaces_ps_stats_as_season(monkeypatch):
     recruit = dict(RECRUIT, ps_season_stats={"PTS": 42, "FGM": 15, "FGA": 30, "GP": 4})
     _patch(monkeypatch, [recruit])
 
-    resp = client.get("/recruit/r1?franchise_id=f1")
+    resp = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}")
     assert resp.status_code == 200
     data = resp.json()
     assert data["season"]["PTS"] == 42
@@ -109,7 +117,7 @@ def test_recruit_endpoint_season_empty_when_never_played(monkeypatch):
     """ps_season_stats is created lazily on first PS game, so absent is normal."""
     _patch(monkeypatch, [RECRUIT])
 
-    data = client.get("/recruit/r1?franchise_id=f1").json()
+    data = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}").json()
     assert data["season"] == {}
 
 
@@ -117,7 +125,7 @@ def test_recruit_endpoint_resolves_lean_team_name(monkeypatch):
     """Lean stores a stringified ObjectId; the page must show the team NAME."""
     _patch(monkeypatch, [RECRUIT])
 
-    data = client.get("/recruit/r1?franchise_id=f1").json()
+    data = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}").json()
     assert data["lean_display"] == "Seattle AAA"
     # Regression: a {"_id": <str>} lookup misses (teams._id is an ObjectId) and
     # used to fall back to echoing the raw id into the UI.
@@ -128,7 +136,7 @@ def test_recruit_endpoint_lean_never_leaks_raw_id(monkeypatch):
     """If the team can't be resolved, show '--' rather than a raw id."""
     _patch(monkeypatch, [RECRUIT], teams=[])
 
-    data = client.get("/recruit/r1?franchise_id=f1").json()
+    data = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}").json()
     assert str(LEAN_TEAM_OID) not in data["lean_display"]
 
 
@@ -136,14 +144,63 @@ def test_recruit_endpoint_open_lean(monkeypatch):
     recruit = dict(RECRUIT, Lean={"1": "open", "2": None, "3": None})
     _patch(monkeypatch, [recruit])
 
-    data = client.get("/recruit/r1?franchise_id=f1").json()
+    data = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}").json()
     assert data["lean_display"] == "Open"
+
+
+def test_recruit_endpoint_signed_after_week_35(monkeypatch):
+    """After week-35 recruiting, detail page shows signed school (not lean)."""
+    franchises = [
+        {
+            "_id": FRANCHISE_OID,
+            "week_35_recruiting_ran": True,
+            "week_35_recruiting_results": {
+                "signed_by_recruit_id": {
+                    "r1": {
+                        "team_id": str(LEAN_TEAM_OID),
+                        "team_name": "Xavien Prep",
+                        "walk_on": False,
+                    }
+                }
+            },
+        }
+    ]
+    _patch(monkeypatch, [RECRUIT], franchises=franchises)
+
+    data = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}").json()
+    assert data["is_signed"] is True
+    assert data["signed_team_name"] == "Xavien Prep"
+    assert data["signed_display"] == "Xavien Prep"
+    # Lean still resolved for older clients / debugging, but UI prefers signed.
+    assert data["lean_display"] == "Seattle AAA"
+
+
+def test_recruit_endpoint_signed_walk_on_suffix(monkeypatch):
+    franchises = [
+        {
+            "_id": FRANCHISE_OID,
+            "week_35_recruiting_ran": True,
+            "week_35_recruiting_results": {
+                "signed_by_recruit_id": {
+                    "r1": {
+                        "team_id": str(LEAN_TEAM_OID),
+                        "team_name": "Xavien Prep",
+                        "walk_on": True,
+                    }
+                }
+            },
+        }
+    ]
+    _patch(monkeypatch, [RECRUIT], franchises=franchises)
+
+    data = client.get(f"/recruit/r1?franchise_id={FRANCHISE_ID}").json()
+    assert data["signed_display"] == "Xavien Prep (walk on)"
 
 
 def test_recruit_endpoint_unknown_recruit_404(monkeypatch):
     _patch(monkeypatch, [RECRUIT])
 
-    assert client.get("/recruit/nope?franchise_id=f1").status_code == 404
+    assert client.get(f"/recruit/nope?franchise_id={FRANCHISE_ID}").status_code == 404
 
 
 def test_recruit_endpoint_scoped_to_franchise(monkeypatch):

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruiting Hub — Spine Foundation (Prompt 0 QA)</title>
+<!-- Body font (Inter) + Bebas Neue fallback via Google; Bebas Neue Pro via app-wide fonts.css -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/fonts.css">
+<link rel="stylesheet" href="/css/rt-buckets.css">
+<link rel="stylesheet" href="/recruiting-spine.css">
+<style>
+  /* QA-gallery-only scaffolding (not part of the shipped spine) */
+  .qa-note{margin-top:10px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surf);font-size:12.5px;color:var(--muted);line-height:1.6;max-width:80ch}
+  .qa-note code{color:#ffc878;font-size:11.5px}
+  .qa-topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;padding:14px 0;background:rgba(11,13,20,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);margin-bottom:8px}
+  .qa-topbar .spine-h{margin-right:auto}
+  .pool-wrap{scroll-margin-top:80px}
+  .pool-stub{border:1px dashed var(--muted-3);border-radius:14px;padding:34px 20px;text-align:center;color:var(--muted-2);font-size:13px;line-height:1.6}
+  .pool-stub b{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<div class="doc">
+  <div class="qa-topbar">
+    <span class="spine-h">Recruiting <b>Hub</b> — Spine Foundation</span>
+    <span id="anchor-mount"></span>
+  </div>
+
+  <div class="doc-head">
+    <div class="doc-eyebrow">Prompt 0 · Foundation</div>
+    <div class="doc-title">Spine Components</div>
+    <p class="doc-lede">QA harness for the shared building blocks — the <strong>lean ladder</strong>, the <strong>phase strip</strong>, and the persistent <strong>Recruit Pool anchor</strong>. No live pages are touched; later prompts assemble these into the hub. Rendered by the vanilla <code>RecruitingSpine</code> module (not React).</p>
+  </div>
+
+  <!-- LEAN OBJECT GALLERY -->
+  <section class="sec" id="lean-sec">
+    <div class="sec-kicker"><span class="sec-num">1</span><span class="sec-tag">Lean Object · Ranked Ladder (variant B)</span></div>
+    <div class="sec-title">Every lean state</div>
+    <p class="sec-desc">Your slot glows <strong>green at #1</strong>, <strong>amber on-list (#2–3)</strong>; rival slots neutral; open slots dashed; a lock badge sits on a rival's #1 for a loyal target. RT color uses the <strong>year-aware scale</strong> (recruit scale for JH; player scale for FR/SO/JR).</p>
+    <div id="lean-gallery" class="lean-gallery"></div>
+  </section>
+
+  <!-- PHASE STRIP -->
+  <section class="sec" id="phase-sec">
+    <div class="sec-kicker"><span class="sec-num">2</span><span class="sec-tag">Phase Strip · calendar-driven</span></div>
+    <div class="sec-title">All four phases</div>
+    <p class="sec-desc">Compact “Week NN · Phase” that expands to the season timeline. The phase is chosen by the calendar — the user never picks it. Click <strong>Season</strong> on any strip to expand.</p>
+    <div id="phase-demos" class="phase-demos"></div>
+  </section>
+
+  <!-- POOL ANCHOR TARGET -->
+  <section class="sec" id="pool-sec">
+    <div class="sec-kicker"><span class="sec-num">3</span><span class="sec-tag">Recruit Pool anchor target</span></div>
+    <div class="sec-title">Recruit Pool</div>
+    <p class="sec-desc">The header anchor scrolls here and (in later prompts) dismisses any active overlay. The full sortable/filterable pool arrives in Prompt 1 (D1).</p>
+    <div class="pool-wrap">
+      <div class="pool-stub"><b>Recruit Pool</b> — the persistent left/main column. Assembled in Prompt 1. This stub is the anchor's scroll target.</div>
+    </div>
+  </section>
+</div>
+
+<script src="/js/shared/rtBucket.js"></script>
+<script src="/js/shared/playerYear.js"></script>
+<script src="/recruiting-spine-data.js"></script>
+<script src="/recruiting-spine.js"></script>
+<script>
+(function () {
+  var S = window.RecruitingSpine;
+  var D = window.SpineData;
+  var yearAbbr = (window.GOB_PlayerYear && window.GOB_PlayerYear.formatAbbrev) || function (y) { return y; };
+
+  // ---- 1. Lean-object gallery: render every state through the shared ladder ----
+  var gallery = document.getElementById('lean-gallery');
+  gallery.innerHTML = D.leanStates.map(function (st) {
+    var rec = st.rec;
+    var model = S.Lean.fromMock(rec, D.TEAM_NAME, D.abbr);
+    var rtCls = S.rtClassForYear(rec.rt, rec.year);
+    return '' +
+      '<div>' +
+        '<div class="state-cap"><b>' + S.esc(st.label) + '</b> — ' + S.esc(st.hint) + '</div>' +
+        '<div class="ctx-rows"><div class="ctx-row">' +
+          '<div class="ctx-name">' + S.esc(rec.name) + '<small>' + S.esc(rec.archetype) + '</small></div>' +
+          '<div class="ctx-pos">' + S.esc(rec.pos) + '</div>' +
+          '<div class="ctx-year">' + S.esc(yearAbbr(rec.year)) + '</div>' +
+          '<div class="ctx-rt-wrap"><span class="ctx-rt ' + rtCls + '">' + S.esc(rec.rt) + '</span><span class="ctx-rt-cap">RT</span></div>' +
+          '<div class="lean-slot-wrap">' + S.Lean.ladderHtml(model) + '</div>' +
+        '</div></div>' +
+      '</div>';
+  }).join('');
+
+  // ---- 2. Phase strip: all four phases, each independently expandable ----
+  var WEEK = { passive: 12, invite: 22, day: 35, results: 36 };
+  var demos = document.getElementById('phase-demos');
+  Object.keys(WEEK).forEach(function (phase) {
+    var wrap = document.createElement('div');
+    wrap.className = 'phase-demo';
+    var cap = document.createElement('div');
+    cap.className = 'phase-demo-cap';
+    cap.textContent = 'Phase: ' + phase + ' (week ' + WEEK[phase] + ')';
+    var body = document.createElement('div');
+    body.innerHTML = S.Phase.stripHtml({ phase: phase, week: WEEK[phase], inviteSent: 3, points: 38, open: false });
+    wrap.appendChild(cap);
+    wrap.appendChild(body);
+    demos.appendChild(wrap);
+    S.Phase.bind(body);
+  });
+
+  // Sanity: confirm calendar-driven phase resolution matches the demos.
+  console.assert(S.Phase.forWeek(12) === 'passive', 'wk12 → passive');
+  console.assert(S.Phase.forWeek(22) === 'invite', 'wk22 → invite');
+  console.assert(S.Phase.forWeek(30) === 'passive', 'wk30 → passive (Tournament)');
+  console.assert(S.Phase.forWeek(35) === 'day', 'wk35 → day');
+  console.assert(S.Phase.forWeek(36) === 'results', 'wk36 → results');
+
+  // ---- 3. Recruit Pool anchor: present in the header, scrolls to the pool ----
+  var mount = document.getElementById('anchor-mount');
+  mount.innerHTML = S.Anchor.html();
+  S.Anchor.bind(mount.querySelector('.hub-anchor'), { poolSelector: '.pool-wrap' });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+/* ============================================================
+   GOB Brand Fonts — canonical @font-face source (loaded app-wide)
+   ------------------------------------------------------------
+   Bebas Neue Pro is the mandated display font per the Style Guide
+   (_documentation_master/11_Design_Systems/Styleguide.md). The OTFs
+   live at /fonts/ and were previously orphaned (no @font-face) — every
+   "Bebas Neue Pro" stack in the app silently fell through to Google
+   "Bebas Neue". This file wires Pro up once, globally, so the whole
+   product renders the real brand face with "Bebas Neue" as the fallback.
+
+   Body font (Inter) continues to load via each page's Google Fonts link.
+   ============================================================ */
+@font-face {
+  font-family: 'Bebas Neue Pro';
+  src: url('/fonts/BebasNeuePro-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Bebas Neue Pro';
+  src: url('/fonts/BebasNeuePro-Book.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Bebas Neue Pro';
+  src: url('/fonts/BebasNeuePro-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

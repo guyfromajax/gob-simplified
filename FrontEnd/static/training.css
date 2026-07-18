@@ -43,7 +43,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .training-container {
@@ -719,7 +719,7 @@ body.training-page .training-header {
 
 body.training-page .page-title {
   margin: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 2.2rem;
   line-height: 0.95;
   letter-spacing: 0.03em;
@@ -737,7 +737,7 @@ body.training-page .header-center {
 
 body.training-page .points-display {
   margin-top: 4px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   line-height: 1;
   letter-spacing: 0.06em;
@@ -874,7 +874,7 @@ body.training-page .coaching-section {
 body.training-page .section-header,
 body.training-page .coaching-title {
   margin: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.65rem;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -1119,7 +1119,7 @@ body.training-page .playbook-mode-btn {
   min-height: 44px;
   padding: 0 20px;
   border-radius: 10px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 17px;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -1353,7 +1353,7 @@ body.training-page .custom-focus-modal-content {
 }
 
 body.training-page .custom-focus-modal-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 28px;
   letter-spacing: 0.03em;
   color: #ffffff;
@@ -1423,7 +1423,7 @@ body.training-page .req-bar {
 }
 
 body.training-page .req-bar-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.06em;
   color: rgba(255, 255, 255, 0.66);
@@ -1488,7 +1488,7 @@ body.training-page .req-chip-label {
 }
 
 body.training-page .req-chip-value {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.03em;
   line-height: 1.05;
@@ -1568,7 +1568,7 @@ body.training-page .req-focus-nudge:hover {
 
 body.training-page .req-readout {
   flex: 0 0 auto;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.05em;
   color: rgba(255, 255, 255, 0.66);
@@ -1630,7 +1630,7 @@ body.training-page .archetype-block[data-archetype] .archetype-header {
 }
 
 body.training-page .archetype-block[data-archetype] .archetype-name {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   font-weight: 400;
   letter-spacing: 0.03em;
@@ -1757,7 +1757,7 @@ body.training-page .has-tooltip { cursor: help; }
 }
 .training-tooltip .tt-attr { font-weight: 700; color: #ffffff; font-size: 13px; }
 .training-tooltip .tt-eyebrow {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
   letter-spacing: 0.06em;
   text-transform: uppercase;

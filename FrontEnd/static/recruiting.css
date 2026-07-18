@@ -11,7 +11,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .recruiting-page {
@@ -40,7 +40,7 @@ input[type="reset"] {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   cursor: pointer;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-weight: 700;
 }
 
@@ -137,7 +137,7 @@ input[type="reset"] {
 .invite-dock-title-wrap h2 {
   margin: 0 0 8px;
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 26px;
   line-height: 1;
   letter-spacing: 0.05em;
@@ -173,7 +173,7 @@ input[type="reset"] {
 
 .position-count {
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   line-height: 1;
   letter-spacing: 0.03em;
@@ -231,7 +231,7 @@ input[type="reset"] {
 
 .leaning-count {
   color: var(--gob-green);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   line-height: 1;
 }
@@ -256,7 +256,7 @@ input[type="reset"] {
   align-self: center;
   white-space: nowrap;
   color: var(--gob-orange);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 36px;
   line-height: 1;
   letter-spacing: 0.03em;
@@ -347,7 +347,7 @@ input[type="reset"] {
 
 .slot-rank {
   color: var(--gob-orange);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   line-height: 1;
 }
@@ -434,7 +434,7 @@ input[type="reset"] {
 }
 
 .recruiting-pool-header h2 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   letter-spacing: 0.05em;
 }
@@ -558,7 +558,7 @@ input[type="reset"] {
   border-radius: 999px;
   background: rgba(247, 148, 32, 0.16);
   color: var(--gob-orange);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   cursor: pointer;
 }
@@ -826,7 +826,7 @@ input[type="reset"] {
   border-radius: 10px;
   background: rgba(52, 236, 39, 0.16);
   color: #d9ffd6;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-weight: 700;
   cursor: pointer;
 }
@@ -896,7 +896,7 @@ input[type="reset"] {
 .recruiting-results-region h3 {
   margin-bottom: 10px;
   color: #f7f9ff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   letter-spacing: 0.03em;
 }
 
@@ -1015,7 +1015,7 @@ input[type="reset"] {
 }
 .toast-title {
   color: #fff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.04em;
 }
@@ -1091,7 +1091,7 @@ input[type="reset"] {
   color: rgba(255, 255, 255, 0.5);
 }
 .budget-points-value {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   line-height: 1;
 }
 .budget-points-value strong {
@@ -1134,7 +1134,7 @@ input[type="reset"] {
   gap: 3px;
 }
 .budget-roster-value {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 26px;
   line-height: 1;
   color: #fff;
@@ -1163,7 +1163,7 @@ input[type="reset"] {
   gap: 6px;
 }
 .budget-ranked-num {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   line-height: 1;
 }
 .budget-ranked-num strong {
@@ -1200,7 +1200,7 @@ input[type="reset"] {
   gap: 1px;
 }
 .focus-pos-count {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   line-height: 1;
   color: rgba(255, 255, 255, 0.82);

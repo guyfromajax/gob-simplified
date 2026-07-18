@@ -11,7 +11,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .team-select-page {
@@ -45,7 +45,7 @@ input[type="reset"] {
 #page-title {
   margin: 0 0 8px;
   text-align: center;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 52px;
   line-height: 1;
   letter-spacing: 0.03em;
@@ -152,7 +152,7 @@ input[type="reset"] {
   bottom: 0;
   padding: 9px 12px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.78));
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.04em;
   color: #ffffff;
@@ -249,7 +249,7 @@ input[type="reset"] {
 
 .team-select-loading-title {
   margin: 26px 0 10px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 48px;
   line-height: 1;
   letter-spacing: 0.03em;

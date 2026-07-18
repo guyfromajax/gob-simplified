@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCC Recruits Tab — Lean Object Update</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="recruiting-spine.css">
+<style>
+body{background:var(--bg);color:var(--text);font-family:var(--body);margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding:40px 28px 90px}
+.eyebrow{font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--orange)}
+.h1{font:400 clamp(36px,5vw,58px)/.94 var(--display);letter-spacing:.01em;margin:12px 0 10px}
+.lede{font-size:14.5px;line-height:1.6;color:var(--muted);max-width:76ch;text-wrap:pretty}.lede strong{color:var(--text);font-weight:600}
+.blk{margin-top:34px}
+.blk-lbl{display:flex;align-items:center;gap:10px;font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
+.blk-lbl.before{color:#ffb3b3}.blk-lbl.after{color:#a9ff9c}
+.blk-lbl .tag{font-size:9px;padding:3px 7px;border-radius:5px}
+.blk-lbl.before .tag{color:#ffb3b3;background:rgba(255,109,109,.13);border:1px solid rgba(255,109,109,.32)}
+.blk-lbl.after .tag{color:#a9ff9c;background:rgba(52,236,39,.12);border:1px solid rgba(52,236,39,.3)}
+.fcard{border:1px solid var(--border);border-radius:14px;background:var(--panel);overflow:hidden}
+.fcard h3{font:400 20px/1 var(--display);letter-spacing:.04em;margin:0;padding:15px 18px 13px;border-bottom:1px solid var(--hair)}
+.scroll-x{overflow-x:auto}
+table.rt-tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
+.rt-tbl thead th{font:800 10px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);text-align:center;padding:11px 8px;border-bottom:1px solid var(--border);white-space:nowrap;background:rgba(255,255,255,.02)}
+.rt-tbl thead th.l{text-align:left;padding-left:16px}
+.rt-tbl tbody td{padding:0 8px;height:52px;text-align:center;border-bottom:1px solid rgba(255,255,255,.045);color:var(--muted)}
+.rt-tbl tbody td.l{text-align:left;padding-left:16px;color:#fff;font-weight:600;white-space:nowrap}
+.rt-tbl tbody tr:hover td{background:rgba(255,255,255,.03)}
+.rt-tbl tbody tr.is-new td{background:rgba(52,236,39,.07)}
+.rt-tbl tbody tr.is-new td.l{box-shadow:inset 3px 0 0 var(--green)}
+.year{font-weight:700;color:var(--muted-2);letter-spacing:.03em}
+.newbadge{display:inline-block;font:700 8px/1 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:#08130d;background:var(--green);padding:2px 5px;border-radius:4px;margin-right:7px;vertical-align:1px}
+.oldlean{text-align:left!important;color:var(--muted-2)!important;font-weight:400!important;font-style:italic;padding-left:14px;font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.leancell{padding-left:12px!important}
+.note{margin-top:12px;font-size:12.5px;color:var(--muted-2);display:flex;gap:9px;align-items:flex-start;text-wrap:pretty}
+.note svg{width:15px;height:15px;color:var(--orange);flex-shrink:0;margin-top:1px}.note strong{color:var(--muted);font-weight:600}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--muted-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:11px;height:11px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Recruiting Hub · D5 — Applied · FCC Recruits Tab</div>
+  <h1 class="h1">Leans, as an object — everywhere.</h1>
+  <p class="lede">The FCC <strong>Recruits</strong> tab is a read-only summary that links into the hub. Today its lean column is a comma-separated text cell — Problem C, still live here. This swaps it for the hub's <strong>lean object</strong> (ranked ladder + your standing) and adds the new <strong>Year</strong> column after POS. Same recruits, same table; just the two changes.</p>
+
+  <div class="blk">
+    <div class="blk-lbl before"><span class="tag">Before</span> Current lean = text cell · no Year</div>
+    <div class="fcard">
+      <h3>Recruits Leaning Your Way</h3>
+      <div class="scroll-x">
+        <table class="rt-tbl">
+          <thead><tr><th class="l">Name</th><th>Region</th><th>Pos</th><th>RT</th><th class="l" style="padding-left:14px">Current Lean</th></tr></thead>
+          <tbody>
+            <tr class="is-new"><td class="l"><span class="newbadge">New</span>Trey Coleman</td><td>B</td><td>SF</td><td class="rt-high">46</td><td class="oldlean">Whitnall, Four Corners, Lancaster</td></tr>
+            <tr class="is-new"><td class="l"><span class="newbadge">New</span>Quentin Diaz</td><td>G</td><td>PG</td><td class="rt-high">41</td><td class="oldlean">Four Corners, Whitnall</td></tr>
+            <tr><td class="l">Marcus Reedy</td><td>C</td><td>SG</td><td class="rt-high">47</td><td class="oldlean">Four Corners, Lancaster, Whitnall</td></tr>
+            <tr><td class="l">Tyrell Banks</td><td>A</td><td>C</td><td class="rt-high">44</td><td class="oldlean">Whitnall, Four Corners</td></tr>
+            <tr><td class="l">Sam Okafor</td><td>E</td><td>PF</td><td class="rt-low">28</td><td class="oldlean">open, Four Corners, Whitnall</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <div class="blk-lbl after"><span class="tag">After</span> Lean object · Year after POS</div>
+    <div class="fcard">
+      <h3>Recruits Leaning Your Way</h3>
+      <div class="scroll-x">
+        <table class="rt-tbl">
+          <thead><tr><th class="l">Name</th><th>Region</th><th>Pos</th><th>Yr</th><th>RT</th><th class="l" style="padding-left:14px">Leans / Your Standing</th></tr></thead>
+          <tbody>
+            <tr class="is-new"><td class="l"><span class="newbadge">New</span>Trey Coleman</td><td>B</td><td>SF</td><td class="year">JH</td><td class="rt-high">46</td><td class="leancell">
+              <span class="lean-b"><span class="lb-slot is-you"><span class="rk">1</span><span class="lb-tok">WHT</span></span><span class="lb-slot"><span class="rk">2</span><span class="lb-tok">FCR</span></span><span class="lb-slot"><span class="rk">3</span><span class="lb-tok">LAN</span></span></span></td></tr>
+            <tr class="is-new"><td class="l"><span class="newbadge">New</span>Quentin Diaz</td><td>G</td><td>PG</td><td class="year">SO</td><td class="rt-high">41</td><td class="leancell">
+              <span class="lean-b"><span class="lb-slot"><span class="rk">1</span><span class="lb-tok">FCR</span></span><span class="lb-slot is-you-list"><span class="rk">2</span><span class="lb-tok">WHT</span></span></span></td></tr>
+            <tr><td class="l">Marcus Reedy</td><td>C</td><td>SG</td><td class="year">JR</td><td class="rt-high">47</td><td class="leancell">
+              <span class="lean-b"><span class="lb-slot"><span class="rk">1</span><span class="lb-tok">FCR</span></span><span class="lb-slot"><span class="rk">2</span><span class="lb-tok">LAN</span></span><span class="lb-slot is-you-list"><span class="rk">3</span><span class="lb-tok">WHT</span></span></span></td></tr>
+            <tr><td class="l">Tyrell Banks</td><td>A</td><td>C</td><td class="year">FR</td><td class="rt-high">44</td><td class="leancell">
+              <span class="lean-b"><span class="lb-slot is-you"><span class="rk">1</span><span class="lb-tok">WHT</span></span><span class="lb-slot"><span class="rk">2</span><span class="lb-tok">FCR</span></span></span></td></tr>
+            <tr><td class="l">Sam Okafor</td><td>E</td><td>PF</td><td class="year">JH</td><td class="rt-low">28</td><td class="leancell">
+              <span class="lean-b"><span class="lb-slot is-open"><span class="rk">1</span><span class="lb-tok">open</span></span><span class="lb-slot"><span class="rk">2</span><span class="lb-tok">FCR</span></span><span class="lb-slot is-you-list"><span class="rk">3</span><span class="lb-tok">WHT</span></span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--green)"></span>Your team, #1</span>
+      <span><span class="sw" style="background:var(--list)"></span>Your team, on list (#2–3)</span>
+      <span><span class="sw" style="background:rgba(255,255,255,.12)"></span>Rival school</span>
+      <span><span class="sw" style="background:transparent;border:1px dashed var(--muted-3)"></span>Open slot</span>
+    </div>
+    <div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg><span><strong>Now you can read where you sit</strong> at a glance — top choice vs. on-list vs. open — instead of parsing a comma list. Identical ladder to the hub pool, so the two surfaces read as one system. Keep the full 12-attribute set between Year and RT in the live tab.</span></div>
+  </div>
+</div>
+</body>
+</html>

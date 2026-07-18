@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCC Recruiting Cards — Dashboard Update</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="recruiting-spine.css">
+<style>
+body{background:var(--bg);color:var(--text);font-family:var(--body);margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 28px 90px}
+.eyebrow{font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--orange)}
+.h1{font:400 clamp(36px,5vw,56px)/.94 var(--display);letter-spacing:.01em;margin:12px 0 10px}
+.lede{font-size:14.5px;line-height:1.6;color:var(--muted);max-width:76ch;text-wrap:pretty}.lede strong{color:var(--text);font-weight:600}
+.blk{margin-top:38px}
+.blk-h{font:400 26px/1 var(--display);letter-spacing:.02em;margin:0 0 4px}
+.blk-sub{font-size:13px;color:var(--muted-2);margin:0 0 16px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,340px));gap:20px;align-items:start}
+.state-lbl{font:700 9.5px/1 'JetBrains Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3);margin:0 2px 10px}
+/* card */
+.rc{border:1px solid var(--border);border-radius:14px;background:var(--panel);overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.32)}
+.rc h3{font:400 20px/1 var(--display);letter-spacing:.04em;margin:0;padding:14px 16px 12px}
+.rc-body{padding:0 12px 4px}
+.rc-hdr,.rc-row{display:grid;grid-template-columns:1.7fr 1fr 34px 34px 30px;gap:6px;align-items:center}
+.rc-hdr{font:700 9px/1 var(--body);letter-spacing:.07em;text-transform:uppercase;color:var(--muted-3);padding:6px 4px 8px;border-bottom:1px solid var(--hair)}
+.rc-hdr span:nth-child(n+3){text-align:right}
+.rc-row{padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.045);font-size:12px}
+.rc-row:last-child{border-bottom:0}
+.rc-name{display:flex;align-items:center;gap:7px;min-width:0}
+.rc-name .nm{font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stand-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.stand-dot.you1{background:var(--green);box-shadow:0 0 7px rgba(52,236,39,.6)}
+.stand-dot.list{background:var(--list)}
+.rc-rank{font:700 8.5px/1 var(--body);letter-spacing:.02em;padding:2px 4px;border-radius:4px;flex-shrink:0}
+.rc-rank.you1{color:#a9ff9c;background:var(--you-soft);border:1px solid var(--you-line)}
+.rc-rank.list{color:#ffdf9e;background:var(--list-soft);border:1px solid var(--list-line)}
+.rc-arch{color:var(--muted-2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-stat{text-align:right;color:var(--muted-2);font-size:11px}
+.rc-rt{text-align:right;font:400 14px/1 var(--display);letter-spacing:.02em}
+/* new-lean row highlight (Coach's Office) */
+.rc-row.is-new{background:rgba(52,236,39,.06);box-shadow:inset 3px 0 0 var(--green);border-radius:4px}
+.newbadge{font:700 7.5px/1 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#08130d;background:var(--green);padding:2px 4px;border-radius:3px;flex-shrink:0}
+/* footnote (phase-aware) */
+.rc-foot{margin:2px 12px 12px;padding:10px 12px;border-radius:10px;border:1px solid var(--hair);background:rgba(255,255,255,.02)}
+.rc-foot.passive{border-color:rgba(74,144,217,.28);background:rgba(74,144,217,.07)}
+.rc-foot.invite{border-color:rgba(247,148,32,.3);background:rgba(247,148,32,.08)}
+.rc-foot-top{display:flex;align-items:center;gap:8px;font:700 9px/1 var(--body);letter-spacing:.1em;text-transform:uppercase}
+.rc-foot.passive .rc-foot-top{color:#9cc4ee}.rc-foot.invite .rc-foot-top{color:#ffc06a}
+.rc-foot-dot{width:7px;height:7px;border-radius:50%}
+.rc-foot.passive .rc-foot-dot{background:var(--lblue)}.rc-foot.invite .rc-foot-dot{background:var(--orange)}
+.rc-foot-txt{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}.rc-foot-txt b{color:#fff;font-weight:700}
+.rc-foot-btn{margin-top:9px;width:100%;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.28);background:var(--orange);color:#15181f;font:400 15px/1 var(--display);letter-spacing:.05em;cursor:pointer}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:11.5px;color:var(--muted-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}.legend .sw{width:10px;height:10px;border-radius:50%}
+.note{margin-top:14px;font-size:12.5px;color:var(--muted-2);display:flex;gap:9px;align-items:flex-start;max-width:80ch;text-wrap:pretty}
+.note svg{width:15px;height:15px;color:var(--orange);flex-shrink:0;margin-top:1px}.note strong{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Recruiting Hub · D5 — Applied · FCC Dashboard Cards</div>
+  <h1 class="h1">The summary cards, in step.</h1>
+  <p class="lede">Both read-only cards link into the hub. Three consistency fixes on each: a <strong>standing marker</strong> (who's leaning to you, and where you sit), <strong>RT colored</strong> on the recruit scale, and a <strong>phase-aware footnote</strong> that speaks the phase strip's language instead of a static string.</p>
+
+  <!-- HOME CARD -->
+  <div class="blk">
+    <h2 class="blk-h">FCC Home — Recruiting card</h2>
+    <p class="blk-sub">Shown in the two phases the card actually appears differently — the footnote swaps with the calendar.</p>
+    <div class="cards">
+      <div>
+        <p class="state-lbl">Passive stretch</p>
+        <div class="rc">
+          <h3>Recruiting</h3>
+          <div class="rc-body">
+            <div class="rc-hdr"><span>Recruit</span><span>Arch.</span><span>HT</span><span>WT</span><span>RT</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Kelley Stone</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Four-Star</span><span class="rc-stat">6'4"</span><span class="rc-stat">208</span><span class="rc-rt rt-elite">54</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Aaron Carter</span><span class="rc-rank list">#2</span></span><span class="rc-arch">Four-Star</span><span class="rc-stat">6'6"</span><span class="rc-stat">228</span><span class="rc-rt rt-elite">50</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Layne Estrada</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Classic C</span><span class="rc-stat">6'4"</span><span class="rc-stat">200</span><span class="rc-rt rt-high">44</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Marcus Reedy</span><span class="rc-rank list">#3</span></span><span class="rc-arch">Sharpshooter</span><span class="rc-stat">6'4"</span><span class="rc-stat">190</span><span class="rc-rt rt-high">47</span></div>
+          </div>
+          <div class="rc-foot passive">
+            <div class="rc-foot-top"><span class="rc-foot-dot"></span>Passive · Week 12</div>
+            <div class="rc-foot-txt">Leans come to you — <b>win games</b>. Invite Season opens Week 20.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="state-lbl">Invite Season</p>
+        <div class="rc">
+          <h3>Recruiting</h3>
+          <div class="rc-body">
+            <div class="rc-hdr"><span>Recruit</span><span>Arch.</span><span>HT</span><span>WT</span><span>RT</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Kelley Stone</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Four-Star</span><span class="rc-stat">6'4"</span><span class="rc-stat">208</span><span class="rc-rt rt-elite">54</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Aaron Carter</span><span class="rc-rank list">#2</span></span><span class="rc-arch">Four-Star</span><span class="rc-stat">6'6"</span><span class="rc-stat">228</span><span class="rc-rt rt-elite">50</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Layne Estrada</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Classic C</span><span class="rc-stat">6'4"</span><span class="rc-stat">200</span><span class="rc-rt rt-high">44</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Marcus Reedy</span><span class="rc-rank list">#3</span></span><span class="rc-arch">Sharpshooter</span><span class="rc-stat">6'4"</span><span class="rc-stat">190</span><span class="rc-rt rt-high">47</span></div>
+          </div>
+          <div class="rc-foot invite">
+            <div class="rc-foot-top"><span class="rc-foot-dot"></span>Invite Season · Week 22</div>
+            <div class="rc-foot-txt"><b>3 of 7</b> invites sent · 4 weeks left.</div>
+            <button class="rc-foot-btn">Week 22 Invites</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COACH'S OFFICE CARD -->
+  <div class="blk">
+    <h2 class="blk-h">Coach's Office — Recruiting card</h2>
+    <p class="blk-sub">Adopts the New-Leans proposal (NEW badge, phase footnote) and adds the standing marker + Signing-Day language for parity with the hub.</p>
+    <div class="cards">
+      <div>
+        <p class="state-lbl">New leans since last game</p>
+        <div class="rc">
+          <h3>Recruiting</h3>
+          <div class="rc-body">
+            <div class="rc-hdr"><span>Recruit</span><span>Arch.</span><span>HT</span><span>WT</span><span>RT</span></div>
+            <div class="rc-row is-new"><span class="rc-name"><span class="newbadge">New</span><span class="nm">Trey Coleman</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Lockdown Wing</span><span class="rc-stat">6'6"</span><span class="rc-stat">198</span><span class="rc-rt rt-high">46</span></div>
+            <div class="rc-row is-new"><span class="rc-name"><span class="newbadge">New</span><span class="nm">Quentin Diaz</span><span class="rc-rank list">#2</span></span><span class="rc-arch">Floor General</span><span class="rc-stat">6'2"</span><span class="rc-stat">180</span><span class="rc-rt rt-high">41</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Marcus Reedy</span><span class="rc-rank list">#3</span></span><span class="rc-arch">Sharpshooter</span><span class="rc-stat">6'4"</span><span class="rc-stat">190</span><span class="rc-rt rt-high">47</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Tyrell Banks</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Rim Protector</span><span class="rc-stat">6'10"</span><span class="rc-stat">240</span><span class="rc-rt rt-high">44</span></div>
+          </div>
+          <div class="rc-foot passive">
+            <div class="rc-foot-top"><span class="rc-foot-dot"></span>Passive · leans shifting</div>
+            <div class="rc-foot-txt"><b>2 new leans</b> this week — recruiting is passive until Week 20.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="state-lbl">Signing Day approaching</p>
+        <div class="rc">
+          <h3>Recruiting</h3>
+          <div class="rc-body">
+            <div class="rc-hdr"><span>Recruit</span><span>Arch.</span><span>HT</span><span>WT</span><span>RT</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Jordan Mathews</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Slasher</span><span class="rc-stat">6'5"</span><span class="rc-stat">195</span><span class="rc-rt rt-elite">52</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot you1"></span><span class="nm">Trey Coleman</span><span class="rc-rank you1">#1</span></span><span class="rc-arch">Lockdown Wing</span><span class="rc-stat">6'6"</span><span class="rc-stat">198</span><span class="rc-rt rt-high">46</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Quentin Diaz</span><span class="rc-rank list">#2</span></span><span class="rc-arch">Floor General</span><span class="rc-stat">6'2"</span><span class="rc-stat">180</span><span class="rc-rt rt-high">41</span></div>
+            <div class="rc-row"><span class="rc-name"><span class="stand-dot list"></span><span class="nm">Marcus Reedy</span><span class="rc-rank list">#3</span></span><span class="rc-arch">Sharpshooter</span><span class="rc-stat">6'4"</span><span class="rc-stat">190</span><span class="rc-rt rt-high">47</span></div>
+          </div>
+          <div class="rc-foot invite">
+            <div class="rc-foot-top"><span class="rc-foot-dot"></span>Signing Day · Week 35</div>
+            <div class="rc-foot-txt">Board auto-fills from your leans — <b>50 points</b> to spend.</div>
+            <button class="rc-foot-btn">Open Signing Board</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--green)"></span>You're #1</span>
+      <span><span class="sw" style="background:var(--list)"></span>On his list (#2–3)</span>
+      <span><span class="sw" style="background:var(--green);box-shadow:none"></span>New badge = just added you</span>
+    </div>
+    <div class="note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg><span><strong>Same read as the hub, at a glance.</strong> The dot + rank chip answers "where do I sit" without opening the hub, RT uses the recruit scale, and the footnote always tells you the phase and what's actionable — the card orients before it links.</span></div>
+  </div>
+</div>
+</body>
+</html>

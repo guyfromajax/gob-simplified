@@ -3,7 +3,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .scouting-modal {
@@ -41,7 +41,7 @@ input[type="reset"] {
 
 .scouting-modal-header h2 {
   margin: 0;
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
   font-size: 32px;
   color: #333;
 }
@@ -84,7 +84,7 @@ input[type="reset"] {
   color: #fff;
   border: none;
   padding: 10px 16px;
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
   font-size: 20px;
   cursor: pointer;
   margin-top: 10px;
@@ -105,7 +105,7 @@ input[type="reset"] {
 }
 
 .projected-starting-five-section h2 {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
   font-size: 1.8rem;
   color: #4a90e2;
   font-weight: 600;
@@ -209,7 +209,7 @@ input[type="reset"] {
 }
 
 .play-usage-section h2 {
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
   font-size: 1.8rem;
   color: #4a90e2;
   font-weight: 600;
@@ -296,7 +296,7 @@ input[type="reset"] {
   top: 10px;
   left: 10px;
   z-index: 2;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 20px;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -311,7 +311,7 @@ input[type="reset"] {
   top: 8px;
   right: 9px;
   z-index: 2;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 30px;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -356,7 +356,7 @@ input[type="reset"] {
 }
 .p5-jersey {
   flex-shrink: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 32px;
   line-height: 0.82;
   letter-spacing: 0.02em;

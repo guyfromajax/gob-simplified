@@ -9,12 +9,12 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 h1 {
   text-align: center;
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
   font-size: 36px;
   margin-bottom: 20px;
 }

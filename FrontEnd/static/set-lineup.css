@@ -10,7 +10,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .set-lineup-shell {
@@ -54,7 +54,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   height: 80px;
   background: rgba(13, 17, 36, 0.96);
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 34px;
   letter-spacing: 0.03em;
 }
@@ -98,7 +98,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .context-stat-value {
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 26px;
   line-height: 1;
   letter-spacing: 0;
@@ -117,14 +117,14 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .context-score-separator {
   color: rgba(255,255,255,0.4);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 26px;
   line-height: 1;
 }
 
 .context-inline-value {
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   line-height: 1;
   letter-spacing: 0;
@@ -307,7 +307,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .lineup-slots-label {
   color: rgba(255,255,255,0.4);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.06em;
   margin-bottom: 8px;
@@ -363,7 +363,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   right: 8px;
   z-index: 4;
   pointer-events: none; /* never block drag-to-reorder */
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -375,7 +375,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .slot-pos {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   color: rgba(255,255,255,0.5);
   width: 28px;
@@ -520,7 +520,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .player-rating {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   color: #F79420;
   flex-shrink: 0;
@@ -648,7 +648,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   border: 1px solid rgba(255,255,255,0.10);
   background: transparent;
   color: rgba(255,255,255,0.38);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
@@ -967,7 +967,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .lineup-modal-title-wrap h2 {
   margin: 0;
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 30px;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -1015,7 +1015,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .exhausted-lineup-body h2 {
   margin: 0;
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 32px;
   letter-spacing: 0.02em;
 }

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruiting Hub — Spine (D1)</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="recruiting-spine.css">
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="recruiting-spine-data.js"></script>
+<script type="text/babel" src="spine-lean.jsx"></script>
+<script type="text/babel" src="spine-phase.jsx"></script>
+<script type="text/babel" src="spine-pool.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+const { leanStates, pool, TEAM_NAME } = window.SpineData;
+const { LeanObject } = window.SpineLean;
+const { PhaseStrip } = window.SpinePhase;
+const { Pool } = window.SpinePool;
+
+const DIRS = [
+  { id: 'A', name: 'Standing Chip', note: <>Your standing is the <strong>hero</strong> — a color-coded verdict word. The list rides behind it as small tokens. Reads as a sentence.</> },
+  { id: 'B', name: 'Ranked Ladder', note: <>Spatial &amp; structural — three ordered slots make rank, count and open slots literal. Your slot <strong>glows</strong> in position.</> },
+  { id: 'C', name: 'Edge + Dots', note: <>Smallest footprint, extends today's dot language. A row <strong>edge accent</strong> + a ringed dot carry your position; a caption spells the odds.</> },
+];
+const WEEK = { passive: 12, invite: 22, day: 35, results: 36 };
+
+function ArrowUp(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M7 17L17 7M9 7h8v8"/></svg>;}
+function ArrowDn(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M17 7L7 17M15 17H7V9"/></svg>;}
+
+/* ---- gallery row ---- */
+function CtxRow({ st, variant }) {
+  const r = st.rec;
+  return (
+    <div className="ctx-row">
+      <div className="ctx-name">{r.name}<small>{r.archetype}</small></div>
+      <div className="ctx-pos">{r.pos}</div>
+      <div className="ctx-year">{r.year}</div>
+      <div className="ctx-rt-wrap"><span className={`ctx-rt rt-${r.rtTier}`}>{r.rt}</span><span className="ctx-rt-cap">RT</span></div>
+      <div className="lean-slot-wrap"><LeanObject rec={r} variant={variant} /></div>
+    </div>
+  );
+}
+
+function Direction({ dir }) {
+  return (
+    <div>
+      <div className="dir-head">
+        <span className="dir-badge">{dir.id}</span>
+        <span className="dir-name">{dir.name}</span>
+        <span className="dir-note">{dir.note}</span>
+      </div>
+      <div className="ctx-rows">
+        {leanStates.map(st => <CtxRow key={st.key} st={st} variant={dir.id} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ---- phase demo (each independently expandable) ---- */
+function PhaseDemo({ phase, cap }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <div className="phase-demo-cap">{cap}</div>
+      <PhaseStrip phase={phase} week={WEEK[phase]} inviteSent={3} points={38} open={open} onToggle={() => setOpen(o => !o)} />
+    </div>
+  );
+}
+
+/* ---- weekly story strip ---- */
+function Story() {
+  const gains = pool.filter(r => r.newLean);
+  const losses = pool.filter(r => r.lost);
+  return (
+    <div className="story">
+      <div className="story-lead"><span className="wkn">Wk 12</span><span className="lbl">This week</span></div>
+      <div className="story-items">
+        {gains.map(r => (
+          <div className="story-item" key={r.id}>
+            <span className="ico gain"><ArrowUp/></span>
+            <span className="tx"><span className="t1">{r.name}</span><span className="t2">now leaning you · <b>{r.yourRank === 1 ? '#1' : '#' + r.yourRank}</b></span></span>
+          </div>
+        ))}
+        {losses.map(r => (
+          <div className="story-item" key={r.id}>
+            <span className="ico loss"><ArrowDn/></span>
+            <span className="tx"><span className="t1">{r.name}</span><span className="t2">dropped you · leans elsewhere</span></span>
+          </div>
+        ))}
+        {gains.length === 0 && losses.length === 0 && <div className="story-empty">Quiet week — no lean changes.</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ---- assembled spine ---- */
+function Spine({ variant, phase, dockOn }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="spine">
+      <div className="spine-topbar">
+        <span className="spine-h">Recruiting <b>Hub</b> — {TEAM_NAME}</span>
+        <button className="hub-anchor" onClick={() => { const el = document.querySelector('#spine .pool-wrap'); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 60, behavior: 'smooth' }); }}><span className="ic">◗</span> Recruit Pool</button>
+      </div>
+      <div className="spine-topbar" style={{ paddingTop: 12, paddingBottom: 0 }}>
+        <div style={{ flex: 1 }}>
+          <PhaseStrip phase={phase} week={WEEK[phase]} inviteSent={3} points={38} open={open} onToggle={() => setOpen(o => !o)} />
+        </div>
+      </div>
+      <div className={`spine-body ${dockOn ? 'with-dock' : 'no-dock'}`} style={{ paddingTop: 14 }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {phase === 'passive' && <Story />}
+          <Pool recruits={pool} variant={variant} condensed={dockOn} />
+        </div>
+        {dockOn && (
+          <div className="dock-ph">
+            <span className="pill">D2 · D3</span>
+            <span className="tag">Action Dock</span>
+            <span className="desc">The invite dock (Phase 2) and signing board (Phase 3) dock here. The pool condenses — attributes collapse — so the split holds at 1280px.</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---- app ---- */
+function Seg({ value, options, onChange }) {
+  return (
+    <span className="tw-seg">
+      {options.map(o => <button key={o.v} className={value === o.v ? 'on' : ''} onClick={() => onChange(o.v)}>{o.l}</button>)}
+    </span>
+  );
+}
+
+function App() {
+  const variant = 'B';
+  const [phase, setPhase] = useState('passive');
+  const [dockOn, setDockOn] = useState(false);
+
+  return (
+    <>
+      <div className="tweakbar">
+        <span className="tw-title">Spine Controls</span>
+        <div className="tw-grp"><span className="tw-lab">Phase</span>
+          <Seg value={phase} onChange={setPhase} options={[{v:'passive',l:'Passive'},{v:'invite',l:'Invite'},{v:'day',l:'Signing'},{v:'results',l:'Results'}]} /></div>
+        <div className="tw-grp"><span className="tw-lab">Action dock</span>
+          <Seg value={dockOn ? 'on' : 'off'} onChange={v => setDockOn(v === 'on')} options={[{v:'off',l:'Off'},{v:'on',l:'On'}]} /></div>
+        <div className="jump"><a href="#leans">Lean object</a><a href="#phase">Phase strip</a><a href="#spine">Assembled</a></div>
+      </div>
+
+      <div className="doc">
+        <div className="doc-head">
+          <div className="doc-eyebrow">Recruiting Hub · Deliverable 1 — The Spine</div>
+          <h1 className="doc-title">One hub, told as a season.</h1>
+          <p className="doc-lede">Five fragmented recruiting pages collapse into a single phase-aware hub. This is the persistent spine: the <strong>lean object</strong> (who leans to you, and where you stand), the <strong>phase strip</strong> (what week it is, what you can do), and the <strong>pool</strong> they live on. Use the controls above to drive the assembled spine at the bottom.</p>
+        </div>
+
+        <section className="sec" id="leans">
+          <div className="sec-kicker"><span className="sec-num">01</span><span className="sec-tag">The priority</span></div>
+          <h2 className="sec-title">The Lean Object</h2>
+          <p className="sec-desc">Every recruit ranks up to 3 schools. Each step up roughly doubles a school's odds — <strong>#1 ≈ 8×, #2 ≈ 4×, #3 ≈ 2×</strong>. The one thing a coach must read across 300 rows is <strong>where their team sits</strong>. Shown across every state, in a pool row — the <strong>Ranked Ladder</strong> format, selected from the earlier comparison.</p>
+          <div className="lean-gallery">
+            <Direction dir={DIRS[1]} />
+          </div>
+          <div className="verdict">
+            <span className="mk">B</span>
+            <p><strong>Selected: the Ranked Ladder.</strong> Three ordered slots make rank, count, and open slots <em>spatial</em> — a coach sweeping a region spots the green-glow slot without reading a word. Your #1 glows green, on-list slots glow amber, loyal/hard targets carry a lock, open slots read as dashed. It reuses the existing lean-dot / "leaning to you" vocabulary.</p>
+          </div>
+        </section>
+
+        <section className="sec" id="phase">
+          <div className="sec-kicker"><span className="sec-num">02</span><span className="sec-tag">The mechanism</span></div>
+          <h2 className="sec-title">The Phase Strip</h2>
+          <p className="sec-desc">The hub knows the week and presents the right phase automatically — the user never navigates to the correct page. Compact by default; <strong>expand any strip</strong> to the full season timeline, which doubles as orientation ("why can't I invite yet?").</p>
+          <div className="phase-demos">
+            <PhaseDemo phase="passive" cap="Passive · weeks 1–19, 27–34 — no actions" />
+            <PhaseDemo phase="invite" cap="Invite Season · weeks 20–26 — invite 1/week, 7 total" />
+            <PhaseDemo phase="day" cap="Signing Day · week 35 — 50 points, promises" />
+            <PhaseDemo phase="results" cap="Results · week 36 — signed" />
+          </div>
+        </section>
+
+        <section className="sec" id="spine">
+          <div className="sec-kicker"><span className="sec-num">03</span><span className="sec-tag">The constant</span></div>
+          <h2 className="sec-title">The Spine, Assembled</h2>
+          <p className="sec-desc">Pool + lean object + phase strip together — the constant that's present in every phase, shown here before any action layer attaches. Collapsible region sections (A–H) keep 300 recruits scannable. Flip <strong>Action dock → On</strong> to see the wide-pool-vs-dock tension resolved: the pool condenses (attributes collapse) and the dock takes the right rail — proving the split survives a 1280px laptop.</p>
+          <Spine variant={variant} phase={phase} dockOn={dockOn} />
+        </section>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

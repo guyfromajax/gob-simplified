@@ -28,7 +28,7 @@ body.has-auth-bar {
 .feedback-modal [type="button"],
 .feedback-modal [type="submit"],
 .feedback-modal [type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .auth-bar {
@@ -70,7 +70,7 @@ body.has-auth-bar {
   background: transparent;
   border: none;
   text-decoration: none;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;

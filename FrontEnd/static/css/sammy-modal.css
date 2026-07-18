@@ -56,7 +56,7 @@
 }
 
 .sammy-modal-eyebrow {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.1em;
@@ -143,7 +143,7 @@
 }
 
 .sammy-modal-btn {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.08em;
   padding: 10px 22px;

@@ -39,7 +39,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .training-report-container {
@@ -739,7 +739,7 @@ body.training-report-page .report-header {
 
 body.training-report-page .page-title {
   margin: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 2.2rem;
   line-height: 0.95;
   letter-spacing: 0.03em;
@@ -804,7 +804,7 @@ body.training-report-page .locker-room-button {
   background: linear-gradient(180deg, #42f438 0%, #34EC27 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
   color: #101510;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 20px;
   letter-spacing: 0.04em;
   transition: filter 0.18s ease, transform 0.18s ease;
@@ -837,7 +837,7 @@ body.training-report-page .team-section h2,
 body.training-report-page .projected-lineup-section h2,
 body.training-report-page .playbook-summary-section h2 {
   margin: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.7rem;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -881,7 +881,7 @@ body.training-report-page .toggle-btn {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.72);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1064,7 +1064,7 @@ body.training-report-page .training-notes-header-copy {
 body.training-report-page .training-notes-section h2 {
   margin: 0;
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -1374,7 +1374,7 @@ body.training-report-page .attr-name {
 
 body.training-report-page .attr-change {
   margin-left: 12px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 24px;
   line-height: 1;
   letter-spacing: 0.03em;
@@ -1525,7 +1525,7 @@ body.training-report-page .playbook-card-name {
 }
 
 body.training-report-page .playbook-card-delta {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 24px;
   line-height: 1;
   letter-spacing: 0.03em;

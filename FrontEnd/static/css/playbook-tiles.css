@@ -67,7 +67,7 @@
   clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.55);
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 16px;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -393,7 +393,7 @@
 }
 
 .et-computed {
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 23px;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -417,7 +417,7 @@
 
 .et-name {
   min-width: 0;
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 21px;
   letter-spacing: 0.03em;
   line-height: 1;
@@ -460,7 +460,7 @@
   border: 0;
   background: transparent;
   text-align: right;
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 23px;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -537,7 +537,7 @@
 }
 
 .et-pcc .slot {
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 12px;
 }
 
@@ -748,7 +748,7 @@
 }
 
 .et-cmd-v {
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 18px;
   letter-spacing: 0.02em;
 }
@@ -799,7 +799,7 @@
 }
 
 .chip-name {
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 18px;
   letter-spacing: 0.03em;
   color: var(--text);
@@ -819,7 +819,7 @@
   border: 0;
   background: transparent;
   text-align: right;
-  font-family: "Bebas Neue", sans-serif;
+  font-family: "Bebas Neue Pro", "Bebas Neue", sans-serif;
   font-size: 20px;
   color: var(--text);
   padding: 1px 2px;

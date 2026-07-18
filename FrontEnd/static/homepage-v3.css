@@ -115,7 +115,7 @@ body.homepage-v3.has-auth-bar {
   align-items: center;
   justify-content: center;
   padding: 7px 18px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   letter-spacing: 0.04em;
   color: #08080f;
@@ -146,7 +146,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .section-eyebrow {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
   letter-spacing: 0.18em;
   color: var(--hp-orange);
@@ -155,7 +155,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .section-headline {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: clamp(2rem, 4vw, 3rem);
   line-height: 1.05;
   color: var(--hp-white);
@@ -178,7 +178,7 @@ body.homepage-v3.has-auth-bar {
   align-items: center;
   justify-content: center;
   padding: 0.875rem 2.25rem;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.125rem;
   letter-spacing: 0.06em;
   color: #08080f;
@@ -269,7 +269,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .hero-headline {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: clamp(3.5rem, 7vw, 5.5rem);
   line-height: 1.0;
   letter-spacing: 0.01em;
@@ -410,14 +410,14 @@ body.homepage-v3.has-auth-bar {
 }
 
 .pillar-number {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
   letter-spacing: 0.14em;
   color: var(--hp-orange);
 }
 
 .pillar-headline {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.6rem;
   line-height: 1.1;
   color: var(--hp-white);
@@ -532,7 +532,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .feature-headline {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.5rem;
   line-height: 1.1;
   color: var(--hp-white);
@@ -648,7 +648,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .faq-question {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.1rem;
   letter-spacing: 0.02em;
   color: var(--hp-white-90);
@@ -727,7 +727,7 @@ body.homepage-v3.has-auth-bar {
 }
 
 .footer-cta-headline {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: clamp(2.5rem, 5vw, 4rem);
   line-height: 1.0;
   color: var(--hp-white);

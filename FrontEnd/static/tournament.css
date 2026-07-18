@@ -57,7 +57,7 @@ body.tcc-page {
   border: 1px solid rgba(255, 102, 0, 0.55);
   border-radius: 6px;
   padding: 9px 16px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -349,7 +349,7 @@ body.tcc-page {
   border-radius: 50%;
   background: linear-gradient(180deg, #322611, #1a1f26);
   border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   color: var(--gold-bright);
   box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 45%, transparent);
@@ -371,7 +371,7 @@ body.tcc-page {
 
 .champ-plate__name {
   display: inline-block;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 30px;
   letter-spacing: 0.03em;
   margin-top: 5px;
@@ -447,7 +447,7 @@ svg.conn {
 }
 
 .tip__name-inline {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 19px;
   color: #fff;
   letter-spacing: 0.02em;
@@ -526,7 +526,7 @@ svg.conn {
 }
 
 .celebrate__title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: calc(64px * var(--cele-scale, 1));
   line-height: 0.92;
   margin: 8px 0 4px;
@@ -547,7 +547,7 @@ svg.conn {
 }
 
 .celebrate__team {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 28px;
   color: #eafff2;
   margin-top: 8px;
@@ -565,7 +565,7 @@ svg.conn {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #fff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.06em;
   padding: 10px 28px;

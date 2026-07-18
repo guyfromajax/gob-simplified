@@ -75,14 +75,14 @@ body.box-score-page {
 }
 
 #header-content .team-name {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.04em;
 }
 
 #header-content .score {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 48px;
   color: #ffffff;
   line-height: 1;
@@ -107,7 +107,7 @@ body.box-score-page {
 
 #quarter-scoring-section h2,
 .stats-section h2 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   color: rgba(255, 255, 255, 0.45);
   letter-spacing: 0.08em;
@@ -146,14 +146,14 @@ body.box-score-page {
 
 #quarter-scoring-table td:first-child {
   text-align: left;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.04em;
   color: #ffffff;
 }
 
 #quarter-scoring-table .final-score {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   color: #ffffff;
 }
@@ -163,7 +163,7 @@ body.box-score-page {
 }
 
 #potg-section h2 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
   color: #F79420;
   letter-spacing: 0.1em;
@@ -194,7 +194,7 @@ body.box-score-page {
 }
 
 .potg-player-line {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   color: #ffffff;
   line-height: 1;
@@ -225,7 +225,7 @@ body.box-score-page {
   border-bottom: 3px solid transparent;
   background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.35);
   color: rgba(255, 255, 255, 0.6);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -352,7 +352,7 @@ body.box-score-page {
 }
 
 .special-stat-value {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   color: #ffffff;
 }
@@ -371,7 +371,7 @@ body.box-score-page {
 }
 
 .scouting-section-header {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   color: #F79420;
   letter-spacing: 0.08em;
@@ -489,7 +489,7 @@ body.box-score-page {
 }
 
 .attr-chip-val {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   line-height: 1;
 }
@@ -583,7 +583,7 @@ body.box-score-page {
 }
 
 .special-stats-popup-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 28px;
   color: #ffffff;
   margin: 0;
@@ -644,7 +644,7 @@ body.box-score-page {
 }
 
 .special-stats-row h3 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   color: #ffffff;
   margin: 0;

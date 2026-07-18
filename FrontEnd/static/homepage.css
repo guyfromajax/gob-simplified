@@ -98,7 +98,7 @@ body {
   align-items: center;
 }
 .hero-text h1 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: clamp(2.5rem, 6vw, 4rem);
   line-height: 1.1;
   margin: 0 0 var(--spacing-sm);
@@ -168,7 +168,7 @@ body {
   box-shadow: 0 6px 12px rgba(0,0,0,0.08);
 }
 .card h2 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 1.75rem;
   margin: 0 0 var(--spacing-sm);
   text-align: center;
@@ -178,7 +178,7 @@ body {
   margin-bottom: var(--spacing-md);
 }
 .card .btn {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-weight: 600;
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius);

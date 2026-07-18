@@ -11,7 +11,7 @@ body.mode-select-page button,
 body.mode-select-page input[type="button"],
 body.mode-select-page input[type="submit"],
 body.mode-select-page input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 body.mode-select-page.mode-select-loading .mode-wrapper {
@@ -61,7 +61,7 @@ body.mode-select-page .mode-select-loading-mark img {
 }
 
 body.mode-select-page .mode-select-loading-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 30px;
   letter-spacing: 0.04em;
   color: #ffffff;
@@ -117,7 +117,7 @@ body.mode-select-page .alpha-disclaimer.is-dismissing {
 
 body.mode-select-page .alpha-disclaimer-title {
   flex: 0 0 auto;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
   color: #F79420;
   letter-spacing: 0.05em;
@@ -379,7 +379,7 @@ body.mode-select-page .atl-result {
   border-radius: 5px;
   display: grid;
   place-items: center;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
   line-height: 1;
 }
@@ -657,7 +657,7 @@ body.mode-select-page .community-panel-header {
 
 body.mode-select-page .community-panel-title {
   margin: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 24px;
   letter-spacing: 0.03em;
   color: #ffffff;
@@ -679,7 +679,7 @@ body.mode-select-page .community-panel-metric {
   border: 1px solid rgba(255,255,255,0.10);
   background: transparent;
   color: rgba(255,255,255,0.38);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-weight: 600;
   font-size: 16px;
   letter-spacing: 0.03em;
@@ -732,7 +732,7 @@ body.mode-select-page .community-leaderboard-row.is-current-user {
 }
 
 body.mode-select-page .community-rank {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   color: rgba(255, 255, 255, 0.5);
   min-width: 24px;
@@ -856,7 +856,7 @@ body.mode-select-page .franchise-empty-icon img {
 
 body.mode-select-page .franchise-empty-title {
   margin: 16px 0 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 28px;
   line-height: 1;
   color: #ffffff;
@@ -958,7 +958,7 @@ body.mode-select-page .franchise-card-content {
 
 body.mode-select-page .franchise-card-team-name {
   margin: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 48px;
   line-height: 1;
   color: #ffffff;
@@ -1062,7 +1062,7 @@ body.mode-select-page .franchise-resume-detail {
 
 body.mode-select-page .franchise-resume-score {
   flex-shrink: 0;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 34px;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -1130,7 +1130,7 @@ body.mode-select-page .confirm-modal-content {
 
 body.mode-select-page .confirm-modal-title {
   margin: 0 0 10px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 30px;
   color: #ffffff;
   letter-spacing: 0.03em;
@@ -1256,7 +1256,7 @@ body.mode-select-page .leaders-by-team-header {
 }
 
 body.mode-select-page .leaders-by-team-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 24px;
   color: #ffffff;
   letter-spacing: 0.04em;
@@ -1339,7 +1339,7 @@ body.mode-select-page .lbt-card-banner-overlay {
 body.mode-select-page .lbt-team-name {
   position: relative;
   z-index: 1;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 14px;
   color: #ffffff;
   letter-spacing: 0.06em;
@@ -1366,7 +1366,7 @@ body.mode-select-page .lbt-leader-row {
 }
 
 body.mode-select-page .lbt-leader-rank {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.25);
   min-width: 14px;
@@ -1386,7 +1386,7 @@ body.mode-select-page .lbt-leader-username {
 }
 
 body.mode-select-page .lbt-leader-points {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 14px;
   flex-shrink: 0;
   /* color set inline via JS using team primary color */

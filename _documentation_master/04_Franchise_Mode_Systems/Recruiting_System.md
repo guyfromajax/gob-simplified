@@ -449,3 +449,10 @@ The 12 profile attributes: `SC, SH, ID, OD, PS, BH, RB, AG, ST, ND, IQ, FT`. Eac
 - Signed recruits keep `CH` through `_normalize_new_franchise_player_attributes` (`preserve_character=True` on the same helper).
 - `compute_position_ratings(recruit, profile="recruit")` derives position ratings from the final attributes + height.
 - `year` comes from the **Recruit Distribution By Year** roll (see top of doc) and selects which tier table applies; `created_at` timestamped; names come from the franchise name generator (`choose_franchise_first_name` + random last name).
+
+---
+
+## UI Redesign — Recruiting Hub (in progress, started 2026-07-18)
+The recruiting UI is being rebuilt into a single phase-aware **Hub** that takes over `recruiting.html`. Backend data model (this doc) is unchanged. Spec + prompt-by-prompt status: [`projects/Recruiting_Hub_Redesign/recruiting_hub_implementation_spec.md`](../projects/Recruiting_Hub_Redesign/recruiting_hub_implementation_spec.md).
+- **Prompt 0 (foundation) shipped:** shared vanilla spine — `FrontEnd/static/recruiting-spine.{js,css}` (`window.RecruitingSpine`), QA gallery `recruiting-spine-gallery.html`. Reuses `rtBucket.js` + `playerYear.js`; the `Lean` ranked-ladder consumes the existing `{"1","2","3"}` `Lean` object verbatim.
+- **Deferred backend item (Prompt 2):** the hub must own the invite loop end-to-end — currently invites save on the recruiting page but execute from Training's *Submit Training* (`franchise_routes.py` `_process_weekly_recruiting_invites`).

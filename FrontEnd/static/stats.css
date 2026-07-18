@@ -25,7 +25,7 @@ body.stats-page {
 .stats-page input[type="button"],
 .stats-page input[type="submit"],
 .stats-page input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .stats-page .resource-page-container {
@@ -109,7 +109,7 @@ body.stats-page {
   margin-bottom: 16px;
 }
 .stats-page .stats-scope-btn {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-weight: 700;
   font-size: 13px;
   text-transform: uppercase;

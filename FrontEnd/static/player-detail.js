@@ -402,12 +402,16 @@
    * Recruit-only block. Home Region / Lean / archetype exist on FRD docs but
    * never on players, and fill the space where STATUS sits for a player.
    * `Lean` is a {"1","2","3"} -> team_id ranking; only the top choice is shown.
+   * After week-35 recruiting runs, LEAN is replaced by SIGNED (school name).
    */
   function buildRecruitingBlock(player) {
+    const leanOrSigned = player.is_signed
+      ? ['SIGNED', player.signed_display || player.signed_team_name || '--']
+      : ['LEAN', player.lean_display || '--'];
     const rows = [
       ['ARCHETYPE', player.archetype || '--'],
       ['HOME REGION', player['Home Region'] || '--'],
-      ['LEAN', player.lean_display || '--'],
+      leanOrSigned,
     ];
     return `
       <div class="pd-divider"></div>

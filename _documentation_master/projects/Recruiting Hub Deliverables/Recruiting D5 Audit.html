@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruiting D5 — Consistency Audit</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0d14;--panel:rgba(14,16,24,.96);--panel-2:rgba(20,23,33,.96);--border:rgba(255,255,255,.09);--hair:rgba(255,255,255,.07);--text:#f4f5f8;--muted:rgba(255,255,255,.62);--muted-2:rgba(255,255,255,.4);--muted-3:rgba(255,255,255,.24);--navy:#27408E;--lblue:#4A90D9;--orange:#F79420;--gold:#FFD700;--green:#34EC27;--red:#ff6d6d;--mono:'JetBrains Mono',monospace;--display:'Bebas Neue',sans-serif;--body:'Inter',system-ui,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--orange);text-decoration:none}a:hover{color:#ffb454}
+.doc{max-width:1080px;margin:0 auto;padding:44px 30px 100px}
+.eyebrow{font:700 11px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}
+.title{font:400 clamp(40px,6vw,66px)/.92 var(--display);letter-spacing:.01em;margin:12px 0 12px}
+.lede{font-size:15px;line-height:1.6;color:var(--muted);max-width:74ch;text-wrap:pretty}.lede strong{color:var(--text);font-weight:600}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:22px 0 6px}
+.legend span{display:inline-flex;align-items:center;gap:8px;font:600 12px/1 var(--body);color:var(--muted-2)}
+.sev{font:700 9px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:5px}
+.sev.high{color:#ffb3b3;background:rgba(255,109,109,.13);border:1px solid rgba(255,109,109,.34)}
+.sev.med{color:#ffce8f;background:rgba(247,148,32,.13);border:1px solid rgba(247,148,32,.34)}
+.sev.low{color:#a9ff9c;background:rgba(52,236,39,.12);border:1px solid rgba(52,236,39,.3)}
+.sev.info{color:#a9d0f2;background:rgba(74,144,217,.13);border:1px solid rgba(74,144,217,.34)}
+.card{border:1px solid var(--border);border-radius:16px;background:linear-gradient(160deg,rgba(255,255,255,.024),transparent 40%),var(--panel);box-shadow:0 16px 40px rgba(0,0,0,.36);margin-top:20px;overflow:hidden}
+.card-head{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid var(--hair)}
+.card-num{font:400 26px/1 var(--display);color:var(--orange);min-width:30px}
+.card-title{font:400 25px/1 var(--display);letter-spacing:.02em}
+.card-file{font:600 11px/1 var(--mono);color:var(--muted-3);margin-top:5px}
+.card-sev{margin-left:auto}
+.card-body{padding:8px 22px 20px}
+.finding{display:grid;grid-template-columns:88px 1fr;gap:16px;padding:15px 0;border-bottom:1px solid var(--hair)}
+.finding:last-child{border-bottom:0}
+.f-kind{font:700 9.5px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding-top:2px}
+.f-kind.issue{color:#ffb3b3}.f-kind.ok{color:#a9ff9c}.f-kind.fix{color:#ffce8f}
+.f-text{font-size:13.5px;line-height:1.6;color:var(--muted);text-wrap:pretty}
+.f-text strong{color:var(--text);font-weight:600}
+.f-text .now{display:inline-block;font:600 12px/1.4 var(--mono);color:var(--muted-2);background:rgba(255,255,255,.04);border:1px solid var(--hair);border-radius:5px;padding:2px 7px;margin:0 1px}
+.f-text .rec{color:#a9ff9c;font-weight:600}
+.f-arrow{color:var(--muted-3);padding:0 4px}
+.summary{margin-top:34px;border:1px solid rgba(247,148,32,.3);border-radius:16px;background:rgba(247,148,32,.06);padding:22px 24px}
+.summary h3{font:400 24px/1 var(--display);letter-spacing:.02em;margin:0 0 12px;color:#ffce8f}
+.summary ol{margin:0;padding-left:20px}
+.summary li{font-size:13.5px;line-height:1.7;color:var(--muted);text-wrap:pretty}.summary li strong{color:var(--text);font-weight:600}
+.summary li .sev{margin-left:6px;transform:translateY(-1px)}
+</style>
+</head>
+<body>
+<div class="doc">
+  <div class="eyebrow">Recruiting Hub · Deliverable 5 — Consistency Sweep</div>
+  <h1 class="title">Tertiary recruit surfaces — audit</h1>
+  <p class="lede">Where recruit info shows up <strong>outside</strong> the hub, and what needs to change so it reads as one system with the new lean object, RT scale, phase language, and Signing-Day mechanics. Findings only — nothing here is changed yet.</p>
+  <div class="legend">
+    <span><span class="sev high">High</span> breaks the redesign's core promise</span>
+    <span><span class="sev med">Med</span> visibly inconsistent</span>
+    <span><span class="sev low">Low</span> minor / mostly aligned</span>
+    <span><span class="sev info">Info</span> needs a pointer</span>
+  </div>
+
+  <!-- 1 -->
+  <div class="card">
+    <div class="card-head"><span class="card-num">01</span><div><div class="card-title">Recruiting Tutorial Page</div><div class="card-file">Recruiting.html — "Mastering GOB"</div></div><span class="card-sev"><span class="sev high">High</span></span></div>
+    <div class="card-body">
+      <div class="finding"><div class="f-kind issue">Naming</div><div class="f-text">Calls the Week-35 phase <span class="now">Recruiting Day</span> throughout (hero, lock note, calendar ribbon, phase card, legend). The hub now names it <span class="rec">Signing Day</span>. <span class="f-arrow">→</span> Rename all instances.</div></div>
+      <div class="finding"><div class="f-kind issue">Stale mechanics</div><div class="f-text">Phase-3 copy says <span class="now">Spend 20 bonus points</span> and build a <span class="now">20-recruit list</span>. The hub uses a <span class="rec">50-point budget</span> and we <span class="rec">removed the 20-recruit cap</span> (bound only by points). <span class="f-arrow">→</span> Update the number and drop the cap language.</div></div>
+      <div class="finding"><div class="f-kind fix">Check</div><div class="f-text">Calendar ribbon labels Weeks 27–34 <span class="now">Tournament</span>; the hub's phase strip calls that stretch <span class="rec">Passive</span>. Decide on one label (they can coexist — a tournament during passive weeks — but the words should match).</div></div>
+      <div class="finding"><div class="f-kind ok">Consistent</div><div class="f-text">The lean-likelihood ladder (<strong>#1 ≈ 8×, #2 ≈ 4×, #3 ≈ 2×</strong>) and the recruit RT scale already match the hub. Keep as the canonical explainer.</div></div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="card">
+    <div class="card-head"><span class="card-num">02</span><div><div class="card-title">FCC Recruits Tab</div><div class="card-file">"Recruits" tab table — full recruit list</div></div><span class="card-sev"><span class="sev high">High</span></span></div>
+    <div class="card-body">
+      <div class="finding"><div class="f-kind issue">Problem C, unsolved</div><div class="f-text">The lean column is still a comma-separated <strong>text cell</strong> — <span class="now">Four Corners, Lancaster</span>, <span class="now">open, Four Corners</span>. This is the exact problem the whole redesign fixes, still live on this surface. <span class="f-arrow">→</span> Replace with the <span class="rec">lean object</span> (ranked ladder + your-standing), same as the hub pool.</div></div>
+      <div class="finding"><div class="f-kind issue">Missing column</div><div class="f-text">No <strong>Year</strong> column. The hub adds Year after POS (game-wide change for full-attribute recruit displays). <span class="f-arrow">→</span> Add <span class="rec">Year</span> after POS here too.</div></div>
+      <div class="finding"><div class="f-kind ok">Consistent</div><div class="f-text">RT is already colored on the recruit scale, and the "New" lean badge from the New-Leans proposal fits the hub's story signal. Keep both.</div></div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="card">
+    <div class="card-head"><span class="card-num">03</span><div><div class="card-title">FCC Home — Recruiting Card</div><div class="card-file">GOB FCC Shell POC.html — home dashboard card</div></div><span class="card-sev"><span class="sev med">Med</span></span></div>
+    <div class="card-body">
+      <div class="finding"><div class="f-kind issue">No lean signal</div><div class="f-text">Rows show <span class="now">Recruit · Arch · HT · WT · RT</span> with nothing about leans — the card can't answer "who's leaning to me," the redesign's core read. <span class="f-arrow">→</span> Add a compact <span class="rec">standing marker</span> (#1 / on-list dot) per row.</div></div>
+      <div class="finding"><div class="f-kind issue">RT not colored</div><div class="f-text">RT renders plain. <span class="f-arrow">→</span> Apply the <span class="rec">recruit RT scale</span> (rt-low / mid / high / elite).</div></div>
+      <div class="finding"><div class="f-kind issue">Static footnote</div><div class="f-text">Footnote is hardcoded <span class="now">Recruiting Invites Active</span>. <span class="f-arrow">→</span> Make it <span class="rec">phase-aware</span>, matching the phase-strip language ("Invite Season · Wk 22 · 3 of 7 sent" / "Passive — leans come to you").</div></div>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="card">
+    <div class="card-head"><span class="card-num">04</span><div><div class="card-title">Coach's Office — Recruiting Card</div><div class="card-file">Recruiting UX / franchise-command-center.css</div></div><span class="card-sev"><span class="sev low">Low</span></span></div>
+    <div class="card-body">
+      <div class="finding"><div class="f-kind ok">Mostly aligned</div><div class="f-text">The New-Leans proposal already adds RT-scale colors, a <strong>New</strong> lean badge, a Week-invite feedblock, and phase-aware footnotes ("visits are open — Weeks 20–26 · used 3 of 7"). Good foundation — adopt it.</div></div>
+      <div class="finding"><div class="f-kind fix">Language</div><div class="f-text">Aligns to "Recruiting visits" / week copy but predates the <span class="rec">Signing Day</span> rename and the standing-chip vocabulary. <span class="f-arrow">→</span> Sync verbs + the Signing-Day name; consider the standing marker here too for parity with the hub.</div></div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="card">
+    <div class="card-head"><span class="card-num">05</span><div><div class="card-title">Training Report</div><div class="card-file">Training.html / tr-*.png</div></div><span class="card-sev"><span class="sev info">Info</span></span></div>
+    <div class="card-body">
+      <div class="finding"><div class="f-kind fix">Not found</div><div class="f-text">No recruit content turned up in <span class="now">Training.html</span> or the training-report captures — the only "lean" reference is coaching-focus copy, unrelated to recruiting. <span class="f-arrow">→</span> If recruits surface in the Training Report (e.g. commit/development notes), point me to the file and I'll fold it into the sweep.</div></div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <h3>Suggested order to apply</h3>
+    <ol>
+      <li><strong>Tutorial copy fixes</strong> — Signing-Day rename + 50-point / no-cap correction. Unambiguous, fast.<span class="sev high">High</span></li>
+      <li><strong>FCC Recruits-tab lean object</strong> — swap the text cell for the ladder + add Year. Highest value; kills Problem C everywhere.<span class="sev high">High</span></li>
+      <li><strong>FCC Home card</strong> — standing marker + RT color + phase-aware footnote.<span class="sev med">Med</span></li>
+      <li><strong>Coach's Office card</strong> — adopt the New-Leans proposal, sync Signing-Day language.<span class="sev low">Low</span></li>
+      <li><strong>Training Report</strong> — pending a pointer.<span class="sev info">Info</span></li>
+    </ol>
+  </div>
+</div>
+</body>
+</html>

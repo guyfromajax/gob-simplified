@@ -116,7 +116,7 @@
 }
 
 .bn-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 44px;
   line-height: 0.96;
   margin: 8px 0 4px;
@@ -145,7 +145,7 @@
 }
 
 .bn-cta {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 19px;
   letter-spacing: 0.06em;
   padding: 12px 40px;
@@ -276,7 +276,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 9px;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   color: var(--bn-gold-bright);
   background: color-mix(in srgb, var(--bn-gold) 12%, transparent);
@@ -284,7 +284,7 @@
 }
 
 .rc__name {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 23px;
   color: #fff;
   line-height: 1;

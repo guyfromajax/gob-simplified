@@ -38,7 +38,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
 .playbooks-resource-shell {
@@ -639,7 +639,7 @@ input[type="reset"] {
 .pc-header h2 {
   margin: 0;
   color: #ffffff;
-  font-family: 'Bebas Neue', cursive;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
   font-size: 2rem;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -817,7 +817,7 @@ input[type="reset"] {
 
 .toast-title {
   color: #ffffff;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -920,7 +920,7 @@ input[type="reset"] {
 }
 
 .save-confirm-title {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 28px;
   color: #ffffff;
   line-height: 1;
@@ -953,7 +953,7 @@ input[type="reset"] {
   border: 1.5px solid rgba(255,255,255,0.2);
   background: transparent;
   color: rgba(255,255,255,0.7);
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.06em;
   border-radius: 8px;

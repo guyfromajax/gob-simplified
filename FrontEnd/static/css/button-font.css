@@ -2,7 +2,7 @@ button:not([data-tab]):not([role="tab"]):not(.tab-button):not(.stats-scope-btn):
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue', sans-serif !important;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif !important;
   font-size: 18px !important;
   letter-spacing: 1.5px !important;
 }
