@@ -32,8 +32,12 @@
     board: [],                       // ordered recruit ids (invite phase)
     search: '', region: 'all', mineOnly: false,
     sort: { key: 'rt', dir: 'desc' }, collapsed: {},
-    drag: { from: null, over: null }
+    drag: { from: null, over: null },
+    // Signing Day (wk 35)
+    alloc: {},                       // { recruitId: {points, promise} }
+    sTab: 'mine', sRegion: 'all', sSearch: '', week35Ran: false, flashId: null
   };
+  var SIGN = { TOTAL: 50, MAX_PER: 20, PROMISE_W: 18 };
 
   function boardActive() { return state.phase === 'invite'; }
   function attrClass(v) { return v >= 65 ? 'attr-hi' : v >= 40 ? 'attr-mid' : v >= 20 ? 'attr-lo' : 'attr-zero'; }
@@ -301,26 +305,207 @@
       '<div class="story-items">' + items + '</div></div>';
   }
 
+  // ===================== SIGNING BOARD (wk 35) =====================
+  var WARN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17v.5"></path><path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>';
+  var DOT_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"></circle></svg>';
+
+  // Placeholder odds (per spec; real signing math is league-relative → not client-computable).
+  // Kept isolated so it can be swapped. Directionally consistent with the backend
+  // score = (1+points+PT_bonus)·lean_mult.
+  function signOdds(rec, points, promise) {
+    var a = Spine.Lean.analyze(rec.leanModel);
+    var base = a.standing === 'you1' ? 48 : a.standing === 'list' ? (a.rank === 2 ? 34 : 26)
+      : a.standing === 'locked' ? 8 : a.standing === 'open' ? 20 : a.standing === 'quiet' ? 16 : 14;
+    var s = Math.max(4, Math.min(99, Math.round(base + points * 2.2 + (promise ? SIGN.PROMISE_W : 0))));
+    var band = s >= 72 ? { cls: 'o-lock', lab: 'Strong' } : s >= 48 ? { cls: 'o-even', lab: 'In the Mix' }
+      : s >= 26 ? { cls: 'o-slim', lab: 'Slim' } : { cls: 'o-long', lab: 'Long shot' };
+    return { pct: s, cls: band.cls, lab: band.lab };
+  }
+  function allocOf(id) { return state.alloc[id] || { points: 0, promise: false }; }
+  function committedIds() { return Object.keys(state.alloc).filter(function (id) { var a = state.alloc[id]; return a && (a.points > 0 || a.promise); }); }
+  function spent() { return committedIds().reduce(function (s, id) { return s + (state.alloc[id].points || 0); }, 0); }
+  function remaining() { return SIGN.TOTAL - spent(); }
+  function pruneAlloc(id) { var a = state.alloc[id]; if (a && a.points === 0 && !a.promise) delete state.alloc[id]; }
+
+  function seedAlloc() {
+    var mine = state.recruits.filter(function (r) { return r.leansToUser; }).sort(function (a, b) { return (b.rt || 0) - (a.rt || 0); });
+    var out = {};
+    if (mine[0]) out[mine[0].recruitId] = { points: 12, promise: true };
+    if (mine[1]) out[mine[1].recruitId] = { points: 9, promise: true };
+    if (mine[2]) out[mine[2].recruitId] = { points: 6, promise: false };
+    return out;
+  }
+
+  function signFiltered() {
+    var q = state.sSearch.trim().toLowerCase();
+    return state.recruits.filter(function (r) {
+      if (state.sTab === 'mine' && !r.leansToUser) return false;
+      if (state.sRegion !== 'all' && regionOf(r) !== state.sRegion) return false;
+      if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    }).sort(function (a, b) { return (b.rt || 0) - (a.rt || 0); });
+  }
+
+  function prowHtml(r) {
+    var a = allocOf(r.recruitId), o = signOdds(r, a.points, a.promise);
+    var committed = a.points > 0 || a.promise;
+    var claimed = (r.leanModel.leans || []).filter(function (s) { return !s.open; }).length;
+    var stand = r.yourRank === 1 ? '<span class="brow-stand you1">' + DOT_SVG + '#1</span>'
+      : r.yourRank > 1 ? '<span class="brow-stand list">#' + r.yourRank + '</span>' : '';
+    var dots = [0, 1, 2].map(function (i) { return '<i class="' + (i < claimed ? 'on' : '') + '"></i>'; }).join('');
+    var canPlus = remaining() > 0 && a.points < SIGN.MAX_PER;
+    return '<div class="prow' + (committed ? ' funded' : '') + (state.flashId === r.recruitId ? ' flash' : '') + '" data-id="' + r.recruitId + '">' +
+      '<div class="prow-name"><div class="nm"><span class="txt">' + Common.escapeHtml(r.name) + '</span>' + stand + '</div>' +
+        '<div class="prow-arch">' + Common.escapeHtml(r.archetype) + '</div></div>' +
+      '<span class="prow-pos">' + Common.escapeHtml(r.pos) + '</span>' +
+      '<span class="prow-region">' + regionOf(r) + '</span>' +
+      '<span class="prow-rt"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + (r.rt != null ? r.rt : '--') + '</span></span>' +
+      '<span class="prow-leans" title="' + claimed + ' of 3 leans">' + dots + '</span>' +
+      '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
+        '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
+        '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button><span class="stepper-pts">pts</span></div></div>' +
+      '<div class="promise-cell' + (a.promise ? ' set' : '') + '"><button class="promise-toggle" data-promise="' + r.recruitId + '" title="Promise playing time">' +
+        '<span class="box">' + CHECK + '</span>' + (a.promise ? 'Binding' : 'Promise') + '</button></div>' +
+      '<div class="odds ' + o.cls + '"><div class="odds-top"><span class="odds-lab">' + o.lab + '</span><span class="odds-pct">' + o.pct + '%</span></div>' +
+        '<div class="odds-bar"><div class="odds-fill" style="width:' + o.pct + '%"></div></div></div></div>';
+  }
+
+  function railHtml() {
+    var cids = committedIds().map(function (id) { return { r: state.byId[id], a: state.alloc[id], o: signOdds(state.byId[id], state.alloc[id].points, state.alloc[id].promise) }; })
+      .filter(function (x) { return x.r; })
+      .sort(function (x, y) { return (y.a.points - x.a.points) || (y.o.pct - x.o.pct); });
+    var rem = remaining(), promises = committedIds().filter(function (id) { return state.alloc[id].promise; }).length;
+    var pct = Math.min(100, (spent() / SIGN.TOTAL) * 100);
+    var list = cids.length === 0
+      ? '<div class="rail-list"><div class="rail-empty"><div class="t1">Nothing committed</div><div class="t2">Add points to a recruit in the pool and they\'ll appear here.</div></div></div>'
+      : '<div class="rail-list">' + cids.map(function (x) {
+          return '<div class="citem" data-jump="' + x.r.recruitId + '" title="Jump to recruit"><div class="citem-body">' +
+            '<div class="citem-name"><span class="nm">' + Common.escapeHtml(x.r.name) + '</span>' + (x.a.promise ? '<span class="pmk">· PT</span>' : '') + '</div>' +
+            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span><span>' + Common.escapeHtml(x.r.pos) + ' · ' + (x.r.rt != null ? x.r.rt : '--') + ' RT</span>' +
+            '<span class="citem-odds" style="color:var(--muted)">' + x.o.pct + '%</span></div></div>' +
+            '<button class="citem-x" data-remove="' + x.r.recruitId + '" title="Remove">×</button></div>';
+        }).join('') + '</div>';
+    var note = promises > 0
+      ? '<div class="rail-note">' + WARN_SVG + '<span><b>' + promises + ' binding ' + (promises === 1 ? 'promise' : 'promises') + '</b> — honor the playing time or your program\'s standing suffers.</span></div>'
+      : '<div class="rail-note"><span>Promises are <b>binding</b> — set one only if you\'ll honor the minutes.</span></div>';
+    var disabled = rem < 0 || state.week35Ran;
+    return '<div class="rail-head"><div class="rail-title">Your Orders</div>' +
+      '<div class="budget-nums"><span class="rem' + (rem < 0 ? ' over' : '') + '">' + rem + '</span><span class="of">/ ' + SIGN.TOTAL + '</span></div>' +
+      '<div class="budget-caprow"><span class="budget-cap">Points to spend</span>' +
+        '<span class="budget-promises"><b>' + promises + '</b> ' + (promises === 1 ? 'promise' : 'promises') + '</span></div>' +
+      '<div class="budget-bar"><div class="budget-fill' + (rem < 0 ? ' over' : '') + '" style="width:' + pct + '%"></div></div></div>' +
+      list +
+      '<div class="rail-foot">' + note +
+        '<button class="rail-submit" id="sign-submit"' + (disabled ? ' disabled' : '') + '>' + (state.week35Ran ? 'Signings Run' : 'Submit Orders') + '</button></div>';
+  }
+
+  function signBoardHtml() {
+    var regionOpts = '<option value="all">All regions</option>' + REGION_ORDER.map(function (r) { return '<option value="' + r + '"' + (state.sRegion === r ? ' selected' : '') + '>' + r + '</option>'; }).join('');
+    return '<div class="spool"><div class="spool-head"><div class="spool-title">Recruit Pool</div>' +
+        '<div class="spool-tools"><div class="spool-tabs">' +
+          '<button class="spool-tab' + (state.sTab === 'mine' ? ' on' : '') + '" data-stab="mine">Leaning to you</button>' +
+          '<button class="spool-tab' + (state.sTab === 'all' ? ' on' : '') + '" data-stab="all">All</button></div>' +
+          '<select class="spool-region" id="sign-region">' + regionOpts + '</select>' +
+          '<input class="spool-search" id="sign-search" placeholder="Search name…" value="' + Common.escapeHtml(state.sSearch) + '"></div></div>' +
+        '<div class="spool-colhdr"><span>Recruit</span><span class="c-num">Pos</span><span class="c-num">Region</span><span class="c-num">RT</span>' +
+          '<span>Leans</span><span>Points</span><span>Playing Time</span><span>Sign odds</span></div>' +
+        '<div class="spool-rows" id="sign-rows">' + signFiltered().map(prowHtml).join('') + '</div></div>' +
+      '<aside class="rail" id="sign-rail">' + railHtml() + '</aside>';
+  }
+
+  function renderSignRows() {
+    var rows = document.getElementById('sign-rows'); if (!rows) return;
+    var top = rows.scrollTop;
+    rows.innerHTML = signFiltered().map(prowHtml).join('');
+    rows.scrollTop = top;
+    bindSignRows();
+  }
+  function renderSignRail() { var rail = document.getElementById('sign-rail'); if (rail) { rail.innerHTML = railHtml(); bindSignRail(); } }
+
+  function stepPoints(id, d) {
+    var a = allocOf(id), nv = a.points + d;
+    if (nv < 0 || nv > SIGN.MAX_PER) return;
+    if (d > 0 && remaining() <= 0) return;
+    state.alloc[id] = { points: nv, promise: a.promise }; pruneAlloc(id);
+    renderSignRows(); renderSignRail();
+  }
+  function togglePromise(id) {
+    var a = allocOf(id);
+    state.alloc[id] = { points: a.points, promise: !a.promise }; pruneAlloc(id);
+    renderSignRows(); renderSignRail();
+  }
+  function removeCommit(id) { delete state.alloc[id]; renderSignRows(); renderSignRail(); }
+  function jumpTo(id) {
+    var r = state.byId[id]; if (!r) return;
+    if (state.sTab === 'mine' && !r.leansToUser) { state.sTab = 'all'; renderSignRows(); document.querySelectorAll('[data-stab]').forEach(function (b) { b.classList.toggle('on', b.dataset.stab === 'all'); }); }
+    var rows = document.getElementById('sign-rows'), row = rows && rows.querySelector('[data-id="' + id + '"]');
+    if (row) rows.scrollTop = row.offsetTop - 8;
+    state.flashId = id; renderSignRows();
+    setTimeout(function () { state.flashId = null; renderSignRows(); }, 1100);
+  }
+
+  function bindSignRows() {
+    var host = document.getElementById('sign-rows'); if (!host) return;
+    host.querySelectorAll('button[data-step]').forEach(function (b) { b.addEventListener('click', function () { stepPoints(this.dataset.id, Number(this.dataset.step)); }); });
+    host.querySelectorAll('button[data-promise]').forEach(function (b) { b.addEventListener('click', function () { togglePromise(this.dataset.promise); }); });
+  }
+  function bindSignRail() {
+    var host = document.getElementById('sign-rail'); if (!host) return;
+    host.querySelectorAll('[data-jump]').forEach(function (b) { b.addEventListener('click', function () { jumpTo(this.dataset.jump); }); });
+    host.querySelectorAll('[data-remove]').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); removeCommit(this.dataset.remove); }); });
+    var submit = host.querySelector('#sign-submit'); if (submit) submit.addEventListener('click', submitOrders);
+  }
+  function bindSignBoard() {
+    document.querySelectorAll('[data-stab]').forEach(function (b) { b.addEventListener('click', function () { state.sTab = this.dataset.stab; renderSignRows(); document.querySelectorAll('[data-stab]').forEach(function (x) { x.classList.toggle('on', x.dataset.stab === state.sTab); }); }); });
+    var region = document.getElementById('sign-region'); if (region) region.addEventListener('change', function () { state.sRegion = this.value; renderSignRows(); });
+    var search = document.getElementById('sign-search'); if (search) search.addEventListener('input', function () { state.sSearch = this.value; renderSignRows(); });
+    bindSignRows(); bindSignRail();
+  }
+
+  function submitOrders() {
+    if (remaining() < 0 || state.week35Ran) return;
+    var btn = document.getElementById('sign-submit'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+    var entries = committedIds().map(function (id) { return { id: id, points: state.alloc[id].points, scholarship: false, playing_time: !!state.alloc[id].promise }; });
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: context.franchiseId, order_entries: entries })
+    }).then(function () {
+      return Common.fetchJSON(API_CONFIG.buildUrl('/franchise/run-week-35-recruiting'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ franchise_id: context.franchiseId })
+      });
+    }).then(function () {
+      showToast('Orders Submitted', 'Points spent and promises are now binding.');
+      setTimeout(function () { window.location.href = Common.buildFccUrl(context); }, 950);
+    }).catch(function (err) {
+      console.error(err); showToast('Submit failed', String(err && err.message || err), false);
+      if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
+    });
+  }
+
   // ===================== SHELL =====================
   function renderShell() {
     var root = document.getElementById('hub-root');
+    var signing = state.phase === 'day';
+    var body = signing
+      ? '<div class="hub-body-sign" id="hub-sign"></div>'
+      : '<div class="spine-body ' + (hasDock() ? 'with-dock' : 'no-dock') + '" style="padding-top:14px">' +
+          '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
+            (state.phase === 'passive' ? storyHtml() : '') +
+            '<div class="pool-wrap"><div id="hub-pool"></div></div></div>' +
+          (hasDock() ? '<div id="hub-dock"></div>' : '') + '</div>';
     root.innerHTML =
       '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
-      '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' +
-      '<div class="spine-body ' + (hasDock() ? 'with-dock' : 'no-dock') + '" style="padding-top:14px">' +
-        '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
-          (state.phase === 'passive' ? storyHtml() : '') +
-          '<div class="pool-wrap"><div id="hub-pool"></div></div></div>' +
-        (hasDock() ? '<div id="hub-dock"></div>' : '') +
-      '</div>';
+      '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;
     var phaseHost = document.getElementById('hub-phase');
-    phaseHost.innerHTML = Spine.Phase.stripHtml({ phase: state.phase, week: state.week, inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length) });
+    phaseHost.innerHTML = Spine.Phase.stripHtml({ phase: state.phase, week: state.week,
+      inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length), points: remaining() });
     Spine.Phase.bind(phaseHost);
     var mount = document.getElementById('hub-anchor-mount');
     mount.innerHTML = Spine.Anchor.html();
-    Spine.Anchor.bind(mount.querySelector('.hub-anchor'), { poolSelector: '.pool-wrap' });
-    renderPool();
-    if (hasDock()) renderDock();
+    Spine.Anchor.bind(mount.querySelector('.hub-anchor'), { poolSelector: signing ? '.spool' : '.pool-wrap' });
+    if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); bindSignBoard(); }
+    else { renderPool(); if (hasDock()) renderDock(); }
   }
 
   // ===================== INIT =====================
@@ -346,6 +531,16 @@
         state.board = Common.recruitingOrderIds(data.saved_orders || {}).filter(function (id) {
           if (!state.byId[id] || seen[id]) return false; seen[id] = true; return true;
         });
+        // Signing Day: restore the budget from saved entries; else auto-fill top leaners.
+        state.week35Ran = !!data.week_35_recruiting_ran;
+        if (state.phase === 'day') {
+          var savedEntries = (data.saved_order_entries_week_35 || []).filter(function (e) { return e && state.byId[e.id]; });
+          if (savedEntries.length) {
+            savedEntries.forEach(function (e) { state.alloc[e.id] = { points: Number(e.points) || 0, promise: !!e.playing_time }; pruneAlloc(e.id); });
+          } else {
+            state.alloc = seedAlloc();
+          }
+        }
         renderShell();
       })
       .catch(function (err) { console.error(err); if (root) root.innerHTML = '<div class="hub-error">Failed to load recruits.</div>'; });
