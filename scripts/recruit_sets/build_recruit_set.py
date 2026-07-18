@@ -186,6 +186,11 @@ def build_one(recruit, random_weights=None):
         "weight": weight,
         "attributes": attrs,                                # verbatim -> FRD
         "position_ratings": pratings,
+        # Stable home region (identity, not franchise-layered): baked once here so
+        # the recruit lands in the same region in every franchise. Seeded by rid so
+        # a rebuild reproduces it. The loader reads this; Lean still derives from it
+        # with its own randomness. Region keys mirror _build_region_team_map (A–H).
+        "Home Region": random.Random(f"region|{rid}").choice(list("ABCDEFGH")),
     }
     manifest = {
         "recruit_id": rid,

@@ -38,7 +38,8 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
       "height": 74,               // integer inches, AS GENERATED (not projected)
       "weight": 190,              // integer lbs,   AS GENERATED (not projected)
       "attributes": { /* exactly the dict generate_recruits_list() emits — see below */ },
-      "position_ratings": { "PG": 41, "SG": 44, "SF": 47, "PF": 39, "C": 30 }
+      "position_ratings": { "PG": 41, "SG": 44, "SF": 47, "PF": 39, "C": 30 },
+      "Home Region": "C"          // stable identity — region A–H, baked once, same in every franchise
     }
     // ... 299 more
   ]
@@ -62,12 +63,18 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
   keys are `PG SG SF PF C`.
 - **`year`** — one of the four recruit years. A 300-pool skews heavily **JH** (Freshman 10–30,
   Sophomore 5–15, Junior 5–15, JH = remainder).
+- **`Home Region`** — one of `A`–`H`. **Stable identity**: baked once (by the baker, or by
+  `bake_home_region.py` for the original set) and read verbatim by the loader, so the recruit
+  lands in the same region in every franchise. Note: `Lean` is **not** stored — it still derives
+  per-franchise from this region with its own randomness (75% "open", etc.), and jersey is still
+  rolled at signing. A recruit with no `Home Region` (dynamic, or a legacy un-baked set) falls
+  back to the loader's per-franchise random draw.
 
 ### Deliberately excluded (layered on per-franchise at load time — never in the set)
 
-`franchise_id`, `Home Region`, `Lean`, `created_at`. These are franchise-specific and assigned
-when the set is loaded into FRD, keeping the set portable and identical across every franchise
-that draws it.
+`franchise_id`, `Lean`, `created_at`. These are genuinely franchise-specific and assigned
+when the set is loaded into FRD, keeping the set portable across every franchise that draws it.
+(`Home Region` used to be here too, but is now baked as stable identity — see above.)
 
 ---
 

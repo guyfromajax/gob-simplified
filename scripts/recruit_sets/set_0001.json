@@ -1,6 +1,6 @@
 {
   "set_id": "set_0001",
-  "version": 1,
+  "version": 2,
   "recruit_count": 300,
   "recruits": [
     {
@@ -38,7 +38,8 @@
         "SF": 23,
         "PF": 26,
         "C": 26
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "b7510ae4-6448-4b82-b435-b7af04cd0bbe",
@@ -75,7 +76,8 @@
         "SF": 28,
         "PF": 28,
         "C": 33
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "857d2c0b-3758-4e8d-8ac7-7dfe7025df8a",
@@ -112,7 +114,8 @@
         "SF": 30,
         "PF": 41,
         "C": 28
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "095544c3-6aa5-4e75-84a5-29a8b3d875f4",
@@ -149,7 +152,8 @@
         "SF": 19,
         "PF": 21,
         "C": 28
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "0541fd5b-11c9-41ff-afa1-aadd03e943d1",
@@ -186,7 +190,8 @@
         "SF": 36,
         "PF": 37,
         "C": 25
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "cc0a286f-2eac-4e67-968a-243987e8af50",
@@ -223,7 +228,8 @@
         "SF": 22,
         "PF": 22,
         "C": 24
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "ec983767-d373-4a50-9771-7c53cd0a84b1",
@@ -260,7 +266,8 @@
         "SF": 16,
         "PF": 24,
         "C": 21
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "6c886343-bd50-4a7e-b14e-092a83fa2637",
@@ -297,7 +304,8 @@
         "SF": 8,
         "PF": 14,
         "C": 14
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "e2f31af1-d62d-4a63-aee9-7cb4d5f685cd",
@@ -334,7 +342,8 @@
         "SF": 17,
         "PF": 15,
         "C": 10
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "fc39dadb-0319-4ece-bb10-a16c041a05d3",
@@ -371,7 +380,8 @@
         "SF": 34,
         "PF": 27,
         "C": 37
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "b15e9c89-f90f-48de-adfa-f718e9738489",
@@ -408,7 +418,8 @@
         "SF": 26,
         "PF": 29,
         "C": 33
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "ae073bcb-3c34-4ae9-85fa-5e38200e2f42",
@@ -445,7 +456,8 @@
         "SF": 38,
         "PF": 27,
         "C": 35
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "ec35a93b-7399-45f7-8d19-c4c12dc63a3f",
@@ -482,7 +494,8 @@
         "SF": 10,
         "PF": 15,
         "C": 17
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "5c242a70-14b0-49cb-836f-b893a4d25983",
@@ -519,7 +532,8 @@
         "SF": 30,
         "PF": 20,
         "C": 32
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "6c372f67-4475-4e1e-a9f0-0fe29ec39668",
@@ -556,7 +570,8 @@
         "SF": 27,
         "PF": 26,
         "C": 22
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "e1acdc9c-f2bb-4746-90d5-9c8fb879bdf7",
@@ -593,7 +608,8 @@
         "SF": 27,
         "PF": 21,
         "C": 30
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "648e898c-20c7-43b5-a267-31f78401361c",
@@ -630,7 +646,8 @@
         "SF": 23,
         "PF": 19,
         "C": 20
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "134d72b7-00a7-4b96-b4d8-8ba0bbb281f9",
@@ -667,7 +684,8 @@
         "SF": 38,
         "PF": 35,
         "C": 28
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "6186d422-bdf4-42fe-97ef-0639097babcf",
@@ -704,7 +722,8 @@
         "SF": 33,
         "PF": 33,
         "C": 46
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "eb0f8af4-ea7f-44eb-9ef6-bc5072ab6bd7",
@@ -741,7 +760,8 @@
         "SF": 33,
         "PF": 46,
         "C": 37
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "8875f89e-c563-47cb-90d7-c6b4506de77f",
@@ -778,7 +798,8 @@
         "SF": 6,
         "PF": 5,
         "C": 5
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "cca4fe08-6c3b-47d8-be23-69a74b0b8085",
@@ -815,7 +836,8 @@
         "SF": 39,
         "PF": 58,
         "C": 59
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "0f4c2b4f-39ec-4a03-bb98-d44f9e8490d3",
@@ -852,7 +874,8 @@
         "SF": 36,
         "PF": 20,
         "C": 24
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "79f3fbf8-5b47-4433-b685-f4a96625823c",
@@ -889,7 +912,8 @@
         "SF": 34,
         "PF": 27,
         "C": 24
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "c761d744-0890-4e18-a90c-cc17739c882f",
@@ -926,7 +950,8 @@
         "SF": 39,
         "PF": 36,
         "C": 37
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "52d6f268-a264-4238-a99c-651b119ced00",
@@ -963,7 +988,8 @@
         "SF": 29,
         "PF": 25,
         "C": 27
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "a929ff8d-4b07-4d93-a3bc-90674c0f153c",
@@ -1000,7 +1026,8 @@
         "SF": 12,
         "PF": 11,
         "C": 14
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "6750a787-678e-4981-b4b3-4a17cdadcfb3",
@@ -1037,7 +1064,8 @@
         "SF": 26,
         "PF": 24,
         "C": 25
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "d9331861-249e-4895-8325-9a7063612419",
@@ -1074,7 +1102,8 @@
         "SF": 11,
         "PF": 14,
         "C": 16
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "8e2bcbd7-8495-4a11-a3f9-f7c9e1c92886",
@@ -1111,7 +1140,8 @@
         "SF": 45,
         "PF": 27,
         "C": 29
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "da48932b-99a2-44ec-98a0-480b6a48034c",
@@ -1148,7 +1178,8 @@
         "SF": 17,
         "PF": 18,
         "C": 27
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "871ae86a-209b-4b6a-bf99-5a0eba78ef0a",
@@ -1185,7 +1216,8 @@
         "SF": 15,
         "PF": 11,
         "C": 11
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "a26cdb55-d9cd-4ac7-b8af-299ce683d5a4",
@@ -1222,7 +1254,8 @@
         "SF": 40,
         "PF": 27,
         "C": 39
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "43b0e433-cf99-44cd-a324-f874798fe486",
@@ -1259,7 +1292,8 @@
         "SF": 27,
         "PF": 11,
         "C": 15
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "7ffd0352-1187-489f-9864-a71ddcb613ef",
@@ -1296,7 +1330,8 @@
         "SF": 9,
         "PF": 15,
         "C": 15
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "93d6d23c-7de6-4d3b-9830-88ef1bd3d476",
@@ -1333,7 +1368,8 @@
         "SF": 27,
         "PF": 32,
         "C": 29
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "c24d4453-003b-4cef-a0e6-df027d941ae1",
@@ -1370,7 +1406,8 @@
         "SF": 13,
         "PF": 22,
         "C": 16
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "460d6667-9c3d-4b0a-9bcb-7fc30a6b7363",
@@ -1407,7 +1444,8 @@
         "SF": 23,
         "PF": 28,
         "C": 25
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "eb2248b7-1718-453d-b3ae-22f38fd92c37",
@@ -1444,7 +1482,8 @@
         "SF": 18,
         "PF": 16,
         "C": 23
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "85440b15-3fa5-42eb-ac46-bc3e64793dcd",
@@ -1481,7 +1520,8 @@
         "SF": 20,
         "PF": 21,
         "C": 25
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "2a1482a7-1e65-484e-a5af-ca61f6242eb6",
@@ -1518,7 +1558,8 @@
         "SF": 9,
         "PF": 10,
         "C": 11
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "efbe8119-24fa-4ca0-80fd-f4f6b08c2909",
@@ -1555,7 +1596,8 @@
         "SF": 30,
         "PF": 20,
         "C": 21
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "3d8cabce-03ff-4f4d-a023-4b3bca3efb44",
@@ -1592,7 +1634,8 @@
         "SF": 30,
         "PF": 24,
         "C": 28
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "92741185-0832-43e7-aa46-01ae4fb5d985",
@@ -1629,7 +1672,8 @@
         "SF": 17,
         "PF": 21,
         "C": 20
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "1c72618c-1b57-4d2d-87ff-66348b99cf66",
@@ -1666,7 +1710,8 @@
         "SF": 19,
         "PF": 22,
         "C": 17
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "38585a50-f603-43c7-98d6-d87ebda952ee",
@@ -1703,7 +1748,8 @@
         "SF": 19,
         "PF": 19,
         "C": 22
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "76a5d9d0-2039-4c5d-9186-420e5694e53b",
@@ -1740,7 +1786,8 @@
         "SF": 31,
         "PF": 23,
         "C": 27
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "fe88830e-72da-44da-986a-8bad9d80ff86",
@@ -1777,7 +1824,8 @@
         "SF": 42,
         "PF": 26,
         "C": 35
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "e0285eed-31f2-41c6-b21a-0d1c931c52b2",
@@ -1814,7 +1862,8 @@
         "SF": 19,
         "PF": 14,
         "C": 23
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "bda5b4ef-5851-4914-85fc-309dabd21d8c",
@@ -1851,7 +1900,8 @@
         "SF": 38,
         "PF": 38,
         "C": 37
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "d905a03c-2876-4e1c-b808-c71091c9a6e2",
@@ -1888,7 +1938,8 @@
         "SF": 30,
         "PF": 31,
         "C": 34
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "f81c1cf6-079b-4588-baed-52c5bf2db4a0",
@@ -1925,7 +1976,8 @@
         "SF": 24,
         "PF": 30,
         "C": 25
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "9153fa00-d2a6-42ac-9d6f-cba47c255e76",
@@ -1962,7 +2014,8 @@
         "SF": 13,
         "PF": 18,
         "C": 16
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "4e42827b-8aa2-4303-ba82-c7ecf24a0f47",
@@ -1999,7 +2052,8 @@
         "SF": 49,
         "PF": 50,
         "C": 41
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "9162ca13-3852-4593-8077-f7e3c3a7db23",
@@ -2036,7 +2090,8 @@
         "SF": 16,
         "PF": 17,
         "C": 17
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "c89217c7-e51a-4610-be88-545d0ebf140e",
@@ -2073,7 +2128,8 @@
         "SF": 21,
         "PF": 21,
         "C": 18
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "9cfc0d36-ecbd-44c1-bdb5-edef0f55ef96",
@@ -2110,7 +2166,8 @@
         "SF": 21,
         "PF": 25,
         "C": 17
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "3ce5afa8-d6e4-4e58-a0f5-ac384fc9c3d8",
@@ -2147,7 +2204,8 @@
         "SF": 25,
         "PF": 32,
         "C": 30
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "aacc3f24-71c4-4c75-bc4c-194b5d6e5360",
@@ -2184,7 +2242,8 @@
         "SF": 38,
         "PF": 37,
         "C": 31
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "c2b0df6e-12d8-45bb-8b31-79c905025940",
@@ -2221,7 +2280,8 @@
         "SF": 19,
         "PF": 24,
         "C": 18
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "c122b54c-aac2-464a-a040-5c5093271f83",
@@ -2258,7 +2318,8 @@
         "SF": 20,
         "PF": 10,
         "C": 17
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "7fc3570d-a99f-45bf-a8d6-a38a36e300b6",
@@ -2295,7 +2356,8 @@
         "SF": 38,
         "PF": 30,
         "C": 31
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "a54dabfe-b5a6-4b4f-87aa-e4006f84021d",
@@ -2332,7 +2394,8 @@
         "SF": 45,
         "PF": 33,
         "C": 46
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "0057e470-7393-452c-88b9-7f2a8337d0df",
@@ -2369,7 +2432,8 @@
         "SF": 47,
         "PF": 39,
         "C": 28
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "770002c4-2acc-4049-946c-d6df2e031407",
@@ -2406,7 +2470,8 @@
         "SF": 35,
         "PF": 23,
         "C": 35
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "8cf605bc-876f-4851-8606-2f2ab9ca5dbf",
@@ -2443,7 +2508,8 @@
         "SF": 38,
         "PF": 45,
         "C": 44
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "d2710c10-dac0-486e-9561-bbafa9fe38f8",
@@ -2480,7 +2546,8 @@
         "SF": 33,
         "PF": 28,
         "C": 46
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "8135b877-fc28-4f4a-8800-697c1d11a554",
@@ -2517,7 +2584,8 @@
         "SF": 28,
         "PF": 25,
         "C": 34
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "fcd9217e-265b-4ecb-bcbd-fc26f9c608c7",
@@ -2554,7 +2622,8 @@
         "SF": 28,
         "PF": 26,
         "C": 40
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "75a5008f-5153-4ccd-ba96-bd58eb8c8232",
@@ -2591,7 +2660,8 @@
         "SF": 37,
         "PF": 46,
         "C": 49
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "ba1f3d97-a738-4a97-b342-3eed2047691c",
@@ -2628,7 +2698,8 @@
         "SF": 32,
         "PF": 19,
         "C": 22
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "53d622b8-e9c4-41a4-a99d-51f7f337289e",
@@ -2665,7 +2736,8 @@
         "SF": 49,
         "PF": 42,
         "C": 40
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "25f93519-aa49-43d0-8529-9423f8078e88",
@@ -2702,7 +2774,8 @@
         "SF": 13,
         "PF": 9,
         "C": 11
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "f2611c50-b447-4a07-890a-7110934095eb",
@@ -2739,7 +2812,8 @@
         "SF": 36,
         "PF": 42,
         "C": 33
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "acfba7bf-e981-4974-8848-5d026f2ccbe3",
@@ -2776,7 +2850,8 @@
         "SF": 32,
         "PF": 15,
         "C": 10
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "3143a4b9-fc79-4552-8596-0e1ccbc10e1a",
@@ -2813,7 +2888,8 @@
         "SF": 37,
         "PF": 38,
         "C": 32
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "40dc6ea7-11fc-43bf-ad86-4fb290b31a20",
@@ -2850,7 +2926,8 @@
         "SF": 26,
         "PF": 35,
         "C": 35
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "3e1f844a-ae5f-40b5-a3fa-5ebe46014630",
@@ -2887,7 +2964,8 @@
         "SF": 27,
         "PF": 37,
         "C": 34
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "fe078884-cf51-408d-aec8-0360208a87e7",
@@ -2924,7 +3002,8 @@
         "SF": 19,
         "PF": 22,
         "C": 18
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "43a87da6-80b6-4aa9-a9b9-9cfe8c1b575a",
@@ -2961,7 +3040,8 @@
         "SF": 21,
         "PF": 11,
         "C": 6
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "6aa23136-c9ef-432a-8e9b-1c1861d30186",
@@ -2998,7 +3078,8 @@
         "SF": 30,
         "PF": 29,
         "C": 26
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "4d548c56-dcc9-4861-a3e8-96d0a7f45ae1",
@@ -3035,7 +3116,8 @@
         "SF": 24,
         "PF": 31,
         "C": 34
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "b51aebd1-d008-433a-9d6d-d18078d190d6",
@@ -3072,7 +3154,8 @@
         "SF": 15,
         "PF": 27,
         "C": 32
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "7bdbbc75-d889-436f-9874-ad557f1ee31d",
@@ -3109,7 +3192,8 @@
         "SF": 35,
         "PF": 46,
         "C": 51
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "2b6bf9ed-3baf-4d93-b5e5-68398ef3a54e",
@@ -3146,7 +3230,8 @@
         "SF": 21,
         "PF": 18,
         "C": 24
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "15630bf1-debe-4b9d-a75c-0b75713d3d21",
@@ -3183,7 +3268,8 @@
         "SF": 21,
         "PF": 17,
         "C": 20
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "dc2da368-74de-4e4c-88f3-1c0406781059",
@@ -3220,7 +3306,8 @@
         "SF": 31,
         "PF": 21,
         "C": 13
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "d9514839-7a6e-43bd-8733-058b788a14a0",
@@ -3257,7 +3344,8 @@
         "SF": 18,
         "PF": 21,
         "C": 14
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "6660e74e-1ce1-4edd-a94f-14a923d295b9",
@@ -3294,7 +3382,8 @@
         "SF": 37,
         "PF": 27,
         "C": 27
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "74dd9e84-8571-4c02-a9e0-e40310b64107",
@@ -3331,7 +3420,8 @@
         "SF": 37,
         "PF": 28,
         "C": 33
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "ad26aabb-ffdd-4ce1-82dc-361df8cc8bf4",
@@ -3368,7 +3458,8 @@
         "SF": 34,
         "PF": 45,
         "C": 43
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "276c7855-5198-4bca-b4d5-8df4e0a0b868",
@@ -3405,7 +3496,8 @@
         "SF": 27,
         "PF": 29,
         "C": 34
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "1379d006-d848-4a95-9541-a9425135132a",
@@ -3442,7 +3534,8 @@
         "SF": 15,
         "PF": 15,
         "C": 14
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "ac9ebdf7-1952-4985-8c23-b762f4431616",
@@ -3479,7 +3572,8 @@
         "SF": 21,
         "PF": 18,
         "C": 21
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "7495d5d8-b70d-44e6-b3ee-14b723295445",
@@ -3516,7 +3610,8 @@
         "SF": 14,
         "PF": 10,
         "C": 9
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "7d6ef66e-4941-4778-8617-9b67061f05aa",
@@ -3553,7 +3648,8 @@
         "SF": 30,
         "PF": 36,
         "C": 36
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "5bef1375-4b3a-4ad4-a220-b109660b19fa",
@@ -3590,7 +3686,8 @@
         "SF": 13,
         "PF": 6,
         "C": 7
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "5bb96021-c572-4901-a821-06fc57f3a38f",
@@ -3627,7 +3724,8 @@
         "SF": 27,
         "PF": 19,
         "C": 21
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "85e214a3-0e66-47b9-8a64-93912a7ecd6f",
@@ -3664,7 +3762,8 @@
         "SF": 26,
         "PF": 35,
         "C": 44
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "1dcb2e02-da9e-4c21-857d-fa38f668d627",
@@ -3701,7 +3800,8 @@
         "SF": 7,
         "PF": 11,
         "C": 16
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "b0c86ced-781a-4fef-bcf8-ce86ac684f3c",
@@ -3738,7 +3838,8 @@
         "SF": 37,
         "PF": 24,
         "C": 20
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "97cbdd0d-025e-451b-9544-7acad48aead7",
@@ -3775,7 +3876,8 @@
         "SF": 35,
         "PF": 33,
         "C": 47
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "cec84404-4a2a-410f-bf28-23b23e00783c",
@@ -3812,7 +3914,8 @@
         "SF": 18,
         "PF": 14,
         "C": 20
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "0c05b040-1454-4f64-801b-a02f84e7a835",
@@ -3849,7 +3952,8 @@
         "SF": 35,
         "PF": 20,
         "C": 27
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "fd15a883-77ee-493d-9b56-0bed8604b6c9",
@@ -3886,7 +3990,8 @@
         "SF": 32,
         "PF": 39,
         "C": 48
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "92aa2d1d-7b8a-414d-9d85-321a8dd9452b",
@@ -3923,7 +4028,8 @@
         "SF": 19,
         "PF": 10,
         "C": 12
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "6133fdd6-7c8c-4656-9045-e4149bc78e81",
@@ -3960,7 +4066,8 @@
         "SF": 43,
         "PF": 52,
         "C": 58
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "b7ec5d4d-26ee-4411-b155-3659e5fe6c13",
@@ -3997,7 +4104,8 @@
         "SF": 10,
         "PF": 14,
         "C": 11
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "ff3a642d-0e3d-44ac-9fdd-79d19076defc",
@@ -4034,7 +4142,8 @@
         "SF": 28,
         "PF": 38,
         "C": 32
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "aa410806-b16a-4d6f-933c-ead0f5b6871e",
@@ -4071,7 +4180,8 @@
         "SF": 21,
         "PF": 20,
         "C": 23
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "8c8aa8b3-6f62-454d-a923-70fb7ff1c803",
@@ -4108,7 +4218,8 @@
         "SF": 10,
         "PF": 8,
         "C": 8
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "61610075-f359-4d34-8c15-4f939fa503e1",
@@ -4145,7 +4256,8 @@
         "SF": 33,
         "PF": 36,
         "C": 34
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "cc28c4ca-6558-42d3-a47f-2af732a51389",
@@ -4182,7 +4294,8 @@
         "SF": 12,
         "PF": 13,
         "C": 9
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "0f8b54c7-1839-4821-8c90-277e9a2e3b76",
@@ -4219,7 +4332,8 @@
         "SF": 27,
         "PF": 32,
         "C": 34
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "0c1ef24d-32ef-4222-8c35-96e28fa97236",
@@ -4256,7 +4370,8 @@
         "SF": 25,
         "PF": 22,
         "C": 29
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "489ede3f-812b-4a5a-a2b9-0f54e4f4074d",
@@ -4293,7 +4408,8 @@
         "SF": 27,
         "PF": 24,
         "C": 20
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "18879347-fce0-4a17-a5a5-80460eec1ea0",
@@ -4330,7 +4446,8 @@
         "SF": 24,
         "PF": 19,
         "C": 25
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "e9b16074-fa77-4a62-8635-b6870bd62dbe",
@@ -4367,7 +4484,8 @@
         "SF": 27,
         "PF": 20,
         "C": 17
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "08e197fd-03c3-4d07-bc0d-1becba8b2ebb",
@@ -4404,7 +4522,8 @@
         "SF": 23,
         "PF": 31,
         "C": 24
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "5f592bbc-2fbc-4472-b8da-2e12f96f1a83",
@@ -4441,7 +4560,8 @@
         "SF": 16,
         "PF": 18,
         "C": 18
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "5a41c37f-2291-41e2-8c6e-93b988a27e60",
@@ -4478,7 +4598,8 @@
         "SF": 25,
         "PF": 20,
         "C": 13
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "22fd2922-a9ae-441f-8c92-3e068d2feb8e",
@@ -4515,7 +4636,8 @@
         "SF": 9,
         "PF": 13,
         "C": 10
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "a4a12bf0-23e0-4dca-96ce-d1bf01f8a1c0",
@@ -4552,7 +4674,8 @@
         "SF": 41,
         "PF": 46,
         "C": 44
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "11a0294e-7070-4ff9-ba33-b71dee8f396f",
@@ -4589,7 +4712,8 @@
         "SF": 34,
         "PF": 28,
         "C": 38
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "7ef2a438-ab74-4499-a753-d646ab597a30",
@@ -4626,7 +4750,8 @@
         "SF": 31,
         "PF": 19,
         "C": 26
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "c1667741-ed1f-483f-bc22-e6f4c9848114",
@@ -4663,7 +4788,8 @@
         "SF": 13,
         "PF": 13,
         "C": 14
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "5f19988e-1aeb-4053-a744-3854cab2b39c",
@@ -4700,7 +4826,8 @@
         "SF": 25,
         "PF": 17,
         "C": 22
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "46c7bbaa-6112-4279-a6bc-0424274caea5",
@@ -4737,7 +4864,8 @@
         "SF": 38,
         "PF": 33,
         "C": 32
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "3c3b880f-8b52-443c-b93b-4f7954931eab",
@@ -4774,7 +4902,8 @@
         "SF": 19,
         "PF": 16,
         "C": 32
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "f33c021f-e443-412c-8ed1-ec461736e2df",
@@ -4811,7 +4940,8 @@
         "SF": 29,
         "PF": 27,
         "C": 27
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "c198cb50-66a6-412d-a077-33e1541286eb",
@@ -4848,7 +4978,8 @@
         "SF": 17,
         "PF": 18,
         "C": 21
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "f94b9643-72a7-4eb3-9624-e1379b2639bb",
@@ -4885,7 +5016,8 @@
         "SF": 23,
         "PF": 16,
         "C": 19
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "dc8586d0-4d4a-49d1-8540-f7e87a02b1fc",
@@ -4922,7 +5054,8 @@
         "SF": 13,
         "PF": 12,
         "C": 9
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "fa182411-b8d3-4603-aee0-fcff5d3a9de3",
@@ -4959,7 +5092,8 @@
         "SF": 26,
         "PF": 30,
         "C": 33
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "f28e3888-55f9-44ec-a5f8-9b344fe1ac5b",
@@ -4996,7 +5130,8 @@
         "SF": 21,
         "PF": 19,
         "C": 15
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "06fcc0e9-5ae0-497a-adfd-d8634e57fafc",
@@ -5033,7 +5168,8 @@
         "SF": 17,
         "PF": 23,
         "C": 14
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "4af6c96c-ca28-469f-aa83-cd26610fe233",
@@ -5070,7 +5206,8 @@
         "SF": 16,
         "PF": 19,
         "C": 18
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "225ef399-7465-47ce-99bb-464adccf1ff5",
@@ -5107,7 +5244,8 @@
         "SF": 27,
         "PF": 28,
         "C": 33
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "92d37594-7c3f-43f5-b66c-01fcb1b08beb",
@@ -5144,7 +5282,8 @@
         "SF": 23,
         "PF": 11,
         "C": 11
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "54f4d0f4-37c8-4a8a-af1a-244e6a161e53",
@@ -5181,7 +5320,8 @@
         "SF": 9,
         "PF": 12,
         "C": 18
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "636ba47f-a15d-4e0e-816b-6d3b074045ab",
@@ -5218,7 +5358,8 @@
         "SF": 25,
         "PF": 27,
         "C": 23
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "20dca201-40e1-429d-bae5-2bab4e114f28",
@@ -5255,7 +5396,8 @@
         "SF": 32,
         "PF": 26,
         "C": 44
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "e7f4822d-a1fe-481b-bc35-31bc6b864aae",
@@ -5292,7 +5434,8 @@
         "SF": 11,
         "PF": 13,
         "C": 13
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "b901f24b-711c-4267-bb08-f2a75953f811",
@@ -5329,7 +5472,8 @@
         "SF": 7,
         "PF": 4,
         "C": 4
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "84e8bf1a-ed78-40f6-86d1-c4913924e34d",
@@ -5366,7 +5510,8 @@
         "SF": 38,
         "PF": 34,
         "C": 34
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "6cca5426-7515-4f3f-842a-2edc59c35eb2",
@@ -5403,7 +5548,8 @@
         "SF": 16,
         "PF": 22,
         "C": 18
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "ee55b322-6dde-4147-95e6-51271777045f",
@@ -5440,7 +5586,8 @@
         "SF": 41,
         "PF": 36,
         "C": 42
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "164e400b-101b-42f0-84b1-f6914cce8ea8",
@@ -5477,7 +5624,8 @@
         "SF": 26,
         "PF": 37,
         "C": 42
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "2acfa3f4-1beb-4693-89f3-89b4a51da919",
@@ -5514,7 +5662,8 @@
         "SF": 26,
         "PF": 24,
         "C": 11
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "93e11c71-4ade-4fb9-a8fc-7ba8a759537b",
@@ -5551,7 +5700,8 @@
         "SF": 37,
         "PF": 27,
         "C": 24
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "326dd8ae-2205-4fee-b016-089d1c7a386f",
@@ -5588,7 +5738,8 @@
         "SF": 30,
         "PF": 37,
         "C": 30
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "a92f91b6-13b8-4685-9292-29f52563b245",
@@ -5625,7 +5776,8 @@
         "SF": 22,
         "PF": 19,
         "C": 21
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "8a2d46f2-efc8-4064-8b5a-53bc58ddfdb1",
@@ -5662,7 +5814,8 @@
         "SF": 43,
         "PF": 44,
         "C": 41
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "62f34319-4b9a-4757-8429-7eb16a484c32",
@@ -5699,7 +5852,8 @@
         "SF": 20,
         "PF": 24,
         "C": 17
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "da7c73ef-cbe6-48d4-bfd6-5b1918a9cc8a",
@@ -5736,7 +5890,8 @@
         "SF": 15,
         "PF": 6,
         "C": 7
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "8a19ef3e-f024-4b06-938b-5df725687ea9",
@@ -5773,7 +5928,8 @@
         "SF": 30,
         "PF": 30,
         "C": 30
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "0a5df38d-10ea-42e0-bf4a-0ff40aca8b78",
@@ -5810,7 +5966,8 @@
         "SF": 27,
         "PF": 24,
         "C": 21
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "8a17ca64-e6b1-444e-afc1-5170e3aa9afc",
@@ -5847,7 +6004,8 @@
         "SF": 27,
         "PF": 45,
         "C": 29
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "c5e7ff23-58f0-4e62-bf0b-e4910bdb1452",
@@ -5884,7 +6042,8 @@
         "SF": 23,
         "PF": 18,
         "C": 18
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "ca3b39b2-d044-4f92-b69e-719896d6690f",
@@ -5921,7 +6080,8 @@
         "SF": 33,
         "PF": 28,
         "C": 22
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "547e5f7a-8b26-436a-ad25-9d6dc38958f8",
@@ -5958,7 +6118,8 @@
         "SF": 27,
         "PF": 31,
         "C": 28
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "8f82f91b-0f09-4dd6-b046-f7269aa54d8b",
@@ -5995,7 +6156,8 @@
         "SF": 36,
         "PF": 48,
         "C": 54
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "fd537d55-9557-4afc-8942-fa6f74e62f40",
@@ -6032,7 +6194,8 @@
         "SF": 22,
         "PF": 16,
         "C": 16
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "efc553e4-71de-40f5-8cb3-6668b21642a3",
@@ -6069,7 +6232,8 @@
         "SF": 27,
         "PF": 27,
         "C": 29
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "f80ea02c-6c83-46d4-8f60-f3017f96c651",
@@ -6106,7 +6270,8 @@
         "SF": 26,
         "PF": 23,
         "C": 21
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "42fe2984-a157-46fa-886d-1d853ad1b6ee",
@@ -6143,7 +6308,8 @@
         "SF": 46,
         "PF": 66,
         "C": 59
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "31303b5e-3ad2-4151-afc8-ec21bd69014d",
@@ -6180,7 +6346,8 @@
         "SF": 23,
         "PF": 26,
         "C": 24
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "61f495cb-c6fb-4d50-9450-f332382be6b6",
@@ -6217,7 +6384,8 @@
         "SF": 31,
         "PF": 26,
         "C": 24
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "394dce1d-5442-4272-b750-de5add182bad",
@@ -6254,7 +6422,8 @@
         "SF": 33,
         "PF": 42,
         "C": 38
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "644f473a-520a-45c6-a949-2510e02603ba",
@@ -6291,7 +6460,8 @@
         "SF": 23,
         "PF": 23,
         "C": 20
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "b2c5513e-121c-49bd-a90f-cc879e3cffd2",
@@ -6328,7 +6498,8 @@
         "SF": 25,
         "PF": 23,
         "C": 25
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "57e029c3-7ff5-4155-9aa2-735300a4fd6d",
@@ -6365,7 +6536,8 @@
         "SF": 14,
         "PF": 17,
         "C": 16
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "36961232-5b74-4507-a9eb-d289320d2b00",
@@ -6402,7 +6574,8 @@
         "SF": 33,
         "PF": 39,
         "C": 29
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "be4927b3-02bb-499e-8656-1faf2ce0fd8a",
@@ -6439,7 +6612,8 @@
         "SF": 30,
         "PF": 36,
         "C": 23
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "a6b267f7-4154-4ce3-9818-0ff4fd8b4cf3",
@@ -6476,7 +6650,8 @@
         "SF": 27,
         "PF": 19,
         "C": 20
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "84b1dfbf-2844-49b6-ab96-9e7aa2e36fd8",
@@ -6513,7 +6688,8 @@
         "SF": 41,
         "PF": 39,
         "C": 36
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "e7fcf8cc-aafa-41d0-ba1d-bed26a1bbd38",
@@ -6550,7 +6726,8 @@
         "SF": 23,
         "PF": 17,
         "C": 25
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "336b4ae0-5841-41bb-b5c9-dfdf344ee6ed",
@@ -6587,7 +6764,8 @@
         "SF": 15,
         "PF": 11,
         "C": 14
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "d95d68f6-deee-401a-ad6a-8440d31afd7b",
@@ -6624,7 +6802,8 @@
         "SF": 14,
         "PF": 17,
         "C": 23
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "9cd0aea9-a242-4159-8910-db424dc81e41",
@@ -6661,7 +6840,8 @@
         "SF": 31,
         "PF": 22,
         "C": 17
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "f4c3186c-688d-4bb1-b442-8cffbbc709da",
@@ -6698,7 +6878,8 @@
         "SF": 34,
         "PF": 29,
         "C": 34
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "0996e47f-8bd6-4f11-8619-55bbacca4946",
@@ -6735,7 +6916,8 @@
         "SF": 27,
         "PF": 21,
         "C": 21
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "e2e560e0-27d1-4e03-9e87-49c9968cdf56",
@@ -6772,7 +6954,8 @@
         "SF": 18,
         "PF": 20,
         "C": 19
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "567db0ea-9aa1-46ec-b3d3-e4404169028b",
@@ -6809,7 +6992,8 @@
         "SF": 27,
         "PF": 30,
         "C": 27
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "63e953a4-924b-4a65-aaa7-4bfbe7e7b97d",
@@ -6846,7 +7030,8 @@
         "SF": 21,
         "PF": 14,
         "C": 14
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "91db3a48-1e0d-43b4-af38-3107d2f7c187",
@@ -6883,7 +7068,8 @@
         "SF": 20,
         "PF": 28,
         "C": 23
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "52e6b044-81a8-4545-b4db-c43d4be8fef0",
@@ -6920,7 +7106,8 @@
         "SF": 18,
         "PF": 17,
         "C": 16
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "bb9f4019-e43f-410d-b5f9-84b434f1c151",
@@ -6957,7 +7144,8 @@
         "SF": 33,
         "PF": 24,
         "C": 26
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "a095b610-df85-4a8d-8558-909744e21714",
@@ -6994,7 +7182,8 @@
         "SF": 36,
         "PF": 34,
         "C": 31
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "5b8405ff-c433-43a7-9f19-e5d82f919f20",
@@ -7031,7 +7220,8 @@
         "SF": 41,
         "PF": 48,
         "C": 46
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "697fa3e6-130d-4a58-92ca-d3632ac1b6ff",
@@ -7068,7 +7258,8 @@
         "SF": 28,
         "PF": 23,
         "C": 23
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "4e101b36-2e1e-4fd6-8464-6b4a29329726",
@@ -7105,7 +7296,8 @@
         "SF": 16,
         "PF": 24,
         "C": 18
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "0ae40dde-49f1-4b24-b851-8999071a0be6",
@@ -7142,7 +7334,8 @@
         "SF": 27,
         "PF": 29,
         "C": 35
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "1267621e-0a18-443e-9f3d-6defc483da24",
@@ -7179,7 +7372,8 @@
         "SF": 9,
         "PF": 10,
         "C": 10
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "60288ab4-4adc-4851-897e-0b1f4b23dab3",
@@ -7216,7 +7410,8 @@
         "SF": 24,
         "PF": 24,
         "C": 21
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "4a05d9a5-ffa6-4651-bc2e-6537757ba126",
@@ -7253,7 +7448,8 @@
         "SF": 9,
         "PF": 12,
         "C": 12
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "df387170-d227-43af-adbb-7c052cd8c031",
@@ -7290,7 +7486,8 @@
         "SF": 28,
         "PF": 22,
         "C": 20
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "61461c69-efe8-44bb-8087-8bafc6edadf6",
@@ -7327,7 +7524,8 @@
         "SF": 69,
         "PF": 66,
         "C": 65
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "39208c0f-4c52-43c7-b3ab-347b908020b1",
@@ -7364,7 +7562,8 @@
         "SF": 27,
         "PF": 24,
         "C": 26
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "36bdc7d1-bbd0-42b2-983f-d93a830065f0",
@@ -7401,7 +7600,8 @@
         "SF": 27,
         "PF": 32,
         "C": 25
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "47e45ef9-5949-41b4-8c09-941983f01bca",
@@ -7438,7 +7638,8 @@
         "SF": 11,
         "PF": 10,
         "C": 11
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "4918bf20-900e-4429-b781-5474b857b930",
@@ -7475,7 +7676,8 @@
         "SF": 35,
         "PF": 42,
         "C": 43
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "a25fe154-d6c9-4be1-b95b-9d72e40dba92",
@@ -7512,7 +7714,8 @@
         "SF": 12,
         "PF": 11,
         "C": 10
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "7ad7a6e2-572a-4292-aa6a-e86a5f2385d5",
@@ -7549,7 +7752,8 @@
         "SF": 30,
         "PF": 26,
         "C": 20
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "306947bb-79a2-44c9-9e56-9581c78f105f",
@@ -7586,7 +7790,8 @@
         "SF": 12,
         "PF": 14,
         "C": 12
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "11dd16f1-0109-4ede-9f50-5c88409f4220",
@@ -7623,7 +7828,8 @@
         "SF": 31,
         "PF": 16,
         "C": 29
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "1d493d0c-f2e5-4beb-bc70-8cda6efaa8e2",
@@ -7660,7 +7866,8 @@
         "SF": 23,
         "PF": 26,
         "C": 18
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "08bab1e4-69d2-4f1b-84ec-73c0fde0e6bf",
@@ -7697,7 +7904,8 @@
         "SF": 23,
         "PF": 17,
         "C": 20
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "47dbad11-b916-4b2c-8dfb-1a403f1a2ac3",
@@ -7734,7 +7942,8 @@
         "SF": 18,
         "PF": 27,
         "C": 31
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "752b1714-6d85-47d6-abd8-49661139a0e2",
@@ -7771,7 +7980,8 @@
         "SF": 32,
         "PF": 25,
         "C": 28
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "4ec4addd-7424-40a1-a08b-d9ba895b8b1b",
@@ -7808,7 +8018,8 @@
         "SF": 43,
         "PF": 32,
         "C": 25
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "2e944a47-9354-4387-bdce-68ad3c43bcf5",
@@ -7845,7 +8056,8 @@
         "SF": 20,
         "PF": 22,
         "C": 18
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "e3415bd5-c971-4912-ae54-d6bffc9b30d1",
@@ -7882,7 +8094,8 @@
         "SF": 32,
         "PF": 36,
         "C": 37
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "efb674b6-b345-416c-bc96-fa65332be955",
@@ -7919,7 +8132,8 @@
         "SF": 58,
         "PF": 48,
         "C": 42
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "06e56c4d-c323-4107-9fb7-884eecd13520",
@@ -7956,7 +8170,8 @@
         "SF": 39,
         "PF": 39,
         "C": 42
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "fb916d84-f8f6-4e79-b5cf-a0bae732bbc6",
@@ -7993,7 +8208,8 @@
         "SF": 9,
         "PF": 9,
         "C": 11
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "647f472f-2bb1-4f20-986d-36f75c1df8cd",
@@ -8030,7 +8246,8 @@
         "SF": 41,
         "PF": 37,
         "C": 40
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "443f7a9c-20ba-4e9d-aba9-75e7574647e4",
@@ -8067,7 +8284,8 @@
         "SF": 8,
         "PF": 5,
         "C": 8
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "35b088db-9198-42f9-bc4d-c99afa54d125",
@@ -8104,7 +8322,8 @@
         "SF": 8,
         "PF": 17,
         "C": 16
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "382dff98-8640-45ab-a58c-ea0f757926ba",
@@ -8141,7 +8360,8 @@
         "SF": 10,
         "PF": 12,
         "C": 12
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "14f0b1cb-5ff0-43c6-bc29-5e1ff4d2557c",
@@ -8178,7 +8398,8 @@
         "SF": 25,
         "PF": 28,
         "C": 26
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "9d60b405-91f1-4482-8be7-fc5ecf9dc027",
@@ -8215,7 +8436,8 @@
         "SF": 14,
         "PF": 18,
         "C": 17
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "25bea462-9ab1-49dc-9464-a4c1c65f9bfe",
@@ -8252,7 +8474,8 @@
         "SF": 30,
         "PF": 36,
         "C": 33
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "ec5d3866-0a89-47c7-8644-59fd5b95c06d",
@@ -8289,7 +8512,8 @@
         "SF": 28,
         "PF": 29,
         "C": 35
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "ed1862f0-3f87-4003-98d4-76ee2336328d",
@@ -8326,7 +8550,8 @@
         "SF": 27,
         "PF": 20,
         "C": 14
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "698360aa-63da-4297-917f-dba81837e3d3",
@@ -8363,7 +8588,8 @@
         "SF": 23,
         "PF": 20,
         "C": 17
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "cf98aed9-921e-4c0a-b43e-4be9540bf29c",
@@ -8400,7 +8626,8 @@
         "SF": 38,
         "PF": 38,
         "C": 45
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "587779d2-7106-42f1-a584-4bda28863e44",
@@ -8437,7 +8664,8 @@
         "SF": 17,
         "PF": 30,
         "C": 21
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "b5fc74dd-0f91-4a07-8a74-3c7d8df3ef56",
@@ -8474,7 +8702,8 @@
         "SF": 22,
         "PF": 18,
         "C": 20
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "0e4b4420-4268-4590-8971-cc1ded3c843f",
@@ -8511,7 +8740,8 @@
         "SF": 25,
         "PF": 20,
         "C": 34
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "e45d4df2-87c3-4493-9747-72cd40db4fe6",
@@ -8548,7 +8778,8 @@
         "SF": 26,
         "PF": 26,
         "C": 22
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "899f0aa9-8ea5-45f7-a663-09369fd55c73",
@@ -8585,7 +8816,8 @@
         "SF": 12,
         "PF": 15,
         "C": 14
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "fe1ecf1b-d240-44da-a82e-54fd0b306b1f",
@@ -8622,7 +8854,8 @@
         "SF": 38,
         "PF": 34,
         "C": 31
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "474e860c-ea56-4cd0-8c8f-1392d78b899c",
@@ -8659,7 +8892,8 @@
         "SF": 25,
         "PF": 24,
         "C": 29
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "b69a80c7-e3db-488c-a5ea-5702a042a0be",
@@ -8696,7 +8930,8 @@
         "SF": 10,
         "PF": 9,
         "C": 8
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "2478deea-0690-425c-986c-b6684d1ddd99",
@@ -8733,7 +8968,8 @@
         "SF": 24,
         "PF": 16,
         "C": 26
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "0667a60e-cb5a-4c72-9b88-baaed7d4cc9b",
@@ -8770,7 +9006,8 @@
         "SF": 26,
         "PF": 41,
         "C": 34
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "893b92ca-2934-4ef6-8295-95873bb23f47",
@@ -8807,7 +9044,8 @@
         "SF": 34,
         "PF": 33,
         "C": 45
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "cdf6fb95-5f0d-4cc9-b2b8-94a948546041",
@@ -8844,7 +9082,8 @@
         "SF": 11,
         "PF": 13,
         "C": 14
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "5da7f6b1-fdf0-48c9-9fe5-ef7c97b21311",
@@ -8881,7 +9120,8 @@
         "SF": 34,
         "PF": 34,
         "C": 39
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "de92d1e9-fbd3-4bd2-bfe8-1f43c81205e7",
@@ -8918,7 +9158,8 @@
         "SF": 23,
         "PF": 28,
         "C": 27
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "7c8dbe4b-80e0-4e18-a76d-66bbeffd4ec8",
@@ -8955,7 +9196,8 @@
         "SF": 34,
         "PF": 40,
         "C": 42
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "1ee346d6-baea-4136-902f-a079beea3bbd",
@@ -8992,7 +9234,8 @@
         "SF": 32,
         "PF": 28,
         "C": 23
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "fddbf37c-e9e7-410a-9952-e898c7f8be18",
@@ -9029,7 +9272,8 @@
         "SF": 44,
         "PF": 50,
         "C": 44
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "a13e5706-efb3-47bd-b9fb-92280b7204a3",
@@ -9066,7 +9310,8 @@
         "SF": 11,
         "PF": 10,
         "C": 11
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "cb064738-e8cd-45d0-be7d-eb87678b5fdd",
@@ -9103,7 +9348,8 @@
         "SF": 38,
         "PF": 42,
         "C": 29
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "4942ce88-1f04-4208-855f-8cda93843799",
@@ -9140,7 +9386,8 @@
         "SF": 26,
         "PF": 28,
         "C": 28
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "988831e2-7bf0-43cd-aea7-54f8b1be2d1a",
@@ -9177,7 +9424,8 @@
         "SF": 11,
         "PF": 17,
         "C": 17
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "9c248f13-bdff-40ce-a868-dd365a56507d",
@@ -9214,7 +9462,8 @@
         "SF": 16,
         "PF": 21,
         "C": 21
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "d4495c7b-6ef4-471e-a3b9-fa5369e3b631",
@@ -9251,7 +9500,8 @@
         "SF": 29,
         "PF": 34,
         "C": 27
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "a21c5463-cdab-43b5-bd9a-7865b9f86939",
@@ -9288,7 +9538,8 @@
         "SF": 29,
         "PF": 29,
         "C": 34
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "3b52be7c-bc9a-4ca4-a5ed-0f6b87b2a394",
@@ -9325,7 +9576,8 @@
         "SF": 24,
         "PF": 21,
         "C": 27
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "df9203c3-d04a-4f7d-9319-0ea189495254",
@@ -9362,7 +9614,8 @@
         "SF": 29,
         "PF": 18,
         "C": 20
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "2b6add22-08a6-42f3-a109-45d287e8898a",
@@ -9399,7 +9652,8 @@
         "SF": 24,
         "PF": 24,
         "C": 28
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "090ceed2-04d7-442b-8d05-6a5a62082b6f",
@@ -9436,7 +9690,8 @@
         "SF": 21,
         "PF": 26,
         "C": 25
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "335225ff-0bfb-4792-b6da-19c9b778c13e",
@@ -9473,7 +9728,8 @@
         "SF": 35,
         "PF": 41,
         "C": 39
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "4281dc23-246b-4a4d-8995-22948f3f2d74",
@@ -9510,7 +9766,8 @@
         "SF": 12,
         "PF": 9,
         "C": 11
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "2458efc1-5572-4fd2-8c35-7720c5189ed6",
@@ -9547,7 +9804,8 @@
         "SF": 30,
         "PF": 21,
         "C": 29
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "467697a8-230a-4e3c-b112-6d577b50e02d",
@@ -9584,7 +9842,8 @@
         "SF": 32,
         "PF": 21,
         "C": 27
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "e6deda35-decf-4dd8-b9ac-20d2e89479ed",
@@ -9621,7 +9880,8 @@
         "SF": 38,
         "PF": 55,
         "C": 55
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "6249ef5a-7f12-4c52-be44-fc46851263c0",
@@ -9658,7 +9918,8 @@
         "SF": 24,
         "PF": 15,
         "C": 25
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "64cc4866-29d5-4a2e-bb7c-cf5c2dc34abe",
@@ -9695,7 +9956,8 @@
         "SF": 33,
         "PF": 37,
         "C": 28
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "b8af6b0a-9a53-452f-92af-5cbc1c60b8de",
@@ -9732,7 +9994,8 @@
         "SF": 28,
         "PF": 30,
         "C": 42
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "34f21e9f-069b-438b-b64f-c099812c71af",
@@ -9769,7 +10032,8 @@
         "SF": 28,
         "PF": 34,
         "C": 38
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "52b089ef-c03b-439b-ad7f-e7028175b340",
@@ -9806,7 +10070,8 @@
         "SF": 29,
         "PF": 37,
         "C": 49
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "dd5511cc-f077-4d76-8b98-3d3255e2976f",
@@ -9843,7 +10108,8 @@
         "SF": 35,
         "PF": 41,
         "C": 38
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "a4dfd2aa-75ef-42d7-9ff6-36fb41b24864",
@@ -9880,7 +10146,8 @@
         "SF": 31,
         "PF": 33,
         "C": 41
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "76f728c9-65fd-4484-8d0a-1bc9307084dc",
@@ -9917,7 +10184,8 @@
         "SF": 19,
         "PF": 18,
         "C": 14
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "7c3cd26c-4c29-4a9b-a971-362970eb51aa",
@@ -9954,7 +10222,8 @@
         "SF": 24,
         "PF": 18,
         "C": 22
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "94bba1ba-69f8-406e-b389-219ec488741a",
@@ -9991,7 +10260,8 @@
         "SF": 14,
         "PF": 17,
         "C": 14
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "4a1744d9-a9bc-4da8-b387-1d7092d8a3fb",
@@ -10028,7 +10298,8 @@
         "SF": 5,
         "PF": 6,
         "C": 7
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "3fed1e69-e995-4afb-872b-be4fe41a24a3",
@@ -10065,7 +10336,8 @@
         "SF": 28,
         "PF": 33,
         "C": 31
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "6a821085-1178-4e46-a982-a54c315f50dc",
@@ -10102,7 +10374,8 @@
         "SF": 20,
         "PF": 31,
         "C": 31
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "55cad3dd-cab0-4357-9911-5f056b015af0",
@@ -10139,7 +10412,8 @@
         "SF": 24,
         "PF": 26,
         "C": 23
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "ee4b457c-cfca-439c-ab71-dac87ab3f2ac",
@@ -10176,7 +10450,8 @@
         "SF": 22,
         "PF": 18,
         "C": 22
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "16a8567b-0c70-4fcb-8c27-0d48dc8b1d43",
@@ -10213,7 +10488,8 @@
         "SF": 44,
         "PF": 54,
         "C": 56
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "1cfcf8c8-e0f1-4961-84b2-643134792628",
@@ -10250,7 +10526,8 @@
         "SF": 31,
         "PF": 32,
         "C": 31
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "41c339a3-06b5-46ef-a5ca-8a93afd58771",
@@ -10287,7 +10564,8 @@
         "SF": 36,
         "PF": 26,
         "C": 22
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "a1bcfb1e-6683-4ce0-926d-0f29d44ec439",
@@ -10324,7 +10602,8 @@
         "SF": 23,
         "PF": 19,
         "C": 32
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "4d6e1317-fb7d-42e7-913a-f10ce0069915",
@@ -10361,7 +10640,8 @@
         "SF": 20,
         "PF": 22,
         "C": 20
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "eff18c2a-5776-489a-b810-6c348ecb2935",
@@ -10398,7 +10678,8 @@
         "SF": 35,
         "PF": 19,
         "C": 20
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "92002e2f-245f-4a28-91b7-7ae1542efa16",
@@ -10435,7 +10716,8 @@
         "SF": 25,
         "PF": 19,
         "C": 11
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "64a8e294-4a5d-4b7e-b3e0-8b9ceb1b1fc5",
@@ -10472,7 +10754,8 @@
         "SF": 28,
         "PF": 24,
         "C": 26
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "4b2cefe1-ec02-44ce-b2fc-6e233e0b2c37",
@@ -10509,7 +10792,8 @@
         "SF": 27,
         "PF": 28,
         "C": 23
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "b874fa01-1ad3-4857-82df-d7f684f700d1",
@@ -10546,7 +10830,8 @@
         "SF": 28,
         "PF": 25,
         "C": 18
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "d36e4870-b7e4-4415-8f7f-e4d98da987e5",
@@ -10583,7 +10868,8 @@
         "SF": 40,
         "PF": 53,
         "C": 50
-      }
+      },
+      "Home Region": "F"
     },
     {
       "recruit_id": "4b410f09-1373-4e46-82bc-d0bf492011a1",
@@ -10620,7 +10906,8 @@
         "SF": 31,
         "PF": 22,
         "C": 13
-      }
+      },
+      "Home Region": "C"
     },
     {
       "recruit_id": "4598c249-0359-4d83-8bb4-ec63d8f10063",
@@ -10657,7 +10944,8 @@
         "SF": 17,
         "PF": 29,
         "C": 29
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "f94329af-3514-4f19-b985-f052739dd774",
@@ -10694,7 +10982,8 @@
         "SF": 24,
         "PF": 16,
         "C": 18
-      }
+      },
+      "Home Region": "B"
     },
     {
       "recruit_id": "9d38a01e-9a3d-4895-9d75-f4549a96d277",
@@ -10731,7 +11020,8 @@
         "SF": 27,
         "PF": 27,
         "C": 23
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "4a641126-5718-47fe-a321-207696381eb9",
@@ -10768,7 +11058,8 @@
         "SF": 29,
         "PF": 41,
         "C": 38
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "d274c4d0-cc27-46ae-af61-f8ecc09e9633",
@@ -10805,7 +11096,8 @@
         "SF": 15,
         "PF": 26,
         "C": 20
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "cacb6166-bbfd-42d0-a78f-daae81b67dd5",
@@ -10842,7 +11134,8 @@
         "SF": 32,
         "PF": 33,
         "C": 23
-      }
+      },
+      "Home Region": "D"
     },
     {
       "recruit_id": "ee2a8c20-55a1-45f4-9b45-d2bb1fe8056a",
@@ -10879,7 +11172,8 @@
         "SF": 43,
         "PF": 42,
         "C": 39
-      }
+      },
+      "Home Region": "G"
     },
     {
       "recruit_id": "41493dcb-62e2-4c17-96f9-12ddd6926721",
@@ -10916,7 +11210,8 @@
         "SF": 43,
         "PF": 42,
         "C": 29
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "3dfa3deb-7d71-4a3e-aedd-24253b31a859",
@@ -10953,7 +11248,8 @@
         "SF": 11,
         "PF": 13,
         "C": 11
-      }
+      },
+      "Home Region": "A"
     },
     {
       "recruit_id": "8eefe41c-ff1f-4987-acaa-37d9296c64b5",
@@ -10990,7 +11286,8 @@
         "SF": 26,
         "PF": 19,
         "C": 21
-      }
+      },
+      "Home Region": "E"
     },
     {
       "recruit_id": "6e0cb571-09f4-4faa-a519-ae515be4bfe6",
@@ -11027,7 +11324,8 @@
         "SF": 32,
         "PF": 27,
         "C": 27
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "2cc4da11-8fd2-4729-b4ee-ecb3e9a88d74",
@@ -11064,7 +11362,8 @@
         "SF": 25,
         "PF": 17,
         "C": 10
-      }
+      },
+      "Home Region": "H"
     },
     {
       "recruit_id": "6d333b1f-1796-4c75-8668-ce1e54aa9c35",
@@ -11101,7 +11400,8 @@
         "SF": 26,
         "PF": 29,
         "C": 36
-      }
+      },
+      "Home Region": "B"
     }
   ]
 }
