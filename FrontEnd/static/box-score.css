@@ -442,71 +442,94 @@ body.box-score-page {
 .ev-negative { color: #ff6d6d; font-weight: 700; }
 .ev-neutral  { color: rgba(255, 255, 255, 0.4); font-weight: 400; }
 
-.attr-changes-pills {
+.attr-changes-lead {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 12px;
+}
+
+.attr-chips {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 20px;
 }
 
-.attr-change-row {
-  display: grid;
-  grid-template-columns: 140px 1fr 48px;
+.attr-chip {
+  width: 168px;
+  display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.attr-change-label {
+.attr-chip.up {
+  border-color: rgba(52, 236, 39, 0.3);
+  background: rgba(52, 236, 39, 0.06);
+}
+
+.attr-chip.down {
+  border-color: rgba(255, 109, 109, 0.3);
+  background: rgba(255, 109, 109, 0.06);
+}
+
+.attr-chip-name {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  text-align: right;
+  color: rgba(255, 255, 255, 0.82);
 }
 
-.attr-change-pill-wrap {
-  flex: 1;
-}
-
-.attr-change-pill {
-  position: relative;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.attr-pill-fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-radius: 999px;
-}
-
-.attr-pill-fill.positive {
-  background: rgba(52, 236, 39, 0.7);
-  left: 50%;
-}
-
-.attr-pill-fill.negative {
-  background: rgba(255, 109, 109, 0.7);
-  right: 50%;
-}
-
-.attr-pill-center {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateX(-50%);
-}
-
-.attr-change-delta {
+.attr-chip-val {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  text-align: left;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.attr-chip-val.up {
+  color: #34EC27;
+}
+
+.attr-chip-val.down {
+  color: #ff6d6d;
+}
+
+.attr-flat {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 14px;
+}
+
+.attr-flat-lead {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 9px;
+}
+
+.attr-flat-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.attr-flat-item {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .player-name-link {
@@ -713,11 +736,6 @@ body.box-score-page {
 
   .special-stats-columns-container {
     flex-direction: column;
-  }
-
-  .attr-change-row {
-    grid-template-columns: 110px 1fr 40px;
-    gap: 10px;
   }
 
   .scouting-content {

@@ -1198,8 +1198,11 @@ function renderAttributeChangePills(container, attributeDeltas) {
     ptbreaks: { label: 'P/T Breaks', scale: 10, invert: false }
   };
   container.innerHTML = '';
-  container.className = 'attr-changes-pills';
+  container.className = 'attr-changes';
   console.log('🔍 [ATTR-CHANGES] renderAttributeChangePills keys=', Object.keys(attributeDeltas || {}));
+
+  const movers = [];
+  const flat = [];
 
   Object.entries(attributeDeltas).forEach(([key, rawDelta]) => {
     const normalizedKey = normalizeAttrKey(key);
@@ -1209,30 +1212,70 @@ function renderAttributeChangePills(container, attributeDeltas) {
 
     const numDelta = Number(rawDelta) || 0;
     const effectiveDelta = config.invert ? -numDelta : numDelta;
-    const fillPct = Math.min(Math.abs(effectiveDelta) / config.scale * 50, 50);
     const isPositive = effectiveDelta > 0;
     const isNegative = effectiveDelta < 0;
     const sign = effectiveDelta > 0 ? '+' : '';
     const displayDelta = config.scale === 0.2
       ? `${sign}${effectiveDelta.toFixed(2)}`
       : `${sign}${Math.round(effectiveDelta)}`;
-    const deltaColor = isPositive ? '#34EC27' : isNegative ? '#ff6d6d' : 'rgba(255,255,255,0.3)';
 
-    const row = document.createElement('div');
-    row.className = 'attr-change-row';
-    row.innerHTML = `
-      <div class="attr-change-label">${config.label}</div>
-      <div class="attr-change-pill-wrap">
-        <div class="attr-change-pill">
-          <div class="attr-pill-fill ${isPositive ? 'positive' : isNegative ? 'negative' : ''}"
-               style="width: ${fillPct}%; ${isPositive ? 'left: 50%' : 'right: 50%'}"></div>
-          <div class="attr-pill-center"></div>
-        </div>
-      </div>
-      <div class="attr-change-delta" style="color: ${deltaColor}">${numDelta !== 0 ? displayDelta : '—'}</div>
-    `;
-    container.appendChild(row);
+    const item = {
+      label: config.label,
+      displayDelta,
+      effectiveDelta,
+      isPositive,
+      isNegative
+    };
+
+    if (numDelta !== 0) {
+      movers.push(item);
+    } else {
+      flat.push(item);
+    }
   });
+
+  movers.sort((a, b) => Math.abs(b.effectiveDelta) - Math.abs(a.effectiveDelta));
+
+  if (movers.length > 0) {
+    const lead = document.createElement('div');
+    lead.className = 'attr-changes-lead';
+    lead.textContent = 'What changed this game';
+    container.appendChild(lead);
+
+    const chips = document.createElement('div');
+    chips.className = 'attr-chips';
+    movers.forEach((item) => {
+      const chip = document.createElement('div');
+      chip.className = `attr-chip ${item.isPositive ? 'up' : item.isNegative ? 'down' : ''}`.trim();
+      chip.innerHTML = `
+        <span class="attr-chip-name">${item.label}</span>
+        <span class="attr-chip-val ${item.isPositive ? 'up' : item.isNegative ? 'down' : ''}">${item.displayDelta}</span>
+      `;
+      chips.appendChild(chip);
+    });
+    container.appendChild(chips);
+  }
+
+  if (flat.length > 0) {
+    const flatWrap = document.createElement('div');
+    flatWrap.className = 'attr-flat';
+
+    const flatLead = document.createElement('div');
+    flatLead.className = 'attr-flat-lead';
+    flatLead.textContent = 'No change';
+    flatWrap.appendChild(flatLead);
+
+    const flatList = document.createElement('div');
+    flatList.className = 'attr-flat-list';
+    flat.forEach((item) => {
+      const pill = document.createElement('span');
+      pill.className = 'attr-flat-item';
+      pill.textContent = item.label;
+      flatList.appendChild(pill);
+    });
+    flatWrap.appendChild(flatList);
+    container.appendChild(flatWrap);
+  }
 }
 
 function getTeamPlayDisplayNameForUsage(storageKey, playData) {

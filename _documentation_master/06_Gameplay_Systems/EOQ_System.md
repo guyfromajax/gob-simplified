@@ -304,7 +304,7 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 
 **Post-emit:** `finalize_flss_post_emit()` — 1s make burn at ≤ 1s clock; quarter drain when terminal.
 
-**Schema emit contract (Final Shot + FLSS):** `_emit_hco_animation_steps` must produce non-empty `animation_steps`. On empty emit / emitter exception, stamp `eoq_schema_emit_failed: true` and log error (`_assert_eoq_animation_steps`). FE must **not** treat that turn as a rendered MAKE (no `_finishFinalTurnQuarterEnd` → `SHOT_MAKE`, no legacy "It's Good!" on empty anim). Scoring still applies.
+**Schema emit contract (Final Shot + FLSS):** In live / turn-by-turn playback, `_emit_hco_animation_steps` must produce non-empty `animation_steps`. On empty emit / emitter exception, stamp `eoq_schema_emit_failed: true` and log error (`_assert_eoq_animation_steps`). FE must **not** treat that turn as a rendered MAKE (no `_finishFinalTurnQuarterEnd` → `SHOT_MAKE`, no legacy "It's Good!" on empty anim). Scoring still applies. Full CPU sims are exempt because `_is_full_simulation` intentionally suppresses animation generation; there is no FE playback path to fail closed.
 
 **Quick foul vs pending FLSS:** When `flss_possession_pending` is set at HCO entry, quick foul is skipped so the HCO branch consumes FLSS. FOUL must not strand the pending flag across FOUL→SIP.
 

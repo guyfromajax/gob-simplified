@@ -109,7 +109,7 @@ If FPD `season` was double-rolled (pre-fix saves), the box score for a single ga
 - **`mergeFullRosters`** fetches both rosters from `GET /roster/{team_identifier}` (passing `franchise_id` when mode is franchise), then maps stats from `gameData.box_score` — lookup order: `box_score[teamId]` → canonical name (uppercased, spaces/hyphens → underscores) → display team name.
 - **`combinePlayersAndBoxScore`** merges roster rows with box-score rows by name/position so every roster player appears (zero lines for DNPs); copies a fixed stat-key set onto `player.stats`; jersey preference is box-score value, else roster (`jersey`/`jerseyNumber`/`jersey_number`).
 - Team table renders from `team_totals` by display team name (`renderTeamStats`); player rows sort by highest RT, then position, then jersey; the special-stats popup shows FB/outlet/HCT/FCP/points-off-TO columns.
-- Franchise games show the **team attribute +/- strip** from `team_attribute_changes` on the game doc (CMD decay is applied at EOG but not displayed here).
+- Franchise games show **Team Measures Changes** from `team_attribute_changes` on the game doc (CMD decay is applied at EOG but not displayed here). `box-score.js` keeps the existing delta normalization/inversion/formatting rules, then renders non-zero measures first as fixed-width chips sorted by absolute effective delta. Zero-delta measures collapse into a muted **No change** footnote instead of full-width rows.
 
 ### Live court sidebar (`FrontEnd/static/js/phaser/gameScene.js`)
 

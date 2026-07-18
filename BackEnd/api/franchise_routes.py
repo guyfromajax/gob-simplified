@@ -13888,7 +13888,6 @@ def sim_championship(req: SimChampionshipRequest):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/franchise/finish-season")
 def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):
     """Eager-paint the USER team's freshly-signed players' uniform masters at
     rollover, so their portraits are already in R2 the instant they open their
@@ -13943,6 +13942,7 @@ def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players
                     painted, str(franchise_id))
 
 
+@router.post("/franchise/finish-season")
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""
     try:

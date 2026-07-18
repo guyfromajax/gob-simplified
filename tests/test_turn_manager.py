@@ -52,6 +52,28 @@ def test_turn_manager_run_micro_turn_executes():
     assert "result_type" in result
 
 
+def test_eoq_empty_schema_failure_is_not_stamped_during_full_sim():
+    game = build_mock_game()
+    game.game_state["_is_full_simulation"] = True
+    tm = TurnManager(game)
+    result = {"final_turn": True, "result_type": "MAKE"}
+
+    tm._assert_eoq_animation_steps(result, anim_steps=[], context="unit")
+
+    assert "eoq_schema_emit_failed" not in result
+
+
+def test_eoq_empty_schema_failure_is_stamped_for_live_playback():
+    game = build_mock_game()
+    game.game_state["_is_full_simulation"] = False
+    tm = TurnManager(game)
+    result = {"final_turn": True, "result_type": "MAKE"}
+
+    tm._assert_eoq_animation_steps(result, anim_steps=[], context="unit")
+
+    assert result["eoq_schema_emit_failed"] is True
+
+
 def test_turn_manager_resolve_shot_returns_score():
     game = build_mock_game()
     sm = ShotManager(game)

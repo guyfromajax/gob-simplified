@@ -3997,6 +3997,13 @@ class TurnManager:
             return
         if not (result.get("final_turn") or result.get("flss")):
             return
+        if bool((getattr(self.game, "game_state", {}) or {}).get("_is_full_simulation")):
+            # Full simulations intentionally suppress animation generation for
+            # performance (`Animator.skeleton_to_animations` returns []). There
+            # is no FE playback to protect, so do not stamp the live-play failure
+            # flag or emit the Sentry-facing error.
+            result.pop("eoq_schema_emit_failed", None)
+            return
         steps = anim_steps if anim_steps is not None else result.get("animation_steps")
         if isinstance(steps, list) and len(steps) > 0:
             result.pop("eoq_schema_emit_failed", None)
