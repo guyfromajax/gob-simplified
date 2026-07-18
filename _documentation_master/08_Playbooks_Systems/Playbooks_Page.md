@@ -8,6 +8,10 @@ The Playbooks page configures offensive and defensive weighting plus Playcall Ce
 
 **UI (redesign on `develop`):** D2-style editable tiles (3-across) under Offense / Defense tabs; enforced redistribution for Motion / Set / Man / Zone; Normalize chips for Fast Breaks / HC Traps; PCC badges derived from `pc_order` only; durable `locks`; live shot-weights via debounced `POST /api/playbooks/preview-shot-weights`; save toast `"Playbooks Saved"` (no confirm modal). Sort UI removed.
 
+**Set Plays display order** (`compareSetPlaysForDisplay` in `common.js`):
+- **While editing** on Playbooks: focus groups stay stable (`inside → attack → outside`), then `%` desc → CMD → name → API index. Tile order does not reshuffle on every % drag.
+- **After Save Playbooks**, and on **read-only venues** (FCC / Set Lineup): `%` desc → focus → CMD → name → API index.
+
 **Read-only venues (FCC playbooks summary + Set Lineup modal):** show items with `percentage > 0`, and also `percentage === 0` when the play is in `pc_order` for that side. 0% plays not on the call sheet stay hidden.
 
 Primary frontend:

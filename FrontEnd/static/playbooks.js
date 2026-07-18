@@ -553,7 +553,7 @@
       }));
 
       const setLocks = lockedSet("set_plays");
-      this.state.setPlays = (data.set_plays || []).map((play) => ({
+      this.state.setPlays = (data.set_plays || []).map((play, index) => ({
         id: String(play.play_id),
         name: play.name,
         focus: play.play_focus || "",
@@ -563,7 +563,12 @@
         effectiveness: parseInteger(play.effectiveness, 0),
         top_scorer: play.top_scorer || "N/A",
         isActive: true,
+        _apiIndex: index,
       }));
+      // Stable focus groups while editing; full %-primary sort runs after Save Playbooks.
+      if (typeof compareSetPlaysForDisplay === "function") {
+        this.state.setPlays.sort((a, b) => compareSetPlaysForDisplay(a, b, { percentPrimary: false }));
+      }
 
       const fbLocks = lockedSet("fast_breaks");
       this.state.fastBreaks = (data.fast_breaks || []).map((row) => ({
@@ -1394,6 +1399,12 @@
           } catch (storageError) {
             console.warn("Unable to store playbook save refresh flag:", storageError);
           }
+        }
+
+        // Re-order Set Plays for read-only venues (% → focus → CMD → name).
+        if (typeof compareSetPlaysForDisplay === "function") {
+          this.state.setPlays.sort((a, b) => compareSetPlaysForDisplay(a, b, { percentPrimary: true }));
+          this.renderEnforcedGrid("setPlays", this.elements.setPlaysGrid, "offense", { kind: "set" });
         }
 
         this.showToast("Playbooks Saved", "", { accentColor: "#34EC27" });

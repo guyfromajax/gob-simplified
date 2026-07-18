@@ -196,6 +196,41 @@ function getPlaybookCmdClass(value) {
   return 'is-low';
 }
 
+/** Set Plays focus rank: inside → attack → outside → other. */
+function getSetPlayFocusRank(focus) {
+  const key = String(focus || '').toLowerCase();
+  if (key === 'inside') return 0;
+  if (key === 'attack') return 1;
+  if (key === 'outside') return 2;
+  return 3;
+}
+
+/**
+ * Shared Set Plays display order (Playbooks editor, FCC, Set Lineup).
+ * percentPrimary true (read-only / post-save): % desc → focus → CMD → name → apiIndex
+ * percentPrimary false (editor while editing): focus → % desc → CMD → name → apiIndex
+ */
+function compareSetPlaysForDisplay(a, b, options) {
+  const percentPrimary = !options || options.percentPrimary !== false;
+  const pctA = Number(a && a.percentage || 0);
+  const pctB = Number(b && b.percentage || 0);
+  const focusA = getSetPlayFocusRank(a && (a.focus != null ? a.focus : a.play_focus));
+  const focusB = getSetPlayFocusRank(b && (b.focus != null ? b.focus : b.play_focus));
+  if (percentPrimary) {
+    if (pctB !== pctA) return pctB - pctA;
+    if (focusA !== focusB) return focusA - focusB;
+  } else {
+    if (focusA !== focusB) return focusA - focusB;
+    if (pctB !== pctA) return pctB - pctA;
+  }
+  const cmdA = Number((a && (a.effectiveness != null ? a.effectiveness : a.cmd)) || 0);
+  const cmdB = Number((b && (b.effectiveness != null ? b.effectiveness : b.cmd)) || 0);
+  if (cmdB !== cmdA) return cmdB - cmdA;
+  const nameCmp = String((a && a.name) || '').localeCompare(String((b && b.name) || ''));
+  if (nameCmp) return nameCmp;
+  return Number((a && a._apiIndex) || 0) - Number((b && b._apiIndex) || 0);
+}
+
 function renderShotWeights(container, shotWeights, compact = false) {
   if (!container) return;
   container.classList.add('psw-root');

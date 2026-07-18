@@ -579,12 +579,14 @@ function buildLineupPlaybookItems(data, key) {
       top_scorer: play?.top_scorer || '',
     }));
   } else if (key === 'set_plays') {
-    items = (data?.set_plays || []).map((play) => ({
+    items = (data?.set_plays || []).map((play, index) => ({
       id: String(play?.play_id || ''),
       name: play?.name || 'Unknown',
       percentage: getLineupPlaybookPercentage(percentages, 'set_plays', play?.play_id),
       effectiveness: Number(play?.effectiveness || 0),
       top_scorer: play?.top_scorer || '',
+      focus: play?.play_focus || '',
+      _apiIndex: index,
     }));
   } else if (key === 'man_defense') {
     items = (data?.man_defense_rows || [])
@@ -625,6 +627,9 @@ function buildLineupPlaybookItems(data, key) {
   return items
     .filter((item) => lineupPlaybookItemVisible(item, key, data))
     .sort(function (a, b) {
+      if (key === 'set_plays' && typeof compareSetPlaysForDisplay === 'function') {
+        return compareSetPlaysForDisplay(a, b, { percentPrimary: true });
+      }
       return (
         Number(b.percentage || 0) - Number(a.percentage || 0) ||
         String(a.name).localeCompare(String(b.name))
