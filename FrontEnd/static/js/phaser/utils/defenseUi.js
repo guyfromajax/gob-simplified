@@ -4,17 +4,23 @@
  */
 
 const HCO_MAN_SLUG = "man";
+// First-class man plays (integrating_new_d_plays.md Phase 4): Base / Deny / Loose in fixed order.
+const HCO_MAN_SLUGS = ["man", "man-tight", "man-loose"];
 const HCO_ZONE_SLUGS = ["2-3-zone", "3-2-zone", "1-3-1-zone"];
 
 const LEGACY_ALIASES_BY_SLUG = {
   man: ["Man", "man"],
+  "man-tight": ["Deny Man", "man-tight"],
+  "man-loose": ["Loose Man", "man-loose"],
   "2-3-zone": ["2-3 Zone", "2-3-zone"],
   "3-2-zone": ["3-2 Zone", "3-2-zone"],
   "1-3-1-zone": ["1-3-1 Zone", "1-3-1-zone"],
 };
 
 const DISPLAY_LABEL_BY_SLUG = {
-  man: "Man",
+  man: "Base Man",
+  "man-tight": "Deny Man",
+  "man-loose": "Loose Man",
   "2-3-zone": "2-3 Zone",
   "3-2-zone": "3-2 Zone",
   "1-3-1-zone": "1-3-1 Zone",
@@ -52,13 +58,15 @@ export function buildPlaybookStyleDefenseRows(scoutingDefense) {
   if (!scoutingDefense || typeof scoutingDefense !== "object") {
     return { man_defenses, zone_defenses };
   }
-  const manRow = getDefenseBlock(scoutingDefense, HCO_MAN_SLUG);
-  if (Object.keys(manRow).length > 0) {
-    man_defenses.push({
-      ...manRow,
-      name: displayLabelForDefenseSlug(HCO_MAN_SLUG),
-      defense_row_key: HCO_MAN_SLUG,
-    });
+  for (const slug of HCO_MAN_SLUGS) {
+    const manRow = getDefenseBlock(scoutingDefense, slug);
+    if (Object.keys(manRow).length > 0) {
+      man_defenses.push({
+        ...manRow,
+        name: displayLabelForDefenseSlug(slug),
+        defense_row_key: slug,
+      });
+    }
   }
   for (const slug of HCO_ZONE_SLUGS) {
     const row = getDefenseBlock(scoutingDefense, slug);
