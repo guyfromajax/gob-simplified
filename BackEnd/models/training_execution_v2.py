@@ -2501,7 +2501,7 @@ def _apply_defense_training(
             remainder = total_points - (points_per * len(seen_canon))
             for i, defense_name in enumerate(seen_canon):
                 points = points_per + (1 if i < remainder else 0)
-                is_man = defense_name == "man"
+                is_man = defense_name in ("man", "man-tight", "man-loose")
                 is_zone = defense_name in TRAINING_ZONE_DEFENSE_NAMES
                 points = _scale_install_training_effectiveness_points(
                     points, authoritarian_execution_eff_mult, is_man
@@ -2526,8 +2526,9 @@ def _apply_defense_training(
     )
     
     if not use_playbooks or playbook_training_mode == "all-plays-even":
-        # Even distribution across all defensive plays (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
-        defense_types = ["man", "2-3-zone", "3-2-zone", "1-3-1-zone"]
+        # Even distribution across all defensive plays (Base/Deny/Loose Man + the three zones).
+        from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
+        defense_types = list(CANONICAL_HCO_DEFENSE_ROW_KEYS)
         valid_defenses = [d for d in defense_types if d in defense_data]
         
         if valid_defenses:
@@ -2537,7 +2538,7 @@ def _apply_defense_training(
             for i, defense_name in enumerate(valid_defenses):
                 points = points_per_defense + (1 if i < remainder else 0)
                 if defense_name in defense_data:
-                    is_man = defense_name == "man"
+                    is_man = defense_name in ("man", "man-tight", "man-loose")
                     is_zone = defense_name in TRAINING_ZONE_DEFENSE_NAMES
                     points = _scale_install_training_effectiveness_points(
                         points, authoritarian_execution_eff_mult, is_man
@@ -2572,17 +2573,36 @@ def _apply_defense_training(
         man_points = math.floor(total_points * man_pct)
         zone_points = total_points - man_points
         
-        # Distribute man defense points
+        # Distribute man defense points across the first-class man plays by playbook % (Step D, mirrors
+        # the zone distribution below). man_normal→`man` row, man_tight→`man-tight`, man_loose→`man-loose`
+        # (the PLAYBOOK_MAN_KEY_TO_DEFENSE_ID values are the scouting rows post-Step-C). No man % set
+        # (legacy/empty playbook) → all points to the base `man` row (prior behavior).
         if man_points > 0:
-            # For now, we only have one man defense row (`man`)
-            # When more man defenses are added, we can use playbook_settings.get("man_defense", {})
-            if "man" in defense_data:
+            man_playbook = playbook_settings.get("man_defense", {})
+            man_rows = {
+                pb_key: PLAYBOOK_MAN_KEY_TO_DEFENSE_ID.get(pb_key)
+                for pb_key in ("man_normal", "man_tight", "man_loose")
+                if PLAYBOOK_MAN_KEY_TO_DEFENSE_ID.get(pb_key) in defense_data
+            }
+            total_man_pct = sum(man_playbook.get(k, 0) for k in man_rows)
+            if total_man_pct > 0:
+                for pb_key, row_key in man_rows.items():
+                    defense_pct = man_playbook.get(pb_key, 0) / total_man_pct
+                    points = math.floor(man_points * defense_pct)
+                    if points > 0:
+                        points = _scale_install_training_effectiveness_points(
+                            points, authoritarian_execution_eff_mult, True
+                        )
+                        old_eff = defense_data[row_key].get("effectiveness", 0)
+                        defense_data[row_key]["effectiveness"] = old_eff + points
+                        logger.warning(f"📚 [TRAINING] Man defense '{row_key}': effectiveness {old_eff} → {old_eff + points} (+{points} points, {defense_pct*100:.1f}% of {man_points})")
+            elif "man" in defense_data:
                 scaled_man = _scale_install_training_effectiveness_points(
                     man_points, authoritarian_execution_eff_mult, True
                 )
                 old_eff = defense_data["man"].get("effectiveness", 0)
                 defense_data["man"]["effectiveness"] = old_eff + scaled_man
-                logger.warning(f"📚 [TRAINING] Defense 'man': effectiveness {old_eff} → {old_eff + scaled_man} (+{scaled_man} points)")
+                logger.warning(f"📚 [TRAINING] Defense 'man' (no man %): effectiveness {old_eff} → {old_eff + scaled_man} (+{scaled_man} points)")
         
         # Distribute zone defense points
         if zone_points > 0:

@@ -230,11 +230,12 @@ def canonical_scouting_defense_key(value: Any) -> Optional[str]:
     did = resolve_to_defense_id(raw)
     if not did:
         return None
-    # Phase 1 (integrating_new_d_plays.md): the man POSTURE variants share the ONE `man` SCOUTING row
-    # (stats/effectiveness) — only `defense_playcall` carries their distinct id (for posture). Splitting
-    # into per-play scouting rows (own EFF/MOM/CLK) is Phase 2; until then collapse them here so every
-    # scouting/man-vs-zone consumer still sees `man`.
-    if did in ("base-man", "man-tight", "man-loose"):
+    # First-class man plays (integrating_new_d_plays.md Step C, 2026-07-19): `man-tight` (Deny) and
+    # `man-loose` (Loose) now have their OWN scouting rows (own EFF/MOM/CLK/usage) — no longer collapsed.
+    # `base-man` still folds to the legacy `man` row (Base keeps its trained EFF there; the base→base-man
+    # scouting split is a later migration). The row templates already carry man-tight/man-loose (Step A),
+    # so stat increments land on real rows.
+    if did == "base-man":
         return "man"
     return did
 
