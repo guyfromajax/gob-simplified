@@ -91,7 +91,7 @@ Default offense seed behavior:
 - **offense** (`motion`, `set_plays`): keyed by `play_id`; seeded plays get an **even distribution** (100 split across the seeded set, remainder to alphabetically-first plays). Seeded set = curated starter package via `SEEDED_OFFENSE_PLAY_IDS` (three core motion + three core starter set + the three SF set plays).
 - **`fast_breaks`**: `covert_release` 33 / `rim_runner` 33 / `triangle` 34.
 - **`zone_defense`**: even split across `zone_23`, `zone_32`, `zone_131`.
-- **`man_defense`**: `man_normal` 100 / `man_pressure` 0 / `man_loose` 0.
+- **`man_defense`**: `man_normal` 100 / `man_tight` 0 / `man_loose` 0 (first-class Base/Deny/Loose Man; `man_pressure` folds to `man_tight` on save).
 - **`position_filters`**: `standard` + `PG/SG/SF/PF/C`, each storing `play_id` arrays (filtered to plays that exist in the universal collection); legacy-curated, not yet metadata-generated.
 - **`pc_order`**: starts empty (`offense: []`, `defense: []`).
 - **`locks`**: empty per-section lists (Playbooks redesign durable lock state; UI-only arithmetic).

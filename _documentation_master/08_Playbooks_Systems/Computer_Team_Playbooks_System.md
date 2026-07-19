@@ -301,17 +301,19 @@ After the selected set-play list is finalized:
 
 ### Man Defense
 
-There is one active man defense option:
+Three first-class man variants (Base / Deny / Loose Man), weighted like the zone map:
 
 ```json
 {
   "man_normal": 100,
-  "man_pressure": 0,
+  "man_tight": 0,
   "man_loose": 0
 }
 ```
 
-This does **not** mean CPU teams always play man. Man vs zone is still determined by the team's `strategy_settings.defense` / gameplay selection rules. This setting only controls which man-defense variant is selected when man defense is chosen.
+(`man_normal`=Base, `man_tight`=Deny, `man_loose`=Loose; legacy `man_pressure` folds to `man_tight` on save.)
+
+This does **not** mean CPU teams always play man. Man vs zone is still determined by the team's `strategy_settings.defense` / gameplay selection rules. This map only weights which man variant is selected (`_select_man_defense_with_playbook_weights`) when man defense is chosen. See [`integrating_new_d_plays.md`](../projects/integrating_new_d_plays.md).
 
 ### Zone Defense
 

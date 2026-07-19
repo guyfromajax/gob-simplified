@@ -16,7 +16,7 @@ This document should reflect the current franchise training implementation in co
 6. **API Endpoints (franchise training)**:
    - `GET /franchise/training-points` - Get available training points (30 for training camp, 24 for regular training)
    - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until distant phase completes. Requires auth + franchise ownership. Response includes `training_highlights` (string array) for the loading feed.
-   - `POST /franchise/run-training/distant-cpu` - **Distant phase**: template-based CPU teams, week-1 camp cuts when applicable, then sets `training_completed` and `cpu_distant_complete_week`. Body: `{ "franchise_id" }`. Requires auth + ownership. Returns `redirect` to the training report when successful.
+   - `POST /franchise/run-training/distant-cpu` - **Distant phase**: template-based CPU teams, week-1 camp cuts when applicable, then bounded Practice Squad work. During PS weeks it returns `status: "processing"` after at most one PS game; the client polls until the response returns success and a report redirect. Body: `{ "franchise_id" }`. Requires auth + ownership.
    - `POST /franchise/run-training` - **Legacy / full path**: same end state as user + distant in one request; if user phase is already applied for the current week but distant is not, handler runs **distant only** (resume). Does not require auth in the same way as the split routes (existing behavior).
    - `GET /franchise/training-report` - Get training report data
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
@@ -59,6 +59,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 - After phase 1 succeeds: highlights are **copied, Fisher–Yates shuffled**, and shown **one line at a time** (first line immediately, then every **5 seconds**). When the list is exhausted, the **last line stays** until distant training completes. If there are no highlights, a single fallback line is used: **“Finishing league training…”**.
 - `PageLoadOverlay.updatePulseSubtitle(text)` updates only the subtitle between ticks (avoids re-running full `show()` each time).
 - Phase 1 and phase 2 requests include `API_CONFIG.getAuthHeaders()` (Bearer token).
+- During weeks 2–19, phase 2 is a durable polling workflow. Every response advances at most one full Practice Squad game and reports `completed_games` / `total_games`. Refreshing or revisiting the training page detects an applied user phase with incomplete distant training and resumes polling automatically. Completed PS games are not replayed; an interrupted in-progress game restarts from tip-off.
 
 **Franchise training state helpers**
 

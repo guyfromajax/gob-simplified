@@ -1231,21 +1231,36 @@ submitBtn.addEventListener('click', async function() {
           }, TRAINING_DISTANT_HIGHLIGHT_MS);
 
           const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
-          const distantRes = await fetch(distantUrl, {
-            method: 'POST',
-            headers: jsonHeaders,
-            body: JSON.stringify({ franchise_id: franchiseId })
-          });
-          try {
-            result = await distantRes.json();
-          } catch (_e) {
-            result = null;
-          }
-          if (!distantRes.ok) {
-            let detail = `HTTP error! status: ${distantRes.status}`;
-            if (result && result.detail) detail = result.detail;
-            throw new Error(detail);
-          }
+          do {
+            const distantRes = await fetch(distantUrl, {
+              method: 'POST',
+              headers: jsonHeaders,
+              body: JSON.stringify({ franchise_id: franchiseId })
+            });
+            try {
+              result = await distantRes.json();
+            } catch (_e) {
+              result = null;
+            }
+            if (!distantRes.ok) {
+              let detail = `HTTP error! status: ${distantRes.status}`;
+              if (result && result.detail) detail = result.detail;
+              throw new Error(detail);
+            }
+            if (result && result.status === 'processing') {
+              const progress = result.progress || {};
+              const done = Number(progress.completed_games || 0);
+              const totalGames = Number(progress.total_games || 0);
+              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
+                window.PageLoadOverlay.updatePulseSubtitle(
+                  totalGames > 0
+                    ? `Practice Squad games: ${done} of ${totalGames} complete…`
+                    : 'Finishing Practice Squad games…'
+                );
+              }
+              await new Promise(resolve => window.setTimeout(resolve, 250));
+            }
+          } while (result && result.status === 'processing');
         } finally {
           if (highlightStreamId !== null) {
             window.clearInterval(highlightStreamId);
@@ -1319,6 +1334,56 @@ submitBtn.addEventListener('click', async function() {
   }
 });
 
+async function resumeDistantTraining(franchiseId) {
+  if (!franchiseId) return;
+  const headers = Object.assign(
+    { 'Content-Type': 'application/json' },
+    (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
+  );
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+    window.PageLoadOverlay.show({
+      variant: 'pulse',
+      title: '',
+      subtitle: 'Resuming Practice Squad games…',
+      teamName: currentTeamName || '',
+      assetKey: 'banner_primary'
+    });
+  }
+  let result = null;
+  do {
+    const response = await fetch(API_CONFIG.buildUrl('/franchise/run-training/distant-cpu'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ franchise_id: franchiseId })
+    });
+    try {
+      result = await response.json();
+    } catch (_e) {
+      result = null;
+    }
+    if (!response.ok) {
+      throw new Error((result && result.detail) || `HTTP error! status: ${response.status}`);
+    }
+    if (result && result.status === 'processing') {
+      const progress = result.progress || {};
+      const done = Number(progress.completed_games || 0);
+      const totalGames = Number(progress.total_games || 0);
+      if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
+        window.PageLoadOverlay.updatePulseSubtitle(
+          totalGames > 0
+            ? `Practice Squad games: ${done} of ${totalGames} complete…`
+            : 'Finishing Practice Squad games…'
+        );
+      }
+      await new Promise(resolve => window.setTimeout(resolve, 250));
+    }
+  } while (result && result.status === 'processing');
+
+  if (result && result.redirect) {
+    window.location.href = result.redirect.replace(/^\/static\//, '/');
+  }
+}
+
 /**
  * Fetch training points from API for franchise mode
  */
@@ -1341,6 +1406,18 @@ async function initializeTrainingPoints() {
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
+        }
+        if (data.distant_training_resume && data.distant_training_resume.required) {
+          try {
+            await resumeDistantTraining(franchiseId);
+          } catch (resumeError) {
+            console.error('Failed to resume distant training:', resumeError);
+            if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+              window.PageLoadOverlay.hide();
+            }
+            showMessageModal(resumeError.message || 'Failed to resume training. Please try again.');
+          }
+          return;
         }
         // Update points remaining display
         if (pointsRemainingEl) {

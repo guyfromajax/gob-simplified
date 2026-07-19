@@ -99,15 +99,17 @@ def test_custom_defense_cmd_maps_row_ids_and_splits_evenly():
     assert d["3-2-zone"]["effectiveness"] == 99
 
 
-def test_custom_defense_dedupes_man_variants_to_one_bucket():
+def test_custom_defense_splits_first_class_man_variants_into_distinct_buckets():
     scouting = {
         "defense": {
             "man": {"effectiveness": 10, "momentum": 0},
+            "man-tight": {"effectiveness": 0, "momentum": 0},
             "2-3-zone": {"effectiveness": 0, "momentum": 0},
         }
     }
-    # man_normal + man_pressure both map to canonical "man" → one slot, all 40 points to man
-    focus = {"offense": [], "defense": ["man_normal", "man_pressure"]}
+    # First-class man plays: man_normal → "man" row, man_tight → distinct "man-tight" row.
+    # 40 points split evenly across the two distinct buckets → 20 each.
+    focus = {"offense": [], "defense": ["man_normal", "man_tight"]}
 
     out = _apply_defense_training(
         copy.deepcopy(scouting),
@@ -117,7 +119,8 @@ def test_custom_defense_dedupes_man_variants_to_one_bucket():
         {},
         training_playbook_focus=focus,
     )
-    assert out["defense"]["man"]["effectiveness"] == 50
+    assert out["defense"]["man"]["effectiveness"] == 30
+    assert out["defense"]["man-tight"]["effectiveness"] == 20
     assert out["defense"]["2-3-zone"]["effectiveness"] == 0
 
 

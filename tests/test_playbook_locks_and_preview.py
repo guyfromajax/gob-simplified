@@ -34,7 +34,7 @@ def test_normalize_playbook_locks_list_and_dict_forms():
         {
             "motion": ["Flex", "pid-motion", "Flex"],  # name + id + dup
             "set_plays": {"pid-set": True, "ghost": False},
-            "man_defense": ["Man", "man_pressure"],
+            "man_defense": ["Base Man", "man_tight", "Base Man"],  # display name + id + dup
             "zone_defense": {"2-3 Zone": 1},
             "fast_breaks": ["Triangle"],
             "hc_traps": {"Straight Pressure": True},
@@ -45,7 +45,7 @@ def test_normalize_playbook_locks_list_and_dict_forms():
 
     assert locks["motion"] == ["pid-motion"]
     assert locks["set_plays"] == ["pid-set"]
-    assert locks["man_defense"] == ["man_normal", "man_pressure"]
+    assert locks["man_defense"] == ["man_normal", "man_tight"]
     assert locks["zone_defense"] == ["zone_23"]
     assert locks["fast_breaks"] == ["triangle"]
     assert locks["hc_traps"] == ["straight_pressure"]

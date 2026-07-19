@@ -12209,9 +12209,25 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
     if week >= 2 and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
         from BackEnd.practice_squad.manager import run_practice_squad_week
 
-        ps_state = run_practice_squad_week(franchise_id, franchise_doc, week)
+        # Bound the user-facing poll to one full game. The manager commits PS
+        # state after every attempt, making retries and refreshes resumable.
+        ps_state = run_practice_squad_week(
+            franchise_id, franchise_doc, week, max_games=1
+        )
         ps_fields["practice_squad"] = ps_state
         franchise_doc["practice_squad"] = ps_state
+        ps_job = ps_state.get("training_job") or {}
+        if ps_job.get("status") != "complete":
+            db.franchises.update_one(
+                {"_id": franchise_id},
+                {"$set": {"practice_squad": ps_state}},
+            )
+            return {
+                "status": "processing",
+                "week": week,
+                "progress": ps_job,
+                "redirect": None,
+            }
         ps_results_story = _build_ps_game_results_news_story(franchise_doc, week, franchise_id)
         if ps_results_story:
             season_news_prepend.append(ps_results_story)
@@ -12372,6 +12388,20 @@ def get_training_points(franchise_id: str):
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
         "player_maximizer_ranking_attrs": ranking_attrs,
+        "distant_training_resume": (
+            {
+                "required": True,
+                "week": week,
+                **dict(((franchise_doc.get("practice_squad") or {}).get("training_job") or {})),
+            }
+            if franchise_user_training_applied_for_week(
+                franchise_doc.get("training_status", {}) or {}, week
+            )
+            and not franchise_training_fully_complete_for_week(
+                franchise_doc.get("training_status", {}) or {}, week
+            )
+            else None
+        ),
     }
 
 

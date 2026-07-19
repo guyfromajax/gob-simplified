@@ -132,6 +132,7 @@ def run_ps_full_simulation(
     away_roster: list[dict],
     fpd_by_id: dict[str, dict],
     frd_by_id: dict[str, dict],
+    game_id: str | None = None,
 ) -> tuple[int, int, dict]:
     """Run a full turn-based sim; no DB writes."""
     home_payloads = [_player_payload_from_roster_slot(s, fpd_by_id, frd_by_id) for s in home_roster]
@@ -152,21 +153,26 @@ def run_ps_full_simulation(
     gm.home_team.lineup = build_ps_lineup(gm.home_team)
     gm.away_team.lineup = build_ps_lineup(gm.away_team)
     gm.game_state["allow_fouled_out_lineup_reentry"] = True
+    gm.game_state["_headless_simulation"] = True
+    gm.game_state["_headless_game_id"] = game_id
 
-    gm.setup_opening_tip()
-    gm.quarter = 1
-    while True:
-        simulate_quarter(gm)
-        current_q = gm.quarter - 1
-        if current_q >= 4:
-            h_pts = gm.game_state["score"][gm.home_team.name]
-            a_pts = gm.game_state["score"][gm.away_team.name]
-            if h_pts != a_pts:
-                gm.quarter = current_q
-                gm.game_state["quarter"] = current_q
-                break
-            gm.home_team.points_by_quarter.append(0)
-            gm.away_team.points_by_quarter.append(0)
+    from BackEnd.utils.headless_simulation import quiet_headless_simulation_logs
+
+    with quiet_headless_simulation_logs():
+        gm.setup_opening_tip()
+        gm.quarter = 1
+        while True:
+            simulate_quarter(gm)
+            current_q = gm.quarter - 1
+            if current_q >= 4:
+                h_pts = gm.game_state["score"][gm.home_team.name]
+                a_pts = gm.game_state["score"][gm.away_team.name]
+                if h_pts != a_pts:
+                    gm.quarter = current_q
+                    gm.game_state["quarter"] = current_q
+                    break
+                gm.home_team.points_by_quarter.append(0)
+                gm.away_team.points_by_quarter.append(0)
 
     away_score = int(gm.score.get(away_display_name, 0) or 0)
     home_score = int(gm.score.get(home_display_name, 0) or 0)

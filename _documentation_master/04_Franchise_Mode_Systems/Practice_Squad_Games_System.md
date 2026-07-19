@@ -11,7 +11,7 @@
 
 ## Overview
 
-- Runs **weeks 2–19** during `/franchise/run-training/distant-cpu` (after user training + distant CPU training).
+- Runs **weeks 2–19** through bounded `/franchise/run-training/distant-cpu` polls (after user training + distant CPU training). Each poll advances at most one full PS game; the training page remains on its loading overlay and automatically continues polling.
 - **Week 1 end:** after Training Camp cuts **and the user's training squad assignment**, build locked rosters (Teams 1–5), schedule, standings; publish **Practice Squad Rosters Announced** news.
 - **Init timing:** CPU camp cuts run at distant-CPU training; PS init is **deferred** until `POST /franchise/cut-players` succeeds when the user still has `cut_required`. If the user roster is already legal (no assignment needed), init runs at distant-CPU instead.
 - **No backfill** for franchises mid-season before this feature shipped.
@@ -34,11 +34,14 @@
 ## Simulation
 
 - Full engine via `BackEnd/practice_squad/sim.py` with `TeamManager.roster_override`.
+- PS games are headless: foul counts, foul-out removal, and replacement still apply, but interactive timeout turns and resume-state saves are skipped.
+- Per-turn diagnostic warnings are suppressed during headless PS sims; errors and concise game/job progress remain logged.
 - Per-game randomized CPU defaults (strategy, team attrs, scouting, plays).
 - Game docs: `games` collection, `mode: "practice_squad"`.
 - Stats → `ps_season_stats` on FPD/FRD only (not season/career).
 - After each sim, `apply_ps_game_stats()` reads the saved game box score and `$inc`s into `ps_season_stats`.
 - **Game `_id` type:** PS games persist with a **string** `_id` (`generate_game_id()`). Rollup must query string first, then ObjectId (see `stats._load_game_doc`). Using ObjectId-only lookup silently skipped all rollups before 2026-06-14.
+- The string game ID is allocated before tip-off and stored on the pending schedule row. It provides stable tracing across retries without requiring midgame persistence.
 - **One-time backfill:** `practice_squad.ps_season_stats_backfilled` on franchises that simmed before the fix. `ensure_ps_season_stats_backfilled()` clears and rebuilds from all `mode=practice_squad` games; runs on next roster API load or next training week hook.
 
 ## Persistence
@@ -49,6 +52,15 @@
 | Box scores | `games` (`mode=practice_squad`) |
 | Player PS stats | `FPD.ps_season_stats` / `FRD.ps_season_stats` |
 | Stats backfill flag | `franchises.practice_squad.ps_season_stats_backfilled` |
+
+### Durable training job and recovery
+
+- `practice_squad.training_job` records week, status, total games, completed games, and update time.
+- Before each game starts, its schedule row is checkpointed as `running` with a stable `game_id` and incremented attempt count.
+- After the game, the completed schedule/standings/bracket state is committed immediately.
+- Completed games are never replayed by a retry.
+- A fresh `running` marker acts as a lease so a refresh or second tab cannot start the same game concurrently. If the request, worker, or deployment stops, the marker becomes stale after 60 seconds and the next poll restarts only that game from tip-off using its stable ID.
+- `practice_squad.trained_week` is set only after every scheduled game is completed, forfeited, or skipped.
 
 ## Known fixes
 

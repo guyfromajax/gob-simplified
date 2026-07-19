@@ -15,6 +15,8 @@
 | **4** | In progress | **`defense-display.js`** + **`defenseUi.js`**, FCC/tournament/training playbook summary, **box-score**, **Phaser** playcall UI, **`court.html`** team box S2 defense stats + script include, **`GET /api/playbooks`** EFF via `read_scouting_defense_row`, **`/franchise/team-data`** + **`/tournament/team-data`** canonical defense rows filled from legacy scouting keys. **Remaining:** optional turn payload display field; any new surfaces found in the wild. |
 | **5** | Partial | Extend round-trip / E2E tests; staging checklist; eventual removal of dual-read / legacy writes. |
 
+**First-class man plays (2026-07-19):** Built on this migration — Deny/Loose Man are now distinct catalog `defense_id`s (`man-tight` / `man-loose`) with their own scouting rows + playbook %; box-score renders a Man aggregate + Base/Deny/Loose subsections. `base-man` catalog doc seeded (staging + prod); legacy `man` doc = Base alias during soak. Authoritative record: [`integrating_new_d_plays.md`](../projects/integrating_new_d_plays.md).
+
 **Repo / git:** Latest defense work is on **`develop`** (commit message references phases 1–2); branch **tracks `origin/develop`** when clean — confirm after each local session with `git status` / `git push`.
 
 **Current split (post–Phase 2 backend):**

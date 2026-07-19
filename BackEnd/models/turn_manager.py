@@ -2373,7 +2373,7 @@ class TurnManager:
             next_play_type_str = f"{next_play_type} ({fb_play})"
         debug_turn_result = f"Turn {turn_num} RESULT: {result_type} | Offense: {offense_team_id} | Next: {next_play_type_str} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}"
         
-        if DEBUG:
+        if DEBUG and not self.game.game_state.get("_headless_simulation"):
             print(debug_turn_result)
         
         # Add debug info to result for frontend display

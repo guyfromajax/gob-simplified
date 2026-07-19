@@ -95,7 +95,7 @@ def test_build_cpu_playbook_build_week_sets_constraints_and_play_fields():
     )
 
     settings = result.playbook_settings
-    assert settings["man_defense"] == {"man_normal": 100, "man_pressure": 0, "man_loose": 0}
+    assert settings["man_defense"] == {"man_normal": 100, "man_tight": 0, "man_loose": 0}
     assert sum(settings["zone_defense"].values()) == 100
     assert max(settings["zone_defense"].values()) <= 50
     assert sum(settings["fast_breaks"].values()) == 100

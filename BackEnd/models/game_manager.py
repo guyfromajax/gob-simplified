@@ -1220,6 +1220,17 @@ class GameManager:
     def _handle_foul_out_timeout(self, result):
         """Create foul-out timeout turn using the unified timeout path, then save."""
 
+        if self.game_state.get("_headless_simulation"):
+            # The universal foul-out funnel has already removed/replaced the player.
+            # Headless games have no lineup modal or resume client, so creating an
+            # interactive timeout and attempting an immediate DB save is both wasted
+            # work and incorrect lifecycle coupling.
+            logging.info(
+                "[HEADLESS FOUL OUT] replacement applied; interactive timeout skipped game_id=%s",
+                self.game_state.get("_headless_game_id"),
+            )
+            return
+
         foul_out_player_data = result.get("foul_out_player", {})
         foul_out_player = None
         foul_out_player_id = foul_out_player_data.get("player_id") if isinstance(foul_out_player_data, dict) else None

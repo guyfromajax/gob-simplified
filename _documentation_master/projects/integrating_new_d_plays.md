@@ -1,7 +1,7 @@
 # Integrating New Man Defense Plays (Base Man / Man Tight / Man Loose)
 
-**Status:** Sequenced integration plan (execution logic owned elsewhere)  
-**Date:** 2026-07-15  
+**Status:** ✅ COMPLETE (Phases 1–5 shipped to `develop`; staging + prod DB seeded). Two intentional deferrals recorded in §8.  
+**Date:** 2026-07-15 (completed 2026-07-19)  
 **Related:** `Dynamic_MM_Brief.md` (posture / deny↔tight), `O_&_D_Plays_Collections.md`, `Defense_ID_Migration.md`, `Sim_Playcalling_System.md`, `Playcall_Center.md`, `Mode_Init_System.md`, `Game_Init_System.md`
 
 ---
@@ -337,9 +337,16 @@ architecture (owner, 2026-07-19).** The S4 posture prototype was reconciled INTO
 
 **Phase 3 ✅ DONE + verified.** `_select_man_defense_with_playbook_weights` (CPU man picker, playbook-%-weighted) wired into BOTH CPU pick branches in `set_playcalls`. Verified end-to-end (class-level probe): deny/loose-heavy playbook → CPU calls Deny/Loose, stats land on `man-tight`/`man-loose` rows (10/60/30 → ~3/26/18), no crash.
 
-**Phase 4 ✅ core done (proto-tested OK).** Shared display source of truth updated — `defenseUi.js` (module) + `defense-display.js` (non-module twin): labels (`man`→Base Man, `man-tight`→Deny Man, `man-loose`→Loose Man), legacy aliases, and `buildPlaybookStyleDefenseRows` iterates all three man slugs. Playbooks page is data-driven via `is_active` (now True). *Tail (in-app): confirm box-score / any renderer that bypasses the shared helper.*
+**Phase 4 ✅ DONE (proto-tested OK).** Shared display source of truth updated — `defenseUi.js` (module) + `defense-display.js` (non-module twin): labels (`man`→Base Man, `man-tight`→Deny Man, `man-loose`→Loose Man), legacy aliases, and `buildPlaybookStyleDefenseRows` iterates all three man slugs. Playbooks page is data-driven via `is_active` (now True). Box-score renders Man aggregate + Base/Deny/Loose subsections; Scouting Notes now 3-column (Offense | Man Defense | Zone Defense).
 
-**Phase 5 🔄 IN PROGRESS** — docs + cross-links (this section + system docs). Deferred cleanup: remove the `man_pressure`/"Man Pressure" aliases AFTER a migration soak (not yet). **Ship remaining:** prod (`gob`) DB seed; base→`base-man` scouting migration; update stale tests (they assert the old man collapse) when pytest is unblocked.
+**Phase 5 ✅ DONE.** Prod (`gob`) DB seed shipped; system + secondary docs swept (`Sim_Playcalling_System`, `O_&_D_Plays_Collections`, `Playbooks_Page`, `Mode_Init_System`, `Computer_Team_Playbooks_System`, `Playcall_Center`, `Defense_ID_Migration`); stale tests updated (`test_cpu_playbook_customization`, `test_playbook_locks_and_preview`, `test_training_playbook_focus` — now assert distinct man buckets; verified against code, runnable when pytest is unblocked).
+
+### Intentional deferrals (NOT loose ends — workstream is functionally complete)
+
+Two items were deliberately **not** done now because doing them now trades real risk for zero functional gain. Base/Deny/Loose Man work correctly today with base living on the shared `man` scouting row.
+
+1. **base→`base-man` scouting-row split** — base's stats currently live on the `man` row, and the Step-D training map (`PLAYBOOK_MAN_KEY_TO_DEFENSE_ID['man_normal']='man'`), the box-score `block('man')` read, and every `man_normal→row` mapping depend on that. Flipping `man_normal→base-man` without also splitting the row + copying the trained `man` EFF (doc §5) would silently break base training/stats. This is a careful data migration, not a cleanup — do it as its own scoped task if/when a distinct Base scouting row is wanted.
+2. **Remove `man_pressure` / "Man Pressure" aliases** — harmless to keep (a tiny back-compat map) and removing before a migration soak risks dropping the key from any saved playbook still holding it. Keep until an active migration has rewritten all persisted `man_pressure` → `man_tight`, then delete.
 
 ---
 
