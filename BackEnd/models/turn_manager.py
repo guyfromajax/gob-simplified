@@ -2826,6 +2826,10 @@ class TurnManager:
                 pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
                 if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
                     chosen_defense = self._select_zone_defense_with_playbook_weights()
+                elif pick == "man":
+                    # CPU: expand bare "man" to a variant (Base/Deny/Loose) by the team's playbook % —
+                    # symmetric to the zone-sentinel expansion (integrating_new_d_plays.md Phase 3).
+                    chosen_defense = self._select_man_defense_with_playbook_weights()
                 else:
                     chosen_defense = pick
             
@@ -2986,6 +2990,11 @@ class TurnManager:
                 if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
                     chosen_defense = self._select_zone_defense_with_playbook_weights()
                     logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
+                elif pick == "man":
+                    # CPU: expand bare "man" to a variant (Base/Deny/Loose) by the team's playbook % —
+                    # symmetric to the zone-sentinel expansion (integrating_new_d_plays.md Phase 3).
+                    chosen_defense = self._select_man_defense_with_playbook_weights()
+                    logging.info(f"🎮 [PLAYCALL DEBUG] Expanded man to: {chosen_defense}")
                 else:
                     chosen_defense = pick
         
@@ -3377,6 +3386,25 @@ class TurnManager:
                 return weighted_random_from_dict(weights)
 
         return random.choice(zone_ids)
+
+    def _select_man_defense_with_playbook_weights(self):
+        """Select a man defense VARIANT via weighted random on the defending team's playbook
+        `man_defense` % — the CPU analogue of the zone picker (integrating_new_d_plays.md Phase 3).
+        Returns canonical `defense_id` row keys: `man` (Base) / `man-tight` (Deny) / `man-loose` (Loose).
+        Falls back to base `man` when no man % is set (e.g. default playbook = 100% base)."""
+        from BackEnd.utils.defense_identity import PLAYBOOK_MAN_KEY_TO_DEFENSE_ID
+        # playbook man key → catalog id (man_normal→man, man_tight→man-tight, man_loose→man-loose)
+        man_map = {k: PLAYBOOK_MAN_KEY_TO_DEFENSE_ID.get(k)
+                   for k in ("man_normal", "man_tight", "man_loose")}
+        playbook_settings = self._load_playbook_settings(self.game.defense_team.team_id)
+        if playbook_settings:
+            man_settings = playbook_settings.get("man_defense", {})
+            weights = {cat_id: man_settings.get(pb_key, 0)
+                       for pb_key, cat_id in man_map.items()
+                       if cat_id and man_settings.get(pb_key, 0) > 0}
+            if weights:
+                return weighted_random_from_dict(weights)
+        return "man"
 
     def _refresh_situational_team_state(self):
         """Refresh the Q4/OT macro situational team-state on ``game_state`` for this turn.
