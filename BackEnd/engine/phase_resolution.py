@@ -4457,18 +4457,19 @@ def _roll_defense_posture(game, rng=None):
     """Set this HCO turn's team defense posture and stash it on game_state for the animator (render)
     + the intercept read. None when the flag is off → legacy placement. See Dynamic_MM_Brief §5A / S4.
 
-    S4 (2026-07-19): the posture is now DERIVED FROM THE DEFENSE PLAYCALL (deny→tight, loose→loose,
-    everything else→normal) — retiring the interim `random.choice` pick. `set_playcalls` stashes the
-    posture-bearing call on `game_state["_hco_defense_posture_call"]` before `defense_playcall` is
-    normalized to canonical `man` (which drops the posture). No call stashed (plain man / zones) →
-    normal. `rng` is accepted for signature back-compat but no longer used."""
+    First-class man plays (integrating_new_d_plays.md §9.3): the posture is DERIVED FROM THE DEFENSE
+    PLAYCALL id — `man-tight`→tight, `man-loose`→loose, everything else (`man`/base/zones)→normal —
+    retiring the interim `random.choice` pick. `defense_playcall` now carries the distinct catalog id
+    (set by `set_playcalls` before this runs), so no side field is needed. `rng` is accepted for
+    signature back-compat but no longer used."""
+    from BackEnd.utils.defense_identity import hco_defense_posture_from_call
     game_state = getattr(game, "game_state", {})
     if game_state is None:
         return None
     if not _dynamic_hco_defense_enabled():
         game_state["_hco_defense_posture"] = None
         return None
-    posture = game_state.get("_hco_defense_posture_call") or "normal"
+    posture = hco_defense_posture_from_call(game_state.get("defense_playcall"))
     if posture not in _HCO_DEFENSE_POSTURES:
         posture = "normal"
     game_state["_hco_defense_posture"] = posture

@@ -5914,10 +5914,10 @@
     
     (function initPlaycallCenter() {
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
-      // NOTE: 'Man Deny' / 'Man Loose' display labels are PLACEHOLDERS (S4, 2026-07-19) — the
-      // coach-facing name is pending user feedback. To rename, change the label here AND its case in
-      // defenseSchemeToApiValue below; the api values (man_deny/man_loose) are stable internal keys.
-      const DEFENSE_SCHEMES = ['Man Normal', 'Man Deny', 'Man Loose', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
+      // First-class man plays (integrating_new_d_plays.md): coach-facing labels Base/Deny/Loose Man.
+      // Api values are playbook keys (man_tight/man_loose) → resolve to catalog ids man-tight/man-loose
+      // (which drive the HCO posture); 'Base Man' → 'Man' → catalog `man`.
+      const DEFENSE_SCHEMES = ['Base Man', 'Deny Man', 'Loose Man', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
       let currentDefenseIndex = 0;
       let selectedDefenseScheme = null; // Explicit user-selected defense scheme, if any
       
@@ -6020,11 +6020,11 @@
 
       // Defense card navigation (circular)
       function defenseSchemeToApiValue(name) {
-        // Man variants → internal posture keys (resolve to canonical `man` + drive HCO posture:
-        // deny→tight, loose→loose). Zones pass their display name through (coerced backend-side).
-        if (name === 'Man Normal') return 'Man';
-        if (name === 'Man Deny') return 'man_deny';
-        if (name === 'Man Loose') return 'man_loose';
+        // Man plays → playbook keys the backend coerces to catalog ids (man_tight→man-tight →
+        // posture tight; man_loose→man-loose → loose). 'Base Man' → 'Man' → catalog `man` (normal).
+        if (name === 'Base Man') return 'Man';
+        if (name === 'Deny Man') return 'man_tight';
+        if (name === 'Loose Man') return 'man_loose';
         return name;
       }
       document.getElementById('defense-nav-up')?.addEventListener('click', () => {

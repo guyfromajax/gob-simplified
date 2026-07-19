@@ -308,9 +308,30 @@ Also accept legacy `"man"` as alias → treat as Base during soak.
 
 ## 8. Status
 
-Phase 0 complete. **This doc's first-class-plays model is the committed architecture (owner, 2026-07-19).**
-An interim posture prototype was built on a *different* model (S4 in `Dynamic_MM_Brief.md`) and must be
-reconciled INTO this plan before Phases 1–6 proceed — see §9.
+**Phase 0 ✅** — naming/identity locked. **This doc's first-class-plays model is the committed
+architecture (owner, 2026-07-19).** The S4 posture prototype was reconciled INTO this plan (§9).
+
+**Phase 1 ✅ DONE + verified (2026-07-19) — code UNCOMMITTED; staging seeded; PROD seed pending.**
+- **Identity de-collapse** (`defense_identity.py`): `man_tight`→`man-tight`, `man_loose`→`man-loose`
+  resolve as DISTINCT catalog ids (`man_pressure` kept as alias→`man-tight`; `man_deny` dropped).
+- **Playcall vs scouting DECOUPLED** — `_coerce_hco_defense_id` (`turn_manager.py`) now returns the
+  distinct catalog `defense_id` for `defense_playcall` (drives posture via
+  `hco_defense_posture_from_call`), while `canonical_scouting_defense_key` collapses
+  `man-tight`/`man-loose`/`base-man`→`man` so every scouting / man-vs-zone consumer still sees `man`
+  (per-play scouting rows are Phase 2). **This decouple was REQUIRED once the Mongo docs existed** —
+  seeding made `defense_scouting_row_key` split prematurely.
+- **Posture** (`phase_resolution.py` `_roll_defense_posture`) derives from `defense_playcall`; interim
+  random roll + S4 side-field/aggression-picker removed. **FE** (`court.html`): Base/Deny/Loose Man.
+- **DB:** `add_man_tight_loose_defenses.py` seeded `man-tight` (Deny Man) + `man-loose` (Loose Man)
+  into **gob-staging** (additive, verified). **Prod (`gob`) NOT yet seeded** — run the same script
+  with `MONGO_DB_NAME=gob` at ship time.
+- **Verified:** Deny Man override → `defense_playcall=man-tight` + posture `tight` over a full game,
+  scouting row = `man`, no crash. Note: staging base = `base-man` (no legacy `man` doc), so base now
+  resolves to `defense_playcall=base-man` (the Phase-2 target, arrived at naturally).
+
+**NEXT: Phase 2** (persistence/init/migration) — see §4. Suggested order: playbook-key rename
+(`man_pressure`→`man_tight`) + `MAN_DEFENSE_ID_TO_NAME` → per-play scouting rows → existing-franchise
+FTD migration (the careful part). Then Phase 3 (CPU playbook-% man picker), Phase 4 (UI), Phase 5 (docs).
 
 ---
 

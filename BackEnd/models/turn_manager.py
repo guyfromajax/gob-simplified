@@ -23,7 +23,6 @@ from BackEnd.constants import (
     POSITION_LIST,
     STRATEGY_CALL_DICTS,
     STRATEGY_DEFENSE_ZONE_SENTINEL,
-    STRATEGY_MAN_POSTURE_BY_AGGRESSION,
     TEMPO_PASS_DICT,
     MALLEABLE_ATTRS,
     HOME_RIM_COORDS,
@@ -2676,37 +2675,23 @@ class TurnManager:
             return None
         if s in ("Zone", "zone", STRATEGY_DEFENSE_ZONE_SENTINEL):
             return self._select_zone_defense_with_playbook_weights()
+        # `defense_playcall` stores the DISTINCT catalog `defense_id` (integrating_new_d_plays.md §0.4:
+        # zone-consistent) so the man posture variants (`man-tight`/`man-loose`) survive here — NOT the
+        # collapsed scouting-row key. Resolve to the catalog id first; the scouting layer collapses to
+        # `man` separately via `defense_scouting_row_key`.
+        rid = resolve_to_defense_id(s)
+        if rid:
+            return rid
         ck = canonical_scouting_defense_key(s)
         if ck:
             return ck
-        rid = resolve_to_defense_id(s)
-        if rid:
-            ck2 = canonical_scouting_defense_key(rid)
-            if ck2:
-                return ck2
         return s
 
-    def _expand_man_posture_pick(self, pick):
-        """CPU: expand a bare ``"man"`` pick into a posture variant (``man_deny`` / ``man_normal`` /
-        ``man_loose``) weighted by the defending team's ``strategy_settings["aggression"]`` (0-4) —
-        symmetric to the zone-sentinel expansion. High aggression → more deny (tight), low → more
-        loose. Non-``"man"`` picks (zone slugs, already-posture variants) pass through unchanged.
-        S4 (2026-07-19); replaces the old interim random posture roll for CPU teams."""
-        if pick != "man":
-            return pick
-        aggr = int((getattr(self.game.defense_team, "strategy_settings", {}) or {}).get("aggression", 2) or 2)
-        return random.choice(STRATEGY_MAN_POSTURE_BY_AGGRESSION.get(aggr, ["man_normal"]))
-
-    def _apply_defense_call(self, raw):
-        """S4 defense-call choke point: return the CANONICAL row-key for `defense_playcall` (via
-        `_coerce_hco_defense_id`, e.g. `man_deny`→`man`) AND stash the derived HCO **posture**
-        (`man_deny`→tight / `man_loose`→loose / else normal) on `game_state["_hco_defense_posture_call"]`,
-        which `_roll_defense_posture` reads — retiring the interim random posture roll. Keeping the
-        canonical `man` for `defense_playcall` means every man/zone consumer is unaffected; the posture
-        rides alongside. (deny↔tight naming kept at this boundary — owner decision 2026-07-19.)"""
-        from BackEnd.utils.defense_identity import hco_defense_posture_from_call
-        self.game.game_state["_hco_defense_posture_call"] = hco_defense_posture_from_call(raw)
-        return self._coerce_hco_defense_id(raw)
+    # NOTE (integrating_new_d_plays.md §9.4): the S4 `_expand_man_posture_pick` (aggression-weighted)
+    # and `_apply_defense_call` (posture-stash choke point) were removed — first-class man plays carry
+    # the posture in the DISTINCT `defense_playcall` id (`man-tight`/`man-loose`), from which
+    # `_roll_defense_posture` derives it. CPU deny/loose selection is Phase 3 (`_select_man_defense_
+    # with_playbook_weights` by playbook %), not the interim aggression roll.
 
     def set_playcalls(self):
         """
@@ -2717,11 +2702,6 @@ class TurnManager:
         User overrides take precedence for turn-by-turn gameplay.
         """
         
-        # S4 defense posture (deny/loose/normal): default to normal each turn so a prior turn's
-        # deny/loose never leaks; `_apply_defense_call` overwrites it when a posture-bearing man
-        # variant is chosen. `_roll_defense_posture` reads `_hco_defense_posture_call`.
-        self.game.game_state["_hco_defense_posture_call"] = "normal"
-
         # ✅ SS&S: Check for user-set calls in team.strategy_calls
         # If offense_call is not None, use it and clear after use
         # If None, use normal selection process
@@ -2835,7 +2815,7 @@ class TurnManager:
             
             # Still need to choose defense normally
             if user_defense:
-                chosen_defense = self._apply_defense_call(user_defense)
+                chosen_defense = self._coerce_hco_defense_id(user_defense)
                 # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
                 self.game.game_state["user_defense_override"] = None  # Legacy clear
                 logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, persistent until manually cleared)")
@@ -2847,7 +2827,7 @@ class TurnManager:
                 if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
                     chosen_defense = self._select_zone_defense_with_playbook_weights()
                 else:
-                    chosen_defense = self._apply_defense_call(self._expand_man_posture_pick(pick))
+                    chosen_defense = pick
             
             # ✅ FIX: Record offensive playcall attempt tracking (same as normal path)
             # This was being skipped due to early return, causing override stats not to be tracked
@@ -2989,7 +2969,7 @@ class TurnManager:
                 defense_call = user_team.strategy_calls.get("defense_call")
                 logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from user_team ({user_team.name}) strategy_calls: {defense_call}")
                 if defense_call:
-                    chosen_defense = self._apply_defense_call(defense_call)
+                    chosen_defense = self._coerce_hco_defense_id(defense_call)
                     # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
                     logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
                 else:
@@ -3007,7 +2987,7 @@ class TurnManager:
                     chosen_defense = self._select_zone_defense_with_playbook_weights()
                     logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
                 else:
-                    chosen_defense = self._apply_defense_call(self._expand_man_posture_pick(pick))
+                    chosen_defense = pick
         
         # Record playcall attempt under new buckets
         try:

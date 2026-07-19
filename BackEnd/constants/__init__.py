@@ -144,19 +144,6 @@ PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
 # Token in STRATEGY_CALL_DICTS["defense"] lists → expand via weighted zone picker (`defense_id` slugs).
 STRATEGY_DEFENSE_ZONE_SENTINEL = "__strategy_zone__"
 
-# S4 (2026-07-19): when the CPU picks bare "man", expand it to a man POSTURE variant weighted by the
-# defending team's `strategy_settings["aggression"]` (0-4) — symmetric to the zone-sentinel expansion.
-# Aggression is a SEPARATE axis from the man/zone `defense` setting: high aggression → more deny
-# (tight), low → more loose. deny↔tight, loose↔loose, normal = plain man. TUNABLE (playcall keys
-# resolve to `man` + drive the HCO posture via `hco_defense_posture_from_call`).
-STRATEGY_MAN_POSTURE_BY_AGGRESSION = {
-    0: ["man_loose", "man_loose", "man_normal"],
-    1: ["man_loose", "man_normal", "man_normal"],
-    2: ["man_normal"],
-    3: ["man_normal", "man_normal", "man_deny"],
-    4: ["man_deny", "man_deny", "man_normal"],
-}
-
 STRATEGY_CALL_DICTS = {
     "defense": {
         0: ["man"],

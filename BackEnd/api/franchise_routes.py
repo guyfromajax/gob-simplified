@@ -11482,18 +11482,17 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     
     # Get scouting data from FTD - initialize defense structure if missing
     scouting_data = ftd_doc.get("scouting_data", {})
+    # Route through the canonical row-key set so new first-class defenses (man-tight/man-loose) surface
+    # in the FCC without another hardcoded list (integrating_new_d_plays.md Step A).
+    from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS, read_scouting_defense_row
     if not scouting_data.get("defense"):
         scouting_data["defense"] = {
-            "man": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "2-3-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "3-2-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0},
-            "1-3-1-zone": {"effectiveness": 0, "momentum": 0, "cloaking": 0}
+            k: {"effectiveness": 0, "momentum": 0, "cloaking": 0}
+            for k in CANONICAL_HCO_DEFENSE_ROW_KEYS
         }
     else:
         # Ensure each HCO defense row exists for FCC; dual-read legacy keys (e.g. Man) into canonical slug.
-        from BackEnd.utils.defense_identity import read_scouting_defense_row
-
-        defenses = ["man", "2-3-zone", "3-2-zone", "1-3-1-zone"]
+        defenses = list(CANONICAL_HCO_DEFENSE_ROW_KEYS)
         def_block = scouting_data.get("defense")
         if not isinstance(def_block, dict):
             def_block = {}

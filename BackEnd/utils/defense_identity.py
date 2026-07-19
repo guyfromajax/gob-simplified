@@ -28,14 +28,16 @@ PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID: Dict[str, str] = {
     "zone_131": "1-3-1-zone",
 }
 
-# Playbook man keys → primary `defense_id` (multiple man variants may share one doc in DB).
-# The man POSTURE variants (deny/loose/normal) all resolve to the ONE `man` defense — they differ only
-# in the HCO defender posture (see `hco_defense_posture_from_call`), not in man-vs-zone identity.
+# Playbook man keys → catalog `defense_id`. First-class man plays (integrating_new_d_plays.md): deny
+# (tight) and loose are DISTINCT catalog ids; only they get their own posture. Phase-1 scope keeps the
+# base/normal man on the legacy `man` id (= Base alias per §6) — the full `man_normal → base-man`
+# migration is Phase 2 (scouting rows). All three remain man-family (`is_zone_defense` = False).
+# Coach-facing display: Base Man / Deny Man / Loose Man; posture from `hco_defense_posture_from_call`.
 PLAYBOOK_MAN_KEY_TO_DEFENSE_ID: Dict[str, str] = {
-    "man_normal": "man",
-    "man_pressure": "man",   # legacy key for the tight/deny posture
-    "man_deny": "man",       # S4 coach-facing name for tight (deny ↔ tight, owner decision 2026-07-19)
-    "man_loose": "man",
+    "man_normal": "man",          # Phase 1: base stays `man`; → `base-man` in Phase 2
+    "man_tight": "man-tight",     # Deny Man (renamed from legacy `man_pressure`)
+    "man_pressure": "man-tight",  # legacy alias → tight/deny
+    "man_loose": "man-loose",     # Loose Man
 }
 
 
@@ -62,9 +64,13 @@ DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY: Dict[str, str] = {
     v: k for k, v in PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID.items()
 }
 
-# Keys used in `scouting_data["defense"]` for half-court defense rows (Phase 2).
+# Keys used in `scouting_data["defense"]` for half-court defense rows. `man-tight`/`man-loose` are the
+# first-class man plays (integrating_new_d_plays.md Step A) — own rows; stats route here after the
+# Step C `canonical_scouting_defense_key` flip (until then they collapse to `man` and stay at 0).
 CANONICAL_HCO_DEFENSE_ROW_KEYS: Tuple[str, ...] = (
     "man",
+    "man-tight",
+    "man-loose",
     "2-3-zone",
     "3-2-zone",
     "1-3-1-zone",
@@ -73,6 +79,8 @@ CANONICAL_HCO_DEFENSE_ROW_KEYS: Tuple[str, ...] = (
 # When scouting was keyed by display names, these alternate keys may hold the same row dict.
 _SCOUTING_DEFENSE_LEGACY_KEYS_BY_CANONICAL: Dict[str, Tuple[str, ...]] = {
     "man": ("Man", "man"),
+    "man-tight": ("Deny Man", "man-tight"),
+    "man-loose": ("Loose Man", "man-loose"),
     "2-3-zone": ("2-3 Zone", "2-3-zone"),
     "3-2-zone": ("3-2 Zone", "3-2-zone"),
     "1-3-1-zone": ("1-3-1 Zone", "1-3-1-zone"),
@@ -222,7 +230,11 @@ def canonical_scouting_defense_key(value: Any) -> Optional[str]:
     did = resolve_to_defense_id(raw)
     if not did:
         return None
-    if did == "base-man":
+    # Phase 1 (integrating_new_d_plays.md): the man POSTURE variants share the ONE `man` SCOUTING row
+    # (stats/effectiveness) — only `defense_playcall` carries their distinct id (for posture). Splitting
+    # into per-play scouting rows (own EFF/MOM/CLK) is Phase 2; until then collapse them here so every
+    # scouting/man-vs-zone consumer still sees `man`.
+    if did in ("base-man", "man-tight", "man-loose"):
         return "man"
     return did
 

@@ -932,6 +932,17 @@ def populate_scouting_data(mode="single"):
                 "game_stats": defense_template["game_stats"].copy(),
                 "season_stats": defense_template["season_stats"].copy()
             },
+            # First-class man plays (Step A): own rows; start at 0 EFF (Deny/Loose start 0 by design).
+            "man-tight": {
+                "used": 0, "success": 0, "effectiveness": 0, "momentum": 0, "cloaking": 0,
+                "game_stats": defense_template["game_stats"].copy(),
+                "season_stats": defense_template["season_stats"].copy(),
+            },
+            "man-loose": {
+                "used": 0, "success": 0, "effectiveness": 0, "momentum": 0, "cloaking": 0,
+                "game_stats": defense_template["game_stats"].copy(),
+                "season_stats": defense_template["season_stats"].copy(),
+            },
             "2-3-zone": {
                 "used": 0,
                 "success": 0,
@@ -967,6 +978,10 @@ def populate_scouting_data(mode="single"):
         # For other modes, use template with default values
         defense_structure = {
             "man": deepcopy(defense_template),
+            # First-class man plays (integrating_new_d_plays.md Step A): own rows, start at template
+            # defaults (Deny/Loose start 0 EFF). Stats route here after the Step C collapse flip.
+            "man-tight": deepcopy(defense_template),
+            "man-loose": deepcopy(defense_template),
             "2-3-zone": deepcopy(defense_template),
             "3-2-zone": deepcopy(defense_template),
             "1-3-1-zone": deepcopy(defense_template),

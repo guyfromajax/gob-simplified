@@ -153,6 +153,11 @@ def _create_scouting_data_template_base():
         "defense": {
             # Create fresh defense structures (will be customized per team/mode)
             "man": create_fresh_defense(),
+            # First-class man plays (integrating_new_d_plays.md Step A): own scouting rows. Stats still
+            # collapse to `man` until the Step C `canonical_scouting_defense_key` flip — these stay at
+            # 0 until then (Deny/Loose start at 0 EFF by design; Base keeps the `man` row's EFF).
+            "man-tight": create_fresh_defense(),
+            "man-loose": create_fresh_defense(),
             "2-3-zone": create_fresh_defense(),
             "3-2-zone": create_fresh_defense(),
             "1-3-1-zone": create_fresh_defense(),
