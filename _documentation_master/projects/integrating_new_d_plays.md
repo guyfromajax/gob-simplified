@@ -329,9 +329,17 @@ architecture (owner, 2026-07-19).** The S4 posture prototype was reconciled INTO
   scouting row = `man`, no crash. Note: staging base = `base-man` (no legacy `man` doc), so base now
   resolves to `defense_playcall=base-man` (the Phase-2 target, arrived at naturally).
 
-**NEXT: Phase 2** (persistence/init/migration) — see §4. Suggested order: playbook-key rename
-(`man_pressure`→`man_tight`) + `MAN_DEFENSE_ID_TO_NAME` → per-play scouting rows → existing-franchise
-FTD migration (the careful part). Then Phase 3 (CPU playbook-% man picker), Phase 4 (UI), Phase 5 (docs).
+**Phase 2 ✅ DONE + verified (Steps A–D).**
+- **A** — `man-tight`/`man-loose` scouting rows added to BOTH templates (`team_manager._create_scouting_data_template_base`, `gameplan_routes.populate_scouting_data`) + `CANONICAL_HCO_DEFENSE_ROW_KEYS` + the franchise-API row-existence loop. Additive; normalize-on-load auto-backfills existing teams.
+- **B** — playbook key `man_pressure`→`man_tight`; `MAN_DEFENSE_ID_TO_NAME` → Base/Deny/Loose Man; `is_active: True` for all three; defaults updated (`gameplan_routes`, `cpu_playbook_customization`, `tutorial_game`); save-side fold (`MAN_DEFENSE_LEGACY_KEY_ALIASES` + `normalize_string_keyed_map`) so old `man_pressure`/"Man Pressure" saves fold forward (verified: `{man_pressure:30}`→`{man_tight:30}`).
+- **C** — flipped `canonical_scouting_defense_key` collapse: `man-tight`/`man-loose` now their OWN scouting rows (`base-man` still folds to `man`). Verified: Deny override → `man-tight.used=83`.
+- **D** — training distributes man points by `man_defense` % (mirrors zone; verified 50/30/20 → 50/30/20; empty-% falls back to base `man`); even-dist list + both `is_man` checks recognize all three.
+
+**Phase 3 ✅ DONE + verified.** `_select_man_defense_with_playbook_weights` (CPU man picker, playbook-%-weighted) wired into BOTH CPU pick branches in `set_playcalls`. Verified end-to-end (class-level probe): deny/loose-heavy playbook → CPU calls Deny/Loose, stats land on `man-tight`/`man-loose` rows (10/60/30 → ~3/26/18), no crash.
+
+**Phase 4 ✅ core done (proto-tested OK).** Shared display source of truth updated — `defenseUi.js` (module) + `defense-display.js` (non-module twin): labels (`man`→Base Man, `man-tight`→Deny Man, `man-loose`→Loose Man), legacy aliases, and `buildPlaybookStyleDefenseRows` iterates all three man slugs. Playbooks page is data-driven via `is_active` (now True). *Tail (in-app): confirm box-score / any renderer that bypasses the shared helper.*
+
+**Phase 5 🔄 IN PROGRESS** — docs + cross-links (this section + system docs). Deferred cleanup: remove the `man_pressure`/"Man Pressure" aliases AFTER a migration soak (not yet). **Ship remaining:** prod (`gob`) DB seed; base→`base-man` scouting migration; update stale tests (they assert the old man collapse) when pytest is unblocked.
 
 ---
 

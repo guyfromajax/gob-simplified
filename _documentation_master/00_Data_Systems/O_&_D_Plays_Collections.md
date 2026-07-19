@@ -42,6 +42,11 @@ Each defense document includes:
 - `zone_definitions` / `shift_triggers` when applicable
 - baseline `effectiveness`, `momentum`, `cloaking`
 
+Catalog `defense_id`s (2026-07-19, first-class man plays): `base-man` (Base Man), `man-tight` (Deny
+Man), `man-loose` (Loose Man), `2-3-zone`, `3-2-zone`, `1-3-1-zone` (legacy `man` doc = Base alias
+during soak). Seeded via `scripts/add_man_tight_loose_defenses.py` — **staging done; prod pending**.
+See [`integrating_new_d_plays.md`](../projects/integrating_new_d_plays.md).
+
 Defense identity is still primarily name-based in most persisted settings.
 
 ## Team-Owned Offensive Play Copies

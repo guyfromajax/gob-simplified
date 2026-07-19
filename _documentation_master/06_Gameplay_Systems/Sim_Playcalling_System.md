@@ -34,8 +34,16 @@ Supporting files:
 
 1. Check for a user defense override in `strategy_calls["defense_call"]`.
 2. If no override, choose Man vs Zone from strategy settings.
-3. If Zone is selected, choose the specific zone from `playbook_settings["zone_defense"]`.
-4. Save the result into `game_state["defense_playcall"]`.
+3. If Zone is selected, choose the specific zone from `playbook_settings["zone_defense"]`
+   (`_select_zone_defense_with_playbook_weights`).
+4. If Man is selected, choose the specific man play (Base / Deny / Loose) from
+   `playbook_settings["man_defense"]` (`_select_man_defense_with_playbook_weights`) — symmetric to the
+   zone picker. Canonical `defense_id`s: `man` (Base) / `man-tight` (Deny) / `man-loose` (Loose).
+5. Save the result into `game_state["defense_playcall"]`.
+
+> **First-class man plays (2026-07-19):** Deny/Loose are distinct `defense_id`s with their own
+> scouting rows + usage %, and drive the HCO defender posture (`man-tight`→tight, `man-loose`→loose,
+> base→normal). Authoritative record: [`integrating_new_d_plays.md`](../projects/integrating_new_d_plays.md).
 
 ## Playbook Identity Rules
 
@@ -45,7 +53,7 @@ Offensive playbook persistence now uses `play_id` keys:
 playbook_settings = {
     "motion": {play_id: percentage},
     "set_plays": {play_id: percentage},
-    "man_defense": {"man_normal": percentage, ...},
+    "man_defense": {"man_normal": percentage, "man_tight": percentage, "man_loose": percentage},
     "zone_defense": {"zone_23": percentage, "zone_32": percentage, "zone_131": percentage},
     "fast_breaks": {play_id_or_fb_key: percentage},
     "pc_order": {
