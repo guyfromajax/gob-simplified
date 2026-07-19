@@ -29,11 +29,33 @@ PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID: Dict[str, str] = {
 }
 
 # Playbook man keys → primary `defense_id` (multiple man variants may share one doc in DB).
+# The man POSTURE variants (deny/loose/normal) all resolve to the ONE `man` defense — they differ only
+# in the HCO defender posture (see `hco_defense_posture_from_call`), not in man-vs-zone identity.
 PLAYBOOK_MAN_KEY_TO_DEFENSE_ID: Dict[str, str] = {
     "man_normal": "man",
-    "man_pressure": "man",
+    "man_pressure": "man",   # legacy key for the tight/deny posture
+    "man_deny": "man",       # S4 coach-facing name for tight (deny ↔ tight, owner decision 2026-07-19)
     "man_loose": "man",
 }
+
+
+def hco_defense_posture_from_call(raw_call: Any) -> str:
+    """Map a raw defense playcall (any string variant, user- or CPU-selected) to the HCO team
+    **posture** keyword the placement geometry uses: ``"tight"`` / ``"loose"`` / ``"normal"``.
+
+    Coach-facing name ``deny`` ↔ internal posture ``tight`` (owner decision 2026-07-19: keep the
+    mapping at this boundary, do NOT rename internal `tight`). ``man loose`` → ``loose``; everything
+    else (``man normal``, plain ``man``, and every zone — zone posture parity is a separate S4 slice)
+    → ``normal``. Keyword-based so it's robust to spacing / casing / `_`/`-` variants
+    (``man deny`` / ``man_pressure`` / ``Man Loose`` …). Retires the interim random posture roll."""
+    s = str(raw_call or "").strip().lower().replace("-", " ").replace("_", " ")
+    if not s:
+        return "normal"
+    if "deny" in s or "pressure" in s or "tight" in s:
+        return "tight"
+    if "loose" in s or "sag" in s:
+        return "loose"
+    return "normal"
 
 # playbook `zone_23` / defenses.defense_id → inverse map for percentage lookup
 DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY: Dict[str, str] = {

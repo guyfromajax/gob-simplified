@@ -4454,19 +4454,25 @@ _HCO_DEFENSE_POSTURES = ("loose", "normal", "tight")
 
 
 def _roll_defense_posture(game, rng=None):
-    """Pick this HCO turn's team defense posture and stash it on game_state for the animator
-    (render) + the future intercept read. None when the flag is off → legacy placement. Rolled
-    fresh each HCO turn so it never goes stale across possessions. See Dynamic_MM_Brief §5A."""
-    import random as _r
+    """Set this HCO turn's team defense posture and stash it on game_state for the animator (render)
+    + the intercept read. None when the flag is off → legacy placement. See Dynamic_MM_Brief §5A / S4.
+
+    S4 (2026-07-19): the posture is now DERIVED FROM THE DEFENSE PLAYCALL (deny→tight, loose→loose,
+    everything else→normal) — retiring the interim `random.choice` pick. `set_playcalls` stashes the
+    posture-bearing call on `game_state["_hco_defense_posture_call"]` before `defense_playcall` is
+    normalized to canonical `man` (which drops the posture). No call stashed (plain man / zones) →
+    normal. `rng` is accepted for signature back-compat but no longer used."""
     game_state = getattr(game, "game_state", {})
     if game_state is None:
         return None
     if not _dynamic_hco_defense_enabled():
         game_state["_hco_defense_posture"] = None
         return None
-    posture = (rng or _r).choice(_HCO_DEFENSE_POSTURES)
+    posture = game_state.get("_hco_defense_posture_call") or "normal"
+    if posture not in _HCO_DEFENSE_POSTURES:
+        posture = "normal"
     game_state["_hco_defense_posture"] = posture
-    logging.warning(f"🛡️ [DYNAMIC DEFENSE] turn posture = {posture}")
+    logging.warning(f"🛡️ [DYNAMIC DEFENSE] turn posture = {posture} (from playcall)")
     return posture
 
 
@@ -6252,7 +6258,8 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     def_team = game.defense_team
     def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
-    shot_clock_est = float(game_state.get("shot_clock_remaining", 30) or 30)
+    raw_shot_clock_est = game_state.get("shot_clock_remaining")
+    shot_clock_est = float(30 if raw_shot_clock_est is None else raw_shot_clock_est)
     # §4 hot-read "truly open" gate (man only for now): per-game lane distance + defense aggression.
     _hco_lane_dist = _hco_pass_lane_dist(game)
     _def_aggr_call = (getattr(def_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")

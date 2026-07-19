@@ -391,11 +391,19 @@ def _walk_ball_owners(
     current_owner: Optional[str] = seed_owner_pos
     for step in skeleton_steps:
         pos_actions = step.get("pos_actions") or {}
-        for pos in _OFFENSE_POSITIONS:
-            action = (pos_actions.get(pos) or {}).get("action")
-            if action in ("handle_ball", "pass"):
-                current_owner = pos
-                break
+        # Bootstrap the owner ONLY when we don't already have a running one (step 0 with no seed, or a
+        # gap). Once established, the owner CARRIES — it changes only via a pass→receive transition
+        # below. This scan used to run EVERY step and reset the owner to the first `_OFFENSE_POSITIONS`
+        # (PG-first) `handle_ball`/`pass` pos, which let a NOMINAL `PG: handle_ball` in the loop skeleton
+        # override a receiver who genuinely held the ball after a reversal — so on non-shot outcomes the
+        # ball snapped back to the passer even though ownership had legitimately moved (bug #5 second
+        # half; the jitter victim was already fixed separately). See projects/hco_roles_audit.md.
+        if current_owner is None:
+            for pos in _OFFENSE_POSITIONS:
+                action = (pos_actions.get(pos) or {}).get("action")
+                if action in ("handle_ball", "pass"):
+                    current_owner = pos
+                    break
         start_owner = current_owner
         passers = [
             p for p in _OFFENSE_POSITIONS

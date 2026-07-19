@@ -118,15 +118,23 @@ function tracePlayback(scene, label, payload = {}) {
 }
 
 function shouldDebugOobAnchors(scene = null) {
-  if (typeof window === "undefined") return Boolean(scene?.__debugOobAnchors);
-  if (window.DEBUG_OOB_ANCHORS === true) return true;
+  // On by default for O&B / FCP-HCT pass-anchor debugging (parity with backend
+  // LOG_OOB_FCP_HCT_CAPTURE). Silence with window.DEBUG_OOB_ANCHORS = false or
+  // ?debug_oob=0.
+  if (typeof window === "undefined") {
+    return scene?.__debugOobAnchors !== false;
+  }
   if (window.DEBUG_OOB_ANCHORS === false) return false;
+  if (window.DEBUG_OOB_ANCHORS === true) return true;
   try {
     const raw = new URLSearchParams(window.location.search).get("debug_oob");
-    return ["1", "true", "yes", "on"].includes(String(raw || "").toLowerCase());
+    if (raw != null && raw !== "") {
+      return !["0", "false", "no", "off"].includes(String(raw).toLowerCase());
+    }
   } catch (_) {
-    return Boolean(scene?.__debugOobAnchors);
+    // fall through to default-on
   }
+  return true;
 }
 
 function clearOobAnchorOverlay(scene) {

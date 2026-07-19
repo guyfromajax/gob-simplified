@@ -5914,7 +5914,10 @@
     
     (function initPlaycallCenter() {
       const clearOffenseBtn = document.getElementById('clear-offense-override-x');
-      const DEFENSE_SCHEMES = ['Man Normal', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
+      // NOTE: 'Man Deny' / 'Man Loose' display labels are PLACEHOLDERS (S4, 2026-07-19) — the
+      // coach-facing name is pending user feedback. To rename, change the label here AND its case in
+      // defenseSchemeToApiValue below; the api values (man_deny/man_loose) are stable internal keys.
+      const DEFENSE_SCHEMES = ['Man Normal', 'Man Deny', 'Man Loose', '2-3 Zone', '3-2 Zone', '1-3-1 Zone'];
       let currentDefenseIndex = 0;
       let selectedDefenseScheme = null; // Explicit user-selected defense scheme, if any
       
@@ -6017,7 +6020,12 @@
 
       // Defense card navigation (circular)
       function defenseSchemeToApiValue(name) {
-        return name === 'Man Normal' ? 'Man' : name;
+        // Man variants → internal posture keys (resolve to canonical `man` + drive HCO posture:
+        // deny→tight, loose→loose). Zones pass their display name through (coerced backend-side).
+        if (name === 'Man Normal') return 'Man';
+        if (name === 'Man Deny') return 'man_deny';
+        if (name === 'Man Loose') return 'man_loose';
+        return name;
       }
       document.getElementById('defense-nav-up')?.addEventListener('click', () => {
         playSound('click-tiny.wav');

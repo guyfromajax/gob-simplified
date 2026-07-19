@@ -71,6 +71,37 @@ def test_inbound_clock_family_keeps_shot_clock_when_no_reset_trigger(result_type
     assert result["uess_clock_elapsed_delta_seconds"] == 0
 
 
+def test_late_game_retained_dead_ball_and_side_inbound_preserve_shorter_clock():
+    # Regression: the retained-possession turn crosses into the final 30 seconds.
+    # The old universal late-game pin raised 8 to 28 here.
+    tm = _make_turn_manager(time_remaining=32, shot_clock_remaining=12, elapsed_authority="ledger")
+
+    batted_oob = {
+        "result_type": "DEAD BALL",
+        "current_turn": "HCO",
+        "next_play_type": "SIDE_INBOUND",
+        "possession_flips": False,
+        "bat_oob": True,
+        "time_elapsed": 4,
+    }
+    tm.update_clock_and_possession(batted_oob)
+
+    assert batted_oob["clock_end"] == 28
+    assert batted_oob["shot_clock_start"] == 12
+    assert batted_oob["shot_clock_end"] == 8
+    assert tm.game.game_state["shot_clock_remaining"] == 8
+
+    side_inbound = {"result_type": "SIDE_INBOUND", "time_elapsed": 0}
+    tm.update_clock_and_possession(side_inbound)
+
+    assert side_inbound["clock_start"] == 28
+    assert side_inbound["clock_end"] == 28
+    assert side_inbound["shot_clock_start"] == 8
+    assert side_inbound["shot_clock_end"] == 8
+    assert side_inbound["shot_clock_reset"] is False
+    assert tm.game.game_state["shot_clock_remaining"] == 8
+
+
 def test_non_shooting_defensive_foul_to_side_inbound_resets_shot_clock_without_possession_change():
     tm = _make_turn_manager(time_remaining=400, shot_clock_remaining=18, elapsed_authority="ledger")
     result = {

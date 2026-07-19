@@ -308,4 +308,82 @@ Also accept legacy `"man"` as alias → treat as Base during soak.
 
 ## 8. Status
 
-Phase 0 complete. Ready for Phase 1 when scheduled (Mongo seeds + `defense_identity` / playbook maps).
+Phase 0 complete. **This doc's first-class-plays model is the committed architecture (owner, 2026-07-19).**
+An interim posture prototype was built on a *different* model (S4 in `Dynamic_MM_Brief.md`) and must be
+reconciled INTO this plan before Phases 1–6 proceed — see §9.
+
+---
+
+## 9. Reconciliation addendum — converging the S4 posture prototype (2026-07-19)
+
+**Why this exists.** Four days after this plan was written, an "S4 man slice" was built to the
+one-line S4 row in `Dynamic_MM_Brief.md` (not to this doc). It took a **different, lighter
+architecture** — ONE `man` defense + a posture *attribute* — that CONFLICTS with this doc's
+first-class-plays model. **Owner decision 2026-07-19: this doc wins (three independent plays).** The
+S4 prototype is therefore partly reusable, partly to be reverted. This section is the exact delta so
+whoever runs Phases 1–6 doesn't build on the wrong foundation or redo salvageable work.
+
+### 9.1 What S4 built (the divergent prototype — all UNCOMMITTED as of 2026-07-19)
+| File | S4 change | Fate under this doc |
+|---|---|---|
+| `defense_identity.py` | added `man_deny`→`man` to `PLAYBOOK_MAN_KEY_TO_DEFENSE_ID`; added `hco_defense_posture_from_call(raw)` | **CHANGE** map (see 9.2); **KEEP** the posture fn (repurpose) |
+| `phase_resolution.py` | `_roll_defense_posture` reads `game_state["_hco_defense_posture_call"]` instead of `random.choice`; random roll retired | **KEEP the retirement**; **CHANGE the source** to `defense_playcall` (see 9.3) |
+| `turn_manager.py` | new `_apply_defense_call` (coerce→canonical `man` + stash posture-call); new `_expand_man_posture_pick` (aggression-weighted); default posture reset in `set_playcalls`; call-sites rewired | **REVERT/REWORK** — collapse-to-`man` and the aggression picker both contradict this doc |
+| `constants/__init__.py` | `STRATEGY_MAN_POSTURE_BY_AGGRESSION` | **REVERT** — this doc selects by playbook %, not aggression |
+| `court.html` | `DEFENSE_SCHEMES` += `Man Deny`/`Man Loose`; `defenseSchemeToApiValue` → `man_deny`/`man_loose` | **RELABEL** to Deny Man/Loose Man + catalog-id api values (see 9.5) |
+
+### 9.2 Identity — distinct catalog ids (supersedes S4's collapse)
+S4 kept `defense_playcall = "man"` for all three and carried posture in a side field. **This doc
+requires distinct ids** (`base-man` / `man-tight` / `man-loose`). So, per Phase 1.2:
+- `PLAYBOOK_MAN_KEY_TO_DEFENSE_ID`: `man_normal→base-man`, **`man_tight→man-tight`**, `man_loose→man-loose`
+  (values become the DISTINCT catalog ids, not `man`). **Drop S4's `man_deny` key — use `man_tight`** (this
+  doc renames `man_pressure`→`man_tight`; `deny` is display-only, "Deny Man").
+- `_coerce_hco_defense_id` / `canonical_scouting_defense_key` must resolve each to its OWN id (stop
+  collapsing tight/loose/base → `man` for the scouting row + playcall).
+
+### 9.3 Posture derivation — read the id, delete the side field (SIMPLIFIES S4)
+Because `defense_playcall` now carries the distinct id, posture derives straight from it — **no side
+field**:
+- `_roll_defense_posture`: `posture = hco_defense_posture_from_call(game_state["defense_playcall"])`.
+  The S4 posture fn already returns the right thing on the catalog ids (`man-tight`→tight,
+  `man-loose`→loose, `base-man`/`man`→normal — keyword match), so **KEEP the function**, just point it
+  at `defense_playcall`.
+- **DELETE**: the `_hco_defense_posture_call` field, its stash inside `_apply_defense_call`, and the
+  default-reset line in `set_playcalls`. (Random-roll retirement STAYS.)
+- The ~13 downstream posture consumers (`animator`, `step_state`, `shot_manager`,
+  `attack_drive_clearance`, and the `_hco_defense_posture`-gated sites in `phase_resolution`) are
+  **unchanged** — they still read `game_state["_hco_defense_posture"]`, which `_roll_defense_posture`
+  still sets. Only its *source* changed. **This is the Phase 6 hand-off, now concrete.**
+
+### 9.4 CPU selection — playbook %, not aggression (supersedes S4)
+**REVERT** `_expand_man_posture_pick` + `STRATEGY_MAN_POSTURE_BY_AGGRESSION`. Build Phase 3's
+`_select_man_defense_with_playbook_weights()` (clone the zone picker) — a strategy `"man"` pick
+expands among `man_normal`/`man_tight`/`man_loose` by playbook % → catalog id. (The aggression axis was
+an S4 invention not in this plan; drop it unless product later wants it as a modifier.)
+
+### 9.5 Exact-string `== "man"` checks — NOW REQUIRED (S4 wrongly dropped them)
+S4 concluded these were unnecessary *because it kept `defense_playcall == "man"`*. Under distinct ids
+they **break** (`man-tight` ≠ `"man"`). Reinstate as real work (part of Phase 2/3):
+`training_execution_v2.py:2504/2540` (`defense_name == "man"`) and `turn_manager.py:3667`
+(`def_row == "man"`) → route through the resolver / an "is man family" check. Add any other
+exact-`"man"` comparisons surfaced by grep.
+
+### 9.6 FE — relabel + catalog-id payload
+`court.html`: `DEFENSE_SCHEMES` → **Base Man / Deny Man / Loose Man** (+ zones); `defenseSchemeToApiValue`
+sends the **catalog id** (`base-man`/`man-tight`/`man-loose`) so it round-trips to `defense_playcall`
+without collapse. Also do Phase 4's `defenseUi.js` / `playcallDisplay.js` / box-score labels (S4 skipped
+these; the card render is safe but the HUD/box-score still show `Man`).
+
+### 9.7 Net-new (S4 didn't touch — full Phases 1–2 stand)
+Mongo catalog docs (`base-man`/`man-tight`/`man-loose`), independent scouting rows (own EFF/MOM/CLK),
+playbook % defaults, FTD migration, training enablement, Playbooks page — all remain exactly as
+Phases 1–2 describe. S4 pre-touched only the *selection* (Phase 3, wrong picker), *posture execution*
+(Phase 6, wrong source), and *Playcall Center* (Phase 4, wrong labels/ids).
+
+### 9.8 Reconciliation checklist (do BEFORE/ALONGSIDE Phase 1)
+- [ ] `defense_identity.py`: man map → distinct ids; drop `man_deny`; keep `hco_defense_posture_from_call`
+- [ ] `_roll_defense_posture` → derive from `defense_playcall`; delete `_hco_defense_posture_call` field + stash + reset
+- [ ] Revert `_expand_man_posture_pick` + `STRATEGY_MAN_POSTURE_BY_AGGRESSION`; build playbook-% man picker (Phase 3)
+- [ ] Fix the `== "man"` exact-string checks (9.5)
+- [ ] FE relabel + catalog-id payload + HUD/box-score labels (9.6)
+- [ ] Then proceed with net-new Phases 1–2 (catalog docs, scouting rows, %, migration)

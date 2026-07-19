@@ -2294,7 +2294,8 @@ def compute_dynamic_hct_turn(
     from BackEnd.utils.shot_clock_policy import sync_late_game_shot_clock
 
     sync_late_game_shot_clock(game_state)
-    shot_clock = float(game_state.get("shot_clock_remaining", 30) or 30)
+    raw_shot_clock = game_state.get("shot_clock_remaining")
+    shot_clock = float(30 if raw_shot_clock is None else raw_shot_clock)
     # 10-second rule is measured against ACTUAL elapsed time from possession start
     # (not an absolute shot-clock threshold), and is disabled when the quarter has
     # less than the limit remaining (the period buzzer ends it first).
