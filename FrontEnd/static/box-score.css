@@ -359,7 +359,8 @@ body.box-score-page {
 
 .scouting-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* 3 columns: Offense (+Fast Breaks) | Man Defense (+Special Situations) | Zone Defense. */
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 0 32px;
   align-items: start;
 }

@@ -1475,9 +1475,12 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
 
   const leftColumn = document.createElement('div');
   leftColumn.className = 'scouting-column';
+  const middleColumn = document.createElement('div');
+  middleColumn.className = 'scouting-column';
   const rightColumn = document.createElement('div');
   rightColumn.className = 'scouting-column';
   container.appendChild(leftColumn);
+  container.appendChild(middleColumn);
   container.appendChild(rightColumn);
 
   const playCallsSection = document.createElement('div');
@@ -1502,11 +1505,8 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
 
   leftColumn.appendChild(playCallsSection);
 
-  // Defense Play Calls Section
-  const defensePlayCallsSection = document.createElement('div');
-  defensePlayCallsSection.className = 'scouting-section';
-  defensePlayCallsSection.innerHTML = '<div class="scouting-section-header">Defense Play Calls</div>';
-
+  // ── Defense Play Calls → Man Defense (middle column) + Zone Defense (right column). Each shows an
+  // aggregate row plus its individual plays, so Man now breaks out Base / Deny / Loose Man (mirrors Zone).
   const gb =
     typeof window !== 'undefined' && window.GOBDefenseDisplay
       ? window.GOBDefenseDisplay
@@ -1516,13 +1516,50 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
       ? gb.getDefenseBlock(defense, slug)
       : {};
 
-  // Man (canonical slug `man` or legacy `Man`)
-  const manDefense =
-    Object.keys(block('man')).length > 0
-      ? block('man')
-      : defense.Man || defense.man || {};
-  const manDefenseSection = createDefensePlaycallSubsection('Man', manDefense);
-  defensePlayCallsSection.appendChild(manDefenseSection);
+  // Aggregate one stat across several defense row-blocks (generalized from the old zone-only helper;
+  // pulls each row's game_stats/season_stats). Handles nested objects (vs_*), numbers, and score arrays.
+  const aggregateDefenseStats = (rows, statKey) => {
+    const vals = rows.map((r) => ((r && (r.game_stats || r.season_stats || r)) || {})[statKey]);
+    const nested = vals.find((v) => v && typeof v === 'object' && !Array.isArray(v));
+    if (nested) {
+      return {
+        attempts: vals.reduce((s, v) => s + ((v && v.attempts) || 0), 0),
+        success: vals.reduce((s, v) => s + ((v && v.success) || 0), 0),
+        ev_scores: vals.flatMap((v) => (v && v.ev_scores) || []),
+        lean_scores: vals.flatMap((v) => (v && v.lean_scores) || []),
+      };
+    }
+    if (vals.some((v) => Array.isArray(v))) return vals.flatMap((v) => v || []);
+    return vals.reduce((s, v) => s + (typeof v === 'number' ? v : 0), 0);
+  };
+  // Flat aggregate row (top-level keys) for createDefensePlaycallSubsection's aggregate display.
+  const aggregateRow = (rows) => {
+    const bases = rows.map((r) => (r && (r.game_stats || r.season_stats || r)) || {});
+    return {
+      used: aggregateDefenseStats(rows, 'used'),
+      success: aggregateDefenseStats(rows, 'success'),
+      ev_scores: bases.flatMap((b) => b.ev_scores || []),
+      lean_scores: bases.flatMap((b) => b.lean_scores || []),
+      vs_motion: aggregateDefenseStats(rows, 'vs_motion'),
+      vs_set: aggregateDefenseStats(rows, 'vs_set'),
+      vs_inside: aggregateDefenseStats(rows, 'vs_inside'),
+      vs_attack: aggregateDefenseStats(rows, 'vs_attack'),
+      vs_outside: aggregateDefenseStats(rows, 'vs_outside'),
+    };
+  };
+
+  // MAN DEFENSE (middle column): aggregate "Man" + Base / Deny / Loose breakouts.
+  const manRow = Object.keys(block('man')).length > 0 ? block('man') : defense.Man || defense.man || {};
+  const denyRow = block('man-tight');
+  const looseRow = block('man-loose');
+  const manDefenseSection = document.createElement('div');
+  manDefenseSection.className = 'scouting-section';
+  manDefenseSection.innerHTML = '<div class="scouting-section-header">Man Defense</div>';
+  manDefenseSection.appendChild(createDefensePlaycallSubsection('Man', aggregateRow([manRow, denyRow, looseRow])));
+  manDefenseSection.appendChild(createDefensePlaycallSubsection('Base Man', manRow));
+  manDefenseSection.appendChild(createDefensePlaycallSubsection('Deny Man', denyRow));
+  manDefenseSection.appendChild(createDefensePlaycallSubsection('Loose Man', looseRow));
+  middleColumn.appendChild(manDefenseSection);
 
   // Zone (aggregate all zone types: 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
   const zone23 =
@@ -1585,30 +1622,15 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
     vs_outside: aggregateZoneStats('vs_outside')
   };
   
-  const zoneDefenseSection = createDefensePlaycallSubsection('Zone', zoneDefense);
-  defensePlayCallsSection.appendChild(zoneDefenseSection);
-
-  // 2-3 Zone
-  const zone23Defense =
-    Object.keys(block('2-3-zone')).length > 0 ? block('2-3-zone') : defense['2-3 Zone'] || {};
-  const zone23DefenseSection = createDefensePlaycallSubsection('2-3 Zone', zone23Defense);
-  defensePlayCallsSection.appendChild(zone23DefenseSection);
-
-  // 3-2 Zone
-  const zone32Defense =
-    Object.keys(block('3-2-zone')).length > 0 ? block('3-2-zone') : defense['3-2 Zone'] || {};
-  const zone32DefenseSection = createDefensePlaycallSubsection('3-2 Zone', zone32Defense);
-  defensePlayCallsSection.appendChild(zone32DefenseSection);
-
-  // 1-3-1 Zone
-  const zone131Defense =
-    Object.keys(block('1-3-1-zone')).length > 0
-      ? block('1-3-1-zone')
-      : defense['1-3-1 Zone'] || {};
-  const zone131DefenseSection = createDefensePlaycallSubsection('1-3-1 Zone', zone131Defense);
-  defensePlayCallsSection.appendChild(zone131DefenseSection);
-
-  rightColumn.appendChild(defensePlayCallsSection);
+  // ZONE DEFENSE (right column): aggregate "Zone" + 2-3 / 3-2 / 1-3-1 breakouts.
+  const zoneDefenseSection = document.createElement('div');
+  zoneDefenseSection.className = 'scouting-section';
+  zoneDefenseSection.innerHTML = '<div class="scouting-section-header">Zone Defense</div>';
+  zoneDefenseSection.appendChild(createDefensePlaycallSubsection('Zone', zoneDefense));
+  zoneDefenseSection.appendChild(createDefensePlaycallSubsection('2-3 Zone', zone23));
+  zoneDefenseSection.appendChild(createDefensePlaycallSubsection('3-2 Zone', zone32));
+  zoneDefenseSection.appendChild(createDefensePlaycallSubsection('1-3-1 Zone', zone131));
+  rightColumn.appendChild(zoneDefenseSection);
 
   // Fast Breaks (left column, after Offense Play Calls)
   const fbEntries = scoutingSnapshot.fb_entries ?? offense.Fast_Break_Entries ?? 0;
@@ -1668,7 +1690,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   fcpBlock.innerHTML = `<div class="scouting-play-type-header"><span>FC Presses:</span><span>${fcpSuccess} / ${fcpUsed} (${fcpPct}%)</span></div>`;
   specialSection.appendChild(fcpBlock);
 
-  rightColumn.appendChild(specialSection);
+  middleColumn.appendChild(specialSection);
 }
 
 /**
