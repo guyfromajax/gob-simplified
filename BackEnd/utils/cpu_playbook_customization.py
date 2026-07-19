@@ -391,7 +391,7 @@ def build_cpu_playbook_for_team(
     else:
         next_settings["hc_traps"] = {"standard_trap": 50, "straight_pressure": 50, "standard_diamond": 0}
     next_settings["zone_defense"] = _random_capped_three(("zone_23", "zone_32", "zone_131"))
-    next_settings["man_defense"] = {"man_normal": 100, "man_pressure": 0, "man_loose": 0}
+    next_settings["man_defense"] = {"man_normal": 100, "man_tight": 0, "man_loose": 0}
 
     meta = next_settings.get("_meta") if isinstance(next_settings.get("_meta"), dict) else {}
     next_settings["_meta"] = {**meta, "schema_version": 2, "cpu_customized": True}

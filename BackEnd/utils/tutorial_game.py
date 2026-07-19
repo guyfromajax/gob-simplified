@@ -118,7 +118,7 @@ TUTORIAL_ZONE_DEFENSE_PCT = {
 }
 TUTORIAL_MAN_DEFENSE_PCT = {
     "man_normal": 100,
-    "man_pressure": 0,
+    "man_tight": 0,
     "man_loose": 0,
 }
 

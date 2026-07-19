@@ -43,9 +43,18 @@ LEGACY_SET_PLAY_KEYS = (
 )
 
 MAN_DEFENSE_ID_TO_NAME = {
-    "man_normal": "Man",
-    "man_pressure": "Man Pressure",
-    "man_loose": "Man Loose",
+    "man_normal": "Base Man",
+    "man_tight": "Deny Man",
+    "man_loose": "Loose Man",
+}
+# Legacy display names + the pre-rename `man_pressure` playbook key fold forward to the current keys
+# (integrating_new_d_plays.md: man_pressure → man_tight). Merged into DEFENSE_NAME_TO_ID + the save-side
+# normalizers so EXISTING saved playbooks don't silently drop their man value on the rename.
+MAN_DEFENSE_LEGACY_KEY_ALIASES = {
+    "Man": "man_normal",
+    "Man Pressure": "man_tight",
+    "Man Loose": "man_loose",
+    "man_pressure": "man_tight",
 }
 ZONE_DEFENSE_ID_TO_NAME = {
     "zone_23": "2-3 Zone",
@@ -74,6 +83,7 @@ HCT_TRAP_ID_ALIASES = {
 DEFENSE_NAME_TO_ID = {
     **{v: k for k, v in MAN_DEFENSE_ID_TO_NAME.items()},
     **{v: k for k, v in ZONE_DEFENSE_ID_TO_NAME.items()},
+    **MAN_DEFENSE_LEGACY_KEY_ALIASES,  # old displays + `man_pressure` key → current keys
 }
 
 

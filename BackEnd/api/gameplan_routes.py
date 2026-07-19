@@ -788,7 +788,7 @@ def initialize_playbook_settings():
         
         # Man defense: only normal is active for now.
         playbook_settings["man_defense"]["man_normal"] = 100
-        playbook_settings["man_defense"]["man_pressure"] = 0
+        playbook_settings["man_defense"]["man_tight"] = 0
         playbook_settings["man_defense"]["man_loose"] = 0
         
         # Initialize position filters with play assignments
@@ -843,7 +843,7 @@ def initialize_playbook_settings():
                 "standard_diamond": 33,
             },
             "zone_defense": {"zone_23": 100, "zone_32": 0, "zone_131": 0},
-            "man_defense": {"man_normal": 100, "man_pressure": 0, "man_loose": 0},
+            "man_defense": {"man_normal": 100, "man_tight": 0, "man_loose": 0},
             "pc_order": {"offense": [], "defense": []},
             "position_filters": {
                 "standard": [],
@@ -2923,7 +2923,7 @@ def get_playbooks(
                         ).get("effectiveness", 0)
                         or 0
                     ),
-                    "is_active": defense_id == "man_normal",
+                    "is_active": True,  # all three man plays are first-class + selectable
                 }
                 for defense_id, defense_name in MAN_DEFENSE_ID_TO_NAME.items()
             ],
@@ -3063,7 +3063,13 @@ def _normalize_playbook_settings_payload(
     )
     playbook_settings["man_defense"] = normalize_string_keyed_map(
         playbook_settings.get("man_defense", {}),
-        {"Man": "man_normal", "Man Pressure": "man_pressure", "Man Loose": "man_loose"},
+        # Current display names + legacy displays/`man_pressure` key → current playbook keys, so both
+        # fresh saves and existing playbooks fold to man_normal/man_tight/man_loose.
+        {
+            "Base Man": "man_normal", "Deny Man": "man_tight", "Loose Man": "man_loose",
+            "Man": "man_normal", "Man Pressure": "man_tight", "Man Loose": "man_loose",
+            "man_pressure": "man_tight",
+        },
     )
     playbook_settings["pc_order"] = normalize_pc_order(
         playbook_settings.get("pc_order", {}),
