@@ -551,7 +551,7 @@
       var vrec = state.byId[String(yourVisit.recruit_id)];
       var leanNote = vrec && vrec.leansToUser ? 'now leaning you at <b>#' + (vrec.yourRank || 1) + '</b>. Odds up sharply.' : 'visit logged this week.';
       heroVisit = '<div class="wvisit"><span class="wvisit-mark gain">' + ARROW_UP + '</span><div class="wvisit-body">' +
-        '<div class="nm">' + Common.escapeHtml(yourVisit.name) + '<span class="wmeta"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.escapeHtml(yourVisit.rt) + ' RT</span></div>' +
+        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.escapeHtml(yourVisit.rt) + ' RT</span></div>' +
         '<div class="sub">Visit landed — ' + leanNote + '</div></div></div>';
     } else {
       heroVisit = '<div class="wvisit"><div class="wvisit-body"><div class="nm">No visit this week</div><div class="sub">Your program didn\'t land a visit in Week ' + state.week + '.</div></div></div>';
@@ -575,12 +575,11 @@
       }).join('');
       return '<div class="wregion-row"><span class="wregion-tag">' + rg + '</span><div class="wregion-visits">' + visits + '</div></div>';
     }).join('');
-    if (!regionHtml) regionHtml = '<div class="wregion-row"><div class="wregion-visits"><div class="wvrow"><span class="note">No contested visits among your leaners this week — clear lanes.</span></div></div></div>';
+    if (!regionHtml) regionHtml = '<div class="wregion-empty"><span class="note">No contested visits among your leaners this week — clear lanes.</span></div>';
 
     return '<div class="wpanel"><div class="wpanel-head"><span class="wpanel-badge">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h13l-2 4 2 4H4"></path></svg></span>' +
-        '<div class="wpanel-title"><small>Week ' + state.week + ' · Visits processed</small>This Week\'s Results</div>' +
-        '<button class="wpanel-dismiss" id="weekly-dismiss">Back to hub</button></div>' +
+        '<div class="wpanel-title"><small>Week ' + state.week + ' · Visits processed</small>This Week\'s Results</div></div>' +
       '<div class="wpanel-hero"><div class="whero"><div class="whero-lbl">Your visit</div>' + heroVisit + '</div>' +
         '<div class="whero"><div class="whero-lbl">What it changed</div><div class="wvisit"><span class="wvisit-mark gain">' + DOT_SVG + '</span>' +
           '<div class="wvisit-body"><div class="nm">' + state.newLeanIds.size + ' new lean' + (state.newLeanIds.size === 1 ? '' : 's') + ' this week</div>' +
@@ -627,7 +626,7 @@
     mount.innerHTML = Spine.Anchor.html();
     Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
       poolSelector: signing ? '.spool' : results ? '.signings-wrap' : '.pool-wrap',
-      onDismiss: (!signing && !results) ? function () { if (showWeeklyPanel()) dismissWeekly(); } : null
+      onDismiss: null   // weekly-results panel is persistent now; the anchor only scrolls to the pool
     });
     if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); bindSignBoard(); }
     else if (results) { document.getElementById('hub-signings').innerHTML = finalSigningsHtml(); bindSignings(); }

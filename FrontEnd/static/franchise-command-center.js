@@ -3518,6 +3518,19 @@ function buildFccBoxScoreUrlForMoment(moment) {
   return `/box-score.html?${params.toString()}`;
 }
 
+function flashSeasonAdvanceScreen() {
+  const existing = document.querySelector('.fcc-season-advance-flash');
+  if (existing) existing.remove();
+  const flash = document.createElement('div');
+  flash.className = 'fcc-season-advance-flash';
+  flash.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(flash);
+  const cleanup = () => flash.remove();
+  flash.addEventListener('animationend', cleanup, { once: true });
+  // Fallback if animationend is skipped (e.g. tab backgrounded).
+  window.setTimeout(cleanup, 500);
+}
+
 function showNewSeasonConfirmModal() {
   const overlay = document.createElement('div');
   overlay.className = 'gob-modal-overlay fcc-new-season-modal is-visible';
@@ -3921,6 +3934,9 @@ playNowBtn.addEventListener('click', async () => {
       closeModal();
     });
     modal.querySelector('#fcc-new-season-proceed')?.addEventListener('click', async () => {
+      // Same confirm SFX as the FCC green advance button + a brief full-screen flash.
+      playSound('confirm-1-lowervol.wav');
+      flashSeasonAdvanceScreen();
       const originalText = playNowBtn.textContent;
       playNowBtn.disabled = true;
       playNowBtn.textContent = 'Starting...';

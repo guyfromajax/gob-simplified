@@ -1835,6 +1835,35 @@ body.has-auth-bar #franchise-container {
   color: #15181f;
 }
 
+/* Brief full-viewport flash when confirming "Start Next Season". */
+.fcc-season-advance-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0;
+  animation: fcc-season-advance-flash 320ms ease-out both;
+}
+
+@keyframes fcc-season-advance-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fcc-season-advance-flash {
+    animation-duration: 120ms;
+  }
+
+  @keyframes fcc-season-advance-flash {
+    0% { opacity: 0; }
+    40% { opacity: 0.45; }
+    100% { opacity: 0; }
+  }
+}
+
 .fcc-cut-required-modal #fcc-cut-required-close.gob-modal-btn-dismiss {
   width: 100%;
 }

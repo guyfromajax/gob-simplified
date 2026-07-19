@@ -576,6 +576,84 @@ def _player_y(p: Any, default: float = 25.0) -> float:
     return default
 
 
+# Same spatial gate as the RR/Triangle lane-pass steal / bat-OOB resolve path:
+# within 8 grid of the BH→RR segment AND at-or-past RR on x (attacking direction).
+RR_LANE_PASS_THREAT_DIST = 8.0
+
+
+def _perp_dist_to_segment(
+    px: float, py: float, ax: float, ay: float, bx: float, by: float
+) -> float:
+    """Perpendicular distance from point to segment A→B (clamped to endpoints)."""
+    dx = bx - ax
+    dy = by - ay
+    len_sq = dx * dx + dy * dy
+    if len_sq < 1e-9:
+        return ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / len_sq))
+    proj_x = ax + t * dx
+    proj_y = ay + t * dy
+    return ((px - proj_x) ** 2 + (py - proj_y) ** 2) ** 0.5
+
+
+def _defender_threatens_rr_lane_pass(
+    *,
+    def_x: float,
+    def_y: float,
+    bh_x: float,
+    bh_y: float,
+    rr_x: float,
+    rr_y: float,
+    is_away_offense: bool,
+    lane_dist: float = RR_LANE_PASS_THREAT_DIST,
+) -> bool:
+    """True if this defender can attempt steal / bat OOB on the BH→RR lane pass."""
+    dist = _perp_dist_to_segment(def_x, def_y, bh_x, bh_y, rr_x, rr_y)
+    past_rr = (def_x >= rr_x) if not is_away_offense else (def_x <= rr_x)
+    return dist <= lane_dist and past_rr
+
+
+def _count_rr_lane_pass_threats(
+    ball_handler: Any,
+    rim_runner: Any,
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+) -> int:
+    """How many defenders threaten the BH→RR lane pass (same gate as steal/bat)."""
+    if not ball_handler or not rim_runner:
+        return 0
+    bh_x = _player_x(ball_handler)
+    bh_y = _player_y(ball_handler)
+    rr_x = _player_x(rim_runner)
+    rr_y = _player_y(rim_runner)
+    count = 0
+    for defender in (def_lineup or {}).values():
+        if not defender:
+            continue
+        if _defender_threatens_rr_lane_pass(
+            def_x=_player_x(defender),
+            def_y=_player_y(defender),
+            bh_x=bh_x,
+            bh_y=bh_y,
+            rr_x=rr_x,
+            rr_y=rr_y,
+            is_away_offense=is_away_offense,
+        ):
+            count += 1
+    return count
+
+
+def _fb_open_from_lane_threats(threat_count: int, *, offense_aggression_call: str) -> bool:
+    """Objective open-lane answer for the post-outlet pass vs hold read.
+
+    Hold is correct when threat_count > 1 (or > 0 when offense aggression_call
+    is passive). ``fb_open`` is True when the correct read is to pass.
+    """
+    if offense_aggression_call == "passive":
+        return threat_count <= 0
+    return threat_count <= 1
+
+
 def _y_toward_rr_clamped(py: float, rr_y: float, max_step: int = 6) -> float:
     """Move y up to ``max_step`` toward rim runner y without crossing past ``rr_y``."""
     dy = float(rr_y) - float(py)
@@ -1010,50 +1088,35 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     rr_to = bp.get("rr_to")
     recv_to = bp.get("receiver_to")
 
-    # --- Burst ---
+    # --- Post-outlet lane-pass read (RR + Triangle share Stages B–E) ---
     getback_ids = (most_recent or {}).get("offense_getback") or []
-    primary_def, in_getback = _primary_burst_defender(
+    primary_def, _in_getback = _primary_burst_defender(
         def_lineup, list(getback_ids), is_away_offense, rr
     )
 
-    # Stage B — burst scores. Both sides now include their team-level FB
-    # attribute (offense: fb_efficiency; defense: fb_opp_modifier). Pattern
-    # matches the CR DEFENSIVE_STOP skill-check formula (sum × die).
-    # In-getback IQ weight lowered from 1.0 → 0.6 (per RR spec update).
-    rr_attrs = getattr(rr, "attributes", {}) if rr else {}
-    burst_offense_score = (
-        rr_attrs.get("AG", 0) * 0.7
-        + rr_attrs.get("IQ", 0) * 0.3
-        + fb_eff
-    ) * random.randint(1, 6)
+    # Stage B/C — objective open lane is a geo count of defenders who could
+    # steal / bat the BH→RR lane pass (same gate as the resolve path below).
+    # Correct read: hold if threats > 1; pass otherwise. Passive offense
+    # (aggression_call) holds if threats > 0.
+    lane_threat_count = _count_rr_lane_pass_threats(
+        ball_handler, rr, def_lineup, is_away_offense
+    )
+    offense_aggression_call = (
+        getattr(off_team, "strategy_calls", None) or {}
+    ).get("aggression_call", "normal")
+    fb_open = _fb_open_from_lane_threats(
+        lane_threat_count, offense_aggression_call=str(offense_aggression_call or "normal")
+    )
+    fb_roles["rim_runner_lane_threat_count"] = lane_threat_count
 
-    if primary_def:
-        da = primary_def.attributes
-        if in_getback:
-            burst_def_base = da.get("IQ", 0) * 0.6 + da.get("AG", 0) * 0.5
-        else:
-            burst_def_base = da.get("IQ", 0) * 0.5 + da.get("AG", 0) * 0.5
-        burst_defense_score = (burst_def_base + fb_opp) * random.randint(1, 6)
-    else:
-        burst_defense_score = 0.0
-
-    # Stage C — fb_open decision. Triangle gets a stricter offense
-    # multiplier than RR (loosened 0.6 → 0.8 per RR spec update — still
-    # stricter than RR's plain comparison).
-    if fb_play_key == TRIANGLE:
-        fb_open = (burst_offense_score * 0.8) > burst_defense_score
-    else:
-        fb_open = burst_offense_score > burst_defense_score
-
-    # Stage D — PG read. read_score now adds offense team fb_efficiency
-    # (per RR spec update). read_threshold still uses the same fb_eff
-    # adjustment as before (200 − 5×fb_eff), so fb_eff now influences
-    # both sides of the comparison.
+    # Stage D — PG read. read_score adds offense team fb_efficiency.
+    # read_threshold uses 200 − 5×fb_eff (fb_eff influences both sides).
     bh_attrs = getattr(ball_handler, "attributes", {})
     read_score = (bh_attrs.get("IQ", 0) + fb_eff) * random.randint(1, 6)
     read_threshold = 200 - (5 * fb_eff)
     correct_read = read_score > read_threshold
 
+    # Stage E — pass_attempted. Misread bias still uses strategy_settings.aggression.
     aggression = int((off_team.strategy_settings or {}).get("aggression", 2) or 2)
     is_aggressive = aggression >= 3
 
@@ -1349,37 +1412,17 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         apply_fast_break_cg_time(turn_result, shot_attempted=True)
         return turn_result
 
-    # Positional gate: defender must be (a) within 8 grid Euclidean of the
-    # pass lane (BH → RR line segment) AND (b) at-or-past RR's x in the
-    # attacking direction. If either fails, no intercept attempt — fall
-    # through to completion (shot). Prevents far-away defenders from
-    # "stealing" the lane pass on attribute roll alone.
-    _bh_x = _player_x(ball_handler)
-    _bh_y = _player_y(ball_handler)
-    _rr_x = _player_x(rr)
-    _rr_y = _player_y(rr)
-    _def_x = _player_x(primary_def)
-    _def_y = _player_y(primary_def)
-
-    _dx_lane = _rr_x - _bh_x
-    _dy_lane = _rr_y - _bh_y
-    _lane_len_sq = _dx_lane * _dx_lane + _dy_lane * _dy_lane
-    if _lane_len_sq < 1e-9:
-        _lane_dist = ((_def_x - _bh_x) ** 2 + (_def_y - _bh_y) ** 2) ** 0.5
-    else:
-        _t = max(
-            0.0,
-            min(
-                1.0,
-                ((_def_x - _bh_x) * _dx_lane + (_def_y - _bh_y) * _dy_lane) / _lane_len_sq,
-            ),
-        )
-        _proj_x = _bh_x + _t * _dx_lane
-        _proj_y = _bh_y + _t * _dy_lane
-        _lane_dist = ((_def_x - _proj_x) ** 2 + (_def_y - _proj_y) ** 2) ** 0.5
-
-    _past_rr = (_def_x >= _rr_x) if not is_away_offense else (_def_x <= _rr_x)
-    _can_intercept = _lane_dist <= 8.0 and _past_rr
+    # Positional gate: same helper as the Stage B/C threat count — primary
+    # defender must threaten the BH→RR lane or we fall through to completion.
+    _can_intercept = _defender_threatens_rr_lane_pass(
+        def_x=_player_x(primary_def),
+        def_y=_player_y(primary_def),
+        bh_x=_player_x(ball_handler),
+        bh_y=_player_y(ball_handler),
+        rr_x=_player_x(rr),
+        rr_y=_player_y(rr),
+        is_away_offense=is_away_offense,
+    )
 
     da = primary_def.attributes
     intercept_score = (

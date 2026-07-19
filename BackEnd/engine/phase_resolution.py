@@ -7515,7 +7515,17 @@ def resolve_half_court_offense_logic(game):
         
         if ball_handler:
             ball_handler_pos = get_player_position(off_lineup, ball_handler)
-            
+
+            # bug #5 FIX: this block recomputes the DEFENDER from the true stop-step ball handler, but
+            # historically left roles["ball_handler"] as the stale assign_roles handler (the shooter /
+            # original passer). On a reversal turnover (ball passed BH→receiver, then the receiver is
+            # trapped) that stale handler is the PASSER — so resolve_turnover_logic set victim_id to the
+            # passer and the dead-ball fumble jitter rendered on the passer's sprite (ball snapped back
+            # after correctly reaching the receiver). Sync the role to the actual stop-step handler so
+            # the victim + fumble target match the backend's chosen ball handler (the receiver).
+            roles["ball_handler"] = ball_handler
+            roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
+
             from BackEnd.utils.defense_utils import is_zone_defense
             is_zone = is_zone_defense(def_call)
             if is_zone:

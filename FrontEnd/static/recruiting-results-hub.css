@@ -32,6 +32,8 @@
 
 /* region activity */
 .wregion{padding:6px 8px 12px}
+.wregion-empty{padding:10px 14px}
+.wregion-empty .note{font-size:12px;color:var(--muted-2);font-style:italic}
 .wregion-row{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start;padding:10px 12px;border-radius:10px}
 .wregion-row+.wregion-row{border-top:1px solid var(--hair)}
 .wregion-tag{display:inline-flex;align-items:center;gap:7px;font:400 16px/1 var(--display);color:var(--lblue);letter-spacing:.03em}

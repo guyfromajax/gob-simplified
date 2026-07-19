@@ -121,7 +121,7 @@ Use **`phase`** strings below in snapshot checkpoints. Prefer the **code anchor*
 | `fb_rr_outlet_contest` | After outlet offense/defense scores; before `if not outlet_ok` | Outlet pass vs pressure decided (`outlet_ok`). |
 | `fb_rr_outlet_denied` | Branch: `outlet_ok` false → `DEFENSIVE_STOP`, `rim_runner_outlet_failed` | Early exit; no burst/PG read. |
 | `fb_rr_post_outlet_coords` | After `rr.coords` / `ball_handler.coords` updated from `rr_to` / `receiver_to` | Positions synced for burst step. |
-| `fb_rr_burst_vs_primary` | After `fb_open = burst_offense_score > burst_defense_score` vs `primary_def` | Rim runner “lane open” vs primary defender. |
+| `fb_rr_lane_threat_geo` | After `lane_threat_count` / `fb_open` from BH→RR steal/bat positional gate | Objective open-lane geo for pass vs hold read. |
 | `fb_rr_pg_read` | After `correct_read`, `pass_attempted` (aggression branches) | Ball handler read on whether to pass to rim runner. |
 | `fb_rr_hold_up_stop` | Branch: `not pass_attempted` → `DEFENSIVE_STOP` (“holding up”) | No pass to finisher. |
 | `fb_rr_pre_shot` | Before `capture_fast_break_animation` + `resolve_shot` for RR shot outcomes (open pass, no primary, intercept tiers completion, etc.) | Includes `_bh_final_x` / `y` when set for shot spot. |

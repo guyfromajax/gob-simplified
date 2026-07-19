@@ -274,28 +274,27 @@ Bat-OOB branch: RR tweens to `rr_to.x + 4` toward basket; batting defender sprin
 
 ### RR Hold-Up vs Lane Pass decision logic (Step 2)
 
-Backend stages (in `resolve_rim_runner_fast_break`) that decide whether the BH attempts the lane pass to RR or holds up:
+Backend stages (in `resolve_rim_runner_fast_break`) that decide whether the BH attempts the lane pass to RR or holds up. **Rim Runner and Triangle share the same Stages B–E** (Triangle no longer uses a stricter burst multiplier).
 
-**Stage B — Burst scores** (sum × die per side; separate die per side; team-level FB attributes baked in)
-- `burst_offense_score = (rr.AG × 0.7 + rr.IQ × 0.3 + offense.fb_efficiency) × random.randint(1, 6)`
-- Defense base depends on whether primary defender is in the get-back pool:
-  - **In get-back**: `burst_def_base = primary.IQ × 0.6 + primary.AG × 0.5`
-  - **NOT in get-back**: `burst_def_base = primary.IQ × 0.5 + primary.AG × 0.5`
-- `burst_defense_score = (burst_def_base + defense.fb_opp_modifier) × random.randint(1, 6)`
-- If no primary defender: `burst_defense_score = 0.0`
+**Stage B — Lane-threat geo count** (objective threats who can steal / bat the BH→RR pass)
+- For each defender in the defensive lineup, apply the **same positional gate** as the lane-pass steal/bat resolve path:
+  - perpendicular distance to the BH→RR line segment ≤ **8** grid, **and**
+  - defender x is at-or-past RR’s x in the attacking direction (HOME: `def_x ≥ rr_x`; AWAY: `def_x ≤ rr_x`)
+- `lane_threat_count` = number of defenders who pass that gate (stored on roles as `rim_runner_lane_threat_count`)
+- Uses live `player.coords` for BH, RR, and defenders at resolve time (same inputs as the steal/bat gate)
 
-**Stage C — `fb_open` decision** (objective: is the lane open?)
-- Rim Runner: `fb_open = burst_offense_score > burst_defense_score`
-- Triangle: `fb_open = (burst_offense_score × 0.8) > burst_defense_score` (stricter than RR but looser than the prior 0.6× spec)
+**Stage C — `fb_open` decision** (objective: is the correct read to pass?)
+- Default: `fb_open = lane_threat_count ≤ 1` (hold is correct when threats **> 1**)
+- If offense `strategy_calls.aggression_call == "passive"`: `fb_open = lane_threat_count ≤ 0` (hold is correct when threats **> 0**)
 
 **Stage D — PG read** (BH's subjective assessment)
 - `read_score = (ball_handler.IQ + offense.fb_efficiency) × random.randint(1, 6)`
 - `read_threshold = 200 − (5 × offense.fb_efficiency)` — higher fb_efficiency lowers the threshold
 - `correct_read = read_score > read_threshold`
-- Note: fb_efficiency now influences BOTH sides of the comparison (additive on score, subtractive on threshold).
+- Note: fb_efficiency influences BOTH sides of the comparison (additive on score, subtractive on threshold).
 
 **Stage E — `pass_attempted` decision**
-- Reads `aggression = off_team.strategy_settings["aggression"]` (integer 0-4 — raw slider, NOT the rolled `aggression_call`)
+- Reads `aggression = off_team.strategy_settings["aggression"]` (integer 0-4 — raw slider, NOT the rolled `aggression_call` used in Stage C)
 - `is_aggressive = aggression >= 3`
 
 | BH read | Aggression | `pass_attempted` |
@@ -330,7 +329,7 @@ Backend stages (in `resolve_rim_runner_fast_break`) that decide whether the BH a
 
 Steps 0-1: Burst + outlet pass (shared with Rim Runner; outlet-denied reuses RR's denied path)
 
-Step 2: RR read gate (stricter threshold: `fb_open = (burst_offense_score × 0.8) > burst_defense_score`)
+Step 2: RR read gate (shared geo `fb_open` with Rim Runner — Stages B–E in `resolve_rim_runner_fast_break`)
 
 | Outcome | Emitter path | Steps (summary) |
 |---|---|---|

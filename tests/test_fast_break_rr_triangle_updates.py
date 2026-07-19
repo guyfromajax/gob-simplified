@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 
 from BackEnd.engine.rim_runner_fast_break import (
+    _count_rr_lane_pass_threats,
+    _defender_threatens_rr_lane_pass,
+    _fb_open_from_lane_threats,
     _resolve_rr_burst_destination,
     _resolve_triangle_setup_payload,
 )
@@ -713,3 +716,49 @@ def test_parallel_move_step_arrival_gate_lands_receiver_on_spot():
     assert gated["end"]["time_elapsed"] > baseline["end"]["time_elapsed"]
     # The gate player still reaches his (shorter) target regardless.
     assert gated["end"]["coords"]["bh"] == {"x": 50.0, "y": 25.0}
+
+
+def test_defender_threatens_rr_lane_pass_matches_steal_bat_gate():
+    """HOME: in lane + at/past RR on x → threat; behind RR or far from lane → not."""
+    # BH (50,25) → RR (80,25); defender on the line past RR.
+    assert _defender_threatens_rr_lane_pass(
+        def_x=85.0, def_y=25.0, bh_x=50.0, bh_y=25.0, rr_x=80.0, rr_y=25.0,
+        is_away_offense=False,
+    )
+    # On the line but still behind RR (toward passer) → not a threat.
+    assert not _defender_threatens_rr_lane_pass(
+        def_x=60.0, def_y=25.0, bh_x=50.0, bh_y=25.0, rr_x=80.0, rr_y=25.0,
+        is_away_offense=False,
+    )
+    # Past RR on x but far off the lane (>8) → not a threat.
+    assert not _defender_threatens_rr_lane_pass(
+        def_x=85.0, def_y=40.0, bh_x=50.0, bh_y=25.0, rr_x=80.0, rr_y=25.0,
+        is_away_offense=False,
+    )
+    # AWAY: past RR means smaller x.
+    assert _defender_threatens_rr_lane_pass(
+        def_x=15.0, def_y=25.0, bh_x=50.0, bh_y=25.0, rr_x=20.0, rr_y=25.0,
+        is_away_offense=True,
+    )
+
+
+def test_count_rr_lane_pass_threats_counts_all_matching_defenders():
+    bh = _player("bh", 50, 25)
+    rr = _player("rr", 80, 25)
+    def_lineup = {
+        "PG": _player("d1", 85, 25),   # threat
+        "SG": _player("d2", 82, 27),   # threat (near lane, past RR)
+        "SF": _player("d3", 60, 25),   # behind RR — not
+        "PF": _player("d4", 85, 40),   # past RR but far — not
+        "C": None,
+    }
+    assert _count_rr_lane_pass_threats(bh, rr, def_lineup, is_away_offense=False) == 2
+
+
+def test_fb_open_from_lane_threats_passive_threshold():
+    assert _fb_open_from_lane_threats(0, offense_aggression_call="normal") is True
+    assert _fb_open_from_lane_threats(1, offense_aggression_call="normal") is True
+    assert _fb_open_from_lane_threats(2, offense_aggression_call="normal") is False
+    assert _fb_open_from_lane_threats(0, offense_aggression_call="passive") is True
+    assert _fb_open_from_lane_threats(1, offense_aggression_call="passive") is False
+    assert _fb_open_from_lane_threats(2, offense_aggression_call="passive") is False
