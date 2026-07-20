@@ -1,0 +1,1044 @@
+{
+  "generated_at": "2026-07-20T17:39:45",
+  "git_commit": "b3ae6ad3254c87bfdc734a8ec0e1984f98a02598",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "both",
+  "workers": 1,
+  "seed": null,
+  "probes_installed": 56,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 62,
+        "total_wall_s": 246.025,
+        "sum_game_s": 242.616,
+        "min_s": 3.2926,
+        "median_s": 3.909,
+        "mean_s": 3.913,
+        "p90_s": 4.303,
+        "max_s": 4.7548
+      },
+      "phases": {
+        "anim.position_defenders": {
+          "self_s": 76.53230106871342,
+          "incl_s": 76.53230106871342,
+          "calls": 16770
+        },
+        "db.read.plays._refresh": {
+          "self_s": 62.90132487111259,
+          "incl_s": 62.90132487111259,
+          "calls": 1605
+        },
+        "core.micro_turn": {
+          "self_s": 31.571869296836667,
+          "incl_s": 183.694172045507,
+          "calls": 12250
+        },
+        "core.hco": {
+          "self_s": 17.379123542807065,
+          "incl_s": 101.3214637991623,
+          "calls": 7997
+        },
+        "db.read.teams._refresh": {
+          "self_s": 11.197158674767707,
+          "incl_s": 11.197158674767707,
+          "calls": 376
+        },
+        "db.read.franchise_team_data._refresh": {
+          "self_s": 9.83729113067966,
+          "incl_s": 9.83729113067966,
+          "calls": 376
+        },
+        "db.read.franchise_players_data._refresh": {
+          "self_s": 5.270200839557219,
+          "incl_s": 5.270200839557219,
+          "calls": 252
+        },
+        "db.read.players._refresh": {
+          "self_s": 4.969545582891442,
+          "incl_s": 4.969545582891442,
+          "calls": 252
+        },
+        "emit.animation_steps": {
+          "self_s": 4.9292616349994205,
+          "incl_s": 7.64937644964084,
+          "calls": 17436
+        },
+        "anim.compute_defender_grid": {
+          "self_s": 4.0894519810099155,
+          "incl_s": 82.01734327088343,
+          "calls": 16770
+        },
+        "db.read.franchises._refresh": {
+          "self_s": 3.909112209104933,
+          "incl_s": 3.909112209104933,
+          "calls": 62
+        },
+        "core.macro_turn": {
+          "self_s": 3.8680608416325413,
+          "incl_s": 191.73765195865417,
+          "calls": 12250
+        },
+        "core.shot_resolution": {
+          "self_s": 2.023012375109829,
+          "incl_s": 2.023012375109829,
+          "calls": 6587
+        },
+        "setup.lineup": {
+          "self_s": 1.7480440321960486,
+          "incl_s": 17.06913961202372,
+          "calls": 1273
+        },
+        "anim.build_all_animations": {
+          "self_s": 1.3955902211600915,
+          "incl_s": 77.92789128987351,
+          "calls": 16770
+        },
+        "setup.gm_init": {
+          "self_s": 0.9568337426753715,
+          "incl_s": 22.185427374148276,
+          "calls": 63
+        },
+        "core.append_turn": {
+          "self_s": 0.9245330333942547,
+          "incl_s": 0.9253975763567723,
+          "calls": 22456
+        },
+        "core.clock": {
+          "self_s": 0.6750860679894686,
+          "incl_s": 0.6750860679894686,
+          "calls": 15899
+        },
+        "core.oreb_turn": {
+          "self_s": 0.42583536443999037,
+          "incl_s": 0.6370504125370644,
+          "calls": 888
+        },
+        "setup.ftd_prepare": {
+          "self_s": 0.4135844196425751,
+          "incl_s": 0.43482354475418106,
+          "calls": 126
+        },
+        "core.final_turn_shot": {
+          "self_s": 0.20695915928808972,
+          "incl_s": 0.27464199787937105,
+          "calls": 250
+        },
+        "serialize.summary": {
+          "self_s": 0.11699849041178823,
+          "incl_s": 9.963127125112806,
+          "calls": 62
+        },
+        "core.free_throw": {
+          "self_s": 0.05042692867573351,
+          "incl_s": 0.05136022955412045,
+          "calls": 1138
+        },
+        "db.read.plays.find_one": {
+          "self_s": 0.022675161599181592,
+          "incl_s": 47.24826134945033,
+          "calls": 1345
+        },
+        "db.read.defenses._refresh": {
+          "self_s": 0.021198375092353672,
+          "incl_s": 0.021198375092353672,
+          "calls": 2
+        },
+        "setup.opening_tip": {
+          "self_s": 0.019314167904667556,
+          "incl_s": 0.019314167904667556,
+          "calls": 63
+        },
+        "db.read.teams.find_one": {
+          "self_s": 0.01608625933295116,
+          "incl_s": 11.221060125448275,
+          "calls": 376
+        },
+        "db.read.plays.find": {
+          "self_s": 0.015584686596412212,
+          "incl_s": 0.015584686596412212,
+          "calls": 1475
+        },
+        "db.read.franchise_team_data.find_one": {
+          "self_s": 0.01339529815595597,
+          "incl_s": 8.107905672630295,
+          "calls": 252
+        },
+        "anim.skeleton_to_animations": {
+          "self_s": 0.012518702424131334,
+          "incl_s": 0.012518702424131334,
+          "calls": 15815
+        },
+        "core.determine_next_turn": {
+          "self_s": 0.010942939203232527,
+          "incl_s": 0.010942939203232527,
+          "calls": 13137
+        },
+        "db.read.teams.find": {
+          "self_s": 0.007815191347617656,
+          "incl_s": 0.007815191347617656,
+          "calls": 376
+        },
+        "anim.capture_halfcourt": {
+          "self_s": 0.006824280717410147,
+          "incl_s": 0.006824280717410147,
+          "calls": 7452
+        },
+        "db.read.franchise_team_data.find": {
+          "self_s": 0.006685959408059716,
+          "incl_s": 0.006685959408059716,
+          "calls": 314
+        },
+        "db.read.franchise_players_data.find": {
+          "self_s": 0.005508120288141072,
+          "incl_s": 0.005508120288141072,
+          "calls": 126
+        },
+        "db.read.players.find": {
+          "self_s": 0.00492771330755204,
+          "incl_s": 0.00492771330755204,
+          "calls": 126
+        },
+        "db.read.franchises.find_one": {
+          "self_s": 0.0013381695607677102,
+          "incl_s": 3.9109618781949393,
+          "calls": 62
+        },
+        "anim.capture_free_throw": {
+          "self_s": 0.0009333008783869445,
+          "incl_s": 0.0009333008783869445,
+          "calls": 1138
+        },
+        "anim.capture_fast_break": {
+          "self_s": 0.000789036916103214,
+          "incl_s": 0.000789036916103214,
+          "calls": 700
+        },
+        "db.read.franchises.find": {
+          "self_s": 0.0005114995292387903,
+          "incl_s": 0.0005114995292387903,
+          "calls": 62
+        },
+        "db.read.defenses.find": {
+          "self_s": 4.075001925230026e-05,
+          "incl_s": 4.075001925230026e-05,
+          "calls": 1
+        }
+      },
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": null,
+          "wall_s": 4.7548,
+          "away_score": 98,
+          "home_score": 116
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": null,
+          "wall_s": 4.08,
+          "away_score": 87,
+          "home_score": 101
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Bentley-Truman @ Lancaster",
+          "seed": null,
+          "wall_s": 3.8999,
+          "away_score": 78,
+          "home_score": 69
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Morristown @ South Lancaster",
+          "seed": null,
+          "wall_s": 3.9184,
+          "away_score": 82,
+          "home_score": 89
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Casino Row @ IDA",
+          "seed": null,
+          "wall_s": 3.6068,
+          "away_score": 66,
+          "home_score": 88
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Chapel Hill @ Durham",
+          "seed": null,
+          "wall_s": 4.1559,
+          "away_score": 108,
+          "home_score": 97
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Nickel Beach @ Appalachia",
+          "seed": null,
+          "wall_s": 4.211,
+          "away_score": 106,
+          "home_score": 64
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cagers World @ Crickstown",
+          "seed": null,
+          "wall_s": 4.0837,
+          "away_score": 98,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Ivy Prep @ Concord",
+          "seed": null,
+          "wall_s": 3.8695,
+          "away_score": 80,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Providence @ Independence",
+          "seed": null,
+          "wall_s": 4.2498,
+          "away_score": 96,
+          "home_score": 48
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "D1 Institute @ Queen's Guard",
+          "seed": null,
+          "wall_s": 3.7117,
+          "away_score": 76,
+          "home_score": 78
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Garden Elites @ Montpeiler",
+          "seed": null,
+          "wall_s": 3.9726,
+          "away_score": 104,
+          "home_score": 80
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Long Island Methodist @ Falls Academy",
+          "seed": null,
+          "wall_s": 4.1946,
+          "away_score": 79,
+          "home_score": 103
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Upstate @ Toronto Limited",
+          "seed": null,
+          "wall_s": 4.2186,
+          "away_score": 69,
+          "home_score": 85
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Syracuse @ St Peters",
+          "seed": null,
+          "wall_s": 3.5373,
+          "away_score": 94,
+          "home_score": 93
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Amariabi International @ Empire City",
+          "seed": null,
+          "wall_s": 3.7255,
+          "away_score": 96,
+          "home_score": 93
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hardwood Fields @ Ann Arbor",
+          "seed": null,
+          "wall_s": 3.7018,
+          "away_score": 72,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "North Columbus @ Columbus",
+          "seed": null,
+          "wall_s": 3.9684,
+          "away_score": 88,
+          "home_score": 65
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Harding Central @ Mynsk",
+          "seed": null,
+          "wall_s": 3.9865,
+          "away_score": 91,
+          "home_score": 71
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Upper Peninsula @ Cleveland-Carlysle",
+          "seed": null,
+          "wall_s": 3.9919,
+          "away_score": 69,
+          "home_score": 79
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Templeton-Wesley @ Burroughs",
+          "seed": null,
+          "wall_s": 3.8537,
+          "away_score": 90,
+          "home_score": 71
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Sacred Heart @ Quigley Catholic",
+          "seed": null,
+          "wall_s": 4.1493,
+          "away_score": 67,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Wacker West @ Evanston",
+          "seed": null,
+          "wall_s": 3.6947,
+          "away_score": 69,
+          "home_score": 71
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Dillinger @ Archbishop McClellan",
+          "seed": null,
+          "wall_s": 4.2615,
+          "away_score": 75,
+          "home_score": 100
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Washington Carver @ Myrtle Private",
+          "seed": null,
+          "wall_s": 4.0393,
+          "away_score": 64,
+          "home_score": 89
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Biloxi @ Monroe-Hayes",
+          "seed": null,
+          "wall_s": 3.763,
+          "away_score": 74,
+          "home_score": 109
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Mobile @ Lexington",
+          "seed": null,
+          "wall_s": 3.6492,
+          "away_score": 72,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Knoxville @ Crimson County",
+          "seed": null,
+          "wall_s": 3.6192,
+          "away_score": 97,
+          "home_score": 115
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "DeLand @ Keys High",
+          "seed": null,
+          "wall_s": 4.4023,
+          "away_score": 92,
+          "home_score": 85
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Valdosta Valley @ Tallahassee",
+          "seed": null,
+          "wall_s": 3.7004,
+          "away_score": 95,
+          "home_score": 107
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Grayson Ranch @ Reardon-Mayes",
+          "seed": null,
+          "wall_s": 3.5306,
+          "away_score": 80,
+          "home_score": 101
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Gainesville @ Dade Academy",
+          "seed": null,
+          "wall_s": 4.3859,
+          "away_score": 101,
+          "home_score": 93
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Fielding @ Ozark Centre",
+          "seed": null,
+          "wall_s": 4.1536,
+          "away_score": 102,
+          "home_score": 76
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Tri-Cities Prep @ Iowa Academy",
+          "seed": null,
+          "wall_s": 3.4715,
+          "away_score": 63,
+          "home_score": 92
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Grupenberg @ Wash U Prep",
+          "seed": null,
+          "wall_s": 3.6587,
+          "away_score": 63,
+          "home_score": 102
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hyde Methodist @ Lawrence",
+          "seed": null,
+          "wall_s": 3.7541,
+          "away_score": 67,
+          "home_score": 96
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Crofton @ Rodeo Circuit",
+          "seed": null,
+          "wall_s": 4.3032,
+          "away_score": 123,
+          "home_score": 79
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Minot @ Mt Simmons",
+          "seed": null,
+          "wall_s": 4.4962,
+          "away_score": 90,
+          "home_score": 95
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Lewis Catholic @ Tower Academy",
+          "seed": null,
+          "wall_s": 3.9807,
+          "away_score": 67,
+          "home_score": 80
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "HA Rushmore @ Two Rivers",
+          "seed": null,
+          "wall_s": 4.1675,
+          "away_score": 102,
+          "home_score": 70
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Amarillo Tech @ Stormwood",
+          "seed": null,
+          "wall_s": 4.3415,
+          "away_score": 95,
+          "home_score": 77
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Norman @ Kenton",
+          "seed": null,
+          "wall_s": 3.9921,
+          "away_score": 98,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Ada @ River's Edge",
+          "seed": null,
+          "wall_s": 3.8949,
+          "away_score": 96,
+          "home_score": 119
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Pan Handle Limited @ Reyes-Santiago",
+          "seed": null,
+          "wall_s": 4.5181,
+          "away_score": 91,
+          "home_score": 78
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Abilene @ MiddleTEX",
+          "seed": null,
+          "wall_s": 4.0699,
+          "away_score": 48,
+          "home_score": 82
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Austin West @ Bayou District",
+          "seed": null,
+          "wall_s": 4.0197,
+          "away_score": 92,
+          "home_score": 99
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "GP Prep School @ Austin",
+          "seed": null,
+          "wall_s": 3.6211,
+          "away_score": 68,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Chambless Global @ Houston Jesuit",
+          "seed": null,
+          "wall_s": 3.9195,
+          "away_score": 85,
+          "home_score": 95
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Border Academy @ Southwest Miner",
+          "seed": null,
+          "wall_s": 4.0511,
+          "away_score": 75,
+          "home_score": 81
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Pike's Prep @ Tucson",
+          "seed": null,
+          "wall_s": 3.4464,
+          "away_score": 74,
+          "home_score": 78
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Barton Lutheran @ East Rockies",
+          "seed": null,
+          "wall_s": 3.6342,
+          "away_score": 80,
+          "home_score": 108
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Desert Regional @ Circus Circus",
+          "seed": null,
+          "wall_s": 3.6322,
+          "away_score": 85,
+          "home_score": 101
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Seattle AAA @ Swoosh",
+          "seed": null,
+          "wall_s": 3.2926,
+          "away_score": 68,
+          "home_score": 89
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Rainier Central @ Vancouver",
+          "seed": null,
+          "wall_s": 3.7251,
+          "away_score": 114,
+          "home_score": 92
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Couer d'Alene @ Salem",
+          "seed": null,
+          "wall_s": 4.0257,
+          "away_score": 100,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cardinal Conor @ Boise",
+          "seed": null,
+          "wall_s": 3.3213,
+          "away_score": 78,
+          "home_score": 71
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hollywood Prep @ Rancho Estrada",
+          "seed": null,
+          "wall_s": 3.7453,
+          "away_score": 90,
+          "home_score": 58
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "West Ocean City @ DeCatur Dei",
+          "seed": null,
+          "wall_s": 3.8378,
+          "away_score": 76,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "San Jose @ Huntington Canyon",
+          "seed": null,
+          "wall_s": 3.8687,
+          "away_score": 97,
+          "home_score": 84
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Berkley @ Valley High",
+          "seed": null,
+          "wall_s": 3.6533,
+          "away_score": 84,
+          "home_score": 74
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Mahala Alou @ Melbourne Americas",
+          "seed": null,
+          "wall_s": 3.4896,
+          "away_score": 65,
+          "home_score": 85
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Pacific All-Stars @ Cupertino",
+          "seed": null,
+          "wall_s": 3.6423,
+          "away_score": 84,
+          "home_score": 126
+        }
+      ],
+      "failures": [
+        {
+          "matchup": "Grizzly Academy @ Redwood High",
+          "err": "ValueError: empty range in randrange(1, 1)"
+        }
+      ],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\nanim.position_defenders                 76.53     31.1%      76.53      16,770\ndb.read.plays._refresh                  62.90     25.6%      62.90       1,605\ncore.micro_turn                         31.57     12.8%     183.69      12,250\ncore.hco                                17.38      7.1%     101.32       7,997\ndb.read.teams._refresh                  11.20      4.6%      11.20         376\ndb.read.franchise_team_data._refresh       9.84      4.0%       9.84         376\ndb.read.franchise_players_data._refresh       5.27      2.1%       5.27         252\ndb.read.players._refresh                 4.97      2.0%       4.97         252\nemit.animation_steps                     4.93      2.0%       7.65      17,436\nanim.compute_defender_grid               4.09      1.7%      82.02      16,770\ndb.read.franchises._refresh              3.91      1.6%       3.91          62\ncore.macro_turn                          3.87      1.6%     191.74      12,250\ncore.shot_resolution                     2.02      0.8%       2.02       6,587\nsetup.lineup                             1.75      0.7%      17.07       1,273\nanim.build_all_animations                1.40      0.6%      77.93      16,770\nsetup.gm_init                            0.96      0.4%      22.19          63\ncore.append_turn                         0.92      0.4%       0.93      22,456\ncore.clock                               0.68      0.3%       0.68      15,899\ncore.oreb_turn                           0.43      0.2%       0.64         888\nsetup.ftd_prepare                        0.41      0.2%       0.43         126\ncore.final_turn_shot                     0.21      0.1%       0.27         250\nserialize.summary                        0.12      0.0%       9.96          62\ncore.free_throw                          0.05      0.0%       0.05       1,138\ndb.read.plays.find_one                   0.02      0.0%      47.25       1,345\ndb.read.defenses._refresh                0.02      0.0%       0.02           2\nsetup.opening_tip                        0.02      0.0%       0.02          63\ndb.read.teams.find_one                   0.02      0.0%      11.22         376\ndb.read.plays.find                       0.02      0.0%       0.02       1,475\ndb.read.franchise_team_data.find_one       0.01      0.0%       8.11         252\nanim.skeleton_to_animations              0.01      0.0%       0.01      15,815\ncore.determine_next_turn                 0.01      0.0%       0.01      13,137\ndb.read.teams.find                       0.01      0.0%       0.01         376\nanim.capture_halfcourt                   0.01      0.0%       0.01       7,452\ndb.read.franchise_team_data.find         0.01      0.0%       0.01         314\ndb.read.franchise_players_data.find       0.01      0.0%       0.01         126\ndb.read.players.find                     0.00      0.0%       0.00         126\ndb.read.franchises.find_one              0.00      0.0%       3.91          62\nanim.capture_free_throw                  0.00      0.0%       0.00       1,138\nanim.capture_fast_break                  0.00      0.0%       0.00         700\ndb.read.franchises.find                  0.00      0.0%       0.00          62\ndb.read.defenses.find                    0.00      0.0%       0.00           1\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          0.47      0.2%\nTOTAL WALL                             246.02    100.0%"
+    },
+    "practice_squad": {
+      "workers": 1,
+      "timing": {
+        "games": 20,
+        "total_wall_s": 76.918,
+        "sum_game_s": 76.914,
+        "min_s": 3.5603,
+        "median_s": 3.768,
+        "mean_s": 3.846,
+        "p90_s": 4.309,
+        "max_s": 4.3333
+      },
+      "phases": {
+        "anim.position_defenders": {
+          "self_s": 30.429804917424917,
+          "incl_s": 30.429804917424917,
+          "calls": 5499
+        },
+        "db.read.plays._refresh": {
+          "self_s": 25.80263576062862,
+          "incl_s": 25.80263576062862,
+          "calls": 919
+        },
+        "core.micro_turn": {
+          "self_s": 9.86598574265372,
+          "incl_s": 74.14589399896795,
+          "calls": 4114
+        },
+        "core.hco": {
+          "self_s": 4.857098255830351,
+          "incl_s": 37.55155213619582,
+          "calls": 2507
+        },
+        "emit.animation_steps": {
+          "self_s": 1.3837530391756445,
+          "incl_s": 2.0639075249200687,
+          "calls": 6412
+        },
+        "anim.compute_defender_grid": {
+          "self_s": 1.2702985494979657,
+          "incl_s": 32.051589949580375,
+          "calls": 5499
+        },
+        "core.macro_turn": {
+          "self_s": 1.0070666145766154,
+          "incl_s": 76.55277374078287,
+          "calls": 4114
+        },
+        "core.shot_resolution": {
+          "self_s": 0.6758479292038828,
+          "incl_s": 0.6758479292038828,
+          "calls": 2416
+        },
+        "core.append_turn": {
+          "self_s": 0.35886194405611604,
+          "incl_s": 0.35886194405611604,
+          "calls": 7583
+        },
+        "anim.build_all_animations": {
+          "self_s": 0.35148648265749216,
+          "incl_s": 30.78129140008241,
+          "calls": 5499
+        },
+        "core.clock": {
+          "self_s": 0.3023777980124578,
+          "incl_s": 0.3023777980124578,
+          "calls": 6105
+        },
+        "core.oreb_turn": {
+          "self_s": 0.20133067126153037,
+          "incl_s": 0.2967162799905054,
+          "calls": 532
+        },
+        "core.free_throw": {
+          "self_s": 0.1204987212549895,
+          "incl_s": 0.1211116224876605,
+          "calls": 784
+        },
+        "core.final_turn_shot": {
+          "self_s": 0.06735595653299242,
+          "incl_s": 0.09062887693289667,
+          "calls": 87
+        },
+        "setup.gm_init": {
+          "self_s": 0.036832999903708696,
+          "incl_s": 0.21356545796152204,
+          "calls": 20
+        },
+        "setup.lineup": {
+          "self_s": 0.016728950664401054,
+          "incl_s": 0.016728950664401054,
+          "calls": 399
+        },
+        "serialize.summary": {
+          "self_s": 0.013125917932484299,
+          "incl_s": 0.013125917932484299,
+          "calls": 20
+        },
+        "db.read.plays.find_one": {
+          "self_s": 0.01009060104843229,
+          "incl_s": 25.64184115489479,
+          "calls": 917
+        },
+        "db.read.plays.find": {
+          "self_s": 0.005847251275554299,
+          "incl_s": 0.005847251275554299,
+          "calls": 918
+        },
+        "anim.skeleton_to_animations": {
+          "self_s": 0.003981238754931837,
+          "incl_s": 0.003981238754931837,
+          "calls": 5242
+        },
+        "core.determine_next_turn": {
+          "self_s": 0.0038306122296489775,
+          "incl_s": 0.0038306122296489775,
+          "calls": 4646
+        },
+        "anim.capture_halfcourt": {
+          "self_s": 0.002244345669168979,
+          "incl_s": 0.002244345669168979,
+          "calls": 2487
+        },
+        "setup.opening_tip": {
+          "self_s": 0.0011332510621286929,
+          "incl_s": 0.0011332510621286929,
+          "calls": 20
+        },
+        "anim.capture_free_throw": {
+          "self_s": 0.0006129012326709926,
+          "incl_s": 0.0006129012326709926,
+          "calls": 784
+        },
+        "anim.capture_fast_break": {
+          "self_s": 0.0002493760548532009,
+          "incl_s": 0.0002493760548532009,
+          "calls": 222
+        }
+      },
+      "per_game": [
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G All-Americans @ Region A All-Americans",
+          "seed": null,
+          "wall_s": 4.3333,
+          "away_score": 78,
+          "home_score": 87
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F All-Americans @ Region H All-Americans",
+          "seed": null,
+          "wall_s": 3.6999,
+          "away_score": 67,
+          "home_score": 83
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E All-Americans @ Region B All-Americans",
+          "seed": null,
+          "wall_s": 3.5603,
+          "away_score": 91,
+          "home_score": 72
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D All-Americans @ Region C All-Americans",
+          "seed": null,
+          "wall_s": 3.9139,
+          "away_score": 53,
+          "home_score": 64
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G All-Stars @ Region A All-Stars",
+          "seed": null,
+          "wall_s": 3.5985,
+          "away_score": 79,
+          "home_score": 50
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F All-Stars @ Region H All-Stars",
+          "seed": null,
+          "wall_s": 4.1139,
+          "away_score": 86,
+          "home_score": 88
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E All-Stars @ Region B All-Stars",
+          "seed": null,
+          "wall_s": 3.6019,
+          "away_score": 44,
+          "home_score": 58
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D All-Stars @ Region C All-Stars",
+          "seed": null,
+          "wall_s": 3.8077,
+          "away_score": 55,
+          "home_score": 66
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G Varsity @ Region A Varsity",
+          "seed": null,
+          "wall_s": 3.7302,
+          "away_score": 60,
+          "home_score": 53
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F Varsity @ Region H Varsity",
+          "seed": null,
+          "wall_s": 3.8323,
+          "away_score": 50,
+          "home_score": 49
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E Varsity @ Region B Varsity",
+          "seed": null,
+          "wall_s": 4.0291,
+          "away_score": 82,
+          "home_score": 72
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D Varsity @ Region C Varsity",
+          "seed": null,
+          "wall_s": 4.0311,
+          "away_score": 73,
+          "home_score": 54
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G JV @ Region A JV",
+          "seed": null,
+          "wall_s": 3.7164,
+          "away_score": 54,
+          "home_score": 40
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F JV @ Region H JV",
+          "seed": null,
+          "wall_s": 3.7047,
+          "away_score": 48,
+          "home_score": 37
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E JV @ Region B JV",
+          "seed": null,
+          "wall_s": 3.8062,
+          "away_score": 48,
+          "home_score": 49
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D JV @ Region C JV",
+          "seed": null,
+          "wall_s": 4.0116,
+          "away_score": 49,
+          "home_score": 42
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G Squad @ Region A Squad",
+          "seed": null,
+          "wall_s": 3.7053,
+          "away_score": 55,
+          "home_score": 44
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F Squad @ Region H Squad",
+          "seed": null,
+          "wall_s": 3.7032,
+          "away_score": 48,
+          "home_score": 52
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E Squad @ Region B Squad",
+          "seed": null,
+          "wall_s": 3.7049,
+          "away_score": 52,
+          "home_score": 32
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D Squad @ Region C Squad",
+          "seed": null,
+          "wall_s": 4.3093,
+          "away_score": 42,
+          "home_score": 43
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\nanim.position_defenders                 30.43     39.6%      30.43       5,499\ndb.read.plays._refresh                  25.80     33.5%      25.80         919\ncore.micro_turn                          9.87     12.8%      74.15       4,114\ncore.hco                                 4.86      6.3%      37.55       2,507\nemit.animation_steps                     1.38      1.8%       2.06       6,412\nanim.compute_defender_grid               1.27      1.7%      32.05       5,499\ncore.macro_turn                          1.01      1.3%      76.55       4,114\ncore.shot_resolution                     0.68      0.9%       0.68       2,416\ncore.append_turn                         0.36      0.5%       0.36       7,583\nanim.build_all_animations                0.35      0.5%      30.78       5,499\ncore.clock                               0.30      0.4%       0.30       6,105\ncore.oreb_turn                           0.20      0.3%       0.30         532\ncore.free_throw                          0.12      0.2%       0.12         784\ncore.final_turn_shot                     0.07      0.1%       0.09          87\nsetup.gm_init                            0.04      0.0%       0.21          20\nsetup.lineup                             0.02      0.0%       0.02         399\nserialize.summary                        0.01      0.0%       0.01          20\ndb.read.plays.find_one                   0.01      0.0%      25.64         917\ndb.read.plays.find                       0.01      0.0%       0.01         918\nanim.skeleton_to_animations              0.00      0.0%       0.00       5,242\ncore.determine_next_turn                 0.00      0.0%       0.00       4,646\nanim.capture_halfcourt                   0.00      0.0%       0.00       2,487\nsetup.opening_tip                        0.00      0.0%       0.00          20\nanim.capture_free_throw                  0.00      0.0%       0.00         784\nanim.capture_fast_break                  0.00      0.0%       0.00         222\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          0.13      0.2%\nTOTAL WALL                              76.92    100.0%"
+    }
+  }
+}
