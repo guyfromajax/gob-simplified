@@ -7091,6 +7091,22 @@ def command_center_data(
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed
+        ps_training_job = dict(
+            ((franchise_doc or {}).get("practice_squad") or {}).get("training_job") or {}
+        )
+        response["distant_training_resume"] = (
+            {
+                "required": True,
+                **ps_training_job,
+            }
+            if franchise_doc
+            and franchise_user_training_applied_for_week(
+                franchise_doc.get("training_status", {}) or {},
+                int(week or 1),
+            )
+            and not training_completed
+            else None
+        )
         response["session_type"] = session_type
         response["week"] = week if week is not None else 1
         cut_state = _week_1_cut_requirement(franchise_doc, fid if franchise_doc else None, team_id)
@@ -12226,6 +12242,7 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
                 "status": "processing",
                 "week": week,
                 "progress": ps_job,
+                "retry_after_ms": 1000,
                 "redirect": None,
             }
         ps_results_story = _build_ps_game_results_news_story(franchise_doc, week, franchise_id)

@@ -3693,7 +3693,10 @@ function updatePlayButton(data) {
     const trainingCompleted = data.training_completed || false;
     const sessionType = data.session_type || 'in-season';
     if (!trainingCompleted) {
-      playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
+      const distantResumeRequired = !!data.distant_training_resume?.required;
+      playNowBtn.textContent = distantResumeRequired
+        ? 'Resume Training'
+        : (sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training');
       playNowBtn.dataset.mode = 'training';
     } else {
       playNowBtn.textContent = 'Play Next Game';

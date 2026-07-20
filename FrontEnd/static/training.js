@@ -1258,9 +1258,13 @@ submitBtn.addEventListener('click', async function() {
                     : 'Finishing Practice Squad games…'
                 );
               }
-              await new Promise(resolve => window.setTimeout(resolve, 250));
+              const retryAfterMs = Math.max(250, Number(result.retry_after_ms || 1000));
+              await new Promise(resolve => window.setTimeout(resolve, retryAfterMs));
             }
           } while (result && result.status === 'processing');
+          if (!result || !['success', 'already_completed'].includes(result.status)) {
+            throw new Error((result && result.detail) || 'Training did not reach a terminal state.');
+          }
         } finally {
           if (highlightStreamId !== null) {
             window.clearInterval(highlightStreamId);
@@ -1375,9 +1379,14 @@ async function resumeDistantTraining(franchiseId) {
             : 'Finishing Practice Squad games…'
         );
       }
-      await new Promise(resolve => window.setTimeout(resolve, 250));
+      const retryAfterMs = Math.max(250, Number(result.retry_after_ms || 1000));
+      await new Promise(resolve => window.setTimeout(resolve, retryAfterMs));
     }
   } while (result && result.status === 'processing');
+
+  if (!result || !['success', 'already_completed'].includes(result.status)) {
+    throw new Error((result && result.detail) || 'Training did not reach a terminal state.');
+  }
 
   if (result && result.redirect) {
     window.location.href = result.redirect.replace(/^\/static\//, '/');

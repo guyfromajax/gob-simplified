@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import random
+import uuid
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote
@@ -44,6 +46,8 @@ from BackEnd.utils.game_id_utils import generate_game_id
 
 logger = logging.getLogger(__name__)
 PS_RUNNING_GAME_STALE_SECONDS = 60
+PS_FULL_ENGINE_MAX_ATTEMPTS = 3
+PS_TERMINAL_GAME_STATUSES = ("completed", "fallback_completed", "forfeit", "skipped")
 
 
 def _running_game_is_stale(game: dict) -> bool:
@@ -51,6 +55,12 @@ def _running_game_is_stale(game: dict) -> bool:
         return False
     raw = game.get("started_at")
     if not raw:
+        return True
+    try:
+        started = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        now = datetime.now(started.tzinfo) if started.tzinfo else datetime.utcnow()
+        return (now - started).total_seconds() >= PS_RUNNING_GAME_STALE_SECONDS
+    except (TypeError, ValueError):
         return True
 
 
@@ -65,12 +75,126 @@ def _training_game_key(game: dict) -> str:
             str(game.get("home_team_id") or ""),
         ]
     )
-    try:
-        started = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
-        now = datetime.now(started.tzinfo) if started.tzinfo else datetime.utcnow()
-        return (now - started).total_seconds() >= PS_RUNNING_GAME_STALE_SECONDS
-    except (TypeError, ValueError):
-        return True
+
+
+def _advance_ps_result(
+    game: dict,
+    ps_state: dict,
+    *,
+    home_score: int,
+    away_score: int,
+    status: str,
+) -> None:
+    """Apply one terminal result to standings and any bracket exactly once."""
+    home_id = str(game.get("home_team_id") or "")
+    away_id = str(game.get("away_team_id") or "")
+    tier = int(
+        game.get("tier")
+        or (ps_state.get("teams") or {}).get(home_id, {}).get("tier")
+        or 1
+    )
+    winner = home_id if home_score > away_score else away_id
+    loser = away_id if winner == home_id else home_id
+    _apply_standings(ps_state, winner, loser, tier)
+    _record_h2h(ps_state, winner, loser)
+    game.update(
+        {
+            "status": status,
+            "home_score": home_score,
+            "away_score": away_score,
+            "winner": winner,
+        }
+    )
+
+    phase = game.get("phase")
+    if phase == "tournament":
+        tier_key = str(game.get("tier"))
+        tstate = (ps_state.get("tournaments") or {}).get(tier_key)
+        if tstate:
+            round_num = int(game.get("round") or 1)
+            idx = int(game.get("match_index") or 0)
+            bracket = tstate.get("bracket") or {}
+            bracket_engine.save_game_result(
+                bracket,
+                round_num,
+                idx,
+                str(game.get("game_id")),
+                winner,
+                score={home_id: home_score, away_id: away_score},
+            )
+            _, next_round, completed, champion = bracket_engine.advance_bracket(
+                bracket, round_num
+            )
+            tstate["bracket"] = bracket
+            tstate["current_round"] = next_round
+            if completed and champion:
+                tstate["champion"] = champion
+    elif phase == "championship":
+        ps_state["championship"] = {**game, "winner": winner}
+
+
+def _complete_with_deterministic_fallback(
+    game: dict,
+    ps_state: dict,
+    *,
+    franchise_id_str: str,
+    week: int,
+    error: Exception,
+) -> dict:
+    """Create an auditable terminal result after the bounded engine attempts fail."""
+    game_id = str(game.get("game_id") or generate_game_id())
+    game["game_id"] = game_id
+    seed_material = f"{franchise_id_str}:{week}:{game_id}"
+    seed = int(hashlib.sha256(seed_material.encode("utf-8")).hexdigest()[:16], 16)
+    rng = random.Random(seed)
+    home_score = rng.randint(50, 80)
+    away_score = rng.randint(50, 80)
+    if home_score == away_score:
+        home_score = home_score + 1 if home_score < 80 else home_score - 1
+
+    now = datetime.utcnow().isoformat() + "Z"
+    error_type = type(error).__name__
+    error_message = str(error)
+    db.games.update_one(
+        {"_id": game_id},
+        {
+            "$set": {
+                "franchise_id": franchise_id_str,
+                "week": week,
+                "mode": "practice_squad",
+                "status": "completed",
+                "simulation_engine": "practice_squad_fallback",
+                "fallback_reason": "full_engine_failed_after_bounded_retries",
+                "full_engine_attempts": int(game.get("attempts") or PS_FULL_ENGINE_MAX_ATTEMPTS),
+                "last_error_type": error_type,
+                "last_error_message": error_message,
+                "last_error_at": now,
+                "player_stats_status": "skipped_fallback_has_no_box_score",
+                "home_team_id": str(game.get("home_team_id") or ""),
+                "away_team_id": str(game.get("away_team_id") or ""),
+                "home_score": home_score,
+                "away_score": away_score,
+            }
+        },
+        upsert=True,
+    )
+    _advance_ps_result(
+        game,
+        ps_state,
+        home_score=home_score,
+        away_score=away_score,
+        status="fallback_completed",
+    )
+    game.update(
+        {
+            "fallback_reason": "full_engine_failed_after_bounded_retries",
+            "last_error_type": error_type,
+            "last_error": error_message,
+            "last_error_at": now,
+            "player_stats_status": "skipped_fallback_has_no_box_score",
+        }
+    )
+    return game
 
 
 def _empty_standings() -> dict[str, dict[str, dict[str, int]]]:
@@ -305,13 +429,11 @@ def _sim_one_game(
         return None
 
     status = game.get("status")
-    if status in ("completed", "forfeit", "skipped"):
+    if status in PS_TERMINAL_GAME_STATUSES:
         return game
 
     home_roster = _resolve_team_roster(ps_state, str(home_id), week)
     away_roster = _resolve_team_roster(ps_state, str(away_id), week)
-
-    tier = int(game.get("tier") or (ps_state.get("teams") or {}).get(str(home_id), {}).get("tier") or 1)
 
     # Scrubs forfeit checks
     home_team = (ps_state.get("teams") or {}).get(str(home_id)) or {}
@@ -353,58 +475,29 @@ def _sim_one_game(
     summary["mode"] = "practice_squad"
     db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
 
-    winner = str(home_id) if home_score > away_score else str(away_id)
-    loser = str(away_id) if winner == str(home_id) else str(home_id)
-    _apply_standings(ps_state, winner, loser, tier)
-    _record_h2h(ps_state, winner, loser)
-
-    game.update(
-        {
-            "status": "completed",
-            "game_id": str(game_id),
-            "home_score": home_score,
-            "away_score": away_score,
-            "winner": winner,
-        }
+    _advance_ps_result(
+        game,
+        ps_state,
+        home_score=home_score,
+        away_score=away_score,
+        status="completed",
     )
 
     sources = _player_sources_from_ps_state(ps_state)
-    apply_ps_game_stats(str(game_id), franchise_id_str, player_sources=sources)
-    applied = ps_state.setdefault("applied_games", [])
-    if str(game_id) not in applied:
-        applied.append(str(game_id))
-
-    # Tournament bracket updates
-    phase = game.get("phase")
-    if phase == "tournament":
-        tier_key = str(game.get("tier"))
-        tstate = (ps_state.get("tournaments") or {}).get(tier_key)
-        if tstate:
-            round_num = int(game.get("round") or 1)
-            idx = int(game.get("match_index") or 0)
-            bracket = tstate.get("bracket") or {}
-            bracket_engine.save_game_result(
-                bracket,
-                round_num,
-                idx,
-                str(game_id),
-                winner,
-                score={str(home_id): home_score, str(away_id): away_score},
-            )
-            _, next_round, completed, champion = bracket_engine.advance_bracket(
-                bracket, round_num
-            )
-            tstate["bracket"] = bracket
-            tstate["current_round"] = next_round
-            if completed and champion:
-                tstate["champion"] = champion
-    elif phase == "championship":
-        ps_state["championship"] = {
-            **game,
-            "status": "completed",
-            "game_id": str(game_id),
-            "winner": winner,
-        }
+    try:
+        apply_ps_game_stats(str(game_id), franchise_id_str, player_sources=sources)
+    except Exception as ex:
+        # The full game and its result are already durable. A stats-rollup error
+        # must not replay the game or apply standings twice; the existing PS
+        # backfill path can rebuild these aggregates from the saved box score.
+        logger.error("PS stats rollup error game_id=%s: %s", game_id, ex, exc_info=True)
+        game["player_stats_status"] = "rollup_failed_backfill_required"
+        game["player_stats_error"] = str(ex)
+    else:
+        game["player_stats_status"] = "applied"
+        applied = ps_state.setdefault("applied_games", [])
+        if str(game_id) not in applied:
+            applied.append(str(game_id))
 
     return game
 
@@ -448,11 +541,11 @@ def run_practice_squad_week(
     for g in games:
         game_key = _training_game_key(g)
         prior = job_games.get(game_key) or {}
-        if prior.get("status") in ("running", "pending"):
+        if prior.get("status") in ("running", "retry_pending"):
             g.update(
                 {
                     key: prior[key]
-                    for key in ("status", "game_id", "attempts", "started_at", "last_error")
+                    for key in ("status", "game_id", "attempts", "attempt_id", "started_at", "last_error")
                     if prior.get(key) is not None
                 }
             )
@@ -461,7 +554,7 @@ def run_practice_squad_week(
             {
                 key: g.get(key)
                 for key in (
-                    "status", "game_id", "attempts", "started_at", "last_error",
+                    "status", "game_id", "attempts", "attempt_id", "started_at", "last_error",
                     "home_team_id", "away_team_id", "tier", "phase", "round", "match_index",
                 )
             },
@@ -492,7 +585,7 @@ def run_practice_squad_week(
             **{
                 key: g.get(key)
                 for key in (
-                    "status", "game_id", "attempts", "started_at", "last_error",
+                    "status", "game_id", "attempts", "attempt_id", "started_at", "last_error",
                     "home_team_id", "away_team_id", "tier", "phase", "round", "match_index",
                 )
             },
@@ -500,7 +593,7 @@ def run_practice_squad_week(
 
     pending = [
         g for g in games
-        if g.get("status") in ("scheduled", "pending") or _running_game_is_stale(g)
+        if g.get("status") in ("scheduled", "retry_pending") or _running_game_is_stale(g)
     ]
     if max_games is not None:
         pending = pending[:max(0, int(max_games))]
@@ -509,11 +602,12 @@ def run_practice_squad_week(
         g["status"] = "running"
         g["game_id"] = str(g.get("game_id") or generate_game_id())
         g["attempts"] = int(g.get("attempts") or 0) + 1
+        g["attempt_id"] = str(uuid.uuid4())
         g["started_at"] = datetime.utcnow().isoformat() + "Z"
         job_games[_training_game_key(g)] = {
             key: g.get(key)
             for key in (
-                "status", "game_id", "attempts", "started_at", "last_error",
+                "status", "game_id", "attempts", "attempt_id", "started_at", "last_error",
                 "home_team_id", "away_team_id", "tier", "phase", "round", "match_index",
             )
         }
@@ -532,14 +626,41 @@ def run_practice_squad_week(
             _sim_one_game(g, ps_state, week, fid, fpd_by_id, frd_by_id)
         except Exception as ex:
             logger.error("PS sim error: %s", ex, exc_info=True)
-            # A retry restarts this game from tip-off while retaining its stable id.
-            g["status"] = "pending"
-            g["last_error"] = str(ex)
-            g["updated_at"] = datetime.utcnow().isoformat() + "Z"
+            try:
+                import sentry_sdk
+
+                with sentry_sdk.push_scope() as scope:
+                    scope.set_tag("simulation_mode", "practice_squad")
+                    scope.set_tag("practice_squad_game_id", str(g.get("game_id")))
+                    scope.set_context("practice_squad_job", {
+                        "franchise_id": fid,
+                        "week": week,
+                        "attempt": int(g.get("attempts") or 0),
+                        "attempt_id": g.get("attempt_id"),
+                    })
+                    sentry_sdk.capture_exception(ex)
+            except Exception:
+                logger.debug("Sentry capture unavailable for PS sim failure", exc_info=True)
+            if int(g.get("attempts") or 0) >= PS_FULL_ENGINE_MAX_ATTEMPTS:
+                _complete_with_deterministic_fallback(
+                    g,
+                    ps_state,
+                    franchise_id_str=fid,
+                    week=week,
+                    error=ex,
+                )
+            else:
+                # A retry restarts this game from tip-off while retaining its stable id.
+                g["status"] = "retry_pending"
+                g["last_error"] = str(ex)
+                g["last_error_type"] = type(ex).__name__
+                g["updated_at"] = datetime.utcnow().isoformat() + "Z"
         job_games[_training_game_key(g)] = {
             key: g.get(key)
             for key in (
-                "status", "game_id", "attempts", "started_at", "updated_at", "last_error",
+                "status", "game_id", "attempts", "attempt_id", "started_at", "updated_at",
+                "last_error", "last_error_type", "last_error_at", "fallback_reason",
+                "player_stats_status", "player_stats_error",
                 "home_team_id", "away_team_id", "tier", "phase", "round", "match_index",
             )
         }
@@ -549,7 +670,7 @@ def run_practice_squad_week(
         )
 
     all_done = bool(job_games) and all(
-        row.get("status") in ("completed", "forfeit", "skipped")
+        row.get("status") in PS_TERMINAL_GAME_STATUSES
         for row in job_games.values()
     )
     if all_done:
@@ -562,7 +683,7 @@ def run_practice_squad_week(
         "completed_games": sum(
             1
             for row in job_games.values()
-            if row.get("status") in ("completed", "forfeit", "skipped")
+            if row.get("status") in PS_TERMINAL_GAME_STATUSES
         ),
         "games": job_games,
         "updated_at": datetime.utcnow().isoformat() + "Z",

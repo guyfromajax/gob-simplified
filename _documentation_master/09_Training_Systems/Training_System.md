@@ -16,7 +16,7 @@ This document should reflect the current franchise training implementation in co
 6. **API Endpoints (franchise training)**:
    - `GET /franchise/training-points` - Get available training points (30 for training camp, 24 for regular training)
    - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until distant phase completes. Requires auth + franchise ownership. Response includes `training_highlights` (string array) for the loading feed.
-   - `POST /franchise/run-training/distant-cpu` - **Distant phase**: template-based CPU teams, week-1 camp cuts when applicable, then bounded Practice Squad work. During PS weeks it returns `status: "processing"` after at most one PS game; the client polls until the response returns success and a report redirect. Body: `{ "franchise_id" }`. Requires auth + ownership.
+   - `POST /franchise/run-training/distant-cpu` - **Distant phase**: template-based CPU teams, week-1 camp cuts when applicable, then bounded Practice Squad work. During PS weeks it returns `status: "processing"` after at most one PS game plus `retry_after_ms`; the client polls at that interval until the response returns success and a report redirect. A PS game receives three full-engine attempts before an auditable deterministic terminal fallback (standings/brackets only; no fabricated player stats). Body: `{ "franchise_id" }`. Requires auth + ownership.
    - `POST /franchise/run-training` - **Legacy / full path**: same end state as user + distant in one request; if user phase is already applied for the current week but distant is not, handler runs **distant only** (resume). Does not require auth in the same way as the split routes (existing behavior).
    - `GET /franchise/training-report` - Get training report data
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
@@ -64,6 +64,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 **Franchise training state helpers**
 
 - `BackEnd/utils/franchise_training_state.py` — `franchise_training_fully_complete_for_week`, `franchise_user_training_applied_for_week` (split-phase vs legacy saves). FCC **`training_completed`** reflects “user + distant done for this week,” not user-only.
+- If user training is applied but the distant PS job is unfinished, training APIs and FCC data expose `distant_training_resume`; the FCC CTA reads **Resume Training**. Completion/fallback of every PS game allows distant finalization to set `training_completed` + `cpu_distant_complete_week`, after which the CTA reads **Play Next Game**.
 
 ### Post-Training Camp Cut Flow
 

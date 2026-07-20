@@ -60,7 +60,11 @@
 - After the game, the completed schedule/standings/bracket state is committed immediately.
 - Completed games are never replayed by a retry.
 - A fresh `running` marker acts as a lease so a refresh or second tab cannot start the same game concurrently. If the request, worker, or deployment stops, the marker becomes stale after 60 seconds and the next poll restarts only that game from tip-off using its stable ID.
-- `practice_squad.trained_week` is set only after every scheduled game is completed, forfeited, or skipped.
+- A full-engine failure changes the game to `retry_pending`. The same stable game ID is retried from tip-off, with a new `attempt_id`, up to three total full-engine attempts.
+- If the third full-engine attempt fails, the game becomes `fallback_completed` with a deterministic, non-tied 50–80 score seeded by franchise ID + week + stable game ID. The saved game records the engine, failure reason, attempt count, final error, and that player-stat rollup was intentionally skipped. The fallback advances standings and tournament/championship brackets but never invents player box-score statistics.
+- Full-engine exceptions are reported to Sentry with the PS game ID, week, attempt number, and attempt ID. The job also retains concise error metadata for audit and recovery.
+- Terminal game states are `completed`, `fallback_completed`, `forfeit`, and `skipped`. `practice_squad.trained_week` is set only after every scheduled game reaches one of those states.
+- The distant-training endpoint returns `retry_after_ms`; the training screen honors it instead of tight-loop polling. A refresh resumes the incomplete distant phase, and the FCC labels that state **Resume Training**. Once the terminal job is finalized, weekly training markers are written and the FCC advances to **Play Next Game**.
 
 ## Known fixes
 
