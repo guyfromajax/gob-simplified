@@ -1,6 +1,6 @@
 ## Full Court Press (FCP) System
 
-> **Doc status (June 2026):** This file is **mid-overhaul**. The **legacy** skeleton + BSM/DST resolution flow (sections through *Overview*) still describes the old path when `USE_DYNAMIC_FCP=False`. The **dynamic** spatial loop (`USE_DYNAMIC_FCP=True`, default) is documented in [**Dynamic FCP Engine — BH Read Logic**](#dynamic-fcp-engine--bh-read-logic-current) below and in the archived [`Dynamic_FCP_Brief.md`](../projects/Z-Completed/Dynamic_FCP_Brief.md). A full rewrite of this document is planned once FCP migration is complete.
+> **Doc status (July 2026):** Placement / BIP setup / in-possession defense targets verified against code. The **legacy** skeleton + BSM/DST resolution flow (sections through *Overview*) still describes the old path when `USE_DYNAMIC_FCP=False`. The **dynamic** spatial loop (`USE_DYNAMIC_FCP=True`, default) is documented in [**Dynamic FCP Engine — BH Read Logic**](#dynamic-fcp-engine--bh-read-logic-current) below and in the archived [`Dynamic_FCP_Brief.md`](../projects/Z-Completed/Dynamic_FCP_Brief.md). A full rewrite collapsing legacy content is still planned once FCP press-play PR3 lands.
 
 > **Half Court Trap (HCT)** is documented separately in [`HCT_System.md`](./HCT_System.md). The live HCT path is **dynamic** (engine loop + UESS schema steps), not the skeleton/stopper system described below for legacy FCP. This file covers **FCP only** plus shared BIP/inbound conventions that apply to both pressure types.
 
@@ -127,7 +127,7 @@ int(((IQ * 0.8) + (CH * 0.2)) * random.randint(1, 6))
 | **Normal** — defender in range (`moment` ≠ `"none"`) | read ≥ **200** | read **> 120** | low-tier roll |
 | **Broken** — no ahead defender in range (`moment == "none"`) | read ≥ **175** | read **> 110** | low-tier roll |
 
-Moment detection uses `MOMENT_RANGE = 11` (same as HCT).
+Moment detection for pressure/trap uses `TRAP_MOMENT_RANGE = 5` (same as HCT). `MOMENT_RANGE = 11` is still used for pass-contest on-ball exclusion and other non-detect checks.
 
 #### FCP-specific strong-handler gate
 
@@ -271,34 +271,58 @@ When the BH enters the Attack Basket Area (trap-break zone — **past x = 64**, 
 
 Set during BASELINE_INBOUND when `next_defensive_setup="FCP"` (`TurnManager._build_fcp_setup_positions`). HOME orientation; away offense flips x via `getAwayTeamCoords`.
 
-**Offense ranges** (`FCP_OFFENSE_SETUP_RANGES` in `BackEnd/constants/__init__.py`):
+**Offense** — SF is chemistry-aware (not in the ranges map). PG/SG/PF/C from `FCP_OFFENSE_SETUP_RANGES` in `BackEnd/constants/__init__.py`:
 
-| Pos | x range | y range | Notes |
+| Pos | x range | y range / rule | Notes |
 |---|---|---|---|
-| SF | 3 (fixed) | chemistry-aware | Inbounder |
-| PG | random.randint(12, 18) | random.randint(15, 23) | Lower receive option |
-| SG | random.randint(12, 18) | random.randint(27, 35) | Upper receive option |
-| PF | random.randint(45, 55) | random.randint(20, 30) | Mid-court outlet |
-| C  | random.randint(60, 70) | random.randint(20, 30) | Frontcourt anchor |
+| SF | 3 (fixed) | chemistry-aware (see below) | Inbounder |
+| PG | (12, 18) | `SF.y + randint(-6, 6)`, clamped to [1, 49] | Receive near inbounder |
+| SG | (25, 32) | (20, 30) | Mid-backcourt outlet |
+| PF | (45, 55) | (20, 30) | Mid-court outlet |
+| C  | (60, 70) | (20, 30) | Frontcourt anchor |
 
-**Defense ranges** (`FCP_DEFENSE_SETUP_RANGES`):
+**SF y (chemistry-aware, mirrors HCO BIP):**
+- Chemistry > 15 → biased toward PG side: `(25, 35)` if `current_pg_y > 24`, else `(15, 25)`
+- Otherwise → `(15, 35)`
+
+**Defense ranges** (`FCP_DEFENSE_SETUP_RANGES` — all five positions; replaces the legacy `get_defender_coords` layout for FCP only):
 
 | Pos | x range | y range |
 |---|---|---|
-| PG | random.randint(20, 25) | random.randint(23, 27) |
-| SG | random.randint(26, 31) | random.randint(30, 36) |
-| SF | random.randint(26, 31) | random.randint(14, 20) |
-| PF | random.randint(50, 55) | random.randint(23, 27) |
-| C  | random.randint(71, 76) | random.randint(23, 27) |
+| PG | (20, 25) | (23, 27) |
+| SG | (26, 31) | (30, 36) |
+| SF | (26, 31) | (14, 20) |
+| PF | (50, 55) | (23, 27) |
+| C  | (71, 76) | (23, 27) |
 
-**Collision rule** (`FCP_SETUP_COLLISION_OFFSET_GRID = 2`): exact (x,y) collisions broken by moving one player 2 grid spots in a random direction, up to 10 rounds.
+**Collision rule** (`FCP_SETUP_COLLISION_OFFSET_GRID = 2`): exact (x,y) collisions (offense + defense together) broken by moving one randomly chosen player 2 grid spots in a random direction, up to 10 rounds.
+
+Also documented in [`BIP_System.md`](./BIP_System.md) § "BASELINE_INBOUND → FCP".
+
+---
+
+### Press Play Selection (`fc_presses`)
+
+Mirrors HCT trap selection on the **defending** team's playbook, but **PR1 implements only Straight Pressure**:
+
+| Key | Label | Status |
+|-----|-------|--------|
+| `fcp_straight_pressure` | Straight Pressure | **Live** — only registered play |
+| `fcp_standard_trap` | Standard Trap | Reserved (PR3) |
+| `fcp_standard_diamond` | Standard Diamond | Reserved (PR3) |
+
+- Chosen once at `TurnManager.determine_defensive_pressure_type()` → `game_state["fcp_press_play"]`.
+- `play_key_for_fcp_press()` always resolves to `fcp_straight_pressure` until PR3 (weights for other keys ignored).
+- Registry: `FCP_PRESS_PLAYS` in `fcp_press_plays.py`. Per-play scouting: `scouting_data["defense"]["fcp_press_plays"][key]`.
+
+**Live placement model (Straight Pressure FCP):** man-glue on PG/SG/SF (`_straight_pressure_targets` with `fcp_man_glue=True`); trap moments downgrade to single-defender `"pressure"`; PF/C use `fcp_pf_c_zone.py` (see above). Release off-ball men when **BH progress x ≥ 64** (not when their man enters ABA).
 
 ---
 
 ### When FCP Activates
 
 - After made shots when `offensive_state = "FCP"`
-- Set via `turn_manager.determine_defensive_pressure_type()`
+- Set via `turn_manager.determine_defensive_pressure_type()` (also stashes `fcp_press_play`)
 
 ---
 
@@ -315,9 +339,9 @@ Set during BASELINE_INBOUND when `next_defensive_setup="FCP"` (`TurnManager._bui
 
 ### Dynamic Player Assignment
 
-- **Ball handler:** from skeleton steps (`handle_ball`, `receive`, `shoot`) — not hardcoded PG
-- **Defender:** position-matched to ball handler
-- **Per-step ball handler:** FCP defenders use `guard_ball` when assignment is the live handler (`FCP_HCT_System.md` legacy note retained for FCP animation behavior)
+**Legacy skeleton path:** ball handler from skeleton steps (`handle_ball`, `receive`, `shoot`); defender position-matched to BH.
+
+**Dynamic path (default):** live BH from the shared HCT/FCP loop; Straight Pressure FCP locks man assignments at converge (`_straight_pressure_begin(..., fcp=True)`); primary/trapper via universal band-based `_select_trappers` (trap moments still downgrade to pressure under `fcp_man_glue`).
 
 ---
 
@@ -348,9 +372,11 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 - `BackEnd/engine/fcp_pf_c_zone.py` — FCP Straight Pressure PF/C zone + anchor ladder
 - `BackEnd/engine/fcp_offball_attack.py` — off-ball attack routing on advance beats
 - `BackEnd/engine/dynamic_hct.py` — shared §4 loop, FCP read constants, engagement, Straight Pressure wiring
-- `BackEnd/engine/fcp_press_plays.py` — FCP play registry (`StraightPressureFCP`, etc.)
+- `BackEnd/engine/fcp_press_plays.py` — FCP play registry (`StraightPressureFCP`; PR1 only)
+- `BackEnd/constants/fcp_press_play_types.py` — keys, `play_key_for_fcp_press()`
+- `BackEnd/engine/fcp_inbound_release.py` — SF staging + pass-clear gate
 - `BackEnd/engine/phase_resolution.py` — `resolve_full_court_press_logic()`, `USE_DYNAMIC_FCP`, legacy skeleton getters, stopper integration
-- `BackEnd/models/turn_manager.py` — `_build_fcp_setup_positions()`, pressure type
+- `BackEnd/models/turn_manager.py` — `_build_fcp_setup_positions()`, pressure type + `fcp_press_play` stash
 - `BackEnd/engine/skeleton_step_emitter.py` — FCP schema steps + stopper step handling
 - `BackEnd/models/animator.py` — legacy skeleton → animations
 

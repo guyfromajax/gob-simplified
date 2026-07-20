@@ -153,7 +153,7 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
   - Defense per-position ranges from `FCP_DEFENSE_SETUP_RANGES` (all 5 — replaces the legacy `get_defender_coords`-derived layout for FCP)
   - **Collision resolution:** any exact (x, y) pair collision is broken by moving one random player `FCP_SETUP_COLLISION_OFFSET_GRID` spots in a random direction, re-checked ≤10 rounds
   - Generated in home orientation; flipped via `getAwayTeamCoords` for away offense
-  - Full details: `FCP_HCT_System.md` → "FCP Starting Alignment" (FCP-only doc; HCT → `HCT_System.md`)
+  - PG y = SF y + randint(-6, 6) (clamped); SG x∈(25,32) y∈(20,30) — see [`FCP_System.md`](./FCP_System.md) → "FCP Starting Alignment"
 - `offense_setup_positions` is built from those `o_dest` coords — **not** from skeleton step 0. Players animate from BIP-end coords toward the first post-inbound skeleton step at archetype rate (non-gate movers freeze at the interrupted coord per UESS §9.5 — no teleport)
 - **BIP step 2 gate (FCP):** advance when **4 of 5** offense players reach setup **and** SF has reached the baseline inbound spot (`gate_mandatory_player_ids` on the inbound passer). Without the mandatory SF gate, step 2 could end before SF walked OOB, breaking the hold and inbound pass visuals.
 - SF is the inbounder (baseline inbound spot)

@@ -36,7 +36,7 @@ The stopper system activates in **HCO and FCP** turns (and **legacy HCT** when `
   4. Shot Attempt (if no event occurred)
 - See `HCO_Turn_Resolution_System.md` for detailed resolution flow
 
-**FCP Turns** (result math owned by `FCP_HCT_System.md` — summarized here, do not re-spec):
+**FCP Turns** (result math owned by `FCP_System.md` — summarized here, do not re-spec):
 - Score-based: `offenseScore`/`defenseScore` from the PG-weighted (×3) BH/AG/IQ vs OD/AG/IQ formulas, each ×`randint(1,6)`. See `resolve_full_court_press_logic()` (~L5724).
 
 **HCT Turns (legacy fallback only):** When `USE_DYNAMIC_HCT = False`, HCT used the same score/stopper path as FCP with HCT BSM/DST constants — see `HCT_System.md` § Legacy Fallback. **Live HCT** (`USE_DYNAMIC_HCT = True`, default) does **not** use this math or the stopper system; outcomes emerge from the dynamic loop in `dynamic_hct.py`. HCT schema playback uses `build_dynamic_hct_animation_steps()` instead of skeleton stopper truncation.

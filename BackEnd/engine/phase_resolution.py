@@ -9629,10 +9629,35 @@ def get_skeleton_by_lean(play_doc, lean_score):
     return skeleton, variant
 
 
+def _playcall_memo(game_context, bucket: str) -> dict:
+    """Per-game memo bucket on the game context (mirrors ``_skeleton_cache``).
+
+    Scope is deliberately **per game, not process-wide**: this guard exists to notice a play that
+    was renamed in the universal collection, so a process-wide cache would defeat its purpose until
+    restart. Per-game keeps the rename check alive (every new game re-queries) while removing the
+    ~430 redundant round-trips a single game was making to re-ask a question whose answer cannot
+    change mid-game.
+
+    Degrades to no caching (never raises) if the context won't accept attributes.
+    """
+    attr = f"_playcall_{bucket}_memo"
+    memo = getattr(game_context, attr, None)
+    if memo is None:
+        memo = {}
+        try:
+            setattr(game_context, attr, memo)
+        except Exception:
+            return {}
+    return memo
+
+
 def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     """
     Resolve a possibly stale ``current_playcall`` string to the current ``plays.name``
     using the team's ``play_id`` when the name no longer exists in the universal collection.
+
+    The universal lookups here are memoized per game (see ``_playcall_memo``) because this runs on
+    every ``get_hco_skeleton`` call — the dominant source of Mongo round-trips during a sim.
     """
     if not game_context or not playcall or not isinstance(playcall, str):
         return playcall
@@ -9642,10 +9667,19 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     from BackEnd.db import games_collection, plays_collection
     from BackEnd.utils.team_play_utils import resolve_team_play
 
+    name_exists = _playcall_memo(game_context, "name_exists")
+
     try:
-        if plays_collection.find_one({"name": playcall}, {"_id": 1}):
+        if playcall in name_exists:
+            found = name_exists[playcall]
+        else:
+            found = bool(plays_collection.find_one({"name": playcall}, {"_id": 1}))
+            name_exists[playcall] = found
+        if found:
             return playcall
     except Exception:
+        # Unchanged semantics: on lookup failure do NOT memoize, and fall through to the
+        # team-plays resolution below rather than returning early.
         logging.debug("canonical playcall: universal name lookup failed for %r", playcall, exc_info=True)
 
     offense_team = getattr(game_context, "offense_team", None)
@@ -9669,16 +9703,30 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     if play_obj:
         pid = play_obj.get("play_id")
         if pid:
+            id_to_name = _playcall_memo(game_context, "id_to_name")
+            key = str(pid)
             try:
-                doc = plays_collection.find_one({"_id": ObjectId(str(pid))}, {"name": 1})
-                if doc and isinstance(doc.get("name"), str) and doc["name"]:
-                    return doc["name"]
+                if key in id_to_name:
+                    name = id_to_name[key]
+                else:
+                    doc = plays_collection.find_one({"_id": ObjectId(key)}, {"name": 1})
+                    name = doc.get("name") if doc else None
+                    if not (isinstance(name, str) and name):
+                        name = None
+                    id_to_name[key] = name
+                if name:
+                    return name
             except Exception:
                 pass
         embedded = play_obj.get("name")
         if isinstance(embedded, str) and embedded:
             try:
-                if plays_collection.find_one({"name": embedded}, {"_id": 1}):
+                if embedded in name_exists:
+                    found = name_exists[embedded]
+                else:
+                    found = bool(plays_collection.find_one({"name": embedded}, {"_id": 1}))
+                    name_exists[embedded] = found
+                if found:
                     return embedded
             except Exception:
                 pass
@@ -9730,9 +9778,17 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     if skeleton:
         return skeleton
     
-    # Fallback to universal plays collection
-    play_doc = plays_collection.find_one({"name": playcall})
-    
+    # Fallback to universal plays collection. Memoized per game for the same reason as the
+    # canonical-name lookups above: this fires on every turn whose playcall misses the team-plays
+    # path, and the universal doc is immutable for the duration of a game. Mirrors the existing
+    # `_skeleton_cache` in `_get_skeleton_from_team_plays`, which already caches full play docs.
+    _doc_memo = _playcall_memo(game_context, "doc_by_name") if game_context else {}
+    if playcall in _doc_memo:
+        play_doc = _doc_memo[playcall]
+    else:
+        play_doc = plays_collection.find_one({"name": playcall})
+        _doc_memo[playcall] = play_doc
+
     if play_doc and "skeletons" in play_doc:
         # Check if this is a Motion play
         play_type = play_doc.get("play_type", "set_play")

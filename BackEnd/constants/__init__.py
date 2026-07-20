@@ -480,7 +480,7 @@ HCO_SETUP_HCO_BH_RADIUS = 10  # max grid units from FB BH for HCO BH placement
 # helper in `turn_manager.py`). All ranges expressed in HOME orientation
 # (x≈0..50 = backcourt for home offense). For away offense, the build
 # function flips via ``getAwayTeamCoords``.
-# See FCP_HCT_System.md → "FCP Starting Alignment" (FCP only; HCT → HCT_System.md).
+# See FCP_System.md → "FCP Starting Alignment" (FCP only; HCT → HCT_System.md).
 FCP_OFFENSE_SETUP_RANGES = {
     "PG": {"x": (12, 18)},  # y: SF y + randint(-6, 6) in turn_manager
     "SG": {"x": (25, 32), "y": (20, 30)},
