@@ -291,6 +291,10 @@ class TeamManager:
         team_doc_time = (time.time() - team_doc_start) * 1000
         if not team_doc and roster_override is None:
             print(f"⚠️ No team document found for team: {name}")
+        # Players came from a caller-supplied roster (Practice Squad: FPD/FRD docs),
+        # NOT from players_collection — so nothing about them should be written back
+        # to the universal players collection. See GameManager._update_position_ratings.
+        self.is_synthetic_roster = roster_override is not None
         if synthetic_team_id is not None:
             self.team_id = synthetic_team_id
         else:

@@ -85,6 +85,11 @@ class GameManager:
         """Recalculate position ratings for all players based on current attributes.
         In-memory player.ratings are always updated. DB write only in single/tournament
         (franchise uses FPD; do not write to universal players_collection).
+
+        Practice Squad also runs mode="single" but builds teams from a roster_override
+        (FPD/FRD docs), so its player_ids do not exist in players_collection — the write
+        matched 0 documents and cost a round trip per PS game. Skipped via
+        `is_synthetic_roster`; real single/tournament games are unaffected.
         """
         from BackEnd.utils.position_ratings import compute_position_ratings
         from pymongo.operations import UpdateOne
@@ -93,6 +98,7 @@ class GameManager:
         bulk_operations = []
 
         for team in [self.home_team, self.away_team]:
+            synthetic = getattr(team, "is_synthetic_roster", False)
             for player in team.get_all_players():
                 player_dict = {
                     "attributes": player.attributes,
@@ -101,7 +107,7 @@ class GameManager:
                 }
                 new_ratings = compute_position_ratings(player_dict)
                 player.ratings = new_ratings
-                if not is_franchise and hasattr(player, "player_id") and player.player_id:
+                if not is_franchise and not synthetic and hasattr(player, "player_id") and player.player_id:
                     bulk_operations.append(
                         UpdateOne(
                             {"_id": player.player_id},
@@ -480,6 +486,7 @@ class GameManager:
         timeout_recharge_amounts = [0.03, 0.04, 0.05, 0.06]
         
         for team in [self.home_team, self.away_team]:
+            synthetic = getattr(team, "is_synthetic_roster", False)
             for player in team.get_all_players():
                     recharge_amount = random.choice(timeout_recharge_amounts)
                     if hasattr(player, "recharge_energy"):
@@ -2332,6 +2339,7 @@ class GameManager:
 
     def _find_player_by_name(self, name):
         for team in [self.home_team, self.away_team]:
+            synthetic = getattr(team, "is_synthetic_roster", False)
             for player in team.get_all_players():
                 if player.get_name() == name:
                     return player
