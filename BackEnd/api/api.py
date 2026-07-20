@@ -467,6 +467,19 @@ try:
     # ✅ Add startup event to verify app is ready
     @app.on_event("startup")
     async def startup_event():
+        # RNG isolation watchdog (LOG-ONLY in production). The engine must draw only
+        # from sim_rng; a site still bound to the global module is not isolated from
+        # third-party RNG (pymongo consumes it) and breaks seeded reproducibility.
+        # The module conversion is only proven against branches the verification weeks
+        # exercised, so this catches rare-branch sites (overtime, ejections) that only
+        # ever fire in live play. Logs each site once at ERROR and never raises.
+        try:
+            from BackEnd.utils.sim_random import install_global_draw_guard
+            install_global_draw_guard(log_only=True)
+        except Exception as e:
+            print(f"⚠️ [WARNING] startup: RNG draw guard not installed: {e}",
+                  file=sys.stderr, flush=True)
+
         # Ensure indexes exist (idempotent; safe on every deploy)
         try:
             from BackEnd.db import (

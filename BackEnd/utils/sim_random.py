@@ -83,6 +83,7 @@ def setstate(state) -> None:
 
 _GLOBAL_DRAWS: dict[str, int] = {}
 _guard_installed = False
+_guard_log_only = False
 
 _GUARDED_FNS = (
     "random", "randint", "choice", "choices", "shuffle", "uniform", "sample",
@@ -92,15 +93,26 @@ _GUARDED_FNS = (
 )
 
 
-def install_global_draw_guard() -> None:
-    """Start recording BackEnd-attributed draws on the GLOBAL module. Idempotent."""
-    global _guard_installed
+def install_global_draw_guard(log_only: bool = False) -> None:
+    """Start recording BackEnd-attributed draws on the GLOBAL module. Idempotent.
+
+    ``log_only=True`` is the PRODUCTION mode: each offending call site is logged
+    once at ERROR with its ``module:function:lineno`` and nothing else happens.
+    It never raises and never alters a draw — a stray site costs reproducibility,
+    not correctness, and is not worth failing a live game over. Verification runs
+    use the default, where the harness asserts the tally is empty.
+    """
+    global _guard_installed, _guard_log_only
+    _guard_log_only = log_only
     if _guard_installed:
         return
     _guard_installed = True
 
     import functools
     import inspect
+    import logging
+
+    _log = logging.getLogger(__name__)
 
     for _name in _GUARDED_FNS:
         _fn = getattr(_stdlib_random, _name, None)
@@ -115,7 +127,18 @@ def install_global_draw_guard() -> None:
                     mod = frame.f_globals.get("__name__", "")
                     if mod.startswith("BackEnd") and mod != __name__:
                         key = f"{mod}:{frame.f_code.co_name}:{frame.f_lineno}"
-                        _GLOBAL_DRAWS[key] = _GLOBAL_DRAWS.get(key, 0) + 1
+                        seen = _GLOBAL_DRAWS.get(key, 0)
+                        _GLOBAL_DRAWS[key] = seen + 1
+                        # Log-only (production): report each site ONCE. Never raise —
+                        # a stray draw costs reproducibility, not correctness, and is
+                        # not worth failing a live game over.
+                        if _guard_log_only and seen == 0:
+                            _log.error(
+                                "🎲 [RNG LEAK] %s drew from the GLOBAL random module. "
+                                "Engine code must use `from BackEnd.utils.sim_random "
+                                "import sim_rng as random` — this site is not isolated "
+                                "from third-party RNG (e.g. pymongo) and breaks seeded "
+                                "reproducibility.", key)
                 except Exception:
                     pass
                 return fn(*a, **k)
