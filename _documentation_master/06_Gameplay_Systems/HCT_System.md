@@ -8,7 +8,7 @@
 
 **Base Constants**
 
-1. **Trap/pressure detect radius:** `TRAP_MOMENT_RANGE = 5` euclidean grid spots (`dynamic_hct.py`) — pressure (1 ahead defender in range) / trap (2+ in range with ≥1 ahead on x). Tighter than vicinity so a "trap" means genuine converge, not nearby help.
+1. **Trap/pressure detect radius:** `TRAP_MOMENT_RANGE = 5` euclidean grid spots (`dynamic_hct.py`) — pressure (1 ahead defender in range) / trap (2+ in range with ≥1 ahead on x). Tighter than vicinity so a "trap" means genuine converge, not nearby help. **No traps in the center horizontal band** (BH y ∈ [20, 30]) — shared `_detect_moment` gate for every HCT play.
 2. **Vicinity radius:** `MOMENT_RANGE = 11` — pass-contest on-ball exclusion, Diamond wing trap-in-range checks, and other non-detect uses (not the pressure/trap classifier).
 3. **Attack Basket Area (ABA):** x past half court toward basket, **y ∈ [10, 40]** (`ATTACK_BASKET_Y_MIN/MAX`). Trap-break / goal resolution runs only when the BH enters this band.
 4. **10-second rule:** `HCT_TEN_SECOND_LIMIT = 10.0` game-seconds from possession start; disabled when &lt;10s remain in the quarter at possession start. Checked with shot-clock each loop iteration.
@@ -114,7 +114,7 @@ Each loop iteration (after step 0 walk-up):
 
 1. **Time terminals** — shot clock ≤ 0 → `DEAD BALL` + `turnover_type = SHOT_CLOCK`; elapsed ≥ 10s and BH not past half → `TEN_SECOND` violation.
 2. **Zone precedence** — BH in ABA → §7 goal achievement (HCO vs FB read, or in-ABA shot tree). x &gt; half court but outside ABA y-band → trap persists (keep looping).
-3. **Moment detection** — `play.detect_moment(bh_xy, def_coords)` → `none` | `pressure` | `trap` (+ in-range defender list). Defenders must be within **`TRAP_MOMENT_RANGE` (5)** and on the basket-side of the BH (x gate). Straight Pressure further requires the **rover** in range before a trap is allowed.
+3. **Moment detection** — `play.detect_moment(bh_xy, def_coords)` → `none` | `pressure` | `trap` (+ in-range defender list). Defenders must be within **`TRAP_MOMENT_RANGE` (5)** and on the basket-side of the BH (x gate). **Center-band gate (all HCT plays):** while BH y ∈ [20, 30], never return `"trap"` — downgrade to `"pressure"` (matches Standard Trap formation, which only builds trap spots on upper/lower shifts). Straight Pressure further requires the **rover** in range before a trap is allowed.
 4. **BH read** — `player_read`-style score → **attack / pass / hold** (thresholds dynamic on `BH + AG`; see [`Dynamic_HCT_Brief.md`](../projects/Z-Completed/Dynamic_HCT_Brief.md) for the full table). Strong-handler sum: `BH + AG > 80` (`READ_STRONG_HANDLER_SUM`).
 5. **Resolve branch:**
    - **attack + none (broken HCT)** → cutoff race to y-keyed ABA spot (`topLane` / upper or lower apex); meet → D8 contest (`_resolve_moment`, steal excluded on drives); no meet → ABA arrival → HCO/FB read or shot.

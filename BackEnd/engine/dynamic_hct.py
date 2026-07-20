@@ -882,10 +882,19 @@ def _detect_moment(
     and ``in_range`` is the nearest-first list of in-range defender positions.
     A trap needs ≥2 in range with ≥1 ahead of the BH; pressure needs ≥1 in
     range that is ahead.
+
+    Center-band gate: while the BH is in the horizontal center band
+    (``SHIFT_LOWER_Y`` ≤ y ≤ ``SHIFT_UPPER_Y``), never return ``"trap"`` —
+    downgrade to ``"pressure"``. Applies to every caller of this helper
+    (all HCT plays share it; FCP Straight Pressure also routes through here).
     """
     in_range = _in_range_defenders(bh_xy, def_coords, radius=TRAP_MOMENT_RANGE)
     ahead = [p for p in in_range if _is_ahead(def_coords[p], bh_xy, is_away_offense)]
     if len(in_range) >= 2 and ahead:
+        # No traps while BH is in the center horizontal band (matches Standard
+        # Trap formation, which only builds trap spots on upper/lower shifts).
+        if _determine_shift(bh_xy["y"]) == "normal":
+            return "pressure", in_range
         return "trap", in_range
     if in_range and ahead:
         return "pressure", in_range
