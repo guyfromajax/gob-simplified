@@ -10,7 +10,7 @@ FB passes looser corridor / time-slack tuning for the more open transition floor
 from __future__ import annotations
 
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Tuple
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")

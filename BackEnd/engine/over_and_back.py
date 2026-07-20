@@ -7,7 +7,7 @@ paths as they adopt the same pre-pass gate.
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional
 
 OOB_PASS_PS_WEIGHT = 0.8

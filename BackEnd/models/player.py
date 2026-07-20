@@ -12,7 +12,7 @@ from BackEnd.constants.momentum import (
 )
 import uuid
 import os
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 
 DEBUG_SERIALIZATION = os.getenv("DEBUG_SERIALIZATION")
 

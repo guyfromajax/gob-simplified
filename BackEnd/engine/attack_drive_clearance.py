@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS

@@ -7,7 +7,7 @@ Coordinates are in HOME orientation (x 0–100); x is mirrored when the future F
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:

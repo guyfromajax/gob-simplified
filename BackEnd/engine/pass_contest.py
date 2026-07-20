@@ -25,7 +25,7 @@ along the flight** (first hand on the ball).
 from __future__ import annotations
 
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 # --- Tunable knobs (§14.6) ---------------------------------------------------

@@ -7,7 +7,7 @@ Home-on-offense coords; away uses ``get_away_player_coords`` at boundaries.
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Set
 
 from BackEnd.utils.shared import clamp_animation_grid_coords, get_away_player_coords

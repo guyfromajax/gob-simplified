@@ -8,7 +8,7 @@ identically.
 Tier definition uses `gap = shot_score - shot_threshold` — closeness to
 the outcome threshold, not absolute score.
 """
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 
 from BackEnd.constants import (
     FLSS_HEAVE_MISS_BACKBOARD_MAX,

@@ -6,7 +6,7 @@ Spec: ``_documentation_master/06_Gameplay_Systems/Fast_Break_System.md``
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional, Tuple
 
 from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID

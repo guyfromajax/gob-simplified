@@ -22,7 +22,7 @@ See ``Fast_Break_System.md`` §Coordinated Transition.
 
 from __future__ import annotations
 
-import random as _random_module
+from BackEnd.utils.sim_random import sim_rng as _random_module
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import HCO_STRING_SPOTS

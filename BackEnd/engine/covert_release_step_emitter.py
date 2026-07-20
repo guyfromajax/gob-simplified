@@ -33,7 +33,7 @@ See ``_documentation_master/00_General_Systems/Step_By_Step_System.md`` —
 """
 
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (

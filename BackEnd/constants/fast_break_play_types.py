@@ -14,7 +14,7 @@ DREB play key is chosen on the shot attempt (``shot_manager``) and passed via
 from __future__ import annotations
 
 import copy
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional
 
 # Canonical keys (match scouting_data["offense"]["fast_break_plays"])

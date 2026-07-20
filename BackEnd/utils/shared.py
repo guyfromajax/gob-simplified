@@ -1,5 +1,5 @@
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import logging
 
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
@@ -2224,7 +2224,7 @@ def resolve_steal_attempt(offense_value, defense_value, soft_steal, hard_steal, 
         - "D_FOUL" - Defensive foul on steal attempt, offense retains possession
         - "NO_EVENT" - No event, play continues normally
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.constants import SOFT_PROB
     
     delta = offense_value - defense_value  # negative => defense won the contest

@@ -1,5 +1,5 @@
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import logging
 from BackEnd.utils.shared import get_away_player_coords
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS

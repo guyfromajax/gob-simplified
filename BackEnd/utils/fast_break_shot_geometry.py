@@ -51,7 +51,7 @@ shape is documented on the function below.
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional
 
 from BackEnd.constants import CONTEST_EUCLIDEAN_RADIUS

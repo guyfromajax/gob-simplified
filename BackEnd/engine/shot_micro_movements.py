@@ -7,7 +7,7 @@ and ``build_shot_micro_steps`` consumed by skeleton / HCT / FB / OREB emitters.
 from __future__ import annotations
 
 import logging
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from BackEnd.constants import (

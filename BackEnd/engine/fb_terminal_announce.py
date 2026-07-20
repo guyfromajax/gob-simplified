@@ -27,7 +27,7 @@ retains) is intentionally excluded.
 
 from __future__ import annotations
 
-import random as _random_module
+from BackEnd.utils.sim_random import sim_rng as _random_module
 from typing import Any, Dict, List, Optional
 
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS

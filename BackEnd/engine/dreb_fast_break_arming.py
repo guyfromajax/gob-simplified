@@ -274,7 +274,7 @@ def arm_dreb_fast_break(
     Returns ``"FAST_BREAK"`` or ``"HCO"``. Mutates ``game.game_state`` and optionally
     stamps Covert fields onto ``result``. Honors situational Force Foul (forgo FB).
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
 
     from BackEnd.utils import situational_logic as sl
 

@@ -4,7 +4,7 @@ Applied at quarter breaks, timeouts, and halftime — NOT at foul-outs.
 See _documentation_master/projects/Player_Momentum_System.md. All tunables
 live in BackEnd/constants/momentum.py.
 """
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 
 from BackEnd.constants.momentum import (
     MO_RESET_REDUCTION_MIN,

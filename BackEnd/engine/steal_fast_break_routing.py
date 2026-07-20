@@ -8,7 +8,7 @@ spot that is x-ahead of the stealer. No path-corridor pre-filter.
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict
 
 from BackEnd.constants.fast_break_constants import STEAL_FB_PROB_BY_POTENTIAL_CUTOFFS

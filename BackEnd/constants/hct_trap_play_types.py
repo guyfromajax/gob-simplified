@@ -22,7 +22,7 @@ Diamond family; future derivatives are out of scope.)
 from __future__ import annotations
 
 import copy
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional
 
 # Canonical keys (match playbook_settings["hc_traps"] / scouting hct_trap_plays)

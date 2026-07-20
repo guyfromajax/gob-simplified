@@ -17,7 +17,7 @@ PR1 registers ``fcp_straight_pressure`` only; PR3 adds the other two plays.
 from __future__ import annotations
 
 import copy
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional
 
 FCP_STANDARD_TRAP = "fcp_standard_trap"

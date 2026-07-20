@@ -11,7 +11,7 @@ Home-on-offense coords; away uses ``get_away_player_coords`` flip at boundaries.
 from __future__ import annotations
 
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from BackEnd.constants import HCO_STRING_SPOTS

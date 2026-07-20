@@ -5,7 +5,7 @@ from BackEnd.models.team_manager import TeamManager
 
 from BackEnd.constants import POSITION_LIST, PLAYCALLS, BOX_SCORE_KEYS
 from copy import deepcopy
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 
 from BackEnd.utils.shared import (
     resolve_game_player_reference,
@@ -175,7 +175,7 @@ class GameManager:
 
     
     def _init_game_state(self):
-        import random
+        from BackEnd.utils.sim_random import sim_rng as random
         return {
             "offense_team": self.offense_team.name,
             "defense_team": self.defense_team.name,
@@ -476,7 +476,7 @@ class GameManager:
 
         # ✅ TIMEOUT ENERGY RECHARGE: All players get random recharge at start of timeout
         # This happens before lineup selection screen, so user sees updated energy values
-        import random
+        from BackEnd.utils.sim_random import sim_rng as random
         timeout_recharge_amounts = [0.03, 0.04, 0.05, 0.06]
         
         for team in [self.home_team, self.away_team]:

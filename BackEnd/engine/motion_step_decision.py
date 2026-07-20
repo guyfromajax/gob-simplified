@@ -12,7 +12,7 @@ a single roll, with the raw (roll-free) helper variants from BackEnd.utils.share
 so there is no double random.
 """
 import logging
-import random as _random
+from BackEnd.utils.sim_random import sim_rng as _random
 from BackEnd.constants import HCO_STRING_SPOTS
 from BackEnd.utils.shared import (
     player_read_raw, defender_pressure_raw, inside_defender_raw, ball_handling_raw,

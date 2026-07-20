@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any
 
 from BackEnd.practice_squad.constants import (

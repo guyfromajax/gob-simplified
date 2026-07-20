@@ -273,6 +273,10 @@ def main():
     ap.add_argument("--no-profile", action="store_true", help="skip phase instrumentation")
     ap.add_argument("--seed", type=int, default=None,
                     help="base seed; game i runs with seed = base + i (reproducible week)")
+    ap.add_argument("--allow-global-draws", action="store_true",
+                    help="skip the RNG-isolation assertion (only for pre-isolation "
+                         "comparison arms, where engine draws on the global module "
+                         "are expected)")
     ap.add_argument("--tag", default="")
     args = ap.parse_args()
 
@@ -293,7 +297,14 @@ def main():
     # import sim modules FIRST so profiler alias-rebinding sees their namespaces
     import BackEnd.api.franchise_routes  # noqa: F401
     import BackEnd.practice_squad.sim  # noqa: F401
-    from BackEnd.utils import sim_profiler
+    from BackEnd.utils import sim_profiler, sim_random
+
+    # RNG isolation is a standing invariant, not a one-off migration check: the
+    # engine must draw only from sim_rng. Armed before any sim runs so a stray
+    # draw site on a rare branch (OT, ejections) is caught and attributed the
+    # first time it fires, instead of showing up later as an unexplained
+    # byte-identical failure.
+    sim_random.install_global_draw_guard()
 
     probes = sim_profiler.install()
 
@@ -391,6 +402,36 @@ def main():
             run_batch("practice_squad", ps_jobs, run_ps_game,
                       lambda j: f"{j['away_display_name']} @ {j['home_display_name']}",
                       args.workers)
+
+    # ---- RNG isolation assertion -----------------------------------------
+    leaks = sim_random.global_draw_report()
+    if leaks:
+        total = sum(leaks.values())
+        msg = [
+            "",
+            "=" * 78,
+            "❌ RNG ISOLATION VIOLATION — engine code drew from the GLOBAL random module",
+            "=" * 78,
+            f"{total:,} draw(s) across {len(leaks)} call site(s). These are NOT isolated from",
+            "third-party RNG use (e.g. pymongo), so seeded results are not reproducible",
+            "and sim outcomes can shift with unrelated activity such as DB writes.",
+            "",
+            "Fix: bind the module to the sim stream —",
+            "    from BackEnd.utils.sim_random import sim_rng as random",
+            "",
+            f"{'call site':<64}{'draws':>10}",
+            "-" * 74,
+        ]
+        for site, n in sorted(leaks.items(), key=lambda kv: -kv[1]):
+            msg.append(f"{site:<64}{n:>10,}")
+        msg.append("=" * 78)
+        print("\n".join(msg), file=sys.stderr)
+        if not args.allow_global_draws:
+            sys.exit(1)
+        print("⚠️  --allow-global-draws set; continuing despite the violation.",
+              file=sys.stderr)
+    else:
+        print("✅ RNG isolation: 0 engine draws on the global module", file=sys.stderr)
 
     payload = {
         "generated_at": _dt.datetime.now().isoformat(timespec="seconds"),

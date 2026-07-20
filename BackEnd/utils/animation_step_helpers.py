@@ -13,7 +13,7 @@ stretched across the gating player's step duration. See
 ``UESS_System.md`` §3 (``tween_durations`` / ``stamp_tween_durations``).
 """
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS

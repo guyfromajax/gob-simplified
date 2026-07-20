@@ -26,7 +26,7 @@ Rules (aligned Jul 2026):
 from __future__ import annotations
 
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional, Set
 
 from BackEnd.constants import (

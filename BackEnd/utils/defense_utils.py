@@ -2,7 +2,7 @@
 Utility functions for defensive playcall tracking and mapping.
 """
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Optional
 
 _LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")

@@ -3,7 +3,7 @@ from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animator import Animator
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import json
 import logging
 import uuid
@@ -3581,7 +3581,7 @@ class TurnManager:
                 Positive: Offensive advantage
                 Negative: Defensive advantage
         """
-        import random
+        from BackEnd.utils.sim_random import sim_rng as random
         
         # Implement EV calculation
         from BackEnd.db import plays_collection

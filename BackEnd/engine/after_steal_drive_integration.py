@@ -8,7 +8,7 @@ remains in ``after_steal_fast_break._resolve_after_steal_legacy``.
 from __future__ import annotations
 
 import logging
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Tuple
 

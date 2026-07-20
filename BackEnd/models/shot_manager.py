@@ -1,4 +1,4 @@
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import logging
 import math
 from BackEnd.constants.momentum import (

@@ -9,7 +9,7 @@ consumed when a franchise game is started (init-game / new simulate-quarter game
 """
 from __future__ import annotations
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Tuple
 
 from BackEnd.constants import FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE

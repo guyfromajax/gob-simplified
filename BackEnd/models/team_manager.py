@@ -1,4 +1,4 @@
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from copy import deepcopy
 from BackEnd.db import teams_collection
 from BackEnd.utils.roster_loader import load_roster

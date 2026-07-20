@@ -1,4 +1,4 @@
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import logging
 import copy
 import time
@@ -603,7 +603,7 @@ def pick_force_foul_defender_spot(
     step at HCO-start carries him in from wherever he is).
     """
     import math
-    import random as _random
+    from BackEnd.utils.sim_random import sim_rng as _random
     from BackEnd.constants import QUICK_FOUL_APPROACH_RADIUS_GRID
 
     r_rng = rng or _random
@@ -3141,7 +3141,7 @@ def resolve_hco_outcome(game, skeleton):
             - execution_score: For SHOT results, execution score (0-100) calculated from result
                           For non-SHOT results, None
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.constants import (
         STANDARD_D_FOUL, STANDARD_O_FOUL, HARD_STEAL, SOFT_STEAL,
         HARD_FOUL, SOFT_FOUL, SOFT_PROB, STEAL_ATTEMPT, DEAD_BALL_TURNOVER
@@ -3359,7 +3359,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
         - Defensive matchup effectiveness
         - Game situation (score, time, quarter)
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.constants import ACTIONS
     
     result = random.choices(
@@ -4260,7 +4260,7 @@ def _uess_sync_emitted_shot_coords(game, skeleton, animations, roles, turn_type=
         # state so it does NOT advance the stream and perturb resolve_shot's
         # make/miss or any downstream outcome. The fix changes the coords the
         # logic reads, never game results directly.
-        import random as _random
+        from BackEnd.utils.sim_random import sim_rng as _random
         _rng_state = _random.getstate()
         try:
             steps = build_skeleton_animation_steps(probe_tr, game, turn_type=turn_type)
@@ -4501,7 +4501,7 @@ def _hco_recovery_roll(game, rng=None):
     offensive_efficiency) × d6` vs `defense_score = (team_chemistry + defensive_efficiency) × d6`
     (each team's own chemistry). True → re-enter at the next defined step; False → GATE 2.
     Formula unchanged from Z-Completed/Dynamic_HCO_SP_Brief."""
-    import random as _r
+    from BackEnd.utils.sim_random import sim_rng as _r
     rng = rng or _r
     oa = (getattr(game.offense_team, "team_attributes", {}) or {})
     da = (getattr(game.defense_team, "team_attributes", {}) or {})
@@ -4839,7 +4839,7 @@ HCO_PASS_INTERCEPT_TIER_MID = 170.0
 def _hco_pass_lane_dist(game):
     """HCO hot-read/kickout passing-lane distance: passive→6, aggressive→5, normal→randint(5,6)
     rolled ONCE per game and cached in game_state['_hco_pass_lane_dist_normal']."""
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     game_state = game.game_state
     def_call = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")
     fixed = HCO_PASS_LANE_DIST_BY_AGGRESSION.get(def_call)
@@ -5675,7 +5675,7 @@ def _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, 
     _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup)
     from BackEnd.utils.defense_utils import is_zone_defense
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
-    import random as _rng
+    from BackEnd.utils.sim_random import sim_rng as _rng
     off_team = game.offense_team
     is_away_offense = off_team.team_id == game.away_team.team_id
     zone = is_zone_defense(game_state.get("defense_playcall"))
@@ -6103,7 +6103,7 @@ def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_ta
     credits / lunges the ACTUAL contesting defender (man position-match ≠ zone defender). The walk
     runs BEFORE shot resolution, so a moment pre-empts the would-be shot (true per-step interleaving
     is a later refinement). All logic + RNG backend-side (SS&S); FE only renders."""
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.utils.defense_utils import is_zone_defense
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
@@ -6200,7 +6200,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     existing non-shot / stopper machinery finalize. Non-terminal contests append ``(step_index,
     defender_id)`` to ``reach_in_tags`` (when passed) for the caller's render-space reach-in flourish
     (indices are in the RETURNED skeleton's step space). Per-turn moment engagement is rolled ONCE."""
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.engine.motion_read_map import build_motion_read_map
     from BackEnd.engine.motion_step_decision import (
         decide_step_action, should_shoot, _choose_attack_or_outside, _step_locations,
@@ -6676,7 +6676,7 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
     including the shot step itself). shot_step is the original skeleton step the shot fires
     from (used as the attack-drive selected_step and for the receiver's location).
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
 
     last_timestamp = base_steps[-1].get("timestamp", 0)
     shooter_pos = decision["shooter_pos"]
@@ -6916,7 +6916,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
     triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.constants import ACTIONS
     from BackEnd.engine.eoq_debug_log import log_eoq_step
     from BackEnd.utils import situational_logic as sl
@@ -9359,7 +9359,7 @@ def get_fcp_skeleton(result_type, game_context=None):
         if game_context.game_state.get("_is_full_simulation", False):
             return None
     
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.db import fcp_skeletons_collection
     
     # Map result_type to variant name
@@ -9460,7 +9460,7 @@ def get_hct_skeleton(result_type, game_context=None):
         if game_context.game_state.get("_is_full_simulation", False):
             return None
     
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
     from BackEnd.db import hct_skeletons_collection
     
     # Map result_type to variant name

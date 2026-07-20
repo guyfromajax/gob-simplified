@@ -5,7 +5,7 @@ See Shot_System.md § Uncontested inside/attack make rule.
 from __future__ import annotations
 
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Optional
 
 # Matches CONTEST_EUCLIDEAN_RADIUS — uncontested helper geo gate.

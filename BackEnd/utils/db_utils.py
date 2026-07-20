@@ -1,5 +1,5 @@
 import logging
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import List, Dict, Union, Optional
 
 from BackEnd.db import players_collection

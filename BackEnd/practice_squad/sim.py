@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any
 
 from BackEnd.main import simulate_quarter

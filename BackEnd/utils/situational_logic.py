@@ -6,7 +6,7 @@ All logic applies only when quarter >= 4 (Q4 and OT). Time remaining is in the q
 Temp overrides (Fast Break, FCP, HCT) revert when the situation ends (re-evaluated each turn).
 """
 
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import logging
 from BackEnd.constants import (
     SITUATIONAL_TIME_BANDS,

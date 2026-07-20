@@ -3459,7 +3459,7 @@ def _append_post_steal_hco_transition(
     coord snapshot for the next HCO turn's handoff. No-op for steals that
     transition to FAST_BREAK (handled by the after_steal FB emitter).
     """
-    import random
+    from BackEnd.utils.sim_random import sim_rng as random
 
     if not steps:
         return

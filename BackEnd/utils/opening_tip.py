@@ -1,4 +1,4 @@
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 
 from BackEnd.opening_lineup_snapshot import snapshot_opening_lineups_to_game_state
 from BackEnd.utils.position_snapshot_ledger import (

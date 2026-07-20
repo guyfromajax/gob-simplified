@@ -1,4 +1,4 @@
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 import os
 
 # Debug flag - set DISABLE_DEBUG=1 environment variable to suppress verbose output

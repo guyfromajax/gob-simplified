@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 import math
-import random
+from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (

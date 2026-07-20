@@ -3916,8 +3916,8 @@ def _run_franchise_cpu_full_simulation_core(
     across threads — see scripts/perf_sim_baseline.py --seed.
     """
     if seed is not None:
-        import random as _seed_random
-        _seed_random.seed(seed)
+        from BackEnd.utils.sim_random import seed as _seed_sim_rng
+        _seed_sim_rng(seed)
 
     home_prepared = prepare_ftd_for_new_game(
         _franchise_cpu_full_sim_ftd_doc(franchise_id, home_id)
