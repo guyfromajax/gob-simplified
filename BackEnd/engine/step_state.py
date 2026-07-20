@@ -50,10 +50,48 @@ def build_step_states(result, game):
         setattr(game, "_hco_render_animations", None)
     except Exception:
         pass
-    anim_source = "emitter-draw" if render_anims else "compute_grid-fallback"
+    # PERF: the compute_defender_grid fallback is a FULL animation build (deepcopy +
+    # offense walk + defender placement) and was ~33% of all defender-grid builds in a
+    # sim. It is dead work there: build_step_states runs LAST in
+    # resolve_half_court_offense — after resolve_half_court_offense_logic (where the
+    # interception contest reads `_step_state["defense"]`, stamped by
+    # _stamp_contest_defender_grid) and after the emit. Its return value is discarded
+    # at the call site, and sims drop turns wholesale
+    # (summarize_game_state(exclude_animations=True)).
+    #
+    # Proven, not assumed: a poison-stash run kept the rebuild executing (identical RNG
+    # draw count) but stashed {x:-9999,y:-9999} for every defender. The seeded 63 CPU +
+    # 20 PS week came back byte-identical, so nothing reads this grid in a full sim. An
+    # exact diff alone cannot establish that — removing the rebuild removes draws from
+    # the sim stream, which shifts every downstream result by construction.
+    #
+    # Animated games are untouched: they take the render-stash branch above, which never
+    # called compute_defender_grid.
+    is_full_sim = bool(game_state.get("_is_full_simulation"))
+    anim_source = ("emitter-draw" if render_anims
+                   else ("stamp-reuse-full-sim" if is_full_sim else "compute_grid-fallback"))
     try:
         if render_anims:
             grid_by_step = Animator.defender_grid_from_animations(render_anims, def_lineup, len(steps))
+        elif is_full_sim:
+            # Reuse the grid _stamp_contest_defender_grid already placed on these steps
+            # rather than rebuilding it — and rather than blanking it, since a later turn
+            # could still read a prior turn's stamp.
+            #
+            # ⚠️ SEMANTIC NOTE for whoever adds the first consumer of StepState.defense:
+            # on the sim path this records STAMP-TIME geometry, not the post-emit rebuild
+            # it used to record. Per step that is the most recent
+            # _stamp_contest_defender_grid to touch it — the coverage-pass stamp
+            # (phase_resolution.py:5675) where it ran, else the pre-walk stamp (:6242).
+            # Steps created AFTER the last stamp (shot-clock recalibration, intra-
+            # resolution expansion) carry {} where the old rebuild produced coordinates.
+            # Deliberate: stamp-time geometry is what the interception contest actually
+            # judged against, i.e. the state that decided the turn. The post-emit rebuild
+            # was a fourth snapshot no decision was ever made on.
+            grid_by_step = {
+                i: ((step.get("_step_state") or {}).get("defense") or {})
+                for i, step in enumerate(steps)
+            }
         else:
             grid_by_step = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
     except Exception:
