@@ -1399,11 +1399,8 @@ def _straight_pressure_targets(
     targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
 
     if off_coords is None:
-        # Terminal collapse beat (stopper): man defenders + rover converge on the BH.
-        for d in state["assignment"]:
-            targets[d] = _converge_xy(bh_xy, is_away_offense)
-        if state["rover"] is not None:
-            targets[state["rover"]] = _converge_xy(bh_xy, is_away_offense)
+        # Terminal stopper / no-offense snapshot: backcourt holds current spots
+        # (do not snap man/rover onto the BH — that forced triple-teams).
         return targets
 
     bh_off = _match_off_pos(off_coords, bh_xy)
@@ -1687,18 +1684,14 @@ def _diamond_targets(
     pos1, pos2, pos3, pos4 = alias["pos1"], alias["pos2"], alias["pos3"], alias["pos4"]
     targets: Dict[str, Dict[str, int]] = {pos: dict(def_coords[pos]) for pos in POSITIONS}
 
+    if off_coords is None:
+        # Terminal stopper / no-offense snapshot: hold current spots.
+        return targets
+
     # center_bc_defender always tracks the BH (on-ball pressure / trapper).
     targets[cbd] = _converge_xy(bh_xy, is_away_offense)
 
     band = _diamond_band(bh_xy["y"])
-
-    if off_coords is None:
-        # Terminal collapse beat (stopper): bring the band's wing in to finish.
-        if band == "upper":
-            targets[pos2] = _converge_xy(bh_xy, is_away_offense)
-        elif band == "lower":
-            targets[pos3] = _converge_xy(bh_xy, is_away_offense)
-        return targets
 
     bh_off = _match_off_pos(off_coords, bh_xy)
     midlane_x = _spot("midLane", is_away_offense)["x"]
@@ -2842,30 +2835,17 @@ def compute_dynamic_hct_turn(
         pending_reach_in_def_pos = None
 
     def _emit_stopper(reason: str, label: str = "") -> float:
-        """D8 — terminal whistle/steal beat: the defense collapses onto the BH
-        for a short hold. Mutates ``def_coords`` and appends the segment."""
+        """D8 — terminal whistle/steal/dead-ball beat: a short hold in place.
+
+        Backcourt defenders keep their current coords (no snap onto the BH).
+        Moment credit already resolved before this beat runs.
+        """
         stop_snap_off, stop_snap_def = _snap_loop_coords()
-        pre_stop_def = {pos: dict(def_coords[pos]) for pos in POSITIONS}
-        _position_defense(bh_xy, def_coords, is_away_offense, play=play)
-        # HCT-Task 7b (standard as of 2026-07-08): size the terminal collapse by
-        # the SLOWEST mover so far defenders don't fast-snap into the trap. End
-        # coords are UNCHANGED (still the full trap _position_defense set); only
-        # the beat DURATION grows and per-defender rates are carried for the
-        # emitter. Runs AFTER the moment is credited, so the steal/foul credit is
-        # never changed — the honest longer close does consume real game clock
-        # (an aggregate-neutral reshuffle, measured; see
-        # Trap_Press_Positioning_Decision.md).
+        # Hold everyone — especially PG/SG/SF. Previously ``_position_defense``
+        # without off_coords snapped Straight Pressure assignments (often all
+        # three backcourt) and Standard Trap form onto the BH → visual triples.
         secs = 0.5
-        stop_move_arch: Dict[str, str] = {}
-        for pos in POSITIONS:
-            arch = _defender_move_archetype(pos, set())
-            stop_move_arch[pos] = arch
-            secs = max(
-                secs,
-                calc_ag_segment_seconds(
-                    pre_stop_def[pos], def_coords[pos], def_lineup.get(pos), archetype=arch
-                ),
-            )
+        stop_move_arch = {pos: _defender_move_archetype(pos, set()) for pos in POSITIONS}
         _append_loop_segment(
             reason,
             secs,
