@@ -2422,8 +2422,14 @@ def summarize_game_state(game, exclude_animations=True):
             for item in obj:
                 _collect_player_ids(item, acc)
 
+    # PERF: this walks the ENTIRE turns tree (~1.2M recursive calls in a full game).
+    # Its only consumer is the `has_fresh_turns` block below, whose guard is exactly
+    # `len(game.turns) > 0 and not exclude_animations`. Sims always pass
+    # exclude_animations=True (and drop turns entirely), so the walk was pure waste
+    # on that path. Same condition here keeps the animated path byte-identical.
     referenced_ids = set()
-    _collect_player_ids(game.turns, referenced_ids)
+    if not exclude_animations and game.turns:
+        _collect_player_ids(game.turns, referenced_ids)
 
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
