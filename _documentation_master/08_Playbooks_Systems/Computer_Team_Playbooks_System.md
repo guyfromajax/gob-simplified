@@ -301,17 +301,30 @@ After the selected set-play list is finalized:
 
 ### Man Defense
 
-Three first-class man variants (Base / Deny / Loose Man), weighted like the zone map:
+Three first-class man variants (Base / Deny / Loose Man), **randomized per customization exactly like
+the zone map** — `_random_capped_three(("man_normal","man_tight","man_loose"), max_pct=MAN_DEFENSE_MAX_PCT)`:
 
 ```json
 {
-  "man_normal": 100,
-  "man_tight": 0,
-  "man_loose": 0
+  "man_normal": 34,
+  "man_tight": 38,
+  "man_loose": 28
 }
 ```
 
+Each variant draws 1..`MAN_DEFENSE_MAX_PCT` (50) and the three sum to 100, so CPU teams mix all three
+man calls (~33% each on average) instead of always calling Base.
+
 (`man_normal`=Base, `man_tight`=Deny, `man_loose`=Loose; legacy `man_pressure` folds to `man_tight` on save.)
+
+> The **user's** seeded default (`initialize_playbook_settings`) and the tutorial stay at
+> `man_normal` 100 / others 0 — only CPU customization randomizes.
+
+## Tunable Constants
+
+| Constant | File | Value | Effect |
+|---|---|---|---|
+| `MAN_DEFENSE_MAX_PCT` | `cpu_playbook_customization.py` | 50 | Per-variant cap on CPU man weights. Mirrors the zone cap. `_random_capped_three` treats the three keys symmetrically, so there is no way to favour Base by tuning this alone — lowering it only makes the mix more even. To keep Base dominant, replace the call with an explicit weight map. |
 
 This does **not** mean CPU teams always play man. Man vs zone is still determined by the team's `strategy_settings.defense` / gameplay selection rules. This map only weights which man variant is selected (`_select_man_defense_with_playbook_weights`) when man defense is chosen. See [`integrating_new_d_plays.md`](../projects/integrating_new_d_plays.md).
 

@@ -341,6 +341,18 @@ architecture (owner, 2026-07-19).** The S4 posture prototype was reconciled INTO
 
 **Phase 5 ✅ DONE.** Prod (`gob`) DB seed shipped; system + secondary docs swept (`Sim_Playcalling_System`, `O_&_D_Plays_Collections`, `Playbooks_Page`, `Mode_Init_System`, `Computer_Team_Playbooks_System`, `Playcall_Center`, `Defense_ID_Migration`); stale tests updated (`test_cpu_playbook_customization`, `test_playbook_locks_and_preview`, `test_training_playbook_focus` — now assert distinct man buckets; verified against code, runnable when pytest is unblocked).
 
+**Phase 6 ✅ CPU + Practice Squad variance (2026-07-20).** Phases 1–5 wired the picker but left every
+CPU team on a hardcoded `{man_normal:100, man_tight:0, man_loose:0}`, so only user teams ever called
+Deny/Loose. Now:
+
+| Surface | Change |
+|---|---|
+| CPU teams | `cpu_playbook_customization.py` — `man_defense` uses `_random_capped_three(..., max_pct=MAN_DEFENSE_MAX_PCT)`, same mechanism as `zone_defense`. Verified: 11 distinct man mixes across 12 builds. |
+| Practice Squad | `practice_squad/sim.py` — new `ps_playbook_settings()` rolls a per-game man mix onto each synthetic team (they have no team doc, so `playbook_settings` was `{}` → picker always returned base). Verified: 20 PS games produced 338 base / 349 deny / 313 loose. |
+| Unchanged | User seeded default (`initialize_playbook_settings`) + tutorial stay 100% Base; PS offense/zone keep equal-weight random fallbacks. |
+
+Knob: `MAN_DEFENSE_MAX_PCT` (50) — see `Computer_Team_Playbooks_System.md` § Tunable Constants.
+
 ### Intentional deferrals (NOT loose ends — workstream is functionally complete)
 
 Two items were deliberately **not** done now because doing them now trades real risk for zero functional gain. Base/Deny/Loose Man work correctly today with base living on the shared `man` scouting row.

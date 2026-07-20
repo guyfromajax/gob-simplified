@@ -95,7 +95,11 @@ def test_build_cpu_playbook_build_week_sets_constraints_and_play_fields():
     )
 
     settings = result.playbook_settings
-    assert settings["man_defense"] == {"man_normal": 100, "man_tight": 0, "man_loose": 0}
+    # Man variants are randomized like zones (Base / Deny / Loose each 1..50, summing to 100)
+    assert set(settings["man_defense"]) == {"man_normal", "man_tight", "man_loose"}
+    assert sum(settings["man_defense"].values()) == 100
+    assert max(settings["man_defense"].values()) <= 50
+    assert min(settings["man_defense"].values()) >= 1
     assert sum(settings["zone_defense"].values()) == 100
     assert max(settings["zone_defense"].values()) <= 50
     assert sum(settings["fast_breaks"].values()) == 100

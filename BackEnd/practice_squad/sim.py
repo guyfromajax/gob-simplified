@@ -49,6 +49,30 @@ logger = logging.getLogger(__name__)
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 
+def ps_playbook_settings() -> dict:
+    """Per-game randomized playbook weights for one PS team.
+
+    PS teams are synthetic (no team doc), so `TeamManager` leaves `playbook_settings` empty and the
+    CPU man picker falls through to base `man` on every possession — meaning PS games never called
+    Deny or Loose Man. Rolling `man_defense` here gives each PS team its own per-game man mix, the
+    same way `zone_defense` already varies (integrating_new_d_plays.md; Practice_Squad_Games_System.md
+    § Simulation "per-game randomized CPU defaults").
+
+    Only `man_defense` is set: offense (`motion`/`set_plays`) and `zone_defense` intentionally stay
+    absent so those selectors keep their existing equal-weight random fallbacks.
+    """
+    from BackEnd.utils.cpu_playbook_customization import (
+        MAN_DEFENSE_MAX_PCT,
+        _random_capped_three,
+    )
+
+    return {
+        "man_defense": _random_capped_three(
+            ("man_normal", "man_tight", "man_loose"), max_pct=MAN_DEFENSE_MAX_PCT
+        )
+    }
+
+
 def _player_payload_from_roster_slot(slot: dict, fpd_by_id: dict, frd_by_id: dict) -> dict[str, Any]:
     pid = str(slot.get("player_id") or "")
     source = slot.get("source")
@@ -152,6 +176,9 @@ def run_ps_full_simulation(
     )
     gm.home_team.lineup = build_ps_lineup(gm.home_team)
     gm.away_team.lineup = build_ps_lineup(gm.away_team)
+    # Roll independently per team so home/away run different man mixes.
+    gm.home_team.playbook_settings = ps_playbook_settings()
+    gm.away_team.playbook_settings = ps_playbook_settings()
     gm.game_state["allow_fouled_out_lineup_reentry"] = True
     gm.game_state["_headless_simulation"] = True
     gm.game_state["_headless_game_id"] = game_id

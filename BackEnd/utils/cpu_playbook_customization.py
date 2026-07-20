@@ -11,6 +11,11 @@ from bson import ObjectId
 
 CORE_MOTION_PLAY_NAMES = ("5-0 Motion", "4-1 Motion", "3-2 Motion")
 PF_POST_MOTION_PLAY_NAME = "PF Post Motion"
+# Per-variant cap on CPU man-defense weights (Base / Deny / Loose). 50 mirrors the zone cap, so all
+# three man calls average ~33%. LOWER this to make CPU man calls more extreme; there is no way to
+# favour Base within `_random_capped_three` — it treats the three keys symmetrically. To keep Base
+# dominant instead, replace the call with an explicit weight map.
+MAN_DEFENSE_MAX_PCT = 50
 FOCUSES = ("inside", "attack", "outside")
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
@@ -391,7 +396,12 @@ def build_cpu_playbook_for_team(
     else:
         next_settings["hc_traps"] = {"standard_trap": 50, "straight_pressure": 50, "standard_diamond": 0}
     next_settings["zone_defense"] = _random_capped_three(("zone_23", "zone_32", "zone_131"))
-    next_settings["man_defense"] = {"man_normal": 100, "man_tight": 0, "man_loose": 0}
+    # Man variants are varied exactly like zones: per-customization random weights summing to 100,
+    # each capped at MAN_DEFENSE_MAX_PCT, so CPU teams mix Base / Deny / Loose Man instead of
+    # always calling Base (integrating_new_d_plays.md Phase 3).
+    next_settings["man_defense"] = _random_capped_three(
+        ("man_normal", "man_tight", "man_loose"), max_pct=MAN_DEFENSE_MAX_PCT
+    )
 
     meta = next_settings.get("_meta") if isinstance(next_settings.get("_meta"), dict) else {}
     next_settings["_meta"] = {**meta, "schema_version": 2, "cpu_customized": True}

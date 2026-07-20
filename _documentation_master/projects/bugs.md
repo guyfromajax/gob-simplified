@@ -1,11 +1,7 @@
 ##Bugs
 1. Teleported an HCO entry step, result was a DB turnover
 2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-5. Dead ball turnove rin HCO is passing ahead then teleppring back to animate the DB turnover
-8. Need to keep games closer / blowout governor
 9. Fix triple teams on HCT and FCP
-13. Better timing on shots, most shoudl be more immediate, those that are not should have pre-shot movement
-14. ~~BIP→HCT@≤30 poisoned EOQ chain (Final Shot armed but never executed)~~ — **Fixed 2026-07-18:** HCT/FCP open window only; Final Shot execute flags HCO-only. See EOQ_System.md §6.
 
 
 ##Full Product Readiness
@@ -16,17 +12,19 @@
 119. PvP sim
 121. Tunable Constants file
 123. Downloadable game vs Live game dynamics
-125. MM: Micro Movement SFX
 127. Add a new hire news story for user team
 128. Add a badass design appraoch to New Stories
 129. Comprehensive Blowout Governor
-132. Watermark free version of player headshots
+129. HCO Roles Audit & Fixes
+130. Better timing on shots, most shoudl be more immediate, those that are not should have pre-shot movement
+
 
 ##Full Product Perfection
 1. Training Camp News Report
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
 25. Fast Break and P/T callouts in the Scouting Report of opponent
+26. Add tournament design magic to the UX -- court screen, modals, FCC, etc
 102. Team court images
 108. Message board
 110. Strategic Geek Points system
@@ -35,6 +33,7 @@
 116. User account -- link X & Facebook?
 117. More action on Signing Day
 118. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
+125. MM: Micro Movement SFX
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 129: Loose Balls!
 131. Centralized Turn Transition Helper / System
@@ -42,6 +41,9 @@
 133. Loose/Normal/Tight Defense Play Types
 134. Better simming of computer games
 135. Better simming of computer training
+136. Need to better calibrate season to season player attribute progression
+137. Watermark free version of player headshots
+
 200. PvP live
 
 ##Continuous Evolution (base is built)

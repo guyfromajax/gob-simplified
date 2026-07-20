@@ -37,6 +37,14 @@
 - PS games are headless: foul counts, foul-out removal, and replacement still apply, but interactive timeout turns and resume-state saves are skipped.
 - Per-turn diagnostic warnings are suppressed during headless PS sims; errors and concise game/job progress remain logged.
 - Per-game randomized CPU defaults (strategy, team attrs, scouting, plays).
+- **Man defense (2026-07-20):** PS teams are synthetic, so `TeamManager` leaves `playbook_settings`
+  empty and the CPU man picker fell through to base `man` every possession — PS games never called
+  Deny or Loose Man. `ps_playbook_settings()` now rolls a per-game `man_defense` mix (Base/Deny/Loose,
+  each 1..50, summing to 100) onto **each** team, so PS games exercise all three man plays and their
+  stats land on the `man` / `man-tight` / `man-loose` scouting rows.
+  Only `man_defense` is set — offense (`motion`/`set_plays`) and `zone_defense` are intentionally left
+  absent so those selectors keep their existing equal-weight random fallbacks.
+  See [`integrating_new_d_plays.md`](../projects/integrating_new_d_plays.md).
 - Game docs: `games` collection, `mode: "practice_squad"`.
 - Stats → `ps_season_stats` on FPD/FRD only (not season/career).
 - After each sim, `apply_ps_game_stats()` reads the saved game box score and `$inc`s into `ps_season_stats`.
