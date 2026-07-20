@@ -3902,8 +3902,23 @@ def _run_franchise_cpu_full_simulation_core(
     away_id: Any,
     home_name: str,
     away_name: str,
+    seed: int | None = None,
 ) -> tuple[int, int, dict]:
-    """CPU-only turn-based franchise sim; hydrate FTD data and avoid DB writes."""
+    """CPU-only turn-based franchise sim; hydrate FTD data and avoid DB writes.
+
+    ``seed`` is a TEST-ONLY reproducibility hook and defaults to None (production
+    passes nothing, so behavior is unchanged). When set, the global ``random``
+    module is seeded before any game state is built, making the game's outcome a
+    pure function of the seed + the FTD inputs. Callers should derive a distinct
+    seed per game (e.g. base + index) so a game reproduces independently of how
+    many games ran before it. Determinism additionally requires a stable
+    PYTHONHASHSEED and single-threaded execution, since the global RNG is shared
+    across threads — see scripts/perf_sim_baseline.py --seed.
+    """
+    if seed is not None:
+        import random as _seed_random
+        _seed_random.seed(seed)
+
     home_prepared = prepare_ftd_for_new_game(
         _franchise_cpu_full_sim_ftd_doc(franchise_id, home_id)
     )

@@ -157,8 +157,17 @@ def run_ps_full_simulation(
     fpd_by_id: dict[str, dict],
     frd_by_id: dict[str, dict],
     game_id: str | None = None,
+    seed: int | None = None,
 ) -> tuple[int, int, dict]:
-    """Run a full turn-based sim; no DB writes."""
+    """Run a full turn-based sim; no DB writes.
+
+    ``seed`` is a TEST-ONLY reproducibility hook, defaulting to None so production
+    behavior is unchanged. See ``_run_franchise_cpu_full_simulation_core`` for the
+    determinism contract (per-game seed, stable PYTHONHASHSEED, single-threaded).
+    """
+    if seed is not None:
+        random.seed(seed)
+
     home_payloads = [_player_payload_from_roster_slot(s, fpd_by_id, frd_by_id) for s in home_roster]
     away_payloads = [_player_payload_from_roster_slot(s, fpd_by_id, frd_by_id) for s in away_roster]
 
