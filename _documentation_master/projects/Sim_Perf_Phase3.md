@@ -141,12 +141,10 @@ Kill switch is env-only, so disabling needs no code deploy.
 
 ## Timing
 
-> **Measurement caveat.** The local box was contended throughout by an unrelated app
-> (OOTP Baseball, intermittent ~210% CPU bursts on the 14-core machine). Wall-clock runs inflated
-> 1.5–2× and varied run-to-run, so wall numbers below are **not** reliable and a clean pool
-> scaling curve could not be produced here. Contention-**immune** measures (CPU-time via
-> `getrusage`, cProfile `tottime`, RSS) are reported instead; the authoritative wall-clock scaling
-> curve is deferred to the Railway staging run — the real 32-vCPU target anyway.
+> **Measurement note.** An unrelated app (OOTP Baseball, ~210% CPU) contended the box for most of
+> the session and had to be closed before a clean curve was possible; earlier contended runs were
+> discarded. The curve below was taken quiet (median of 3, 14-core box: 10 performance + 4
+> efficiency). Railway's 32-vCPU staging service remains the authoritative target — see rollout.
 
 ### Stage 3a — single-core (contention-immune)
 
@@ -160,28 +158,41 @@ but the function is ~13% of a game's cumtime and the win is a fraction of that, 
 single-core wins were already taken in Phases 1–2; 3a's role was to clear the hottest leaf cheaply
 and safely, which it did.
 
-### Stage 3b — pool scaling
+### Stage 3b — pool scaling curve
 
-- **Per-worker peak RSS ~200 MB** (contention-independent). At 8 workers ≈ 1.6 GB + parent — a
-  small fraction of Railway's 32 GB, so **memory is not a constraint** at the default worker count.
-- **Correctness at scale:** the pool completed the full 63/64-game week with **zero errors at 1, 4,
-  8, and 12 workers**.
-- **Wall (indicative only, contended):** one pass caught the box briefly idle and did 64 games in
-  **25.7 s at 12 workers** (~0.4 s/game effective) — ~11.7 s of pure compute (2.19 s × 64 ÷ 12)
-  plus spawn/import and DB. Consistent with near-linear scaling, but a single data point, not a
-  curve. The 1/4/8-worker passes were caught mid-contention and discarded.
-- **Cold pool creation** (spawn + per-worker app import) is included in all pool wall times, since
-  production pays it per advance-week. It is the dominant fixed cost at high worker counts on a
-  short week — one reason the default is 8, not the max.
+Full 64-game week, wall time **includes cold pool creation** (spawn + per-worker app import), which
+production pays per advance-week. Median of 3.
+
+| Workers | Wall (s) | Speedup | Parallel efficiency | Peak RSS/worker |
+|--------:|---------:|--------:|--------------------:|----------------:|
+| 1  | 224.9 | 1.00× | 100% | 202 MB |
+| 4  | 61.4  | 3.66× | 92%  | 197 MB |
+| 8  | 34.6  | 6.51× | 81%  | 200 MB |
+| 12 | 26.4  | 8.53× | 71%  | 212 MB |
+
+Contrast the ThreadPoolExecutor's **1.57× on 4 workers** (Phase 1): the pool delivers **3.66×** on
+the same worker count — real parallelism, GIL gone.
+
+Efficiency decays as expected: 92% → 81% → 71%. Two causes — the box has only 10 performance cores
+(the 4 efficiency cores are slower), and cold pool creation is a fixed per-run cost that a short
+week amortizes worse at high worker counts. **The default of 8 (6.51×, 81%) is the sweet spot** —
+near-peak throughput while leaving headroom so live user-game requests don't contend.
+
+**Memory is not a constraint:** RSS holds ~200 MB/worker regardless of count. 8 workers ≈ 1.6 GB +
+parent, a small fraction of Railway's 32 GB.
+
+**Correctness at scale:** zero errors at every worker count.
 
 ### Railway projection
 
-Deferred to staging. The local box is doubly unrepresentative: contended, AND its ~27 ms Atlas RTT
-is ~10× Railway's colocated latency, so the DB-wait fraction the pool overlaps differs. Staging
-(32 vCPU, colocated Atlas) is where the 90 s-target math should be settled. Order-of-magnitude:
-single-core CPU is ~138 s/week and the work is embarrassingly parallel across games, so 8 workers
-should bring the compute portion comfortably under target; the open question staging answers is
-how DB and spawn/import overhead land on real hardware.
+> **At 8 workers the full week runs in 34.6 s locally — already under the 90 s target** — and this
+> box has ~10× *worse* DB latency than Railway (27 ms Atlas RTT vs ~1–3 ms colocated). The DB-wait
+> portion, which the pool overlaps across processes, is larger here than it will be on Railway.
+
+So the 90 s target looks comfortably reachable. The remaining unknowns staging resolves: whether a
+Railway vCPU matches this Mac's performance-core throughput, and how process spawn + app import
+behave under uvicorn. Single-core compute is ~138 s CPU/week and the work is embarrassingly
+parallel across games, so headroom is large. Staging measures the real number.
 
 ## Found but NOT touched (Phase 4 candidates)
 
