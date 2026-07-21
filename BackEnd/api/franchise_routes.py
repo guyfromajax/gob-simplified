@@ -2080,6 +2080,7 @@ def auto_train_one_cpu_team(
     team_id: Any,
     week: int,
     *,
+    is_first_training: bool | None = None,
     seed: int | None = None,
     dry_run: bool = False,
     ftd_doc: dict | None = None,
@@ -2147,7 +2148,7 @@ def auto_train_one_cpu_team(
     if not players_for_training:
         return {"status": "error", "reason": "no_players", "team_id": str(team_id)}
 
-    is_first = week == 1
+    is_first = is_first_training if is_first_training is not None else (week == 1)
     points = 30 if is_first else 24
     allocations = generate_random_training_allocations(points)  # per-team roll
     coaching_focus = generate_random_coaching_focus()           # per-team roll
@@ -3716,6 +3717,17 @@ def _franchise_all_games_full_sim() -> bool:
     no deploy. Pair with FRANCHISE_CPU_SIM_USE_POOL=1 so 63 full games stay fast.
     """
     return os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM", "0") in ("1", "true", "True")
+
+
+def _franchise_all_teams_autotrain() -> bool:
+    """Sunset Distant Training: run REAL auto-train (execute_training) for every CPU team.
+
+    FLAG — DEFAULTS OFF, so the deploy is behavior-neutral. When on
+    (FRANCHISE_ALL_TEAMS_AUTOTRAIN=1), _apply_franchise_distant_cpu_training routes to
+    _run_all_cpu_autotrain instead of the template deltas — so CPU teams train play +
+    scouting effectiveness like the user's team does. Flip to 0 to revert instantly.
+    """
+    return os.environ.get("FRANCHISE_ALL_TEAMS_AUTOTRAIN", "0") in ("1", "true", "True")
 
 
 def _utc_now_iso() -> str:
@@ -12299,6 +12311,62 @@ class FranchiseDistantTrainingRequest(BaseModel):
     franchise_id: str
 
 
+def _run_all_cpu_autotrain(
+    franchise_id: ObjectId,
+    *,
+    franchise_doc: dict,
+    user_team_id_str: str,
+    week: int,
+    is_first_training: bool,
+    seed_base: int | None = None,
+) -> dict:
+    """Sunset replacement for distant training: run REAL per-team auto-train for every CPU team.
+
+    SERIAL for now (step 1b) — the pool comes in step 2. Same team-selection as distant training
+    (skip user team + EOS-eliminated). Each team is idempotency-guarded inside
+    auto_train_one_cpu_team (cpu_autotrain_week), so a partial run is resumable: a re-run skips
+    already-trained teams and finishes the rest. FPD is batch-loaded once and shared across teams.
+    """
+    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
+    eliminated_team_ids = set()
+    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
+        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
+    fpd_by_player_id = {
+        str(d["player_id"]): d
+        for d in franchise_players_data_collection.find({"franchise_id": str(franchise_id)})
+    }
+    _t0 = time.time()
+    trained = skipped = errored = 0
+    for idx, ftd_doc in enumerate(all_ftd_docs):
+        team_oid = ftd_doc.get("team_id")
+        if team_oid is None:
+            continue
+        if str(team_oid) == str(user_team_id_str):
+            continue
+        if str(team_oid) in eliminated_team_ids:
+            continue
+        seed = None if seed_base is None else seed_base + idx
+        res = auto_train_one_cpu_team(
+            franchise_id, team_oid, week,
+            is_first_training=is_first_training, seed=seed,
+            ftd_doc=ftd_doc, fpd_by_player_id=fpd_by_player_id,
+        )
+        st = res.get("status")
+        if st == "trained":
+            trained += 1
+        elif st == "skipped_already_trained":
+            skipped += 1
+        else:
+            errored += 1
+            logger.warning("[CPU-AUTOTRAIN] team=%s status=%s reason=%s",
+                           str(team_oid), st, res.get("reason"))
+    logger.warning(
+        "[CPU-AUTOTRAIN] franchise=%s week=%s trained=%s skipped=%s errors=%s total=%.1fs",
+        franchise_id, week, trained, skipped, errored, time.time() - _t0,
+    )
+    return {"trained": trained, "skipped": skipped, "errors": errored}
+
+
 def _apply_franchise_distant_cpu_training(
     franchise_id: ObjectId,
     *,
@@ -12309,6 +12377,16 @@ def _apply_franchise_distant_cpu_training(
     franchise_players: dict,
 ) -> None:
     """Template-based distant CPU training for all non-user FTDs. Idempotent per FTD via cpu_distant_trained_week."""
+    # Sunset switch (default OFF): route to REAL per-team auto-train instead of template deltas.
+    if _franchise_all_teams_autotrain():
+        _run_all_cpu_autotrain(
+            franchise_id,
+            franchise_doc=franchise_doc,
+            user_team_id_str=user_team_id_str,
+            week=week,
+            is_first_training=is_first_training,
+        )
+        return
     all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
     training_type = "tc" if is_first_training else "regular"
     eliminated_team_ids = set()
