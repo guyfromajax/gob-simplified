@@ -3973,22 +3973,32 @@ def _run_franchise_cpu_full_simulation_core(
     if not gm.away_team.lineup:
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
 
-    gm.setup_opening_tip()
+    # Silence per-turn engine debug logs during the sim, exactly as Practice Squad
+    # does — suppresses everything below ERROR (EOQ-TRACE, shot recon, intercept
+    # gates, pass census/lanes, stepstate, playbook diag, dynamic gates, shot-select,
+    # etc.). The "Turn N RESULT" line is a print(), not a logging call, so it is NOT
+    # filtered and remains as the turn-identifying trace. Essential at 63-games/week:
+    # full-sim CPU games used to firehose these where distant sims emitted almost
+    # nothing. ERROR-level lines still pass through.
+    from BackEnd.utils.headless_simulation import quiet_headless_simulation_logs
 
-    gm.quarter = 1
-    while True:
-        simulate_quarter(gm)
+    with quiet_headless_simulation_logs():
+        gm.setup_opening_tip()
 
-        current_q = gm.quarter - 1
-        if current_q >= 4:
-            h_pts = gm.game_state["score"][gm.home_team.name]
-            a_pts = gm.game_state["score"][gm.away_team.name]
-            if h_pts != a_pts:
-                gm.quarter = current_q
-                gm.game_state["quarter"] = current_q
-                break
-            gm.home_team.points_by_quarter.append(0)
-            gm.away_team.points_by_quarter.append(0)
+        gm.quarter = 1
+        while True:
+            simulate_quarter(gm)
+
+            current_q = gm.quarter - 1
+            if current_q >= 4:
+                h_pts = gm.game_state["score"][gm.home_team.name]
+                a_pts = gm.game_state["score"][gm.away_team.name]
+                if h_pts != a_pts:
+                    gm.quarter = current_q
+                    gm.game_state["quarter"] = current_q
+                    break
+                gm.home_team.points_by_quarter.append(0)
+                gm.away_team.points_by_quarter.append(0)
 
     away_score = int(gm.score.get(away_name, 0) or 0)
     home_score = int(gm.score.get(home_name, 0) or 0)
