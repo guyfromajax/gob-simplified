@@ -273,6 +273,10 @@ def main():
     ap.add_argument("--no-profile", action="store_true", help="skip phase instrumentation")
     ap.add_argument("--seed", type=int, default=None,
                     help="base seed; game i runs with seed = base + i (reproducible week)")
+    ap.add_argument("--pool", type=int, default=0,
+                    help="run CPU games through the spawn-based ProcessPoolExecutor "
+                         "with this many workers (0 = in-process path). Phase timings "
+                         "are unavailable in pool mode; wall time and refstats are.")
     ap.add_argument("--allow-global-draws", action="store_true",
                     help="skip the RNG-isolation assertion (only for pre-isolation "
                          "comparison arms, where engine draws on the global module "
@@ -386,13 +390,56 @@ def main():
               + batches[kind]["table"], file=sys.stderr)
         return batches[kind]
 
+    pool_leaks: dict[int, dict] = {}
+
+    def run_cpu_pool_batch(fid, matchups, workers):
+        """CPU batch via the spawn process pool. Records refstats in canonical
+        (game-index) order so a seeded pooled run is byte-identical to sequential."""
+        from BackEnd.utils.cpu_week_pool import simulate_cpu_week_pooled
+        jobs = [(i, fid, m["home_id"], m["away_id"], m["home_name"], m["away_name"])
+                for i, m in enumerate(matchups)]
+        wall0 = time.perf_counter()
+        results, errors, leaks = simulate_cpu_week_pooled(
+            jobs, seed_base=args.seed, max_workers=workers, collect_guard=True)
+        total_wall = time.perf_counter() - wall0
+        pool_leaks.update(leaks)
+
+        game_times, failures = [], []
+        for idx in sorted(results):  # canonical order, not completion order
+            away, home, summary = results[idx]
+            m = matchups[idx]
+            meta = {"kind": "cpu_full",
+                    "matchup": f"{m['away_name']} @ {m['home_name']}",
+                    "seed": None if args.seed is None else args.seed + idx}
+            game_times.append({**meta, "away_score": away, "home_score": home})
+            for side in ("home", "away"):
+                stat_rows.append(_row_from_summary(summary, side, meta))
+        for idx in sorted(errors):
+            failures.append({"matchup": matchups[idx]["away_name"], "err": repr(errors[idx])})
+
+        durs = sorted(g.get("wall_s", 0) for g in game_times)  # per-game wall N/A in pool
+        batches["cpu_full"] = {
+            "workers": workers, "pool": True,
+            "timing": {"games": len(results), "total_wall_s": round(total_wall, 3),
+                       "min_s": None, "median_s": None, "mean_s": None,
+                       "p90_s": None, "max_s": None},
+            "phases": {}, "per_game": game_times, "failures": failures,
+            "worker_leaks": {i: v for i, v in leaks.items() if v},
+        }
+        print(f"  [cpu_full pool] {len(results)} games in {total_wall:.1f}s "
+              f"({workers} workers), {len(errors)} failure(s)", file=sys.stderr)
+
     if args.mode in ("cpu", "both"):
         fid, matchups = resolve_matchups(args.franchise, args.week, args.games)
         print(f"▶ CPU franchise={args.franchise} week={args.week} "
-              f"matchups={len(matchups)} workers={args.workers} commit={commit[:9]}",
-              file=sys.stderr)
-        run_batch("cpu_full", matchups, lambda m, sd: run_cpu_game(fid, m, sd),
-                  lambda m: f"{m['away_name']} @ {m['home_name']}", args.workers)
+              f"matchups={len(matchups)} "
+              f"{'pool=' + str(args.pool) if args.pool else 'workers=' + str(args.workers)} "
+              f"commit={commit[:9]}", file=sys.stderr)
+        if args.pool:
+            run_cpu_pool_batch(fid, matchups, args.pool)
+        else:
+            run_batch("cpu_full", matchups, lambda m, sd: run_cpu_game(fid, m, sd),
+                      lambda m: f"{m['away_name']} @ {m['home_name']}", args.workers)
 
     if args.mode in ("ps", "both"):
         ps_jobs = resolve_ps_games(args.ps_franchise or args.franchise,
@@ -404,7 +451,13 @@ def main():
                       args.workers)
 
     # ---- RNG isolation assertion -----------------------------------------
-    leaks = sim_random.global_draw_report()
+    # Parent-process guard covers in-process runs. Pool runs execute in worker
+    # processes whose draws the parent cannot see, so each worker reports its own
+    # tally (collect_guard) and we fold them in here.
+    leaks = dict(sim_random.global_draw_report())
+    for widx, wl in pool_leaks.items():
+        for site, n in (wl or {}).items():
+            leaks[f"worker[{widx}]:{site}"] = leaks.get(f"worker[{widx}]:{site}", 0) + n
     if leaks:
         total = sum(leaks.values())
         msg = [
