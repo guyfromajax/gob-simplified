@@ -1920,7 +1920,7 @@ def build_eog_offensive_play_effectiveness_decay_ftd_updates(
             decay = 0
         ftd_row = ftd_plays.get(storage_key)
         if not isinstance(ftd_row, dict):
-            logger.warning(
+            logger.debug(
                 "📉 [EOG-PLAY-EFF] Skipping %s (storage_key=%s): no matching FTD play row",
                 display_name,
                 storage_key,
@@ -1933,7 +1933,7 @@ def build_eog_offensive_play_effectiveness_decay_ftd_updates(
         new_eff = max(0, current_eff - decay)
         if new_eff != current_eff:
             set_doc[f"plays.{storage_key}.effectiveness"] = new_eff
-            logger.warning(
+            logger.debug(
                 "📉 [EOG-PLAY-EFF] %s: effectiveness %s → %s (times_run=%s total=%s decay=%s)",
                 display_name,
                 current_eff,
@@ -2023,7 +2023,7 @@ def build_eog_defensive_effectiveness_decay_ftd_updates(
         decay = int(100.0 * float(u) / float(total_used))
         ftk = _ftd_defense_storage_key(ftd_def, str(gk))
         if not ftk:
-            logger.warning(
+            logger.debug(
                 "📉 [EOG-DEF-EFF] Skipping defense game_key=%s: no matching FTD scouting_data.defense row",
                 gk,
             )
@@ -2038,7 +2038,7 @@ def build_eog_defensive_effectiveness_decay_ftd_updates(
         new_eff = max(0, current_eff - decay)
         if new_eff != current_eff:
             set_doc[f"scouting_data.defense.{ftk}.effectiveness"] = new_eff
-            logger.warning(
+            logger.debug(
                 "📉 [EOG-DEF-EFF] %s: effectiveness %s → %s (used=%s total=%s decay=%s)",
                 ftk,
                 current_eff,

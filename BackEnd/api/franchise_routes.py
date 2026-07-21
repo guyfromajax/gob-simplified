@@ -1316,7 +1316,7 @@ def _set_team_attribute_changes_on_game(game_id_str: str, tac: dict) -> bool:
         {"$set": {"team_attribute_changes": tac}}
     )
     if r.matched_count > 0:
-        logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={game_id_str!r} (string _id) (keys={list(tac.keys())})")
+        logger.debug(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={game_id_str!r} (string _id) (keys={list(tac.keys())})")
         return True
     try:
         oid = ObjectId(game_id_str)
@@ -1325,7 +1325,7 @@ def _set_team_attribute_changes_on_game(game_id_str: str, tac: dict) -> bool:
             {"$set": {"team_attribute_changes": tac}}
         )
         if r2.matched_count > 0:
-            logger.warning(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={game_id_str!r} (ObjectId _id) (keys={list(tac.keys())})")
+            logger.debug(f"✅ [COMPLETE_WEEK] team_attribute_changes $set on game_id={game_id_str!r} (ObjectId _id) (keys={list(tac.keys())})")
             return True
     except Exception:
         pass
@@ -1360,7 +1360,7 @@ def _finalize_team_attributes_for_game(
             )
             _set_team_attribute_changes_on_game(game_id_str, {})
             return
-        logger.warning(
+        logger.debug(
             "🧭 [EOG-CALL-SITE] About to call update_team_attributes_after_game game_id=%s gid=%s week=%s franchise_id=%s home=%s away=%s winner=%s loser=%s",
             str(game_id),
             str(gid),
@@ -1381,7 +1381,7 @@ def _finalize_team_attributes_for_game(
             winner_score=winner_score,
             loser_score=loser_score,
         )
-        logger.warning(
+        logger.debug(
             "🧭 [EOG-CALL-SITE] update_team_attributes_after_game returned game_id=%s has_changes=%s keys=%s",
             str(game_id),
             bool(attribute_changes),
@@ -1416,7 +1416,7 @@ def update_team_attributes_after_game(
             away_team_id: {"shot_threshold": +12, "discipline": -2, "fight": -2, ...}
         }
     """
-    logger.warning(
+    logger.debug(
         "🧪 [EOG-FUNC-ENTRY] update_team_attributes_after_game entered game_id=%s franchise_id=%s",
         str(game_id),
         str(franchise_id),
@@ -1457,7 +1457,7 @@ def update_team_attributes_after_game(
         candidate_docs,
         key=lambda pair: _game_doc_richness_score(pair[1]),
     )
-    logger.warning(
+    logger.debug(
         "🧭 [EOG-GAME-DOC-SELECT] game_id=%s selected=%s score=%s candidates=%s",
         game_id_str,
         selected_kind,
@@ -1513,7 +1513,7 @@ def update_team_attributes_after_game(
         away_scouting.get("pt_combined_rate", 0),
         away_scouting.get("pt_total_attempts", 0),
     )
-    logger.warning(
+    logger.debug(
         "🧪 [EOG-SNAPSHOT-SOURCES] game_id=%s home_totals_source=%s home_scouting_source=%s away_totals_source=%s away_scouting_source=%s",
         str(game_doc.get("_id")),
         eog_inputs.get("home", {}).get("totals_source", "unknown"),
@@ -1649,7 +1649,7 @@ def update_team_attributes_after_game(
         team_rank = _rank_value(ftd_doc)
         opponent_rank = _rank_value(opponent_ftd_doc)
 
-        logger.warning(
+        logger.debug(
             "🧪 [EOG-TEAM-INPUTS] team=%s winner=%s totals=%s opp_totals=%s scouting=%s opp_scouting=%s",
             str(team_id_label),
             bool(is_winner),
@@ -1818,7 +1818,7 @@ def update_team_attributes_after_game(
                 ftd_update[f"team_attributes.{attr_name}"] = clamped_val
                 # Store the actual change (may be different if clamped)
                 changes[attr_name] = clamped_val - current_val
-                logger.warning(
+                logger.debug(
                     "🧪 [EOG-APPLY] team=%s attr=%s current=%s raw_change=%s unclamped=%s clamped=%s applied_change=%s",
                     str(team_id_label),
                     attr_name,

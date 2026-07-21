@@ -1887,11 +1887,11 @@ def finalize_game(
         
         # ✅ DEBUG: Verify team name matching
         if home_team_name and home_team_name not in box_score:
-            logger.warning(f"⚠️ [FINALIZE_GAME] home_team_name '{home_team_name}' NOT in box_score keys: {list(box_score.keys())}")
+            logger.debug(f"⚠️ [FINALIZE_GAME] home_team_name '{home_team_name}' NOT in box_score keys: {list(box_score.keys())}")
         else:
             logger.info(f"✅ [FINALIZE_GAME] home_team_name '{home_team_name}' found in box_score")
         if away_team_name and away_team_name not in box_score:
-            logger.warning(f"⚠️ [FINALIZE_GAME] away_team_name '{away_team_name}' NOT in box_score keys: {list(box_score.keys())}")
+            logger.debug(f"⚠️ [FINALIZE_GAME] away_team_name '{away_team_name}' NOT in box_score keys: {list(box_score.keys())}")
         else:
             logger.info(f"✅ [FINALIZE_GAME] away_team_name '{away_team_name}' found in box_score")
 
