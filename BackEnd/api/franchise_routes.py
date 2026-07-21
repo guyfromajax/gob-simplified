@@ -2159,6 +2159,12 @@ def auto_train_one_cpu_team(
     playbook_settings = ftd_doc.get("playbook_settings") or {}
     scouting_data = ftd_doc.get("scouting_data") or {}
 
+    # execute_training mutates plays_data IN PLACE (scouting is returned fresh). For a usable
+    # dry-run delta, snapshot the pre-training plays/scouting first — otherwise "orig" aliases
+    # the mutated result and reads as zero change. Only in dry_run (no persist-path overhead).
+    _orig_plays_snapshot = deepcopy(plays_data) if dry_run else None
+    _orig_scouting_snapshot = deepcopy(scouting_data) if dry_run else None
+
     updated_players, updated_team, updated_plays, updated_scouting, training_report = execute_training(
         players_for_training,
         team_stats,
@@ -2191,8 +2197,8 @@ def auto_train_one_cpu_team(
             "updated_team": updated_team,
             "updated_plays": updated_plays,
             "updated_scouting": updated_scouting,
-            "orig_plays": plays_data,
-            "orig_scouting": scouting_data,
+            "orig_plays": _orig_plays_snapshot,
+            "orig_scouting": _orig_scouting_snapshot,
         }
 
     # --- persist: FPD per-player, then FTD (mirrors the user-training write contract) ---
