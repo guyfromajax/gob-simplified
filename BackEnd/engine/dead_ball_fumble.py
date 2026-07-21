@@ -270,9 +270,6 @@ def inject_dead_ball_fumble_before_turn_stop(
 
     clock = dict((anchor.get("end") or {}).get("clock") or {"clock_remaining": 0.0, "shot_clock_remaining": 0.0})
     label = roll_dead_ball_fumble_label()
-    from BackEnd.engine.oob_fcp_hct_capture import log_fumble_overwrote_oob
-
-    log_fumble_overwrote_oob(turn_result, new_label=label)
     turn_result["turnover_type"] = label
     turn_result["suppress_turn_prep_turnover_announce"] = True
 

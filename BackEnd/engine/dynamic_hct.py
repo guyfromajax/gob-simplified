@@ -3308,20 +3308,6 @@ def compute_dynamic_hct_turn(
         oob_violation = is_over_and_back_pass(
             frontcourt_established, off_coords[receiver_pos], is_away_offense
         )
-        from BackEnd.engine.oob_fcp_hct_capture import log_pass_oob_check
-
-        log_pass_oob_check(
-            turn_mode=turn_mode,
-            frontcourt_established=frontcourt_established,
-            is_away_offense=is_away_offense,
-            passer_pos=passer_pos,
-            receiver_pos=receiver_pos,
-            passer_xy=off_coords[passer_pos],
-            receiver_xy=off_coords[receiver_pos],
-            violation_fired=oob_violation,
-            loop_segment_count=len(loop_segments),
-            frontcourt_grace_bh_pos=frontcourt_grace_bh_pos,
-        )
         if oob_violation:
             result_type = "DEAD BALL"
             turnover_type = "OVER_BACK"
@@ -3355,17 +3341,6 @@ def compute_dynamic_hct_turn(
 
     # Engine returns intermediate data only — the emitter assembles the walk-up
     # step plus one schema step per loop segment.
-    from BackEnd.engine.oob_fcp_hct_capture import log_turn_terminal_oob
-
-    log_turn_terminal_oob(
-        turn_mode=turn_mode,
-        result_type=result_type,
-        turnover_type=turnover_type,
-        text_suffix=text_suffix,
-        loop_segments=loop_segments,
-        is_away_offense=is_away_offense,
-        bh_pos=bh_pos,
-    )
     return {
         "result_type": result_type,
         "turnover_type": turnover_type,
