@@ -2170,18 +2170,24 @@ def auto_train_one_cpu_team(
     _orig_plays_snapshot = deepcopy(plays_data) if dry_run else None
     _orig_scouting_snapshot = deepcopy(scouting_data) if dry_run else None
 
-    updated_players, updated_team, updated_plays, updated_scouting, training_report = execute_training(
-        players_for_training,
-        team_stats,
-        allocations,
-        coaching_focus,
-        plays_data=plays_data,
-        strategy_settings=strategy_settings,
-        playbook_settings=playbook_settings,
-        scouting_data=scouting_data,
-        playbook_training_mode="current-playbooks",
-        skip_pre_training_depreciation=is_first,
-    )
+    # CPU auto-train runs execute_training 127x/week; its per-play WARNING diagnostics
+    # would flood the platform log rate limit and drop real signal (batch timing lines,
+    # errors). Quiet just this engine's logger for the call — user-team training, on a
+    # different path, stays fully verbose.
+    from BackEnd.utils.headless_simulation import quiet_training_engine_logs
+    with quiet_training_engine_logs():
+        updated_players, updated_team, updated_plays, updated_scouting, training_report = execute_training(
+            players_for_training,
+            team_stats,
+            allocations,
+            coaching_focus,
+            plays_data=plays_data,
+            strategy_settings=strategy_settings,
+            playbook_settings=playbook_settings,
+            scouting_data=scouting_data,
+            playbook_training_mode="current-playbooks",
+            skip_pre_training_depreciation=is_first,
+        )
 
     position_ratings_updates: dict[str, dict] = {}
     for player in updated_players:
