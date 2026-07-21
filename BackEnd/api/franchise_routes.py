@@ -12366,11 +12366,15 @@ def _run_all_cpu_autotrain(
             errored += 1
             logger.warning("[CPU-AUTOTRAIN] team=%s status=%s reason=%s",
                            str(team_oid), st, res.get("reason"))
+    _elapsed = time.time() - _t0
+    _ran = trained + errored  # teams that actually executed (skipped were no-ops)
     logger.warning(
-        "[CPU-AUTOTRAIN] franchise=%s week=%s trained=%s skipped=%s errors=%s total=%.1fs",
-        franchise_id, week, trained, skipped, errored, time.time() - _t0,
+        "[CPU-AUTOTRAIN-TIMING] franchise=%s week=%s | trained=%s skipped=%s errors=%s | "
+        "engine=serial | total=%.1fs (%.2fs/team)",
+        franchise_id, week, trained, skipped, errored,
+        _elapsed, _elapsed / max(1, _ran),
     )
-    return {"trained": trained, "skipped": skipped, "errors": errored}
+    return {"trained": trained, "skipped": skipped, "errors": errored, "seconds": round(_elapsed, 2)}
 
 
 def _apply_franchise_distant_cpu_training(
