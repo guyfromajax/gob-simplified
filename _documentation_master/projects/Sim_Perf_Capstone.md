@@ -160,6 +160,24 @@ reader runs earlier in the turn), but the test is not unconditional proof.
 20260720), cut after RNG isolation. A seeded reference is only valid within an RNG-topology-stable
 code state — re-cut it after any intentional stream change.
 
+**The instruments are committed and runnable** in `scripts/sim_verify/` (see its README for a
+per-tool map and copy-paste commands). The poison-stash test is a durable harness flag,
+`perf_sim_baseline.py --poison-stash`, not just prose. The canonical seeded verification run:
+
+```bash
+PYTHONHASHSEED=0 python3 scripts/perf_sim_baseline.py \
+  --franchise 6a28436c98dbd04e902eee09 --week 7 --games 63 --mode both \
+  --ps-franchise 6a5e1f0e517ebcc58d981675 --ps-week 3 \
+  --seed 20260720 --no-profile --workers 1 --tag mychange
+python3 scripts/sim_verify/diffstats.py \
+  reports/perf/refstats_postB_20260720_20260720_153720.csv \
+  reports/perf/refstats_mychange_*.csv
+```
+
+Add `--poison-stash` for a draw-count change; swap `--workers 1` for `--pool 8` to exercise the
+pool. Fixtures are `gob-staging` docs — swap for any franchise with a populated week-7 schedule +
+initialized practice squad.
+
 ---
 
 ## Standing rules
@@ -273,8 +291,9 @@ explicitly perf-only and forbade basketball-logic changes.
 ### Key code
 - `BackEnd/utils/sim_random.py` — dedicated RNG + global-draw guard
 - `BackEnd/utils/cpu_week_pool.py` — process pool + failure ladder
-- `scripts/perf_sim_baseline.py` — the verification + benchmark harness (`--seed`, `--pool N`, `--workers`)
+- `scripts/perf_sim_baseline.py` — verification + benchmark harness (`--seed`, `--pool N`, `--workers`, `--poison-stash`)
 - `BackEnd/utils/sim_profiler.py` — pure-monkeypatch phase timer (`GOB_SIM_PROFILE=1`)
+- `scripts/sim_verify/` — the verification toolkit (diffstats, distcompare, kill_worker_test, p2_rng_audit, bench_pool) + README mapping each to the toolkit table above
 
 ### The substantive commits (git archaeology, one hop away)
 | Hash | Change |

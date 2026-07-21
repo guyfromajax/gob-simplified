@@ -257,6 +257,49 @@ def summarize_phases(total_wall):
     return snap, sim_profiler.format_table(snap, total_wall)
 
 
+def _install_poison_stash():
+    """Generic poison-stash harness (verification toolkit).
+
+    Wraps step_state.build_step_states so the sim-path defender-grid work still
+    runs — identical RNG draw count — but the value written into each step's
+    _step_state["defense"] is replaced by an absurd sentinel {x:-9999,y:-9999}.
+    A consumer that reads the grid and does anything numeric with it would
+    diverge; so a seeded week that stays byte-identical to the reference proves
+    nothing reads it. This is the durable, runnable form of the one-off test used
+    to clear Phase 2's defender-grid reuse (commit 4da067d87).
+
+    Blind spot (documented): the sentinel catches arithmetic consumers, not one
+    that merely checks a key's presence.
+    """
+    import BackEnd.engine.step_state as ss
+
+    if getattr(ss.build_step_states, "__poisoned__", False):
+        return
+    _orig = ss.build_step_states
+
+    def poisoned(result, game, *a, **k):
+        states = _orig(result, game, *a, **k)  # real work + real draws happen here
+        steps = ((result or {}).get("skeleton") or {}).get("steps") or []
+        for step in steps:
+            st = step.get("_step_state")
+            if isinstance(st, dict) and st.get("defense"):
+                st["defense"] = {pos: {"x": -9999.0, "y": -9999.0} for pos in st["defense"]}
+        for st in (states or []):
+            if isinstance(st, dict) and st.get("defense"):
+                st["defense"] = {pos: {"x": -9999.0, "y": -9999.0} for pos in st["defense"]}
+        return states
+
+    poisoned.__poisoned__ = True
+    ss.build_step_states = poisoned
+    # rebind the by-value import in turn_manager
+    import BackEnd.models.turn_manager as tm
+    if getattr(tm, "build_step_states", None) is _orig:
+        tm.build_step_states = poisoned
+    print("⚗️  [poison-stash] StepState.defense poisoned with {x:-9999,y:-9999} "
+          "(rebuild still runs) — a byte-identical seeded week proves nothing reads it",
+          file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--franchise", required=True)
@@ -273,6 +316,12 @@ def main():
     ap.add_argument("--no-profile", action="store_true", help="skip phase instrumentation")
     ap.add_argument("--seed", type=int, default=None,
                     help="base seed; game i runs with seed = base + i (reproducible week)")
+    ap.add_argument("--poison-stash", action="store_true",
+                    help="GENERIC POISON-STASH TEST for StepState.defense (see the "
+                         "verification toolkit). Keeps the defender-grid rebuild running "
+                         "so the RNG draw count is unchanged, but replaces the stashed "
+                         "value with an absurd sentinel. Run seeded and exact-diff vs the "
+                         "reference: byte-identical proves nothing reads that grid.")
     ap.add_argument("--pool", type=int, default=0,
                     help="run CPU games through the spawn-based ProcessPoolExecutor "
                          "with this many workers (0 = in-process path). Phase timings "
@@ -309,6 +358,9 @@ def main():
     # first time it fires, instead of showing up later as an unexplained
     # byte-identical failure.
     sim_random.install_global_draw_guard()
+
+    if args.poison_stash:
+        _install_poison_stash()
 
     probes = sim_profiler.install()
 
