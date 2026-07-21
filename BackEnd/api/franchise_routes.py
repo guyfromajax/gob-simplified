@@ -16,7 +16,7 @@ import uuid
 from copy import deepcopy
 from types import SimpleNamespace
 from typing import Any, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import urlencode
 from BackEnd.main import run_simulation, simulate_quarter
@@ -3784,6 +3784,73 @@ def _cpu_sim_job_path(week: int) -> str:
     return f"cpu_sim_jobs.{str(week)}"
 
 
+# --- CPU-week single-flight claim -------------------------------------------
+# A week's CPU sim is run by whichever request wins an atomic claim; a second
+# concurrent request (a duplicate start-cpu-sims, or a phase-b that fires the
+# instant the user finishes while start-cpu-sims is still mid-slate) must NOT
+# start a second full sim — that was the observed double-sim. start-cpu-sims
+# persists results.{week} on completion, so once it releases the claim a waiting
+# phase-b finds the results, skips every CPU game, and just finalizes.
+_CPU_SIM_CLAIM_STALE_SECONDS = 300   # crash backstop; > worst-case uncontended sim
+_CPU_SIM_CLAIM_WAIT_SECONDS = 150    # phase-b bounded wait for an in-flight claim
+_CPU_SIM_CLAIM_POLL_SECONDS = 0.5
+
+
+def _cpu_sim_claim_path(week: int) -> str:
+    return f"cpu_sim_jobs.{str(week)}.claim"
+
+
+def _acquire_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> bool:
+    """Atomically claim the week's CPU sim. True if this request now owns it.
+
+    Wins iff no claim exists, the claim is inactive (released), or the active
+    claim's heartbeat is stale (owner crashed). find_one_and_update serializes
+    concurrent callers, so exactly one wins the race."""
+    path = _cpu_sim_claim_path(week)
+    now = datetime.utcnow()
+    now_iso = now.isoformat() + "Z"
+    stale_iso = (now - timedelta(seconds=_CPU_SIM_CLAIM_STALE_SECONDS)).isoformat() + "Z"
+    matched = db.franchises.find_one_and_update(
+        {
+            "_id": franchise_id,
+            "$or": [
+                {path: {"$exists": False}},
+                {f"{path}.active": {"$ne": True}},
+                {f"{path}.heartbeat": {"$lt": stale_iso}},
+            ],
+        },
+        {"$set": {path: {
+            "active": True, "owner": owner,
+            "acquired_at": now_iso, "heartbeat": now_iso,
+        }}},
+    )
+    return matched is not None
+
+
+def _release_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> None:
+    """Release the claim iff this request still owns it (never steal a re-claim)."""
+    path = _cpu_sim_claim_path(week)
+    db.franchises.update_one(
+        {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
+        {"$set": {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}},
+    )
+
+
+def _await_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> bool:
+    """Block (bounded) until this request can claim the week, polling for the holder
+    to release or go stale. Used by phase-b, whose client can't poll — it must return
+    a terminal result, so it waits rather than starting a duplicate sim. Returns True
+    on acquire, False on timeout (holder still alive past the window — very rare, since
+    once phase-b waits the holder runs uncontended and finishes in seconds)."""
+    deadline = time.time() + _CPU_SIM_CLAIM_WAIT_SECONDS
+    while True:
+        if _acquire_cpu_sim_claim(franchise_id, week, owner):
+            return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(_CPU_SIM_CLAIM_POLL_SECONDS)
+
+
 def _cpu_sim_completed_matchup_from_result(row: dict) -> dict[str, Any] | None:
     if not isinstance(row, dict):
         return None
@@ -7035,22 +7102,41 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     )
     results = [dict(r) for r in saved_list]
 
-    out = _complete_week_finish_cpu_and_persist(
-        franchise_doc,
-        franchise_id,
-        req.franchise_id,
-        req.week,
-        week_games,
-        week_games_meta,
-        eos_current_round,
-        user_team_id_str,
-        user_eos_sim_scope,
-        team1_id,
-        team2_id,
-        results,
-        community_highlight_pending=None,
-        persist_cpu_results_only=True,
-    )
+    # Single-flight claim: if another request already owns this week's CPU sim
+    # (a duplicate start-cpu-sims, or a phase-b that already grabbed it), do NOT
+    # start a second slate. Fire-and-forget for the client — it treats 200 as done.
+    _claim_owner = uuid.uuid4().hex
+    if not _acquire_cpu_sim_claim(franchise_id, req.week, _claim_owner):
+        logger.info(
+            "[START-CPU-SIMS] skip — week already claimed franchise_id=%s week=%s",
+            req.franchise_id, req.week,
+        )
+        return {
+            "status": "processing",
+            "phase": "start_cpu_sims",
+            "week": req.week,
+            "idempotent": True,
+            "cpu_sim_job": _cpu_sim_job_public_summary(franchise_doc, req.week),
+        }
+    try:
+        out = _complete_week_finish_cpu_and_persist(
+            franchise_doc,
+            franchise_id,
+            req.franchise_id,
+            req.week,
+            week_games,
+            week_games_meta,
+            eos_current_round,
+            user_team_id_str,
+            user_eos_sim_scope,
+            team1_id,
+            team2_id,
+            results,
+            community_highlight_pending=None,
+            persist_cpu_results_only=True,
+        )
+    finally:
+        _release_cpu_sim_claim(franchise_id, req.week, _claim_owner)
     out["idempotent"] = False
     logger.info(
         "[START-CPU-SIMS] complete franchise_id=%s week=%s results_count=%s week_matchups=%s",
@@ -7120,47 +7206,75 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
             detail="No saved results for this week; run phase A first.",
         )
 
-    fake_req = SimpleNamespace(week=req.week, franchise_id=req.franchise_id)
-    week_games, week_games_meta, eos_current_round = _resolve_complete_week_week_games(
-        franchise_doc, fake_req  # type: ignore[arg-type]
-    )
-    _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
-    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
-    team1_id, team2_id = _find_user_franchise_week_matchup_normalized_ids(
-        week_games,
-        user_team_id_str,
-        week=req.week,
-        saved_week_results=saved,
-    )
-    results = [dict(r) for r in saved]
+    # Single-flight: wait for any in-flight start-cpu-sims to finish rather than
+    # starting a duplicate slate (the observed double-sim). phase-b's client can't
+    # poll — it needs a terminal result — so it BLOCKS on the claim (bounded). Once
+    # start-cpu-sims releases, it has persisted results.{week}, so the reload below
+    # picks those up and the sim loop skips every CPU game and just finalizes.
+    _claim_owner = uuid.uuid4().hex
+    if not _await_cpu_sim_claim(franchise_id, req.week, _claim_owner):
+        raise HTTPException(
+            status_code=503,
+            detail="CPU sims for this week are still in progress; please retry.",
+        )
+    try:
+        # Re-read post-wait: start-cpu-sims may have advanced the week or persisted
+        # the full CPU slate while we waited.
+        franchise_doc = db.franchises.find_one({"_id": franchise_id}) or franchise_doc
+        if int(franchise_doc.get("week", 1)) > req.week:
+            payload: dict[str, Any] = {
+                "status": "ok", "phase": "b", "idempotent": True,
+                "week": req.week, "results": [],
+            }
+            if eos_heal_summary:
+                payload["eos_heal"] = eos_heal_summary
+                payload["idempotent"] = False
+            return payload
+        saved = franchise_doc.get("results", {}).get(wk) or saved
 
-    pre_summary = _cpu_sim_job_public_summary(franchise_doc, req.week)
-    if pre_summary:
-        logger.info(
-            "[CPU-SIM-RESUME] phase-b recovery start franchise_id=%s week=%s status=%s completed=%s/%s failed=%s",
+        fake_req = SimpleNamespace(week=req.week, franchise_id=req.franchise_id)
+        week_games, week_games_meta, eos_current_round = _resolve_complete_week_week_games(
+            franchise_doc, fake_req  # type: ignore[arg-type]
+        )
+        _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+        user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
+        team1_id, team2_id = _find_user_franchise_week_matchup_normalized_ids(
+            week_games,
+            user_team_id_str,
+            week=req.week,
+            saved_week_results=saved,
+        )
+        results = [dict(r) for r in saved]
+
+        pre_summary = _cpu_sim_job_public_summary(franchise_doc, req.week)
+        if pre_summary:
+            logger.info(
+                "[CPU-SIM-RESUME] phase-b recovery start franchise_id=%s week=%s status=%s completed=%s/%s failed=%s",
+                req.franchise_id,
+                req.week,
+                pre_summary.get("status"),
+                pre_summary.get("completed_matchups"),
+                pre_summary.get("expected_matchups"),
+                pre_summary.get("failed_matchups"),
+            )
+
+        out = _complete_week_finish_cpu_and_persist(
+            franchise_doc,
+            franchise_id,
             req.franchise_id,
             req.week,
-            pre_summary.get("status"),
-            pre_summary.get("completed_matchups"),
-            pre_summary.get("expected_matchups"),
-            pre_summary.get("failed_matchups"),
+            week_games,
+            week_games_meta,
+            eos_current_round,
+            user_team_id_str,
+            user_eos_sim_scope,
+            team1_id,
+            team2_id,
+            results,
+            community_highlight_pending=None,
         )
-
-    out = _complete_week_finish_cpu_and_persist(
-        franchise_doc,
-        franchise_id,
-        req.franchise_id,
-        req.week,
-        week_games,
-        week_games_meta,
-        eos_current_round,
-        user_team_id_str,
-        user_eos_sim_scope,
-        team1_id,
-        team2_id,
-        results,
-        community_highlight_pending=None,
-    )
+    finally:
+        _release_cpu_sim_claim(franchise_id, req.week, _claim_owner)
     out["status"] = "ok"
     out["phase"] = "b"
     out["idempotent"] = False
