@@ -4250,6 +4250,13 @@ def _run_franchise_cpu_full_simulation_core(
     gm.home_team.playbook_settings = dict(home_prepared.get("playbook_settings") or {})
     gm.away_team.playbook_settings = dict(away_prepared.get("playbook_settings") or {})
     gm.game_state["allow_fouled_out_lineup_reentry"] = True
+    # Mark as headless, exactly like Practice Squad games. This (a) suppresses the
+    # per-turn "Turn N RESULT" print — at 63 full-sim CPU games/week that trace is
+    # ~11k stdout lines that trip the platform log rate limit and drop real signal
+    # (e.g. [CPU-WEEK-TIMING]); and (b) makes foul-outs skip the interactive timeout
+    # modal + DB save that a client-less CPU game can't use (game_manager foul-out
+    # path). CPU games have no interactive client, so both are correct.
+    gm.game_state["_headless_simulation"] = True
 
     if not gm.home_team.lineup:
         gm.home_team.lineup = build_lineup_from_mongo(gm.home_team, gm.game_state)
@@ -4259,10 +4266,10 @@ def _run_franchise_cpu_full_simulation_core(
     # Silence per-turn engine debug logs during the sim, exactly as Practice Squad
     # does — suppresses everything below ERROR (EOQ-TRACE, shot recon, intercept
     # gates, pass census/lanes, stepstate, playbook diag, dynamic gates, shot-select,
-    # etc.). The "Turn N RESULT" line is a print(), not a logging call, so it is NOT
-    # filtered and remains as the turn-identifying trace. Essential at 63-games/week:
-    # full-sim CPU games used to firehose these where distant sims emitted almost
-    # nothing. ERROR-level lines still pass through.
+    # etc.). The "Turn N RESULT" print is separately suppressed by the
+    # _headless_simulation flag set above (it bypasses this logging filter). Essential
+    # at 63-games/week: full-sim CPU games used to firehose these where distant sims
+    # emitted almost nothing. ERROR-level lines still pass through.
     from BackEnd.utils.headless_simulation import quiet_headless_simulation_logs
 
     with quiet_headless_simulation_logs():
