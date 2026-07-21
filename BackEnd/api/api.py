@@ -946,9 +946,9 @@ try:
                                 game_doc=game_doc
                             )
                             if strategy_settings or playbook_settings:
-                                logging.warning(f"✅ [PHASE 5.7] Loaded settings from game doc using unified function (game_id={game_id}, team_identifier={team_identifier})")
+                                logging.debug(f"✅ [PHASE 5.7] Loaded settings from game doc using unified function (game_id={game_id}, team_identifier={team_identifier})")
             except Exception as e:
-                logging.warning(f"⚠️ [PHASE 5.7] Error loading from game doc, falling back to master: {e}")
+                logging.debug(f"⚠️ [PHASE 5.7] Error loading from game doc, falling back to master: {e}")
         
         # If settings not loaded from game doc, load from master doc (FTD for franchise, extract for tournament)
         if strategy_settings is None and playbook_settings is None:
@@ -1196,12 +1196,12 @@ try:
             if games_collection is not None:
                 saved, query_id = find_game_doc(games_collection, game_id)
                 if saved:
-                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (where we save)")
+                    logging.debug(f"✅ TIMEOUT RESUME: Found game in games_collection (where we save)")
             else:
-                logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in games_collection")
+                logging.debug(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in games_collection")
             
             if not saved:
-                logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
+                logging.debug(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
                 return None
             
             # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log what we loaded (Hypothesis 2 - confirm doc has timeout state and game_stats_initialized)
@@ -1233,19 +1233,19 @@ try:
                             {"$set": {"timeout_next_play_type": inferred_next_play_type}},
                         )
                     except Exception as update_err:
-                        logging.warning(
+                        logging.debug(
                             "⚠️ TIMEOUT RESUME: Failed to persist inferred timeout_next_play_type "
                             "for game %s: %s",
                             game_id,
                             update_err,
                         )
-                    logging.warning(
+                    logging.debug(
                         "⚠️ TIMEOUT RESUME: timeout_next_play_type missing for game %s; "
                         "inferred SIDE_INBOUND from timeout_offense_team_id",
                         game_id,
                     )
                 else:
-                    logging.warning(
+                    logging.debug(
                         "⚠️ TIMEOUT RESUME: timeout_next_play_type missing from saved game %s "
                         "and no timeout_offense_team_id present; treating as no timeout resume",
                         game_id,
@@ -1330,8 +1330,8 @@ try:
         logging.warning(f"💾 [TIMEOUT-SAVE] db_summary home playbook slot_assignments: {len(home_summary_pb.get('slot_assignments', {})) if home_summary_pb else 0}")
         logging.warning(f"💾 [TIMEOUT-SAVE] db_summary away playbook slot_assignments: {len(away_summary_pb.get('slot_assignments', {})) if away_summary_pb else 0}")
         logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary timeout fields: timeout_next_play_type={db_summary.get('timeout_next_play_type')}, timeout_offense_team_id={db_summary.get('timeout_offense_team_id')}")
-        logging.warning(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
-        logging.warning(
+        logging.debug(f"🔍 [{debug_prefix} TIMEOUT SAVE DEBUG] db_summary score={db_summary.get('score')}, clock={db_summary.get('clock')}, time_remaining={db_summary.get('time_remaining')}")
+        logging.debug(
             "🧭 [TIMEOUT TRACE] save trace_id=%s game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s",
             trace_id,
             game_id,
@@ -1534,13 +1534,13 @@ try:
         # Restore timeout-specific state
         if "timeout_next_play_type" in saved:
             gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
-            logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
+            logging.debug(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
         if "timeout_trace_id" in saved:
             gm.game_state["timeout_trace_id"] = saved["timeout_trace_id"]
-            logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_trace_id={saved['timeout_trace_id']}")
+            logging.debug(f"🔄 TIMEOUT RESUME: Applied timeout_trace_id={saved['timeout_trace_id']}")
         if saved.get("timeout_seam_ball_handler_id"):
             gm.game_state["timeout_seam_ball_handler_id"] = str(saved["timeout_seam_ball_handler_id"])
-            logging.info(
+            logging.debug(
                 "🔄 TIMEOUT RESUME: Applied timeout_seam_ball_handler_id=%s",
                 saved["timeout_seam_ball_handler_id"],
             )
@@ -1567,9 +1567,9 @@ try:
                         break
                 if shooter is not None:
                     gm.game_state["shooter"] = shooter
-                    logging.info(f"🔄 TIMEOUT RESUME: Restored FREE_THROW state (shooter_id={shooter_id}, free_throws_remaining={gm.game_state.get('free_throws_remaining')})")
+                    logging.debug(f"🔄 TIMEOUT RESUME: Restored FREE_THROW state (shooter_id={shooter_id}, free_throws_remaining={gm.game_state.get('free_throws_remaining')})")
                 else:
-                    logging.warning(f"⚠️ TIMEOUT RESUME: FREE_THROW resume could not find shooter_id={shooter_id} in rosters")
+                    logging.debug(f"⚠️ TIMEOUT RESUME: FREE_THROW resume could not find shooter_id={shooter_id} in rosters")
         
         # ✅ CRITICAL FIX: Restore offense team from timeout_offense_team_id
         # This ensures the correct team has possession after timeout (e.g., if user called timeout during BIP)
@@ -1582,30 +1582,30 @@ try:
             if saved_offense_team_id == gm.home_team.team_id:
                 gm.offense_team = gm.home_team
                 gm.defense_team = gm.away_team
-                logging.info(f"🔄 TIMEOUT RESUME: Set offense_team to HOME ({gm.home_team.name}) based on timeout_offense_team_id")
+                logging.debug(f"🔄 TIMEOUT RESUME: Set offense_team to HOME ({gm.home_team.name}) based on timeout_offense_team_id")
             elif saved_offense_team_id == gm.away_team.team_id:
                 gm.offense_team = gm.away_team
                 gm.defense_team = gm.home_team
-                logging.info(f"🔄 TIMEOUT RESUME: Set offense_team to AWAY ({gm.away_team.name}) based on timeout_offense_team_id")
+                logging.debug(f"🔄 TIMEOUT RESUME: Set offense_team to AWAY ({gm.away_team.name}) based on timeout_offense_team_id")
             else:
-                logging.warning(f"⚠️ TIMEOUT RESUME: timeout_offense_team_id ({saved_offense_team_id}) does not match home_team_id ({gm.home_team.team_id}) or away_team_id ({gm.away_team.team_id}) - possession may be incorrect")
+                logging.debug(f"⚠️ TIMEOUT RESUME: timeout_offense_team_id ({saved_offense_team_id}) does not match home_team_id ({gm.home_team.team_id}) or away_team_id ({gm.away_team.team_id}) - possession may be incorrect")
         
         # Restore clock and time (critical for timeout resume)
         if "clock" in saved:
             gm.game_state["clock"] = saved["clock"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored clock={saved['clock']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored clock={saved['clock']} from saved document")
         
         if "time_remaining" in saved:
             gm.game_state["time_remaining"] = saved["time_remaining"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored time_remaining={saved['time_remaining']} from saved document")
         if "shot_clock_remaining" in saved:
             gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored shot_clock_remaining={saved['shot_clock_remaining']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored shot_clock_remaining={saved['shot_clock_remaining']} from saved document")
         
         # ✅ COMPUTER TIMEOUT: Restore per-quarter count and checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
         if "computer_timeouts" in saved and saved["computer_timeouts"]:
             gm.game_state["computer_timeouts"] = deserialize_computer_timeouts(saved["computer_timeouts"])
-            logging.info(f"🔄 TIMEOUT RESUME: Restored computer_timeouts from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored computer_timeouts from saved document")
         # ✅ MAN DEFENSE MATCHUPS: Restore user and computer matchups (computer defaults if missing)
         from BackEnd.utils.man_defense_matchups import get_default_matchups, USER_MATCHUPS_KEY, COMPUTER_MATCHUPS_KEY
         if USER_MATCHUPS_KEY in saved:
@@ -1640,7 +1640,7 @@ try:
             for team_name, score_value in saved["score"].items():
                 if team_name in gm.score:
                     gm.score[team_name] = score_value
-                    logging.info(f"🔄 TIMEOUT RESUME: Restored score {team_name}={score_value} from saved document")
+                    logging.debug(f"🔄 TIMEOUT RESUME: Restored score {team_name}={score_value} from saved document")
         
         # ✅ CRITICAL FIX: Restore team fouls and timeouts from saved document
         # Check unified teams structure first, then fall back to old structure
@@ -1660,20 +1660,20 @@ try:
         
         if "team_fouls" in home_team_data:
             gm.home_team.team_fouls = home_team_data["team_fouls"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored home team_fouls={home_team_data['team_fouls']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored home team_fouls={home_team_data['team_fouls']} from saved document")
         
         if "team_fouls" in away_team_data:
             gm.away_team.team_fouls = away_team_data["team_fouls"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored away team_fouls={away_team_data['team_fouls']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored away team_fouls={away_team_data['team_fouls']} from saved document")
         
         # ✅ CRITICAL FIX: Restore team timeouts from saved document (unified structure support)
         if "timeouts" in home_team_data:
             gm.home_team.timeouts = home_team_data["timeouts"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored home timeouts={home_team_data['timeouts']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored home timeouts={home_team_data['timeouts']} from saved document")
         
         if "timeouts" in away_team_data:
             gm.away_team.timeouts = away_team_data["timeouts"]
-            logging.info(f"🔄 TIMEOUT RESUME: Restored away timeouts={away_team_data['timeouts']} from saved document")
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored away timeouts={away_team_data['timeouts']} from saved document")
     
     # 4. Routes
     @app.get("/")
@@ -2918,7 +2918,7 @@ try:
                     "quarter": body.quarter,
                 },
             )
-        logging.warning(
+        logging.debug(
             "🧭 [TIMEOUT TRACE] simulate-quarter entry trace_id=%s raw_game_id=%s normalized_game_id=%s resume_from_timeout=%s requested_quarter=%s",
             entry_trace_id,
             raw_game_id,
@@ -3184,7 +3184,7 @@ try:
                 saved_quarter = timeout_saved_state.get("quarter", 0)
                 timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
                 saved_trace_id = timeout_saved_state.get("timeout_trace_id")
-                logging.warning(
+                logging.debug(
                     "🧭 [TIMEOUT TRACE] simulate-quarter loaded-timeout trace_id=%s game_id=%s saved_quarter=%s saved_clock=%s saved_time_remaining=%s saved_next_play=%s",
                     saved_trace_id or entry_trace_id,
                     game_id,
@@ -3195,29 +3195,29 @@ try:
                 )
                 
                 if body.resume_from_timeout and timeout_next_play_type and saved_quarter == body.quarter:
-                    logging.info(f"✅ TIMEOUT RESUME: Found valid timeout state in DB, timeout_next_play_type={timeout_next_play_type}, quarter={saved_quarter}")
+                    logging.debug(f"✅ TIMEOUT RESUME: Found valid timeout state in DB, timeout_next_play_type={timeout_next_play_type}, quarter={saved_quarter}")
                     # body.resume_from_timeout already True from client
                     # ✅ CRITICAL FIX: Always force reload from DB when resuming from timeout
                     # This ensures we use the latest saved state, not stale in-memory state
                     # This fixes the bug where computer timeout → user timeout shows stale data
                     if gm is not None:
-                        logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
+                        logging.debug(f"🔍 TIMEOUT RESUME: Game in memory, but forcing DB reload to ensure latest state (game_id={game_id})")
                         logging.warning(f"🔄 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='Timeout resume - forcing DB reload'")
                         _drop_cached_game()
                         gm = None  # Force reload from DB
-                    logging.info(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
+                    logging.debug(f"🔍 TIMEOUT RESUME: Will load fresh game from DB and apply timeout state")
                 elif body.resume_from_timeout and timeout_next_play_type and saved_quarter != body.quarter:
                     # Timeout resume requested with quarter mismatch: use saved quarter as source of truth.
-                    logging.warning(
+                    logging.debug(
                         "⚠️ TIMEOUT RESUME: Quarter mismatch (requested=%s, saved=%s) - using saved quarter and treating as timeout resume (game_id=%s)",
                         body.quarter, saved_quarter, game_id,
                     )
                     body.quarter = saved_quarter
                     if gm is not None:
-                        logging.warning(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
+                        logging.debug(f"🔍 TIMEOUT RESUME: Game in memory, forcing DB reload (game_id={game_id})")
                         _drop_cached_game()
                         gm = None
-                    logging.info(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
+                    logging.debug(f"✅ TIMEOUT RESUME: Corrected body.quarter to %s, resume_from_timeout=True", saved_quarter)
                 else:
                     # Non-resume requests (or missing next_play_type): ignore timeout state for this request.
                     # Do not mutate DB timeout fields here; timeout state is cleared after a successful resume.
@@ -3233,7 +3233,7 @@ try:
                         body.resume_from_timeout = False
             else:
                 if body.resume_from_timeout:
-                    logging.warning(f"⚠️ TIMEOUT RESUME: URL has resume_from_timeout=true but no timeout state found in DB for game_id={game_id} - treating as normal quarter start")
+                    logging.debug(f"⚠️ TIMEOUT RESUME: URL has resume_from_timeout=true but no timeout state found in DB for game_id={game_id} - treating as normal quarter start")
                     # ✅ QUARTER BREAK: Clear resume_from_timeout flag if no timeout state in DB
                     # This handles cases where resume_from_timeout was incorrectly preserved across quarter boundaries
                     body.resume_from_timeout = False
@@ -3466,9 +3466,9 @@ try:
                                 logging.warning(f"✅ Restored user_team_side from preserved in-memory value: {preserved_user_team_side}")
                             elif body.user_team_side:
                                 gm.game_state["user_team_side"] = body.user_team_side
-                                logging.warning(f"✅ Set user_team_side from request: {body.user_team_side}")
+                                logging.debug(f"✅ Set user_team_side from request: {body.user_team_side}")
                             else:
-                                logging.warning(f"⚠️ No user_team_side found in DB, preserved memory, or request - override checking will not work!")
+                                logging.debug(f"⚠️ No user_team_side found in DB, preserved memory, or request - override checking will not work!")
                             
                             # 🔍 DEBUG: Log offense_play_type in saved state (if present)
                             if "offense_play_type" in saved:
@@ -3694,9 +3694,9 @@ try:
                                     apply_timeout_resume_state_to_gm(gm, saved)  # Use full saved document
                                     # Override body.resume_from_timeout to ensure simulate_quarter() handles timeout resume
                                     body.resume_from_timeout = True
-                                    logging.info(f"✅ TIMEOUT RESUME: Applied timeout state from full saved document (quarter matches), setting resume_from_timeout=True for simulate_quarter()")
+                                    logging.debug(f"✅ TIMEOUT RESUME: Applied timeout state from full saved document (quarter matches), setting resume_from_timeout=True for simulate_quarter()")
                                 else:
-                                    logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter})")
+                                    logging.debug(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={body.quarter})")
                                     timeout_saved_state = None  # Clear invalid timeout state
                             else:
                                 # ✅ FIX: Don't restore time_remaining when starting a new quarter
@@ -3893,9 +3893,9 @@ try:
                             gm.game_state["user_team_side"] = body.user_team_side
                             logging.warning(f"✅ [NEW GAME] Set user_team_side in game_state: {body.user_team_side}")
                         elif gm.game_state.get("user_team_side"):
-                            logging.warning(f"✅ [NEW GAME] user_team_side already set in game_state: {gm.game_state.get('user_team_side')}")
+                            logging.debug(f"✅ [NEW GAME] user_team_side already set in game_state: {gm.game_state.get('user_team_side')}")
                         else:
-                            logging.warning(f"⚠️ [NEW GAME] No user_team_side set! body.user_team_side={body.user_team_side}")
+                            logging.debug(f"⚠️ [NEW GAME] No user_team_side set! body.user_team_side={body.user_team_side}")
                         
                         logging.warning(f"🔧 [STRATEGY SETTINGS] AFTER GAMEMANAGER (NEW)")
                         logging.warning(f"   - Home: HCT={gm.home_team.strategy_settings.get('hc_trap', 'MISSING')}, FCP={gm.home_team.strategy_settings.get('fc_press', 'MISSING')}")
@@ -4532,7 +4532,7 @@ try:
             turn_by_turn_mode = not body.full_sim
             logging.info(f"🎮 simulate_quarter_endpoint: full_sim={body.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={body.quarter}, resume_from_timeout={body.resume_from_timeout}")
             if gm is not None:
-                logging.warning(
+                logging.debug(
                     "🧭 [TIMEOUT TRACE] simulate-quarter pre-sim trace_id=%s game_id=%s gm_quarter=%s gm_clock=%s gm_time_remaining=%s",
                     gm.game_state.get("timeout_trace_id") or entry_trace_id,
                     game_id,
@@ -4828,7 +4828,7 @@ try:
         # Return frontend summary WITH animations for real-time play
         turns = frontend_summary.get("turns", [])
         first_turn = turns[0] if turns else {}
-        logging.warning(
+        logging.debug(
             "🧭 [TIMEOUT TRACE] simulate-quarter response trace_id=%s game_id=%s response_clock=%s response_time_remaining=%s first_turn_clock=%s first_turn_time_remaining=%s first_turn_type=%s",
             frontend_summary.get("timeout_trace_id") or (gm.game_state.get("timeout_trace_id") if gm else None) or entry_trace_id,
             game_id,
@@ -4843,10 +4843,10 @@ try:
         # simulate_quarter() already created the SIP turn and added it to gm.turns when resume_from_timeout=True
         # We should return it just like we return BIP turns for quarter breaks
         if body.resume_from_timeout:
-            logging.info(f"✅ TIMEOUT RESUME: Returning turns from simulate_quarter() (turns count: {len(turns)})")
+            logging.debug(f"✅ TIMEOUT RESUME: Returning turns from simulate_quarter() (turns count: {len(turns)})")
             if turns:
                 first_turn = turns[0]
-                logging.info(f"✅ TIMEOUT RESUME: First turn result_type={first_turn.get('result_type')}, current_turn={first_turn.get('current_turn')}, quarter={first_turn.get('quarter')}")
+                logging.debug(f"✅ TIMEOUT RESUME: First turn result_type={first_turn.get('result_type')}, current_turn={first_turn.get('current_turn')}, quarter={first_turn.get('quarter')}")
             else:
                 timeout_resume_next_play_type = None
                 if isinstance(timeout_saved_state, dict):
@@ -4857,12 +4857,12 @@ try:
                 if timeout_resume_next_play_type == "SIDE_INBOUND":
                     logging.error("🚨 TIMEOUT RESUME: No turns returned for SIDE_INBOUND resume; expected immediate SIP turn from simulate_quarter()")
                 elif timeout_resume_next_play_type in {"FREE_THROW", "BASELINE_INBOUND"}:
-                    logging.info(
+                    logging.debug(
                         "✅ TIMEOUT RESUME: No immediate turns returned for %s resume (expected; first turn is created on /api/simulate-turn)",
                         timeout_resume_next_play_type,
                     )
                 else:
-                    logging.warning(
+                    logging.debug(
                         "⚠️ TIMEOUT RESUME: No turns returned and timeout_next_play_type is unknown/missing (%s)",
                         timeout_resume_next_play_type,
                     )
@@ -5435,7 +5435,7 @@ try:
                 latest_turn_type = latest_turn.get("result_type") if isinstance(latest_turn, dict) else None
                 latest_turn_next = latest_turn.get("next_play_type") if isinstance(latest_turn, dict) else None
                 latest_turn_elapsed = latest_turn.get("time_elapsed") if isinstance(latest_turn, dict) else None
-                logging.warning(
+                logging.debug(
                     "🧭 [ZERO CLOCK TRACE] simulate-turn post-turn game_id=%s quarter=%s time_before=%s time_after=%s shot_after=%s latest_turn_type=%s latest_turn_next=%s latest_turn_elapsed=%s pending_terminal_ft=%s quarter_complete=%s",
                     game_id,
                     gm.quarter,
@@ -5886,7 +5886,7 @@ try:
         if request.timeout_trace_id:
             gm.game_state["timeout_trace_id"] = request.timeout_trace_id
 
-        logging.warning(
+        logging.debug(
             "🧭 [TIMEOUT TRACE] click-capture trace_id=%s game_id=%s backend_clock=%s backend_time=%s displayed_clock=%s displayed_time=%s effective_time=%s backend_shot=%s displayed_shot=%s effective_shot=%s",
             gm.game_state.get("timeout_trace_id") or request.timeout_trace_id,
             game_id,
@@ -6947,9 +6947,9 @@ try:
         # This ensures is_user_team flags persist across game loads
         if user_team_side:
             gm.game_state["user_team_side"] = user_team_side
-            logging.warning(f"✅ [INIT-GAME] Set user_team_side in game_state: {user_team_side}")
+            logging.debug(f"✅ [INIT-GAME] Set user_team_side in game_state: {user_team_side}")
         else:
-            logging.warning(f"⚠️ [INIT-GAME] No user_team_side provided - override checking will not work!")
+            logging.debug(f"⚠️ [INIT-GAME] No user_team_side provided - override checking will not work!")
         
         # Initialize game stats (this randomizes EM, CH, MO for all players)
         stats_start = time.time()
@@ -7092,7 +7092,7 @@ try:
                         if user_team_id_in_game:
                             if master_playbook:
                                 summary["teams"][user_team_id_in_game]["playbook_settings"] = master_playbook.copy()
-                                logging.warning(f"✅ [PHASE 5.7] Copied playbook_settings from tournament master to game doc for team {user_team_id_in_game}")
+                                logging.debug(f"✅ [PHASE 5.7] Copied playbook_settings from tournament master to game doc for team {user_team_id_in_game}")
                                 # ✅ FIX: Apply to GameManager so settings are available during gameplay (prevents 37 DB lookups per quarter)
                                 if user_team_id_in_game == home_team_id:
                                     gm.home_team.playbook_settings = dict(master_playbook) if master_playbook else {}
@@ -7100,14 +7100,14 @@ try:
                                     gm.away_team.playbook_settings = dict(master_playbook) if master_playbook else {}
                             if master_strategy:
                                 summary["teams"][user_team_id_in_game]["strategy_settings"] = master_strategy.copy()
-                                logging.warning(f"✅ [PHASE 5.7] Copied strategy_settings from tournament master to game doc for team {user_team_id_in_game}")
+                                logging.debug(f"✅ [PHASE 5.7] Copied strategy_settings from tournament master to game doc for team {user_team_id_in_game}")
                                 # ✅ FIX: Apply to GameManager so settings are available during gameplay
                                 if user_team_id_in_game == home_team_id:
                                     gm.home_team.strategy_settings = dict(master_strategy) if master_strategy else {}
                                 elif user_team_id_in_game == away_team_id:
                                     gm.away_team.strategy_settings = dict(master_strategy) if master_strategy else {}
             except Exception as e:
-                logging.warning(f"⚠️ [PHASE 5.7] Error copying settings from tournament master: {e}")
+                logging.debug(f"⚠️ [PHASE 5.7] Error copying settings from tournament master: {e}")
         summary_time = (time.time() - summary_start) * 1000
         
         # Set GameManager quarter to 1 to match

@@ -302,11 +302,11 @@ def extract_team_settings(
         
         # 🔍 DEBUG: Log available keys in teams object
         available_keys = list(teams_obj.keys()) if teams_obj else []
-        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Available team keys in saved_doc: {available_keys}")
-        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Looking for team_identifier='{team_identifier}', settings_type='{settings_type}', mode='{mode}'")
+        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Available team keys in saved_doc: {available_keys}")
+        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Looking for team_identifier='{team_identifier}', settings_type='{settings_type}', mode='{mode}'")
         
         if not teams_obj:
-            logger.warning(f"⚠️ [EXTRACT-TEAM-SETTINGS] No teams object found in saved document")
+            logger.debug(f"⚠️ [EXTRACT-TEAM-SETTINGS] No teams object found in saved document")
             return None
         
         # Resolve team_id to canonical format (same logic as save)
@@ -316,36 +316,36 @@ def extract_team_settings(
             # Use normalize_team_id_to_canonical for single mode
             if game_doc:
                 actual_team_id = normalize_team_id_to_canonical(team_identifier, mode, game_doc)
-                logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Resolved via normalize_team_id_to_canonical: '{team_identifier}' → '{actual_team_id}'")
+                logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Resolved via normalize_team_id_to_canonical: '{team_identifier}' → '{actual_team_id}'")
             else:
                 # Fallback: try direct lookup, then name matching
                 if team_identifier in teams_obj:
                     actual_team_id = team_identifier
-                    logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Direct lookup found: '{team_identifier}'")
+                    logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Direct lookup found: '{team_identifier}'")
                 else:
                     # Try name matching
                     for tid, team_data in teams_obj.items():
                         if team_data.get("name") == team_identifier:
                             actual_team_id = tid
-                            logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Name match found: '{team_identifier}' → '{tid}'")
+                            logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Name match found: '{team_identifier}' → '{tid}'")
                             break
         else:
             # For franchise/tournament, try direct lookup first
             if team_identifier in teams_obj:
                 actual_team_id = team_identifier
-                logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Direct lookup found: '{team_identifier}'")
+                logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Direct lookup found: '{team_identifier}'")
             else:
                 # Try name matching
                 for tid, team_data in teams_obj.items():
                     if team_data.get("name") == team_identifier:
                         actual_team_id = tid
-                        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Name match found: '{team_identifier}' → '{tid}'")
+                        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Name match found: '{team_identifier}' → '{tid}'")
                         break
         
         if not actual_team_id:
-            logger.warning(f"⚠️ [EXTRACT-TEAM-SETTINGS] Could not resolve team_id for '{team_identifier}'")
-            logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Available keys: {available_keys}")
-            logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Team names in teams_obj: {[team_data.get('name') for team_data in teams_obj.values()]}")
+            logger.debug(f"⚠️ [EXTRACT-TEAM-SETTINGS] Could not resolve team_id for '{team_identifier}'")
+            logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Available keys: {available_keys}")
+            logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Team names in teams_obj: {[team_data.get('name') for team_data in teams_obj.values()]}")
             return None
         
         # Extract settings
@@ -353,21 +353,21 @@ def extract_team_settings(
         settings = team_data.get(settings_type)
         
         # 🔍 DEBUG: Log extraction result
-        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] Lookup result:")
-        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS]   actual_team_id = '{actual_team_id}'")
-        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS]   team_data exists: {bool(team_data)}")
-        logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS]   {settings_type} exists: {bool(settings)}")
+        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] Lookup result:")
+        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS]   actual_team_id = '{actual_team_id}'")
+        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS]   team_data exists: {bool(team_data)}")
+        logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS]   {settings_type} exists: {bool(settings)}")
         if settings:
             if settings_type == "playbook_settings":
                 slot_count = len(settings.get("slot_assignments", {}))
-                logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS]   playbook_settings slot_assignments count: {slot_count}")
+                logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS]   playbook_settings slot_assignments count: {slot_count}")
         
         if settings:
-            logger.info(f"✅ [EXTRACT-TEAM-SETTINGS] Found {settings_type} for team_id={actual_team_id}")
+            logger.debug(f"✅ [EXTRACT-TEAM-SETTINGS] Found {settings_type} for team_id={actual_team_id}")
             return settings
         else:
-            logger.warning(f"⚠️ [EXTRACT-TEAM-SETTINGS] No {settings_type} found for team_id={actual_team_id}")
-            logger.warning(f"🔍 [EXTRACT-TEAM-SETTINGS] team_data keys: {list(team_data.keys()) if team_data else 'NO_TEAM_DATA'}")
+            logger.debug(f"⚠️ [EXTRACT-TEAM-SETTINGS] No {settings_type} found for team_id={actual_team_id}")
+            logger.debug(f"🔍 [EXTRACT-TEAM-SETTINGS] team_data keys: {list(team_data.keys()) if team_data else 'NO_TEAM_DATA'}")
             return None
     
     except Exception as e:

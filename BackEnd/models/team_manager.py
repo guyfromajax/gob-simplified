@@ -319,7 +319,7 @@ class TeamManager:
         scouting_time = (time.time() - scouting_start) * 1000
 
         import logging
-        logging.warning(
+        logging.debug(
             "⏱️ [PERF] TeamManager(%s): roster=%.0fms lineup=%.0fms team_doc=%.0fms scouting=%.0fms",
             name, roster_time, lineup_time, team_doc_time, scouting_time,
         )

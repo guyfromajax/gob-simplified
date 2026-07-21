@@ -67,9 +67,9 @@ class GameManager:
             self.game_state["user_team_side"] = user_team_side
             logging.warning(f"✅ [GAME MANAGER] Set user_team_side in game_state: {user_team_side}")
             # logging.warning(f"   - Home team: {self.home_team.name} (team_id: {self.home_team.team_id}, is_home_team: {self.home_team.is_home_team})")
-            # logging.warning(f"   - Away team: {self.away_team.name} (team_id: {self.away_team.team_id}, is_home_team: {self.away_team.is_home_team})")
+            # logging.debug(f"   - Away team: {self.away_team.name} (team_id: {self.away_team.team_id}, is_home_team: {self.away_team.is_home_team})")
         else:
-            logging.warning(f"⚠️ [GAME MANAGER] No user_team_side provided - override checking will not work!")
+            logging.debug(f"⚠️ [GAME MANAGER] No user_team_side provided - override checking will not work!")
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)
@@ -1321,7 +1321,7 @@ class GameManager:
             logging.warning(
                 "⚠️ FOUL OUT: Attached placeholder foul_out_player so frontend always receives one (result had fouled_out=True but no usable data)"
             )
-        logging.warning(
+        logging.debug(
             "⏸️ FOUL OUT TIMEOUT: Created timeout turn for foul out - %s (game_id=%s)",
             foul_out_player_data.get("name", "Unknown"),
             self.game_id,
@@ -1359,7 +1359,7 @@ class GameManager:
                             result2.matched_count, result2.modified_count,
                         )
                         if result2.matched_count > 0:
-                            logging.warning(
+                            logging.debug(
                                 "⚠️ FOUL OUT TIMEOUT: Initial update matched 0 documents; retried with ObjectId and matched %s",
                                 result2.matched_count,
                             )
@@ -1371,7 +1371,7 @@ class GameManager:
                         "return to court may reset / data loss possible",
                         self.game_id,
                     )
-                logging.warning(
+                logging.debug(
                     "💾 FOUL OUT TIMEOUT: Saved game state immediately: game_id=%s, quarter=%s, clock=%s, next_play_type=%s",
                     self.game_id,
                     db_summary.get("quarter"),
@@ -1383,7 +1383,7 @@ class GameManager:
                     "🚨 FOUL OUT TIMEOUT: Exception during save - data loss on return to court possible: %s", e
                 )
         else:
-            logging.warning(
+            logging.debug(
                 "⚠️ FOUL OUT TIMEOUT: Skipped save - game_id is missing (game_id=%s)",
                 self.game_id,
             )

@@ -1277,7 +1277,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                     rr_result["animation_steps"] = anim_steps
                 else:
                     # The emitter logs its own 🚨 [TRIANGLE EMITTER NULL] guard line.
-                    logging.warning(
+                    logging.debug(
                         "🚨 [TRIANGLE EMITTER NULL CONSEQUENCE] result_type=%s "
                         "next_play_type=%s — animation_steps not set, FE → LEGACY",
                         rr_result.get("result_type"),
@@ -7393,7 +7393,7 @@ def resolve_half_court_offense_logic(game):
                 _drv_id = getattr(off_lineup.get(_drv_pos), "player_id", None) if _drv_pos else None
                 stamp_foul_contact_rattle(
                     _dsteps[_dc_pin], [_walk.get("drive_contact_defender_id"), _drv_id])
-                logging.warning("💥 [DRIVE CONTACT] %s → %s (pin=%s def=%s driver=%s)",
+                logging.debug("💥 [DRIVE CONTACT] %s → %s (pin=%s def=%s driver=%s)",
                                 _walk["drive_contact"], result, _dc_pin,
                                 _walk.get("drive_contact_defender_id"), _drv_id)
             else:

@@ -1114,7 +1114,7 @@ def build_attack_drive_sequence(
             drive_tier, drive_stop_fraction, drive_contact = _cut_tier, _cut_frac, _cut_contact
             bh_defender_pos = _cut_pos  # cutoff defender now walls the ball (S2d) / credits contact (S2b)
             drive_offense_wins = drive_tier == "A"
-            logging.warning(
+            logging.debug(
                 "🚧 [HELP CUTOFF] %s cuts off blow-by → tier %s stop=%.2f contact=%s meet=%s",
                 _cut_pos, drive_tier, drive_stop_fraction, _cut_contact, _cut_meet)
 

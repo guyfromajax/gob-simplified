@@ -696,7 +696,7 @@ def build_triangle_animation_steps(
             "fast_break_play_mismatch",
             detail=str(turn_result.get("fast_break_play")),
         )
-        logging.warning(
+        logging.debug(
             "🚨 [TRIANGLE EMITTER NULL] guard=fast_break_play_mismatch "
             "fast_break_play=%s result_type=%s — FE will fall to LEGACY_HANDLER",
             turn_result.get("fast_break_play"), turn_result.get("result_type"),
@@ -715,7 +715,7 @@ def build_triangle_animation_steps(
             "missing_burst_phase",
             detail=str(list(fb_roles.keys()) if isinstance(fb_roles, dict) else None),
         )
-        logging.warning(
+        logging.debug(
             "🚨 [TRIANGLE EMITTER NULL] guard=missing_burst_phase result_type=%s "
             "fb_roles_keys=%s — FE will fall to LEGACY_HANDLER",
             turn_result.get("result_type"),
@@ -734,7 +734,7 @@ def build_triangle_animation_steps(
     all_start_coords = _all_player_start_coords(off_lineup, def_lineup)
     if not all_start_coords:
         mark_fb_emitter_fallback(turn_result, "triangle", "empty_start_coords")
-        logging.warning(
+        logging.debug(
             "🚨 [TRIANGLE EMITTER NULL] guard=empty_start_coords result_type=%s "
             "— FE will fall to LEGACY_HANDLER",
             turn_result.get("result_type"),

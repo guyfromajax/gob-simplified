@@ -502,7 +502,7 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
         elif mode == "tournament":
             return tournaments_collection, tournament_id, False
     except Exception as e:
-        logger.warning(f"⚠️ [PHASE 5.7] Error checking game status, defaulting to master save: {e}")
+        logger.debug(f"⚠️ [PHASE 5.7] Error checking game status, defaulting to master save: {e}")
         # On error, default to master save
         if mode == "franchise":
             return franchises_collection, franchise_id, False

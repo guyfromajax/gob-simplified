@@ -34,7 +34,7 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
 
         # ✅ FRANCHISE MODE: If franchise_id provided, load from FPD (franchise_players_data)
         if franchise_id:
-            logger.warning(f"🔍 [ROSTER LOADER DEBUG] franchise_id={franchise_id}, team_name={team_name}")
+            logger.debug(f"🔍 [ROSTER LOADER DEBUG] franchise_id={franchise_id}, team_name={team_name}")
             try:
                 team_object_id = team_doc.get("_id")
                 ftd_doc = franchise_team_data_collection.find_one(
@@ -118,11 +118,11 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             logger.error(f"❌ [ROSTER LOADER] Traceback: {traceback.format_exc()}")
                             continue
 
-                    logger.warning(f"🔍 [ROSTER LOADER DEBUG] Loop completed. Returning {len(players)} players from FPD")
+                    logger.debug(f"🔍 [ROSTER LOADER DEBUG] Loop completed. Returning {len(players)} players from FPD")
                     if players:
                         total_time = (time.time() - total_start) * 1000
-                        # logger.warning(f"⏱️ [DB TIMING] _load_from_db TOTAL for {team_name} (franchise path): {total_time:.2f}ms")
-                        logger.warning(f"🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning {len(players)} franchise players")
+                        # logger.debug(f"⏱️ [DB TIMING] _load_from_db TOTAL for {team_name} (franchise path): {total_time:.2f}ms")
+                        logger.debug(f"🔍 [ROSTER LOADER DEBUG] ✅ SUCCESS: Returning {len(players)} franchise players")
                         return team_doc, players
                     else:
                         logger.error(f"❌ [ROSTER LOADER] Loop completed but players list is empty! This should not happen.")

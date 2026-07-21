@@ -2505,7 +2505,7 @@ class TurnManager:
         result["player_energy"] = player_energy
         
         if low_clock_branch:
-            logging.warning(
+            logging.debug(
                 "🧭 [ZERO CLOCK TRACE] run_micro_turn branch=%s state=%s game_clock_remaining=%s shot_clock_remaining=%s result_type=%s next_play_type=%s next_turn=%s",
                 low_clock_branch,
                 state,
@@ -2516,7 +2516,7 @@ class TurnManager:
                 result.get("next_turn") if isinstance(result, dict) else None,
             )
         elif state in clock_enforced_states and (game_clock_remaining <= 2 or shot_clock_remaining <= 2):
-            logging.warning(
+            logging.debug(
                 "🧭 [ZERO CLOCK TRACE] run_micro_turn near-zero NO_BRANCH state=%s game_clock_remaining=%s shot_clock_remaining=%s",
                 state,
                 game_clock_remaining,
@@ -5869,7 +5869,7 @@ class TurnManager:
             self.logger.log(
                 f"ptsReconcile:{team.name}:{total_pts}->{team_score}:diff={diff}"
             )
-            logging.warning(
+            logging.debug(
                 "Player PTS sum (%s) != team score (%s) for %s (diff=%s); "
                 "PTS left derived from shooting stats — investigate scoring path",
                 total_pts,

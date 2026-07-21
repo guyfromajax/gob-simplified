@@ -3665,7 +3665,7 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
         isinstance(turn_result.get("animation_steps"), list)
         and turn_result.get("animation_steps")
     ):
-        logging.warning(
+        logging.debug(
             "🚨 [FB FINAL_COORDS FALLBACK] fast_break_play=%s result_type=%s "
             "next_play_type=%s — next turn seeded from legacy animations[] "
             "(no animation_steps)",
