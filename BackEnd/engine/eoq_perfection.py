@@ -409,6 +409,14 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     is_home_off = _is_home_offense(game)
 
     ball_handler = game_state.get("last_ball_handler")
+    # last_ball_handler holds whoever LAST touched the ball. At an end-of-quarter
+    # possession flip (rebound / steal / inbound → new offense) it can still be the
+    # prior handler — now a DEFENDER. Using it as the FLSS shooter credits the made
+    # basket's FGM/PTS to the wrong team's player while the points go to the current
+    # offense, which is the player-PTS-vs-team-score ±2 mismatch. Only keep it if it
+    # is actually on the current offense (get_player_position is falsy otherwise).
+    if ball_handler is not None and not get_player_position(off_lineup, ball_handler):
+        ball_handler = None
     if not ball_handler:
         ball_handler = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
     if not ball_handler:
