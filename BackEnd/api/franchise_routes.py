@@ -3536,6 +3536,19 @@ def _franchise_cpu_use_pool() -> bool:
     return os.environ.get("FRANCHISE_CPU_SIM_USE_POOL", "0") in ("1", "true", "True")
 
 
+def _franchise_all_games_full_sim() -> bool:
+    """Sunset Distant Sim: route EVERY regular-season CPU game to full Turn-by-Turn.
+
+    FLAG — DEFAULTS OFF, so the deploy is behavior-neutral. When on
+    (FRANCHISE_ALL_GAMES_FULL_SIM=1), the is_distant decision is forced False for
+    regular-season games (EOS already forces full sim), AND the full-sim path
+    applies the post-game momentum update that the distant path used to own — so
+    momentum keeps being game-driven for all teams. Flip to 0 to revert instantly,
+    no deploy. Pair with FRANCHISE_CPU_SIM_USE_POOL=1 so 63 full games stay fast.
+    """
+    return os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM", "0") in ("1", "true", "True")
+
+
 def _utc_now_iso() -> str:
     return datetime.utcnow().isoformat() + "Z"
 
@@ -6012,6 +6025,10 @@ def _complete_week_finish_cpu_and_persist(
             home_ftd = ftd_by_team_id.get(str(home_id), {})
             if distant_sim_should_promote_ranked_fullsim(away_ftd, home_ftd):
                 is_distant = False
+        # Distant Sim sunset (flag, default OFF): route every remaining regular-season
+        # game to full Turn-by-Turn. Momentum is preserved by the full-sim path below.
+        if is_distant and _franchise_all_games_full_sim():
+            is_distant = False
         if is_distant:
             cpu_job = _persist_cpu_sim_job(
                 franchise_id,
@@ -6337,6 +6354,27 @@ def _complete_week_finish_cpu_and_persist(
                 week=week,
             )
             winner_oid = hid if home_score > away_score else aid
+            # Distant Sim sunset: momentum was game-driven via the distant path. When
+            # all games are full-sim, apply that same (RNG-free, win/loss-driven)
+            # momentum + streak update here so it stays game-driven for every team.
+            # Reuses the existing engine-agnostic helper; momentum is output-only
+            # (the sim never reads it), so post-game application is safe. Wrapped so a
+            # momentum error can never fail the week. Regular season only — EOS/tourney
+            # games (week_games_meta present) don't carry season momentum streaks.
+            if _franchise_all_games_full_sim() and week not in ft.EOS_WEEKS:
+                loser_oid = aid if home_score > away_score else hid
+                try:
+                    _distant_sim_persist_momentum_score_updates(
+                        franchise_id,
+                        winner_team_object_id=winner_oid,
+                        loser_team_object_id=loser_oid,
+                        ftd_cache=ftd_by_team_id,
+                    )
+                except Exception:
+                    logger.exception(
+                        "[CPU-WEEK] momentum update failed franchise_id=%s week=%s winner=%s loser=%s",
+                        franchise_id_str, week, str(winner_oid), str(loser_oid),
+                    )
             sim_eos_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
             _award_gp_sim(winner_oid, sim_eos_g, (aid, hid))
             results.append(
