@@ -3518,11 +3518,21 @@ def _order_franchise_week_results_like_schedule(results: list, week_games: list)
 
 
 def _franchise_cpu_full_sim_max_workers() -> int:
-    """Phase 3: cap parallel turn-based CPU sims."""
+    """Phase 3: cap parallel turn-based CPU sims (thread path)."""
     try:
         return max(1, int(os.environ.get("FRANCHISE_CPU_SIM_MAX_WORKERS", "4")))
     except (TypeError, ValueError):
         return 4
+
+
+def _franchise_cpu_use_pool() -> bool:
+    """Phase 3b: use the spawn-based ProcessPoolExecutor for the CPU week.
+
+    KILL SWITCH — DEFAULTS OFF. The thread path stays the default until the pool
+    is exercised on the real FastAPI/uvicorn/Railway spawn path on staging. Enable
+    per-service with FRANCHISE_CPU_SIM_USE_POOL=1 (no code deploy needed to flip).
+    """
+    return os.environ.get("FRANCHISE_CPU_SIM_USE_POOL", "0") in ("1", "true", "True")
 
 
 def _utc_now_iso() -> str:
@@ -6106,29 +6116,58 @@ def _complete_week_finish_cpu_and_persist(
             len(full_jobs),
             max_workers,
         )
-        future_meta = {}
         for sched_idx, aid, hid, an, hn in full_jobs:
             cpu_job = _cpu_sim_mark_matchup_running(cpu_job, aid, hid, engine="cpu_full")
         cpu_job = _persist_cpu_sim_job(franchise_id, week, cpu_job)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for sched_idx, aid, hid, an, hn in full_jobs:
-                fut = executor.submit(
-                    _run_franchise_cpu_full_simulation_core,
-                    franchise_id,
-                    hid,
-                    aid,
-                    hn,
-                    an,
-                )
-                future_meta[fut] = (sched_idx, aid, hid, an, hn)
+
         sim_ok: dict[int, tuple[int, int, dict]] = {}
         sim_err: dict[int, Exception] = {}
-        for fut in as_completed(future_meta):
-            sched_idx, aid, hid, an, hn = future_meta[fut]
-            try:
-                sim_ok[sched_idx] = fut.result()
-            except Exception as ex:
-                sim_err[sched_idx] = ex
+
+        if _franchise_cpu_use_pool():
+            # Phase 3b process-pool path (kill switch on). Same core function, same
+            # (away, home, summary) shape; the pool's failure ladder recovers a dead
+            # worker's games rather than dropping them. seed_base=None keeps
+            # production unseeded, so behavior matches the thread path statistically.
+            from BackEnd.utils.cpu_week_pool import (
+                simulate_cpu_week_pooled,
+                pool_worker_count,
+            )
+            pool_jobs = [
+                (sched_idx, franchise_id, hid, aid, hn, an)
+                for sched_idx, aid, hid, an, hn in full_jobs
+            ]
+            logger.info(
+                "[COMPLETE-WEEK-PHASE3] POOL full CPU sims franchise_id=%s week=%s jobs=%s workers=%s",
+                franchise_id_str, week, len(pool_jobs), pool_worker_count(),
+            )
+            sim_ok, sim_err, _pool_leaks = simulate_cpu_week_pooled(
+                pool_jobs, seed_base=None, max_workers=pool_worker_count()
+            )
+            if _pool_leaks and any(_pool_leaks.values()):
+                logger.error("[COMPLETE-WEEK-PHASE3] pool RNG leak(s): %s", _pool_leaks)
+        else:
+            logger.info(
+                "[COMPLETE-WEEK-PHASE3] THREAD full CPU sims franchise_id=%s week=%s jobs=%s max_workers=%s",
+                franchise_id_str, week, len(full_jobs), max_workers,
+            )
+            future_meta = {}
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for sched_idx, aid, hid, an, hn in full_jobs:
+                    fut = executor.submit(
+                        _run_franchise_cpu_full_simulation_core,
+                        franchise_id,
+                        hid,
+                        aid,
+                        hn,
+                        an,
+                    )
+                    future_meta[fut] = (sched_idx, aid, hid, an, hn)
+            for fut in as_completed(future_meta):
+                sched_idx, aid, hid, an, hn = future_meta[fut]
+                try:
+                    sim_ok[sched_idx] = fut.result()
+                except Exception as ex:
+                    sim_err[sched_idx] = ex
 
         # Collect each full-sim CPU game's shot-diagnostic summary (both teams
         # combined, stamped by summarize_game_state) and stash a slim copy on the
