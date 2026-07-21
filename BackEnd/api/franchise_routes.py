@@ -6184,7 +6184,7 @@ def _complete_week_finish_cpu_and_persist(
         # (persistence follows and is not counted here). When Distant is sunset,
         # full_tbt should climb toward the whole slate and distant toward 0.
         _fullsim_secs = time.time() - _cpu_fullsim_t0
-        logger.info(
+        logger.warning(
             "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s distant=%s | "
             "engine=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
             franchise_id_str, week, len(full_jobs), _cpu_distant_count,
